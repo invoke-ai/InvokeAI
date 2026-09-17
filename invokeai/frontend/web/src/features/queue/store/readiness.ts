@@ -539,9 +539,15 @@ export const getReasonsWhyCannotEnqueueGenerateTab = (arg: {
       const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
       if (!hasQwen3Source) {
         reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
-      } else if (zImageQwen3EncoderConfig && !isZImageQwen3EncoderModelConfig(zImageQwen3EncoderConfig)) {
-        reasons.push({ content: i18n.t('parameters.invoke.zImageQwen3EncoderIncompatible') });
       }
+    }
+    // Deliberately outside the branch above: ZImageModelLoaderInvocation resolves the encoder as
+    // standalone slot -> Qwen3 Source -> self-contained main, so a populated slot wins even when the
+    // main ships its own encoder. Gating this on !mainIsSelfContainedPipeline let a leftover 8B slot
+    // reach an SDNQ pipeline main and fail at the first denoise step with 4096 vs 2560 - issue #9526,
+    // from the one class of main this check is supposed to cover.
+    if (zImageQwen3EncoderConfig && !isZImageQwen3EncoderModelConfig(zImageQwen3EncoderConfig)) {
+      reasons.push({ content: i18n.t('parameters.invoke.zImageQwen3EncoderIncompatible') });
     }
     // PiD decode (Z-Image reuses the FLUX decoder) needs both a PiD decoder and the Gemma-2 caption encoder.
     if (params.pidMode !== 'off') {
@@ -1299,9 +1305,15 @@ export const getReasonsWhyCannotEnqueueCanvasTab = (arg: {
       const hasQwen3Source = params.zImageQwen3EncoderModel !== null || params.zImageQwen3SourceModel !== null;
       if (!hasQwen3Source) {
         reasons.push({ content: i18n.t('parameters.invoke.noZImageQwen3EncoderSourceSelected') });
-      } else if (zImageQwen3EncoderConfig && !isZImageQwen3EncoderModelConfig(zImageQwen3EncoderConfig)) {
-        reasons.push({ content: i18n.t('parameters.invoke.zImageQwen3EncoderIncompatible') });
       }
+    }
+    // Deliberately outside the branch above: ZImageModelLoaderInvocation resolves the encoder as
+    // standalone slot -> Qwen3 Source -> self-contained main, so a populated slot wins even when the
+    // main ships its own encoder. Gating this on !mainIsSelfContainedPipeline let a leftover 8B slot
+    // reach an SDNQ pipeline main and fail at the first denoise step with 4096 vs 2560 - issue #9526,
+    // from the one class of main this check is supposed to cover.
+    if (zImageQwen3EncoderConfig && !isZImageQwen3EncoderModelConfig(zImageQwen3EncoderConfig)) {
+      reasons.push({ content: i18n.t('parameters.invoke.zImageQwen3EncoderIncompatible') });
     }
     // PiD decode on the Canvas: decoder + Gemma-2 encoder required, and "Scale Before Processing" must be off.
     if (params.pidMode !== 'off') {

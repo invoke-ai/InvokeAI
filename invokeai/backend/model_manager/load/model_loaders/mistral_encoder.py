@@ -4,8 +4,13 @@
 FLUX.2 [dev] uses BFL's 30-layer "cow-mistral3-small" distillation as its sole
 text encoder. The diffusers release wraps it in the multimodal
 ``Mistral3ForConditionalGeneration``; standalone single-file safetensors
-(Comfy-Org bf16/fp8/fp4) and GGUF redistributions (gguf-org cow variants) ship
+(Comfy-Org bf16/fp8) and GGUF redistributions (gguf-org cow variants) ship
 only the text tower, which we load as an encoder-only ``MistralModel``.
+
+Comfy-Org's ``*_fp4_mixed`` files are deliberately not listed: FP4 packs two
+values per byte, and the dequantization below multiplies the packed uint8 by the
+scale instead of unpacking the nibbles, so it produces the wrong tensor (and a
+shape mismatch at load - issue #9565). Rejecting them outright is a follow-up.
 
 Both single-file packagings embed the canonical Tekken tokenizer as a U8 tensor
 named ``tekken_model`` (~19 MB). When ``mistral_common`` is installed we use
@@ -346,11 +351,17 @@ def _warn_if_40_layer_mistral(variant: MistralVariantType, logger: Any) -> None:
 
 
 def _drop_quantization_metadata(sd: dict[str, Any], logger, target_dtype: torch.dtype | None = None) -> dict[str, Any]:
-    """Dequantize Comfy-Org-style FP8/FP4 weights and drop their metadata keys.
+    """Dequantize Comfy-Org-style FP8 weights and drop their metadata keys.
 
     Comfy-Org's Mistral FLUX.2 redistributions store quantized weights alongside
     ``*.weight_scale`` (and occasionally ``*.input_scale``) tensors. We apply the
     scale in-place and remove the metadata so transformers can load the result.
+
+    FP8 only. This multiplies the stored weight by its scale, which is correct for
+    one value per byte and wrong for FP4, where a byte holds two packed nibbles
+    that have to be unpacked first - the source of the shape mismatch in #9565.
+    ``*_fp4_mixed`` files are not supported; the starter entry for one was removed
+    rather than left pointing at a 12 GB download that cannot load.
 
     Dequantization runs in fp32 for numerical accuracy, but each result is cast
     back down to ``target_dtype`` immediately (when provided) so the transient peak

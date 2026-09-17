@@ -399,6 +399,88 @@ describe('Z-Image readiness checks – generate tab', () => {
   });
 });
 
+const buildZImageCanvasArg = (overrides: {
+  model?: MainModelConfig | null;
+  zImageQwen3EncoderModel?: unknown;
+  zImageQwen3EncoderConfig?: AnyModelConfig | null;
+}) => ({
+  ...buildCanvasTabArg({}),
+  model: overrides.model ?? zImageGgufModel,
+  params: {
+    ...baseParams,
+    zImageVaeModel: null,
+    zImageQwen3EncoderModel: overrides.zImageQwen3EncoderModel ?? null,
+    zImageQwen3SourceModel: null,
+  } as unknown as ParamsState,
+  zImageQwen3EncoderConfig: overrides.zImageQwen3EncoderConfig ?? null,
+});
+
+describe('Z-Image encoder-slot compatibility is independent of the main model format', () => {
+  // ZImageModelLoaderInvocation resolves the encoder as standalone slot -> Qwen3 Source ->
+  // self-contained main, so a populated slot wins even when the main ships its own encoder. Gating
+  // the compatibility check on "not a self-contained pipeline" let a leftover 8B slot reach an SDNQ
+  // pipeline main and fail at the first denoise step with 4096 vs 2560 - the #9526 crash, from the
+  // one class of main the check is supposed to cover.
+  const encoder8B = { key: 'enc', type: 'qwen3_encoder', variant: 'qwen3_8b' } as AnyModelConfig;
+  const encoder4B = { key: 'enc', type: 'qwen3_encoder', variant: 'qwen3_4b' } as AnyModelConfig;
+
+  it('generate: errors when an 8B encoder slot is set alongside a self-contained SDNQ main', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildZImageTabArg({
+        model: zImageSdnqPipelineModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: encoder8B,
+      })
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(true);
+  });
+
+  it('generate: no error when the slot holds a 4B encoder alongside a self-contained SDNQ main', () => {
+    const reasons = getReasonsWhyCannotEnqueueGenerateTab(
+      buildZImageTabArg({
+        model: zImageSdnqPipelineModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: encoder4B,
+      })
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(false);
+    expect(hasZImageQwen3Reason(reasons)).toBe(false);
+  });
+
+  it('canvas: errors when an 8B encoder slot is set alongside a self-contained SDNQ main', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildZImageCanvasArg({
+        model: zImageSdnqPipelineModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: encoder8B,
+      }) as never
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(true);
+  });
+
+  it('canvas: errors when an 8B encoder slot is set alongside a GGUF main', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildZImageCanvasArg({
+        model: zImageGgufModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: encoder8B,
+      }) as never
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(true);
+  });
+
+  it('canvas: no error when the slot holds a 4B encoder alongside a self-contained SDNQ main', () => {
+    const reasons = getReasonsWhyCannotEnqueueCanvasTab(
+      buildZImageCanvasArg({
+        model: zImageSdnqPipelineModel,
+        zImageQwen3EncoderModel: { key: 'enc' },
+        zImageQwen3EncoderConfig: encoder4B,
+      }) as never
+    );
+    expect(hasZImageQwen3IncompatibleReason(reasons)).toBe(false);
+  });
+});
+
 describe('FLUX.2 Klein readiness checks – canvas tab', () => {
   it('no errors when main model is diffusers', () => {
     const reasons = getReasonsWhyCannotEnqueueCanvasTab(buildCanvasTabArg({ model: flux2DiffusersModel }) as never);
