@@ -67212,7 +67212,7 @@
           "variant"
         ],
         "title": "MistralEncoder_Checkpoint_Config",
-        "description": "Configuration for a single-file Mistral text encoder (safetensors).\n\nAccepts both 30-layer cow (Comfy-Org bf16/fp8/fp4) and 40-layer Mistral Small 3\n(BFL canonical / upstream Mistral 3.x single-files). The loader uses the\ndetected variant to decide whether to keep or strip the final RMSNorm."
+        "description": "Configuration for a single-file Mistral text encoder (safetensors).\n\nAccepts both 30-layer cow (Comfy-Org bf16/fp8) and 40-layer Mistral Small 3\n(BFL canonical / upstream Mistral 3.x single-files). The loader uses the\ndetected variant to decide whether to keep or strip the final RMSNorm."
       },
       "MistralEncoder_Diffusers_Config": {
         "properties": {
