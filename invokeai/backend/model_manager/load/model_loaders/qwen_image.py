@@ -33,6 +33,7 @@ from invokeai.backend.model_manager.taxonomy import (
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, log_unexpected_keys
 
 
 def _remap_qwen_vl_checkpoint_keys(sd: dict) -> dict:
@@ -218,7 +219,9 @@ class QwenImageGGUFCheckpointModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = QwenImageTransformer2DModel(**model_config)
 
-        model.load_state_dict(sd, strict=False, assign=True)
+        load_state_dict_ignoring_extras(
+            model, sd, source="Qwen-Image transformer checkpoint", assign=True, allow_missing=True
+        )
         return model
 
 
@@ -285,7 +288,9 @@ class QwenImageCheckpointModel(ModelLoader):
         new_sd_size = sum(t.nelement() * t.element_size() for t in sd.values())
         self._ram_cache.make_room(new_sd_size)
 
-        model.load_state_dict(sd, strict=False, assign=True)
+        load_state_dict_ignoring_extras(
+            model, sd, source="Qwen-Image transformer checkpoint", assign=True, allow_missing=True
+        )
         return model
 
 
@@ -443,11 +448,7 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
 
         # Load weights; allow missing keys for tied lm_head and re-initialised buffers.
         load_result = model.load_state_dict(sd, strict=False, assign=True)
-        if load_result.unexpected_keys:
-            logger.warning(
-                f"{len(load_result.unexpected_keys)} unexpected keys in checkpoint, "
-                f"first 5: {load_result.unexpected_keys[:5]}"
-            )
+        log_unexpected_keys("Qwen2.5-VL text encoder checkpoint", load_result.unexpected_keys)
 
         # Tie lm_head ↔ embed_tokens if config requires it and lm_head wasn't loaded
         if getattr(qwen_config, "tie_word_embeddings", False):
