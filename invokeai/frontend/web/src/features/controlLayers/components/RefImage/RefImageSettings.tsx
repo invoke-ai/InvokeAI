@@ -7,6 +7,7 @@ import { IPAdapterCLIPVisionModel } from 'features/controlLayers/components/comm
 import { PullBboxIntoRefImageIconButton } from 'features/controlLayers/components/common/PullBboxIntoRefImageIconButton';
 import { Weight } from 'features/controlLayers/components/common/Weight';
 import { IPAdapterMethod } from 'features/controlLayers/components/RefImage/IPAdapterMethod';
+import { Krea2StyleStrength } from 'features/controlLayers/components/RefImage/Krea2StyleStrength';
 import { RefImageModel } from 'features/controlLayers/components/RefImage/RefImageModel';
 import { RefImageNoImageState } from 'features/controlLayers/components/RefImage/RefImageNoImageState';
 import { RefImageNoImageStateWithCanvasOptions } from 'features/controlLayers/components/RefImage/RefImageNoImageStateWithCanvasOptions';
@@ -23,6 +24,7 @@ import {
   refImageIPAdapterCLIPVisionModelChanged,
   refImageIPAdapterMethodChanged,
   refImageIPAdapterWeightChanged,
+  refImageKrea2StyleStrengthChanged,
   refImageModelChanged,
   selectRefImageEntity,
   selectRefImageEntityOrThrow,
@@ -38,6 +40,7 @@ import {
   isFlux2ReferenceImageConfig,
   isFLUXReduxConfig,
   isIPAdapterConfig,
+  isKrea2ReferenceImageConfig,
   isQwenImageReferenceImageConfig,
   isWanReferenceImageConfig,
 } from 'features/controlLayers/store/types';
@@ -97,6 +100,13 @@ const RefImageSettingsContent = memo(() => {
     [dispatch, id]
   );
 
+  const onChangeKrea2StyleStrength = useCallback(
+    (styleStrength: number) => {
+      dispatch(refImageKrea2StyleStrengthChanged({ id, styleStrength }));
+    },
+    [dispatch, id]
+  );
+
   const onChangeModel = useCallback(
     (modelConfig: IPAdapterModelConfig | FLUXReduxModelConfig | ChatGPT4oModelConfig | FLUXKontextModelConfig) => {
       dispatch(refImageModelChanged({ id, modelConfig }));
@@ -130,11 +140,13 @@ const RefImageSettingsContent = memo(() => {
   const isFLUX = useAppSelector(selectIsFLUX);
   const isExternalModel = !!mainModelConfig && isExternalApiModelConfig(mainModelConfig);
 
-  // FLUX.2 Klein, Qwen Image Edit, Wan 2.2 and external API models do not require a ref image model selection.
+  // FLUX.2 Klein, Qwen Image Edit, Wan 2.2, Krea-2 and external API models do not require a ref image
+  // model selection.
   const showModelSelector =
     !isFlux2ReferenceImageConfig(config) &&
     !isQwenImageReferenceImageConfig(config) &&
     !isWanReferenceImageConfig(config) &&
+    !isKrea2ReferenceImageConfig(config) &&
     !isExternalModel;
 
   return (
@@ -168,6 +180,11 @@ const RefImageSettingsContent = memo(() => {
             {!isFLUX && <IPAdapterMethod method={config.method} onChange={onChangeIPMethod} />}
             <Weight weight={config.weight} onChange={onChangeWeight} />
             <BeginEndStepPct beginEndStepPct={config.beginEndStepPct} onChange={onChangeBeginEndStepPct} />
+          </Flex>
+        )}
+        {isKrea2ReferenceImageConfig(config) && (
+          <Flex flexDir="column" gap={2} w="full" alignItems="flex-start">
+            <Krea2StyleStrength styleStrength={config.styleStrength} onChange={onChangeKrea2StyleStrength} />
           </Flex>
         )}
         {isFLUXReduxConfig(config) && !isExternalModel && (

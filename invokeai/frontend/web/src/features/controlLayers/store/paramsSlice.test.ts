@@ -88,6 +88,14 @@ describe('paramsSlice selectors for external models', () => {
     expect(selectModelSupportsRefImages.resultFunc(model, config)).toBe(false);
   });
 
+  it('supports reference images on Krea-2, which uses training-free style reference', () => {
+    // Krea-2 has no ref-image adapter model, so the panel is gated purely on the base being listed in
+    // SUPPORTS_REF_IMAGES_BASE_MODELS.
+    const model = { key: 'krea2', hash: 'hash', name: 'Krea-2 Turbo', base: 'krea-2', type: 'main' } as never;
+
+    expect(selectModelSupportsRefImages.resultFunc(model, null)).toBe(true);
+  });
+
   it('returns false for guidance support on external models', () => {
     const config = createExternalConfig({
       modes: ['txt2img'],
