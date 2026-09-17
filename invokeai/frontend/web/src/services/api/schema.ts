@@ -28446,7 +28446,7 @@ export type components = {
          * MistralEncoder_Checkpoint_Config
          * @description Configuration for a single-file Mistral text encoder (safetensors).
          *
-         *     Accepts both 30-layer cow (Comfy-Org bf16/fp8/fp4) and 40-layer Mistral Small 3
+         *     Accepts both 30-layer cow (Comfy-Org bf16/fp8) and 40-layer Mistral Small 3
          *     (BFL canonical / upstream Mistral 3.x single-files). The loader uses the
          *     detected variant to decide whether to keep or strip the final RMSNorm.
          */
