@@ -432,6 +432,11 @@ export const isAnimaQwen3EncoderModelConfig = (config: AnyModelConfig): config i
   return config.type === 'qwen3_encoder' && config.variant === 'qwen3_06b';
 };
 
+/** Z-Image consumes 2560-wide embeddings, so only the 4B encoder fits - Klein 9B's 8B one (4096) does not. */
+export const isZImageQwen3EncoderModelConfig = (config: AnyModelConfig): config is Qwen3EncoderModelConfig => {
+  return config.type === 'qwen3_encoder' && config.variant === 'qwen3_4b';
+};
+
 export const isMistralEncoderModelConfig = (config: AnyModelConfig): config is MistralEncoderModelConfig => {
   return config.type === 'mistral_encoder';
 };

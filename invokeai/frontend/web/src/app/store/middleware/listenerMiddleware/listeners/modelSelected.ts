@@ -67,7 +67,6 @@ import {
   selectAnimaVAEModels,
   selectFlux1VAEModels,
   selectGlobalRefImageModels,
-  selectQwen3EncoderModels,
   selectQwen3VLEncoderModels,
   selectQwenImageDiffusersModels,
   selectQwenImageVAEModels,
@@ -77,6 +76,7 @@ import {
   selectWanT5EncoderModels,
   selectWanVAEModels,
   selectZImageDiffusersModels,
+  selectZImageQwen3EncoderModels,
 } from 'services/api/hooks/modelsByType';
 import type { FLUXKontextModelConfig, FLUXReduxModelConfig, IPAdapterModelConfig } from 'services/api/types';
 import {
@@ -176,7 +176,8 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
               }
             } else {
               // Fallback: try to set Qwen3 Encoder + VAE
-              const availableQwen3Encoders = selectQwen3EncoderModels(state);
+              // 4B encoders only - the 8B one Klein 9B uses is listed too, but Z-Image cannot consume it (#9526).
+              const availableQwen3Encoders = selectZImageQwen3EncoderModels(state);
               // FLUX.1 VAEs only - the Z-Image VAE picker is built from `isFlux1VAEModelConfig` and
               // Z-Image cannot use a FLUX.2 VAE, so a wider flux+flux2 pool would default the slot to
               // a model the user can neither see in the picker nor generate with.
@@ -190,8 +191,10 @@ export const addModelSelectedListener = (startAppListening: AppStartListening) =
                   dispatch(
                     zImageQwen3EncoderModelSelected({
                       key: qwen3Encoder.key,
+                      hash: qwen3Encoder.hash,
                       name: qwen3Encoder.name,
                       base: qwen3Encoder.base,
+                      type: qwen3Encoder.type,
                     })
                   );
                 }
