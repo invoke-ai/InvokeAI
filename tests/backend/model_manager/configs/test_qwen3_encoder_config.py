@@ -28,6 +28,7 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
     _has_qwen_vl_visual_tower,
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
+from invokeai.backend.quantization.sdnq.loaders import _parse_quantization_config, sdnq_sd_loader
 
 _OVERRIDE_FIELDS: dict[str, object] = {
     "hash": "blake3:fakehash",
@@ -292,3 +293,130 @@ class TestSdnqQwen3EncoderFolder:
 
         config = Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
         assert config.format.value == "sdnq_quantized"
+
+
+class TestSdnqEncoderIdentificationMatchesTheLoader:
+    """Identification must not accept a folder `Qwen3EncoderSDNQLoader` cannot open.
+
+    Claiming the nested `text_encoder/` layout without teaching the loader about it would turn
+    "unknown at install" into "installed, then ValueError at generation time" - the worse of the two,
+    and the very failure `Main_SDNQ_Diffusers_ZImage_Config._validate_has_sdnq_transformer` exists to
+    prevent. `sdnq_sd_loader` globs one directory and reads the `quantization_config.json` beside it,
+    so the loader has to resolve the layout the same way the config did.
+    """
+
+    @staticmethod
+    def _make_nested_bundle(root: Path, *, group_size: int = 64) -> Path:
+        text_encoder = root / "text_encoder"
+        text_encoder.mkdir(parents=True)
+        (text_encoder / "config.json").write_text(
+            json.dumps({"architectures": ["Qwen3ForCausalLM"], "hidden_size": 2560})
+        )
+        (text_encoder / "quantization_config.json").write_text(
+            json.dumps({"quant_method": "sdnq", "group_size": group_size})
+        )
+        save_file(
+            {
+                "model.embed_tokens.weight": torch.randint(-128, 127, (64, 64), dtype=torch.int8),
+                "model.embed_tokens.scale": torch.tensor([0.01], dtype=torch.float32),
+            },
+            str(text_encoder / "model-00001-of-00002.safetensors"),
+        )
+        save_file(
+            {
+                "model.layers.0.self_attn.q_norm.weight": torch.randint(-128, 127, (64, 64), dtype=torch.int8),
+                "model.layers.0.self_attn.q_norm.scale": torch.tensor([0.02], dtype=torch.float32),
+            },
+            str(text_encoder / "model-00002-of-00002.safetensors"),
+        )
+        (root / "tokenizer").mkdir()
+        (root / "tokenizer" / "tokenizer_config.json").write_text("{}")
+        return root
+
+    def test_the_loader_can_open_what_identification_accepted(self, tmp_path: Path) -> None:
+        root = self._make_nested_bundle(tmp_path / "sdnq-nested-loadable")
+
+        config = Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
+        assert config.format.value == "sdnq_quantized"
+
+        # The bug: handing the loader the registered path finds no weights at all.
+        with pytest.raises(ValueError, match="No safetensors files found"):
+            sdnq_sd_loader(root, compute_dtype=torch.float32)
+
+        # The fix: the same resolution identification used points at the shards *and* at the marker
+        # next to them, so a real group_size is honoured instead of silently defaulting.
+        resolved = Qwen3Encoder_SDNQ_Folder_Config.resolve_text_encoder_dir(root)
+        assert resolved == root / "text_encoder"
+        assert _parse_quantization_config(resolved / "quantization_config.json").get("group_size") == 64
+
+        sd = sdnq_sd_loader(resolved, compute_dtype=torch.float32)
+        assert "model.embed_tokens.weight" in sd
+        assert "model.layers.0.self_attn.q_norm.weight" in sd
+
+    def test_standalone_layout_still_resolves_to_the_root(self, tmp_path: Path) -> None:
+        root = tmp_path / "sdnq-standalone"
+        root.mkdir()
+        assert Qwen3Encoder_SDNQ_Folder_Config.resolve_text_encoder_dir(root) == root
+
+
+class TestSdnqPipelineBundleIsNotAQwen3Encoder:
+    """A full SDNQ pipeline bundle must not also match `Qwen3Encoder_SDNQ_Folder_Config`.
+
+    Its transformer and VAE are SDNQ-quantized too, so a recursive key scan answers "yes" at the
+    bundle root. While `Main_SDNQ_Diffusers_*` matches, the factory's type sort hides that; when it
+    declines - an interrupted download, a corrupt `model_index.json` - the whole bundle registers as
+    a Qwen3 encoder at a path the SDNQ encoder loader cannot open.
+    """
+
+    @staticmethod
+    def _make_bundle(root: Path, *, model_index: str | None = None, transformer_shards: bool = True) -> Path:
+        transformer = root / "transformer"
+        transformer.mkdir(parents=True)
+        (transformer / "config.json").write_text(json.dumps({"_class_name": "ZImageTransformer2DModel"}))
+        (transformer / "quantization_config.json").write_text(json.dumps({"quant_method": "sdnq"}))
+        if transformer_shards:
+            save_file(
+                {
+                    "transformer_blocks.0.attn.to_q.weight": torch.randint(-128, 127, (64, 64), dtype=torch.int8),
+                    "transformer_blocks.0.attn.to_q.scale": torch.tensor([0.01], dtype=torch.float32),
+                },
+                str(transformer / "diffusion_pytorch_model.safetensors"),
+            )
+        if model_index is not None:
+            (root / "model_index.json").write_text(model_index)
+        return root
+
+    def test_complete_bundle_is_rejected(self, tmp_path: Path) -> None:
+        root = self._make_bundle(tmp_path / "bundle", model_index=json.dumps({"_class_name": "ZImagePipeline"}))
+        with pytest.raises(NotAMatchError, match="full diffusers pipeline"):
+            Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
+
+    def test_interrupted_download_is_rejected(self, tmp_path: Path) -> None:
+        """Transformer marker and config present, shards not downloaded yet: still not an encoder."""
+        root = self._make_bundle(tmp_path / "bundle-partial", transformer_shards=False)
+        with pytest.raises(NotAMatchError, match="full diffusers pipeline"):
+            Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
+
+    def test_corrupt_model_index_is_rejected(self, tmp_path: Path) -> None:
+        root = self._make_bundle(tmp_path / "bundle-corrupt", model_index="{not json")
+        with pytest.raises(NotAMatchError, match="full diffusers pipeline"):
+            Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))
+
+    def test_sdnq_keys_outside_the_encoder_dirs_do_not_count(self, tmp_path: Path) -> None:
+        """The scan is scoped to the directories the loaders read, not an rglob over the tree.
+
+        No `transformer/` and no `model_index.json` here, so the pipeline guard does not fire - only
+        the scope keeps a folder whose sole SDNQ weights live in `vae/` from reading as an encoder.
+        """
+        root = tmp_path / "vae-only"
+        vae = root / "vae"
+        vae.mkdir(parents=True)
+        save_file(
+            {
+                "decoder.conv_in.weight": torch.randint(-128, 127, (64, 64), dtype=torch.int8),
+                "decoder.conv_in.scale": torch.tensor([0.01], dtype=torch.float32),
+            },
+            str(vae / "diffusion_pytorch_model.safetensors"),
+        )
+        with pytest.raises(NotAMatchError, match="does not look like an SDNQ-quantized Qwen3 encoder"):
+            Qwen3Encoder_SDNQ_Folder_Config.from_model_on_disk(ModelOnDisk(root), dict(_OVERRIDE_FIELDS))

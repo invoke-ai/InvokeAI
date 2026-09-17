@@ -1,5 +1,6 @@
 import json
 from collections.abc import Iterable
+from pathlib import Path
 from typing import Any, Literal, Optional, Self
 
 from pydantic import Field
@@ -64,8 +65,36 @@ def _has_sdnq_keys(state_dict: dict[str | int, Any]) -> bool:
     return any(key.endswith(".weight") and f"{key[: -len('.weight')]}.scale" in keys for key in keys)
 
 
+_TEXT_ENCODER_SUBDIR = "text_encoder"
+
+
+def resolve_qwen3_encoder_dir(model_path: Path) -> Path:
+    """The directory a Qwen3 encoder's weights and quantization marker actually live in.
+
+    Two layouts ship in the wild: a ``text_encoder+tokenizer`` download, where the weights sit under
+    ``text_encoder/`` next to a sibling ``tokenizer/``, and a standalone ``text_encoder`` download
+    whose files sit at the root. Identification and the loaders must resolve that the same way, or
+    identification accepts a folder the loader then cannot open - so this is the one implementation,
+    and `Qwen3EncoderSDNQLoader` calls it too.
+    """
+    nested = model_path / _TEXT_ENCODER_SUBDIR
+    return nested if nested.is_dir() else model_path
+
+
+def _encoder_dirs(mod: ModelOnDisk) -> tuple[Path, ...]:
+    """The directories a Qwen3 encoder folder probe is allowed to look at.
+
+    Deliberately not `mod.weight_files()`: that is an `rglob` over the whole tree, so for a full SDNQ
+    pipeline bundle it finds the transformer's and VAE's shards and reports the *bundle* as an SDNQ
+    encoder. The loaders only ever open the root or `text_encoder/`, so identification must judge the
+    folder on exactly that set.
+    """
+    nested = mod.path / _TEXT_ENCODER_SUBDIR
+    return (mod.path, nested) if nested.is_dir() else (mod.path,)
+
+
 def _folder_tensor_names(mod: ModelOnDisk) -> set[str]:
-    """Tensor names declared by every safetensors shard under `mod.path`.
+    """Tensor names declared by the safetensors of the encoder folder at `mod.path`.
 
     Folder probes must not go through ``ModelOnDisk.load_state_dict()``. It refuses to pick a file
     when a folder holds more than one weight file and raises ``ValueError`` — not a
@@ -73,7 +102,10 @@ def _folder_tensor_names(mod: ModelOnDisk) -> set[str]:
     sharded encoder ends up stored as ``unknown``. Every folder-layout Qwen3 encoder we ship is
     sharded: the FLUX.2 Klein 4B/9B and Z-Image ``text_encoder`` downloads are 2-4 shards each.
     """
-    return safetensors_tensor_names(mod.weight_files())
+    names: set[str] = set()
+    for folder in _encoder_dirs(mod):
+        names |= safetensors_tensor_names(folder.glob("*.safetensors"))
+    return names
 
 
 def _folder_is_sdnq_quantized(mod: ModelOnDisk) -> bool:
@@ -86,9 +118,9 @@ def _folder_is_sdnq_quantized(mod: ModelOnDisk) -> bool:
     the root and only at safetensors sitting directly in it. A markerless SDNQ encoder in the nested
     `text_encoder/` layout was therefore rejected by *both* and stored as `unknown`.
     """
-    if any(folder_has_sdnq_marker(folder) for folder in (mod.path, mod.path / "text_encoder")):
+    if any(folder_has_sdnq_marker(folder) for folder in _encoder_dirs(mod)):
         return True
-    return safetensors_have_sdnq_keys(mod.weight_files())
+    return safetensors_have_sdnq_keys(f for folder in _encoder_dirs(mod) for f in folder.glob("*.safetensors"))
 
 
 def _has_t5_encoder_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -548,6 +580,12 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
 
         raise_for_override_fields(cls, override_fields)
 
+        # Exclude full pipeline models, mirroring Qwen3Encoder_Qwen3Encoder_Config. An SDNQ bundle's
+        # transformer and VAE are SDNQ-quantized too, so without this the bundle root answers "yes"
+        # to the SDNQ question and registers as a Qwen3 encoder whenever the Main config declines it
+        # (an interrupted download, a corrupt model_index.json) - at a path this loader cannot open.
+        cls._reject_if_pipeline(mod)
+
         # Shared with the rejection guard in Qwen3Encoder_Qwen3Encoder_Config: exactly one of the two
         # configs claims a given folder. A corrupt or foreign quantization_config.json falls through
         # to the key check there instead of aborting this probe with a JSONDecodeError.
@@ -568,6 +606,25 @@ class Qwen3Encoder_SDNQ_Folder_Config(Config_Base):
 
         variant = cls._get_variant_from_dir(mod)
         return cls(variant=variant, **override_fields)
+
+    @staticmethod
+    def resolve_text_encoder_dir(model_path: Path) -> Path:
+        """The directory `Qwen3EncoderSDNQLoader` opens for this config's weights and marker.
+
+        Exposed on the config so the loader resolves the layout exactly as identification did, the
+        way `T5Encoder_SDNQ_Config` already does for its own two layouts.
+        """
+        return resolve_qwen3_encoder_dir(model_path)
+
+    @classmethod
+    def _reject_if_pipeline(cls, mod: ModelOnDisk) -> None:
+        # Same signals as Qwen3Encoder_Qwen3Encoder_Config: model_index.json at the root (diffusers
+        # pipeline) or a transformer subfolder. A standalone encoder download has neither.
+        if (mod.path / "model_index.json").exists() or (mod.path / "transformer").exists():
+            raise NotAMatchError(
+                "directory looks like a full diffusers pipeline (has model_index.json or transformer folder), "
+                "not a standalone Qwen3 encoder"
+            )
 
     @classmethod
     def _reject_if_complete_causal_lm(cls, mod: ModelOnDisk) -> None:
