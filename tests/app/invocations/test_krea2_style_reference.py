@@ -79,7 +79,7 @@ def _invocation(**overrides) -> Krea2StyleReferenceInvocation:
     return Krea2StyleReferenceInvocation.model_construct(**defaults)
 
 
-def _context(saved: dict) -> SimpleNamespace:
+def _context(saved: dict, force_tiled_decode: bool = False) -> SimpleNamespace:
     def save(tensor: torch.Tensor) -> str:
         saved["tensor"] = tensor
         return "saved"
@@ -89,14 +89,18 @@ def _context(saved: dict) -> SimpleNamespace:
         models=SimpleNamespace(load=lambda _identifier: object()),
         tensors=SimpleNamespace(save=save),
         util=SimpleNamespace(signal_progress=lambda _message: None),
+        config=SimpleNamespace(get=lambda: SimpleNamespace(force_tiled_decode=force_tiled_decode)),
     )
 
 
-def test_invoke_encodes_the_reference_and_carries_the_settings(monkeypatch) -> None:
+def _patch_vae_encode(monkeypatch) -> dict:
+    """Replace the real VAE encode with a recorder, returning what it was called with."""
     encoded: dict = {}
 
-    def fake_vae_encode(*, vae_info, image_tensor):
+    def fake_vae_encode(*, vae_info, image_tensor, tiled=False, tile_size=0):
         encoded["image_tensor"] = image_tensor
+        encoded["tiled"] = tiled
+        encoded["tile_size"] = tile_size
         return torch.zeros(1, 16, 1, 8, 8)
 
     monkeypatch.setattr(
@@ -104,6 +108,11 @@ def test_invoke_encodes_the_reference_and_carries_the_settings(monkeypatch) -> N
         staticmethod(fake_vae_encode),
     )
     monkeypatch.setattr("invokeai.app.invocations.krea2_style_reference.TorchDevice.empty_cache", lambda: None)
+    return encoded
+
+
+def test_invoke_encodes_the_reference_and_carries_the_settings(monkeypatch) -> None:
+    encoded = _patch_vae_encode(monkeypatch)
 
     saved: dict = {}
     output = _invocation(style_strength=0.6, low_scale_end=1.25).invoke(_context(saved))
@@ -118,6 +127,24 @@ def test_invoke_encodes_the_reference_and_carries_the_settings(monkeypatch) -> N
     assert field.style_strength == pytest.approx(0.6)
     assert field.low_scale_end == pytest.approx(1.25)
     assert field.blocks == "7-27"
+
+
+def test_invoke_encodes_untiled_by_default(monkeypatch) -> None:
+    encoded = _patch_vae_encode(monkeypatch)
+
+    _invocation().invoke(_context({}, force_tiled_decode=False))
+
+    assert encoded["tiled"] is False
+
+
+def test_invoke_honors_force_tiled_decode(monkeypatch) -> None:
+    # Regression: the encode ignored force_tiled_decode, so forced tiling could not protect a high-resolution
+    # reference from OOMing before denoising even started.
+    encoded = _patch_vae_encode(monkeypatch)
+
+    _invocation().invoke(_context({}, force_tiled_decode=True))
+
+    assert encoded["tiled"] is True
 
 
 def test_invoke_rejects_a_malformed_block_spec(monkeypatch) -> None:

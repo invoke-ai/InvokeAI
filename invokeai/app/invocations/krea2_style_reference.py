@@ -201,8 +201,13 @@ class Krea2StyleReferenceInvocation(BaseInvocation):
         vae_info = context.models.load(self.vae.vae)
         context.util.signal_progress("VAE-encoding style reference")
         # Reuse the Qwen-Image encoder: Krea-2 shares its VAE, and this already applies the per-channel
-        # latents_mean/latents_std normalization the transformer expects.
-        latents = QwenImageImageToLatentsInvocation.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
+        # latents_mean/latents_std normalization the transformer expects. Honor force_tiled_decode like every
+        # other VAE node, so a high-resolution reference can't OOM the encode before denoising even starts.
+        latents = QwenImageImageToLatentsInvocation.vae_encode(
+            vae_info=vae_info,
+            image_tensor=image_tensor,
+            tiled=context.config.get().force_tiled_decode,
+        )
 
         latents = latents.detach().to("cpu")
         # Release the encode intermediates before the denoise node partial-loads the transformer.
