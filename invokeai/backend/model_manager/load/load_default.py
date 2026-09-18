@@ -70,11 +70,23 @@ def resolve_submodel_path(config: AnyModelConfig, submodel_type: SubModelType, f
     instead assumes the key always equals the slot name, so a pipeline that calls its CLIP encoder
     something else passes discovery and is then loaded from a directory that does not exist.
 
+    Remote installs discover components inside a ``tmpinstall_*`` directory before moving the
+    pipeline into its permanent model directory. Existing records may therefore carry a discovered
+    path whose root no longer exists. Discovery only records direct children of the pipeline, so in
+    that case rebase the recorded component name onto the current model root.
+
     `fallback` is used when the config carries no such entry — configs persisted before submodel
     discovery existed, and the layouts where the component folder *is* the model path.
     """
     discovered = (getattr(config, "submodels", None) or {}).get(submodel_type)
-    return Path(discovered.path_or_prefix) if discovered else fallback
+    if not discovered:
+        return fallback
+
+    discovered_path = Path(discovered.path_or_prefix)
+    relocated_path = Path(config.path) / discovered_path.name
+    if not discovered_path.exists() and relocated_path.exists():
+        return relocated_path
+    return discovered_path
 
 
 def _device_supports_fp8_storage(device: torch.device, logger: Optional[Logger] = None) -> bool:

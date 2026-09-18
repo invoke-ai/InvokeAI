@@ -60,6 +60,53 @@ class TestResolveSubmodelPath:
 
         assert resolved == Path("/models/pipeline/clip_encoder")
 
+    def test_it_rebases_a_discovered_path_after_the_pipeline_is_moved(self, tmp_path: Path) -> None:
+        """Remote installs identify a pipeline in a staging dir before moving it into models/."""
+        staging_root = tmp_path / "tmpinstall_pipeline"
+        discovered_component = staging_root / "clip_encoder"
+        discovered_component.mkdir(parents=True)
+
+        installed_root = tmp_path / "models" / "pipeline"
+        installed_root.parent.mkdir()
+        staging_root.rename(installed_root)
+        config = SimpleNamespace(
+            path=installed_root.as_posix(),
+            submodels={SubModelType.TextEncoder: SimpleNamespace(path_or_prefix=discovered_component.as_posix())},
+        )
+
+        resolved = resolve_submodel_path(config, SubModelType.TextEncoder, installed_root / "text_encoder")
+
+        assert resolved == installed_root / "clip_encoder"
+
+    def test_it_keeps_an_existing_discovered_path_outside_the_pipeline(self, tmp_path: Path) -> None:
+        """A valid external component must not be replaced merely because the pipeline has a namesake."""
+        external_component = tmp_path / "shared" / "clip_encoder"
+        external_component.mkdir(parents=True)
+        installed_component = tmp_path / "pipeline" / "clip_encoder"
+        installed_component.mkdir(parents=True)
+        config = SimpleNamespace(
+            path=installed_component.parent.as_posix(),
+            submodels={SubModelType.TextEncoder: SimpleNamespace(path_or_prefix=external_component.as_posix())},
+        )
+
+        resolved = resolve_submodel_path(config, SubModelType.TextEncoder, installed_component.parent / "text_encoder")
+
+        assert resolved == external_component
+
+    def test_it_keeps_a_missing_discovered_path_when_no_relocated_component_exists(self, tmp_path: Path) -> None:
+        """Do not hide a genuinely missing component behind an invented path under the model root."""
+        missing_component = tmp_path / "staging" / "clip_encoder"
+        installed_root = tmp_path / "pipeline"
+        installed_root.mkdir()
+        config = SimpleNamespace(
+            path=installed_root.as_posix(),
+            submodels={SubModelType.TextEncoder: SimpleNamespace(path_or_prefix=missing_component.as_posix())},
+        )
+
+        resolved = resolve_submodel_path(config, SubModelType.TextEncoder, installed_root / "text_encoder")
+
+        assert resolved == missing_component
+
     def test_it_falls_back_when_the_slot_was_not_discovered(self) -> None:
         """Configs persisted before submodel discovery existed carry no map."""
         fallback = Path("/models/pipeline/text_encoder")
