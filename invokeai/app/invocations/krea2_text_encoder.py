@@ -127,7 +127,8 @@ class Krea2TextEncoderInvocation(BaseInvocation):
             # Padding sits between the prompt body and assistant suffix. Count only valid tokens when
             # assigning positions so the suffix receives the same mRoPE phase as it did during training.
             position_ids = (attention_mask.long().cumsum(dim=-1) - 1).clamp(min=0)
-            position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
+            if hasattr(text_encoder, "visual"):
+                position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
 
             outputs = text_encoder(
                 input_ids=input_ids,

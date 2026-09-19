@@ -152,6 +152,23 @@ class Qwen3VLEncoder_Qwen3VLEncoder_Config(Config_Base):
 
         return cls(**override_fields)
 
+class Qwen3VLEncoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
+    """Configuration for a single-file GGUF Qwen3-VL encoder."""
+
+    base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
+    type: Literal[ModelType.Qwen3VLEncoder] = Field(default=ModelType.Qwen3VLEncoder)
+    format: Literal[ModelFormat.GGUFQuantized] = Field(default=ModelFormat.GGUFQuantized)
+    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        if mod.path.suffix.lower() != ".gguf":
+            raise NotAMatchError(f"expected a .gguf file, got {mod.path.suffix or '(no suffix)'}")
+
+        return cls(**override_fields)
 
 def _is_qwen3_vl_encoder_state_dict(state_dict: dict[str | int, Any]) -> bool:
     """True for a single-file Qwen3-VL encoder: a Qwen3 text decoder PLUS a visual tower.
