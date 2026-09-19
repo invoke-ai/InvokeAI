@@ -23,7 +23,7 @@ import type { KeyboardEventHandler, MouseEvent, MouseEventHandler } from 'react'
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { VideoDTO } from 'services/api/types';
 
-import { galleryItemContainerSX } from './galleryItemContainerSX';
+import { getGalleryItemContainerSX } from './galleryItemContainerSX';
 import { GalleryItemPlayBadge } from './GalleryItemPlayBadge';
 import { GalleryItemSizeBadge } from './GalleryItemSizeBadge';
 import { GalleryItemVideoStarIconButton } from './GalleryItemVideoStarIconButton';
@@ -31,6 +31,7 @@ import { GalleryVideoThumbnail } from './GalleryVideoThumbnail';
 
 interface Props {
   videoDTO: VideoDTO;
+  layout?: 'grid' | 'masonry';
 }
 
 /**
@@ -88,7 +89,7 @@ const buildOnClick =
     }
   };
 
-export const GalleryVideoItem = memo(({ videoDTO }: Props) => {
+export const GalleryVideoItem = memo(({ videoDTO, layout = 'grid' }: Props) => {
   const store = useAppStore();
   const ref = useRef<HTMLDivElement>(null);
   const [isHovered, setIsHovered] = useState(false);
@@ -120,6 +121,10 @@ export const GalleryVideoItem = memo(({ videoDTO }: Props) => {
     () => ({ width: videoDTO.width, height: videoDTO.height }),
     [videoDTO.width, videoDTO.height]
   );
+  const containerSX = useMemo(() => {
+    const aspectRatio = layout === 'masonry' ? `${videoDTO.width}/${videoDTO.height}` : '1/1';
+    return getGalleryItemContainerSX(aspectRatio);
+  }, [layout, videoDTO.height, videoDTO.width]);
 
   // Right-click / long-press context menu (delete, change board, download).
   useVideoContextMenu(videoDTO, ref);
@@ -166,7 +171,7 @@ export const GalleryVideoItem = memo(({ videoDTO }: Props) => {
   return (
     <Flex
       ref={ref}
-      sx={galleryItemContainerSX}
+      sx={containerSX}
       data-item-id={videoDTO.video_name}
       role="button"
       tabIndex={0}

@@ -1,6 +1,6 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 
-export const galleryItemContainerSX = {
+const baseGalleryItemContainerSX = {
   containerType: 'inline-size',
   w: 'full',
   h: 'full',
@@ -17,7 +17,6 @@ export const galleryItemContainerSX = {
   position: 'relative',
   justifyContent: 'center',
   alignItems: 'center',
-  aspectRatio: '1/1',
   '::before': {
     content: '""',
     display: 'inline-block',
@@ -50,3 +49,9 @@ export const galleryItemContainerSX = {
       'inset 0px 0px 0px 3px var(--invoke-colors-invokeGreen-200), inset 0px 0px 0px 4px var(--invoke-colors-invokeGreen-800)',
   },
 } satisfies SystemStyleObject;
+
+export const getGalleryItemContainerSX = (aspectRatio: string) =>
+  ({
+    ...baseGalleryItemContainerSX,
+    aspectRatio,
+  }) satisfies SystemStyleObject;
