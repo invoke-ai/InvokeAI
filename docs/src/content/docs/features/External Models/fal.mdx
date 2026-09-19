@@ -1,0 +1,80 @@
+---
+title: fal.ai
+---
+
+Invoke can use fal.ai-hosted image models from the Canvas Image Editor. Requests
+run on fal.ai, and fal.ai bills them to your account.
+
+## Setup
+
+Configure fal.ai in **Models → Add Model → External Providers**. Paste your
+fal.ai API key and save. Invoke stores it in `api_keys.yaml`; the key is not
+written to `invokeai.yaml` or shown after saving.
+
+Manual configuration uses:
+
+```yaml
+# api_keys.yaml
+external_fal_api_key: "your-fal-api-key"
+
+# Optional queue API override, mainly for a compatible proxy
+external_fal_base_url: "https://queue.fal.run"
+```
+
+Restart Invoke after manual configuration.
+
+## Models
+
+Invoke exposes two fal.ai model paths:
+
+- **Native Canvas models** — image endpoints can be searched in the fal.ai
+  catalog and installed into Invoke's External Models list. Their endpoint
+  schema determines supported modes and common fields.
+- **Generic media endpoints** — every catalog endpoint can be called from the
+  `fal.ai Generic Media` node with its raw JSON schema. This covers text/video
+  generation, image-to-video, video-to-video, upscaling, audio, speech, 3D,
+  and new endpoints that fal.ai adds later.
+
+The provider keeps these curated image presets for quick setup:
+
+- `fal-ai/flux/schnell` — text to image
+- `fal-ai/flux/dev` — text to image
+- `fal-ai/flux-pro/kontext` — image to image and semantic edits
+- `fal-ai/flux-lora-fill` — masked inpainting
+
+Use **Refresh** in the fal.ai catalog to load current endpoint metadata. No
+model weights are downloaded; installed entries are lightweight external
+references.
+
+## Generic media workflows
+
+Add the `fal.ai Generic Media` node in Workflow Editor. Set `model_id` to any
+fal.ai endpoint and paste the endpoint's JSON input into `input_json`. Local
+images, masks, and videos can be connected to the node and referenced with
+`${image_url}`, `${mask_url}`, and `${video_url}` placeholders. The node
+returns raw JSON, so endpoint-specific outputs remain available without
+waiting for a new Invoke release.
+
+## Canvas
+
+1. Open **Canvas**.
+2. Select one of the fal.ai models in the model picker.
+3. Use normal generation for FLUX Schnell or FLUX Dev.
+4. Use **img2img** with an existing canvas image for Kontext.
+5. Draw an inpaint mask and choose **inpaint** with FLUX Fill.
+6. Press **Invoke**. The image is uploaded to fal.ai, processed remotely, and
+the result is imported into the Invoke gallery.
+
+Canvas settings are constrained by each model's capabilities. For example,
+Kontext requires an input image, while Fill requires both an input image and a
+mask. The provider converts Invoke's white-preserve/black-edit canvas mask to
+the white-edit format expected by fal.ai.
+
+## Costs and limits
+
+Every generation, upload, and result download uses remote services. Check the
+current model pricing and limits on its fal.ai model page before invoking.
+Automated tests do not submit inference requests.
+
+- https://fal.ai/models
+- https://fal.ai/docs/model-apis

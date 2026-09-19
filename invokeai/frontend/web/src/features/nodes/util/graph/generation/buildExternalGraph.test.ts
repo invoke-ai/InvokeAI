@@ -182,6 +182,28 @@ describe('buildExternalGraph', () => {
     expect(externalNode?.type).toBe('gemini_image_generation');
   });
 
+  it('uses the fal.ai invocation for fal models', async () => {
+    mockModelConfig = createExternalModel({
+      provider_id: 'fal',
+      provider_model_id: 'fal-ai/flux/schnell',
+      path: 'external://fal/fal-ai/flux/schnell',
+      source: 'external://fal/fal-ai/flux/schnell',
+      hash: 'external:fal:fal-ai/flux/schnell',
+    });
+
+    const { g } = await buildExternalGraph({
+      generationMode: 'txt2img',
+      state: {} as RootState,
+      manager: null,
+    });
+
+    const graph = g.getGraph();
+    const externalNode = Object.values(graph.nodes).find((node) => node.type === 'fal_image_generation');
+
+    expect(externalNode).toBeDefined();
+    expect(externalNode?.type).toBe('fal_image_generation');
+  });
+
   it('throws when mode is unsupported', async () => {
     const modelConfig = createExternalModel({
       capabilities: {

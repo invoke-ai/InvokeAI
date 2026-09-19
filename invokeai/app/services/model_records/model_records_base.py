@@ -17,6 +17,7 @@ from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefa
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelDefaultSettings,
     ExternalModelCapabilities,
+    ExternalModelPanelSchema,
 )
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.lora import LoraModelDefaultSettings
@@ -126,6 +127,10 @@ class ModelRecordChanges(BaseModelExcludeNull):
     provider_model_id: Optional[str] = Field(description="External provider model identifier", default=None)
     capabilities: Optional[ExternalModelCapabilities] = Field(
         description="External model capabilities",
+        default=None,
+    )
+    panel_schema: Optional[ExternalModelPanelSchema] = Field(
+        description="External model controls exposed in the frontend",
         default=None,
     )
     cpu_only: Optional[bool] = Field(description="Whether this model should run on CPU only", default=None)
