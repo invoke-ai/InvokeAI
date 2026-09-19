@@ -44,6 +44,9 @@ export const WorkflowBuilder = memo(() => {
           <Button size="sm" variant="ghost" tooltip={t('workflows.builder.nodeFieldTooltip')}>
             {t('workflows.builder.nodeField')}
           </Button>
+          <Button size="sm" variant="ghost" tooltip={t('workflows.builder.nodeSettingTooltip')}>
+            {t('workflows.builder.nodeSetting')}
+          </Button>
           <Spacer />
           <WorkflowBuilderEditMenu />
         </Flex>

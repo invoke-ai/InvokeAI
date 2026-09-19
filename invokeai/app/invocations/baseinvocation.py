@@ -260,17 +260,23 @@ class BaseInvocation(ABC, BaseModel):
         description="The id of this instance of an invocation. Must be unique among all instances of invocations.",
         json_schema_extra={"field_kind": FieldKind.NodeAttribute},
     )
+    # `is_intermediate` and `use_cache` remain node attributes - the workflow editor stores them on the node itself
+    # and renders them in the node footer, not in the node's input list. They declare `Input.Any` so that a graph edge
+    # may drive them; edge values are applied in `GraphExecutionState.next()` before the invocation runs, so both are
+    # resolved by the time the cache is consulted and by the time the output image is saved.
     is_intermediate: bool = Field(
         default=False,
         description="Whether or not this is an intermediate invocation.",
         json_schema_extra=InputFieldJSONSchemaExtra(
-            input=Input.Direct, field_kind=FieldKind.NodeAttribute, ui_type=UIType._IsIntermediate
+            input=Input.Any, field_kind=FieldKind.NodeAttribute, orig_required=False
         ).model_dump(exclude_none=True),
     )
     use_cache: bool = Field(
         default=True,
         description="Whether or not to use the cache",
-        json_schema_extra={"field_kind": FieldKind.NodeAttribute},
+        json_schema_extra=InputFieldJSONSchemaExtra(
+            input=Input.Any, field_kind=FieldKind.NodeAttribute, orig_required=False
+        ).model_dump(exclude_none=True),
     )
 
     bottleneck: ClassVar[Bottleneck]

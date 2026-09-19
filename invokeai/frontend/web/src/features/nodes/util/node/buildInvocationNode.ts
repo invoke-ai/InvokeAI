@@ -3,6 +3,7 @@ import { reduce } from 'es-toolkit/compat';
 import { SHARED_NODE_PROPERTIES } from 'features/nodes/types/constants';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { InvocationNode, InvocationTemplate } from 'features/nodes/types/invocation';
+import { isNodeAttributeFieldName } from 'features/nodes/types/nodeAttributeFields';
 import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -13,6 +14,13 @@ export const buildInvocationNode = (position: XYPosition, template: InvocationTe
   const inputs = reduce(
     template.inputs,
     (inputsAccumulator, inputTemplate, inputName) => {
+      if (isNodeAttributeFieldName(inputName)) {
+        // Node attribute fields have a template so they can be connection targets, but their value lives on the node
+        // (`data.useCache` / `data.isIntermediate`). Creating an instance here would give them a second, conflicting
+        // source of truth. `updateNode` derives its allowed keys from this object, so it drops them too.
+        return inputsAccumulator;
+      }
+
       const fieldId = uuidv4();
 
       const inputFieldValue: FieldInputInstance = buildFieldInputInstance(fieldId, inputTemplate);

@@ -10,7 +10,12 @@ import {
 } from 'features/nodes/store/util/testUtils';
 import type { InvocationTemplate } from 'features/nodes/types/invocation';
 import type { WorkflowV3 } from 'features/nodes/types/workflow';
-import { buildNodeFieldElement, getDefaultForm, isNodeFieldElement } from 'features/nodes/types/workflow';
+import {
+  buildNodeFieldElement,
+  buildNodeSettingElement,
+  getDefaultForm,
+  isNodeFieldElement,
+} from 'features/nodes/types/workflow';
 import { buildInvocationNode } from 'features/nodes/util/node/buildInvocationNode';
 import { buildFieldInputInstance } from 'features/nodes/util/schema/buildFieldInputInstance';
 import { validateWorkflow } from 'features/nodes/util/workflow/validateWorkflow';
@@ -502,6 +507,45 @@ describe('validateWorkflow', () => {
       throw new Error('Expected a node field form element');
     }
     expect(updatedElement.data.fieldIdentifier.fieldName).toBe('images');
+  });
+
+  it('should retain node setting form elements whose node still exists', async () => {
+    const workflow = getWorkflow();
+    const element = buildNodeSettingElement('afad11b4-bb5c-45d1-b956-6c8e2357ee11', 'save_to_gallery');
+    addElement({ form: workflow.form, element, parentId: workflow.form.rootElementId });
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    expect(validationResult.workflow.form.elements[element.id]).toBeDefined();
+  });
+
+  it('should delete node setting form elements whose node no longer exists', async () => {
+    const workflow = getWorkflow();
+    const element = buildNodeSettingElement('does-not-exist', 'use_cache');
+    addElement({ form: workflow.form, element, parentId: workflow.form.rootElementId });
+
+    const validationResult = await validateWorkflow({
+      workflow,
+      templates: { img_resize, main_model_loader },
+      checkImageAccess: resolveTrue,
+      checkVideoAccess: resolveTrue,
+      checkBoardAccess: resolveTrue,
+      checkModelAccess: resolveTrue,
+    });
+
+    const { form } = validationResult.workflow;
+    expect(form.elements[element.id]).toBeUndefined();
+    // The dangling child reference must be cleaned up too, else the form fails structure validation on the next load
+    const rootElement = form.elements[form.rootElementId];
+    expect(rootElement?.type === 'container' && rootElement.data.children).toEqual([]);
+    expect(validationResult.warnings.length).toBe(1);
   });
 
   it('should refresh call_saved_workflow dynamic inputs while loading a stale serialized workflow', async () => {

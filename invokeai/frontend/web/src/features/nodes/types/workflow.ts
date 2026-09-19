@@ -175,6 +175,40 @@ export const buildNodeFieldElement = (
   return element;
 };
 
+const NODE_SETTING_TYPE = 'node-setting';
+export const NODE_SETTING_CLASS_NAME = `form-builder-${NODE_SETTING_TYPE}`;
+/**
+ * Node settings are node-level toggles that are not input fields, so they cannot be represented as node field
+ * elements. They live directly on the node's data instead of in its inputs.
+ */
+const zNodeSettingName = z.enum(['use_cache', 'save_to_gallery']);
+export type NodeSettingName = z.infer<typeof zNodeSettingName>;
+const zNodeSettingData = z.object({
+  nodeId: z.string().trim().min(1),
+  setting: zNodeSettingName,
+  // Unlike node fields, there is nowhere on the node to store a user-provided label, so it is stored on the element.
+  label: z.string().default(''),
+});
+const zNodeSettingElement = zElementBase.extend({
+  type: z.literal(NODE_SETTING_TYPE),
+  data: zNodeSettingData,
+});
+export type NodeSettingElement = z.infer<typeof zNodeSettingElement>;
+export const isNodeSettingElement = (el: FormElement): el is NodeSettingElement => el.type === NODE_SETTING_TYPE;
+export const buildNodeSettingElement = (
+  nodeId: NodeSettingElement['data']['nodeId'],
+  setting: NodeSettingElement['data']['setting'],
+  parentId?: NodeSettingElement['parentId']
+): NodeSettingElement => {
+  const element: NodeSettingElement = {
+    id: getPrefixedId(NODE_SETTING_TYPE, '-'),
+    type: NODE_SETTING_TYPE,
+    parentId,
+    data: { nodeId, setting, label: '' },
+  };
+  return element;
+};
+
 const HEADING_TYPE = 'heading';
 export const HEADING_CLASS_NAME = `form-builder-${HEADING_TYPE}`;
 const zHeadingElement = zElementBase.extend({
@@ -262,7 +296,14 @@ export const buildContainer = (
   return element;
 };
 
-const zFormElement = z.union([zContainerElement, zNodeFieldElement, zHeadingElement, zTextElement, zDividerElement]);
+const zFormElement = z.union([
+  zContainerElement,
+  zNodeFieldElement,
+  zNodeSettingElement,
+  zHeadingElement,
+  zTextElement,
+  zDividerElement,
+]);
 
 export type FormElement = z.infer<typeof zFormElement>;
 

@@ -6,7 +6,8 @@ import type { NodesState } from 'features/nodes/store/types';
 import type { FieldInputInstance } from 'features/nodes/types/field';
 import type { AnyNode, InvocationNode, InvocationNodeData } from 'features/nodes/types/invocation';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
+import type { NodeSettingName } from 'features/nodes/types/workflow';
+import { isContainerElement, isNodeFieldElement, isNodeSettingElement } from 'features/nodes/types/workflow';
 import { assert } from 'tsafe';
 
 export const selectNode = (nodesSlice: NodesState, nodeId: string): AnyNode => {
@@ -93,6 +94,9 @@ export const selectFormInitialValues = createNodesSelector((workflow) => workflo
 export const selectNodeFieldElements = createNodesSelector((workflow) =>
   Object.values(workflow.form.elements).filter(isNodeFieldElement)
 );
+const selectNodeSettingElements = createNodesSelector((workflow) =>
+  Object.values(workflow.form.elements).filter(isNodeSettingElement)
+);
 
 export const buildSelectElement = (id: string) => createNodesSelector((workflow) => workflow.form?.elements[id]);
 export const buildSelectWorkflowFormNodeElement = (nodeId: string, fieldName: string) =>
@@ -101,4 +105,8 @@ export const buildSelectWorkflowFormNodeElement = (nodeId: string, fieldName: st
       (element) =>
         element.data.fieldIdentifier.nodeId === nodeId && element.data.fieldIdentifier.fieldName === fieldName
     )
+  );
+export const buildSelectWorkflowFormNodeSettingElement = (nodeId: string, setting: NodeSettingName) =>
+  createSelector(selectNodeSettingElements, (elements) =>
+    elements.find((element) => element.data.nodeId === nodeId && element.data.setting === setting)
   );
