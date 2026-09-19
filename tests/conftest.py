@@ -2,7 +2,7 @@
 # without needing to explicitly import them. (https://docs.pytest.org/en/6.2.x/fixture.html)
 
 
-# We import the model_installer and torch_device fixtures here so that they can be used by all tests. Flake8 does not
+# We import the torch_device fixture here so that it can be used by all tests. Flake8 does not
 # play well with fixtures (F401 and F811), so this is cleaner than importing in all files that use these fixtures.
 import logging
 import shutil
@@ -32,6 +32,7 @@ from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.test_utils import torch_device  # noqa: F401
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService

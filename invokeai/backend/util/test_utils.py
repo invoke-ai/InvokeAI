@@ -33,7 +33,7 @@ def install_and_load_model(
     This is intended as a utility function for tests.
 
     Args:
-        mm2_model_manager (ModelManagerServiceBase): The model manager
+        model_manager (ModelManagerServiceBase): The model manager
         model_path_id_or_url (Union[str, Path]): The path, HF ID, URL, etc. where the model can be installed from if it
             is not already installed.
         model_name (str): The model name, forwarded to ModelManager.get_model(...).
