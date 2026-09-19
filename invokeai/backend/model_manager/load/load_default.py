@@ -73,7 +73,9 @@ def resolve_submodel_path(config: AnyModelConfig, submodel_type: SubModelType, f
     Remote installs discover components inside a ``tmpinstall_*`` directory before moving the
     pipeline into its permanent model directory. Existing records may therefore carry a discovered
     path whose root no longer exists. Discovery only records direct children of the pipeline, so in
-    that case rebase the recorded component name onto the current model root.
+    that case rebase the recorded component name onto the current model root. Use the resolved
+    fallback's parent for that root because managed model records persist ``config.path`` relative
+    to the models directory.
 
     `fallback` is used when the config carries no such entry — configs persisted before submodel
     discovery existed, and the layouts where the component folder *is* the model path.
@@ -83,7 +85,7 @@ def resolve_submodel_path(config: AnyModelConfig, submodel_type: SubModelType, f
         return fallback
 
     discovered_path = Path(discovered.path_or_prefix)
-    relocated_path = Path(config.path) / discovered_path.name
+    relocated_path = fallback.parent / discovered_path.name
     if not discovered_path.exists() and relocated_path.exists():
         return relocated_path
     return discovered_path

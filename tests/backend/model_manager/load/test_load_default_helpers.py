@@ -70,7 +70,9 @@ class TestResolveSubmodelPath:
         installed_root.parent.mkdir()
         staging_root.rename(installed_root)
         config = SimpleNamespace(
-            path=installed_root.as_posix(),
+            # Managed model records store paths relative to the models directory. The loader's
+            # fallback carries the resolved absolute model root.
+            path=installed_root.name,
             submodels={SubModelType.TextEncoder: SimpleNamespace(path_or_prefix=discovered_component.as_posix())},
         )
 
