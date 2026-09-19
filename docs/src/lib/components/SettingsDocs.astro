@@ -1,6 +1,8 @@
 ---
 import settingsData from '../../generated/settings.json';
 
+const t = Astro.locals.t;
+
 const groupedSettings = Object.entries(
   settingsData.settings.reduce((groups, setting) => {
     const category = setting.category || 'OTHER';
@@ -62,15 +64,15 @@ const formatCategoryName = (category) => {
           </dt>
           <!-- Granular details -->
           <dd class="settings-ref-col settings-ref-type-col">
-            <span class="settings-ref-label">Type</span>
+            <span class="settings-ref-label">{t('settings.type')}</span>
             <code>{formatType(setting.type)}</code>
           </dd>
           <dd class="settings-ref-col settings-ref-default-col">
-            <span class="settings-ref-label">Default</span>
+            <span class="settings-ref-label">{t('settings.default')}</span>
             <code>{formatValue(setting.default)}</code>
           </dd>
           <dd class="settings-ref-col settings-ref-env-col">
-            <span class="settings-ref-label">Env</span>
+            <span class="settings-ref-label">{t('settings.environment')}</span>
             <code>{setting.env_var}</code>
           </dd>
           <!-- Description -->
@@ -78,7 +80,7 @@ const formatCategoryName = (category) => {
             {setting.description}
             {setting.literal_values.length > 0 && (
               <span class="settings-ref-values">
-                Values: {setting.literal_values.map((v) => <code>{formatValue(v)}</code>).reduce((prev, curr) => [prev, ' ', curr])}
+                {t('settings.values')} {setting.literal_values.map((v) => <code>{formatValue(v)}</code>).reduce((prev, curr) => [prev, ' ', curr])}
               </span>
             )}
             {Object.keys(setting.validation).length > 0 && (
