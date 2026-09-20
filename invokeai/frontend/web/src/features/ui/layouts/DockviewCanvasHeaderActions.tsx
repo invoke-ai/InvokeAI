@@ -17,6 +17,7 @@ import { WORKSPACE_PANEL_ID } from './shared';
 const $fallbackTool = atom<Tool>('move');
 const $fallbackPrimaryPointerDown = atom(false);
 const $fallbackTextSession = atom<null>(null);
+const $fallbackPathEditSession = atom<null>(null);
 
 type CanvasToolModifierHintKey = ReturnType<typeof getCanvasToolModifierHints>[number]['keys'][number];
 
@@ -52,6 +53,7 @@ export const DockviewCanvasHeaderActions = memo((props: IDockviewHeaderActionsPr
   const baseTool = useStore(canvasManager?.tool.$baseTool ?? $fallbackTool);
   const isPrimaryPointerDown = useStore(canvasManager?.tool.$isPrimaryPointerDown ?? $fallbackPrimaryPointerDown);
   const textSession = useStore(canvasManager?.tool.tools.text.$session ?? $fallbackTextSession);
+  const pathEditSession = useStore(canvasManager?.tool.tools.path.$editSession ?? $fallbackPathEditSession);
 
   const effectiveTool = useMemo<Tool>(() => {
     return tool === 'view' || tool === 'colorPicker' ? baseTool : tool;
@@ -69,11 +71,13 @@ export const DockviewCanvasHeaderActions = memo((props: IDockviewHeaderActionsPr
       bboxAspectRatioLocked,
       hasActiveTextSession: Boolean(textSession),
       isPrimaryPointerDown,
+      isEditingPathSession: Boolean(pathEditSession),
     });
   }, [
     bboxAspectRatioLocked,
     canvasManager,
     effectiveTool,
+    pathEditSession,
     isPrimaryPointerDown,
     lassoMode,
     props.activePanel?.id,

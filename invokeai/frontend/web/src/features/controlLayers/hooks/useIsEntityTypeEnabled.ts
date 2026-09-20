@@ -28,6 +28,8 @@ export const useIsEntityTypeEnabled = (entityType: CanvasEntityType) => {
         return !isFluxKontext && !isExternal;
       case 'raster_layer':
         return !isFluxKontext;
+      case 'vector_layer':
+        return !isFluxKontext;
       default:
         assert<Equals<typeof entityType, never>>(false);
     }

@@ -3,6 +3,7 @@ import type {
   CanvasInpaintMaskState,
   CanvasRasterLayerState,
   CanvasRegionalGuidanceState,
+  CanvasVectorLayerState,
   RefImageState,
 } from 'features/controlLayers/store/types';
 import type { ModelIdentifierField } from 'features/nodes/types/common';
@@ -302,6 +303,15 @@ export const getInpaintMaskWarnings = (
   if (model?.base === 'ideogram-4' && entity.objects.length > 0) {
     warnings.push(WARNINGS.IDEOGRAM4_TXT2IMG_ONLY);
   }
+
+  return warnings;
+};
+
+export const getVectorLayerWarnings = (
+  _entity: CanvasVectorLayerState,
+  _model: MainOrExternalModelConfig | null | undefined
+): WarningTKey[] => {
+  const warnings: WarningTKey[] = [];
 
   return warnings;
 };

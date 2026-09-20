@@ -1,4 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
+import { useIsCanvasPathEditSessionActive } from 'features/controlLayers/hooks/useIsCanvasPathEditSessionActive';
 import { useIsUncommittedCanvasTextSessionActive } from 'features/controlLayers/hooks/useIsUncommittedCanvasTextSessionActive';
 import {
   canonicalizeHotkeyString,
@@ -15,6 +16,8 @@ import { useTranslation } from 'react-i18next';
 import { assert } from 'tsafe';
 
 type HotkeyCategory = 'app' | 'canvas' | 'viewer' | 'gallery' | 'workflows';
+
+export const getIsHotkeyAllowedDuringCanvasPathEdit = (category: HotkeyCategory): boolean => category === 'canvas';
 
 export { IS_MAC_OS } from 'features/system/components/HotkeysModal/hotkeyStrings';
 
@@ -255,6 +258,7 @@ type UseRegisteredHotkeysArg = {
  * A wrapper around `useHotkeys` that adds a handler for a registered hotkey.
  */
 export const useRegisteredHotkeys = ({ id, category, callback, options, dependencies }: UseRegisteredHotkeysArg) => {
+  const isCanvasPathEditSessionActive = useIsCanvasPathEditSessionActive();
   const isUncommittedCanvasTextSessionActive = useIsUncommittedCanvasTextSessionActive();
   const hotkeysData = useHotkeyData();
   const data = useMemo(() => {
@@ -279,6 +283,14 @@ export const useRegisteredHotkeys = ({ id, category, callback, options, dependen
   const _optionsWithCanvasTextGuard = useMemo(() => {
     return {
       ..._options,
+      ignoreEventWhen: (event: KeyboardEvent) => {
+        // A disabled hotkey stops event propagation in react-hotkeys-hook. Ignore shortcuts from other regions instead
+        // so the canvas handler can still receive shared keys such as Delete during path editing.
+        if (isCanvasPathEditSessionActive() && !getIsHotkeyAllowedDuringCanvasPathEdit(category)) {
+          return true;
+        }
+        return _options.ignoreEventWhen?.(event) ?? false;
+      },
       enabled: (event, hotkeysEvent) => {
         // Suppress all registered hotkeys while text editing is still uncommitted.
         if (isUncommittedCanvasTextSessionActive()) {
@@ -290,7 +302,7 @@ export const useRegisteredHotkeys = ({ id, category, callback, options, dependen
         return _options.enabled ?? true;
       },
     } satisfies Options;
-  }, [_options, isUncommittedCanvasTextSessionActive]);
+  }, [_options, category, isCanvasPathEditSessionActive, isUncommittedCanvasTextSessionActive]);
 
   return useHotkeys(data.hotkeys, callback, _optionsWithCanvasTextGuard, dependencies);
 };

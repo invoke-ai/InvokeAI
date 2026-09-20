@@ -10,6 +10,7 @@ import type { CanvasProjectState } from 'features/controlLayers/util/canvasProje
 import {
   checkExistingImages,
   collectImageNames,
+  parseCanvasProjectState,
   parseManifest,
   processWithConcurrencyLimit,
   remapCanvasState,
@@ -45,7 +46,9 @@ export const useCanvasProjectLoad = () => {
         if (!canvasStateFile) {
           throw new Error('Invalid project file: missing canvas_state.json');
         }
-        const canvasState: CanvasProjectState = JSON.parse(await canvasStateFile.async('string'));
+        const canvasState: CanvasProjectState = parseCanvasProjectState(
+          JSON.parse(await canvasStateFile.async('string'))
+        );
 
         const paramsFile = zip.file('params.json');
         let projectParams: ParamsState | null = null;
@@ -112,6 +115,7 @@ export const useCanvasProjectLoad = () => {
           canvasProjectRecalled({
             rasterLayers: remappedCanvasState.rasterLayers,
             controlLayers: remappedCanvasState.controlLayers,
+            vectorLayers: remappedCanvasState.vectorLayers,
             inpaintMasks: remappedCanvasState.inpaintMasks,
             regionalGuidance: remappedCanvasState.regionalGuidance,
             bbox: remappedCanvasState.bbox,
