@@ -3,6 +3,7 @@ import pytest
 import torch
 
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.gguf.utils import DEQUANTIZE_FUNCTIONS, TORCH_COMPATIBLE_QTYPES
 from invokeai.backend.util.calc_tensor_size import calc_tensor_size
 
 
@@ -126,3 +127,28 @@ def test_ggml_tensor_calc_size():
     compression_ratio = calc_tensor_size(x) / calc_tensor_size(x_quantized)
     # Assert that the compression ratio is approximately 4x.
     assert abs(compression_ratio - 4) < 0.5
+
+
+def test_ggml_tensor_numpy_fallback_dequantize_uses_logical_shape():
+    """Qtypes without a torch dequantize kernel fall back to numpy, which infers the shape from the stored data.
+
+    ComfyUI reshapes tensors before quantizing them, so the stored shape is not necessarily the logical one - the
+    fallback must still return the logical shape (see GGMLTensor.tensor_shape).
+    """
+    qtype = gguf.GGMLQuantizationType.IQ4_NL
+    assert qtype not in DEQUANTIZE_FUNCTIONS and qtype not in TORCH_COMPATIBLE_QTYPES
+
+    # One IQ4_NL block is 32 elements in 18 bytes, so this holds 8 rows of 32 elements = 256 elements, which the
+    # numpy fallback dequantizes to (8, 32). The logical shape is a different view of the same 256 elements.
+    generator = torch.Generator().manual_seed(123)
+    quantized = torch.randint(0, 256, (8, 18), dtype=torch.uint8, generator=generator)
+    logical_shape = torch.Size((4, 64))
+
+    t = GGMLTensor(
+        data=quantized,
+        ggml_quantization_type=qtype,
+        tensor_shape=logical_shape,
+        compute_dtype=torch.float32,
+    )
+
+    assert t.get_dequantized_tensor().shape == logical_shape
