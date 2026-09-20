@@ -283,13 +283,17 @@ export const useRegisteredHotkeys = ({ id, category, callback, options, dependen
   const _optionsWithCanvasTextGuard = useMemo(() => {
     return {
       ..._options,
+      ignoreEventWhen: (event: KeyboardEvent) => {
+        // A disabled hotkey stops event propagation in react-hotkeys-hook. Ignore shortcuts from other regions instead
+        // so the canvas handler can still receive shared keys such as Delete during path editing.
+        if (isCanvasPathEditSessionActive() && !getIsHotkeyAllowedDuringCanvasPathEdit(category)) {
+          return true;
+        }
+        return _options.ignoreEventWhen?.(event) ?? false;
+      },
       enabled: (event, hotkeysEvent) => {
         // Suppress all registered hotkeys while text editing is still uncommitted.
         if (isUncommittedCanvasTextSessionActive()) {
-          return false;
-        }
-        // Keep path-editing hotkeys active, but prevent shortcuts from acting on another app region.
-        if (isCanvasPathEditSessionActive() && !getIsHotkeyAllowedDuringCanvasPathEdit(category)) {
           return false;
         }
         if (typeof _options.enabled === 'function') {

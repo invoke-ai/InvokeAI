@@ -13,7 +13,7 @@ const TAPER_LENGTH_STROKE_WIDTH_SCALE = 6;
 const getDistance = (a: Coordinate, b: Coordinate): number => Math.hypot(a.x - b.x, a.y - b.y);
 const smoothstep = (value: number): number => value * value * (3 - 2 * value);
 
-export const buildTaperedTracePoints = (coordinates: Coordinate[], strokeWidth: number): number[] => {
+export const buildTaperedTracePoints = (coordinates: Coordinate[], strokeWidth: number, taper = 100): number[] => {
   if (coordinates.length === 0) {
     return [];
   }
@@ -29,7 +29,10 @@ export const buildTaperedTracePoints = (coordinates: Coordinate[], strokeWidth: 
   }
 
   const totalLength = distancesFromStart.at(-1) ?? 0;
-  const taperLength = Math.min(totalLength / 2, Math.max(0, strokeWidth * TAPER_LENGTH_STROKE_WIDTH_SCALE));
+  const taperLength = Math.min(
+    totalLength / 2,
+    Math.max(0, strokeWidth * TAPER_LENGTH_STROKE_WIDTH_SCALE * (taper / 100))
+  );
 
   return coordinates.flatMap((coordinate, index) => {
     const distanceFromStart = distancesFromStart[index] ?? 0;
@@ -44,7 +47,8 @@ export const buildVectorTraceObject = (
   path: CanvasBezierPathState,
   strokeWidth: number,
   color: RgbaColor,
-  taperEnds: boolean
+  taperEnds: boolean,
+  taper = 100
 ): CanvasBrushLineState | CanvasBrushLineWithPressureState | null => {
   const coordinates = approximateBezierPath(path.points, path.isClosed);
   if (coordinates.length < 2) {
@@ -56,7 +60,7 @@ export const buildVectorTraceObject = (
       id: getPrefixedId('brush_line_with_pressure'),
       type: 'brush_line_with_pressure',
       strokeWidth,
-      points: buildTaperedTracePoints(coordinates, strokeWidth),
+      points: buildTaperedTracePoints(coordinates, strokeWidth, taper),
       color,
       pressureAffectsWidth: true,
       pressureAffectsOpacity: false,

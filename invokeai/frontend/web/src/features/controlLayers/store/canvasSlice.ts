@@ -563,6 +563,39 @@ const slice = createSlice({
 
       entity.paths.push({ ...path });
     },
+    vectorPathExtracted: {
+      reducer: (
+        state,
+        action: PayloadAction<EntityIdentifierPayload<{ pathId: string; newLayerId: string }, 'vector_layer'>>
+      ) => {
+        const { entityIdentifier, pathId, newLayerId } = action.payload;
+        const sourceLayerIndex = state.vectorLayers.entities.findIndex((entity) => entity.id === entityIdentifier.id);
+        const sourceLayer = state.vectorLayers.entities[sourceLayerIndex];
+        if (!sourceLayer) {
+          return;
+        }
+
+        const pathIndex = sourceLayer.paths.findIndex((path) => path.id === pathId);
+        const path = sourceLayer.paths[pathIndex];
+        if (!path) {
+          return;
+        }
+
+        sourceLayer.paths.splice(pathIndex, 1);
+        const extractedLayer = getVectorLayerState(newLayerId, {
+          opacity: sourceLayer.opacity,
+          position: { ...sourceLayer.position },
+          paths: [deepClone(path)],
+        });
+        state.vectorLayers.entities.splice(sourceLayerIndex + 1, 0, extractedLayer);
+        state.selectedEntityIdentifier = { type: 'vector_layer', id: newLayerId };
+      },
+      prepare: (
+        payload: EntityIdentifierPayload<{ pathId: string }, 'vector_layer'>
+      ): { payload: EntityIdentifierPayload<{ pathId: string; newLayerId: string }, 'vector_layer'> } => ({
+        payload: { ...payload, newLayerId: getPrefixedId('vector_layer') },
+      }),
+    },
     vectorLayerPathsReplaced: (
       state,
       action: PayloadAction<
@@ -588,6 +621,26 @@ const slice = createSlice({
       }
 
       entity.paths = entity.paths.map((path) => transformBezierPath(path, matrix, entity.position));
+    },
+    vectorPathTransformed: (
+      state,
+      action: PayloadAction<
+        EntityIdentifierPayload<{ pathId: string; matrix: TransformMatrix; undoGroup?: string }, 'vector_layer'>
+      >
+    ) => {
+      const { entityIdentifier, pathId, matrix } = action.payload;
+      const entity = selectEntity(state, entityIdentifier);
+      if (!entity || entity.type !== 'vector_layer') {
+        return;
+      }
+
+      const pathIndex = entity.paths.findIndex((path) => path.id === pathId);
+      const path = entity.paths[pathIndex];
+      if (!path) {
+        return;
+      }
+
+      entity.paths[pathIndex] = transformBezierPath(path, matrix, entity.position);
     },
     vectorLayersMergedDown: (
       state,
@@ -2194,8 +2247,10 @@ export const {
   controlLayerRecalled,
   vectorLayerAdded,
   vectorPathAdded,
+  vectorPathExtracted,
   vectorLayerPathsReplaced,
   vectorLayerTransformed,
+  vectorPathTransformed,
   vectorLayersMergedDown,
   controlLayerConvertedToRasterLayer,
   controlLayerConvertedToInpaintMask,
@@ -2269,7 +2324,7 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
     return filter;
   },
   groupBy: (action) => {
-    if (vectorLayerPathsReplaced.match(action)) {
+    if (isAnyOf(vectorLayerPathsReplaced, vectorPathTransformed)(action)) {
       return action.payload.undoGroup ?? null;
     }
     return null;

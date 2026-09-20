@@ -7,6 +7,7 @@ import {
   canvasSettingsSliceConfig,
   settingsPressureAffectsOpacityToggled,
   settingsPressureAffectsWidthToggled,
+  settingsTraceTaperChanged,
   settingsTraceTaperEndsToggled,
 } from './canvasSettingsSlice';
 
@@ -49,6 +50,23 @@ describe('canvasSettingsSlice', () => {
     const result = migrate?.(olderState) as InitialState;
 
     expect(result.traceTaperEnds).toBe(false);
+  });
+
+  it('updates and clamps the vector trace taper length', () => {
+    const state = canvasSettingsSliceConfig.getInitialState();
+
+    expect(reducer(state, settingsTraceTaperChanged(175)).traceTaper).toBe(175);
+    expect(reducer(state, settingsTraceTaperChanged(0)).traceTaper).toBe(1);
+    expect(reducer(state, settingsTraceTaperChanged(600)).traceTaper).toBe(500);
+  });
+
+  it('defaults vector trace taper length when migrating older settings', () => {
+    expect(migrate).toBeDefined();
+    const { traceTaper: _traceTaper, ...olderState } = canvasSettingsSliceConfig.getInitialState();
+
+    const result = migrate?.(olderState) as InitialState;
+
+    expect(result.traceTaper).toBe(100);
   });
 
   it('migrates legacy pressureSensitivity to pressureAffectsWidth and leaves opacity disabled', () => {

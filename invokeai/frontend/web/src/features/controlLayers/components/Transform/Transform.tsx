@@ -7,7 +7,7 @@ import { TransformSmoothingControls } from 'features/controlLayers/components/Tr
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { memo, useRef } from 'react';
+import { memo, useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) => {
@@ -17,6 +17,14 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
   const isCanvasFocused = useIsRegionFocused('canvas');
   const isProcessing = useStore(adapter.transformer.$isProcessing);
   const silentTransform = useStore(adapter.transformer.$silentTransform);
+  const cancelTransform = useCallback(
+    (event: KeyboardEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      adapter.transformer.stopTransform();
+    },
+    [adapter.transformer]
+  );
 
   useRegisteredHotkeys({
     id: 'applyTransform',
@@ -29,9 +37,9 @@ const TransformContent = memo(({ adapter }: { adapter: CanvasEntityAdapter }) =>
   useRegisteredHotkeys({
     id: 'cancelTransform',
     category: 'canvas',
-    callback: adapter.transformer.stopTransform,
+    callback: cancelTransform,
     options: { enabled: !isProcessing && isCanvasFocused },
-    dependencies: [adapter.transformer, isProcessing, isCanvasFocused],
+    dependencies: [cancelTransform, isProcessing, isCanvasFocused],
   });
 
   if (silentTransform) {

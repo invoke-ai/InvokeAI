@@ -99,10 +99,7 @@ export class CanvasEntityVectorLayerRenderer extends CanvasEntityObjectRenderer 
     return this.manager.stage.unscale(VECTOR_PATH_STROKE_WIDTH_PX);
   };
 
-  private syncPathStrokeWidths = (
-    group: Konva.Group = this.konva.objectGroup,
-    strokeWidth = this.getPathStrokeWidth()
-  ) => {
+  syncPathStrokeWidths = (group: Konva.Group = this.konva.objectGroup, strokeWidth = this.getPathStrokeWidth()) => {
     for (const node of group.getChildren()) {
       if (node instanceof Konva.Path) {
         node.strokeWidth(strokeWidth);

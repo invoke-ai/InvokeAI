@@ -247,6 +247,10 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.applyToolHotkeyState(setBaseToolInState(this.getToolHotkeyState(), tool));
   };
 
+  private isPathEditInteractionTool = (tool: Tool): boolean => {
+    return this.tools.path.hasActiveEditSession() && (tool === 'path' || tool === 'move');
+  };
+
   pressSpaceKey = () => {
     this.applyToolHotkeyState(pressSpaceInState(this.getToolHotkeyState()));
   };
@@ -346,6 +350,8 @@ export class CanvasToolModule extends CanvasModuleBase {
         this.tools.brush.syncCursorStyle();
       } else if (tool === 'eraser') {
         this.tools.eraser.syncCursorStyle();
+      } else if (this.isPathEditInteractionTool(tool)) {
+        this.tools.path.syncCursorStyle();
       } else if (tool === 'move') {
         this.tools.move.syncCursorStyle();
       } else if (tool === 'path') {
@@ -495,10 +501,14 @@ export class CanvasToolModule extends CanvasModuleBase {
     }
 
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
-    const isVectorDrawingTool = tool === 'path' || (tool === 'rect' && selectedEntity?.state.type === 'vector_layer');
+    const isPathEditInteractionTool = this.isPathEditInteractionTool(tool);
+    const isVectorDrawingTool =
+      tool === 'path' ||
+      isPathEditInteractionTool ||
+      (tool === 'rect' && selectedEntity?.state.type === 'vector_layer');
 
     if (isVectorDrawingTool) {
-      if (tool === 'path' && this.tools.path.hasActiveEditSession()) {
+      if (isPathEditInteractionTool) {
         return this.tools.path.getCanMutateEditSession();
       }
 
@@ -622,7 +632,7 @@ export class CanvasToolModule extends CanvasModuleBase {
         await this.tools.brush.onStagePointerDown(e);
       } else if (tool === 'eraser') {
         await this.tools.eraser.onStagePointerDown(e);
-      } else if (tool === 'path') {
+      } else if (tool === 'path' || this.isPathEditInteractionTool(tool)) {
         this.tools.path.onStagePointerDown(e);
       } else if (tool === 'rect') {
         await this.tools.rect.onStagePointerDown(e);
@@ -660,7 +670,7 @@ export class CanvasToolModule extends CanvasModuleBase {
         this.tools.brush.onStagePointerUp(e);
       } else if (tool === 'eraser') {
         this.tools.eraser.onStagePointerUp(e);
-      } else if (tool === 'path') {
+      } else if (tool === 'path' || this.isPathEditInteractionTool(tool)) {
         this.tools.path.onStagePointerUp(e);
       } else if (tool === 'rect') {
         await this.tools.rect.onStagePointerUp(e);
@@ -699,7 +709,7 @@ export class CanvasToolModule extends CanvasModuleBase {
         await this.tools.brush.onStagePointerMove(e);
       } else if (tool === 'eraser') {
         await this.tools.eraser.onStagePointerMove(e);
-      } else if (tool === 'path') {
+      } else if (tool === 'path' || this.isPathEditInteractionTool(tool)) {
         this.tools.path.onStagePointerMove(e);
       } else if (tool === 'rect') {
         await this.tools.rect.onStagePointerMove(e);
@@ -827,7 +837,7 @@ export class CanvasToolModule extends CanvasModuleBase {
           return;
         }
         await this.tools.rect.onWindowPointerMove();
-      } else if (this.$tool.get() === 'path') {
+      } else if (this.$tool.get() === 'path' || this.isPathEditInteractionTool(this.$tool.get())) {
         if (!this.tools.path.hasActiveEditDragSession()) {
           return;
         }
@@ -860,12 +870,23 @@ export class CanvasToolModule extends CanvasModuleBase {
 
   onKeyDown = (e: KeyboardEvent) => {
     const isSpaceKey = e.key === KEY_SPACE || e.code === CODE_SPACE;
+    if (e.defaultPrevented) {
+      return;
+    }
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
       return;
     }
     // Suppress canvas key handlers while an uncommitted text session is active.
     const hasActiveTextSession = this.tools.text.$session.get() !== null;
     if (hasActiveTextSession) {
+      return;
+    }
+    // The tool-change dialog owns Escape. Closing it resumes path editing without discarding the session.
+    if (this.tools.path.$isExitConfirmationOpen.get()) {
+      return;
+    }
+    // The Transform overlay owns Enter/Escape while a transform transaction is active.
+    if (this.manager.stateApi.$transformingAdapter.get()) {
       return;
     }
 
@@ -889,12 +910,16 @@ export class CanvasToolModule extends CanvasModuleBase {
         this.tools.rect.hasSuspendableSession()
       );
 
+      if (tool === 'rect' && this.tools.path.hasActiveEditSession() && !this.tools.rect.hasActiveSession()) {
+        toolToCancel = 'path';
+      }
+
       if (toolToCancel === null) {
-        if (tool === 'path') {
+        if (tool === 'path' || (tool === 'move' && this.tools.path.hasActiveEditSession())) {
           toolToCancel = 'path';
         } else if (
           (tool === 'view' || tool === 'colorPicker') &&
-          this.$baseTool.get() === 'path' &&
+          (this.$baseTool.get() === 'path' || this.$baseTool.get() === 'move') &&
           this.tools.path.hasActiveSession()
         ) {
           toolToCancel = 'path';
@@ -943,14 +968,22 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
       const isPathQuickSwitch =
         (tool === 'view' || tool === 'colorPicker') &&
-        this.$baseTool.get() === 'path' &&
+        (this.$baseTool.get() === 'path' || this.$baseTool.get() === 'move') &&
         this.tools.path.hasActiveSession();
-      if ((tool === 'path' || isPathQuickSwitch) && this.tools.path.hasActiveSession()) {
+      if (
+        (tool === 'path' || (tool === 'move' && this.tools.path.hasActiveEditSession()) || isPathQuickSwitch) &&
+        this.tools.path.hasActiveSession()
+      ) {
         e.preventDefault();
         this.tools.path.commit();
         if (isPathQuickSwitch) {
           this.clearTemporaryToolHotkeys();
         }
+        return;
+      }
+      if (tool === 'rect' && this.tools.path.hasActiveEditSession() && !this.tools.rect.hasActiveSession()) {
+        e.preventDefault();
+        this.tools.path.commit();
         return;
       }
     }

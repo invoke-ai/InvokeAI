@@ -76,10 +76,21 @@ describe('getCanvasToolModifierHintIds', () => {
     ]);
   });
 
+  it('shows path edit hints for the move tool while editing a vector layer', () => {
+    expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'move', isEditingPathSession: true }))).toEqual([
+      'shiftInsertPathPoint',
+      'modAddPathPointSelection',
+      'enterApplyPathEdit',
+      'escCancelPathEdit',
+      'spacePan',
+      'altPickColor',
+    ]);
+  });
+
   it('shows edit hints for path tool while editing a vector layer', () => {
     expect(getCanvasToolModifierHintIds(buildArgs({ tool: 'path', isEditingPathSession: true }))).toEqual([
       'shiftInsertPathPoint',
-      'modDeletePathPoint',
+      'modAddPathPointSelection',
       'enterApplyPathEdit',
       'escCancelPathEdit',
       'spacePan',

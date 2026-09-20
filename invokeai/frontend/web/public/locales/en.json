@@ -807,8 +807,8 @@
                 "desc": "Switch between the last two selected layers. If a layer is bookmarked, always switch between it and the last non-bookmarked layer."
             },
             "deleteSelected": {
-                "title": "Delete Layer / Active Spline",
-                "desc": "Delete the active spline in Vector Edit mode; otherwise delete the selected layer."
+                "title": "Delete Selection",
+                "desc": "In Vector Edit mode, delete selected points or the active spline when no points are selected; otherwise delete the selected layer."
             },
             "resetSelected": {
                 "title": "Reset Layer",
@@ -3225,12 +3225,26 @@
             "symmetric": "Symmetric",
             "smoothPath": "Smooth Path",
             "smoothSelectedPoints": "Selected Points",
-            "deleteActivePathHint": "Delete active spline",
+            "deleteSelectionHint": "Delete selected points or active spline",
+            "splitPoint": "Split Points",
+            "joinPoints": "Join Points",
+            "toolChangeTitle": "Finish Vector Editing",
+            "toolChangePrompt": "Apply the current vector changes before switching tools? Discard removes all changes made in this edit session. Press Esc to return to editing.",
+            "discardChanges": "Discard",
             "traceWidth": "Trace Width",
             "taperEnds": "Taper Ends",
+            "taper": "Taper",
             "traceAll": "Trace All Paths",
             "fillClosedPaths": "Fill Closed Paths",
-            "createInpaintMask": "Create Inpaint Mask"
+            "createInpaintMask": "Create Inpaint Mask",
+            "pathTitle": "Path",
+            "transformPath": "Transform Path",
+            "tracePath": "Trace Path",
+            "fillPath": "Fill Path",
+            "createInpaintMaskFromPath": "Create Inpaint Mask",
+            "extractPath": "Extract Path",
+            "copyPath": "Copy Path",
+            "deletePath": "Delete Path"
         },
         "lasso": {
             "freehand": "Freehand",
@@ -3281,7 +3295,7 @@
                 "snapRotation": "Snap rotation",
                 "nudgeSelection": "Nudge selection",
                 "insertPathPoint": "Insert point",
-                "deletePathPoint": "Delete point"
+                "addPathPointSelection": "Add points to selection"
             }
         },
         "tool": {
@@ -3495,7 +3509,7 @@
             "isolatedStagingPreview": "Isolated Staging Preview",
             "isolatedPreview": "Isolated Preview",
             "isolatedLayerPreview": "Isolated Layer Preview",
-            "isolatedLayerPreviewDesc": "Whether to show only this layer when performing operations like filtering or transforming.",
+            "isolatedLayerPreviewDesc": "Show only the current layer during layer operations, or only the active path when transforming a path.",
             "invertBrushSizeScrollDirection": "Invert Scroll for Brush Size",
             "pressureAffectsWidth": "Pressure Affects Width",
             "pressureAffectsBrushOpacity": "Pressure Affects Opacity"

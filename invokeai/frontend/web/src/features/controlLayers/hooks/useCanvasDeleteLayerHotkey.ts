@@ -22,7 +22,7 @@ export function useCanvasDeleteLayerHotkey() {
 
     const pathTool = canvasManager.tool.tools.path;
     if (pathTool.hasActiveEditSession()) {
-      pathTool.deleteActivePath();
+      pathTool.deleteSelectedPointsOrActivePath();
       return;
     }
 

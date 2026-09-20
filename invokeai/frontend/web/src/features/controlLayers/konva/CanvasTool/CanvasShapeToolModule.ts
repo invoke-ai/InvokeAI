@@ -1078,9 +1078,13 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     }
 
     activeEntity.bufferRenderer.clearBuffer();
+    const path = getBezierPathState(getPrefixedId('bezier_path'), { points, isClosed });
+    if (this.manager.tool.tools.path.addPathToEditSession(path)) {
+      return;
+    }
     this.manager.stateApi.addVectorPath({
       entityIdentifier: { id: activeEntity.entityIdentifier.id, type: 'vector_layer' },
-      path: getBezierPathState(getPrefixedId('bezier_path'), { points, isClosed }),
+      path,
     });
   };
 

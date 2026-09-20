@@ -31,7 +31,7 @@ type CanvasToolModifierHintId =
   | 'shiftSnapRotation'
   | 'arrowKeysNudgeSelection'
   | 'shiftInsertPathPoint'
-  | 'modDeletePathPoint';
+  | 'modAddPathPointSelection';
 
 type CanvasToolModifierHint = {
   id: CanvasToolModifierHintId;
@@ -157,10 +157,10 @@ const HINTS: Record<CanvasToolModifierHintId, CanvasToolModifierHint> = {
     keys: ['shift'],
     labelKey: 'controlLayers.modifierHints.labels.insertPathPoint',
   },
-  modDeletePathPoint: {
-    id: 'modDeletePathPoint',
+  modAddPathPointSelection: {
+    id: 'modAddPathPointSelection',
     keys: ['mod'],
-    labelKey: 'controlLayers.modifierHints.labels.deletePathPoint',
+    labelKey: 'controlLayers.modifierHints.labels.addPathPointSelection',
   },
 };
 
@@ -200,12 +200,22 @@ export const getCanvasToolModifierHintIds = ({
       'altScaleFromCenter',
       'modFineGrid',
     ],
-    move: () => ['arrowKeysNudgeSelection', 'modFineGrid', ...SHARED_HINT_IDS],
+    move: ({ isEditingPathSession }) =>
+      isEditingPathSession
+        ? [
+            'shiftInsertPathPoint',
+            'modAddPathPointSelection',
+            'enterApplyPathEdit',
+            'escCancelPathEdit',
+            'spacePan',
+            'altPickColor',
+          ]
+        : ['arrowKeysNudgeSelection', 'modFineGrid', ...SHARED_HINT_IDS],
     path: ({ isEditingPathSession }) =>
       isEditingPathSession
         ? [
             'shiftInsertPathPoint',
-            'modDeletePathPoint',
+            'modAddPathPointSelection',
             'enterApplyPathEdit',
             'escCancelPathEdit',
             'spacePan',

@@ -16,7 +16,7 @@ export const EntityListSelectedEntityActionBar = memo(() => {
     <Flex flexDirection="column" gap={2}>
       <Flex w="full" minW={0} gap={2} ps={1}>
         <EntityListSelectedEntityActionBarCompositeOperation />
-        <EntityListSelectedEntityActionBarOpacity />
+        {!isVectorLayerSelected && <EntityListSelectedEntityActionBarOpacity />}
         {isVectorLayerSelected && <VectorLayerTraceWidth />}
         <EntityListSelectedEntityActionBarFill />
       </Flex>

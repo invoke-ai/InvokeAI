@@ -1,4 +1,5 @@
 import { MenuGroup } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { useAppSelector } from 'app/store/storeHooks';
 import { ControlLayerMenuItems } from 'features/controlLayers/components/ControlLayer/ControlLayerMenuItems';
 import { InpaintMaskMenuItems } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItems';
@@ -6,7 +7,9 @@ import { RasterLayerMenuItems } from 'features/controlLayers/components/RasterLa
 import { IPAdapterMenuItems } from 'features/controlLayers/components/RefImage/IPAdapterMenuItems';
 import { RegionalGuidanceMenuItems } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItems';
 import { VectorLayerMenuItems } from 'features/controlLayers/components/VectorLayer/VectorLayerMenuItems';
+import { VectorPathMenuItems } from 'features/controlLayers/components/VectorLayer/VectorPathMenuItems';
 import { CanvasEntityStateGate } from 'features/controlLayers/contexts/CanvasEntityStateGate';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import {
   EntityIdentifierContext,
   useEntityIdentifierContext,
@@ -15,11 +18,14 @@ import { useEntityTypeString } from 'features/controlLayers/hooks/useEntityTypeS
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
+  const canvasManager = useCanvasManager();
+  const editSession = useStore(canvasManager.tool.tools.path.$editSession);
 
   if (entityIdentifier.type === 'raster_layer') {
     return <RasterLayerMenuItems />;
@@ -31,6 +37,12 @@ const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
     return <InpaintMaskMenuItems />;
   }
   if (entityIdentifier.type === 'vector_layer') {
+    if (
+      editSession?.entityIdentifier.id === entityIdentifier.id &&
+      editSession.entityIdentifier.type === entityIdentifier.type
+    ) {
+      return <VectorPathMenuItems />;
+    }
     return <VectorLayerMenuItems />;
   }
   if (entityIdentifier.type === 'regional_guidance') {
@@ -46,8 +58,16 @@ const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
 CanvasContextMenuSelectedEntityMenuItemsContent.displayName = 'CanvasContextMenuSelectedEntityMenuItemsContent';
 
 const CanvasContextMenuSelectedEntityMenuGroup = memo((props: PropsWithChildren) => {
+  const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
-  const title = useEntityTypeString(entityIdentifier.type);
+  const canvasManager = useCanvasManager();
+  const editSession = useStore(canvasManager.tool.tools.path.$editSession);
+  const entityTypeTitle = useEntityTypeString(entityIdentifier.type);
+  const isEditingPath =
+    entityIdentifier.type === 'vector_layer' &&
+    editSession?.entityIdentifier.id === entityIdentifier.id &&
+    editSession.entityIdentifier.type === entityIdentifier.type;
+  const title = isEditingPath ? t('controlLayers.vectorEdit.pathTitle') : entityTypeTitle;
 
   return <MenuGroup title={title}>{props.children}</MenuGroup>;
 });
@@ -55,15 +75,18 @@ const CanvasContextMenuSelectedEntityMenuGroup = memo((props: PropsWithChildren)
 CanvasContextMenuSelectedEntityMenuGroup.displayName = 'CanvasContextMenuSelectedEntityMenuGroup';
 
 export const CanvasContextMenuSelectedEntityMenuItems = memo(() => {
+  const canvasManager = useCanvasManager();
+  const editSession = useStore(canvasManager.tool.tools.path.$editSession);
   const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+  const entityIdentifier = editSession?.entityIdentifier ?? selectedEntityIdentifier;
 
-  if (!selectedEntityIdentifier) {
+  if (!entityIdentifier) {
     return null;
   }
 
   return (
-    <EntityIdentifierContext.Provider value={selectedEntityIdentifier}>
-      <CanvasEntityStateGate entityIdentifier={selectedEntityIdentifier}>
+    <EntityIdentifierContext.Provider value={entityIdentifier}>
+      <CanvasEntityStateGate entityIdentifier={entityIdentifier}>
         <CanvasContextMenuSelectedEntityMenuGroup>
           <CanvasContextMenuSelectedEntityMenuItemsContent />
         </CanvasContextMenuSelectedEntityMenuGroup>

@@ -90,6 +90,9 @@ const getInputValueFromEvent = (
   const input = currentTarget?.querySelector('input') ?? null;
   return { input, parsed: input ? parseInputValue(input.value) : NaN };
 };
+const selectInputValue = (event: FocusEvent<HTMLElement>) => {
+  getInputValueFromEvent(event).input?.select();
+};
 
 interface ToolWidthPickerComponentProps {
   ariaLabel?: string;
@@ -146,7 +149,12 @@ const DropDownToolWidthPickerComponent = memo(
               clampValueOnBlur={false}
             >
               <PopoverTrigger>
-                <NumberInputField _focusVisible={{ zIndex: 0 }} aria-label={ariaLabel} title="" />
+                <NumberInputField
+                  _focusVisible={{ zIndex: 0 }}
+                  aria-label={ariaLabel}
+                  title=""
+                  onFocus={selectInputValue}
+                />
               </PopoverTrigger>
               <NumberInputStepper>
                 <NumberIncrementStepper>
@@ -219,6 +227,7 @@ const SliderToolWidthPickerComponent = memo(
           max={600}
           value={localValue}
           onChange={onChangeInput}
+          onFocus={selectInputValue}
           onBlur={onBlur}
           onKeyDown={onKeyDown}
           onPointerDownCapture={onPointerDownCapture}

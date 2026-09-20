@@ -2,6 +2,10 @@ import { MenuItem } from '@invoke-ai/ui-library';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityAdapterSafe } from 'features/controlLayers/contexts/EntityAdapterContext';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
+import { useEntityIsEnabled } from 'features/controlLayers/hooks/useEntityIsEnabled';
+import { useEntityIsLocked } from 'features/controlLayers/hooks/useEntityIsLocked';
+import { useEntityTypeIsHidden } from 'features/controlLayers/hooks/useEntityTypeIsHidden';
 import type { CanvasInpaintMaskState, CanvasRasterLayerState } from 'features/controlLayers/store/types';
 import {
   buildClosedPathLassoObjects,
@@ -17,6 +21,10 @@ export const VectorLayerMenuItemsMaterializeClosedPaths = memo(() => {
   const canvasManager = useCanvasManager();
   const entityIdentifier = useEntityIdentifierContext('vector_layer');
   const adapter = useEntityAdapterSafe(entityIdentifier);
+  const isBusy = useCanvasIsBusy();
+  const isEnabled = useEntityIsEnabled(entityIdentifier);
+  const isLocked = useEntityIsLocked(entityIdentifier);
+  const isVectorLayerTypeHidden = useEntityTypeIsHidden('vector_layer');
 
   const acceptActiveEditSession = useCallback(() => {
     const editSession = canvasManager.tool.tools.path.$editSession.get();
@@ -74,13 +82,14 @@ export const VectorLayerMenuItemsMaterializeClosedPaths = memo(() => {
   }
 
   const hasClosedPaths = adapter.state.paths.some(isFillableBezierPath);
+  const isDisabled = !hasClosedPaths || !isEnabled || isLocked || isVectorLayerTypeHidden || isBusy;
 
   return (
     <>
-      <MenuItem onClick={onFillClosedPaths} icon={<PiPaintBucketBold />} isDisabled={!hasClosedPaths}>
+      <MenuItem onClick={onFillClosedPaths} icon={<PiPaintBucketBold />} isDisabled={isDisabled}>
         {t('controlLayers.vectorEdit.fillClosedPaths')}
       </MenuItem>
-      <MenuItem onClick={onCreateInpaintMask} icon={<PiSelectionAllBold />} isDisabled={!hasClosedPaths}>
+      <MenuItem onClick={onCreateInpaintMask} icon={<PiSelectionAllBold />} isDisabled={isDisabled}>
         {t('controlLayers.vectorEdit.createInpaintMask')}
       </MenuItem>
     </>

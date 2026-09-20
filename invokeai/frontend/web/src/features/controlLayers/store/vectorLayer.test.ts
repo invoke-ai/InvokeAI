@@ -19,6 +19,8 @@ import {
   vectorLayersMergedDown,
   vectorLayerTransformed,
   vectorPathAdded,
+  vectorPathExtracted,
+  vectorPathTransformed,
 } from './canvasSlice';
 import {
   buildSelectHasObjects,
@@ -361,6 +363,83 @@ describe('vector layer integration', () => {
         ],
       },
     ]);
+  });
+
+  it('applies a transform matrix only to the requested path', () => {
+    const state = getInitialCanvasState();
+    state.vectorLayers.entities.push(
+      getVectorLayerState('vector-layer-a', {
+        position: { x: 10, y: 20 },
+        paths: [
+          {
+            id: 'bezier-path-a',
+            name: null,
+            isClosed: false,
+            points: [{ anchor: { x: 1, y: 2 }, inHandle: null, outHandle: null, type: 'corner' }],
+          },
+          {
+            id: 'bezier-path-b',
+            name: null,
+            isClosed: false,
+            points: [{ anchor: { x: 30, y: 40 }, inHandle: null, outHandle: null, type: 'corner' }],
+          },
+        ],
+      })
+    );
+
+    const result = reducer(
+      state,
+      vectorPathTransformed({
+        entityIdentifier: { id: 'vector-layer-a', type: 'vector_layer' },
+        pathId: 'bezier-path-a',
+        matrix: [1, 0, 0, 1, 15, 27],
+      })
+    );
+
+    expect(result.vectorLayers.entities[0]?.paths[0]?.points[0]?.anchor).toEqual({ x: 6, y: 9 });
+    expect(result.vectorLayers.entities[0]?.paths[1]?.points[0]?.anchor).toEqual({ x: 30, y: 40 });
+  });
+
+  it('extracts one path into a selected vector layer above its source', () => {
+    const state = getInitialCanvasState();
+    state.vectorLayers.entities.push(
+      getVectorLayerState('vector-layer-a', {
+        opacity: 0.4,
+        position: { x: 10, y: 20 },
+        paths: [
+          {
+            id: 'bezier-path-a',
+            name: 'Path A',
+            isClosed: false,
+            points: [{ anchor: { x: 1, y: 2 }, inHandle: null, outHandle: null, type: 'corner' }],
+          },
+          {
+            id: 'bezier-path-b',
+            name: 'Path B',
+            isClosed: false,
+            points: [{ anchor: { x: 3, y: 4 }, inHandle: null, outHandle: null, type: 'corner' }],
+          },
+        ],
+      })
+    );
+
+    const result = reducer(
+      state,
+      vectorPathExtracted({
+        entityIdentifier: { id: 'vector-layer-a', type: 'vector_layer' },
+        pathId: 'bezier-path-a',
+      })
+    );
+
+    expect(result.vectorLayers.entities).toHaveLength(2);
+    expect(result.vectorLayers.entities[0]?.paths.map((path) => path.id)).toEqual(['bezier-path-b']);
+    expect(result.vectorLayers.entities[1]).toMatchObject({
+      id: 'vector_layer-1',
+      opacity: 0.4,
+      position: { x: 10, y: 20 },
+      paths: [{ id: 'bezier-path-a', name: 'Path A' }],
+    });
+    expect(result.selectedEntityIdentifier).toEqual({ id: 'vector_layer-1', type: 'vector_layer' });
   });
 
   it('duplicates a vector layer and rekeys its paths', () => {

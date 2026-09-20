@@ -2,7 +2,9 @@ import { Mutex } from 'async-mutex';
 import { withResult, withResultAsync } from 'common/util/result';
 import { roundToMultiple } from 'common/util/roundDownToMultiple';
 import { clamp, debounce, get } from 'es-toolkit/compat';
+import { CanvasEntityVectorLayerRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityVectorLayerRenderer';
 import type { CanvasEntityAdapter } from 'features/controlLayers/konva/CanvasEntity/types';
+import { prepareVectorPathTransformPreview } from 'features/controlLayers/konva/CanvasEntity/vectorPathTransformPreview';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
 import {
@@ -15,6 +17,7 @@ import {
   roundRect,
 } from 'features/controlLayers/konva/util';
 import type { TransformSmoothingMode } from 'features/controlLayers/store/canvasSettingsSlice';
+import { selectIsolatedLayerPreview } from 'features/controlLayers/store/canvasSettingsSlice';
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { Coordinate, LifecycleCallback, Rect, RectWithRotation } from 'features/controlLayers/store/types';
 import { imageDTOToImageObject } from 'features/controlLayers/store/util';
@@ -185,6 +188,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    */
   transformMutex = new Mutex();
 
+  private vectorPathId: string | null = null;
+  private vectorPathPreviewGroup: Konva.Group | null = null;
+
   /**
    * Callbacks that are executed when the bbox is updated.
    */
@@ -279,6 +285,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
         }
         if (newVal.scale !== oldVal.scale) {
           this.syncScale();
+          if (this.vectorPathPreviewGroup && this.parent.renderer instanceof CanvasEntityVectorLayerRenderer) {
+            this.parent.renderer.syncPathStrokeWidths(this.vectorPathPreviewGroup);
+          }
         }
       })
     );
@@ -293,10 +302,23 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     // When the selected tool changes, we need to update the transformer's interaction state.
     this.subscriptions.add(this.manager.tool.$tool.listen(this.syncInteractionState));
+    this.subscriptions.add(
+      this.manager.tool.tools.path.$editSession.listen((session, previousSession) => {
+        const isEditingThisVectorLayer = session?.entityIdentifier.id === this.parent.entityIdentifier.id;
+        const wasEditingThisVectorLayer = previousSession?.entityIdentifier.id === this.parent.entityIdentifier.id;
+        if (isEditingThisVectorLayer !== wasEditingThisVectorLayer) {
+          this.syncInteractionState();
+        }
+      })
+    );
 
     // When the selected entity changes, we need to update the transformer's interaction state.
     this.subscriptions.add(
       this.manager.stateApi.createStoreSubscription(selectSelectedEntityIdentifier, this.syncInteractionState)
+    );
+
+    this.subscriptions.add(
+      this.manager.stateApi.createStoreSubscription(selectIsolatedLayerPreview, this.syncVectorPathPreviewVisibility)
     );
 
     /**
@@ -705,6 +727,10 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     const tool = this.manager.tool.$tool.get();
     const isSelected = this.manager.stateApi.getIsSelected(this.parent.id);
+    const pathEditSession = this.manager.tool.tools.path.$editSession.get();
+    const isEditingThisVectorLayer =
+      pathEditSession?.entityIdentifier.type === 'vector_layer' &&
+      pathEditSession.entityIdentifier.id === this.parent.entityIdentifier.id;
 
     if (!isSelected) {
       // The layer is not selected
@@ -722,6 +748,13 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
     if (this.parent.$isLocked.get()) {
       // The layer is locked, it should not be interactable
+      this.parent.konva.layer.listening(false);
+      this._setInteractionMode('off');
+      return;
+    }
+
+    if (isEditingThisVectorLayer && !this.$isTransforming.get()) {
+      // The move tool manipulates path points during an edit session, not the whole vector layer.
       this.parent.konva.layer.listening(false);
       this._setInteractionMode('off');
       return;
@@ -769,6 +802,38 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.konva.transformer.forceUpdate();
   };
 
+  private prepareVectorPathTransform = (pathId: string): boolean => {
+    if (this.parent.state.type !== 'vector_layer') {
+      return false;
+    }
+
+    const objectGroup = this.parent.renderer.konva.objectGroup;
+    const prepared = prepareVectorPathTransformPreview(objectGroup, pathId);
+    if (!prepared) {
+      return false;
+    }
+
+    const { activePathNode, previewGroup } = prepared;
+    if (previewGroup.hasChildren()) {
+      this.parent.konva.layer.add(previewGroup);
+      previewGroup.zIndex(objectGroup.zIndex());
+      this.vectorPathPreviewGroup = previewGroup;
+      this.syncVectorPathPreviewVisibility();
+    } else {
+      previewGroup.destroy();
+    }
+
+    const rect = activePathNode.getClientRect({ skipTransform: true });
+    this.$nodeRect.set({ ...rect });
+    this.$pixelRect.set({ ...rect });
+    this.updateBbox();
+    return true;
+  };
+
+  private syncVectorPathPreviewVisibility = () => {
+    this.vectorPathPreviewGroup?.visible(!this.manager.stateApi.runSelector(selectIsolatedLayerPreview));
+  };
+
   /**
    * Starts the transformation of the entity.
    *
@@ -778,6 +843,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * @param arg Options for starting the transformation
    * @param arg.silent Whether the transformation should be silent. If silent, the transform controls will not be shown,
    * so you _must_ call `applyTransform` or `stopTransform` to complete the transformation.
+   * @param arg.vectorPathId When set, transform only this path while preserving its active edit session.
    *
    * @example
    * ```ts
@@ -786,22 +852,47 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    * await adapter.transformer.applyTransform();
    * ```
    */
-  startTransform = async (arg?: { silent: boolean }) => {
+  startTransform = async (arg?: { silent?: boolean; vectorPathId?: string }) => {
     const transformingAdapter = this.manager.stateApi.$transformingAdapter.get();
     if (transformingAdapter) {
       assert(false, `Already transforming an entity: ${transformingAdapter.id}`);
     }
+    const { silent = false, vectorPathId = null } = arg ?? {};
     const pathEditSession = this.manager.tool.tools.path.$editSession.get();
-    if (
+    if (vectorPathId) {
+      if (
+        this.parent.state.type !== 'vector_layer' ||
+        pathEditSession?.entityIdentifier.id !== this.parent.entityIdentifier.id ||
+        pathEditSession.activePathId !== vectorPathId
+      ) {
+        return;
+      }
+    } else if (
       this.parent.state.type === 'vector_layer' &&
       pathEditSession?.entityIdentifier.id === this.parent.entityIdentifier.id
     ) {
       this.manager.tool.tools.path.acceptEditSession();
     }
+    if (vectorPathId) {
+      // Path edits can schedule many bbox updates. Drop the pending coalesced update because this transform computes its
+      // own bbox directly from the active path.
+      this.requestRectCalculation.cancel();
+    }
     // This will be released when the transformation is stopped
     await this.transformMutex.acquire();
+    if (vectorPathId) {
+      const currentPathEditSession = this.manager.tool.tools.path.$editSession.get();
+      if (
+        currentPathEditSession?.entityIdentifier.id !== this.parent.entityIdentifier.id ||
+        currentPathEditSession.activePathId !== vectorPathId ||
+        !this.prepareVectorPathTransform(vectorPathId)
+      ) {
+        this.transformMutex.release();
+        return;
+      }
+      this.vectorPathId = vectorPathId;
+    }
     this.log.debug('Starting transform');
-    const { silent } = { silent: false, ...arg };
     this.$silentTransform.set(silent);
     this.$isTransforming.set(true);
     this.manager.stateApi.$transformingAdapter.set(this.parent);
@@ -829,10 +920,14 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
       this.resetScale();
       this.updatePosition();
-      this.manager.stateApi.transformVectorLayer({
-        entityIdentifier: { id: this.parent.entityIdentifier.id, type: 'vector_layer' },
-        matrix: [a, b, c, d, e, f],
-      });
+      if (this.vectorPathId) {
+        this.manager.tool.tools.path.applyActivePathTransform([a, b, c, d, e, f]);
+      } else {
+        this.manager.stateApi.transformVectorLayer({
+          entityIdentifier: { id: this.parent.entityIdentifier.id, type: 'vector_layer' },
+          matrix: [a, b, c, d, e, f],
+        });
+      }
       this.stopTransform();
       return;
     }
@@ -948,6 +1043,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
    */
   stopTransform = () => {
     this.log.debug('Stopping transform');
+    const didTransformVectorPath = this.vectorPathId !== null;
 
     this.$isTransforming.set(false);
 
@@ -958,6 +1054,12 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.manager.stateApi.$transformingAdapter.set(null);
     this.$isProcessing.set(false);
     this.transformMutex.release();
+    this.vectorPathId = null;
+    if (didTransformVectorPath && this.parent.state.type === 'vector_layer') {
+      this.vectorPathPreviewGroup?.destroy();
+      this.vectorPathPreviewGroup = null;
+      void this.parent.renderer.render().then(this.requestRectCalculation);
+    }
   };
 
   /**
@@ -1060,7 +1162,7 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     CanvasEntityTransformer.runBboxUpdatedCallbacks(this.parent);
   };
 
-  calculateRect = debounce(() => {
+  calculateRect = () => {
     this.log.debug('Calculating bbox');
 
     const getCanvasResult = withResult(() => this.parent.getCanvas());
@@ -1127,15 +1229,15 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
         this.transformMutex.release();
       }
     );
-  }, this.config.RECT_CALC_DEBOUNCE_MS);
+  };
 
-  requestRectCalculation = async () => {
+  requestRectCalculation = debounce(async () => {
     // This will be released when the rect calculation is complete
     await this.transformMutex.acquire();
     this.$isPendingRectCalculation.set(true);
     this.syncInteractionState();
     this.calculateRect();
-  };
+  }, this.config.RECT_CALC_DEBOUNCE_MS);
 
   // TODO(psyche): After resetting an entity, this can return stale data...
   getRelativeRect = (): Rect => {
@@ -1217,8 +1319,10 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
 
   destroy = () => {
     this.log.debug('Destroying module');
+    this.requestRectCalculation.cancel();
     this.subscriptions.forEach((unsubscribe) => unsubscribe());
     this.subscriptions.clear();
+    this.vectorPathPreviewGroup?.destroy();
     this.konva.outlineRect.destroy();
     this.konva.transformer.destroy();
     this.konva.proxyRect.destroy();

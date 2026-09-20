@@ -1,18 +1,30 @@
 import type { FlexProps } from '@invoke-ai/ui-library';
 import { ContextMenu, Flex, MenuList } from '@invoke-ai/ui-library';
+import { useStore } from '@nanostores/react';
 import { ControlLayerMenuItems } from 'features/controlLayers/components/ControlLayer/ControlLayerMenuItems';
 import { InpaintMaskMenuItems } from 'features/controlLayers/components/InpaintMask/InpaintMaskMenuItems';
 import { RasterLayerMenuItems } from 'features/controlLayers/components/RasterLayer/RasterLayerMenuItems';
 import { IPAdapterMenuItems } from 'features/controlLayers/components/RefImage/IPAdapterMenuItems';
 import { RegionalGuidanceMenuItems } from 'features/controlLayers/components/RegionalGuidance/RegionalGuidanceMenuItems';
 import { VectorLayerMenuItems } from 'features/controlLayers/components/VectorLayer/VectorLayerMenuItems';
+import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
 import { memo, useCallback } from 'react';
 import { assert } from 'tsafe';
 
 export const CanvasEntityHeader = memo(({ children, ...rest }: FlexProps) => {
   const entityIdentifier = useEntityIdentifierContext();
+  const canvasManager = useCanvasManager();
+  const editSession = useStore(canvasManager.tool.tools.path.$editSession);
   const renderMenu = useCallback(() => {
+    if (
+      editSession &&
+      (editSession.entityIdentifier.id !== entityIdentifier.id ||
+        editSession.entityIdentifier.type !== entityIdentifier.type)
+    ) {
+      return <MenuList />;
+    }
+
     if (entityIdentifier.type === 'regional_guidance') {
       return (
         <MenuList>
@@ -62,7 +74,7 @@ export const CanvasEntityHeader = memo(({ children, ...rest }: FlexProps) => {
     }
 
     assert(false, 'Unhandled entity type');
-  }, [entityIdentifier]);
+  }, [editSession, entityIdentifier]);
 
   return (
     <ContextMenu renderMenu={renderMenu}>

@@ -53,6 +53,16 @@ describe('vector layer trace utilities', () => {
     expect(pressures).toEqual([0, 1, 0]);
   });
 
+  it('uses the taper percentage to control how gradually the stroke narrows', () => {
+    const coordinates = Array.from({ length: 13 }, (_, index) => ({ x: index * 20, y: 0 }));
+    const defaultTaper = buildTaperedTracePoints(coordinates, 10, 100);
+    const gradualTaper = buildTaperedTracePoints(coordinates, 10, 200);
+
+    expect(gradualTaper[5]).toBeLessThan(defaultTaper[5] ?? 0);
+    expect(defaultTaper.at(-1)).toBe(0);
+    expect(gradualTaper.at(-1)).toBe(0);
+  });
+
   it('returns full pressure for a zero-length trace', () => {
     expect(buildTaperedTracePoints([{ x: 4, y: 8 }], 10)).toEqual([4, 8, 1]);
   });
