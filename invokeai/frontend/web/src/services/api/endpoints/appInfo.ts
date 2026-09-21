@@ -116,6 +116,36 @@ export const appInfoApi = api.injectEndpoints({
       }),
       invalidatesTags: ['AppConfig', 'FetchOnReconnect'],
     }),
+    getFalModels: build.query<
+      paths['/api/v1/app/external_providers/fal/models']['get']['responses']['200']['content']['application/json'],
+      paths['/api/v1/app/external_providers/fal/models']['get']['parameters']['query']
+    >({
+      query: (query) => ({
+        url: buildAppInfoUrl('external_providers/fal/models', query ?? undefined),
+        method: 'GET',
+      }),
+      providesTags: ['FetchOnReconnect'],
+    }),
+    getFalModelSchema: build.query<
+      paths['/api/v1/app/external_providers/fal/models/{endpoint_id}/schema']['get']['responses']['200']['content']['application/json'],
+      string
+    >({
+      query: (endpoint_id) => ({
+        url: buildAppInfoUrl(`external_providers/fal/models/${endpoint_id}/schema`),
+        method: 'GET',
+      }),
+    }),
+    installFalModel: build.mutation<
+      paths['/api/v1/app/external_providers/fal/models/install']['post']['responses']['201']['content']['application/json'],
+      paths['/api/v1/app/external_providers/fal/models/install']['post']['requestBody']['content']['application/json']
+    >({
+      query: (body) => ({
+        url: buildAppInfoUrl('external_providers/fal/models/install'),
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['FetchOnReconnect'],
+    }),
     getInvocationCacheStatus: build.query<
       paths['/api/v1/app/invocation_cache/status']['get']['responses']['200']['content']['application/json'],
       void
@@ -162,6 +192,8 @@ export const {
   useGetGenerationDeviceOptionsQuery,
   useGetExternalProviderStatusesQuery,
   useGetExternalProviderConfigsQuery,
+  useLazyGetFalModelsQuery,
+  useInstallFalModelMutation,
   useSetExternalProviderConfigMutation,
   useResetExternalProviderConfigMutation,
   useUpdateRuntimeConfigMutation,

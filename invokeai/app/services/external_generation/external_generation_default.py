@@ -3,7 +3,8 @@ from __future__ import annotations
 import dataclasses
 import time
 from logging import Logger
-from typing import TYPE_CHECKING
+from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 from PIL import Image
 from PIL.Image import Image as PILImageType
@@ -13,6 +14,7 @@ from invokeai.app.services.external_generation.errors import (
     ExternalProviderNotConfiguredError,
     ExternalProviderNotFoundError,
     ExternalProviderRateLimitError,
+    ExternalProviderRequestError,
 )
 from invokeai.app.services.external_generation.external_generation_base import (
     ExternalGenerationServiceBase,
@@ -90,6 +92,34 @@ class ExternalGenerationService(ExternalGenerationServiceBase):
 
     def get_provider_statuses(self) -> dict[str, ExternalProviderStatus]:
         return {provider_id: provider.get_status() for provider_id, provider in self._providers.items()}
+
+    def generate_generic(
+        self,
+        provider_id: str,
+        model_id: str,
+        payload: dict[str, object],
+        *,
+        image: Any = None,
+        mask_image: Any = None,
+        reference_images: list[Any] | None = None,
+        video_path: Path | None = None,
+    ) -> dict[str, object]:
+        provider = self._providers.get(provider_id)
+        if provider is None:
+            raise ExternalProviderRequestError(f"No external provider registered for '{provider_id}'")
+        if not provider.is_configured():
+            raise ExternalProviderRequestError(f"Provider '{provider_id}' is missing credentials")
+        try:
+            return provider.generate_generic(
+                model_id,
+                payload,
+                image=image,
+                mask_image=mask_image,
+                reference_images=reference_images,
+                video_path=video_path,
+            )
+        except NotImplementedError as exc:
+            raise ExternalProviderRequestError(str(exc)) from exc
 
     def _validate_request(self, request: ExternalGenerationRequest) -> None:
         capabilities = request.model.capabilities
