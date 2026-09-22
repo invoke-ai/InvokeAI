@@ -150,7 +150,8 @@
         "unpin": "ピンを外す",
         "zoomIn": "ズームイン",
         "zoomOut": "ズームアウト",
-        "json": "JSON"
+        "json": "JSON",
+        "userGuideLabel": "ユーザーガイド"
     },
     "gallery": {
         "galleryImageSize": "画像のサイズ",
@@ -158,7 +159,7 @@
         "autoSwitchNewImages": "新しい画像に自動切替",
         "copy": "コピー",
         "image": "画像",
-        "autoAssignBoardOnClick": "クリックしたボードに自動追加",
+        "autoAssignBoardOnClick": "ボードに自動追加",
         "featuresWillReset": "この画像を削除すると、これらの機能は即座にリセットされます。",
         "unstarImage": "スターを外す",
         "loading": "ロード中",
@@ -189,8 +190,8 @@
         "stretchToFit": "画面に合わせる",
         "exitCompare": "比較を終了する",
         "compareHelp1": "<Kbd>Alt</Kbd> キーを押しながらギャラリーの画像をクリックするか、矢印キーを使用して比較する画像を変更します。",
-        "compareHelp3": "<Kbd>C</Kbd>を押して、比較した画像を入れ替えます。",
-        "compareHelp4": "<Kbd>[Z</Kbd>]または<Kbd>[Esc</Kbd>]を押して終了します。",
+        "compareHelp3": "<Kbd>C</Kbd> を押して、比較した画像を入れ替えます。",
+        "compareHelp4": "<Kbd>Z</Kbd>または<Kbd>Esc</Kbd>を押して終了します。",
         "compareHelp2": "<Kbd>M</Kbd> キーを押して比較モードを切り替えます。",
         "move": "移動",
         "exitSearch": "画像検索を終了",
@@ -685,7 +686,7 @@
         "syncModels": "モデルを同期",
         "modelType": "モデルタイプ",
         "convertToDiffusersHelpText1": "このモデルは 🧨 Diffusers フォーマットに変換されます。",
-        "convertToDiffusersHelpText3": "チェックポイントファイルは、InvokeAIルートフォルダ内にある場合、ディスクから削除されます。カスタムロケーションにある場合は、削除されません。",
+        "convertToDiffusersHelpText3": "ディスクのInvokeAIルートフォルダにある場合、チェックポイントファイルは削除されます。任意で設定した場所にある場合は削除されません。",
         "convertToDiffusersHelpText4": "これは一回限りのプロセスです。コンピュータの仕様によっては、約30秒から60秒かかる可能性があります。",
         "cancel": "キャンセル",
         "uploadImage": "画像をアップロード",
@@ -757,7 +758,7 @@
         "prune": "除去",
         "hfTokenHelperText": "いくつかのモデルにHuggingFaceトークンが必要です。ここをクリックしてあなたのトークンを作成してください。",
         "starterBundleHelpText": "メインモデル，コントロールネット，IPアダプターなど，ベースモデルから始めるのに必要なすべてのモデルを簡単にインストールできます.バンドルを選択すると，すでにインストールされているモデルはスキップされます.",
-        "inplaceInstallDesc": "ファイルを移動せずにモデルをインストールします。このモデルを利用する際には元の場所からロードされます。これが利用できない場合、モデルファイルはInvoke管理下のモデルディレクトリに移動されインストールされます。",
+        "inplaceInstallDesc": "ファイルを移動せずにモデルをインストールします。このモデルの利用時には元の場所からロードされます。この設定が無効の場合、モデルファイルはInvoke管理下のモデルディレクトリに移動されてからインストールされます。",
         "hfTokenUnableToVerifyErrorMessage": "HuggingFaceトークンを確認できません。ネットワークによるエラーの可能性があります。後ほどトライしてください。",
         "restoreDefaultSettings": "クリックするとモデルのデフォルト設定が使用されます.",
         "hfTokenSaved": "HuggingFaceトークンを保存しました",
@@ -799,7 +800,7 @@
             "huggingFaceDescription": "HuggingFace リポジトリからモデルを直接参照してインストールします。",
             "scanFolderDescription": "ローカルフォルダをスキャンしてモデルを自動的に検出し、インストールします。",
             "recommendedModels": "推奨モデル",
-            "exploreStarter": "または、利用可能なすべてのスターターモデルを参照してください",
+            "exploreStarter": "または、利用可能な全スターターモデルを確認してください",
             "bundleDescription": "各バンドルにはそれぞれのモデルファミリー向けの必須モデルと、厳選されたベースモデルが含まれています。",
             "sdxl": "SDXL",
             "quickStart": "クイックスタートバンドル",
@@ -818,11 +819,11 @@
         "actions": "一括操作",
         "selectAll": "全て選択",
         "deselectAll": "全て選択解除",
-        "deleteModelsConfirm": "本当に {{count}} 個のモデルを削除しますか？ このアクションは取り消せません。",
+        "deleteModelsConfirm_other": "本当に {{count}} 個のモデルを削除しますか？ この操作は取り消せません。",
         "deleteWarning": "Invokeのモデルディレクトリにあるモデルは、ディスクから完全に削除されます。",
-        "modelsDeleted": "{{count}} 個のモデルの削除に成功しました",
+        "modelsDeleted_other": "{{count}} 個のモデルの削除に成功しました",
         "modelsDeleteFailed": "モデルの削除に失敗しました",
-        "someModelsFailedToDelete": "{{count}}個のモデルを削除できませんでした",
+        "someModelsFailedToDelete_other": "{{count}}個のモデルを削除できませんでした",
         "modelsDeletedPartial": "一部完了",
         "someModelsDeleted": "{{deleted}} を削除, {{failed}} が失敗",
         "modelsDeleteError": "モデルの削除中にエラーが発生しました",
@@ -845,11 +846,11 @@
         "reidentifyUnknown": "モデルの識別ができません",
         "reidentifyError": "モデルの識別中にエラーが発生",
         "reidentifyModels": "モデルの再識別",
-        "reidentifyModelsConfirm": "{{count}} 個のモデルを再識別しますか？ モデルが再度解析され、正しい形式と設定が特定されます。",
+        "reidentifyModelsConfirm_other": "{{count}} 個のモデルを再識別しますか？ これによりモデルが再度解析され、正しい形式と設定が特定されます。",
         "reidentifyWarning": "これらのモデルに適用したカスタム設定はすべてリセットされます。",
-        "modelsReidentified": "{{count}} 個のモデルの再識別に成功",
+        "modelsReidentified_other": "{{count}} 個のモデルの再識別に成功",
         "modelsReidentifyFailed": "モデルの再識別に失敗",
-        "someModelsFailedToReidentify": "{{count}} このモデルを再識別できませんでした",
+        "someModelsFailedToReidentify_other": "{{count}} 個のモデルを再識別できませんでした",
         "modelsReidentifiedPartial": "一部完了",
         "someModelsReidentified": "{{succeeded}} 再識別完了, {{failed}} 失敗",
         "modelsReidentifyError": "モデルの再識別中にエラー",
@@ -915,8 +916,8 @@
         "maxImageWidth": "画像の最大横幅",
         "sourceUrl": "ソースURL",
         "textLLM": "LLM",
-        "filesCount": "{{count}} ファイル",
-        "deleteSelected": "選択中の {{count}} を削除",
+        "filesCount_other": "{{count}} ファイル",
+        "deleteSelected_other": "選択中の {{count}} を削除",
         "orphanedModelsDeleteErrors": "いくつかのモデルが削除できませんでした",
         "queueEmpty": "インストールキューが空です。",
         "selectModelToView": "モデルを選択して詳細を表示",
@@ -927,7 +928,46 @@
         "settingsImportedPartial": "モデル設定は部分的にインポートされました。互換性のない設定はスキップされました: {{fields}}",
         "settingsImportFailed": "モデル設定のインポートに失敗しました",
         "settingsImportIncompatible": "設定ファイルにこのモデルタイプと互換性のある設定項目がありません",
-        "settingsImportInvalidFile": "不正な設定ファイルです"
+        "settingsImportInvalidFile": "不正な設定ファイルです",
+        "fp8Storage": "FP8 Storage (VRAM節約)",
+        "externalBaseUrlPlaceholder": "https://...",
+        "maxImageHeight": "画像の最大縦幅",
+        "numImages": "画像枚数",
+        "noOrphanedModels": "モデルディレクトリーが同期されました。孤立したファイルはありませんでした。",
+        "orphanedModelsFound": "孤立したファイルが見つかりました",
+        "orphanedModelsDescription": "以下のモデルディレクトリはデータベースに参照されていないので、安全に削除することができます：",
+        "foundOrphanedModels_other": "{{count}} 個の孤立ファイルがモデルディレクトリで見つかりました",
+        "orphanedModelsDeleted_other": "{{count}} 個の孤立モデルが削除されました",
+        "orphanedModelsDeleteFailed": "孤立モデルの削除に失敗",
+        "errorLoadingOrphanedModels": "孤立モデルのロードに失敗しました。再試行してください。",
+        "qwen3Encoder": "Qwen3 エンコーダー",
+        "qwenVLEncoder": "Qwen2.5-VLエンコーダ",
+        "animaVae": "VAE",
+        "animaVaePlaceholder": "Anima互換VAEを選択",
+        "animaQwen3Encoder": "Qwen3 0.6B エンコーダー",
+        "animaQwen3EncoderPlaceholder": "Qwen3 0.6B エンコーダを選択",
+        "zImageVae": "VAE (オプション)",
+        "zImageVaePlaceholder": "VAEソースモデルから",
+        "zImageQwen3Encoder": "Qwen3エンコーダ(オプション)",
+        "zImageQwen3EncoderPlaceholder": "Qwen3 ソースモデルから",
+        "zImageQwen3Source": "Qwen3とVAE ソースモデル",
+        "zImageQwen3SourcePlaceholder": "VAE/エンコーダ が空の場合必要です",
+        "flux2KleinVae": "VAE (任意)",
+        "flux2KleinVaePlaceholder": "ディフューザーモデルから",
+        "flux2KleinVaeNoModelPlaceholder": "利用可能なディフューザーモデルがありません",
+        "flux2KleinQwen3Encoder": "Qwen3エンコーダ(任意)",
+        "flux2KleinQwen3EncoderPlaceholder": "ディフューザーモデルから",
+        "flux2KleinQwen3EncoderNoModelPlaceholder": "利用可能なディフューザーモデルがありません",
+        "qwenImageComponentSource": "VAE/エンコーダ ソース(ディフューザー)",
+        "qwenImageVae": "VAE",
+        "qwenImageVaePlaceholder": "VAE/エンコーダ ソースから",
+        "qwenImageQwenVLEncoder": "Qwen2.5-VLエンコーダ",
+        "qwenImageQwenVLEncoderPlaceholder": "VAE/エンコーダ ソースから",
+        "qwenImageQuantization": "エンコーダの量子化",
+        "qwenImageQuantizationNone": "なし (bf16)",
+        "qwenImageQuantizationInt8": "8ビット(int8)",
+        "qwenImageQuantizationNf4": "4ビット(nf4)",
+        "qwenImageComponentSourcePlaceholder": "GGUFモデルでは、スタンドアロンのVAEとエンコーダーがインストールされていない限り、これが必要です"
     },
     "parameters": {
         "images": "画像",
@@ -995,7 +1035,16 @@
             "fluxModelIncompatibleBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、バウンディングボックスの高さは{{height}}です",
             "fluxModelIncompatibleScaledBboxWidth": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、リサイズ後のバウンディングボックスの幅は{{width}}です",
             "fluxModelIncompatibleScaledBboxHeight": "$t(parameters.invoke.fluxRequiresDimensionsToBeMultipleOf16)、リサイズ後のバウンディングボックスの高さは {{height}} です",
-            "incompatibleLoRAs": "互換性のない LoRA が追加されました"
+            "incompatibleLoRAs": "互換性のない LoRA が追加されました",
+            "boardNotWritable": "ボード「{{boardName}}」への書き込み権限がありません。所有しているボードを選択するか、「未分類」に切り替えてください。",
+            "noQwen3EncoderModelSelected": "FLUX2 Klein生成用のQwen3エンコーダーモデルが選択されていません",
+            "noFlux2KleinVaeModelSelected": "VAEが選択されていません。非拡散型FLUX.2 KleinモデルにはスタンドアロンVAEが必要です。",
+            "noFlux2KleinQwen3EncoderModelSelected": "Qwen3エンコーダが選択されていません。非拡散型FLUX.2 Kleinモデルには、スタンドアロンのQwen3エンコーダが必要です",
+            "noQwenImageComponentSourceSelected": "GGUF Qwenイメージモデルには、VAE/エンコーダ用の拡散コンポーネントソースが必要です。",
+            "noZImageVaeSourceSelected": "VAEソースなし：VAE（FLUX）またはQwen3ソースモデルを選択してください",
+            "noZImageQwen3EncoderSourceSelected": "Qwen3エンコーダーソースなし：Qwen3エンコーダーまたはQwen3ソースモデルを選択してください",
+            "noAnimaVaeModelSelected": "Anima VAEモデルが選択されていません",
+            "noAnimaQwen3EncoderModelSelected": "Anima Qwen3エンコーダモデルが選択されていません"
         },
         "aspect": "縦横比",
         "lockAspectRatio": "縦横比を固定",
@@ -1044,7 +1093,7 @@
         "symmetry": "左右対称",
         "seamlessXAxis": "水平方向シームレス",
         "sendToCanvas": "キャンバスに送る",
-        "modelDisabledForTrial": "{{modelName}} を使用した生成はトライアルアカウントではご利用いただけません.アップグレードするには,<LinkComponent>アカウント設定</LinkComponent> にアクセスしてください.",
+        "modelDisabledForTrial": "{{modelName}} はトライアルアカウントではご利用いただけません。アップグレードするには、<LinkComponent>アカウント設定</LinkComponent> にアクセスしてください。",
         "duration": "間隔",
         "downloadImage": "画像をダウンロード",
         "images_withCount_other": "画像",
@@ -1053,7 +1102,42 @@
         "resolution": "解像度",
         "colorCompensation": "色補正",
         "imageSize": "画像サイズ",
-        "disabledNotSupported": "モデルがサポートしていません"
+        "disabledNotSupported": "モデルがサポートしていません",
+        "quality": "品質",
+        "qualityOptions": {
+            "auto": "自動",
+            "high": "高",
+            "medium": "中",
+            "low": "低"
+        },
+        "background": "背景",
+        "backgroundOptions": {
+            "auto": "自動",
+            "transparent": "透過",
+            "opaque": "不透明"
+        },
+        "inputFidelity": "入力忠実度",
+        "inputFidelityOptions": {
+            "default": "デフォルト",
+            "low": "低",
+            "high": "高"
+        },
+        "temperature": "Temperature",
+        "thinkingLevel": "思考レベル",
+        "thinkingLevelOptions": {
+            "default": "デフォルト",
+            "minimal": "ミニマル",
+            "high": "高"
+        },
+        "watermark": "透かし",
+        "optimizePrompt": "プロンプト最適化",
+        "dypePreset": "DyPE",
+        "dypeScale": "DyPE λs",
+        "dypeExponent": "DyPE λt",
+        "seedVarianceEnabled": "シード分散エンハンサー",
+        "seedVarianceStrength": "分散強度",
+        "seedVarianceRandomizePercent": "ランダム化％",
+        "shift": "Shift"
     },
     "settings": {
         "models": "モデル",
@@ -1122,7 +1206,6 @@
         "parameters": "パラメーター",
         "parameterSet": "パラメーターが呼び出されました",
         "pasteSuccess": "{{destination}} に貼り付けました",
-        "imagesWillBeAddedTo": "アップロードされた画像はボード {{boardName}} のアセットに追加されます.",
         "layerCopiedToClipboard": "レイヤーがクリップボードにコピーされました",
         "pasteFailed": "貼り付け失敗",
         "importSuccessful": "インポートが成功しました",
@@ -1208,7 +1291,10 @@
         "modelDownloadRestartFailed": "失敗したダウンロードを再開",
         "modelDownloadRestartFile": "ファイルダウンロードの再開中",
         "modelDownloadRestartedFromScratch": "一部のファイルが見つかりません。 最初からダウンロードを再開しました。",
-        "schedulerReset": "スケジューラをリセット"
+        "schedulerReset": "スケジューラをリセット",
+        "kleinEncoderCleared": "Qwen3エンコーダーがクリアされました",
+        "kleinEncoderClearedDescription": "新しいKleinモデルバリアントに対応するQwen3エンコーダを選択してください",
+        "schedulerResetZImageBase": "LCMスケジューラはZイメージベースモデルと互換性がありません。Eulerにリセットしてください。"
     },
     "accessibility": {
         "invokeProgressBar": "進捗バー",
@@ -1249,7 +1335,7 @@
         "vae": "VAE",
         "cfgRescaleMultiplier": "$t(parameters.cfgRescaleMultiplier)",
         "canvasV2Metadata": "キャンバス・レイヤー",
-        "guidance": "手引き",
+        "guidance": "ガイダンス",
         "seamlessXAxis": "シームレスX軸",
         "seamlessYAxis": "シームレスY軸",
         "parameterSet": "パラメーター {{parameter}} が設定されました",
@@ -1266,9 +1352,16 @@
         "seedVarianceRandomizePercent": "シードバリアンスのランダム化パーセンテージ",
         "zImageShift": "Z-Image シフト",
         "geminiTemperature": "Gemini Temperature",
-        "geminiThinkingLevel": "Gemini Thinking Level",
+        "geminiThinkingLevel": "Gemini 思考レベル",
         "openaiQuality": "OpenAI 品質",
-        "imageSize": "画像サイズ"
+        "imageSize": "画像サイズ",
+        "dypePreset": "$t(parameters.dypePreset)",
+        "dypeScale": "$t(parameters.dypeScale)",
+        "dypeExponent": "$t(parameters.dypeExponent)",
+        "openaiBackground": "OpenAI 背景",
+        "openaiInputFidelity": "OpenAI 入力忠実度",
+        "seedreamWatermark": "Seedream 透かし",
+        "seedreamOptimizePrompt": "Seedream プロンプト最適化"
     },
     "queue": {
         "queueEmpty": "キューが空です",
@@ -1566,7 +1659,10 @@
         },
         "noWorkflowToSave": "保存するワークフローがありません",
         "groupNodesByCategory": "ノードをカテゴリごとに表示",
-        "groupNodesByCategoryHelp": "ノード追加ダイアログ内で、ノードをカテゴリ別に表示"
+        "groupNodesByCategoryHelp": "ノード追加ダイアログ内で、ノードをカテゴリ別に表示",
+        "nodeData": "ノードデータ",
+        "addConnector": "コネクターを追加",
+        "deleteConnector": "コネクターの削除"
     },
     "boards": {
         "autoAddBoard": "自動追加するボード",
@@ -1675,13 +1771,13 @@
         "regionalGuidance": {
             "heading": "領域ガイダンス",
             "paragraphs": [
-                "グローバルプロンプトの要素が表示される場所をガイドするブラシ."
+                "ブラシで全域プロンプトの要素が表示される場所を指定します。"
             ]
         },
         "rasterLayer": {
             "heading": "ラスターレイヤー",
             "paragraphs": [
-                "画像生成中に使用される,キャンバスのピクセルベースのコンテンツ."
+                "画像生成中に使用される、キャンバス上のピクセルベースのコンテンツ。"
             ]
         },
         "globalReferenceImage": {
@@ -1738,7 +1834,7 @@
         "compositingCoherenceMode": {
             "heading": "モード",
             "paragraphs": [
-                "新しく生成されたマスク領域と,一貫性のある画像を作成するために使用される方法."
+                "新しく生成されたマスク領域と、一貫性のある画像を作成するために使用される手法。"
             ]
         },
         "paramModel": {
@@ -1855,13 +1951,13 @@
         "compositingCoherenceMinDenoise": {
             "paragraphs": [
                 "境界なじませ処理の最小ノイズ強度",
-                "インペイント・アウトペイント時の境界なじませ領域の最小ノイズ強度"
+                "インペイント/アウトペイント時の境界なじませ領域の最小ノイズ強度"
             ],
             "heading": "最小ノイズ除去"
         },
         "compositingCoherencePass": {
             "paragraphs": [
-                "2 回目のノイズ除去は,インペイント/アウトペイントされた画像の合成に役立ちます."
+                "2 回目のノイズ除去は、インペイント/アウトペイントで生成された画像の合成に影響します。"
             ],
             "heading": "境界のなじませ"
         },
@@ -1947,7 +2043,7 @@
             "heading": "初期画像を出力サイズに合わせる"
         },
         "infillMethod": {
-            "heading": "インフィル方法",
+            "heading": "インフィル方式",
             "paragraphs": [
                 "アウトペインティングまたはインペインティングのプロセス中に埋め込む方法."
             ]
@@ -2067,7 +2163,7 @@
         "fluxDevLicense": {
             "heading": "非商用ライセンス",
             "paragraphs": [
-                "FLUX.1 [dev]モデルは、FLUX [dev]非商用ライセンスに基づいてライセンスされています。Invokeでこのモデルタイプを商用目的で使用する場合は、当社のウェブサイトをご覧ください。"
+                "このモデルは非商用利用のみのライセンスです。FLUX.1 [dev] モデルは FLUX.1 [dev] 非商用ライセンスを、FLUX.2 Klein 9B は FLUX.2 非商用ライセンスです。"
             ]
         },
         "tileSize": {
@@ -2088,6 +2184,64 @@
             "heading": "色補正",
             "paragraphs": [
                 "入力画像を調整し、インペイントや img2imgによる色の変化を減らします(SDXL限定) 。"
+            ]
+        },
+        "fluxDypePreset": {
+            "heading": "DyPE (高解像度)",
+            "paragraphs": [
+                "動的位置外挿（DyPE）は、学習サイズ（1024ピクセル）を超える解像度でのFLUX生成品質を向上させます。",
+                "オフ：標準生成。自動：1536ピクセルを超える画像に対して自動的に有効になります。4K：4K解像度出力用に最適化された設定です。"
+            ]
+        },
+        "fluxDypeScale": {
+            "heading": "DyPE スケール (λs)",
+            "paragraphs": [
+                "DyPE変調の強度を制御します。値が大きいほど、外挿効果が強くなります。",
+                "デフォルト値：2.0。範囲：0.0～8.0。"
+            ]
+        },
+        "fluxDypeExponent": {
+            "heading": "DyPE 指数 (λt)",
+            "paragraphs": [
+                "時間の経過に伴う動的効果の強さを制御します。",
+                "2.0：4K以上の解像度に推奨。アーティファクトを迅速に除去するために、積極的な処理スケジュールで素早く移行します。",
+                "1.0: 約2K～3K解像度のスタート地点として最適です。",
+                "0.5: ネイティブ解像度（1024px）よりわずかに高い解像度に対して、より緩やかなスケジュールを設定します。"
+            ]
+        },
+        "seedVarianceEnhancer": {
+            "heading": "シード分散エンハンサー",
+            "paragraphs": [
+                "Z-Image-Turboは、異なるシード値を用いて比較的類似した画像を生成できます。この機能は、テキスト埋め込みにシード値に基づくノイズを追加することで、再現性を維持しながら視覚的なバリエーションを向上させます。",
+                "これを有効にすると、さまざまなシードで試行する際に、より多様な結果が得られます。"
+            ]
+        },
+        "seedVarianceStrength": {
+            "heading": "分散強度",
+            "paragraphs": [
+                "埋め込みデータに加えるノイズの強度を制御します。強度は、埋め込みデータの標準偏差に基づいて自動的に調整されます。",
+                "0.1未満の値では僅かな変化が生じ、0.5になると変化が顕著になります。0.5を超える値では予期せぬ結果が生じる可能性があります。"
+            ]
+        },
+        "seedVarianceRandomizePercent": {
+            "heading": "ランダム化％",
+            "paragraphs": [
+                "ノイズを受ける埋め込み値の割合（1～100%）。",
+                "値が低いほど選択的なノイズパターンが生成され、100%ではすべての値に均等に影響します。"
+            ]
+        },
+        "cpuOnly": {
+            "heading": "CPUのみ",
+            "paragraphs": [
+                "有効にすると、テキストエンコーダーコンポーネントのみがGPUではなくCPU上で実行されます。",
+                "これによりノイズ除去処理用のVRAMを節約しつつ、パフォーマンスへの影響を最小限に抑えることができます。コンディショニング出力は、ノイズ除去処理のために自動的にGPUに移動されます。"
+            ]
+        },
+        "fp8Storage": {
+            "heading": "FP8ストレージ",
+            "paragraphs": [
+                "モデルの重みをFP8形式でVRAMに保存することで、FP16と比較してメモリ使用量を約50%削減します。",
+                "推論時には、重みはレイヤーごとに計算精度（FP16/BF16）にキャストされるため、画像品質が維持されます。すべてのCUDA対応GPUで動作します。"
             ]
         }
     },
@@ -2168,7 +2322,8 @@
             "upscaling": "アップスケール",
             "upscalingTab": "$t(ui.tabs.upscaling) $t(common.tab)",
             "generate": "生成",
-            "customNodes": "ノード"
+            "customNodes": "ノード",
+            "customNodesTab": "$t(ui.tabs.customNodes) $t(common.tab)"
         },
         "launchpad": {
             "upscaling": {
@@ -2223,7 +2378,8 @@
                 "loadFromFile": {
                     "title": "ファイルからワークフローを読み込む",
                     "description": "既存のワークフローをアップロードして開始する"
-                }
+                },
+                "descriptionMultiuser": "ワークフローは、画像生成タスクを自動化する再利用可能なテンプレートです。複雑な操作を迅速に実行し、一貫した結果を得ることができます。ワークフローを作成または編集する際に「共有ワークフロー」を選択することで、システムの他のユーザーとワークフローを共有できます。"
             },
             "createNewWorkflowFromScratch": "新しいワークフローを最初から作成する",
             "browseAndLoadWorkflows": "既存のワークフローを参照して読み込む",
@@ -2355,7 +2511,6 @@
             "isolatedLayerPreview": "分離されたレイヤーのプレビュー",
             "isolatedLayerPreviewDesc": "フィルタリングや変換などの操作を実行するときに、このレイヤーのみを表示するかどうか。",
             "invertBrushSizeScrollDirection": "ブラシサイズ調整のスクロール方向を反転",
-            "pressureSensitivity": "筆圧感知",
             "saveAllImagesToGallery": {
                 "label": "ギャラリーに新しい生成画像を送る",
                 "alert": "キャンバスを経由せず、直接ギャラリーに生成画像が送られます"
@@ -2853,7 +3008,22 @@
             "title": "キャンバスでワークフローを使う",
             "runWorkflow": "ワークフローを使う",
             "execute": "ワークフローを実行",
-            "executing": "実行中..."
+            "executing": "実行中...",
+            "description": "現在のキャンバスレイヤーで実行するワークフローを、キャンバス出力ノードと画像パラメータを含むものから選択します。実行前にパラメータを調整できます。結果はキャンバスに追加されます。",
+            "filteringWorkflows": "ワークフローをフィルタ中...",
+            "loadingWorkflows": "ワークフローをロード中...",
+            "noWorkflowsFound": "ワークフローが見つかりません。",
+            "noWorkflowsWithImageField": "互換性のあるワークフローが見つかりませんでした。ワークフローには、画像入力フィールドとキャンバス出力ノードを備えたフォームビルダーが必要です。",
+            "selectWorkflow": "ワークフローを選択",
+            "selectPlaceholder": "ワークフローを選択してください...",
+            "unnamedWorkflow": "無名のワークフロー",
+            "loadingParameters": "ワークフローのパラメータをロード中...",
+            "noFormBuilderError": "このワークフローにはフォームビルダーがないため、使用できません。別のワークフローを選択してください。",
+            "imageFieldSelected": "このフィールドはキャンバス画像を受け取ります",
+            "imageFieldNotSelected": "ここをクリックしてこのフィールドにキャンバス画像を使います",
+            "executionStarted": "ワークフロー実行開始",
+            "executionStartedDescription": "処理が完了すると、結果はステージングエリアに表示されます。",
+            "executionFailed": "ワークフローの実行に失敗しました"
         },
         "shape": {
             "rect": "矩形",
@@ -2874,8 +3044,43 @@
                 "scaleFromCenter": "中央から変形",
                 "snapRotation": "回転をスナップ",
                 "nudgeSelection": "選択をナッジ",
-                "cancelText": "キャンセル"
+                "cancelText": "キャンセル",
+                "newLine": "新規ライン",
+                "commitText": "確定",
+                "dragText": "テキストをドラッグ",
+                "fineGrid": "グリッドにスナップ"
+            },
+            "keys": {
+                "control": "Ctrl",
+                "command": "Cmd",
+                "option": "Option",
+                "alt": "Alt",
+                "shift": "Shift",
+                "space": "Space",
+                "wheel": "マウスホイール",
+                "arrows": "矢印キー",
+                "enter": "Enter",
+                "esc": "Esc"
             }
+        },
+        "invalidReferenceImage": "無効な参照画像:",
+        "removeImageFromCollection": "コレクションから画像を削除する",
+        "selectRefImage": "参照画像を選択",
+        "text": {
+            "font": "フォント",
+            "size": "サイズ",
+            "bold": "太文字",
+            "italic": "斜体",
+            "underline": "下線",
+            "strikethrough": "取り消し線",
+            "alignLeft": "左揃え",
+            "alignCenter": "中央揃え",
+            "alignRight": "右揃え",
+            "px": "px",
+            "lineHeight": "間隔",
+            "lineHeightDense": "狭く",
+            "lineHeightNormal": "標準",
+            "lineHeightSpacious": "広く"
         }
     },
     "stylePresets": {
@@ -2923,7 +3128,9 @@
         "useForTemplate": "プロンプトテンプレートに使用する",
         "viewList": "テンプレートリストを表示",
         "viewModeTooltip": "現在選択されているテンプレートでは、プロンプトはこのようになります。プロンプトを編集するには、テキストボックス内の任意の場所をクリックしてください。",
-        "togglePromptPreviews": "プロンプトプレビューを切り替える"
+        "togglePromptPreviews": "プロンプトプレビューを切り替える",
+        "selectPreset": "スタイルプリセットを選択",
+        "noMatchingPresets": "一致するプリセットがありません"
     },
     "upscaling": {
         "upscaleModel": "アップスケールモデル",
@@ -2946,7 +3153,8 @@
         "incompatibleBaseModelDesc": "アップスケールはSD1.5およびSDXLアーキテクチャモデルでのみサポートされています。アップスケールを有効にするには、メインモデルを変更してください。",
         "tileControl": "タイルコントロール",
         "tileSize": "タイルサイズ",
-        "tileOverlap": "タイルオーバーラップ"
+        "tileOverlap": "タイルオーバーラップ",
+        "missingModelsWarningNonAdmin": "Invoke管理者（<AdminEmailLink />）に必要なモデルのインストール依頼をしてください："
     },
     "sdxl": {
         "denoisingStrength": "ノイズ強度",
@@ -3104,7 +3312,10 @@
         "noDescription": "説明なし",
         "searchWorkflows": "ワークフローを検索",
         "clearWorkflowSearchFilter": "ワークフロー検索フィルターをクリア",
-        "openLibrary": "ライブラリを開く"
+        "openLibrary": "ライブラリを開く",
+        "tags": "タグ",
+        "sharedWorkflows": "共有ワークフロー",
+        "shareWorkflow": "共有ワークフロー"
     },
     "system": {
         "logNamespaces": {
@@ -3145,7 +3356,8 @@
         "dynamicPrompts": "ダイナミックプロンプト",
         "loading": "ダイナミックプロンプトを生成中...",
         "maxPrompts": "最大プロンプト",
-        "promptsToGenerate": "生成するプロンプト"
+        "promptsToGenerate": "生成するプロンプト",
+        "problemGeneratingPrompts": "プロンプトの生成中に問題がありました"
     },
     "newUserExperience": {
         "toGetStartedLocal": "始めるには、Invoke の実行に必要なモデルをダウンロードまたはインポートしてください。次に、ボックスにプロンプトを入力し、<StrongComponent>Invoke</StrongComponent> をクリックして最初の画像を生成します。プロンプトテンプレートを選択すると、結果が向上します。画像は <StrongComponent>Gallery</StrongComponent> に直接保存するか、<StrongComponent>Canvas</StrongComponent> で編集するかを選択できます。",
@@ -3153,17 +3365,24 @@
         "toGetStartedWorkflow": "左側のフィールドに入力し、<StrongComponent>Invoke</StrongComponent> をクリックして画像を生成します。他のワークフローも試してみたい場合は、ワークフロータイトルの横にある<StrongComponent>フォルダアイコン</StrongComponent> をクリックすると、試せる他のテンプレートのリストが表示されます。",
         "gettingStartedSeries": "さらに詳しいガイダンスが必要ですか? Invoke Studio の可能性を最大限に引き出すためのヒントについては、<LinkComponent>入門シリーズ</LinkComponent>をご覧ください。",
         "lowVRAMMode": "最高のパフォーマンスを得るには、<LinkComponent>低 VRAM ガイド</LinkComponent>に従ってください。",
-        "noModelsInstalled": "モデルがインストールされていないようです。<DownloadStarterModelsButton>スターターモデルバンドルをダウンロード</DownloadStarterModelsButton>するか、<ImportModelsButton>モデルをインポート</ImportModelsButton>してください。"
+        "noModelsInstalled": "モデルがインストールされていないようです。<DownloadStarterModelsButton>スターターモデルバンドルをダウンロード</DownloadStarterModelsButton>するか、<ImportModelsButton>モデルをインポート</ImportModelsButton>してください。",
+        "toGetStartedNonAdmin": "使用を開始するには、InvokeAI 管理者 (<AdminEmailLink />) に、必要な AI モデルのインストールを依頼してください。次に、ボックスにプロンプトを入力し、 <StrongComponent>Invoke</StrongComponent> をクリックして最初の画像を生成してみましょう。プロンプト テンプレートを選択すると品質が向上します。画像は <StrongComponent>Gallery</StrongComponent> に直接保存するか、 <StrongComponent>Canvas</StrongComponent> で編集するかを選択できます。",
+        "noModelsInstalledAskAdmin": "管理者にインストールを依頼してください。"
     },
     "whatsNew": {
         "whatsNewInInvoke": "Invokeの新機能",
         "items": [
             "LLMプロンプトツール：ローカルLLMでプロンプトを拡張したり、画像からプロンプトを生成できます。使用するにはLLM（例：Qwen2.5-1.5B-Instruct）をインストールしてください。",
-            "ラスター レイヤーの調整: レイヤーの明度、コントラスト、彩度、カーブなどを簡単に調整できます。"
+            "FLUX.2 Kleinのサポート：InvokeAIは、GGUF、FP8、およびDiffusersフォーマットに対応した新しいFLUX.2 Kleinモデル（4Bおよび9Bバリアント）をサポートするようになりました。txt2img、img2img、インペイント、アウトペイントなどの機能をご利用いただけます。「スターターモデル」から使い始めてみてください。",
+            "FLUXモデルにおけるDyPEサポートは、高解像度（1536ピクセル以上、最大4K）画像の品質を向上させます。「高度オプション」セクションで有効化してください。",
+            "Z-Image Turboの多様性: 「詳細オプション」の「シード多様性エンハンサー」を有効にして、ZiTの生成物に多様性を追加します。",
+            "マルチユーザーモードは、同一サーバー上で複数のユーザーが利用できます。",
+            "Z-ImageおよびFLUX.2モデルのサポートを強化しました。"
         ],
         "readReleaseNotes": "リリースノートを読む",
-        "watchRecentReleaseVideos": "最近のリリースビデオを見る",
-        "watchUiUpdatesOverview": "Watch UI アップデートの概要"
+        "watchUiUpdatesOverview": "Watch UI アップデートの概要",
+        "readTheDocs": "ドキュメントを読む",
+        "readDocumentation": "Invokeのドキュメントを読む"
     },
     "supportVideos": {
         "supportVideos": "サポートビデオ",
@@ -3179,7 +3398,11 @@
                 "title": "スタジオセッション",
                 "description": "高度な Invoke 機能、クリエイティブなワークフロー、コミュニティのディスカッションについて詳しく説明するセッションです。"
             }
-        }
+        },
+        "gettingStartedPlaylist": "入門プレイリスト",
+        "studioSessionsPlaylist": "スタジオセッションプレイリスト",
+        "discord": "Discord",
+        "github": "GitHub"
     },
     "lora": {
         "weight": "重み",
@@ -3307,6 +3530,15 @@
         "name": "名前",
         "message": "メッセージ",
         "nodeCount_other": "{{count}} ノード",
-        "uninstalled": "アンインストール済み"
+        "uninstalled": "アンインストール済み",
+        "gitUrlPlaceholder": "https://github.com/user/node-pack.git"
+    },
+    "cropper": {
+        "cropImage": "画像をクロップ",
+        "aspectRatio": "縦横比",
+        "free": "自由",
+        "mouseWheelZoom": "マウスホイール: ズーム",
+        "spaceDragPan": "スペース + ドラッグ: パン",
+        "dragCropBoxToAdjust": "クロップボックスまたはハンドルをドラッグして調整"
     }
 }

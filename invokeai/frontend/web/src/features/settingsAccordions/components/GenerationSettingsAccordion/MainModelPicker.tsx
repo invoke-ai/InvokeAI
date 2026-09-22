@@ -11,13 +11,22 @@ import { useTranslation } from 'react-i18next';
 import { MdMoneyOff } from 'react-icons/md';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
-import { type AnyModelConfigWithExternal, isNonCommercialMainModelConfig } from 'services/api/types';
+import {
+  type AnyModelConfigWithExternal,
+  isNonCommercialMainModelConfig,
+  selectPrimaryMainModelOptions,
+} from 'services/api/types';
 
 export const MainModelPicker = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const activeTab = useAppSelector(selectActiveTab);
-  const [modelConfigs] = useMainModels();
+  const [allModelConfigs] = useMainModels();
+  // Low-noise Wan single-file experts (GGUF or safetensors checkpoint) belong in
+  // the Transformer (Low Noise) slot of the Wan advanced section, not as a primary
+  // main. Shared with the other two places a primary main can be chosen so the
+  // three cannot disagree about what is offerable.
+  const modelConfigs = useMemo(() => selectPrimaryMainModelOptions(allModelConfigs), [allModelConfigs]);
   const selectedModelConfig = useSelectedModelConfig();
   const onChange = useCallback(
     (modelConfig: AnyModelConfigWithExternal) => {

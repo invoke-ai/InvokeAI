@@ -13,7 +13,48 @@ from invokeai.app.invocations.fields import FieldDescriptions, ImageField, Input
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.shared.models import FreeUConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
+
+# An SDNQ-quantized pipeline install (Z-Image / FLUX.2 Klein) is only self-contained when it ships
+# every component its loader reads from a fixed subfolder: the transformer, the VAE and the Qwen3
+# encoder (text_encoder + tokenizer). A truthy `submodels` dict is not sufficient — Main_SDNQ_Diffusers_*
+# configs record whichever submodels they recognize from model_index.json, so a partial (or
+# partially recognized) pipeline can expose only the transformer, and a malformed index can advertise
+# the components while omitting the transformer every loader requests. Treating either as
+# self-contained moves the failure from readiness/model-loader validation to runtime submodel loading.
+_REQUIRED_PIPELINE_SUBMODELS = frozenset(
+    {SubModelType.Transformer, SubModelType.VAE, SubModelType.TextEncoder, SubModelType.Tokenizer}
+)
+
+
+def is_self_contained_sdnq_pipeline(config: AnyModelConfig) -> bool:
+    """True if `config` is an SDNQ pipeline that ships its own transformer, VAE and Qwen3
+    (text_encoder + tokenizer) submodels, so a single install can supply every component. Returns
+    False for single-file / GGUF models and for partial pipelines missing any required submodel."""
+    if getattr(config, "format", None) != ModelFormat.SDNQQuantized:
+        return False
+    submodels = getattr(config, "submodels", None) or {}
+    return _REQUIRED_PIPELINE_SUBMODELS.issubset(submodels.keys())
+
+
+# FLUX.1 needs two text encoders, so its pipelines must additionally ship the T5 pair on top of the
+# CLIP one above. A FLUX.2 / Z-Image pipeline is complete without them.
+_REQUIRED_FLUX1_PIPELINE_SUBMODELS = _REQUIRED_PIPELINE_SUBMODELS | {
+    SubModelType.TextEncoder2,
+    SubModelType.Tokenizer2,
+}
+
+
+def is_self_contained_sdnq_flux1_pipeline(config: AnyModelConfig) -> bool:
+    """True if `config` is an SDNQ FLUX.1 pipeline that ships every component the graph needs:
+    transformer, VAE, CLIP (text_encoder + tokenizer) and T5 (text_encoder_2 + tokenizer_2).
+
+    Stricter than `is_self_contained_sdnq_pipeline`, which describes the single-encoder pipelines.
+    A FLUX.1 folder missing the T5 pair still needs an external T5 selected."""
+    if getattr(config, "format", None) != ModelFormat.SDNQQuantized:
+        return False
+    submodels = getattr(config, "submodels", None) or {}
+    return _REQUIRED_FLUX1_PIPELINE_SUBMODELS.issubset(submodels.keys())
 
 
 class ModelIdentifierField(BaseModel):
@@ -87,9 +128,64 @@ class Qwen3EncoderField(BaseModel):
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
+class MistralEncoderField(BaseModel):
+    """Field for the Mistral text encoder used by FLUX.2 [dev].
+
+    The "tokenizer" submodel actually points to the multimodal processor (AutoProcessor /
+    Mistral3Processor), which wraps the tokenizer plus the chat template needed by FLUX.2.
+    """
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer / processor submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+
+
+class Mistral3EncoderField(BaseModel):
+    """Field for Mistral3 text encoder used by ERNIE-Image models."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
+
+class PromptEnhancerField(BaseModel):
+    """Field for the optional ERNIE-Image prompt-enhancer (Ministral3ForCausalLM)."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load PE tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load PE causal-LM submodel")
+
+
+class Qwen3VLEncoderField(BaseModel):
+    """Field for the Qwen3-VL text encoder used by Krea-2 models."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+
+
+class WanT5EncoderField(BaseModel):
+    """Field for the UMT5-XXL text encoder used by Wan 2.2 models."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+
+
 class VAEField(BaseModel):
     vae: ModelIdentifierField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')
+
+
+class Gemma2EncoderField(BaseModel):
+    """Field for the Gemma-2 text encoder used by PiD decoders."""
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
+
+class PiDDecoderField(BaseModel):
+    """Field for a PiD (Pixel Diffusion Decoder) checkpoint."""
+
+    decoder: ModelIdentifierField = Field(description="Info to load PiD decoder checkpoint")
 
 
 class ControlLoRAField(LoRAField):
@@ -99,6 +195,47 @@ class ControlLoRAField(LoRAField):
 class TransformerField(BaseModel):
     transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
     loras: List[LoRAField] = Field(description="LoRAs to apply on model loading")
+
+
+class WanTransformerField(BaseModel):
+    """Transformer field for Wan 2.2 models.
+
+    Wan 2.2 A14B is a Mixture-of-Experts model with two transformer experts:
+    a high-noise expert (active at large timesteps) and a low-noise expert
+    (active at small timesteps). TI2V-5B is a single-transformer model and only
+    populates ``transformer``.
+
+    ``boundary_ratio`` matches Diffusers' ``WanPipeline`` semantics: it's the
+    boundary timestep as a fraction of ``num_train_timesteps`` (typically 1000),
+    so ``boundary_ratio=0.875`` means the high-noise expert handles t >= 875 and
+    the low-noise expert handles t < 875.
+    """
+
+    transformer: ModelIdentifierField = Field(
+        description="Primary transformer submodel. For A14B this is the high-noise expert."
+    )
+    transformer_low_noise: ModelIdentifierField | None = Field(
+        default=None,
+        description="Low-noise transformer expert (Wan 2.2 A14B only). None for TI2V-5B.",
+    )
+    loras: List[LoRAField] = Field(
+        default_factory=list,
+        description="LoRAs to apply to the primary transformer. For A14B applied to the high-noise expert.",
+    )
+    loras_low_noise: List[LoRAField] = Field(
+        default_factory=list,
+        description="LoRAs to apply to the low-noise expert (Wan 2.2 A14B). The Wan LoRA loader "
+        "routes 'both'- and 'low'-targeted LoRAs here; if empty, no LoRAs are applied to the "
+        "low-noise expert (a 'high'-targeted LoRA must not leak onto it).",
+    )
+    boundary_ratio: float = Field(
+        default=0.875,
+        ge=0.0,
+        le=1.0,
+        description="Boundary timestep as a fraction of num_train_timesteps (Wan 2.2 A14B only). "
+        "High-noise expert: t >= boundary_ratio * num_train_timesteps. Low-noise expert: t below. "
+        "Ignored for TI2V-5B.",
+    )
 
 
 @invocation_output("unet_output")

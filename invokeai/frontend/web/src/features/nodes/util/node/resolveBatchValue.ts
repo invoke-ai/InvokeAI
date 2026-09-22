@@ -1,5 +1,6 @@
 import type { AppDispatch } from 'app/store/store';
 import type { NodesState } from 'features/nodes/store/types';
+import { resolveConnectorSource } from 'features/nodes/store/util/connectorTopology';
 import type { ImageField } from 'features/nodes/types/common';
 import {
   isFloatFieldCollectionInputInstance,
@@ -15,9 +16,32 @@ import {
   resolveIntegerGeneratorField,
   resolveStringGeneratorField,
 } from 'features/nodes/types/field';
-import type { InvocationNode } from 'features/nodes/types/invocation';
-import { isBatchNode, isInvocationNode } from 'features/nodes/types/invocation';
+import type { AnyEdge, AnyNode, InvocationNode } from 'features/nodes/types/invocation';
+import { isBatchNode, isConnectorNode, isInvocationNode } from 'features/nodes/types/invocation';
 import { assert } from 'tsafe';
+
+const findGeneratorNode = (
+  edge: AnyEdge,
+  nodes: AnyNode[],
+  edges: AnyEdge[],
+  invocationNodes: InvocationNode[]
+): InvocationNode | undefined => {
+  const sourceNode = nodes.find((node) => node.id === edge.source);
+  if (!sourceNode) {
+    return undefined;
+  }
+  if (isInvocationNode(sourceNode)) {
+    return invocationNodes.find((node) => node.id === sourceNode.id);
+  }
+  if (isConnectorNode(sourceNode)) {
+    const resolvedSource = resolveConnectorSource(sourceNode.id, nodes, edges);
+    if (!resolvedSource) {
+      return undefined;
+    }
+    return invocationNodes.find((node) => node.id === resolvedSource.nodeId);
+  }
+  return undefined;
+};
 
 export const resolveBatchValue = async (arg: {
   dispatch: AppDispatch;
@@ -37,7 +61,7 @@ export const resolveBatchValue = async (arg: {
       return ownValue ?? [];
     }
 
-    const generatorNode = invocationNodes.find((node) => node.id === incomers.source);
+    const generatorNode = findGeneratorNode(incomers, nodes, edges, invocationNodes);
     assert(generatorNode, 'Missing edge from image generator to image batch');
 
     const generatorField = generatorNode.data.inputs['generator'];
@@ -54,7 +78,7 @@ export const resolveBatchValue = async (arg: {
       return ownValue ?? [];
     }
 
-    const generatorNode = invocationNodes.find((node) => node.id === edgeToStrings.source);
+    const generatorNode = findGeneratorNode(edgeToStrings, nodes, edges, invocationNodes);
     assert(generatorNode, 'Missing edge from string generator to string batch');
 
     const generatorField = generatorNode.data.inputs['generator'];
@@ -71,7 +95,7 @@ export const resolveBatchValue = async (arg: {
       return ownValue ?? [];
     }
 
-    const generatorNode = invocationNodes.find((node) => node.id === edgeToFloats.source);
+    const generatorNode = findGeneratorNode(edgeToFloats, nodes, edges, invocationNodes);
     assert(generatorNode, 'Missing edge from float generator to float batch');
 
     const generatorField = generatorNode.data.inputs['generator'];
@@ -88,7 +112,7 @@ export const resolveBatchValue = async (arg: {
       return ownValue ?? [];
     }
 
-    const generatorNode = invocationNodes.find((node) => node.id === incomers.source);
+    const generatorNode = findGeneratorNode(incomers, nodes, edges, invocationNodes);
     assert(generatorNode, 'Missing edge from integer generator to integer batch');
 
     const generatorField = generatorNode.data.inputs['generator'];

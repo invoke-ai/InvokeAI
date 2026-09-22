@@ -2,7 +2,7 @@
 
 The canvas is a fairly complex feature. It uses "native" KonvaJS (i.e. not the Konva react bindings) to render a drawing canvas.
 
-It supports layers, drawing, erasing, undo/redo, exporting, backend filters (i.e. filters that require sending image data to teh backend to process) and frontend filters.
+It supports layers, drawing, erasing, undo/redo, exporting, backend filters (i.e. filters that require sending image data to the backend to process) and frontend filters.
 
 ## Broad Strokes of Design
 

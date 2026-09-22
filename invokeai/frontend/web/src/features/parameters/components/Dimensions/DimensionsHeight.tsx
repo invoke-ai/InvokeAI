@@ -9,7 +9,7 @@ import { useTranslation } from 'react-i18next';
 export const CONSTRAINTS = {
   initial: 512,
   sliderMin: 64,
-  sliderMax: 1536,
+  sliderMax: 2048,
   numberInputMin: 64,
   numberInputMax: 4096,
   fineStep: 8,

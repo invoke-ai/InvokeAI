@@ -4,6 +4,7 @@ import type {
   BoardFieldInputTemplate,
   BooleanFieldInputTemplate,
   ColorFieldInputTemplate,
+  ControlNetMetadataFieldInputTemplate,
   EnumFieldInputTemplate,
   FieldInputTemplate,
   FieldType,
@@ -16,7 +17,10 @@ import type {
   IntegerFieldCollectionInputTemplate,
   IntegerFieldInputTemplate,
   IntegerGeneratorFieldInputTemplate,
+  IPAdapterMetadataFieldInputTemplate,
   LoRAFieldCollectionInputTemplate,
+  LoRAMetadataFieldInputTemplate,
+  MetadataExtraFieldInputTemplate,
   ModelIdentifierFieldInputTemplate,
   SavedWorkflowFieldInputTemplate,
   SchedulerFieldInputTemplate,
@@ -26,6 +30,9 @@ import type {
   StringFieldInputTemplate,
   StringGeneratorFieldInputTemplate,
   StylePresetFieldInputTemplate,
+  SystemPromptFieldInputTemplate,
+  T2IAdapterMetadataFieldInputTemplate,
+  VideoFieldInputTemplate,
 } from 'features/nodes/types/field';
 import {
   getFloatGeneratorArithmeticSequenceDefaults,
@@ -307,12 +314,40 @@ const buildStylePresetFieldInputTemplate: FieldInputTemplateBuilder<StylePresetF
   return template;
 };
 
+const buildSystemPromptFieldInputTemplate: FieldInputTemplateBuilder<SystemPromptFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: SystemPromptFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
 const buildImageFieldInputTemplate: FieldInputTemplateBuilder<ImageFieldInputTemplate> = ({
   schemaObject,
   baseField,
   fieldType,
 }) => {
   const template: ImageFieldInputTemplate = {
+    ...baseField,
+    type: fieldType,
+    default: schemaObject.default ?? undefined,
+  };
+
+  return template;
+};
+
+const buildVideoFieldInputTemplate: FieldInputTemplateBuilder<VideoFieldInputTemplate> = ({
+  schemaObject,
+  baseField,
+  fieldType,
+}) => {
+  const template: VideoFieldInputTemplate = {
     ...baseField,
     type: fieldType,
     default: schemaObject.default ?? undefined,
@@ -513,6 +548,53 @@ const buildImageGeneratorFieldInputTemplate: FieldInputTemplateBuilder<ImageGene
   return template;
 };
 
+const buildLoRAMetadataFieldInputTemplate: FieldInputTemplateBuilder<LoRAMetadataFieldInputTemplate> = ({
+  baseField,
+  fieldType,
+}) => ({
+  ...baseField,
+  type: fieldType,
+  default: undefined,
+});
+
+const buildControlNetMetadataFieldInputTemplate: FieldInputTemplateBuilder<ControlNetMetadataFieldInputTemplate> = ({
+  baseField,
+  fieldType,
+}) => ({
+  ...baseField,
+  type: fieldType,
+  default: undefined,
+});
+
+const buildIPAdapterMetadataFieldInputTemplate: FieldInputTemplateBuilder<IPAdapterMetadataFieldInputTemplate> = ({
+  baseField,
+  fieldType,
+}) => ({
+  ...baseField,
+  type: fieldType,
+  default: undefined,
+});
+
+const buildT2IAdapterMetadataFieldInputTemplate: FieldInputTemplateBuilder<T2IAdapterMetadataFieldInputTemplate> = ({
+  baseField,
+  fieldType,
+}) => ({
+  ...baseField,
+  type: fieldType,
+  default: undefined,
+});
+
+// MetadataExtraField is synthesized by graphToWorkflow for `core_metadata` extras and never
+// produced by parseSchema. This builder exists only to satisfy the StatefulFieldType['name'] record.
+const buildMetadataExtraFieldInputTemplate: FieldInputTemplateBuilder<MetadataExtraFieldInputTemplate> = ({
+  baseField,
+  fieldType,
+}) => ({
+  ...baseField,
+  type: fieldType,
+  default: undefined,
+});
+
 const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplateBuilder> = {
   BoardField: buildBoardFieldInputTemplate,
   BooleanField: buildBooleanFieldInputTemplate,
@@ -520,6 +602,7 @@ const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplate
   EnumField: buildEnumFieldInputTemplate,
   FloatField: buildFloatFieldInputTemplate,
   ImageField: buildImageFieldInputTemplate,
+  VideoField: buildVideoFieldInputTemplate,
   IntegerField: buildIntegerFieldInputTemplate,
   // LoRAField is always handled by the collection branch above (COLLECTION / SINGLE_OR_COLLECTION);
   // this entry is a defensive fallback to satisfy the exhaustive builder map.
@@ -529,10 +612,16 @@ const TEMPLATE_BUILDER_MAP: Record<StatefulFieldType['name'], FieldInputTemplate
   SavedWorkflowField: buildSavedWorkflowFieldInputTemplate,
   StringField: buildStringFieldInputTemplate,
   StylePresetField: buildStylePresetFieldInputTemplate,
+  SystemPromptField: buildSystemPromptFieldInputTemplate,
   FloatGeneratorField: buildFloatGeneratorFieldInputTemplate,
   IntegerGeneratorField: buildIntegerGeneratorFieldInputTemplate,
   StringGeneratorField: buildStringGeneratorFieldInputTemplate,
   ImageGeneratorField: buildImageGeneratorFieldInputTemplate,
+  LoRAMetadataField: buildLoRAMetadataFieldInputTemplate,
+  ControlNetMetadataField: buildControlNetMetadataFieldInputTemplate,
+  IPAdapterMetadataField: buildIPAdapterMetadataFieldInputTemplate,
+  T2IAdapterMetadataField: buildT2IAdapterMetadataFieldInputTemplate,
+  MetadataExtraField: buildMetadataExtraFieldInputTemplate,
 };
 
 export const buildFieldInputTemplate = (

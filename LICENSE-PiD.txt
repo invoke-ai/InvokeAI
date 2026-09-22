@@ -1,0 +1,68 @@
+PiD (Pixel Diffusion Decoder) — License notice
+
+Upstream project: https://github.com/nv-tlabs/PiD
+Vendored under:   invokeai/backend/pid/
+
+================================================================================
+CODE (Apache License 2.0)
+================================================================================
+
+The PiD source code, including the `pid/_src/` subtree and the `pid/_ext/imaginaire/`
+framework subset, is licensed under the Apache License, Version 2.0.
+
+Copyright 2026 NVIDIA CORPORATION & AFFILIATES.
+
+Portions of the framework (pid/_ext/imaginaire/) were originally adapted from
+the cosmos-predict2.5 project (https://github.com/nvidia-cosmos/cosmos-predict2.5/).
+
+Files vendored into invokeai/backend/pid/ retain their original SPDX-License-Identifier
+headers. The Apache 2.0 license text is available at:
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+================================================================================
+MODEL WEIGHTS (NVIDIA Source Code License v1 — non-commercial)
+================================================================================
+
+The pre-trained PiD decoder checkpoints distributed by NVIDIA at
+
+    https://huggingface.co/nvidia/PiD
+
+are released under the NSCLv1 license. Per NSCLv1, the weights may only be used
+for non-commercial (research or evaluation) purposes:
+
+    https://huggingface.co/nvidia/PixelDiT-1300M-1024px/blob/main/LICENSE
+
+This restriction applies to the weights only, not to the InvokeAI source code
+or the vendored PiD source code (which remain Apache 2.0). Users are responsible
+for ensuring their use of the PiD weights complies with NSCLv1.
+
+================================================================================
+LOCAL MODIFICATIONS
+================================================================================
+
+The following changes were applied to the upstream PiD subset when vendoring:
+
+* All `pid.*` imports were rewritten to `invokeai.backend.pid.*`.
+* `pid/_src/configs/`, `pid/_src/tokenizers/`, `pid/_src/checkpointer/`,
+  `pid/_src/inference/_demo_*.py`, `from_*.py`, `create_dataset.py`,
+  `rae_generation.py`, and `scale_rae_generation.py` were dropped (not needed
+  for the decoder-only inference subset).
+* `pid/_ext/imaginaire/checkpointer/`, `trainer.py`, `visualize/`, `flags.py`,
+  `config.py`, `types/`, `utils/easy_io/`, `utils/callback.py`,
+  `utils/config_helper.py`, `utils/validator{,_params}.py` and the
+  `lazy_config/omegaconf_patch.py` were dropped.
+* The upstream `utils/log.py` (loguru-based) and `utils/misc.py` were replaced
+  with stdlib-based stubs covering only the API surface used by the decoder.
+* `lazy_config/file_io.py` (iopath PathManager) and `lazy_config/registry.py`
+  (fvcore Registry) were replaced with stdlib-only implementations.
+* `lazy_config/lazy.py` was reduced to a minimal `LazyCall`/`LazyConfig` stub;
+  the upstream yaml/cloudpickle/dill/detectron2 config save/load paths are
+  intentionally not supported.
+* `lazy_config/instantiate.py` was reduced to a stdlib-only implementation;
+  the upstream omegaconf `DictConfig`/`ListConfig` branches were dropped, so
+  no `omegaconf` dependency is required.
+* `_src/utils/model_loader.py` (which depended on Imaginaire's distributed
+  checkpointer + easy_io) and `_src/inference/inference_utils.py` (S3 / video
+  helpers) were removed; their decode-path equivalents are reimplemented in
+  `invokeai/backend/pid/decode.py`.

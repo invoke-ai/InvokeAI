@@ -57,12 +57,16 @@ from invokeai.backend.patches.lora_conversions.flux_xlabs_lora_conversion_utils 
     is_state_dict_likely_in_flux_xlabs_format,
     lora_model_from_flux_xlabs_state_dict,
 )
+from invokeai.backend.patches.lora_conversions.krea2_lora_conversion_utils import (
+    lora_model_from_krea2_state_dict,
+)
 from invokeai.backend.patches.lora_conversions.peft_adapter_utils import normalize_peft_adapter_names
 from invokeai.backend.patches.lora_conversions.qwen_image_lora_conversion_utils import (
     lora_model_from_qwen_image_state_dict,
 )
 from invokeai.backend.patches.lora_conversions.sd_lora_conversion_utils import lora_model_from_sd_state_dict
 from invokeai.backend.patches.lora_conversions.sdxl_lora_conversion_utils import convert_sdxl_keys_to_diffusers_format
+from invokeai.backend.patches.lora_conversions.wan_lora_conversion_utils import lora_model_from_wan_state_dict
 from invokeai.backend.patches.lora_conversions.z_image_lora_conversion_utils import lora_model_from_z_image_state_dict
 
 
@@ -172,9 +176,17 @@ class LoRALoader(ModelLoader):
             model = lora_model_from_z_image_state_dict(state_dict=state_dict, alpha=None)
         elif self._model_base == BaseModelType.QwenImage:
             model = lora_model_from_qwen_image_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.Krea2:
+            # Krea-2 LoRAs use diffusers PEFT format targeting the Krea2 transformer (and optionally
+            # the Qwen3-VL text encoder). alpha=None → alpha=rank (common diffusers default).
+            model = lora_model_from_krea2_state_dict(state_dict=state_dict, alpha=None)
         elif self._model_base == BaseModelType.Anima:
             # Anima LoRAs use Kohya-style or diffusers PEFT format targeting Cosmos DiT blocks.
             model = lora_model_from_anima_state_dict(state_dict=state_dict, alpha=None)
+        elif self._model_base == BaseModelType.Wan:
+            # Wan LoRAs use Kohya / diffusers PEFT / native PEFT formats targeting
+            # WanTransformer3DModel attention (attn1/attn2) and FFN blocks.
+            model = lora_model_from_wan_state_dict(state_dict=state_dict, alpha=None)
         else:
             raise ValueError(f"Unsupported LoRA base model: {self._model_base}")
 

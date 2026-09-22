@@ -284,7 +284,10 @@ class SD3DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             assert isinstance(transformer, SD3Transformer2DModel)
 
             # 6. Denoising loop
-            for step_idx, (t_curr, t_prev) in tqdm(list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True)))):
+            for step_idx, (t_curr, t_prev) in tqdm(
+                list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True))),
+                desc=f"Denoising{TorchDevice.get_session_device_label()}",
+            ):
                 # Expand the latents if we are doing CFG.
                 latent_model_input = torch.cat([latents] * 2) if do_classifier_free_guidance else latents
                 # Expand the timestep to match the latent model input.

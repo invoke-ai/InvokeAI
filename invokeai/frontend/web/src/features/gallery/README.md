@@ -60,7 +60,7 @@ It starts by loading a list of all image names for the selected board or view se
 
 This affords a nice UX, where the user can scroll to any part of their gallery. The scrollbar size never changes.
 
-We've tried some other approachs in the past, but they all had significant UX or implementation issues:
+We've tried some other approaches in the past, but they all had significant UX or implementation issues:
 
 ### Infinite scroll
 

@@ -1,3 +1,4 @@
+import asyncio
 import csv
 import io
 import json
@@ -78,7 +79,7 @@ def _load_record_or_404(style_preset_id: str) -> StylePresetRecordDTO:
         200: {"model": StylePresetRecordWithImage},
     },
 )
-async def get_style_preset(
+def get_style_preset(
     current_user: CurrentUserOrDefault,
     style_preset_id: str = Path(description="The style preset to get"),
 ) -> StylePresetRecordWithImage:
@@ -118,7 +119,7 @@ async def update_style_preset(
     except (json.JSONDecodeError, pydantic.ValidationError):
         raise HTTPException(status_code=400, detail="Invalid preset data")
 
-    record = _load_record_or_404(style_preset_id)
+    record = await asyncio.to_thread(_load_record_or_404, style_preset_id)
     _assert_preset_write(record, current_user)
 
     if image is not None:
@@ -127,28 +128,34 @@ async def update_style_preset(
 
         contents = await image.read()
         try:
-            pil_image = Image.open(io.BytesIO(contents))
+            pil_image = await asyncio.to_thread(Image.open, io.BytesIO(contents))
 
         except Exception:
             ApiDependencies.invoker.services.logger.error(traceback.format_exc())
             raise HTTPException(status_code=415, detail="Failed to read image")
 
         try:
-            ApiDependencies.invoker.services.style_preset_image_files.save(style_preset_id, pil_image)
+            await asyncio.to_thread(
+                ApiDependencies.invoker.services.style_preset_image_files.save, style_preset_id, pil_image
+            )
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
     else:
         try:
-            ApiDependencies.invoker.services.style_preset_image_files.delete(style_preset_id)
+            await asyncio.to_thread(ApiDependencies.invoker.services.style_preset_image_files.delete, style_preset_id)
         except StylePresetImageFileNotFoundException:
             pass
 
     preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
     changes = StylePresetChanges(name=name, preset_data=preset_data, type=type, is_public=is_public)
 
-    style_preset_image = ApiDependencies.invoker.services.style_preset_image_files.get_url(style_preset_id)
-    style_preset = ApiDependencies.invoker.services.style_preset_records.update(
-        style_preset_id=style_preset_id, changes=changes
+    style_preset_image = await asyncio.to_thread(
+        ApiDependencies.invoker.services.style_preset_image_files.get_url, style_preset_id
+    )
+    style_preset = await asyncio.to_thread(
+        ApiDependencies.invoker.services.style_preset_records.update,
+        style_preset_id=style_preset_id,
+        changes=changes,
     )
     return StylePresetRecordWithImage(image=style_preset_image, **style_preset.model_dump())
 
@@ -157,7 +164,7 @@ async def update_style_preset(
     "/i/{style_preset_id}",
     operation_id="delete_style_preset",
 )
-async def delete_style_preset(
+def delete_style_preset(
     current_user: CurrentUserOrDefault,
     style_preset_id: str = Path(description="The style preset to delete"),
 ) -> None:
@@ -204,30 +211,38 @@ async def create_style_preset(
     if type == PresetType.Default and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can create default presets")
 
-    preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
-    style_preset = StylePresetWithoutId(name=name, preset_data=preset_data, type=type, is_public=is_public)
-    new_style_preset = ApiDependencies.invoker.services.style_preset_records.create(
-        style_preset=style_preset, user_id=current_user.user_id
-    )
-
+    pil_image = None
     if image is not None:
         if not image.content_type or not image.content_type.startswith("image"):
             raise HTTPException(status_code=415, detail="Not an image")
 
         contents = await image.read()
         try:
-            pil_image = Image.open(io.BytesIO(contents))
+            pil_image = await asyncio.to_thread(Image.open, io.BytesIO(contents))
 
         except Exception:
             ApiDependencies.invoker.services.logger.error(traceback.format_exc())
             raise HTTPException(status_code=415, detail="Failed to read image")
 
+    preset_data = PresetData(positive_prompt=positive_prompt, negative_prompt=negative_prompt)
+    style_preset = StylePresetWithoutId(name=name, preset_data=preset_data, type=type, is_public=is_public)
+    new_style_preset = await asyncio.to_thread(
+        ApiDependencies.invoker.services.style_preset_records.create,
+        style_preset=style_preset,
+        user_id=current_user.user_id,
+    )
+
+    if pil_image is not None:
         try:
-            ApiDependencies.invoker.services.style_preset_image_files.save(new_style_preset.id, pil_image)
+            await asyncio.to_thread(
+                ApiDependencies.invoker.services.style_preset_image_files.save, new_style_preset.id, pil_image
+            )
         except ValueError as e:
             raise HTTPException(status_code=409, detail=str(e))
 
-    preset_image = ApiDependencies.invoker.services.style_preset_image_files.get_url(new_style_preset.id)
+    preset_image = await asyncio.to_thread(
+        ApiDependencies.invoker.services.style_preset_image_files.get_url, new_style_preset.id
+    )
     return StylePresetRecordWithImage(image=preset_image, **new_style_preset.model_dump())
 
 
@@ -238,7 +253,7 @@ async def create_style_preset(
         200: {"model": list[StylePresetRecordWithImage]},
     },
 )
-async def list_style_presets(current_user: CurrentUserOrDefault) -> list[StylePresetRecordWithImage]:
+def list_style_presets(current_user: CurrentUserOrDefault) -> list[StylePresetRecordWithImage]:
     """Gets the style presets visible to the current user."""
     style_presets_with_image: list[StylePresetRecordWithImage] = []
     style_presets = ApiDependencies.invoker.services.style_preset_records.get_many(
@@ -265,7 +280,7 @@ async def list_style_presets(current_user: CurrentUserOrDefault) -> list[StylePr
     },
     status_code=200,
 )
-async def get_style_preset_image(
+def get_style_preset_image(
     current_user: CurrentUserOrDefault,
     style_preset_id: str = Path(description="The id of the style preset image to get"),
 ) -> FileResponse:
@@ -294,7 +309,7 @@ async def get_style_preset_image(
     responses={200: {"content": {"text/csv": {}}, "description": "A CSV file with the requested data."}},
     status_code=200,
 )
-async def export_style_presets(current_user: AdminUserOrDefault):
+def export_style_presets(current_user: AdminUserOrDefault):
     # Admin-only export covers every user preset.
     output = io.StringIO()
     writer = csv.writer(output)
@@ -330,7 +345,11 @@ async def import_style_presets(
 ):
     try:
         style_presets = await parse_presets_from_file(file)
-        ApiDependencies.invoker.services.style_preset_records.create_many(style_presets, user_id=current_user.user_id)
+        await asyncio.to_thread(
+            ApiDependencies.invoker.services.style_preset_records.create_many,
+            style_presets,
+            user_id=current_user.user_id,
+        )
     except InvalidPresetImportDataError as e:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=400, detail=str(e))

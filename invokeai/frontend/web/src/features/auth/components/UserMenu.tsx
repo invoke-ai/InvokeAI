@@ -1,6 +1,9 @@
 import { Badge, Flex, IconButton, Menu, MenuButton, MenuItem, MenuList, Text, Tooltip } from '@invoke-ai/ui-library';
 import { useAppDispatch, useAppSelector } from 'app/store/storeHooks';
+import { pauseMediaCookieRefreshForLogout } from 'features/auth/hooks/useMediaCookieRefresh';
 import { logout, selectCurrentUser } from 'features/auth/store/authSlice';
+import { logoutAfterServerConfirmation } from 'features/auth/store/logoutAfterServerConfirmation';
+import { toast } from 'features/toast/toast';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { PiGearBold, PiSignOutBold, PiUserBold, PiUsersBold } from 'react-icons/pi';
@@ -15,18 +18,24 @@ export const UserMenu = memo(() => {
   const [logoutMutation] = useLogoutMutation();
 
   const handleLogout = useCallback(() => {
-    // Call backend logout endpoint
-    logoutMutation()
-      .unwrap()
-      .catch(() => {
-        // Ignore errors - we'll log out locally anyway
-      })
-      .finally(() => {
-        // Clear local state regardless of backend response
+    void logoutAfterServerConfirmation(
+      () => logoutMutation().unwrap(),
+      () => {
         dispatch(logout());
         navigate('/login');
+      },
+      pauseMediaCookieRefreshForLogout
+    ).catch(() => {
+      // Local auth state is deliberately kept when the server can't confirm the logout
+      // (the media cookie may still be live) — but silently doing nothing leaves the
+      // user stuck with a dead button, so say why.
+      toast({
+        status: 'error',
+        title: t('auth.logoutFailed'),
+        description: t('auth.logoutFailedDesc'),
       });
-  }, [dispatch, navigate, logoutMutation]);
+    });
+  }, [dispatch, navigate, logoutMutation, t]);
 
   const handleProfile = useCallback(() => {
     navigate('/profile');

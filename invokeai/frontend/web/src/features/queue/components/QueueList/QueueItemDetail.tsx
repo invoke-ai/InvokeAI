@@ -18,24 +18,26 @@ import type { S } from 'services/api/types';
 import { getQueueItemActionVisibility } from './getQueueItemActionVisibility';
 
 type Props = {
-  queueItem: S['SessionQueueItem'];
+  queueItem: S['SessionQueueItemSummary'];
 };
 
-const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
-  const { session_id, batch_id, item_id, origin, destination } = queueItemDTO;
+const QueueItemComponent = ({ queueItem: queueItemSummary }: Props) => {
+  const { batch_id, item_id, origin, destination } = queueItemSummary;
   const { t } = useTranslation();
   const isBatchCanceled = useBatchIsCanceled(batch_id);
   const cancelBatch = useCancelBatch();
   const cancelQueueItem = useCancelQueueItem();
   const retryQueueItem = useRetryQueueItem();
-  const { data: queueItem } = useGetQueueItemQuery(item_id);
+  const { data: queueItem, isError } = useGetQueueItemQuery(item_id);
 
   const originText = useOriginText(origin);
   const destinationText = useDestinationText(destination);
 
   const statusAndTiming = useMemo(() => {
     if (!queueItem) {
-      return t('common.loading');
+      // Distinguish the two, or a queue item the backend cannot serve — one whose graph
+      // references a node type this build no longer registers, say — reads as loading forever.
+      return isError ? t('common.error') : t('common.loading');
     }
     if (!queueItem.completed_at || !queueItem.started_at) {
       return t(`queue.${queueItem.status}`);
@@ -45,7 +47,7 @@ const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
       return `${t('queue.completedIn')} ${seconds}${seconds === 1 ? '' : 's'}`;
     }
     return `${seconds}s`;
-  }, [queueItem, t]);
+  }, [isError, queueItem, t]);
 
   const isCanceled = useMemo(
     () => !!queueItem && ['canceled', 'completed', 'failed'].includes(queueItem.status),
@@ -54,8 +56,8 @@ const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
 
   const isFailed = useMemo(() => !!queueItem && ['canceled', 'failed'].includes(queueItem.status), [queueItem]);
   const { canShowCancelQueueItem, canShowRetryQueueItem } = useMemo(
-    () => getQueueItemActionVisibility(queueItemDTO),
-    [queueItemDTO]
+    () => getQueueItemActionVisibility(queueItemSummary),
+    [queueItemSummary]
   );
 
   const onCancelBatch = useCallback(() => {
@@ -86,7 +88,10 @@ const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
         <QueueItemData label={t('queue.destination')} data={destinationText} />
         <QueueItemData label={t('queue.item')} data={item_id} />
         <QueueItemData label={t('queue.batch')} data={batch_id} />
-        <QueueItemData label={t('queue.session')} data={session_id} />
+        <QueueItemData
+          label={t('queue.session')}
+          data={queueItem?.session_id ?? (isError ? t('common.error') : t('common.loading'))}
+        />
         <ButtonGroup size="xs" orientation="vertical">
           {canShowCancelQueueItem && !isFailed && (
             <Button
@@ -147,6 +152,8 @@ const QueueItemComponent = ({ queueItem: queueItemDTO }: Props) => {
             data={queueItem}
             extraCopyActions={[{ label: 'Graph', getData: (data) => get(data, 'session.graph') }]}
           />
+        ) : isError ? (
+          <Text color="error.400">{t('queue.queueItemLoadFailed')}</Text>
         ) : (
           <Spinner opacity={0.5} />
         )}

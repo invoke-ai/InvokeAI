@@ -19,7 +19,7 @@ Key differences from Z-Image denoise:
 import math
 import sys
 from contextlib import ExitStack
-from typing import Callable, Iterator, Optional, Tuple
+from typing import Callable, Iterator, Optional
 
 import torch
 import torchvision.transforms as tv_transforms
@@ -58,7 +58,7 @@ from invokeai.backend.flux.schedulers import (
     ANIMA_SHIFT,
 )
 from invokeai.backend.model_manager.taxonomy import BaseModelType
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_TRANSFORMER_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
@@ -789,7 +789,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
                 if driver is not None:
                     user_step = 0
-                    pbar = tqdm(total=total_steps, desc="Denoising (Anima)")
+                    pbar = tqdm(total=total_steps, desc=f"Denoising (Anima){TorchDevice.get_session_device_label()}")
                     for it in driver.iterations():
                         # Gate on the user-facing step index so both halves of a
                         # multi-pass step (e.g. Heun pairs) share one gate value.
@@ -843,7 +843,9 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     pbar.close()
                 else:
                     # Built-in Euler implementation (default for Anima)
-                    for step_idx in tqdm(range(total_steps), desc="Denoising (Anima)"):
+                    for step_idx in tqdm(
+                        range(total_steps), desc=f"Denoising (Anima){TorchDevice.get_session_device_label()}"
+                    ):
                         for lllite_field, lllite_model, _ in lllite_adapters:
                             lllite_model.set_multiplier(
                                 self._get_lllite_multiplier(lllite_field, step_idx, total_steps)
@@ -930,7 +932,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         return step_callback
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[Tuple[ModelPatchRaw, float]]:
+    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         """Iterate over LoRA models to apply to the transformer."""
         for lora in self.transformer.loras:
             lora_info = context.models.load(lora.lora)
@@ -939,5 +941,4 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
                     "The LoRA model may be corrupted or incompatible."
                 )
-            yield (lora_info.model, lora.weight)
-            del lora_info
+            yield (lora_info.model, lora.weight, lora_info.model_in_ram())

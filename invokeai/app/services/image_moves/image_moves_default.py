@@ -491,6 +491,14 @@ class ImageMoveService:
                     )
                     continue
                 raise RuntimeError(f"Neither old nor new image file exists for {item.image_name}")
+
+            old_thumbnail_exists = old_thumbnail_path.exists()
+            new_thumbnail_exists = new_thumbnail_path.exists()
+            if old_exists and not new_exists and not old_thumbnail_exists and not new_thumbnail_exists:
+                # Generate the thumbnail while the source is still available. If this fails,
+                # leave the source untouched so recovery can retry the complete operation.
+                self._regenerate_thumbnail(old_path, new_thumbnail_path)
+
             if old_exists:
                 new_path.parent.mkdir(parents=True, exist_ok=True)
                 os.replace(old_path, new_path)

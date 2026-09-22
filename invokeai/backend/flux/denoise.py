@@ -15,6 +15,7 @@ from invokeai.backend.flux.extensions.xlabs_ip_adapter_extension import XLabsIPA
 from invokeai.backend.flux.model import Flux
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+from invokeai.backend.util.devices import TorchDevice
 
 
 def denoise(
@@ -95,7 +96,7 @@ def denoise(
             # Use diffusers scheduler for stepping
             # Use tqdm with total_steps (user-facing steps) not num_scheduler_steps (internal steps)
             # This ensures progress bar shows 1/8, 2/8, etc. even when scheduler uses more internal steps
-            pbar = tqdm(total=total_steps, desc="Denoising")
+            pbar = tqdm(total=total_steps, desc=f"Denoising{TorchDevice.get_session_device_label()}")
             for step_index in range(num_scheduler_steps):
                 timestep = scheduler.timesteps[step_index]
                 # Convert scheduler timestep (0-1000) to normalized (0-1) for the model
@@ -266,7 +267,10 @@ def denoise(
             return img
 
         # Original Euler implementation (when scheduler is None)
-        for step_index, (t_curr, t_prev) in tqdm(list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True)))):
+        for step_index, (t_curr, t_prev) in tqdm(
+            list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True))),
+            desc=f"Denoising{TorchDevice.get_session_device_label()}",
+        ):
             # DyPE: Update step state for timestep-dependent scaling
             if dype_extension is not None and dype_embedder is not None:
                 dype_extension.update_step_state(

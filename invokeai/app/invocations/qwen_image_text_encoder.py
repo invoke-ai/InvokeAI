@@ -18,6 +18,7 @@ from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     ConditioningFieldData,
     QwenImageConditioningInfo,
 )
+from invokeai.backend.util.devices import TorchDevice
 
 # Prompt templates and drop indices for the two Qwen Image model modes.
 # These are taken directly from the diffusers pipelines.
@@ -67,6 +68,7 @@ def _build_prompt(user_prompt: str, num_images: int) -> str:
     category="conditioning",
     version="1.2.0",
     classification=Classification.Prototype,
+    idle_gpu_offloadable=True,
 )
 class QwenImageTextEncoderInvocation(BaseInvocation):
     """Encodes text and reference images for Qwen Image using Qwen2.5-VL."""
@@ -318,6 +320,6 @@ class QwenImageTextEncoderInvocation(BaseInvocation):
             nonlocal text_encoder
             del text_encoder
             gc.collect()
-            torch.cuda.empty_cache()
+            TorchDevice.empty_cache()
 
         return text_encoder, device, cleanup

@@ -10,13 +10,20 @@ import { useTranslation } from 'react-i18next';
 import { MdMoneyOff } from 'react-icons/md';
 import { useMainModels } from 'services/api/hooks/modelsByType';
 import { useSelectedModelConfig } from 'services/api/hooks/useSelectedModelConfig';
-import { type AnyModelConfigWithExternal, isNonCommercialMainModelConfig } from 'services/api/types';
+import {
+  type AnyModelConfigWithExternal,
+  isNonCommercialMainModelConfig,
+  selectPrimaryMainModelOptions,
+} from 'services/api/types';
 
 export const InitialStateMainModelPicker = memo(() => {
   const { t } = useTranslation();
   const dispatch = useAppDispatch();
   const activeTab = useAppSelector(selectActiveTab);
-  const [modelConfigs] = useMainModels();
+  const [allModelConfigs] = useMainModels();
+  // Same filter as MainModelPicker — a Wan low-noise expert offered here is just as
+  // unusable as a primary main, and this picker is the launchpad's first impression.
+  const modelConfigs = useMemo(() => selectPrimaryMainModelOptions(allModelConfigs), [allModelConfigs]);
   const selectedModelConfig = useSelectedModelConfig();
   const onChange = useCallback(
     (modelConfig: AnyModelConfigWithExternal) => {

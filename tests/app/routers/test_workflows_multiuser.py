@@ -59,6 +59,7 @@ def client():
 def mock_services() -> InvocationServices:
     from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
     from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+    from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
     from invokeai.app.services.boards.boards_default import BoardService
     from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
     from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import (
@@ -68,7 +69,11 @@ def mock_services() -> InvocationServices:
     from invokeai.app.services.images.images_default import ImageService
     from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
     from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
+    from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import (
+        SqliteSystemPromptRecordsStorage,
+    )
     from invokeai.app.services.users.users_default import UserService
+    from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
     from tests.test_nodes import TestEventService
 
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
@@ -101,12 +106,18 @@ def mock_services() -> InvocationServices:
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
+        system_prompt_records=SqliteSystemPromptRecordsStorage(db=db),
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistenceSqlite(db=db),
         users=UserService(db),
         external_generation=None,  # type: ignore
+        videos=None,  # type: ignore
+        video_files=None,  # type: ignore
+        video_records=SqliteVideoRecordStorage(db=db),
+        board_video_records=SqliteBoardVideoRecordStorage(db=db),
+        gallery=None,  # type: ignore
     )
 
 

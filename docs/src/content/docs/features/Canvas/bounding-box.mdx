@@ -1,0 +1,49 @@
+---
+title: Generation Bounding Box
+description: Learn how the bounding box defines the Canvas generation area and the image context sent to the model.
+lastUpdated: 2026-08-02
+sidebar:
+  order: 0
+---
+
+The **generation bounding box** is the rectangle that defines where a Canvas generation takes place. It controls both
+the area returned by the model and the portion of the Canvas used as image context for that generation.
+
+## What the Model Sees
+
+When you click **Invoke**, the visible Canvas content inside the bounding box is composited and sent through the
+generation pipeline. Content outside the box is not included in that Canvas image input, even though it remains visible
+to you on the larger Canvas.
+
+This makes placement important. If the model needs to continue a shape, match a texture, or preserve part of a subject,
+include enough of that content inside the bounding box to give the model useful context. Moving the box changes which
+part of the image the model can use for the next generation.
+
+:::note
+The bounding box defines the generation area; it is not an inpaint mask. Use an **Inpaint Mask** when only selected
+parts inside the box should be regenerated.
+:::
+
+## Move and Resize the Bounding Box
+
+Select the **Bounding Box** tool in the Canvas toolbar. You can then:
+
+- Drag inside the box to move it.
+- Drag its handles to resize it.
+- Use the aspect-ratio lock when you need to preserve its current proportions.
+
+The bounding box dimensions determine the generated image's width and height. Invoke constrains these dimensions to
+values supported by the selected model.
+
+:::tip[Tap & Hold C]
+Tap <kbd>C</kbd> to keep the **Bounding Box** tool selected. Hold <kbd>C</kbd> to use it temporarily, then release the
+key to return to your previous tool. The shortcut can be changed in the **Hotkeys** settings.
+:::
+
+## Bounding Box Size and Processing Size
+
+The bounding box is the final footprint of the generation on the Canvas. If **Scale Before Processing** is enabled,
+Invoke may process that area at a different resolution and then resize the result back to the bounding box dimensions.
+
+For best results, choose a box large enough to include the visual context the model needs, while keeping its dimensions
+appropriate for the selected model and your available VRAM.

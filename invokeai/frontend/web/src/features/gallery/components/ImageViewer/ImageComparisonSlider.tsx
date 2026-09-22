@@ -1,6 +1,7 @@
 import { Box, Flex, Icon, Image } from '@invoke-ai/ui-library';
 import { useAppSelector } from 'app/store/storeHooks';
 import { preventDefault } from 'common/util/stopPropagation';
+import { useMediaUrl } from 'features/auth/store/mediaCookieRefresh';
 import { TRANSPARENCY_CHECKERBOARD_PATTERN_DARK_DATAURL } from 'features/controlLayers/konva/patterns/transparency-checkerboard-pattern';
 import type { Dimensions } from 'features/controlLayers/store/types';
 import { ImageComparisonLabel } from 'features/gallery/components/ImageViewer/ImageComparisonLabel';
@@ -21,6 +22,10 @@ const HANDLE_LEFT_INITIAL_PX = `calc(${INITIAL_POS} - ${HANDLE_HITBOX / 2}px)`;
 
 export const ImageComparisonSlider = memo(({ firstImage, secondImage, rect }: ComparisonProps) => {
   const comparisonFit = useAppSelector(selectComparisonFit);
+  const firstImageUrl = useMediaUrl(firstImage.image_url);
+  const firstThumbnailUrl = useMediaUrl(firstImage.thumbnail_url);
+  const secondImageUrl = useMediaUrl(secondImage.image_url);
+  const secondThumbnailUrl = useMediaUrl(secondImage.thumbnail_url);
 
   // How far the handle is from the left - this will be a CSS calculation that takes into account the handle width
   const [left, setLeft] = useState(HANDLE_LEFT_INITIAL_PX);
@@ -130,8 +135,8 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, rect }: Co
           <Image
             position="relative"
             id="image-comparison-second-image"
-            src={secondImage.image_url}
-            fallbackSrc={secondImage.thumbnail_url}
+            src={secondImageUrl}
+            fallbackSrc={secondThumbnailUrl}
             w={compareImageDims.width}
             h={compareImageDims.height}
             maxW={fittedDims.width}
@@ -152,8 +157,8 @@ export const ImageComparisonSlider = memo(({ firstImage, secondImage, rect }: Co
           >
             <Image
               id="image-comparison-first-image"
-              src={firstImage.image_url}
-              fallbackSrc={firstImage.thumbnail_url}
+              src={firstImageUrl}
+              fallbackSrc={firstThumbnailUrl}
               w={fittedDims.width}
               h={fittedDims.height}
               objectFit="cover"

@@ -1,5 +1,5 @@
 import { Box, Button, Flex, Icon, IconButton, Image, Tooltip } from '@invoke-ai/ui-library';
-import { dropzoneAccept } from 'common/hooks/useImageUploadButton';
+import { imageDropzoneAccept } from 'common/util/uploadMediaAccept';
 import { useCallback } from 'react';
 import { useDropzone } from 'react-dropzone';
 import type { UseControllerProps } from 'react-hook-form';
@@ -27,7 +27,7 @@ export const StylePresetImageField = (props: UseControllerProps<StylePresetFormD
   }, [field]);
 
   const { getInputProps, getRootProps } = useDropzone({
-    accept: dropzoneAccept,
+    accept: imageDropzoneAccept,
     onDropAccepted,
     noDrag: true,
     multiple: false,

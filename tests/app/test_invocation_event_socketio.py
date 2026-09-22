@@ -12,14 +12,18 @@ from unittest.mock import AsyncMock
 
 import pytest
 from fastapi import FastAPI
+from pydantic.networks import AnyHttpUrl
 
 from invokeai.app.api.sockets import SocketIO
 from invokeai.app.services.events.events_common import (
+    DownloadStartedEvent,
     InvocationCompleteEvent,
     InvocationErrorEvent,
     InvocationProgressEvent,
     InvocationStartedEvent,
+    ModelInstallStartedEvent,
 )
+from invokeai.app.services.model_install.model_install_common import URLModelSource
 
 
 @pytest.fixture
@@ -152,18 +156,23 @@ async def test_model_load_events_are_emitted_only_to_triggering_user() -> None:
 
 
 @pytest.mark.anyio
-async def test_model_install_events_remain_broadcast() -> None:
-    from invokeai.app.services.events.events_common import ModelInstallStartedEvent
-
+async def test_download_and_model_install_events_are_admin_only() -> None:
     socketio = SocketIO(FastAPI())
     socketio._sio.emit = AsyncMock()
 
-    from types import SimpleNamespace
+    download_event = DownloadStartedEvent(source="https://example.com/model", download_path="/cache/model")
+    install_event = ModelInstallStartedEvent(
+        id=1,
+        source=URLModelSource(url=AnyHttpUrl("https://example.com/model")),
+    )
 
-    event = SimpleNamespace(model_dump=lambda mode="json": {"id": 1})
-    # Not a load event, so it takes the broadcast path (no room argument).
-    assert not isinstance(event, ModelInstallStartedEvent)
+    await socketio._handle_model_event(("download_started", download_event))
+    await socketio._handle_model_event(("model_install_started", install_event))
 
-    await socketio._handle_model_event(("model_install_started", event))
-
-    socketio._sio.emit.assert_awaited_once_with(event="model_install_started", data={"id": 1})
+    socketio._sio.emit.assert_any_await(
+        event="download_started", data=download_event.model_dump(mode="json"), room="admin"
+    )
+    socketio._sio.emit.assert_any_await(
+        event="model_install_started", data=install_event.model_dump(mode="json"), room="admin"
+    )
+    assert socketio._sio.emit.await_count == 2

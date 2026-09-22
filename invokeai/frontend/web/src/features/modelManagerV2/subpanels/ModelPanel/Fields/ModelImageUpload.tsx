@@ -1,7 +1,7 @@
 import type { SystemStyleObject } from '@invoke-ai/ui-library';
 import { Box, IconButton, Image } from '@invoke-ai/ui-library';
-import { dropzoneAccept } from 'common/hooks/useImageUploadButton';
 import { typedMemo } from 'common/util/typedMemo';
+import { imageDropzoneAccept } from 'common/util/uploadMediaAccept';
 import { toast } from 'features/toast/toast';
 import { useCallback, useState } from 'react';
 import { useDropzone } from 'react-dropzone';
@@ -96,7 +96,7 @@ const ModelImageUpload = ({ model_key, model_image }: Props) => {
   }, [model_key, t, deleteModelImage]);
 
   const { getInputProps, getRootProps } = useDropzone({
-    accept: dropzoneAccept,
+    accept: imageDropzoneAccept,
     onDropAccepted,
     noDrag: true,
     multiple: false,

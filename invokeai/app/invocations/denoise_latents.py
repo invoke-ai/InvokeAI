@@ -1,7 +1,7 @@
 # Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 import inspect
 import os
-from contextlib import ExitStack
+from contextlib import ExitStack, nullcontext
 from typing import Any, Dict, Iterator, List, Optional, Tuple, Union
 
 import torch
@@ -42,7 +42,7 @@ from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelVariantType
 from invokeai.backend.model_patcher import ModelPatcher
-from invokeai.backend.patches.layer_patcher import LayerPatcher
+from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext, DenoiseInputs
@@ -65,6 +65,7 @@ from invokeai.backend.stable_diffusion.diffusion_backend import StableDiffusionB
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.controlnet import ControlNetExt
 from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
+from invokeai.backend.stable_diffusion.extensions.hidiffusion import HiDiffusionExt
 from invokeai.backend.stable_diffusion.extensions.inpaint import InpaintExt
 from invokeai.backend.stable_diffusion.extensions.inpaint_model import InpaintModelExt
 from invokeai.backend.stable_diffusion.extensions.lora import LoRAExt
@@ -73,9 +74,11 @@ from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGE
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.stable_diffusion.extensions.t2i_adapter import T2IAdapterExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
+from invokeai.backend.stable_diffusion.hidiffusion_utils import hidiffusion_patch
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.fp8 import get_model_compute_dtype
 from invokeai.backend.util.hotfixes import ControlNetModel
 from invokeai.backend.util.mask import to_standard_float_mask
 from invokeai.backend.util.silence_warnings import SilenceWarnings
@@ -130,7 +133,7 @@ def get_scheduler(
     title="Denoise - SD1.5, SDXL",
     tags=["latents", "denoise", "txt2img", "t2i", "t2l", "img2img", "i2i", "l2l"],
     category="latents",
-    version="1.5.4",
+    version="1.6.0",
 )
 class DenoiseLatentsInvocation(BaseInvocation):
     """Denoises noisy latents to decodable images"""
@@ -190,6 +193,35 @@ class DenoiseLatentsInvocation(BaseInvocation):
     )
     cfg_rescale_multiplier: float = InputField(
         title="CFG Rescale Multiplier", default=0, ge=0, lt=1, description=FieldDescriptions.cfg_rescale_multiplier
+    )
+    hidiffusion: bool = InputField(
+        default=False,
+        description=FieldDescriptions.hidiffusion,
+        title="HiDiffusion",
+    )
+    hidiffusion_raunet: bool = InputField(
+        default=True,
+        description=FieldDescriptions.hidiffusion_raunet,
+        title="HiDiffusion: RAU-Net",
+    )
+    hidiffusion_window_attn: bool = InputField(
+        default=True,
+        description=FieldDescriptions.hidiffusion_window_attn,
+        title="HiDiffusion: Window Attention",
+    )
+    hidiffusion_t1_ratio: float = InputField(
+        default=0.4,
+        ge=0,
+        le=1,
+        description=FieldDescriptions.hidiffusion_t1_ratio,
+        title="HiDiffusion: T1 Ratio",
+    )
+    hidiffusion_t2_ratio: float = InputField(
+        default=0.0,
+        ge=0,
+        le=1,
+        description=FieldDescriptions.hidiffusion_t2_ratio,
+        title="HiDiffusion: T2 Ratio",
     )
     latents: Optional[LatentsField] = InputField(
         default=None,
@@ -466,7 +498,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 # batch_size=batch_size * num_images_per_prompt,
                 # num_images_per_prompt=num_images_per_prompt,
                 device=device,
-                dtype=control_model.dtype,
+                dtype=get_model_compute_dtype(control_model),
                 control_mode=control_info.control_mode,
                 resize_mode=control_info.resize_mode,
             )
@@ -485,6 +517,14 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # MultiControlNetModel has been refactored out, just need list[ControlNetData]
 
         return controlnet_data
+
+    @staticmethod
+    def _get_hidiffusion_name_or_path(unet_config: AnyModelConfig) -> Optional[str]:
+        return (
+            getattr(unet_config, "source", None)
+            or getattr(unet_config, "path", None)
+            or getattr(unet_config, "name", None)
+        )
 
     @staticmethod
     def parse_controlnet_field(
@@ -671,7 +711,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                     height=control_height_resize,
                     num_channels=t2i_adapter_model.config["in_channels"],  # mypy treats this as a FrozenDict
                     device=device,
-                    dtype=t2i_adapter_model.dtype,
+                    dtype=get_model_compute_dtype(t2i_adapter_model),
                     resize_mode=t2i_adapter_field.resize_mode,
                 )
 
@@ -837,6 +877,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         # get the unet's config so that we can pass the base to sd_step_callback()
         unet_config = context.models.get_config(self.unet.unet.key)
+        hidiffusion_name_or_path = self._get_hidiffusion_name_or_path(unet_config)
 
         conditioning_data = self.get_conditioning_data(
             context=context,
@@ -874,6 +915,19 @@ class DenoiseLatentsInvocation(BaseInvocation):
             context.util.sd_step_callback(state, unet_config.base)
 
         ext_manager.add_extension(PreviewExt(step_callback))
+        if self.hidiffusion:
+            ext_manager.add_extension(
+                HiDiffusionExt(
+                    name_or_path=hidiffusion_name_or_path,
+                    apply_raunet=self.hidiffusion_raunet,
+                    apply_window_attn=self.hidiffusion_window_attn,
+                    has_controlnet=bool(self.control),
+                    is_controlnet_text_to_image=bool(self.control) and self.latents is None,
+                    t1_ratio=self.hidiffusion_t1_ratio,
+                    t2_ratio=self.hidiffusion_t2_ratio,
+                    generator=torch.Generator(device="cpu").manual_seed(seed),
+                )
+            )
 
         ### cfg rescale
         if self.cfg_rescale_multiplier > 0:
@@ -940,14 +994,17 @@ class DenoiseLatentsInvocation(BaseInvocation):
             # ext: t2i/ip adapter
             ext_manager.run_callback(ExtensionCallbackType.SETUP, denoise_ctx)
 
-            with (
-                context.models.load(self.unet.unet).model_on_device() as (cached_weights, unet),
-                ModelPatcher.patch_unet_attention_processor(unet, denoise_ctx.inputs.attention_processor_cls),
+            with ExitStack() as unet_stack:
+                cached_weights, unet = unet_stack.enter_context(context.models.load(self.unet.unet).model_on_device())
+                unet._num_timesteps = timesteps.shape[0]
+                unet_stack.enter_context(
+                    ModelPatcher.patch_unet_attention_processor(unet, denoise_ctx.inputs.attention_processor_cls)
+                )
                 # ext: controlnet
-                ext_manager.patch_extensions(denoise_ctx),
-                # ext: freeu, seamless, ip adapter, lora
-                ext_manager.patch_unet(unet, cached_weights),
-            ):
+                unet_stack.enter_context(ext_manager.patch_extensions(denoise_ctx))
+                # ext: freeu, seamless, ip adapter, lora, hidiffusion
+                unet_stack.enter_context(ext_manager.patch_unet(unet, cached_weights))
+
                 sd_backend = StableDiffusionBackend(unet, scheduler)
                 denoise_ctx.unet = unet
                 result_latents = sd_backend.latents_from_embeddings(denoise_ctx, ext_manager)
@@ -997,16 +1054,16 @@ class DenoiseLatentsInvocation(BaseInvocation):
 
         # get the unet's config so that we can pass the base to sd_step_callback()
         unet_config = context.models.get_config(self.unet.unet.key)
+        hidiffusion_name_or_path = self._get_hidiffusion_name_or_path(unet_config)
 
         def step_callback(state: PipelineIntermediateState) -> None:
             context.util.sd_step_callback(state, unet_config.base)
 
-        def _lora_loader() -> Iterator[Tuple[ModelPatchRaw, float]]:
+        def _lora_loader() -> Iterator[PatchSpec]:
             for lora in self.unet.loras:
                 lora_info = context.models.load(lora.lora)
                 assert isinstance(lora_info.model, ModelPatchRaw)
-                yield (lora_info.model, lora.weight)
-                del lora_info
+                yield (lora_info.model, lora.weight, lora_info.model_in_ram())
             return
 
         with (
@@ -1019,18 +1076,21 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 model=unet,
                 patches=_lora_loader(),
                 prefix="lora_unet_",
-                dtype=unet.dtype,
+                # NOT unet.dtype: with fp8 storage that is float8_e4m3fn, which has no arithmetic
+                # kernels — every tensor in the denoise loop must use the compute dtype.
+                dtype=get_model_compute_dtype(unet),
                 cached_weights=cached_weights,
             ),
         ):
             assert isinstance(unet, UNet2DConditionModel)
-            latents = latents.to(device=device, dtype=unet.dtype)
+            unet_dtype = get_model_compute_dtype(unet)
+            latents = latents.to(device=device, dtype=unet_dtype)
             if noise is not None:
-                noise = noise.to(device=device, dtype=unet.dtype)
+                noise = noise.to(device=device, dtype=unet_dtype)
             if mask is not None:
-                mask = mask.to(device=device, dtype=unet.dtype)
+                mask = mask.to(device=device, dtype=unet_dtype)
             if masked_latents is not None:
-                masked_latents = masked_latents.to(device=device, dtype=unet.dtype)
+                masked_latents = masked_latents.to(device=device, dtype=unet_dtype)
 
             scheduler = get_scheduler(
                 context=context,
@@ -1048,7 +1108,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 positive_conditioning_field=self.positive_conditioning,
                 negative_conditioning_field=self.negative_conditioning,
                 device=device,
-                dtype=unet.dtype,
+                dtype=unet_dtype,
                 latent_height=latent_height,
                 latent_width=latent_width,
                 cfg_scale=self.cfg_scale,
@@ -1073,7 +1133,7 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 exit_stack=exit_stack,
                 latent_height=latent_height,
                 latent_width=latent_width,
-                dtype=unet.dtype,
+                dtype=unet_dtype,
             )
 
             timesteps, init_timestep, scheduler_step_kwargs = self.init_scheduler(
@@ -1084,23 +1144,39 @@ class DenoiseLatentsInvocation(BaseInvocation):
                 denoising_end=self.denoising_end,
                 seed=seed,
             )
+            pipeline._num_timesteps = timesteps.shape[0]
 
-            result_latents = pipeline.latents_from_embeddings(
-                latents=latents,
-                timesteps=timesteps,
-                init_timestep=init_timestep,
-                noise=noise,
-                seed=seed,
-                mask=mask,
-                masked_latents=masked_latents,
-                is_gradient_mask=gradient_mask,
-                scheduler_step_kwargs=scheduler_step_kwargs,
-                conditioning_data=conditioning_data,
-                control_data=controlnet_data,
-                ip_adapter_data=ip_adapter_data,
-                t2i_adapter_data=t2i_adapter_data,
-                callback=step_callback,
-            )
+            with (
+                hidiffusion_patch(
+                    pipeline,
+                    name_or_path=hidiffusion_name_or_path,
+                    apply_raunet=self.hidiffusion_raunet,
+                    apply_window_attn=self.hidiffusion_window_attn,
+                    has_controlnet=bool(controlnet_data),
+                    is_controlnet_text_to_image=bool(controlnet_data) and self.latents is None,
+                    t1_ratio=self.hidiffusion_t1_ratio,
+                    t2_ratio=self.hidiffusion_t2_ratio,
+                    generator=torch.Generator(device="cpu").manual_seed(seed),
+                )
+                if self.hidiffusion
+                else nullcontext()
+            ):
+                result_latents = pipeline.latents_from_embeddings(
+                    latents=latents,
+                    timesteps=timesteps,
+                    init_timestep=init_timestep,
+                    noise=noise,
+                    seed=seed,
+                    mask=mask,
+                    masked_latents=masked_latents,
+                    is_gradient_mask=gradient_mask,
+                    scheduler_step_kwargs=scheduler_step_kwargs,
+                    conditioning_data=conditioning_data,
+                    control_data=controlnet_data,
+                    ip_adapter_data=ip_adapter_data,
+                    t2i_adapter_data=t2i_adapter_data,
+                    callback=step_callback,
+                )
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         result_latents = result_latents.to("cpu")

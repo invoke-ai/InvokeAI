@@ -1,6 +1,3 @@
-import queryString from 'query-string';
-import type { ImageCategory } from 'services/api/types';
-
 import type { ApiTagDescription } from '..';
 import { api, buildV1Url } from '..';
 
@@ -10,17 +7,15 @@ export type VirtualSubBoard = {
   date: string;
   image_count: number;
   asset_count: number;
+  video_count: number;
   cover_image_name: string | null;
-};
-
-type ImageNamesResult = {
-  image_names: string[];
-  starred_count: number;
-  total_count: number;
+  cover_video_name: string | null;
 };
 
 const buildVirtualBoardsUrl = (path: string = '') => buildV1Url(`virtual_boards/${path}`);
 
+// Not exported: with virtual-date name lists served by `listGalleryItemNames`, nothing outside
+// this module needs the api object itself — only the hook below.
 const virtualBoardsApi = api.injectEndpoints({
   endpoints: (build) => ({
     listVirtualBoardsByDate: build.query<VirtualSubBoard[], void>({
@@ -29,28 +24,9 @@ const virtualBoardsApi = api.injectEndpoints({
       }),
       providesTags: (): ApiTagDescription[] => ['VirtualBoards', 'FetchOnReconnect'],
     }),
-
-    getVirtualBoardImageNamesByDate: build.query<
-      ImageNamesResult,
-      {
-        date: string;
-        starred_first?: boolean;
-        order_dir?: 'ASC' | 'DESC';
-        categories?: ImageCategory[];
-        search_term?: string;
-      }
-    >({
-      query: ({ date, ...params }) => ({
-        url: buildVirtualBoardsUrl(
-          `by_date/${date}/image_names?${queryString.stringify(params, { arrayFormat: 'none', skipNull: true, skipEmptyString: true })}`
-        ),
-      }),
-      providesTags: (_result, _error, arg): ApiTagDescription[] => [
-        { type: 'ImageNameList', id: `virtual_${arg.date}` },
-        'FetchOnReconnect',
-      ],
-    }),
   }),
 });
 
-export const { useListVirtualBoardsByDateQuery, useGetVirtualBoardImageNamesByDateQuery } = virtualBoardsApi;
+// Virtual-date name lists are served by `listGalleryItemNames` with a `created_date` filter;
+// the deprecated `by_date/{date}/item_names` route is no longer called from the UI.
+export const { useListVirtualBoardsByDateQuery } = virtualBoardsApi;

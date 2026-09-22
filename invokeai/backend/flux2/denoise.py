@@ -14,6 +14,7 @@ from tqdm import tqdm
 
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
+from invokeai.backend.util.devices import TorchDevice
 
 
 def denoise(
@@ -77,13 +78,22 @@ def denoise(
     """
     total_steps = len(timesteps) - 1
 
-    # Store original sequence length for extracting output later (before concatenating reference images)
+    # Sequence length of the generated latents, i.e. everything that is *not* reference conditioning.
     original_seq_len = img.shape[1]
 
-    # Concatenate reference image conditioning if provided (multi-reference image editing)
-    if img_cond_seq is not None and img_cond_seq_ids is not None:
-        img = torch.cat([img, img_cond_seq], dim=1)
-        img_ids = torch.cat([img_ids, img_cond_seq_ids], dim=1)
+    # Reference image conditioning (multi-reference image editing) is constant context: it is
+    # concatenated onto the latents for every forward pass, but it must NOT be advanced by the
+    # sampler. Concatenating it onto `img` itself would make every sampler step integrate the
+    # reference tokens along the model's velocity field, so the reference drifts away from the
+    # encoded image over the schedule (and drags the generated image with it). Instead, build the
+    # model input per step and slice the prediction back to the generated tokens - same as the
+    # FLUX.1 Kontext path and diffusers' Flux2KleinPipeline.
+    # The position IDs for the concatenated sequence are constant, so precompute them once.
+    if img_cond_seq is not None:
+        assert img_cond_seq_ids is not None, "You need to provide either both or neither of the sequence conditioning"
+        model_img_ids = torch.cat([img_ids, img_cond_seq_ids], dim=1)
+    else:
+        model_img_ids = img_ids
 
     # The transformer forward() requires a guidance tensor even when guidance_embeds=False,
     # because the Flux2TimestepGuidanceEmbeddings forward signature takes it unconditionally.
@@ -121,7 +131,7 @@ def denoise(
         is_heun = hasattr(scheduler, "state_in_first_order")
         user_step = 0
 
-        pbar = tqdm(total=total_steps, desc="Denoising")
+        pbar = tqdm(total=total_steps, desc=f"Denoising{TorchDevice.get_session_device_label()}")
         for step_index in range(num_scheduler_steps):
             timestep = scheduler.timesteps[step_index]
             # Convert scheduler timestep (0-1000) to normalized (0-1) for the model
@@ -131,12 +141,15 @@ def denoise(
             # Track if we're in first or second order step (for Heun)
             in_first_order = scheduler.state_in_first_order if is_heun else True
 
+            # Append the (unchanged) reference conditioning for this forward pass only.
+            img_input = torch.cat([img, img_cond_seq], dim=1) if img_cond_seq is not None else img
+
             # Run the transformer model (matching diffusers: guidance=guidance, return_dict=False)
             output = model(
-                hidden_states=img,
+                hidden_states=img_input,
                 encoder_hidden_states=txt,
                 timestep=t_vec,
-                img_ids=img_ids,
+                img_ids=model_img_ids,
                 txt_ids=txt_ids,
                 guidance=guidance_vec,
                 joint_attention_kwargs=pos_joint_attention_kwargs,
@@ -146,6 +159,10 @@ def denoise(
             # Extract the sample from the output (return_dict=False returns tuple)
             pred = output[0] if isinstance(output, tuple) else output
 
+            # Drop the prediction for the reference tokens - they are context, not sampled state.
+            if img_cond_seq is not None:
+                pred = pred[:, :original_seq_len]
+
             step_cfg_scale = cfg_scale[min(user_step, len(cfg_scale) - 1)]
 
             # Apply CFG if scale is not 1.0
@@ -154,16 +171,18 @@ def denoise(
                     raise ValueError("Negative text conditioning is required when cfg_scale is not 1.0.")
 
                 neg_output = model(
-                    hidden_states=img,
+                    hidden_states=img_input,
                     encoder_hidden_states=neg_txt,
                     timestep=t_vec,
-                    img_ids=img_ids,
+                    img_ids=model_img_ids,
                     txt_ids=neg_txt_ids if neg_txt_ids is not None else txt_ids,
                     guidance=guidance_vec,
                     return_dict=False,
                 )
 
                 neg_pred = neg_output[0] if isinstance(neg_output, tuple) else neg_output
+                if img_cond_seq is not None:
+                    neg_pred = neg_pred[:, :original_seq_len]
                 pred = neg_pred + step_cfg_scale * (pred - neg_pred)
 
             # Use scheduler.step() for the update
@@ -178,15 +197,7 @@ def denoise(
 
             # Apply inpainting merge at each step
             if inpaint_extension is not None:
-                # Separate the generated latents from the reference conditioning
-                gen_img = img[:, :original_seq_len, :]
-                ref_img = img[:, original_seq_len:, :]
-
-                # Merge only the generated part
-                gen_img = inpaint_extension.merge_intermediate_latents_with_init_latents(gen_img, t_prev)
-
-                # Concatenate back together
-                img = torch.cat([gen_img, ref_img], dim=1)
+                img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
 
             # For Heun, only increment user step after second-order step completes
             if is_heun:
@@ -199,17 +210,13 @@ def denoise(
                             preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(
                                 preview_img, 0.0
                             )
-                        # Extract only the generated image portion for preview (exclude reference images)
-                        callback_latents = (
-                            preview_img[:, :original_seq_len, :] if img_cond_seq is not None else preview_img
-                        )
                         step_callback(
                             PipelineIntermediateState(
                                 step=user_step,
                                 order=2,
                                 total_steps=total_steps,
                                 timestep=int(t_curr * 1000),
-                                latents=callback_latents,
+                                latents=preview_img,
                             ),
                         )
             else:
@@ -219,30 +226,34 @@ def denoise(
                     preview_img = img - t_curr * pred
                     if inpaint_extension is not None:
                         preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
-                    # Extract only the generated image portion for preview (exclude reference images)
-                    callback_latents = preview_img[:, :original_seq_len, :] if img_cond_seq is not None else preview_img
                     step_callback(
                         PipelineIntermediateState(
                             step=user_step,
                             order=1,
                             total_steps=total_steps,
                             timestep=int(t_curr * 1000),
-                            latents=callback_latents,
+                            latents=preview_img,
                         ),
                     )
 
         pbar.close()
     else:
         # Manual Euler stepping (original behavior)
-        for step_index, (t_curr, t_prev) in tqdm(list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True)))):
+        for step_index, (t_curr, t_prev) in tqdm(
+            list(enumerate(zip(timesteps[:-1], timesteps[1:], strict=True))),
+            desc=f"Denoising{TorchDevice.get_session_device_label()}",
+        ):
             t_vec = torch.full((img.shape[0],), t_curr, dtype=img.dtype, device=img.device)
+
+            # Append the (unchanged) reference conditioning for this forward pass only.
+            img_input = torch.cat([img, img_cond_seq], dim=1) if img_cond_seq is not None else img
 
             # Run the transformer model (matching diffusers: guidance=guidance, return_dict=False)
             output = model(
-                hidden_states=img,
+                hidden_states=img_input,
                 encoder_hidden_states=txt,
                 timestep=t_vec,
-                img_ids=img_ids,
+                img_ids=model_img_ids,
                 txt_ids=txt_ids,
                 guidance=guidance_vec,
                 joint_attention_kwargs=pos_joint_attention_kwargs,
@@ -252,6 +263,10 @@ def denoise(
             # Extract the sample from the output (return_dict=False returns tuple)
             pred = output[0] if isinstance(output, tuple) else output
 
+            # Drop the prediction for the reference tokens - they are context, not sampled state.
+            if img_cond_seq is not None:
+                pred = pred[:, :original_seq_len]
+
             step_cfg_scale = cfg_scale[step_index]
 
             # Apply CFG if scale is not 1.0
@@ -260,16 +275,18 @@ def denoise(
                     raise ValueError("Negative text conditioning is required when cfg_scale is not 1.0.")
 
                 neg_output = model(
-                    hidden_states=img,
+                    hidden_states=img_input,
                     encoder_hidden_states=neg_txt,
                     timestep=t_vec,
-                    img_ids=img_ids,
+                    img_ids=model_img_ids,
                     txt_ids=neg_txt_ids if neg_txt_ids is not None else txt_ids,
                     guidance=guidance_vec,
                     return_dict=False,
                 )
 
                 neg_pred = neg_output[0] if isinstance(neg_output, tuple) else neg_output
+                if img_cond_seq is not None:
+                    neg_pred = neg_pred[:, :original_seq_len]
                 pred = neg_pred + step_cfg_scale * (pred - neg_pred)
 
             # Euler step
@@ -278,34 +295,17 @@ def denoise(
 
             # Apply inpainting merge at each step
             if inpaint_extension is not None:
-                # Separate the generated latents from the reference conditioning
-                gen_img = img[:, :original_seq_len, :]
-                ref_img = img[:, original_seq_len:, :]
+                img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
+                preview_img = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_img, 0.0)
 
-                # Merge only the generated part
-                gen_img = inpaint_extension.merge_intermediate_latents_with_init_latents(gen_img, t_prev)
-
-                # Concatenate back together
-                img = torch.cat([gen_img, ref_img], dim=1)
-
-                # Handling preview images
-                preview_gen = preview_img[:, :original_seq_len, :]
-                preview_gen = inpaint_extension.merge_intermediate_latents_with_init_latents(preview_gen, 0.0)
-
-            # Extract only the generated image portion for preview (exclude reference images)
-            callback_latents = preview_img[:, :original_seq_len, :] if img_cond_seq is not None else preview_img
             step_callback(
                 PipelineIntermediateState(
                     step=step_index + 1,
                     order=1,
                     total_steps=total_steps,
                     timestep=int(t_curr),
-                    latents=callback_latents,
+                    latents=preview_img,
                 ),
             )
-
-    # Extract only the generated image portion (exclude concatenated reference images)
-    if img_cond_seq is not None:
-        img = img[:, :original_seq_len, :]
 
     return img

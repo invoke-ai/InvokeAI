@@ -10,8 +10,14 @@ class BoardDTO(BoardRecord):
 
     cover_image_name: Optional[str] = Field(description="The name of the board's cover image.")
     """The URL of the thumbnail of the most recent image in the board."""
+    cover_video_name: Optional[str] = Field(
+        default=None, description="The name of the board's cover video, when the most recent item is a video."
+    )
+    """The name of the cover video, set when the most-recent item on the board is a video rather than an image."""
     image_count: int = Field(description="The number of images in the board.")
     """The number of images in the board."""
+    video_count: int = Field(default=0, description="The number of videos in the board.")
+    """The number of videos in the board."""
     asset_count: int = Field(description="The number of assets in the board.")
     """The number of assets in the board."""
     owner_username: Optional[str] = Field(default=None, description="The username of the board owner (for admin view).")
@@ -24,12 +30,16 @@ def board_record_to_dto(
     image_count: int,
     asset_count: int,
     owner_username: Optional[str] = None,
+    cover_video_name: Optional[str] = None,
+    video_count: int = 0,
 ) -> BoardDTO:
     """Converts a board record to a board DTO."""
     return BoardDTO(
         **board_record.model_dump(exclude={"cover_image_name"}),
         cover_image_name=cover_image_name,
+        cover_video_name=cover_video_name,
         image_count=image_count,
+        video_count=video_count,
         asset_count=asset_count,
         owner_username=owner_username,
     )

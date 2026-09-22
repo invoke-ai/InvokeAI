@@ -1,61 +1,41 @@
-import { skipToken } from '@reduxjs/toolkit/query';
 import { EMPTY_ARRAY } from 'app/store/constants';
 import { useAppSelector } from 'app/store/storeHooks';
-import { selectGetImageNamesQueryArgs, selectSelectedBoardId } from 'features/gallery/store/gallerySelectors';
-import { getDateFromVirtualBoardId, isVirtualBoardId } from 'features/gallery/store/types';
-import { useGetImageNamesQuery } from 'services/api/endpoints/images';
-import { useGetVirtualBoardImageNamesByDateQuery } from 'services/api/endpoints/virtual_boards';
+import { selectGalleryItemNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
+import { useListGalleryItemNamesQuery } from 'services/api/endpoints/gallery';
 import { useDebounce } from 'use-debounce';
 
-const selectFromResult = ({
+const selectFromGalleryItemNamesResult = ({
   currentData,
   isLoading,
   isFetching,
 }: {
-  currentData?: { image_names: string[] };
+  currentData?: { item_names: string[] };
   isLoading: boolean;
   isFetching: boolean;
 }) => ({
-  imageNames: currentData?.image_names ?? EMPTY_ARRAY,
+  imageNames: currentData?.item_names ?? (EMPTY_ARRAY as string[]),
   isLoading,
   isFetching,
 });
 
-const queryOptions = {
+const galleryQueryOptions = {
   refetchOnReconnect: true,
-  selectFromResult,
+  selectFromResult: selectFromGalleryItemNamesResult,
 };
 
+/**
+ * Returns the ordered flat list of gallery item names. Names are polymorphic — both image and
+ * video names appear in the same list, interleaved by created_at. Callers that need to know the
+ * kind of a particular name use `isVideoName` from `features/gallery/store/types`.
+ *
+ * Regular boards and date-based virtual boards share one endpoint; the selector translates a
+ * virtual board id into the `created_date` filter.
+ */
 export const useGalleryImageNames = () => {
-  const selectedBoardId = useAppSelector(selectSelectedBoardId);
-  const _queryArgs = useAppSelector(selectGetImageNamesQueryArgs);
+  const _queryArgs = useAppSelector(selectGalleryItemNamesQueryArgs);
   const [queryArgs] = useDebounce(_queryArgs, 300);
-  const isVirtual = isVirtualBoardId(selectedBoardId);
 
-  // Regular board query
-  const regularResult = useGetImageNamesQuery(isVirtual ? skipToken : queryArgs, queryOptions);
+  const { imageNames, isLoading, isFetching } = useListGalleryItemNamesQuery(queryArgs, galleryQueryOptions);
 
-  // Virtual board query
-  const date = isVirtual ? getDateFromVirtualBoardId(selectedBoardId) : '';
-  const virtualResult = useGetVirtualBoardImageNamesByDateQuery(
-    isVirtual
-      ? {
-          date,
-          categories: queryArgs.categories ?? undefined,
-          search_term: queryArgs.search_term || undefined,
-          order_dir: queryArgs.order_dir,
-          starred_first: queryArgs.starred_first,
-        }
-      : skipToken,
-    queryOptions
-  );
-
-  const result = isVirtual ? virtualResult : regularResult;
-
-  return {
-    imageNames: result.imageNames,
-    isLoading: result.isLoading,
-    isFetching: result.isFetching,
-    queryArgs,
-  };
+  return { imageNames, isLoading, isFetching, queryArgs };
 };

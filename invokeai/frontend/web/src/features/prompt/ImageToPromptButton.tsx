@@ -20,6 +20,7 @@ import { useImageUploadButton } from 'common/hooks/useImageUploadButton';
 import { positivePromptChanged, selectPositivePrompt } from 'features/controlLayers/store/paramsSlice';
 import { setInstallModelsTabByName } from 'features/modelManagerV2/store/installModelsStore';
 import { ModelPicker } from 'features/parameters/components/ModelPicker';
+import { LLMTaskProgressDisplay } from 'features/prompt/LLMTaskProgressDisplay';
 import { setPromptUndo } from 'features/prompt/promptUndo';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
 import { memo, useCallback, useEffect, useState } from 'react';
@@ -28,6 +29,8 @@ import { PiImageBold } from 'react-icons/pi';
 import { useImageToPromptMutation } from 'services/api/endpoints/utilities';
 import { useLlavaModels } from 'services/api/hooks/modelsByType';
 import type { AnyModelConfig, ImageDTO } from 'services/api/types';
+import { clearLLMTaskState } from 'services/events/stores';
+import { v4 as uuidv4 } from 'uuid';
 
 const loadingStyles: SystemStyleObject = {
   svg: { animation: spinAnimation },
@@ -46,6 +49,7 @@ export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: 
   const popover = useDisclosure(false);
   const [selectedModel, setSelectedModel] = useState<AnyModelConfig | undefined>(undefined);
   const [uploadedImage, setUploadedImage] = useState<ImageDTO | undefined>(undefined);
+  const [taskId, setTaskId] = useState<string | null>(null);
   const [imageToPrompt, { isLoading }] = useImageToPromptMutation();
 
   const hasModels = modelConfigs.length > 0;
@@ -76,10 +80,13 @@ export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: 
     if (!selectedModel || !uploadedImage) {
       return;
     }
+    const newTaskId = uuidv4();
+    setTaskId(newTaskId);
     try {
       const result = await imageToPrompt({
         image_name: uploadedImage.image_name,
         model_key: selectedModel.key,
+        task_id: newTaskId,
       }).unwrap();
       if (result.prompt) {
         setPromptUndo(currentPrompt);
@@ -89,6 +96,9 @@ export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: 
       setUploadedImage(undefined);
     } catch {
       // Error is handled by RTK Query
+    } finally {
+      clearLLMTaskState(newTaskId);
+      setTaskId(null);
     }
   }, [selectedModel, uploadedImage, imageToPrompt, dispatch, popover, currentPrompt]);
 
@@ -157,6 +167,7 @@ export const ImageToPromptButton = memo(({ droppedImage, onClearDroppedImage }: 
                     />
                   )}
                 </Flex>
+                {isLoading ? <LLMTaskProgressDisplay taskId={taskId} /> : null}
                 <Button
                   size="sm"
                   colorScheme="invokeBlue"

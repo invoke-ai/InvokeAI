@@ -8,7 +8,7 @@ import type { S } from 'services/api/types';
 import { REDACTED_USER_ID } from 'services/events/eventScope';
 import { QUEUE_CHANGED_TAGS } from 'services/events/queueCacheTags';
 import { getUpdatedQueueStatusOnQueueItemStatusChanged } from 'services/events/queueStatusEvents';
-import { $lastProgressEvent } from 'services/events/stores';
+import { $lastProgressEvent, clearProgressEvent } from 'services/events/stores';
 
 const log = logger('events');
 
@@ -58,6 +58,18 @@ export const buildOnQueueItemStatusChanged = (dispatch: AppDispatch, coordinator
         draft.error_type = error_type;
         draft.error_message = error_message;
         draft.error_traceback = error_traceback;
+      })
+    );
+
+    // The list rows render from summaries, which are a separate cache. The tag invalidation below
+    // would refresh them too, but only after a round trip — mirror the write so a row's status
+    // flips as immediately as the detail view's does. The summary carries no error or sequence
+    // fields, so only the status and timestamps apply.
+    dispatch(
+      queueApi.util.updateQueryData('getQueueItemSummary', item_id, (draft) => {
+        draft.status = status;
+        draft.started_at = started_at;
+        draft.completed_at = completed_at;
       })
     );
 
@@ -118,6 +130,8 @@ export const buildOnQueueItemStatusChanged = (dispatch: AppDispatch, coordinator
       }
       // If the queue item is completed, failed, or cancelled, we want to clear the last progress event
       $lastProgressEvent.set(null);
+      // Also remove this session's per-item progress so its stacked progress bar disappears.
+      clearProgressEvent(item_id);
     }
   };
 };

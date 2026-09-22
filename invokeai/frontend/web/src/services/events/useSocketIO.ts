@@ -76,7 +76,7 @@ export const useSocketIO = () => {
     const socket: AppSocket = io(socketUrl, socketOptions);
     $socket.set(socket);
 
-    setEventListeners({ socket, store, setIsConnected: $isConnected.set });
+    const disposeEventListeners = setEventListeners({ socket, store, setIsConnected: $isConnected.set });
 
     socket.connect();
 
@@ -101,6 +101,8 @@ export const useSocketIO = () => {
         console.log('Socket teardown', socket);
       }
       unsubscribeQueueStatusListener();
+      // Before the socket goes: anything this session scheduled must not land in the next one.
+      disposeEventListeners();
       socket.disconnect();
       $socket.set(null);
     };

@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import ANY, AsyncMock
+from unittest.mock import ANY, AsyncMock, Mock
 
 import pytest
 from fastapi import FastAPI
@@ -13,7 +13,9 @@ def anyio_backend() -> str:
 
 
 def _patch_multiuser_context(monkeypatch: pytest.MonkeyPatch, *, user_id: str, is_admin: bool) -> None:
-    user = SimpleNamespace(user_id=user_id, is_active=True)
+    # The connect handler derives is_admin from the database record, not the token,
+    # so the mocked user record carries the role.
+    user = SimpleNamespace(user_id=user_id, is_active=True, is_admin=is_admin, token_epoch=0)
     invoker = SimpleNamespace(
         services=SimpleNamespace(
             configuration=SimpleNamespace(multiuser=True),
@@ -21,9 +23,14 @@ def _patch_multiuser_context(monkeypatch: pytest.MonkeyPatch, *, user_id: str, i
         )
     )
     monkeypatch.setattr("invokeai.app.api.dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
+    # Connect resolves the record via `resolve_authorized_user`, which binds
+    # ApiDependencies at import time in auth_dependencies.
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", SimpleNamespace(invoker=invoker))
     monkeypatch.setattr(
         "invokeai.app.api.sockets.verify_token",
-        lambda token: SimpleNamespace(user_id=user_id, is_admin=is_admin) if token == "valid-token" else None,
+        lambda token: SimpleNamespace(user_id=user_id, is_admin=is_admin, token_epoch=0)
+        if token == "valid-token"
+        else None,
     )
 
 
@@ -178,3 +185,77 @@ async def test_shared_to_private_transition_emits_access_revoked_to_shared_room(
         data={"workflow_id": "wf-1", "user_id": "owner-1", "timestamp": ANY},
         room="workflows:shared",
     )
+
+
+@pytest.mark.anyio
+async def test_authenticated_socket_logs_disconnect_at_same_level_as_connect(monkeypatch: pytest.MonkeyPatch) -> None:
+    """A connect logged at INFO must be matched by a disconnect logged at INFO.
+
+    Otherwise a client that reconnects in a loop looks exactly like sockets piling up.
+    """
+    socketio = SocketIO(FastAPI())
+    socketio._sio.enter_room = AsyncMock()
+    _patch_multiuser_context(monkeypatch, user_id="user-1", is_admin=False)
+    await socketio._handle_connect("sid-1", {}, {"token": "valid-token"})
+
+    log = SimpleNamespace(info=Mock(), debug=Mock(), warning=Mock(), error=Mock())
+    monkeypatch.setattr("invokeai.app.api.sockets.logger", log)
+
+    await socketio._sio._trigger_event("disconnect", "/", "sid-1", "ping timeout")
+
+    log.info.assert_called_once()
+    message = log.info.call_args.args[0]
+    assert "sid-1" in message
+    assert "user-1" in message
+    assert "ping timeout" in message
+    log.debug.assert_not_called()
+    assert "sid-1" not in socketio._socket_users
+
+
+@pytest.mark.anyio
+async def test_single_user_socket_logs_disconnect_at_debug(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The single-user connect is logged at DEBUG, so its disconnect must be too."""
+    socketio = SocketIO(FastAPI())
+    socketio._sio.enter_room = AsyncMock()
+    _patch_single_user_context(monkeypatch)
+    await socketio._handle_connect("sid-1", {}, None)
+
+    log = SimpleNamespace(info=Mock(), debug=Mock(), warning=Mock(), error=Mock())
+    monkeypatch.setattr("invokeai.app.api.sockets.logger", log)
+
+    await socketio._handle_disconnect("sid-1", "transport close")
+
+    log.debug.assert_called_once()
+    log.info.assert_not_called()
+    assert "sid-1" not in socketio._socket_users
+
+
+@pytest.mark.anyio
+async def test_disconnect_of_unknown_socket_is_silent(monkeypatch: pytest.MonkeyPatch) -> None:
+    """An unknown sid must not raise: an exception here would cost python-socketio its own
+    cleanup (`AsyncServer._handle_disconnect` does not guard the handler call, so the sid
+    would stay in its rooms and in `server.environ` for the life of the process)."""
+    socketio = SocketIO(FastAPI())
+    log = SimpleNamespace(info=Mock(), debug=Mock(), warning=Mock(), error=Mock())
+    monkeypatch.setattr("invokeai.app.api.sockets.logger", log)
+
+    await socketio._handle_disconnect("never-connected")
+
+    log.info.assert_not_called()
+    log.debug.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_disconnect_without_reason_is_accepted(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`python-socketio` is unpinned; versions before 5.12 call the handler with `sid` alone."""
+    socketio = SocketIO(FastAPI())
+    socketio._sio.enter_room = AsyncMock()
+    _patch_multiuser_context(monkeypatch, user_id="user-1", is_admin=False)
+    await socketio._handle_connect("sid-1", {}, {"token": "valid-token"})
+
+    log = SimpleNamespace(info=Mock(), debug=Mock(), warning=Mock(), error=Mock())
+    monkeypatch.setattr("invokeai.app.api.sockets.logger", log)
+
+    await socketio._handle_disconnect("sid-1")
+
+    assert "unknown" in log.info.call_args.args[0]

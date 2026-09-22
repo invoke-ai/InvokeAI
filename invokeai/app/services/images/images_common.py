@@ -47,6 +47,10 @@ class ResultWithAffectedBoards(BaseModel):
 
 class DeleteImagesResult(ResultWithAffectedBoards):
     deleted_images: list[str] = Field(description="The names of the images that were deleted")
+    failed_images: list[str] = Field(
+        default_factory=list,
+        description="The names of authorized images that could not be deleted",
+    )
 
 
 class StarredImagesResult(ResultWithAffectedBoards):

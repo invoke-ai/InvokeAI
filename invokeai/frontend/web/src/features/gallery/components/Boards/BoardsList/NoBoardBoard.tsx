@@ -15,7 +15,11 @@ import {
 import { autoAddBoardIdChanged, boardIdSelected } from 'features/gallery/store/gallerySlice';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useGetBoardAssetsTotalQuery, useGetBoardImagesTotalQuery } from 'services/api/endpoints/boards';
+import {
+  useGetBoardAssetsTotalQuery,
+  useGetBoardImagesTotalQuery,
+  useGetBoardVideosTotalQuery,
+} from 'services/api/endpoints/boards';
 import { useBoardName } from 'services/api/hooks/useBoardName';
 
 interface Props {
@@ -33,11 +37,18 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
       return { imagesTotal: data?.total ?? 0 };
     },
   });
+  const { videosTotal } = useGetBoardVideosTotalQuery('none', {
+    selectFromResult: ({ data }) => {
+      return { videosTotal: data?.total ?? 0 };
+    },
+  });
   const { assetsTotal } = useGetBoardAssetsTotalQuery('none', {
     selectFromResult: ({ data }) => {
       return { assetsTotal: data?.total ?? 0 };
     },
   });
+  // Videos share the "images" headline count so a board with only videos doesn't read as empty.
+  const imagesAndVideosTotal = imagesTotal + videosTotal;
   const autoAddBoardId = useAppSelector(selectAutoAddBoardId);
   const autoAssignBoardOnClick = useAppSelector(selectAutoAssignBoardOnClick);
   const boardSearchText = useAppSelector(selectBoardSearchText);
@@ -62,7 +73,12 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
       <NoBoardBoardContextMenu>
         {(ref) => (
           <Tooltip
-            label={<BoardTooltip board={null} boardCounts={{ image_count: imagesTotal, asset_count: assetsTotal }} />}
+            label={
+              <BoardTooltip
+                board={null}
+                boardCounts={{ image_count: imagesTotal, video_count: videosTotal, asset_count: assetsTotal }}
+              />
+            }
             openDelay={1000}
             placement="right"
             closeOnScroll
@@ -103,7 +119,7 @@ const NoBoardBoard = memo(({ isSelected }: Props) => {
               </Text>
               {autoAddBoardId === 'none' && <AutoAddBadge />}
               <Text variant="subtext">
-                {imagesTotal} | {assetsTotal}
+                {imagesAndVideosTotal} | {assetsTotal}
               </Text>
             </Flex>
           </Tooltip>

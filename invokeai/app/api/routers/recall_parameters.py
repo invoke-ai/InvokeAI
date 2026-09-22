@@ -399,7 +399,7 @@ def _assert_recall_image_access(parameters: "RecallParameter", current_user: Cur
     operation_id="update_recall_parameters",
     response_model=dict[str, Any],
 )
-async def update_recall_parameters(
+def update_recall_parameters(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(..., description="The queue id to perform this operation on"),
     parameters: RecallParameter = Body(..., description="Recall parameters to update"),
@@ -585,7 +585,7 @@ async def update_recall_parameters(
     operation_id="get_recall_parameters",
     response_model=dict[str, Any],
 )
-async def get_recall_parameters(
+def get_recall_parameters(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(..., description="The queue id to retrieve parameters for"),
 ) -> dict[str, Any]:

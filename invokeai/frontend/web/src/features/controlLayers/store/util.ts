@@ -22,6 +22,7 @@ import type {
   RegionalGuidanceIPAdapterConfig,
   RgbColor,
   T2IAdapterConfig,
+  WanReferenceImageConfig,
   ZImageControlConfig,
 } from 'features/controlLayers/store/types';
 import type { ImageDTO } from 'services/api/types';
@@ -121,6 +122,10 @@ export const initialFlux2ReferenceImage: Flux2ReferenceImageConfig = {
 };
 export const initialQwenImageReferenceImage: QwenImageReferenceImageConfig = {
   type: 'qwen_image_reference_image',
+  image: null,
+};
+export const initialWanReferenceImage: WanReferenceImageConfig = {
+  type: 'wan_reference_image',
   image: null,
 };
 export const initialT2IAdapter: T2IAdapterConfig = {

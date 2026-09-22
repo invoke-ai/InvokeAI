@@ -113,7 +113,21 @@ def calc_model_size_by_fs(model_path: Path, subfolder: Optional[str] = None, var
         return model_path.stat().st_size
 
     if subfolder is not None:
-        model_path = model_path / subfolder
+        subfolder_path = model_path / subfolder
+        if subfolder_path.exists():
+            model_path = subfolder_path
+        elif (model_path / "config.json").is_file() and not (model_path / "model_index.json").is_file():
+            # Standalone single-component install: the loader reads the weights directly from the model
+            # root (a flat `config.json` + weights folder), not from a `<subfolder>/` dir — e.g. a
+            # mix-and-match Qwen3-VL / Z-Image Qwen3 / Wan T5 encoder, or a flat Wan VAE. Estimate from
+            # the root so the cache reserves the right amount before the cold load; otherwise it
+            # under-reserves to 0 and evicts nothing, spiking transient RAM (the transformer stays
+            # resident while the encoder is constructed). A real diffusers pipeline that merely lacks
+            # this subfolder (e.g. an undownloaded safety_checker) still has `model_index.json` at the
+            # root, so it keeps returning 0 below.
+            pass  # keep model_path at the root
+        else:
+            return 0
 
     # this can happen when, for example, the safety checker is not downloaded.
     if not model_path.exists():

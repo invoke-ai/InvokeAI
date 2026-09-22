@@ -7,8 +7,10 @@ import { Box, Flex, Heading } from '@invoke-ai/ui-library';
 import { getStore } from 'app/store/nanostores/store';
 import { useAppSelector } from 'app/store/storeHooks';
 import { getFocusedRegion } from 'common/hooks/focus';
+import { isVideoFile } from 'common/util/uploadMediaAccept';
 import { setFileToPaste } from 'features/controlLayers/components/CanvasPasteModal';
 import { DndDropOverlay } from 'features/dnd/DndDropOverlay';
+import { zUploadFile } from 'features/dnd/fullscreenDropzoneAccept';
 import type { DndTargetState } from 'features/dnd/types';
 import { selectAutoAddBoardId } from 'features/gallery/store/gallerySelectors';
 import { toast } from 'features/toast/toast';
@@ -16,39 +18,10 @@ import { selectActiveTab } from 'features/ui/store/uiSelectors';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { uploadImages } from 'services/api/endpoints/images';
+import { uploadVideos } from 'services/api/endpoints/videos';
 import { useBoardName } from 'services/api/hooks/useBoardName';
-import type { UploadImageArg } from 'services/api/types';
+import type { UploadImageArg, UploadVideoArg } from 'services/api/types';
 import { z } from 'zod';
-
-const ACCEPTED_IMAGE_TYPES = ['image/png', 'image/jpg', 'image/jpeg', 'image/webp'];
-const ACCEPTED_FILE_EXTENSIONS = ['.png', '.jpg', '.jpeg', '.webp'];
-
-// const MAX_IMAGE_SIZE = 4; //In MegaBytes
-// const sizeInMB = (sizeInBytes: number, decimalsNum = 2) => {
-//   const result = sizeInBytes / (1024 * 1024);
-//   return +result.toFixed(decimalsNum);
-// };
-
-const zUploadFile = z
-  .custom<File>()
-  // .refine(
-  //   (file) => {
-  //     return sizeInMB(file.size) <= MAX_IMAGE_SIZE;
-  //   },
-  //   () => ({ message: `The maximum image size is ${MAX_IMAGE_SIZE}MB` })
-  // )
-  .refine(
-    (file) => {
-      return ACCEPTED_IMAGE_TYPES.includes(file.type.toLowerCase());
-    },
-    { message: `File type is not supported` }
-  )
-  .refine(
-    (file) => {
-      return ACCEPTED_FILE_EXTENSIONS.some((ext) => file.name.toLowerCase().endsWith(ext));
-    },
-    { message: `File extension is not supported` }
-  );
 
 const sx = {
   position: 'absolute',
@@ -73,7 +46,9 @@ export const FullscreenDropzone = memo(() => {
       const parseResult = z.array(zUploadFile).safeParse(files);
 
       if (!parseResult.success) {
-        const description = t('toast.uploadFailedInvalidUploadDesc');
+        // The fullscreen surface accepts videos too, so its invalid-upload message must
+        // mention MP4 (unlike image-only upload fields, which keep the image-only text).
+        const description = t('toast.uploadFailedInvalidMediaUploadDesc');
 
         toast({
           id: 'UPLOAD_FAILED',
@@ -86,25 +61,49 @@ export const FullscreenDropzone = memo(() => {
 
       const focusedRegion = getFocusedRegion();
 
-      // While on the canvas tab and when pasting a single image, canvas may want to create a new layer. Let it handle
-      // the paste event.
-      const [firstImageFile] = files;
-      if (focusedRegion === 'canvas' && activeTab === 'canvas' && files.length === 1 && firstImageFile) {
-        setFileToPaste(firstImageFile);
+      // While on the canvas tab and when pasting a single image (not a video — the canvas can't
+      // host videos), canvas may want to create a new layer. Let it handle the paste event.
+      const [firstFile] = files;
+      if (
+        focusedRegion === 'canvas' &&
+        activeTab === 'canvas' &&
+        files.length === 1 &&
+        firstFile &&
+        !isVideoFile(firstFile)
+      ) {
+        setFileToPaste(firstFile);
         return;
       }
 
       const autoAddBoardId = selectAutoAddBoardId(getState());
+      const boardId = autoAddBoardId === 'none' ? undefined : autoAddBoardId;
 
-      const uploadArgs: UploadImageArg[] = files.map((file, i) => ({
-        file,
-        image_category: 'user',
-        is_intermediate: false,
-        board_id: autoAddBoardId === 'none' ? undefined : autoAddBoardId,
-        isFirstUploadOfBatch: i === 0,
-      }));
+      // Split files by media type so each batch goes through its own uploader. Image and video
+      // uploaders are independent — they each update their own RTK cache + invalidate the gallery.
+      const imageFiles = files.filter((f) => !isVideoFile(f));
+      const videoFiles = files.filter((f) => isVideoFile(f));
 
-      uploadImages(uploadArgs);
+      if (imageFiles.length > 0) {
+        const imageUploadArgs: UploadImageArg[] = imageFiles.map((file, i) => ({
+          file,
+          image_category: 'user',
+          is_intermediate: false,
+          board_id: boardId,
+          isFirstUploadOfBatch: i === 0,
+        }));
+        uploadImages(imageUploadArgs);
+      }
+
+      if (videoFiles.length > 0) {
+        const videoUploadArgs: UploadVideoArg[] = videoFiles.map((file, i) => ({
+          file,
+          video_category: 'user',
+          is_intermediate: false,
+          board_id: boardId,
+          isFirstUploadOfBatch: i === 0,
+        }));
+        uploadVideos(videoUploadArgs);
+      }
     },
     [activeTab, t]
   );
@@ -180,7 +179,7 @@ const DropLabel = memo(() => {
   return (
     <Flex flexDir="column" gap={4} color="base.100" alignItems="center">
       <Heading size="lg">{t('gallery.dropToUpload')}</Heading>
-      <Heading size="md">{t('toast.imagesWillBeAddedTo', { boardName })}</Heading>
+      <Heading size="md">{t('toast.itemsWillBeAddedTo', { boardName })}</Heading>
     </Flex>
   );
 });

@@ -1,3 +1,5 @@
+from collections import defaultdict, deque
+from collections.abc import Iterator
 from typing import Optional
 from unittest.mock import Mock
 
@@ -30,6 +32,7 @@ from tests.test_nodes import (
     AnyTypeTestInvocationOutput,
     PromptCollectionTestInvocation,
     PromptTestInvocation,
+    TestEventService,
     TextToImageTestInvocation,
     create_edge,
 )
@@ -47,6 +50,15 @@ class IntegerCollectionFromItemTestInvocation(BaseInvocation):
         return IntegerCollectionTestInvocationOutput(collection=[base, base + 1])
 
 
+class IntegerCollectionWithBranchingTestInvocation(BaseInvocation):
+    value: int = InputField(default=0)
+    branch_count: int = InputField(default=2)
+
+    def invoke(self, context: InvocationContext) -> IntegerCollectionTestInvocationOutput:
+        base = self.value * 10
+        return IntegerCollectionTestInvocationOutput(collection=[base + branch for branch in range(self.branch_count)])
+
+
 class MaybeEmptyIntegerCollectionTestInvocation(BaseInvocation):
     value: int = InputField(default=0)
     always_empty: bool = InputField(default=False)
@@ -55,6 +67,13 @@ class MaybeEmptyIntegerCollectionTestInvocation(BaseInvocation):
         if self.always_empty or self.value == 0:
             return IntegerCollectionTestInvocationOutput(collection=[])
         return IntegerCollectionTestInvocationOutput(collection=[self.value])
+
+
+class EmptyOrTwoIntegerCollectionTestInvocation(BaseInvocation):
+    value: int = InputField(default=0)
+
+    def invoke(self, context: InvocationContext) -> IntegerCollectionTestInvocationOutput:
+        return IntegerCollectionTestInvocationOutput(collection=[] if self.value == 0 else [0, 1])
 
 
 class IntegerCollectionPassthroughTestInvocation(BaseInvocation):
@@ -70,6 +89,14 @@ class TwoIntegerCollectionsTestInvocation(BaseInvocation):
 
     def invoke(self, context: InvocationContext) -> IntegerCollectionTestInvocationOutput:
         return IntegerCollectionTestInvocationOutput(collection=self.first + self.second)
+
+
+class IntegerAndCollectionTestInvocation(BaseInvocation):
+    value: int = InputField(default=0)
+    collection: list[int] = InputField(default=[])
+
+    def invoke(self, context: InvocationContext) -> IntegerCollectionTestInvocationOutput:
+        return IntegerCollectionTestInvocationOutput(collection=[self.value, *self.collection])
 
 
 @pytest.fixture
@@ -446,6 +473,347 @@ def test_graph_state_expands_iterator():
     assert results == expected
 
 
+def test_graph_state_materialization_does_not_revalidate_execution_edges(monkeypatch: pytest.MonkeyPatch):
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=3, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "collect", "item"))
+
+    validate_edge_calls = 0
+    original_validate_edge = Graph._validate_edge
+
+    def track_validate_edge(self: Graph, edge):
+        nonlocal validate_edge_calls
+        validate_edge_calls += 1
+        return original_validate_edge(self, edge)
+
+    monkeypatch.setattr(Graph, "_validate_edge", track_validate_edge)
+
+    state = GraphExecutionState(graph=graph)
+    execute_all_nodes(state)
+
+    assert validate_edge_calls == 0
+    state.execution_graph.validate_self()
+
+
+def test_iterator_and_collector_do_not_use_invocation_cache_by_default():
+    assert IterateInvocation().use_cache is False
+    assert CollectInvocation().use_cache is False
+
+
+def test_materialized_control_nodes_disable_invocation_cache():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=3, step=1))
+    graph.add_node(IterateInvocation(id="iterate", use_cache=True))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(CollectInvocation(id="collect", use_cache=True))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "collect", "item"))
+    state = GraphExecutionState(graph=graph)
+
+    execute_all_nodes(state)
+
+    for source_node_id in ("iterate", "collect"):
+        for prepared_node_id in state.source_prepared_mapping[source_node_id]:
+            assert state.execution_graph.get_node(prepared_node_id).use_cache is False
+
+
+def test_iterator_and_collector_event_invocations_omit_collections():
+    iterator = IterateInvocation(collection=[1, 2, 3], index=1)
+    collector = CollectInvocation(collection=[1, 2, 3])
+
+    iterator_event_invocation = iterator.get_event_invocation()
+    collector_event_invocation = collector.get_event_invocation()
+
+    assert iterator_event_invocation is not iterator
+    assert iterator_event_invocation.collection == []
+    assert iterator_event_invocation.index == iterator.index
+    assert iterator.collection == [1, 2, 3]
+
+    assert collector_event_invocation is not collector
+    assert collector_event_invocation.collection == []
+    assert collector.collection == [1, 2, 3]
+
+
+def test_invocation_event_service_uses_compact_control_node_representation():
+    iterator = IterateInvocation(collection=[1, 2, 3], index=1)
+    queue_item = Mock(
+        queue_id="default",
+        item_id=1,
+        batch_id="batch",
+        origin="workflows",
+        destination=None,
+        user_id="system",
+        session_id="session",
+        session=Mock(prepared_source_mapping={iterator.id: "source"}),
+    )
+    events = TestEventService()
+
+    events.emit_invocation_started(queue_item, iterator)
+
+    assert len(events.events) == 1
+    event = events.events[0]
+    assert isinstance(event.invocation, IterateInvocation)
+    assert event.invocation.collection == []
+    assert iterator.collection == [1, 2, 3]
+
+
+def test_if_scheduler_does_not_resolve_iteration_path_when_graph_has_no_if(monkeypatch: pytest.MonkeyPatch):
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="source", prompt="test"))
+    state = GraphExecutionState(graph=graph)
+    prepared_node = PromptTestInvocation(id="prepared", prompt="test")
+    state.execution_graph.add_node(prepared_node)
+    state._register_prepared_exec_node(prepared_node.id, "source")
+
+    def fail_get_iteration_path(self: GraphExecutionState, exec_node_id: str):
+        raise AssertionError(f"Unexpected iteration path lookup for {exec_node_id}")
+
+    monkeypatch.setattr(GraphExecutionState, "_get_iteration_path", fail_get_iteration_path)
+
+    assert state._if_scheduler().is_deferred_by_unresolved_if(prepared_node.id) is False
+
+
+def test_materializer_caches_iteration_paths_for_single_parent_chain(monkeypatch: pytest.MonkeyPatch):
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=3, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "collect", "item"))
+    state = GraphExecutionState(graph=graph)
+
+    def fail_build_iteration_path(exec_node_id: str, source_node_id: str):
+        raise AssertionError(f"Unexpected graph traversal for {exec_node_id} from {source_node_id}")
+
+    monkeypatch.setattr(state._runtime(), "_build_iteration_path", fail_build_iteration_path)
+
+    execute_all_nodes(state)
+
+
+def test_materializer_reuses_matching_parent_iteration_paths():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=1, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="left"))
+    graph.add_node(AddInvocation(id="right"))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "left", "a"))
+    graph.add_edge(create_edge("iterate", "item", "right", "a"))
+    state = GraphExecutionState(graph=graph)
+    registry = state._prepared_registry()
+    registry.register("left-prepared", "left")
+    registry.register("right-prepared", "right")
+    registry.set_iteration_path("left-prepared", (2,))
+    registry.set_iteration_path("right-prepared", (2,))
+
+    iteration_path = state._materializer()._get_known_iteration_path(
+        -1,
+        [("left", "left-prepared"), ("right", "right-prepared")],
+    )
+
+    assert iteration_path == (2,)
+
+
+def test_materializer_does_not_merge_matching_paths_from_independent_iterators():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="left_range", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="left_iterate"))
+    graph.add_node(RangeInvocation(id="right_range", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="right_iterate"))
+    graph.add_node(AddInvocation(id="add"))
+    graph.add_edge(create_edge("left_range", "collection", "left_iterate", "collection"))
+    graph.add_edge(create_edge("right_range", "collection", "right_iterate", "collection"))
+    graph.add_edge(create_edge("left_iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("right_iterate", "item", "add", "b"))
+    state = GraphExecutionState(graph=graph)
+
+    execute_all_nodes(state)
+
+    iteration_paths = {state._get_iteration_path(prepared_id) for prepared_id in state.source_prepared_mapping["add"]}
+    assert iteration_paths == {(0, 0), (0, 1), (1, 0), (1, 1)}
+
+
+def test_materializer_indexes_prepared_nodes_once_per_source(monkeypatch: pytest.MonkeyPatch):
+    item_count = 24
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=item_count, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "collect", "item"))
+    state = GraphExecutionState(graph=graph)
+    materializer_type = type(state._materializer())
+    original_get_prepared_nodes = materializer_type._get_prepared_nodes_for_source
+    calls_by_source: defaultdict[str, int] = defaultdict(int)
+
+    def track_get_prepared_nodes(self, source_node_id: str):
+        calls_by_source[source_node_id] += 1
+        return original_get_prepared_nodes(self, source_node_id)
+
+    monkeypatch.setattr(materializer_type, "_get_prepared_nodes_for_source", track_get_prepared_nodes)
+
+    execute_all_nodes(state)
+
+    assert calls_by_source["iterate"] <= 2
+    assert calls_by_source["add"] <= 2
+
+
+def test_materializer_uses_iteration_path_index_for_loop_body(monkeypatch: pytest.MonkeyPatch):
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=8, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="first_add", b=1))
+    graph.add_node(AddInvocation(id="second_add", b=1))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "first_add", "a"))
+    graph.add_edge(create_edge("first_add", "value", "second_add", "a"))
+    graph.add_edge(create_edge("second_add", "value", "collect", "item"))
+    state = GraphExecutionState(graph=graph)
+    materializer_type = type(state._materializer())
+
+    def fail_matches_parent_iterators(*args, **kwargs):
+        raise AssertionError("Known iteration paths should not require execution-graph path searches")
+
+    monkeypatch.setattr(materializer_type, "_matches_parent_iterators", fail_matches_parent_iterators)
+
+    execute_all_nodes(state)
+
+    prepared_collect_id = next(iter(state.source_prepared_mapping["collect"]))
+    assert state.results[prepared_collect_id].collection == list(range(2, 10))
+
+
+def test_materializer_yields_parent_iteration_mappings_lazily():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=3, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    state = GraphExecutionState(graph=graph)
+
+    invoke_next(state)
+    iterate_node = state.next()
+    assert isinstance(iterate_node, IterateInvocation)
+
+    mappings = state._materializer()._get_parent_iteration_mappings("add", graph.nx_graph_flat())
+
+    assert isinstance(mappings, Iterator)
+    assert len(next(mappings)) == 1
+
+
+def test_graph_caches_edge_adjacency_and_updates_it_incrementally():
+    class CountingEdges(list):
+        def __init__(self, edges):
+            super().__init__(edges)
+            self.iterations = 0
+
+        def __iter__(self):
+            self.iterations += 1
+            return super().__iter__()
+
+    graph = Graph()
+    graph.add_node(PromptTestInvocation(id="source", prompt="test"))
+    graph.add_node(PromptTestInvocation(id="first"))
+    graph.add_node(PromptTestInvocation(id="second"))
+    first_edge = create_edge("source", "prompt", "first", "prompt")
+    second_edge = create_edge("source", "prompt", "second", "prompt")
+    graph.add_edge(first_edge)
+    counting_edges = CountingEdges(graph.edges)
+    object.__setattr__(graph, "edges", counting_edges)
+    graph._invalidate_edge_indexes()
+
+    assert graph._get_input_edges("first") == [first_edge]
+    assert graph._get_input_edges("first") == [first_edge]
+    assert counting_edges.iterations == 1
+
+    graph._extend_edges_unchecked([second_edge])
+    assert graph._get_input_edges("second") == [second_edge]
+    assert graph._get_output_edges("source") == [first_edge, second_edge]
+    assert counting_edges.iterations == 1
+
+    graph.delete_edge(first_edge)
+    assert graph._get_input_edges("first") == []
+    assert graph._get_output_edges("source") == [second_edge]
+    assert counting_edges.iterations == 1
+
+
+def test_ready_queue_does_not_scan_for_duplicate_nodes():
+    class NoMembershipScanDeque(deque):
+        def __contains__(self, value):
+            raise AssertionError("Ready queue membership must use the scheduler index")
+
+    state = GraphExecutionState(graph=Graph())
+    prepared_node = PromptTestInvocation(id="prepared", prompt="test")
+    state.execution_graph.add_node(prepared_node)
+    state._register_prepared_exec_node(prepared_node.id, "source")
+    state._prepared_registry().set_iteration_path(prepared_node.id, ())
+    state.indegree[prepared_node.id] = 0
+    class_name = state._type_key(prepared_node)
+    state._ready_queues[class_name] = NoMembershipScanDeque()
+
+    state._enqueue_if_ready(prepared_node.id)
+    state._enqueue_if_ready(prepared_node.id)
+
+    assert list(state._ready_queues[class_name]) == [prepared_node.id]
+
+
+def test_iterator_reuses_collection_input_until_completed():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=3, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    state = GraphExecutionState(graph=graph)
+
+    range_node, range_output = invoke_next(state)
+    assert range_node is not None
+    assert range_output is not None
+
+    iterate_node = state.next()
+    assert isinstance(iterate_node, IterateInvocation)
+    assert iterate_node.collection is range_output.collection
+
+    iterate_output = iterate_node.invoke(Mock(InvocationContext))
+    state.complete(iterate_node.id, iterate_output)
+
+    assert iterate_output.item == 0
+    assert iterate_node.collection == []
+
+
+def test_completed_collector_releases_input_collection_but_preserves_results():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=3, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "collect", "item"))
+    state = GraphExecutionState(graph=graph)
+
+    execute_all_nodes(state)
+
+    prepared_collect_id = next(iter(state.source_prepared_mapping["collect"]))
+    prepared_collect = state.execution_graph.get_node(prepared_collect_id)
+    assert isinstance(prepared_collect, CollectInvocation)
+    assert prepared_collect.collection == []
+    assert state.results[prepared_collect_id].collection == [1, 2, 3]
+    assert {state.results[node_id].value for node_id in state.source_prepared_mapping["add"]} == {1, 2, 3}
+    assert state.execution_graph._input_edges_by_node is None
+    assert state.execution_graph._output_edges_by_node is None
+    assert state._ready_node_ids == set()
+
+
 def test_graph_state_collects():
     graph = Graph()
     test_prompts = ["Banana sushi", "Cat sushi"]
@@ -550,6 +918,62 @@ def test_graph_state_resumes_partially_executed_session_after_json_round_trip():
 
     prepared_collect_id = next(iter(resumed.source_prepared_mapping["collect"]))
     assert resumed.results[prepared_collect_id].collection == [2, 3, 4, 5]
+
+
+def test_graph_state_round_trip_reuses_persisted_iteration_paths(monkeypatch: pytest.MonkeyPatch):
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=24, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+    graph.add_edge(create_edge("add", "value", "collect", "item"))
+
+    state = GraphExecutionState(graph=graph)
+    for _ in range(8):
+        invocation, output = invoke_next(state)
+        assert invocation is not None
+        assert output is not None
+
+    raw = state.model_dump_json(warnings=False, exclude_none=True)
+    runtime_type = type(state._runtime())
+
+    def fail_build_iteration_path(self, exec_node_id: str, source_node_id: str):
+        raise AssertionError(f"Unexpected graph traversal for {exec_node_id} from {source_node_id}")
+
+    monkeypatch.setattr(runtime_type, "_build_iteration_path", fail_build_iteration_path)
+
+    resumed = TypeAdapter(GraphExecutionState).validate_json(raw, strict=False)
+
+    assert all(
+        resumed._get_iteration_path(exec_node_id) is not None for exec_node_id in resumed.prepared_source_mapping
+    )
+
+
+def test_graph_state_round_trip_rebuilds_iteration_paths_for_legacy_session():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="range", start=0, stop=4, step=1))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(AddInvocation(id="add", b=1))
+    graph.add_edge(create_edge("range", "collection", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "add", "a"))
+
+    state = GraphExecutionState(graph=graph)
+    for _ in range(3):
+        invocation, output = invoke_next(state)
+        assert invocation is not None
+        assert output is not None
+
+    legacy_payload = state.model_dump(mode="json", warnings=False, exclude_none=True)
+    legacy_payload.pop("prepared_iteration_paths")
+
+    resumed = TypeAdapter(GraphExecutionState).validate_python(legacy_payload, strict=False)
+
+    assert all(
+        resumed._get_iteration_path(exec_node_id) is not None for exec_node_id in resumed.prepared_source_mapping
+    )
+    assert execute_all_nodes(resumed)
 
 
 def test_if_graph_state_resumes_resolved_branch_after_json_round_trip():
@@ -847,6 +1271,161 @@ def test_graph_collector_nested_under_outer_iterator_preserves_empty_groups(
     prepared_outer_collect_id = next(iter(state.source_prepared_mapping["outer_collect"]))
     assert state.results[prepared_outer_collect_id].collection == expected_collection
     assert state.is_complete()
+
+
+def test_graph_consumer_with_direct_iterator_and_empty_collector_preserves_outer_iterations():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="outer_range", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="outer_iter"))
+    graph.add_node(MaybeEmptyIntegerCollectionTestInvocation(id="inner_collection"))
+    graph.add_node(IterateInvocation(id="inner_iter"))
+    graph.add_node(AddInvocation(id="inner_item", b=0))
+    graph.add_node(CollectInvocation(id="inner_collect"))
+    graph.add_node(IntegerAndCollectionTestInvocation(id="join"))
+    graph.add_node(CollectInvocation(id="outer_collect"))
+
+    graph.add_edge(create_edge("outer_range", "collection", "outer_iter", "collection"))
+    graph.add_edge(create_edge("outer_iter", "item", "inner_collection", "value"))
+    graph.add_edge(create_edge("inner_collection", "collection", "inner_iter", "collection"))
+    graph.add_edge(create_edge("inner_iter", "item", "inner_item", "a"))
+    graph.add_edge(create_edge("inner_item", "value", "inner_collect", "item"))
+    graph.add_edge(create_edge("inner_collect", "collection", "join", "collection"))
+    graph.add_edge(create_edge("outer_iter", "item", "join", "value"))
+    graph.add_edge(create_edge("join", "collection", "outer_collect", "item"))
+
+    state = GraphExecutionState(graph=graph)
+    execute_all_nodes(state)
+
+    join_ids = state.source_prepared_mapping["join"]
+    assert sorted(state._get_iteration_path(node_id) for node_id in join_ids) == [(0,), (1,)]
+    assert sorted(state.results[node_id].collection for node_id in join_ids) == [[0], [1, 1]]
+    outer_collect_id = next(iter(state.source_prepared_mapping["outer_collect"]))
+    assert state.results[outer_collect_id].collection == [[0], [1, 1]]
+
+
+@pytest.mark.parametrize(
+    ("always_empty", "expected"),
+    [(True, [[], []]), (False, [[0, 1], [10, 11]]), (None, [[], [1]])],
+)
+def test_graph_chained_collectors_preserve_outer_iteration_scope(always_empty: bool | None, expected: list[list[int]]):
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="outer_range", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="outer_iter"))
+    if always_empty is not False:
+        graph.add_node(
+            MaybeEmptyIntegerCollectionTestInvocation(id="inner_collection", always_empty=always_empty is True)
+        )
+    else:
+        graph.add_node(IntegerCollectionFromItemTestInvocation(id="inner_collection"))
+    graph.add_node(IterateInvocation(id="inner_iter"))
+    graph.add_node(AddInvocation(id="inner_item", b=0))
+    graph.add_node(CollectInvocation(id="collect_a"))
+    graph.add_node(IterateInvocation(id="downstream_iter"))
+    graph.add_node(AddInvocation(id="downstream_body", b=0))
+    graph.add_node(CollectInvocation(id="collect_b"))
+    graph.add_node(IntegerCollectionPassthroughTestInvocation(id="per_outer"))
+    graph.add_node(CollectInvocation(id="outer_collect"))
+
+    graph.add_edge(create_edge("outer_range", "collection", "outer_iter", "collection"))
+    graph.add_edge(create_edge("outer_iter", "item", "inner_collection", "value"))
+    graph.add_edge(create_edge("inner_collection", "collection", "inner_iter", "collection"))
+    graph.add_edge(create_edge("inner_iter", "item", "inner_item", "a"))
+    graph.add_edge(create_edge("inner_item", "value", "collect_a", "item"))
+    graph.add_edge(create_edge("collect_a", "collection", "downstream_iter", "collection"))
+    graph.add_edge(create_edge("downstream_iter", "item", "downstream_body", "a"))
+    graph.add_edge(create_edge("downstream_body", "value", "collect_b", "item"))
+    graph.add_edge(create_edge("collect_b", "collection", "per_outer", "collection"))
+    graph.add_edge(create_edge("per_outer", "collection", "outer_collect", "item"))
+
+    state = GraphExecutionState(graph=graph)
+    execute_all_nodes(state)
+
+    collect_b_ids = state.source_prepared_mapping["collect_b"]
+    assert sorted(state._get_iteration_path(node_id) for node_id in collect_b_ids) == [(0,), (1,)]
+    assert sorted(state.results[node_id].collection for node_id in collect_b_ids) == expected
+    outer_collect_id = next(iter(state.source_prepared_mapping["outer_collect"]))
+    assert state.results[outer_collect_id].collection == expected
+
+
+def test_graph_chained_collectors_preserve_ragged_empty_scope():
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="source", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="outer_iter"))
+    graph.add_node(EmptyOrTwoIntegerCollectionTestInvocation(id="middle_map"))
+    graph.add_node(IterateInvocation(id="middle_iter"))
+    graph.add_node(IntegerCollectionFromItemTestInvocation(id="inner_map"))
+    graph.add_node(IterateInvocation(id="inner_iter"))
+    graph.add_node(AddInvocation(id="body", b=0))
+    graph.add_node(CollectInvocation(id="collect_a"))
+    graph.add_node(IntegerCollectionPassthroughTestInvocation(id="per_x"))
+    graph.add_node(CollectInvocation(id="top_collect"))
+
+    graph.add_edge(create_edge("source", "collection", "outer_iter", "collection"))
+    graph.add_edge(create_edge("outer_iter", "item", "middle_map", "value"))
+    graph.add_edge(create_edge("middle_map", "collection", "middle_iter", "collection"))
+    graph.add_edge(create_edge("middle_iter", "item", "inner_map", "value"))
+    graph.add_edge(create_edge("inner_map", "collection", "inner_iter", "collection"))
+    graph.add_edge(create_edge("inner_iter", "item", "body", "a"))
+    graph.add_edge(create_edge("body", "value", "collect_a", "item"))
+    graph.add_edge(create_edge("collect_a", "collection", "per_x", "collection"))
+    graph.add_edge(create_edge("per_x", "collection", "top_collect", "item"))
+
+    state = GraphExecutionState(graph=graph)
+    execute_all_nodes(state)
+
+    top_collect_ids = state.source_prepared_mapping["top_collect"]
+    top_collect_results = {
+        state._get_iteration_path(node_id): state.results[node_id].collection for node_id in top_collect_ids
+    }
+    assert top_collect_results == {(0,): [[]], (1,): [[0, 1], [10, 11]]}
+
+
+@pytest.mark.parametrize(("levels", "branch_count"), [(3, 2), (4, 2), (5, 1), (6, 1), (7, 1)])
+def test_graph_chained_collectors_preserve_all_iteration_scopes(levels: int, branch_count: int):
+    graph = Graph()
+    graph.add_node(RangeInvocation(id="source", start=0, stop=2, step=1))
+    graph.add_node(IterateInvocation(id="iter_0"))
+    for level in range(1, levels):
+        graph.add_node(IntegerCollectionWithBranchingTestInvocation(id=f"map_{level}", branch_count=branch_count))
+        graph.add_node(IterateInvocation(id=f"iter_{level}"))
+    graph.add_node(AddInvocation(id="body", b=0))
+
+    graph.add_edge(create_edge("source", "collection", "iter_0", "collection"))
+    for level in range(1, levels):
+        graph.add_edge(create_edge(f"iter_{level - 1}", "item", f"map_{level}", "value"))
+        graph.add_edge(create_edge(f"map_{level}", "collection", f"iter_{level}", "collection"))
+    graph.add_edge(create_edge(f"iter_{levels - 1}", "item", "body", "a"))
+
+    previous_node_id = "body"
+    previous_field = "value"
+    for level in reversed(range(levels)):
+        collect_id = f"collect_{level}"
+        graph.add_node(CollectInvocation(id=collect_id))
+        graph.add_edge(create_edge(previous_node_id, previous_field, collect_id, "item"))
+        previous_node_id = collect_id
+        previous_field = "collection"
+
+    state = GraphExecutionState(graph=graph)
+    execute_all_nodes(state)
+
+    def paths(depth: int) -> list[tuple[int, ...]]:
+        if depth == 0:
+            return [()]
+        branch_level = depth - 1
+        branch_options = range(2) if branch_level == 0 else range(branch_count)
+        return [prefix + (branch,) for prefix in paths(depth - 1) for branch in branch_options]
+
+    def expected_collection(level: int, prefix: tuple[int, ...]):
+        branch_options = range(2) if level == 0 else range(branch_count)
+        if level == levels - 1:
+            return [int("".join(map(str, prefix + (branch,)))) for branch in branch_options]
+        return [expected_collection(level + 1, prefix + (branch,)) for branch in branch_options]
+
+    for level in range(levels):
+        prepared_ids = state.source_prepared_mapping[f"collect_{level}"]
+        actual = {state._get_iteration_path(node_id): state.results[node_id].collection for node_id in prepared_ids}
+        expected = {prefix: expected_collection(level, prefix) for prefix in paths(level)}
+        assert actual == expected
 
 
 def test_graph_collector_reuses_outer_collection_input_for_each_nested_iterator_group():

@@ -114,7 +114,7 @@ class BlendLatentsInvocation(BaseInvocation):
 
         # https://discuss.huggingface.co/t/memory-usage-by-later-pipeline-stages/23699
         blended_latents = blended_latents.to("cpu")
-        torch.cuda.empty_cache()
+        TorchDevice.empty_cache()
 
         name = context.tensors.save(tensor=blended_latents)
         return LatentsOutput.build(latents_name=name, latents=blended_latents)

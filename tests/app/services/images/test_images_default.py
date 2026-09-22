@@ -4,18 +4,28 @@ Covers subfolder forwarding for all strategies and the delete_images_on_board
 silent-failure contract (Points 2 & 3 from PR review).
 """
 
-from unittest.mock import MagicMock
+from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
 from PIL import Image
 
+from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.image_files.image_files_common import (
+    ImageFileSaveException,
+)
+from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecord,
+    ImageRecordNotFoundException,
     ResourceOrigin,
 )
+from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
+from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.backend.util.logging import InvokeAILogger
 
 
 @pytest.fixture
@@ -53,6 +63,79 @@ def _make_record(
         has_workflow=False,
         image_subfolder=image_subfolder,
     )
+
+
+@pytest.fixture
+def real_image_service(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage]:
+    logger = InvokeAILogger.get_logger()
+    config = InvokeAIAppConfig(use_memory_db=True, image_subfolder_strategy="flat")
+    config._root = tmp_path
+    storage = DiskImageFileStorage(tmp_path / "images")
+    invoker = MagicMock()
+    invoker.services.configuration.pil_compress_level = 6
+    storage.start(invoker)
+    db = init_db(config=config, logger=logger, image_files=storage)
+    records = SqliteImageRecordStorage(db=db)
+
+    invoker.services.configuration.image_subfolder_strategy = "flat"
+    invoker.services.names.create_image_name.return_value = "uploaded.png"
+    invoker.services.image_records = records
+    invoker.services.image_files = storage
+    invoker.services.board_image_records.get_board_for_image.return_value = None
+    invoker.services.urls.get_image_url.return_value = "/api/v1/images/i/uploaded.png"
+    invoker.services.logger = MagicMock()
+
+    service = ImageService()
+    service.start(invoker)
+    return service, records, storage
+
+
+def test_create_rolls_back_record_and_files_when_thumbnail_save_fails(
+    real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage],
+) -> None:
+    service, records, storage = real_image_service
+    image = Image.new("RGB", (32, 32), "red")
+    broken_thumbnail = MagicMock()
+    broken_thumbnail.save.side_effect = OSError("thumbnail filesystem failure")
+
+    try:
+        with patch(
+            "invokeai.app.services.image_files.image_files_disk.make_thumbnail",
+            return_value=broken_thumbnail,
+        ):
+            with pytest.raises(ImageFileSaveException):
+                service.create(
+                    image=image,
+                    image_origin=ResourceOrigin.EXTERNAL,
+                    image_category=ImageCategory.GENERAL,
+                )
+
+        with pytest.raises(ImageRecordNotFoundException):
+            records.get("uploaded.png")
+        assert not storage.get_path("uploaded.png").exists()
+        assert not storage.get_path("uploaded.png", thumbnail=True).exists()
+    finally:
+        image.close()
+
+
+def test_create_accepts_large_16_bit_image(
+    real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage],
+) -> None:
+    service, records, storage = real_image_service
+    image = Image.new("I;16", (1024, 1024), 32768)
+
+    try:
+        service.create(
+            image=image,
+            image_origin=ResourceOrigin.EXTERNAL,
+            image_category=ImageCategory.GENERAL,
+        )
+
+        assert records.get("uploaded.png").image_subfolder == ""
+        assert storage.get_path("uploaded.png").exists()
+        assert storage.get_path("uploaded.png", thumbnail=True).exists()
+    finally:
+        image.close()
 
 
 # ── Point 2: subfolder forwarding tests ──
@@ -206,11 +289,9 @@ class TestDeleteForwardsSubfolder:
 
 
 class TestDeleteImagesOnBoardContract:
-    """Tests for the silent-failure behavior of delete_images_on_board."""
+    """A file-delete failure must preserve the corresponding database record."""
 
-    def test_db_rows_deleted_even_when_file_delete_fails(self, image_service: ImageService):
-        """Current behavior: DB rows are deleted even if file cleanup fails for some images.
-        This test documents the contract so any change is intentional."""
+    def test_record_preserved_when_file_delete_fails(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
         invoker.services.board_image_records.get_all_board_image_names_for_board.return_value = [
             "good.png",
@@ -222,13 +303,14 @@ class TestDeleteImagesOnBoardContract:
         bad_record = _make_record(image_name="bad.png", image_subfolder="bad/path")
 
         invoker.services.image_records.get.side_effect = [good_record, bad_record]
-        # File delete succeeds for first, fails for second
-        invoker.services.image_files.delete.side_effect = [None, Exception("disk error")]
+        # File staging succeeds for first, fails for second
+        invoker.services.image_files.stage_delete.side_effect = [object(), Exception("disk error")]
 
-        image_service.delete_images_on_board("board-1")
+        deleted, failed = image_service.delete_images_on_board("board-1")
 
-        # DB rows are still deleted for all images
-        invoker.services.image_records.delete_many.assert_called_once_with(["good.png", "bad.png"])
+        invoker.services.image_records.delete_many.assert_called_once_with(["good.png"])
+        assert deleted == ["good.png"]
+        assert failed == ["bad.png"]
 
     def test_file_cleanup_failure_does_not_raise(self, image_service: ImageService):
         """File cleanup errors are swallowed, not propagated."""
@@ -237,13 +319,13 @@ class TestDeleteImagesOnBoardContract:
 
         record = _make_record(image_name="img.png", image_subfolder="sub")
         invoker.services.image_records.get.return_value = record
-        invoker.services.image_files.delete.side_effect = Exception("permission denied")
+        invoker.services.image_files.stage_delete.side_effect = Exception("permission denied")
 
-        # Should not raise
-        image_service.delete_images_on_board("board-1")
+        deleted, failed = image_service.delete_images_on_board("board-1")
 
-        # DB delete still happens
-        invoker.services.image_records.delete_many.assert_called_once()
+        invoker.services.image_records.delete_many.assert_called_once_with([])
+        assert deleted == []
+        assert failed == ["img.png"]
 
     def test_record_lookup_failure_does_not_block_others(self, image_service: ImageService):
         """If getting the record for one image fails, other images are still processed."""
@@ -256,9 +338,24 @@ class TestDeleteImagesOnBoardContract:
         ok_record = _make_record(image_name="ok.png", image_subfolder="")
         invoker.services.image_records.get.side_effect = [Exception("not found"), ok_record]
 
-        image_service.delete_images_on_board("board-1")
+        deleted, failed = image_service.delete_images_on_board("board-1")
 
-        # File delete was attempted for the second image only
-        invoker.services.image_files.delete.assert_called_once_with("ok.png", image_subfolder="")
-        # DB rows are still deleted for all
-        invoker.services.image_records.delete_many.assert_called_once_with(["missing.png", "ok.png"])
+        # File staging was attempted for the second image only
+        invoker.services.image_files.stage_delete.assert_called_once_with("ok.png", image_subfolder="")
+        invoker.services.image_records.delete_many.assert_called_once_with(["ok.png"])
+        assert deleted == ["ok.png"]
+        assert failed == ["missing.png"]
+
+    def test_database_failure_restores_staged_files(self, image_service: ImageService):
+        invoker = image_service._ImageService__invoker  # type: ignore
+        invoker.services.board_image_records.get_all_board_image_names_for_board.return_value = ["img.png"]
+        invoker.services.image_records.get.return_value = _make_record(image_name="img.png", image_subfolder="general")
+        token = object()
+        invoker.services.image_files.stage_delete.return_value = token
+        invoker.services.image_records.delete_many.side_effect = RuntimeError("database unavailable")
+
+        with pytest.raises(RuntimeError, match="database unavailable"):
+            image_service.delete_images_on_board("board-1")
+
+        invoker.services.image_files.rollback_delete.assert_called_once_with(token)
+        invoker.services.image_files.commit_delete.assert_not_called()

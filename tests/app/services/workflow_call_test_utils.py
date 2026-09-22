@@ -934,23 +934,29 @@ class _DummySessionQueue:
         self.session_updates.append((item_id, session))
         return queue_item
 
-    def suspend_queue_item(self, item_id: int):
+    def save_queue_item_session(self, item_id: int, session):
         self._raise_if_not_found(item_id)
-        queue_item = self._ensure_queue_item(item_id, None)
+        queue_item = self._ensure_queue_item(item_id, session)
+        queue_item.session = session
+        self.session_updates.append((item_id, session))
+
+    def suspend_queue_item(self, item_id: int, queue_item=None):
+        self._raise_if_not_found(item_id)
+        queue_item = queue_item or self._ensure_queue_item(item_id, None)
         queue_item.status = "waiting"
         self.waiting_item_ids.append(item_id)
         return queue_item
 
-    def resume_queue_item(self, item_id: int):
+    def resume_queue_item(self, item_id: int, queue_item=None):
         self._raise_if_not_found(item_id)
-        queue_item = self._ensure_queue_item(item_id, None)
+        queue_item = queue_item or self._ensure_queue_item(item_id, None)
         queue_item.status = "pending"
         self.resumed_item_ids.append(item_id)
         return queue_item
 
-    def complete_queue_item(self, item_id: int):
+    def complete_queue_item(self, item_id: int, queue_item=None):
         self._raise_if_not_found(item_id)
-        queue_item = self._ensure_queue_item(item_id, None)
+        queue_item = queue_item or self._ensure_queue_item(item_id, None)
         queue_item.status = "completed"
         self.completed_item_ids.append(item_id)
         return queue_item

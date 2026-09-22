@@ -7,7 +7,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 from PIL import Image
 
+from invokeai.app.services.image_files.image_files_common import ImageFileSaveException
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage, _should_use_png_rle
+from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.util.thumbnails import get_thumbnail_name
 
 
@@ -156,6 +158,73 @@ def test_level_one_png_round_trip_from_disk(tmp_path: Path, mode: str):
     image.close()
 
 
+def test_large_16_bit_png_save_creates_thumbnail(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+    image_name = "large-16-bit.png"
+    image = Image.new("I;16", (1024, 1024), 32768)
+
+    try:
+        storage.save(image=image, image_name=image_name)
+
+        image_path = storage.get_path(image_name)
+        thumbnail_path = storage.get_path(image_name, thumbnail=True)
+        assert image_path.exists()
+        assert thumbnail_path.exists()
+        with Image.open(thumbnail_path) as thumbnail:
+            thumbnail.load()
+            assert thumbnail.format == "WEBP"
+            assert thumbnail.mode == "RGB"
+    finally:
+        image.close()
+
+
+def test_palette_transparency_survives_thumbnail_save(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+    image = Image.new("P", (32, 32), 0)
+    image.putpalette([255, 0, 0] * 256)
+    image.info["transparency"] = 0
+
+    try:
+        storage.save(image=image, image_name="transparent-palette.png")
+
+        with Image.open(storage.get_path("transparent-palette.png", thumbnail=True)) as thumbnail:
+            thumbnail.load()
+            assert thumbnail.mode == "RGBA"
+            assert thumbnail.getpixel((0, 0))[3] == 0
+    finally:
+        image.close()
+
+
+def test_save_removes_partial_files_when_thumbnail_save_fails(tmp_path: Path):
+    storage = DiskImageFileStorage(tmp_path)
+    mock_invoker = MagicMock()
+    mock_invoker.services.configuration.pil_compress_level = 6
+    storage._DiskImageFileStorage__invoker = mock_invoker  # type: ignore
+    image_name = "thumbnail-failure.png"
+    image = Image.new("RGB", (32, 32), "red")
+    broken_thumbnail = MagicMock()
+    broken_thumbnail.save.side_effect = OSError("thumbnail filesystem failure")
+
+    try:
+        with patch(
+            "invokeai.app.services.image_files.image_files_disk.make_thumbnail",
+            return_value=broken_thumbnail,
+        ):
+            with pytest.raises(ImageFileSaveException):
+                storage.save(image=image, image_name=image_name)
+
+        assert not storage.get_path(image_name).exists()
+        assert not storage.get_path(image_name, thumbnail=True).exists()
+    finally:
+        image.close()
+
+
 # ── Subfolder validation tests (Point 1) ──
 
 
@@ -252,3 +321,61 @@ class TestSaveDeleteRoundTrip:
         assert flat_path.exists()
         assert nested_path.exists()
         assert flat_path.parent != nested_path.parent
+
+    def test_staged_delete_can_be_rolled_back(self, disk_storage: DiskImageFileStorage):
+        image_name = "rollback.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+        image_path = disk_storage.get_path(image_name)
+        thumbnail_path = disk_storage.get_path(image_name, thumbnail=True)
+
+        token = disk_storage.stage_delete(image_name)
+
+        assert not image_path.exists()
+        assert not thumbnail_path.exists()
+
+        disk_storage.rollback_delete(token)
+
+        assert image_path.exists()
+        assert thumbnail_path.exists()
+
+    def test_staged_delete_can_be_committed(self, disk_storage: DiskImageFileStorage, tmp_path: Path):
+        image_name = "commit.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+
+        token = disk_storage.stage_delete(image_name)
+        disk_storage.commit_delete(token)
+
+        assert not list(tmp_path.glob(".delete_*"))
+
+    def test_invalid_staged_delete_does_not_create_staging_directory(
+        self, disk_storage: DiskImageFileStorage, tmp_path: Path
+    ):
+        with pytest.raises(ValueError, match="Invalid image name"):
+            disk_storage.stage_delete("../invalid.png")
+
+        assert not list(tmp_path.glob(".delete_*"))
+
+    def test_startup_restores_staged_files_when_record_exists(self, disk_storage: DiskImageFileStorage):
+        image_name = "recover.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+        image_path = disk_storage.get_path(image_name)
+        disk_storage.stage_delete(image_name)
+
+        invoker = MagicMock()
+        invoker.services.image_records.get.return_value = object()
+        restarted = DiskImageFileStorage(disk_storage.image_root)
+        restarted.start(invoker)
+
+        assert image_path.exists()
+
+    def test_startup_purges_staged_files_when_record_was_deleted(self, disk_storage: DiskImageFileStorage):
+        image_name = "purge.png"
+        disk_storage.save(image=Image.new("RGB", (32, 32)), image_name=image_name)
+        disk_storage.stage_delete(image_name)
+
+        invoker = MagicMock()
+        invoker.services.image_records.get.side_effect = ImageRecordNotFoundException
+        restarted = DiskImageFileStorage(disk_storage.image_root)
+        restarted.start(invoker)
+
+        assert not list(disk_storage.image_root.glob(".delete_*"))

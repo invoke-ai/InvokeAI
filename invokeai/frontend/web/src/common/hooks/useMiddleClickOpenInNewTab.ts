@@ -1,5 +1,5 @@
 import { useAppSelector } from 'app/store/storeHooks';
-import { openImageInNewTab } from 'common/util/openImageInNewTab';
+import { openMediaInNewTab } from 'features/auth/hooks/useMediaCookieRefresh';
 import { selectSystemShouldUseMiddleClickToOpenInNewTab } from 'features/system/store/systemSlice';
 import type { RefObject } from 'react';
 import { useEffect } from 'react';
@@ -58,7 +58,7 @@ export const useMiddleClickOpenInNewTab = <T extends HTMLElement = HTMLElement>(
 
       event.preventDefault();
       event.stopPropagation();
-      openImageInNewTab(imageUrl);
+      openMediaInNewTab(imageUrl);
     };
 
     element.addEventListener('mousedown', onMouseDown);

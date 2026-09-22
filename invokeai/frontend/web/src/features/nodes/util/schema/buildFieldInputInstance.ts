@@ -8,6 +8,7 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   ColorField: { r: 0, g: 0, b: 0, a: 1 },
   FloatField: 0,
   ImageField: undefined,
+  VideoField: undefined,
   IntegerField: 0,
   ModelIdentifierField: undefined,
   LoRAField: [],
@@ -15,10 +16,16 @@ const FIELD_VALUE_FALLBACK_MAP: Record<StatefulFieldType['name'], FieldValue> = 
   SavedWorkflowField: '',
   StringField: '',
   StylePresetField: undefined,
+  SystemPromptField: undefined,
   FloatGeneratorField: undefined,
   IntegerGeneratorField: undefined,
   StringGeneratorField: undefined,
   ImageGeneratorField: undefined,
+  LoRAMetadataField: undefined,
+  ControlNetMetadataField: undefined,
+  IPAdapterMetadataField: undefined,
+  T2IAdapterMetadataField: undefined,
+  MetadataExtraField: undefined,
 };
 
 export const buildFieldInputInstance = (id: string, template: FieldInputTemplate): FieldInputInstance => {

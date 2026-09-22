@@ -23,7 +23,7 @@ from invokeai.backend.util.logging import InvokeAILogger
 
 def _build_db(tmp_path: Path) -> SqliteDatabase:
     logger = InvokeAILogger.get_logger()
-    config = InvokeAIAppConfig(use_memory_db=False)
+    config = InvokeAIAppConfig(use_memory_db=True)
     config._root = tmp_path
     image_files = DiskImageFileStorage(tmp_path / "images")
     return init_db(config=config, logger=logger, image_files=image_files)
@@ -195,6 +195,62 @@ def test_move_all_images_continues_after_missing_non_intermediate_source_file(tm
     assert records.get(valid_image_name).image_subfolder == "2024/02/05"
     assert "error" in _job_states(service).values()
     assert "committed" in _job_states(service).values()
+
+
+def test_move_recovers_existing_16_bit_destination_without_thumbnail(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "large-16-bit.png"
+    _save_record(records, image_name=image_name, subfolder="", created_at="2024-02-04 04:05:06.000")
+    old_path = service.image_files.get_path(image_name)
+    old_path.parent.mkdir(parents=True, exist_ok=True)
+    image = Image.new("I;16", (1024, 1024), 32768)
+
+    try:
+        image.save(old_path, format="PNG")
+        move = service.plan_batch(last_image_name="", limit=100)[0]
+        job_id = service.create_move_job([move])
+        move.new_path.parent.mkdir(parents=True, exist_ok=True)
+        move.old_path.replace(move.new_path)
+
+        recovered = service.startup_recovery()
+
+        assert recovered.committed == 1
+        assert recovered.errors == 0
+        assert records.get(image_name).image_subfolder == "2024/02/04"
+        assert move.new_path.exists()
+        assert move.new_thumbnail_path.exists()
+        assert service.get_job(job_id).state == "committed"
+    finally:
+        image.close()
+
+
+def test_move_does_not_relocate_source_when_thumbnail_generation_fails(tmp_path: Path) -> None:
+    service, records = _service(tmp_path, strategy="date")
+    image_name = "thumbnail-retry.png"
+    _save_record(records, image_name=image_name, subfolder="", created_at="2024-02-05 04:05:06.000")
+    old_path = service.image_files.get_path(image_name)
+    old_path.parent.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (32, 32), "red").save(old_path, format="PNG")
+    move = service.plan_batch(last_image_name="", limit=100)[0]
+    job_id = service.create_move_job([move])
+
+    with patch.object(service, "_regenerate_thumbnail", side_effect=OSError("thumbnail unavailable")):
+        with pytest.raises(OSError, match="thumbnail unavailable"):
+            service.perform_filesystem_moves(job_id)
+
+    assert move.old_path.exists()
+    assert not move.new_path.exists()
+    assert records.get(image_name).image_subfolder == ""
+    assert service.get_job(job_id).state == "moving"
+
+    recovered = service.startup_recovery()
+
+    assert recovered.committed == 1
+    assert recovered.errors == 0
+    assert records.get(image_name).image_subfolder == "2024/02/05"
+    assert move.new_path.exists()
+    assert move.new_thumbnail_path.exists()
+    assert service.get_job(job_id).state == "committed"
 
 
 def test_recovery_treats_missing_intermediate_source_file_as_success(tmp_path: Path) -> None:

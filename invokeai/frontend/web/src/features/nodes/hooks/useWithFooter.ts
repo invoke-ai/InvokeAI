@@ -1,9 +1,9 @@
 import { useIsExecutableNode } from 'features/nodes/hooks/useIsBatchNode';
 
-import { useNodeHasImageOutput } from './useNodeHasImageOutput';
+import { useNodeHasGalleryOutput } from './useNodeHasGalleryOutput';
 
 export const useWithFooter = () => {
-  const hasImageOutput = useNodeHasImageOutput();
+  const hasGalleryOutput = useNodeHasGalleryOutput();
   const isExecutableNode = useIsExecutableNode();
-  return isExecutableNode && hasImageOutput;
+  return isExecutableNode && hasGalleryOutput;
 };

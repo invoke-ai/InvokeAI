@@ -57,12 +57,13 @@ export const getScaledBoundingBoxDimensions = (dimensions: Dimensions, base?: Ba
  * @param ratio The aspect ratio to calculate the new size for
  * @param area The input area
  * @param base The base model
+ * @param pidScale The PiD generation scale (see {@link getPidScale}); defaults to 1 (no PiD)
  * @returns The width and height that will fit the given aspect ratio, retaining the input area
  */
-export const calculateNewSize = (ratio: number, area: number, base?: BaseModelType): Dimensions => {
+export const calculateNewSize = (ratio: number, area: number, base?: BaseModelType, pidScale = 1): Dimensions => {
   const exactWidth = Math.sqrt(area * ratio);
   const exactHeight = exactWidth / ratio;
-  const gridSize = getGridSize(base);
+  const gridSize = getGridSize(base, pidScale);
 
   return {
     width: roundToMultiple(exactWidth, gridSize),

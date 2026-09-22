@@ -89,6 +89,35 @@ class ZImageConditioningInfo:
 
 
 @dataclass
+class ErnieImageConditioningInfo:
+    """ERNIE-Image text conditioning. Holds the unbatched, unpadded second-to-last
+    hidden states of the Mistral3 encoder for a single prompt.
+    """
+
+    prompt_embeds: torch.Tensor
+    """Encoder hidden states for a single prompt. Shape: (seq_len, hidden_size)."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
+class Ideogram4ConditioningInfo:
+    """Ideogram 4 text conditioning from the Qwen3-VL encoder.
+
+    prompt_embeds is the concatenation of hidden states from 13 Qwen3-VL layers.
+    Shape: (seq_len, 53248) where 53248 = 4096 * 13.
+    """
+
+    prompt_embeds: torch.Tensor
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        return self
+
+
+@dataclass
 class QwenImageConditioningInfo:
     """Qwen Image Edit conditioning information from Qwen2.5-VL encoder."""
 
@@ -97,6 +126,28 @@ class QwenImageConditioningInfo:
 
     prompt_embeds_mask: torch.Tensor | None = None
     """Attention mask for prompt_embeds. Shape: (batch_size, seq_len). 1 for valid, 0 for padding."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        if self.prompt_embeds_mask is not None:
+            self.prompt_embeds_mask = self.prompt_embeds_mask.to(device=device)
+        return self
+
+
+@dataclass
+class Krea2ConditioningInfo:
+    """Krea-2 text conditioning from the Qwen3-VL encoder.
+
+    Krea-2 taps 12 decoder hidden-state layers and stacks them per token, so prompt_embeds keeps a
+    layer axis (the transformer's text-fusion stage consumes it). This is unique vs Z-Image (2D) and
+    Qwen-Image (3D).
+    """
+
+    prompt_embeds: torch.Tensor
+    """Stacked Qwen3-VL hidden states. Shape: (batch_size, seq_len, num_text_layers=12, hidden=2560)."""
+
+    prompt_embeds_mask: torch.Tensor | None = None
+    """Attention mask for prompt_embeds. Shape: (batch_size, seq_len). 1/True for valid, 0/False for padding."""
 
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
         self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
@@ -131,6 +182,27 @@ class AnimaConditioningInfo:
 
 
 @dataclass
+class WanConditioningInfo:
+    """Wan 2.2 text conditioning information from the UMT5-XXL encoder.
+
+    The Wan transformer takes the encoder's last hidden state directly as
+    cross-attention context (``encoder_hidden_states``).
+    """
+
+    prompt_embeds: torch.Tensor
+    """UMT5-XXL hidden states. Shape: (seq_len, hidden_size) where hidden_size=4096."""
+
+    prompt_attention_mask: torch.Tensor | None = None
+    """Attention mask marking valid (non-padding) tokens. Shape: (seq_len,). 1 for valid, 0 for padding."""
+
+    def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+        self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+        if self.prompt_attention_mask is not None:
+            self.prompt_attention_mask = self.prompt_attention_mask.to(device=device)
+        return self
+
+
+@dataclass
 class ConditioningFieldData:
     # If you change this class, adding more types, you _must_ update the instantiation of ObjectSerializerDisk in
     # invokeai/app/api/dependencies.py, adding the types to the list of safe globals. If you do not, torch will be
@@ -142,8 +214,12 @@ class ConditioningFieldData:
         | List[SD3ConditioningInfo]
         | List[CogView4ConditioningInfo]
         | List[ZImageConditioningInfo]
+        | List[ErnieImageConditioningInfo]
+        | List[Ideogram4ConditioningInfo]
         | List[QwenImageConditioningInfo]
+        | List[Krea2ConditioningInfo]
         | List[AnimaConditioningInfo]
+        | List[WanConditioningInfo]
     )
 
 

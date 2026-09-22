@@ -150,6 +150,47 @@ def test_get_queue_item_round_trips_workflow_call_metadata(session_queue: Sqlite
     assert queue_item.workflow_call_depth == 3
 
 
+def test_save_queue_item_session_does_not_reload_full_queue_item(
+    session_queue: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = GraphExecutionState(graph=Graph())
+    item_id = _insert_queue_item(session_queue, session=session, status="pending")
+    session.errors["node"] = "updated"
+
+    def fail_get_queue_item(item_id: int):
+        raise AssertionError(f"Unexpected full queue item reload for {item_id}")
+
+    monkeypatch.setattr(session_queue, "get_queue_item", fail_get_queue_item)
+
+    session_queue.save_queue_item_session(item_id, session)
+
+    with session_queue._db.transaction() as cursor:
+        cursor.execute("SELECT session FROM session_queue WHERE item_id = ?", (item_id,))
+        row = cursor.fetchone()
+    assert row is not None
+    persisted = GraphExecutionState.model_validate_json(row[0])
+    assert persisted.errors == {"node": "updated"}
+
+
+def test_status_transition_reuses_loaded_queue_item(
+    session_queue: SqliteSessionQueue, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    session = GraphExecutionState(graph=Graph())
+    item_id = _insert_queue_item(session_queue, session=session, status="in_progress")
+    queue_item = session_queue.get_queue_item(item_id)
+
+    def fail_get_queue_item(item_id: int):
+        raise AssertionError(f"Unexpected full queue item reload for {item_id}")
+
+    monkeypatch.setattr(session_queue, "get_queue_item", fail_get_queue_item)
+
+    updated = session_queue.suspend_queue_item(item_id, queue_item=queue_item)
+
+    assert updated is queue_item
+    assert updated.status == "waiting"
+    assert updated.status_sequence == 1
+
+
 def test_enqueue_workflow_call_child_persists_pending_child_queue_item(session_queue: SqliteSessionQueue) -> None:
     parent_graph = Graph()
     parent_graph.add_node(CallSavedWorkflowInvocation(id="call-node", workflow_id="workflow-a"))

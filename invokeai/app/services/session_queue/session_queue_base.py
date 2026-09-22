@@ -21,6 +21,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     RetryItemsResult,
     SessionQueueCountsByDestination,
     SessionQueueItem,
+    SessionQueueItemSummary,
     SessionQueueStatus,
 )
 from invokeai.app.services.shared.graph import GraphExecutionState
@@ -32,8 +33,13 @@ class SessionQueueBase(ABC):
     """Base class for session queue"""
 
     @abstractmethod
-    def dequeue(self) -> Optional[SessionQueueItem]:
-        """Dequeues the next session queue item."""
+    def dequeue(self, device: Optional[str] = None) -> Optional[SessionQueueItem]:
+        """Dequeues the next session queue item, recording the processing device (e.g. 'cuda:1') if given.
+
+        When a device is given, implementations may prefer — among the fairness-chosen user's
+        equal-priority pending items — one whose models are already cached on that device, to
+        avoid expensive model reloads (device affinity).
+        """
         pass
 
     @abstractmethod
@@ -92,8 +98,8 @@ class SessionQueueBase(ABC):
         acting_user_id is independent of user_id and controls only current-item redaction:
         when set, the returned status omits item_id/session_id/batch_id unless the
         currently-running item belongs to acting_user_id. The redaction is decided from the
-        same get_current() snapshot used to embed those identifiers, so it cannot race against
-        a concurrent state change.
+        same database snapshot used to embed those identifiers, so it cannot race against a
+        concurrent state change.
 
         is_admin disables current-item redaction entirely: admins may see the identifiers of
         any user's current item. Redaction stays fail-closed - a caller that passes user_id
@@ -114,17 +120,17 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
-    def complete_queue_item(self, item_id: int) -> SessionQueueItem:
+    def complete_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
         """Completes a session queue item"""
         pass
 
     @abstractmethod
-    def suspend_queue_item(self, item_id: int) -> SessionQueueItem:
+    def suspend_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
         """Suspends a session queue item while waiting on a child workflow execution."""
         pass
 
     @abstractmethod
-    def resume_queue_item(self, item_id: int) -> SessionQueueItem:
+    def resume_queue_item(self, item_id: int, queue_item: Optional[SessionQueueItem] = None) -> SessionQueueItem:
         """Resumes a suspended session queue item by returning it to pending state."""
         pass
 
@@ -219,6 +225,11 @@ class SessionQueueBase(ABC):
         pass
 
     @abstractmethod
+    def get_queue_item_summaries_by_ids(self, queue_id: str, item_ids: list[int]) -> list[SessionQueueItemSummary]:
+        """Gets lightweight queue item summaries in the requested item ID order."""
+        pass
+
+    @abstractmethod
     def get_queue_item(self, item_id: int) -> SessionQueueItem:
         """Gets a session queue item by ID for a given queue"""
         pass
@@ -226,6 +237,11 @@ class SessionQueueBase(ABC):
     @abstractmethod
     def set_queue_item_session(self, item_id: int, session: GraphExecutionState) -> SessionQueueItem:
         """Sets the session for a session queue item. Use this to update the session state."""
+        pass
+
+    @abstractmethod
+    def save_queue_item_session(self, item_id: int, session: GraphExecutionState) -> None:
+        """Persists a queue item's session without loading and returning the full queue item."""
         pass
 
     @abstractmethod

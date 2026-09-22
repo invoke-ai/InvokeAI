@@ -34,7 +34,11 @@ export const DockviewTabCanvasViewer = memo((props: IDockviewPanelHeaderProps<Do
         {t(props.params.i18nKey)}
       </Text>
       {currentQueueItemDestination === 'canvas' && isGenerationInProgress && (
-        <ProgressBar position="absolute" bottom={0} left={0} right={0} h={1} borderRadius="none" />
+        <ProgressBar
+          fitHeightPx={10}
+          containerProps={{ position: 'absolute', bottom: 0, left: 0, right: 0 }}
+          borderRadius="none"
+        />
       )}
     </Flex>
   );

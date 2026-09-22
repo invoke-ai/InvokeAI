@@ -13,7 +13,7 @@ client_state_router = APIRouter(prefix="/v1/client_state", tags=["client_state"]
     operation_id="get_client_state_by_key",
     response_model=str | None,
 )
-async def get_client_state_by_key(
+def get_client_state_by_key(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id (ignored, kept for backwards compatibility)"),
     key: str = Query(..., description="Key to get"),
@@ -31,7 +31,7 @@ async def get_client_state_by_key(
     operation_id="set_client_state",
     response_model=str,
 )
-async def set_client_state(
+def set_client_state(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id (ignored, kept for backwards compatibility)"),
     key: str = Query(..., description="Key to set"),
@@ -50,7 +50,7 @@ async def set_client_state(
     operation_id="get_client_state_keys_by_prefix",
     response_model=list[str],
 )
-async def get_client_state_keys_by_prefix(
+def get_client_state_keys_by_prefix(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id (ignored, kept for backwards compatibility)"),
     prefix: str = Query(..., description="Prefix to filter keys by"),
@@ -70,7 +70,7 @@ async def get_client_state_keys_by_prefix(
     operation_id="delete_client_state_by_key",
     responses={204: {"description": "Client state key deleted"}},
 )
-async def delete_client_state_by_key(
+def delete_client_state_by_key(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id (ignored, kept for backwards compatibility)"),
     key: str = Query(..., description="Key to delete"),
@@ -88,7 +88,7 @@ async def delete_client_state_by_key(
     operation_id="delete_client_state",
     responses={204: {"description": "Client state deleted"}},
 )
-async def delete_client_state(
+def delete_client_state(
     current_user: CurrentUserOrDefault,
     queue_id: str = Path(description="The queue id (ignored, kept for backwards compatibility)"),
 ) -> None:

@@ -37,6 +37,7 @@ class MemoryInvocationCache(InvocationCacheBase):
         if self._max_cache_size == 0:
             return
         self._invoker.services.images.on_deleted(self._delete_by_match)
+        self._invoker.services.videos.on_deleted(self._delete_by_match)
         self._invoker.services.tensors.on_deleted(self._delete_by_match)
         self._invoker.services.conditioning.on_deleted(self._delete_by_match)
 

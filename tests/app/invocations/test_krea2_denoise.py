@@ -1,0 +1,759 @@
+import math
+from contextlib import contextmanager, nullcontext
+from types import SimpleNamespace
+
+import pytest
+import torch
+
+from invokeai.app.invocations.fields import DenoiseMaskField, Krea2ConditioningField, LatentsField, TensorField
+from invokeai.app.invocations.krea2_denoise import KREA2_LATENT_CHANNELS, Krea2DenoiseInvocation
+from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
+from invokeai.backend.model_manager.taxonomy import BaseModelType, Krea2VariantType, ModelFormat, ModelType
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, Krea2ConditioningInfo
+
+
+@pytest.mark.parametrize(("denoising_start", "denoising_end"), [(0.75, 0.25), (0.5, 0.5)])
+def test_validate_inputs_rejects_empty_or_inverted_denoising_range(
+    denoising_start: float, denoising_end: float
+) -> None:
+    invocation = Krea2DenoiseInvocation.model_construct(
+        denoising_start=denoising_start, denoising_end=denoising_end, denoise_mask=None
+    )
+
+    with pytest.raises(ValueError, match="denoising_start must be less than denoising_end"):
+        invocation._validate_inputs()
+
+
+def test_validate_inputs_rejects_denoise_mask_without_latents() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct(
+        denoising_start=0.0,
+        denoising_end=1.0,
+        denoise_mask=DenoiseMaskField(mask_name="mask"),
+        latents=None,
+    )
+
+    with pytest.raises(ValueError, match="Initial latents are required when a denoise mask is provided"):
+        invocation._validate_inputs()
+
+
+def test_validate_inputs_accepts_a_valid_configuration() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct(
+        denoising_start=0.0, denoising_end=1.0, denoise_mask=None, latents=None
+    )
+    # A full-range denoise with no mask is valid and must not raise.
+    invocation._validate_inputs()
+
+
+def _validation_payload() -> dict:
+    model = ModelIdentifierField(
+        key="krea-model",
+        hash="model-hash",
+        name="Krea Model",
+        base=BaseModelType.Krea2,
+        type=ModelType.Main,
+    )
+    return {
+        "transformer": TransformerField(transformer=model, loras=[]),
+        "positive_conditioning": Krea2ConditioningField(conditioning_name="positive"),
+    }
+
+
+@pytest.mark.parametrize(("field", "value"), [("width", 0), ("width", -16), ("height", 0), ("height", -16)])
+def test_model_validation_rejects_non_positive_dimensions(field: str, value: int) -> None:
+    with pytest.raises(ValueError):
+        Krea2DenoiseInvocation(**_validation_payload(), **{field: value})
+
+
+@pytest.mark.parametrize(
+    ("field", "value"),
+    [
+        ("cfg_scale", math.nan),
+        ("cfg_scale", math.inf),
+        ("cfg_scale", [1.0, math.nan]),
+        ("shift", math.nan),
+        ("shift", math.inf),
+    ],
+)
+def test_model_validation_rejects_non_finite_sampling_values(field: str, value: object) -> None:
+    with pytest.raises(ValueError):
+        Krea2DenoiseInvocation(**_validation_payload(), **{field: value})
+
+
+def test_model_validation_accepts_positive_dimensions_and_finite_sampling_values() -> None:
+    invocation = Krea2DenoiseInvocation(**_validation_payload(), width=16, height=32, cfg_scale=[1.0] * 8, shift=1.15)
+    assert invocation.width == 16
+    assert invocation.height == 32
+
+
+class TestPrepareCfgScale:
+    def test_scalar_is_broadcast_to_the_step_count(self) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct(cfg_scale=4.5)
+        assert invocation._prepare_cfg_scale(8) == [4.5] * 8
+
+    def test_list_of_matching_length_is_returned_unchanged(self) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct(cfg_scale=[4.0, 3.0, 2.0])
+        assert invocation._prepare_cfg_scale(3) == [4.0, 3.0, 2.0]
+
+    def test_list_of_wrong_length_raises(self) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct(cfg_scale=[4.0, 3.0, 2.0])
+        with pytest.raises(ValueError, match="cfg_scale list has 3 values but the model is configured for 8 steps"):
+            invocation._prepare_cfg_scale(8)
+
+
+class TestCfgForStep:
+    def test_scale_above_one_uses_cfg_when_negative_conditioning_is_available(self) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct()
+        assert invocation._should_apply_cfg_for_step(4.0, has_negative_conditioning=True) is True
+
+    @pytest.mark.parametrize("cfg_scale", [1.0, 0.5])
+    def test_scale_at_or_below_one_does_not_use_cfg(self, cfg_scale: float) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct()
+        assert invocation._should_apply_cfg_for_step(cfg_scale, has_negative_conditioning=True) is False
+
+    def test_missing_negative_conditioning_does_not_use_cfg(self) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct()
+        assert invocation._should_apply_cfg_for_step(4.0, has_negative_conditioning=False) is False
+
+
+class TestEffectiveScheduleValidation:
+    def test_rejects_a_fractional_range_that_rounds_to_zero_steps(self) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct()
+        with pytest.raises(ValueError, match="does not contain any effective denoising steps"):
+            invocation._validate_effective_schedule(start_idx=0, end_idx=0)
+
+    def test_accepts_a_range_with_at_least_one_effective_step(self) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct()
+        invocation._validate_effective_schedule(start_idx=0, end_idx=1)
+
+    def test_invalid_type_raises(self) -> None:
+        invocation = Krea2DenoiseInvocation.model_construct(cfg_scale="nonsense")
+        with pytest.raises(ValueError, match="Invalid CFG scale type"):
+            invocation._prepare_cfg_scale(8)
+
+
+def test_cfg_scale_list_is_built_against_full_step_count_then_clipped() -> None:
+    # Regression: a per-step CFG list carries one value per *configured* step. img2img/inpaint clips the
+    # sampling schedule (denoising_start/denoising_end), which shrinks the number of active steps. The list
+    # must be prepared against the full step count (``total_sigmas``) and *then* sliced to the active
+    # window — preparing it against the already-reduced count would reject the user's full-length list.
+    steps = 8
+    invocation = Krea2DenoiseInvocation.model_construct(cfg_scale=[float(i) for i in range(steps)])
+
+    full_cfg_scale = invocation._prepare_cfg_scale(steps)  # built against the FULL step count -> ok
+    assert len(full_cfg_scale) == steps
+
+    # Slicing to the active window [start_idx:end_idx] (as _run_diffusion does) keeps the right per-step values.
+    start_idx, end_idx = 2, 6
+    assert full_cfg_scale[start_idx:end_idx] == [2.0, 3.0, 4.0, 5.0]
+
+    # Preparing against the reduced (clipped) count instead would have raised — the bug this guards against.
+    with pytest.raises(ValueError):
+        invocation._prepare_cfg_scale(end_idx - start_idx)
+
+
+def test_get_noise_is_deterministic_and_correctly_shaped() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct()
+    device = torch.device("cpu")
+
+    noise_a = invocation._get_noise(height=64, width=128, dtype=torch.float32, device=device, seed=42)
+    noise_b = invocation._get_noise(height=64, width=128, dtype=torch.float32, device=device, seed=42)
+    noise_other = invocation._get_noise(height=64, width=128, dtype=torch.float32, device=device, seed=43)
+
+    # Shape is (1, latent_channels, H // 8, W // 8).
+    assert noise_a.shape == (1, KREA2_LATENT_CHANNELS, 8, 16)
+    # Same seed -> identical noise (reproducibility); different seed -> different noise.
+    assert torch.equal(noise_a, noise_b)
+    assert not torch.equal(noise_a, noise_other)
+
+
+def test_load_text_conditioning_concatenates_only_valid_tokens() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct()
+    first_embeds = torch.stack(
+        [
+            torch.full((12, 8), 1.0),
+            torch.full((12, 8), 99.0),
+            torch.full((12, 8), 3.0),
+        ],
+        dim=0,
+    ).unsqueeze(0)
+    conditionings = {
+        "first": ConditioningFieldData(
+            conditionings=[
+                Krea2ConditioningInfo(
+                    prompt_embeds=first_embeds,
+                    prompt_embeds_mask=torch.tensor([[True, False, True]]),
+                )
+            ]
+        ),
+        "second": ConditioningFieldData(
+            conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.full((1, 3, 12, 8), 2.0))]
+        ),
+    }
+    regional_mask = torch.tensor([[1.0, 0.0], [1.0, 0.0]])
+    context = SimpleNamespace(
+        conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
+        tensors=SimpleNamespace(load=lambda name: regional_mask if name == "region-mask" else None),
+    )
+
+    extension = invocation._load_text_conditioning(
+        context=context,
+        conditioning_field=[
+            Krea2ConditioningField(conditioning_name="first", mask=TensorField(tensor_name="region-mask")),
+            Krea2ConditioningField(conditioning_name="second"),
+        ],
+        grid_height=1,
+        grid_width=2,
+        dtype=torch.float32,
+        device=torch.device("cpu"),
+    )
+    prompt_embeds = extension.regional_text_conditioning.prompt_embeds
+
+    assert prompt_embeds.shape == (1, 5, 12, 8)
+    assert torch.equal(prompt_embeds[:, 0], torch.full((1, 12, 8), 1.0))
+    assert torch.equal(prompt_embeds[:, 1], torch.full((1, 12, 8), 3.0))
+    assert torch.equal(prompt_embeds[:, 2:], torch.full((1, 3, 12, 8), 2.0))
+    assert torch.equal(
+        extension.regional_text_conditioning.image_masks[0],
+        torch.tensor([[[1.0, 0.0]]]),
+    )
+    assert extension.regional_text_conditioning.image_masks[1] is None
+
+
+def test_load_text_conditioning_compacts_a_single_masked_conditioning() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct()
+    embeds = torch.arange(4 * 12 * 8, dtype=torch.float32).reshape(1, 4, 12, 8)
+    conditionings = {
+        "prompt": ConditioningFieldData(
+            conditionings=[
+                Krea2ConditioningInfo(
+                    prompt_embeds=embeds,
+                    prompt_embeds_mask=torch.tensor([[True, False, True, False]]),
+                )
+            ]
+        )
+    }
+    context = SimpleNamespace(
+        conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
+        tensors=SimpleNamespace(load=lambda _name: None),
+    )
+
+    extension = invocation._load_text_conditioning(
+        context=context,
+        conditioning_field=Krea2ConditioningField(conditioning_name="prompt"),
+        grid_height=1,
+        grid_width=1,
+        dtype=torch.float32,
+        device=torch.device("cpu"),
+    )
+    prompt_embeds = extension.regional_text_conditioning.prompt_embeds
+
+    assert torch.equal(prompt_embeds, embeds[:, [0, 2]])
+    assert extension.get_attention_mask() is None
+
+
+def test_load_text_conditioning_preserves_none_when_all_masks_are_none() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct()
+    conditionings = {
+        "first": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
+        "second": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 3, 12, 8))]),
+    }
+    context = SimpleNamespace(
+        conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
+        tensors=SimpleNamespace(load=lambda _name: None),
+    )
+
+    extension = invocation._load_text_conditioning(
+        context=context,
+        conditioning_field=[
+            Krea2ConditioningField(conditioning_name="first"),
+            Krea2ConditioningField(conditioning_name="second"),
+        ],
+        grid_height=1,
+        grid_width=1,
+        dtype=torch.float32,
+        device=torch.device("cpu"),
+    )
+
+    prompt_embeds = extension.regional_text_conditioning.prompt_embeds
+    assert prompt_embeds.shape == (1, 5, 12, 8)
+    assert extension.get_attention_mask() is None
+
+
+def test_load_text_conditioning_rejects_an_empty_collection() -> None:
+    invocation = Krea2DenoiseInvocation.model_construct()
+    context = SimpleNamespace(conditioning=SimpleNamespace(load=lambda _name: None))
+
+    with pytest.raises(ValueError, match="At least one Krea-2 conditioning is required"):
+        invocation._load_text_conditioning(
+            context=context,
+            conditioning_field=[],
+            grid_height=1,
+            grid_width=1,
+            dtype=torch.float32,
+            device=torch.device("cpu"),
+        )
+
+
+class _Scheduler:
+    def __init__(self, **_kwargs) -> None:
+        self.config = SimpleNamespace(num_train_timesteps=1000)
+
+    def set_timesteps(self, *, sigmas, mu, device) -> None:
+        del mu
+        self.sigmas = torch.tensor([*sigmas, 0.0], device=device)
+        self.timesteps = self.sigmas[:-1] * self.config.num_train_timesteps
+
+
+class _Transformer:
+    def __init__(self) -> None:
+        self.conditioning_values: list[float] = []
+        self.regional_attention_masks: list[torch.Tensor | None] = []
+        self.combined_sequence_lengths: list[int] = []
+        self.attn_processors = {
+            "text_fusion.layerwise_blocks.0.attn.processor": object(),
+            "transformer_blocks.0.attn.processor": object(),
+            "transformer_blocks.1.attn.processor": object(),
+        }
+        self.installed_processors = None
+
+    def set_attn_processor(self, processor) -> None:
+        # The real Krea2Transformer2DModel exposes this; denoise swaps in a memory-efficient attention processor.
+        self.installed_processors = processor
+
+    def __call__(self, *, hidden_states, encoder_hidden_states, **_kwargs):
+        self.conditioning_values.append(float(encoder_hidden_states.mean()))
+        # The real transformer concatenates [text, image] before attention, so this is the sequence length a
+        # regional mask has to match.
+        self.combined_sequence_lengths.append(encoder_hidden_states.shape[1] + hidden_states.shape[1])
+        regional_processor = self.installed_processors["transformer_blocks.0.attn.processor"]
+        attention_mask = regional_processor.regional_prompting_state.attention_mask
+        self.regional_attention_masks.append(attention_mask.clone() if attention_mask is not None else None)
+        return (torch.zeros_like(hidden_states),)
+
+
+class _TransformerInfo:
+    def __init__(self, transformer: _Transformer) -> None:
+        self.transformer = transformer
+
+    @contextmanager
+    def model_on_device(self, **_kwargs):
+        yield ({}, self.transformer)
+
+
+def _model_identifier() -> ModelIdentifierField:
+    return ModelIdentifierField(
+        key="krea-model",
+        hash="model-hash",
+        name="Krea Model",
+        base=BaseModelType.Krea2,
+        type=ModelType.Main,
+    )
+
+
+def _runtime_invocation(
+    *,
+    cfg_scale: float | list[float],
+    with_mask: bool = False,
+    negative_conditioning: Krea2ConditioningField | list[Krea2ConditioningField] | None = None,
+) -> Krea2DenoiseInvocation:
+    return Krea2DenoiseInvocation.model_construct(
+        transformer=TransformerField(transformer=_model_identifier(), loras=[]),
+        positive_conditioning=Krea2ConditioningField(conditioning_name="positive"),
+        negative_conditioning=negative_conditioning
+        if negative_conditioning is not None
+        else Krea2ConditioningField(conditioning_name="negative"),
+        cfg_scale=cfg_scale,
+        width=16,
+        height=16,
+        steps=2,
+        seed=1,
+        shift=1.15,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        latents=LatentsField(latents_name="init") if with_mask else None,
+        denoise_mask=DenoiseMaskField(mask_name="mask") if with_mask else None,
+    )
+
+
+def _runtime_context(tmp_path, transformer: _Transformer, *, negative_text_seq_len: int = 2):
+    conditionings = {
+        "positive": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
+        "negative": ConditioningFieldData(
+            conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.zeros(1, negative_text_seq_len, 12, 8))]
+        ),
+    }
+    tensors = {
+        "init": torch.zeros(1, KREA2_LATENT_CHANNELS, 2, 2),
+        "mask": torch.zeros(1, 1, 16, 16),
+        "positive-region": torch.ones(1, 16, 16),
+        "negative-region": torch.zeros(1, 16, 16),
+    }
+    config = SimpleNamespace(format=ModelFormat.Checkpoint, variant=Krea2VariantType.Turbo)
+    return SimpleNamespace(
+        models=SimpleNamespace(
+            load=lambda _identifier: _TransformerInfo(transformer),
+            get_config=lambda _identifier: config,
+            get_absolute_path=lambda _config: tmp_path,
+        ),
+        conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
+        tensors=SimpleNamespace(load=lambda name: tensors[name]),
+        util=SimpleNamespace(sd_step_callback=lambda *_args: None),
+    )
+
+
+def _patch_runtime(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "diffusers.schedulers.scheduling_flow_match_euler_discrete.FlowMatchEulerDiscreteScheduler", _Scheduler
+    )
+    monkeypatch.setattr(
+        "invokeai.app.invocations.krea2_denoise.TorchDevice.choose_torch_device", lambda: torch.device("cpu")
+    )
+    monkeypatch.setattr(
+        "invokeai.app.invocations.krea2_denoise.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda _device: torch.float32,
+    )
+    monkeypatch.setattr(
+        "invokeai.app.invocations.krea2_denoise.LayerPatcher.apply_smart_model_patches",
+        lambda **_kwargs: nullcontext(),
+    )
+
+
+def test_run_diffusion_applies_mixed_cfg_only_at_enabled_steps(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+
+    latents = _runtime_invocation(cfg_scale=[2.0, 1.0])._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
+    assert transformer.conditioning_values == [1.0, 0.0, 1.0]
+
+
+def test_run_diffusion_treats_an_empty_negative_collection_as_absent(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+
+    latents = _runtime_invocation(
+        cfg_scale=2.0,
+        negative_conditioning=[],
+    )._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
+    assert transformer.conditioning_values == [1.0, 1.0]
+
+
+def test_run_diffusion_switches_regional_masks_between_equal_length_cfg_conditionings(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=2.0)
+    invocation.positive_conditioning = Krea2ConditioningField(
+        conditioning_name="positive", mask=TensorField(tensor_name="positive-region")
+    )
+    invocation.negative_conditioning = Krea2ConditioningField(
+        conditioning_name="negative", mask=TensorField(tensor_name="negative-region")
+    )
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    positive_mask, negative_mask, positive_mask_second_step, negative_mask_second_step = (
+        transformer.regional_attention_masks
+    )
+    assert positive_mask is not None
+    assert negative_mask is not None
+    assert not torch.equal(positive_mask, negative_mask)
+    assert torch.equal(positive_mask, positive_mask_second_step)
+    assert torch.equal(negative_mask, negative_mask_second_step)
+    regional_processor = transformer.installed_processors["transformer_blocks.0.attn.processor"]
+    assert regional_processor.regional_prompting_state.attention_mask is None
+
+
+def test_run_diffusion_sizes_regional_masks_per_pass_when_cfg_lengths_differ(monkeypatch, tmp_path) -> None:
+    # The positive and negative prompts tokenize independently, so each pass needs a mask sized for its own
+    # text sequence. A mask carried over from the other pass would trip the processor's shape guard.
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    invocation = _runtime_invocation(cfg_scale=2.0)
+    invocation.positive_conditioning = Krea2ConditioningField(
+        conditioning_name="positive", mask=TensorField(tensor_name="positive-region")
+    )
+    invocation.negative_conditioning = Krea2ConditioningField(
+        conditioning_name="negative", mask=TensorField(tensor_name="negative-region")
+    )
+
+    invocation._run_diffusion(_runtime_context(tmp_path, transformer, negative_text_seq_len=5))
+
+    # width=height=16 -> 2x2 latent -> a single 2x2 patch, so image_seq_len is 1.
+    assert transformer.combined_sequence_lengths == [3, 6, 3, 6]
+    assert [tuple(mask.shape) for mask in transformer.regional_attention_masks] == [(3, 3), (6, 6), (3, 3), (6, 6)]
+    for mask, sequence_length in zip(
+        transformer.regional_attention_masks, transformer.combined_sequence_lengths, strict=True
+    ):
+        assert mask.shape == (sequence_length, sequence_length)
+
+
+def test_run_diffusion_releases_regional_mask_when_transformer_raises(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+
+    class _FailingTransformer(_Transformer):
+        def __call__(self, **kwargs):
+            super().__call__(**kwargs)
+            raise RuntimeError("transformer failure")
+
+    transformer = _FailingTransformer()
+    invocation = _runtime_invocation(cfg_scale=1.0)
+    invocation.positive_conditioning = Krea2ConditioningField(
+        conditioning_name="positive", mask=TensorField(tensor_name="positive-region")
+    )
+
+    with pytest.raises(RuntimeError, match="transformer failure"):
+        invocation._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    regional_processor = transformer.installed_processors["transformer_blocks.0.attn.processor"]
+    assert regional_processor.regional_prompting_state.attention_mask is None
+
+
+def test_run_diffusion_reaches_masked_denoising_merge(monkeypatch, tmp_path) -> None:
+    _patch_runtime(monkeypatch)
+    transformer = _Transformer()
+    merge_sigmas: list[float] = []
+
+    class _InpaintExtension:
+        def __init__(self, **_kwargs) -> None:
+            pass
+
+        def merge_intermediate_latents_with_init_latents(self, latents, sigma):
+            merge_sigmas.append(sigma)
+            return latents
+
+    monkeypatch.setattr("invokeai.app.invocations.krea2_denoise.RectifiedFlowInpaintExtension", _InpaintExtension)
+
+    latents = _runtime_invocation(cfg_scale=1.0, with_mask=True)._run_diffusion(_runtime_context(tmp_path, transformer))
+
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
+    assert len(merge_sigmas) == 2
+    assert transformer.conditioning_values == [1.0, 1.0]
+
+
+def test_run_diffusion_uses_per_prompt_position_ids_when_lengths_differ(monkeypatch, tmp_path) -> None:
+    # Regression: the positive and negative prompts can tokenize to different lengths. The rotary position
+    # ids (text tokens + image grid) must match *each pass's own* text length. Reusing the positive prompt's
+    # position ids for the uncond pass leaves the rotary embedding a different length than the negative
+    # query sequence, which crashes in the real transformer's apply_rotary_emb.
+    _patch_runtime(monkeypatch)
+
+    image_seq_len = 1  # width=height=16 -> 2x2 latent -> a single 2x2 patch
+
+    class _PositionIdChecker:
+        attn_processors = {"transformer_blocks.0.attn.processor": object()}
+
+        def set_attn_processor(self, processor) -> None:
+            pass
+
+        def __call__(self, *, hidden_states, encoder_hidden_states, position_ids, **_kwargs):
+            text_len = encoder_hidden_states.shape[1]
+            pos_len = position_ids.shape[0]
+            # The invariant the real Krea2Transformer2DModel enforces: rotary length == text + image tokens.
+            assert pos_len == text_len + image_seq_len, (
+                f"position_ids length {pos_len} must equal text length {text_len} + image tokens {image_seq_len}"
+            )
+            return (torch.zeros_like(hidden_states),)
+
+    transformer = _PositionIdChecker()
+
+    # Positive prompt is longer than the negative prompt (3 vs. 2 text tokens).
+    conditionings = {
+        "positive": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 3, 12, 8))]),
+        "negative": ConditioningFieldData(
+            conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.zeros(1, 2, 12, 8))]
+        ),
+    }
+    config = SimpleNamespace(format=ModelFormat.Checkpoint, variant=Krea2VariantType.Turbo)
+    context = SimpleNamespace(
+        models=SimpleNamespace(
+            load=lambda _identifier: _TransformerInfo(transformer),
+            get_config=lambda _identifier: config,
+            get_absolute_path=lambda _config: tmp_path,
+        ),
+        conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
+        tensors=SimpleNamespace(load=lambda _name: None),
+        util=SimpleNamespace(sd_step_callback=lambda *_args: None),
+    )
+
+    # cfg_scale > 1 so both the cond (positive) and uncond (negative) passes run each step. Without the fix,
+    # the uncond pass receives the positive prompt's position ids and the checker above fails.
+    latents = _runtime_invocation(cfg_scale=2.0)._run_diffusion(context)
+    assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
+
+
+def _mu_branch_invocation() -> Krea2DenoiseInvocation:
+    # shift=None so the resolution-aware calculate_shift branch runs (not the fixed-mu override); width/height
+    # 16 -> a 2x2 latent -> 1x1 grid -> image_seq_len == 1.
+    return Krea2DenoiseInvocation.model_construct(
+        transformer=TransformerField(transformer=_model_identifier(), loras=[]),
+        positive_conditioning=Krea2ConditioningField(conditioning_name="positive"),
+        negative_conditioning=None,
+        cfg_scale=1.0,
+        width=16,
+        height=16,
+        steps=2,
+        seed=1,
+        shift=None,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        latents=None,
+        denoise_mask=None,
+    )
+
+
+def _mu_branch_context(tmp_path, transformer: _Transformer):
+    # variant=Base -> _is_distilled() is False -> the resolution-aware mu (calculate_shift) branch is taken.
+    conditionings = {
+        "positive": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
+    }
+    config = SimpleNamespace(format=ModelFormat.Checkpoint, variant=Krea2VariantType.Base)
+    return SimpleNamespace(
+        models=SimpleNamespace(
+            load=lambda _identifier: _TransformerInfo(transformer),
+            get_config=lambda _identifier: config,
+            get_absolute_path=lambda _config: tmp_path,
+        ),
+        conditioning=SimpleNamespace(load=lambda name: conditionings[name]),
+        tensors=SimpleNamespace(load=lambda _name: None),
+        util=SimpleNamespace(sd_step_callback=lambda *_args: None),
+    )
+
+
+def _install_mu_capturing_scheduler(monkeypatch, captured: list[float], config_kwargs: dict) -> None:
+    class _MuCapturingScheduler:
+        def __init__(self, **_kwargs) -> None:
+            # The real diffusers scheduler exposes shift params on .config (a FrozenDict, attribute-access);
+            # the denoise reads them via getattr(scheduler.config, <key>, <krea-2 default>). Omitting a key
+            # here (SimpleNamespace without the attr) exercises the fallback-to-default path.
+            self.config = SimpleNamespace(num_train_timesteps=1000, **config_kwargs)
+
+        def set_timesteps(self, *, sigmas, mu, device) -> None:
+            captured.append(mu)
+            self.sigmas = torch.tensor([*sigmas, 0.0], device=device)
+            self.timesteps = self.sigmas[:-1] * self.config.num_train_timesteps
+
+    monkeypatch.setattr(
+        "diffusers.schedulers.scheduling_flow_match_euler_discrete.FlowMatchEulerDiscreteScheduler",
+        _MuCapturingScheduler,
+    )
+
+
+def test_run_diffusion_mu_honors_scheduler_config_shift_params(monkeypatch, tmp_path) -> None:
+    # Regression: the undistilled (Raw) resolution-aware mu path must derive its shift params from the loaded
+    # scheduler's config so a checkpoint shipping a customized scheduler_config.json samples with its own
+    # shift, rather than the hardcoded Krea-2 defaults.
+    from invokeai.backend.krea2.sampling_utils import calculate_shift
+
+    _patch_runtime(monkeypatch)  # patches TorchDevice + LayerPatcher (and the default _Scheduler)...
+    captured: list[float] = []
+    custom = {"base_image_seq_len": 100, "max_image_seq_len": 1000, "base_shift": 0.3, "max_shift": 1.5}
+    _install_mu_capturing_scheduler(monkeypatch, captured, custom)  # ...then override the scheduler.
+
+    _mu_branch_invocation()._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
+
+    image_seq_len = 1  # width=height=16
+    assert captured == [pytest.approx(calculate_shift(image_seq_len, **custom))]
+    # Sanity: the custom config actually moves mu away from the stock-default result.
+    assert captured[0] != pytest.approx(calculate_shift(image_seq_len))
+
+
+def test_run_diffusion_mu_falls_back_to_krea2_defaults_for_absent_config_keys(monkeypatch, tmp_path) -> None:
+    # A scheduler config that omits some shift params must fall back to the Krea-2 defaults for exactly the
+    # missing keys, honoring the ones it does provide.
+    from invokeai.backend.krea2.sampling_utils import (
+        KREA2_BASE_SHIFT,
+        KREA2_MAX_IMAGE_SEQ_LEN,
+        calculate_shift,
+    )
+
+    _patch_runtime(monkeypatch)
+    captured: list[float] = []
+    # Provide only base_image_seq_len + max_shift; base_shift and max_image_seq_len must default.
+    partial = {"base_image_seq_len": 100, "max_shift": 1.5}
+    _install_mu_capturing_scheduler(monkeypatch, captured, partial)
+
+    _mu_branch_invocation()._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
+
+    image_seq_len = 1
+    expected = calculate_shift(
+        image_seq_len,
+        base_image_seq_len=100,
+        max_image_seq_len=KREA2_MAX_IMAGE_SEQ_LEN,
+        base_shift=KREA2_BASE_SHIFT,
+        max_shift=1.5,
+    )
+    assert captured == [pytest.approx(expected)]
+
+
+def test_estimate_working_memory_stays_within_a_24gb_card_at_high_res() -> None:
+    # Regression: with SDPA attention the footprint is ~linear with a small per-token constant. The previous
+    # ~2.6 MiB/token figure demanded ~36 GB at 2560x1440 (14400 tokens), exceeding a 24 GB card, so the cache
+    # offloaded the transformer itself to RAM and the forward pass hung. The estimate plus a fully-resident
+    # ~12.2 GB fp8 transformer must comfortably fit a 24 GB card so the encoder (not the transformer) is what
+    # gets evicted.
+    inv = Krea2DenoiseInvocation.model_construct(transformer=SimpleNamespace(loras=[]))
+    GB = 1024**3
+    transformer_bytes = int(12.3 * GB)  # Krea-2-Turbo fp8
+
+    # 2560x1440 -> (2560/16) x (1440/16) = 160 x 90 = 14400 image tokens.
+    est_hi = inv._estimate_working_memory(
+        image_seq_len=14400, positive_text_seq_len=512, negative_text_seq_len=None, do_cfg=False, num_loras=0
+    )
+    assert est_hi + transformer_bytes < 24 * GB
+
+    # 1280x720 -> 80 x 45 = 3600 image tokens.
+    est_lo = inv._estimate_working_memory(
+        image_seq_len=3600, positive_text_seq_len=512, negative_text_seq_len=None, do_cfg=False, num_loras=0
+    )
+    assert est_lo + transformer_bytes < 24 * GB
+
+    # Monotonic in tokens, and a non-trivial (multi-GB) reservation so eviction is actually triggered.
+    assert est_hi > est_lo
+    assert est_lo > 1 * GB
+
+
+def test_estimate_working_memory_accounts_for_the_longest_text_conditioning() -> None:
+    inv = Krea2DenoiseInvocation.model_construct(transformer=SimpleNamespace(loras=[]))
+
+    short_text = inv._estimate_working_memory(
+        image_seq_len=3600, positive_text_seq_len=64, negative_text_seq_len=32, do_cfg=True, num_loras=0
+    )
+    long_positive = inv._estimate_working_memory(
+        image_seq_len=3600, positive_text_seq_len=256, negative_text_seq_len=32, do_cfg=True, num_loras=0
+    )
+    long_negative = inv._estimate_working_memory(
+        image_seq_len=3600, positive_text_seq_len=64, negative_text_seq_len=256, do_cfg=True, num_loras=0
+    )
+
+    assert long_positive > short_text
+    assert long_negative == long_positive
+
+
+def test_estimate_working_memory_accounts_for_regional_attention_masks() -> None:
+    inv = Krea2DenoiseInvocation.model_construct(transformer=SimpleNamespace(loras=[]))
+
+    without_regional_masks = inv._estimate_working_memory(
+        image_seq_len=3600, positive_text_seq_len=64, negative_text_seq_len=32, do_cfg=True, num_loras=0
+    )
+    with_regional_masks = inv._estimate_working_memory(
+        image_seq_len=3600,
+        positive_text_seq_len=64,
+        negative_text_seq_len=32,
+        do_cfg=True,
+        num_loras=0,
+        regional_attention_mask_bytes=1234,
+    )
+
+    assert with_regional_masks == without_regional_masks + 1234
+
+
+def test_regional_attention_memory_includes_masks_build_scratch_and_dtype_sized_attention_bias() -> None:
+    positive = SimpleNamespace(attention_mask_numel=120, attention_mask_build_scratch_numel=40)
+    negative = SimpleNamespace(attention_mask_numel=100, attention_mask_build_scratch_numel=40)
+
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16) == 500
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.float32) == 740
+    assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, None, torch.bfloat16) == 400

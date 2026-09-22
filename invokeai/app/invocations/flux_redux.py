@@ -50,6 +50,7 @@ DOWNSAMPLING_FUNCTIONS = Literal["nearest", "bilinear", "bicubic", "area", "near
     category="conditioning",
     version="2.1.0",
     classification=Classification.Beta,
+    idle_gpu_offloadable=True,
 )
 class FluxReduxInvocation(BaseInvocation):
     """Runs a FLUX Redux model to generate a conditioning tensor."""
@@ -90,6 +91,10 @@ class FluxReduxInvocation(BaseInvocation):
         redux_conditioning = self._flux_redux_encode(context, encoded_x)
         if self.downsampling_factor > 1 or self.weight != 1.0:
             redux_conditioning = self._downsample_weight(context, redux_conditioning)
+
+        # Store on CPU, like the other idle_gpu_offloadable encoders: this node may run on a
+        # borrowed idle GPU, and the consumer (FLUX denoise) runs on the session's GPU.
+        redux_conditioning = redux_conditioning.detach().to("cpu")
 
         tensor_name = context.tensors.save(redux_conditioning)
         return FluxReduxOutput(

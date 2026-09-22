@@ -7,7 +7,7 @@ from functools import total_ordering
 from pathlib import Path
 from typing import Any, Callable, List, Optional, Set, Union
 
-from pydantic import BaseModel, Field, PrivateAttr
+from pydantic import BaseModel, Field, PrivateAttr, field_serializer
 from pydantic.networks import AnyHttpUrl
 
 from invokeai.backend.model_manager.metadata import RemoteModelFile
@@ -59,6 +59,17 @@ class DownloadJobBase(BaseModel):
     # set when an error occurs
     error_type: Optional[str] = Field(default=None, description="Name of exception that caused an error")
     error: Optional[str] = Field(default=None, description="Traceback of the exception that caused an error")
+
+    @field_serializer("dest", "download_path")
+    def _serialize_path(self, path: Optional[Path]) -> Optional[str]:
+        """Emit paths with forward slashes so the wire format does not depend on the server's OS.
+
+        `str(WindowsPath("models/x.bin"))` is `models\\x.bin`, so without this a client that
+        submits a POSIX-style `dest` gets a different spelling back from a Windows host than
+        from a Linux one. The download events already normalise this way - see
+        `DownloadStartedEvent.build` in `events_common.py`.
+        """
+        return path.as_posix() if path is not None else None
 
     # internal flag
     _cancelled: bool = PrivateAttr(default=False)

@@ -1,3 +1,6 @@
+import gc
+import weakref
+
 import pytest
 import torch
 
@@ -41,6 +44,125 @@ class DummyModuleWithNestedLayer(torch.nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.block(self.top_layer(x))
+
+
+def test_apply_smart_model_patches_retains_patch_cache_handle_for_context_lifetime():
+    """A loaded-model handle must pin each patch's cache record until patch use is complete."""
+
+    class CacheHandle:
+        is_entered = False
+
+        def __enter__(self):
+            self.is_entered = True
+            return self
+
+        def __exit__(self, *args):
+            self.is_entered = False
+            return None
+
+    handle_ref: weakref.ReferenceType[CacheHandle] | None = None
+
+    def patch_specs():
+        nonlocal handle_ref
+        handle = CacheHandle()
+        handle_ref = weakref.ref(handle)
+        yield (ModelPatchRaw({}), 0.0, handle)
+        assert handle.is_entered
+
+    model = DummyModuleWithOneLayer(1, 1, device="cpu", dtype=torch.float32)
+    with LayerPatcher.apply_smart_model_patches(model=model, patches=patch_specs(), prefix="", dtype=torch.float32):
+        gc.collect()
+        assert handle_ref is not None and handle_ref() is not None
+
+    gc.collect()
+    assert handle_ref is not None and handle_ref() is None
+
+
+class _PinTracker:
+    """A stand-in for the model_in_ram() context manager carried in a 3-tuple patch spec."""
+
+    def __init__(self):
+        self.enter_count = 0
+        self.exit_count = 0
+
+    def __enter__(self):
+        self.enter_count += 1
+        return self
+
+    def __exit__(self, *args):
+        self.exit_count += 1
+        return None
+
+
+def test_apply_smart_model_patches_exits_every_pin_on_normal_exit():
+    """Each pin must be entered before patching and exited exactly once when the context closes.
+
+    Regression guard for the `finally: cache_pins.close()` in apply_smart_model_patches: without it,
+    every LoRA cache record stays locked forever and becomes permanently invisible to eviction while
+    still charged to the shared RAM budget. The weakref-based retention test above cannot catch a
+    dropped close() (the pins would be collected silently), so assert the __exit__ calls directly.
+    """
+    pins = [_PinTracker(), _PinTracker()]
+    patches = [(ModelPatchRaw({}), 0.5, pins[0]), (ModelPatchRaw({}), 0.5, pins[1])]
+
+    model = DummyModuleWithOneLayer(1, 1, device="cpu", dtype=torch.float32)
+    with LayerPatcher.apply_smart_model_patches(model=model, patches=iter(patches), prefix="", dtype=torch.float32):
+        assert all(pin.enter_count == 1 and pin.exit_count == 0 for pin in pins)
+
+    assert all(pin.enter_count == 1 and pin.exit_count == 1 for pin in pins)
+
+
+def test_apply_smart_model_patches_exits_every_pin_when_the_body_raises():
+    pin = _PinTracker()
+
+    model = DummyModuleWithOneLayer(1, 1, device="cpu", dtype=torch.float32)
+    with pytest.raises(RuntimeError, match="boom"):
+        with LayerPatcher.apply_smart_model_patches(
+            model=model, patches=iter([(ModelPatchRaw({}), 0.5, pin)]), prefix="", dtype=torch.float32
+        ):
+            raise RuntimeError("boom")
+
+    assert pin.enter_count == 1
+    assert pin.exit_count == 1
+
+
+def test_apply_smart_model_patches_exits_every_pin_when_restoration_raises(monkeypatch):
+    """A failure while restoring patched weights must still release the cache pins."""
+    from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
+
+    pin = _PinTracker()
+
+    def raising_get_changed_weights(self):
+        raise RuntimeError("restore failed")
+
+    monkeypatch.setattr(OriginalWeightsStorage, "get_changed_weights", raising_get_changed_weights)
+
+    model = DummyModuleWithOneLayer(1, 1, device="cpu", dtype=torch.float32)
+    with pytest.raises(RuntimeError, match="restore failed"):
+        with LayerPatcher.apply_smart_model_patches(
+            model=model, patches=iter([(ModelPatchRaw({}), 0.5, pin)]), prefix="", dtype=torch.float32
+        ):
+            pass
+
+    assert pin.enter_count == 1
+    assert pin.exit_count == 1
+
+
+def test_apply_smart_model_patches_unwinds_entered_pins_when_a_later_load_raises():
+    """A producer that fails while loading LoRA B must release LoRA A's already-entered pin."""
+    pin_a = _PinTracker()
+
+    def patch_specs():
+        yield (ModelPatchRaw({}), 0.5, pin_a)
+        raise RuntimeError("load of the second LoRA failed")
+
+    model = DummyModuleWithOneLayer(1, 1, device="cpu", dtype=torch.float32)
+    with pytest.raises(RuntimeError, match="load of the second LoRA failed"):
+        with LayerPatcher.apply_smart_model_patches(model=model, patches=patch_specs(), prefix="", dtype=torch.float32):
+            pass
+
+    assert pin_a.enter_count == 1
+    assert pin_a.exit_count == 1
 
 
 @torch.no_grad()
@@ -415,3 +537,135 @@ def test_apply_smart_model_patches_fp8_weights_force_sidecar():
 
     # After exiting the context, the sidecar patch is cleared.
     assert model.linear_layer_1.get_num_patches() == 0
+
+
+def test_shape_expanding_patch_excludes_concurrent_model_construction():
+    """FLUX Control LoRA shape expansion registers a new nn.Parameter (setattr routes through
+    nn.Module.register_parameter). Model construction on another thread monkey-patches
+    register_parameter process-wide (accelerate's init_empty_weights) so that any registered
+    parameter lands on the meta device. Patch application must therefore hold the
+    MODEL_LOAD_LOCK read lock: it must WAIT for an in-flight construction, or the expanded
+    parameter would be stranded on meta ("Cannot copy out of meta tensor")."""
+    import threading
+
+    from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+    from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlLoRALayer
+
+    small_in_features = 4
+    big_in_features = 8
+    out_features = 16
+    rank = 4
+
+    model = DummyModuleWithOneLayer(small_in_features, out_features, "cpu", torch.float32)
+    layer = FluxControlLoRALayer(
+        up=torch.ones(out_features, rank),
+        mid=None,
+        down=torch.ones(rank, big_in_features),
+        alpha=float(rank),
+        bias=None,
+    )
+    patch = ModelPatchRaw({"linear_layer_1": layer})
+
+    hijack_installed = threading.Event()
+    release_construction = threading.Event()
+    original_register_parameter = torch.nn.Module.register_parameter
+
+    def hijacking_register_parameter(module: torch.nn.Module, name: str, param) -> None:
+        # Emulate accelerate.init_empty_weights: while the construction patch is installed, ANY
+        # registered parameter is rerouted to the meta device.
+        if param is not None:
+            param = torch.nn.Parameter(param.to("meta"), requires_grad=param.requires_grad)
+        original_register_parameter(module, name, param)
+
+    def construct_model() -> None:
+        with MODEL_LOAD_LOCK.write_lock():
+            torch.nn.Module.register_parameter = hijacking_register_parameter
+            try:
+                hijack_installed.set()
+                release_construction.wait(timeout=30)
+            finally:
+                torch.nn.Module.register_parameter = original_register_parameter
+
+    result: dict[str, object] = {}
+
+    def apply_patch() -> None:
+        with LayerPatcher.apply_smart_model_patches(
+            model=model, patches=[(patch, 1.0)], prefix="", dtype=torch.float32, force_direct_patching=True
+        ):
+            result["device"] = model.linear_layer_1.weight.device.type
+            result["shape"] = tuple(model.linear_layer_1.weight.shape)
+
+    constructor = threading.Thread(target=construct_model)
+    patcher = threading.Thread(target=apply_patch)
+    try:
+        constructor.start()
+        assert hijack_installed.wait(timeout=10)
+        patcher.start()
+        # The patcher must block behind the construction's write lock (if it ran now, the hijack
+        # would strand its expanded parameter on meta).
+        patcher.join(timeout=0.5)
+        assert patcher.is_alive(), "patch application must wait for an in-flight model construction"
+    finally:
+        release_construction.set()
+        constructor.join(timeout=10)
+        patcher.join(timeout=10)
+
+    assert not patcher.is_alive()
+    assert result["device"] == "cpu"
+    assert result["shape"] == (out_features, big_in_features)
+
+
+def test_lazy_patch_iterator_that_constructs_a_model_does_not_deadlock():
+    """Regression test for a self-deadlock on cold-cache LoRA patching.
+
+    Callers pass ``patches`` as a lazy generator that constructs each LoRA on demand
+    (e.g. flux_text_encoder._t5_lora_iterator -> context.models.load()); a cold-cache
+    construction takes MODEL_LOAD_LOCK.write_lock(). MODEL_LOAD_LOCK is a non-reentrant,
+    write-preferring readers-writer lock, so consuming such a generator *while the patcher
+    holds the read lock* would deadlock (the write acquire waits for readers==0, but the
+    consuming thread is that reader). apply_smart_model_patches must therefore materialize
+    the iterable before taking the read lock. This test simulates a LoRA load by acquiring
+    (and releasing) the write lock during iteration; it must complete, not hang.
+    """
+    import threading
+
+    from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
+
+    in_features = 4
+    out_features = 16
+    rank = 4
+
+    model = DummyModuleWithOneLayer(in_features, out_features, "cpu", torch.float32)
+    layer = LoRALayer(
+        up=torch.ones(out_features, rank),
+        mid=None,
+        down=torch.ones(rank, in_features),
+        alpha=float(rank),
+        bias=None,
+    )
+    patch = ModelPatchRaw({"linear_layer_1": layer})
+
+    def lazy_patch_iterator():
+        # Emulate a cold-cache model construction (context.models.load) that grabs the write lock
+        # before the patch tuple is available.
+        with MODEL_LOAD_LOCK.write_lock():
+            pass
+        yield (patch, 1.0)
+
+    result: dict[str, object] = {}
+
+    def apply_patch() -> None:
+        with LayerPatcher.apply_smart_model_patches(
+            model=model,
+            patches=lazy_patch_iterator(),
+            prefix="",
+            dtype=torch.float32,
+            force_direct_patching=True,
+        ):
+            result["done"] = True
+
+    patcher = threading.Thread(target=apply_patch)
+    patcher.start()
+    patcher.join(timeout=10)
+    assert not patcher.is_alive(), "patching a lazily-constructed LoRA must not deadlock on MODEL_LOAD_LOCK"
+    assert result.get("done") is True

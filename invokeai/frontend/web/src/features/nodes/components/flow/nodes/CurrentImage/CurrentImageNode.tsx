@@ -6,6 +6,7 @@ import { IAINoContentFallback } from 'common/components/IAIImageFallback';
 import { DndImage } from 'features/dnd/DndImage';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
+import { isVideoName } from 'features/gallery/store/types';
 import NonInvocationNodeWrapper from 'features/nodes/components/flow/nodes/common/NonInvocationNodeWrapper';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import type { AnimationProps } from 'framer-motion';
@@ -19,7 +20,12 @@ import { $lastProgressEvent } from 'services/events/stores';
 const CurrentImageNode = (props: NodeProps) => {
   const lastSelectedItem = useAppSelector(selectLastSelectedItem);
   const lastProgressEvent = useStore($lastProgressEvent);
-  const imageDTO = useImageDTO(lastSelectedItem);
+  // Pass a real name only when the selection is an image. Videos use the polymorphic
+  // gallery and would otherwise trigger GET /api/v1/images/i/<uuid>.mp4 — which 404s
+  // and emits a noisy "Image record not found" backend log every time a video is
+  // clicked in the gallery while a Current Image node is in the workflow.
+  const imageName = lastSelectedItem && !isVideoName(lastSelectedItem) ? lastSelectedItem : null;
+  const imageDTO = useImageDTO(imageName);
 
   if (lastProgressEvent?.image) {
     return (

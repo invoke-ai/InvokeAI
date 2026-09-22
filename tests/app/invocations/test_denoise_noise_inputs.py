@@ -9,7 +9,11 @@ from invokeai.app.invocations.anima_denoise import AnimaDenoiseInvocation
 from invokeai.app.invocations.cogview4_denoise import CogView4DenoiseInvocation
 from invokeai.app.invocations.flux2_denoise import Flux2DenoiseInvocation
 from invokeai.app.invocations.flux_denoise import FluxDenoiseInvocation
-from invokeai.app.invocations.metadata_linked import FluxDenoiseLatentsMetaInvocation, ZImageDenoiseMetaInvocation
+from invokeai.app.invocations.metadata_linked import (
+    DenoiseLatentsMetaInvocation,
+    FluxDenoiseLatentsMetaInvocation,
+    ZImageDenoiseMetaInvocation,
+)
 from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd3_denoise import SD3DenoiseInvocation
 from invokeai.app.invocations.z_image_denoise import ZImageDenoiseInvocation
@@ -390,6 +394,36 @@ def test_z_image_metadata_ignores_external_noise_seed_when_noise_not_used():
         result = invocation.invoke(mock_context)
 
     assert result.metadata.root["seed"] == 999
+
+
+def test_denoise_metadata_persists_hidiffusion_fields_when_disabled():
+    invocation = DenoiseLatentsMetaInvocation.model_construct(
+        width=64,
+        height=64,
+        steps=10,
+        cfg_scale=7.5,
+        cfg_rescale_multiplier=0,
+        denoising_start=0.0,
+        denoising_end=1.0,
+        scheduler="euler",
+        unet=SimpleNamespace(unet="main-model", loras=[]),
+        hidiffusion=False,
+        hidiffusion_raunet=False,
+        hidiffusion_window_attn=False,
+        hidiffusion_t1_ratio=0.25,
+        hidiffusion_t2_ratio=0.1,
+    )
+    mock_context = MagicMock()
+    output = LatentsOutput.build("latents", torch.zeros(1, 4, 8, 8), seed=None)
+
+    with patch("invokeai.app.invocations.metadata_linked.DenoiseLatentsInvocation.invoke", return_value=output):
+        result = invocation.invoke(mock_context)
+
+    assert result.metadata.root["hidiffusion"] is False
+    assert result.metadata.root["hidiffusion_raunet"] is False
+    assert result.metadata.root["hidiffusion_window_attn"] is False
+    assert result.metadata.root["hidiffusion_t1_ratio"] == 0.25
+    assert result.metadata.root["hidiffusion_t2_ratio"] == 0.1
 
 
 def _get_first_scheduler_sigma(

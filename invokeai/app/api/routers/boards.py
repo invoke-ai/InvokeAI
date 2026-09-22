@@ -22,6 +22,22 @@ class DeleteBoardResult(BaseModel):
         description="The image names of the board-images relationships that were deleted."
     )
     deleted_images: list[str] = Field(description="The names of the images that were deleted.")
+    deleted_board_videos: list[str] = Field(
+        default_factory=list,
+        description="The video names of the board-videos relationships that were deleted.",
+    )
+    deleted_videos: list[str] = Field(
+        default_factory=list,
+        description="The names of the videos that were deleted.",
+    )
+    failed_images: list[str] = Field(
+        default_factory=list,
+        description="The names of images that could not be deleted and became uncategorized.",
+    )
+    failed_videos: list[str] = Field(
+        default_factory=list,
+        description="The names of videos that could not be deleted and became uncategorized.",
+    )
 
 
 @boards_router.post(
@@ -33,7 +49,7 @@ class DeleteBoardResult(BaseModel):
     status_code=201,
     response_model=BoardDTO,
 )
-async def create_board(
+def create_board(
     current_user: CurrentUserOrDefault,
     board_name: str = Query(description="The name of the board to create", max_length=300),
 ) -> BoardDTO:
@@ -46,7 +62,7 @@ async def create_board(
 
 
 @boards_router.get("/{board_id}", operation_id="get_board", response_model=BoardDTO)
-async def get_board(
+def get_board(
     current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of board to get"),
 ) -> BoardDTO:
@@ -81,7 +97,7 @@ async def get_board(
     status_code=201,
     response_model=BoardDTO,
 )
-async def update_board(
+def update_board(
     current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of board to update"),
     changes: BoardChanges = Body(description="The changes to apply to the board"),
@@ -103,10 +119,12 @@ async def update_board(
 
 
 @boards_router.delete("/{board_id}", operation_id="delete_board", response_model=DeleteBoardResult)
-async def delete_board(
+def delete_board(
     current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of board to delete"),
-    include_images: Optional[bool] = Query(description="Permanently delete all images on the board", default=False),
+    include_images: Optional[bool] = Query(
+        description="Permanently delete all images and videos on the board", default=False
+    ),
 ) -> DeleteBoardResult:
     """Deletes a board (user must have access to it)"""
     try:
@@ -117,20 +135,37 @@ async def delete_board(
     if not current_user.is_admin and board.user_id != current_user.user_id:
         raise HTTPException(status_code=403, detail="Not authorized to delete this board")
 
+    # Admins delete everything on the board; regular owners only delete their own
+    # contributions so that contributions from other users to a public/shared board
+    # are preserved (they cascade to "uncategorized" via FK on board_videos / board_images).
+    cascade_user_id: Optional[str] = None if current_user.is_admin else current_user.user_id
+    deleted_images: list[str] = []
+    deleted_videos: list[str] = []
+
     try:
         if include_images is True:
             assert_image_move_maintenance_inactive()
-            deleted_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
-                board_id=board_id,
-                categories=None,
-                is_intermediate=None,
+            # The services report both outcomes: records whose file delete failed are
+            # preserved (they cascade to "uncategorized" via the board FKs when the
+            # board is deleted below) and returned as failures. This is the ground
+            # truth — reconstructing failures by diffing a router-side board listing
+            # against the deleted names would double the DB work and misreport items
+            # moved or deleted concurrently between the two queries.
+            deleted_images, failed_images = ApiDependencies.invoker.services.images.delete_images_on_board(
+                board_id=board_id, user_id=cascade_user_id
             )
-            ApiDependencies.invoker.services.images.delete_images_on_board(board_id=board_id)
+            deleted_videos, failed_videos = ApiDependencies.invoker.services.videos.delete_videos_on_board(
+                board_id=board_id, user_id=cascade_user_id
+            )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,
                 deleted_board_images=[],
                 deleted_images=deleted_images,
+                deleted_board_videos=[],
+                deleted_videos=deleted_videos,
+                failed_images=failed_images,
+                failed_videos=failed_videos,
             )
         else:
             deleted_board_images = ApiDependencies.invoker.services.board_images.get_all_board_image_names_for_board(
@@ -138,15 +173,34 @@ async def delete_board(
                 categories=None,
                 is_intermediate=None,
             )
+            deleted_board_videos = (
+                ApiDependencies.invoker.services.board_video_records.get_all_board_video_names_for_board(
+                    board_id=board_id,
+                    categories=None,
+                    is_intermediate=None,
+                )
+            )
             ApiDependencies.invoker.services.boards.delete(board_id=board_id)
             return DeleteBoardResult(
                 board_id=board_id,
                 deleted_board_images=deleted_board_images,
                 deleted_images=[],
+                deleted_board_videos=deleted_board_videos,
+                deleted_videos=[],
             )
     except HTTPException:
         raise
     except Exception:
+        if include_images is True:
+            raise HTTPException(
+                status_code=500,
+                detail={
+                    "message": "Failed to delete board after partially deleting media",
+                    "deleted_images": deleted_images,
+                    "deleted_videos": deleted_videos,
+                    "board_deleted": False,
+                },
+            )
         raise HTTPException(status_code=500, detail="Failed to delete board")
 
 
@@ -155,7 +209,7 @@ async def delete_board(
     operation_id="list_boards",
     response_model=Union[OffsetPaginatedResults[BoardDTO], list[BoardDTO]],
 )
-async def list_boards(
+def list_boards(
     current_user: CurrentUserOrDefault,
     order_by: BoardRecordOrderBy = Query(default=BoardRecordOrderBy.CreatedAt, description="The attribute to order by"),
     direction: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The direction to order by"),
@@ -185,7 +239,7 @@ async def list_boards(
     operation_id="list_all_board_image_names",
     response_model=list[str],
 )
-async def list_all_board_image_names(
+def list_all_board_image_names(
     current_user: CurrentUserOrDefault,
     board_id: str = Path(description="The id of the board or 'none' for uncategorized images"),
     categories: list[ImageCategory] | None = Query(default=None, description="The categories of image to include."),
