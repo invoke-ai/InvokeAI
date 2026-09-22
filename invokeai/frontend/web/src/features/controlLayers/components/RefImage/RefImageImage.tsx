@@ -21,6 +21,7 @@ import { useTranslation } from 'react-i18next';
 import { PiArrowCounterClockwiseBold, PiCropBold, PiRulerBold } from 'react-icons/pi';
 import { useGetImageDTOQuery, useUploadImageMutation } from 'services/api/endpoints/images';
 import type { ImageDTO } from 'services/api/types';
+import { isImageMissingError } from 'services/api/util/imageErrors';
 import { $isConnected } from 'services/events/stores';
 
 type Props<T extends typeof setGlobalReferenceImageDndTarget | typeof setRegionalGuidanceReferenceImageDndTarget> = {
@@ -56,10 +57,20 @@ export const RefImageImage = memo(
     }, [onChangeImage]);
 
     useEffect(() => {
-      if ((isConnected && croppedImageDTOReq.isError) || originalImageDTOReq.isError) {
+      // Cleared only on a confirmed 404. A 403 is a permission decision that can be
+      // reversed — a board flipped back to Shared — and the image behind it still
+      // exists; a 5xx or a dropped connection says nothing at all. Dropping the
+      // reference is silent and has no undo. See `isImageMissingError`.
+      // Both arms wait for the connection, where the original's used to clear regardless. The
+      // two images belong to one reference and there is no reading under which losing the crop
+      // is more suspect than losing the original.
+      if (
+        isConnected &&
+        (isImageMissingError(croppedImageDTOReq.error) || isImageMissingError(originalImageDTOReq.error))
+      ) {
         handleResetControlImage();
       }
-    }, [handleResetControlImage, isConnected, croppedImageDTOReq.isError, originalImageDTOReq.isError]);
+    }, [handleResetControlImage, isConnected, croppedImageDTOReq.error, originalImageDTOReq.error]);
 
     const onUpload = useCallback(
       (imageDTO: ImageDTO) => {

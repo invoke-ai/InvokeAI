@@ -12,7 +12,7 @@ import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { CanvasState, RefImagesState } from 'features/controlLayers/store/types';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
-import { imageSelected } from 'features/gallery/store/gallerySlice';
+import { imageSelected, selectionChanged } from 'features/gallery/store/gallerySlice';
 import {
   pickSelectionAfterDelete,
   selectCachedGalleryItemNames,
@@ -107,7 +107,26 @@ export const handleDeletions = async (image_names: string[], store: AppStore) =>
         // video displayed while images were deleted, or a hover-delete of another item)
         // or its own delete failed. Keep viewing it and just prune the deleted items
         // from the multi-selection.
-        dispatch(imageSelected(lastSelected));
+        //
+        // This is a mutation, not a pick. `imageSelected` would leave the same state in the
+        // ordinary case, but it is the action that means "the user asked to see this" — and
+        // while a generation is running the viewer answers that by lifting the progress
+        // overlay off the item for a couple of seconds. Deleting some *other* item is not a
+        // request to look at the one already on screen. See gallerySelectionSource.
+        //
+        // Filtered from the *live* selection rather than collapsed onto the pre-await
+        // snapshot: the user can select something else while the delete is in flight, and
+        // collapsing would both discard that and move the active item — which publishes as
+        // a change of active item and reveals anyway, the very flash this avoids.
+        //
+        // The fallback (everything they had selected meanwhile was deleted) does not get
+        // that guarantee: `lastSelected` is not in the live selection at all there, so it
+        // moves the active item and does reveal — and `deletedNames` only proves it outlived
+        // *this* request, so a second delete overlapping this one can leave it pointing at
+        // an item that is already gone. Both are pre-existing and want the advance branch's
+        // neighbour search, which cannot run off these pre-await snapshots.
+        const survivors = getState().gallery.selection.filter((name) => !deletedNames.has(name));
+        dispatch(selectionChanged(survivors.length > 0 ? survivors : [lastSelected]));
       } else {
         // Advance to a still-living neighbour (prev > next) so the Viewer keeps a real
         // selection. May pick a video — the polymorphic list intentionally allows that.

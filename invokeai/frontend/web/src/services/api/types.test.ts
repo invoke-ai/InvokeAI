@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import type { MainModelConfig } from './types';
 import {
+  isAnimaCompatibleVAEModelConfig,
+  isAnimaVAEModelConfig,
   isFlux2DiffusersMainModelConfig,
   isWanLowNoisePartnerOption,
   isZImageDiffusersMainModelConfig,
@@ -30,6 +32,82 @@ describe('SDNQ pipeline model predicates', () => {
     ['z-image', isZImageDiffusersMainModelConfig],
   ] as const)('rejects a pipeline with no transformer submodel', (base, predicate) => {
     expect(predicate(partialConfig(base, { vae: {}, text_encoder: {}, tokenizer: {} }) as never)).toBe(false);
+  });
+});
+
+// The Anima loader accepts a FLUX VAE and a 16-channel Wan VAE beside the Wan/QwenImage one, but Krea-2
+// draws its own VAE pool from the base-driven `isAnimaVAEModelConfig` and must not be offered either.
+// The two predicates must therefore stay distinct - collapsing them would widen Krea-2's picker as a
+// side effect.
+describe('Anima VAE predicates', () => {
+  const vae = (base: string, over: Record<string, unknown> = {}) =>
+    ({ key: `${base}-vae`, type: 'vae', base, name: `${base} vae`, ...over }) as never;
+
+  it('accepts an Anima VAE in both predicates', () => {
+    expect(isAnimaVAEModelConfig(vae('anima'))).toBe(true);
+    expect(isAnimaCompatibleVAEModelConfig(vae('anima'))).toBe(true);
+  });
+
+  it('accepts a FLUX VAE only as Anima-compatible, not as an Anima-base VAE', () => {
+    expect(isAnimaVAEModelConfig(vae('flux'))).toBe(false);
+    expect(isAnimaCompatibleVAEModelConfig(vae('flux'))).toBe(true);
+  });
+
+  // Anima's transformer works in a 16-channel latent space, which the A14B Wan VAE provides. The
+  // 48-channel Wan2.2-VAE (TI2V-5B) is the same AutoencoderKLWan class but a different latent space.
+  it('accepts a 16-channel Wan VAE as Anima-compatible', () => {
+    expect(isAnimaCompatibleVAEModelConfig(vae('wan', { latent_channels: 16 }))).toBe(true);
+    expect(isAnimaVAEModelConfig(vae('wan', { latent_channels: 16 }))).toBe(false);
+  });
+
+  it('rejects a 48-channel Wan VAE', () => {
+    expect(isAnimaCompatibleVAEModelConfig(vae('wan', { latent_channels: 48 }))).toBe(false);
+  });
+
+  // A main model's bundled `vae` submodel carries no `latent_channels`, so its geometry is unverifiable.
+  it('rejects a Wan VAE whose latent channel count is unknown', () => {
+    expect(isAnimaCompatibleVAEModelConfig(vae('wan'))).toBe(false);
+  });
+
+  it.each(['flux2', 'qwen-image', 'sdxl'])('rejects a %s VAE in both predicates', (base) => {
+    expect(isAnimaVAEModelConfig(vae(base))).toBe(false);
+    expect(isAnimaCompatibleVAEModelConfig(vae(base))).toBe(false);
+  });
+
+  // Every VAE picker is built from one of these guards called with a *single* argument, so main models
+  // with a bundled `vae` submodel are part of each slot's domain. The `excludeSubmodels` parameter is
+  // what distinguishes that from a geometry check the submodel cannot answer - see the Wan arm below.
+  describe('main-model VAE submodels', () => {
+    const mainWithVae = (base: string) =>
+      ({ key: `${base}-main`, type: 'main', base, name: `${base} main`, submodels: { vae: {} } }) as never;
+
+    it('accepts a FLUX main-model VAE submodel unless submodels are excluded', () => {
+      expect(isAnimaCompatibleVAEModelConfig(mainWithVae('flux'))).toBe(true);
+      expect(isAnimaCompatibleVAEModelConfig(mainWithVae('flux'), true)).toBe(false);
+    });
+
+    it('accepts an Anima main-model VAE submodel unless submodels are excluded', () => {
+      expect(isAnimaVAEModelConfig(mainWithVae('anima'))).toBe(true);
+      expect(isAnimaVAEModelConfig(mainWithVae('anima'), true)).toBe(false);
+      expect(isAnimaCompatibleVAEModelConfig(mainWithVae('anima'))).toBe(true);
+    });
+
+    // A bundled submodel carries no `latent_channels`, so a Wan main model can never clear the geometry
+    // check - regardless of what is passed for `excludeSubmodels`.
+    it('never accepts a Wan main-model VAE submodel', () => {
+      expect(isAnimaCompatibleVAEModelConfig(mainWithVae('wan'))).toBe(false);
+      expect(isAnimaCompatibleVAEModelConfig(mainWithVae('wan'), true)).toBe(false);
+    });
+
+    // Point-free `.filter(guard)` would hand these guards the array *index* as `excludeSubmodels`.
+    // TypeScript rejects that at this call site, but not inside `buildModelsSelector`, whose generic
+    // signature declares the guard as single-parameter - see modelsByType.test.ts for that coverage.
+    it('changes its verdict based on the second argument', () => {
+      const config = mainWithVae('flux');
+
+      expect(isAnimaCompatibleVAEModelConfig(config, false)).toBe(true);
+      expect(isAnimaCompatibleVAEModelConfig(config, true)).toBe(false);
+    });
   });
 });
 

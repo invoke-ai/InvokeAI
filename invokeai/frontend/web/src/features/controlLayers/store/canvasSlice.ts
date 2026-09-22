@@ -5,6 +5,7 @@ import { moveOneToEnd, moveOneToStart, moveToEnd, moveToStart } from 'common/uti
 import { deepClone } from 'common/util/deepClone';
 import { roundDownToMultiple, roundToMultiple } from 'common/util/roundDownToMultiple';
 import { merge } from 'es-toolkit/compat';
+import { logout } from 'features/auth/store/authSlice';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { canvasReset } from 'features/controlLayers/store/actions';
 import { aspectRatioIdChanged, modelChanged, resolutionPresetSelected } from 'features/controlLayers/store/paramsSlice';
@@ -1831,6 +1832,18 @@ const slice = createSlice({
   },
   extraReducers(builder) {
     builder.addCase(canvasReset, (state) => {
+      return resetState(state);
+    });
+    // A deliberate sign-out hands this browser to whoever comes next: the canvas is personal
+    // workspace state, and it is also where deleted-image references live (raster layers,
+    // control layers), so leaving it standing hands the next account both the previous user's
+    // work and, after an aborted cross-user batch delete, references to images that no longer
+    // exist. `sessionExpiredLogout` is deliberately NOT handled — a session timeout must not
+    // destroy work, and the same user's committed deletions are pruned by `handleDeletions`
+    // off the batch's partial result instead. The undo stack is cleared separately: this case
+    // is a cross-slice action the undoable filter keeps out of history without emptying it,
+    // and the store's account-change reducer chains `canvasClearHistory` for it.
+    builder.addCase(logout, (state) => {
       return resetState(state);
     });
     builder.addCase(modelChanged, (state, action) => {

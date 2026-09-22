@@ -14,7 +14,7 @@ import {
   selectSelectedBoardId,
   selectSelection,
 } from 'features/gallery/store/gallerySelectors';
-import { selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
+import { imageSelected, selectGallerySlice, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { selectCachedGalleryItemNames } from 'features/gallery/store/selectCachedGalleryItemNames';
 import { isVideoName } from 'features/gallery/store/types';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -52,7 +52,7 @@ const buildOnClick =
     if (itemNames.length === 0) {
       // Without an ordered list, only basic single-click selection is possible.
       if (!shiftKey && !ctrlKey && !metaKey && !altKey) {
-        dispatch(selectionChanged([videoName]));
+        dispatch(imageSelected(videoName));
       }
       return;
     }
@@ -61,7 +61,7 @@ const buildOnClick =
 
     if (altKey) {
       // Alt-click is image-only (comparison view). Quietly treat as a normal click for videos.
-      dispatch(selectionChanged([videoName]));
+      dispatch(imageSelected(videoName));
     } else if (shiftKey) {
       const lastSelectedItem = selection.at(-1);
       const lastClickedIndex = itemNames.findIndex((name) => name === lastSelectedItem);
@@ -82,7 +82,9 @@ const buildOnClick =
         dispatch(selectionChanged(uniq(selection.concat(videoName))));
       }
     } else {
-      dispatch(selectionChanged([videoName]));
+      // A plain click is a pick of one item, not a mutation of the multi-selection — see the same
+      // branch in GalleryImage for why the gallery selection source depends on the distinction.
+      dispatch(imageSelected(videoName));
     }
   };
 

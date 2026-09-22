@@ -4,7 +4,14 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import { authSliceConfig, currentUserUpdated, externalTokenAdopted, setCredentials, tokenRefreshed } from './authSlice';
+import {
+  authSliceConfig,
+  currentUserUpdated,
+  externalTokenAdopted,
+  getTokenSessionKey,
+  setCredentials,
+  tokenRefreshed,
+} from './authSlice';
 
 const user = {
   user_id: 'user',
@@ -14,15 +21,35 @@ const user = {
   is_active: true,
 };
 
-const tokenFor = (userId: string) =>
-  `header.${Buffer.from(JSON.stringify({ user_id: userId })).toString('base64url')}.signature`;
+const tokenFor = (userId: string, nonce = 0, epoch = 0) =>
+  `header.${Buffer.from(JSON.stringify({ user_id: userId, nonce, token_epoch: epoch })).toString('base64url')}.signature`;
 
 describe('refreshed token consumers', () => {
-  it('updates the Redux token used by socket reconnects', () => {
+  it('updates the Redux token the next request will carry', () => {
     let state = authSliceConfig.slice.reducer(undefined, setCredentials({ token: 'old', user }));
     state = authSliceConfig.slice.reducer(state, tokenRefreshed('new'));
 
     expect(state.token).toBe('new');
+  });
+
+  it('keeps one session key across a refresh, so the socket is not rebuilt for it', () => {
+    // The middleware mints new bytes for the same login on every mutating request. Consumers that
+    // key work to a session — `useSocketIO` — must not see that as a new session.
+    expect(getTokenSessionKey(tokenFor('user', 1))).toBe(getTokenSessionKey(tokenFor('user', 2)));
+    expect(getTokenSessionKey(tokenFor('user', 1))).not.toBe(getTokenSessionKey(tokenFor('other', 1)));
+    expect(getTokenSessionKey(null)).toBeNull();
+  });
+
+  it('changes the session key when a revoked epoch supersedes the token', () => {
+    // A password change bumps the epoch and the server drops every socket authenticated under the
+    // old one; socket.io does not retry that, so the replacement token must count as a new session.
+    expect(getTokenSessionKey(tokenFor('user', 1, 0))).not.toBe(getTokenSessionKey(tokenFor('user', 2, 1)));
+  });
+
+  it('falls back to the token itself when it carries no user id', () => {
+    // Nothing to compare identities with, so byte equality is the only safe answer.
+    expect(getTokenSessionKey('opaque-token')).toBe('opaque-token');
+    expect(getTokenSessionKey('')).toBeNull();
   });
 
   it('clears the previous user when adopting a token from another tab', () => {

@@ -1,6 +1,6 @@
 import { ExternalLink, Flex, Tab, TabList, TabPanel, TabPanels, Tabs, Text } from '@invoke-ai/ui-library';
 import { IAINoContentFallback } from 'common/components/IAIImageFallback';
-import { openMediaInNewTab } from 'features/auth/hooks/useMediaCookieRefresh';
+import { openMediaInNewTab } from 'common/util/openMediaInNewTab';
 import { memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useGetVideoMetadataQuery, useGetVideoWorkflowQuery } from 'services/api/endpoints/videos';

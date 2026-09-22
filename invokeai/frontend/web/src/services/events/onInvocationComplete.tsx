@@ -1,7 +1,7 @@
 import { logger } from 'app/logging/logger';
 import type { AppDispatch, AppGetState } from 'app/store/store';
 import { canvasWorkflowIntegrationProcessingCompleted } from 'features/controlLayers/store/canvasWorkflowIntegrationSlice';
-import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
+import { markNextSelectionAutoSwitched } from 'features/gallery/store/gallerySelectionSource';
 import {
   selectAutoSwitch,
   selectGalleryView,
@@ -283,11 +283,11 @@ export const buildOnInvocationComplete = (
     const { image_name } = lastImageDTO;
     const board_id = lastImageDTO.board_id ?? 'none';
 
-    // Both branches below auto-switch the selection to this image. Record that so the viewer's
-    // reveal effect can tell the handoff apart from a user's gallery click — this dispatch happens
-    // after an async DTO fetch, so it can land after the next generation's first progress event has
+    // Both branches below auto-switch the selection to this image. Mark it so the viewer's reveal
+    // machine can tell the handoff apart from a user's gallery click — this dispatch happens after
+    // an async DTO fetch, so it can land after the next generation's first progress event has
     // already reset $isProgressImageResolving, and timing alone cannot distinguish the two.
-    autoSwitchedImages.record(image_name);
+    markNextSelectionAutoSwitched();
 
     // With optimistic updates, we can immediately switch to the new image
     const selectedBoardId = selectSelectedBoardId(getState());
@@ -453,12 +453,9 @@ export const buildOnInvocationComplete = (
     const { video_name } = lastVideoDTO;
     const board_id = lastVideoDTO.board_id ?? 'none';
 
-    // Both branches below auto-switch the selection to this video. Record that so the viewer's
-    // reveal effect can tell the handoff apart from a user's gallery click — this dispatch happens
-    // after an async DTO fetch, so it can land after the next render's first progress event has
-    // already reset $isProgressImageResolving, and timing alone cannot distinguish the two. The
-    // marker is keyed by gallery item name, which is polymorphic across images and videos.
-    autoSwitchedImages.record(video_name);
+    // Both branches below auto-switch the selection to this video. Same reasoning as the image
+    // path above: the mark is what tells the viewer's reveal machine this is a handoff.
+    markNextSelectionAutoSwitched();
 
     // Selection is a polymorphic string[]; useGalleryItemDTO discriminates by filename extension.
     const selectedBoardId = selectSelectedBoardId(getState());

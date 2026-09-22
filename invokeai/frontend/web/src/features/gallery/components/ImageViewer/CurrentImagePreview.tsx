@@ -7,7 +7,6 @@ import { DndImage } from 'features/dnd/DndImage';
 import ImageMetadataViewer from 'features/gallery/components/ImageMetadataViewer/ImageMetadataViewer';
 import NextPrevItemButtons from 'features/gallery/components/NextPrevItemButtons';
 import { useNextPrevItemNavigation } from 'features/gallery/components/useNextPrevItemNavigation';
-import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
 import { selectLastSelectedItem } from 'features/gallery/store/gallerySelectors';
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { navigationApi } from 'features/ui/layouts/navigation-api';
@@ -21,7 +20,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { memo, useCallback, useEffect, useRef, useState } from 'react';
 import type { ImageDTO } from 'services/api/types';
 
-import { SELECTED_ITEM_MEDIA_GRACE_MS, SELECTED_ITEM_REVEAL_DURATION_MS, useImageViewerContext } from './context';
+import { useImageViewerContext } from './context';
 import { NoContentForViewer } from './NoContentForViewer';
 import { ProgressImage } from './ProgressImage2';
 import { ProgressImageTiles } from './ProgressImageTiles';
@@ -41,7 +40,7 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
     $activeProgressData,
     $isProgressImageResolving,
     $isTemporarilyShowingSelectedImage,
-    lastRenderedItemNameRef,
+    revealMachine,
   } = useImageViewerContext();
   const progressEvent = useStore($progressEvent);
   const progressImage = useStore($progressImage);
@@ -119,14 +118,9 @@ export const CurrentImagePreview = memo(({ imageDTO }: { imageDTO: ImageDTO | nu
   // around it lives in the hook, where it is mounted and tested with real lifecycles. The image
   // path only renders an image once its preload has settled, so whatever is rendered has painted.
   useSelectedItemReveal({
-    lastRenderedItemNameRef,
-    $isTemporarilyShowingSelectedImage,
-    marker: autoSwitchedImages,
-    durationMs: SELECTED_ITEM_REVEAL_DURATION_MS,
-    mediaGraceMs: SELECTED_ITEM_MEDIA_GRACE_MS,
+    revealMachine,
     renderedItemName: imageToRender?.image_name ?? null,
     isMediaReady: imageToRender !== null,
-    selectedItemName: selectedImageName ?? null,
     shouldShowProgressInViewer,
     hasProgressImage,
     isProgressImageResolving,

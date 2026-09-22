@@ -11,6 +11,7 @@ import {
 } from 'services/api/endpoints/models';
 import type { AnyModelConfig, AnyModelConfigWithExternal, MainOrExternalModelConfig } from 'services/api/types';
 import {
+  isAnimaCompatibleVAEModelConfig,
   isAnimaInpaintControlNetModelConfig,
   isAnimaQwen3EncoderModelConfig,
   isAnimaVAEModelConfig,
@@ -24,7 +25,6 @@ import {
   isFlux2VAEModelConfig,
   isFluxKontextModelConfig,
   isFluxReduxModelConfig,
-  isFluxVAEModelConfig,
   isGemma2EncoderModelConfig,
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
@@ -114,6 +114,8 @@ export const useVAEModels = () => buildModelsHook(isVAEModelConfigOrSubmodel)();
 export const useFlux1VAEModels = () => buildModelsHook(isFlux1VAEModelConfig)();
 export const useFlux2VAEModels = () => buildModelsHook(isFlux2VAEModelConfig)();
 export const useAnimaVAEModels = () => buildModelsHook(isAnimaVAEModelConfig)();
+/** The Anima VAE slot itself - wider than `useAnimaVAEModels`, which feeds Krea-2's pool. */
+export const useAnimaCompatibleVAEModels = () => buildModelsHook(isAnimaCompatibleVAEModelConfig)();
 export const useAnimaQwen3EncoderModels = () => buildModelsHook(isAnimaQwen3EncoderModelConfig)();
 export const useAnimaInpaintControlNetModels = () => buildModelsHook(isAnimaInpaintControlNetModelConfig)();
 export const useZImageDiffusersModels = () => buildModelsHook(isZImageDiffusersMainModelConfig)();
@@ -152,10 +154,15 @@ const buildModelsSelector =
       modelConfigsAdapterSelectors.selectAll(missingResult.data ?? { ids: [], entities: {} }).map((m) => m.key)
     );
 
-    return modelConfigsAdapterSelectors
-      .selectAll(result.data)
-      .filter(typeGuard)
-      .filter((config) => !missingModelKeys.has(config.key));
+    return (
+      modelConfigsAdapterSelectors
+        .selectAll(result.data)
+        // Called with exactly one argument on purpose: several guards take an optional `excludeSubmodels`
+        // second parameter, and a point-free `.filter(typeGuard)` would hand them the array *index* - so
+        // the first entry would be evaluated with submodels included and every other one without.
+        .filter((config): config is T => typeGuard(config))
+        .filter((config) => !missingModelKeys.has(config.key))
+    );
   };
 export const selectIPAdapterModels = buildModelsSelector(isIPAdapterModelConfig);
 export const selectGlobalRefImageModels = buildModelsSelector(
@@ -172,8 +179,14 @@ export const selectQwenVLEncoderModels = buildModelsSelector(isQwenVLEncoderMode
 export const selectZImageDiffusersModels = buildModelsSelector(isZImageDiffusersMainModelConfig);
 export const selectFlux2DiffusersModels = buildModelsSelector(isFlux2DiffusersMainModelConfig);
 export const selectFlux2DevDiffusersModels = buildModelsSelector(isFlux2DevDiffusersMainModelConfig);
-export const selectFluxVAEModels = buildModelsSelector(isFluxVAEModelConfig);
+/**
+ * FLUX.1 VAEs only. The `params.fluxVAE` and `params.zImageVaeModel` slots both hold one of these -
+ * their pickers are built from `isFlux1VAEModelConfig`, and neither slot can use a FLUX.2 VAE - so the
+ * listeners that auto-fill them must draw from this pool, not from the wider flux+flux2 one.
+ */
+export const selectFlux1VAEModels = buildModelsSelector(isFlux1VAEModelConfig);
 export const selectAnimaVAEModels = buildModelsSelector(isAnimaVAEModelConfig);
+export const selectAnimaCompatibleVAEModels = buildModelsSelector(isAnimaCompatibleVAEModelConfig);
 export const selectQwen3VLEncoderModels = buildModelsSelector(isQwen3VLEncoderModelConfig);
 export const selectWanDiffusersModels = buildModelsSelector(isWanDiffusersMainModelConfig);
 export const selectWanVAEModels = buildModelsSelector(isWanVAEModelConfig);

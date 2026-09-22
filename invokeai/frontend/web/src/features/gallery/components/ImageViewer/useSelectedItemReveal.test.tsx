@@ -1,17 +1,24 @@
 // @vitest-environment happy-dom
 /**
- * Mounted-DOM coverage for the preview components' reveal wiring. The controller's sequencing has
- * its own unit tests; what only a real mount can verify is the wiring the components rely on —
- * effect ordering, cleanup, StrictMode double-invocation, the image <-> video component swap over
- * the shared ref, and media readiness driven by a real <video> element's event.
+ * Mounted-DOM coverage for the preview components' reveal wiring. The machine's sequencing has its
+ * own unit tests; what only a real mount can verify is the wiring the components rely on — effect
+ * lifecycles, StrictMode double-invocation, the image <-> video component swap over the one shared
+ * machine, and media readiness driven by a real <video> element's event.
  */
-import { createAutoSwitchedSelectionMarker } from 'features/gallery/store/autoSwitchedImages';
+import {
+  $gallerySelection,
+  markNextSelectionAutoSwitched,
+  recordGallerySelection,
+  resetGallerySelectionSource,
+} from 'features/gallery/store/gallerySelectionSource';
 import { atom } from 'nanostores';
 import { act, StrictMode } from 'react';
 import type { Root } from 'react-dom/client';
 import { createRoot } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import type { SelectedItemRevealMachine } from './selectedItemReveal';
+import { createSelectedItemRevealMachine } from './selectedItemReveal';
 import { usePaintedItemName, useSelectedItemReveal } from './useSelectedItemReveal';
 
 declare global {
@@ -22,35 +29,34 @@ globalThis.IS_REACT_ACT_ENVIRONMENT = true;
 const DURATION_MS = 2000;
 const MEDIA_GRACE_MS = 1000;
 
-/** The pieces the viewer context shares between the two preview components. */
-const createSharedContext = () => ({
-  lastRenderedItemNameRef: { current: null as string | null },
-  $isTemporarilyShowingSelectedImage: atom(false),
-  marker: createAutoSwitchedSelectionMarker(),
-});
-
-type Shared = ReturnType<typeof createSharedContext>;
+/** What the viewer context provides: one machine writing one shared flag. */
+const createHarness = () => {
+  const $revealed = atom(false);
+  const machine = createSelectedItemRevealMachine({
+    setRevealed: (revealed) => $revealed.set(revealed),
+    durationMs: DURATION_MS,
+    mediaGraceMs: MEDIA_GRACE_MS,
+  });
+  return { machine, isRevealed: () => $revealed.get() };
+};
 
 const RevealProbe = ({
-  shared,
+  machine,
   itemName,
   isMediaReady = true,
   hasProgressImage = true,
   isProgressImageResolving = false,
 }: {
-  shared: Shared;
+  machine: SelectedItemRevealMachine;
   itemName: string | null;
   isMediaReady?: boolean;
   hasProgressImage?: boolean;
   isProgressImageResolving?: boolean;
 }) => {
   useSelectedItemReveal({
-    ...shared,
-    durationMs: DURATION_MS,
-    mediaGraceMs: MEDIA_GRACE_MS,
+    revealMachine: machine,
     renderedItemName: itemName,
     isMediaReady,
-    selectedItemName: itemName,
     shouldShowProgressInViewer: true,
     hasProgressImage,
     isProgressImageResolving,
@@ -59,15 +65,12 @@ const RevealProbe = ({
 };
 
 /** CurrentVideoPreview's readiness wiring: a real <video> element feeding usePaintedItemName. */
-const VideoProbe = ({ shared, videoName }: { shared: Shared; videoName: string | null }) => {
+const VideoProbe = ({ machine, videoName }: { machine: SelectedItemRevealMachine; videoName: string | null }) => {
   const { isMediaReady, onPainted } = usePaintedItemName(videoName);
   useSelectedItemReveal({
-    ...shared,
-    durationMs: DURATION_MS,
-    mediaGraceMs: MEDIA_GRACE_MS,
+    revealMachine: machine,
     renderedItemName: videoName,
     isMediaReady,
-    selectedItemName: videoName,
     shouldShowProgressInViewer: true,
     hasProgressImage: true,
     isProgressImageResolving: false,
@@ -81,6 +84,7 @@ describe('useSelectedItemReveal (mounted)', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    resetGallerySelectionSource();
     container = document.createElement('div');
     document.body.appendChild(container);
     root = createRoot(container);
@@ -94,160 +98,231 @@ describe('useSelectedItemReveal (mounted)', () => {
     vi.useRealTimers();
   });
 
-  it('reveals a selection change and lowers when the duration elapses', () => {
-    const shared = createSharedContext();
+  /** The user picks an item: publish the selection the way the store listener would. */
+  const select = (itemName: string) => {
     act(() => {
-      root.render(<RevealProbe shared={shared} itemName="a.png" />);
+      recordGallerySelection(itemName);
     });
+  };
+
+  it('reveals a mid-render click and lowers when the duration elapses', () => {
+    const h = createHarness();
     act(() => {
-      root.render(<RevealProbe shared={shared} itemName="b.png" />);
+      root.render(<RevealProbe machine={h.machine} itemName="a.png" />);
     });
-    expect(shared.$isTemporarilyShowingSelectedImage.get()).toBe(true);
+    select('b.png');
+    act(() => {
+      root.render(<RevealProbe machine={h.machine} itemName="b.png" />);
+    });
+    expect(h.isRevealed()).toBe(true);
 
     act(() => {
       vi.advanceTimersByTime(DURATION_MS);
     });
-    expect(shared.$isTemporarilyShowingSelectedImage.get()).toBe(false);
-  });
-
-  it('lowers the flag on unmount and leaves no timer to re-raise it', () => {
-    const shared = createSharedContext();
-    act(() => {
-      root.render(<RevealProbe shared={shared} itemName="a.png" />);
-    });
-    act(() => {
-      root.render(<RevealProbe shared={shared} itemName="b.png" />);
-    });
-    expect(shared.$isTemporarilyShowingSelectedImage.get()).toBe(true);
-
-    act(() => {
-      root.unmount();
-    });
-    expect(shared.$isTemporarilyShowingSelectedImage.get(), 'a reveal must not outlive its component').toBe(false);
-
-    act(() => {
-      vi.advanceTimersByTime(DURATION_MS * 2);
-    });
-    expect(shared.$isTemporarilyShowingSelectedImage.get()).toBe(false);
-    root = createRoot(container); // afterEach unmounts a root; give it a live one
+    expect(h.isRevealed()).toBe(false);
   });
 
   it('survives StrictMode double-invoked effects', () => {
-    const shared = createSharedContext();
+    const h = createHarness();
     act(() => {
       root.render(
         <StrictMode>
-          <RevealProbe shared={shared} itemName="a.png" />
+          <RevealProbe machine={h.machine} itemName="a.png" />
         </StrictMode>
       );
     });
+    select('b.png');
     act(() => {
       root.render(
         <StrictMode>
-          <RevealProbe shared={shared} itemName="b.png" />
+          <RevealProbe machine={h.machine} itemName="b.png" />
         </StrictMode>
       );
     });
-    expect(shared.$isTemporarilyShowingSelectedImage.get(), 'the reveal survives the doubled effects').toBe(true);
+    expect(h.isRevealed(), 'the reveal survives the doubled effects').toBe(true);
   });
 
-  it('carries the reveal across an image -> video component swap', () => {
-    // The two preview components are mutually exclusive; the shared ref is what makes a click that
-    // switches media type read as a selection change. Only a real unmount/mount can test that the
-    // outgoing component's cleanup does not destroy the incoming one's reveal.
-    const shared = createSharedContext();
+  it('keeps one reveal running across an image -> video component swap mid-reveal', () => {
+    // One machine serves both components, so the swap must neither kill the running reveal nor
+    // restart its clock.
+    const h = createHarness();
     act(() => {
-      root.render(<RevealProbe shared={shared} itemName="a.png" />);
+      root.render(<RevealProbe machine={h.machine} itemName="a.png" />);
     });
+    select('b.png');
     act(() => {
-      root.render(<VideoProbe shared={shared} videoName="b.mp4" />);
+      root.render(<RevealProbe machine={h.machine} itemName="b.png" />);
     });
-    expect(shared.$isTemporarilyShowingSelectedImage.get(), 'held for the unpainted video').toBe(false);
+    expect(h.isRevealed()).toBe(true);
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+
+    // The other preview component takes over rendering the same item.
+    act(() => {
+      root.render(<RevealProbe key="video-side" machine={h.machine} itemName="b.png" />);
+    });
+    expect(h.isRevealed(), 'the reveal survives the swap').toBe(true);
+
+    act(() => {
+      vi.advanceTimersByTime(DURATION_MS - 500);
+    });
+    expect(h.isRevealed(), 'and still ends on the original clock').toBe(false);
+  });
+
+  it('holds a video click until a real loadeddata event, then reveals', () => {
+    const h = createHarness();
+    act(() => {
+      root.render(<RevealProbe machine={h.machine} itemName="a.png" />);
+    });
+    select('b.mp4');
+    act(() => {
+      root.render(<VideoProbe machine={h.machine} videoName="b.mp4" />);
+    });
+    expect(h.isRevealed(), 'held for the unpainted video').toBe(false);
 
     const video = container.querySelector('video');
     expect(video).not.toBeNull();
     act(() => {
       video?.dispatchEvent(new Event('loadeddata'));
     });
-    expect(shared.$isTemporarilyShowingSelectedImage.get(), 'revealed once the frame is there').toBe(true);
+    expect(h.isRevealed(), 'revealed once the frame is there').toBe(true);
   });
 
-  it('does not reveal an auto-switched selection', () => {
-    const shared = createSharedContext();
+  it('reveals after the media grace even if loadeddata never fires', () => {
+    const h = createHarness();
     act(() => {
-      root.render(<RevealProbe shared={shared} itemName="a.png" />);
+      root.render(<RevealProbe machine={h.machine} itemName="a.png" />);
     });
-    shared.marker.record('b.png');
-    shared.marker.settle('b.png');
+    select('never-loads.mp4');
     act(() => {
-      root.render(<RevealProbe shared={shared} itemName="b.png" />);
+      root.render(<VideoProbe machine={h.machine} videoName="never-loads.mp4" />);
     });
-    expect(shared.$isTemporarilyShowingSelectedImage.get()).toBe(false);
-  });
-
-  it('reveals an unpainted video after the media grace even if loadeddata never fires', () => {
-    const shared = createSharedContext();
-    act(() => {
-      root.render(<RevealProbe shared={shared} itemName="a.png" />);
-    });
-    act(() => {
-      root.render(<VideoProbe shared={shared} videoName="never-loads.mp4" />);
-    });
-    expect(shared.$isTemporarilyShowingSelectedImage.get()).toBe(false);
+    expect(h.isRevealed()).toBe(false);
     act(() => {
       vi.advanceTimersByTime(MEDIA_GRACE_MS);
     });
-    expect(shared.$isTemporarilyShowingSelectedImage.get(), 'the click still lands').toBe(true);
+    expect(h.isRevealed(), 'the click still lands').toBe(true);
   });
 
   it('resets readiness when the video element is swapped for another video', () => {
     // A stale "painted" from the previous element must not lift the overlay onto the new, black
-    // one — the readiness is compared by name, so the swap cannot inherit it.
-    const shared = createSharedContext();
+    // one — readiness is compared by name, so the swap cannot inherit it.
+    const h = createHarness();
+    select('a.mp4');
     act(() => {
-      root.render(<VideoProbe shared={shared} videoName="a.mp4" />);
+      root.render(<VideoProbe machine={h.machine} videoName="a.mp4" />);
     });
     act(() => {
       container.querySelector('video')?.dispatchEvent(new Event('loadeddata'));
     });
     act(() => {
-      root.render(<VideoProbe shared={shared} videoName="b.mp4" />);
+      vi.advanceTimersByTime(DURATION_MS);
     });
-    expect(shared.$isTemporarilyShowingSelectedImage.get(), 'held: the new element has not painted').toBe(false);
+
+    select('b.mp4');
+    act(() => {
+      root.render(<VideoProbe machine={h.machine} videoName="b.mp4" />);
+    });
+    expect(h.isRevealed(), 'held: the new element has not painted').toBe(false);
     act(() => {
       container.querySelector('video')?.dispatchEvent(new Event('loadeddata'));
     });
-    expect(shared.$isTemporarilyShowingSelectedImage.get()).toBe(true);
+    expect(h.isRevealed()).toBe(true);
   });
 
-  it("does not let the outgoing component's timer cut the incoming reveal short", () => {
-    // Image A is mid-reveal when the user clicks video B. A's controller unmounts with ~1.5s left
-    // on its timer; if the cleanup does not cancel it, that timer fires into the shared flag and
-    // ends B's two seconds early.
-    const shared = createSharedContext();
+  it('does not reveal an auto-switched selection', () => {
+    const h = createHarness();
     act(() => {
-      root.render(<RevealProbe shared={shared} itemName="a.png" />);
+      root.render(<RevealProbe machine={h.machine} itemName="a.png" />);
     });
     act(() => {
-      root.render(<RevealProbe shared={shared} itemName="b.png" />);
+      markNextSelectionAutoSwitched();
+      recordGallerySelection('finished.png');
     });
     act(() => {
-      vi.advanceTimersByTime(500);
+      root.render(<RevealProbe machine={h.machine} itemName="finished.png" />);
     });
-    act(() => {
-      root.render(<RevealProbe shared={shared} itemName="c.png" key="other-component" />);
-    });
-    expect(shared.$isTemporarilyShowingSelectedImage.get()).toBe(true);
+    expect(h.isRevealed()).toBe(false);
+  });
 
-    // Past where the outgoing component's timer would have fired, short of the new reveal's end.
+  it('settles a selection made while neither preview was mounted, instead of replaying it', () => {
+    // Comparison mode unmounts both previews while the provider (and its machine) stays alive; the
+    // provider settles selections through noteSelection. Returning must not fire a reveal for a
+    // click that was already visible when it happened.
+    const h = createHarness();
     act(() => {
-      vi.advanceTimersByTime(DURATION_MS - 400);
+      root.render(<RevealProbe machine={h.machine} itemName="a.png" />);
     });
-    expect(shared.$isTemporarilyShowingSelectedImage.get(), 'the new reveal runs its full duration').toBe(true);
+    act(() => {
+      root.unmount();
+    });
+    root = createRoot(container);
 
     act(() => {
-      vi.advanceTimersByTime(400);
+      recordGallerySelection('picked-while-comparing.png');
+      h.machine.noteSelection($gallerySelection.get());
     });
-    expect(shared.$isTemporarilyShowingSelectedImage.get()).toBe(false);
+
+    act(() => {
+      root.render(<RevealProbe machine={h.machine} itemName="picked-while-comparing.png" />);
+    });
+    expect(h.isRevealed()).toBe(false);
+  });
+
+  it('lowers everything on provider teardown, with no timer left behind', () => {
+    const h = createHarness();
+    act(() => {
+      root.render(<RevealProbe machine={h.machine} itemName="a.png" />);
+    });
+    select('b.png');
+    act(() => {
+      root.render(<RevealProbe machine={h.machine} itemName="b.png" />);
+    });
+    expect(h.isRevealed()).toBe(true);
+
+    act(() => {
+      h.machine.reset();
+    });
+    expect(h.isRevealed()).toBe(false);
+    act(() => {
+      vi.advanceTimersByTime(DURATION_MS * 2);
+    });
+    expect(h.isRevealed()).toBe(false);
+  });
+
+  it('reveals a repeat click on the item already on screen', () => {
+    // Re-picking the displayed item changes no state and no rendered name — only the selection
+    // generation moves. This is the click the previous name-comparison design could never see.
+    const h = createHarness();
+    select('a.png');
+    act(() => {
+      root.render(<RevealProbe machine={h.machine} itemName="a.png" />);
+    });
+    act(() => {
+      vi.advanceTimersByTime(DURATION_MS);
+    });
+    expect(h.isRevealed()).toBe(false);
+
+    select('a.png');
+    expect(h.isRevealed(), 'the repeat click is a new selection and reveals').toBe(true);
+  });
+
+  it('keeps the reveal when the provider settles selections while a preview is mounted', () => {
+    // The provider's subscription calls noteSelection on every selection; while a preview is
+    // attached that must be a no-op, or every selection would be settled before the component's
+    // own sync can classify it — and no click would ever reveal.
+    const h = createHarness();
+    act(() => {
+      root.render(<RevealProbe machine={h.machine} itemName="a.png" />);
+    });
+    act(() => {
+      recordGallerySelection('b.png');
+      h.machine.noteSelection($gallerySelection.get());
+    });
+    act(() => {
+      root.render(<RevealProbe machine={h.machine} itemName="b.png" />);
+    });
+    expect(h.isRevealed(), 'attach makes the provider settle a no-op while mounted').toBe(true);
   });
 });

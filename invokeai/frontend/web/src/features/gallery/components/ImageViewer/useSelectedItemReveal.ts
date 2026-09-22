@@ -1,24 +1,17 @@
-import type { WritableAtom } from 'nanostores';
+import { useStore } from '@nanostores/react';
+import { $gallerySelection } from 'features/gallery/store/gallerySelectionSource';
 import { useCallback, useEffect, useState } from 'react';
 
-import { createSelectedItemRevealController } from './selectedItemReveal';
+import type { SelectedItemRevealMachine } from './selectedItemReveal';
 
 type UseSelectedItemRevealArgs = {
-  /** Shared with the other preview component via the viewer context, so a click that switches
-   * media type still reads as a selection change on both ends. */
-  lastRenderedItemNameRef: { current: string | null };
-  /** The shared overlay-lift flag the progress overlay reads. */
-  $isTemporarilyShowingSelectedImage: WritableAtom<boolean>;
-  /** The auto-switch marker (see features/gallery/store/autoSwitchedImages). */
-  marker: { consume: (itemName: string) => boolean };
-  durationMs: number;
-  mediaGraceMs: number;
+  /** The viewer context's machine. One instance serves both preview components, so a click that
+   * switches media type is just another selection rather than a component swap to reason about. */
+  revealMachine: SelectedItemRevealMachine;
   /** The item the component is rendering right now, or null when it has nothing to show. */
   renderedItemName: string | null;
   /** Whether that item has a frame on screen. See usePaintedItemName. */
   isMediaReady: boolean;
-  /** The item the gallery selection points at, or null when the selection is empty. */
-  selectedItemName: string | null;
   shouldShowProgressInViewer: boolean;
   hasProgressImage: boolean;
   isProgressImageResolving: boolean;
@@ -26,64 +19,46 @@ type UseSelectedItemRevealArgs = {
 
 /**
  * The preview components' reveal wiring, extracted so it can be mounted and tested with real
- * effect lifecycles (see useSelectedItemReveal.test.tsx). The sequencing itself lives in the
- * controller — this hook owns what a component must get right around it:
+ * effect lifecycles (see useSelectedItemReveal.test.tsx). The sequencing lives in the machine —
+ * this hook owns what a component must get right around it:
  *
- * - one controller per mounted component, created once;
- * - `run` on every change of the inputs, with the cleanup cancelling only the timer — the next
- *   run (or the unmount path) owns the revealed flag;
- * - the flag lowered on unmount, so a reveal cannot outlive the component that raised it.
+ * - registering as a live driver while mounted (attach), so selections that land with neither
+ *   preview mounted are settled by the provider instead of replaying as a reveal on return;
+ * - syncing the machine on every change of the inputs, with the current selection descriptor.
+ *
+ * Deliberately nothing else: the machine owns the revealed flag and its timers exclusively —
+ * components lowering the flag on unmount is how a provider-owned machine gets desynced.
  */
 export const useSelectedItemReveal = ({
-  lastRenderedItemNameRef,
-  $isTemporarilyShowingSelectedImage,
-  marker,
-  durationMs,
-  mediaGraceMs,
+  revealMachine,
   renderedItemName,
   isMediaReady,
-  selectedItemName,
   shouldShowProgressInViewer,
   hasProgressImage,
   isProgressImageResolving,
 }: UseSelectedItemRevealArgs): void => {
-  const [revealController] = useState(() =>
-    createSelectedItemRevealController({
-      lastRenderedItemNameRef,
-      marker,
-      setRevealed: (revealed) => $isTemporarilyShowingSelectedImage.set(revealed),
-      durationMs,
-      mediaGraceMs,
-    })
-  );
+  const selection = useStore($gallerySelection);
+
+  useEffect(() => revealMachine.attach(), [revealMachine]);
 
   useEffect(() => {
-    revealController.run({
+    revealMachine.sync({
+      selection,
+      renderedItemName,
+      isMediaReady,
       shouldShowProgressInViewer,
       hasProgressImage,
       isProgressImageResolving,
-      renderedItemName,
-      isMediaReady,
-      selectedItemName,
     });
-    return () => {
-      revealController.clearTimer();
-    };
   }, [
     hasProgressImage,
     isMediaReady,
     isProgressImageResolving,
     renderedItemName,
-    revealController,
-    selectedItemName,
+    revealMachine,
+    selection,
     shouldShowProgressInViewer,
   ]);
-
-  useEffect(() => {
-    return () => {
-      $isTemporarilyShowingSelectedImage.set(false);
-    };
-  }, [$isTemporarilyShowingSelectedImage]);
 };
 
 /**

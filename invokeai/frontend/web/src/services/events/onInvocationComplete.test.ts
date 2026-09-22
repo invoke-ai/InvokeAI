@@ -125,7 +125,11 @@ vi.mock('services/events/stores', () => ({
 // Import AFTER the mocks above are declared (vi.mock is hoisted; explicit ordering here
 // is for the human reader).
 import { logger } from 'app/logging/logger';
-import { autoSwitchedImages } from 'features/gallery/store/autoSwitchedImages';
+import {
+  $gallerySelection,
+  recordGallerySelection,
+  resetGallerySelectionSource,
+} from 'features/gallery/store/gallerySelectionSource';
 import { selectAutoSwitch } from 'features/gallery/store/gallerySelectors';
 import { imageSelected } from 'features/gallery/store/gallerySlice';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
@@ -172,7 +176,7 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     // clearAllMocks resets calls, not implementations — restore the factory default so a test that
     // turns auto-switch on cannot leak it into the next one.
     vi.mocked(selectAutoSwitch).mockReturnValue(false);
-    autoSwitchedImages.settle(null);
+    resetGallerySelectionSource();
   });
 
   it('invalidates GalleryItemNameList + GalleryItemList when an image output completes', async () => {
@@ -350,7 +354,7 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
   it('records a duplicated video completion once, so a later reselection of that video reveals', async () => {
     // The duplicate delivery used to re-run addVideosToGallery in full: a second auto-switch
     // marker record and a second selection dispatch. The dedupe must stop the whole re-run.
-    autoSwitchedImages.settle(null); // the marker is a module singleton; start from empty
+    resetGallerySelectionSource(); // module singleton; start from empty
     vi.mocked(selectAutoSwitch).mockReturnValueOnce(true);
     vi.mocked(getVideoDTOSafe).mockResolvedValueOnce({
       video_name: 'fresh-video.mp4',
@@ -392,14 +396,14 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     expect(getVideoDTOSafe).toHaveBeenCalledTimes(1);
     expect(imageSelected).toHaveBeenCalledTimes(1);
 
-    // The rest of JPPhoto's sequence, against the real marker singleton: the auto-switched video
-    // renders (consume), the user selects another item, then re-selects the video — which must
-    // NOT read as an auto-switch, or the click is dead under the progress overlay.
-    autoSwitchedImages.settle('fresh-video.mp4');
-    expect(autoSwitchedImages.consume('fresh-video.mp4')).toBe(true);
-    autoSwitchedImages.settle('some-other-item.png');
-    autoSwitchedImages.settle('fresh-video.mp4');
-    expect(autoSwitchedImages.consume('fresh-video.mp4')).toBe(false);
+    // The rest of JPPhoto's sequence, against the real selection source: the auto-switched video's
+    // selection carries the mark, and a later re-selection of it does not — so the re-click is a
+    // click, and the viewer reveals it.
+    recordGallerySelection('fresh-video.mp4');
+    expect($gallerySelection.get().isAutoSwitch).toBe(true);
+    recordGallerySelection('some-other-item.png');
+    recordGallerySelection('fresh-video.mp4');
+    expect($gallerySelection.get().isAutoSwitch).toBe(false);
   });
 
   it('lets a re-delivery retry when the first attempt lost its DTO to a transient failure', async () => {
@@ -551,7 +555,7 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
     // tell the handoff from a click, since it lands after the next generation's first progress
     // event has already reset the timing-based guard.
     vi.mocked(selectAutoSwitch).mockReturnValue(true);
-    autoSwitchedImages.settle(null);
+    resetGallerySelectionSource();
 
     const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
     const getState = vi.fn(() => ({}));
@@ -566,12 +570,15 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
 
     await handler(buildImageCompleteEvent());
 
-    expect(autoSwitchedImages.consume('fresh-image.png')).toBe(true);
+    // The mark is spent by the selection the auto-switch dispatches; the mocked gallery slice does
+    // not run the real reducer, so record it the way the source listener would.
+    recordGallerySelection('fresh-image.png');
+    expect($gallerySelection.get()).toMatchObject({ name: 'fresh-image.png', isAutoSwitch: true });
   });
 
   it('does not mark anything when auto-switch is off — nothing is selected to be revealed', async () => {
     vi.mocked(selectAutoSwitch).mockReturnValue(false);
-    autoSwitchedImages.settle(null);
+    resetGallerySelectionSource();
 
     const dispatch = vi.fn(() => ({ unwrap: () => Promise.resolve(undefined) }));
     const getState = vi.fn(() => ({}));
@@ -586,7 +593,8 @@ describe('onInvocationComplete polymorphic gallery cache', () => {
 
     await handler(buildImageCompleteEvent());
 
-    expect(autoSwitchedImages.consume('fresh-image.png')).toBe(false);
+    recordGallerySelection('fresh-image.png');
+    expect($gallerySelection.get().isAutoSwitch).toBe(false);
   });
 
   it('retries only the image half of a mixed result, not the video that landed', async () => {

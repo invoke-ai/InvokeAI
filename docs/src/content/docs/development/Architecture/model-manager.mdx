@@ -755,7 +755,7 @@ Event handlers can be provided to the queue at initialization time as shown in t
 
 `max_parallel_dl` sets the number of simultaneous active downloads that are allowed. The default of five has not been benchmarked in any way, but seems to give acceptable performance.
 
-`requests_session` can be used to provide a `requests` module Session object that will be used to stream remote URLs to disk. This facility was added for use in the module's unit tests to simulate a remote web server, but may be useful in other contexts.
+`requests_session` can be used to provide a `requests` module Session object that will be used to stream remote URLs to disk. This facility is intended for unit tests that simulate a remote web server. A test Session without Invoke's socket-level SSRF guard must also set `requests_session_is_trusted=True`.
 
 `quiet` will prevent the queue from issuing any log messages at the INFO or higher levels.
 
