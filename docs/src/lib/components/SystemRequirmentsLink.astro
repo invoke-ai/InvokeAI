@@ -1,10 +1,18 @@
 ---
 import { LinkCard } from '@astrojs/starlight/components';
-import { withBase } from '../base-path';
+import { localizePath, withBase } from '../base-path';
+
+let locale: string | undefined;
+try {
+  locale = Astro.locals.starlightRoute.locale;
+} catch {
+  // Content is also rendered outside a Starlight route when generating llms-full.txt.
+  locale = undefined;
+}
 ---
 
 <LinkCard
-  title="System Requirements"
-  description="Please check the system requirements page to make sure your hardware is capable of running the desired models."
-  href={withBase('/start-here/system-requirements/', import.meta.env.BASE_URL)}
+  title={Astro.locals.t('systemRequirements.title')}
+  description={Astro.locals.t('systemRequirements.description')}
+  href={withBase(localizePath('/start-here/system-requirements/', locale), import.meta.env.BASE_URL)}
 />

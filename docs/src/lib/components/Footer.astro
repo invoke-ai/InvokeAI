@@ -5,7 +5,7 @@ import PageFooter from '@astrojs/starlight/components/Footer.astro';
 <PageFooter {...Astro.props} />
 
 <div class="built-by">
-  This site was designed and developed by <a
+  {Astro.locals.t('footer.builtBy')} <a
     target="_blank"
     rel="noreferrer noopener"
     href="https://aetherfox.studio">Aether Fox Studio</a
