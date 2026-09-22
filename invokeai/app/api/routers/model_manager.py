@@ -657,6 +657,15 @@ async def update_model_image(
 
     logger = ApiDependencies.invoker.services.logger
     model_images = ApiDependencies.invoker.services.model_images
+
+    # The image is stored in a file named after the key, so a key that names no model would have us write a
+    # stray file - and a key that is not a plain filename would have us write it outside the images folder.
+    # Resolving the record first turns both into a 404 instead.
+    try:
+        ApiDependencies.invoker.services.model_manager.store.get_model(key)
+    except UnknownModelException as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
     # A conversion moves this model's image to the replacement's key when it finishes, so claim
     # the key before reading the upload and hold it until the image is saved.
     with _claim_model_key(key):
@@ -844,6 +853,14 @@ def delete_model_image(
 ) -> None:
     logger = ApiDependencies.invoker.services.logger
     model_images = ApiDependencies.invoker.services.model_images
+
+    # As in the upload: resolve the record first, so a key that names no model - or that is not a plain
+    # filename - is a 404 rather than an attempt to unlink a path built from it.
+    try:
+        ApiDependencies.invoker.services.model_manager.store.get_model(key)
+    except UnknownModelException as e:
+        raise HTTPException(status_code=404, detail=str(e))
+
     # Claimed for the same reason as the upload: a conversion carries this model's image over to
     # the replacement's key, so a delete accepted meanwhile is undone by that copy.
     with _claim_model_key(key):

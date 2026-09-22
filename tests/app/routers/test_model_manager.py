@@ -636,3 +636,52 @@ def test_bulk_reidentify_reports_a_busy_key_instead_of_racing_it(conversion_in_f
     assert [entry["key"] for entry in response.failed] == ["busy-key"]
     assert "already in progress" in response.failed[0]["error"]
     reidentify.assert_called_once_with("free-key")
+
+
+@pytest.mark.parametrize("key", ["no-such-model", "..\\..\\pwned", ".."])
+def test_delete_model_image_404s_for_a_key_that_names_no_model(key: str) -> None:
+    """The stored file is named after the key, so the route has to resolve the record before it touches the
+    filesystem - otherwise an unknown key reaches the storage service and comes back as a 500."""
+    from unittest.mock import MagicMock, patch
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+    from invokeai.app.services.model_records.model_records_base import UnknownModelException
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = MagicMock()
+        deps.invoker.services.model_manager.store.get_model.side_effect = UnknownModelException(key)
+
+        with pytest.raises(HTTPException) as exc_info:
+            model_manager.delete_model_image(MagicMock(), key=key)
+
+        assert exc_info.value.status_code == 404
+        deps.invoker.services.model_images.delete.assert_not_called()
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("key", ["no-such-model", "..\\..\\pwned", ".."])
+async def test_update_model_image_404s_for_a_key_that_names_no_model(key: str) -> None:
+    from unittest.mock import MagicMock, patch
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+    from invokeai.app.services.model_records.model_records_base import UnknownModelException
+
+    image = MagicMock()
+    image.content_type = "image/png"
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = MagicMock()
+        deps.invoker.services.model_manager.store.get_model.side_effect = UnknownModelException(key)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await model_manager.update_model_image(key, image, MagicMock())
+
+        assert exc_info.value.status_code == 404
+        deps.invoker.services.model_images.save.assert_not_called()
+        assert key not in model_manager._CLAIMED_MODEL_KEYS

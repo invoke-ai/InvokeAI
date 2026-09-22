@@ -13,6 +13,7 @@ from pydantic import BaseModel, Field, field_validator
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
+from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelDefaultSettings,
@@ -110,6 +111,18 @@ class ModelRecordChanges(BaseModelExcludeNull):
     base: Optional[BaseModelType] = Field(description="The base model.", default=None)
     type: Optional[ModelType] = Field(description="Type of model", default=None)
     key: Optional[str] = Field(description="Database ID for this model", default=None)
+
+    @field_validator("key")
+    @classmethod
+    def validate_key(cls, v: Optional[str]) -> Optional[str]:
+        # An install request may name the key it wants, and that key is then joined onto the filesystem in two
+        # places - the model's own directory under `models_path` and its cover image under `model_images` - so it
+        # has to be a plain filename. Both joins are individually guarded, but this is where the untrusted value
+        # actually enters.
+        if v is not None and not is_plain_filename(v):
+            raise ValueError("key must not contain path separators")
+        return v
+
     hash: Optional[str] = Field(description="hash of model file", default=None)
     file_size: Optional[int] = Field(description="Size of model file", default=None)
     format: Optional[str] = Field(description="format of model file", default=None)
