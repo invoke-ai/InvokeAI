@@ -80,6 +80,17 @@ _MODEL_KEY_CLAIM_LOCK = threading.Lock()
 _CLAIMED_MODEL_KEYS: set[str] = set()
 
 
+def _claim_token(key: str) -> str:
+    """The form of a key recorded in `_CLAIMED_MODEL_KEYS`.
+
+    A model's cover image is stored as `<key>.webp`, and on a case-insensitive filesystem (the macOS and Windows
+    defaults) `K.webp` and `k.webp` are the same file. Claims are case-folded so that a case variant of a key cannot
+    slip past a claim held on the key itself and touch that file. Two keys that differ only in case would at worst
+    serialize against each other.
+    """
+    return key.casefold()
+
+
 @contextlib.contextmanager
 def _claim_model_key(key: str) -> Generator[None, None, None]:
     """Hold the exclusive claim on one model key, or raise 409 if another request holds it."""
@@ -90,20 +101,21 @@ def _claim_model_key(key: str) -> Generator[None, None, None]:
             status_code=409,
             detail="Another model operation is already in progress. Wait for it to finish and try again.",
         )
+    token = _claim_token(key)
     try:
-        if key in _CLAIMED_MODEL_KEYS:
+        if token in _CLAIMED_MODEL_KEYS:
             raise HTTPException(
                 status_code=409,
                 detail=f"Another operation on model {key} is already in progress. Wait for it to finish and try again.",
             )
-        _CLAIMED_MODEL_KEYS.add(key)
+        _CLAIMED_MODEL_KEYS.add(token)
     finally:
         _MODEL_KEY_CLAIM_LOCK.release()
     try:
         yield
     finally:
         with _MODEL_KEY_CLAIM_LOCK:
-            _CLAIMED_MODEL_KEYS.discard(key)
+            _CLAIMED_MODEL_KEYS.discard(token)
 
 
 @contextlib.contextmanager
@@ -115,17 +127,18 @@ def _install_and_claim_model(
     # request claims so a delete cannot observe the new record before its key is claimed.
     with _MODEL_KEY_CLAIM_LOCK:
         new_key = installer.install_path(model_path, config=config)
-        if new_key in _CLAIMED_MODEL_KEYS:
+        token = _claim_token(new_key)
+        if token in _CLAIMED_MODEL_KEYS:
             raise HTTPException(
                 status_code=409,
                 detail=f"Another operation on model {new_key} is already in progress. Wait for it to finish and try again.",
             )
-        _CLAIMED_MODEL_KEYS.add(new_key)
+        _CLAIMED_MODEL_KEYS.add(token)
     try:
         yield new_key
     finally:
         with _MODEL_KEY_CLAIM_LOCK:
-            _CLAIMED_MODEL_KEYS.discard(new_key)
+            _CLAIMED_MODEL_KEYS.discard(token)
 
 
 # The HF token is process-global state backed by a file in the HF cache. Concurrent writers would
@@ -666,8 +679,10 @@ async def update_model_image(
     with _claim_model_key(key):
         # The image is stored in a file named after the key, so a key that names no model would have us write a
         # stray file - and a key that is not a plain filename would have us write it outside the images folder.
-        # Resolving the record turns both into a 404 instead. It has to happen under the claim: deletion and
-        # conversion claim the key too, so a record seen here cannot vanish before the image is saved.
+        # Resolving the record turns both into a 404 instead. It has to happen under the claim: the delete and
+        # convert routes claim the key too, so they cannot remove the record between this check and the save.
+        # (Removing an external provider's models in `app_info.py` does not take the claim, so that path can
+        # still leave an orphan image - which the image-delete route below can clean up.)
         try:
             ApiDependencies.invoker.services.model_manager.store.get_model(key)
         except UnknownModelException as e:

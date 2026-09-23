@@ -672,7 +672,9 @@ def test_delete_model_image_removes_the_image_of_a_deleted_model(real_model_imag
     assert not image_path.exists()
 
 
-@pytest.mark.parametrize("key", ["no-such-model", "..\\escaped", ".."])
+# `../escaped` is the case that matters on posix: the backslash and `..` shapes are literal (and missing) filenames
+# there, so they would 404 even with no key validation at all.
+@pytest.mark.parametrize("key", ["no-such-model", "../escaped", "..\\escaped", ".."])
 def test_delete_model_image_404s_for_a_missing_image_or_an_unsafe_key(real_model_images, key: str) -> None:
     """A missing image and a key that is not a plain filename are both 404s - not 500s, and never an unlink of a
     path outside the images folder. A file is planted at the traversal target so a missing guard would show."""
@@ -763,3 +765,19 @@ async def test_update_model_image_checks_the_record_while_holding_the_claim() ->
 def test_update_model_image_documents_its_404(client: TestClient) -> None:
     operation = client.get("/openapi.json").json()["paths"]["/api/v2/models/i/{key}/image"]["patch"]
     assert "404" in operation["responses"]
+
+
+def test_a_case_variant_of_a_claimed_key_is_refused() -> None:
+    """Cover images are `<key>.webp`, which is one file for `K` and `k` on a case-insensitive filesystem - so a
+    claim on one must block the other, or an image delete could race a conversion of the same model."""
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+
+    with model_manager._claim_model_key("abc-model"):
+        with pytest.raises(HTTPException) as exc_info:
+            with model_manager._claim_model_key("ABC-Model"):
+                pass
+        assert exc_info.value.status_code == 409
+
+    assert not model_manager._CLAIMED_MODEL_KEYS
