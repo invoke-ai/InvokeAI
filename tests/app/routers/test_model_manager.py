@@ -728,6 +728,49 @@ async def test_update_model_image_404s_for_a_key_that_names_no_model(key: str) -
 
 
 @pytest.mark.anyio
+async def test_update_model_image_404s_for_a_legacy_unsafe_model_key(real_model_images) -> None:
+    """A persisted legacy record can outlive current key validation, but an upload must still return a client error
+    when the storage layer rejects its key instead of surfacing a 500."""
+    from io import BytesIO
+    from unittest.mock import MagicMock, patch
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+
+    key = "../escaped"
+    escaped_image_path = real_model_images._model_images_folder.parent / "escaped.webp"
+    image_bytes = BytesIO()
+    Image.new("RGB", (8, 8)).save(image_bytes, format="PNG")
+    image = MagicMock()
+    image.content_type = "image/png"
+
+    async def read() -> bytes:
+        return image_bytes.getvalue()
+
+    async def run_in_thread(function: Any, *args: Any, **kwargs: Any) -> Any:
+        return function(*args, **kwargs)
+
+    image.read = read
+
+    with (
+        patch.object(model_manager, "ApiDependencies") as deps,
+        patch.object(model_manager.asyncio, "to_thread", run_in_thread),
+    ):
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = real_model_images
+        # Simulate a model record written before unsafe model keys were rejected.
+        deps.invoker.services.model_manager.store.get_model.return_value = MagicMock()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await model_manager.update_model_image(key, image, MagicMock())
+
+    assert exc_info.value.status_code == 404
+    assert not escaped_image_path.exists()
+    assert key not in model_manager._CLAIMED_MODEL_KEYS
+
+
+@pytest.mark.anyio
 async def test_update_model_image_checks_the_record_while_holding_the_claim() -> None:
     """Deletion and conversion claim the key too, so checking the record under the claim is what stops one of them
     from removing the model between the check and the save - which would leave an orphan image behind a 200."""
