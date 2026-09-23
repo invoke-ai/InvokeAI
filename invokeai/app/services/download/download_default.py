@@ -31,7 +31,12 @@ from invokeai.app.services.download.download_base import (
     UnknownJobIDException,
 )
 from invokeai.app.util.misc import get_iso_timestamp
-from invokeai.app.util.ssrf import build_guarded_session, validate_download_url, warn_if_proxied
+from invokeai.app.util.ssrf import (
+    SsrfGuardedAdapter,
+    build_guarded_session,
+    validate_download_url,
+    warn_if_proxied,
+)
 from invokeai.backend.model_manager.metadata import RemoteModelFile
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -51,6 +56,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         app_config: Optional[InvokeAIAppConfig] = None,
         event_bus: Optional["EventServiceBase"] = None,
         requests_session: Optional[requests.sessions.Session] = None,
+        requests_session_is_trusted: bool = False,
     ):
         """
         Initialize DownloadQueue.
@@ -58,6 +64,7 @@ class DownloadQueueService(DownloadQueueServiceBase):
         :param app_config: InvokeAIAppConfig object
         :param max_parallel_dl: Number of simultaneous downloads allowed [5].
         :param requests_session: Optional requests.sessions.Session object, for unit tests.
+        :param requests_session_is_trusted: Accept an unguarded caller-supplied session for unit tests.
         """
         self._app_config = app_config or get_config()
         self._jobs: Dict[int, DownloadJob] = {}
@@ -72,12 +79,21 @@ class DownloadQueueService(DownloadQueueServiceBase):
         self._lock = threading.Lock()
         self._logger = InvokeAILogger.get_logger("DownloadQueueService")
         self._event_bus = event_bus
-        # A caller-supplied session is left exactly as given (the tests inject mock
-        # transports). Sessions we build ourselves refuse to connect to a non-public
-        # address, which is the check that holds against DNS rebinding and against host
-        # spellings that `requests` decodes differently from us.
+        # A caller-supplied session is left exactly as given. Recognize Invoke's guarded
+        # adapter; mock transports require an explicit trust decision while the
+        # private-address policy is enabled.
         self._request_proxies: Optional[Dict[str, str]] = None
         if requests_session is not None:
+            if not self._app_config.allow_private_download_urls and not requests_session_is_trusted:
+                has_ssrf_guard = isinstance(
+                    requests_session.get_adapter("https://example.com"),
+                    SsrfGuardedAdapter,
+                )
+                if not has_ssrf_guard:
+                    raise ValueError(
+                        "An unguarded caller-supplied requests_session bypasses the SSRF socket guard. "
+                        "Pass requests_session_is_trusted=True only for a test session whose destination policy you trust."
+                    )
             self._requests = requests_session
         elif self._app_config.allow_private_download_urls:
             # The operator has opted out of the address policy, so ambient proxy variables

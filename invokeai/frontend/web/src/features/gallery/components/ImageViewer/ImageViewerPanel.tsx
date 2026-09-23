@@ -6,6 +6,7 @@ import { memo } from 'react';
 import { ImageViewerContextProvider } from './context';
 import { ImageComparison } from './ImageComparison';
 import { ImageViewer } from './ImageViewer';
+import { useToggleMetadataHotkey } from './useToggleMetadataHotkey';
 
 const selectIsComparing = createSelector(
   [selectLastSelectedItem, selectImageToCompare],
@@ -13,18 +14,28 @@ const selectIsComparing = createSelector(
 );
 
 export const ImageViewerPanel = memo(() => {
-  const isComparing = useAppSelector(selectIsComparing);
-  const lastSelectedItem = useAppSelector(selectLastSelectedItem);
-
   return (
     <ImageViewerContextProvider>
+      <ImageViewerPanelContent />
+    </ImageViewerContextProvider>
+  );
+});
+ImageViewerPanel.displayName = 'ImageViewerPanel';
+
+const ImageViewerPanelContent = memo(() => {
+  const isComparing = useAppSelector(selectIsComparing);
+  const lastSelectedItem = useAppSelector(selectLastSelectedItem);
+  useToggleMetadataHotkey();
+
+  return (
+    <>
       {
         // The image viewer renders progress images - if no image is selected, show the image viewer anyway
         !isComparing && !lastSelectedItem && <ImageViewer />
       }
       {!isComparing && <ImageViewer />}
       {isComparing && <ImageComparison />}
-    </ImageViewerContextProvider>
+    </>
   );
 });
-ImageViewerPanel.displayName = 'ImageViewerPanel';
+ImageViewerPanelContent.displayName = 'ImageViewerPanelContent';
