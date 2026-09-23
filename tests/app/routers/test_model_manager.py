@@ -4,6 +4,7 @@ from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
@@ -638,27 +639,64 @@ def test_bulk_reidentify_reports_a_busy_key_instead_of_racing_it(conversion_in_f
     reidentify.assert_called_once_with("free-key")
 
 
-@pytest.mark.parametrize("key", ["no-such-model", "..\\..\\pwned", ".."])
-def test_delete_model_image_404s_for_a_key_that_names_no_model(key: str) -> None:
-    """The stored file is named after the key, so the route has to resolve the record before it touches the
-    filesystem - otherwise an unknown key reaches the storage service and comes back as a 500."""
+@pytest.fixture
+def real_model_images(tmp_path: Path):
+    from unittest.mock import MagicMock
+
+    from invokeai.app.services.model_images.model_images_default import ModelImageFileStorageDisk
+
+    storage = ModelImageFileStorageDisk(tmp_path / "model_images")
+    storage.start(MagicMock())
+    return storage
+
+
+def test_delete_model_image_removes_the_image_of_a_deleted_model(real_model_images) -> None:
+    """Deleting a model leaves its cover image behind, and this route is how that orphan is cleaned up - so it must
+    not require the model's record to still exist."""
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers import model_manager
+    from invokeai.app.services.model_records.model_records_base import UnknownModelException
+
+    real_model_images.save(Image.new("RGB", (8, 8)), "deleted-model")
+    image_path = real_model_images.get_path("deleted-model")
+    assert image_path.exists()
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = real_model_images
+        deps.invoker.services.model_manager.store.get_model.side_effect = UnknownModelException("deleted-model")
+
+        model_manager.delete_model_image(MagicMock(), key="deleted-model")
+
+    assert not image_path.exists()
+
+
+@pytest.mark.parametrize("key", ["no-such-model", "..\\escaped", ".."])
+def test_delete_model_image_404s_for_a_missing_image_or_an_unsafe_key(real_model_images, key: str) -> None:
+    """A missing image and a key that is not a plain filename are both 404s - not 500s, and never an unlink of a
+    path outside the images folder. A file is planted at the traversal target so a missing guard would show."""
     from unittest.mock import MagicMock, patch
 
     from starlette.exceptions import HTTPException
 
     from invokeai.app.api.routers import model_manager
-    from invokeai.app.services.model_records.model_records_base import UnknownModelException
+
+    images_dir = real_model_images._model_images_folder
+    images_dir.mkdir(parents=True, exist_ok=True)
+    planted = images_dir.parent / "escaped.webp"
+    planted.write_bytes(b"not yours")
 
     with patch.object(model_manager, "ApiDependencies") as deps:
         deps.invoker.services.logger = MagicMock()
-        deps.invoker.services.model_images = MagicMock()
-        deps.invoker.services.model_manager.store.get_model.side_effect = UnknownModelException(key)
+        deps.invoker.services.model_images = real_model_images
 
         with pytest.raises(HTTPException) as exc_info:
             model_manager.delete_model_image(MagicMock(), key=key)
 
-        assert exc_info.value.status_code == 404
-        deps.invoker.services.model_images.delete.assert_not_called()
+    assert exc_info.value.status_code == 404
+    assert planted.exists()
+    assert key not in model_manager._CLAIMED_MODEL_KEYS
 
 
 @pytest.mark.anyio
@@ -685,3 +723,43 @@ async def test_update_model_image_404s_for_a_key_that_names_no_model(key: str) -
         assert exc_info.value.status_code == 404
         deps.invoker.services.model_images.save.assert_not_called()
         assert key not in model_manager._CLAIMED_MODEL_KEYS
+
+
+@pytest.mark.anyio
+async def test_update_model_image_checks_the_record_while_holding_the_claim() -> None:
+    """Deletion and conversion claim the key too, so checking the record under the claim is what stops one of them
+    from removing the model between the check and the save - which would leave an orphan image behind a 200."""
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers import model_manager
+
+    image = MagicMock()
+    image.content_type = "image/png"
+    claimed_during_lookup: list[bool] = []
+
+    def get_model(key: str) -> MagicMock:
+        claimed_during_lookup.append(key in model_manager._CLAIMED_MODEL_KEYS)
+        return MagicMock()
+
+    async def read() -> bytes:
+        return b"irrelevant"
+
+    image.read = read
+
+    with (
+        patch.object(model_manager, "ApiDependencies") as deps,
+        patch.object(model_manager.Image, "open", return_value=MagicMock()),
+    ):
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = MagicMock()
+        deps.invoker.services.model_manager.store.get_model.side_effect = get_model
+
+        await model_manager.update_model_image("some-model", image, MagicMock())
+
+    assert claimed_during_lookup == [True]
+    deps.invoker.services.model_images.save.assert_called_once()
+
+
+def test_update_model_image_documents_its_404(client: TestClient) -> None:
+    operation = client.get("/openapi.json").json()["paths"]["/api/v2/models/i/{key}/image"]["patch"]
+    assert "404" in operation["responses"]

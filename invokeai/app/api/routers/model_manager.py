@@ -24,7 +24,10 @@ from typing_extensions import Annotated
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
+from invokeai.app.services.model_images.model_images_common import (
+    ModelImageFileDeleteException,
+    ModelImageFileNotFoundException,
+)
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 from invokeai.app.services.model_records import (
     InvalidModelException,
@@ -643,6 +646,7 @@ def get_model_image(
             "description": "The model image was updated successfully",
         },
         400: {"description": "Bad request"},
+        404: {"description": "The model could not be found"},
         409: {"description": "Another operation on this model is already in progress"},
     },
     status_code=200,
@@ -657,18 +661,18 @@ async def update_model_image(
 
     logger = ApiDependencies.invoker.services.logger
     model_images = ApiDependencies.invoker.services.model_images
-
-    # The image is stored in a file named after the key, so a key that names no model would have us write a
-    # stray file - and a key that is not a plain filename would have us write it outside the images folder.
-    # Resolving the record first turns both into a 404 instead.
-    try:
-        ApiDependencies.invoker.services.model_manager.store.get_model(key)
-    except UnknownModelException as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
     # A conversion moves this model's image to the replacement's key when it finishes, so claim
     # the key before reading the upload and hold it until the image is saved.
     with _claim_model_key(key):
+        # The image is stored in a file named after the key, so a key that names no model would have us write a
+        # stray file - and a key that is not a plain filename would have us write it outside the images folder.
+        # Resolving the record turns both into a 404 instead. It has to happen under the claim: deletion and
+        # conversion claim the key too, so a record seen here cannot vanish before the image is saved.
+        try:
+            ApiDependencies.invoker.services.model_manager.store.get_model(key)
+        except UnknownModelException as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
         contents = await image.read()
         try:
             pil_image = await asyncio.to_thread(Image.open, io.BytesIO(contents))
@@ -853,24 +857,20 @@ def delete_model_image(
 ) -> None:
     logger = ApiDependencies.invoker.services.logger
     model_images = ApiDependencies.invoker.services.model_images
-
-    # As in the upload: resolve the record first, so a key that names no model - or that is not a plain
-    # filename - is a 404 rather than an attempt to unlink a path built from it.
-    try:
-        ApiDependencies.invoker.services.model_manager.store.get_model(key)
-    except UnknownModelException as e:
-        raise HTTPException(status_code=404, detail=str(e))
-
     # Claimed for the same reason as the upload: a conversion carries this model's image over to
     # the replacement's key, so a delete accepted meanwhile is undone by that copy.
     with _claim_model_key(key):
+        # Unlike the upload, this does not require the model's record: deleting a model leaves its image
+        # behind, and this route is how that orphan gets cleaned up. The storage service rejects a key that
+        # is not a plain filename, and that - like a missing file - is a 404.
         try:
             model_images.delete(key)
             logger.info(f"Deleted model image: {key}")
             return
-        except UnknownModelException as e:
-            logger.error(str(e))
-            raise HTTPException(status_code=404, detail=str(e))
+        except ModelImageFileDeleteException as e:
+            if isinstance(e.__cause__, ModelImageFileNotFoundException):
+                raise HTTPException(status_code=404, detail=str(e.__cause__))
+            raise
 
 
 @model_manager_router.post(
