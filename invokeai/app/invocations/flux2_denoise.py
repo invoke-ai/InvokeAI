@@ -31,6 +31,7 @@ from invokeai.backend.flux2.denoise import denoise
 from invokeai.backend.flux2.extensions.regional_prompting_extension import Flux2RegionalPromptingExtension
 from invokeai.backend.flux2.ref_image_extension import Flux2RefImageExtension
 from invokeai.backend.flux2.sampling_utils import (
+    FLUX2_TXT2IMG_SCHEDULER_KWARGS,
     compute_empirical_mu,
     generate_img_ids_flux2,
     get_noise_flux2,
@@ -385,9 +386,18 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         # img2img and inpainting step this schedule manually (see the scheduler setup below), while
         # txt2img hands it to the scheduler, which applies the exponential shift from mu itself. Apply
-        # the same shift here so both paths follow one schedule -- and apply it before clipping, so
-        # denoising_start/end select a fraction of the schedule the model is actually run on.
-        uses_manual_euler = self.denoise_mask is not None or self.denoising_start > 1e-5
+        # the same shift here so both paths follow one schedule, and apply it before clipping so the
+        # clip selects from the schedule the model is actually run on. The clip works by sigma value,
+        # not by step count, so shifting first does not change what a given denoising_start means --
+        # it only changes how many steps fall below that sigma.
+        #
+        # Keyed on the same condition that decides whether a scheduler gets built below. Manual Euler
+        # also runs when the requested scheduler is unavailable (e.g. "lcm" when FlowMatchLCMScheduler
+        # cannot be imported); keying on denoise_mask/denoising_start alone would leave that run on the
+        # unshifted linear schedule -- the one this fix exists to avoid.
+        uses_manual_euler = (
+            self.denoise_mask is not None or self.denoising_start > 1e-5 or self.scheduler not in FLUX_SCHEDULER_MAP
+        )
         if uses_manual_euler:
             timesteps = time_shift_flux2(timesteps, mu)
 
@@ -415,10 +425,6 @@ class Flux2DenoiseInvocation(BaseInvocation):
                 raise ValueError("denoising_start should be 0 when initial latents are not provided.")
             assert noise is not None
             x = noise
-
-        # If len(timesteps) == 1, then short-circuit
-        if len(timesteps) <= 1:
-            return x
 
         # Generate image position IDs (FLUX.2 uses 4D coordinates)
         # Position IDs use int64 dtype like diffusers
@@ -450,6 +456,15 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # Verify packed dimensions
         assert packed_h * packed_w == x.shape[1]
 
+        # Nothing left to step (denoising_start == denoising_end, say). Hand the start latents back
+        # through the same denormalization the full path uses. Returning the raw-space blend here
+        # instead would leave the noise term unscaled, so a downstream FLUX.2 denoise that normalizes
+        # this output would divide it by bn_std a second time.
+        if len(timesteps) <= 1:
+            if bn_mean is not None and bn_std is not None:
+                x = self._bn_denormalize(x, bn_mean, bn_std)
+            return unpack_flux2(x.float(), self.height, self.width)
+
         # Prepare inpaint extension
         inpaint_extension: Optional[RectifiedFlowInpaintExtension] = None
         if inpaint_mask_packed is not None:
@@ -474,7 +489,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
         # change the first effective timestep/sigma and break parity with the
         # preblend computed above.
         scheduler = None
-        if self.scheduler in FLUX_SCHEDULER_MAP and not uses_manual_euler:
+        if not uses_manual_euler:
             # Only use scheduler for txt2img - use manual Euler for inpainting to preserve exact timesteps
             scheduler_class = FLUX_SCHEDULER_MAP[self.scheduler]
             # FlowMatchHeunDiscreteScheduler only supports num_train_timesteps and shift parameters
@@ -485,16 +500,7 @@ class Flux2DenoiseInvocation(BaseInvocation):
                     shift=3.0,
                 )
             else:
-                scheduler = scheduler_class(
-                    num_train_timesteps=1000,
-                    shift=3.0,
-                    use_dynamic_shifting=True,
-                    base_shift=0.5,
-                    max_shift=1.15,
-                    base_image_seq_len=256,
-                    max_image_seq_len=4096,
-                    time_shift_type="exponential",
-                )
+                scheduler = scheduler_class(**FLUX2_TXT2IMG_SCHEDULER_KWARGS)
 
         # Prepare reference image extension for FLUX.2 Klein built-in editing
         ref_image_extension = None

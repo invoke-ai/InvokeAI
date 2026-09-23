@@ -107,6 +107,21 @@ def unpack_flux2(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
     )
 
 
+# Config for the scheduler the FLUX.2 txt2img path builds. Shared with the schedule-shift test so the
+# manual shift used by img2img/inpainting is always checked against the scheduler the node actually
+# uses, rather than against a copy that can drift out of sync.
+FLUX2_TXT2IMG_SCHEDULER_KWARGS = {
+    "num_train_timesteps": 1000,
+    "shift": 3.0,
+    "use_dynamic_shifting": True,
+    "base_shift": 0.5,
+    "max_shift": 1.15,
+    "base_image_seq_len": 256,
+    "max_image_seq_len": 4096,
+    "time_shift_type": "exponential",
+}
+
+
 def compute_empirical_mu(image_seq_len: int, num_steps: int) -> float:
     """Compute mu for FLUX.2 schedule shifting.
 

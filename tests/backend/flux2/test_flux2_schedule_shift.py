@@ -11,21 +11,21 @@ import numpy as np
 import pytest
 from diffusers import FlowMatchEulerDiscreteScheduler
 
-from invokeai.backend.flux2.sampling_utils import compute_empirical_mu, get_schedule_flux2, time_shift_flux2
+from invokeai.backend.flux2.sampling_utils import (
+    FLUX2_TXT2IMG_SCHEDULER_KWARGS,
+    compute_empirical_mu,
+    get_schedule_flux2,
+    time_shift_flux2,
+)
 
 
 def _txt2img_scheduler() -> FlowMatchEulerDiscreteScheduler:
-    """The scheduler exactly as Flux2DenoiseInvocation builds it for txt2img."""
-    return FlowMatchEulerDiscreteScheduler(
-        num_train_timesteps=1000,
-        shift=3.0,
-        use_dynamic_shifting=True,
-        base_shift=0.5,
-        max_shift=1.15,
-        base_image_seq_len=256,
-        max_image_seq_len=4096,
-        time_shift_type="exponential",
-    )
+    """The scheduler exactly as Flux2DenoiseInvocation builds it for txt2img.
+
+    Built from the same config the node uses rather than a copy of it, so the two cannot drift apart
+    without this test noticing.
+    """
+    return FlowMatchEulerDiscreteScheduler(**FLUX2_TXT2IMG_SCHEDULER_KWARGS)
 
 
 @pytest.mark.parametrize("num_steps", [4, 9, 20, 30])
