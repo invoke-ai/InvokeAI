@@ -9,7 +9,9 @@ pass the whole suite:
 * shifting unconditionally, which shifts txt2img twice (the scheduler already applies ``mu``);
 * re-normalizing ``noise_packed`` before the inpaint extension is built, bringing back the half of
   the noise-scaling bug that lives in the unmasked region;
-* handing ``_prepare_normalized_start_latents`` a ``t_0`` from the unclipped schedule.
+* handing ``_prepare_normalized_start_latents`` a ``t_0`` from the unclipped schedule;
+* skipping the respacing of the clipped schedule, so img2img at low strength runs one or two steps
+  instead of the requested number and the final Euler jump flattens the source image's detail.
 
 These tests drive the real ``_run_diffusion`` up to the transformer load and assert on what the
 wiring actually produced.
@@ -27,6 +29,7 @@ from invokeai.backend.flux2.sampling_utils import (
     compute_empirical_mu,
     get_schedule_flux2,
     pack_flux2,
+    redensify_schedule_flux2,
     time_shift_flux2,
     unpack_flux2,
 )
@@ -80,7 +83,7 @@ def _drive(
     noise = _latents(7)
     init_latents = _latents(8)
     mask = torch.full_like(noise, 0.5)
-    captured: dict = {"shift_calls": [], "start_kwargs": [], "inpaint": []}
+    captured: dict = {"shift_calls": [], "start_kwargs": [], "inpaint": [], "redensify_calls": []}
 
     transformer_info = MagicMock()
     transformer_info.model_on_device = MagicMock(side_effect=_StopBeforeLoad)
@@ -125,6 +128,13 @@ def _drive(
         captured["shift_calls"].append((list(timesteps), mu))
         return real_shift(timesteps, mu)
 
+    real_redensify = flux2_denoise.redensify_schedule_flux2
+
+    def recording_redensify(timesteps, num_steps, mu):
+        result = real_redensify(timesteps, num_steps, mu)
+        captured["redensify_calls"].append({"clipped": list(timesteps), "num_steps": num_steps, "result": result})
+        return result
+
     real_prepare = Flux2DenoiseInvocation._prepare_normalized_start_latents
 
     def recording_prepare(self, **kwargs):
@@ -143,6 +153,7 @@ def _drive(
         patch.object(Flux2DenoiseInvocation, "_prepare_normalized_start_latents", recording_prepare),
         patch("invokeai.backend.util.devices.TorchDevice.choose_torch_device", return_value=torch.device("cpu")),
         patch.object(flux2_denoise, "time_shift_flux2", recording_shift),
+        patch.object(flux2_denoise, "redensify_schedule_flux2", recording_redensify),
         patch.object(flux2_denoise, "RectifiedFlowInpaintExtension", _RecordingInpaintExtension),
     ):
         try:
@@ -161,7 +172,8 @@ def _expected_schedule(denoising_start: float, denoising_end: float = 1.0, shift
     linear = get_schedule_flux2(num_steps=NUM_STEPS, image_seq_len=IMAGE_SEQ_LEN)
     mu = compute_empirical_mu(image_seq_len=IMAGE_SEQ_LEN, num_steps=NUM_STEPS)
     timesteps = time_shift_flux2(linear, mu) if shifted else linear
-    return clip_timestep_schedule_fractional(timesteps, denoising_start, denoising_end)
+    clipped = clip_timestep_schedule_fractional(timesteps, denoising_start, denoising_end)
+    return redensify_schedule_flux2(clipped, NUM_STEPS, mu) if shifted else clipped
 
 
 def test_txt2img_does_not_shift_the_schedule() -> None:
@@ -254,3 +266,41 @@ def test_the_degenerate_return_is_not_the_raw_space_blend() -> None:
 
     # The two differ by the bn_std scaling of the noise term, far beyond bf16 precision.
     assert not torch.allclose(captured["result"], raw_blend, atol=1e-1)
+
+
+def test_img2img_still_takes_the_requested_number_of_steps() -> None:
+    """Clipping the shifted schedule dropped most of the steps; the node has to space them back in.
+
+    At 4 steps and denoising_start 0.5 the clipped window holds a single step, from sigma 0.5 straight
+    to 0. One Euler jump that large destroys the source image's fine detail, which is what users saw
+    as a loss of skin texture.
+    """
+    captured = _drive(denoising_start=0.5)
+
+    assert len(captured["redensify_calls"]) == 1
+    call = captured["redensify_calls"][0]
+    assert call["num_steps"] == NUM_STEPS
+    assert len(call["clipped"]) - 1 < NUM_STEPS, "precondition: clipping dropped steps"
+    assert len(call["result"]) - 1 == NUM_STEPS
+    # The respacing must not move the window: t_0 feeds the img2img preblend.
+    assert call["result"][0] == call["clipped"][0]
+    assert call["result"][-1] == call["clipped"][-1]
+
+
+def test_txt2img_is_not_respaced() -> None:
+    """txt2img hands the full schedule to the scheduler; there is nothing clipped to space out."""
+    captured = _drive(denoising_start=0.0, with_init=False)
+
+    assert captured["redensify_calls"] == []
+
+
+def test_respacing_leaves_full_strength_img2img_alone() -> None:
+    """denoising_start == 0 with init latents keeps every sigma of the shifted schedule.
+
+    This is the endpoint that must stay identical to txt2img, so respacing may not touch it.
+    """
+    captured = _drive(denoising_start=0.0, with_mask=True)
+
+    assert len(captured["redensify_calls"]) == 1
+    call = captured["redensify_calls"][0]
+    assert call["result"] == call["clipped"]

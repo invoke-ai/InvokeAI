@@ -37,6 +37,7 @@ from invokeai.backend.flux2.sampling_utils import (
     get_noise_flux2,
     get_schedule_flux2,
     pack_flux2,
+    redensify_schedule_flux2,
     time_shift_flux2,
     unpack_flux2,
 )
@@ -403,6 +404,15 @@ class Flux2DenoiseInvocation(BaseInvocation):
 
         # Clip the timesteps schedule based on denoising_start and denoising_end
         timesteps = clip_timestep_schedule_fractional(timesteps, self.denoising_start, self.denoising_end)
+
+        # Clipping keeps only the sigmas that fall inside the denoising window, so a narrow window
+        # runs fewer steps than were requested. Under the shift that is severe: at 4 steps and
+        # strength 0.2 only two steps survive, and the last has to cover sigma 0.715 -> 0 in one
+        # Euler jump, which wipes out the source image's fine detail. Re-space the window so the
+        # requested number of steps is actually taken. The endpoints are preserved exactly, so the
+        # preblend below and the denoising range itself are unaffected.
+        if uses_manual_euler:
+            timesteps = redensify_schedule_flux2(timesteps, self.num_steps, mu)
 
         # Prepare input latent image
         if init_latents is not None:

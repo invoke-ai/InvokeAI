@@ -207,6 +207,74 @@ def time_shift_flux2(sigmas: list[float], mu: float) -> list[float]:
     ]
 
 
+def unshift_flux2(sigmas: list[float], mu: float) -> list[float]:
+    """Invert :func:`time_shift_flux2`.
+
+    Solving ``sigma' = exp(mu) / (exp(mu) + (1 / sigma - 1))`` for ``sigma`` gives::
+
+        sigma = 1 / (exp(mu) * (1 / sigma' - 1) + 1)
+
+    Args:
+        sigmas: Shifted sigmas, descending from 1.0 to 0.0.
+        mu: The same shift parameter that produced them.
+
+    Returns:
+        The unshifted sigmas. As in the forward transform, 1.0 and 0.0 are fixed points and are
+        passed through directly to avoid a division by zero.
+    """
+    exp_mu = math.exp(mu)
+    return [
+        1.0 if sigma >= 1.0 else 0.0 if sigma <= 0.0 else 1.0 / (exp_mu * (1.0 / sigma - 1.0) + 1.0) for sigma in sigmas
+    ]
+
+
+def redensify_schedule_flux2(timesteps: list[float], num_steps: int, mu: float) -> list[float]:
+    """Re-space a clipped FLUX.2 schedule so it still takes ``num_steps`` steps.
+
+    Clipping a schedule to a denoising window keeps only the sigmas that happen to fall inside it, so
+    img2img at low strength runs far fewer steps than were requested. The shift makes that much worse
+    than it is on the unshifted schedule, because it pushes sigmas up and leaves the low end sparse:
+    at 4 steps and strength 0.2 the clipped window holds two steps, the last of which has to cover
+    0.715 -> 0 in a single Euler jump. The model reconstructs the whole image from that one jump and
+    the fine detail of the source image -- skin texture, pores, film grain -- does not survive it.
+
+    Resampling the window to the requested number of steps fixes that: the endpoints are held fixed
+    (so the img2img preblend at ``timesteps[0]`` is unaffected) and the interior is re-spaced. The
+    spacing is done in unshifted space and shifted back, so the result is the same curve the full
+    schedule follows through this window, just sampled more finely.
+
+    The schedule is only ever made denser, never sparser: if the clipped window already holds
+    ``num_steps`` steps or more -- which is the case for txt2img, and for any window wide enough not
+    to lose steps -- it is returned unchanged.
+
+    Args:
+        timesteps: The clipped, shifted schedule, descending.
+        num_steps: The number of steps that was requested.
+        mu: The shift parameter the schedule was shifted with.
+
+    Returns:
+        A schedule over the same sigma range with ``num_steps`` steps, or ``timesteps`` unchanged.
+    """
+    if num_steps < 1 or len(timesteps) < 2 or len(timesteps) - 1 >= num_steps:
+        return timesteps
+
+    start, end = unshift_flux2([timesteps[0], timesteps[-1]], mu)
+    if start <= end:
+        # Degenerate window: nothing to space out.
+        return timesteps
+
+    unshifted = [start + (end - start) * (i / num_steps) for i in range(num_steps + 1)]
+    respaced = time_shift_flux2(unshifted, mu)
+
+    # Pin the endpoints to the values that went in. Shifting back and forth is exact in theory but
+    # not in floating point, and both endpoints are load-bearing: timesteps[0] is the sigma the
+    # img2img start latents are blended at, and timesteps[-1] has to be exactly the end of the
+    # requested denoising range.
+    respaced[0] = timesteps[0]
+    respaced[-1] = timesteps[-1]
+    return respaced
+
+
 def generate_img_ids_flux2(h: int, w: int, batch_size: int, device: torch.device) -> torch.Tensor:
     """Generate tensor of image position ids for FLUX.2 with RoPE scaling.
 
