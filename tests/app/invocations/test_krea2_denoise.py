@@ -15,8 +15,10 @@ from invokeai.app.invocations.fields import (
 )
 from invokeai.app.invocations.krea2_denoise import KREA2_LATENT_CHANNELS, Krea2DenoiseInvocation
 from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
+from invokeai.backend.krea2.sampling_utils import build_sigmas, pack_latents, unpack_latents
 from invokeai.backend.krea2.style_reference import Krea2StyleReferenceMode, capture_style_reference
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Krea2VariantType, ModelFormat, ModelType
+from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, Krea2ConditioningInfo
 
 
@@ -444,6 +446,105 @@ def _patch_runtime(monkeypatch) -> None:
     )
 
 
+@pytest.mark.parametrize(
+    ("start_step", "has_initial_latents", "with_mask"),
+    [(0, False, False), (2, True, False), (2, True, True)],
+)
+def test_run_diffusion_keeps_fp32_sampler_state_with_bf16_model_input(
+    monkeypatch, tmp_path, start_step: int, has_initial_latents: bool, with_mask: bool
+) -> None:
+    """The Euler state stays fp32; only the transformer input is cast.
+
+    Round-tripping the latents through bf16 on every step discards low-order bits, which shows up as
+    grain. This pins the exact arithmetic: bf16 in to the model, fp32 accumulation out.
+    """
+    _patch_runtime(monkeypatch)
+    monkeypatch.setattr(
+        "invokeai.app.invocations.krea2_denoise.TorchDevice.choose_bfloat16_safe_dtype",
+        lambda _device: torch.bfloat16,
+    )
+
+    class _Bf16Transformer(_Transformer):
+        def __init__(self) -> None:
+            super().__init__()
+            self.model_inputs: list[torch.Tensor] = []
+
+        def __call__(self, *, hidden_states, **kwargs):
+            self.model_inputs.append(hidden_states.detach().clone())
+            super().__call__(hidden_states=hidden_states, **kwargs)
+            prediction = hidden_states * 0.25 + torch.tensor(
+                0.1, device=hidden_states.device, dtype=hidden_states.dtype
+            )
+            return (prediction,)
+
+    transformer = _Bf16Transformer()
+    invocation = _runtime_invocation(cfg_scale=1.0, with_mask=with_mask)
+    invocation.steps = 8
+    invocation.denoising_start = start_step / invocation.steps
+    context = _runtime_context(tmp_path, transformer)
+    initial_latents = torch.linspace(-0.4, 0.5, KREA2_LATENT_CHANNELS * 4, dtype=torch.float32).reshape(
+        1, KREA2_LATENT_CHANNELS, 2, 2
+    )
+    if has_initial_latents:
+        invocation.latents = LatentsField(latents_name="init")
+        tensors = {"init": initial_latents, "mask": torch.zeros(1, 1, 16, 16)}
+        context.tensors.load = lambda name: tensors[name]
+    intermediate_states = []
+    context.util.sd_step_callback = lambda state, _base: intermediate_states.append(state)
+
+    inpaint_constructor_dtypes: list[torch.dtype] = []
+    inpaint_merge_input_dtypes: list[torch.dtype] = []
+    inpaint_merge_output_dtypes: list[torch.dtype] = []
+    if with_mask:
+
+        class _TrackingInpaintExtension:
+            def __init__(self, *, init_latents, inpaint_mask, noise) -> None:
+                inpaint_constructor_dtypes.extend([init_latents.dtype, inpaint_mask.dtype, noise.dtype])
+                self._extension = RectifiedFlowInpaintExtension(init_latents, inpaint_mask, noise)
+
+            def merge_intermediate_latents_with_init_latents(self, latents, sigma):
+                inpaint_merge_input_dtypes.append(latents.dtype)
+                merged = self._extension.merge_intermediate_latents_with_init_latents(latents, sigma)
+                inpaint_merge_output_dtypes.append(merged.dtype)
+                return merged
+
+        monkeypatch.setattr(
+            "invokeai.app.invocations.krea2_denoise.RectifiedFlowInpaintExtension", _TrackingInpaintExtension
+        )
+
+    latents = invocation._run_diffusion(context)
+
+    noise = invocation._get_noise(16, 16, torch.float32, torch.device("cpu"), seed=invocation.seed)
+    sigmas = torch.tensor([*build_sigmas(invocation.steps), 0.0], dtype=torch.float32)[start_step:]
+    active_steps = len(sigmas) - 1
+    if has_initial_latents:
+        initial_sigma = sigmas[0].item()
+        expected_state = initial_sigma * noise + (1.0 - initial_sigma) * initial_latents
+    else:
+        expected_state = noise
+
+    assert torch.equal(intermediate_states[0].latents, expected_state)
+    expected_packed_state = pack_latents(expected_state, 1, KREA2_LATENT_CHANNELS, 2, 2)
+    for step_idx in range(active_steps):
+        expected_model_input = expected_packed_state.to(torch.bfloat16)
+        assert torch.equal(transformer.model_inputs[step_idx], expected_model_input)
+
+        model_prediction = expected_model_input * 0.25 + torch.tensor(0.1, dtype=torch.bfloat16)
+        dt = sigmas[step_idx + 1] - sigmas[step_idx]
+        expected_packed_state = expected_packed_state + dt * model_prediction.to(torch.float32)
+        expected_state = unpack_latents(expected_packed_state, 2, 2)
+        assert torch.allclose(intermediate_states[step_idx + 1].latents, expected_state, atol=1e-7, rtol=0)
+
+    assert latents.dtype == torch.float32
+    assert torch.allclose(latents.squeeze(2), expected_state, atol=1e-7, rtol=0)
+    assert len(transformer.model_inputs) == active_steps
+    assert len(intermediate_states) == active_steps + 1
+    if with_mask:
+        assert inpaint_constructor_dtypes == [torch.float32, torch.float32, torch.float32]
+        assert inpaint_merge_input_dtypes == [torch.float32] * active_steps
+        assert inpaint_merge_output_dtypes == [torch.float32] * active_steps
+
+
 def test_run_diffusion_applies_mixed_cfg_only_at_enabled_steps(monkeypatch, tmp_path) -> None:
     _patch_runtime(monkeypatch)
     transformer = _Transformer()
@@ -610,7 +711,7 @@ def test_run_diffusion_uses_per_prompt_position_ids_when_lengths_differ(monkeypa
     assert latents.shape == (1, KREA2_LATENT_CHANNELS, 1, 2, 2)
 
 
-def _mu_branch_invocation() -> Krea2DenoiseInvocation:
+def _mu_branch_invocation(shift: float | None = None) -> Krea2DenoiseInvocation:
     # shift=None so the resolution-aware calculate_shift branch runs (not the fixed-mu override); width/height
     # 16 -> a 2x2 latent -> 1x1 grid -> image_seq_len == 1.
     return Krea2DenoiseInvocation.model_construct(
@@ -622,7 +723,7 @@ def _mu_branch_invocation() -> Krea2DenoiseInvocation:
         height=16,
         steps=2,
         seed=1,
-        shift=None,
+        shift=shift,
         denoising_start=0.0,
         denoising_end=1.0,
         latents=None,
@@ -630,12 +731,13 @@ def _mu_branch_invocation() -> Krea2DenoiseInvocation:
     )
 
 
-def _mu_branch_context(tmp_path, transformer: _Transformer):
+def _mu_branch_context(tmp_path, transformer: _Transformer, variant=Krea2VariantType.Base):
     # variant=Base -> _is_distilled() is False -> the resolution-aware mu (calculate_shift) branch is taken.
+    # Pass variant=Turbo to exercise the distilled fixed-mu branch instead.
     conditionings = {
         "positive": ConditioningFieldData(conditionings=[Krea2ConditioningInfo(prompt_embeds=torch.ones(1, 2, 12, 8))]),
     }
-    config = SimpleNamespace(format=ModelFormat.Checkpoint, variant=Krea2VariantType.Base)
+    config = SimpleNamespace(format=ModelFormat.Checkpoint, variant=variant)
     return SimpleNamespace(
         models=SimpleNamespace(
             load=lambda _identifier: _TransformerInfo(transformer),
@@ -712,6 +814,53 @@ def test_run_diffusion_mu_falls_back_to_krea2_defaults_for_absent_config_keys(mo
         max_shift=1.5,
     )
     assert captured == [pytest.approx(expected)]
+
+
+@pytest.mark.parametrize("shift", [0.0, -1.0])
+def test_run_diffusion_treats_a_non_positive_shift_as_unset_on_turbo(monkeypatch, tmp_path, shift: float) -> None:
+    """Regression: an untouched shift field arrived as 0.0 and silently replaced the distilled mu.
+
+    The node editor builds every float field with ``schemaObject.default ?? 0``, so an optional shift the
+    user never touched reaches the node as 0.0 rather than None. Taking that literally set mu=0, which
+    flattens the Turbo sigma schedule and produced visibly grainy images.
+    """
+    from invokeai.backend.krea2.sampling_utils import KREA2_DISTILLED_MU
+
+    _patch_runtime(monkeypatch)
+    captured: list[float] = []
+    _install_mu_capturing_scheduler(monkeypatch, captured, {})
+
+    _mu_branch_invocation(shift=shift)._run_diffusion(
+        _mu_branch_context(tmp_path, _Transformer(), variant=Krea2VariantType.Turbo)
+    )
+
+    assert captured == [pytest.approx(KREA2_DISTILLED_MU)]
+
+
+def test_run_diffusion_treats_a_zero_shift_as_unset_on_raw(monkeypatch, tmp_path) -> None:
+    # The same bypass must fall through to the resolution-aware branch for an undistilled checkpoint.
+    from invokeai.backend.krea2.sampling_utils import calculate_shift
+
+    _patch_runtime(monkeypatch)
+    captured: list[float] = []
+    _install_mu_capturing_scheduler(monkeypatch, captured, {})
+
+    _mu_branch_invocation(shift=0.0)._run_diffusion(_mu_branch_context(tmp_path, _Transformer()))
+
+    assert captured == [pytest.approx(calculate_shift(1))]
+
+
+def test_run_diffusion_still_honors_an_explicit_positive_shift(monkeypatch, tmp_path) -> None:
+    # The override itself must keep working - only non-positive values are reinterpreted as "unset".
+    _patch_runtime(monkeypatch)
+    captured: list[float] = []
+    _install_mu_capturing_scheduler(monkeypatch, captured, {})
+
+    _mu_branch_invocation(shift=1.8)._run_diffusion(
+        _mu_branch_context(tmp_path, _Transformer(), variant=Krea2VariantType.Turbo)
+    )
+
+    assert captured == [pytest.approx(1.8)]
 
 
 def test_estimate_working_memory_stays_within_a_24gb_card_at_high_res() -> None:

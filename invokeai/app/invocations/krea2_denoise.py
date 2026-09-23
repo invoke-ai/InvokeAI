@@ -96,8 +96,9 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
     seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
     shift: Optional[float] = InputField(
         default=None,
-        description="Override the resolution-aware timestep shift (mu). Leave unset to use the model default "
-        "(mu=1.15 for the distilled Turbo checkpoint).",
+        description="Override the resolution-aware timestep shift (mu). Leave unset -- or 0, which is what "
+        "the node editor fills in for an untouched optional float -- to use the model default: mu=1.15 for "
+        "the distilled Turbo checkpoint, resolution-dependent for Raw.",
     )
     style_reference: Optional[Krea2StyleReferenceField] = InputField(
         default=None,
@@ -318,7 +319,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 time_shift_type="exponential",
             )
 
-        if self.shift is not None:
+        # A non-positive shift means "unset", not "no time shift". The node editor builds every float field
+        # with `schemaObject.default ?? 0`, so an untouched optional shift arrives here as 0.0 rather than
+        # None -- which would otherwise silently replace the model's mu and leave Turbo visibly grainy.
+        # mu <= 0 is not a useful Krea-2 schedule anyway, so there is no legitimate value being shadowed.
+        if self.shift is not None and self.shift > 0:
             mu = self.shift
         elif self._is_distilled(context):
             mu = KREA2_DISTILLED_MU
@@ -378,11 +383,13 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # Load initial latents (img2img).
         init_latents = context.tensors.load(self.latents.latents_name) if self.latents else None
         if init_latents is not None:
-            init_latents = init_latents.to(device=device, dtype=inference_dtype)
+            init_latents = init_latents.to(device=device, dtype=torch.float32)
             if init_latents.dim() == 5:
                 init_latents = init_latents.squeeze(2)
 
-        noise = self._get_noise(self.height, self.width, inference_dtype, device, self.seed)
+        # Keep the sampler state in fp32; only the transformer input is cast to its inference dtype.
+        # Round-tripping the latents through bf16 every step loses low-order bits that show up as grain.
+        noise = self._get_noise(self.height, self.width, torch.float32, device, self.seed)
 
         if init_latents is not None:
             s_0 = sigmas_sched[0].item()
@@ -522,6 +529,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
             for step_idx, t in enumerate(tqdm(timesteps_sched)):
                 # The pipeline passes timestep / num_train_timesteps to the transformer.
                 timestep = (t / num_train_timesteps).expand(latents.shape[0]).to(inference_dtype)
+                # The sampler state stays fp32; the transformer gets its own cast copy.
+                model_latents = latents.to(inference_dtype)
 
                 style_pass = nullcontext()
                 if style_extension is not None:
@@ -547,7 +556,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 with style_pass:
                     self._install_attention_payload(attention_state, pos_attention_payload)
                     noise_pred_cond = transformer(
-                        hidden_states=latents,
+                        hidden_states=model_latents,
                         encoder_hidden_states=pos_prompt_embeds,
                         encoder_attention_mask=None,
                         timestep=timestep,
@@ -560,7 +569,7 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                     ):
                         self._install_attention_payload(attention_state, neg_attention_payload)
                         noise_pred_uncond = transformer(
-                            hidden_states=latents,
+                            hidden_states=model_latents,
                             encoder_hidden_states=neg_prompt_embeds,
                             encoder_attention_mask=None,
                             timestep=timestep,
@@ -574,9 +583,8 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 # Euler step using the (possibly clipped) sigma schedule.
                 sigma_curr = sigmas_sched[step_idx]
                 sigma_next = sigmas_sched[step_idx + 1]
-                dt = sigma_next - sigma_curr
-                latents = latents.to(torch.float32) + dt * noise_pred.to(torch.float32)
-                latents = latents.to(inference_dtype)
+                dt = (sigma_next - sigma_curr).to(torch.float32)
+                latents = latents + dt * noise_pred.to(torch.float32)
 
                 if inpaint_extension is not None:
                     sigma_next_f = sigmas_sched[step_idx + 1].item()
