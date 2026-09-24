@@ -25,6 +25,7 @@ TRAVERSAL_KEYS = [
     "/etc/passwd",
     "..\\escaped",
     "C:\\Windows\\win",
+    "..:stream",
     "nul\x00byte",
 ]
 

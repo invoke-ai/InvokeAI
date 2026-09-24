@@ -13,7 +13,16 @@ from pydantic import ValidationError
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.backend.model_manager.util.lora_metadata_extractor import _process_preview_image
 
-TRAVERSAL_KEYS = ["../../pwned", "..", "sub/nested", "/etc/pwned", "..\\pwned", "C:\\pwned", "nul\x00byte"]
+TRAVERSAL_KEYS = [
+    "../../pwned",
+    "..",
+    "sub/nested",
+    "/etc/pwned",
+    "..\\pwned",
+    "C:\\pwned",
+    "..:stream",
+    "nul\x00byte",
+]
 
 
 @pytest.mark.parametrize("key", TRAVERSAL_KEYS)

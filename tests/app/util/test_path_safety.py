@@ -23,6 +23,8 @@ UNSAFE_NAMES = [
     "C:\\Windows\\win.ini",
     "C:relative",
     "\\\\?\\C:\\Windows\\win.ini",
+    # NTFS stream syntax still parses `..` as the parent component.
+    "..:stream",
     "nul\x00byte",
 ]
 
