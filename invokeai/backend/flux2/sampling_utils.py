@@ -107,6 +107,21 @@ def unpack_flux2(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
     )
 
 
+# Config for the scheduler the FLUX.2 txt2img path builds. Shared with the schedule-shift test so the
+# manual shift used by img2img/inpainting is always checked against the scheduler the node actually
+# uses, rather than against a copy that can drift out of sync.
+FLUX2_TXT2IMG_SCHEDULER_KWARGS = {
+    "num_train_timesteps": 1000,
+    "shift": 3.0,
+    "use_dynamic_shifting": True,
+    "base_shift": 0.5,
+    "max_shift": 1.15,
+    "base_image_seq_len": 256,
+    "max_image_seq_len": 4096,
+    "time_shift_type": "exponential",
+}
+
+
 def compute_empirical_mu(image_seq_len: int, num_steps: int) -> float:
     """Compute mu for FLUX.2 schedule shifting.
 
@@ -160,6 +175,104 @@ def get_schedule_flux2(
     sigmas_list.append(0.0)
 
     return sigmas_list
+
+
+def time_shift_flux2(sigmas: list[float], mu: float) -> list[float]:
+    """Apply the exponential schedule shift that the txt2img scheduler applies internally.
+
+    ``get_schedule_flux2()`` returns an unshifted linear schedule because the
+    FlowMatchEulerDiscreteScheduler used for txt2img shifts it itself from ``mu``. Code paths that
+    step the schedule manually (img2img, inpainting) must apply the shift themselves, otherwise they
+    run the model on a completely different sigma trajectory than txt2img does: with 9 steps the
+    shifted schedule bottoms out at sigma 0.485, the linear one at 0.111. A distilled model such as
+    FLUX.2 Klein is never trained at the low end of the linear schedule and leaves a grainy residue
+    there.
+
+    Mirrors diffusers' ``FlowMatchEulerDiscreteScheduler._time_shift_exponential`` with an exponent
+    of 1.0, which is how the scheduler invokes it::
+
+        sigma' = exp(mu) / (exp(mu) + (1 / sigma - 1))
+
+    Args:
+        sigmas: Unshifted sigma schedule, descending from 1.0 to 0.0.
+        mu: Shift parameter, as returned by ``compute_empirical_mu()``.
+
+    Returns:
+        The shifted schedule. The 1.0 and 0.0 endpoints are fixed points of the transform and are
+        passed through directly to avoid a division by zero.
+    """
+    exp_mu = math.exp(mu)
+    return [
+        1.0 if sigma >= 1.0 else 0.0 if sigma <= 0.0 else exp_mu / (exp_mu + (1.0 / sigma - 1.0)) for sigma in sigmas
+    ]
+
+
+def unshift_flux2(sigmas: list[float], mu: float) -> list[float]:
+    """Invert :func:`time_shift_flux2`.
+
+    Solving ``sigma' = exp(mu) / (exp(mu) + (1 / sigma - 1))`` for ``sigma`` gives::
+
+        sigma = 1 / (exp(mu) * (1 / sigma' - 1) + 1)
+
+    Args:
+        sigmas: Shifted sigmas, descending from 1.0 to 0.0.
+        mu: The same shift parameter that produced them.
+
+    Returns:
+        The unshifted sigmas. As in the forward transform, 1.0 and 0.0 are fixed points and are
+        passed through directly to avoid a division by zero.
+    """
+    exp_mu = math.exp(mu)
+    return [
+        1.0 if sigma >= 1.0 else 0.0 if sigma <= 0.0 else 1.0 / (exp_mu * (1.0 / sigma - 1.0) + 1.0) for sigma in sigmas
+    ]
+
+
+def redensify_schedule_flux2(timesteps: list[float], num_steps: int, mu: float) -> list[float]:
+    """Re-space a clipped FLUX.2 schedule so it still takes ``num_steps`` steps.
+
+    Clipping a schedule to a denoising window keeps only the sigmas that happen to fall inside it, so
+    img2img at low strength runs far fewer steps than were requested. The shift makes that much worse
+    than it is on the unshifted schedule, because it pushes sigmas up and leaves the low end sparse:
+    at 4 steps and strength 0.2 the clipped window holds two steps, the last of which has to cover
+    0.715 -> 0 in a single Euler jump. The model reconstructs the whole image from that one jump and
+    the fine detail of the source image -- skin texture, pores, film grain -- does not survive it.
+
+    Resampling the window to the requested number of steps fixes that: the endpoints are held fixed
+    (so the img2img preblend at ``timesteps[0]`` is unaffected) and the interior is re-spaced. The
+    spacing is done in unshifted space and shifted back, so the result is the same curve the full
+    schedule follows through this window, just sampled more finely.
+
+    The schedule is only ever made denser, never sparser: if the clipped window already holds
+    ``num_steps`` steps or more -- which is the case for txt2img, and for any window wide enough not
+    to lose steps -- it is returned unchanged.
+
+    Args:
+        timesteps: The clipped, shifted schedule, descending.
+        num_steps: The number of steps that was requested.
+        mu: The shift parameter the schedule was shifted with.
+
+    Returns:
+        A schedule over the same sigma range with ``num_steps`` steps, or ``timesteps`` unchanged.
+    """
+    if num_steps < 1 or len(timesteps) < 2 or len(timesteps) - 1 >= num_steps:
+        return timesteps
+
+    start, end = unshift_flux2([timesteps[0], timesteps[-1]], mu)
+    if start <= end:
+        # Degenerate window: nothing to space out.
+        return timesteps
+
+    unshifted = [start + (end - start) * (i / num_steps) for i in range(num_steps + 1)]
+    respaced = time_shift_flux2(unshifted, mu)
+
+    # Pin the endpoints to the values that went in. Shifting back and forth is exact in theory but
+    # not in floating point, and both endpoints are load-bearing: timesteps[0] is the sigma the
+    # img2img start latents are blended at, and timesteps[-1] has to be exactly the end of the
+    # requested denoising range.
+    respaced[0] = timesteps[0]
+    respaced[-1] = timesteps[-1]
+    return respaced
 
 
 def generate_img_ids_flux2(h: int, w: int, batch_size: int, device: torch.device) -> torch.Tensor:
