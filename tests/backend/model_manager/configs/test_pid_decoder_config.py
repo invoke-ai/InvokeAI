@@ -173,14 +173,29 @@ class TestPidNetContract:
             with pytest.raises(InvalidMatchError, match="missing 1 of the weights required by PidNet"):
                 PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
 
-    def test_an_unexpected_key_is_rejected(self) -> None:
-        """`load_pid_decoder` refuses these too, so accepting them here would install a file that
-        cannot load."""
+    def test_an_unexpected_key_is_accepted(self) -> None:
+        """Since issue #9437 `load_pid_decoder` ignores extra keys, so rejecting them here would
+        refuse to install a file that loads fine — the installer must track the loader in both
+        directions, not just the strict one."""
         sd = _pid_state_dict()
         sd[f"{_NET_PREFIX}not_a_pid_key"] = _FakeShapeTensor(1)
         with TemporaryDirectory() as tmpdir:
             mod = _mock_mod(Path(tmpdir), sd)
-            with pytest.raises(InvalidMatchError, match="1 keys PidNet does not expect"):
+            config = PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
+        assert config.base is BaseModelType.Flux
+
+    def test_a_non_string_key_is_rejected(self) -> None:
+        """The one extra key the loader genuinely cannot survive: `nn.Module.load_state_dict` calls
+        `.startswith()` on every key, so a non-string one raises from inside torch. Identification
+        has to keep refusing these even though it now accepts ordinary extras.
+
+        Built bare, without the `net.` prefix: `strip_net_prefix` drops non-string keys when it has a
+        prefix to strip, so only a bare checkpoint can carry one this far."""
+        sd: dict[Any, Any] = {k: _FakeShapeTensor(*shape) for k, shape in required_pid_net_shapes().items()}
+        sd[1] = _FakeShapeTensor(1)
+        with TemporaryDirectory() as tmpdir:
+            mod = _mock_mod(Path(tmpdir), sd)
+            with pytest.raises(InvalidMatchError, match="1 keys that are not strings"):
                 PiDDecoder_Checkpoint_FLUX_Config.from_model_on_disk(mod, dict(_OVERRIDE_FIELDS))
 
     def test_a_wrong_shaped_weight_is_rejected(self) -> None:
@@ -312,10 +327,12 @@ class TestUnusableCheckpointIsNeverRegistered:
         """A complete *bare* contract plus two keys PidNet does not expect, one of them not a string.
 
         A bare checkpoint is passed through `strip_net_prefix` untouched, so a `.pth` can hand
-        identification whatever it was pickled with. Reporting the unexpected keys sorts them, and
-        sorting `{1, "not_a_pid_key"}` raises TypeError — which the factory catches as a generic
-        candidate failure and answers with the Unknown_Config registration this class is about. A
-        crash in an unusability check therefore does not fail loudly; it fails as a silent accept.
+        identification whatever it was pickled with. Since issue #9437 the plain `not_a_pid_key`
+        is accepted (the loader ignores it), but `1` is not: `load_state_dict` calls `.startswith()`
+        on every key. Reporting it sorts the offenders, and sorting a mixed set raises TypeError —
+        which the factory catches as a generic candidate failure and answers with the Unknown_Config
+        registration this class is about. A crash in an unusability check therefore does not fail
+        loudly; it fails as a silent accept, so the sort stays `key=str`.
         """
         scalar = torch.zeros(())
         sd: dict[Any, object] = {k: scalar.expand(shape) for k, shape in required_pid_net_shapes().items()}
@@ -332,7 +349,7 @@ class TestUnusableCheckpointIsNeverRegistered:
             ("_intact_v1_5", "lq_proj hidden dim 1024"),
             ("_unsupported_latent_channels", "32 latent channels"),
             ("_malformed_discriminator", "malformed lq_proj.latent_proj.0.weight"),
-            ("_bare_with_a_non_string_key", "2 keys PidNet does not expect"),
+            ("_bare_with_a_non_string_key", "1 keys that are not strings"),
         ],
     )
     def test_factory_returns_no_config_even_with_allow_unknown(self, case: str, expected_reason: str) -> None:

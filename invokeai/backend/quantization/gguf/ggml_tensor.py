@@ -184,8 +184,14 @@ class GGMLTensor(torch.Tensor):
             ).to(self.compute_dtype)
         else:
             # There is no GPU implementation for this quantization type, so fallback to the numpy implementation.
+            # The numpy implementation infers the output shape from the stored (possibly reshaped) data, so reshape
+            # to the logical shape here - see GGMLTensor.tensor_shape.
             new = gguf.quants.dequantize(self.quantized_data.cpu().numpy(), self._ggml_quantization_type)
-            return torch.from_numpy(new).to(self.quantized_data.device, dtype=self.compute_dtype)
+            return (
+                torch.from_numpy(new)
+                .reshape(self.tensor_shape)
+                .to(self.quantized_data.device, dtype=self.compute_dtype)
+            )
 
     @classmethod
     def __torch_dispatch__(cls, func, types, args, kwargs):
