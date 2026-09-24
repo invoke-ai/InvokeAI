@@ -41,6 +41,7 @@ from invokeai.app.services.model_install.model_install_common import (
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, UnknownModelException
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelConfig,
@@ -460,6 +461,10 @@ class ModelInstallService(ModelInstallServiceBase):
         config = config or ModelRecordChanges()
         info: AnyModelConfig = self._probe(Path(model_path), config)  # type: ignore
 
+        # The key names the directory the model is moved into. `ModelRecordChanges` validates a client-supplied key,
+        # but a caller can build one without validation, so check again here - before anything is created or moved.
+        if not is_plain_filename(info.key):
+            raise ValueError(f"Invalid model key {info.key!r}: it must be a plain filename")
         dest_dir = self.app_config.models_path / info.key
         try:
             if dest_dir.exists():

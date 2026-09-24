@@ -55,3 +55,18 @@ def test_lora_preview_image_is_still_written_for_an_ordinary_key(tmp_path: Path)
 
     assert _process_preview_image("mylora", model_dir, "abc-123", model_images) is True
     assert (model_images / "abc-123.webp").exists()
+
+
+def test_install_path_refuses_an_unvalidated_traversal_key(mm2_installer, embedding_file: Path):
+    """`install_path()` moves the model into `models_path / key`. A caller can build `ModelRecordChanges` without
+    validation, so the join must be guarded at the sink too - before anything is created or moved."""
+    models_path = mm2_installer.app_config.models_path
+    escaped = models_path.parent / "escaped"
+    config = ModelRecordChanges.model_construct(key="../escaped")
+
+    with pytest.raises(ValueError, match="plain filename"):
+        mm2_installer.install_path(embedding_file, config=config)
+
+    assert not escaped.exists()
+    assert embedding_file.exists()
+    assert mm2_installer.record_store.search_by_attr() == []

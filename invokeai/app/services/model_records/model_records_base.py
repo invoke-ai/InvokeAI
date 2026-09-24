@@ -117,8 +117,8 @@ class ModelRecordChanges(BaseModelExcludeNull):
     def validate_key(cls, v: Optional[str]) -> Optional[str]:
         # An install request may name the key it wants, and that key is then joined onto the filesystem in two
         # places - the model's own directory under `models_path` and its cover image under `model_images` - so it
-        # has to be a plain filename. The cover-image join also checks for itself, but the model directory join
-        # (`install_path()`) does not, so this is the only thing standing between it and a traversal (#9596).
+        # has to be a plain filename. Both joins check for themselves too, but this is where the untrusted value
+        # enters, so a bad key is rejected with a validation error before any install work starts.
         if v is not None and not is_plain_filename(v):
             raise ValueError("key must not contain path separators")
         return v

@@ -7,6 +7,7 @@ import io
 import pathlib
 import threading
 import traceback
+import unicodedata
 from collections.abc import Generator
 from copy import deepcopy
 from enum import Enum
@@ -83,12 +84,13 @@ _CLAIMED_MODEL_KEYS: set[str] = set()
 def _claim_token(key: str) -> str:
     """The form of a key recorded in `_CLAIMED_MODEL_KEYS`.
 
-    A model's cover image is stored as `<key>.webp`, and on a case-insensitive filesystem (the macOS and Windows
-    defaults) `K.webp` and `k.webp` are the same file. Claims are case-folded so that a case variant of a key cannot
-    slip past a claim held on the key itself and touch that file. Two keys that differ only in case would at worst
-    serialize against each other.
+    A model's cover image is stored as `<key>.webp`, and some filesystems map different strings to one file: the
+    macOS and Windows defaults are case-insensitive, and APFS also ignores Unicode normalization, so `\u00e9` and
+    `e\u0301` name the same entry. Claims use Unicode canonical caseless matching (NFD, casefold, NFD) so that such a
+    variant of a key cannot slip past a claim held on the key itself and touch that file. Two keys that are
+    distinct on disk but equal under this form would at worst serialize against each other.
     """
-    return key.casefold()
+    return unicodedata.normalize("NFD", unicodedata.normalize("NFD", key).casefold())
 
 
 @contextlib.contextmanager
@@ -686,6 +688,14 @@ async def update_model_image(
         try:
             ApiDependencies.invoker.services.model_manager.store.get_model(key)
         except UnknownModelException as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        # A record written before install requests had their keys validated can still carry a key that is not a
+        # plain filename. The storage service refuses to build a path from it; ask it now, so that is a 404
+        # rather than a save failure surfacing as a 500 after the upload has been read.
+        try:
+            model_images.get_path(key)
+        except ModelImageFileNotFoundException as e:
             raise HTTPException(status_code=404, detail=str(e))
 
         contents = await image.read()

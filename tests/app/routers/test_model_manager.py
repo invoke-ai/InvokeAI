@@ -824,3 +824,19 @@ def test_a_case_variant_of_a_claimed_key_is_refused() -> None:
         assert exc_info.value.status_code == 409
 
     assert not model_manager._CLAIMED_MODEL_KEYS
+
+
+def test_a_normalization_variant_of_a_claimed_key_is_refused() -> None:
+    """APFS ignores Unicode normalization, so `é.webp` and `é.webp` are one file there - the claims must
+    conflict just like case variants do."""
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+
+    with model_manager._claim_model_key("café"):
+        with pytest.raises(HTTPException) as exc_info:
+            with model_manager._claim_model_key("CAFÉ"):
+                pass
+        assert exc_info.value.status_code == 409
+
+    assert not model_manager._CLAIMED_MODEL_KEYS
