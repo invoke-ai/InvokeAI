@@ -1078,3 +1078,47 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
     mm2_installer.wait_for_job(install_job2, timeout=10)
     assert install_job2.complete
     assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
+
+
+def test_restore_skips_a_legacy_marker_whose_key_no_longer_validates(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+) -> None:
+    """A marker written before install keys were validated can carry a key that is not a plain filename. Restoring
+    must skip that one marker, not raise out of the loop and leave every other interrupted install unrestored."""
+    assert isinstance(mm2_installer, ModelInstallService)
+
+    tmpdirs: list[Path] = []
+    try:
+        for repo_id, config_in in [
+            ("stabilityai/legacy-key", ModelRecordChanges.model_construct(key="../escaped")),
+            ("stabilityai/ordinary", ModelRecordChanges()),
+        ]:
+            tmpdir = mm2_app_config.models_path / f"tmpinstall_legacy_{uuid.uuid4().hex}"
+            tmpdir.mkdir(parents=True, exist_ok=True)
+            tmpdirs.append(tmpdir)
+            job = ModelInstallJob(
+                id=99999,
+                source=HFModelSource(repo_id=repo_id, variant=ModelRepoVariant.Default),
+                config_in=config_in,
+                local_path=tmpdir,
+            )
+            job._install_tmpdir = tmpdir
+            job.status = InstallStatus.PAUSED
+            mm2_installer._write_install_marker(job, status=InstallStatus.PAUSED)
+
+        restored_installer = ModelInstallService(
+            app_config=mm2_app_config,
+            record_store=mm2_installer.record_store,
+            download_queue=mm2_download_queue,
+            session=mm2_session,
+        )
+        restored_installer._restore_incomplete_installs()
+
+        restored = restored_installer.list_jobs()
+        assert [str(job.source) for job in restored] == ["stabilityai/ordinary"]
+    finally:
+        for tmpdir in tmpdirs:
+            shutil.rmtree(tmpdir, ignore_errors=True)

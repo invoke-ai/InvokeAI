@@ -244,12 +244,15 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
                     self._safe_rmtree(tmpdir, self._logger)
                     continue
+                # Inside the `try`: a marker written by an older version can hold a config that no longer validates
+                # (e.g. a key that is not a plain filename), and that must skip this marker, not abort the restore
+                # of every marker after it.
+                config_in = ModelRecordChanges(**(marker.get("config_in") or {}))
                 seen_sources.add(source_str)
             except Exception as e:
                 self._logger.warning(f"Skipping install marker in {tmpdir}: {e}")
                 continue
 
-            config_in = ModelRecordChanges(**(marker.get("config_in") or {}))
             job = ModelInstallJob(
                 id=self._next_id(),
                 source=source,
