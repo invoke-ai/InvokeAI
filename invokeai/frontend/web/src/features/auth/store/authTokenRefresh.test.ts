@@ -85,6 +85,16 @@ describe('refreshed token acceptance', () => {
     now.mockRestore();
   });
 
+  it('accepts a routine same-epoch replacement after the throttle window', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(300_000);
+    markTokenRefreshAccepted();
+    now.mockReturnValue(360_001);
+
+    expect(shouldThrottleRefreshedToken(tokenFor('user', 1, 1), tokenFor('user', 2, 1))).toBe(false);
+
+    now.mockRestore();
+  });
+
   it('serializes media-cookie writes', async () => {
     const calls: string[] = [];
     let releaseFirst: (() => void) | undefined;

@@ -3,7 +3,7 @@ import type { BaseQueryApi } from '@reduxjs/toolkit/query';
 import { tokenRefreshed } from 'features/auth/store/authSlice';
 import { markTokenRefreshAccepted } from 'features/auth/store/authTokenRefresh';
 import { authApi } from 'services/api/endpoints/auth';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { api, buildV1Url, dynamicBaseQuery } from '..';
 
@@ -11,8 +11,10 @@ import { api, buildV1Url, dynamicBaseQuery } from '..';
  * `dynamicBaseQuery` reads the bearer token out of localStorage, and `getDeploymentBaseUrl`
  * reads `window.location.origin`. Neither exists in the default (node) test environment.
  */
-beforeAll(() => {
-  const values = new Map<string, string>();
+const values = new Map<string, string>();
+
+beforeEach(() => {
+  values.clear();
   vi.stubGlobal('localStorage', {
     clear: () => values.clear(),
     getItem: (key: string) => values.get(key) ?? null,
@@ -26,8 +28,9 @@ beforeAll(() => {
   vi.stubGlobal('window', { location: { origin: 'http://localhost' } });
 });
 
-beforeEach(() => {
-  localStorage.clear();
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 const buildStore = () =>
@@ -52,10 +55,12 @@ describe('refreshed token acceptance', () => {
       localStorage.setItem('auth_token', requestToken);
       markTokenRefreshAccepted();
 
-      const dispatch = vi.fn();
+      const events: string[] = [];
+      const dispatch = vi.fn(() => events.push('dispatch'));
       const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
         const url = input instanceof Request ? input.url : input.toString();
         if (url.endsWith('/api/v1/auth/media-cookie')) {
+          events.push('media-cookie');
           expect(new Headers(init?.headers).get('Authorization')).toBe(`Bearer ${refreshedToken}`);
           return Promise.resolve(new Response(null, { status: 204 }));
         }
@@ -84,6 +89,7 @@ describe('refreshed token acceptance', () => {
 
       expect(fetchMock).toHaveBeenCalledTimes(2);
       expect(dispatch).toHaveBeenCalledWith(tokenRefreshed(refreshedToken));
+      expect(events).toEqual(['media-cookie', 'dispatch']);
     }
   );
 
@@ -120,6 +126,48 @@ describe('refreshed token acceptance', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(dispatch).not.toHaveBeenCalled();
+  });
+
+  it('commits a same-epoch replacement after the routine refresh throttle window', async () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(300_000);
+    const requestToken = tokenFor(1, 1);
+    const refreshedToken = tokenFor(2, 1);
+    localStorage.setItem('auth_token', requestToken);
+    markTokenRefreshAccepted();
+    now.mockReturnValue(360_001);
+
+    const dispatch = vi.fn();
+    const fetchMock = vi.fn((input: string | URL | Request, init?: RequestInit) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      if (url.endsWith('/api/v1/auth/media-cookie')) {
+        expect(new Headers(init?.headers).get('Authorization')).toBe(`Bearer ${refreshedToken}`);
+        return Promise.resolve(new Response(null, { status: 204 }));
+      }
+      return Promise.resolve(
+        new Response('{}', {
+          headers: { 'content-type': 'application/json', 'X-Refreshed-Token': refreshedToken },
+        })
+      );
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await dynamicBaseQuery(
+      buildV1Url('images/i/example.png'),
+      {
+        dispatch,
+        getState: () => ({}),
+        signal: new AbortController().signal,
+        abort: () => {},
+        endpoint: 'getImageDTO',
+        type: 'query',
+        forced: false,
+        extra: undefined,
+      } as unknown as BaseQueryApi,
+      {}
+    );
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(dispatch).toHaveBeenCalledWith(tokenRefreshed(refreshedToken));
   });
 });
 
