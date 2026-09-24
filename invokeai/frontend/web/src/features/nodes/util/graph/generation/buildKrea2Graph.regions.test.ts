@@ -47,6 +47,17 @@ vi.mock('features/controlLayers/store/paramsSlice', () => ({
   selectParamsSlice: vi.fn(() => params),
 }));
 
+let refImageEntities: unknown[] = [];
+vi.mock('features/controlLayers/store/refImagesSlice', async () => {
+  const actual = await vi.importActual('features/controlLayers/store/refImagesSlice');
+  return { ...actual, selectRefImagesSlice: vi.fn(() => ({ entities: refImageEntities })) };
+});
+
+vi.mock('features/controlLayers/store/validators', async () => {
+  const actual = await vi.importActual('features/controlLayers/store/validators');
+  return { ...actual, getGlobalReferenceImageWarnings: vi.fn(() => []) };
+});
+
 vi.mock('features/controlLayers/store/selectors', () => ({
   selectCanvasMetadata: vi.fn(() => ({})),
   selectCanvasSlice: vi.fn(() => ({
@@ -139,6 +150,7 @@ const sourceOf = (g: BuiltGraph, nodeId: string, field: string) =>
 describe('buildKrea2Graph - regional guidance (composed)', () => {
   afterEach(() => {
     nextId = 0;
+    refImageEntities = [];
     params = { ...defaultParams };
     regions = [];
     loraState.loras = [];
