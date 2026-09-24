@@ -1515,6 +1515,15 @@ class Qwen3EncoderSDNQLoader(ModelLoader):
             )
         model_path = Path(config.path)
 
+        # A folder encoder ships in one of two layouts: weights at the root, or under `text_encoder/`
+        # next to a sibling `tokenizer/`. `sdnq_sd_loader` globs one directory and reads the
+        # `quantization_config.json` beside it, so pointing it at the root of a nested install finds
+        # no shards ("No safetensors files found") and would fall back to a default `group_size`.
+        # Resolve the layout with the same helper identification used, so the loader can open every
+        # folder identification accepts. Single-file configs carry a file path and are left alone.
+        if isinstance(config, Qwen3Encoder_SDNQ_Folder_Config):
+            model_path = Qwen3Encoder_SDNQ_Folder_Config.resolve_text_encoder_dir(model_path)
+
         # Determine safe dtype based on target device capabilities
         target_device = TorchDevice.choose_torch_device()
         compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
