@@ -82,7 +82,9 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
                 # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it
                 # from current param residency: partial loading may have temporarily offloaded all weights to RAM,
                 # which would wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
-                latents = latents.to(device=vae_info.compute_device, dtype=vae.dtype)
+                # Keep the per-channel denormalization in fp32; cast only the decoded VAE input to the
+                # VAE's configured compute dtype.
+                latents = latents.to(device=vae_info.compute_device, dtype=torch.float32)
 
                 # Tiling bounds the VAE's per-tile memory, which is the scalable way to decode very
                 # large outputs that would exceed VRAM even after offloading the transformer/text
@@ -99,15 +101,13 @@ class QwenImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard)
                     # instead of a single scaling_factor.
                     # Latents are 5D: (B, C, num_frames, H, W) — the unpack from the
                     # denoise step already produces this shape.
-                    latents_mean = (
-                        torch.tensor(vae.config.latents_mean)
-                        .view(1, vae.config.z_dim, 1, 1, 1)
-                        .to(latents.device, latents.dtype)
+                    latents_mean = torch.tensor(
+                        vae.config.latents_mean, device=latents.device, dtype=torch.float32
+                    ).view(1, vae.config.z_dim, 1, 1, 1)
+                    latents_std = torch.tensor(vae.config.latents_std, device=latents.device, dtype=torch.float32).view(
+                        1, vae.config.z_dim, 1, 1, 1
                     )
-                    latents_std = 1.0 / torch.tensor(vae.config.latents_std).view(1, vae.config.z_dim, 1, 1, 1).to(
-                        latents.device, latents.dtype
-                    )
-                    latents = latents / latents_std + latents_mean
+                    latents = (latents * latents_std + latents_mean).to(dtype=vae.dtype)
 
                     img = vae.decode(latents, return_dict=False)[0]
                     # Drop the temporal frame dimension: (B, C, 1, H, W) -> (B, C, H, W)
