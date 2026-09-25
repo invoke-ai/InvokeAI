@@ -13,7 +13,6 @@ from pydantic import BaseModel, Field, field_validator
 from invokeai.app.services.shared.pagination import PaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.model_exclude_null import BaseModelExcludeNull
-from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.backend.model_manager.configs.controlnet import ControlAdapterDefaultSettings
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelDefaultSettings,
@@ -110,18 +109,13 @@ class ModelRecordChanges(BaseModelExcludeNull):
     description: Optional[str] = Field(description="Model description", default=None)
     base: Optional[BaseModelType] = Field(description="The base model.", default=None)
     type: Optional[ModelType] = Field(description="Type of model", default=None)
+    # Deliberately NOT validated here. This model is the *update* body as well as the install body, and the model
+    # edit form posts the whole record back (`ModelEdit.tsx` seeds the form from the config, key included), so a
+    # validator on this field makes a model whose key predates key validation impossible to edit: FastAPI answers
+    # 422 before the handler runs, and the UI offers no way to change a key. The same model is also re-parsed from
+    # install markers written by older versions during startup recovery. The key is validated where an install
+    # adopts one (`install_model`) and again at every join that builds a path out of it.
     key: Optional[str] = Field(description="Database ID for this model", default=None)
-
-    @field_validator("key")
-    @classmethod
-    def validate_key(cls, v: Optional[str]) -> Optional[str]:
-        # An install request may name the key it wants, and that key is then joined onto the filesystem in two
-        # places - the model's own directory under `models_path` and its cover image under `model_images` - so it
-        # has to be a plain filename. Both joins check for themselves too, but this is where the untrusted value
-        # enters, so a bad key is rejected with a validation error before any install work starts.
-        if v is not None and not is_plain_filename(v):
-            raise ValueError("key must not contain path separators")
-        return v
 
     hash: Optional[str] = Field(description="hash of model file", default=None)
     file_size: Optional[int] = Field(description="Size of model file", default=None)

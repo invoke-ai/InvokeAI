@@ -1,6 +1,25 @@
 from pathlib import PureWindowsPath
 
-_CONTROL_CHARS = frozenset(chr(c) for c in range(0x20)) | {"\x7f"}
+# C0, DEL and C1. `str.splitlines()` also splits on U+0085 (in C1), U+2028 and U+2029, so a name containing one
+# of those forges a second line in any log record that interpolates it.
+_CONTROL_CHARS = (
+    frozenset(chr(c) for c in range(0x20)) | frozenset(chr(c) for c in range(0x7F, 0xA0)) | {"\u2028", "\u2029"}
+)
+
+# Characters Windows does not allow in a filename. `:` is the one that matters for containment - see the
+# docstring - and the rest come along because a name that is not a valid filename everywhere is not a name we
+# should be joining onto a directory.
+_RESERVED_CHARS = frozenset('<>:"|?*')
+
+# Windows resolves these to the device namespace from *any* directory, so they never name a file in the directory
+# they were joined onto - `<store>/NUL.webp` is the NUL device, and a write to it is silently discarded. Matched on
+# the stem, case-insensitively: `CON.txt` is reserved, `CONTEXT` is not.
+# `COM`/`LPT` are reserved with the superscript digits too (Microsoft's "Naming Files, Paths, and Namespaces"
+# lists them explicitly), and with `0` on current Windows.
+_RESERVED_STEMS = frozenset(
+    {"CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$", "CLOCK$", "CONFIG$", "KEYBD$", "SCREEN$"}
+    | {f"{dev}{d}" for dev in ("COM", "LPT") for d in "0123456789\u00b9\u00b2\u00b3"}
+)
 
 
 def is_plain_filename(name: str) -> bool:
@@ -11,19 +30,36 @@ def is_plain_filename(name: str) -> bool:
     they are untrusted. Joining one onto a directory is only safe if it is a bare filename: anything carrying a
     separator, a drive letter or a `..` would resolve outside that directory.
 
-    Three details are worth spelling out:
+    Five details are worth spelling out:
 
     - `PureWindowsPath` is used for the check rather than the platform's `Path`. It treats both `/` and `\` as
       separators and understands drive letters, so backslash- and drive-shaped payloads are rejected on posix too,
       instead of passing here and only escaping on Windows deployments.
+    - Colons are rejected outright rather than left to `PureWindowsPath`, which only reads a *single* leading
+      character as a drive: it parses `C:foo` as drive `C:` plus `foo`, but hands back `..:stream` whole. On NTFS
+      that names the alternate data stream `stream` on the file `..` - the parent directory - so
+      `<store>/..:stream` writes outside the store while looking like one bare component to `pathlib`.
     - Trailing dots and spaces are stripped before the `.`/`..` comparison. `pathlib` keeps them, but the Win32
       path normaliser drops them from the final component when the file is opened, so `".. "` would reach the
       parent directory on Windows.
+    - Windows device names (`NUL`, `CON`, `COM1`, ...) are rejected. They do not escape upwards, but they do not
+      stay put either: Win32 resolves them to the device namespace from any directory, so the join silently does
+      not address a file in the store at all.
     - Control characters are rejected outright. They cannot escape a directory on their own, but a name is only
-      "safe to join" if it also survives being put in a header or a log line.
+      "safe to join" if it also survives being put in a log line.
+
+    Nothing the server generates - a uuid, `f"{cls.__name__}_{uuid}"`, or a `slugify()`ed external-model key -
+    can contain any of the rejected characters, so this never turns away a name we produced ourselves.
     """
-    if not name or _CONTROL_CHARS.intersection(name):
+    if not name or _CONTROL_CHARS.intersection(name) or _RESERVED_CHARS.intersection(name):
         return False
-    if name.rstrip(" .") in ("", ".", ".."):
+    # Win32 strips trailing dots and spaces from the final component when it opens the file, so compare against
+    # what it would actually be left holding.
+    normalised = name.rstrip(" .")
+    if normalised in ("", ".", ".."):
+        return False
+    # Win32 takes the base name up to the first `.` and trims trailing spaces from it before the device lookup,
+    # so `"NUL .webp"` is still the NUL device - strip again after the split, not only before it.
+    if normalised.split(".", 1)[0].rstrip(" ").upper() in _RESERVED_STEMS:
         return False
     return PureWindowsPath(name).name == name

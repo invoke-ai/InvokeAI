@@ -840,3 +840,45 @@ def test_a_normalization_variant_of_a_claimed_key_is_refused() -> None:
         assert exc_info.value.status_code == 409
 
     assert not model_manager._CLAIMED_MODEL_KEYS
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("new_key", ["../../pwned", "..:stream", "a-different-but-valid-key"])
+async def test_update_model_record_refuses_to_change_the_key(new_key: str) -> None:
+    """`update_model` copies every set field into the stored config, so a `key` in the body is written into the
+    blob while the row id keeps the old one. The record then answers to a key nothing can look it up by:
+    `replace_model` (and so reidentify) raises UnknownModelException forever after, and the UI caches the model
+    under the new key so every later request 404s. Note the last case - a *valid* key does this too, so the guard
+    is on the key changing, not on it being unsafe."""
+    from unittest.mock import MagicMock, patch
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+    from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        with pytest.raises(HTTPException) as exc_info:
+            await model_manager.update_model_record(
+                key="real-key", changes=ModelRecordChanges(key=new_key, name="x"), current_admin=MagicMock()
+            )
+
+        assert exc_info.value.status_code == 422
+        deps.invoker.services.model_manager.store.update_model.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_update_model_record_accepts_the_forms_unchanged_key_echo() -> None:
+    """`ModelEdit.tsx` seeds its form from the whole config, so the key rides along on every save. That echo must
+    go through - including for a key that predates key validation, which has no other way to be edited."""
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers import model_manager
+    from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
+
+    for key in ("ecd3b3a5-6c4f-4a5f-9a0e-4b1c2d3e4f50", "legacy:key", "legacy?key"):
+        with patch.object(model_manager, "_update_model_record") as update:
+            await model_manager.update_model_record(
+                key=key, changes=ModelRecordChanges(key=key, name="renamed"), current_admin=MagicMock()
+            )
+            assert update.call_args.args[0] == key

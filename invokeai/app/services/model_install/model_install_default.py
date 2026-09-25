@@ -244,9 +244,12 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
                     self._safe_rmtree(tmpdir, self._logger)
                     continue
-                # Inside the `try`: a marker written by an older version can hold a config that no longer validates
-                # (e.g. a key that is not a plain filename), and that must skip this marker, not abort the restore
-                # of every marker after it.
+                # Inside the `try`: a marker written by an older version can hold a config that no longer
+                # validates, and that must skip this marker, not abort the restore of every marker after it. Note
+                # that an unsafe *key* is no longer such a case - `ModelRecordChanges` deliberately accepts one so
+                # the install is restored and then fails at the join in `install_path()`, which errors the job and
+                # reclaims its tmpdir. Skipping it here would strand the partial download instead: no job is
+                # created to clean up, and `_remove_dangling_install_dirs` keeps any readable non-terminal marker.
                 config_in = ModelRecordChanges(**(marker.get("config_in") or {}))
                 seen_sources.add(source_str)
             except Exception as e:
@@ -1022,6 +1025,9 @@ class ModelInstallService(ModelInstallServiceBase):
         )
         name = job.config_in.name or f"{provider_id} {provider_model_id}"
         key = job.config_in.key or slugify(f"{provider_id}-{provider_model_id}")
+        # External registration builds its config directly, so it never passes through `_probe`'s check.
+        if not is_plain_filename(key):
+            raise InvalidModelConfigException(f"Invalid model key {key!r}: it must be a plain filename")
 
         existing_external = next(
             (
@@ -1158,6 +1164,12 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _probe(self, model_path: Path, config: Optional[ModelRecordChanges] = None):
         config = config or ModelRecordChanges()
+        # A caller may name the key it wants, and the key names a directory under `models_path` and a file under
+        # `model_images`. `ModelRecordChanges` deliberately does not validate it (it is the update body too, and is
+        # re-parsed from old install markers), so assert it here - the one place a caller-supplied key becomes a
+        # record's key, for in-place registration as well as for a move-in install.
+        if config.key is not None and not is_plain_filename(config.key):
+            raise InvalidModelConfigException(f"Invalid model key {config.key!r}: it must be a plain filename")
         hash_algo = self._app_config.hashing_algorithm
         fields = config.model_dump()
 

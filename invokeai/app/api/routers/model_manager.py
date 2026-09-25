@@ -38,6 +38,7 @@ from invokeai.app.services.model_records import (
 )
 from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelInfo
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.app.util.suppress_output import SuppressOutput
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
@@ -598,6 +599,13 @@ async def update_model_record(
     current_admin: AdminUserOrDefault,
 ) -> AnyModelConfig:
     """Update a model's config."""
+    # The key identifies the row; it is not an editable field, and there is no UI to change one. The edit form
+    # does post the record back whole, so an unchanged echo is expected and accepted - but a *different* key is
+    # written into the stored config while the row id keeps the old one, which leaves a record that answers to a
+    # key nothing can look it up by: `replace_model` (and so reidentify) raises `UnknownModelException` forever
+    # after, and the UI caches the model under the new key so every later request for it 404s.
+    if "key" in changes.model_fields_set and changes.key != key:
+        raise HTTPException(status_code=422, detail="A model's key cannot be changed")
     return await asyncio.to_thread(_update_model_record, key, changes)
 
 
@@ -947,6 +955,12 @@ def install_model(
     interpreting the job information returned by this route.
     """
     logger = ApiDependencies.invoker.services.logger
+
+    # A caller may name the key it wants, and the key names the directory the model is moved into and the file its
+    # cover image is written to. Reject an unusable one here, where it is being chosen, rather than letting the
+    # install fail later at one of those joins. Existing records are not held to this - see `ModelRecordChanges.key`.
+    if config.key is not None and not is_plain_filename(config.key):
+        raise HTTPException(status_code=422, detail=f"Invalid model key {config.key!r}: it must be a plain filename")
 
     try:
         installer = ApiDependencies.invoker.services.model_manager.install
