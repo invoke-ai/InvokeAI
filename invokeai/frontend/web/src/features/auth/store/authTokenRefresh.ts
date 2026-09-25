@@ -22,16 +22,18 @@ export const markTokenRefreshAccepted = () => {
   lastTokenRefreshAcceptedAt = Date.now();
 };
 
+/** True when `refreshedToken` is the same user's replacement that advances the revocation epoch. */
+const isEpochReplacement = (requestToken: string, refreshedToken: string): boolean =>
+  tokensBelongToSameUser(requestToken, refreshedToken) &&
+  getTokenSessionKey(requestToken) !== getTokenSessionKey(refreshedToken);
+
 export const shouldThrottleRefreshedToken = (requestToken: string, refreshedToken: string): boolean => {
   if (!isTokenRefreshThrottled()) {
     return false;
   }
   // An epoch-changing replacement is the only credential that remains valid after revocation.
   // Keep every other replacement on the normal sliding-refresh throttle.
-  return !(
-    tokensBelongToSameUser(requestToken, refreshedToken) &&
-    getTokenSessionKey(requestToken) !== getTokenSessionKey(refreshedToken)
-  );
+  return !isEpochReplacement(requestToken, refreshedToken);
 };
 
 type FallbackLockTicket = {
@@ -54,8 +56,36 @@ export const beginAuthTransition = () => {
   return next;
 };
 
-export const shouldAcceptRefreshedToken = (requestToken: string, requestGeneration: number) =>
-  getAuthGeneration() === requestGeneration && localStorage.getItem('auth_token') === requestToken;
+/**
+ * True when `refreshedToken`, returned for a request sent with `requestToken`, may replace the
+ * stored token.
+ *
+ * Byte equality with the stored token rejects refreshes that belong to a different login: a
+ * logout, another user logging in, or another tab adopting a new token. A routine sliding-window
+ * refresh of the same session committed in the meantime is not one of those, but it changes the
+ * bytes too. For an epoch-advancing replacement (a password change) that would drop the only
+ * credential that survives the revocation, so it is also accepted when the stored token is the
+ * same session (user id and epoch) as `requestToken`. It is then strictly newer than both. The
+ * generation check still rejects any login transition that started after the request was sent.
+ */
+export const shouldAcceptRefreshedToken = (
+  requestToken: string,
+  requestGeneration: number,
+  refreshedToken?: string
+): boolean => {
+  if (getAuthGeneration() !== requestGeneration) {
+    return false;
+  }
+  const storedToken = localStorage.getItem('auth_token');
+  if (storedToken === requestToken) {
+    return true;
+  }
+  return (
+    refreshedToken !== undefined &&
+    isEpochReplacement(requestToken, refreshedToken) &&
+    getTokenSessionKey(storedToken) === getTokenSessionKey(requestToken)
+  );
+};
 
 /**
  * True when a 401 for a request that carried `requestToken` should end the live session.
