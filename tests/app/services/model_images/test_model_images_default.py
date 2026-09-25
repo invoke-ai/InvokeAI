@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -92,3 +93,29 @@ def test_ordinary_keys_still_round_trip(storage: ModelImageFileStorageDisk):
         storage.delete(key)
         with pytest.raises(ModelImageFileNotFoundException):
             storage.get(key)
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Legacy colon keys could only have been stored on POSIX filesystems")
+def test_existing_legacy_posix_key_still_serves_its_cover(storage: ModelImageFileStorageDisk):
+    """Keys with Windows-reserved punctuation were valid on POSIX before this guard and may already have cover files."""
+    key = "legacy:key"
+    image_path = storage._model_images_folder / f"{key}.webp"
+    Image.new("RGB", (8, 8)).save(image_path, format="webp")
+    storage._invoker.services.urls.get_model_image_url.return_value = f"/api/v2/models/i/{key}/image"
+
+    url = storage.get_url(key)
+
+    assert url is not None
+    assert url.startswith(f"/api/v2/models/i/{key}/image?")
+
+
+@pytest.mark.skipif(os.name == "nt", reason="Legacy colon keys could only have been stored on POSIX filesystems")
+def test_existing_legacy_posix_key_cover_can_be_deleted(storage: ModelImageFileStorageDisk):
+    """An existing cover for a previously valid POSIX key must remain manageable after upgrade."""
+    key = "legacy:key"
+    image_path = storage._model_images_folder / f"{key}.webp"
+    Image.new("RGB", (8, 8)).save(image_path, format="webp")
+
+    storage.delete(key)
+
+    assert not image_path.exists()
