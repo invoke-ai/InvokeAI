@@ -5,7 +5,7 @@ point the server at addresses only the server can reach — loopback services, o
 hosts on the private network, or the cloud metadata endpoint at 169.254.169.254 — and
 use the download job as a proxy for them.
 
-There are two layers here, and the second is the one that actually holds:
+There are two layers for direct downloads, and the second is the one that actually holds:
 
 `build_guarded_session()` returns a `requests.Session` that validates the peer address
 of every socket it opens, before a single byte of the request is written. Checking the
@@ -191,8 +191,10 @@ def validate_download_url(url: str, allow_private_urls: bool = False) -> None:
     loopback record is rejected, because we cannot control which one the HTTP client picks.
 
     An unresolvable host is allowed through to the HTTP client, so that offline test
-    environments and mocked sessions keep working. That is only safe because the session
-    from `build_guarded_session()` re-checks the address it actually connects to.
+    environments and mocked sessions keep working. For direct downloads this is safe
+    because the session from `build_guarded_session()` re-checks the address it actually
+    connects to. With an explicit proxy, the operator must enforce the destination policy
+    at the proxy; this process cannot inspect the proxy's DNS resolution or final peer.
     """
     parts = urlsplit(str(url))
 
@@ -275,21 +277,6 @@ class SsrfGuardedAdapter(HTTPAdapter):
             "https": _GuardedHTTPSConnectionPool,
         }
 
-    def proxy_manager_for(self, proxy: str, **proxy_kwargs: Any) -> Any:
-        """Install the socket guard on proxy pools as well as direct pools.
-
-        Requests creates proxy managers separately from the adapter's direct pool
-        manager. Without replacing their pool classes, an explicit download proxy
-        would use urllib3's ordinary connection classes and bypass the peer-address
-        check entirely.
-        """
-        manager = super().proxy_manager_for(proxy, **proxy_kwargs)
-        manager.pool_classes_by_scheme = {
-            "http": _GuardedHTTPConnectionPool,
-            "https": _GuardedHTTPSConnectionPool,
-        }
-        return manager
-
 
 class _SsrfGuardedSession(requests.Session):
     """Session that keeps Requests environment support but drops ambient proxies."""
@@ -341,7 +328,7 @@ class _SsrfGuardedSession(requests.Session):
 
 
 def build_guarded_session(proxy: str | None = None) -> requests.Session:
-    """A `requests.Session` that will not open a connection to a non-public address."""
+    """Guard direct connections; an explicit proxy owns destination-address policy."""
     session = _SsrfGuardedSession()
     if proxy:
         session.proxies.update({"http": proxy, "https": proxy})
@@ -368,8 +355,9 @@ def warn_if_proxied(session: requests.Session, logger: logging.Logger) -> None:
     proxies = proxies_in_effect(session)
     if proxies:
         logger.warning(
-            "An explicit HTTP proxy is configured (%s). Downloads through it cannot be checked "
-            "against loopback/private addresses at the socket; restrict outbound access at the proxy.",
+            "An explicit HTTP proxy is configured (%s). InvokeAI cannot verify the download "
+            "destination address through it. The proxy must enforce the destination address policy "
+            "and block loopback, private-network, and cloud-metadata targets, including after DNS resolution.",
             ", ".join(sorted(proxies)),
         )
     elif getattr(session, "_ignore_environment_proxies", False) and getproxies():
