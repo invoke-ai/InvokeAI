@@ -916,3 +916,30 @@ async def test_a_legacy_posix_key_can_still_replace_and_delete_its_cover(real_mo
 
         model_manager.delete_model_image(MagicMock(), key=key)
         assert not image_path.exists()
+
+
+def test_model_image_url_encodes_the_key() -> None:
+    """Unencoded, a stored key like `X?y` makes the cover URL address the route for model `X` instead."""
+    from invokeai.app.services.urls.urls_default import LocalUrlService
+
+    urls = LocalUrlService()
+    assert urls.get_model_image_url("X?y") == "api/v2/models/i/X%3Fy/image"
+    assert urls.get_model_image_url("a#b%c") == "api/v2/models/i/a%23b%25c/image"
+    assert urls.get_model_image_url("openai-dall-e-3") == "api/v2/models/i/openai-dall-e-3/image"
+
+
+def test_an_encoded_key_reaches_the_image_route_intact(client: TestClient, tmp_path: Path) -> None:
+    """The other half of the encoding: the server decodes `%3F` back into the key, rather than routing on it."""
+    from unittest.mock import patch
+
+    from invokeai.app.api.routers import model_manager
+
+    cover = tmp_path / "cover.webp"
+    Image.new("RGB", (8, 8)).save(cover, format="webp")
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        deps.invoker.services.model_images.get_path.return_value = cover
+        response = client.get("/api/v2/models/i/X%3Fy/image")
+
+    assert response.status_code == 200
+    deps.invoker.services.model_images.get_path.assert_called_once_with("X?y")

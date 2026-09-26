@@ -58,8 +58,12 @@ class ModelImageFileStorageDisk(ModelImageFileStorageBase):
         except ModelImageFileNotFoundException:
             # This is called while listing every model, so a bad key must not take the whole list down.
             return None
-        if not self._validate_path(path):
-            return
+        try:
+            if not self._validate_path(path):
+                return
+        except OSError:
+            # e.g. ENAMETOOLONG for an over-long stored key: as above, one bad key must not fail the whole list.
+            return None
 
         url = self._invoker.services.urls.get_model_image_url(model_key)
 

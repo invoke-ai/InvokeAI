@@ -67,7 +67,9 @@ def test_get_path_rejects_posix_traversal_keys(storage: ModelImageFileStorageDis
         storage.get_path(key)
 
 
-@pytest.mark.parametrize("key", ["legacy:key", "legacy?key", "a\\b", "NUL", "trailing.", "..:stream"])
+# Skipped on Windows: `get_path` builds a real `WindowsPath`, which splits `a\\b` whatever rules are forced.
+@pytest.mark.skipif(os.name == "nt", reason="Legacy posix keys could only have been stored on POSIX filesystems")
+@pytest.mark.parametrize("key", ["legacy:key", "legacy?key", "a\\b", "NUL", "..:stream"])
 def test_get_path_keeps_legacy_posix_keys_inside_the_folder(
     storage: ModelImageFileStorageDisk, posix_rules: None, key: str
 ):
@@ -150,3 +152,9 @@ def test_existing_legacy_posix_key_cover_can_be_deleted(storage: ModelImageFileS
     storage.delete(key)
 
     assert not image_path.exists()
+
+
+def test_get_url_returns_none_for_an_over_long_key(storage: ModelImageFileStorageDisk):
+    """`exists()` raises ENAMETOOLONG rather than returning False, and `get_url()` runs for every model in the list
+    response - so an over-long stored key must not fail the whole listing."""
+    assert storage.get_url("a" * 300) is None

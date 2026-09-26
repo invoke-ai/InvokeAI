@@ -134,7 +134,7 @@ export const modelsApi = api.injectEndpoints({
     updateModel: build.mutation<UpdateModelResponse, UpdateModelArg>({
       query: ({ key, body }) => {
         return {
-          url: buildModelsUrl(`i/${key}`),
+          url: buildModelsUrl(`i/${encodeURIComponent(key)}`),
           method: 'PATCH',
           body: body,
         };
@@ -168,7 +168,7 @@ export const modelsApi = api.injectEndpoints({
         const formData = new FormData();
         formData.append('image', image);
         return {
-          url: buildModelsUrl(`i/${key}/image`),
+          url: buildModelsUrl(`i/${encodeURIComponent(key)}/image`),
           method: 'PATCH',
           body: formData,
         };
@@ -189,7 +189,7 @@ export const modelsApi = api.injectEndpoints({
     deleteModels: build.mutation<DeleteModelResponse, DeleteModelArg>({
       query: ({ key }) => {
         return {
-          url: buildModelsUrl(`i/${key}`),
+          url: buildModelsUrl(`i/${encodeURIComponent(key)}`),
           method: 'DELETE',
         };
       },
@@ -208,26 +208,26 @@ export const modelsApi = api.injectEndpoints({
     deleteModelImage: build.mutation<DeleteModelImageResponse, string>({
       query: (key) => {
         return {
-          url: buildModelsUrl(`i/${key}/image`),
+          url: buildModelsUrl(`i/${encodeURIComponent(key)}/image`),
           method: 'DELETE',
         };
       },
       invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
     getModelImage: build.query<string, string>({
-      query: (key) => buildModelsUrl(`i/${key}/image`),
+      query: (key) => buildModelsUrl(`i/${encodeURIComponent(key)}/image`),
     }),
     convertModel: build.mutation<ConvertMainModelResponse, string>({
       query: (key) => {
         return {
-          url: buildModelsUrl(`convert/${key}`),
+          url: buildModelsUrl(`convert/${encodeURIComponent(key)}`),
           method: 'PUT',
         };
       },
       invalidatesTags: [{ type: 'ModelConfig', id: LIST_TAG }],
     }),
     getModelConfig: build.query<GetModelConfigResponse, string>({
-      query: (key) => buildModelsUrl(`i/${key}`),
+      query: (key) => buildModelsUrl(`i/${encodeURIComponent(key)}`),
       providesTags: (result) => {
         const tags: ApiTagDescription[] = [];
 
@@ -418,7 +418,7 @@ export const modelsApi = api.injectEndpoints({
     >({
       query: ({ key }) => {
         return {
-          url: buildModelsUrl(`i/${key}/reidentify`),
+          url: buildModelsUrl(`i/${encodeURIComponent(key)}/reidentify`),
           method: 'POST',
         };
       },
