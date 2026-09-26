@@ -11,7 +11,7 @@ from invokeai.app.services.model_images.model_images_common import (
     ModelImageFileSaveException,
 )
 from invokeai.app.util.misc import uuid_string
-from invokeai.app.util.path_safety import is_plain_filename
+from invokeai.app.util.path_safety import is_contained_filename
 from invokeai.app.util.thumbnails import make_thumbnail
 
 
@@ -86,14 +86,16 @@ class ModelImageFileStorageDisk(ModelImageFileStorageBase):
 
     @staticmethod
     def _validate_key(model_key: str) -> None:
-        """Validates that a model key is a plain filename, so it cannot escape the model images folder.
+        """Validates that a model key cannot escape the model images folder.
 
         Keys are server-generated - a uuid, or a slug for external API models - but they arrive from the client as
-        a path parameter, so they are untrusted.
+        a path parameter, so they are untrusted. This checks containment on the running platform rather than the
+        portable rules new keys must meet: a key stored by an older version may be a legal posix filename that
+        Windows would reject (`legacy:key`), and its existing cover must stay servable and manageable.
 
-        :raises ModelImageFileNotFoundException: if the key is not a plain filename
+        :raises ModelImageFileNotFoundException: if the key would not name a file inside the folder
         """
-        if not is_plain_filename(model_key):
+        if not is_contained_filename(model_key):
             raise ModelImageFileNotFoundException(f"Invalid model key {model_key!r}")
 
     def _validate_storage_folders(self) -> None:

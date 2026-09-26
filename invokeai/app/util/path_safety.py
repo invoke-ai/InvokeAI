@@ -1,4 +1,8 @@
+import os
 from pathlib import PureWindowsPath
+
+# Read at call time by `is_contained_filename`, so tests can exercise both platforms' rules on either.
+_ON_WINDOWS = os.name == "nt"
 
 # C0, DEL and C1. `str.splitlines()` also splits on U+0085 (in C1), U+2028 and U+2029, so a name containing one
 # of those forges a second line in any log record that interpolates it.
@@ -63,3 +67,23 @@ def is_plain_filename(name: str) -> bool:
     if normalised.split(".", 1)[0].rstrip(" ").upper() in _RESERVED_STEMS:
         return False
     return PureWindowsPath(name).name == name
+
+
+def is_contained_filename(name: str) -> bool:
+    r"""Checks whether a name that may already be on disk can be joined onto its storage directory.
+
+    `is_plain_filename` is the gate for a name we are about to *accept*: it applies Windows' rules everywhere, so
+    nothing new can be stored that some deployment could not hold. But no released version checked model keys, and
+    on posix `: ? * | < > " \` and names like `NUL` are ordinary filename characters, so records exist whose keys
+    fail it - and whose files (a model's cover image, say) are sitting in the store under those names. Applying the
+    portable rules to *those* would only strand the data: its cover stops being served and can no longer be replaced
+    or deleted.
+
+    So this checks containment on the platform we are running on, and nothing more. On Windows that is exactly
+    `is_plain_filename`, since every rule there exists because Win32 would otherwise leave the directory (or the
+    file namespace). On posix, only an empty name, `.`, `..` or a `/` can leave it; control characters are refused
+    on both for the same log-safety reason `is_plain_filename` gives.
+    """
+    if _ON_WINDOWS:
+        return is_plain_filename(name)
+    return bool(name) and not _CONTROL_CHARS.intersection(name) and "/" not in name and name not in (".", "..")

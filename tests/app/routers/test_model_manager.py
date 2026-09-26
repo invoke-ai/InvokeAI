@@ -882,3 +882,37 @@ async def test_update_model_record_accepts_the_forms_unchanged_key_echo() -> Non
                 key=key, changes=ModelRecordChanges(key=key, name="renamed"), current_admin=MagicMock()
             )
             assert update.call_args.args[0] == key
+
+
+@pytest.mark.anyio
+@pytest.mark.skipif(os.name == "nt", reason="Legacy colon keys could only have been stored on POSIX filesystems")
+async def test_a_legacy_posix_key_can_still_replace_and_delete_its_cover(real_model_images) -> None:
+    """No released version checked model keys, so a posix install can hold a model keyed `legacy:key` with a cover
+    already on disk. The image routes must keep managing it rather than 404ing on a Windows-only rule."""
+    from io import BytesIO
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers import model_manager
+
+    key = "legacy:key"
+    image_bytes = BytesIO()
+    Image.new("RGB", (8, 8)).save(image_bytes, format="PNG")
+    image = MagicMock()
+    image.content_type = "image/png"
+
+    async def read() -> bytes:
+        return image_bytes.getvalue()
+
+    image.read = read
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = real_model_images
+        deps.invoker.services.model_manager.store.get_model.return_value = MagicMock()
+
+        await model_manager.update_model_image(key, image, MagicMock())
+        image_path = real_model_images._model_images_folder / f"{key}.webp"
+        assert image_path.exists()
+
+        model_manager.delete_model_image(MagicMock(), key=key)
+        assert not image_path.exists()

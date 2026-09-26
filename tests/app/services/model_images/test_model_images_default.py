@@ -11,6 +11,7 @@ from invokeai.app.services.model_images.model_images_common import (
     ModelImageFileSaveException,
 )
 from invokeai.app.services.model_images.model_images_default import ModelImageFileStorageDisk
+from invokeai.app.util import path_safety
 
 # Model keys reach this service from the `/v2/models/i/{key}/image` path parameter and from an install
 # request's `ModelRecordChanges.key`. Note which of these are actually reachable over HTTP: uvicorn
@@ -31,6 +32,22 @@ TRAVERSAL_KEYS = [
 ]
 
 
+# The subset of TRAVERSAL_KEYS that leaves the folder on posix. The rest are ordinary filenames there, and an older
+# version may have stored a cover under one, so the store only refuses them on Windows.
+POSIX_TRAVERSAL_KEYS = ["..", ".", "", "../escaped", "sub/nested", "/etc/passwd", "nul\x00byte"]
+
+
+@pytest.fixture
+def windows_rules(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Apply Windows' containment rules whatever the host, so a posix CI run still covers the Windows payloads."""
+    monkeypatch.setattr(path_safety, "_ON_WINDOWS", True)
+
+
+@pytest.fixture
+def posix_rules(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(path_safety, "_ON_WINDOWS", False)
+
+
 @pytest.fixture
 def storage(tmp_path: Path) -> ModelImageFileStorageDisk:
     storage = ModelImageFileStorageDisk(tmp_path / "model_images")
@@ -39,9 +56,23 @@ def storage(tmp_path: Path) -> ModelImageFileStorageDisk:
 
 
 @pytest.mark.parametrize("key", TRAVERSAL_KEYS)
-def test_get_path_rejects_traversal_keys(storage: ModelImageFileStorageDisk, key: str):
+def test_get_path_rejects_traversal_keys(storage: ModelImageFileStorageDisk, windows_rules: None, key: str):
     with pytest.raises(ModelImageFileNotFoundException):
         storage.get_path(key)
+
+
+@pytest.mark.parametrize("key", POSIX_TRAVERSAL_KEYS)
+def test_get_path_rejects_posix_traversal_keys(storage: ModelImageFileStorageDisk, posix_rules: None, key: str):
+    with pytest.raises(ModelImageFileNotFoundException):
+        storage.get_path(key)
+
+
+@pytest.mark.parametrize("key", ["legacy:key", "legacy?key", "a\\b", "NUL", "trailing.", "..:stream"])
+def test_get_path_keeps_legacy_posix_keys_inside_the_folder(
+    storage: ModelImageFileStorageDisk, posix_rules: None, key: str
+):
+    """On posix these are ordinary filenames that stay in the folder, and older versions stored covers under them."""
+    assert storage.get_path(key).parent == storage._model_images_folder
 
 
 def test_get_does_not_read_outside_the_images_folder(storage: ModelImageFileStorageDisk, tmp_path: Path):
@@ -54,7 +85,7 @@ def test_get_does_not_read_outside_the_images_folder(storage: ModelImageFileStor
 
 
 @pytest.mark.parametrize("key", TRAVERSAL_KEYS)
-def test_save_rejects_traversal_keys(storage: ModelImageFileStorageDisk, key: str):
+def test_save_rejects_traversal_keys(storage: ModelImageFileStorageDisk, windows_rules: None, key: str):
     with pytest.raises(ModelImageFileSaveException):
         storage.save(Image.new("RGB", (8, 8)), key)
 

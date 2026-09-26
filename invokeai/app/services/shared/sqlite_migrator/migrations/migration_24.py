@@ -8,7 +8,7 @@ from pydantic import ValidationError
 
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_common import Migration
-from invokeai.app.util.path_safety import is_plain_filename
+from invokeai.app.util.path_safety import is_contained_filename
 from invokeai.backend.model_manager.configs.factory import AnyModelConfigValidator
 
 
@@ -119,11 +119,11 @@ class Migration24Callback:
         rollback_ops: list[tuple[Path, Path]] = []
 
         # Destination directory is models_dir/<key> - a flat directory structure. The key comes from the stored
-        # config blob, and older versions did not check what went in there, so a key that is not a plain filename
-        # would mkdir and move the weights outside `models_dir`. Leave such a model where it is rather than
-        # relocating it somewhere it should not be; it stays usable via its recorded path.
-        if not is_plain_filename(key):
-            self._logger.warning("Model key %r is not a plain filename; leaving its files in place", key)
+        # config blob, and older versions did not check what went in there, so a key that would not stay inside
+        # `models_dir` on this platform would mkdir and move the weights outside it. Leave such a model where it is
+        # rather than relocating it somewhere it should not be; it stays usable via its recorded path.
+        if not is_contained_filename(key):
+            self._logger.warning("Model key %r would escape the models directory; leaving its files in place", key)
             return NormalizeResult(new_relative_path=None, rollback_ops=[])
 
         destination_dir = models_dir / key

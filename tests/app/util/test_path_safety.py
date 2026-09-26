@@ -1,7 +1,8 @@
 import pytest
 
+from invokeai.app.util import path_safety
 from invokeai.app.util.misc import uuid_string
-from invokeai.app.util.path_safety import is_plain_filename
+from invokeai.app.util.path_safety import is_contained_filename, is_plain_filename
 
 # Every one of these, joined onto a storage directory, resolves outside it - or, for the empty/dot cases,
 # resolves to the directory itself rather than a file in it. The backslash and drive-letter shapes only escape on
@@ -142,3 +143,42 @@ def test_is_plain_filename_keeps_names_that_merely_start_like_a_device(name: str
 def test_is_plain_filename_keeps_names_that_only_look_like_dot_names(name: str):
     """The trailing-dot rule must not swallow ordinary names that happen to end in a dot."""
     assert is_plain_filename(name) is True
+
+
+# Legal posix filenames that `is_plain_filename` refuses. Older versions stored model keys unchecked, so data can
+# already exist under these names on a posix install.
+LEGACY_POSIX_NAMES = [
+    "legacy:key",
+    "legacy?key",
+    "legacy*key",
+    'a"b',
+    "a|b",
+    "<a>",
+    "a\\b",
+    "NUL",
+    "COM1",
+    "...",
+    "... ",
+    "..:stream",
+    "C:relative",
+]
+POSIX_ESCAPING_NAMES = ["", ".", "..", "../escaped", "/etc/passwd", "sub/nested", "trailing/", "nul\x00byte", "a\nb"]
+
+
+@pytest.mark.parametrize("name", LEGACY_POSIX_NAMES)
+def test_is_contained_filename_keeps_legacy_posix_names_on_posix(monkeypatch: pytest.MonkeyPatch, name: str):
+    monkeypatch.setattr(path_safety, "_ON_WINDOWS", False)
+    assert not is_plain_filename(name)
+    assert is_contained_filename(name)
+
+
+@pytest.mark.parametrize("name", POSIX_ESCAPING_NAMES)
+def test_is_contained_filename_rejects_posix_escapes_on_posix(monkeypatch: pytest.MonkeyPatch, name: str):
+    monkeypatch.setattr(path_safety, "_ON_WINDOWS", False)
+    assert not is_contained_filename(name)
+
+
+@pytest.mark.parametrize("name", UNSAFE_NAMES + LEGACY_POSIX_NAMES + SAFE_NAMES)
+def test_is_contained_filename_is_is_plain_filename_on_windows(monkeypatch: pytest.MonkeyPatch, name: str):
+    monkeypatch.setattr(path_safety, "_ON_WINDOWS", True)
+    assert is_contained_filename(name) == is_plain_filename(name)
