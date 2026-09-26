@@ -37,7 +37,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_comfy_quant_hints,
     extract_fp8_scaled_layers,
     parse_quantization_metadata,
-    predict_cast_state_dict_size,
     read_safetensors_metadata,
     should_keep_fp8_weights,
     split_fp8_scaled_layers,
@@ -47,7 +46,8 @@ from invokeai.backend.quantization.fp8_scaled import (
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.int8_convrot import reject_int8_layers_a_plain_fold_cannot_decode
-from invokeai.backend.quantization.nvfp4 import install_nvfp4_layers, pop_nvfp4_layers, predict_nvfp4_install_size
+from invokeai.backend.quantization.load_plan import reserve_for_load
+from invokeai.backend.quantization.nvfp4 import install_nvfp4_layers, pop_nvfp4_layers
 from invokeai.backend.qwen2_5_vl.qwen2_5_vl_assets import (
     load_bundled_qwen2_5_vl_config_dict,
     load_bundled_qwen2_5_vl_tokenizer,
@@ -315,11 +315,15 @@ class QwenImageCheckpointModel(ModelLoader):
 
         # One reservation, before the fold or the split widens a single weight: `make_room` makes that much room
         # rather than adding to an earlier one.
-        self._ram_cache.make_room(
-            predict_cast_state_dict_size(
-                sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns, scaled_layers=fp8_layers
-            )
-            + predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns)
+        reserve_for_load(
+            self._ram_cache.make_room,
+            sd,
+            model_dtype,
+            keep_fp8=keep_fp8,
+            model=model,
+            skip_patterns=skip_patterns,
+            fp8_layers=fp8_layers,
+            nvfp4_payloads=nvfp4_payloads,
         )
 
         if fp8_layers and not keep_fp8:
@@ -472,9 +476,15 @@ class QwenVLEncoderCheckpointLoader(ModelLoader):
 
         # One reservation, before the fold widens a single weight: `make_room` makes that much room rather than adding
         # to an earlier one. Every fp8 layer is folded to the compute dtype.
-        self._ram_cache.make_room(
-            predict_cast_state_dict_size(sd, model_dtype, keep_fp8=False)
-            + predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns)
+        reserve_for_load(
+            self._ram_cache.make_room,
+            sd,
+            model_dtype,
+            keep_fp8=False,
+            model=model,
+            skip_patterns=skip_patterns,
+            fp8_layers={},
+            nvfp4_payloads=nvfp4_payloads,
         )
 
         # Dequantize ComfyUI-style fp8 weights, then strip the now-unused quantization

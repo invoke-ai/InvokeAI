@@ -195,12 +195,17 @@ def test_the_transformer_keeps_nvfp4_packed_and_scaled_fp8_only_where_something_
     assert entries_at_storage_cast == ([0] if mode == "fp8_storage" else [])
 
     # Counted by hand: the packed layers as stored; their biases, the fp8 layer's bias and the dense input projection at
-    # bf16; the fp8 weight at bf16 when folded and one byte per element when kept. The side-channel scales, recovered
-    # before the reservation, are not in the state dict it sizes.
+    # bf16; the fp8 weight at bf16 when folded and one byte per element when kept. The side-channel scales are recovered
+    # before the reservation and are no longer in the state dict it sizes -- the seam reserves through `reserve_for_load`,
+    # which is handed them too and charges them. Four bytes here, for the one scalar `weight_scale`: the `input_scale` of
+    # 1.0 is an uncalibrated placeholder that `_usable_input_scale` drops, so nothing is charged for it.
     packed = _packed_bytes(128, 64) + _packed_bytes(256, 64)
     fp8_weight = 128 * 64 * (COMPUTE_DTYPE.itemsize if mode == "fold" else 1)
     dense = (128 + 256) + 128 + (128 * 64 + 128)
-    loader._ram_cache.make_room.assert_called_once_with(packed + fp8_weight + dense * COMPUTE_DTYPE.itemsize)
+    recovered_scale = torch.tensor(0.5).element_size()
+    loader._ram_cache.make_room.assert_called_once_with(
+        packed + fp8_weight + dense * COMPUTE_DTYPE.itemsize + recovered_scale
+    )
 
 
 class _TinyQwenVL(torch.nn.Module):

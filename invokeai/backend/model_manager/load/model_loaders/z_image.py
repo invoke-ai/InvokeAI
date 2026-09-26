@@ -56,7 +56,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     is_scale_metadata_key,
     iter_weight_scale_pairs,
     parse_quantization_metadata,
-    predict_cast_state_dict_size,
     read_safetensors_metadata,
     reject_quantized_side_channel,
     reject_undecoded_mx_scale,
@@ -72,6 +71,7 @@ from invokeai.backend.quantization.int8_convrot import (
     install_int8_convrot_layers,
     reject_unmarked_int8_weights,
 )
+from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.quantization.nvfp4 import (
     NVFP4Payload,
     install_nvfp4_layers,
@@ -649,16 +649,15 @@ class ZImageCheckpointModel(ModelLoader):
             # With it, `scaled_layers` is what keeps the prediction honest: the split also widens layers
             # whose scale layout `scaled_mm` cannot apply, and without the mapping the prediction would
             # charge those 1 byte/element and arrive at 2.
-            self._ram_cache.make_room(
-                predict_cast_state_dict_size(
-                    sd,
-                    model_dtype,
-                    keep_fp8=keep_fp8,
-                    model=model,
-                    skip_patterns=skip_patterns,
-                    scaled_layers=fp8_layers,
-                )
-                + nvfp4_bytes
+            reserve_for_load(
+                self._ram_cache.make_room,
+                sd,
+                model_dtype,
+                keep_fp8=keep_fp8,
+                model=model,
+                skip_patterns=skip_patterns,
+                fp8_layers=fp8_layers,
+                nvfp4_payloads=nvfp4_payloads,
             )
 
             if fp8_layers and not keep_fp8:
@@ -1370,6 +1369,11 @@ class Qwen3EncoderCheckpointLoader(ModelLoader):
             # reservation for what the state dict ends up holding -- every tensor but the scale metadata at the
             # compute dtype, plus the nvfp4 layers as they will be held -- since `make_room` makes that much room
             # rather than adding to an earlier one.
+            # The excluded scale keys are still in `sd` and still resident, so this sum is short by
+            # them -- bounded, not open-ended: `_fold_comfy_scaled_weights` refuses an MXFP8 grid by
+            # name before folding, so the residue here is per-tensor and per-channel float32 scales,
+            # kilobytes on this encoder. That is why this seam keeps its own sum rather than
+            # `reserve_for_load`, which sizes a dict the side channel has been *popped* out of.
             new_sd_size = sum(
                 tensor.nelement() * model_dtype.itemsize for key, tensor in sd.items() if not is_scale_metadata_key(key)
             )

@@ -47,7 +47,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
     parse_quantization_metadata,
-    predict_cast_state_dict_size,
     read_safetensors_metadata,
     reject_quantized_side_channel,
     should_keep_fp8_weights,
@@ -61,6 +60,7 @@ from invokeai.backend.quantization.int8_convrot import (
     reject_int8_layers_a_plain_fold_cannot_decode,
     reject_unmarked_int8_weights,
 )
+from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, log_unexpected_keys
 
@@ -430,15 +430,15 @@ class Ideogram4CheckpointModel(ModelLoader):
             # Where the weights are not kept the prediction charges every float at `model_dtype`,
             # folded yet or not, so the number is the same on either side of the fold -- what changes
             # is when the room exists.
-            self._ram_cache.make_room(
-                predict_cast_state_dict_size(
-                    sd,
-                    model_dtype,
-                    keep_fp8=keep_fp8,
-                    model=model,
-                    skip_patterns=skip_patterns,
-                    scaled_layers=fp8_layers,
-                )
+            reserve_for_load(
+                self._ram_cache.make_room,
+                sd,
+                model_dtype,
+                keep_fp8=keep_fp8,
+                model=model,
+                skip_patterns=skip_patterns,
+                fp8_layers=fp8_layers,
+                nvfp4_payloads={},
             )
             if fp8_layers and not keep_fp8:
                 # Neither consumer asked. Fold the scales in: staying quantized would halve VRAM but

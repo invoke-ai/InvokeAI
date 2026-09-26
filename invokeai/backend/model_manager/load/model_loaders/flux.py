@@ -98,7 +98,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     is_scale_metadata_key,
     iter_weight_scale_pairs,
     parse_quantization_metadata,
-    predict_cast_state_dict_size,
     read_safetensors_metadata,
     reject_quantized_side_channel,
     split_fp8_scaled_layers,
@@ -115,6 +114,7 @@ from invokeai.backend.quantization.int8_convrot import (
     install_int8_convrot_layers,
     reject_unmarked_int8_weights,
 )
+from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
 from invokeai.backend.util.logging import InvokeAILogger
@@ -861,15 +861,15 @@ class FluxCheckpointModel(ModelLoader):
         # mapping the prediction would charge those 1 byte/element and arrive at 2. Where they are
         # not kept the prediction charges every float at the compute dtype, folded yet or not, so
         # the number is the same on either side of the fold -- what changes is when the room exists.
-        self._ram_cache.make_room(
-            predict_cast_state_dict_size(
-                sd,
-                torch.bfloat16,
-                keep_fp8=keep_fp8,
-                model=model,
-                skip_patterns=skip_patterns,
-                scaled_layers=fp8_layers,
-            )
+        reserve_for_load(
+            self._ram_cache.make_room,
+            sd,
+            torch.bfloat16,
+            keep_fp8=keep_fp8,
+            model=model,
+            skip_patterns=skip_patterns,
+            fp8_layers=fp8_layers,
+            nvfp4_payloads={},
         )
 
         if fp8_layers and not keep_fp8:
@@ -1249,7 +1249,21 @@ class Flux2CheckpointModel(ModelLoader):
                 # quantized, and with `keep_fp8` false nothing does, so the model-less number is the
                 # same one. With `keep_fp8` true neither step widens anything, and the reservation
                 # below covers the split on its own.
-                self._ram_cache.make_room(predict_cast_state_dict_size(converted_sd, torch.bfloat16, keep_fp8=False))
+                # Through the shared reservation, for the scales `extract_fp8_scaled_layers` has just
+                # recovered: they are resident across this `make_room` and are consumed by the fold
+                # immediately below, and `predict_cast_state_dict_size` cannot see them because they
+                # are no longer in the dict. On an MXFP8 build that is ~0.125 B per weight element of
+                # decoded exponent grid. No model here, which is fine -- `keep_fp8` is false, so the
+                # prediction does not consult one, and no nvfp4 payload exists on this path.
+                reserve_for_load(
+                    self._ram_cache.make_room,
+                    converted_sd,
+                    torch.bfloat16,
+                    keep_fp8=False,
+                    model=None,
+                    fp8_layers=fp8_layers,
+                    nvfp4_payloads={},
+                )
 
             if fp8_layers and not keep_fp8:
                 # Neither the matmul nor FP8 Storage asked for them, so keeping them quantized would
@@ -1373,15 +1387,15 @@ class Flux2CheckpointModel(ModelLoader):
             # transient land on an unreserved cache. This path had no reservation at all, which on
             # a machine already holding the 15 GiB Qwen3-8B encoder meant nothing was ever evicted
             # to make room for a 16.9 GiB bf16 Klein 9B.
-            self._ram_cache.make_room(
-                predict_cast_state_dict_size(
-                    converted_sd,
-                    torch.bfloat16,
-                    keep_fp8=keep_fp8,
-                    model=model,
-                    skip_patterns=skip_patterns,
-                    scaled_layers=fp8_layers,
-                )
+            reserve_for_load(
+                self._ram_cache.make_room,
+                converted_sd,
+                torch.bfloat16,
+                keep_fp8=keep_fp8,
+                model=model,
+                skip_patterns=skip_patterns,
+                fp8_layers=fp8_layers,
+                nvfp4_payloads={},
             )
 
             # Scaled layers the cast would dequantize anyway are folded here, scale applied, so

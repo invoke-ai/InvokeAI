@@ -1532,38 +1532,24 @@ class TestMalformedWeightScale:
             expand_weight_scale(torch.ones(32, 16), torch.full((7,), 2.0))
 
 
-class TestReservationCoversTheSideChannelItHolds:
-    """The reservation is made *after* the side channel has been taken out of the state dict.
+class TestTheDecodeWidensTheGridOutsideThisPrediction:
+    """Why this predictor cannot answer about an MXFP8 build, and what does.
 
-    `extract_fp8_scaled_layers` pops every scale key and hands back a mapping of tensors, and for an
-    MXFP8 layer it does more than move them: `decode_mx_block_scales` replaces the stored `uint8`
-    exponent grid with a float one, four times the size. That happens before the caller's
-    `make_room`, so those bytes are resident while the cache decides what to evict -- and they are in
-    no reservation, because the predictor walks the state dict they are no longer in.
+    `extract_fp8_scaled_layers` pops every scale key and hands back a mapping, and for an MXFP8 layer
+    it does more than move them: `decode_mx_block_scales` replaces the stored `uint8` exponent grid
+    with a float32 one four times the size. That happens before the caller's `make_room`, so those
+    bytes are resident while the cache decides what to evict -- and this function cannot see them,
+    because it walks the state dict they have left.
 
-    Measured on a 512x512 toy layer, per element of the weight:
+    That is a property of its contract rather than a defect in it: it answers about the dict, exactly,
+    and `TestPredictionIsSplitAware` pins the equality. Adding the mapping's bytes here would turn the
+    answer into a peak and redden all three of those parametrizations. The question belongs to
+    `reserve_for_load`, which is handed both halves; `tests/backend/quantization/test_load_plan.py`
+    is where the grid is asserted to be inside the reservation.
 
-        predicted (the widened bf16 weight)            2.000 B/element   524288 B
-        decoded grids, held for every layer at once    0.125 B/element    32768 B
-        per-layer fold transients (below)             12.000 B/element
-
-    The grid is the *smallest* unreserved term, and the only one held for the whole quantized set at
-    once, which is why it is what this class pins: one entry per 32 weight elements, so around 1.5 GB
-    on Comfy-Org's 12 GB MXFP8 build.
-
-    The per-layer term is larger *per element* and not in absolute peak. `dequantize_fp8_scaled` folds
-    one layer at a time, and for a block-wise grid `expand_weight_scale` `repeat_interleave`s it to the
-    weight's full width in float32 -- 4 B/element -- beside `weight.float()` and the float32 product,
-    so the peak is ~14 B/element of the *largest* layer against 2 predicted. Measured on the released
-    12.6 GiB build: its largest quantized layers are 16384x6144, so ~1.21 GB for one of them, against
-    1.455 GiB of grids summed over all 256. The grids are the bigger number as well as the persistent
-    one, which is why they are what this class pins. `int8_convrot.py:607` records the policy
-    that absorbs such a transient in the reservation's slack, on the grounds that "the widened set is
-    by construction the small one". That justification does not transfer here: a block-wise scale is
-    never matmul-usable (`is_matmul_usable_scale`), so for MXFP8 the widened set is every quantized
-    Linear in the file.
-
-    Same class as the overshoots recorded at `z_image.py:697` and `krea2.py:588`.
+    Kept here because the measurement is what motivates that function: on the released 12.6 GiB Krea-2
+    build the grids total 1.455 GiB across 256 layers, more than the ~1.21 GB fold transient of its
+    largest layer, and every seam used to omit them.
     """
 
     @staticmethod
@@ -1574,10 +1560,9 @@ class TestReservationCoversTheSideChannelItHolds:
         model.add_module("lin", torch.nn.Linear(blocks * MX_BLOCK_SIZE, rows, bias=False))
         return sd, hints, model
 
-    def test_the_decode_widens_the_grid_before_anything_reserves_for_it(self) -> None:
-        """The half of the finding that is true today, so the numbers are recorded rather than
-        argued: the stored grid leaves the state dict and a four-times-larger one takes its place in
-        a mapping the predictor is handed but does not weigh."""
+    def test_the_decode_widens_the_grid_and_this_prediction_does_not_see_it(self) -> None:
+        """The stored grid leaves the state dict and a four-times-larger one takes its place in a
+        mapping this function is handed but, by its contract, does not weigh."""
         sd, hints, model = self._mx_layer()
         stored_bytes = sd["lin.weight_scale"].nelement() * sd["lin.weight_scale"].element_size()
 
@@ -1586,37 +1571,9 @@ class TestReservationCoversTheSideChannelItHolds:
 
         assert "lin.weight_scale" not in sd
         assert grid.dtype is torch.float32 and stored_bytes * 4 == grid.nelement() * grid.element_size()
-        # `keep_fp8=True`, which is what the seams that can receive an MX build pass. The layer is
-        # charged 2 B/element either way -- a block-wise scale fails `is_matmul_usable_scale` -- but
-        # this is the branch where `scaled_layers` and `model` are consulted at all.
+        # `keep_fp8=True`, the branch where `scaled_layers` and `model` are consulted at all. The MX
+        # layer is charged 2 B/element either way, because a block-wise scale is never matmul-usable.
         assert (
             predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=True, model=model, scaled_layers=layers)
             == sd["lin.weight"].nelement() * 2
         )
-
-    @pytest.mark.xfail(
-        strict=True,
-        reason=(
-            "No fix for this belongs in this function as it stands. Adding the mapping's bytes "
-            "cannot be unconditional: whether a scale is still resident after the split depends on "
-            "whether its layer stayed fp8, so a flat term turns this function from 'bytes the state "
-            "dict will occupy' into 'peak bytes', and `TestPredictionIsSplitAware` pins the former "
-            "exactly -- measured: the flat term reddens all three `predicted == actual` "
-            "parametrizations and the under-count regression beside them. The alternative is a "
-            "second hand-assembled term at each of the nine call sites, beside the "
-            "`predict_nvfp4_install_size` each already adds by hand, which is the per-loader "
-            "assembly that keeps producing this class of gap. "
-            "Remove this marker when one object owns both the state dict and the scales recovered "
-            "from it and the reservation is computed from that object, so the size question cannot "
-            "be asked about half of the load."
-        ),
-    )
-    def test_the_decoded_mx_grid_is_inside_the_reservation(self) -> None:
-        """What the reservation should cover. Strict, so the fix cannot land without removing it."""
-        sd, hints, model = self._mx_layer()
-        layers = extract_fp8_scaled_layers(sd, layer_hints=hints)
-        grid = layers["lin"].weight_scale
-
-        predicted = predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=True, model=model, scaled_layers=layers)
-
-        assert predicted >= sd["lin.weight"].nelement() * 2 + grid.nelement() * grid.element_size()
