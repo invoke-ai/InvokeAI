@@ -44076,6 +44076,13 @@ export interface operations {
                 };
                 content?: never;
             };
+            /** @description The model could not be found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description Another operation on this model is already in progress */
             409: {
                 headers: {

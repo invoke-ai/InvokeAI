@@ -109,7 +109,14 @@ class ModelRecordChanges(BaseModelExcludeNull):
     description: Optional[str] = Field(description="Model description", default=None)
     base: Optional[BaseModelType] = Field(description="The base model.", default=None)
     type: Optional[ModelType] = Field(description="Type of model", default=None)
+    # Deliberately NOT validated here. This model is the *update* body as well as the install body, and the model
+    # edit form posts the whole record back (`ModelEdit.tsx` seeds the form from the config, key included), so a
+    # validator on this field makes a model whose key predates key validation impossible to edit: FastAPI answers
+    # 422 before the handler runs, and the UI offers no way to change a key. The same model is also re-parsed from
+    # install markers written by older versions during startup recovery. The key is validated where an install
+    # adopts one (`install_model`) and again at every join that builds a path out of it.
     key: Optional[str] = Field(description="Database ID for this model", default=None)
+
     hash: Optional[str] = Field(description="hash of model file", default=None)
     file_size: Optional[int] = Field(description="Size of model file", default=None)
     format: Optional[str] = Field(description="format of model file", default=None)

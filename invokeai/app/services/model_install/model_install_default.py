@@ -41,6 +41,7 @@ from invokeai.app.services.model_install.model_install_common import (
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, UnknownModelException
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelConfig,
@@ -243,12 +244,18 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
                     self._safe_rmtree(tmpdir, self._logger)
                     continue
+                # Inside the `try`: a marker written by an older version can hold a config that no longer
+                # validates, and that must skip this marker, not abort the restore of every marker after it. Note
+                # that an unsafe *key* is no longer such a case - `ModelRecordChanges` deliberately accepts one so
+                # the install is restored and then fails at the join in `install_path()`, which errors the job and
+                # reclaims its tmpdir. Skipping it here would strand the partial download instead: no job is
+                # created to clean up, and `_remove_dangling_install_dirs` keeps any readable non-terminal marker.
+                config_in = ModelRecordChanges(**(marker.get("config_in") or {}))
                 seen_sources.add(source_str)
             except Exception as e:
                 self._logger.warning(f"Skipping install marker in {tmpdir}: {e}")
                 continue
 
-            config_in = ModelRecordChanges(**(marker.get("config_in") or {}))
             job = ModelInstallJob(
                 id=self._next_id(),
                 source=source,
@@ -460,6 +467,10 @@ class ModelInstallService(ModelInstallServiceBase):
         config = config or ModelRecordChanges()
         info: AnyModelConfig = self._probe(Path(model_path), config)  # type: ignore
 
+        # The key names the directory the model is moved into. `ModelRecordChanges` validates a client-supplied key,
+        # but a caller can build one without validation, so check again here - before anything is created or moved.
+        if not is_plain_filename(info.key):
+            raise ValueError(f"Invalid model key {info.key!r}: it must be a plain filename")
         dest_dir = self.app_config.models_path / info.key
         try:
             if dest_dir.exists():
@@ -1014,6 +1025,9 @@ class ModelInstallService(ModelInstallServiceBase):
         )
         name = job.config_in.name or f"{provider_id} {provider_model_id}"
         key = job.config_in.key or slugify(f"{provider_id}-{provider_model_id}")
+        # External registration builds its config directly, so it never passes through `_probe`'s check.
+        if not is_plain_filename(key):
+            raise InvalidModelConfigException(f"Invalid model key {key!r}: it must be a plain filename")
 
         existing_external = next(
             (
@@ -1150,6 +1164,12 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _probe(self, model_path: Path, config: Optional[ModelRecordChanges] = None):
         config = config or ModelRecordChanges()
+        # A caller may name the key it wants, and the key names a directory under `models_path` and a file under
+        # `model_images`. `ModelRecordChanges` deliberately does not validate it (it is the update body too, and is
+        # re-parsed from old install markers), so assert it here - the one place a caller-supplied key becomes a
+        # record's key, for in-place registration as well as for a move-in install.
+        if config.key is not None and not is_plain_filename(config.key):
+            raise InvalidModelConfigException(f"Invalid model key {config.key!r}: it must be a plain filename")
         hash_algo = self._app_config.hashing_algorithm
         fields = config.model_dump()
 

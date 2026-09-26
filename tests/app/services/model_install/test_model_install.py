@@ -3,6 +3,7 @@ Test the model installer
 """
 
 import gc
+import json
 import platform
 import shutil
 import threading
@@ -37,7 +38,11 @@ from invokeai.app.services.model_install.model_install_common import (
     ModelInstallJob,
     URLModelSource,
 )
-from invokeai.app.services.model_install.model_install_default import TMPDIR_PREFIX
+from invokeai.app.services.model_install.model_install_default import (
+    INSTALL_MARKER_FILENAME,
+    INSTALL_MARKER_VERSION,
+    TMPDIR_PREFIX,
+)
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.taxonomy import (
@@ -1078,3 +1083,102 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
     mm2_installer.wait_for_job(install_job2, timeout=10)
     assert install_job2.complete
     assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
+
+
+def test_restore_keeps_a_legacy_marker_whose_key_predates_key_validation(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+) -> None:
+    """A marker written before install keys were checked can carry a key that is not a plain filename. It must
+    still be restored: dropping it strands the partial download forever, because no job is created to clean up
+    the tmpdir and `_remove_dangling_install_dirs` keeps any tmpdir whose marker is readable and non-terminal.
+    Containment does not depend on this - `install_path()` checks the key at the join and errors the job."""
+    assert isinstance(mm2_installer, ModelInstallService)
+
+    tmpdirs: list[Path] = []
+    try:
+        for repo_id, config_in in [
+            ("stabilityai/legacy-key", ModelRecordChanges.model_construct(key="../escaped")),
+            ("stabilityai/ordinary", ModelRecordChanges()),
+        ]:
+            tmpdir = mm2_app_config.models_path / f"tmpinstall_legacy_{uuid.uuid4().hex}"
+            tmpdir.mkdir(parents=True, exist_ok=True)
+            tmpdirs.append(tmpdir)
+            job = ModelInstallJob(
+                id=99999,
+                source=HFModelSource(repo_id=repo_id, variant=ModelRepoVariant.Default),
+                config_in=config_in,
+                local_path=tmpdir,
+            )
+            job._install_tmpdir = tmpdir
+            job.status = InstallStatus.PAUSED
+            mm2_installer._write_install_marker(job, status=InstallStatus.PAUSED)
+
+        restored_installer = ModelInstallService(
+            app_config=mm2_app_config,
+            record_store=mm2_installer.record_store,
+            download_queue=mm2_download_queue,
+            session=mm2_session,
+        )
+        restored_installer._restore_incomplete_installs()
+
+        restored = {str(job.source) for job in restored_installer.list_jobs()}
+        assert restored == {"stabilityai/legacy-key", "stabilityai/ordinary"}
+    finally:
+        for tmpdir in tmpdirs:
+            shutil.rmtree(tmpdir, ignore_errors=True)
+
+
+def test_restore_skips_an_unparseable_marker_without_abandoning_the_rest(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+) -> None:
+    """A marker whose stored config no longer validates must skip that one marker, not raise out of the loop and
+    leave every interrupted install after it unrestored."""
+    assert isinstance(mm2_installer, ModelInstallService)
+
+    tmpdirs: list[Path] = []
+    try:
+        bad_tmpdir = mm2_app_config.models_path / f"tmpinstall_bad_{uuid.uuid4().hex}"
+        bad_tmpdir.mkdir(parents=True, exist_ok=True)
+        tmpdirs.append(bad_tmpdir)
+        (bad_tmpdir / INSTALL_MARKER_FILENAME).write_text(
+            json.dumps(
+                {
+                    "version": INSTALL_MARKER_VERSION,
+                    "source": "stabilityai/unparseable",
+                    "config_in": {"base": "not-a-real-base"},
+                    "status": InstallStatus.PAUSED.value,
+                }
+            )
+        )
+
+        good_tmpdir = mm2_app_config.models_path / f"tmpinstall_good_{uuid.uuid4().hex}"
+        good_tmpdir.mkdir(parents=True, exist_ok=True)
+        tmpdirs.append(good_tmpdir)
+        job = ModelInstallJob(
+            id=99998,
+            source=HFModelSource(repo_id="stabilityai/ordinary", variant=ModelRepoVariant.Default),
+            config_in=ModelRecordChanges(),
+            local_path=good_tmpdir,
+        )
+        job._install_tmpdir = good_tmpdir
+        job.status = InstallStatus.PAUSED
+        mm2_installer._write_install_marker(job, status=InstallStatus.PAUSED)
+
+        restored_installer = ModelInstallService(
+            app_config=mm2_app_config,
+            record_store=mm2_installer.record_store,
+            download_queue=mm2_download_queue,
+            session=mm2_session,
+        )
+        restored_installer._restore_incomplete_installs()
+
+        assert [str(job.source) for job in restored_installer.list_jobs()] == ["stabilityai/ordinary"]
+    finally:
+        for tmpdir in tmpdirs:
+            shutil.rmtree(tmpdir, ignore_errors=True)
