@@ -12,12 +12,12 @@ import { sessionExpiredLogout, tokenRefreshed } from 'features/auth/store/authSl
 import {
   beginAuthTransition,
   captureAuthGeneration,
-  isTokenRefreshThrottled,
   markTokenRefreshAccepted,
   MEDIA_COOKIE_SYNC_TIMEOUT_MS,
   runWithMediaAuthLock,
   shouldAcceptRefreshedToken,
   shouldEndSessionForUnauthorized,
+  shouldThrottleRefreshedToken,
 } from 'features/auth/store/authTokenRefresh';
 import queryString from 'query-string';
 import stableHash from 'stable-hash';
@@ -174,11 +174,17 @@ export const acceptRefreshedToken = async (
   requestGeneration: number,
   dispatch: (action: ReturnType<typeof tokenRefreshed>) => unknown
 ): Promise<void> => {
-  if (isTokenRefreshThrottled() || !shouldAcceptRefreshedToken(requestToken, requestGeneration)) {
+  if (
+    shouldThrottleRefreshedToken(requestToken, refreshedToken) ||
+    !shouldAcceptRefreshedToken(requestToken, requestGeneration)
+  ) {
     return;
   }
   await runWithMediaAuthLock(async () => {
-    if (isTokenRefreshThrottled() || !shouldAcceptRefreshedToken(requestToken, requestGeneration)) {
+    if (
+      shouldThrottleRefreshedToken(requestToken, refreshedToken) ||
+      !shouldAcceptRefreshedToken(requestToken, requestGeneration)
+    ) {
       return;
     }
     try {

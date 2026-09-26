@@ -1802,6 +1802,7 @@
             "duplicateWanTransformer": "The same model is selected as both Transformer and Transformer (Low Noise). An A14B expert pair needs two different models.",
             "noZImageVaeSourceSelected": "No VAE source: Select VAE (FLUX) or Qwen3 Source model",
             "noZImageQwen3EncoderSourceSelected": "No Qwen3 Encoder source: Select Qwen3 Encoder or Qwen3 Source model",
+            "zImageQwen3EncoderIncompatible": "Selected Qwen3 Encoder is incompatible with Z-Image: select a Qwen3 4B encoder",
             "noKrea2VaeModelSelected": "Non-diffusers Krea-2: select a VAE in Advanced settings",
             "noKrea2Qwen3VlEncoderModelSelected": "Non-diffusers Krea-2: select a Qwen3-VL Encoder in Advanced settings",
             "krea2RebalanceWeightsInvalid": "Krea-2 Conditioning Rebalance weights must be exactly 12 finite comma-separated numbers",
@@ -2866,6 +2867,7 @@
         }
     },
     "controlLayers": {
+        "krea2StyleStrength": "Style Strength",
         "regional": "Regional",
         "global": "Global",
         "canvas": "Canvas",
@@ -3153,6 +3155,7 @@
             "rgNoPromptsOrIPAdapters": "no text prompts or Reference Images",
             "rgNegativePromptNotSupported": "Negative Prompt not supported for selected base model",
             "rgReferenceImagesNotSupported": "regional Reference Images not supported for selected base model",
+            "krea2OnlyOneReferenceImage": "Krea-2 style reference uses only one image — this one is ignored",
             "rgAutoNegativeNotSupported": "Auto-Negative not supported for selected base model",
             "rgNoRegion": "no region drawn",
             "ideogram4Txt2ImgOnly": "Ideogram 4 is text-to-image only; raster layers and inpaint masks are not supported",

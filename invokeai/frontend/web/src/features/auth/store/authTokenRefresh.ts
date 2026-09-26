@@ -1,4 +1,4 @@
-import { tokensBelongToSameUser } from 'features/auth/store/authSlice';
+import { getTokenSessionKey, tokensBelongToSameUser } from 'features/auth/store/authSlice';
 
 const AUTH_GENERATION_KEY = 'auth_generation';
 const MEDIA_AUTH_LOCK = 'invokeai-media-auth';
@@ -20,6 +20,18 @@ export const isTokenRefreshThrottled = () => Date.now() - lastTokenRefreshAccept
 
 export const markTokenRefreshAccepted = () => {
   lastTokenRefreshAcceptedAt = Date.now();
+};
+
+export const shouldThrottleRefreshedToken = (requestToken: string, refreshedToken: string): boolean => {
+  if (!isTokenRefreshThrottled()) {
+    return false;
+  }
+  // An epoch-changing replacement is the only credential that remains valid after revocation.
+  // Keep every other replacement on the normal sliding-refresh throttle.
+  return !(
+    tokensBelongToSameUser(requestToken, refreshedToken) &&
+    getTokenSessionKey(requestToken) !== getTokenSessionKey(refreshedToken)
+  );
 };
 
 type FallbackLockTicket = {

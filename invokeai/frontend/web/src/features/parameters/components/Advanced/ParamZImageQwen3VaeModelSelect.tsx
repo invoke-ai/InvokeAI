@@ -12,7 +12,11 @@ import {
 import { type ModelIdentifierField, zModelIdentifierField } from 'features/nodes/types/common';
 import { memo, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useFlux1VAEModels, useQwen3EncoderModels, useZImageDiffusersModels } from 'services/api/hooks/modelsByType';
+import {
+  useFlux1VAEModels,
+  useZImageDiffusersModels,
+  useZImageQwen3EncoderModels,
+} from 'services/api/hooks/modelsByType';
 import type { MainModelConfig, Qwen3EncoderModelConfig, VAEModelConfig } from 'services/api/types';
 
 /**
@@ -70,7 +74,7 @@ const ParamZImageQwen3EncoderModelSelect = memo(() => {
   const dispatch = useAppDispatch();
   const { t } = useTranslation();
   const zImageQwen3EncoderModel = useAppSelector(selectZImageQwen3EncoderModel);
-  const [modelConfigs, { isLoading }] = useQwen3EncoderModels();
+  const [modelConfigs, { isLoading }] = useZImageQwen3EncoderModels();
 
   const _onChange = useCallback(
     (model: Qwen3EncoderModelConfig | null) => {
