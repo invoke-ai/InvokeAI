@@ -25,6 +25,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Ideogram4_Config,
     Main_Diffusers_Ideogram4_Config,
 )
+from invokeai.backend.model_manager.load.fp8_capability import NotApplicable
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import (
@@ -101,7 +102,15 @@ def _verify_encoder_fully_materialized(model: torch.nn.Module, *, context: str) 
         )
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Ideogram4, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.Ideogram4,
+    type=ModelType.Main,
+    format=ModelFormat.Diffusers,
+    fp8_storage=NotApplicable(
+        "every published build is nf4 or fp8 already: `Fp8Linear` keeps the fp8 one at a byte per weight, "
+        "and casting the nf4 payload would corrupt it silently"
+    ),
+)
 class Ideogram4DiffusersModel(ModelLoader):
     """Loads Ideogram 4 main models (nf4 / fp8) bundled in diffusers layout."""
 

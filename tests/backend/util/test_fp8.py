@@ -19,7 +19,7 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.load.load_default import ModelLoader
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
 from invokeai.backend.util.fp8 import (
     FP8_COMPUTE_DTYPE_ATTR,
     get_model_compute_dtype,
@@ -81,6 +81,9 @@ def test_returns_compute_dtype_after_real_fp8_cast():
     config = SimpleNamespace(
         type=ModelType.Main,
         base=BaseModelType.StableDiffusionXL,
+        # A real config always declares a format, and the gate reads it: whether the loader for this
+        # `(base, type, format)` implements the cast is part of the answer (`load/fp8_capability.py`).
+        format=ModelFormat.Diffusers,
         name="test",
         default_settings=SimpleNamespace(fp8_storage=True),
     )
@@ -143,6 +146,9 @@ def test_double_cast_is_a_noop():
     config = SimpleNamespace(
         type=ModelType.Main,
         base=BaseModelType.StableDiffusionXL,
+        # A real config always declares a format, and the gate reads it: whether the loader for this
+        # `(base, type, format)` implements the cast is part of the answer (`load/fp8_capability.py`).
+        format=ModelFormat.Diffusers,
         name="test",
         default_settings=SimpleNamespace(fp8_storage=True),
     )
