@@ -40,6 +40,7 @@ from invokeai.app.invocations.primitives import (
     BooleanInvocation,
     BooleanOutput,
     IntegerCollectionInvocation,
+    StringCollectionInvocation,
 )
 from invokeai.app.invocations.workflow_return import WorkflowReturnOutput
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
@@ -5062,6 +5063,37 @@ def test_if_invocation_output_connects_to_downstream_input():
     assert len(prepared_prompt_nodes) == 1
     prepared_prompt_node_id = next(iter(prepared_prompt_nodes))
     assert g.results[prepared_prompt_node_id].prompt == "connected value"
+
+
+@pytest.mark.parametrize(
+    ("condition", "selected_node_id", "unselected_node_id", "expected_values"),
+    [
+        (True, "true_values", "false_values", ["true-a", "true-b"]),
+        (False, "false_values", "true_values", ["false-a"]),
+    ],
+)
+def test_if_output_iterates_only_selected_collection_branch(
+    condition: bool, selected_node_id: str, unselected_node_id: str, expected_values: list[str]
+):
+    graph = Graph()
+    graph.add_node(StringCollectionInvocation(id="true_values", collection=["true-a", "true-b"]))
+    graph.add_node(StringCollectionInvocation(id="false_values", collection=["false-a"]))
+    graph.add_node(IfInvocation(id="if", condition=condition))
+    graph.add_node(IterateInvocation(id="iterate"))
+    graph.add_node(CollectInvocation(id="collect"))
+    graph.add_edge(create_edge("true_values", "collection", "if", "true_input"))
+    graph.add_edge(create_edge("false_values", "collection", "if", "false_input"))
+    graph.add_edge(create_edge("if", "value", "iterate", "collection"))
+    graph.add_edge(create_edge("iterate", "item", "collect", "item"))
+
+    state = GraphExecutionState(graph=graph)
+    executed_node_ids = execute_all_nodes(state)
+
+    collect_exec_ids = state.source_prepared_mapping["collect"]
+    assert len(collect_exec_ids) == 1
+    assert state.results[next(iter(collect_exec_ids))].collection == expected_values
+    assert selected_node_id in executed_node_ids
+    assert unselected_node_id not in executed_node_ids
 
 
 @pytest.mark.xfail(strict=True, reason="Legacy eager If-node execution should no longer occur")
