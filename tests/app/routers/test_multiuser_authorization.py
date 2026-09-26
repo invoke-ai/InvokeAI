@@ -3325,6 +3325,30 @@ class TestWebSocketAuth:
         # And never to the shared queue room, which would leak to other users.
         assert "default" not in room
 
+    def test_video_recall_is_emitted_once_to_the_owner_only(self, socketio: Any) -> None:
+        """A video recall names the owner's media and no admin UI consumes it, so it goes to the
+        owner's room alone, in one emit: a reference-video recall appends, so a second delivery
+        would add the video twice."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import VideoRecallRequestedEvent, VideoRecallVideo
+
+        event = VideoRecallRequestedEvent.build(
+            queue_id="default",
+            user_id="owner-video",
+            action="reference_video",
+            video=VideoRecallVideo(video_name="clip.mp4", width=832, height=480, duration=5.0),
+        )
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("video_recall_requested", event)))
+
+        assert mock_emit.call_count == 1
+        assert mock_emit.call_args.kwargs.get("room") == "user:owner-video"
+
 
 class TestCustomNodesAuthorization:
     """Tests that custom_nodes endpoints enforce AdminUserOrDefault.

@@ -595,3 +595,28 @@ def test_the_encoder_sizes_its_weight_file_one_directory_down(tmp_path) -> None:
     loader = object.__new__(LTX2Gemma4EncoderModel)
     assert loader.get_size_fs(config, tmp_path, SubModelType.TextEncoder) == 5000
     assert loader.get_size_fs(config, tmp_path, SubModelType.Tokenizer) == 40
+
+
+def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_evicted(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The degraded half-state, at this seam rather than at the detector.
+
+    A packed uint8 weight with a block-scale grid and no `weight_scale_2` is what a guard keyed on
+    `weight_scale_2` -- the key the decode keys on -- lets straight through. `_find_nvfp4_layers`
+    refuses it and `test_nvfp4.py` pins that; what only a seam can answer is whether this loader
+    reaches the detector before it asks the cache for room. Here a key conversion stands between the
+    pop and the reservation, and nothing but their order keeps them that way round.
+    """
+    sd = _tiny_transformer_checkpoint()
+    target = _official_name(f"{NVFP4_LAYER}.weight")[: -len(".weight")]
+    rows, packed = sd[f"{target}.weight"].shape[0], sd[f"{target}.weight"].shape[1] // 2
+    sd[f"{target}.weight"] = torch.zeros(rows, packed, dtype=torch.uint8)
+    sd[f"{target}.weight_scale"] = torch.zeros(rows, packed // 8).to(torch.float8_e4m3fn)
+    _tiny_geometry(monkeypatch)
+    run = prepare(_transformer_seam(), monkeypatch)
+
+    with pytest.raises(ValueError, match="with a weight_scale but no weight_scale_2"):
+        run.load(_checkpoint_config(tmp_path, sd))
+
+    assert run.reserved == []

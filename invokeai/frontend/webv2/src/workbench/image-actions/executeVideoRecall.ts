@@ -1,6 +1,6 @@
 import type { GalleryVideoItem } from '@features/gallery';
 import type { ModelConfig } from '@features/models';
-import type { VideoReferenceItem } from '@features/video';
+import type { VideoReferenceItem, VideoWidgetValues } from '@features/video';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 
@@ -8,8 +8,11 @@ import { galleryImages, galleryItems, galleryVideos } from '@features/gallery';
 import {
   createDefaultVideoWidgetValues,
   createVideoConditioningClip,
+  createVideoReferenceEntry,
   createVideoSourceClip,
   getDefaultReferenceConditioning,
+  getInitialVideoPatch,
+  getReferencesPatch,
   getVideoModelPolicy,
   isVideoReferenceConditioning,
   normalizeVideoWidgetValues,
@@ -77,6 +80,28 @@ export const getCurrentVideoValues = ({
   return syncVideoWidgetValuesWithModels(normalized, models);
 };
 
+interface VideoRecallNotice {
+  message: string;
+  title: string;
+}
+
+const reportVideoRecallError = (
+  commands: Pick<WorkbenchCommands, 'notifications'>,
+  owner: AccountScope,
+  error: unknown,
+  projectId: string | undefined
+): false => {
+  if (isAccountScopeCurrent(owner)) {
+    commands.notifications.reportError({
+      area: 'video-recall',
+      message: toErrorMessage(error),
+      namespace: 'generation',
+      projectId,
+    });
+  }
+  return false;
+};
+
 export const executeVideoRecall = async ({
   commands,
   getVideoValues,
@@ -101,26 +126,113 @@ export const executeVideoRecall = async ({
     return false;
   }
 
-  try {
-    const metadata = await loadVideoMetadata(item.name, owner);
+  let metadata: unknown;
 
+  try {
+    metadata = await loadVideoMetadata(item.name, owner);
+  } catch (error: unknown) {
+    return reportVideoRecallError(commands, owner, error, projectId);
+  }
+
+  return applyVideoRecallMetadata({
+    commands,
+    emptyNotice: {
+      message: 'This video does not include supported Video metadata.',
+      title: 'No recallable video data',
+    },
+    getVideoValues,
+    kind,
+    metadata,
+    models,
+    owner,
+    projectId,
+  });
+};
+
+/**
+ * Apply a video metadata record — read from a gallery video, or sent by the external recall API — to the Video
+ * panel: build the values, hydrate the media it names from the gallery, drop media the resulting model cannot use,
+ * and commit. Resolves whether anything was applied.
+ */
+export const applyVideoRecallMetadata = async ({
+  commands,
+  emptyNotice,
+  getVideoValues,
+  kind,
+  metadata,
+  models,
+  owner,
+  partial = false,
+  projectId,
+  requireGenerationMode = true,
+}: {
+  commands: Pick<WorkbenchCommands, 'notifications' | 'widgets'>;
+  /** Shown when nothing in the record applies. */
+  emptyNotice: VideoRecallNotice;
+  getVideoValues: () => Record<string, unknown>;
+  kind: VideoRecallKind;
+  metadata: unknown;
+  models: readonly ModelConfig[];
+  owner: AccountScope;
+  /** See `buildVideoRecallSettings`. */
+  partial?: boolean;
+  projectId?: string;
+  /** See `buildVideoRecallSettings`. */
+  requireGenerationMode?: boolean;
+}): Promise<boolean> => {
+  try {
     assertAccountScopeCurrent(owner);
     // Snapshot the panel AFTER the fetch: an edit made while the metadata
     // loaded must survive into the base the recall applies on top of.
     const currentValues = getCurrentVideoValues({ models, videoValues: getVideoValues() });
-    const result = buildVideoRecallSettings({ currentValues, kind, metadata, models });
+    const result = buildVideoRecallSettings({
+      currentValues,
+      kind,
+      metadata,
+      models,
+      partial,
+      requireGenerationMode,
+    });
 
     if (!result) {
-      commands.notifications.add({
-        kind: 'info',
-        message: 'This video does not include supported Video metadata.',
-        title: 'No recallable video data',
-      });
+      commands.notifications.add({ kind: 'info', ...emptyNotice });
       return false;
+    }
+
+    // A partial recall names media on top of the panel's own. One the panel's model cannot use would still displace
+    // the held media it conflicts with before the mode check below dropped it, so it is dropped up front instead.
+    if (partial && result.values.model) {
+      const policy = getVideoModelPolicy(result.values.model, result.values);
+      const modes = policy.modes;
+      const names = result.mediaNames;
+
+      if (!modes.includes('reference')) {
+        names.references = [];
+      }
+      if (!modes.includes('first-frame') && !modes.includes('first-last')) {
+        names.firstFrameName = null;
+      }
+      if (!modes.includes('last-frame') && !modes.includes('first-last')) {
+        names.lastFrameName = null;
+      }
+      if (!modes.includes('extend') && !policy.references?.extend) {
+        names.sourceVideoName = null;
+        names.sourceVideoTrim = null;
+      }
+      if (
+        names.conditioningClip &&
+        !modes.includes(names.conditioningClip.role === 'audio' ? 'audio-to-video' : 'video-to-audio')
+      ) {
+        names.conditioningClip = null;
+      }
     }
 
     // Resolve media names against the gallery for dimensions/probe data and drop deleted references.
     if (result.fields.includes('media')) {
+      // A full recall that cleared held media changed the panel even if nothing named below hydrates.
+      const clearedMedia = (
+        ['conditioningClip', 'firstFrameImage', 'lastFrameImage', 'references', 'sourceVideo'] as const
+      ).some((slot) => result.values[slot] !== currentValues[slot]);
       let recalledMedia = false;
       const { firstFrameName, lastFrameName, sourceVideoName } = result.mediaNames;
       const frameNames = [firstFrameName, lastFrameName].filter((name): name is string => name !== null);
@@ -282,14 +394,15 @@ export const executeVideoRecall = async ({
             lastFrameImage: null,
             references,
             // A source video recorded alongside references is reference-extend
-            // state (hydrated above) — keep it; clear only a leftover.
-            sourceVideo: result.mediaNames.sourceVideoName ? result.values.sourceVideo : null,
+            // state (hydrated above) — keep it; clear only a leftover. A partial
+            // recall keeps the panel's own, subject to the mode check below.
+            sourceVideo: result.mediaNames.sourceVideoName || partial ? result.values.sourceVideo : null,
           };
           recalledMedia = true;
         }
       }
 
-      if (!recalledMedia) {
+      if (!recalledMedia && !clearedMedia) {
         result.fields = result.fields.filter((field) => field !== 'media');
       }
 
@@ -301,6 +414,22 @@ export const executeVideoRecall = async ({
         const policy = getVideoModelPolicy(effectiveModel, result.values);
         const modes = policy.modes;
         const referenceExtend = Boolean(policy.references?.extend);
+
+        // A partial recall can replace the references or the initial video alone, which on a reference-extend panel
+        // would orphan the clip's continuity reference or leave it pointing at the previous clip. Relink it the way
+        // the panel's Initial Video field does, dropping the clip when no reference slot is left for it.
+        if (partial && referenceExtend && result.values.sourceVideo) {
+          const linked = getInitialVideoPatch({
+            maxVideos: policy.references?.maxVideos ?? 0,
+            numFrames: result.values.numFrames,
+            referenceExtend,
+            references: result.values.references,
+            sourceVideo: result.values.sourceVideo,
+          });
+
+          result.values = linked ? { ...result.values, ...linked } : { ...result.values, sourceVideo: null };
+        }
+
         let { firstFrameImage, lastFrameImage, sourceVideo } = result.values;
         let references = result.values.references;
 
@@ -345,11 +474,7 @@ export const executeVideoRecall = async ({
     }
 
     if (result.fields.length === 0) {
-      commands.notifications.add({
-        kind: 'info',
-        message: 'This video does not include supported Video metadata.',
-        title: 'No recallable video data',
-      });
+      commands.notifications.add({ kind: 'info', ...emptyNotice });
       return false;
     }
 
@@ -375,16 +500,107 @@ export const executeVideoRecall = async ({
     });
     return true;
   } catch (error: unknown) {
-    if (!isAccountScopeCurrent(owner)) {
-      return false;
-    }
-
-    commands.notifications.reportError({
-      area: 'video-recall',
-      message: toErrorMessage(error),
-      namespace: 'generation',
-      projectId,
-    });
-    return false;
+    return reportVideoRecallError(commands, owner, error, projectId);
   }
+};
+
+// Placing a gallery video in the Video panel. Kept in this module rather than a file of its own: the gallery's actions
+// load it on every editor route, and a new module there is a new entry in the routes' pinned source-owner sets.
+
+/** What placing a video needs to know about it; gallery items and the external recall event both carry it. */
+export interface PlaceableVideo {
+  durationSeconds: number;
+  fps?: number;
+  height: number;
+  mediaOrigin?: string;
+  name: string;
+  width: number;
+}
+
+export type InitialVideoPlacement =
+  | {
+      patch: Partial<VideoWidgetValues>;
+      status: 'placed';
+      /** Whether the panel's model can generate from an initial video; the slot is filled either way. */
+      usable: boolean;
+    }
+  | { status: 'full' };
+
+/** Set the video as the Video panel's Initial Video, exactly as the panel's own Initial Video field would. */
+export const placeInitialVideo = ({
+  models,
+  video,
+  videoValues,
+}: {
+  models: readonly ModelConfig[];
+  video: PlaceableVideo;
+  videoValues: Record<string, unknown>;
+}): InitialVideoPlacement => {
+  const values = getCurrentVideoValues({ models, videoValues });
+  const policy = values.model ? getVideoModelPolicy(values.model, values) : null;
+  const referenceExtend = Boolean(policy?.references?.extend);
+  const patch = getInitialVideoPatch({
+    maxVideos: policy?.references?.maxVideos ?? 0,
+    numFrames: values.numFrames,
+    referenceExtend,
+    references: values.references,
+    sourceVideo: createVideoSourceClip(video),
+  });
+
+  return patch
+    ? { patch, status: 'placed', usable: Boolean(policy && (policy.modes.includes('extend') || referenceExtend)) }
+    : { status: 'full' };
+};
+
+export type ReferenceVideoPlacement =
+  | { patch: Partial<VideoWidgetValues>; status: 'appended' }
+  | { status: 'full' | 'unsupported' };
+
+const getReferenceVideoRoom = (values: VideoWidgetValues): 'available' | 'full' | 'unsupported' => {
+  const policy = values.model ? getVideoModelPolicy(values.model, values) : null;
+
+  if (!policy?.references || !policy.modes.includes('reference')) {
+    return 'unsupported';
+  }
+
+  return values.references.filter((entry) => entry.kind === 'video').length < policy.references.maxVideos
+    ? 'available'
+    : 'full';
+};
+
+/** Whether the Video panel's model takes reference videos and has room for another. */
+export const canAppendReferenceVideo = ({
+  models,
+  videoValues,
+}: {
+  models: readonly ModelConfig[];
+  videoValues: Record<string, unknown>;
+}): boolean => getReferenceVideoRoom(getCurrentVideoValues({ models, videoValues })) === 'available';
+
+/** Append the video to the Video panel's references with the defaults the References field gives a new video. */
+export const appendReferenceVideo = ({
+  models,
+  video,
+  videoValues,
+}: {
+  models: readonly ModelConfig[];
+  video: PlaceableVideo;
+  videoValues: Record<string, unknown>;
+}): ReferenceVideoPlacement => {
+  const values = getCurrentVideoValues({ models, videoValues });
+  const room = getReferenceVideoRoom(values);
+
+  if (room !== 'available') {
+    return { status: room };
+  }
+
+  const referenceExtend = Boolean(values.model && getVideoModelPolicy(values.model, values).references?.extend);
+
+  return {
+    patch: getReferencesPatch({
+      referenceExtend,
+      references: [...values.references, createVideoReferenceEntry(video)],
+    }),
+    status: 'appended',
+  };
 };

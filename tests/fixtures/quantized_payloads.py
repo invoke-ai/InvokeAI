@@ -17,6 +17,7 @@ from typing import Any, NamedTuple
 
 import torch
 
+from invokeai.backend.quantization.block_scale_tiles import check_tile_layout
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, build_regular_hadamard
 
 # e4m3's largest finite magnitude. A per-tensor scaled-fp8 export divides by this, so that the
@@ -31,6 +32,9 @@ INT8_LEVELS = 127.0
 # give a weight whose exact value is known without depending on the rest of the E2M1 table.
 NVFP4_CODE_PLUS_ONE = 2
 NVFP4_CODE_MINUS_ONE = 10
+
+# One MX block is 32 elements wide in every published build; the marker only cross-checks it.
+MX_BLOCK_SIZE = 32
 
 
 def comfy_quant_marker(marker: Mapping[str, Any], *, pad: int = 0) -> torch.Tensor:
@@ -140,3 +144,60 @@ def nvfp4_signed_tensors(path: str, positive: torch.Tensor) -> tuple[dict[str, t
     codes = nvfp4_codes(positive)
     tensors = nvfp4_tensors(path, codes, block_scale=2.0, global_scale=0.25)
     return tensors, torch.where(positive, 0.5, -0.5)
+
+
+def stored_layout(grid: torch.Tensor) -> torch.Tensor:
+    """Lay a row-major grid out the way checkpoints store it.
+
+    By the measured index formula: element ``[m, k]`` lands at flat position ``position``. Shared
+    with the nvfp4 and MXFP8 decode tests so both check against the same independent statement of
+    the layout rather than against each other.
+    """
+    rows, blocks = grid.shape
+    flat = torch.full((rows * blocks,), float("nan"), dtype=grid.dtype)
+    for m in range(rows):
+        for k in range(blocks):
+            position = ((((m // 128) * (blocks // 4) + k // 4) * 32 + m % 32) * 4 + (m % 128) // 32) * 4 + k % 4
+            flat[position] = grid[m, k]
+    return flat.reshape(rows, blocks)
+
+
+def mxfp8_tensors(
+    path: str, exponents: torch.Tensor, *, block_size: int = MX_BLOCK_SIZE
+) -> tuple[dict[str, torch.Tensor], torch.Tensor]:
+    """One MXFP8 layer in checkpoint layout, and the block-wise float scale it decodes to.
+
+    This builder existed already, private to `tests/backend/quantization/test_fp8_scaled.py`, which
+    now imports it from here instead. That is the whole of the change: MXFP8 was tested, it just was
+    not available to the other suites, so a seam-level cell had to hand-roll the layout -- and the
+    layout is the part worth getting from one place, because getting it wrong is silent.
+
+    The grid is E8M0 exponent *bytes*, so 127 means `2**0`; folded as linear multipliers the weights
+    come out around 127x too large, at the right shape and the right dtype, with nothing raised and
+    nothing logged. And it is stored in cuBLAS tiles (:func:`stored_layout`), because that is how
+    both published builds store it; read row-major it pairs blocks with the wrong rows.
+
+    The weight is all ones, so the returned scale *is* the expected decoded weight -- an expectation
+    that moves by `2**(byte - 127)` per block if either half of the decode is skipped. It is
+    independent of the decode: the tile order comes from the hand-written index formula in
+    :func:`stored_layout`, and the bias is the spec's 127 rather than `_E8M0_BIAS`.
+    """
+    rows, blocks = exponents.shape
+    # `stored_layout` is a bijection only over whole tiles. Off-tile, its `flat` keeps NaNs, and
+    # `.to(torch.uint8)` turns those into zeros -- every scale silently becomes `2**-127`.
+    check_tile_layout(rows, blocks)
+    tensors = {
+        f"{path}.weight": torch.ones(rows, blocks * block_size).to(torch.float8_e4m3fn),
+        f"{path}.weight_scale": stored_layout(exponents.to(torch.float64)).to(torch.uint8),
+    }
+    return tensors, torch.exp2(exponents.float() - 127)
+
+
+def mxfp8_marker(*, block_size: int = MX_BLOCK_SIZE) -> dict[str, object]:
+    """What a layer has to say about itself before the decode will read its grid.
+
+    A `uint8` tensor beside an fp8 weight is otherwise just an unknown producer's convention. The
+    format string is spelled out rather than imported from `fp8_scaled`: it is what the *producer*
+    writes, so a rename on our side has to be caught by a test, not mirrored by one.
+    """
+    return {"format": "mxfp8", "block_size": block_size}

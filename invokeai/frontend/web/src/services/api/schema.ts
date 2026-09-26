@@ -4040,6 +4040,108 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recall/video/{queue_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recall Video Parameters
+         * @description Apply video generation parameters to the current user's Video panel.
+         *
+         *     Models and media that cannot be used are dropped and listed in `skipped`; the rest are applied.
+         */
+        post: operations["recall_video_parameters"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recall/video/{queue_id}/initial-video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recall Initial Video
+         * @description Place a gallery video in the current user's Video panel as the Initial Video.
+         */
+        post: operations["recall_initial_video"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recall/video/{queue_id}/initial-video/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recall Initial Video Upload
+         * @description Upload a video into the gallery and place it in the current user's Video panel as the Initial Video.
+         */
+        post: operations["recall_initial_video_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recall/video/{queue_id}/reference-video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recall Reference Video
+         * @description Append a gallery video to the current user's reference videos (models that take them, e.g. MiniMax H3 Ref2VA).
+         */
+        post: operations["recall_reference_video"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recall/video/{queue_id}/reference-video/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recall Reference Video Upload
+         * @description Upload a video into the gallery and append it to the current user's reference videos.
+         */
+        post: operations["recall_reference_video_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/custom_nodes/": {
         parameters: {
             query?: never;
@@ -19763,6 +19865,32 @@ export type components = {
             starred?: boolean | null;
         } & {
             [key: string]: unknown;
+        };
+        /** ImageRefParameter */
+        ImageRefParameter: {
+            /**
+             * Image Name
+             * @description The name of a gallery image
+             */
+            image_name: string;
+        };
+        /** ImageReferenceParameter */
+        ImageReferenceParameter: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "image";
+            /**
+             * Image Name
+             * @description The name of a gallery image
+             */
+            image_name: string;
+            /**
+             * Detail
+             * @description The reference image's detail mode
+             */
+            detail?: ("max" | "match") | null;
         };
         /**
          * Resize Image
@@ -47230,6 +47358,20 @@ export type components = {
              */
             type: "video";
         };
+        /** VideoLoRARecallParameter */
+        VideoLoRARecallParameter: {
+            /**
+             * Model Name
+             * @description The name (or key) of the LoRA model
+             */
+            model_name: string;
+            /**
+             * Weight
+             * @description The weight for the LoRA
+             * @default 1
+             */
+            weight?: number;
+        };
         /** VideoNamesBatch */
         VideoNamesBatch: {
             /**
@@ -47298,6 +47440,319 @@ export type components = {
              */
             type: "video_output";
         };
+        /** VideoRecallMediaResponse */
+        VideoRecallMediaResponse: {
+            /**
+             * Status
+             * @constant
+             */
+            status: "success";
+            /** Queue Id */
+            queue_id: string;
+            /**
+             * Action
+             * @enum {string}
+             */
+            action: "parameters" | "initial_video" | "reference_video";
+            video: components["schemas"]["VideoDTO"];
+            /**
+             * Uploaded
+             * @description Whether the video was uploaded into the gallery by this request
+             */
+            uploaded: boolean;
+        };
+        /**
+         * VideoRecallParameter
+         * @description Video generation parameters to apply to the Video panel.
+         *
+         *     Field names follow the video metadata record (see the Media Metadata architecture doc). Models
+         *     are given by name (or key) and resolved to installed models; media by gallery name. Bounds are
+         *     the ones the Video panel accepts, so a value it would ignore is refused here instead.
+         */
+        VideoRecallParameter: {
+            /**
+             * Positive Prompt
+             * @description Positive prompt text
+             */
+            positive_prompt?: string | null;
+            /**
+             * Negative Prompt
+             * @description Negative prompt text; an explicit null turns the negative prompt off
+             */
+            negative_prompt?: string | null;
+            /**
+             * Seed
+             * @description Random seed; ignored when remixing
+             */
+            seed?: number | null;
+            /**
+             * Num Frames
+             * @description Number of frames to generate
+             */
+            num_frames?: number | null;
+            /**
+             * Fps
+             * @description Output frame rate
+             */
+            fps?: number | null;
+            /**
+             * Width
+             * @description Output width in pixels
+             */
+            width?: number | null;
+            /**
+             * Height
+             * @description Output height in pixels
+             */
+            height?: number | null;
+            /**
+             * Steps
+             * @description Number of denoising steps
+             */
+            steps?: number | null;
+            /**
+             * Cfg Scale
+             * @description CFG scale
+             */
+            cfg_scale?: number | null;
+            /**
+             * Wan Guidance Scale Low Noise
+             * @description Wan A14B: the low-noise expert's CFG scale
+             */
+            wan_guidance_scale_low_noise?: number | null;
+            /**
+             * Ltx2 Audio Cfg Scale
+             * @description LTX-2: audio CFG scale
+             */
+            ltx2_audio_cfg_scale?: number | null;
+            /**
+             * Ltx2 Stg Scale
+             * @description LTX-2: spatiotemporal guidance scale
+             */
+            ltx2_stg_scale?: number | null;
+            /**
+             * Ltx2 Modality Scale
+             * @description LTX-2: modality guidance scale
+             */
+            ltx2_modality_scale?: number | null;
+            /**
+             * Ltx2 Context Frames
+             * @description LTX-2: frames of the initial video an extension continues from
+             */
+            ltx2_context_frames?: number | null;
+            /**
+             * Minimax H3 Hybrid Start Block
+             * @description MiniMax H3 Ref2VA: first block taken from the hybrid FL2VA base
+             */
+            minimax_h3_hybrid_start_block?: number | null;
+            /**
+             * Model
+             * @description The main video model's name (or key)
+             */
+            model?: string | null;
+            /**
+             * Vae
+             * @description Wan: a standalone VAE's name (or key)
+             */
+            vae?: string | null;
+            /**
+             * Wan T5 Encoder Model
+             * @description Wan: standalone UMT5 encoder
+             */
+            wan_t5_encoder_model?: string | null;
+            /**
+             * Wan Transformer Low Noise
+             * @description Wan A14B: low-noise expert
+             */
+            wan_transformer_low_noise?: string | null;
+            /**
+             * Wan Component Source
+             * @description Wan: Diffusers component source
+             */
+            wan_component_source?: string | null;
+            /**
+             * Minimax H3 Transformer Model
+             * @description MiniMax H3: transformer override
+             */
+            minimax_h3_transformer_model?: string | null;
+            /**
+             * Minimax H3 Component Source
+             * @description MiniMax H3: Diffusers component source
+             */
+            minimax_h3_component_source?: string | null;
+            /**
+             * Minimax H3 Text Encoder Model
+             * @description MiniMax H3: Qwen3-VL encoder
+             */
+            minimax_h3_text_encoder_model?: string | null;
+            /**
+             * Minimax H3 Hybrid Base Model
+             * @description MiniMax H3 Ref2VA: FL2VA base
+             */
+            minimax_h3_hybrid_base_model?: string | null;
+            /**
+             * Ltx2 Component Source
+             * @description LTX-2: component source
+             */
+            ltx2_component_source?: string | null;
+            /**
+             * Ltx2 Text Encoder Model
+             * @description LTX-2: Gemma-4 encoder
+             */
+            ltx2_text_encoder_model?: string | null;
+            /**
+             * Loras
+             * @description LoRAs with their weights; an empty list asks for none
+             */
+            loras?: components["schemas"]["VideoLoRARecallParameter"][] | null;
+            /** @description First-frame image */
+            first_frame_image?: components["schemas"]["ImageRefParameter"] | null;
+            /** @description Last-frame image */
+            last_frame_image?: components["schemas"]["ImageRefParameter"] | null;
+            /** @description Initial video to extend */
+            source_video?: components["schemas"]["VideoRefParameter"] | null;
+            /**
+             * Source Video Start Frame
+             * @description First frame of the initial video to use (inclusive)
+             */
+            source_video_start_frame?: number | null;
+            /**
+             * Source Video End Frame
+             * @description Last frame of the initial video to use (inclusive)
+             */
+            source_video_end_frame?: number | null;
+            /** @description LTX-2: a clip whose audio (or picture) conditions the whole generation */
+            ltx2_conditioning_video?: components["schemas"]["VideoRefParameter"] | null;
+            /**
+             * Ltx2 Conditioning Role
+             * @description LTX-2: which stream of `ltx2_conditioning_video` is the condition; required with it
+             */
+            ltx2_conditioning_role?: ("audio" | "video") | null;
+            /**
+             * Minimax H3 References
+             * @description MiniMax H3 Ref2VA references in conditioning order: at most 3 videos and 9 images; an empty list asks for none
+             */
+            minimax_h3_references?: (components["schemas"]["ImageReferenceParameter"] | components["schemas"]["VideoReferenceParameter"])[] | null;
+        };
+        /** VideoRecallParametersResponse */
+        VideoRecallParametersResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "success" | "no_parameters_provided" | "nothing_resolved";
+            /** Queue Id */
+            queue_id: string;
+            /**
+             * Parameters
+             * @description The resolved parameters sent to the frontend
+             */
+            parameters: {
+                [key: string]: unknown;
+            };
+            /**
+             * Skipped
+             * @description Requested fields dropped because their model or media could not be used
+             */
+            skipped: string[];
+            /**
+             * Overridden
+             * @description Requested media fields dropped because another medium in the same request takes precedence over them, mapped to that field (e.g. first_frame_image -> source_video)
+             */
+            overridden?: {
+                [key: string]: string;
+            };
+        };
+        /**
+         * VideoRecallRequestedEvent
+         * @description Event model for video_recall_requested
+         */
+        VideoRecallRequestedEvent: {
+            /**
+             * Timestamp
+             * @description The timestamp of the event
+             */
+            timestamp: number;
+            /**
+             * Queue Id
+             * @description The ID of the queue
+             */
+            queue_id: string;
+            /**
+             * User Id
+             * @description The ID of the user whose Video panel the recall targets
+             */
+            user_id: string;
+            /**
+             * Action
+             * @description What the frontend should do with the payload
+             * @enum {string}
+             */
+            action: "parameters" | "initial_video" | "reference_video";
+            /**
+             * Mode
+             * @description For `parameters`: `remix` applies everything except the seed
+             * @default null
+             */
+            mode: ("recall" | "remix") | null;
+            /**
+             * Strict
+             * @description For `parameters`: treat the payload as a whole generation record, clearing omitted LoRAs and media
+             * @default false
+             */
+            strict: boolean;
+            /**
+             * Parameters
+             * @description For `parameters`: recall fields, keyed like the video metadata record
+             * @default null
+             */
+            parameters: {
+                [key: string]: unknown;
+            } | null;
+            /**
+             * @description For `initial_video` and `reference_video`: the video to place
+             * @default null
+             */
+            video: components["schemas"]["VideoRecallVideo"] | null;
+        };
+        /**
+         * VideoRecallVideo
+         * @description The gallery video a video recall places into the Video panel.
+         */
+        VideoRecallVideo: {
+            /**
+             * Video Name
+             * @description The name of the gallery video
+             */
+            video_name: string;
+            /**
+             * Width
+             * @description The video's width in pixels
+             */
+            width: number;
+            /**
+             * Height
+             * @description The video's height in pixels
+             */
+            height: number;
+            /**
+             * Duration
+             * @description The video's duration in seconds
+             */
+            duration: number;
+            /**
+             * Fps
+             * @description The video's frame rate, when known
+             * @default null
+             */
+            fps?: number | null;
+            /**
+             * Media Origin
+             * @description How the video entered the gallery, e.g. `audio_upload` for wrapped audio
+             * @default null
+             */
+            media_origin?: string | null;
+        };
         /**
          * VideoRecordChanges
          * @description Allowed mutations on a video record.
@@ -47322,6 +47777,42 @@ export type components = {
             starred?: boolean | null;
         } & {
             [key: string]: unknown;
+        };
+        /** VideoRefParameter */
+        VideoRefParameter: {
+            /**
+             * Video Name
+             * @description The name of a gallery video
+             */
+            video_name: string;
+        };
+        /** VideoReferenceParameter */
+        VideoReferenceParameter: {
+            /**
+             * @description discriminator enum property added by openapi-typescript
+             * @enum {string}
+             */
+            kind: "video";
+            /**
+             * Video Name
+             * @description The name of a gallery video
+             */
+            video_name: string;
+            /**
+             * Conditioning
+             * @description Which of the clip's streams condition the generation
+             */
+            conditioning?: ("video_audio" | "video" | "audio") | null;
+            /**
+             * Start Frame
+             * @description First frame of the clip to use (inclusive)
+             */
+            start_frame?: number | null;
+            /**
+             * End Frame
+             * @description Last frame of the clip to use (inclusive)
+             */
+            end_frame?: number | null;
         };
         /**
          * VideoUploadedEvent
@@ -58165,6 +58656,253 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HTTPValidationError"];
                 };
+            };
+        };
+    };
+    recall_video_parameters: {
+        parameters: {
+            query?: {
+                /** @description `recall` applies every field; `remix` applies everything except the seed */
+                mode?: "recall" | "remix";
+                /** @description When true, the parameters are treated as a whole generation record: LoRAs and media not included are cleared from the Video panel. When false, only the included fields change. */
+                strict?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VideoRecallParameter"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoRecallParametersResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recall_initial_video: {
+        parameters: {
+            query: {
+                /** @description The name of the gallery video */
+                video_name: string;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoRecallMediaResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recall_initial_video_upload: {
+        parameters: {
+            query?: {
+                /** @description The board to upload the video to; Uncategorized when omitted */
+                board_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** File */
+                    file: Blob;
+                    /**
+                     * Metadata
+                     * @description The metadata to associate with the video, must be a stringified JSON dict
+                     */
+                    metadata?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoRecallMediaResponse"];
+                };
+            };
+            /** @description The video exceeds the upload size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The file is not a supported video or audio file */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many concurrent video uploads */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    recall_reference_video: {
+        parameters: {
+            query: {
+                /** @description The name of the gallery video */
+                video_name: string;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoRecallMediaResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recall_reference_video_upload: {
+        parameters: {
+            query?: {
+                /** @description The board to upload the video to; Uncategorized when omitted */
+                board_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** File */
+                    file: Blob;
+                    /**
+                     * Metadata
+                     * @description The metadata to associate with the video, must be a stringified JSON dict
+                     */
+                    metadata?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoRecallMediaResponse"];
+                };
+            };
+            /** @description The video exceeds the upload size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The file is not a supported video or audio file */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many concurrent video uploads */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

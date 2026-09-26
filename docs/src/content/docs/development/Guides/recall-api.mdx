@@ -4,6 +4,10 @@ title: Recall Parameters API
 
 ## Overview
 
+:::tip
+For the Video panel, see the [Video Recall API](/development/guides/video-recall-api/).
+:::
+
 The Recall Parameters API is a REST endpoint on the InvokeAI backend that
 lets external processes set recallable generation parameters on the
 frontend. Supported parameters include:
@@ -37,10 +41,12 @@ Typical use cases:
 3. **Resolution** — models are resolved from human-readable names to the
    internal model keys used by the frontend, and image filenames are
    validated against `{INVOKEAI_ROOT}/outputs/images`.
-4. **Broadcast** — a `recall_parameters_updated` event is emitted on the
-   websocket room for `queue_id`.
-5. **Frontend update** — any connected client subscribed to that queue
-   applies the update to its generation settings, so UI fields, LoRAs,
+4. **Broadcast** — a `recall_parameters_updated` event is emitted, once, to
+   the calling user's room and the administrators' room. webv2 ignores events
+   addressed to another user; the legacy frontend applies them, so an
+   administrator using it also receives other users' recalls.
+5. **Frontend update** — the calling user's connected clients
+   apply the update to their generation settings, so UI fields, LoRAs,
    reference images and (in the legacy frontend) control layers populate
    immediately. See [Frontend behavior](#frontend-behavior) for what each
    frontend applies.
@@ -467,8 +473,9 @@ fetch(API_URL, {
 
 ## WebSocket Events
 
-Parameter updates emit a `recall_parameters_updated` event to the queue
-room. Connected frontend clients automatically:
+Parameter updates emit a `recall_parameters_updated` event to the calling
+user's room and the administrators' room. The calling user's connected frontend
+clients automatically:
 
 1. Apply standard parameters (prompts, steps, dimensions, etc.).
 2. Load and add LoRAs to the LoRA list.
@@ -486,7 +493,11 @@ room. Connected frontend clients automatically:
 
 The update lands in the **Generate** panel of the project that was active when
 the event arrived, and shows a notification summarizing how many fields were
-applied. Parameters the Generate panel has no home for, and entries that could
+applied. If that project is still on screen, the Generate widget is brought to the
+front the same way the [Video Recall API](/development/guides/video-recall-api/#frontend-behavior)
+brings the Video widget forward: its tab is selected, a floating window is raised
+(and unrolled if shaded),
+and nothing moves while the user is typing. Parameters the Generate panel has no home for, and entries that could
 not be resolved, are left out and named in a second notification so the caller
 can tell what did not land. The editor must be open: events that arrive while
 the user is on the Launchpad are dropped even though the request returns 200.

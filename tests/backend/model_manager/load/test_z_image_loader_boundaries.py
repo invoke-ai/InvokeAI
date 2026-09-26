@@ -410,3 +410,25 @@ def test_a_comfyui_prefixed_checkpoint_loads_the_same_as_a_bare_one(monkeypatch,
     assert set(from_prefixed) == set(from_bare)
     for key, value in from_bare.items():
         assert torch.equal(from_prefixed[key], value), key
+
+
+def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_evicted(monkeypatch, tmp_path) -> None:
+    """The degraded half-state, at this seam rather than at the detector.
+
+    A packed uint8 weight with a block-scale grid and no `weight_scale_2` is the shape a guard keyed
+    on `weight_scale_2` -- the key the decode keys on -- lets straight through. `_find_nvfp4_layers`
+    refuses it and `test_nvfp4.py` pins that; what only a seam can answer is whether this loader
+    reaches the detector before it asks the cache for room, which nothing but the order of those two
+    statements secures.
+    """
+    state_dict = {
+        "x_embedder.weight": torch.randn(4, 4),
+        "layers.0.attention.qkv.weight": torch.zeros(384, 32, dtype=torch.uint8),
+        "layers.0.attention.qkv.weight_scale": torch.zeros(384, 4).to(torch.float8_e4m3fn),
+    }
+    run, config = _driver(monkeypatch, tmp_path, state_dict)
+
+    with pytest.raises(ValueError, match="with a weight_scale but no weight_scale_2"):
+        run.load(config)
+
+    assert run.reserved == []

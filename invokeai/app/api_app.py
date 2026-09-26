@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import logging
+import re
 from collections.abc import Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -42,6 +43,7 @@ from invokeai.app.api.routers import (
     style_presets,
     system_prompts,
     utilities,
+    video_recall,
     videos,
     virtual_boards,
     wildcards,
@@ -408,7 +410,14 @@ class RequestBodyLimitASGIMiddleware:
             return await self.app(scope, receive, send)
         # Behind a sub-path proxy the public path carries the prefix (see SubPathASGIMiddleware).
         route_path: str = scope.get("path", "").removeprefix(scope.get("root_path", ""))
-        if not self.matches_request(scope.get("method", ""), route_path):
+        # Starlette matches routes with `^...$`, and `$` also matches before a final newline, so a
+        # request for `/upload%0A` reaches the `/upload` route. Test both spellings: the newline may
+        # be the route's terminator (`/upload\n`) or a path parameter's only character
+        # (`/projects/\n`), and either way the request must not reach the route unbounded.
+        method = scope.get("method", "")
+        if not (
+            self.matches_request(method, route_path) or self.matches_request(method, route_path.removesuffix("\n"))
+        ):
             return await self.app(scope, receive, send)
 
         # `connection` is a hop-by-hop header and illegal in HTTP/2+, so every use below is
@@ -533,6 +542,18 @@ class RequestBodyLimitASGIMiddleware:
             self._active_by_user.pop(per_user_key, None)
 
 
+# The video-recall routes that take an upload ingest it exactly as /videos/upload does, so they
+# share its ingress cap and concurrency slots. Their name-only siblings take no body and stay
+# outside the limiter, so a caller mid-upload is never refused a slot for a bodyless request.
+_VIDEO_RECALL_UPLOAD_PATH = re.compile(r"/api/v1/recall/video/[^/]+/(?:initial-video|reference-video)/upload")
+
+
+def _is_video_upload(method: str, path: str) -> bool:
+    return method == "POST" and (
+        path == "/api/v1/videos/upload" or _VIDEO_RECALL_UPLOAD_PATH.fullmatch(path) is not None
+    )
+
+
 class VideoUploadLimitASGIMiddleware(RequestBodyLimitASGIMiddleware):
     """Bound video-upload ingress before FastAPI's multipart parser runs."""
 
@@ -548,7 +569,7 @@ class VideoUploadLimitASGIMiddleware(RequestBodyLimitASGIMiddleware):
     ) -> None:
         super().__init__(
             app=app,
-            matches_request=lambda method, path: method == "POST" and path == "/api/v1/videos/upload",
+            matches_request=_is_video_upload,
             too_large_detail=lambda _actual, limit: f"Video upload exceeds maximum request size ({limit} bytes)",
             capacity_refusal_detail=lambda per_user: (
                 "Too many concurrent video uploads for this user; try again shortly"
@@ -737,6 +758,7 @@ app.include_router(system_prompts.system_prompts_router, prefix="/api")
 app.include_router(client_state.client_state_router, prefix="/api")
 app.include_router(projects.projects_router, prefix="/api")
 app.include_router(recall_parameters.recall_parameters_router, prefix="/api")
+app.include_router(video_recall.video_recall_router, prefix="/api")
 app.include_router(custom_nodes.custom_nodes_router, prefix="/api")
 
 app.openapi = get_openapi_func(app)

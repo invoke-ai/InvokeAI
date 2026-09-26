@@ -17,10 +17,8 @@ import { galleryImageUrls, galleryVideoUrls, isGalleryItemDragData } from '@feat
 import { resolveMiniMaxH3ReferenceImage } from '@features/video/core/dimensions';
 import {
   clampReferenceSampleFrames,
-  createVideoSourceClip,
+  createVideoReferenceEntry,
   formatReferencePromptLabels,
-  getDefaultReferenceClip,
-  getDefaultReferenceConditioning,
   getDefaultReferenceImageDetail,
   referencePromptLabels,
   referenceSampleFrames,
@@ -496,17 +494,8 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
 
   const addVideoItem = useCallback(
     (item: GalleryVideoItem) => {
-      // Do not persist mediaOrigin on the clip: project import reuploads under a new name without rederiving it.
-      const conditioning = getDefaultReferenceConditioning(item.mediaOrigin);
-      const clip = createVideoSourceClip(item);
       // Construct once so the caller retains the same entry identity through reorders.
-      const entry: Extract<VideoReferenceItem, { kind: 'video' }> = {
-        // Footage defaults to a short sample; audio uses the whole clip. References are truncated, not
-        // crossfade-joined.
-        clip: getDefaultReferenceClip(clip, conditioning),
-        conditioning,
-        kind: 'video',
-      };
+      const entry = createVideoReferenceEntry(item);
       let declined = false;
 
       setErrorMessage(null);

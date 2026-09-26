@@ -59,6 +59,7 @@ from invokeai.app.services.events.events_common import (
     QueueItemStatusChangedEvent,
     RecallParametersUpdatedEvent,
     UserAccessChangedEvent,
+    VideoRecallRequestedEvent,
     VideoUploadedEvent,
     WorkflowAccessRevokedEvent,
     WorkflowCreatedEvent,
@@ -114,6 +115,7 @@ QUEUE_EVENTS = {
     QueueItemsCanceledEvent,
     QueueClearedEvent,
     RecallParametersUpdatedEvent,
+    VideoRecallRequestedEvent,
 }
 
 MODEL_EVENTS = {
@@ -967,7 +969,7 @@ class SocketIO:
            per-session side effects.
 
         InvocationEventBase events stay private (owner + admins only). RecallParametersUpdatedEvent
-        is also private. QueueClearedEvent is broadcast to the queue room when unscoped (an admin or
+        is also private, and VideoRecallRequestedEvent goes to the owner alone. QueueClearedEvent is broadcast to the queue room when unscoped (an admin or
         single-user clear that deleted every user's items); a user-scoped clear goes full to
         owner + admins with a sanitized companion to the rest of the queue room, so other users
         refresh their queue lists without treating the clear as their own.
@@ -1080,6 +1082,15 @@ class SocketIO:
                     event=event_name, data=event_data.model_dump(mode="json"), room=[user_room, "admin"]
                 )
                 logger.debug(f"Emitted private recall_parameters_updated event to user room {user_room} and admin room")
+
+            # VideoRecallRequestedEvent goes to the owner only. Unlike image recall no admin UI
+            # consumes it, and its payload names the owner's media. One room also means one
+            # delivery, which matters: a reference-video recall appends.
+            elif isinstance(event_data, VideoRecallRequestedEvent):
+                await self._sio.emit(
+                    event=event_name, data=event_data.model_dump(mode="json"), room=f"user:{event_data.user_id}"
+                )
+                logger.debug(f"Emitted private video_recall_requested event to user room user:{event_data.user_id}")
 
             # BatchEnqueuedEvent: full to owner+admin, sanitized to everyone else in the queue
             # room so their badge total and queue list pick up the new items.

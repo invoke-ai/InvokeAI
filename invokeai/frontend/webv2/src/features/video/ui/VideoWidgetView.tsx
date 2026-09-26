@@ -20,11 +20,11 @@ import {
   snapLtx2FramesDown,
 } from '@features/video/core/dimensions';
 import {
-  applyReferenceExtendSourceVideo,
   applyReferenceExtendNumFrames,
   canPlaceReferenceExtendAnchor,
+  getInitialVideoPatch,
+  getReferencesPatch,
   isVideoTargetResolution,
-  pinReferenceExtendAnchor,
   normalizeVideoWidgetValues,
   resolveVideoMode,
   VIDEO_ASPECT_RATIO_IDS,
@@ -295,32 +295,29 @@ export const VideoWidgetView = () => {
   );
   const setSourceVideo = useCallback(
     (sourceVideo: VideoSourceClip | null) => {
-      if (referenceExtend) {
-        if (!referencesRef.current.live || referencesRef.current.projectId !== projectId) {
-          return;
-        }
-        const current = referencesRef.current.references;
-        const references = applyReferenceExtendSourceVideo(current, sourceVideo, maxVideoReferences, values.numFrames);
-
-        // Unchanged identity means no tail-reference slot is available: refuse the whole drop so the clip cannot
-        // be set without its continuity anchor. Clearing cannot overflow.
-        if (sourceVideo && references === current) {
-          toaster.create({
-            description: t('widgets.video.referenceExtendCapFullDescription'),
-            title: t('widgets.video.referenceExtendCapFull'),
-            type: 'warning',
-          });
-
-          return;
-        }
-        patch({
-          references,
-          sourceVideo,
-          ...(sourceVideo ? { conditioningClip: null, firstFrameImage: null } : {}),
-        });
+      if (referenceExtend && (!referencesRef.current.live || referencesRef.current.projectId !== projectId)) {
         return;
       }
-      patch({ sourceVideo, ...(sourceVideo ? { conditioningClip: null, firstFrameImage: null } : {}) });
+      const placement = getInitialVideoPatch({
+        maxVideos: maxVideoReferences,
+        numFrames: values.numFrames,
+        referenceExtend,
+        references: referencesRef.current.references,
+        sourceVideo,
+      });
+
+      // No tail-reference slot is available: refuse the whole drop so the clip cannot be set without its
+      // continuity anchor.
+      if (!placement) {
+        toaster.create({
+          description: t('widgets.video.referenceExtendCapFullDescription'),
+          title: t('widgets.video.referenceExtendCapFull'),
+          type: 'warning',
+        });
+
+        return;
+      }
+      patch(placement);
     },
     [maxVideoReferences, patch, projectId, referenceExtend, t, values.numFrames]
   );
@@ -336,19 +333,7 @@ export const VideoWidgetView = () => {
       if (updated === referencesRef.current.references) {
         return;
       }
-      const next = referenceExtend ? pinReferenceExtendAnchor(updated) : updated;
-
-      patch({
-        references: next,
-        ...(next.length > 0
-          ? {
-              conditioningClip: null,
-              firstFrameImage: null,
-              lastFrameImage: null,
-              ...(referenceExtend ? {} : { sourceVideo: null }),
-            }
-          : {}),
-      });
+      patch(getReferencesPatch({ referenceExtend, references: updated }));
     },
     [patch, projectId, referenceExtend]
   );

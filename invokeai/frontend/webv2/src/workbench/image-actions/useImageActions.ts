@@ -1,5 +1,7 @@
 import type { GalleryItemActionContext, GalleryItemActions } from '@features/gallery/react';
 import type { VaeModelConfig } from '@features/generation/contracts';
+import type { ModelConfig } from '@features/models';
+import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import {
   galleryImages,
@@ -47,8 +49,8 @@ import {
 } from '@workbench/canvas-operations/api';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
-import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useWorkbenchCommands, useWorkbenchQueries } from '@workbench/WorkbenchContext';
+import { getProjectWidgetInstance, getProjectWidgetValues } from '@workbench/widgetState';
+import { useWorkbenchCommands, useWorkbenchQueries, useWorkbenchSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -57,7 +59,12 @@ import type { RequestDeletionConfirmation } from './useDeletionConfirmation';
 import { appendReferenceImage } from './appendReferenceImage';
 import { recordCanvasImportError } from './canvasImportError';
 import { executeImageRecall, executeLoadImageWorkflow, getCurrentGenerateValues } from './executeImageRecall';
-import { executeVideoRecall } from './executeVideoRecall';
+import {
+  appendReferenceVideo,
+  canAppendReferenceVideo,
+  executeVideoRecall,
+  placeInitialVideo,
+} from './executeVideoRecall';
 import {
   captureGalleryWidgetKeyValues,
   collectGalleryStoreKnownItemFields,
@@ -87,6 +94,8 @@ import {
 export interface ImageActions extends GalleryItemActions {
   /** Whether the generate widget's current model can accept another reference image. */
   canUseAsReferenceImage: boolean;
+  /** Whether the video widget's current model takes reference videos and has room for another. */
+  canUseAsReferenceVideo: boolean;
   copyImage: (image: GalleryImage) => Promise<void>;
   /** Opens a new project whose canvas holds these images as raster layers. */
   createCanvasFromImages: (images: readonly GalleryImage[]) => Promise<void>;
@@ -108,13 +117,41 @@ export interface ImageActions extends GalleryItemActions {
   recallImageData: (image: GalleryImage, kind: ImageRecallKind) => Promise<void>;
   /** Applies a gallery video's recorded parameters to the Video panel. */
   recallVideoData: (item: GalleryVideoItem, kind: VideoRecallKind) => Promise<void>;
+  /** Sets a gallery video as the Video panel's Initial Video, as that field would. */
+  sendToInitialVideo: (item: GalleryVideoItem) => void;
   /** Opens the generate widget's template editor prefilled from this image's prompts. */
   savePromptAsTemplate: (image: GalleryImage) => Promise<void>;
   selectForCompare: (image: GalleryImage) => void;
   sendToCanvas: (images: readonly GalleryImage[], destination: GalleryCanvasImportDestination) => Promise<void>;
   setImagesStarred: (imageNames: string[], starred: boolean) => Promise<void>;
   useAsReferenceImage: (image: GalleryImage) => void;
+  useAsReferenceVideo: (item: GalleryVideoItem) => void;
 }
+
+const EMPTY_WIDGET_VALUES: Record<string, unknown> = {};
+
+/**
+ * Selected as a boolean so Video panel edits re-render action consumers only when the answer flips. The cache skips
+ * re-normalizing video values that have not changed since the last store update.
+ */
+const createCanUseAsReferenceVideoSelector = (models: readonly ModelConfig[], projectId: string | undefined) => {
+  let lastValues: Record<string, unknown> | null = null;
+  let lastResult = false;
+
+  return (snapshot: WorkbenchSnapshot): boolean => {
+    const project = projectId
+      ? snapshot.projects.find((candidate) => candidate.id === projectId)
+      : snapshot.activeProject;
+    const videoValues = (project && getProjectWidgetInstance(project, 'video')?.state.values) ?? EMPTY_WIDGET_VALUES;
+
+    if (videoValues !== lastValues) {
+      lastValues = videoValues;
+      lastResult = canAppendReferenceVideo({ models, videoValues });
+    }
+
+    return lastResult;
+  };
+};
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 
@@ -174,6 +211,12 @@ export const useImageActions = ({
       };
     }, [generateValues, supportedModels])
   );
+
+  const selectCanUseAsReferenceVideo = useMemo(
+    () => createCanUseAsReferenceVideoSelector(models, projectId),
+    [models, projectId]
+  );
+  const canUseAsReferenceVideo = useWorkbenchSelector(selectCanUseAsReferenceVideo, Object.is);
 
   useMountEffect(() => {
     void ensureModelsLoaded();
@@ -1004,6 +1047,50 @@ export const useImageActions = ({
           starred
         ),
       canUseAsReferenceImage,
+      canUseAsReferenceVideo,
+      sendToInitialVideo: (item) => {
+        const placement = placeInitialVideo({ models, video: item, videoValues: getLatestVideoValues() });
+
+        if (placement.status === 'full') {
+          notifications.add({
+            kind: 'info',
+            message: t('widgets.video.placement.initialVideoFull'),
+            title: t('widgets.video.referenceExtendCapFull'),
+          });
+          return;
+        }
+
+        openWorkbenchWidget('video', { preferredRegions: ['left'] });
+        commands.widgets.patchValues('video', placement.patch, projectId);
+        generation.setSource('video');
+        if (!placement.usable) {
+          notifications.add({
+            kind: 'info',
+            message: t('widgets.video.placement.initialVideoUnused'),
+            title: t('widgets.video.placement.initialVideoSet'),
+          });
+        }
+      },
+      useAsReferenceVideo: (item) => {
+        const placement = appendReferenceVideo({ models, video: item, videoValues: getLatestVideoValues() });
+
+        // The menu offers this only when there is room; a race can still fill the last slot first.
+        if (placement.status !== 'appended') {
+          notifications.add({
+            kind: 'info',
+            message: t(
+              placement.status === 'full'
+                ? 'widgets.video.placement.referenceFull'
+                : 'widgets.video.placement.referenceUnsupported'
+            ),
+            title: t('widgets.video.placement.referenceNotAdded'),
+          });
+          return;
+        }
+
+        commands.widgets.patchValues('video', placement.patch, projectId);
+        openWorkbenchWidget('video', { preferredRegions: ['left'] });
+      },
       useAsReferenceImage: (image) => {
         const result = appendReferenceImage({ generateValues: getLatestGenerateValues(), image, models });
 
@@ -1018,6 +1105,7 @@ export const useImageActions = ({
   }, [
     boards,
     canUseAsReferenceImage,
+    canUseAsReferenceVideo,
     confirmImageDeletion,
     currentGenerateValues,
     commands,
