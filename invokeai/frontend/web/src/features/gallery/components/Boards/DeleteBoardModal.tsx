@@ -21,13 +21,18 @@ import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import ImageUsageMessage from 'features/deleteImageModal/components/ImageUsageMessage';
 import { getImageUsage } from 'features/deleteImageModal/store/state';
 import type { ImageUsage } from 'features/deleteImageModal/store/types';
+import { isVideoName } from 'features/gallery/store/types';
 import { selectNodesSlice } from 'features/nodes/store/selectors';
 import { selectUpscaleSlice } from 'features/parameters/store/upscaleSlice';
+import {
+  selectSystemShouldConfirmOnDelete,
+  selectSystemShouldProtectStarredMedia,
+} from 'features/system/store/systemSlice';
 import { toast } from 'features/toast/toast';
 import { atom } from 'nanostores';
-import { memo, useCallback, useMemo, useRef } from 'react';
+import { memo, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { useListAllImageNamesForBoardQuery } from 'services/api/endpoints/boards';
+import { useListGalleryItemNamesQuery } from 'services/api/endpoints/gallery';
 import {
   useDeleteBoardAndImagesMutation,
   useDeleteBoardMutation,
@@ -44,17 +49,23 @@ const DeleteBoardModal = () => {
   useAssertSingleton('DeleteBoardModal');
   const boardToDelete = useStore($boardToDelete);
   const { t } = useTranslation();
+  const shouldConfirmOnDelete = useAppSelector(selectSystemShouldConfirmOnDelete);
+  const shouldProtectStarredMedia = useAppSelector(selectSystemShouldProtectStarredMedia);
 
   const boardId = useMemo(() => (boardToDelete === 'none' ? 'none' : boardToDelete?.board_id), [boardToDelete]);
-
-  const { currentData: boardImageNames, isFetching: isFetchingBoardNames } = useListAllImageNamesForBoardQuery(
+  const { currentData: boardMedia, isFetching: isFetchingBoardNames } = useListGalleryItemNamesQuery(
     boardId
       ? {
           board_id: boardId,
           categories: undefined,
           is_intermediate: undefined,
+          starred_first: true,
         }
       : skipToken
+  );
+  const boardImageNames = useMemo(
+    () => boardMedia?.item_names.filter((name) => !isVideoName(name)) ?? [],
+    [boardMedia?.item_names]
   );
 
   const selectImageUsageSummary = useMemo(
@@ -62,7 +73,7 @@ const DeleteBoardModal = () => {
       createMemoizedSelector(
         [selectNodesSlice, selectCanvasSlice, selectUpscaleSlice, selectRefImagesSlice],
         (nodes, canvas, upscale, refImages) => {
-          const allImageUsage = (boardImageNames ?? []).map((imageName) =>
+          const allImageUsage = boardImageNames.map((imageName) =>
             getImageUsage(nodes, canvas, upscale, refImages, imageName)
           );
 
@@ -83,70 +94,135 @@ const DeleteBoardModal = () => {
   );
 
   const [deleteBoardOnly, { isLoading: isDeleteBoardOnlyLoading }] = useDeleteBoardMutation();
-
   const [deleteBoardAndImages, { isLoading: isDeleteBoardAndImagesLoading }] = useDeleteBoardAndImagesMutation();
-
   const [deleteUncategorizedImages, { isLoading: isDeleteUncategorizedImagesLoading }] =
     useDeleteUncategorizedImagesMutation();
-
   const [deleteUncategorizedVideos, { isLoading: isDeleteUncategorizedVideosLoading }] =
     useDeleteUncategorizedVideosMutation();
 
   const imageUsageSummary = useAppSelector(selectImageUsageSummary);
+  const [starredConfirmationBoardId, setStarredConfirmationBoardId] = useState<string | null>(null);
+  const isStarredConfirmationOpen =
+    boardToDelete !== null && boardToDelete !== 'none' && starredConfirmationBoardId === boardToDelete.board_id;
 
-  const handleDeleteBoardOnly = useCallback(() => {
-    if (!boardToDelete || boardToDelete === 'none') {
-      return;
-    }
-    deleteBoardOnly({ board_id: boardToDelete.board_id });
+  const handleClose = useCallback(() => {
+    setStarredConfirmationBoardId(null);
     $boardToDelete.set(null);
-  }, [boardToDelete, deleteBoardOnly]);
+  }, []);
 
-  const handleDeleteBoardAndImages = useCallback(async () => {
+  const reportDeletionSummary = useCallback(
+    (summary: ReturnType<typeof getMediaDeletionSummary>, showProtectedWarning: boolean) => {
+      if (summary.requestFailed) {
+        toast({
+          status: 'error',
+          title: t('toast.mediaDeleteFailed'),
+          description: t('toast.mediaDeleteFailedDesc'),
+        });
+        return;
+      }
+      if (summary.failedCount > 0) {
+        toast({
+          status: 'warning',
+          title: t('toast.mediaDeleteFailed'),
+          description: t('toast.mediaDeletePartial', { count: summary.failedCount }),
+        });
+      }
+      if (showProtectedWarning && summary.protectedCount > 0) {
+        toast({
+          status: 'warning',
+          title: t('toast.starredMediaProtected'),
+          description: t('toast.starredMediaProtectedDesc', { count: summary.protectedCount }),
+        });
+      }
+    },
+    [t]
+  );
+
+  const handleDeleteBoardOnly = useCallback(async () => {
     if (!boardToDelete || boardToDelete === 'none') {
       return;
     }
-    const result = await Promise.allSettled([deleteBoardAndImages({ board_id: boardToDelete.board_id }).unwrap()]);
-    const summary = getMediaDeletionSummary(result);
-    if (summary.requestFailed || summary.failedCount > 0) {
+    try {
+      await deleteBoardOnly({ board_id: boardToDelete.board_id }).unwrap();
+      handleClose();
+    } catch {
       toast({
-        status: summary.requestFailed ? 'error' : 'warning',
+        status: 'error',
         title: t('toast.mediaDeleteFailed'),
-        description: summary.requestFailed
-          ? t('toast.mediaDeleteFailedDesc')
-          : t('toast.mediaDeletePartial', { count: summary.failedCount }),
+        description: t('toast.mediaDeleteFailedDesc'),
       });
     }
-    $boardToDelete.set(null);
-  }, [boardToDelete, deleteBoardAndImages, t]);
+  }, [boardToDelete, deleteBoardOnly, handleClose, t]);
+
+  const deleteBoardWithMedia = useCallback(async () => {
+    if (!boardToDelete || boardToDelete === 'none') {
+      return;
+    }
+    const results = await Promise.allSettled([
+      deleteBoardAndImages({
+        board_id: boardToDelete.board_id,
+        delete_starred: !shouldProtectStarredMedia,
+      }).unwrap(),
+    ]);
+    const summary = getMediaDeletionSummary(results);
+    reportDeletionSummary(summary, shouldConfirmOnDelete);
+    if (!summary.requestFailed) {
+      handleClose();
+    }
+  }, [
+    boardToDelete,
+    deleteBoardAndImages,
+    handleClose,
+    reportDeletionSummary,
+    shouldConfirmOnDelete,
+    shouldProtectStarredMedia,
+  ]);
+
+  const handleDeleteBoardAndMedia = useCallback(() => {
+    if (!boardToDelete || boardToDelete === 'none') {
+      return;
+    }
+    if (shouldProtectStarredMedia && (boardMedia?.starred_count ?? 0) > 0) {
+      setStarredConfirmationBoardId(boardToDelete.board_id);
+      return;
+    }
+    void deleteBoardWithMedia();
+  }, [boardMedia?.starred_count, boardToDelete, deleteBoardWithMedia, shouldProtectStarredMedia]);
+
+  const handleConfirmStarredDelete = useCallback(() => {
+    if (!boardToDelete || boardToDelete === 'none' || starredConfirmationBoardId !== boardToDelete.board_id) {
+      return;
+    }
+    void deleteBoardWithMedia();
+  }, [boardToDelete, deleteBoardWithMedia, starredConfirmationBoardId]);
+
+  const handleCancelStarredDelete = useCallback(() => {
+    setStarredConfirmationBoardId(null);
+  }, []);
 
   const handleDeleteUncategorizedMedia = useCallback(async () => {
     if (!boardToDelete || boardToDelete !== 'none') {
       return;
     }
-    // The uncategorized bucket is polymorphic (the button says "Images/Videos"), so both
-    // media kinds are deleted. The mutations are independent — a failure in one doesn't
-    // block the other.
+    const params = shouldProtectStarredMedia ? { delete_starred: false } : undefined;
     const results = await Promise.allSettled([
-      deleteUncategorizedImages().unwrap(),
-      deleteUncategorizedVideos().unwrap(),
+      deleteUncategorizedImages(params).unwrap(),
+      deleteUncategorizedVideos(params).unwrap(),
     ]);
     const summary = getMediaDeletionSummary(results);
-    if (summary.requestFailed || summary.failedCount > 0) {
-      toast({
-        status: summary.requestFailed ? 'error' : 'warning',
-        title: t('toast.mediaDeleteFailed'),
-        description: summary.requestFailed
-          ? t('toast.mediaDeleteFailedDesc')
-          : t('toast.mediaDeletePartial', { count: summary.failedCount }),
-      });
+    reportDeletionSummary(summary, shouldConfirmOnDelete);
+    if (!summary.requestFailed) {
+      handleClose();
     }
-    $boardToDelete.set(null);
-  }, [boardToDelete, deleteUncategorizedImages, deleteUncategorizedVideos, t]);
-
-  const handleClose = useCallback(() => {
-    $boardToDelete.set(null);
-  }, []);
+  }, [
+    boardToDelete,
+    deleteUncategorizedImages,
+    deleteUncategorizedVideos,
+    handleClose,
+    reportDeletionSummary,
+    shouldConfirmOnDelete,
+    shouldProtectStarredMedia,
+  ]);
 
   const cancelRef = useRef<HTMLButtonElement>(null);
 
@@ -171,58 +247,88 @@ const DeleteBoardModal = () => {
   }
 
   return (
-    <AlertDialog isOpen={Boolean(boardToDelete)} onClose={handleClose} leastDestructiveRef={cancelRef} isCentered>
-      <AlertDialogOverlay>
-        <AlertDialogContent>
-          <AlertDialogHeader fontSize="lg" fontWeight="bold">
-            {t('common.delete')} {boardToDelete === 'none' ? t('boards.uncategorizedImages') : boardToDelete.board_name}
-          </AlertDialogHeader>
+    <>
+      <AlertDialog isOpen={!isStarredConfirmationOpen} onClose={handleClose} leastDestructiveRef={cancelRef} isCentered>
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              {t('common.delete')}{' '}
+              {boardToDelete === 'none' ? t('boards.uncategorizedImages') : boardToDelete.board_name}
+            </AlertDialogHeader>
 
-          <AlertDialogBody>
-            <Flex direction="column" gap={3}>
-              {isFetchingBoardNames ? (
-                <Skeleton>
-                  <Flex w="full" h={32} />
-                </Skeleton>
-              ) : (
-                <ImageUsageMessage
-                  imageUsage={imageUsageSummary}
-                  topMessage={t('boards.topMessage')}
-                  bottomMessage={t('boards.bottomMessage')}
-                />
-              )}
-              {boardToDelete !== 'none' ? (
-                <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
-              ) : (
-                <Text>{t('gallery.deleteMediaPermanent')}</Text>
-              )}
-            </Flex>
-          </AlertDialogBody>
-          <AlertDialogFooter>
-            <Flex w="full" gap={2} justifyContent="end">
-              <Button ref={cancelRef} onClick={handleClose}>
-                {t('boards.cancel')}
-              </Button>
-              {boardToDelete !== 'none' && (
-                <Button colorScheme="warning" isLoading={isLoading} onClick={handleDeleteBoardOnly}>
-                  {t('boards.deleteBoardOnly')}
+            <AlertDialogBody>
+              <Flex direction="column" gap={3}>
+                {isFetchingBoardNames ? (
+                  <Skeleton>
+                    <Flex w="full" h={32} />
+                  </Skeleton>
+                ) : (
+                  <ImageUsageMessage
+                    imageUsage={imageUsageSummary}
+                    topMessage={t('boards.topMessage')}
+                    bottomMessage={t('boards.bottomMessage')}
+                  />
+                )}
+                {boardToDelete !== 'none' ? (
+                  <Text>{t('boards.deletedBoardsCannotbeRestored')}</Text>
+                ) : (
+                  <Text>{t('gallery.deleteMediaPermanent')}</Text>
+                )}
+              </Flex>
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Flex w="full" gap={2} justifyContent="end">
+                <Button ref={cancelRef} onClick={handleClose}>
+                  {t('boards.cancel')}
                 </Button>
-              )}
-              {boardToDelete !== 'none' && (
-                <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteBoardAndImages}>
-                  {t('boards.deleteBoardAndAssets')}
+                {boardToDelete !== 'none' && (
+                  <Button colorScheme="warning" isLoading={isLoading} onClick={handleDeleteBoardOnly}>
+                    {t('boards.deleteBoardOnly')}
+                  </Button>
+                )}
+                {boardToDelete !== 'none' && (
+                  <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteBoardAndMedia}>
+                    {t('boards.deleteBoardAndAssets')}
+                  </Button>
+                )}
+                {boardToDelete === 'none' && (
+                  <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteUncategorizedMedia}>
+                    {t('boards.deleteAllUncategorizedImages')}
+                  </Button>
+                )}
+              </Flex>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+      <AlertDialog
+        isOpen={isStarredConfirmationOpen}
+        onClose={handleCancelStarredDelete}
+        leastDestructiveRef={cancelRef}
+        isCentered
+      >
+        <AlertDialogOverlay>
+          <AlertDialogContent>
+            <AlertDialogHeader fontSize="lg" fontWeight="bold">
+              {t('boards.containsStarredMediaTitle')}
+            </AlertDialogHeader>
+            <AlertDialogBody>
+              <Text>{t('boards.containsStarredMediaConfirm')}</Text>
+            </AlertDialogBody>
+            <AlertDialogFooter>
+              <Flex w="full" gap={2} justifyContent="end">
+                <Button ref={cancelRef} onClick={handleCancelStarredDelete}>
+                  {t('boards.cancel')}
                 </Button>
-              )}
-              {boardToDelete === 'none' && (
-                <Button colorScheme="error" isLoading={isLoading} onClick={handleDeleteUncategorizedMedia}>
-                  {t('boards.deleteAllUncategorizedImages')}
+                <Button colorScheme="error" isLoading={isLoading} onClick={handleConfirmStarredDelete}>
+                  {t('common.delete')}
                 </Button>
-              )}
-            </Flex>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialogOverlay>
-    </AlertDialog>
+              </Flex>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialogOverlay>
+      </AlertDialog>
+    </>
   );
 };
 

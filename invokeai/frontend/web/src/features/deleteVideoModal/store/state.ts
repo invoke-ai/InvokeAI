@@ -11,7 +11,10 @@ import {
 import { fieldVideoValueChanged } from 'features/nodes/store/nodesSlice';
 import { isVideoFieldInputInstance } from 'features/nodes/types/field';
 import { isInvocationNode } from 'features/nodes/types/invocation';
-import { selectSystemShouldConfirmOnDelete } from 'features/system/store/systemSlice';
+import {
+  selectSystemShouldConfirmOnDelete,
+  selectSystemShouldProtectStarredMedia,
+} from 'features/system/store/systemSlice';
 import { toast } from 'features/toast/toast';
 import { t } from 'i18next';
 import { atom } from 'nanostores';
@@ -81,6 +84,8 @@ export const handleDeletions = async (video_names: string[], store: AppStore) =>
   // Snapshot the polymorphic gallery list and the currently-displayed item *before* the
   // delete fires; once the network call resolves the cache will already have shifted.
   const stateBefore = getState();
+  const shouldConfirmOnDelete = selectSystemShouldConfirmOnDelete(stateBefore);
+  const shouldProtectStarredMedia = selectSystemShouldProtectStarredMedia(stateBefore);
   const galleryItemNames = selectCachedGalleryItemNames(stateBefore);
   const lastSelected = selectLastSelectedItem(stateBefore);
   const lastSelectedIndex =
@@ -91,14 +96,25 @@ export const handleDeletions = async (video_names: string[], store: AppStore) =>
   let deletedNames = new Set<string>();
   try {
     const result = await dispatch(
-      videosApi.endpoints.deleteVideos.initiate({ video_names }, { track: false })
+      videosApi.endpoints.deleteVideos.initiate(
+        { video_names, delete_starred: !shouldProtectStarredMedia },
+        { track: false }
+      )
     ).unwrap();
     deletedNames = new Set(result.deleted_videos);
+    const starredSkipped = result.starred_skipped ?? [];
     if (result.failed_videos.length > 0) {
       toast({
         status: 'warning',
         title: t('toast.videoDeleteFailed'),
         description: t('toast.videoDeletePartial', { count: result.failed_videos.length }),
+      });
+    }
+    if (shouldConfirmOnDelete && starredSkipped.length > 0) {
+      toast({
+        status: 'warning',
+        title: t('toast.starredMediaProtected'),
+        description: t('toast.starredMediaProtectedDesc', { count: starredSkipped.length }),
       });
     }
   } catch {
