@@ -855,3 +855,30 @@ def test_room_is_reserved_before_the_scaled_weights_are_widened(monkeypatch, tmp
     assert torch.allclose(model.transformer_blocks[0].attn.to_q.weight.float(), payload.dequantized, atol=1e-5)
     assert [step for step, _ in run.order] == list(widening), run.order
     assert all(reserved for _step, reserved in run.order), run.order
+
+
+def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_evicted(monkeypatch, tmp_path) -> None:
+    """The degraded nvfp4 half-state, at this seam rather than at the detector.
+
+    A packed uint8 weight with a block-scale grid and no `weight_scale_2` is the state a guard keyed
+    on `weight_scale_2` -- the key the decode itself keys on -- lets straight through.
+    `_find_nvfp4_layers` refuses it and `test_nvfp4.py` pins that; what only a seam can answer is
+    whether this loader reaches the detector before it asks the cache for room. Krea-2 pops on the
+    *native* keys, before the conversion that remaps the payload paths, so the refusal has to survive
+    being upstream of the rename as well as upstream of the reservation.
+    """
+    # A whole number of cuBLAS tiles -- 128 rows, 8 blocks of 16 -- rather than the tiny model's
+    # width, which would give an empty grid. The refusal reads only the key pairing and the uint8
+    # dtype, so it fires either way; a layer no nvfp4 build could contain is the wrong thing to
+    # assert against, and it would stop representing the state if that check is ever tightened.
+    state_dict = {
+        **_native_block(_TinyNativeKrea2.WIDTH),
+        "blocks.0.attn.wq.weight": torch.zeros(128, 64, dtype=torch.uint8),
+        "blocks.0.attn.wq.weight_scale": torch.zeros(128, 8).to(torch.float8_e4m3fn),
+    }
+    run, config = _native_fp8_driver(monkeypatch, tmp_path, state_dict)
+
+    with pytest.raises(ValueError, match="with a weight_scale but no weight_scale_2"):
+        run.load(config)
+
+    assert run.reserved == []

@@ -49,6 +49,19 @@ def _marker(fmt: str) -> torch.Tensor:
     return comfy_quant_marker({"format": fmt})
 
 
+#: Both single-file encoder cells drive the same entry, so the driver is declared once.
+ENCODER_SEAM = Seam(
+    loader=QwenVLEncoderCheckpointLoader,
+    module=qwen_image,
+    entry="_load_text_encoder_from_singlefile",
+    # The loader imports `load_file` inside the method, so the name it resolves is the package's.
+    load_file_host=safetensors.torch,
+    patches_device=True,
+    sets_torch_dtype=False,
+    casts_fp8_storage=False,
+)
+
+
 def _patch_common(monkeypatch: pytest.MonkeyPatch, state_dict: dict, metadata: dict) -> list[bool]:
     """Patch file access and devices; return a log for `_record_fold`."""
     import safetensors.torch
@@ -292,19 +305,83 @@ def test_an_int8_convrot_checkpoint_is_refused_before_the_cache_is_evicted(monke
     }
     checkpoint = tmp_path / "qwen_2.5_vl_7b_int8_convrot.safetensors"
     checkpoint.touch()
-    seam = Seam(
-        loader=QwenVLEncoderCheckpointLoader,
-        module=qwen_image,
-        entry="_load_text_encoder_from_singlefile",
-        # The loader imports `load_file` inside the method, so the name it resolves is the package's.
-        load_file_host=safetensors.torch,
-        patches_device=True,
-        sets_torch_dtype=False,
-        casts_fp8_storage=False,
-    )
-    run = prepare(seam, monkeypatch, state_dict=state_dict, metadata=None)
+    run = prepare(ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=None)
 
     with pytest.raises(ValueError, match="quantized with convrot"):
         run.load(QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint)))
+
+    assert run.reserved == []
+
+
+def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_evicted(monkeypatch, tmp_path) -> None:
+    """The degraded half-state, at the seam rather than at the detector.
+
+    A packed uint8 weight with a block-scale grid and no `weight_scale_2` is the shape a guard keyed
+    on `weight_scale_2` -- what the decode keys on -- lets straight through. `_find_nvfp4_layers`
+    refuses it, and `test_nvfp4.py` pins that; what only a seam can answer is whether this loader
+    still reaches the detector *before* it asks the cache for room, which nothing but the order of
+    those two statements secures.
+    """
+    state_dict = {
+        # 128 rows and a 16-block grid: a whole number of cuBLAS tiles, i.e. a layer a real build
+        # could hold. The refusal reads only the key pairing and the uint8 dtype, so it fires either
+        # way -- but a shape no build can contain is the wrong thing to assert the state against.
+        "model.layers.0.self_attn.q_proj.weight": torch.zeros(128, 128, dtype=torch.uint8),
+        "model.layers.0.self_attn.q_proj.weight_scale": torch.zeros(128, 16).to(torch.float8_e4m3fn),
+    }
+    checkpoint = tmp_path / "qwen_2.5_vl_7b_nvfp4_half.safetensors"
+    checkpoint.touch()
+    run = prepare(ENCODER_SEAM, monkeypatch, state_dict=state_dict, metadata=None)
+
+    with pytest.raises(ValueError, match="with a weight_scale but no weight_scale_2"):
+        run.load(QwenVLEncoder_Checkpoint_Config.model_construct(path=str(checkpoint)))
+
+    assert run.reserved == []
+
+
+def test_the_transformer_refuses_an_nvfp4_layer_missing_its_global_scale_before_the_cache_is_evicted(
+    monkeypatch: pytest.MonkeyPatch, tmp_path
+) -> None:
+    """The same degraded half-state at the transformer seam, which had no `Seam` of its own.
+
+    The encoder cell above covers the other Qwen-Image seam; this one is the transformer. Declared
+    through the shared driver rather than the hand-rolled loader the cells above use, because
+    `run.reserved` is the assertion: the recorded reservations are what say "before", where a
+    `MagicMock` would only say "not called at all".
+    """
+    import diffusers
+
+    state_dict = {
+        "img_in.weight": torch.randn(128, 64),
+        "img_in.bias": torch.randn(128),
+        "transformer_blocks.0.attn.to_q.weight": torch.zeros(128, 32, dtype=torch.uint8),
+        "transformer_blocks.0.attn.to_q.weight_scale": torch.zeros(128, 4).to(torch.float8_e4m3fn),
+    }
+    checkpoint = tmp_path / "qwen_image_nvfp4_half.safetensors"
+    checkpoint.touch()
+    seam = Seam(
+        loader=QwenImageCheckpointModel,
+        module=qwen_image,
+        entry="_load_from_singlefile",
+        load_file_host=safetensors.torch,
+        compute_dtype=COMPUTE_DTYPE,
+        patches_device=True,
+        # This entry reads neither: `_torch_dtype` is read nowhere in `qwen_image`, and the fp8
+        # storage cast is called from `_load_model`. Stubbing them would hide one that started.
+        sets_torch_dtype=False,
+        casts_fp8_storage=False,
+    )
+    run = prepare(
+        seam,
+        monkeypatch,
+        state_dict=state_dict,
+        metadata=None,
+        geometry=lambda patch: patch.setattr(
+            diffusers, "QwenImageTransformer2DModel", _TinyQwenImageTransformer, raising=False
+        ),
+    )
+
+    with pytest.raises(ValueError, match="with a weight_scale but no weight_scale_2"):
+        run.load(Main_Checkpoint_QwenImage_Config.model_construct(path=str(checkpoint), name="qwen_image_nvfp4_half"))
 
     assert run.reserved == []
