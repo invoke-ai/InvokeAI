@@ -228,6 +228,17 @@ def test_guarded_session_is_installed_for_both_schemes():
         assert adapter.poolmanager.pool_classes_by_scheme["https"] is ssrf._GuardedHTTPSConnectionPool
 
 
+def test_guarded_session_allows_private_proxy_for_public_url(loopback_server: int):
+    """An operator's local proxy must not be mistaken for the download destination."""
+    session = build_guarded_session(proxy=f"http://127.0.0.1:{loopback_server}")
+    try:
+        response = session.get("http://example.com/public-model", timeout=5)
+        assert response.status_code == 200
+        assert response.content == b"internal-only"
+    finally:
+        session.close()
+
+
 @pytest.mark.parametrize(
     "url",
     [
@@ -300,9 +311,20 @@ def test_guarded_session_supports_explicit_proxy(monkeypatch: Any):
     assert captured["proxies"] == session.proxies
 
 
+def test_explicit_proxy_warning_assigns_destination_policy_to_proxy(caplog: Any):
+    session = build_guarded_session(proxy="http://proxy.internal:3128")
+    logger = logging.getLogger("test-ssrf-explicit-proxy")
+    with caplog.at_level(logging.WARNING, logger="test-ssrf-explicit-proxy"):
+        ssrf.warn_if_proxied(session, logger)
+    assert "destination address policy" in caplog.text
+    assert "proxy" in caplog.text
+
+
 def test_no_warning_without_a_proxy(monkeypatch: Any, caplog: Any):
     for var in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
         monkeypatch.delenv(var, raising=False)
+    # Windows may report a system proxy from the registry even with no proxy env vars.
+    monkeypatch.setattr(ssrf, "getproxies", lambda: {})
     session = build_guarded_session()
     assert ssrf.proxies_in_effect(session) == {}
 
