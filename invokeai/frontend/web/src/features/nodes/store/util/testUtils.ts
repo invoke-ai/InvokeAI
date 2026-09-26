@@ -14,6 +14,36 @@ export const buildEdge = (source: string, sourceHandle: string, target: string, 
 
 export const buildNode = (template: InvocationTemplate) => buildInvocationNode({ x: 0, y: 0 }, template);
 
+/**
+ * `is_intermediate` and `use_cache` are declared on every invocation by the backend's `BaseInvocation`, so every
+ * parsed template carries them. They are node attributes - never instantiated on a node - but they are parsed all the
+ * same so they can be connection targets.
+ */
+const nodeAttributeFieldTemplates = (useCacheDefault: boolean): InvocationTemplate['inputs'] => ({
+  is_intermediate: {
+    name: 'is_intermediate',
+    title: 'Is Intermediate',
+    required: false,
+    description: 'Whether or not this is an intermediate invocation.',
+    fieldKind: 'input',
+    input: 'any',
+    ui_hidden: false,
+    type: { name: 'BooleanField', cardinality: 'SINGLE', batch: false },
+    default: false,
+  },
+  use_cache: {
+    name: 'use_cache',
+    title: 'Use Cache',
+    required: false,
+    description: 'Whether or not to use the cache',
+    fieldKind: 'input',
+    input: 'any',
+    ui_hidden: false,
+    type: { name: 'BooleanField', cardinality: 'SINGLE', batch: false },
+    default: useCacheDefault,
+  },
+});
+
 export const add: InvocationTemplate = {
   title: 'Add Integers',
   type: 'add',
@@ -22,6 +52,7 @@ export const add: InvocationTemplate = {
   description: 'Adds two numbers',
   outputType: 'integer_output',
   inputs: {
+    ...nodeAttributeFieldTemplates(true),
     a: {
       name: 'a',
       title: 'A',
@@ -82,6 +113,7 @@ export const call_saved_workflow: InvocationTemplate = {
   category: 'workflow',
   outputType: 'integer_output',
   inputs: {
+    ...nodeAttributeFieldTemplates(false),
     workflow_id: {
       name: 'workflow_id',
       title: 'Workflow Id',
@@ -132,6 +164,7 @@ export const workflow_return: InvocationTemplate = {
   category: 'workflow',
   outputType: 'workflow_return_output',
   inputs: {
+    ...nodeAttributeFieldTemplates(false),
     collection: {
       name: 'collection',
       title: 'Collection',
@@ -177,6 +210,7 @@ export const sub: InvocationTemplate = {
   description: 'Subtracts two numbers',
   outputType: 'integer_output',
   inputs: {
+    ...nodeAttributeFieldTemplates(true),
     a: {
       name: 'a',
       title: 'A',
@@ -236,6 +270,7 @@ export const collect: InvocationTemplate = {
   description: 'Collects values into a collection',
   outputType: 'collect_output',
   inputs: {
+    ...nodeAttributeFieldTemplates(true),
     collection: {
       name: 'collection',
       title: 'Collection',
@@ -298,6 +333,7 @@ const scheduler: InvocationTemplate = {
   description: 'Selects a scheduler.',
   outputType: 'scheduler_output',
   inputs: {
+    ...nodeAttributeFieldTemplates(true),
     scheduler: {
       name: 'scheduler',
       title: 'Scheduler',
@@ -355,6 +391,7 @@ export const main_model_loader: InvocationTemplate = {
   description: 'Loads a main model, outputting its submodels.',
   outputType: 'model_loader_output',
   inputs: {
+    ...nodeAttributeFieldTemplates(true),
     model: {
       name: 'model',
       title: 'Model',
@@ -424,6 +461,7 @@ export const img_resize: InvocationTemplate = {
   description: 'Resizes an image to specific dimensions',
   outputType: 'image_output',
   inputs: {
+    ...nodeAttributeFieldTemplates(true),
     board: {
       name: 'board',
       title: 'Board',
@@ -569,6 +607,7 @@ const iterate: InvocationTemplate = {
   description: 'Iterates over a list of items',
   outputType: 'iterate_output',
   inputs: {
+    ...nodeAttributeFieldTemplates(true),
     collection: {
       name: 'collection',
       title: 'Collection',
@@ -666,7 +705,9 @@ export const schema = {
             description: 'Whether or not this is an intermediate invocation.',
             default: false,
             field_kind: 'node_attribute',
-            ui_type: 'IsIntermediate',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           use_cache: {
             type: 'boolean',
@@ -674,6 +715,9 @@ export const schema = {
             description: 'Whether or not to use the cache',
             default: false,
             field_kind: 'node_attribute',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           workflow_id: {
             type: 'string',
@@ -724,7 +768,9 @@ export const schema = {
             description: 'Whether or not this is an intermediate invocation.',
             default: false,
             field_kind: 'node_attribute',
-            ui_type: 'IsIntermediate',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           use_cache: {
             type: 'boolean',
@@ -732,6 +778,9 @@ export const schema = {
             description: 'Whether or not to use the cache',
             default: false,
             field_kind: 'node_attribute',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           collection: {
             type: 'array',
@@ -806,7 +855,9 @@ export const schema = {
             description: 'Whether or not this is an intermediate invocation.',
             default: false,
             field_kind: 'node_attribute',
-            ui_type: 'IsIntermediate',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           use_cache: {
             type: 'boolean',
@@ -814,6 +865,9 @@ export const schema = {
             description: 'Whether or not to use the cache',
             default: true,
             field_kind: 'node_attribute',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           a: {
             type: 'integer',
@@ -898,7 +952,9 @@ export const schema = {
             description: 'Whether or not this is an intermediate invocation.',
             default: false,
             field_kind: 'node_attribute',
-            ui_type: 'IsIntermediate',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           use_cache: {
             type: 'boolean',
@@ -906,6 +962,9 @@ export const schema = {
             description: 'Whether or not to use the cache',
             default: true,
             field_kind: 'node_attribute',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           scheduler: {
             type: 'string',
@@ -1031,7 +1090,9 @@ export const schema = {
             description: 'Whether or not this is an intermediate invocation.',
             default: false,
             field_kind: 'node_attribute',
-            ui_type: 'IsIntermediate',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           use_cache: {
             type: 'boolean',
@@ -1039,6 +1100,9 @@ export const schema = {
             description: 'Whether or not to use the cache',
             default: true,
             field_kind: 'node_attribute',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           model: {
             allOf: [
@@ -1394,7 +1458,9 @@ export const schema = {
             description: 'Whether or not this is an intermediate invocation.',
             default: false,
             field_kind: 'node_attribute',
-            ui_type: 'IsIntermediate',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           use_cache: {
             type: 'boolean',
@@ -1402,6 +1468,9 @@ export const schema = {
             description: 'Whether or not to use the cache',
             default: true,
             field_kind: 'node_attribute',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           item: {
             anyOf: [
@@ -1490,7 +1559,9 @@ export const schema = {
             description: 'Whether or not this is an intermediate invocation.',
             default: false,
             field_kind: 'node_attribute',
-            ui_type: 'IsIntermediate',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           use_cache: {
             type: 'boolean',
@@ -1498,6 +1569,9 @@ export const schema = {
             description: 'Whether or not to use the cache',
             default: true,
             field_kind: 'node_attribute',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           a: {
             type: 'integer',
@@ -1588,7 +1662,9 @@ export const schema = {
             description: 'Whether or not this is an intermediate invocation.',
             default: false,
             field_kind: 'node_attribute',
-            ui_type: 'IsIntermediate',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           use_cache: {
             type: 'boolean',
@@ -1596,6 +1672,9 @@ export const schema = {
             description: 'Whether or not to use the cache',
             default: true,
             field_kind: 'node_attribute',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           image: {
             allOf: [
@@ -1757,7 +1836,9 @@ export const schema = {
             description: 'Whether or not this is an intermediate invocation.',
             default: false,
             field_kind: 'node_attribute',
-            ui_type: 'IsIntermediate',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           use_cache: {
             type: 'boolean',
@@ -1765,6 +1846,9 @@ export const schema = {
             description: 'Whether or not to use the cache',
             default: true,
             field_kind: 'node_attribute',
+            input: 'any',
+            orig_required: false,
+            ui_hidden: false,
           },
           collection: {
             items: {},

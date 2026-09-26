@@ -10,8 +10,8 @@ import { NodeFieldElementSettings } from 'features/nodes/components/sidePanel/bu
 import { useMouseOverFormField } from 'features/nodes/hooks/useMouseOverNode';
 import { useZoomToNode } from 'features/nodes/hooks/useZoomToNode';
 import { formElementRemoved } from 'features/nodes/store/nodesSlice';
-import type { FormElement, NodeFieldElement } from 'features/nodes/types/workflow';
-import { isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
+import type { FormElement } from 'features/nodes/types/workflow';
+import { isContainerElement, isNodeFieldElement, isNodeSettingElement } from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -56,20 +56,20 @@ export const FormElementEditModeHeader = memo(({ element, dragHandleRef, ...rest
             fieldName={element.data.fieldIdentifier.fieldName}
             fallback={null} // Do not render these buttons if the field is not found
           >
-            <ZoomToNodeButton element={element} />
+            <ZoomToNodeButton nodeId={element.data.fieldIdentifier.nodeId} />
             <NodeFieldElementSettings element={element} />
           </InputFieldGate>
         </InvocationNodeContextProvider>
       )}
+      {isNodeSettingElement(element) && <ZoomToNodeButton nodeId={element.data.nodeId} />}
       <RemoveElementButton element={element} />
     </Flex>
   );
 });
 FormElementEditModeHeader.displayName = 'FormElementEditModeHeader';
 
-const ZoomToNodeButton = memo(({ element }: { element: NodeFieldElement }) => {
+const ZoomToNodeButton = memo(({ nodeId }: { nodeId: string }) => {
   const { t } = useTranslation();
-  const { nodeId } = element.data.fieldIdentifier;
   const zoomToNode = useZoomToNode(nodeId);
   const mouseOverFormField = useMouseOverFormField(nodeId);
 

@@ -18,6 +18,10 @@ const zCanvasWorkflowIntegrationState = z.object({
     })
     .nullable(),
   fieldValues: z.record(z.string(), z.any()).nullable(),
+  // Node settings (Use Cache / Save To Gallery) the user changed in the form preview (format: "nodeId.setting").
+  // Kept apart from `fieldValues`: these are node attributes, not inputs, so they are applied to the invocation
+  // itself rather than written into `node.data.inputs`.
+  nodeSettingValues: z.record(z.string(), z.boolean()).nullable(),
   // Which ImageField to use for canvas image (format: "nodeId.fieldName")
   selectedImageFieldKey: z.string().nullable(),
   isProcessing: z.boolean(),
@@ -31,6 +35,7 @@ const getInitialState = (): CanvasWorkflowIntegrationState => ({
   selectedWorkflowId: null,
   sourceEntityIdentifier: null,
   fieldValues: null,
+  nodeSettingValues: null,
   selectedImageFieldKey: null,
   isProcessing: false,
 });
@@ -47,12 +52,14 @@ const slice = createSlice({
       state.sourceEntityIdentifier = action.payload.sourceEntityIdentifier;
       state.selectedWorkflowId = null;
       state.fieldValues = null;
+      state.nodeSettingValues = null;
     },
     canvasWorkflowIntegrationClosed: (state) => {
       state.isOpen = false;
       state.selectedWorkflowId = null;
       state.sourceEntityIdentifier = null;
       state.fieldValues = null;
+      state.nodeSettingValues = null;
       state.selectedImageFieldKey = null;
       state.isProcessing = false;
     },
@@ -60,6 +67,7 @@ const slice = createSlice({
       state.selectedWorkflowId = action.payload.workflowId;
       // Reset field values when switching workflows
       state.fieldValues = null;
+      state.nodeSettingValues = null;
       state.selectedImageFieldKey = null;
     },
     canvasWorkflowIntegrationImageFieldSelected: (state, action: PayloadAction<{ fieldKey: string | null }>) => {
@@ -74,8 +82,18 @@ const slice = createSlice({
       }
       state.fieldValues[action.payload.fieldName] = action.payload.value;
     },
+    canvasWorkflowIntegrationNodeSettingChanged: (
+      state,
+      action: PayloadAction<{ settingKey: string; value: boolean }>
+    ) => {
+      if (!state.nodeSettingValues) {
+        state.nodeSettingValues = {};
+      }
+      state.nodeSettingValues[action.payload.settingKey] = action.payload.value;
+    },
     canvasWorkflowIntegrationFieldValuesReset: (state) => {
       state.fieldValues = null;
+      state.nodeSettingValues = null;
     },
     canvasWorkflowIntegrationProcessingStarted: (state) => {
       state.isProcessing = true;
@@ -92,6 +110,7 @@ export const {
   canvasWorkflowIntegrationWorkflowSelected,
   canvasWorkflowIntegrationImageFieldSelected,
   canvasWorkflowIntegrationFieldValueChanged,
+  canvasWorkflowIntegrationNodeSettingChanged,
   canvasWorkflowIntegrationProcessingStarted,
   canvasWorkflowIntegrationProcessingCompleted,
 } = slice.actions;
@@ -105,6 +124,10 @@ export const canvasWorkflowIntegrationSliceConfig: SliceConfig<typeof slice> = {
       assert(isPlainObject(state));
       if (!('_version' in state)) {
         state._version = 1;
+      }
+      if (!('nodeSettingValues' in state)) {
+        // Persisted before node settings could be put in a form
+        state.nodeSettingValues = null;
       }
       return zCanvasWorkflowIntegrationState.parse(state);
     },
@@ -125,6 +148,9 @@ export const selectCanvasWorkflowIntegrationSourceEntityIdentifier = createCanva
 );
 export const selectCanvasWorkflowIntegrationFieldValues = createCanvasWorkflowIntegrationSelector(
   (state) => state.fieldValues
+);
+export const selectCanvasWorkflowIntegrationNodeSettingValues = createCanvasWorkflowIntegrationSelector(
+  (state) => state.nodeSettingValues
 );
 export const selectCanvasWorkflowIntegrationSelectedImageFieldKey = createCanvasWorkflowIntegrationSelector(
   (state) => state.selectedImageFieldKey

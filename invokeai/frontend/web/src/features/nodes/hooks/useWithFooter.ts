@@ -1,9 +1,13 @@
-import { useIsExecutableNode } from 'features/nodes/hooks/useIsBatchNode';
+import { useNodeTemplateOrThrow } from 'features/nodes/hooks/useNodeTemplateOrThrow';
+import { getHasNodeFooter } from 'features/nodes/types/invocation';
+import { useMemo } from 'react';
 
-import { useNodeHasGalleryOutput } from './useNodeHasGalleryOutput';
-
+/**
+ * Whether the node renders a footer. The footer hosts the node attribute fields and their connection handles.
+ *
+ * @see {@link getHasNodeFooter}
+ */
 export const useWithFooter = () => {
-  const hasGalleryOutput = useNodeHasGalleryOutput();
-  const isExecutableNode = useIsExecutableNode();
-  return isExecutableNode && hasGalleryOutput;
+  const template = useNodeTemplateOrThrow();
+  return useMemo(() => getHasNodeFooter(template), [template]);
 };

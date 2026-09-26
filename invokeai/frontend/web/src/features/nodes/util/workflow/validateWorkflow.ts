@@ -1,6 +1,10 @@
 import { parseify } from 'common/util/serialize';
 import { getSavedWorkflowDynamicFields } from 'features/nodes/components/flow/nodes/Invocation/callSavedWorkflowFormUtils';
-import { addElement, getIsFormEmpty } from 'features/nodes/components/sidePanel/builder/form-manipulation';
+import {
+  addElement,
+  getIsFormEmpty,
+  removeElement,
+} from 'features/nodes/components/sidePanel/builder/form-manipulation';
 import { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX } from 'features/nodes/store/nodesSlice';
 import type { Templates } from 'features/nodes/store/types';
 import { validateConnection } from 'features/nodes/store/util/validateConnection';
@@ -19,6 +23,7 @@ import {
   buildNodeFieldElement,
   getDefaultForm,
   isNodeFieldElement,
+  isNodeSettingElement,
   isWorkflowInvocationNode,
 } from 'features/nodes/types/workflow';
 import {
@@ -415,6 +420,22 @@ export const validateWorkflow = async (args: ValidateWorkflowArgs): Promise<Vali
       warnings.push({
         message: t('nodes.deletedMissingNodeFieldFormElement', { nodeId, fieldName }),
         data: { nodeId, fieldName },
+      });
+    }
+  }
+
+  // Likewise, remove any node setting elements whose node no longer exists
+  for (const element of Object.values(_workflow.form.elements)) {
+    if (!isNodeSettingElement(element)) {
+      continue;
+    }
+    const { nodeId, setting } = element.data;
+    const node = nodes.filter(isWorkflowInvocationNode).find(({ id }) => id === nodeId);
+    if (!node) {
+      removeElement({ form: _workflow.form, id: element.id });
+      warnings.push({
+        message: t('nodes.deletedMissingNodeSettingFormElement', { nodeId, setting }),
+        data: { nodeId, setting },
       });
     }
   }
