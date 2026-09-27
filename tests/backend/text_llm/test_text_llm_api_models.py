@@ -4,6 +4,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
+from PIL import Image
 from pydantic import ValidationError
 
 from invokeai.app.api.dependencies import ApiDependencies
@@ -95,3 +96,32 @@ def test_expand_prompt_uses_fresh_seed() -> None:
         pipeline_class.return_value.run.reset_mock()
         assert _run_expand_prompt("cat", "model", 10, None, 456, None, "user") == ("expanded", 456)
         assert pipeline_class.return_value.run.call_args.kwargs["seed"] == 456
+
+
+def test_expand_prompt_with_an_image_runs_it_through_the_processor() -> None:
+    """The stored image reaches the pipeline as RGB, next to the model's processor, whose tokenizer is reused."""
+    model_config = MagicMock(type=ModelType.TextLLM, path="model", supports_images=True)
+    model = MagicMock()
+    model.parameters.side_effect = lambda: iter([torch.nn.Parameter(torch.zeros(1))])
+    loaded_model = MagicMock()
+    loaded_model.model_on_device.return_value.__enter__.return_value = (None, model)
+    services = MagicMock()
+    services.model_manager.store.get_model.return_value = model_config
+    services.model_manager.load.load_model.return_value = loaded_model
+    services.images.get_pil_image.return_value = Image.new("RGBA", (8, 8))
+
+    with (
+        patch.object(ApiDependencies, "invoker", MagicMock(services=services), create=True),
+        patch("invokeai.app.api.routers.utilities._resolve_model_path", return_value="model"),
+        patch("invokeai.app.api.routers.utilities.AutoTokenizer.from_pretrained") as load_tokenizer,
+        patch("invokeai.app.api.routers.utilities.AutoProcessor.from_pretrained") as load_processor,
+        patch("invokeai.app.api.routers.utilities.TextLLMPipeline") as pipeline_class,
+    ):
+        pipeline_class.return_value.run.return_value = "expanded"
+        _run_expand_prompt("she waves", "model", 10, None, 1, None, "user", image_name="frame.png")
+
+    services.images.get_pil_image.assert_called_once_with("frame.png")
+    processor = load_processor.return_value
+    load_tokenizer.assert_not_called()
+    assert pipeline_class.call_args.args[1:] == (processor.tokenizer, processor)
+    assert pipeline_class.return_value.run.call_args.kwargs["image"].mode == "RGB"

@@ -5,6 +5,7 @@ Covers:
 - image-to-prompt: image read-access check must fire BEFORE the model is loaded,
   so non-owners can't probe stored images.
 - image-to-prompt: a missing image surfaces as 404, not 500.
+- expand-prompt with an image: the same read-access check, and a text-only model is refused before loading.
 """
 
 import shutil
@@ -367,3 +368,64 @@ def test_list_user_fonts_skips_symlinked_files(
     assert r.status_code == status.HTTP_200_OK
     assert r.json()["fonts"] == []
     assert "Skipping font path" in caplog.text
+
+
+# ----------------------------- expand_prompt with an image -----------------------------
+
+
+def test_expand_prompt_image_forbidden_for_non_owner(
+    client: TestClient, user1_token: str, user2_token: str, mock_invoker: Invoker
+):
+    """Attaching an image must not let a second user read a private image through the rewrite."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    _save_image(mock_invoker, "private-frame.png", user1.user_id)
+
+    r = client.post(
+        "/api/v1/utilities/expand-prompt",
+        json={"prompt": "she waves", "model_key": "some-key", "image_name": "private-frame.png"},
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+    mock_invoker.services.model_manager.store.get_model.assert_not_called()
+
+
+def test_expand_prompt_image_with_text_only_model_is_rejected_before_loading(
+    client: TestClient, user1_token: str, mock_invoker: Invoker
+):
+    from invokeai.backend.model_manager.taxonomy import ModelType
+
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    _save_image(mock_invoker, "frame.png", user1.user_id)
+    mock_invoker.services.model_manager.store.get_model = MagicMock(
+        return_value=MagicMock(type=ModelType.TextLLM, supports_images=False)
+    )
+    mock_invoker.services.model_manager.load.load_model = MagicMock()
+
+    r = client.post(
+        "/api/v1/utilities/expand-prompt",
+        json={"prompt": "she waves", "model_key": "qwen", "image_name": "frame.png"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert "cannot read images" in r.json()["detail"]
+    mock_invoker.services.model_manager.load.load_model.assert_not_called()
+
+
+def test_expand_prompt_missing_image_is_404_for_an_admin(client: TestClient, admin_token: str, mock_invoker: Invoker):
+    """Admins skip the ownership lookup, so a missing record surfaces on the read and must still be a 404."""
+    from invokeai.backend.model_manager.taxonomy import ModelType
+
+    mock_invoker.services.model_manager.store.get_model = MagicMock(
+        return_value=MagicMock(type=ModelType.TextLLM, supports_images=True)
+    )
+    mock_invoker.services.model_manager.load.load_model = MagicMock()
+
+    r = client.post(
+        "/api/v1/utilities/expand-prompt",
+        json={"prompt": "she waves", "model_key": "e2b", "image_name": "deleted-frame.png"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert r.status_code == status.HTTP_404_NOT_FOUND
+    mock_invoker.services.model_manager.load.load_model.assert_not_called()

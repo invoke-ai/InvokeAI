@@ -21,6 +21,7 @@ from invokeai.app.api.routers._access import assert_image_read_access
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
+from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.services.system_prompt_records.system_prompt_records_common import (
     EXPAND_PROMPT_MAX_TOKENS_DEFAULT,
@@ -376,6 +377,13 @@ class ExpandPromptRequest(BaseModel):
     task_id: str | None = Field(
         default=None, description="Client-supplied task ID used to correlate socket progress events to this request"
     )
+    image_name: str | None = Field(
+        default=None,
+        description=(
+            "An image to condition the rewrite on, such as a video's first frame. Requires a model whose "
+            "`supports_images` is true."
+        ),
+    )
 
 
 class ExpandPromptResponse(BaseModel):
@@ -425,6 +433,7 @@ def _run_expand_prompt(
     seed: int | None,
     task_id: str | None,
     user_id: str,
+    image_name: str | None = None,
 ) -> tuple[str, int]:
     """Run text LLM inference synchronously (called from thread)."""
     model_manager = ApiDependencies.invoker.services.model_manager
@@ -433,18 +442,35 @@ def _run_expand_prompt(
 
     if model_config.type != ModelType.TextLLM:
         raise ValueError(f"Model '{model_key}' is not a TextLLM model (got {model_config.type})")
+    # Only the TextLLM config carries the flag (the record type is a union); older records validate to False.
+    if image_name is not None and not getattr(model_config, "supports_images", False):
+        raise ValueError(f"Model '{model_config.name}' cannot read images; choose a vision-capable text LLM")
+
+    # Read before the model load so a missing image fails fast.
+    image = (
+        ApiDependencies.invoker.services.images.get_pil_image(image_name).convert("RGB")
+        if image_name is not None
+        else None
+    )
 
     if task_id is not None:
         events.emit_llm_task_progress(task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model")
+
+    # Loaded before the model so the disk reads do not hold it on the device. A processor carries its own
+    # tokenizer; loading another would parse the (for Gemma, ~30 MB) vocabulary twice.
+    model_abs_path = _resolve_model_path(model_config.path)
+    processor = AutoProcessor.from_pretrained(model_abs_path, local_files_only=True) if image is not None else None
+    tokenizer = (
+        processor.tokenizer
+        if processor is not None
+        else AutoTokenizer.from_pretrained(model_abs_path, local_files_only=True)
+    )
 
     with _model_load_lock:
         loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
 
     with torch.no_grad(), loaded_model.model_on_device() as (_, model):
-        model_abs_path = _resolve_model_path(model_config.path)
-        tokenizer = AutoTokenizer.from_pretrained(model_abs_path, local_files_only=True)
-
-        pipeline = TextLLMPipeline(model, tokenizer)
+        pipeline = TextLLMPipeline(model, tokenizer, processor)
         model_device = next(model.parameters()).device
 
         progress_callback = _make_progress_callback(events, task_id, user_id)
@@ -458,6 +484,7 @@ def _run_expand_prompt(
             device=model_device,
             dtype=TorchDevice.choose_torch_dtype(),
             progress_callback=progress_callback,
+            image=image,
         )
 
     return output, effective_seed
@@ -472,6 +499,11 @@ def _run_expand_prompt(
 )
 async def expand_prompt(current_user: CurrentUserOrDefault, body: ExpandPromptRequest) -> ExpandPromptResponse:
     """Expand a brief prompt into a detailed image generation prompt using a text LLM."""
+    if body.image_name is not None:
+        # Same policy as image-to-prompt: non-owners cannot probe stored images through this endpoint.
+        await asyncio.to_thread(assert_image_move_maintenance_inactive)
+        await asyncio.to_thread(assert_image_read_access, body.image_name, current_user)
+
     events = ApiDependencies.invoker.services.events
     try:
         expanded, seed = await asyncio.to_thread(
@@ -483,6 +515,7 @@ async def expand_prompt(current_user: CurrentUserOrDefault, body: ExpandPromptRe
             body.seed,
             body.task_id,
             current_user.user_id,
+            body.image_name,
         )
         if body.task_id is not None:
             events.emit_llm_task_complete(task_id=body.task_id, user_id=current_user.user_id)
@@ -491,6 +524,11 @@ async def expand_prompt(current_user: CurrentUserOrDefault, body: ExpandPromptRe
         if body.task_id is not None:
             events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error="Model not found")
         raise HTTPException(status_code=404, detail=f"Model '{body.model_key}' not found")
+    except (ImageFileNotFoundException, ImageRecordNotFoundException):
+        # The record check matters for admins (and single-user mode), whose access check never reads the record.
+        if body.task_id is not None:
+            events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error="Image not found")
+        raise HTTPException(status_code=404, detail=f"Image '{body.image_name}' not found")
     except ValueError as e:
         if body.task_id is not None:
             events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error=str(e))
@@ -601,7 +639,7 @@ async def image_to_prompt(current_user: CurrentUserOrDefault, body: ImageToPromp
         if body.task_id is not None:
             events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error="Model not found")
         raise HTTPException(status_code=404, detail=f"Model '{body.model_key}' not found")
-    except ImageFileNotFoundException:
+    except (ImageFileNotFoundException, ImageRecordNotFoundException):
         if body.task_id is not None:
             events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error="Image not found")
         raise HTTPException(status_code=404, detail=f"Image '{body.image_name}' not found")

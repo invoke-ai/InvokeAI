@@ -12004,6 +12004,11 @@ export type components = {
              * @description Client-supplied task ID used to correlate socket progress events to this request
              */
             task_id?: string | null;
+            /**
+             * Image Name
+             * @description An image to condition the rewrite on, such as a video's first frame. Requires a model whose `supports_images` is true.
+             */
+            image_name?: string | null;
         };
         /** ExpandPromptResponse */
         ExpandPromptResponse: {
@@ -45178,6 +45183,12 @@ export type components = {
              * @description Whether this model should run on CPU only
              */
             cpu_only: boolean | null;
+            /**
+             * Supports Images
+             * @description Whether the model has a vision tower and processor, so Expand Prompt can condition on an image
+             * @default false
+             */
+            supports_images: boolean;
         };
         /** Tile */
         Tile: {

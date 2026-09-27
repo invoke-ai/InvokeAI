@@ -1,10 +1,11 @@
 import queue
 import threading
 import time
-from typing import Callable
+from typing import Any, Callable
 
 import torch
-from transformers import PreTrainedModel, PreTrainedTokenizerBase, TextIteratorStreamer
+from PIL.Image import Image
+from transformers import PreTrainedModel, PreTrainedTokenizerBase, ProcessorMixin, TextIteratorStreamer
 from transformers.generation.logits_process import LogitsProcessor
 
 DEFAULT_SYSTEM_PROMPT = (
@@ -127,11 +128,18 @@ if torch.Tensor.multinomial is not _seeded_tensor_multinomial:
 
 
 class TextLLMPipeline:
-    """A wrapper for a causal language model + tokenizer for text generation."""
+    """A wrapper for a causal language model + tokenizer for text generation.
 
-    def __init__(self, model: PreTrainedModel, tokenizer: PreTrainedTokenizerBase):
+    A multimodal model can also condition on one image; that needs its ``processor``, which owns
+    the image side of the input (resizing, patching and the image placeholder tokens).
+    """
+
+    def __init__(
+        self, model: PreTrainedModel, tokenizer: PreTrainedTokenizerBase, processor: ProcessorMixin | None = None
+    ):
         self._model = model
         self._tokenizer = tokenizer
+        self._processor = processor
 
     def run(
         self,
@@ -142,16 +150,24 @@ class TextLLMPipeline:
         device: torch.device = torch.device("cpu"),
         dtype: torch.dtype = torch.float16,
         progress_callback: ProgressCallback | None = None,
+        image: Image | None = None,
     ) -> str:
         # Build messages for chat template if supported, otherwise use raw prompt.
         used_chat_template = (
             hasattr(self._tokenizer, "apply_chat_template") and self._tokenizer.chat_template is not None
         )
+        if image is not None and (self._processor is None or not used_chat_template):
+            raise ValueError("Conditioning on an image needs a multimodal model with a processor and a chat template")
+
+        def user_content(text: str) -> str | list[dict[str, str]]:
+            # The template renders the image placeholder; the processor expands it into the image's tokens.
+            return text if image is None else [{"type": "image"}, {"type": "text", "text": text}]
+
         if used_chat_template:
-            messages = []
+            messages: list[dict[str, Any]] = []
             if system_prompt:
                 messages.append({"role": "system", "content": system_prompt})
-            messages.append({"role": "user", "content": prompt})
+            messages.append({"role": "user", "content": user_content(prompt)})
             try:
                 # enable_thinking=False makes reasoning models (Qwen3, DeepSeek-R1 distills and
                 # other templates that honour the flag) emit an empty thinking block instead of a
@@ -164,7 +180,7 @@ class TextLLMPipeline:
                 # Some chat templates (notably Gemma) reject a dedicated "system" role. Fold the
                 # system prompt into the first user turn and retry instead of failing the expansion.
                 if system_prompt and "system role" in str(e).lower():
-                    merged = [{"role": "user", "content": f"{system_prompt}\n\n{prompt}"}]
+                    merged = [{"role": "user", "content": user_content(f"{system_prompt}\n\n{prompt}")}]
                     formatted_prompt = self._tokenizer.apply_chat_template(
                         merged, tokenize=False, add_generation_prompt=True, enable_thinking=False
                     )
@@ -179,9 +195,17 @@ class TextLLMPipeline:
         # A rendered chat template already carries the model's control tokens, so adding special
         # tokens again duplicates BOS for the families that use one (Gemma, Llama). The raw
         # fallback prompt above has no control tokens and still needs them.
-        inputs = self._tokenizer(formatted_prompt, return_tensors="pt", add_special_tokens=not used_chat_template).to(
-            device=device
-        )
+        if image is None:
+            inputs = self._tokenizer(
+                formatted_prompt, return_tensors="pt", add_special_tokens=not used_chat_template
+            ).to(device=device)
+        else:
+            assert self._processor is not None
+            # BatchFeature.to casts floating tensors only, so the pixels follow the model's dtype and the
+            # token ids stay integral.
+            inputs = self._processor(
+                text=formatted_prompt, images=[image], return_tensors="pt", add_special_tokens=False
+            ).to(device=device, dtype=self._model.dtype)
 
         streamer = TextIteratorStreamer(
             self._tokenizer, skip_prompt=True, skip_special_tokens=True, timeout=STREAM_TIMEOUT
