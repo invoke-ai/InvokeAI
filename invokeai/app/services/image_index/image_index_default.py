@@ -28,6 +28,7 @@ from invokeai.app.services.videos.videos_common import VideoDTO
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_manager.taxonomy import ModelType
+from invokeai.backend.util.device_pool import idle_device_borrowed
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.load_report import suppress_load_report
 
@@ -1763,8 +1764,11 @@ class ImageIndexService(ImageIndexServiceBase):
                     self._cpu_model = model
             return self._embed(self._cpu_model, images, torch.device("cpu"))
 
-        loaded = self._invoker.services.model_manager.load.load_model(self._model_config)
-        with loaded.model_on_device() as (_, model):
-            # The cache decides where the model actually lives; follow it.
-            device = next(model.parameters()).device
-            return self._embed(model, images, device)
+        # This runs outside the session queue (the index worker, or a request thread), so it takes an
+        # idle GPU and its lock for the batch instead of sharing a busy GPU's cache with a session.
+        with idle_device_borrowed(purpose="Image embedding"):
+            loaded = self._invoker.services.model_manager.load.load_model(self._model_config)
+            with loaded.model_on_device() as (_, model):
+                # The cache decides where the model actually lives; follow it.
+                device = next(model.parameters()).device
+                return self._embed(model, images, device)

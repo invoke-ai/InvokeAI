@@ -1,13 +1,16 @@
-"""Tests for the idle generation-device arbiter used by text-encoder offload."""
+"""Tests for the idle generation-device arbiter used by text-encoder offload and off-queue model work."""
 
 import threading
 import time
 from collections.abc import Iterator
+from unittest.mock import patch
 
 import pytest
 import torch
 
-from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL, idle_device_borrowed
+from invokeai.backend.util.devices import TorchDevice
+from tests.fixtures.device_pool import two_gpu_pool
 
 
 @pytest.fixture(autouse=True)
@@ -249,3 +252,119 @@ class TestAnyOtherDeviceBusy:
         GENERATION_DEVICE_POOL.reset()
         assert not GENERATION_DEVICE_POOL.any_other_device_busy(None)
         assert not GENERATION_DEVICE_POOL.any_other_device_busy(torch.device("cuda:0"))
+
+
+# --- Borrowing from outside the session queue -------------------------------------------------
+
+
+@pytest.fixture
+def off_queue_thread() -> Iterator[list[torch.device]]:
+    with two_gpu_pool() as torch_pins:
+        yield torch_pins
+
+
+def test_off_queue_borrow_takes_the_first_idle_gpu_in_registration_order() -> None:
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:1"), torch.device("cuda:0")])
+    GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:0"))  # a render; it still serves the queue
+    assert GENERATION_DEVICE_POOL.try_borrow_off_queue("cuda") == torch.device("cuda:1")
+    assert GENERATION_DEVICE_POOL.try_borrow_off_queue("mps") is None
+
+
+def test_off_queue_borrow_never_takes_the_last_gpu_left_for_the_queue() -> None:
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+    assert GENERATION_DEVICE_POOL.try_borrow_off_queue("cuda") == torch.device("cuda:0")
+    # cuda:1 is idle, but lending it too would leave the queue nowhere to start a session.
+    assert GENERATION_DEVICE_POOL.try_borrow_off_queue("cuda") is None
+    # A running session's encoder offload is not off-queue work, and may still borrow it.
+    assert GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("cuda:0")) == torch.device("cuda:1")
+
+
+def test_off_queue_borrow_is_refused_on_a_single_gpu() -> None:
+    """With one GPU, a borrow would only make the next session wait for the off-queue work."""
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0")])
+    assert GENERATION_DEVICE_POOL.try_borrow_off_queue("cuda") is None
+
+
+def test_off_queue_borrow_follows_the_thread_device_type() -> None:
+    GENERATION_DEVICE_POOL.set_generation_devices(
+        [torch.device("cuda:0"), torch.device("xpu:0"), torch.device("xpu:1")]
+    )
+    with (
+        patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("xpu")),
+        patch("invokeai.backend.util.device_pool.set_torch_current_device"),
+        patch("invokeai.backend.util.device_pool._torch_current_device", return_value=None),
+    ):
+        try:
+            with idle_device_borrowed() as device:
+                assert device == torch.device("xpu:0")
+        finally:
+            TorchDevice.clear_session_device()
+
+
+def test_lent_state_and_release_listener() -> None:
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+    released: list[bool] = []
+    GENERATION_DEVICE_POOL.set_release_listener(lambda: released.append(True))
+
+    borrowed = GENERATION_DEVICE_POOL.try_borrow(exclude=torch.device("cuda:0"))
+    assert borrowed is not None and GENERATION_DEVICE_POOL.is_lent(borrowed)
+    assert not GENERATION_DEVICE_POOL.is_lent(torch.device("cuda:0"))
+    GENERATION_DEVICE_POOL.release_borrow(borrowed)
+    assert not GENERATION_DEVICE_POOL.is_lent(borrowed)
+    assert released == [True]
+
+
+def test_off_queue_work_moves_to_the_idle_gpu_and_unpins_after(off_queue_thread: list[torch.device]) -> None:
+    GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:0"))  # a render is running on GPU 0
+
+    with idle_device_borrowed() as device:
+        assert device == torch.device("cuda:1")
+        assert TorchDevice.choose_torch_device() == torch.device("cuda:1")
+        assert GENERATION_DEVICE_POOL.is_lent(torch.device("cuda:1"))
+
+    # A pooled thread must come back unpinned, or later unrelated work would follow the pin.
+    assert TorchDevice.get_session_device() is None
+    assert off_queue_thread == [torch.device("cuda:1"), torch.device("cuda:0")]
+    assert not GENERATION_DEVICE_POOL.is_lent(torch.device("cuda:1"))
+
+
+def test_off_queue_work_stays_put_when_every_gpu_is_busy(off_queue_thread: list[torch.device]) -> None:
+    GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:0"))
+    GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:1"))
+
+    with idle_device_borrowed() as device:
+        assert device is None
+        assert TorchDevice.get_session_device() is None
+
+    assert off_queue_thread == []
+
+
+def test_off_queue_borrow_is_released_and_unpinned_when_the_work_raises(
+    off_queue_thread: list[torch.device],
+) -> None:
+    with pytest.raises(RuntimeError, match="out of memory"):
+        with idle_device_borrowed():
+            raise RuntimeError("out of memory")
+
+    assert TorchDevice.get_session_device() is None
+    assert not GENERATION_DEVICE_POOL.is_lent(torch.device("cuda:0"))
+
+
+def test_off_queue_borrow_is_a_no_op_without_a_registered_pool() -> None:
+    """Legacy installs (no generation devices) register nothing, so nothing changes for them."""
+    with idle_device_borrowed() as device:
+        assert device is None
+    assert TorchDevice.get_session_device() is None
+
+
+def test_off_queue_borrow_is_held_until_the_pins_are_restored(off_queue_thread: list[torch.device]) -> None:
+    """Releasing first would let a session start on the GPU while this thread still points at it."""
+    GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:0"))
+    lent_at_each_pin: list[bool] = []
+    with patch(
+        "invokeai.backend.util.device_pool.set_torch_current_device",
+        side_effect=lambda device: lent_at_each_pin.append(GENERATION_DEVICE_POOL.is_lent(torch.device("cuda:1"))),
+    ):
+        with idle_device_borrowed():
+            pass
+    assert lent_at_each_pin == [True, True]  # the pin, then the restore
