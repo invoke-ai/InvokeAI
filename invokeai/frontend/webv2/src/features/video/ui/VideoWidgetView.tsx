@@ -34,6 +34,7 @@ import {
   getAcceleratorToggleResult,
   getEffectiveVideoTiming,
   getVideoDimensions,
+  getVideoExpandPromptSuggestion,
   getVideoModelPolicy,
   getVideoModelSelectionResult,
   isVideoModelSelectable,
@@ -422,6 +423,13 @@ export const VideoWidgetView = () => {
   const mode = resolveVideoMode(values);
   const supportsFirstFrame = policy.modes.includes('first-frame') || policy.modes.includes('first-last');
   const supportsLastFrame = policy.modes.includes('first-last') || policy.modes.includes('last-frame');
+  const promptEnhancer = policy.prompt.enhancer;
+  const firstFrameImage = values.firstFrameImage;
+  // Memoized for VideoPromptFields' equality check; both inputs keep their identity between patches.
+  const expandPromptSuggestion = useMemo(
+    () => getVideoExpandPromptSuggestion(promptEnhancer, firstFrameImage),
+    [promptEnhancer, firstFrameImage]
+  );
   const supportsExtend = policy.modes.includes('extend');
   const supportsReferences = policy.modes.includes('reference');
   const supportsConditioningClip = policy.modes.includes('audio-to-video') || policy.modes.includes('video-to-audio');
@@ -499,6 +507,7 @@ export const VideoWidgetView = () => {
       </Stack>
 
       <VideoPromptFields
+        expandPromptSuggestion={expandPromptSuggestion}
         loras={values.loras}
         model={values.model}
         negativeHelpText={policy.prompt.negativeHelpTextKey ? t(policy.prompt.negativeHelpTextKey) : undefined}
