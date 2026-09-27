@@ -6,9 +6,9 @@ import { WidgetFailureBoundary } from './WidgetFailureBoundary';
 
 type WidgetHostProject = {
   floatingWidgets?: Record<string, unknown>;
-  projectGraph?: { libraryWorkflowId?: unknown; nodes: unknown[] };
   widgetInstances: Record<string, { typeId?: string }>;
   widgetRegions: Record<string, { instanceIds: string[] }>;
+  workflows?: { entries: Array<{ document: { nodes: unknown[] }; source?: unknown }> };
 };
 
 export const projectHasWidgetType = (project: WidgetHostProject, widgetTypeId: string): boolean => {
@@ -22,18 +22,31 @@ export const projectHasWidgetType = (project: WidgetHostProject, widgetTypeId: s
   );
 };
 
+// Documents are immutable per identity; only an edited workflow is rescanned.
+const savedWorkflowCallScans = new WeakMap<object, boolean>();
+
+const documentCallsSavedWorkflow = (document: { nodes: readonly unknown[] }): boolean => {
+  let calls = savedWorkflowCallScans.get(document);
+
+  if (calls === undefined) {
+    calls = document.nodes.some((node) => {
+      if (typeof node !== 'object' || node === null) {
+        return false;
+      }
+
+      const candidate = node as { type?: unknown; data?: { type?: unknown } };
+      return candidate.type === 'invocation' && candidate.data?.type === 'call_saved_workflow';
+    });
+    savedWorkflowCallScans.set(document, calls);
+  }
+
+  return calls;
+};
+
+/** Saved-workflow calls reconcile against live library records even while the editor is closed. */
 export const projectNeedsWorkflowHost = (project: WidgetHostProject): boolean =>
   projectHasWidgetType(project, 'workflow') ||
-  (typeof project.projectGraph?.libraryWorkflowId === 'string' && project.projectGraph.libraryWorkflowId.length > 0) ||
-  (project.projectGraph?.nodes.some((node) => {
-    if (typeof node !== 'object' || node === null) {
-      return false;
-    }
-
-    const candidate = node as { type?: unknown; data?: { type?: unknown } };
-    return candidate.type === 'invocation' && candidate.data?.type === 'call_saved_workflow';
-  }) ??
-    false);
+  (project.workflows?.entries.some((entry) => documentCallsSavedWorkflow(entry.document)) ?? false);
 
 const WidgetHost = ({ widget }: { widget: ReturnType<typeof getWidgetHosts>[number] }) => {
   const Host = use(widget.host!.load());

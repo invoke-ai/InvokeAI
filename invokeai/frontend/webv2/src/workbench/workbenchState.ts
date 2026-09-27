@@ -1,7 +1,7 @@
 import type { GenerateWidgetValues } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { QueueCompiledSubmission, QueueHistoryItemStatus } from '@features/queue/contracts';
-import type { ProjectGraphState } from '@features/workflow/contracts';
+import type { ProjectGraphState, ProjectWorkflowSource } from '@features/workflow/contracts';
 import type { WorkflowSubmissionPlan } from '@features/workflow/graph';
 import type { LogNamespace } from '@platform/logging/contracts';
 import type {
@@ -95,6 +95,26 @@ import {
 import { createNewCanvasState, loadCanvasState } from './canvasMigration';
 import { applyCanvasProjectMutation, type CanvasProjectMutation } from './canvasProjectMutations';
 import { gateProjectCanvases } from './projectCanvasGate';
+import {
+  addProjectWorkflow,
+  applyProjectWorkflowAction,
+  createBlankWorkflowDocument,
+  createProjectWorkflowCollection,
+  duplicateProjectWorkflow,
+  findProjectWorkflow,
+  getActiveProjectGraph,
+  getActiveProjectWorkflow,
+  migrateProjectGraphToCollection,
+  normalizeProjectWorkflowCollection,
+  recordProjectWorkflowRun,
+  redoProjectWorkflow,
+  removeProjectWorkflow,
+  selectProjectWorkflow,
+  setProjectWorkflowDocument,
+  setProjectWorkflowSource,
+  undoProjectWorkflow,
+  type ProjectWorkflowCollection,
+} from './projectWorkflows';
 import { normalizeRestoredQueueItem } from './queue-integration/queueRunRestoration';
 import { getProjectWidgetValues } from './widgetState';
 export { nextLayerName } from './canvasProjectMutations';
@@ -144,11 +164,7 @@ import {
 import { planWorkflowSubmission } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
 import {
-  cloneProjectGraph,
-  createProjectGraph,
-  getProjectGraphUndoEntry,
   hasMultipleWorkflowReturnNodes,
-  normalizeProjectGraph,
   projectGraphReducer,
   serializeWorkflowJsonForSubmission,
   type ProjectGraphAction,
@@ -308,9 +324,22 @@ type WorkbenchReducerAction =
       values: Record<string, unknown>;
       projectId?: string;
     }
-  | { type: 'applyProjectGraphAction'; action: ProjectGraphAction }
-  | { type: 'replaceProjectGraph'; document: ProjectGraphState; label: string }
-  | { type: 'setProjectGraphLibraryBinding'; libraryWorkflowId: string }
+  /** Edits one workflow; absent targets mean the active project's active workflow. */
+  | { type: 'applyWorkflowAction'; action: ProjectGraphAction; projectId?: string; workflowId?: string }
+  | {
+      type: 'addProjectWorkflow';
+      document: ProjectGraphState;
+      label: string;
+      projectId?: string;
+      source?: ProjectWorkflowSource;
+      reusePlaceholder?: boolean;
+    }
+  | { type: 'selectProjectWorkflow'; workflowId: string; projectId?: string }
+  | { type: 'duplicateProjectWorkflow'; workflowId: string; copyId: string; copyName: string; projectId?: string }
+  | { type: 'removeProjectWorkflow'; workflowId: string; projectId?: string }
+  | { type: 'setProjectWorkflowSource'; projectId: string; workflowId: string; source?: ProjectWorkflowSource }
+  | { type: 'undoWorkflowChange'; projectId?: string; workflowId?: string }
+  | { type: 'redoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean; models?: readonly ModelConfig[] }
   | {
       type: 'submitResolvedInvocationSnapshot';
@@ -321,6 +350,10 @@ type WorkbenchReducerAction =
       workflowGenerators?: WorkflowGeneratorResolutions;
       route: InvocationRoute;
       models?: readonly ModelConfig[];
+      /** The project the submission was prepared from; a switch in between never redirects it. */
+      projectId: string;
+      /** The workflow the submission was prepared from; required for workflow routes. */
+      workflowId?: string;
     }
   | {
       type: 'markQueueItemBackendSubmitted';
@@ -439,6 +472,7 @@ type WorkbenchReducerAction =
       sourceName: string;
       targetProjectId: string;
     }
+  | { type: 'autosaveScheduled' }
   | { type: 'autosaveStarted' }
   | { type: 'autosavePending'; error: string }
   | { type: 'autosaveSucceeded'; savedAt: string }
@@ -1146,15 +1180,11 @@ const cloneWidgetRegions = cloneLayoutPresetWidgetRegions;
 const cloneWidgetGraphs = (widgetGraphs: Project['widgetGraphs']): Project['widgetGraphs'] =>
   Object.fromEntries(Object.entries(widgetGraphs).map(([key, graph]) => [key, graph ? cloneGraph(graph) : graph]));
 
-// Canvas pixel history belongs to the engine; project undo preserves the live canvas.
-const createUndoSnapshot = (
-  project: Project,
-  projectGraph = cloneProjectGraph(project.projectGraph)
-): ProjectUndoSnapshot => ({
+// Canvas pixel history belongs to the engine and graph history to each workflow; project undo preserves both.
+const createUndoSnapshot = (project: Project): ProjectUndoSnapshot => ({
   floatingWidgets: project.floatingWidgets ? { ...project.floatingWidgets } : undefined,
   invocation: { ...project.invocation },
   layout: { ...project.layout, panels: { ...project.layout.panels } },
-  projectGraph,
   widgetGraphs: cloneWidgetGraphs(project.widgetGraphs),
   widgetInstances: cloneWidgetInstances(project.widgetInstances),
   widgetRegions: cloneWidgetRegions(project.widgetRegions),
@@ -1166,14 +1196,13 @@ const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): P
   floatingWidgets: snapshot.floatingWidgets ? { ...snapshot.floatingWidgets } : undefined,
   invocation: { ...snapshot.invocation },
   layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
-  projectGraph: cloneProjectGraph(normalizeProjectGraph(snapshot.projectGraph)),
   widgetGraphs: cloneWidgetGraphs(snapshot.widgetGraphs),
   widgetInstances: cloneWidgetInstances(snapshot.widgetInstances),
   widgetRegions: cloneWidgetRegions(snapshot.widgetRegions),
 });
 
 /** Capture pre-edit state; edits sharing a mergeKey within the window undo as one burst. */
-const pushUndo = (project: Project, label: string, projectGraph?: ProjectGraphState, mergeKey?: string): Project => {
+const pushUndo = (project: Project, label: string, mergeKey?: string): Project => {
   const previous = project.undoRedo.past.at(-1);
   const timestamp = now();
 
@@ -1205,7 +1234,7 @@ const pushUndo = (project: Project, label: string, projectGraph?: ProjectGraphSt
           id: createId('undo'),
           label,
           ...(mergeKey ? { mergeKey } : {}),
-          project: createUndoSnapshot(project, projectGraph),
+          project: createUndoSnapshot(project),
         },
       ].slice(-HISTORY_LIMIT),
     },
@@ -1634,10 +1663,16 @@ const assembleWorkbenchProject = (
   const { isArriving = true } = options;
   const {
     graphHistory: _graphHistory,
+    projectGraph: legacyProjectGraph,
     recoveredAt: _recoveredAt,
     recoveryOf: _recoveryOf,
     ...persistentProject
-  } = project as Project & { graphHistory?: unknown; recoveredAt?: unknown; recoveryOf?: unknown };
+  } = project as Project & {
+    graphHistory?: unknown;
+    projectGraph?: unknown;
+    recoveredAt?: unknown;
+    recoveryOf?: unknown;
+  };
   const legacyWidgetRegions = project.widgetRegions as
     | Partial<Record<WidgetRegion | 'left-panel' | 'right-panel' | 'status-bar', WidgetRegionState>>
     | undefined;
@@ -1759,14 +1794,28 @@ const assembleWorkbenchProject = (
     floatingWidgets: placement.floatingWidgets,
     // Resolve historical built-in preset ids to their current arrangements to avoid false layout drift.
     layout: { ...project.layout, presetId: resolveLayoutPresetId(project.layout.presetId) },
-    projectGraph: normalizeProjectGraph(project.projectGraph),
     promptHistory: normalizePromptHistory((project as Partial<Project>).promptHistory),
     queue: isArriving ? { items: [] } : project.queue,
     settings: normalizeProjectSettings(project.settings),
     widgetRegions: placement.widgetRegions,
     widgetInstances,
+    workflowHistories: isArriving ? {} : (project.workflowHistories ?? {}),
+    workflows: resolveProjectWorkflows(project.workflows, legacyProjectGraph),
   };
 };
+
+/**
+ * Documents reach here through `migrateProjectDocument`, which already refused malformed collections. Session
+ * snapshots (`normalizeWorkbenchState`) are the one input that does not: a legacy single graph migrates, and a
+ * snapshot without a usable collection gets one blank workflow rather than failing the whole session restore.
+ */
+const resolveProjectWorkflows = (
+  candidate: ProjectWorkflowCollection | undefined,
+  legacyProjectGraph: unknown
+): ProjectWorkflowCollection =>
+  normalizeProjectWorkflowCollection(candidate) ??
+  migrateProjectGraphToCollection(legacyProjectGraph ?? {}) ??
+  createProjectWorkflowCollection(createBlankWorkflowDocument());
 
 /**
  * Assign the server board after normalization creates missing gallery instances. Projects with no gallery layout
@@ -1802,13 +1851,14 @@ const createProject = (index: number, id: string, preset: LayoutPreset): Project
       layout: { ...defaultLayoutPreset.snapshot.layout, panels: { ...defaultLayoutPreset.snapshot.layout.panels } },
       name: `Project Name #${index}`,
       promptHistory: [],
-      projectGraph: createProjectGraph(`${id}-graph`),
       queue: { items: [] },
       settings: normalizeProjectSettings(),
       undoRedo: { future: [], past: [] },
       widgetGraphs: {},
       widgetInstances: createWidgetInstances(),
       widgetRegions: createWidgetRegions(),
+      workflowHistories: {},
+      workflows: createProjectWorkflowCollection(createBlankWorkflowDocument()),
     },
     preset
   );
@@ -2370,12 +2420,15 @@ const compileInvocationSnapshot = (
   project: Project,
   route: InvocationRoute,
   models?: readonly ModelConfig[],
-  workflowGenerators?: WorkflowGeneratorResolutions
+  workflowGenerators?: WorkflowGeneratorResolutions,
+  workflowDocument: ProjectGraphState = getActiveProjectGraph(project)
 ): {
   graph: GraphContract;
   widgetStates: WidgetStateMap;
   workflowJson?: Record<string, unknown>;
   workflow?: Omit<WorkflowSubmissionPlan, 'graph'>;
+  /** The project workflow the graph was compiled from; results and seed advances return to it. */
+  projectWorkflowId?: string;
 } | null => {
   const widgetStates = getWidgetStatesSnapshot(project.widgetInstances);
   const randDevice = resolveRandDeviceMetadata(project.settings.useCpuNoise, getGenerationDevicesSnapshot().options);
@@ -2388,7 +2441,7 @@ const compileInvocationSnapshot = (
       return null;
     }
 
-    const plan = planWorkflowSubmission(project.projectGraph, templatesSnapshot.templates, {
+    const plan = planWorkflowSubmission(workflowDocument, templatesSnapshot.templates, {
       batchCount: sanitizeBatchCount(widgetStates.workflow?.values.batchCount),
       generators: workflowGenerators,
     });
@@ -2399,13 +2452,14 @@ const compileInvocationSnapshot = (
     }
 
     const { graph, ...workflow } = plan;
-    const { id: _id, ...workflowJson } = serializeWorkflowJsonForSubmission(project.projectGraph);
+    const { id: _id, ...workflowJson } = serializeWorkflowJsonForSubmission(workflowDocument);
 
     return {
       graph,
+      projectWorkflowId: workflowDocument.id,
       widgetStates,
       workflow,
-      ...(hasMultipleWorkflowReturnNodes(project.projectGraph) ? {} : { workflowJson }),
+      ...(hasMultipleWorkflowReturnNodes(workflowDocument) ? {} : { workflowJson }),
     };
   }
 
@@ -2973,8 +3027,50 @@ const routeQueueItemPartialResults = (
   );
 };
 
-const routeQueueItemResults = (project: Project, queueItemId: string, images: GeneratedImageContract[]): Project => {
-  const queueItem = project.queue.items.find((item) => item.id === queueItemId);
+/** Seed advances are bookkeeping on the submitted workflow, not an undoable edit. */
+const advanceWorkflowSeeds = (
+  project: Project,
+  workflowId: string,
+  advances: WorkflowSubmissionPlan['seedAdvances']
+): Project => {
+  const entry = findProjectWorkflow(project, workflowId);
+
+  return entry
+    ? setProjectWorkflowDocument(
+        project,
+        workflowId,
+        projectGraphReducer(entry.document, { advances, type: 'advanceSeedFields' })
+      )
+    : project;
+};
+
+/** A completed workflow run becomes the originating project workflow's preview; other copies are untouched. */
+const recordWorkflowRunPreview = (
+  project: Project,
+  queueItem: QueueItem | undefined,
+  images: GeneratedImageContract[]
+): Project => {
+  const submission = queueItem?.snapshot.backendSubmission;
+  const lastImage = images.at(-1);
+
+  if (!queueItem || submission?.kind !== 'workflow' || !submission.projectWorkflowId || !lastImage) {
+    return project;
+  }
+
+  return recordProjectWorkflowRun(project, submission.projectWorkflowId, {
+    completedAt: now(),
+    imageName: lastImage.imageName,
+    submittedAt: queueItem.snapshot.submittedAt,
+  });
+};
+
+const routeQueueItemResults = (
+  sourceProject: Project,
+  queueItemId: string,
+  images: GeneratedImageContract[]
+): Project => {
+  const queueItem = sourceProject.queue.items.find((item) => item.id === queueItemId);
+  const project = recordWorkflowRunPreview(sourceProject, queueItem, images);
   const destination = queueItem?.snapshot.destination ?? project.invocation.destination;
   const previousSelectedSlot = getSelectedCanvasStagingSlot(project);
   const nextProject = updateQueueItem(project, queueItemId, (item) => ({
@@ -3020,6 +3116,8 @@ const enqueueCompiledSnapshot = (
     workflowJson?: Record<string, unknown>;
     /** The workflow route's seed plan: batch data, run count, and the fields to advance. */
     workflow?: Omit<WorkflowSubmissionPlan, 'graph'>;
+    /** The project workflow the graph was compiled from; results and seed advances return to it. */
+    projectWorkflowId?: string;
   },
   backendSupportsCancellation: boolean,
   canvasSnapshot?: CanvasStateContractV3
@@ -3088,11 +3186,9 @@ const enqueueCompiledSnapshot = (
             graph: backendGraph,
             kind: 'workflow',
             ...(compiled.workflowJson ? { workflow: compiled.workflowJson } : {}),
-            // Capture the library binding at submission so completion updates the originating workflow even after
-            // the editor changes.
-            ...(project.projectGraph.libraryWorkflowId
-              ? { libraryWorkflowId: project.projectGraph.libraryWorkflowId }
-              : {}),
+            // Capture the originating project workflow so results and seed advances return to it even after the
+            // active workflow changes.
+            ...(compiled.projectWorkflowId ? { projectWorkflowId: compiled.projectWorkflowId } : {}),
           }
       : sourceGenerateSettings && effectivePrompts
         ? {
@@ -3194,14 +3290,8 @@ const enqueueCompiledSnapshot = (
             ? { ...values, seed: seedPlan.nextSeed }
             : values
         )
-      : compiled.workflow && compiled.workflow.seedAdvances.length > 0
-        ? {
-            ...project,
-            projectGraph: projectGraphReducer(project.projectGraph, {
-              advances: compiled.workflow.seedAdvances,
-              type: 'advanceSeedFields',
-            }),
-          }
+      : compiled.workflow && compiled.workflow.seedAdvances.length > 0 && compiled.projectWorkflowId
+        ? advanceWorkflowSeeds(project, compiled.projectWorkflowId, compiled.workflow.seedAdvances)
         : project;
 
   return {
@@ -3249,13 +3339,14 @@ const submitInvocationSnapshot = (
   route = resolveInvocationRoute(project),
   models?: readonly ModelConfig[],
   positivePrompts?: string[],
-  workflowGenerators?: WorkflowGeneratorResolutions
+  workflowGenerators?: WorkflowGeneratorResolutions,
+  workflowDocument?: ProjectGraphState
 ): Project => {
   if (!isInvocationRouteValid(route)) {
     return project;
   }
 
-  const compiledSnapshot = compileInvocationSnapshot(project, route, models, workflowGenerators);
+  const compiledSnapshot = compileInvocationSnapshot(project, route, models, workflowGenerators, workflowDocument);
 
   if (!compiledSnapshot) {
     return project;
@@ -4108,61 +4199,72 @@ export const __workbenchReducerInternal = (
         })
       );
     }
-    case 'applyProjectGraphAction': {
-      return updateActiveProject(state, (project) => {
-        const projectGraph = projectGraphReducer(project.projectGraph, action.action);
+    case 'applyWorkflowAction': {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
+        const workflowId = action.workflowId ?? project.workflows.activeWorkflowId;
+        const result = applyProjectWorkflowAction(project, workflowId, action.action, now());
 
-        if (projectGraph === project.projectGraph) {
+        if (!result.didChange) {
           return project;
         }
 
-        const routedProject = isHighConfidenceGraphEdit(action.action)
-          ? applyAutoRouteForEdit(project, 'workflow', context)
-          : project;
-        const undoEntry = getProjectGraphUndoEntry(action.action);
-        const nextProject = undoEntry
-          ? pushUndo(routedProject, undoEntry.label, undefined, undoEntry.mergeKey)
-          : routedProject;
-        const updated = { ...nextProject, projectGraph };
-
-        return updated;
+        // Editing an inactive workflow (a fenced async completion) must not re-route the project to it.
+        return workflowId === project.workflows.activeWorkflowId && isHighConfidenceGraphEdit(action.action)
+          ? applyAutoRouteForEdit(result.project, 'workflow', context)
+          : result.project;
       });
     }
-    case 'replaceProjectGraph': {
-      const nextState = updateActiveProject(state, (project) => {
-        const routedProject = applyAutoRouteForEdit(project, 'workflow', context);
-        const outgoingGraph = cloneProjectGraph(project.projectGraph);
-        const nextProject = pushUndo(routedProject, 'Replace project graph', outgoingGraph);
+    case 'addProjectWorkflow': {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
+        if (findProjectWorkflow(project, action.document.id)) {
+          return project;
+        }
+
+        const nextProject = addProjectWorkflow(applyAutoRouteForEdit(project, 'workflow', context), action.document, {
+          reusePlaceholder: action.reusePlaceholder,
+          source: action.source,
+        });
 
         return {
           ...nextProject,
           events: prependProjectEvent(nextProject.events, {
             createdAt: now(),
             id: createId('event'),
-            summary: `Replaced the project graph with "${action.document.name || 'Untitled Workflow'}" (${action.label})`,
+            summary: `Added workflow "${action.document.name || 'Untitled Workflow'}" (${action.label})`,
             type: 'graph-replaced',
           }),
-          projectGraph: cloneProjectGraph(action.document),
         };
       });
-      const activeProject = nextState.projects.find((project) => project.id === nextState.activeProjectId);
-
-      return addNotification(
-        nextState,
-        createNotification({
-          kind: 'info',
-          message:
-            'The previous graph is available through Undo for this session. Save workflows to the library for a permanent copy.',
-          projectId: activeProject?.id,
-          title: `Project graph replaced (${action.label})`,
-        })
+    }
+    case 'selectProjectWorkflow': {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        selectProjectWorkflow(project, action.workflowId)
       );
     }
-    case 'setProjectGraphLibraryBinding': {
-      return updateActiveProject(state, (project) => ({
-        ...project,
-        projectGraph: { ...project.projectGraph, libraryWorkflowId: action.libraryWorkflowId },
-      }));
+    case 'duplicateProjectWorkflow': {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        duplicateProjectWorkflow(project, action.workflowId, action.copyId, () => action.copyName)
+      );
+    }
+    case 'removeProjectWorkflow': {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        removeProjectWorkflow(project, action.workflowId)
+      );
+    }
+    case 'setProjectWorkflowSource': {
+      return updateProjectById(state, action.projectId, (project) =>
+        setProjectWorkflowSource(project, action.workflowId, action.source)
+      );
+    }
+    case 'undoWorkflowChange': {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        undoProjectWorkflow(project, action.workflowId ?? project.workflows.activeWorkflowId, now())
+      );
+    }
+    case 'redoWorkflowChange': {
+      return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
+        redoProjectWorkflow(project, action.workflowId ?? project.workflows.activeWorkflowId, now())
+      );
     }
     case 'submitInvocationSnapshot': {
       return withEnqueueNotification(
@@ -4174,19 +4276,45 @@ export const __workbenchReducerInternal = (
       );
     }
     case 'submitResolvedInvocationSnapshot': {
+      const target = state.projects.find((project) => project.id === action.projectId);
+      const workflow =
+        target && action.route.sourceId === 'workflow'
+          ? action.workflowId
+            ? findProjectWorkflow(target, action.workflowId)
+            : getActiveProjectWorkflow(target)
+          : undefined;
+
+      // The originating workflow was removed while the submission was being prepared; nothing else may run in its
+      // place.
+      if (target && action.route.sourceId === 'workflow' && !workflow) {
+        return addNotification(
+          state,
+          createNotification({
+            category: 'enqueue',
+            kind: 'error',
+            message: 'The workflow was removed from the project before it could be queued.',
+            messageKey: 'widgets.workflow.submitRemovedBody',
+            projectId: target.id,
+            title: 'Workflow not queued',
+            titleKey: 'widgets.workflow.submitRemovedTitle',
+          })
+        );
+      }
+
       return withEnqueueNotification(
         state,
-        updateActiveProject(state, (project) =>
+        updateProjectById(state, action.projectId, (project) =>
           submitInvocationSnapshot(
             project,
             action.backendSupportsCancellation,
-            resolveInvocationRoute(project, 'global', action.route, action.models),
+            resolveInvocationRoute(project, 'global', action.route, action.models, workflow?.document),
             action.models,
             action.positivePrompts,
-            action.workflowGenerators
+            action.workflowGenerators,
+            workflow?.document
           )
         ),
-        state.activeProjectId
+        action.projectId
       );
     }
     case 'markQueueItemBackendSubmitted': {
@@ -4998,6 +5126,17 @@ export const __workbenchReducerInternal = (
           ? state.projects.map((candidate) => (candidate.id === action.projectId ? project : candidate))
           : [...state.projects, project],
       };
+    }
+    case 'autosaveScheduled': {
+      return state.autosave.status === 'pending' || state.autosave.status === 'saving'
+        ? state
+        : {
+            ...state,
+            autosave: {
+              ...(state.autosave.lastSavedAt ? { lastSavedAt: state.autosave.lastSavedAt } : {}),
+              status: 'pending',
+            },
+          };
     }
     case 'autosaveStarted': {
       return { ...state, autosave: { status: 'saving' } };

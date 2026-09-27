@@ -63,7 +63,7 @@ If you pick a model that can't run the current combination, the Invoke button te
 
 ### Prompt
 
-The prompt toolbar carries the same helpers as the image Generate panel — templates, prompt expansion, image-to-prompt, and history. The **negative prompt** behaves per family:
+The prompt toolbar carries the same helpers as the image Generate panel — templates, prompt expansion, image-to-prompt, and history. On LTX-2, **Expand Prompt** starts from the enhancer LTX-2.5 was released with and, when a first frame is set, describes the video from that frame — see [prompt enhancement for LTX-2.5](/features/prompt-tools/#prompt-enhancement-for-ltx-25). The **negative prompt** behaves per family:
 
 * **Wan** — used only when CFG is greater than 1 (the field says so). With the Lightning fast path on (CFG 1), it is ignored by the graph.
 * **MiniMax H3** — hidden entirely. H3 is guidance-distilled and has no CFG, so a negative prompt has nothing to act on.

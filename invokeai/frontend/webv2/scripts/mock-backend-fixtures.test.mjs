@@ -6,6 +6,7 @@ import {
   assertMockBackendFixture,
   collectCanvasLeaves,
   createMockBackendFixture,
+  getFixtureProjectWorkflowDocument,
   getMockBackendFixtureCounts,
   MOCK_BACKEND_PROFILE_COUNTS,
   MOCK_BACKEND_PROFILE_NAMES,
@@ -73,10 +74,13 @@ test('representative fixtures keep node discovery and heavy project data coheren
   const project = fixture.projects[0];
 
   assert.deepEqual(catalogTypes, invocationTypes);
+  assert.equal(project.data.documentSchemaVersion, 3);
   assert.deepEqual(
-    project.data.projectGraph.nodes.map((node) => node.data.type),
+    getFixtureProjectWorkflowDocument(project.data).nodes.map((node) => node.data.type),
     invocationTypes
   );
+  assert.equal(project.data.workflows.entries.length, 2);
+  assert.equal(project.data.workflows.activeWorkflowId, project.data.workflows.entries[0].document.id);
   const leaves = collectCanvasLeaves(project.data.canvas.document);
   assert.equal(leaves.length, MOCK_BACKEND_PROFILE_COUNTS.representative.layers);
   assert.equal(new Set(leaves.map((layer) => layer.id)).size, 64);
@@ -105,6 +109,8 @@ test('Fixture Project 002 carries the image and video references used by the pro
     collectCanvasLeaves(project.data.canvas.document).every((layer) => layer.type === 'raster'),
     true
   );
+  // A schema-2 document on purpose: the project-file journey migrates it on load and exports schema 3.
+  assert.equal(project.data.documentSchemaVersion, 2);
   assert.deepEqual(project.data.projectGraph.nodes[0]?.data.inputs.video?.value, {
     video_name: MOCK_BACKEND_REPRESENTATIVE_VIDEO_NAME,
   });

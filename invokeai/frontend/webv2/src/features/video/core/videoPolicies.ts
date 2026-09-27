@@ -1,7 +1,9 @@
 import type {
+  ExpandPromptSuggestion,
   GenerateLora,
   GenerationModelCatalogItem as ModelConfig,
   GenerationModelTaxonomyType as ModelTaxonomyType,
+  ImageWithDims,
   LoraModelConfig,
   MainModelConfig,
 } from '@features/generation/contracts';
@@ -169,10 +171,23 @@ interface VideoVariantConfig {
   /** What a fresh panel seeds the negative prompt with, when the family ships one. */
   defaultNegativePrompt?: string;
   negativePrompt: { visible: boolean; usage: VideoNegativePromptUsage };
+  /** The family's released prompt enhancer, which Expand Prompt preselects. */
+  promptEnhancer?: VideoPromptEnhancer;
   accelerator: VideoAcceleratorConfig | null;
   audioOutput: boolean;
   /** Ref2VA reference caps; present only on variants whose modes include 'reference'. */
   references?: { maxVideos: number; maxImages: number; extend?: boolean };
+}
+
+export interface VideoPromptEnhancer {
+  /** Starter source of the enhancer model; an installed text LLM with this source is preselected. */
+  modelSource: string;
+  /** The starter model's name (backend `starter_models/ltx_2.py`). */
+  modelName: string;
+  /** Seeded system prompts (backend migration `2026_09_26_add_ltx2_system_prompts`). */
+  textToVideoSystemPromptId: string;
+  /** Describes the video from its first frame; used only when Expand Prompt sends that frame along. */
+  imageToVideoSystemPromptId: string;
 }
 
 /** A family whose only guidance control is the primary CFG scale. */
@@ -344,6 +359,12 @@ const LTX2_FRAMES: VideoFramesGridPolicy = {
 
 const LTX2_COMMON = {
   accelerator: null,
+  promptEnhancer: {
+    imageToVideoSystemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0010',
+    modelName: 'LTX-2.5 Prompt Enhancer (Gemma-4 E2B)',
+    modelSource: 'google/gemma-4-E2B-it',
+    textToVideoSystemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0009',
+  },
   audioOutput: true,
   cfg: { lowNoiseVisible: false, visible: true },
   fps: { defaultValue: LTX2_FPS_DEFAULT, editable: true, max: LTX2_FPS_MAX, min: LTX2_FPS_MIN },
@@ -703,11 +724,30 @@ export const getVideoPromptPolicy = (
       (config.negativePrompt.usage === 'cfg-gated' && (settings.cfgScale > 1 || lowNoiseCfgActive || audioCfgActive)));
 
   return {
+    enhancer: config.promptEnhancer ?? null,
     negativeVisible: config.negativePrompt.visible && !guidanceDistilled,
     negativeUsedInGraph,
     ...(config.negativePrompt.usage === 'cfg-gated' ? { negativeHelpTextKey: 'widgets.video.negativeCfgHelp' } : {}),
   };
 };
+
+/**
+ * What Expand Prompt starts from for this family: its enhancer and system prompts, with the first frame
+ * offered when one is set (only a first frame opens the video it describes).
+ */
+export const getVideoExpandPromptSuggestion = (
+  enhancer: VideoPromptEnhancer | null,
+  firstFrameImage: ImageWithDims | null
+): ExpandPromptSuggestion | null =>
+  enhancer
+    ? {
+        image: firstFrameImage,
+        imageSystemPromptId: enhancer.imageToVideoSystemPromptId,
+        modelName: enhancer.modelName,
+        modelSource: enhancer.modelSource,
+        systemPromptId: enhancer.textToVideoSystemPromptId,
+      }
+    : null;
 
 export interface VideoModelPolicy {
   isSupported: boolean;
@@ -731,6 +771,7 @@ export interface VideoModelPolicy {
     modalityScale: number | null;
   };
   prompt: {
+    enhancer: VideoPromptEnhancer | null;
     negativeVisible: boolean;
     negativeUsedInGraph: boolean;
     /** Translation key for the negative prompt's inline help; absent when the field needs none. */

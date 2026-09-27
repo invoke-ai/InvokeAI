@@ -32,6 +32,7 @@ import { getCanvasStagingCandidateFingerprint, getCanvasStagingSlots } from './c
 import { layoutPresets } from './layoutPresets';
 import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
 import { PROJECT_EVENT_LIMIT } from './projectEvents';
+import { getActiveProjectGraph } from './projectWorkflows';
 import { DEFAULT_PROJECT_SETTINGS } from './settings/store';
 import { getProjectWidgetValues } from './widgetState';
 import {
@@ -453,6 +454,7 @@ describe('generation-device orchestration metadata', () => {
     const state = workbenchReducer(primeGenerate(initial), {
       backendSupportsCancellation: true,
       route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      projectId: initial.activeProjectId,
       type: 'submitResolvedInvocationSnapshot',
     });
 
@@ -482,6 +484,7 @@ describe('generation-device orchestration metadata', () => {
       backendSupportsCancellation: true,
       models,
       route: { destination: 'gallery', destinationLocked: false, sourceId: 'upscale', sourceLocked: false },
+      projectId: state.activeProjectId,
       type: 'submitResolvedInvocationSnapshot',
     });
 
@@ -941,7 +944,7 @@ describe('adopting a project from another realm', () => {
     const legacyProject = {
       ...project,
       events: [{ createdAt: 'now', id: 'legacy-event', summary: 'legacy', type: 'project-created' }],
-      graphHistory: [{ document: project.projectGraph, id: 'legacy-snapshot' }],
+      graphHistory: [{ document: getActiveProjectGraph(project), id: 'legacy-snapshot' }],
       queue: { items: [{}] },
     } as unknown as Project;
 
@@ -3008,11 +3011,13 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const once = workbenchReducer(state, {
       backendSupportsCancellation: true,
       route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      projectId: state.activeProjectId,
       type: 'submitResolvedInvocationSnapshot',
     });
     const twice = workbenchReducer(once, {
       backendSupportsCancellation: true,
       route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+      projectId: once.activeProjectId,
       type: 'submitResolvedInvocationSnapshot',
     });
 
@@ -3044,6 +3049,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       const next = workbenchReducer(state, {
         backendSupportsCancellation: true,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+        projectId: state.activeProjectId,
         type: 'submitResolvedInvocationSnapshot',
       });
 
@@ -3063,6 +3069,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       const next = workbenchReducer(state, {
         backendSupportsCancellation: true,
         route: { destination: 'canvas', destinationLocked: false, sourceId: 'upscale', sourceLocked: true },
+        projectId: state.activeProjectId,
         type: 'submitResolvedInvocationSnapshot',
       });
 
@@ -3125,6 +3132,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = workbenchReducer(state, {
       backendSupportsCancellation: true,
       route: { destination: 'canvas', destinationLocked: false, sourceId: 'workflow', sourceLocked: true },
+      projectId: state.activeProjectId,
       type: 'submitResolvedInvocationSnapshot',
     });
 
@@ -3156,42 +3164,72 @@ describe('workbenchReducer Phase 5 generation flow', () => {
         },
         type: 'addNode',
       },
-      type: 'applyProjectGraphAction',
+      type: 'applyWorkflowAction',
     });
 
     const project = getActiveProject(state);
 
-    expect(project.projectGraph.nodes).toHaveLength(1);
-    expect(project.undoRedo.past.at(-1)?.label).toBe('Add workflow node');
+    expect(getActiveProjectGraph(project).nodes).toHaveLength(1);
+    expect(project.workflowHistories[project.workflows.activeWorkflowId]?.past.at(-1)?.label).toBe('Add workflow node');
+    // Graph edits never enter the project-level history.
+    expect(project.undoRedo.past.some((entry) => entry.label === 'Add workflow node')).toBe(false);
     expect(project.invocation.sourceId).toBe('workflow');
     expect(project.invocation.destination).toBe('gallery');
 
-    state = workbenchReducer(state, { type: 'undoProjectChange' });
+    state = workbenchReducer(state, { type: 'undoWorkflowChange' });
 
-    expect(getActiveProject(state).projectGraph.nodes).toHaveLength(0);
+    expect(getActiveProjectGraph(getActiveProject(state)).nodes).toHaveLength(0);
+    // Undoing a graph edit does not undo the route the edit switched to.
     expect(getActiveProject(state).invocation).toMatchObject({ destination: 'gallery', sourceId: 'workflow' });
   });
 
-  it('replaceProjectGraph preserves the previous document in session undo', () => {
+  it('never restores a workflow document through project-level undo', () => {
     let state = createInitialWorkbenchState();
-    const originalGraphId = getActiveProject(state).projectGraph.id;
 
     state = workbenchReducer(state, {
-      document: { ...getActiveProject(state).projectGraph, id: 'replacement-graph', name: 'Replacement' },
-      label: 'Test replace',
-      type: 'replaceProjectGraph',
+      action: { patch: { name: 'Edited' }, type: 'setMetadata' },
+      type: 'applyWorkflowAction',
+    });
+    // A layout change enters the project-level history after the edit.
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    const edited = getActiveProjectGraph(getActiveProject(state));
+
+    state = workbenchReducer(state, { type: 'undoProjectChange' });
+    state = workbenchReducer(state, { type: 'undoProjectChange' });
+
+    expect(getActiveProjectGraph(getActiveProject(state))).toBe(edited);
+    expect(getActiveProject(state).workflowHistories[edited.id]?.past).toHaveLength(1);
+  });
+
+  it("adds a workflow beside the others and keeps each workflow's history to itself", () => {
+    let state = createInitialWorkbenchState();
+    const originalGraphId = getActiveProjectGraph(getActiveProject(state)).id;
+
+    state = workbenchReducer(state, {
+      action: { patch: { name: 'First' }, type: 'setMetadata' },
+      type: 'applyWorkflowAction',
+    });
+    state = workbenchReducer(state, {
+      document: { ...getActiveProjectGraph(getActiveProject(state)), id: 'second-graph', name: 'Second' },
+      label: 'Test add',
+      type: 'addProjectWorkflow',
     });
 
     const project = getActiveProject(state);
 
-    expect(project.projectGraph.id).toBe('replacement-graph');
+    expect(project.workflows.activeWorkflowId).toBe('second-graph');
+    expect(project.workflows.entries.map((entry) => entry.document.id)).toEqual([originalGraphId, 'second-graph']);
     expect(project.invocation).toMatchObject({ destination: 'gallery', sourceId: 'workflow' });
-    expect(project.undoRedo.past.at(-1)?.project.projectGraph.id).toBe(originalGraphId);
 
-    state = workbenchReducer(state, { type: 'undoProjectChange' });
+    // The new workflow has no history of its own; undo does nothing to it and nothing to its neighbour.
+    state = workbenchReducer(state, { type: 'undoWorkflowChange' });
+    expect(getActiveProjectGraph(getActiveProject(state)).id).toBe('second-graph');
+    expect(getActiveProject(state).workflows.entries[0]?.document.name).toBe('First');
 
-    expect(getActiveProject(state).projectGraph.id).toBe(originalGraphId);
-    expect(getActiveProject(state).invocation).toMatchObject({ destination: 'gallery', sourceId: 'workflow' });
+    state = workbenchReducer(state, { type: 'selectProjectWorkflow', workflowId: originalGraphId });
+    state = workbenchReducer(state, { type: 'undoWorkflowChange' });
+    expect(getActiveProjectGraph(getActiveProject(state)).name).toBe('Untitled Workflow');
+    expect(getActiveProject(state).workflows.entries[1]?.document.name).toBe('Second');
   });
 
   it('does not queue Upscale while its required settings are incomplete', () => {
@@ -3204,6 +3242,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     state = workbenchReducer(state, {
       backendSupportsCancellation: true,
       route: { destination: 'canvas', destinationLocked: false, sourceId: 'upscale', sourceLocked: true },
+      projectId: state.activeProjectId,
       type: 'submitResolvedInvocationSnapshot',
     });
 
@@ -3220,9 +3259,12 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
   describe('expanded positive prompts on the compiled submission', () => {
     const submitResolvedWithPrompts = (positivePrompt: string, positivePrompts?: string[]) =>
-      workbenchReducer(primeGenerate(undefined, { positivePrompt }), {
+      submitResolvedTo(primeGenerate(undefined, { positivePrompt }), positivePrompts);
+    const submitResolvedTo = (primed: WorkbenchState, positivePrompts?: string[]) =>
+      workbenchReducer(primed, {
         backendSupportsCancellation: true,
         positivePrompts,
+        projectId: primed.activeProjectId,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
         type: 'submitResolvedInvocationSnapshot',
       });
@@ -3257,7 +3299,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     // The template is what introduced the `{…}` here, so the gate has to read the
     // merged prompt or the expansion would be discarded and the literal submitted.
     it('keeps an expansion whose dynamic syntax came from the prompt template', () => {
-      const state = workbenchReducer(
+      const state = submitResolvedTo(
         primeGenerate(undefined, {
           positivePrompt: 'a cat',
           promptTemplate: {
@@ -3267,12 +3309,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
             positivePrompt: '{prompt}, {red|green} tint',
           },
         }),
-        {
-          backendSupportsCancellation: true,
-          positivePrompts: ['a cat, red tint', 'a cat, green tint'],
-          route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
-          type: 'submitResolvedInvocationSnapshot',
-        }
+        ['a cat, red tint', 'a cat, green tint']
       );
 
       expect(getActiveProject(state).queue.items[0]?.snapshot.backendSubmission).toMatchObject({
@@ -3348,7 +3385,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
           },
           type: 'addNode',
         },
-        type: 'applyProjectGraphAction',
+        type: 'applyWorkflowAction',
       });
 
       return state;
@@ -3357,12 +3394,13 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       workbenchReducer(state, {
         backendSupportsCancellation: true,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'workflow', sourceLocked: false },
+        projectId: state.activeProjectId,
         type: 'submitResolvedInvocationSnapshot',
       });
     const readSubmission = (state: WorkbenchState, index = 0) =>
       getActiveProject(state).queue.items[index]?.snapshot.backendSubmission;
     const readNodeSeed = (state: WorkbenchState) => {
-      const node = getActiveProject(state).projectGraph.nodes[0];
+      const node = getActiveProjectGraph(getActiveProject(state)).nodes[0];
 
       return node?.type === 'invocation' ? node.data.inputs.seed?.value : undefined;
     };
@@ -3433,7 +3471,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
       state = workbenchReducer(state, {
         action: { node: invocationNode('float-1', 'float', { value: 0.5 }), type: 'addNode' },
-        type: 'applyProjectGraphAction',
+        type: 'applyWorkflowAction',
       });
       state = workbenchReducer(state, {
         action: {
@@ -3448,7 +3486,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
           node: invocationNode('batch-1', 'float_batch', { batch_group_id: 'None', floats: [1.5, 2.5] }),
           type: 'addNodeAndEdge',
         },
-        type: 'applyProjectGraphAction',
+        type: 'applyWorkflowAction',
       });
       state = submitWorkflow(state);
 
@@ -3543,7 +3581,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
             },
             type: 'addNode',
           },
-          type: 'applyProjectGraphAction',
+          type: 'applyWorkflowAction',
         });
       }
 
@@ -3621,6 +3659,153 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       expect(getActiveProject(next).queue.items).toEqual([]);
       expect(readNodeSeed(next)).toBe(42);
     });
+
+    describe('attribution to the originating project workflow', () => {
+      const workflowIdOf = (state: WorkbenchState) => getActiveProject(state).workflows.activeWorkflowId;
+      const seedOf = (state: WorkbenchState, workflowId: string) => {
+        const entry = getActiveProject(state).workflows.entries.find(
+          (candidate) => candidate.document.id === workflowId
+        );
+        const node = entry?.document.nodes[0];
+
+        return node?.type === 'invocation' ? node.data.inputs.seed?.value : undefined;
+      };
+      const submitFrom = (state: WorkbenchState, workflowId: string) =>
+        workbenchReducer(state, {
+          backendSupportsCancellation: true,
+          projectId: state.activeProjectId,
+          route: { destination: 'gallery', destinationLocked: false, sourceId: 'workflow', sourceLocked: false },
+          type: 'submitResolvedInvocationSnapshot',
+          workflowId,
+        });
+
+      it('submits and advances the captured workflow even after another one became active', () => {
+        let state = primeWorkflow(42, 'increment', 1);
+        const original = workflowIdOf(state);
+
+        state = workbenchReducer(state, {
+          document: { ...getActiveProjectGraph(getActiveProject(state)), id: 'other', name: 'Other', nodes: [] },
+          label: 'Add',
+          type: 'addProjectWorkflow',
+        });
+        expect(workflowIdOf(state)).toBe('other');
+
+        state = submitFrom(state, original);
+
+        const item = getActiveProject(state).queue.items[0];
+
+        expect(item?.snapshot.backendSubmission).toMatchObject({
+          graph: { nodes: { 'noise-1': { seed: 42 } } },
+          kind: 'workflow',
+          projectWorkflowId: original,
+        });
+        expect(seedOf(state, original)).toBe(43);
+        expect(workflowIdOf(state)).toBe('other');
+        expect(getActiveProjectGraph(getActiveProject(state)).nodes).toEqual([]);
+      });
+
+      it('queues nothing and says so when the captured workflow was removed meanwhile', () => {
+        let state = primeWorkflow(42, 'increment', 1);
+        const original = workflowIdOf(state);
+
+        state = workbenchReducer(state, {
+          document: { ...getActiveProjectGraph(getActiveProject(state)), id: 'other', name: 'Other', nodes: [] },
+          label: 'Add',
+          type: 'addProjectWorkflow',
+        });
+        state = workbenchReducer(state, { type: 'removeProjectWorkflow', workflowId: original });
+        state = submitFrom(state, original);
+
+        expect(getActiveProject(state).queue.items).toEqual([]);
+        expect(state.notifications[0]).toMatchObject({
+          kind: 'error',
+          titleKey: 'widgets.workflow.submitRemovedTitle',
+        });
+      });
+
+      it('records the newest submitted successful run on the originating workflow and nowhere else', () => {
+        vi.useFakeTimers({ now: new Date('2026-06-10T00:00:00.000Z') });
+
+        try {
+          let state = primeWorkflow(42, 'increment', 1);
+          const original = workflowIdOf(state);
+
+          state = workbenchReducer(state, {
+            copyId: 'copy',
+            copyName: 'Copy',
+            type: 'duplicateProjectWorkflow',
+            workflowId: original,
+          });
+          // The copy shares its node ids with the original; attribution goes by workflow, never by node id.
+          state = submitFrom(state, original);
+          vi.advanceTimersByTime(1000);
+          state = submitFrom(state, original);
+
+          const [second, first] = getActiveProject(state).queue.items;
+
+          expect(second?.snapshot.submittedAt).not.toBe(first?.snapshot.submittedAt);
+
+          state = workbenchReducer(state, {
+            images: [createImage('second.png', second!.id)],
+            projectId: state.activeProjectId,
+            queueItemId: second!.id,
+            type: 'routeQueueItemResults',
+          });
+          state = workbenchReducer(state, {
+            images: [createImage('first.png', first!.id)],
+            projectId: state.activeProjectId,
+            queueItemId: first!.id,
+            type: 'routeQueueItemResults',
+          });
+
+          const entries = getActiveProject(state).workflows.entries;
+
+          expect(entries.find((entry) => entry.document.id === original)?.lastRun?.imageName).toBe('second.png');
+          expect(entries.find((entry) => entry.document.id === 'copy')?.lastRun).toBeUndefined();
+        } finally {
+          vi.useRealTimers();
+        }
+      });
+
+      it('routes results of a run restored without a workflow identity without touching any workflow', () => {
+        let state = primeWorkflow(42, 'increment', 1);
+        const project = getActiveProject(state);
+        const restored = {
+          cancellable: true,
+          id: 'older-run',
+          snapshot: {
+            backendSubmission: { batchCount: 1, graph: { edges: [], id: 'g', nodes: {} }, kind: 'workflow' },
+            canvas: {
+              document: { bbox: { height: 1, width: 1, x: 0, y: 0 }, height: 1, width: 1 },
+              documentRevision: 0,
+            },
+            destination: 'gallery',
+            filterIntermediateResults: true,
+            galleryBoardId: null,
+            graph: { id: 'g', label: 'Older' },
+            presentation: { batchCount: 1, height: 1, width: 1 },
+            sourceId: 'workflow',
+            submittedAt: '2026-01-01T00:00:00.000Z',
+          },
+          status: 'running',
+        };
+
+        state = workbenchReducer(state, {
+          items: [restored],
+          projectId: project.id,
+          type: 'restoreQueueItemsFromJournal',
+        });
+        state = workbenchReducer(state, {
+          images: [createImage('old.png', 'older-run')],
+          projectId: project.id,
+          queueItemId: 'older-run',
+          type: 'routeQueueItemResults',
+        });
+
+        expect(getActiveProject(state).queue.items.find((item) => item.id === 'older-run')?.status).toBe('completed');
+        expect(getActiveProject(state).workflows.entries.every((entry) => entry.lastRun === undefined)).toBe(true);
+      });
+    });
   });
 
   describe('seed modes on the compiled submission', () => {
@@ -3633,6 +3818,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
         backendSupportsCancellation: true,
         positivePrompts,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'generate', sourceLocked: false },
+        projectId: state.activeProjectId,
         type: 'submitResolvedInvocationSnapshot',
       });
 
@@ -3733,6 +3919,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
         backendSupportsCancellation: true,
         models: upscaleModels,
         route: { destination: 'gallery', destinationLocked: false, sourceId: 'upscale', sourceLocked: false },
+        projectId: state.activeProjectId,
         type: 'submitResolvedInvocationSnapshot',
       });
 
@@ -4889,14 +5076,15 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       const setValue = (fieldName: string, value: number) =>
         workbenchReducer(state, {
           action: { fieldName, nodeId: 'node-1', type: 'setFieldValue', value },
-          type: 'applyProjectGraphAction',
+          type: 'applyWorkflowAction',
         });
       const fieldValue = (fieldName: string) => {
-        const node = getActiveProject(state).projectGraph.nodes[0];
+        const node = getActiveProjectGraph(getActiveProject(state)).nodes[0];
 
         return node?.type === 'invocation' ? node.data.inputs[fieldName]?.value : undefined;
       };
-      const past = () => getActiveProject(state).undoRedo.past;
+      const past = () =>
+        getActiveProject(state).workflowHistories[getActiveProject(state).workflows.activeWorkflowId]?.past ?? [];
 
       state = workbenchReducer(state, {
         action: {
@@ -4918,7 +5106,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
           },
           type: 'addNode',
         },
-        type: 'applyProjectGraphAction',
+        type: 'applyWorkflowAction',
       });
       const stepsAfterAdd = past().length;
 
@@ -4939,18 +5127,18 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
       expect(past()).toHaveLength(stepsAfterAdd + 3);
 
-      state = workbenchReducer(state, { type: 'undoProjectChange' });
+      state = workbenchReducer(state, { type: 'undoWorkflowChange' });
       expect(fieldValue('b')).toBeUndefined();
       expect(fieldValue('a')).toBe(3);
 
-      state = workbenchReducer(state, { type: 'undoProjectChange' });
+      state = workbenchReducer(state, { type: 'undoWorkflowChange' });
       expect(fieldValue('a')).toBe(123);
 
-      state = workbenchReducer(state, { type: 'undoProjectChange' });
+      state = workbenchReducer(state, { type: 'undoWorkflowChange' });
       expect(fieldValue('a')).toBeUndefined();
 
       // Redo brings the whole burst back at once, and a fresh edit after it starts its own step.
-      state = workbenchReducer(state, { type: 'redoProjectChange' });
+      state = workbenchReducer(state, { type: 'redoWorkflowChange' });
       expect(fieldValue('a')).toBe(123);
 
       state = setValue('a', 4);
@@ -4959,17 +5147,17 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
       // An undo inside the window ends the burst: the step the user undid back to stays its own step.
       state = setValue('b', 8);
-      state = workbenchReducer(state, { type: 'undoProjectChange' });
+      state = workbenchReducer(state, { type: 'undoWorkflowChange' });
       state = setValue('a', 5);
 
       expect(past()).toHaveLength(stepsAfterAdd + 3);
-      state = workbenchReducer(state, { type: 'undoProjectChange' });
+      state = workbenchReducer(state, { type: 'undoWorkflowChange' });
       expect(fieldValue('a')).toBe(4);
 
       // Node moves are not history: dragging a node around leaves the steps alone.
       state = workbenchReducer(state, {
         action: { nodeId: 'node-1', position: { x: 10, y: 10 }, type: 'setNodePosition' },
-        type: 'applyProjectGraphAction',
+        type: 'applyWorkflowAction',
       });
       expect(past()).toHaveLength(stepsAfterAdd + 2);
     } finally {

@@ -25,6 +25,7 @@ import { socketHub } from '@platform/transport/socketHub';
 import { Button, CloseButton, Field, Select } from '@platform/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
+import { getActiveProjectGraph } from '@workbench/projectWorkflows';
 import { useNotify } from '@workbench/useNotify';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useState } from 'react';
@@ -111,7 +112,7 @@ const getLayerWorkflowAvailability = (
 };
 
 export const useLayerWorkflowAvailability = (): LayerWorkflowAvailability => {
-  const document = useActiveProjectSelector((project) => project.projectGraph, Object.is);
+  const document = useActiveProjectSelector((project) => getActiveProjectGraph(project), Object.is);
   const templatesSnapshot = useInvocationTemplatesSnapshot();
 
   return getLayerWorkflowAvailability(document, templatesSnapshot);
@@ -198,6 +199,8 @@ export const RunLayerWorkflowDialog = ({
   const { canvas, workflows } = useWorkbenchCommands();
   const queryClient = useQueryClient();
   const projectId = useActiveProjectSelector((project) => project.id);
+  // The document the dialog offers to run; seed advances after the upload return to it, not to whatever is active.
+  const workflowId = availability.document.id;
   const [session] = useState(createLayerActionSession);
   const [selectionState, setSelectionState] = useState<SelectionState>(() => ({
     availability,
@@ -375,7 +378,8 @@ export const RunLayerWorkflowDialog = ({
       const operations = getCanvasOperations(engine);
       const result = await runLayerWorkflow({
         deps: {
-          advanceSeeds: (advances) => workflows.editGraph({ advances, type: 'advanceSeedFields' }),
+          advanceSeeds: (advances) =>
+            workflows.editGraph({ advances, type: 'advanceSeedFields' }, { projectId, workflowId }),
           appendStaging: (targetProjectId, candidate) =>
             canvas.appendStagingCandidate({ candidate, projectId: targetProjectId }),
           buildGraph: buildLayerWorkflowGraph,
@@ -436,7 +440,7 @@ export const RunLayerWorkflowDialog = ({
       }
       session.finish(request.token);
     }
-  }, [runContext]);
+  }, [runContext, workflowId]);
 
   const handleSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {

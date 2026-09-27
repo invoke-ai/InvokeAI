@@ -127,6 +127,7 @@
     "projectContracts.ts": "workbench",
     "projectEventContracts.ts": "workbench",
     "projectEvents.ts": "workbench",
+    "projectWorkflows.ts": "workbench",
     "queueHistoryContracts.ts": "workbench",
     "useCanvasProjectMutationDispatch.ts": "workbench",
     "useNotify.ts": "workbench",

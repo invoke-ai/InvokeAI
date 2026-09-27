@@ -26,6 +26,14 @@ from invokeai.backend.model_manager.taxonomy import (
 # Gemma 2 variants (9B=3584, 27B=4608) are rejected there and must stay classifiable as a generic TextLLM.
 _GEMMA2_2B_HIDDEN_SIZE = 2304
 
+# Multimodal architectures that `AutoModelForCausalLM` still loads (transformers maps their model types
+# onto these classes in its causal-LM table). Only listed ones are accepted, so a vision-language folder
+# never becomes a TextLLM unless the generic loader is known to build it.
+_CONDITIONAL_GENERATION_TEXT_LLMS = {"Gemma4ForConditionalGeneration"}
+
+# Files that let `AutoProcessor` build the image side of a multimodal checkpoint.
+_PROCESSOR_CONFIG_FILES = ("processor_config.json", "preprocessor_config.json")
+
 
 class TextLLM_Diffusers_Config(Diffusers_Config_Base, Config_Base):
     """Model config for text-only causal language models (e.g. Llama, Phi, Qwen, Mistral)."""
@@ -33,6 +41,10 @@ class TextLLM_Diffusers_Config(Diffusers_Config_Base, Config_Base):
     type: Literal[ModelType.TextLLM] = Field(default=ModelType.TextLLM)
     base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
     cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
+    supports_images: bool = Field(
+        default=False,
+        description="Whether the model has a vision tower and processor, so Expand Prompt can condition on an image",
+    )
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -45,7 +57,7 @@ class TextLLM_Diffusers_Config(Diffusers_Config_Base, Config_Base):
         # MistralForCausalLM, GemmaForCausalLM, GPTNeoXForCausalLM, etc.
         config_dict = get_config_dict_or_raise(common_config_paths(mod.path))
         class_name = get_class_name_from_config_dict_or_raise(config_dict)
-        if not class_name.endswith("ForCausalLM"):
+        if not class_name.endswith("ForCausalLM") and class_name not in _CONDITIONAL_GENERATION_TEXT_LLMS:
             raise NotAMatchError(f"model architecture '{class_name}' is not a causal language model")
 
         # During *automatic* classification, defer to the dedicated PiD Gemma2 encoder config — but only
@@ -79,4 +91,10 @@ class TextLLM_Diffusers_Config(Diffusers_Config_Base, Config_Base):
                 f"(expected at least one of: {', '.join(sorted(tokenizer_files))})"
             )
 
-        return cls(**override_fields)
+        # Only an allow-listed multimodal class is known to load with its vision tower through the generic loader.
+        supports_images = (
+            class_name in _CONDITIONAL_GENERATION_TEXT_LLMS
+            and "vision_config" in config_dict
+            and any((mod.path / f).exists() for f in _PROCESSOR_CONFIG_FILES)
+        )
+        return cls(**override_fields, supports_images=supports_images)

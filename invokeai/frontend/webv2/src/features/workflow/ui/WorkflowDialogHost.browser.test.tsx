@@ -1,43 +1,32 @@
-import type { ProjectGraphState } from '@features/workflow/core/types';
+import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
+import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
+import { requestWorkflowRename, workflowUiStore } from '@features/workflow/ui/workflowUiStore';
 import { createProjectGraph } from '@features/workflow/utility';
-import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
-import { act, Profiler, StrictMode } from 'react';
+import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { WorkflowUiAdapter } from './WorkflowUiContext';
-
-import { workflowLibrarySyncStore } from './library/workflowLibrarySyncStore';
-import { WorkflowUiProvider } from './WorkflowUiContext';
 import { WorkflowDialogHost } from './WorkflowWidgetChrome';
 
-const deferred = <T,>() => {
-  let reject!: (reason?: unknown) => void;
-  let resolve!: (value: T) => void;
-  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
-    resolve = resolvePromise;
-    reject = rejectPromise;
-  });
-
-  return { promise, reject, resolve };
-};
-
-// Stub heavy dialog leaves to isolate autosave wiring.
+// The host's other dialogs and runtimes have their own suites; here only the rename dialog is under test.
 vi.mock('./editor/AddNodeDialog', () => ({ AddNodeDialog: () => null }));
+vi.mock('./editor/CallSavedWorkflowSyncRuntime', () => ({ CallSavedWorkflowSyncRuntime: () => null }));
 vi.mock('./library/WorkflowLibraryDialog', () => ({ WorkflowLibraryDialog: () => null }));
+vi.mock('./library/WorkflowPublicationHost', () => ({ WorkflowPublicationHost: () => null }));
 vi.mock('./PendingLibraryWorkflowLoader', () => ({ PendingWorkflowLoader: () => null }));
 
-import { onWorkflowLibraryCacheInvalidated } from '@features/workflow/queries';
+const TRANSLATIONS: Record<string, string> = {
+  'workflowLibrary.rename': 'Rename',
+  'workflowLibrary.renameTitle': 'Rename workflow',
+  'workflowLibrary.workflowName': 'Workflow name',
+};
 
-const { updateLibraryWorkflowMock } = vi.hoisted(() => ({ updateLibraryWorkflowMock: vi.fn() }));
-
-vi.mock('@features/workflow/queries', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  updateLibraryWorkflow: updateLibraryWorkflowMock,
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => TRANSLATIONS[key] ?? key }),
 }));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -45,6 +34,7 @@ vi.mock('@features/workflow/queries', async (importOriginal) => ({
 const createMutablePort = <Snapshot,>(initialSnapshot: Snapshot) => {
   let snapshot = initialSnapshot;
   const listeners = new Set<() => void>();
+
   return {
     port: {
       getSnapshot: () => snapshot,
@@ -62,593 +52,149 @@ const createMutablePort = <Snapshot,>(initialSnapshot: Snapshot) => {
   };
 };
 
-const createGraphWithDuplicateWorkflowReturns = (): ProjectGraphState => ({
-  ...createProjectGraph('workflow-1'),
-  libraryWorkflowId: 'library-workflow-1',
-  nodes: [
-    { data: { type: 'workflow_return' }, id: 'return-1', position: { x: 0, y: 0 }, type: 'invocation' },
-    { data: { type: 'workflow_return' }, id: 'return-2', position: { x: 100, y: 0 }, type: 'invocation' },
-  ] as unknown as ProjectGraphState['nodes'],
-});
+const ALPHA: ProjectWorkflowEntry = { document: { ...createProjectGraph('wf-1'), name: 'Alpha' } };
+const BETA: ProjectWorkflowEntry = { document: { ...createProjectGraph('wf-2'), name: 'Beta' } };
 
-/**
- * Exercise real StrictMode cleanup/remount so autosaver creation and disposal share a lifecycle and cannot leave a
- * permanently disposed instance.
- */
-describe('WorkflowDialogHost library autosave under StrictMode', () => {
+const projectSnapshot = (workflows: readonly ProjectWorkflowEntry[], activeWorkflowId = workflows[0]!.document.id) => {
+  const active = workflows.find((entry) => entry.document.id === activeWorkflowId)!;
+
+  return {
+    activeWorkflow: active,
+    activeWorkflowId,
+    galleryValues: {},
+    id: 'project-1',
+    isWorkflowRunning: false,
+    projectGraph: active.document,
+    workflowValues: {},
+    workflows,
+  };
+};
+
+describe('WorkflowDialogHost rename', () => {
   let host: HTMLDivElement;
   let root: Root;
-  let queryClient: QueryClient;
+  let project: ReturnType<typeof createMutablePort<ReturnType<typeof projectSnapshot>>>;
+  let commands: {
+    addWorkflow: ReturnType<typeof vi.fn>;
+    editGraph: ReturnType<typeof vi.fn>;
+    renameWorkflow: ReturnType<typeof vi.fn>;
+  };
+
+  const settleFrame = () =>
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+  const flush = () =>
+    act(async () => {
+      await settleFrame();
+      await settleFrame();
+    });
 
   beforeEach(() => {
     host = document.createElement('div');
     document.body.append(host);
-    queryClient = new QueryClient();
-    updateLibraryWorkflowMock.mockReset();
-    updateLibraryWorkflowMock.mockResolvedValue(undefined);
+    root = createRoot(host);
+    commands = { addWorkflow: vi.fn(), editGraph: vi.fn(), renameWorkflow: vi.fn() };
+    workflowUiStore.patchSnapshot({ renameRequest: null });
   });
 
   afterEach(async () => {
     await act(() => root.unmount());
-    queryClient.clear();
     host.remove();
+    workflowUiStore.patchSnapshot({ renameRequest: null });
   });
 
-  it('still autosaves a bound workflow after a graph edit', async () => {
-    const cacheInvalidated = vi.fn();
-    const stopListening = onWorkflowLibraryCacheInvalidated(cacheInvalidated);
-
-    const boundGraph = { ...createProjectGraph('workflow-1'), libraryWorkflowId: 'library-workflow-1' };
-    const project = createMutablePort({
-      galleryValues: {},
-      id: 'project-1',
-      isWorkflowRunning: false,
-      projectGraph: boundGraph,
-      workflowValues: {},
-    });
-
+  const renderHost = async (workflows: readonly ProjectWorkflowEntry[]) => {
+    project = createMutablePort(projectSnapshot(workflows));
     // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
     const adapter = {
-      commands: {
-        bindLibraryWorkflow: vi.fn(),
-        editGraph: vi.fn(),
-        redo: vi.fn(),
-        replace: vi.fn(),
-        undo: vi.fn(),
-      },
+      commands,
       getProjectGraph: () => project.port.getSnapshot().projectGraph,
       notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
       project: project.port,
-      widgets: { open: vi.fn(), patchValues: vi.fn() },
     } as unknown as WorkflowUiAdapter;
 
-    root = createRoot(host);
-
-    await act(() => {
+    await act(async () => {
       root.render(
         <StrictMode>
           <ChakraProvider value={system}>
-            <QueryClientProvider client={queryClient}>
-              <WorkflowUiProvider adapter={adapter}>
-                <WorkflowDialogHost />
-              </WorkflowUiProvider>
-            </QueryClientProvider>
+            <WorkflowUiProvider adapter={adapter}>
+              <WorkflowDialogHost />
+            </WorkflowUiProvider>
           </ChakraProvider>
         </StrictMode>
       );
+      await settleFrame();
     });
+  };
 
-    expect(updateLibraryWorkflowMock).not.toHaveBeenCalled();
+  const dialog = () =>
+    [...document.querySelectorAll<HTMLElement>('[role="dialog"][data-state="open"]')].find(
+      (candidate) => candidate.querySelector('h2')?.textContent === 'Rename workflow'
+    ) ?? null;
+  const input = () => dialog()?.querySelector<HTMLInputElement>('input[name="renameValue"]') ?? null;
 
-    await act(() => {
-      project.setSnapshot({
-        ...project.port.getSnapshot(),
-        projectGraph: { ...boundGraph, name: 'Edited name' },
-      });
+  const request = async (workflowId: string) => {
+    await act(async () => {
+      requestWorkflowRename(workflowId);
+      await settleFrame();
     });
+    await flush();
+  };
 
-    // Past the 2s debounce.
-    await act(
-      () =>
-        new Promise<void>((resolve) => {
-          setTimeout(resolve, 2100);
-        })
-    );
-    // Let the autosaver's save promise settle.
-    await act(
-      () =>
-        new Promise<void>((resolve) => {
-          setTimeout(resolve, 0);
-        })
-    );
+  const typeAndSubmit = async (name: string) => {
+    const field = input();
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
 
-    expect(updateLibraryWorkflowMock).toHaveBeenCalledTimes(1);
-    expect(updateLibraryWorkflowMock).toHaveBeenCalledWith(
-      'library-workflow-1',
-      expect.objectContaining({ name: 'Edited name' }),
-      expect.any(AbortSignal)
-    );
-    // The library dialog must not keep serving the pre-save payload.
-    expect(cacheInvalidated).toHaveBeenCalledTimes(1);
-    stopListening();
-  });
-
-  it('rejects an autosave when the graph has duplicate workflow returns', async () => {
-    const boundGraph = createGraphWithDuplicateWorkflowReturns();
-    const project = createMutablePort({
-      galleryValues: {},
-      id: 'project-1',
-      isWorkflowRunning: false,
-      projectGraph: boundGraph,
-      workflowValues: {},
-    });
-    const notifications = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
-
-    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
-    const adapter = {
-      commands: {
-        bindLibraryWorkflow: vi.fn(),
-        editGraph: vi.fn(),
-        redo: vi.fn(),
-        replace: vi.fn(),
-        undo: vi.fn(),
-      },
-      getProjectGraph: () => project.port.getSnapshot().projectGraph,
-      notifications,
-      project: project.port,
-      widgets: { open: vi.fn(), patchValues: vi.fn() },
-    } as unknown as WorkflowUiAdapter;
-
-    root = createRoot(host);
-
-    await act(() => {
-      root.render(
-        <StrictMode>
-          <ChakraProvider value={system}>
-            <QueryClientProvider client={queryClient}>
-              <WorkflowUiProvider adapter={adapter}>
-                <WorkflowDialogHost />
-              </WorkflowUiProvider>
-            </QueryClientProvider>
-          </ChakraProvider>
-        </StrictMode>
-      );
-    });
-
-    await act(() => {
-      project.setSnapshot({
-        ...project.port.getSnapshot(),
-        projectGraph: { ...boundGraph, name: 'Invalid duplicate-return edit' },
-      });
-    });
-    await act(
-      () =>
-        new Promise<void>((resolve) => {
-          setTimeout(resolve, 2100);
-        })
-    );
-
-    expect(updateLibraryWorkflowMock).not.toHaveBeenCalled();
-    expect(notifications.error).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not repeat the duplicate-return autosave notification for every edit', async () => {
-    const boundGraph = createGraphWithDuplicateWorkflowReturns();
-    const project = createMutablePort({
-      galleryValues: {},
-      id: 'project-1',
-      isWorkflowRunning: false,
-      projectGraph: boundGraph,
-      workflowValues: {},
-    });
-    const notifications = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
-
-    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
-    const adapter = {
-      commands: {
-        bindLibraryWorkflow: vi.fn(),
-        editGraph: vi.fn(),
-        redo: vi.fn(),
-        replace: vi.fn(),
-        undo: vi.fn(),
-      },
-      getProjectGraph: () => project.port.getSnapshot().projectGraph,
-      notifications,
-      project: project.port,
-      widgets: { open: vi.fn(), patchValues: vi.fn() },
-    } as unknown as WorkflowUiAdapter;
-
-    root = createRoot(host);
-
-    await act(() => {
-      root.render(
-        <StrictMode>
-          <ChakraProvider value={system}>
-            <QueryClientProvider client={queryClient}>
-              <WorkflowUiProvider adapter={adapter}>
-                <WorkflowDialogHost />
-              </WorkflowUiProvider>
-            </QueryClientProvider>
-          </ChakraProvider>
-        </StrictMode>
-      );
-    });
-
-    const editAndWaitForAutosave = async (name: string) => {
-      await act(() => {
-        project.setSnapshot({
-          ...project.port.getSnapshot(),
-          projectGraph: { ...boundGraph, name },
-        });
-      });
-      await act(
-        () =>
-          new Promise<void>((resolve) => {
-            setTimeout(resolve, 2100);
-          })
-      );
-    };
-
-    await editAndWaitForAutosave('First invalid edit');
-    await editAndWaitForAutosave('Second invalid edit');
-
-    expect(notifications.error).toHaveBeenCalledTimes(1);
-    expect(updateLibraryWorkflowMock).not.toHaveBeenCalled();
-  });
-
-  it('does not notify when disposing a pending duplicate-return autosave', async () => {
-    const boundGraph = createGraphWithDuplicateWorkflowReturns();
-    const project = createMutablePort({
-      galleryValues: {},
-      id: 'project-1',
-      isWorkflowRunning: false,
-      projectGraph: boundGraph,
-      workflowValues: {},
-    });
-    const notifications = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
-
-    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
-    const adapter = {
-      commands: {
-        bindLibraryWorkflow: vi.fn(),
-        editGraph: vi.fn(),
-        redo: vi.fn(),
-        replace: vi.fn(),
-        undo: vi.fn(),
-      },
-      getProjectGraph: () => project.port.getSnapshot().projectGraph,
-      notifications,
-      project: project.port,
-      widgets: { open: vi.fn(), patchValues: vi.fn() },
-    } as unknown as WorkflowUiAdapter;
-
-    root = createRoot(host);
-
-    await act(() => {
-      root.render(
-        <StrictMode>
-          <ChakraProvider value={system}>
-            <QueryClientProvider client={queryClient}>
-              <WorkflowUiProvider adapter={adapter}>
-                <WorkflowDialogHost />
-              </WorkflowUiProvider>
-            </QueryClientProvider>
-          </ChakraProvider>
-        </StrictMode>
-      );
-    });
-
-    await act(() => {
-      project.setSnapshot({
-        ...project.port.getSnapshot(),
-        projectGraph: { ...boundGraph, name: 'Pending invalid edit' },
-      });
-    });
-    await act(() => root.render(null));
-
-    expect(notifications.error).not.toHaveBeenCalled();
-    expect(updateLibraryWorkflowMock).not.toHaveBeenCalled();
-  });
-
-  it('re-arms duplicate-return notifications after valid saves and deduped reverts', async () => {
-    const boundGraph = createGraphWithDuplicateWorkflowReturns();
-    const validGraph = { ...createProjectGraph('workflow-1'), libraryWorkflowId: 'library-workflow-1' };
-    const project = createMutablePort({
-      galleryValues: {},
-      id: 'project-1',
-      isWorkflowRunning: false,
-      projectGraph: boundGraph,
-      workflowValues: {},
-    });
-    const notifications = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
-
-    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
-    const adapter = {
-      commands: {
-        bindLibraryWorkflow: vi.fn(),
-        editGraph: vi.fn(),
-        redo: vi.fn(),
-        replace: vi.fn(),
-        undo: vi.fn(),
-      },
-      getProjectGraph: () => project.port.getSnapshot().projectGraph,
-      notifications,
-      project: project.port,
-      widgets: { open: vi.fn(), patchValues: vi.fn() },
-    } as unknown as WorkflowUiAdapter;
-
-    root = createRoot(host);
-
-    await act(() => {
-      root.render(
-        <StrictMode>
-          <ChakraProvider value={system}>
-            <QueryClientProvider client={queryClient}>
-              <WorkflowUiProvider adapter={adapter}>
-                <WorkflowDialogHost />
-              </WorkflowUiProvider>
-            </QueryClientProvider>
-          </ChakraProvider>
-        </StrictMode>
-      );
-    });
-
-    const waitForAutosave = async () => {
-      await act(
-        () =>
-          new Promise<void>((resolve) => {
-            setTimeout(resolve, 2100);
-          })
-      );
-    };
-
-    await act(() => {
-      project.setSnapshot({ ...project.port.getSnapshot(), projectGraph: { ...boundGraph, name: 'Invalid edit' } });
-    });
-    await waitForAutosave();
-
-    await act(() => {
-      project.setSnapshot({ ...project.port.getSnapshot(), projectGraph: validGraph });
-    });
-    await waitForAutosave();
-
-    await act(() => {
-      project.setSnapshot({ ...project.port.getSnapshot(), projectGraph: { ...boundGraph, name: 'Invalid again' } });
-    });
-    await waitForAutosave();
-
-    expect(notifications.error).toHaveBeenCalledTimes(2);
-
-    await act(() => {
-      project.setSnapshot({ ...project.port.getSnapshot(), projectGraph: validGraph });
-    });
-    await waitForAutosave();
-
-    await act(() => {
-      project.setSnapshot({
-        ...project.port.getSnapshot(),
-        projectGraph: { ...boundGraph, name: 'Invalid after revert' },
-      });
-    });
-    await waitForAutosave();
-
-    expect(notifications.error).toHaveBeenCalledTimes(3);
-    expect(updateLibraryWorkflowMock).toHaveBeenCalledTimes(1);
-  });
-
-  /** Notify autosave through the project store subscription without rerendering the dialog host on graph edits. */
-  it('schedules an autosave for graph edits made outside React renders', async () => {
-    workflowLibrarySyncStore.setSnapshot({ status: 'idle' });
-
-    const boundGraph = { ...createProjectGraph('workflow-1'), libraryWorkflowId: 'library-workflow-1' };
-    const project = createMutablePort({
-      galleryValues: {},
-      id: 'project-1',
-      isWorkflowRunning: false,
-      projectGraph: boundGraph,
-      workflowValues: {},
-    });
-
-    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
-    const adapter = {
-      commands: {
-        bindLibraryWorkflow: vi.fn(),
-        editGraph: vi.fn(),
-        redo: vi.fn(),
-        replace: vi.fn(),
-        undo: vi.fn(),
-      },
-      getProjectGraph: () => project.port.getSnapshot().projectGraph,
-      notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
-      project: project.port,
-      widgets: { open: vi.fn(), patchValues: vi.fn() },
-    } as unknown as WorkflowUiAdapter;
-
-    root = createRoot(host);
-
-    let renderCount = 0;
-    // eslint-disable-next-line react-perf/jsx-no-new-function-as-prop -- test-only render probe, not app code
-    const countRender = () => {
-      renderCount += 1;
-    };
-
-    await act(() => {
-      root.render(
-        <StrictMode>
-          <ChakraProvider value={system}>
-            <QueryClientProvider client={queryClient}>
-              <WorkflowUiProvider adapter={adapter}>
-                <Profiler id="dialog-host" onRender={countRender}>
-                  <WorkflowDialogHost />
-                </Profiler>
-              </WorkflowUiProvider>
-            </QueryClientProvider>
-          </ChakraProvider>
-        </StrictMode>
-      );
-    });
-
-    // Only the edit dispatched below is under test; the mount itself renders
-    // (StrictMode doubles it).
-    renderCount = 0;
-
-    // Dispatch directly through the store to test imperative edits without prop-driven rerenders.
-    await act(() => {
-      project.setSnapshot({
-        ...project.port.getSnapshot(),
-        projectGraph: { ...boundGraph, name: 'Edited outside React' },
-      });
-    });
-
-    expect(renderCount).toBe(0);
-    expect(workflowLibrarySyncStore.getSnapshot().status).toBe('dirty');
-  });
-
-  /**
-   * Fence status callbacks across account rotation: aborted saves reject after the new account's synchronous idle
-   * reset.
-   */
-  it('does not park a stale save error in the sync store after an account switch', async () => {
-    const boundGraph = { ...createProjectGraph('workflow-1'), libraryWorkflowId: 'library-workflow-1' };
-    const project = createMutablePort({
-      galleryValues: {},
-      id: 'project-1',
-      isWorkflowRunning: false,
-      projectGraph: boundGraph,
-      workflowValues: {},
-    });
-
-    const request = deferred<void>();
-
-    updateLibraryWorkflowMock.mockReturnValue(request.promise);
-
-    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
-    const adapter = {
-      commands: {
-        bindLibraryWorkflow: vi.fn(),
-        editGraph: vi.fn(),
-        redo: vi.fn(),
-        replace: vi.fn(),
-        undo: vi.fn(),
-      },
-      getProjectGraph: () => project.port.getSnapshot().projectGraph,
-      notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
-      project: project.port,
-      widgets: { open: vi.fn(), patchValues: vi.fn() },
-    } as unknown as WorkflowUiAdapter;
-
-    root = createRoot(host);
-
-    await act(() => {
-      root.render(
-        <StrictMode>
-          <ChakraProvider value={system}>
-            <QueryClientProvider client={queryClient}>
-              <WorkflowUiProvider adapter={adapter}>
-                <WorkflowDialogHost />
-              </WorkflowUiProvider>
-            </QueryClientProvider>
-          </ChakraProvider>
-        </StrictMode>
-      );
-    });
-
-    await act(() => {
-      project.setSnapshot({
-        ...project.port.getSnapshot(),
-        projectGraph: { ...boundGraph, name: 'Edited before switch' },
-      });
-    });
-
-    await act(
-      () =>
-        new Promise<void>((resolve) => {
-          setTimeout(resolve, 2100);
-        })
-    );
-
-    expect(updateLibraryWorkflowMock).toHaveBeenCalledTimes(1);
-
-    try {
-      accountLifecycle.activate('workflow-dialog-host-test-account', ':user:workflow-dialog-host-test-account');
-
-      expect(workflowLibrarySyncStore.getSnapshot().status).toBe('idle');
-
-      // Resolve after rotation to exercise scope-check rejection without leaking an error status into the new
-      // account.
-      await act(async () => {
-        request.resolve();
-        await request.promise.catch(() => undefined);
-        // Give the save's `.then`/`.catch` continuation a turn to run.
-        await Promise.resolve();
-        await Promise.resolve();
-      });
-
-      expect(workflowLibrarySyncStore.getSnapshot().status).toBe('idle');
-    } finally {
-      accountLifecycle.invalidate();
-    }
-  });
-
-  it('does not flush a pending old-account edit after the account switches', async () => {
-    const boundGraph = { ...createProjectGraph('workflow-1'), libraryWorkflowId: 'library-workflow-1' };
-    const project = createMutablePort({
-      galleryValues: {},
-      id: 'project-1',
-      isWorkflowRunning: false,
-      projectGraph: boundGraph,
-      workflowValues: {},
-    });
-    const notifications = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
-
-    accountLifecycle.activate('workflow-dialog-host-old-account', ':user:workflow-dialog-host-old-account');
-
-    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
-    const adapter = {
-      commands: {
-        bindLibraryWorkflow: vi.fn(),
-        editGraph: vi.fn(),
-        redo: vi.fn(),
-        replace: vi.fn(),
-        undo: vi.fn(),
-      },
-      getProjectGraph: () => project.port.getSnapshot().projectGraph,
-      notifications,
-      project: project.port,
-      widgets: { open: vi.fn(), patchValues: vi.fn() },
-    } as unknown as WorkflowUiAdapter;
-
-    root = createRoot(host);
-
-    try {
-      await act(() => {
-        root.render(
-          <StrictMode>
-            <ChakraProvider value={system}>
-              <QueryClientProvider client={queryClient}>
-                <WorkflowUiProvider adapter={adapter}>
-                  <WorkflowDialogHost />
-                </WorkflowUiProvider>
-              </QueryClientProvider>
-            </ChakraProvider>
-          </StrictMode>
-        );
-      });
-
-      await act(() => {
-        project.setSnapshot({
-          ...project.port.getSnapshot(),
-          projectGraph: { ...boundGraph, name: 'Old account edit' },
-        });
-      });
-
-      accountLifecycle.activate('workflow-dialog-host-new-account', ':user:workflow-dialog-host-new-account');
-      await act(() => root.render(null));
+    await act(async () => {
+      setValue?.call(field, name);
+      field?.dispatchEvent(new Event('input', { bubbles: true }));
       await Promise.resolve();
+    });
+    await act(async () => {
+      field?.closest('form')?.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+      await settleFrame();
+    });
+    await flush();
+  };
 
-      expect(updateLibraryWorkflowMock).not.toHaveBeenCalled();
-    } finally {
-      accountLifecycle.invalidate();
-    }
+  it('renames the workflow the request named, then closes, and a later request opens again', async () => {
+    await renderHost([ALPHA, BETA]);
+    expect(dialog()).toBeNull();
+
+    await request('wf-1');
+    expect(input()?.value).toBe('Alpha');
+
+    await typeAndSubmit('Alpha, renamed');
+    expect(commands.renameWorkflow).toHaveBeenCalledWith('wf-1', 'Alpha, renamed');
+    expect(dialog()).toBeNull();
+
+    await request('wf-1');
+    expect(dialog()).not.toBeNull();
+  });
+
+  it('shows the request only while its workflow is the active one', async () => {
+    await renderHost([ALPHA, BETA]);
+
+    await request('wf-1');
+    expect(dialog()).not.toBeNull();
+
+    // Another surface switched workflows behind the dialog: the request is for Alpha, so it is no longer shown.
+    await act(() => project.setSnapshot(projectSnapshot([ALPHA, BETA], 'wf-2')));
+    await flush();
+    expect(dialog()).toBeNull();
+
+    // That request is over: Alpha becoming active again does not bring it back.
+    await act(() => project.setSnapshot(projectSnapshot([ALPHA, BETA], 'wf-1')));
+    await flush();
+    expect(dialog()).toBeNull();
+    await act(() => project.setSnapshot(projectSnapshot([ALPHA, BETA], 'wf-2')));
+    await flush();
+
+    await request('wf-2');
+    expect(input()?.value).toBe('Beta');
+    await typeAndSubmit('Beta, renamed');
+    expect(commands.renameWorkflow).toHaveBeenCalledWith('wf-2', 'Beta, renamed');
+    expect(commands.renameWorkflow).not.toHaveBeenCalledWith('wf-1', expect.anything());
   });
 });

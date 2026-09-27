@@ -1,6 +1,6 @@
 import type { ProjectGraphAction } from '@features/workflow/core/document';
 import type { ForLoopValidationReason } from '@features/workflow/core/forLoops';
-import type { ProjectGraphState, XYPosition } from '@features/workflow/core/types';
+import type { ProjectGraphState, ProjectWorkflowSource, XYPosition } from '@features/workflow/core/types';
 import type { LogSource } from '@platform/logging/contracts';
 
 export type WorkflowRegion = 'left' | 'right' | 'bottom' | 'center' | 'dialog' | 'popover' | 'floating';
@@ -40,12 +40,28 @@ export interface WorkflowWidgetLabelProps {
   presentation?: 'compact' | 'expanded' | 'tooltip';
 }
 
+/** Where an edit or history step lands; absent means the active project's active workflow. */
+export interface WorkflowTarget {
+  projectId: string;
+  workflowId: string;
+}
+
 export interface WorkflowCommands {
-  bindLibraryWorkflow(libraryWorkflowId: string): void;
-  editGraph(action: ProjectGraphAction): void;
-  replace(document: ProjectGraphState, label: string): void;
-  redo(): void;
-  undo(): void;
+  /** Adds and activates a document in the active project; returns the id the project knows it by. */
+  addWorkflow(
+    document: ProjectGraphState,
+    options: { label: string; reusePlaceholder?: boolean; source?: ProjectWorkflowSource }
+  ): string;
+  createWorkflow(): string;
+  duplicateWorkflow(workflowId: string, copyName: string): string | null;
+  editGraph(action: ProjectGraphAction, target?: WorkflowTarget): void;
+  redo(target?: WorkflowTarget): void;
+  removeWorkflow(workflowId: string): void;
+  renameWorkflow(workflowId: string, name: string): void;
+  selectWorkflow(workflowId: string): void;
+  /** Records a publication target; ignored once that project or workflow no longer exists. */
+  setWorkflowSource(target: WorkflowTarget, source: ProjectWorkflowSource | undefined): void;
+  undo(target?: WorkflowTarget): void;
 }
 
 export interface WorkflowWidgetCommands {

@@ -16,6 +16,7 @@ const workflows = [
     description: 'A landscape starter',
     is_public: false,
     name: 'Alpha Workflow',
+    revision: 1,
     tags: 'landscape,starter',
     workflow_id: 'workflow-a',
   },
@@ -29,6 +30,7 @@ const workflows = [
     description: '',
     is_public: true,
     name: 'Beta Workflow',
+    revision: 3,
     workflow_id: 'workflow-b',
   },
 ];

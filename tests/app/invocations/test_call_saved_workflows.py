@@ -46,6 +46,7 @@ def build_workflow_record_dto(
         opened_at=None,
         user_id=user_id,
         is_public=is_public,
+        revision=1,
     )
 
 

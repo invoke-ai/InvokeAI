@@ -51,7 +51,7 @@ gallery or a video file, which is uploaded into the gallery first.
 
 | Query parameter | Default | Meaning |
 |---|---|---|
-| `mode` | `recall` | `recall` sends every field; `remix` never sends `seed`, so the panel's own seed stands |
+| `mode` | `recall` | `recall` sends every field. `remix` never sends `seed`, and when the remix applies, a panel whose seed mode is *fixed* switches it to *random* so the next generation is a new take; *increment* and *decrement* are left as they are. |
 | `strict` | `false` | `false` changes only the fields you send. `true` treats the body as a whole generation record: LoRAs, media and a MiniMax H3 hybrid base you do not send are cleared, as the gallery's *Recall All* does with a video's own metadata. |
 
 Fields naming a model or medium that cannot be used are dropped and listed in the
@@ -216,7 +216,7 @@ curl -X POST http://localhost:9090/api/v1/recall/video/default \
         "first_frame_image": {"image_name": "0b6f…png"}
       }'
 
-# Remix: the seed is never sent
+# Remix: the seed is never sent, and a fixed seed mode becomes random
 curl -X POST "http://localhost:9090/api/v1/recall/video/default?mode=remix" \
   -H "Content-Type: application/json" \
   -d '{"positive_prompt": "a heron lands on a misty lake", "model": "Wan 2.2 I2V A14B"}'

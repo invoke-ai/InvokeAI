@@ -18,6 +18,9 @@ import { FormBuilderTab } from './FormBuilderTab';
 import { LinearFormView } from './LinearFormView';
 import { PanelModeToggle } from './WorkflowLinearPanel';
 
+// Field controls name the project they render for; these harnesses hold one static project.
+const TEST_PROJECT_PORT = { getSnapshot: () => ({ id: 'project-1' }), subscribe: () => () => undefined };
+
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 // Probe renders through a passthrough hook spy; compiler memoization can skip pure helper calls independently of
@@ -188,13 +191,8 @@ describe('Form builder drag and drop (dnd-kit)', () => {
     const adapter = useMemo(
       () =>
         ({
-          commands: {
-            bindLibraryWorkflow: () => undefined,
-            editGraph,
-            redo: () => undefined,
-            replace: () => undefined,
-            undo: () => undefined,
-          },
+          commands: { editGraph, redo: () => undefined, undo: () => undefined },
+          project: TEST_PROJECT_PORT,
           widgets: { open: () => undefined, patchValues: () => undefined },
         }) as unknown as WorkflowUiAdapter,
       [editGraph]
@@ -490,7 +488,8 @@ describe('Linear form field entry', () => {
       const adapter = useMemo(
         () =>
           ({
-            commands: { bindLibraryWorkflow: vi.fn(), editGraph, redo: vi.fn(), replace: vi.fn(), undo: vi.fn() },
+            commands: { editGraph, redo: vi.fn(), undo: vi.fn() },
+            project: TEST_PROJECT_PORT,
             widgets: { open: vi.fn(), patchValues: vi.fn() },
           }) as unknown as WorkflowUiAdapter,
         [editGraph]

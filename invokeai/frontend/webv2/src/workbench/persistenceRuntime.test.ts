@@ -101,6 +101,7 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
     reportLoadUnavailable: (error) => events.push(`load-unavailable:${error}`),
     saveFailed: (error) => events.push(`save-failed:${error}`),
     savePending: (error) => events.push(`save-pending:${error}`),
+    saveScheduled: () => events.push('save-scheduled'),
     saveStarted: () => events.push('save-started'),
     saveSucceeded: (savedAt) => events.push(`save-succeeded:${savedAt}`),
     setHasHydrated: (next) => {
@@ -263,6 +264,44 @@ describe('Workbench persistence runtime', () => {
     expect(persistence.saveWorkbench).toHaveBeenCalledWith(
       expect.objectContaining({ projects: [expect.objectContaining({ name: 'Local edit during load' })] })
     );
+  });
+
+  it('reports edits as pending from the moment they happen until their own save is acknowledged', async () => {
+    const aggregate = createAggregate();
+    const { persistence } = createPersistence(() => Promise.resolve(null));
+    const first = deferred<WorkbenchSaveResult>();
+    const second = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench)
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    const clock = new FakeClock();
+    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+
+    runtime.start();
+    await flushPromises();
+    aggregate.events.length = 0;
+
+    // Before the debounce fires, the edit is already reported, so nothing can claim it was saved.
+    aggregate.edit('First');
+    await flushPromises();
+    expect(aggregate.events).toEqual(['save-scheduled']);
+    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
+
+    clock.runAll();
+    expect(aggregate.events).toEqual(['save-scheduled', 'save-started']);
+
+    // An edit made while the save runs makes that save's answer stale: nothing reports "saved" until the edit's
+    // own save is acknowledged.
+    aggregate.edit('Second');
+    await flushPromises();
+    first.resolve(saveResult(aggregate.state, 'first'));
+    await flushPromises();
+    expect(aggregate.events).toEqual(['save-scheduled', 'save-started']);
+
+    clock.runAll();
+    second.resolve(saveResult(aggregate.state, 'second'));
+    await flushPromises();
+    expect(aggregate.events).toEqual(['save-scheduled', 'save-started', 'save-started', 'save-succeeded:second']);
   });
 
   it('debounces edits and ignores stale completions after a newer revision', async () => {

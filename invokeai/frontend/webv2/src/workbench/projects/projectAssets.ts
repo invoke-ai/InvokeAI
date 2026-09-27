@@ -103,8 +103,22 @@ const isHeldSkipKey = (key: string): boolean => key === 'recentImages' || GALLER
 export const collectHeldAssetRefs = (projects: readonly object[]): ProjectAssetRefs =>
   collectMediaNames(projects.flatMap(withoutHistoryRoots), isHeldSkipKey, MAX_HELD_NAME_LENGTH);
 
-/** Containers whose children an edit replaces independently: the canvas, its snapshots and undo stacks. */
-const SPLIT_HELD_KEYS: ReadonlySet<string> = new Set(['canvas', 'snapshots', 'undoRedo', 'past', 'future']);
+/**
+ * Containers whose children an edit replaces independently: the canvas, its snapshots, undo stacks, and the workflow
+ * collection with its per-workflow histories, so editing one workflow rescans only that workflow.
+ */
+const SPLIT_HELD_KEYS: ReadonlySet<string> = new Set([
+  'canvas',
+  'snapshots',
+  'undoRedo',
+  'past',
+  'future',
+  'workflows',
+  'entries',
+]);
+
+/** Containers keyed by ids (workflow histories): every child is split, and their entries are shared by identity. */
+const SPLIT_CHILDREN_HELD_KEYS: ReadonlySet<string> = new Set(['workflowHistories']);
 
 type HeldPart = ProjectAssetRefs | CanvasHeldAssetRefs;
 
@@ -131,7 +145,7 @@ export const createOpenProjectsHeldMediaReader = (
   const residueScans = new WeakMap<object, ProjectAssetRefs>();
   let last: { parts: HeldPart[]; result: { images: string[]; videos: string[] } } | null = null;
 
-  const collectParts = (node: object, isRoot: boolean, parts: HeldPart[]): void => {
+  const collectParts = (node: object, isRoot: boolean, parts: HeldPart[], splitChildren = false): void => {
     const entries = Array.isArray(node)
       ? node.map((value, index) => [String(index), value] as const)
       : Object.entries(node);
@@ -142,8 +156,8 @@ export const createOpenProjectsHeldMediaReader = (
       }
       if (typeof value !== 'object' || value === null) {
         (residue ??= {})[key] = value;
-      } else if (SPLIT_HELD_KEYS.has(key)) {
-        collectParts(value, false, parts);
+      } else if (splitChildren || SPLIT_HELD_KEYS.has(key)) {
+        collectParts(value, false, parts, SPLIT_CHILDREN_HELD_KEYS.has(key));
       } else {
         let refs = scans.get(value);
         if (!refs) {
