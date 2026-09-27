@@ -126,9 +126,9 @@ export const duplicateProjectRecord = async (
 
   const project = loaded.project;
 
-  const { applyAuthoritativeProjectBoard, serializeProjectDocument, serializeProjectDocumentV2 } =
+  const { applyAuthoritativeProjectBoard, serializeProjectDocument } =
     await import('@workbench/projects/projectDocument');
-  const canonicalDocument = input.identity ? serializeProjectDocumentV2(project) : serializeProjectDocument(project);
+  const canonicalDocument = serializeProjectDocument(project);
   const boardItems = input.boardItems as readonly InvkBoardItem[];
   const stagingBoardId = boardItems.length === 0 ? null : await createStagingBoard(name, owner.signal);
   const ledger = createRestoredMediaLedger(stagingBoardId);

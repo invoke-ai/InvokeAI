@@ -13121,11 +13121,24 @@
       "patch": {
         "tags": ["workflows"],
         "summary": "Update Workflow",
-        "description": "Updates a workflow",
+        "description": "Updates a workflow's content and advances its revision.",
         "operationId": "update_workflow",
         "security": [
           {
             "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The workflow to update",
+              "title": "Workflow Id"
+            },
+            "description": "The workflow to update"
           }
         ],
         "requestBody": {
@@ -13148,6 +13161,18 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "The body's workflow id does not match the URL, or the update is malformed"
+          },
+          "403": {
+            "description": "The workflow is bundled or belongs to another account"
+          },
+          "404": {
+            "description": "The workflow does not exist"
+          },
+          "409": {
+            "description": "The workflow's content revision no longer matches `expected_revision`"
           },
           "422": {
             "description": "Validation Error",
@@ -13237,6 +13262,12 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "The workflow or the reserved id is malformed"
+          },
+          "409": {
+            "description": "The reserved id already names a different workflow"
           },
           "422": {
             "description": "Validation Error",
@@ -20125,6 +20156,18 @@
           "workflow": {
             "$ref": "#/components/schemas/WorkflowWithoutID",
             "description": "The workflow to create"
+          },
+          "workflow_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Id",
+            "description": "A client-reserved UUID for the new record. Retrying the same creation with the same id returns the record already created for it; another owner's record or different content under that id is a 409."
           }
         },
         "type": "object",
@@ -20467,6 +20510,18 @@
           "workflow": {
             "$ref": "#/components/schemas/Workflow",
             "description": "The updated workflow"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision",
+            "description": "The content revision the client last observed; when set, a different stored revision refuses the write with 409 instead of overwriting newer content."
           }
         },
         "type": "object",
@@ -109351,13 +109406,18 @@
             "title": "Is Public",
             "description": "Whether this workflow is shared with all users."
           },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Monotonic content revision; every write of the workflow document increments it."
+          },
           "workflow": {
             "$ref": "#/components/schemas/Workflow",
             "description": "The workflow."
           }
         },
         "type": "object",
-        "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "workflow"],
+        "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "revision", "workflow"],
         "title": "WorkflowRecordDTO"
       },
       "WorkflowRecordListItemWithThumbnailDTO": {
@@ -109440,6 +109500,11 @@
             "title": "Is Public",
             "description": "Whether this workflow is shared with all users."
           },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Monotonic content revision; every write of the workflow document increments it."
+          },
           "description": {
             "type": "string",
             "title": "Description",
@@ -109486,6 +109551,7 @@
           "updated_at",
           "user_id",
           "is_public",
+          "revision",
           "description",
           "category",
           "tags"
@@ -109578,6 +109644,11 @@
             "title": "Is Public",
             "description": "Whether this workflow is shared with all users."
           },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Monotonic content revision; every write of the workflow document increments it."
+          },
           "workflow": {
             "$ref": "#/components/schemas/Workflow",
             "description": "The workflow."
@@ -109607,7 +109678,7 @@
           }
         },
         "type": "object",
-        "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "workflow"],
+        "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "revision", "workflow"],
         "title": "WorkflowRecordWithThumbnailDTO"
       },
       "WorkflowReturnGetInvocation": {

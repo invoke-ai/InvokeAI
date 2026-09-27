@@ -1,13 +1,15 @@
 import type { Project } from '@workbench/projectContracts';
+import type { ProjectWorkflowCollection } from '@workbench/projectWorkflows';
 
 import { stripInfiniteWindowAnchor, stripSessionScopedGallerySearch } from '@features/gallery/contracts';
+import { migrateProjectGraphToCollection, normalizeProjectWorkflowCollection } from '@workbench/projectWorkflows';
 
 /** Keep document codecs reducer-free; load rehydration lazily. */
 
-export const PROJECT_DOCUMENT_SCHEMA_VERSION = 2;
+export const PROJECT_DOCUMENT_SCHEMA_VERSION = 3;
 export const PROJECT_DOCUMENT_MAX_BYTES = 32 * 1024 * 1024;
 
-export type ProjectDocumentV2 = Omit<
+export type ProjectDocumentV3 = Omit<
   Pick<
     Project,
     | 'canvas'
@@ -16,7 +18,6 @@ export type ProjectDocumentV2 = Omit<
     | 'invocation'
     | 'layout'
     | 'name'
-    | 'projectGraph'
     | 'promptHistory'
     | 'settings'
     | 'widgetGraphs'
@@ -27,6 +28,7 @@ export type ProjectDocumentV2 = Omit<
 > & {
   documentSchemaVersion: typeof PROJECT_DOCUMENT_SCHEMA_VERSION;
   floatingWidgets?: Project['floatingWidgets'];
+  workflows: ProjectWorkflowCollection;
 };
 
 export const stripSessionScopedGalleryState = (project: Project): Project => {
@@ -53,9 +55,13 @@ export const stripSessionScopedGalleryState = (project: Project): Project => {
   return didChange ? { ...project, widgetInstances } : project;
 };
 
-export const serializeProjectDocumentV2 = (project: Project): ProjectDocumentV2 => {
+/**
+ * The durable shape server persistence writes: an allowlist of editable fields. Queue runs, events, undo and workflow
+ * histories are session state and never appear.
+ */
+export const serializeProjectDocumentV3 = (project: Project): ProjectDocumentV3 => {
   const persistent = stripSessionScopedGalleryState(project);
-  const document: ProjectDocumentV2 = {
+  const document: ProjectDocumentV3 = {
     canvas: persistent.canvas,
     documentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION,
     ...(persistent.floatingWidgets ? { floatingWidgets: persistent.floatingWidgets } : {}),
@@ -63,36 +69,41 @@ export const serializeProjectDocumentV2 = (project: Project): ProjectDocumentV2 
     invocation: persistent.invocation,
     layout: persistent.layout,
     name: persistent.name,
-    projectGraph: persistent.projectGraph,
     promptHistory: persistent.promptHistory,
     settings: persistent.settings,
     widgetGraphs: persistent.widgetGraphs,
     widgetInstances: persistent.widgetInstances,
     widgetRegions: persistent.widgetRegions,
+    workflows: persistent.workflows,
   };
 
   return document;
 };
 
-export const serializeProjectDocumentV2Json = (
+export const serializeProjectDocumentV3Json = (
   project: Project
-): { byteSize: number; document: ProjectDocumentV2; documentJson: string } => {
-  const document = serializeProjectDocumentV2(project);
+): { byteSize: number; document: ProjectDocumentV3; documentJson: string } => {
+  const document = serializeProjectDocumentV3(project);
   const documentJson = JSON.stringify(document);
 
   return { byteSize: new TextEncoder().encode(documentJson).byteLength, document, documentJson };
 };
 
+/**
+ * The transfer shape export, import and duplication write: every field a loaded project carries except session
+ * state, so a document authored with fields this client does not know keeps them, stamped with the current schema.
+ */
 export const serializeProjectDocument = (project: Project): Record<string, unknown> => {
   const {
     events: _events,
     graphHistory: _graphHistory,
     queue: _queue,
     undoRedo: _undoRedo,
+    workflowHistories: _workflowHistories,
     ...document
   } = stripSessionScopedGalleryState(project) as Project & { graphHistory?: unknown };
 
-  return document;
+  return { ...document, documentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION };
 };
 
 const normalizeInvocationSourceId = (sourceId: unknown): unknown => {
@@ -107,21 +118,76 @@ const normalizeInvocationSourceId = (sourceId: unknown): unknown => {
   return sourceId;
 };
 
-export const normalizeLegacyProjectDocument = (data: Record<string, unknown>): Record<string, unknown> => {
-  const invocation = data.invocation;
-  const { events: _events, graphHistory: _graphHistory, queue: _queue, ...document } = data;
-
-  return {
-    ...document,
-    invocation:
-      invocation && typeof invocation === 'object'
-        ? { ...invocation, sourceId: normalizeInvocationSourceId((invocation as { sourceId?: unknown }).sourceId) }
-        : invocation,
-  };
-};
-
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+export type ProjectDocumentMigration =
+  | { status: 'migrated'; document: Record<string, unknown> }
+  | { status: 'malformed'; reason: string };
+
+/**
+ * The migration boundary: any supported older document comes out as schema 3. A document without a version is
+ * schema 1; schema 2 owned one `projectGraph`, which becomes the first, active workflow. Collections that would
+ * lose a workflow if repaired are refused instead. Callers check for a future version before calling this.
+ */
+export const migrateProjectDocument = (data: Record<string, unknown>): ProjectDocumentMigration => {
+  const version = data.documentSchemaVersion;
+
+  if (version !== undefined && version !== 2 && version !== PROJECT_DOCUMENT_SCHEMA_VERSION) {
+    return { reason: `Unsupported project document schema ${String(version)}.`, status: 'malformed' };
+  }
+
+  if (typeof data.id !== 'string' || typeof data.name !== 'string' || !isRecord(data.layout)) {
+    return { reason: 'The document is missing its project identity or layout.', status: 'malformed' };
+  }
+
+  const {
+    events: _events,
+    graphHistory: _graphHistory,
+    invocation,
+    projectGraph,
+    queue: _queue,
+    undoRedo: _undoRedo,
+    workflowHistories: _workflowHistories,
+    workflows,
+    ...rest
+  } = data;
+
+  let collection: ProjectWorkflowCollection;
+
+  if (version === PROJECT_DOCUMENT_SCHEMA_VERSION) {
+    const normalized = normalizeProjectWorkflowCollection(workflows);
+
+    if (!normalized) {
+      return {
+        reason: 'The workflow collection is malformed or names a missing active workflow.',
+        status: 'malformed',
+      };
+    }
+
+    collection = normalized;
+  } else {
+    const migrated = migrateProjectGraphToCollection(projectGraph);
+
+    if (!migrated) {
+      return { reason: 'The project graph is damaged.', status: 'malformed' };
+    }
+
+    collection = migrated;
+  }
+
+  return {
+    document: {
+      ...rest,
+      documentSchemaVersion: PROJECT_DOCUMENT_SCHEMA_VERSION,
+      invocation: isRecord(invocation)
+        ? { ...invocation, sourceId: normalizeInvocationSourceId(invocation.sourceId) }
+        : invocation,
+      workflows: collection,
+    },
+    status: 'migrated',
+  };
+};
 
 const patchGalleryValues = (
   values: Record<string, unknown>,
@@ -183,11 +249,3 @@ export const applyAuthoritativeProjectBoard = (
 
   return hasChanged ? next : projectDocument;
 };
-
-/** Reject invalid document formats without eagerly loading the reducer. */
-export const isProjectDocumentShape = (data: Record<string, unknown>): boolean =>
-  typeof data.id === 'string' &&
-  typeof data.name === 'string' &&
-  typeof data.layout === 'object' &&
-  data.layout !== null &&
-  (data.documentSchemaVersion === undefined || data.documentSchemaVersion === PROJECT_DOCUMENT_SCHEMA_VERSION);

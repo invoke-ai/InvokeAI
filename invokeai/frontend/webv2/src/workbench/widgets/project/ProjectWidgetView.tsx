@@ -21,8 +21,8 @@ export const ProjectWidgetView = () => {
       events: project.events,
       id: project.id,
       name: project.name,
-      projectGraph: project.projectGraph,
       queue: project.queue,
+      workflows: project.workflows,
     }),
     shallowEqual
   );
@@ -35,7 +35,7 @@ export const ProjectWidgetView = () => {
   );
 };
 
-type ProjectPanelViewModel = Pick<Project, 'events' | 'id' | 'name' | 'projectGraph' | 'queue'>;
+type ProjectPanelViewModel = Pick<Project, 'events' | 'id' | 'name' | 'queue' | 'workflows'>;
 
 const NameSection = ({ project }: { project: ProjectPanelViewModel }) => {
   const { t } = useTranslation();
@@ -143,7 +143,10 @@ const DetailsSection = ({ project }: { project: ProjectPanelViewModel }) => {
         <DetailRow label={t('common.lastSaved')}>
           {lastSavedAt ? formatTimestamp(lastSavedAt, t('common.unknownTime')) : t('common.notYet')}
         </DetailRow>
-        <DetailRow label={t('widgets.project.graphNodes')}>{project.projectGraph.nodes.length}</DetailRow>
+        <DetailRow label={t('widgets.project.graphNodes')}>
+          {project.workflows.entries.reduce((count, entry) => count + entry.document.nodes.length, 0)}
+        </DetailRow>
+        <DetailRow label={t('widgets.project.workflows')}>{project.workflows.entries.length}</DetailRow>
         <DetailRow label={t('widgets.project.activeRuns')}>
           {t('widgets.project.activeRunCounts', { running, queued })}
         </DetailRow>

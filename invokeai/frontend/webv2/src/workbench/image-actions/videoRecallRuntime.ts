@@ -12,7 +12,7 @@ import type { PendingRecallEvent, RecallRevealContext, RecallRuntime } from './r
 // Through the package entry, not the modules themselves: the gallery's actions share these modules, and importing
 // them from this lazy runtime directly would split them out of the image-actions chunk into one more request on
 // every editor route.
-import { appendReferenceVideo, applyVideoRecallMetadata, placeInitialVideo } from './index';
+import { appendReferenceVideo, applyVideoRecallMetadata, getCurrentVideoValues, placeInitialVideo } from './index';
 import { bringRecallWidgetToFront, createRecallEventRuntime } from './recallEventRuntime';
 
 /** The `video` of a `video_recall_requested` event: a gallery video, as the backend describes it. */
@@ -135,6 +135,12 @@ export const createVideoRecallRuntime = ({
         projectId,
         requireGenerationMode: false,
       });
+
+      // A remix asks for a new take, which a fixed seed would not give; increment and decrement already vary it.
+      const current = applied && event.mode === 'remix' ? readVideoValues() : null;
+      if (current && getCurrentVideoValues({ models, videoValues: current }).seedMode === 'fixed') {
+        commands.widgets.patchValues('video', { seedMode: 'random' }, projectId);
+      }
     } else if (event.action === 'initial_video') {
       const placement = placeInitialVideo({ models, video: toPlaceableVideo(event.video), videoValues });
 

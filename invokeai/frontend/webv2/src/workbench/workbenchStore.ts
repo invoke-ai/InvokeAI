@@ -1,3 +1,4 @@
+import type { ProjectGraphState, ProjectWorkflowSource } from '@features/workflow/contracts';
 import type { ProjectGraphAction } from '@features/workflow/utility';
 import type { LayoutPreset } from '@workbench/layoutContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
@@ -19,6 +20,7 @@ import { clearLayerPanelStates, reconcileLayerPanelStates } from './layerPanelSt
 import { createLayoutPresetActivator, loadLayoutPresetWidgets } from './layoutPresetActivation';
 import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
 import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
+import { createBlankWorkflowDocument, findProjectWorkflow } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
 import { areWidgetsLoaded } from './widgetRegistry';
 import {
@@ -477,16 +479,76 @@ const createCommands = (
       toggle: command('toggleRegionWidget'),
     },
     workflows: {
-      bindLibraryWorkflow: command('setProjectGraphLibraryBinding', (libraryWorkflowId: string) => ({
-        libraryWorkflowId,
-      })),
-      editGraph: command('applyProjectGraphAction', (action: ProjectGraphAction) => ({ action })),
-      replace: command(
-        'replaceProjectGraph',
-        (document: ActionPayload<'replaceProjectGraph'>['document'], label: string) => ({ document, label })
+      /** Adds a workflow to the project and activates it; returns the id it is known by. */
+      add: (
+        document: ProjectGraphState,
+        options: { label: string; projectId?: string; reusePlaceholder?: boolean; source?: ProjectWorkflowSource }
+      ): string => {
+        dispatch({
+          document,
+          label: options.label,
+          projectId: options.projectId,
+          reusePlaceholder: options.reusePlaceholder,
+          source: options.source,
+          type: 'addProjectWorkflow',
+        });
+        return document.id;
+      },
+      create: (projectId?: string): string => {
+        const document = createBlankWorkflowDocument();
+        dispatch({ document, label: 'New workflow', projectId, type: 'addProjectWorkflow' });
+        return document.id;
+      },
+      duplicate: (workflowId: string, copyName: string, projectId?: string): string | null => {
+        const project = getState().projects.find(
+          (candidate) => candidate.id === (projectId ?? getState().activeProjectId)
+        );
+        if (!project || !findProjectWorkflow(project, workflowId)) {
+          return null;
+        }
+        const copyId = createBlankWorkflowDocument().id;
+        dispatch({ copyId, copyName, projectId, type: 'duplicateProjectWorkflow', workflowId });
+        return copyId;
+      },
+      editGraph: command(
+        'applyWorkflowAction',
+        (action: ProjectGraphAction, target?: { projectId: string; workflowId: string }) => ({
+          action,
+          projectId: target?.projectId,
+          workflowId: target?.workflowId,
+        })
       ),
-      redo: command('redoProjectChange'),
-      undo: command('undoProjectChange'),
+      redo: command('redoWorkflowChange', (target?: { projectId?: string; workflowId?: string }) => ({
+        projectId: target?.projectId,
+        workflowId: target?.workflowId,
+      })),
+      remove: command('removeProjectWorkflow', (workflowId: string, projectId?: string) => ({ projectId, workflowId })),
+      rename: (workflowId: string, name: string, projectId?: string): ProjectCommandResult => {
+        if (!name.trim()) {
+          return { ok: false, reason: 'invalid-name' };
+        }
+        dispatch({
+          action: { patch: { name: name.trim() }, type: 'setMetadata' },
+          projectId,
+          type: 'applyWorkflowAction',
+          workflowId,
+        });
+        return { ok: true };
+      },
+      select: command('selectProjectWorkflow', (workflowId: string, projectId?: string) => ({ projectId, workflowId })),
+      /** Records where a workflow was explicitly published; a no-op once the project or workflow is gone. */
+      setSource: command(
+        'setProjectWorkflowSource',
+        (projectId: string, workflowId: string, source: ProjectWorkflowSource | undefined) => ({
+          projectId,
+          source,
+          workflowId,
+        })
+      ),
+      undo: command('undoWorkflowChange', (target?: { projectId?: string; workflowId?: string }) => ({
+        projectId: target?.projectId,
+        workflowId: target?.workflowId,
+      })),
     },
   };
 };
@@ -522,6 +584,7 @@ const createPersistenceAdapter = (dispatch: WorkbenchDispatch, getState: () => W
     },
     saveFailed: command('autosaveFailed', (error: string) => ({ error })),
     savePending: command('autosavePending', (error: string) => ({ error })),
+    saveScheduled: command('autosaveScheduled'),
     saveStarted: command('autosaveStarted'),
     saveSucceeded: command('autosaveSucceeded', (savedAt: string) => ({ savedAt })),
   };

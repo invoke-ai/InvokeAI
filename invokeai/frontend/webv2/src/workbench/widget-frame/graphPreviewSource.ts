@@ -15,6 +15,7 @@ import { compileGeneratePreviewGraph, getGenerateNodeProvenance } from '@feature
 import { compileProjectGraph } from '@features/workflow/graph';
 import { ForLoopGraphValidationError } from '@features/workflow/utility';
 import { getDestinationLabel } from '@workbench/invocation';
+import { getActiveProjectGraph } from '@workbench/projectWorkflows';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 
 /**
@@ -64,10 +65,11 @@ const buildWorkflowSource = (
     return { ...EMPTY_SOURCE_BASE, graph: null, isLive: true };
   }
 
-  const positionHints = Object.fromEntries(project.projectGraph.nodes.map((node) => [node.id, node.position]));
+  const document = getActiveProjectGraph(project);
+  const positionHints = Object.fromEntries(document.nodes.map((node) => [node.id, node.position]));
 
   try {
-    const graph = compileProjectGraph(project.projectGraph, templates.templates);
+    const graph = compileProjectGraph(document, templates.templates);
 
     return { ...EMPTY_SOURCE_BASE, graph, isLive: true, positionHints };
   } catch (error) {

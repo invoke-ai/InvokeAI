@@ -2,17 +2,17 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 897042,
+        "brotliBytes": 898192,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 895775,
+        "gzipBytes": 896907,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2132017,
+        "initialRawBytes": 2134258,
         "largestAssetRawBytes": 778953,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 91552,
-        "requestCount": 37,
-        "scriptRequestCount": 21,
+        "ownedRawBytes": 91583,
+        "requestCount": 36,
+        "scriptRequestCount": 20,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -328,15 +328,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1237634,
+        "brotliBytes": 1247542,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1231243,
+        "gzipBytes": 1241055,
         "imageRawBytes": 156376,
-        "initialRawBytes": 3176267,
+        "initialRawBytes": 3207749,
         "largestAssetRawBytes": 778953,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 141925,
+        "ownedRawBytes": 143588,
         "requestCount": 86,
         "scriptRequestCount": 70,
         "sourceOwners": [
@@ -680,12 +680,7 @@
           "source:src/features/workflow/core/types.ts",
           "source:src/features/workflow/core/validation.ts",
           "source:src/features/workflow/core/workflowJson.ts",
-          "source:src/features/workflow/data/api.ts",
-          "source:src/features/workflow/data/libraryCache.ts",
-          "source:src/features/workflow/data/runCapture.ts",
-          "source:src/features/workflow/data/savedWorkflowQueries.ts",
           "source:src/features/workflow/data/templates.ts",
-          "source:src/features/workflow/queries.ts",
           "source:src/features/workflow/react.ts",
           "source:src/features/workflow/ui/WorkflowUiContext.tsx",
           "source:src/features/workflow/ui/workflowUiStore.ts",
@@ -898,6 +893,7 @@
           "source:src/workbench/persistenceRuntime.ts",
           "source:src/workbench/projectCanvasGate.ts",
           "source:src/workbench/projectEvents.ts",
+          "source:src/workbench/projectWorkflows.ts",
           "source:src/workbench/projects/accountOwnedWorkbenchDatabase.ts",
           "source:src/workbench/projects/api.ts",
           "source:src/workbench/projects/components/OpenProjectDialog.tsx",
@@ -1056,7 +1052,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-09-23",
+  "capturedAt": "2026-09-26",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

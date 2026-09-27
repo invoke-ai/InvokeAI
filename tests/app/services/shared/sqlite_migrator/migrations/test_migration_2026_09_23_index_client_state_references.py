@@ -15,8 +15,14 @@ def _database() -> sqlite3.Cursor:
     cursor = connection.cursor()
     create_media_references_table(cursor)
     cursor.execute(
-        "CREATE TABLE intermediates_browser_holds (user_id TEXT, lease_id TEXT, media_kind TEXT, media_name TEXT,"
-        " expires_at TEXT);"
+        """CREATE TABLE intermediates_browser_holds (
+            user_id TEXT NOT NULL,
+            lease_id TEXT NOT NULL,
+            media_kind TEXT NOT NULL,
+            media_name TEXT NOT NULL,
+            expires_at TEXT NOT NULL,
+            PRIMARY KEY(user_id, lease_id, media_kind, media_name)
+        );"""
     )
     cursor.execute("CREATE TABLE client_state (user_id TEXT, key TEXT, value TEXT, PRIMARY KEY (user_id, key));")
     cursor.execute("CREATE TABLE users (user_id TEXT PRIMARY KEY);")
@@ -35,6 +41,8 @@ def _rows(cursor: sqlite3.Cursor) -> set[tuple[str, ...]]:
 
 def test_indexes_legacy_canvas_state_and_quarantined_projects_idempotently() -> None:
     cursor = _database()
+    hold = ("alice", "tab-1", "image", "held.png", "2026-09-26 23:00:00")
+    cursor.execute("INSERT INTO intermediates_browser_holds VALUES (?, ?, ?, ?, ?);", hold)
     canvas = {"rasterLayers": [{"objects": [{"image": {"image_name": "layer.png"}}]}]}
     cursor.executemany(
         "INSERT INTO client_state VALUES (?, ?, ?);",
@@ -59,6 +67,8 @@ def test_indexes_legacy_canvas_state_and_quarantined_projects_idempotently() -> 
     }
     cursor.execute("SELECT name FROM sqlite_master WHERE name = 'idx_intermediates_browser_holds_expires_at';")
     assert cursor.fetchone() is not None
+    cursor.execute("SELECT * FROM intermediates_browser_holds;")
+    assert cursor.fetchall() == [hold]
 
 
 def test_databases_without_either_table_migrate() -> None:
@@ -70,3 +80,27 @@ def test_databases_without_either_table_migrate() -> None:
     build_migration(getLogger(__name__)).callback(cursor)
 
     assert _rows(cursor) == set()
+
+
+def test_creates_browser_holds_when_earlier_migration_predated_them() -> None:
+    connection = sqlite3.connect(":memory:")
+    cursor = connection.cursor()
+    create_media_references_table(cursor)
+
+    build_migration(getLogger(__name__)).callback(cursor)
+
+    cursor.execute("PRAGMA table_info(intermediates_browser_holds);")
+    columns = cursor.fetchall()
+    assert {row[1] for row in columns} == {"user_id", "lease_id", "media_kind", "media_name", "expires_at"}
+    assert {row[1]: (row[3], row[5]) for row in columns} == {
+        "user_id": (1, 1),
+        "lease_id": (1, 2),
+        "media_kind": (1, 3),
+        "media_name": (1, 4),
+        "expires_at": (1, 0),
+    }
+    cursor.execute("SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='intermediates_browser_holds';")
+    assert {row[0] for row in cursor.fetchall()} >= {
+        "idx_intermediates_browser_holds_media",
+        "idx_intermediates_browser_holds_expires_at",
+    }

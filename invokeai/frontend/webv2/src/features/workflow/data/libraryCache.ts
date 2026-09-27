@@ -4,7 +4,13 @@ import {
   registerAccountOwnedResource,
 } from '@platform/state/accountLifecycle';
 
-import { getLibraryWorkflow, listLibraryWorkflows, type ListWorkflowsParams, type WorkflowLibraryPage } from './api';
+import {
+  getLibraryWorkflowRecord,
+  listLibraryWorkflows,
+  type ListWorkflowsParams,
+  type WorkflowLibraryPage,
+  type WorkflowRecordDTO,
+} from './api';
 
 /**
  * Serve cached library pages immediately and revalidate; local mutations invalidate ordering and pagination
@@ -12,7 +18,7 @@ import { getLibraryWorkflow, listLibraryWorkflows, type ListWorkflowsParams, typ
  */
 
 const pageCache = new Map<string, WorkflowLibraryPage>();
-const workflowCache = new Map<string, Record<string, unknown>>();
+const recordCache = new Map<string, WorkflowRecordDTO>();
 
 /** `JSON.stringify` on a sorted copy avoids delimiter collisions between tag values. */
 const getTagsKey = (tags: string[] | undefined): string => JSON.stringify([...(tags ?? [])].sort());
@@ -36,29 +42,39 @@ export const listLibraryWorkflowsCached = async (params: ListWorkflowsParams): P
   return result;
 };
 
-/** Workflow payloads are immutable per save; cache hits skip the fetch entirely. */
-export const getLibraryWorkflowCached = async (
+/** A record is immutable per revision; a cache hit skips the fetch until a write invalidates it. */
+export const getLibraryWorkflowRecordCached = async (
   workflowId: string,
   externalSignal?: AbortSignal
-): Promise<Record<string, unknown>> => {
+): Promise<WorkflowRecordDTO> => {
   const owner = captureAccountScope();
   const signal = externalSignal ? AbortSignal.any([externalSignal, owner.signal]) : owner.signal;
 
   signal.throwIfAborted();
-  const cached = workflowCache.get(workflowId);
+  const cached = recordCache.get(workflowId);
 
   if (cached) {
     assertAccountScopeCurrent(owner);
     return cached;
   }
 
-  const result = await getLibraryWorkflow(workflowId, signal);
+  const result = await getLibraryWorkflowRecord(workflowId, signal);
 
   assertAccountScopeCurrent(owner);
   signal.throwIfAborted();
-  workflowCache.set(workflowId, result);
+  recordCache.set(workflowId, result);
 
   return result;
+};
+
+/** The stored workflow JSON with the record id stamped in, from the record cache. */
+export const getLibraryWorkflowCached = async (
+  workflowId: string,
+  externalSignal?: AbortSignal
+): Promise<Record<string, unknown>> => {
+  const record = await getLibraryWorkflowRecordCached(workflowId, externalSignal);
+
+  return { ...record.workflow, id: record.workflow_id };
 };
 
 type WorkflowLibraryCacheInvalidationListener = (workflowId?: string) => void;
@@ -73,7 +89,7 @@ export const onWorkflowLibraryCacheInvalidated = (listener: WorkflowLibraryCache
 
 export const invalidateWorkflowLibraryCache = (workflowId?: string): void => {
   pageCache.clear();
-  workflowCache.clear();
+  recordCache.clear();
 
   for (const listener of invalidationListeners) {
     listener(workflowId);

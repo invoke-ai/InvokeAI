@@ -6,6 +6,7 @@ import type {
   QueueEnqueueWorkflowRequest,
   QueueResultImage,
   QueueResultImageOptions,
+  QueueRunOrigin,
   TerminalQueueItemStatus,
 } from '@features/queue/core/types';
 import type { BackendConnectionStatus } from '@platform/transport/types';
@@ -59,7 +60,10 @@ export interface QueueModelLoadPort {
 }
 
 export interface QueueNodeExecutionPort {
+  /** Forgets every node and the origin of the run they belonged to. */
   clearAll(): void;
+  /** Names the project workflow whose run the store now reflects; null when it cannot be attributed. */
+  setOrigin(origin: QueueRunOrigin | null): void;
   completed(event: InvocationCompleteEvent): void;
   failed(event: InvocationErrorEvent): void;
   progress(nodeId: string, percentage: number | null, message: string): void;
@@ -125,6 +129,7 @@ export interface ReconcileInput {
   status: 'pending' | 'running';
   backendItemIds?: number[];
   backendBatchId?: string;
+  origin?: QueueRunOrigin;
 }
 
 export type ReconcileOutcome =
@@ -151,7 +156,11 @@ export interface QueueCoordinator {
   /** Enqueue a generate batch and track its backend items for event-driven settlement. */
   submitGenerate(localQueueItemId: string, request: QueueEnqueueGenerateRequest): Promise<QueueEnqueueResult>;
   /** Enqueue a compiled workflow graph and track its backend items the same way. */
-  submitWorkflow(localQueueItemId: string, request: QueueEnqueueWorkflowRequest): Promise<QueueEnqueueResult>;
+  submitWorkflow(
+    localQueueItemId: string,
+    request: QueueEnqueueWorkflowRequest,
+    origin?: QueueRunOrigin
+  ): Promise<QueueEnqueueResult>;
   /**
    * Await every backend item's terminal state via sockets and safety sweeps; return images or throw
    * failure/cancellation.
@@ -182,6 +191,7 @@ interface RunProgressState {
 interface WaitState {
   frameGates: Map<number, { revision: number | null; sessionId: string }>;
   localQueueItemId: string;
+  origin: QueueRunOrigin | null;
   settle: (outcome: TerminalOutcome) => void;
 }
 
@@ -383,6 +393,7 @@ export const createQueueCoordinator = (
       nodeExecutionRootItemId = backendItemId;
       nodeExecutionRootItemSequence = sequence;
       nodeExecution.clearAll();
+      nodeExecution.setOrigin(waits.get(backendItemId)?.origin ?? null);
     }
 
     const nodeIds = nodeIdsByBackendItem.get(backendItemId);
@@ -602,7 +613,11 @@ export const createQueueCoordinator = (
   const isTrackedEvent = (event: { item_id: number; root_item_id?: number | null }): boolean =>
     waits.has(getTrackedBackendItemId(event));
 
-  const trackBackendItem = (localQueueItemId: string, backendItemId: number): Promise<TerminalOutcome> => {
+  const trackBackendItem = (
+    localQueueItemId: string,
+    backendItemId: number,
+    origin: QueueRunOrigin | null
+  ): Promise<TerminalOutcome> => {
     const bufferedOutcome = recentTerminalOutcomes.get(backendItemId);
 
     if (bufferedOutcome) {
@@ -615,13 +630,18 @@ export const createQueueCoordinator = (
     }
 
     return new Promise<TerminalOutcome>((settle) => {
-      waits.set(backendItemId, { frameGates: new Map(), localQueueItemId, settle });
+      waits.set(backendItemId, { frameGates: new Map(), localQueueItemId, origin, settle });
       replayNodeEvents(backendItemId);
       replayProgressEvent(backendItemId);
     });
   };
 
-  const beginRun = (localQueueItemId: string, backendItemIds: number[], backendBatchId?: string): void => {
+  const beginRun = (
+    localQueueItemId: string,
+    backendItemIds: number[],
+    backendBatchId?: string,
+    origin: QueueRunOrigin | null = null
+  ): void => {
     if (!isActive()) {
       throw new QueueItemCancelledError(localQueueItemId);
     }
@@ -636,7 +656,7 @@ export const createQueueCoordinator = (
     runs.set(localQueueItemId, {
       backendBatchId,
       backendItemIds,
-      outcomePromises: backendItemIds.map((backendItemId) => trackBackendItem(localQueueItemId, backendItemId)),
+      outcomePromises: backendItemIds.map((backendItemId) => trackBackendItem(localQueueItemId, backendItemId, origin)),
     });
 
     publishRunProgress(localQueueItemId);
@@ -1060,7 +1080,7 @@ export const createQueueCoordinator = (
       const backendItemIds = foundBackendItems.map((backendItem) => backendItem.id);
       const backendBatchId = item.backendBatchId ?? foundBackendItems[0]?.batchId;
 
-      beginRun(item.id, backendItemIds, backendBatchId);
+      beginRun(item.id, backendItemIds, backendBatchId, item.origin ?? null);
 
       for (const backendItem of foundBackendItems) {
         settleFromQueueItem(backendItem);
@@ -1092,13 +1112,14 @@ export const createQueueCoordinator = (
   const adoptEnqueueResult = (
     localQueueItemId: string,
     result: QueueEnqueueResult,
-    workKind: 'generation' | 'workflow'
+    workKind: 'generation' | 'workflow',
+    origin: QueueRunOrigin | null = null
   ): QueueEnqueueResult => {
     if (result.enqueued === 0) {
       throw new QueueEnqueueNotAcceptedError(workKind);
     }
 
-    beginRun(localQueueItemId, result.itemIds, result.batchId);
+    beginRun(localQueueItemId, result.itemIds, result.batchId, origin);
 
     return result;
   };
@@ -1118,14 +1139,15 @@ export const createQueueCoordinator = (
 
   const submitWorkflow = async (
     localQueueItemId: string,
-    request: QueueEnqueueWorkflowRequest
+    request: QueueEnqueueWorkflowRequest,
+    origin?: QueueRunOrigin
   ): Promise<QueueEnqueueResult> => {
     if (!isActive()) {
       throw new QueueItemCancelledError(localQueueItemId);
     }
 
     return await withSubmissionInFlight(async () =>
-      adoptEnqueueResult(localQueueItemId, await backend.enqueueWorkflow(request), 'workflow')
+      adoptEnqueueResult(localQueueItemId, await backend.enqueueWorkflow(request), 'workflow', origin ?? null)
     );
   };
 

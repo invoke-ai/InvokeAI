@@ -8,6 +8,7 @@ import type { LayoutPreset, LayoutPresetRoute } from './layoutContracts';
 import type { WorkbenchInternalStore, WorkbenchSnapshot } from './workbenchStore';
 
 import { publishLayerPanelSelection, readLayerPanelState, toggleLayerStackCollapsed } from './layerPanelState';
+import { getActiveProjectGraph } from './projectWorkflows';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from './widgetPlacementMeta';
 import { getProjectWidgetValues } from './widgetState';
 import { createInitialWorkbenchState } from './workbenchState';
@@ -775,7 +776,7 @@ describe('createWorkbenchStore', () => {
 
     store.commands.workflows.editGraph({ patch: { name: 'Command-owned workflow' }, type: 'setMetadata' });
 
-    expect(store.getSnapshot().activeProject.projectGraph.name).toBe('Command-owned workflow');
+    expect(getActiveProjectGraph(store.getSnapshot().activeProject).name).toBe('Command-owned workflow');
   });
 
   it('keeps placement selectors stable across generate and settings changes', () => {

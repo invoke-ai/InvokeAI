@@ -3,12 +3,11 @@
 import pytest
 
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.shared.media_references import extract_media_references
 from invokeai.app.services.workflow_records.workflow_records_common import (
     Workflow,
+    WorkflowAccessDeniedError,
     WorkflowCategory,
     WorkflowMeta,
-    WorkflowRecordDTO,
     WorkflowWithoutID,
 )
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
@@ -58,27 +57,22 @@ def test_create_update_and_delete_keep_the_index_current(workflow_records: Sqlit
 def test_an_update_refused_by_ownership_leaves_the_index_alone(workflow_records: SqliteWorkflowRecordsStorage) -> None:
     created = workflow_records.create(_workflow("input.png"), user_id="user-1")
 
-    workflow_records.update(Workflow(**_workflow("stolen.png").model_dump(), id=created.workflow_id), user_id="user-2")
+    with pytest.raises(WorkflowAccessDeniedError):
+        workflow_records.update(
+            Workflow(**_workflow("stolen.png").model_dump(), id=created.workflow_id), user_id="user-2"
+        )
 
     assert _references(workflow_records, created.workflow_id) == {("user-1", "image", "input.png")}
 
 
 def test_visibility_change_keeps_the_reference_index_of_the_document_it_writes(
-    workflow_records: SqliteWorkflowRecordsStorage, monkeypatch: pytest.MonkeyPatch
+    workflow_records: SqliteWorkflowRecordsStorage,
 ) -> None:
     created = workflow_records.create(_workflow("old.png"), user_id="user-1")
-    original_get = workflow_records.get
 
-    def concurrent_edit(workflow_id: str) -> WorkflowRecordDTO:
-        previous = original_get(workflow_id)
-        monkeypatch.setattr(workflow_records, "get", original_get)
-        workflow_records.update(Workflow(**_workflow("new.png").model_dump(), id=workflow_id), user_id="user-1")
-        return previous
+    shared = workflow_records.update_is_public(created.workflow_id, True, user_id="user-1")
 
-    monkeypatch.setattr(workflow_records, "get", concurrent_edit)
-    workflow_records.update_is_public(created.workflow_id, True, user_id="user-1")
-    actual = original_get(created.workflow_id)
-
-    assert _references(workflow_records, created.workflow_id) == {
-        ("user-1", "image", name) for name in extract_media_references(actual.workflow.model_dump()).images
-    }
+    assert shared.is_public is True
+    assert _references(workflow_records, created.workflow_id) == {("user-1", "image", "old.png")}
+    workflow_records.update(Workflow(**_workflow("new.png").model_dump(), id=created.workflow_id), user_id="user-1")
+    assert _references(workflow_records, created.workflow_id) == {("user-1", "image", "new.png")}

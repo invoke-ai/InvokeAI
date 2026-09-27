@@ -1,6 +1,8 @@
 /* eslint-disable react/globals, react/immutability -- test instrumentation intentionally records render counts */
+import type { ProjectGraphState } from '@features/workflow/core/types';
 import type { ReactNode } from 'react';
 
+import { createProjectGraph } from '@features/workflow/utility';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -10,6 +12,7 @@ import type { WorkflowGraphPreviewPort, WorkflowReadPort, WorkflowUiAdapter } fr
 import {
   useWorkflowCapabilitiesSelector,
   useWorkflowGraphPreview,
+  useWorkflowNodeExecutionState,
   useWorkflowPreferencesSelector,
   useWorkflowProjectSelector,
   useWorkflowUi,
@@ -40,13 +43,25 @@ const createMutablePort = <Snapshot,>(initialSnapshot: Snapshot) => {
   };
 };
 
-const projectState = (id = 'project-1') => ({
+const projectState = (id = 'project-1', projectGraph: ProjectGraphState = createProjectGraph('workflow-1')) => ({
+  activeWorkflow: { document: projectGraph },
+  activeWorkflowId: projectGraph.id,
   galleryValues: {},
   id,
   isWorkflowRunning: false,
-  projectGraph: { edges: [], nodes: [], version: 1 as const },
+  projectGraph,
   workflowValues: {},
+  workflows: [{ document: projectGraph }],
 });
+
+const NODE_STATE = {
+  error: null,
+  latestOutput: null,
+  outputImageUrl: null,
+  progress: 0.5,
+  progressMessage: null,
+  status: 'running' as const,
+};
 
 const preferencesState = () => ({
   reduceMotion: false,
@@ -83,7 +98,12 @@ describe('Workflow UI read-port isolation', () => {
       capabilities: capabilities.port,
       commands: {},
       getProjectGraph: () => project.port.getSnapshot().projectGraph,
-      nodeExecution: { get: () => null, subscribe: () => vi.fn() },
+      nodeExecution: {
+        get: () => null,
+        getOrigin: () => null,
+        subscribe: () => vi.fn(),
+        subscribeOrigin: () => vi.fn(),
+      },
       notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
       performance: { mark: vi.fn(), measure: vi.fn(), time: vi.fn() },
       preferences: preferences.port,
@@ -155,7 +175,7 @@ describe('Workflow UI read-port isolation', () => {
     });
     expect(counts).toEqual({ capability: 1, graph: 1, preferences: 1, project: 1, projectEqual: 1, services: 1 });
 
-    await act(() => project.setSnapshot({ ...projectState(), projectGraph: { edges: [], nodes: [], version: 1 } }));
+    await act(() => project.setSnapshot(projectState()));
     expect(counts).toEqual({ capability: 1, graph: 1, preferences: 1, project: 2, projectEqual: 1, services: 1 });
 
     await act(() => preferences.setSnapshot({ ...preferencesState(), workflowSnapToGrid: true }));
@@ -183,5 +203,60 @@ describe('Workflow UI read-port isolation', () => {
       })
     );
     expect(counts).toEqual({ capability: 2, graph: 3, preferences: 2, project: 2, projectEqual: 1, services: 1 });
+  });
+
+  it('shows node execution only while the tracked run came from the workflow this editor shows', async () => {
+    const graph = createProjectGraph('workflow-1');
+    const project = createMutablePort(projectState('project-1', graph));
+    let origin: { projectId: string; workflowId: string } | null = null;
+    const originListeners = new Set<() => void>();
+    const setOrigin = (next: typeof origin) => {
+      origin = next;
+      originListeners.forEach((listener) => listener());
+    };
+    // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
+    const adapter = {
+      capabilities: createMutablePort({ canUseCache: true }).port,
+      commands: {},
+      getProjectGraph: () => project.port.getSnapshot().projectGraph,
+      nodeExecution: {
+        get: (nodeId: string) => (nodeId === 'node-1' ? NODE_STATE : null),
+        getOrigin: () => origin,
+        subscribe: () => () => {},
+        subscribeOrigin: (listener: () => void) => {
+          originListeners.add(listener);
+          return () => originListeners.delete(listener);
+        },
+      },
+      notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
+      performance: { mark: vi.fn(), measure: vi.fn(), time: vi.fn() },
+      preferences: createMutablePort(preferencesState()).port,
+      project: project.port,
+      registerModalHotkeyLayer: vi.fn(() => vi.fn()),
+      widgets: {},
+    } as unknown as WorkflowUiAdapter;
+    const Consumer = () => <output>{useWorkflowNodeExecutionState('node-1')?.status ?? 'none'}</output>;
+
+    await act(() => {
+      root.render(
+        <WorkflowUiProvider adapter={adapter}>
+          <Consumer />
+        </WorkflowUiProvider>
+      );
+    });
+    expect(host.textContent).toBe('none');
+
+    await act(() => setOrigin({ projectId: 'project-1', workflowId: 'workflow-1' }));
+    expect(host.textContent).toBe('running');
+
+    // The same project, another of its workflows: that copy's progress stays out of this editor.
+    await act(() => project.setSnapshot(projectState('project-1', createProjectGraph('workflow-2'))));
+    expect(host.textContent).toBe('none');
+
+    await act(() => project.setSnapshot(projectState('project-1', graph)));
+    expect(host.textContent).toBe('running');
+
+    await act(() => setOrigin({ projectId: 'project-2', workflowId: 'workflow-1' }));
+    expect(host.textContent).toBe('none');
   });
 });

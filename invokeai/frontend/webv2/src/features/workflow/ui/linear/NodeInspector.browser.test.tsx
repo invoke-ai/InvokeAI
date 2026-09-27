@@ -85,12 +85,16 @@ const node: WorkflowInvocationNode = {
   type: 'invocation',
 };
 const projectGraph: ProjectGraphState = { ...createProjectGraph('inspector-test'), nodes: [node] };
+const PROJECT_ID = 'project-1';
 const projectSnapshot = {
+  activeWorkflow: { document: projectGraph },
+  activeWorkflowId: projectGraph.id,
   galleryValues: {},
-  id: 'project-1',
+  id: PROJECT_ID,
   isWorkflowRunning: false,
   projectGraph,
   workflowValues: { inspectorTab: 'outputs' },
+  workflows: [{ document: projectGraph }],
 };
 
 /** A node-execution port the test can advance between renders. */
@@ -101,10 +105,13 @@ const createExecutionPort = () => {
   return {
     port: {
       get: (nodeId: string) => (nodeId === node.id ? state : null),
+      // The run originates from this editor's own workflow; another copy's progress would be hidden.
+      getOrigin: () => ({ projectId: PROJECT_ID, workflowId: projectGraph.id }),
       subscribe: (_nodeId: string, listener: () => void) => {
         listeners.add(listener);
         return () => listeners.delete(listener);
       },
+      subscribeOrigin: () => () => {},
     },
     set(next: WorkflowNodeExecutionState | null) {
       state = next;
@@ -116,7 +123,18 @@ const createExecutionPort = () => {
 const createAdapter = (nodeExecution: WorkflowUiAdapter['nodeExecution']): WorkflowUiAdapter =>
   ({
     capabilities: { getSnapshot: () => ({ canUseCache: true }), subscribe: () => () => {} },
-    commands: { bindLibraryWorkflow: vi.fn(), editGraph: vi.fn(), redo: vi.fn(), replace: vi.fn(), undo: vi.fn() },
+    commands: {
+      addWorkflow: vi.fn(),
+      createWorkflow: vi.fn(),
+      duplicateWorkflow: vi.fn(),
+      editGraph: vi.fn(),
+      redo: vi.fn(),
+      removeWorkflow: vi.fn(),
+      renameWorkflow: vi.fn(),
+      selectWorkflow: vi.fn(),
+      setWorkflowSource: vi.fn(),
+      undo: vi.fn(),
+    },
     getProjectGraph: () => projectGraph,
     nodeExecution,
     notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
@@ -206,7 +224,7 @@ const baseAdapter = createAdapter(createExecutionPort().port);
 const detailsAdapter = {
   ...baseAdapter,
   project: { ...baseAdapter.project, getSnapshot: () => detailsSnapshot },
-} as WorkflowUiAdapter;
+} as unknown as WorkflowUiAdapter;
 
 describe('NodeInspector details tab node updates', () => {
   let host: HTMLDivElement;
