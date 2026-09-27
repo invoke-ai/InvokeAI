@@ -1114,6 +1114,35 @@
         ]
       }
     },
+    "/api/v2/models/fp8_storage_support": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "List Fp8 Storage Support",
+        "description": "Which kinds of model FP8 Storage actually reaches, so a client stops offering it for the rest.\n\nKeyed `(base, type, format)` -- the key model loaders are registered under, because the answer\ndiffers along all three: FLUX main implements the cast and FLUX ControlNet does not, and a GGUF\nmain model must never be re-encoded. A key with no row is not supported; that is also what the\nserver itself concludes for one.\n\nA static table, the same for every install and every user. Fetch it once and join it against model\nrecords locally. Whether the *device* can do fp8 is deliberately not in here -- that probe belongs\non the loading thread, not behind an HTTP handler.\n\nDeclared `def`, not `async def`: it awaits nothing, so FastAPI runs it in a threadpool instead of\non the event loop. See docs/contributing/blocking-work-in-api-routes.",
+        "operationId": "list_fp8_storage_support",
+        "responses": {
+          "200": {
+            "description": "Whether FP8 Storage does anything, per loader key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Fp8StorageSupport"
+                  },
+                  "type": "array",
+                  "title": "Response List Fp8 Storage Support"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v2/models/": {
       "get": {
         "tags": ["model_manager"],
@@ -39128,6 +39157,28 @@
         "type": "object",
         "required": ["path", "is_installed"],
         "title": "FoundModel"
+      },
+      "Fp8StorageSupport": {
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/BaseModelType"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ModelType"
+          },
+          "format": {
+            "$ref": "#/components/schemas/ModelFormat"
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported",
+            "description": "Whether FP8 Storage changes anything for a model of this kind."
+          }
+        },
+        "type": "object",
+        "required": ["base", "type", "format", "supported"],
+        "title": "Fp8StorageSupport",
+        "description": "One row of the served table: a loader key and the finished answer.\n\nThe reason is not served. Both markers hide the control identically, so a client has nothing to\ndo with the difference; it stays in the declaration, where the backlog lives."
       },
       "FreeUConfig": {
         "description": "Configuration for the FreeU hyperparameters.\n- https://huggingface.co/docs/diffusers/main/en/using-diffusers/freeu\n- https://github.com/ChenyangSi/FreeU",

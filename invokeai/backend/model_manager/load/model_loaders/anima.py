@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.controlnet import ControlNet_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Anima_Config
+from invokeai.backend.model_manager.load.fp8_capability import NotApplicable
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import (
@@ -258,7 +259,15 @@ class AnimaCheckpointModel(ModelLoader):
         return model
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.Anima,
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+    fp8_storage=NotApplicable(
+        "an LLLite adapter is 8-66 MB (every one in the starter catalog), so the saving is tens of "
+        "megabytes bought with an upcast on each of its per-Linear modules, every forward"
+    ),
+)
 class AnimaControlNetLLLiteModel(ModelLoader):
     """Class to load Anima ControlNet-LLLite adapter models from safetensors checkpoints.
 

@@ -66,6 +66,24 @@ def _to_native_layout(sd: dict[str, torch.Tensor]) -> dict[str, torch.Tensor]:
     return native_sd
 
 
+def _recording_model() -> tuple[MagicMock, dict[str, torch.Tensor]]:
+    """A stand-in transformer that snapshots the state dict it is handed.
+
+    Reading `call_args.args[0]` afterwards is not enough any more: the loader drops its own references
+    to that dict before the FP8 cast (so the bf16 originals are not held alive beside their fp8 copies),
+    and the assertion would then run against an emptied dict.
+    """
+    model = MagicMock()
+    handed_over: dict[str, torch.Tensor] = {}
+
+    def record(state_dict, *args, **kwargs):
+        handed_over.update(state_dict)
+        return SimpleNamespace(missing_keys=[], unexpected_keys=[])
+
+    model.load_state_dict.side_effect = record
+    return model, handed_over
+
+
 def _make_loader() -> WanCheckpointModel:
     loader = object.__new__(WanCheckpointModel)
     loader._ram_cache = MagicMock()
@@ -239,12 +257,10 @@ class TestEndToEnd:
         path = tmp_path / "Wan2.2-A14B-HighNoise-fp8_scaled.safetensors"
         save_file(sd, path)
 
-        model = MagicMock()
-        model.load_state_dict.return_value = SimpleNamespace(missing_keys=[], unexpected_keys=[])
+        model, handed_over = _recording_model()
         with patch("diffusers.WanTransformer3DModel", return_value=model):
             _load(path)
 
-        handed_over = model.load_state_dict.call_args.args[0]
         assert not [k for k in handed_over if k.endswith((".scale_weight", ".scale_input")) or k == "scaled_fp8"]
         # ...without eating scale_shift_table, which is a real Wan parameter.
         assert "scale_shift_table" in handed_over
@@ -292,8 +308,7 @@ class TestEndToEnd:
         path = tmp_path / "wan2.2-t2v-rapid-aio-v10-high_noise.safetensors"
         save_file(sd, path)
 
-        model = MagicMock()
-        model.load_state_dict.return_value = SimpleNamespace(missing_keys=[], unexpected_keys=[])
+        model, handed_over = _recording_model()
         with patch("diffusers.WanTransformer3DModel", return_value=model):
             _load(path)
 
@@ -301,7 +316,6 @@ class TestEndToEnd:
         # tautology — a freshly built WanTransformer3DModel has no such attribute either
         # way — and it would not catch the bundled weights being cast and RAM-reserved
         # before load_state_dict discarded them, which is the cost this avoids.
-        handed_over = model.load_state_dict.call_args.args[0]
         assert [k for k in handed_over if k.startswith(("vae.", "text_encoders.", "model_ema."))] == []
         assert "patch_embedding.weight" in handed_over
 

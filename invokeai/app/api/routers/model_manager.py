@@ -44,6 +44,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXL_Config,
     Main_Checkpoint_SDXLRefiner_Config,
 )
+from invokeai.backend.model_manager.load.fp8_capability import Fp8StorageSupport, fp8_storage_support
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
@@ -252,6 +253,29 @@ def list_architecture_capabilities(current_user: CurrentUserOrDefault) -> list[A
     on the event loop. See docs/contributing/blocking-work-in-api-routes.
     """
     return architecture_capabilities()
+
+
+@model_manager_router.get(
+    "/fp8_storage_support",
+    operation_id="list_fp8_storage_support",
+    responses={200: {"description": "Whether FP8 Storage does anything, per loader key"}},
+)
+def list_fp8_storage_support(current_user: CurrentUserOrDefault) -> list[Fp8StorageSupport]:
+    """Which kinds of model FP8 Storage actually reaches, so a client stops offering it for the rest.
+
+    Keyed `(base, type, format)` -- the key model loaders are registered under, because the answer
+    differs along all three: FLUX main implements the cast and FLUX ControlNet does not, and a GGUF
+    main model must never be re-encoded. A key with no row is not supported; that is also what the
+    server itself concludes for one.
+
+    A static table, the same for every install and every user. Fetch it once and join it against model
+    records locally. Whether the *device* can do fp8 is deliberately not in here -- that probe belongs
+    on the loading thread, not behind an HTTP handler.
+
+    Declared `def`, not `async def`: it awaits nothing, so FastAPI runs it in a threadpool instead of
+    on the event loop. See docs/contributing/blocking-work-in-api-routes.
+    """
+    return fp8_storage_support()
 
 
 @model_manager_router.get(

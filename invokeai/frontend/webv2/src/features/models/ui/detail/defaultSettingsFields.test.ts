@@ -2,38 +2,13 @@ import type { ModelConfig } from '@features/models/core/types';
 
 import { describe, expect, it } from 'vitest';
 
-import { getFieldsForModel, supportsFp8Storage, validateDefaults } from './defaultSettingsFields';
+import { getFieldsForModel, validateDefaults } from './defaultSettingsFields';
 
 const model = (base: string, type: string): Pick<ModelConfig, 'base' | 'type'> =>
   ({ base, type }) as Pick<ModelConfig, 'base' | 'type'>;
 
-const fieldKeys = (candidate: Pick<ModelConfig, 'base' | 'type'>): string[] =>
-  getFieldsForModel(candidate).map((field) => String(field.key));
-
-describe('supportsFp8Storage', () => {
-  it('offers the toggle for main models', () => {
-    // Expose Z-Image FP8 defaults so installed settings can be inspected and disabled.
-    for (const base of ['sdxl', 'flux', 'krea-2', 'qwen-image', 'wan', 'ideogram-4', 'z-image']) {
-      expect(supportsFp8Storage(model(base, 'main'))).toBe(true);
-    }
-  });
-
-  it('hides it for LoRA and ControlLoRA, which are patched rather than run', () => {
-    // The casting hooks would never fire, so the toggle would be silently ignored.
-    expect(supportsFp8Storage(model('sdxl', 'lora'))).toBe(false);
-    expect(supportsFp8Storage(model('sdxl', 'control_lora'))).toBe(false);
-  });
-
-  it('offers it for the control adapters the backend does cast', () => {
-    expect(supportsFp8Storage(model('sdxl', 'controlnet'))).toBe(true);
-    expect(supportsFp8Storage(model('sdxl', 't2i_adapter'))).toBe(true);
-  });
-
-  it('hides it for VAEs', () => {
-    // fp8 storage measurably degrades decode quality, so the backend excludes VAEs outright.
-    expect(supportsFp8Storage(model('sdxl', 'vae'))).toBe(false);
-  });
-});
+const fieldKeys = (candidate: Pick<ModelConfig, 'base' | 'type'>, fp8StorageSupported = true): string[] =>
+  getFieldsForModel(candidate, fp8StorageSupported).map((field) => String(field.key));
 
 describe('getFieldsForModel', () => {
   it('appends fp8_storage to the main-model fields without disturbing the existing ones', () => {
@@ -62,7 +37,16 @@ describe('getFieldsForModel', () => {
   });
 
   it('gives a ControlLoRA the preprocessor only', () => {
-    expect(fieldKeys(model('sdxl', 'control_lora'))).toEqual(['preprocessor']);
+    // Not decided here any more: the backend's table has no `supported` row for a control LoRA, since
+    // it is patched into a base model and the casting hooks would never fire.
+    expect(fieldKeys(model('sdxl', 'control_lora'), false)).toEqual(['preprocessor']);
+  });
+
+  it('leaves the row out entirely when the backend says FP8 Storage does nothing for this model', () => {
+    // The whole point of the change: a FLUX ControlNet, a GGUF main model or a model whose loader never
+    // casts must not be offered a control that silently does nothing.
+    expect(fieldKeys(model('flux', 'controlnet'), false)).toEqual(['preprocessor']);
+    expect(fieldKeys(model('flux', 'main'), false)).not.toContain('fp8_storage');
   });
 });
 

@@ -63,6 +63,7 @@ from invokeai.backend.model_manager.configs.t5_encoder import (
     T5Encoder_T5Encoder_Config,
 )
 from invokeai.backend.model_manager.configs.vae import VAE_Checkpoint_Config_Base, VAE_Checkpoint_Flux2_Config
+from invokeai.backend.model_manager.load.fp8_capability import Unimplemented
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
     _model_declared_skip_patterns,
@@ -1823,8 +1824,25 @@ class Flux2GGUFCheckpointModel(ModelLoader):
         return model
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
-@ModelLoaderRegistry.register(base=BaseModelType.Flux, type=ModelType.ControlNet, format=ModelFormat.Diffusers)
+_FLUX_CONTROLNET_FP8_STORAGE = Unimplemented(
+    "neither the XLabs nor the InstantX path casts -- they do not even move the adapter to a compute dtype -- "
+    "and the InstantX union build is a full FLUX transformer, so the gap is worth closing"
+)
+"""Both registrations below say this; naming it once keeps the two from drifting apart."""
+
+
+@ModelLoaderRegistry.register(
+    base=BaseModelType.Flux,
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+    fp8_storage=_FLUX_CONTROLNET_FP8_STORAGE,
+)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.Flux,
+    type=ModelType.ControlNet,
+    format=ModelFormat.Diffusers,
+    fp8_storage=_FLUX_CONTROLNET_FP8_STORAGE,
+)
 class FluxControlnetModel(ModelLoader):
     """Class to load FLUX ControlNet models."""
 

@@ -25,6 +25,7 @@ from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_SDNQ_Config,
     Qwen3Encoder_SDNQ_Folder_Config,
 )
+from invokeai.backend.model_manager.load.fp8_capability import Unimplemented
 from invokeai.backend.model_manager.load.load_default import (
     ModelLoader,
     _model_declared_skip_patterns,
@@ -1003,7 +1004,15 @@ class Qwen3EncoderLoader(ModelLoader):
         )
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.ZImage, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.ZImage,
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+    fp8_storage=Unimplemented(
+        "the adapter is loaded straight from the file and never cast at all; the Tile build is ~6.7 GB, "
+        "so this one is worth closing"
+    ),
+)
 class ZImageControlCheckpointModel(ModelLoader):
     """Class to load Z-Image Control adapter models from safetensors checkpoint.
 

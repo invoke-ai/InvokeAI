@@ -3,7 +3,7 @@ import type { TFunction } from 'i18next';
 
 import { loraDefaultSettingsSchema, mainDefaultSettingsSchema } from '@features/models/core/schemas';
 
-export type DefaultSettingsModel = Pick<ModelConfig, 'base' | 'default_settings' | 'key' | 'type'>;
+export type DefaultSettingsModel = Pick<ModelConfig, 'base' | 'default_settings' | 'format' | 'key' | 'type'>;
 
 const CONTROL_ADAPTER_TYPES = new Set(['controlnet', 't2i_adapter', 'control_lora']);
 
@@ -200,12 +200,14 @@ const CONTROL_ADAPTER_FIELDS: FieldSpec[] = [
   },
 ];
 
-/** Exclude LoRA/ControlLoRA: patched weights lack their own forward hooks. VAEs have no defaults section. */
-export const supportsFp8Storage = (model: Pick<ModelConfig, 'base' | 'type'>): boolean =>
-  model.type === 'main' || model.type === 'controlnet' || model.type === 't2i_adapter';
-
-export const getFieldsForModel = (model: Pick<ModelConfig, 'base' | 'type'>): FieldSpec[] => {
-  const fp8Fields = supportsFp8Storage(model) ? [FP8_STORAGE_FIELD] : [];
+/**
+ * `fp8StorageSupported` is the backend's answer (see `data/fp8StorageSupportStore`), not a rule applied
+ * here. It used to be `type === 'main' || 'controlnet' || 't2i_adapter'`, which offered the control for
+ * 19 of the 52 loader keys that ignore it: the answer also depends on the model's format, and on
+ * whether its loader implements the cast at all — neither of which this module can see.
+ */
+export const getFieldsForModel = (model: Pick<ModelConfig, 'type'>, fp8StorageSupported: boolean): FieldSpec[] => {
+  const fp8Fields = fp8StorageSupported ? [FP8_STORAGE_FIELD] : [];
 
   if (model.type === 'main') {
     return [...MAIN_FIELDS, ...fp8Fields];

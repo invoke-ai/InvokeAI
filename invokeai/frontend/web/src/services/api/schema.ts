@@ -567,6 +567,38 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/fp8_storage_support": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Fp8 Storage Support
+         * @description Which kinds of model FP8 Storage actually reaches, so a client stops offering it for the rest.
+         *
+         *     Keyed `(base, type, format)` -- the key model loaders are registered under, because the answer
+         *     differs along all three: FLUX main implements the cast and FLUX ControlNet does not, and a GGUF
+         *     main model must never be re-encoded. A key with no row is not supported; that is also what the
+         *     server itself concludes for one.
+         *
+         *     A static table, the same for every install and every user. Fetch it once and join it against model
+         *     records locally. Whether the *device* can do fp8 is deliberately not in here -- that probe belongs
+         *     on the loading thread, not behind an HTTP handler.
+         *
+         *     Declared `def`, not `async def`: it awaits nothing, so FastAPI runs it in a threadpool instead of
+         *     on the event loop. See docs/contributing/blocking-work-in-api-routes.
+         */
+        get: operations["list_fp8_storage_support"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/models/": {
         parameters: {
             query?: never;
@@ -15730,6 +15762,23 @@ export type components = {
              * @description Whether or not the model is already installed
              */
             is_installed: boolean;
+        };
+        /**
+         * Fp8StorageSupport
+         * @description One row of the served table: a loader key and the finished answer.
+         *
+         *     The reason is not served. Both markers hide the control identically, so a client has nothing to
+         *     do with the difference; it stays in the declaration, where the backlog lives.
+         */
+        Fp8StorageSupport: {
+            base: components["schemas"]["BaseModelType"];
+            type: components["schemas"]["ModelType"];
+            format: components["schemas"]["ModelFormat"];
+            /**
+             * Supported
+             * @description Whether FP8 Storage changes anything for a model of this kind.
+             */
+            supported: boolean;
         };
         /**
          * FreeUConfig
@@ -51565,6 +51614,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArchitectureCapabilities"][];
+                };
+            };
+        };
+    };
+    list_fp8_storage_support: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether FP8 Storage does anything, per loader key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Fp8StorageSupport"][];
                 };
             };
         };

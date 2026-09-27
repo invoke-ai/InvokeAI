@@ -187,7 +187,6 @@ from invokeai.backend.model_manager.configs.vae import (
 from invokeai.backend.model_manager.configs.wan_t5_encoder import WanT5Encoder_WanT5Encoder_Config
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk, read_safetensors_header
 from invokeai.backend.model_manager.taxonomy import (
-    QUANTIZED_MODEL_FORMATS,
     BaseModelType,
     ModelFormat,
     ModelSourceType,
@@ -250,19 +249,38 @@ def _identified_default_settings(
     settings_cls: type[SettingsT],
     mod: ModelOnDisk,
     override_fields: dict[str, Any] | None,
-    fp8_storage_applies: bool,
+    # Quoted: `AnyModelConfig` is the union of the concrete config classes and is assembled further down
+    # this module. `Config_Base` would not do — it declares none of base/type/format, which only a concrete
+    # class does (enforced by `__pydantic_init_subclass__`).
+    config: "AnyModelConfig",
 ) -> SettingsT | None:
     """Layer the settings sent with an install, and FP8 Storage for a float8 denoiser, over the recommended defaults.
 
     An install setting wins over detection in both directions. Fields the settings class does not have (a main-model
     field sent along with a LoRA install) are dropped, since nothing would read them.
+
+    FP8 Storage is enabled only where the model's own loader implements it. It used to be enabled for any float8
+    denoiser whose format was not already quantized, which wrote `fp8_storage: true` onto records whose loader ignores
+    it -- a Wan fp8 install was told its weights were halved and then loaded at bf16 size. `fp8_storage_verdict` is the
+    same answer the loader gate and the API row give; see `load/fp8_capability.py`.
+
+    A request sent with the install is dropped for such a model rather than stored. The detail panel does not offer the
+    control where the loader ignores it, so a stored `true` would be a value nobody can see or clear again -- and the
+    Add Models flow has one FP8 Storage checkbox for whatever is being installed, so it is easy to send for a model
+    that cannot use it.
     """
     requested = (override_fields or {}).get("default_settings") or {}
     update = {
         name: value for name, value in requested.items() if name in settings_cls.model_fields and value is not None
     }
 
-    if fp8_storage_applies and "fp8_storage" not in update and _denoiser_stores_float8_weights(mod):
+    # Imported here, not at module scope: `model_loader_registry` imports this module, so the reverse edge would close
+    # a cycle. Identification runs long after import time, and the import is a `sys.modules` hit after the first.
+    from invokeai.backend.model_manager.load.fp8_capability import fp8_storage_verdict
+
+    if not fp8_storage_verdict(config.base, config.type, config.format).supported:
+        update.pop("fp8_storage", None)
+    elif "fp8_storage" not in update and _denoiser_stores_float8_weights(mod):
         logger.info(f"{mod.name}: denoiser weights are stored in float8, enabling FP8 Storage by default")
         update["fp8_storage"] = True
 
@@ -889,7 +907,7 @@ class ModelConfigFactory:
                     MainModelDefaultSettings,
                     mod,
                     override_fields,
-                    fp8_storage_applies=config.format not in QUANTIZED_MODEL_FORMATS,
+                    config=config,
                 )
             case ModelType.ControlNet | ModelType.T2IAdapter | ModelType.ControlLoRa:
                 config.default_settings = _identified_default_settings(
@@ -897,8 +915,7 @@ class ModelConfigFactory:
                     ControlAdapterDefaultSettings,
                     mod,
                     override_fields,
-                    # A ControlLoRA is patched into its base model and never cast on its own.
-                    fp8_storage_applies=config.type is not ModelType.ControlLoRa,
+                    config=config,
                 )
             case ModelType.LoRA:
                 config.default_settings = _identified_default_settings(
@@ -906,7 +923,7 @@ class ModelConfigFactory:
                     LoraModelDefaultSettings,
                     mod,
                     override_fields,
-                    fp8_storage_applies=False,
+                    config=config,
                 )
             case _:
                 pass
