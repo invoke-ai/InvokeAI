@@ -4847,6 +4847,18 @@ export type components = {
              */
             vae?: components["schemas"]["VAEField"] | null;
             /**
+             * Tiled
+             * @description Processing using overlapping tiles (reduce memory consumption)
+             * @default false
+             */
+            tiled?: boolean;
+            /**
+             * Tile Size
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 64 are raised to 64.
+             * @default 0
+             */
+            tile_size?: number;
+            /**
              * type
              * @default anima_i2l
              * @constant
@@ -15422,6 +15434,18 @@ export type components = {
              */
             vae?: components["schemas"]["VAEField"] | null;
             /**
+             * Tiled
+             * @description Processing using overlapping tiles (reduce memory consumption)
+             * @default false
+             */
+            tiled?: boolean;
+            /**
+             * Tile Size
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.
+             * @default 0
+             */
+            tile_size?: number;
+            /**
              * type
              * @default flux_vae_decode
              * @constant
@@ -15460,6 +15484,18 @@ export type components = {
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;
+            /**
+             * Tiled
+             * @description Processing using overlapping tiles (reduce memory consumption)
+             * @default false
+             */
+            tiled?: boolean;
+            /**
+             * Tile Size
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.
+             * @default 0
+             */
+            tile_size?: number;
             /**
              * type
              * @default flux_vae_encode
@@ -37653,7 +37689,7 @@ export type components = {
              */
             image?: components["schemas"]["ImageField"] | null;
             /**
-             * @description FLUX AutoEncoder VAE. PiD upscale runs the FLUX backbone and applies FLUX VAE scaling, and the encode path only supports InvokeAI's FLUX AutoEncoder — a diffusers AutoencoderKL (e.g. Z-Image) is not supported here.
+             * @description The FLUX.1 VAE, which Z-Image also uses. PiD upscale runs the FLUX backbone and undoes FLUX VAE scaling, so a VAE of another family is not accepted.
              * @default null
              */
             vae?: components["schemas"]["VAEField"] | null;
@@ -50325,7 +50361,7 @@ export type components = {
         };
         /**
          * Image to Latents - Z-Image
-         * @description Generates latents from an image using Z-Image VAE (supports both Diffusers and FLUX VAE).
+         * @description Generates latents from an image using the Z-Image VAE.
          */
         ZImageImageToLatentsInvocation: {
             /**
@@ -50366,6 +50402,18 @@ export type components = {
              */
             vae?: components["schemas"]["VAEField"] | null;
             /**
+             * Tiled
+             * @description Processing using overlapping tiles (reduce memory consumption)
+             * @default false
+             */
+            tiled?: boolean;
+            /**
+             * Tile Size
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.
+             * @default 0
+             */
+            tile_size?: number;
+            /**
              * type
              * @default z_image_i2l
              * @constant
@@ -50374,7 +50422,7 @@ export type components = {
         };
         /**
          * Latents to Image - Z-Image
-         * @description Generates an image from latents using Z-Image VAE (supports both Diffusers and FLUX VAE).
+         * @description Generates an image from latents using the Z-Image VAE.
          */
         ZImageLatentsToImageInvocation: {
             /**
@@ -50422,7 +50470,7 @@ export type components = {
             tiled?: boolean;
             /**
              * Tile Size
-             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage.
+             * @description The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.
              * @default 0
              */
             tile_size?: number;

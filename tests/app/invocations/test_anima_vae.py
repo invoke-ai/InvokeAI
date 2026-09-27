@@ -97,6 +97,35 @@ class TestEstimateVaeWorkingMemoryAnima:
         assert fp32 == 2 * fp16
 
 
+class TestTheTiledEncodeResidual:
+    """A tiled encode does not bound the frame it slices from, nor the moments it assembles.
+
+    Without those terms the estimate is flat in the image size while the measurement grows about
+    4 bytes per pixel: measured on a 4090 it fell from 1.07x headroom at 1024px to 0.69x at 4096px,
+    i.e. the cache promised less than the encode used -- and this node has no tiled retry, so that
+    is a failed generation rather than a slower one.
+    """
+
+    def test_the_tiled_encode_estimate_grows_with_the_frame(self):
+        vae = _mock_vae()
+        estimates = [
+            estimate_vae_working_memory_anima("encode", torch.zeros(1, 3, edge, edge), vae, tile_size=256)
+            for edge in (1024, 4096)
+        ]
+        assert estimates[1] > estimates[0], "the un-bounded part of a tiled encode is not priced"
+
+    def test_the_tiled_decode_estimate_is_left_flat(self):
+        """Stated rather than assumed: the decode has the same kind of un-bounded assembly and does
+        not price it either. That is pre-existing -- this node has tiled since it was written -- and
+        is deliberately not changed in a diff about the encode."""
+        vae = _mock_vae()
+        estimates = [
+            estimate_vae_working_memory_anima("decode", torch.zeros(1, 16, edge // 8, edge // 8), vae, tile_size=256)
+            for edge in (1024, 4096)
+        ]
+        assert estimates[0] == estimates[1]
+
+
 class TestUseTiledDecode:
     @pytest.mark.parametrize("device_type", ["cpu", "mps"])
     def test_non_cuda_never_tiles(self, device_type):
@@ -184,10 +213,13 @@ class TestAnimaAcceptsBothWan21VaeLayouts:
 
 
 def _flux_vae_info() -> MagicMock:
-    from invokeai.backend.flux.modules.autoencoder import AutoEncoder as FluxAutoEncoder
+    from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
     vae_info = MagicMock()
-    vae_info.model = MagicMock(spec=FluxAutoEncoder)
+    # The FLUX.1 autoencoder is loaded as a diffusers `AutoencoderKL`, which is *not* one of the two
+    # classes `as_qwen_image_vae` accepts (`AutoencoderKLQwenImage`, `AutoencoderKLWan`). So the
+    # refusal is still a class check here -- what changed is which class the FLUX VAE presents as.
+    vae_info.model = MagicMock(spec=AutoencoderKL)
     return vae_info
 
 
@@ -201,7 +233,7 @@ def _flux_decode_context(vae_info: MagicMock) -> MagicMock:
 class TestAnimaRefusesAForeignDecoder:
     """A FLUX VAE has Anima's channel count and compression but a different basis.
 
-    It used to be accepted -- the node had a `FluxAutoEncoder` branch, the picker offered it, and
+    It used to be accepted -- the node had a branch for that class, the picker offered it, and
     the decode returned a magenta moire with the subject barely visible while the run reported
     success. Measured against the correct decode of the same latent: 8.67 dB PSNR, mean absolute
     error 84 of 255. Nothing downstream can tell such an image from an intended one, so the node

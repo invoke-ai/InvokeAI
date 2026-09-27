@@ -78,7 +78,7 @@ Everything above describes PiD as a *decode* step: it needs the latent the model
 It encodes your image with the FLUX VAE and hands the resulting latent to the PiD decoder, giving a 4× result in one pass — the PiD analogue of an ESRGAN / SUPIR upscale. Connect a FLUX VAE, a **FLUX** PiD decoder and the Gemma-2 encoder, and optionally give it a caption describing the image (the decoder is caption-conditioned; an empty caption is the cheapest option but usually the weaker result).
 
 <Aside type="caution">
-This node is a **prototype** and FLUX-only in both directions: it requires InvokeAI's FLUX `AutoEncoder` VAE (a diffusers `AutoencoderKL`, e.g. Z-Image's, is rejected) and a FLUX PiD decoder. Since the input is a plain image rather than the generating model's own latent, results are less faithful than PiD used as a decode.
+This node is a **prototype** and FLUX-only in both directions: it requires the FLUX.1 VAE (which Z-Image also uses; a VAE of another family is rejected) and a FLUX PiD decoder. Since the input is a plain image rather than the generating model's own latent, results are less faithful than PiD used as a decode.
 </Aside>
 
 ## Tips & limitations
