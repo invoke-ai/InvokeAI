@@ -1,8 +1,9 @@
+import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowLibraryBrowseSnapshot, WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 import type { ChangeEvent } from 'react';
 
-import { Dialog, HStack, Input, Portal, SegmentGroup, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Dialog, HStack, Input, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import {
   ensureWorkflowLibraryBrowseLoaded,
   getWorkflowLibraryBrowseSnapshot,
@@ -10,13 +11,27 @@ import {
   useWorkflowLibraryBrowseSelector,
 } from '@features/workflow/data/libraryBrowseStore';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
+import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
+import {
+  setWorkflowLibrarySelection,
+  setWorkflowLibraryTab,
+  workflowUiStore,
+  type WorkflowLibraryTab,
+} from '@features/workflow/ui/workflowUiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { CloseButton } from '@platform/ui';
-import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { CloseButton, SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui';
+import { lazy, Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { WorkflowCardMenuAnchor } from './WorkflowLibraryCard';
+
 import { buildLibraryGraphPreviewSource } from './libraryPreviewSource';
-import { useLoadLibraryWorkflow } from './useLoadLibraryWorkflow';
+import { ProjectWorkflowsView } from './ProjectWorkflowsView';
+import {
+  type OpenLibraryWorkflowMode,
+  planLibraryWorkflowOpen,
+  useOpenLibraryWorkflow,
+} from './useOpenLibraryWorkflow';
 import { WorkflowLibraryDetailPanel } from './WorkflowLibraryDetailPanel';
 import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
 import { WorkflowLibraryTagChips } from './WorkflowLibraryTagChips';
@@ -31,10 +46,11 @@ const LazyGraphPreviewDialog = lazy(() =>
 
 const SEARCH_DEBOUNCE_MS = 300;
 
-const CATEGORY_ITEMS = [
+const TAB_ITEMS: ReadonlyArray<{ labelKey: string; value: WorkflowLibraryTab }> = [
+  { labelKey: 'workflowLibrary.thisProject', value: 'project' },
   { labelKey: 'workflowLibrary.browse', value: 'default' },
   { labelKey: 'workflowLibrary.yours', value: 'user' },
-] as const;
+];
 
 /** Flat and shallow-comparable, so unrelated store patches do not re-render the shell. */
 const selectBrowseView = (snapshot: WorkflowLibraryBrowseSnapshot) => ({
@@ -46,9 +62,14 @@ const selectBrowseView = (snapshot: WorkflowLibraryBrowseSnapshot) => ({
   tagCounts: snapshot.tagCounts,
 });
 
+const selectLibraryNavigation = (snapshot: ReturnType<typeof workflowUiStore.getSnapshot>) => ({
+  selection: snapshot.librarySelection,
+  tab: snapshot.libraryTab,
+});
+
 /**
- * On open, load the first page and choose defaults for empty accounts only if filters have not changed during the
- * probe.
+ * On a template tab's first open, load the first page and choose defaults for empty accounts only if filters have
+ * not changed during the probe. The project view never loads library pages.
  */
 const WorkflowLibraryBrowseSession = () => {
   useMountEffect(() => {
@@ -57,12 +78,18 @@ const WorkflowLibraryBrowseSession = () => {
 
       if (userTotal === 0 && filter.category === 'user' && !filter.search) {
         setWorkflowLibraryBrowseFilter({ category: 'default', tag: null });
+        setWorkflowLibraryTab('default');
       }
     });
   });
 
   return null;
 };
+
+/** A preview request from either view: a library entry's enriched document or a project workflow's own. */
+type PreviewRequest =
+  | { kind: 'library'; entry: WorkflowLibraryEntry }
+  | { kind: 'project'; entry: ProjectWorkflowEntry };
 
 export const WorkflowLibraryDialog = ({
   isOpen,
@@ -73,25 +100,31 @@ export const WorkflowLibraryDialog = ({
 }) => {
   const { t } = useTranslation();
   const { category, entries, error, status, tag, tagCounts } = useWorkflowLibraryBrowseSelector(selectBrowseView);
+  const { selection, tab } = workflowUiStore.useSelector(selectLibraryNavigation);
+  const projectId = useWorkflowProjectSelector((project) => project.id);
+  const projectWorkflows = useWorkflowProjectSelector((project) => project.workflows);
   const templatesSnapshot = useInvocationTemplatesSnapshot();
   const [searchInput, setSearchInput] = useState('');
   const [selectedWorkflowId, setSelectedWorkflowId] = useState<string | null>(null);
   // Clear pending preview entries on every library-close path because the persistent shell otherwise resurrects
   // them on reopen.
-  const [previewEntry, setPreviewEntry] = useState<WorkflowLibraryEntry | null>(null);
-  // Close before clearing previewEntry so the lazy dialog remains mounted through its exit transition.
+  const [previewRequest, setPreviewRequest] = useState<PreviewRequest | null>(null);
+  // Close before clearing the request so the lazy dialog remains mounted through its exit transition.
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [contextMenuPoint, setContextMenuPoint] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenuPoint, setContextMenuPoint] = useState<WorkflowCardMenuAnchor | null>(null);
+  // The element focus returns to when the menu closes. It outlives the open menu: the menu is told it closed only
+  // after React has rendered the close, so the trigger it restores focus to must still be the one that opened it.
+  const [contextMenuTriggerId, setContextMenuTriggerId] = useState<string | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const closeDialog = useCallback(() => {
     // Closing the library removes its preview immediately; the parent surface is leaving too.
-    setPreviewEntry(null);
+    setPreviewRequest(null);
     setIsPreviewOpen(false);
     setContextMenuPoint(null);
     onOpenChange(false);
   }, [onOpenChange]);
-  const { load, loadPhase } = useLoadLibraryWorkflow(closeDialog);
+  const { loadPhase, open, resume } = useOpenLibraryWorkflow(closeDialog);
   const isLoadPending = loadPhase !== 'idle';
   const missingCounts = useWorkflowLibraryMissingCounts(entries);
 
@@ -100,6 +133,8 @@ export const WorkflowLibraryDialog = ({
     ? selectedWorkflowId
     : (entries[0]?.item.workflow_id ?? null);
   const activeEntry = entries.find((entry) => entry.item.workflow_id === activeWorkflowId) ?? null;
+  // The project selection belongs to the project it was made in; another project starts from its active workflow.
+  const projectSelectionId = selection?.projectId === projectId ? selection.workflowId : null;
 
   const handleDialogOpenChange = useCallback(
     (event: { open: boolean }) => {
@@ -117,7 +152,11 @@ export const WorkflowLibraryDialog = ({
   );
 
   const handlePreviewRequest = useCallback((entry: WorkflowLibraryEntry) => {
-    setPreviewEntry(entry);
+    setPreviewRequest({ entry, kind: 'library' });
+    setIsPreviewOpen(true);
+  }, []);
+  const handleProjectPreviewRequest = useCallback((entry: ProjectWorkflowEntry) => {
+    setPreviewRequest({ entry, kind: 'project' });
     setIsPreviewOpen(true);
   }, []);
 
@@ -132,18 +171,31 @@ export const WorkflowLibraryDialog = ({
   // arrives after that must not pull the mount out from under it.
   const handlePreviewExitComplete = useCallback(() => {
     if (!isPreviewOpen) {
-      setPreviewEntry(null);
+      setPreviewRequest(null);
     }
   }, [isPreviewOpen]);
 
   // Only ready enrichment has a document; guard stale preview entries after revalidation.
   const previewSource = useMemo(() => {
-    if (!previewEntry || previewEntry.enrichment.status !== 'ready' || templatesSnapshot.status !== 'loaded') {
+    if (!previewRequest || templatesSnapshot.status !== 'loaded') {
       return null;
     }
 
-    return buildLibraryGraphPreviewSource(previewEntry.enrichment.document, templatesSnapshot.templates);
-  }, [previewEntry, templatesSnapshot]);
+    if (previewRequest.kind === 'project') {
+      return buildLibraryGraphPreviewSource(previewRequest.entry.document, templatesSnapshot.templates);
+    }
+
+    return previewRequest.entry.enrichment.status === 'ready'
+      ? buildLibraryGraphPreviewSource(previewRequest.entry.enrichment.document, templatesSnapshot.templates)
+      : null;
+  }, [previewRequest, templatesSnapshot]);
+  const previewGraphId =
+    previewRequest?.kind === 'project'
+      ? previewRequest.entry.document.id
+      : (previewRequest?.entry.item.workflow_id ?? '');
+  const previewLabel =
+    (previewRequest?.kind === 'project' ? previewRequest.entry.document.name : previewRequest?.entry.item.name) ||
+    t('workflowLibrary.untitled');
 
   const handleSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
     const { value } = event.currentTarget;
@@ -158,13 +210,26 @@ export const WorkflowLibraryDialog = ({
     searchTimerRef.current = setTimeout(() => setWorkflowLibraryBrowseFilter({ search: value }), SEARCH_DEBOUNCE_MS);
   }, []);
 
-  const handleCategoryChange = useCallback((event: { value: string | null }) => {
-    // The store applies filter patches literally, so clearing the tag when the
-    // category changes (its chips do not carry over) is the UI's job.
-    if (event.value === 'default' || event.value === 'user') {
-      setWorkflowLibraryBrowseFilter({ category: event.value, tag: null });
-    }
-  }, []);
+  const handleTabChange = useCallback(
+    (value: WorkflowLibraryTab) => {
+      setContextMenuPoint(null);
+
+      if (value === 'project') {
+        setWorkflowLibraryTab('project');
+        return;
+      }
+
+      // The store applies filter patches literally, so clearing the tag when the
+      // category changes (its chips do not carry over) is the UI's job.
+      setWorkflowLibraryTab(value);
+
+      if (category !== value) {
+        setWorkflowLibraryBrowseFilter({ category: value, tag: null });
+      }
+    },
+    [category]
+  );
+  const goToTemplates = useCallback(() => handleTabChange('default'), [handleTabChange]);
 
   const handleTagSelect = useCallback((nextTag: string | null) => setWorkflowLibraryBrowseFilter({ tag: nextTag }), []);
 
@@ -174,22 +239,52 @@ export const WorkflowLibraryDialog = ({
         (candidate) => candidate.item.workflow_id === workflowId
       );
 
-      if (entry) {
-        void load(entry.item);
+      if (!entry) {
+        return;
       }
+
+      const plan = planLibraryWorkflowOpen(projectWorkflows, workflowId);
+
+      if (plan.kind === 'choose') {
+        // Several copies: the project view shows them all, with the first one selected.
+        setWorkflowLibrarySelection({ projectId, workflowId: plan.copies[0]!.document.id });
+        setWorkflowLibraryTab('project');
+        return;
+      }
+
+      void open(entry.item, 'resume-or-add');
     },
-    [load]
+    [open, projectId, projectWorkflows]
   );
 
-  const handleOpenItem = useCallback((item: WorkflowLibraryListItem) => void load(item), [load]);
+  const handleOpenItem = useCallback(
+    (item: WorkflowLibraryListItem, mode: OpenLibraryWorkflowMode) => void open(item, mode),
+    [open]
+  );
 
   const handleDeleted = useCallback(() => {
     setSelectedWorkflowId(null);
     setContextMenuPoint(null);
   }, []);
   const handleCardContextMenu = useCallback(
-    (workflowId: string, point: { x: number; y: number }) => {
-      setSelectedWorkflowId(workflowId);
+    (workflowId: string, point: WorkflowCardMenuAnchor) => {
+      if (tab === 'project') {
+        setWorkflowLibrarySelection({ projectId, workflowId });
+      } else {
+        setSelectedWorkflowId(workflowId);
+      }
+
+      setContextMenuTriggerId(point.kind === 'trigger' ? point.triggerId : null);
+
+      // The menu button that opened the menu closes it again.
+      if (
+        point.kind === 'trigger' &&
+        contextMenuPoint?.kind === 'trigger' &&
+        contextMenuPoint.triggerId === point.triggerId
+      ) {
+        setContextMenuPoint(null);
+        return;
+      }
 
       // An open menu does not follow a new anchor: close it and reopen it at the
       // new point once that close has rendered, as a native menu relocates.
@@ -200,9 +295,18 @@ export const WorkflowLibraryDialog = ({
         setContextMenuPoint(point);
       }
     },
-    [contextMenuPoint]
+    [contextMenuPoint, projectId, tab]
   );
   const closeContextMenu = useCallback(() => setContextMenuPoint(null), []);
+  const handleProjectSelect = useCallback(
+    (workflowId: string | null) => setWorkflowLibrarySelection(workflowId ? { projectId, workflowId } : null),
+    [projectId]
+  );
+
+  const isProjectTab = tab === 'project';
+  const tabsIdBase = useId();
+  const activeTab: WorkflowLibraryTab = isProjectTab ? 'project' : category;
+  const tabItems = useMemo(() => TAB_ITEMS.map((item) => ({ id: item.value, label: t(item.labelKey) })), [t]);
 
   return (
     <>
@@ -238,25 +342,30 @@ export const WorkflowLibraryDialog = ({
                 <Stack gap="2" minW="0" w="full">
                   <HStack gap="3" minW="0">
                     <Dialog.Title flexShrink={0}>{t('workflowLibrary.title')}</Dialog.Title>
-                    <Input
-                      aria-label={t('workflowLibrary.searchPlaceholder')}
-                      flex="1"
-                      minW="0"
-                      placeholder={t('workflowLibrary.searchPlaceholder')}
-                      size="xs"
-                      type="search"
-                      value={searchInput}
-                      onChange={handleSearchChange}
+                    {isProjectTab ? (
+                      <Text color="fg.subtle" flex="1" fontSize="xs" minW="0" truncate>
+                        {t('workflowLibrary.thisProjectHint')}
+                      </Text>
+                    ) : (
+                      <Input
+                        aria-label={t('workflowLibrary.searchPlaceholder')}
+                        flex="1"
+                        minW="0"
+                        placeholder={t('workflowLibrary.searchPlaceholder')}
+                        size="xs"
+                        type="search"
+                        value={searchInput}
+                        onChange={handleSearchChange}
+                      />
+                    )}
+                    <SegmentTabs
+                      activeId={activeTab}
+                      ariaLabel={t('workflowLibrary.title')}
+                      idBase={tabsIdBase}
+                      isCompact
+                      tabs={tabItems}
+                      onSelect={handleTabChange}
                     />
-                    <SegmentGroup.Root flexShrink={0} size="xs" value={category} onValueChange={handleCategoryChange}>
-                      <SegmentGroup.Indicator />
-                      {CATEGORY_ITEMS.map((item) => (
-                        <SegmentGroup.Item key={item.value} value={item.value}>
-                          <SegmentGroup.ItemHiddenInput />
-                          <SegmentGroup.ItemText>{t(item.labelKey)}</SegmentGroup.ItemText>
-                        </SegmentGroup.Item>
-                      ))}
-                    </SegmentGroup.Root>
 
                     <Dialog.CloseTrigger asChild>
                       <CloseButton
@@ -268,50 +377,76 @@ export const WorkflowLibraryDialog = ({
                       />
                     </Dialog.CloseTrigger>
                   </HStack>
-                  <WorkflowLibraryTagChips selectedTag={tag} tagCounts={tagCounts} onSelect={handleTagSelect} />
+                  {isProjectTab ? null : (
+                    <WorkflowLibraryTagChips selectedTag={tag} tagCounts={tagCounts} onSelect={handleTagSelect} />
+                  )}
                 </Stack>
               </Dialog.Header>
               <Dialog.Body
-                data-pending-preview={previewEntry?.item.workflow_id}
+                aria-labelledby={segmentTabsTabId(tabsIdBase, activeTab)}
+                data-library-tab={tab}
+                data-pending-preview={previewGraphId || undefined}
                 display="flex"
                 flex="1"
                 gap="3"
+                id={segmentTabsPanelId(tabsIdBase)}
                 minH="0"
+                role="tabpanel"
               >
-                <WorkflowLibraryGrid
-                  entries={entries}
-                  error={error}
-                  missingCounts={missingCounts}
-                  selectedWorkflowId={activeWorkflowId}
-                  status={status}
-                  onContextMenu={handleCardContextMenu}
-                  onOpen={handleOpenWorkflow}
-                  onSelect={setSelectedWorkflowId}
-                />
-                <WorkflowLibraryDetailPanel
-                  contextMenuPoint={contextMenuPoint}
-                  entry={activeEntry}
-                  onClose={closeDialog}
-                  onContextMenuClose={closeContextMenu}
-                  onDeleted={handleDeleted}
-                  onDuplicated={setSelectedWorkflowId}
-                  onOpen={handleOpenItem}
-                  onPreview={handlePreviewRequest}
-                />
+                {isProjectTab ? (
+                  <ProjectWorkflowsView
+                    contextMenuPoint={contextMenuPoint}
+                    contextMenuTriggerId={contextMenuTriggerId}
+                    selectedWorkflowId={projectSelectionId}
+                    onAddWorkflow={goToTemplates}
+                    onClose={closeDialog}
+                    onContextMenu={handleCardContextMenu}
+                    onContextMenuClose={closeContextMenu}
+                    onPreview={handleProjectPreviewRequest}
+                    onSelect={handleProjectSelect}
+                  />
+                ) : (
+                  <>
+                    <WorkflowLibraryGrid
+                      entries={entries}
+                      error={error}
+                      missingCounts={missingCounts}
+                      openMenuAnchor={contextMenuPoint}
+                      selectedWorkflowId={activeWorkflowId}
+                      status={status}
+                      onContextMenu={handleCardContextMenu}
+                      onOpen={handleOpenWorkflow}
+                      onSelect={setSelectedWorkflowId}
+                    />
+                    <WorkflowLibraryDetailPanel
+                      contextMenuPoint={contextMenuPoint}
+                      contextMenuTriggerId={contextMenuTriggerId}
+                      entry={activeEntry}
+                      projectWorkflows={projectWorkflows}
+                      onClose={closeDialog}
+                      onContextMenuClose={closeContextMenu}
+                      onDeleted={handleDeleted}
+                      onDuplicated={setSelectedWorkflowId}
+                      onOpen={handleOpenItem}
+                      onPreview={handlePreviewRequest}
+                      onResume={resume}
+                    />
+                  </>
+                )}
               </Dialog.Body>
-              {isOpen ? <WorkflowLibraryBrowseSession /> : null}
+              {isOpen && !isProjectTab ? <WorkflowLibraryBrowseSession /> : null}
             </Dialog.Content>
           </Dialog.Positioner>
         </Portal>
       </Dialog.Root>
-      {previewEntry && previewSource ? (
+      {previewRequest && previewSource ? (
         <Suspense fallback={null}>
           <LazyGraphPreviewDialog
-            graphId={previewEntry.item.workflow_id}
+            graphId={previewGraphId}
             hideInvoke
             isOpen={isPreviewOpen}
             source={previewSource}
-            sourceLabel={previewEntry.item.name || t('workflowLibrary.untitled')}
+            sourceLabel={previewLabel}
             onExitComplete={handlePreviewExitComplete}
             onOpenChange={handlePreviewOpenChange}
           />

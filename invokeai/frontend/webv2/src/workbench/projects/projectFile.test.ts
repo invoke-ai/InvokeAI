@@ -227,14 +227,14 @@ describe('exportLibraryProject', () => {
     const entries = await readArchive(new Uint8Array(await blob.arrayBuffer()));
     const exported = JSON.parse(readEntryText(entries.get('project.json')!)) as Record<string, unknown>;
 
-    expect(exported.documentSchemaVersion).toBe(2);
+    expect(exported.documentSchemaVersion).toBe(3);
     expect(exported).not.toHaveProperty('events');
     expect(exported).not.toHaveProperty('graphHistory');
     expect(exported).not.toHaveProperty('queue');
   });
 
   it('exports a future-schema server record verbatim for recovery', async () => {
-    const document = { documentSchemaVersion: 3, futureField: { value: 42 }, id: 'future', name: 'Future' };
+    const document = { documentSchemaVersion: 4, futureField: { value: 42 }, id: 'future', name: 'Future' };
 
     api.getProject.mockResolvedValue({ data: document, name: 'Future', project_id: 'p1', revision: 3 });
 
@@ -475,6 +475,31 @@ describe('importing a project board', () => {
     expect(api.createProjectSettled.mock.calls[0]![0]).toMatchObject({ board_id: 'staging-board' });
     expect(outcome.boardItemIssues).toEqual([]);
     expect(outcome.documentReferenceIssues).toEqual([]);
+  });
+
+  it('drops library links on import: a portable file never acquires a write target', async () => {
+    acceptCreate();
+    api.getProjectBoardSnapshot.mockResolvedValue(boardSnapshot());
+    const project = boardProject();
+    await projectFile.exportOpenProject({
+      ...project,
+      workflows: {
+        ...project.workflows,
+        entries: project.workflows.entries.map((entry) => ({
+          ...entry,
+          source: { libraryWorkflowId: 'lib-1', revision: 2 },
+        })),
+      },
+    });
+
+    await projectFile.importProjectFile(capturedArchive());
+
+    const { data } = api.createProjectSettled.mock.calls[0]![0] as {
+      data: { workflows: { entries: { document: { id: string }; source?: unknown }[] } };
+    };
+
+    expect(data.workflows.entries).toHaveLength(1);
+    expect(data.workflows.entries[0]).not.toHaveProperty('source');
   });
 
   it('stars only the descriptors that were starred', async () => {

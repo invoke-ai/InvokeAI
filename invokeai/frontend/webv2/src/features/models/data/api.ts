@@ -36,6 +36,24 @@ export const listMissingModels = async (signal?: AbortSignal): Promise<ModelConf
 export const getModelsDir = (signal?: AbortSignal): Promise<string> =>
   requestJson<string>(`${MODELS_BASE}/models_dir`, { signal });
 
+/** One `(base, type, format)` loader key and whether FP8 Storage reaches it. */
+export interface Fp8StorageSupportRow {
+  base: string;
+  type: string;
+  format: string;
+  supported: boolean;
+}
+
+/**
+ * Which kinds of model FP8 Storage actually does something for. Static per backend build.
+ *
+ * Keyed by the loader key rather than the model type, because the answer differs along all three
+ * parts: FLUX main implements the cast, FLUX ControlNet does not, and a GGUF main model must never be
+ * re-encoded. A key the backend does not serve is not supported.
+ */
+export const getFp8StorageSupport = (signal?: AbortSignal): Promise<Fp8StorageSupportRow[]> =>
+  requestJson<Fp8StorageSupportRow[]>(`${MODELS_BASE}/fp8_storage_support`, { signal });
+
 export const updateModel = (key: string, changes: ModelRecordChanges, signal?: AbortSignal): Promise<ModelConfig> =>
   requestJson<ModelConfig>(`${MODELS_BASE}/i/${encodeURIComponent(key)}`, {
     body: JSON.stringify(changes),

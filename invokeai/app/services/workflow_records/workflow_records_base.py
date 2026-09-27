@@ -28,13 +28,28 @@ class WorkflowRecordsStorageBase(ABC):
         workflow: WorkflowWithoutID,
         user_id: str = WORKFLOW_LIBRARY_DEFAULT_USER_ID,
         is_public: bool = False,
+        workflow_id: Optional[str] = None,
     ) -> WorkflowRecordDTO:
-        """Creates a workflow."""
+        """Creates a workflow at revision 1.
+
+        `workflow_id` is an optional client-reserved UUID that makes creation retry-safe: a record that already
+        carries it is returned as-is when the same owner submitted the same content, and any other collision raises
+        `WorkflowIdConflictError`.
+        """
         pass
 
     @abstractmethod
-    def update(self, workflow: Workflow, user_id: Optional[str] = None) -> WorkflowRecordDTO:
-        """Updates a workflow. When user_id is provided, the UPDATE is scoped to that user."""
+    def update(
+        self, workflow: Workflow, user_id: Optional[str] = None, expected_revision: Optional[int] = None
+    ) -> WorkflowRecordDTO:
+        """Replaces a workflow's content and increments its revision, atomically with authorization and reference
+        indexing.
+
+        When `user_id` is provided the write is refused (`WorkflowAccessDeniedError`) unless that user owns the
+        record. When `expected_revision` is provided the write is refused (`WorkflowRevisionConflictError`) unless
+        the stored revision still matches. Bundled workflows raise `WorkflowImmutableError` regardless of the
+        submitted category.
+        """
         pass
 
     @abstractmethod

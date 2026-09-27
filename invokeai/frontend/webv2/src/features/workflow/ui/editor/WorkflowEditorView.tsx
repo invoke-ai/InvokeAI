@@ -242,6 +242,7 @@ export const getInitialRenderFlowModel = (model: WorkflowFlowModel, viewport: Vi
 const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
   const projectId = useWorkflowProjectSelector((project) => project.id);
+  const workflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
   const ui = useWorkflowUi();
   const { mark: markWorkbenchPerf, measure: measureWorkbenchPerf, time: timeWorkbenchPerf } = ui.performance;
   const { editGraph, redo, undo } = useProjectGraphCommands();
@@ -276,8 +277,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     nodeCount: projectGraph.nodes.length,
   });
   const viewportKey = useMemo(
-    () => getWorkflowViewportKey(projectId, runtime.instanceId),
-    [projectId, runtime.instanceId]
+    () => getWorkflowViewportKey(projectId, workflowId, runtime.instanceId),
+    [projectId, runtime.instanceId, workflowId]
   );
   const perfSource = useMemo<WorkflowPerfSource>(
     () => ({
@@ -1220,9 +1221,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 };
 
 export const WorkflowEditorView = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
+  // Each project workflow is its own editor mount: selection, viewport and deferred large-graph work stay with it.
   const flowIdentity = useWorkflowProjectSelector(
     (project) =>
-      `${project.id}:${isLargeWorkflowGraph({ edgeCount: project.projectGraph.edges.length, nodeCount: project.projectGraph.nodes.length }) ? 'large' : 'standard'}`
+      `${project.id}:${project.activeWorkflowId}:${isLargeWorkflowGraph({ edgeCount: project.projectGraph.edges.length, nodeCount: project.projectGraph.nodes.length }) ? 'large' : 'standard'}`
   );
 
   useEffect(() => {

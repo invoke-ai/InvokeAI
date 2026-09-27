@@ -24,6 +24,7 @@ const workflows: WorkflowRecordListItemWithThumbnailDTO[] = [
     description: '',
     tags: '',
     is_public: false,
+    revision: 1,
     thumbnail_url: null,
     category: 'user',
     user_id: 'user-a',
@@ -42,6 +43,7 @@ const workflows: WorkflowRecordListItemWithThumbnailDTO[] = [
     description: '',
     tags: '',
     is_public: true,
+    revision: 1,
     thumbnail_url: null,
     category: 'default',
     user_id: 'system',
@@ -121,6 +123,7 @@ describe('savedWorkflowFieldUtils', () => {
       opened_at: null,
       user_id: 'user-z',
       is_public: true,
+      revision: 1,
       thumbnail_url: null,
       call_saved_workflow_compatibility: {
         is_callable: true,
@@ -188,6 +191,7 @@ describe('savedWorkflowFieldUtils', () => {
       workflow_id: 'workflow-shared',
       name: 'Shared Workflow',
       is_public: true,
+      revision: 1,
     };
 
     expect(mergeSavedWorkflowPickerItems([ownedWorkflow], [defaultWorkflow, sharedWorkflow], [ownedWorkflow])).toEqual([

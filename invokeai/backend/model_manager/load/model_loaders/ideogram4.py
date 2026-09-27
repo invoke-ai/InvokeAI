@@ -25,6 +25,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Ideogram4_Config,
     Main_Diffusers_Ideogram4_Config,
 )
+from invokeai.backend.model_manager.load.fp8_capability import NotApplicable
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import (
@@ -47,7 +48,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
     parse_quantization_metadata,
-    predict_cast_state_dict_size,
     read_safetensors_metadata,
     reject_quantized_side_channel,
     should_keep_fp8_weights,
@@ -61,6 +61,7 @@ from invokeai.backend.quantization.int8_convrot import (
     reject_int8_layers_a_plain_fold_cannot_decode,
     reject_unmarked_int8_weights,
 )
+from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, log_unexpected_keys
 
@@ -101,7 +102,15 @@ def _verify_encoder_fully_materialized(model: torch.nn.Module, *, context: str) 
         )
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Ideogram4, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.Ideogram4,
+    type=ModelType.Main,
+    format=ModelFormat.Diffusers,
+    fp8_storage=NotApplicable(
+        "every published build is nf4 or fp8 already: `Fp8Linear` keeps the fp8 one at a byte per weight, "
+        "and casting the nf4 payload would corrupt it silently"
+    ),
+)
 class Ideogram4DiffusersModel(ModelLoader):
     """Loads Ideogram 4 main models (nf4 / fp8) bundled in diffusers layout."""
 
@@ -430,15 +439,15 @@ class Ideogram4CheckpointModel(ModelLoader):
             # Where the weights are not kept the prediction charges every float at `model_dtype`,
             # folded yet or not, so the number is the same on either side of the fold -- what changes
             # is when the room exists.
-            self._ram_cache.make_room(
-                predict_cast_state_dict_size(
-                    sd,
-                    model_dtype,
-                    keep_fp8=keep_fp8,
-                    model=model,
-                    skip_patterns=skip_patterns,
-                    scaled_layers=fp8_layers,
-                )
+            reserve_for_load(
+                self._ram_cache.make_room,
+                sd,
+                model_dtype,
+                keep_fp8=keep_fp8,
+                model=model,
+                skip_patterns=skip_patterns,
+                fp8_layers=fp8_layers,
+                nvfp4_payloads={},
             )
             if fp8_layers and not keep_fp8:
                 # Neither consumer asked. Fold the scales in: staying quantized would halve VRAM but

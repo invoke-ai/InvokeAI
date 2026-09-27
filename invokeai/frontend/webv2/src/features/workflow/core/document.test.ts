@@ -11,7 +11,6 @@ import {
   getProjectGraphUndoEntry,
   getUpdatableNodeIds,
   isFieldExposed,
-  normalizeProjectGraph,
   projectGraphReducer,
   updateWorkflowNodes,
 } from './document';
@@ -330,23 +329,6 @@ describe('projectGraphReducer', () => {
 
     expect(next.name).toBe('My Flow');
     expect(next.author).toBe('josh');
-  });
-});
-
-describe('normalizeProjectGraph', () => {
-  it('passes through current documents', () => {
-    const doc = createProjectGraph('keep-me');
-
-    expect(normalizeProjectGraph(doc)).toBe(doc);
-  });
-
-  it('replaces the Phase-1 placeholder graph with an empty document, preserving the id', () => {
-    const normalized = normalizeProjectGraph({ edges: [], id: 'legacy-id', label: 'Old', nodes: [], version: 1 });
-
-    expect(normalized.version).toBe(2);
-    expect(normalized.id).toBe('legacy-id');
-    expect(normalized.nodes).toEqual([]);
-    expect(normalized.form.elements[normalized.form.rootElementId]?.type).toBe('container');
   });
 });
 

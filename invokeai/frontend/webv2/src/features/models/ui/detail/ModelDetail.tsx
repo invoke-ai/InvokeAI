@@ -104,9 +104,16 @@ const selectModelIdentity = (snapshot: ModelsSnapshot, modelKey: string): ModelI
 const selectDefaultSettingsModel = (snapshot: ModelsSnapshot, modelKey: string): DefaultSettingsModel | null => {
   const model = findModel(snapshot, modelKey);
 
-  // `base` is projected too: the FP8 storage default is unavailable for Z-Image.
+  // `base` and `format` are projected too: together with the type they are the loader key the backend
+  // answers the FP8 Storage question on, and all three parts change the answer.
   return model
-    ? { base: model.base, default_settings: model.default_settings, key: model.key, type: model.type }
+    ? {
+        base: model.base,
+        default_settings: model.default_settings,
+        format: model.format,
+        key: model.key,
+        type: model.type,
+      }
     : null;
 };
 

@@ -29,7 +29,9 @@ describe('projectHasWidgetType', () => {
     expect(
       projectNeedsWorkflowHost({
         ...project([]),
-        projectGraph: { nodes: [{ data: { type: 'call_saved_workflow' }, type: 'invocation' }] },
+        workflows: {
+          entries: [{ document: { nodes: [{ data: { type: 'call_saved_workflow' }, type: 'invocation' }] } }],
+        },
       })
     ).toBe(true);
   });
@@ -38,16 +40,21 @@ describe('projectHasWidgetType', () => {
     expect(
       projectNeedsWorkflowHost({
         ...project([]),
-        projectGraph: { nodes: [{ data: { type: 'noise' }, type: 'invocation' }] },
+        workflows: { entries: [{ document: { nodes: [{ data: { type: 'noise' }, type: 'invocation' }] } }] },
       })
     ).toBe(false);
   });
 
-  it('keeps the workflow host for a library-bound graph after its last call node is removed', () => {
+  it('mounts the workflow host when an inactive workflow calls a saved workflow', () => {
     expect(
       projectNeedsWorkflowHost({
         ...project([]),
-        projectGraph: { libraryWorkflowId: 'library-workflow-1', nodes: [] },
+        workflows: {
+          entries: [
+            { document: { nodes: [] } },
+            { document: { nodes: [{ data: { type: 'call_saved_workflow' }, type: 'invocation' }] } },
+          ],
+        },
       })
     ).toBe(true);
   });

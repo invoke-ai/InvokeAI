@@ -293,3 +293,29 @@ def test_the_config_reads_layer_and_head_counts_through_packed_projections() -> 
 
     assert (config.num_hidden_layers, config.num_attention_heads, config.num_key_value_heads) == (40, 40, 16)
     assert config.intermediate_size == 16384
+
+
+@pytest.mark.parametrize("keep_fp8", [False, True], ids=["fp8_dequantized", "fp8_kept"])
+def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_evicted(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, keep_fp8: bool
+) -> None:
+    """The degraded half-state, at this seam rather than at the detector.
+
+    A packed uint8 weight with a block-scale grid and no `weight_scale_2` is what a guard keyed on
+    `weight_scale_2` -- the key the decode itself keys on -- lets straight through. `_find_nvfp4_layers`
+    refuses it and `test_nvfp4.py` pins that; what only a seam can answer is whether this loader still
+    reaches the detector before it asks the cache for room, and on both fp8 branches. Nothing but the
+    order of two statements keeps `pop_nvfp4_layers` above the reservation here.
+    """
+    checkpoint, _, _ = _write_checkpoint(tmp_path, evidence="none")
+    tensors = load_file(checkpoint)
+    target = f"model.layers.0.{FP8_PROJECTION}"
+    tensors[f"{target}.weight"] = torch.zeros(KV_ROWS, HIDDEN // 2, dtype=torch.uint8)
+    tensors[f"{target}.weight_scale"] = torch.zeros(KV_ROWS, HIDDEN // 16).to(torch.float8_e4m3fn)
+    save_file(tensors, checkpoint)
+    run = prepare(SEAM, monkeypatch, geometry=_fp8_matmul(keep_fp8))
+
+    with pytest.raises(ValueError, match="with a weight_scale but no weight_scale_2"):
+        run.load(_config(checkpoint))
+
+    assert run.reserved == []

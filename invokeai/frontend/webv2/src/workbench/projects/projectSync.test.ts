@@ -1,12 +1,13 @@
 import type { Project } from '@workbench/projectContracts';
 
+import { addProjectWorkflow, getActiveProjectGraph, recordProjectWorkflowRun } from '@workbench/projectWorkflows';
 import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
 import { describe, expect, it } from 'vitest';
 
 import {
   applyAuthoritativeProjectBoard,
-  serializeProjectDocumentV2,
-  serializeProjectDocumentV2Json,
+  serializeProjectDocumentV3,
+  serializeProjectDocumentV3Json,
 } from './projectDocument';
 import { deserializeProjectDocument, deserializeProjectRecord, serializeProjectDocument } from './syncedPersistence';
 
@@ -27,7 +28,7 @@ const loadDocument = (document: Record<string, unknown>): Project => {
 };
 
 describe('project document serialization', () => {
-  it('serializes only the V2 durable allowlist and restores session state empty', () => {
+  it('serializes only the durable allowlist and restores session state empty', () => {
     const project = getProject();
 
     project.undoRedo.past.push({
@@ -37,7 +38,6 @@ describe('project document serialization', () => {
       project: {
         invocation: project.invocation,
         layout: project.layout,
-        projectGraph: project.projectGraph,
         widgetGraphs: {},
         widgetInstances: project.widgetInstances,
         widgetRegions: project.widgetRegions,
@@ -51,7 +51,7 @@ describe('project document serialization', () => {
       recoveryOf: 'old-project',
     });
 
-    const document = serializeProjectDocumentV2(project);
+    const document = serializeProjectDocumentV3(project);
 
     expect(Object.keys(document).sort()).toEqual(
       [
@@ -61,19 +61,20 @@ describe('project document serialization', () => {
         'invocation',
         'layout',
         'name',
-        'projectGraph',
         'promptHistory',
         'settings',
         'widgetGraphs',
         'widgetInstances',
         'widgetRegions',
+        'workflows',
       ].sort()
     );
-    expect(document.documentSchemaVersion).toBe(2);
+    expect(document.documentSchemaVersion).toBe(3);
 
     const roundTripped = loadDocument(document);
 
     expect(roundTripped.undoRedo).toEqual({ future: [], past: [] });
+    expect(roundTripped.workflowHistories).toEqual({});
     expect(roundTripped.queue).toEqual({ items: [] });
     expect(roundTripped.events).toEqual([]);
     expect(roundTripped.id).toBe(project.id);
@@ -82,22 +83,22 @@ describe('project document serialization', () => {
 
   it('measures the exact UTF-8 wire bytes once', () => {
     const project = getProject({ name: '文書' });
-    const encoded = serializeProjectDocumentV2Json(project);
+    const encoded = serializeProjectDocumentV3Json(project);
 
-    expect(encoded.document).toEqual(serializeProjectDocumentV2(project));
+    expect(encoded.document).toEqual(serializeProjectDocument(project));
     expect(encoded.documentJson).toBe(JSON.stringify(encoded.document));
     expect(encoded.byteSize).toBe(new TextEncoder().encode(encoded.documentJson).byteLength);
   });
 
   it('keeps project document bytes constant as session queue history grows', () => {
     const project = getProject();
-    const baseline = serializeProjectDocumentV2Json(project);
+    const baseline = serializeProjectDocumentV3Json(project);
     project.queue.items = Array.from({ length: 2_000 }, (_, index) => ({
       id: `queue-${index}`,
       snapshot: { oversizedContext: 'x'.repeat(100) },
     })) as never;
 
-    const withQueueHistory = serializeProjectDocumentV2Json(project);
+    const withQueueHistory = serializeProjectDocumentV3Json(project);
 
     expect(withQueueHistory.byteSize).toBe(baseline.byteSize);
     expect(withQueueHistory.documentJson).toBe(baseline.documentJson);
@@ -114,10 +115,17 @@ describe('project document serialization', () => {
     expect(document).not.toHaveProperty('queue');
   });
 
-  it('rejects documents that do not look like projects', () => {
-    expect(deserializeProjectDocument({})).toEqual({ status: 'unavailable' });
-    expect(deserializeProjectDocument({ id: 'x' })).toEqual({ status: 'unavailable' });
-    expect(deserializeProjectDocument({ id: 'x', layout: null, name: 'y' })).toEqual({ status: 'unavailable' });
+  it('refuses documents that do not look like projects, keeping the raw document for recovery', () => {
+    for (const data of [{}, { id: 'x' }, { id: 'x', layout: null, name: 'y' }]) {
+      const result = deserializeProjectDocument(data);
+
+      expect(result.status).toBe('refused');
+      if (result.status !== 'refused') {
+        throw new Error('expected a refusal');
+      }
+      expect(result.refused.raw).toBe(data);
+      expect(result.refused.refusal).toMatchObject({ scope: 'project-document', status: 'malformed' });
+    }
   });
 
   it('refuses a document whose canvas was written by a newer client, keeping the raw document', () => {
@@ -140,7 +148,7 @@ describe('project document serialization', () => {
 
   it('refuses a newer project document schema while preserving its raw bytes for export', () => {
     const project = getProject();
-    const future = { ...serializeProjectDocumentV2(project), documentSchemaVersion: 3 };
+    const future = { ...serializeProjectDocument(project), documentSchemaVersion: 4 };
 
     expect(deserializeProjectDocument(future)).toEqual({
       refused: {
@@ -151,7 +159,7 @@ describe('project document serialization', () => {
           raw: future,
           scope: 'project-document',
           status: 'unsupported-version',
-          version: 3,
+          version: 4,
         },
         source: 'project-document',
       },
@@ -161,7 +169,7 @@ describe('project document serialization', () => {
 
   it('uses authoritative server identity and untouched bytes for a future document refusal', () => {
     const raw = {
-      documentSchemaVersion: 3,
+      documentSchemaVersion: 4,
       id: 'untrusted-id',
       name: 'Untrusted name',
       widgetInstances: {
@@ -174,7 +182,7 @@ describe('project document serialization', () => {
         board_id: 'authoritative-board',
         created_at: '2026-09-03T00:00:00.000Z',
         data: raw,
-        minimum_canvas_schema_version: 3,
+        minimum_canvas_schema_version: 4,
         name: 'Authoritative name',
         project_id: 'authoritative-id',
         revision: 4,
@@ -185,11 +193,91 @@ describe('project document serialization', () => {
         projectId: 'authoritative-id',
         projectName: 'Authoritative name',
         raw,
-        refusal: { raw, scope: 'project-document', status: 'unsupported-version', version: 3 },
+        refusal: { raw, scope: 'project-document', status: 'unsupported-version', version: 4 },
         source: 'project-document',
       },
       status: 'refused',
     });
+  });
+
+  it('migrates a schema-2 document into the first, active workflow with an unknown-revision source', () => {
+    const project = getProject();
+    const legacyGraph = { ...getActiveProjectGraph(project), id: 'legacy-graph', libraryWorkflowId: 'lib-1' };
+    const { workflows: _workflows, ...withoutCollection } = serializeProjectDocument(project);
+    const v2 = { ...withoutCollection, documentSchemaVersion: 2, projectGraph: legacyGraph };
+
+    const loaded = loadDocument(v2);
+
+    expect(loaded.workflows.activeWorkflowId).toBe('legacy-graph');
+    expect(loaded.workflows.entries).toHaveLength(1);
+    expect(loaded.workflows.entries[0]?.source).toEqual({ libraryWorkflowId: 'lib-1', revision: null });
+    expect('libraryWorkflowId' in loaded.workflows.entries[0]!.document).toBe(false);
+    expect(serializeProjectDocumentV3(loaded).documentSchemaVersion).toBe(3);
+  });
+
+  it('migrates an unversioned document the same way and drops its legacy history', () => {
+    const project = getProject();
+    const { documentSchemaVersion: _version, workflows: _workflows, ...legacy } = serializeProjectDocument(project);
+
+    const loaded = loadDocument({
+      ...legacy,
+      graphHistory: [{ id: 'gh' }],
+      projectGraph: getActiveProjectGraph(project),
+    });
+
+    expect(loaded.workflows.entries.map((entry) => entry.document.id)).toEqual([getActiveProjectGraph(project).id]);
+    expect('graphHistory' in loaded).toBe(false);
+  });
+
+  it('keeps every workflow and the active selection through a round trip', () => {
+    let project = getProject();
+    const second = { ...getActiveProjectGraph(project), id: 'second', name: 'Second' };
+
+    project = addProjectWorkflow(project, second, { source: { libraryWorkflowId: 'lib-2', revision: 7 } });
+    project = recordProjectWorkflowRun(project, 'second', {
+      completedAt: 't2',
+      imageName: 'out.png',
+      submittedAt: 't1',
+    });
+
+    const loaded = loadDocument(serializeProjectDocumentV3(project));
+
+    expect(loaded.workflows.activeWorkflowId).toBe('second');
+    expect(loaded.workflows.entries.map((entry) => entry.document.id)).toEqual(
+      [getActiveProjectGraph(getProject()).id, 'second'].map((id, index) =>
+        index === 0 ? project.workflows.entries[0]!.document.id : id
+      )
+    );
+    expect(loaded.workflows.entries[1]).toMatchObject({
+      lastRun: { completedAt: 't2', imageName: 'out.png', submittedAt: 't1' },
+      source: { libraryWorkflowId: 'lib-2', revision: 7 },
+    });
+  });
+
+  it('refuses a schema-3 document whose collection would lose a workflow instead of repairing it', () => {
+    const document = serializeProjectDocumentV3(getProject());
+    const refusal = (data: Record<string, unknown>) => {
+      const result = deserializeProjectDocument(data);
+
+      return result.status === 'refused' ? { ...result.refused.refusal, kept: result.refused.raw } : result.status;
+    };
+
+    expect(refusal({ ...document, workflows: { ...document.workflows, activeWorkflowId: 'x' } })).toMatchObject({
+      status: 'malformed',
+    });
+    expect(refusal({ ...document, workflows: { activeWorkflowId: 'a', entries: [] } })).toMatchObject({
+      status: 'malformed',
+    });
+    expect(refusal({ ...document, workflows: null })).toMatchObject({ status: 'malformed' });
+
+    // An authored workflow this build cannot read is refused with the document intact, never blanked and re-saved.
+    const [entry] = document.workflows.entries;
+    const unreadable = {
+      ...document,
+      workflows: { ...document.workflows, entries: [{ ...entry, document: { ...entry!.document, version: 99 } }] },
+    };
+
+    expect(refusal(unreadable)).toMatchObject({ kept: unreadable, status: 'malformed' });
   });
 
   it('normalizes legacy project-graph invocation sources to workflow', () => {

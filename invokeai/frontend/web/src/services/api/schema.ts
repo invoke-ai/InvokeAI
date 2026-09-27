@@ -567,6 +567,38 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v2/models/fp8_storage_support": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Fp8 Storage Support
+         * @description Which kinds of model FP8 Storage actually reaches, so a client stops offering it for the rest.
+         *
+         *     Keyed `(base, type, format)` -- the key model loaders are registered under, because the answer
+         *     differs along all three: FLUX main implements the cast and FLUX ControlNet does not, and a GGUF
+         *     main model must never be re-encoded. A key with no row is not supported; that is also what the
+         *     server itself concludes for one.
+         *
+         *     A static table, the same for every install and every user. Fetch it once and join it against model
+         *     records locally. Whether the *device* can do fp8 is deliberately not in here -- that probe belongs
+         *     on the loading thread, not behind an HTTP handler.
+         *
+         *     Declared `def`, not `async def`: it awaits nothing, so FastAPI runs it in a threadpool instead of
+         *     on the event loop. See docs/contributing/blocking-work-in-api-routes.
+         */
+        get: operations["list_fp8_storage_support"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/models/": {
         parameters: {
             query?: never;
@@ -3376,7 +3408,7 @@ export type paths = {
         head?: never;
         /**
          * Update Workflow
-         * @description Updates a workflow
+         * @description Updates a workflow's content and advances its revision.
          */
         patch: operations["update_workflow"];
         trace?: never;
@@ -6033,6 +6065,11 @@ export type components = {
         Body_create_workflow: {
             /** @description The workflow to create */
             workflow: components["schemas"]["WorkflowWithoutID"];
+            /**
+             * Workflow Id
+             * @description A client-reserved UUID for the new record. Retrying the same creation with the same id returns the record already created for it; another owner's record or different content under that id is a 409.
+             */
+            workflow_id?: string | null;
         };
         /** Body_delete_images_from_list */
         Body_delete_images_from_list: {
@@ -6215,6 +6252,11 @@ export type components = {
         Body_update_workflow: {
             /** @description The updated workflow */
             workflow: components["schemas"]["Workflow"];
+            /**
+             * Expected Revision
+             * @description The content revision the client last observed; when set, a different stored revision refuses the write with 409 instead of overwriting newer content.
+             */
+            expected_revision?: number | null;
         };
         /** Body_update_workflow_is_public */
         Body_update_workflow_is_public: {
@@ -15730,6 +15772,23 @@ export type components = {
              * @description Whether or not the model is already installed
              */
             is_installed: boolean;
+        };
+        /**
+         * Fp8StorageSupport
+         * @description One row of the served table: a loader key and the finished answer.
+         *
+         *     The reason is not served. Both markers hide the control identically, so a client has nothing to
+         *     do with the difference; it stays in the declaration, where the backlog lives.
+         */
+        Fp8StorageSupport: {
+            base: components["schemas"]["BaseModelType"];
+            type: components["schemas"]["ModelType"];
+            format: components["schemas"]["ModelFormat"];
+            /**
+             * Supported
+             * @description Whether FP8 Storage changes anything for a model of this kind.
+             */
+            supported: boolean;
         };
         /**
          * FreeUConfig
@@ -49452,6 +49511,11 @@ export type components = {
              * @description Whether this workflow is shared with all users.
              */
             is_public: boolean;
+            /**
+             * Revision
+             * @description Monotonic content revision; every write of the workflow document increments it.
+             */
+            revision: number;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
         };
@@ -49497,6 +49561,11 @@ export type components = {
              * @description Whether this workflow is shared with all users.
              */
             is_public: boolean;
+            /**
+             * Revision
+             * @description Monotonic content revision; every write of the workflow document increments it.
+             */
+            revision: number;
             /**
              * Description
              * @description The description of the workflow.
@@ -49565,6 +49634,11 @@ export type components = {
              * @description Whether this workflow is shared with all users.
              */
             is_public: boolean;
+            /**
+             * Revision
+             * @description Monotonic content revision; every write of the workflow document increments it.
+             */
+            revision: number;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
             /**
@@ -51565,6 +51639,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ArchitectureCapabilities"][];
+                };
+            };
+        };
+    };
+    list_fp8_storage_support: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Whether FP8 Storage does anything, per loader key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Fp8StorageSupport"][];
                 };
             };
         };
@@ -57176,7 +57270,10 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description The workflow to update */
+                workflow_id: string;
+            };
             cookie?: never;
         };
         requestBody: {
@@ -57193,6 +57290,34 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WorkflowRecordDTO"];
                 };
+            };
+            /** @description The body's workflow id does not match the URL, or the update is malformed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The workflow is bundled or belongs to another account */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The workflow does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The workflow's content revision no longer matches `expected_revision` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -57276,6 +57401,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WorkflowRecordDTO"];
                 };
+            };
+            /** @description The workflow or the reserved id is malformed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The reserved id already names a different workflow */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

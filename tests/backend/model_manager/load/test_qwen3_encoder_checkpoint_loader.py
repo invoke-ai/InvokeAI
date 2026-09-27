@@ -251,3 +251,34 @@ def test_an_int8_convrot_encoder_stays_int8_resident_and_encodes_like_its_dense_
     loader._ram_cache.make_room.assert_called_once()
     (reserved,), _ = loader._ram_cache.make_room.call_args
     assert reserved == codes_and_scales + dense_bytes
+
+
+def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_evicted(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """The degraded nvfp4 half-state, at this seam rather than at the detector.
+
+    A packed uint8 weight with a block-scale grid and no `weight_scale_2` is the state a guard keyed
+    on `weight_scale_2` -- the key the decode keys on -- lets straight through. `_find_nvfp4_layers`
+    refuses it and `test_nvfp4.py` pins that; what only a seam can answer is whether this loader
+    reaches the detector before it asks the cache for room. Asserted through the cache double this
+    file already uses, in the same idiom as the cells above, because this loader reads its header
+    from the real path rather than from a served state dict.
+    """
+    tensors = {
+        "model.embed_tokens.weight": torch.randn(VOCAB, HIDDEN),
+        "model.layers.0.self_attn.q_proj.weight": torch.zeros(HIDDEN, HIDDEN // 2, dtype=torch.uint8),
+        "model.layers.0.self_attn.q_proj.weight_scale": torch.zeros(HIDDEN, HIDDEN // 16).to(torch.float8_e4m3fn),
+    }
+    checkpoint = tmp_path / "qwen_3_4b_fp4_half.safetensors"
+    save_file(tensors, checkpoint)
+    monkeypatch.setattr(z_image.TorchDevice, "choose_torch_device", lambda: torch.device("cpu"))
+    monkeypatch.setattr(z_image.TorchDevice, "choose_bfloat16_safe_dtype", lambda _device: torch.float32)
+    loader = object.__new__(Qwen3EncoderCheckpointLoader)
+    loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    config = Qwen3Encoder_Checkpoint_Config.model_construct(path=str(checkpoint), variant=Qwen3VariantType.Qwen3_4B)
+
+    with pytest.raises(ValueError, match="with a weight_scale but no weight_scale_2"):
+        loader._load_from_singlefile(config)
+
+    loader._ram_cache.make_room.assert_not_called()

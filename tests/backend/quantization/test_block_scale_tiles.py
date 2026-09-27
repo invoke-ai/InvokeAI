@@ -10,22 +10,7 @@ import pytest
 import torch
 
 from invokeai.backend.quantization.block_scale_tiles import unblock_scale_grid
-
-
-def stored_layout(grid: torch.Tensor) -> torch.Tensor:
-    """Lay a row-major grid out the way checkpoints store it.
-
-    By the measured index formula: element ``[m, k]`` lands at flat position ``position``. Shared
-    with the nvfp4 and MXFP8 decode tests so both check against the same independent statement of
-    the layout rather than against each other.
-    """
-    rows, blocks = grid.shape
-    flat = torch.full((rows * blocks,), float("nan"), dtype=grid.dtype)
-    for m in range(rows):
-        for k in range(blocks):
-            position = ((((m // 128) * (blocks // 4) + k // 4) * 32 + m % 32) * 4 + (m % 128) // 32) * 4 + k % 4
-            flat[position] = grid[m, k]
-    return flat.reshape(rows, blocks)
+from tests.fixtures.quantized_payloads import stored_layout
 
 
 @pytest.mark.parametrize("shape", [(128, 4), (128, 8), (256, 16), (384, 8)])

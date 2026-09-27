@@ -174,15 +174,23 @@ def test_fp8_storage_alone_keeps_the_checkpoint_in_its_own_scaled_form(monkeypat
     # And the reservation is sized for what is actually held. This is the number the fix moves --
     # measured on the released checkpoint, 17.28 GiB down to 8.68 -- and it is what a loader that
     # decided the prediction's flag separately from the fold's would get wrong while every
-    # end-state assertion above still passed. The scale is popped out of the dict before this
-    # point, so only the codes and the dense remainder are charged.
+    # end-state assertion above still passed.
+    #
+    # The scale is popped out of the dict before this point, so no prediction over the dict can see
+    # it; the seam reserves through `reserve_for_load`, which is handed the recovered scales as well and
+    # charges them. Four bytes here for a scalar, and 1.455 GiB on an MXFP8 build whose scales are
+    # decoded exponent grids -- the reason the charge exists at all.
     kept_codes = before[f"{KEPT}.weight"].numel()
     dense = sum(
         tensor.numel() * torch.float32.itemsize
         for key, tensor in before.items()
         if key != f"{KEPT}.weight" and not key.endswith(".weight_scale")
     )
-    assert run.reserved[-1] == kept_codes + dense
+    recovered_scales = sum(
+        tensor.numel() * tensor.element_size() for key, tensor in before.items() if key.endswith(".weight_scale")
+    )
+    assert recovered_scales > 0, "otherwise this cell would not notice the plan dropping the term"
+    assert run.reserved[-1] == kept_codes + dense + recovered_scales
 
 
 def test_with_the_fp8_matmul_the_codes_stay_and_the_scales_are_attached(monkeypatch, tmp_path) -> None:

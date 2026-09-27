@@ -1114,6 +1114,35 @@
         ]
       }
     },
+    "/api/v2/models/fp8_storage_support": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "List Fp8 Storage Support",
+        "description": "Which kinds of model FP8 Storage actually reaches, so a client stops offering it for the rest.\n\nKeyed `(base, type, format)` -- the key model loaders are registered under, because the answer\ndiffers along all three: FLUX main implements the cast and FLUX ControlNet does not, and a GGUF\nmain model must never be re-encoded. A key with no row is not supported; that is also what the\nserver itself concludes for one.\n\nA static table, the same for every install and every user. Fetch it once and join it against model\nrecords locally. Whether the *device* can do fp8 is deliberately not in here -- that probe belongs\non the loading thread, not behind an HTTP handler.\n\nDeclared `def`, not `async def`: it awaits nothing, so FastAPI runs it in a threadpool instead of\non the event loop. See docs/contributing/blocking-work-in-api-routes.",
+        "operationId": "list_fp8_storage_support",
+        "responses": {
+          "200": {
+            "description": "Whether FP8 Storage does anything, per loader key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Fp8StorageSupport"
+                  },
+                  "type": "array",
+                  "title": "Response List Fp8 Storage Support"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v2/models/": {
       "get": {
         "tags": ["model_manager"],
@@ -13092,11 +13121,24 @@
       "patch": {
         "tags": ["workflows"],
         "summary": "Update Workflow",
-        "description": "Updates a workflow",
+        "description": "Updates a workflow's content and advances its revision.",
         "operationId": "update_workflow",
         "security": [
           {
             "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "workflow_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The workflow to update",
+              "title": "Workflow Id"
+            },
+            "description": "The workflow to update"
           }
         ],
         "requestBody": {
@@ -13119,6 +13161,18 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "The body's workflow id does not match the URL, or the update is malformed"
+          },
+          "403": {
+            "description": "The workflow is bundled or belongs to another account"
+          },
+          "404": {
+            "description": "The workflow does not exist"
+          },
+          "409": {
+            "description": "The workflow's content revision no longer matches `expected_revision`"
           },
           "422": {
             "description": "Validation Error",
@@ -13208,6 +13262,12 @@
                 }
               }
             }
+          },
+          "400": {
+            "description": "The workflow or the reserved id is malformed"
+          },
+          "409": {
+            "description": "The reserved id already names a different workflow"
           },
           "422": {
             "description": "Validation Error",
@@ -20096,6 +20156,18 @@
           "workflow": {
             "$ref": "#/components/schemas/WorkflowWithoutID",
             "description": "The workflow to create"
+          },
+          "workflow_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Workflow Id",
+            "description": "A client-reserved UUID for the new record. Retrying the same creation with the same id returns the record already created for it; another owner's record or different content under that id is a 409."
           }
         },
         "type": "object",
@@ -20438,6 +20510,18 @@
           "workflow": {
             "$ref": "#/components/schemas/Workflow",
             "description": "The updated workflow"
+          },
+          "expected_revision": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Expected Revision",
+            "description": "The content revision the client last observed; when set, a different stored revision refuses the write with 409 instead of overwriting newer content."
           }
         },
         "type": "object",
@@ -39128,6 +39212,28 @@
         "type": "object",
         "required": ["path", "is_installed"],
         "title": "FoundModel"
+      },
+      "Fp8StorageSupport": {
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/BaseModelType"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ModelType"
+          },
+          "format": {
+            "$ref": "#/components/schemas/ModelFormat"
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported",
+            "description": "Whether FP8 Storage changes anything for a model of this kind."
+          }
+        },
+        "type": "object",
+        "required": ["base", "type", "format", "supported"],
+        "title": "Fp8StorageSupport",
+        "description": "One row of the served table: a loader key and the finished answer.\n\nThe reason is not served. Both markers hide the control identically, so a client has nothing to\ndo with the difference; it stays in the declaration, where the backlog lives."
       },
       "FreeUConfig": {
         "description": "Configuration for the FreeU hyperparameters.\n- https://huggingface.co/docs/diffusers/main/en/using-diffusers/freeu\n- https://github.com/ChenyangSi/FreeU",
@@ -109281,13 +109387,18 @@
             "title": "Is Public",
             "description": "Whether this workflow is shared with all users."
           },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Monotonic content revision; every write of the workflow document increments it."
+          },
           "workflow": {
             "$ref": "#/components/schemas/Workflow",
             "description": "The workflow."
           }
         },
         "type": "object",
-        "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "workflow"],
+        "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "revision", "workflow"],
         "title": "WorkflowRecordDTO"
       },
       "WorkflowRecordListItemWithThumbnailDTO": {
@@ -109370,6 +109481,11 @@
             "title": "Is Public",
             "description": "Whether this workflow is shared with all users."
           },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Monotonic content revision; every write of the workflow document increments it."
+          },
           "description": {
             "type": "string",
             "title": "Description",
@@ -109416,6 +109532,7 @@
           "updated_at",
           "user_id",
           "is_public",
+          "revision",
           "description",
           "category",
           "tags"
@@ -109508,6 +109625,11 @@
             "title": "Is Public",
             "description": "Whether this workflow is shared with all users."
           },
+          "revision": {
+            "type": "integer",
+            "title": "Revision",
+            "description": "Monotonic content revision; every write of the workflow document increments it."
+          },
           "workflow": {
             "$ref": "#/components/schemas/Workflow",
             "description": "The workflow."
@@ -109537,7 +109659,7 @@
           }
         },
         "type": "object",
-        "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "workflow"],
+        "required": ["workflow_id", "name", "created_at", "updated_at", "user_id", "is_public", "revision", "workflow"],
         "title": "WorkflowRecordWithThumbnailDTO"
       },
       "WorkflowReturnGetInvocation": {

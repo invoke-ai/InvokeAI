@@ -23,6 +23,24 @@ class IndexClientStateReferencesCallback:
         self._logger = logger
 
     def __call__(self, cursor: sqlite3.Cursor) -> None:
+        # This table was added to the already-released September 22 migration. Databases that
+        # applied its earlier form need it created by a migration they have not yet run.
+        cursor.execute(
+            """--sql
+            CREATE TABLE IF NOT EXISTS intermediates_browser_holds (
+                user_id TEXT NOT NULL,
+                lease_id TEXT NOT NULL,
+                media_kind TEXT NOT NULL,
+                media_name TEXT NOT NULL,
+                expires_at TEXT NOT NULL,
+                PRIMARY KEY(user_id, lease_id, media_kind, media_name)
+            );
+            """
+        )
+        cursor.execute(
+            "CREATE INDEX IF NOT EXISTS idx_intermediates_browser_holds_media "
+            "ON intermediates_browser_holds(media_kind, media_name, expires_at);"
+        )
         cursor.execute(
             "CREATE INDEX IF NOT EXISTS idx_intermediates_browser_holds_expires_at "
             "ON intermediates_browser_holds(expires_at);"

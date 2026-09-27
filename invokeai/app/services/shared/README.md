@@ -200,7 +200,23 @@ Runs a sequence of checks:
 
 1. **Type compatibility** `get_output_field_type` vs `get_input_field_type` and `are_connection_types_compatible`.
 
-   Special case:
+   If output types:
+
+   - For `IfInvocation.value`, resolve both branch inputs to their source ports, following nested `If` outputs and
+     deduplicating shared sources. Check every resolved source against the destination using the existing compatibility
+     hooks; the current condition value does not narrow the possible types.
+   - Collector item/collection checks and iterator collection checks also use the resolved branch sources. This allows
+     matching string branches to feed a string collector without an intermediate string node.
+   - Iterators over collectors validate their item consumers against the same inferred collector root type. Mixed
+     `int` and `float` items therefore require consumers compatible with `float`.
+   - If a branch is unresolved, retain the declared output compatibility behavior (`Any` for collector type
+     inference). The graph's separate DAG check rejects cycles before projection.
+   - This widens compatibility: a direct collector with both `int` and `float` items, previously rejected, now resolves
+     to `float`. Its downstream consumers must accept floats; unrelated mixed item types remain invalid.
+   - Ordinary source ports use the direct compatibility path with already resolved nodes, without If traversal or
+     projection allocations.
+
+   Saved-workflow special case:
 
    - `call_saved_workflow` currently accepts dynamic destination handles of the form
      `saved_workflow_input::{childNodeId}::{childFieldName}` as part of its dynamic call-boundary contract.
@@ -227,6 +243,11 @@ Checks a single prospective edge before insertion:
 - Destination port is not already occupied unless it's a collector `item`.
 - Adding the edge to the flat DAG must keep it acyclic.
 - Iterator/collector constraints re-checked when the edge creates relevant patterns.
+
+After inserting an edge into `If.true_input` or `If.false_input`, `add_edge` also revalidates affected downstream
+connections. It follows resolved If outputs and collector chains, checking each affected If, collector, or iterator
+once. Ordinary nodes end this dependency walk; unrelated unfinished nodes are not revalidated. If a check fails, the
+new edge is removed and adjacency indexes are restored before the validation error is raised.
 
 ### 3.4 Topology utilities
 
