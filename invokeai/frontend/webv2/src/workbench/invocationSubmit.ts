@@ -6,6 +6,7 @@
 import type { GenerateSettings } from '@features/generation/contracts';
 import type { ParseDynamicPromptsResponse } from '@features/generation/prompts';
 import type { ModelConfig } from '@features/models';
+import type { ProjectGraphState } from '@features/workflow/contracts';
 import type { WorkflowGeneratorResolutions, WorkflowPendingGenerator } from '@features/workflow/utility';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { ResolvedInvocationRoute } from '@workbench/invocationContracts';
@@ -27,6 +28,7 @@ import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import type { PrepareCanvasInvocationArgs } from './widgets/canvas/invoke/prepareCanvasInvocation';
 import type { WorkbenchCommands } from './workbenchStore';
 
+import { getActiveProjectWorkflow } from './projectWorkflows';
 import { readCanvasCompositingSettings } from './widgets/canvas/invoke/canvasCompositing';
 import { readCanvasDenoisingStrength } from './widgets/canvas/invoke/canvasStrength';
 import { getProjectWidgetValues } from './widgetState';
@@ -43,6 +45,11 @@ export interface SubmitResolvedInvocationDeps {
   project: Project;
   /** Loaded models (or `undefined` while loading), forwarded verbatim to both paths. */
   models: readonly ModelConfig[] | undefined;
+  /**
+   * The project workflow a workflow route submits. Captured with the project snapshot so a switch during
+   * generator resolution never submits another workflow; defaults to the snapshot's active workflow.
+   */
+  workflowId?: string;
   /** Identity lifetime that initiated this submission. */
   owner: AccountScope;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
@@ -92,15 +99,23 @@ const resolveExpandedPrompts = async (settings: GenerateSettings): Promise<Parse
   }
 };
 
+const getSubmittedWorkflowDocument = (project: Project, workflowId: string | undefined): ProjectGraphState | null =>
+  workflowId
+    ? (project.workflows.entries.find((entry) => entry.document.id === workflowId)?.document ?? null)
+    : getActiveProjectWorkflow(project).document;
+
 /** The async generators (dynamic prompts, board listings) a workflow submission still has to resolve. */
-const getPendingWorkflowGenerators = (project: Project, route: ResolvedInvocationRoute): WorkflowPendingGenerator[] => {
+const getPendingWorkflowGenerators = (
+  document: ProjectGraphState | null,
+  route: ResolvedInvocationRoute
+): WorkflowPendingGenerator[] => {
   const templatesSnapshot = getInvocationTemplatesSnapshot();
 
-  if (route.sourceId !== 'workflow' || templatesSnapshot.status !== 'loaded') {
+  if (!document || route.sourceId !== 'workflow' || templatesSnapshot.status !== 'loaded') {
     return [];
   }
 
-  return planWorkflowBatch(project.projectGraph, templatesSnapshot.templates).pendingGenerators;
+  return planWorkflowBatch(document, templatesSnapshot.templates).pendingGenerators;
 };
 
 /**
@@ -109,6 +124,7 @@ const getPendingWorkflowGenerators = (project: Project, route: ResolvedInvocatio
  */
 const resolveWorkflowGeneratorsForRoute = async (
   project: Project,
+  document: ProjectGraphState,
   pending: readonly WorkflowPendingGenerator[],
   owner: AccountScope,
   commands: Pick<WorkbenchCommands, 'notifications'>
@@ -133,7 +149,7 @@ const resolveWorkflowGeneratorsForRoute = async (
   }
 
   // Sizes were unknown until now: an empty board or a mismatched group only shows once the lists exist.
-  const resolvedPlan = planWorkflowBatch(project.projectGraph, templatesSnapshot.templates, {
+  const resolvedPlan = planWorkflowBatch(document, templatesSnapshot.templates, {
     generators: resolutions,
   });
 
@@ -161,17 +177,30 @@ export const submitResolvedInvocation = async ({
   prepareCanvasInvocation,
   project,
   route,
+  workflowId,
 }: SubmitResolvedInvocationDeps): Promise<void> => {
   if (!isAccountScopeCurrent(owner)) {
     return;
   }
 
+  const workflowDocument = route.sourceId === 'workflow' ? getSubmittedWorkflowDocument(project, workflowId) : null;
+
+  if (route.sourceId === 'workflow' && !workflowDocument) {
+    return;
+  }
+
   // Only a workflow with unresolved generators needs this round trip; every other route dispatches synchronously.
-  const pendingGenerators = getPendingWorkflowGenerators(project, route);
+  const pendingGenerators = getPendingWorkflowGenerators(workflowDocument, route);
   let workflowGenerators: WorkflowGeneratorResolutions | undefined;
 
-  if (pendingGenerators.length > 0) {
-    const resolved = await resolveWorkflowGeneratorsForRoute(project, pendingGenerators, owner, commands);
+  if (pendingGenerators.length > 0 && workflowDocument) {
+    const resolved = await resolveWorkflowGeneratorsForRoute(
+      project,
+      workflowDocument,
+      pendingGenerators,
+      owner,
+      commands
+    );
 
     if (resolved === null) {
       return;
@@ -201,17 +230,19 @@ export const submitResolvedInvocation = async ({
     }
 
     await dispatchResolvedInvocation(
-      { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route },
+      { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route, workflowId },
       expansion.prompts.length > 0 ? expansion.prompts : undefined,
-      workflowGenerators
+      workflowGenerators,
+      workflowDocument?.id
     );
     return;
   }
 
   await dispatchResolvedInvocation(
-    { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route },
+    { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route, workflowId },
     undefined,
-    workflowGenerators
+    workflowGenerators,
+    workflowDocument?.id
   );
 };
 
@@ -226,7 +257,8 @@ const dispatchResolvedInvocation = async (
     route,
   }: SubmitResolvedInvocationDeps,
   positivePrompts: string[] | undefined,
-  workflowGenerators: WorkflowGeneratorResolutions | undefined
+  workflowGenerators: WorkflowGeneratorResolutions | undefined,
+  workflowId: string | undefined
 ): Promise<void> => {
   if (route.sourceId === 'canvas') {
     // Await Canvas preparation to retain the submission guard until completion; pass the resolved destination so
@@ -252,7 +284,9 @@ const dispatchResolvedInvocation = async (
     backendSupportsCancellation: true,
     models,
     positivePrompts,
+    projectId: project.id,
     route,
     ...(workflowGenerators ? { workflowGenerators } : {}),
+    ...(workflowId ? { workflowId } : {}),
   });
 };

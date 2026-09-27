@@ -203,6 +203,37 @@ describe('createVideoRecallRuntime', () => {
     runtime.dispose();
   });
 
+  it.each([
+    ['fixed', 'random'],
+    ['random', 'random'],
+    ['increment', 'increment'],
+    ['decrement', 'decrement'],
+  ])('a remix turns a %s seed into %s', async (before, after) => {
+    const { runtime, socket, store, projectId, videoValues } = setup();
+    store.commands.widgets.patchValues('video', { seed: 42, seedMode: before }, projectId);
+
+    socket.emit(parametersEvent({ positive_prompt: 'a heron' }, { mode: 'remix' }));
+    await flush();
+
+    expect(videoValues()).toMatchObject({ positivePrompt: 'a heron', seed: 42, seedMode: after });
+
+    runtime.dispose();
+  });
+
+  it('keeps a fixed seed for a recall, and for a remix that applied nothing', async () => {
+    const { runtime, socket, store, projectId, videoValues } = setup();
+    store.commands.widgets.patchValues('video', { seedMode: 'fixed' }, projectId);
+
+    socket.emit(parametersEvent({ positive_prompt: 'a heron' }));
+    await flush();
+    socket.emit(parametersEvent({ model: { key: 'not-installed' } }, { mode: 'remix' }));
+    await flush();
+
+    expect(videoValues().seedMode).toBe('fixed');
+
+    runtime.dispose();
+  });
+
   it('applies to the project it arrived for, without pulling a different project to the front', async () => {
     const { videoShown, projectId, runtime, socket, store, videoValues } = setup();
     let releaseModels: () => void = () => {};

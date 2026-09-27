@@ -1,5 +1,7 @@
-import type { WorkflowGraphPreviewPort, WorkflowUiAdapter } from '@features/workflow/react';
+import type { WorkflowGraphPreviewPort, WorkflowProjectPersistence, WorkflowUiAdapter } from '@features/workflow/react';
+import type { ProjectSyncSnapshot } from '@workbench/projects/syncStore';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
+import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 import type { ReactNode } from 'react';
 
 import { flushGenerateDrafts } from '@features/generation/react';
@@ -25,6 +27,8 @@ import {
   resolveInvocationRouteInput,
 } from '@workbench/invocation';
 import { markWorkbenchPerf, measureWorkbenchPerf, timeWorkbenchPerf } from '@workbench/performanceMarks';
+import { getProjectSyncSnapshot, subscribeProjectSync } from '@workbench/projects/syncStore';
+import { getActiveProjectWorkflow } from '@workbench/projectWorkflows';
 import { getWorkbenchPreferences, subscribeWorkbenchPreferences } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -48,6 +52,63 @@ const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
   workflowSnapToGrid: preferences.workflowSnapToGrid,
   workflowValidateConnections: preferences.workflowValidateConnections,
 });
+
+/**
+ * The active project's own persistence, read from the same sync service the conflict banner uses. "Saved" means
+ * the server acknowledged the document; a pending push with browser recovery is still only local.
+ */
+const selectProjectPersistence = ([workbench, sync]: readonly [
+  WorkbenchSnapshot,
+  ProjectSyncSnapshot,
+]): WorkflowProjectPersistence => {
+  const projectId = workbench.activeProject.id;
+  const info = sync.projects[projectId];
+  const autosave = workbench.autosave;
+  const isUnacknowledged = info === undefined || info.revision === null || info.isPendingPush;
+  const status: WorkflowProjectPersistence['status'] = info?.conflict
+    ? 'conflict'
+    : info?.schemaRefusal
+      ? 'error'
+      : autosave.status === 'error'
+        ? 'error'
+        : autosave.status === 'saving'
+          ? 'saving'
+          : autosave.status === 'pending' || isUnacknowledged
+            ? 'pending'
+            : 'saved';
+
+  return {
+    error: autosave.error ?? null,
+    hasLocalRecovery: sync.localDraftStatus === 'ok',
+    lastSavedAt: status === 'saved' ? (autosave.lastSavedAt ?? sync.lastSyncedAt) : null,
+    status,
+  };
+};
+
+/** One source over two stores: a change in either republishes a fresh pair, an unchanged pair keeps identity. */
+const createPairedSource = <A, B>(
+  a: { getSnapshot: () => A; subscribe: (listener: () => void) => () => void },
+  b: { getSnapshot: () => B; subscribe: (listener: () => void) => () => void }
+) => {
+  const cache = { pair: [a.getSnapshot(), b.getSnapshot()] as readonly [A, B] };
+
+  return {
+    getSnapshot: (): readonly [A, B] => {
+      const next = [a.getSnapshot(), b.getSnapshot()] as const;
+
+      if (next[0] !== cache.pair[0] || next[1] !== cache.pair[1]) {
+        cache.pair = next;
+      }
+
+      return cache.pair;
+    },
+    subscribe: (listener: () => void) => {
+      const unsubscribers = [a.subscribe(listener), b.subscribe(listener)];
+
+      return () => unsubscribers.forEach((unsubscribe) => unsubscribe());
+    },
+  };
+};
 
 const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode }) => {
   const routeInput = useActiveProjectSelector(selectInvocationRouteInput);
@@ -106,10 +167,10 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
           throw error;
         }
       },
-      openDocumentInNewProject: (document, label) => {
-        // Create first: replace targets the active project.
+      openDocumentInNewProject: (document, label, source) => {
+        // Create first: the new project's blank placeholder is what the document takes over.
         commands.projects.create();
-        commands.workflows.replace(document, label);
+        commands.workflows.add(document, { label, reusePlaceholder: true, source });
         openWidget('workflow');
       },
       openWorkflowEditor: () => {
@@ -137,14 +198,30 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
     () =>
       createProjectedExternalStore({
         source: store,
-        select: (snapshot) => ({
-          galleryValues: getProjectWidgetValues(snapshot.activeProject, 'gallery'),
-          id: snapshot.activeProject.id,
-          isWorkflowRunning: hasPendingWorkflowQueueItem(snapshot.activeProject.queue.items),
-          projectGraph: snapshot.activeProject.projectGraph,
-          workflowValues: getProjectWidgetValues(snapshot.activeProject, 'workflow'),
-        }),
+        select: (snapshot) => {
+          const activeWorkflow = getActiveProjectWorkflow(snapshot.activeProject);
+
+          return {
+            activeWorkflow,
+            activeWorkflowId: activeWorkflow.document.id,
+            galleryValues: getProjectWidgetValues(snapshot.activeProject, 'gallery'),
+            id: snapshot.activeProject.id,
+            isWorkflowRunning: hasPendingWorkflowQueueItem(snapshot.activeProject.queue.items),
+            projectGraph: activeWorkflow.document,
+            workflowValues: getProjectWidgetValues(snapshot.activeProject, 'workflow'),
+            workflows: snapshot.activeProject.workflows.entries,
+          };
+        },
         isEqual: shallowEqual,
+      }),
+    [store]
+  );
+  const persistence = useMemo(
+    () =>
+      createProjectedExternalStore({
+        isEqual: shallowEqual,
+        select: selectProjectPersistence,
+        source: createPairedSource(store, { getSnapshot: getProjectSyncSnapshot, subscribe: subscribeProjectSync }),
       }),
     [store]
   );
@@ -171,14 +248,27 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
     () => ({
       capabilities,
       commands: {
-        bindLibraryWorkflow: commands.workflows.bindLibraryWorkflow,
+        addWorkflow: (document, options) => commands.workflows.add(document, options),
+        createWorkflow: () => commands.workflows.create(),
+        duplicateWorkflow: (workflowId, copyName) => commands.workflows.duplicate(workflowId, copyName),
         editGraph: commands.workflows.editGraph,
         redo: commands.workflows.redo,
-        replace: commands.workflows.replace,
+        removeWorkflow: (workflowId) => commands.workflows.remove(workflowId),
+        renameWorkflow: (workflowId, name) => {
+          commands.workflows.rename(workflowId, name);
+        },
+        selectWorkflow: (workflowId) => commands.workflows.select(workflowId),
+        setWorkflowSource: (target, source) =>
+          commands.workflows.setSource(target.projectId, target.workflowId, source),
         undo: commands.workflows.undo,
       },
-      getProjectGraph: () => queries.getSnapshot().activeProject.projectGraph,
-      nodeExecution: { get: nodeExecutionStore.get, subscribe: nodeExecutionStore.subscribe },
+      getProjectGraph: () => getActiveProjectWorkflow(queries.getSnapshot().activeProject).document,
+      nodeExecution: {
+        get: nodeExecutionStore.get,
+        getOrigin: nodeExecutionStore.getOrigin,
+        subscribe: nodeExecutionStore.subscribe,
+        subscribeOrigin: nodeExecutionStore.subscribeOrigin,
+      },
       notifications: { error: notify.error, info: notify.info, success: notify.success },
       // Lazy-load manager filter state to preserve editor bundle boundaries; seed it before hash navigation.
       openAddModels: (query) => {
@@ -192,6 +282,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         measure: (name, start, source, end) => measureWorkbenchPerf(name, start, source, end),
         time: (name, source, callback) => timeWorkbenchPerf(name, source, callback),
       },
+      persistence,
       preferences,
       project,
       registerModalHotkeyLayer: registerHotkeyModalLayer,
@@ -200,7 +291,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         patchValues: (widgetId, values) => commands.widgets.patchValues(widgetId, values),
       },
     }),
-    [capabilities, commands, notify.error, notify.info, notify.success, preferences, project, queries]
+    [capabilities, commands, notify.error, notify.info, notify.success, persistence, preferences, project, queries]
   );
 
   return (

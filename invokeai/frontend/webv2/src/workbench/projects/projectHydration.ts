@@ -6,8 +6,7 @@ import type { ProjectRecordDTO } from './api';
 
 import {
   applyAuthoritativeProjectBoard,
-  isProjectDocumentShape,
-  normalizeLegacyProjectDocument,
+  migrateProjectDocument,
   PROJECT_DOCUMENT_SCHEMA_VERSION,
 } from './projectDocument';
 
@@ -45,13 +44,26 @@ export const deserializeProjectDocument = (data: Record<string, unknown>): Proje
   if (futureDocument) {
     return futureDocument;
   }
-  const normalizedData = normalizeLegacyProjectDocument(data);
-  if (!isProjectDocumentShape(normalizedData)) {
-    return { status: 'unavailable' };
+  const migrated = migrateProjectDocument(data);
+  if (migrated.status === 'malformed') {
+    return {
+      refused: {
+        projectId: typeof data.id === 'string' ? data.id : '',
+        projectName: typeof data.name === 'string' ? data.name : '',
+        raw: data,
+        refusal: { raw: data, reason: migrated.reason, scope: 'project-document', status: 'malformed' },
+        source: 'project-document',
+      },
+      status: 'refused',
+    };
   }
 
-  const { documentSchemaVersion: _documentSchemaVersion, ...projectDocument } = normalizedData;
-  const result = loadWorkbenchProject({ ...projectDocument, undoRedo: { future: [], past: [] } } as unknown as Project);
+  const { documentSchemaVersion: _documentSchemaVersion, ...projectDocument } = migrated.document;
+  const result = loadWorkbenchProject({
+    ...projectDocument,
+    undoRedo: { future: [], past: [] },
+    workflowHistories: {},
+  } as unknown as Project);
 
   return result.status === 'refused' ? { refused: { ...result.refused, raw: data }, status: 'refused' } : result;
 };

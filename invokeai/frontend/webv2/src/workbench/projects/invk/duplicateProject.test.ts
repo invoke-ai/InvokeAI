@@ -261,6 +261,25 @@ describe('duplicateProjectRecord', () => {
     expect(claimed).toMatchObject({ projectBoardId: 'staging-board', selectedBoardId: 'staging-board' });
   });
 
+  it('keeps each workflow linked to its library template, since the copy lives on the same server', async () => {
+    const source = { libraryWorkflowId: 'lib-1', revision: 4 };
+    const project = createDraftProject([]);
+    const record = sourceRecord({
+      documentSchemaVersion: 3,
+      workflows: {
+        ...project.workflows,
+        entries: project.workflows.entries.map((entry) => ({ ...entry, source })),
+      },
+    });
+
+    await duplicateProject.duplicateProjectRecord({ boardItems: [], owner, record });
+
+    const workflows = createdData().workflows as { entries: { source?: unknown }[] };
+
+    expect(workflows.entries[0]?.source).toEqual(source);
+    expect(createdData().documentSchemaVersion).toBe(3);
+  });
+
   it('creates no staging board for a project whose board is empty', async () => {
     await duplicateProject.duplicateProjectRecord({ boardItems: [], owner, record: sourceRecord() });
 

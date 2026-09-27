@@ -8,6 +8,7 @@ import type { WorkflowGraphPreviewPort, WorkflowUiAdapter } from '@features/work
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
+import { createProjectGraph } from '@features/workflow/utility';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -101,13 +102,14 @@ vi.mock('@features/workflow/react', async (importOriginal) => ({
   useInvocationTemplatesSnapshot: () => templatesSnapshotRef.current,
 }));
 
-const { createLibraryWorkflowMock } = vi.hoisted(() => ({
-  createLibraryWorkflowMock: vi.fn(),
+const { createLibraryWorkflowRecordMock } = vi.hoisted(() => ({
+  createLibraryWorkflowRecordMock: vi.fn(),
 }));
 
-vi.mock('@features/workflow/queries', async (importOriginal) => ({
+// The publication controller reaches the transport through the API module itself, not the queries barrel.
+vi.mock('@features/workflow/data/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  createLibraryWorkflow: createLibraryWorkflowMock,
+  createLibraryWorkflowRecord: createLibraryWorkflowRecordMock,
 }));
 
 // Supply rendered English strings without starting the HTTP-backed i18n client.
@@ -156,6 +158,8 @@ const TRANSLATIONS: Record<string, string> = {
   'graphPreview.thisGraph': 'This graph',
   'graphPreview.title': 'Graph preview',
   'workflowLibrary.saveFailed': 'Failed to save workflow',
+  'workflowLibrary.saved': 'Workflow saved',
+  'workflowLibrary.savedCreatedBody': 'Saved "{{name}}" to the library.',
 };
 
 const interpolate = (template: string, options?: Record<string, unknown>): string =>
@@ -283,13 +287,20 @@ const preferencesSnapshot = {
 };
 
 // Keep adapter snapshots stable so external-store subscribers cannot loop on fresh equivalent objects.
-const createProjectSnapshot = () => ({
-  galleryValues: {},
-  id: 'project-1',
-  isWorkflowRunning: false,
-  projectGraph: { edges: [], nodes: [], version: 1 as const },
-  workflowValues: {},
-});
+const createProjectSnapshot = () => {
+  const projectGraph = createProjectGraph('workflow-1');
+
+  return {
+    activeWorkflow: { document: projectGraph },
+    activeWorkflowId: projectGraph.id,
+    galleryValues: {},
+    id: 'project-1',
+    isWorkflowRunning: false,
+    projectGraph,
+    workflowValues: {},
+    workflows: [{ document: projectGraph }],
+  };
+};
 
 const createWorkflowUiAdapter = (): WorkflowUiAdapter => {
   const projectSnapshot = createProjectSnapshot();
@@ -297,14 +308,24 @@ const createWorkflowUiAdapter = (): WorkflowUiAdapter => {
   return {
     capabilities: { getSnapshot: () => ({ canUseCache: true }), subscribe: () => () => {} },
     commands: {
-      bindLibraryWorkflow: vi.fn(),
+      addWorkflow: vi.fn(),
+      createWorkflow: vi.fn(),
+      duplicateWorkflow: vi.fn(),
       editGraph: vi.fn(),
       redo: vi.fn(),
-      replace: vi.fn(),
+      removeWorkflow: vi.fn(),
+      renameWorkflow: vi.fn(),
+      selectWorkflow: vi.fn(),
+      setWorkflowSource: vi.fn(),
       undo: vi.fn(),
     },
-    getProjectGraph: () => ({ edges: [], nodes: [], version: 1 as const }),
-    nodeExecution: { get: () => null, subscribe: () => () => {} },
+    getProjectGraph: () => projectSnapshot.projectGraph,
+    nodeExecution: {
+      get: () => null,
+      getOrigin: () => null,
+      subscribe: () => () => {},
+      subscribeOrigin: () => () => {},
+    },
     notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
     performance: {
       mark: vi.fn(),
@@ -384,7 +405,7 @@ describe('GraphPreviewDialog', () => {
     workflowUiAdapter = createWorkflowUiAdapter();
     downloads.downloadBlob.mockReset();
     downloads.downloadText.mockReset();
-    createLibraryWorkflowMock.mockReset();
+    createLibraryWorkflowRecordMock.mockReset();
     fitViewMock.mockClear();
     templatesSnapshotRef.current = TEMPLATES_SNAPSHOT;
   });
@@ -645,16 +666,17 @@ describe('GraphPreviewDialog', () => {
     expect(text).not.toContain('Resolved inputs');
   });
 
-  it('Open as → Edit in workflow editor replaces the document, opens the editor, closes the dialog', async () => {
+  it('Open as → Edit in workflow editor adds the document as a project workflow, opens the editor, closes the dialog', async () => {
     await renderDialog(FIXTURE_SOURCE);
 
     await openAsMenu();
     await clickMenuItemWithText('Edit in workflow editor');
 
-    expect(workflowUiAdapter.commands.replace).toHaveBeenCalledTimes(1);
-    const [document_, label] = vi.mocked(workflowUiAdapter.commands.replace).mock.calls[0] ?? [];
+    expect(workflowUiAdapter.commands.addWorkflow).toHaveBeenCalledTimes(1);
+    const [document_, options] = vi.mocked(workflowUiAdapter.commands.addWorkflow).mock.calls[0] ?? [];
     expect(document_?.nodes).toHaveLength(3);
-    expect(label).toBe('Opened from graph preview');
+    // A blank starter workflow may be taken over; an edited one gets the preview beside it.
+    expect(options).toEqual({ label: 'Opened from graph preview', reusePlaceholder: true });
     expect(graphPreviewPort.openWorkflowEditor).toHaveBeenCalledTimes(1);
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
@@ -670,8 +692,8 @@ describe('GraphPreviewDialog', () => {
     expect(document_?.nodes).toHaveLength(3);
     expect(document_?.name).toBe('Generate');
     expect(label).toBe('Opened from graph preview');
-    // Forking must not touch the current project's workflow.
-    expect(workflowUiAdapter.commands.replace).not.toHaveBeenCalled();
+    // Forking must not touch the current project's workflows.
+    expect(workflowUiAdapter.commands.addWorkflow).not.toHaveBeenCalled();
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
@@ -715,7 +737,9 @@ describe('GraphPreviewDialog', () => {
   });
 
   it('Open as → Save to workflow library names the document from the source label and notifies success', async () => {
-    createLibraryWorkflowMock.mockResolvedValue('library-workflow-1');
+    createLibraryWorkflowRecordMock.mockImplementation((workflow: Record<string, unknown>) =>
+      Promise.resolve({ name: workflow.name, revision: 1, workflow, workflow_id: 'library-workflow-1' })
+    );
 
     await renderDialog(FIXTURE_SOURCE);
 
@@ -723,14 +747,21 @@ describe('GraphPreviewDialog', () => {
     await clickMenuItemWithText('Save to workflow library');
     await flushAsync();
 
-    expect(createLibraryWorkflowMock).toHaveBeenCalledTimes(1);
-    const [serialized] = createLibraryWorkflowMock.mock.calls[0] ?? [];
+    expect(createLibraryWorkflowRecordMock).toHaveBeenCalledTimes(1);
+    const [serialized, options] = createLibraryWorkflowRecordMock.mock.calls[0] ?? [];
     expect(serialized).toMatchObject({ name: 'Generate' });
-    expect(workflowUiAdapter.notifications.success).toHaveBeenCalledWith('Saved to workflow library');
+    // A client-reserved id makes a resend after a lost answer idempotent.
+    expect(options).toMatchObject({ reservedId: expect.any(String) });
+    expect(workflowUiAdapter.notifications.success).toHaveBeenCalledWith(
+      'Workflow saved',
+      'Saved "Generate" to the library.'
+    );
+    // A preview is not a project workflow, so nothing in the project is pointed at the new template.
+    expect(workflowUiAdapter.commands.setWorkflowSource).not.toHaveBeenCalled();
   });
 
-  it('Open as → Save to workflow library does not notify success when the save fails', async () => {
-    createLibraryWorkflowMock.mockRejectedValue(new Error('network down'));
+  it('Open as → Save to workflow library retries a lost answer once under the same reserved id, never claiming success', async () => {
+    createLibraryWorkflowRecordMock.mockRejectedValue(new Error('network down'));
 
     await renderDialog(FIXTURE_SOURCE);
 
@@ -738,10 +769,11 @@ describe('GraphPreviewDialog', () => {
     await clickMenuItemWithText('Save to workflow library');
     await flushAsync();
 
-    expect(createLibraryWorkflowMock).toHaveBeenCalledTimes(1);
+    expect(createLibraryWorkflowRecordMock).toHaveBeenCalledTimes(2);
+    const [, first] = createLibraryWorkflowRecordMock.mock.calls[0] ?? [];
+    const [, second] = createLibraryWorkflowRecordMock.mock.calls[1] ?? [];
+    expect((second as { reservedId: string }).reservedId).toBe((first as { reservedId: string }).reservedId);
     expect(workflowUiAdapter.notifications.success).not.toHaveBeenCalled();
-    // `useSaveWorkflowToLibrary`'s own catch path (Task 8) reports the failure.
-    expect(workflowUiAdapter.notifications.error).toHaveBeenCalledWith('Failed to save workflow', expect.any(String));
   });
 
   it('Open as → Save to workflow library bails with an error notification when the graph has no saveable nodes', async () => {
@@ -752,7 +784,7 @@ describe('GraphPreviewDialog', () => {
     await flushAsync();
 
     // Reject conversion with no recognized nodes before backend save.
-    expect(createLibraryWorkflowMock).not.toHaveBeenCalled();
+    expect(createLibraryWorkflowRecordMock).not.toHaveBeenCalled();
     expect(workflowUiAdapter.notifications.error).toHaveBeenCalledWith('No saveable nodes in this graph.');
     expect(workflowUiAdapter.notifications.success).not.toHaveBeenCalled();
   });

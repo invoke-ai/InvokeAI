@@ -102,6 +102,39 @@ it('keeps the held result while edits touch only name-free subtrees, and sees na
   expect(new Set(read().images)).toEqual(new Set(['stroke.png', 'snapshot.png', 'undo.png', 'next.png']));
 });
 
+it('rescans only the workflow an edit touched, sharing the documents its history retains', () => {
+  const docA = { id: 'a', nodes: [{ data: { inputs: { image: { value: { image_name: 'a.png' } } } } }] };
+  const docB = { id: 'b', nodes: [{ data: { inputs: { image: { value: { image_name: 'b.png' } } } } }] };
+  let project = {
+    id: 'project-1',
+    workflowHistories: {},
+    workflows: { activeWorkflowId: 'a', entries: [{ document: docA }, { document: docB }] },
+  };
+  const read = createOpenProjectsHeldMediaReader(
+    () => [project],
+    () => undefined
+  );
+  const first = read();
+  expect(new Set(first.images)).toEqual(new Set(['a.png', 'b.png']));
+
+  // Editing `a` keeps `docA` in a's history; b's entry is untouched and its scan is reused by identity.
+  const docA2 = { ...docA, nodes: [{ data: { inputs: { image: { value: { image_name: 'a2.png' } } } } }] };
+  project = {
+    ...project,
+    workflowHistories: { a: { future: [], past: [{ document: docA, id: 'h1', sequence: 1 }] } },
+    workflows: { ...project.workflows, entries: [{ document: docA2 }, project.workflows.entries[1]!] },
+  };
+  expect(new Set(read().images)).toEqual(new Set(['a.png', 'a2.png', 'b.png']));
+
+  // Removing `a` releases its history: nothing holds a.png or a2.png any more.
+  project = {
+    ...project,
+    workflowHistories: {},
+    workflows: { activeWorkflowId: 'b', entries: [project.workflows.entries[1]!] },
+  };
+  expect(read().images).toEqual(['b.png']);
+});
+
 it('announces engines registering and releasing their held media', () => {
   const sources = createCanvasHeldMediaSources();
   const onChange = vi.fn();

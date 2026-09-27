@@ -23,6 +23,42 @@ class WorkflowNotFoundError(Exception):
     """Raised when a workflow is not found"""
 
 
+class WorkflowImmutableError(Exception):
+    """Raised when a write targets a bundled (default) workflow, which the server never lets anyone modify."""
+
+    def __init__(self, workflow_id: str) -> None:
+        self.workflow_id = workflow_id
+        super().__init__(f"Workflow {workflow_id} is a bundled workflow and cannot be modified")
+
+
+class WorkflowAccessDeniedError(Exception):
+    """Raised when a scoped write targets a workflow another account owns."""
+
+    def __init__(self, workflow_id: str) -> None:
+        self.workflow_id = workflow_id
+        super().__init__(f"Workflow {workflow_id} is owned by another account")
+
+
+class WorkflowRevisionConflictError(Exception):
+    """Raised when an update carries a stale content revision (another writer saved first)."""
+
+    def __init__(self, workflow_id: str, expected_revision: int, current_revision: int) -> None:
+        self.workflow_id = workflow_id
+        self.expected_revision = expected_revision
+        self.current_revision = current_revision
+        super().__init__(
+            f"Workflow {workflow_id} is at revision {current_revision}; the update expected revision {expected_revision}"
+        )
+
+
+class WorkflowIdConflictError(Exception):
+    """Raised when a client-reserved workflow id already names a record that is not the same request."""
+
+    def __init__(self, workflow_id: str) -> None:
+        self.workflow_id = workflow_id
+        super().__init__(f"Workflow id {workflow_id} is already in use")
+
+
 class WorkflowRecordOrderBy(str, Enum, metaclass=MetaEnum):
     """The order by options for workflow records"""
 
@@ -127,6 +163,7 @@ class WorkflowRecordDTOBase(BaseModel):
     )
     user_id: str = Field(description="The id of the user who owns this workflow.")
     is_public: bool = Field(description="Whether this workflow is shared with all users.")
+    revision: int = Field(description="Monotonic content revision; every write of the workflow document increments it.")
 
 
 class WorkflowRecordDTO(WorkflowRecordDTOBase):

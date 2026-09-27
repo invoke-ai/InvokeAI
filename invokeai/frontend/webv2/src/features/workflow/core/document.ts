@@ -66,16 +66,125 @@ export const createProjectGraph = (id: string, name = 'Untitled Workflow'): Proj
 
 export const cloneProjectGraph = (document: ProjectGraphState): ProjectGraphState => structuredClone(document);
 
-/** Accepts any persisted `projectGraph` shape and yields a current document, preserving the id. */
-export const normalizeProjectGraph = (candidate: unknown): ProjectGraphState => {
-  if (typeof candidate === 'object' && candidate !== null && (candidate as ProjectGraphState).version === 2) {
-    return candidate as ProjectGraphState;
+const isRecord = (value: unknown): value is Record<string, unknown> => typeof value === 'object' && value !== null;
+
+const isNodeLike = (value: unknown): boolean =>
+  isRecord(value) &&
+  typeof value.id === 'string' &&
+  typeof value.type === 'string' &&
+  isRecord(value.position) &&
+  typeof value.position.x === 'number' &&
+  typeof value.position.y === 'number' &&
+  isRecord(value.data) &&
+  (value.type !== 'invocation' || (typeof value.data.type === 'string' && isRecord(value.data.inputs)));
+
+const isFormElementLike = (value: unknown): boolean => {
+  if (!isRecord(value) || typeof value.id !== 'string' || typeof value.type !== 'string') {
+    return false;
   }
 
-  const legacyId =
-    typeof (candidate as { id?: unknown } | null)?.id === 'string' ? (candidate as { id: string }).id : null;
+  const data = value.data;
 
-  return createProjectGraph(legacyId ?? createWorkflowId('workflow'));
+  switch (value.type) {
+    case 'container':
+      return (
+        isRecord(data) &&
+        (data.layout === 'row' || data.layout === 'column') &&
+        Array.isArray(data.children) &&
+        data.children.every((child) => typeof child === 'string')
+      );
+    case 'node-field':
+      return (
+        isRecord(data) &&
+        isRecord(data.fieldIdentifier) &&
+        typeof data.fieldIdentifier.nodeId === 'string' &&
+        typeof data.fieldIdentifier.fieldName === 'string'
+      );
+    case 'heading':
+    case 'text':
+      return isRecord(data) && typeof data.content === 'string';
+    case 'divider':
+      return true;
+    default:
+      return false;
+  }
+};
+
+const isEdgeLike = (value: unknown): boolean =>
+  isRecord(value) &&
+  typeof value.id === 'string' &&
+  typeof value.source === 'string' &&
+  typeof value.target === 'string';
+
+const isFormLike = (value: unknown): boolean =>
+  isRecord(value) &&
+  typeof value.rootElementId === 'string' &&
+  isRecord(value.elements) &&
+  isRecord(value.elements[value.rootElementId]) &&
+  (value.elements[value.rootElementId] as Record<string, unknown>).type === 'container' &&
+  Object.values(value.elements).every(isFormElementLike);
+
+const METADATA_KEYS = ['author', 'contact', 'description', 'name', 'notes', 'tags', 'workflowVersion'] as const;
+
+/**
+ * Reads a persisted version-2 document. Authored content (nodes, edges, form) must carry the structure the editor
+ * and the linear form read, or the document is refused (`null`), never quietly replaced; missing metadata strings
+ * are the only thing filled in.
+ */
+export const readPersistedProjectGraph = (candidate: unknown): ProjectGraphState | null => {
+  if (
+    !isRecord(candidate) ||
+    candidate.version !== 2 ||
+    typeof candidate.id !== 'string' ||
+    candidate.id.length === 0 ||
+    !Array.isArray(candidate.nodes) ||
+    !candidate.nodes.every(isNodeLike) ||
+    !Array.isArray(candidate.edges) ||
+    !candidate.edges.every(isEdgeLike) ||
+    !isFormLike(candidate.form)
+  ) {
+    return null;
+  }
+
+  if (METADATA_KEYS.every((key) => typeof candidate[key] === 'string') && typeof candidate.updatedAt === 'string') {
+    return candidate as unknown as ProjectGraphState;
+  }
+
+  const filled: Record<string, unknown> = { ...candidate };
+
+  for (const key of METADATA_KEYS) {
+    if (typeof filled[key] !== 'string') {
+      filled[key] = key === 'workflowVersion' ? '1.0.0' : '';
+    }
+  }
+
+  if (typeof filled.updatedAt !== 'string') {
+    filled.updatedAt = now();
+  }
+
+  return filled as unknown as ProjectGraphState;
+};
+
+/**
+ * The only pre-version-2 shape ever persisted was the Phase-1 placeholder: no nodes, nothing authored. It becomes a
+ * blank under its own id; any other unrecognised graph is refused (`null`) rather than replaced.
+ */
+export const readLegacyPlaceholderGraph = (candidate: unknown): ProjectGraphState | null => {
+  if (!isRecord(candidate)) {
+    return createProjectGraph(createWorkflowId('workflow'));
+  }
+
+  const hasAuthoredContent = Array.isArray(candidate.nodes)
+    ? candidate.nodes.length > 0
+    : candidate.nodes !== undefined;
+
+  if ((candidate.version !== undefined && candidate.version !== 1) || hasAuthoredContent) {
+    return null;
+  }
+
+  return createProjectGraph(
+    typeof candidate.id === 'string' && candidate.id ? candidate.id : createWorkflowId('workflow')
+  );
 };
 
 export const buildInvocationNode = (template: InvocationTemplate, position: XYPosition): WorkflowInvocationNode => {
