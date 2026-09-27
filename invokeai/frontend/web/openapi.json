@@ -3961,6 +3961,9 @@
           "400": {
             "description": "Bad request"
           },
+          "404": {
+            "description": "The model could not be found"
+          },
           "409": {
             "description": "Another operation on this model is already in progress"
           },
