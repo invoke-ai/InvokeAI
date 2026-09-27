@@ -5,7 +5,7 @@ import { markTokenRefreshAccepted } from 'features/auth/store/authTokenRefresh';
 import { authApi } from 'services/api/endpoints/auth';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { api, buildV1Url, dynamicBaseQuery } from '..';
+import { acceptRefreshedToken, api, buildV1Url, dynamicBaseQuery } from '..';
 
 /**
  * `dynamicBaseQuery` reads the bearer token out of localStorage, and `getDeploymentBaseUrl`
@@ -168,6 +168,52 @@ describe('refreshed token acceptance', () => {
 
     expect(fetchMock).toHaveBeenCalledTimes(2);
     expect(dispatch).toHaveBeenCalledWith(tokenRefreshed(refreshedToken));
+  });
+
+  describe('a password-change replacement racing a routine refresh of the same session', () => {
+    // The request carried T0. A routine refresh T0' (same epoch) and the password change's
+    // epoch-advancing replacement R were both minted for it, and T0' commits first.
+    const requestToken = tokenFor(1, 0);
+    const routineToken = tokenFor(2, 0);
+    const replacementToken = tokenFor(3, 1);
+
+    // Commits like the real `tokenRefreshed` reducer, so the second acceptance sees T0' stored.
+    const dispatch = vi.fn((action: ReturnType<typeof tokenRefreshed>) => {
+      localStorage.setItem('auth_token', action.payload);
+    });
+
+    beforeEach(() => {
+      // Put the throttle past its window, so the routine refresh is accepted and commits.
+      const now = vi.spyOn(Date, 'now').mockReturnValue(300_000);
+      markTokenRefreshAccepted();
+      now.mockReturnValue(360_001);
+      dispatch.mockClear();
+      localStorage.setItem('auth_token', requestToken);
+      vi.stubGlobal(
+        'fetch',
+        vi.fn(() => Promise.resolve(new Response(null, { status: 204 })))
+      );
+    });
+
+    it('keeps the replacement when the routine refresh committed before it arrived', async () => {
+      await acceptRefreshedToken(routineToken, requestToken, 0, dispatch);
+      expect(localStorage.getItem('auth_token')).toBe(routineToken);
+
+      await acceptRefreshedToken(replacementToken, requestToken, 0, dispatch);
+
+      expect(localStorage.getItem('auth_token')).toBe(replacementToken);
+    });
+
+    it('keeps the replacement when it queued on the lock behind the routine refresh', async () => {
+      // Both pass the check before the lock while T0 is still stored; the replacement then waits
+      // for the routine refresh to commit and re-checks inside the lock.
+      const routine = acceptRefreshedToken(routineToken, requestToken, 0, dispatch);
+      const replacement = acceptRefreshedToken(replacementToken, requestToken, 0, dispatch);
+      await Promise.all([routine, replacement]);
+
+      expect(dispatch.mock.calls.map(([action]) => action.payload)).toEqual([routineToken, replacementToken]);
+      expect(localStorage.getItem('auth_token')).toBe(replacementToken);
+    });
   });
 });
 

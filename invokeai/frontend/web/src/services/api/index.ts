@@ -176,14 +176,14 @@ export const acceptRefreshedToken = async (
 ): Promise<void> => {
   if (
     shouldThrottleRefreshedToken(requestToken, refreshedToken) ||
-    !shouldAcceptRefreshedToken(requestToken, requestGeneration)
+    !shouldAcceptRefreshedToken(requestToken, requestGeneration, refreshedToken)
   ) {
     return;
   }
   await runWithMediaAuthLock(async () => {
     if (
       shouldThrottleRefreshedToken(requestToken, refreshedToken) ||
-      !shouldAcceptRefreshedToken(requestToken, requestGeneration)
+      !shouldAcceptRefreshedToken(requestToken, requestGeneration, refreshedToken)
     ) {
       return;
     }
@@ -208,7 +208,7 @@ export const acceptRefreshedToken = async (
       // failure would trade a transiently stale media cookie for a hard session
       // expiry mid-activity.
     }
-    if (shouldAcceptRefreshedToken(requestToken, requestGeneration)) {
+    if (shouldAcceptRefreshedToken(requestToken, requestGeneration, refreshedToken)) {
       markTokenRefreshAccepted();
       dispatch(tokenRefreshed(refreshedToken));
     }
