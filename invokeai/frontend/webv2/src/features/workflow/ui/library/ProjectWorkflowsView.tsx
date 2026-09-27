@@ -68,7 +68,6 @@ export interface ProjectWorkflowsViewProps {
   onSelect: (workflowId: string | null) => void;
 }
 
-
 export const ProjectWorkflowsView = ({
   contextMenuPoint,
   contextMenuTriggerId,
