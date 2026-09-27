@@ -15,12 +15,16 @@ from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.workflow_call_compatibility import get_workflow_call_compatibility
 from invokeai.app.services.workflow_records.workflow_records_common import (
     Workflow,
+    WorkflowAccessDeniedError,
     WorkflowCategory,
+    WorkflowIdConflictError,
+    WorkflowImmutableError,
     WorkflowNotFoundError,
     WorkflowRecordDTO,
     WorkflowRecordListItemWithThumbnailDTO,
     WorkflowRecordOrderBy,
     WorkflowRecordWithThumbnailDTO,
+    WorkflowRevisionConflictError,
     WorkflowWithoutID,
 )
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_common import WorkflowThumbnailFileNotFoundException
@@ -73,24 +77,61 @@ def get_workflow(
     operation_id="update_workflow",
     responses={
         200: {"model": WorkflowRecordDTO},
+        400: {"description": "The body's workflow id does not match the URL, or the update is malformed"},
+        403: {"description": "The workflow is bundled or belongs to another account"},
+        404: {"description": "The workflow does not exist"},
+        409: {"description": "The workflow's content revision no longer matches `expected_revision`"},
     },
 )
 def update_workflow(
     current_user: CurrentUserOrDefault,
+    workflow_id: str = Path(description="The workflow to update"),
     workflow: Workflow = Body(description="The updated workflow", embed=True),
+    expected_revision: Optional[int] = Body(
+        default=None,
+        embed=True,
+        description="The content revision the client last observed; when set, a different stored revision refuses "
+        "the write with 409 instead of overwriting newer content.",
+    ),
 ) -> WorkflowRecordDTO:
-    """Updates a workflow"""
+    """Updates a workflow's content and advances its revision."""
+    if workflow.id != workflow_id:
+        raise HTTPException(status_code=400, detail="The workflow id in the body does not match the URL")
+
     try:
-        existing = ApiDependencies.invoker.services.workflow_records.get(workflow.id)
+        existing = ApiDependencies.invoker.services.workflow_records.get(workflow_id)
     except WorkflowNotFoundError:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
+    if existing.workflow.meta.category is WorkflowCategory.Default:
+        raise HTTPException(status_code=403, detail="Bundled workflows cannot be modified")
     config = ApiDependencies.invoker.services.configuration
     if config.multiuser:
         if not current_user.is_admin and existing.user_id != current_user.user_id:
             raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
     user_id = None if current_user.is_admin else current_user.user_id
-    updated = ApiDependencies.invoker.services.workflow_records.update(workflow=workflow, user_id=user_id)
+    try:
+        updated = ApiDependencies.invoker.services.workflow_records.update(
+            workflow=workflow, user_id=user_id, expected_revision=expected_revision
+        )
+    except WorkflowNotFoundError:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    except WorkflowImmutableError:
+        raise HTTPException(status_code=403, detail="Bundled workflows cannot be modified")
+    except WorkflowAccessDeniedError:
+        raise HTTPException(status_code=403, detail="Not authorized to update this workflow")
+    except WorkflowRevisionConflictError as e:
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "message": str(e),
+                "reason": "revision-conflict",
+                "current_revision": e.current_revision,
+                "expected_revision": e.expected_revision,
+            },
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
     ApiDependencies.invoker.services.events.emit_workflow_updated(
         workflow_id=updated.workflow_id,
         user_id=updated.user_id,
@@ -114,6 +155,8 @@ def delete_workflow(
     except WorkflowNotFoundError:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
+    if existing.workflow.meta.category is WorkflowCategory.Default:
+        raise HTTPException(status_code=403, detail="Bundled workflows cannot be deleted")
     config = ApiDependencies.invoker.services.configuration
     if config.multiuser:
         if not current_user.is_admin and existing.user_id != current_user.user_id:
@@ -124,7 +167,14 @@ def delete_workflow(
         # It's OK if the workflow has no thumbnail file. We can still delete the workflow.
         pass
     user_id = None if current_user.is_admin else current_user.user_id
-    ApiDependencies.invoker.services.workflow_records.delete(workflow_id, user_id=user_id)
+    try:
+        ApiDependencies.invoker.services.workflow_records.delete(workflow_id, user_id=user_id)
+    except WorkflowNotFoundError:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+    except WorkflowImmutableError:
+        raise HTTPException(status_code=403, detail="Bundled workflows cannot be deleted")
+    except WorkflowAccessDeniedError:
+        raise HTTPException(status_code=403, detail="Not authorized to delete this workflow")
     ApiDependencies.invoker.services.events.emit_workflow_deleted(
         workflow_id=existing.workflow_id,
         user_id=existing.user_id,
@@ -137,25 +187,49 @@ def delete_workflow(
     operation_id="create_workflow",
     responses={
         200: {"model": WorkflowRecordDTO},
+        400: {"description": "The workflow or the reserved id is malformed"},
+        409: {"description": "The reserved id already names a different workflow"},
     },
 )
 def create_workflow(
     current_user: CurrentUserOrDefault,
     workflow: WorkflowWithoutID = Body(description="The workflow to create", embed=True),
+    workflow_id: Optional[str] = Body(
+        default=None,
+        embed=True,
+        description="A client-reserved UUID for the new record. Retrying the same creation with the same id returns "
+        "the record already created for it; another owner's record or different content under that id is a 409.",
+    ),
 ) -> WorkflowRecordDTO:
     """Creates a workflow"""
     # In single-user mode, workflows are owned by 'system' and shared by default so all legacy/single-user
     # workflows remain visible. In multiuser mode, workflows are private to the creator by default.
     config = ApiDependencies.invoker.services.configuration
     is_public = not config.multiuser
-    created = ApiDependencies.invoker.services.workflow_records.create(
-        workflow=workflow, user_id=current_user.user_id, is_public=is_public
-    )
-    ApiDependencies.invoker.services.events.emit_workflow_created(
-        workflow_id=created.workflow_id,
-        user_id=created.user_id,
-        is_public=created.is_public,
-    )
+    # A retried creation that finds its record already made emits no second event: the first write emitted one.
+    is_retry = False
+    if workflow_id is not None:
+        try:
+            ApiDependencies.invoker.services.workflow_records.get(workflow_id)
+            is_retry = True
+        except WorkflowNotFoundError:
+            pass
+    try:
+        created = ApiDependencies.invoker.services.workflow_records.create(
+            workflow=workflow, user_id=current_user.user_id, is_public=is_public, workflow_id=workflow_id
+        )
+    except WorkflowIdConflictError:
+        raise HTTPException(
+            status_code=409, detail={"message": "The workflow id is already in use", "reason": "id-conflict"}
+        )
+    except ValueError as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    if not is_retry:
+        ApiDependencies.invoker.services.events.emit_workflow_created(
+            workflow_id=created.workflow_id,
+            user_id=created.user_id,
+            is_public=created.is_public,
+        )
     return created
 
 
