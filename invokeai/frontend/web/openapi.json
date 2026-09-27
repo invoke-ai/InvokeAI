@@ -31665,6 +31665,18 @@
             ],
             "title": "Task Id",
             "description": "Client-supplied task ID used to correlate socket progress events to this request"
+          },
+          "image_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Image Name",
+            "description": "An image to condition the rewrite on, such as a video's first frame. Requires a model whose `supports_images` is true."
           }
         },
         "type": "object",
@@ -101967,6 +101979,12 @@
             ],
             "title": "Cpu Only",
             "description": "Whether this model should run on CPU only"
+          },
+          "supports_images": {
+            "type": "boolean",
+            "title": "Supports Images",
+            "description": "Whether the model has a vision tower and processor, so Expand Prompt can condition on an image",
+            "default": false
           }
         },
         "type": "object",
@@ -101986,7 +102004,8 @@
           "repo_variant",
           "type",
           "base",
-          "cpu_only"
+          "cpu_only",
+          "supports_images"
         ],
         "title": "TextLLM_Diffusers_Config",
         "description": "Model config for text-only causal language models (e.g. Llama, Phi, Qwen, Mistral)."

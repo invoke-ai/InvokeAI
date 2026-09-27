@@ -78,6 +78,23 @@ export interface ImageWithDims {
   height: number;
 }
 
+/**
+ * What a widget suggests to Expand Prompt for its model family. Each part applies only until the
+ * user picks a model or system prompt themselves.
+ */
+export interface ExpandPromptSuggestion {
+  /** Source of the family's released enhancer, preselected when an installed text LLM has it. */
+  modelSource: string | null;
+  /** How the model is listed among the starter models, for the hint shown when it is not installed. */
+  modelName: string | null;
+  /** For a text-only rewrite. */
+  systemPromptId: string | null;
+  /** Replaces `systemPromptId` whenever `image` is actually sent; a prompt written for an image must not run without one. */
+  imageSystemPromptId: string | null;
+  /** An image the rewrite may describe from, such as a video's first frame. */
+  image: ImageWithDims | null;
+}
+
 export interface CroppableImageWithDims {
   original: { image: ImageWithDims };
   crop?: {

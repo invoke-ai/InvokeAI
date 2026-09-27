@@ -1,11 +1,17 @@
 import type { GenerationModelCatalogItem as ModelConfig, PromptHistoryItem } from '@features/generation/contracts';
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
-import type { GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
+import type {
+  ExpandPromptSuggestion,
+  GenerateLora,
+  GenerateModelConfig,
+  ImageWithDims,
+} from '@features/generation/core/types';
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
 import type { DroppedPromptImage } from '@features/generation/ui/promptFields/usePromptImageDrop';
 import type { ChangeEvent, MouseEvent } from 'react';
 
-import { HStack, Icon, Image, Input, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
+import { Checkbox, HStack, Icon, Image, Input, Popover, Portal, Separator, Stack, Text } from '@chakra-ui/react';
+import { galleryImageUrls } from '@features/gallery/utility';
 import { filterPromptHistory } from '@features/generation/core/promptHistory';
 import { resolveSelectedSystemPromptId } from '@features/generation/core/systemPrompts';
 import { llmTaskProgressStore } from '@features/generation/data/llmTaskProgress';
@@ -82,6 +88,8 @@ interface PositivePromptActionsProps {
   dynamicPrompts: DynamicPromptsFieldConfig | null;
   /** The authored prompt wrapped by the active template — what actually expands. */
   effectivePositivePrompt: string;
+  /** Absent on surfaces whose model family has no prompt enhancer of its own. */
+  expandPromptSuggestion?: ExpandPromptSuggestion | null;
   loras: GenerateLora[];
   isPromptTriggerPickerOpen: boolean;
   onUsePrompt: (prompt: PromptHistoryItem) => void;
@@ -100,6 +108,7 @@ export const PositivePromptActions = ({
   droppedImage,
   dynamicPrompts,
   effectivePositivePrompt,
+  expandPromptSuggestion,
   isPromptTriggerPickerOpen,
   onInsertText,
   onOpenPromptTriggerPicker,
@@ -133,6 +142,7 @@ export const PositivePromptActions = ({
         isDisabled={template.isViewMode}
         positivePrompt={positivePrompt}
         projectId={projectId}
+        suggestion={expandPromptSuggestion ?? null}
         onPositivePromptChange={onPositivePromptChangeImmediate}
       />
       <ImageToPromptButton
@@ -366,10 +376,12 @@ const ExpandPromptButton = ({
   onPositivePromptChange,
   positivePrompt,
   projectId,
+  suggestion,
 }: {
   isDisabled: boolean;
   positivePrompt: string;
   projectId: string;
+  suggestion: ExpandPromptSuggestion | null;
   onPositivePromptChange: (prompt: string) => void;
 }) => {
   const { t } = useTranslation();
@@ -385,12 +397,27 @@ const ExpandPromptButton = ({
   const [taskId, setTaskId] = useState<string | null>(null);
   const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
   const [selectedSystemPromptId, setSelectedSystemPromptId] = useState<string | null>(null);
+  // Keyed by image so unticking one frame does not carry over to the next one.
+  const [excludedImageName, setExcludedImageName] = useState<string | null>(null);
   const textLlmModels = models.filter((model) => model.type === 'text_llm');
-  const selectedModel = selectedModelKey ? textLlmModels.find((model) => model.key === selectedModelKey) : null;
+  const suggestedModelKey = suggestion?.modelSource
+    ? (textLlmModels.find((model) => model.source === suggestion.modelSource)?.key ?? null)
+    : null;
+  // An explicit choice wins; otherwise the widget's suggested enhancer, when it is installed.
+  const effectiveModelKey = selectedModelKey ?? suggestedModelKey;
+  const selectedModel = effectiveModelKey ? textLlmModels.find((model) => model.key === effectiveModelKey) : null;
+  const suggestedImage = suggestion?.image ?? null;
+  const canReadImages = selectedModel?.supports_images === true;
+  const isImageIncluded = suggestedImage !== null && excludedImageName !== suggestedImage.image_name;
+  const conditioningImage = suggestedImage && canReadImages && isImageIncluded ? suggestedImage : null;
   // The list is behind the popover, so a closed button has nothing to fetch.
   const systemPrompts = useSystemPrompts({ isEnabled: isOpen });
+  const suggestedSystemPromptId = conditioningImage ? suggestion?.imageSystemPromptId : suggestion?.systemPromptId;
   // Resolve selection at read time after deletion or without an explicit choice.
-  const effectiveSystemPromptId = resolveSelectedSystemPromptId(systemPrompts.prompts, selectedSystemPromptId);
+  const effectiveSystemPromptId = resolveSelectedSystemPromptId(
+    systemPrompts.prompts,
+    selectedSystemPromptId ?? suggestedSystemPromptId ?? null
+  );
   const selectedSystemPrompt = systemPrompts.prompts.find((prompt) => prompt.id === effectiveSystemPromptId);
 
   // eslint-disable-next-line react/refs
@@ -412,6 +439,7 @@ const ExpandPromptButton = ({
     try {
       const result = await expandPrompt({
         // Forward the selected prompt's optional token cap to expansion.
+        image_name: conditioningImage?.image_name,
         max_tokens: selectedSystemPrompt?.maxTokens ?? undefined,
         model_key: selectedModel.key,
         prompt: positivePrompt,
@@ -436,9 +464,24 @@ const ExpandPromptButton = ({
       setTaskId(null);
       setIsLoading(false);
     }
-  }, [notifications, onPositivePromptChange, positivePrompt, projectId, selectedModel, selectedSystemPrompt, t]);
+  }, [
+    conditioningImage,
+    notifications,
+    onPositivePromptChange,
+    positivePrompt,
+    projectId,
+    selectedModel,
+    selectedSystemPrompt,
+    t,
+  ]);
 
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
+  const suggestedImageName = suggestedImage?.image_name ?? null;
+  const handleImageIncludedChange = useCallback(
+    (event: { checked: boolean | 'indeterminate' }) =>
+      setExcludedImageName(event.checked === true ? null : suggestedImageName),
+    [suggestedImageName]
+  );
   const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
   const handleModelChange = useCallback((model: ModelConfig | null) => setSelectedModelKey(model?.key ?? null), []);
   const handleRunExpandPrompt = useCallback(() => void runExpandPrompt(), [runExpandPrompt]);
@@ -486,14 +529,32 @@ const ExpandPromptButton = ({
                       modelTypes={TEXT_LLM_MODEL_TYPES}
                       placeholder={t('widgets.generate.selectTextLlm')}
                       size="xs"
-                      value={selectedModelKey}
+                      value={effectiveModelKey}
                       onChange={handleModelChange}
                     />
+                    {suggestion?.modelSource && !suggestedModelKey ? (
+                      <>
+                        <Text color="fg.subtle" fontSize="xs">
+                          {t('widgets.generate.expandSuggestedModelMissing', {
+                            model: suggestion.modelName ?? suggestion.modelSource,
+                          })}
+                        </Text>
+                        <OpenModelManagerButton modelType="text_llm" />
+                      </>
+                    ) : null}
                     <SystemPromptsField
                       catalog={systemPrompts}
                       selectedId={effectiveSystemPromptId}
                       onSelect={setSelectedSystemPromptId}
                     />
+                    {suggestedImage && selectedModel ? (
+                      <ExpandPromptImageOption
+                        canReadImages={canReadImages}
+                        image={suggestedImage}
+                        isIncluded={isImageIncluded}
+                        onIncludedChange={handleImageIncludedChange}
+                      />
+                    ) : null}
                     <LLMTaskProgressDisplay taskId={taskId} />
                     {positivePrompt.trim() ? null : (
                       <Text color="fg.subtle" fontSize="xs">
@@ -501,7 +562,8 @@ const ExpandPromptButton = ({
                       </Text>
                     )}
                     <Button
-                      disabled={!selectedModel || !positivePrompt.trim()}
+                      // The request carries the system prompt's text, so it waits for the list.
+                      disabled={!selectedModel || !positivePrompt.trim() || systemPrompts.isLoading}
                       loading={isLoading}
                       size="xs"
                       onClick={handleRunExpandPrompt}
@@ -516,6 +578,46 @@ const ExpandPromptButton = ({
         </Popover.Positioner>
       </Portal>
     </Popover.Root>
+  );
+};
+
+const ExpandPromptImageOption = ({
+  canReadImages,
+  image,
+  isIncluded,
+  onIncludedChange,
+}: {
+  canReadImages: boolean;
+  image: ImageWithDims;
+  isIncluded: boolean;
+  onIncludedChange: (event: { checked: boolean | 'indeterminate' }) => void;
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <HStack gap="2">
+      {/* Decorative: the checkbox label or the note beside it names the frame. */}
+      <Image
+        alt=""
+        boxSize="10"
+        flexShrink="0"
+        objectFit="cover"
+        opacity={canReadImages && isIncluded ? 1 : 0.5}
+        rounded="md"
+        src={galleryImageUrls.thumbnail(image.image_name)}
+      />
+      {canReadImages ? (
+        <Checkbox.Root checked={isIncluded} size="sm" onCheckedChange={onIncludedChange}>
+          <Checkbox.HiddenInput />
+          <Checkbox.Control />
+          <Checkbox.Label fontSize="xs">{t('widgets.generate.expandFromFirstFrame')}</Checkbox.Label>
+        </Checkbox.Root>
+      ) : (
+        <Text color="fg.subtle" fontSize="xs">
+          {t('widgets.generate.expandFirstFrameUnreadable')}
+        </Text>
+      )}
+    </HStack>
   );
 };
 

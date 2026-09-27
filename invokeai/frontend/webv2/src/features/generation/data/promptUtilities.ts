@@ -7,6 +7,8 @@ export interface ExpandPromptRequest {
   max_tokens?: number;
   seed?: number | null;
   system_prompt?: string | null;
+  /** Needs a model whose record has `supports_images`. */
+  image_name?: string;
 }
 
 export interface ExpandPromptResponse {
