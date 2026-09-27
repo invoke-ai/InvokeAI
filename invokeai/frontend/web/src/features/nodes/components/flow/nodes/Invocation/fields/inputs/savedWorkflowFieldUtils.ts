@@ -98,6 +98,7 @@ export const getSavedWorkflowListItemFromRecord = (
   opened_at: workflow.opened_at,
   user_id: workflow.user_id,
   is_public: workflow.is_public,
+  revision: workflow.revision,
   description: workflow.workflow.description,
   category: workflow.workflow.meta.category,
   tags: workflow.workflow.tags,

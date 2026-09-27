@@ -6,6 +6,7 @@ import { getWorkflowFieldSeedMode, isSeedInputField } from '@features/workflow/g
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { WorkflowFieldInput } from '@features/workflow/ui/fields/WorkflowFieldInput';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
+import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import {
   cloneWorkflowFieldDefault,
   getEffectiveWorkflowFieldDescription,
@@ -58,10 +59,14 @@ export const NodeFieldControl = ({
 }) => {
   const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
+  const projectId = useWorkflowProjectSelector((project) => project.id);
   const { fieldName, instance, invocationNode, nodeContext, nodeId, template } = useNodeFieldBinding(
     element,
     projectGraph
   );
+  // The form stays mounted across a workflow switch; a value that arrives later (an upload) must still land in
+  // the workflow this control rendered.
+  const target = useMemo(() => ({ projectId, workflowId: projectGraph.id }), [projectId, projectGraph.id]);
   // Seed focused label drafts from displayed text, including template fallback.
   const [draftLabel, setDraftLabel] = useState<string | null>(null);
 
@@ -101,8 +106,8 @@ export const NodeFieldControl = ({
   );
   const onLabelFocus = useCallback(() => setDraftLabel(label), [label]);
   const onValueChange = useCallback(
-    (value: unknown) => editGraph({ fieldName, nodeId, type: 'setFieldValue', value }),
-    [editGraph, fieldName, nodeId]
+    (value: unknown) => editGraph({ fieldName, nodeId, type: 'setFieldValue', value }, target),
+    [editGraph, fieldName, nodeId, target]
   );
   const onSeedModeChange = useCallback(
     (seedMode: SeedMode) => editGraph({ fieldName, nodeId, seedMode, type: 'setFieldSeedMode' }),
@@ -197,6 +202,7 @@ export const NodeFieldControl = ({
                 seedMode={getWorkflowFieldSeedMode(instance)}
                 template={template}
                 value={instance?.value}
+                workflowId={projectGraph.id}
                 onChange={onValueChange}
                 onSeedModeChange={onSeedModeChange}
               />

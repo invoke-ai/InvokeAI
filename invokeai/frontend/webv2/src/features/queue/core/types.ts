@@ -93,8 +93,11 @@ export type QueueCompiledSubmission =
       seeds?: QueueWorkflowSeed[];
       /** Batch-node value lists resolved at compile time: outer groups multiply, inner datums zip. */
       batchData?: QueueWorkflowBatchDatum[][];
-      /** Capture the bound library ID at compile time so completion attribution survives later editor changes. */
-      libraryWorkflowId?: string;
+      /**
+       * The project workflow the graph was compiled from, so results return to it whatever is active later. Absent
+       * on records queued before projects owned several workflows; those results keep their destination only.
+       */
+      projectWorkflowId?: string;
     }
   | {
       batchCount: number;
@@ -137,20 +140,6 @@ export interface QueueResultImage {
   sourceQueueItemId: string;
   thumbnailUrl: string;
   width: number;
-}
-
-/** A settled run of a library-bound workflow, reported once its results are routed. */
-export interface QueueWorkflowRunCompletedEvent {
-  /** Result images in run order; the last one is the run's final output. */
-  imageNames: readonly string[];
-  libraryWorkflowId: string;
-  projectId: string;
-  queueItemId: string;
-}
-
-/** App injects optional completed-library-run capture; Queue owns neither library nor gallery. */
-export interface QueueWorkflowRunSink {
-  onWorkflowRunCompleted(event: QueueWorkflowRunCompletedEvent): void;
 }
 
 export type QueueItemStatus = 'pending' | 'in_progress' | 'waiting' | 'completed' | 'failed' | 'canceled';
@@ -259,6 +248,12 @@ export interface QueueReadModel {
 
 export interface QueueResultImageOptions {
   resultNodeIds?: readonly string[];
+}
+
+/** The project workflow a run was compiled from; node progress is shown only in that editor. */
+export interface QueueRunOrigin {
+  projectId: string;
+  workflowId: string;
 }
 
 export interface QueueResultVideoOptions extends QueueResultImageOptions {

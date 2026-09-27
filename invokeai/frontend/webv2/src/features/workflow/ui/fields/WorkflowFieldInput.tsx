@@ -146,6 +146,8 @@ export interface WorkflowFieldInputProps {
   invalid?: boolean;
   /** Owning invocation node, when known — lets widgets read sibling fields (e.g. the frame scrubber's companion video). */
   nodeId?: string;
+  /** Owning project workflow, when known — an upload that finishes after a switch still lands in this one. */
+  workflowId?: string;
   template: FieldInputTemplate;
   value: unknown;
   onChange: (value: unknown) => void;
@@ -758,7 +760,15 @@ const MediaDropMonitor = ({
   return null;
 };
 
-const ImageCollectionInput = ({ id, invalid, nodeId, onChange, template, value }: WorkflowFieldInputProps) => {
+const ImageCollectionInput = ({
+  id,
+  invalid,
+  nodeId,
+  onChange,
+  template,
+  value,
+  workflowId,
+}: WorkflowFieldInputProps) => {
   const { t } = useTranslation();
   const { project } = useWorkflowUi();
   const names = useMemo(() => getImageCollectionNames(value), [value]);
@@ -767,7 +777,16 @@ const ImageCollectionInput = ({ id, invalid, nodeId, onChange, template, value }
   // to the list this render saw.
   const appendNames = useCallback(
     (added: string[]) => {
-      const node = project.getSnapshot().projectGraph.nodes.find((candidate) => candidate.id === nodeId);
+      const snapshot = project.getSnapshot();
+      const document = workflowId
+        ? snapshot.workflows.find((entry) => entry.document.id === workflowId)?.document
+        : snapshot.projectGraph;
+
+      if (!document) {
+        return;
+      }
+
+      const node = document.nodes.find((candidate) => candidate.id === nodeId);
       const current = getImageCollectionNames(
         node && isInvocationNode(node) ? node.data.inputs[template.name]?.value : value
       );
@@ -777,7 +796,7 @@ const ImageCollectionInput = ({ id, invalid, nodeId, onChange, template, value }
         onChange(next.map((image_name) => ({ image_name })));
       }
     },
-    [nodeId, onChange, project, template.name, value]
+    [nodeId, onChange, project, template.name, value, workflowId]
   );
   const removeAt = useCallback(
     (index: number) => onChange(names.filter((_, i) => i !== index).map((image_name) => ({ image_name }))),

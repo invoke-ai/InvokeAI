@@ -19,6 +19,8 @@ export interface PersistenceAggregatePort {
   reportRefusedProjects(refused: readonly RefusedWorkbenchProject[]): void;
   saveFailed(error: string): void;
   savePending(error: string): void;
+  /** Persisted content changed and its save is scheduled: the workbench is dirty until that save is acknowledged. */
+  saveScheduled(): void;
   saveStarted(): void;
   saveSucceeded(savedAt: string): void;
   setHasHydrated(hasHydrated: boolean): void;
@@ -239,6 +241,12 @@ export const createWorkbenchPersistenceRuntime = ({
     generation += 1;
     clearScheduledSave();
     timeoutId = clock.setTimeout(() => save(false), saveDelayMs);
+    // Reported outside the aggregate's own notification, as a status change is itself an aggregate change.
+    queueMicrotask(() => {
+      if (!disposed && scheduledRevision === revision && !isSaveInFlight) {
+        aggregate.saveScheduled();
+      }
+    });
   };
 
   const onAggregateChange = (): void => {

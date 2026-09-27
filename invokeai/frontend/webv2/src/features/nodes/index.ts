@@ -14,6 +14,7 @@ export {
 export {
   nodeExecutionStore,
   useNodeExecutionState,
+  type NodeExecutionOrigin,
   type NodeExecutionSink,
   type NodeExecutionState,
   type NodeExecutionStatus,

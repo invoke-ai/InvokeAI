@@ -125,7 +125,7 @@ const buildProject = () => {
 
   state = workbenchReducer(state, {
     action: { node: invocationNode('gen', 'string_generator', { generator: generatorValue }), type: 'addNode' },
-    type: 'applyProjectGraphAction',
+    type: 'applyWorkflowAction',
   });
   state = workbenchReducer(state, {
     action: {
@@ -133,7 +133,7 @@ const buildProject = () => {
       node: invocationNode('batch', 'string_batch', { batch_group_id: 'None' }),
       type: 'addNodeAndEdge',
     },
-    type: 'applyProjectGraphAction',
+    type: 'applyWorkflowAction',
   });
   state = workbenchReducer(state, {
     action: {
@@ -141,7 +141,7 @@ const buildProject = () => {
       node: invocationNode('prompt', 'string', { value: 'static' }),
       type: 'addNodeAndEdge',
     },
-    type: 'applyProjectGraphAction',
+    type: 'applyWorkflowAction',
   });
 
   return getActiveProject(state);
@@ -205,6 +205,51 @@ describe('submitResolvedInvocation with a workflow generator', () => {
     expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({
       workflowGenerators: { gen: { items: ['a red cat', 'a green cat'] } },
     });
+  });
+
+  it('carries the captured project and workflow through generator resolution to the dispatch', async () => {
+    generatorsMock.resolveWorkflowGenerators.mockImplementation(
+      (_client: unknown, pending: Array<{ key: string; nodeId: string }>) =>
+        Promise.resolve({
+          errors: [],
+          resolutions: Object.fromEntries(pending.map((item) => [item.nodeId, { items: ['a cat'], key: item.key }])),
+        })
+    );
+    const project = buildProject();
+    const workflowId = project.workflows.activeWorkflowId;
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+
+    await submitResolvedInvocation({
+      commands,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      project,
+      route: resolveInvocationRoute(project, 'global', workflowRoute),
+      workflowId,
+    });
+
+    expect(submitResolved.mock.calls[0]?.[0]).toMatchObject({ projectId: project.id, workflowId });
+  });
+
+  it('queues nothing for a workflow the captured project no longer owns', async () => {
+    const project = buildProject();
+    const commands = createWorkbenchStore().commands;
+    const submitResolved = vi.spyOn(commands.generation, 'submitResolved');
+
+    await submitResolvedInvocation({
+      commands,
+      models: undefined,
+      owner: captureAccountScope(),
+      prepareCanvasInvocation: vi.fn(),
+      project,
+      route: resolveInvocationRoute(project, 'global', workflowRoute),
+      workflowId: 'removed',
+    });
+
+    expect(generatorsMock.resolveWorkflowGenerators).not.toHaveBeenCalled();
+    expect(submitResolved).not.toHaveBeenCalled();
   });
 
   it('reports a generator that failed to resolve and queues nothing', async () => {

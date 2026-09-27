@@ -25,8 +25,6 @@ export type {
   QueueSourceId,
   QueueStatusReadModel,
   QueueSubmissionPresentation,
-  QueueWorkflowRunCompletedEvent,
-  QueueWorkflowRunSink,
   TerminalQueueItemStatus,
 } from './core/types';
 export {

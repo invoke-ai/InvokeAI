@@ -573,10 +573,73 @@ const createRasterForest = (layers) => {
   ];
 };
 
+/** A schema-2 style graph; the workflow collection wraps it, or a legacy document carries it as `projectGraph`. */
+const createWorkflowDocument = ({ description, graphId, index, name, workflowNodes }) => {
+  const formRootId = `${graphId}-form-root`;
+
+  return {
+    author: 'InvokeAI',
+    contact: '',
+    description,
+    edges: [],
+    form: {
+      elements: {
+        [formRootId]: {
+          data: { children: [], layout: 'column' },
+          id: formRootId,
+          type: 'container',
+        },
+      },
+      rootElementId: formRootId,
+    },
+    id: graphId,
+    name,
+    nodes: workflowNodes,
+    notes: '',
+    tags: 'fixture',
+    updatedAt: timestampAt(index),
+    version: 2,
+    workflowVersion: '1.0.0',
+  };
+};
+
+/**
+ * Project 0 is a current schema-3 document that owns two workflows (a second, blank one beside the representative
+ * graph, so the This-project view has something to switch to). Project 1 stays a schema-2 document with a single
+ * `projectGraph`, which the project-file journey loads, exports and imports through the migration boundary.
+ */
 const createProjectDocument = ({ index, layers = [], workflowNodes = [] }) => {
   const id = `fixture-project-${ordinal(index, 3)}`;
   const graphId = `${id}-graph`;
-  const formRootId = `${graphId}-form-root`;
+  const primaryWorkflow = createWorkflowDocument({
+    description: index === 0 ? 'Representative 100-node workflow.' : '',
+    graphId,
+    index,
+    name: index === 0 ? 'Representative Workflow' : 'Empty Workflow',
+    workflowNodes,
+  });
+  const workflows =
+    index === 1
+      ? null
+      : {
+          activeWorkflowId: graphId,
+          entries: [
+            { document: primaryWorkflow },
+            ...(index === 0
+              ? [
+                  {
+                    document: createWorkflowDocument({
+                      description: 'A second, blank workflow beside the representative graph.',
+                      graphId: `${id}-graph-2`,
+                      index,
+                      name: 'Second Workflow',
+                      workflowNodes: [],
+                    }),
+                  },
+                ]
+              : []),
+          ],
+        };
 
   return {
     canvas: {
@@ -608,6 +671,7 @@ const createProjectDocument = ({ index, layers = [], workflowNodes = [] }) => {
       sourceId: workflowNodes.length > 0 ? 'workflow' : 'generate',
       sourceLocked: false,
     },
+    ...(workflows ? { documentSchemaVersion: 3 } : { documentSchemaVersion: 2 }),
     layout: {
       centerViewId: 'preview',
       panels: { isBottomOpen: false, isLeftOpen: true, isRightOpen: true },
@@ -615,35 +679,16 @@ const createProjectDocument = ({ index, layers = [], workflowNodes = [] }) => {
     },
     name: `Fixture Project ${ordinal(index, 3)}`,
     promptHistory: [],
-    projectGraph: {
-      author: 'InvokeAI',
-      contact: '',
-      description: index === 0 ? 'Representative 100-node workflow.' : '',
-      edges: [],
-      form: {
-        elements: {
-          [formRootId]: {
-            data: { children: [], layout: 'column' },
-            id: formRootId,
-            type: 'container',
-          },
-        },
-        rootElementId: formRootId,
-      },
-      id: graphId,
-      name: index === 0 ? 'Representative Workflow' : 'Empty Workflow',
-      nodes: workflowNodes,
-      notes: '',
-      tags: 'fixture',
-      updatedAt: timestampAt(index),
-      version: 2,
-      workflowVersion: '1.0.0',
-    },
+    ...(workflows ? { workflows } : { projectGraph: primaryWorkflow }),
     queue: { items: [] },
     settings: {},
     widgetGraphs: {},
   };
 };
+
+/** The first workflow a project document carries, whichever schema it uses. */
+export const getFixtureProjectWorkflowDocument = (data) =>
+  data?.workflows?.entries?.[0]?.document ?? data?.projectGraph ?? null;
 
 const createProjects = (count, workflowNodeCount, layerCount) =>
   range(count, (index) => {
@@ -678,6 +723,7 @@ const createWorkflows = (count) =>
       description: `Synthetic workflow library entry ${id}.`,
       name: `Fixture Workflow ${id}`,
       opened_at: index % 3 === 0 ? timestampAt(index) : null,
+      revision: 1,
       tags: 'fixture,representative',
       thumbnail_url: null,
       updated_at: timestampAt(index),
@@ -696,7 +742,8 @@ const createWorkflows = (count) =>
         version: '3.0.0',
         workflowVersion: '1.0.0',
       },
-      workflow_id: `fixture-workflow-${id}`,
+      // Bundled ids carry the server's `default_` prefix; the client treats those templates as read-only.
+      workflow_id: index % 4 === 0 ? `default_fixture-workflow-${id}` : `fixture-workflow-${id}`,
     };
   });
 
@@ -797,7 +844,7 @@ export const getMockBackendFixtureCounts = (fixture) => ({
   nodes: countInvocationSchemas(fixture),
   projects: fixture.projects.length,
   queueItems: fixture.queueItems.length,
-  workflowNodes: fixture.projects[0]?.data?.projectGraph?.nodes?.length ?? 0,
+  workflowNodes: getFixtureProjectWorkflowDocument(fixture.projects[0]?.data)?.nodes?.length ?? 0,
 });
 
 const findDuplicates = (values) => {

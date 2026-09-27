@@ -144,17 +144,19 @@ describe('CallSavedWorkflowSyncRuntime with an unreachable child workflow', () =
     let graph: ProjectGraphState = { ...createProjectGraph('parent'), nodes };
     const listeners = new Set<() => void>();
     const snapshot = () => ({
+      activeWorkflow: { document: graph },
+      activeWorkflowId: graph.id,
       galleryValues: {},
       id: 'project-1',
       isWorkflowRunning: false,
       projectGraph: graph,
       workflowValues: {},
+      workflows: [{ document: graph }],
     });
     let current = snapshot();
     // eslint-disable-next-line react-perf/jsx-no-new-object-as-prop -- intentionally stable for this render lifetime
     const adapter = {
       commands: {
-        bindLibraryWorkflow: vi.fn(),
         editGraph: (action: ProjectGraphAction) => {
           graph = projectGraphReducer(graph, action);
           current = snapshot();
@@ -163,7 +165,6 @@ describe('CallSavedWorkflowSyncRuntime with an unreachable child workflow', () =
           }
         },
         redo: vi.fn(),
-        replace: vi.fn(),
         undo: vi.fn(),
       },
       getProjectGraph: () => graph,
