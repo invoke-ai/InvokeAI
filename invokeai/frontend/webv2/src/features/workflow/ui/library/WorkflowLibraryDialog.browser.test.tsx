@@ -461,6 +461,18 @@ describe('WorkflowLibraryDialog', () => {
   const buttonWithText = (text: string) =>
     [...document.querySelectorAll('button')].find((candidate) => (candidate.textContent ?? '') === text);
 
+  /** A pointer press on a tile's menu button: pointerdown (an outside press for an open menu), then the click. */
+  const pressTileMenuButton = async (button: HTMLElement | null) => {
+    expect(button).not.toBeNull();
+    await act(async () => {
+      button?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerType: 'mouse' }));
+      await settleFrame();
+      button?.click();
+      await settleFrame();
+      await settleFrame();
+    });
+  };
+
   const clickText = async (text: string) => {
     const button = buttonWithText(text);
     expect(button).not.toBeUndefined();
@@ -736,6 +748,67 @@ describe('WorkflowLibraryDialog', () => {
 
     expect(detail()?.dataset.workflowDetail).toBe('wf-landscape');
     expect(detail()?.textContent).toContain('Landscape Pass');
+  });
+
+  it("opens a tile's actions from its own menu button, toggles it closed, and hands focus back to the button", async () => {
+    await openWith(LOADED_SNAPSHOT);
+
+    const button = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-landscape"]');
+    expect(button).not.toBeNull();
+    // A sibling of the card button, never nested inside it.
+    expect(document.querySelector('[data-workflow-card="wf-landscape"]')?.tagName).toBe('BUTTON');
+    expect(document.querySelector('[data-workflow-card="wf-landscape"]')?.contains(button)).toBe(false);
+
+    await act(async () => {
+      button?.click();
+      await settleFrame();
+    });
+
+    // The button selects its tile and opens the same actions the right-click offers, anchored to the button.
+    expect(document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail).toBe('wf-landscape');
+    const open = () =>
+      document.querySelector<HTMLElement>('[data-workflow-context-menu][data-state="open"] [data-menu-item="open"]');
+    await vi.waitFor(() => expect(open()).not.toBeNull());
+    await vi.waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull(), { timeout: 2000 });
+
+    await act(async () => {
+      await userEvent.keyboard('{Escape}');
+    });
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).toBeNull()
+    );
+    expect(document.activeElement).toBe(button);
+
+    // A second press on the same button closes the menu instead of reopening it elsewhere. The press is a pointer
+    // sequence, since the pointerdown lands outside the menu and must be kept from dismissing it first.
+    await pressTileMenuButton(button);
+    await vi.waitFor(() => expect(open()).not.toBeNull());
+    expect(button?.getAttribute('aria-expanded')).toBe('true');
+    await pressTileMenuButton(button);
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).toBeNull()
+    );
+    expect(button?.getAttribute('aria-expanded')).toBe('false');
+  });
+
+  it("moves the open menu to another tile's button and hands the expanded state over", async () => {
+    await openWith(LOADED_SNAPSHOT);
+
+    const first = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-landscape"]');
+    const second = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-portrait"]');
+    expect(second).not.toBeNull();
+
+    await pressTileMenuButton(first);
+    await vi.waitFor(() => expect(first?.getAttribute('aria-expanded')).toBe('true'));
+
+    await pressTileMenuButton(second);
+
+    await vi.waitFor(() => expect(second?.getAttribute('aria-expanded')).toBe('true'));
+    expect(first?.getAttribute('aria-expanded')).toBe('false');
+    expect(document.querySelector<HTMLElement>('[data-workflow-detail]')?.dataset.workflowDetail).toBe('wf-portrait');
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-workflow-context-menu][data-state="open"]')).not.toBeNull()
+    );
   });
 
   it('hands focus to the template rail menu it opens', async () => {
@@ -1134,6 +1207,21 @@ describe('WorkflowLibraryDialog — This project', () => {
 
     expect(COMMANDS.selectWorkflow).toHaveBeenLastCalledWith('wf-bundled');
     expect(onOpenChange).toHaveBeenCalledTimes(2);
+  });
+
+  it("opens a project tile's actions from its menu button, including rename", async () => {
+    await renderDialog();
+
+    const button = document.querySelector<HTMLButtonElement>('[data-workflow-card-menu="wf-bundled"]');
+    await act(async () => {
+      button?.click();
+      await settleFrame();
+    });
+
+    await vi.waitFor(() =>
+      expect(document.querySelector('[data-workflow-context-menu] [data-menu-item="rename"]')).not.toBeNull()
+    );
+    expect(rail()?.dataset.projectWorkflowDetail).toBe('wf-bundled');
   });
 
   it('hands focus to the rail menu it opens, so the pointer can move onto it without closing it', async () => {

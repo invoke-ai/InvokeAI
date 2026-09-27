@@ -326,6 +326,7 @@ describe('WorkflowLibraryDetailPanel', () => {
               <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
                 <WorkflowLibraryDetailPanel
                   contextMenuPoint={null}
+                  contextMenuTriggerId={null}
                   entry={selected}
                   projectWorkflows={projectWorkflows}
                   onClose={onClose}

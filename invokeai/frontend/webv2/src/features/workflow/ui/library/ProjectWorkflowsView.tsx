@@ -32,7 +32,13 @@ import {
   toProjectWorkflowLibraryEntries,
 } from './projectWorkflowEntries';
 import { formatRelativeTime } from './relativeTime';
-import { getWorkflowLibraryCardId } from './WorkflowLibraryCard';
+import {
+  getWorkflowLibraryCardId,
+  getWorkflowLibraryCardMenuContentId,
+  keepCardMenuOpenForRetarget,
+  type WorkflowCardMenuAnchor,
+  type WorkflowLibraryCardProps,
+} from './WorkflowLibraryCard';
 import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
 import {
   resolveEntryRequirements,
@@ -50,31 +56,22 @@ const DETAIL_RAIL_WIDTH = '18rem';
 const THUMBNAIL_ASPECT_RATIO = 3 / 2;
 
 export interface ProjectWorkflowsViewProps {
-  contextMenuPoint: { x: number; y: number } | null;
+  contextMenuPoint: WorkflowCardMenuAnchor | null;
+  /** What opened the menu last, kept through its close so focus returns there. */
+  contextMenuTriggerId: string | null;
   selectedWorkflowId: string | null;
   onAddWorkflow: () => void;
   onClose: () => void;
-  onContextMenu: (workflowId: string, point: { x: number; y: number }) => void;
+  onContextMenu: WorkflowLibraryCardProps['onContextMenu'];
   onContextMenuClose: () => void;
   onPreview: (entry: ProjectWorkflowEntry) => void;
   onSelect: (workflowId: string | null) => void;
 }
 
-const keepOpenForCardRightClick = (event: { detail: { originalEvent: Event }; preventDefault(): void }) => {
-  const original = event.detail.originalEvent;
-
-  if (
-    original instanceof PointerEvent &&
-    original.button === 2 &&
-    original.target instanceof Element &&
-    original.target.closest('[data-workflow-card]') !== null
-  ) {
-    event.preventDefault();
-  }
-};
 
 export const ProjectWorkflowsView = ({
   contextMenuPoint,
+  contextMenuTriggerId,
   selectedWorkflowId,
   onAddWorkflow,
   onClose,
@@ -170,6 +167,7 @@ export const ProjectWorkflowsView = ({
             entries={entries}
             error={null}
             missingCounts={missingCounts}
+            openMenuAnchor={contextMenuPoint}
             selectedWorkflowId={activeSelectionId}
             status="loaded"
             onContextMenu={onContextMenu}
@@ -178,6 +176,7 @@ export const ProjectWorkflowsView = ({
           />
           <ProjectWorkflowDetailPanel
             contextMenuPoint={contextMenuPoint}
+            contextMenuTriggerId={contextMenuTriggerId}
             entry={selectedEntry ? selectedEntry.projectWorkflow : null}
             isActive={selectedEntry?.item.workflow_id === activeWorkflowId}
             missingCount={selectedEntry ? (missingCounts.get(selectedEntry.item.workflow_id) ?? 0) : 0}
@@ -215,7 +214,9 @@ export const ProjectWorkflowsView = ({
 };
 
 interface ProjectWorkflowDetailPanelProps {
-  contextMenuPoint: { x: number; y: number } | null;
+  contextMenuPoint: WorkflowCardMenuAnchor | null;
+  /** What opened the menu last, kept through its close so focus returns there. */
+  contextMenuTriggerId: string | null;
   entry: ProjectWorkflowEntry | null;
   isActive: boolean;
   missingCount: number;
@@ -229,6 +230,7 @@ interface ProjectWorkflowDetailPanelProps {
 
 const ProjectWorkflowDetailPanel = ({
   contextMenuPoint,
+  contextMenuTriggerId,
   entry,
   isActive,
   missingCount,
@@ -261,12 +263,15 @@ const ProjectWorkflowDetailPanel = ({
     [deps, libraryEntry]
   );
 
+  // A pointer point is a fixed rect; the tile button is the menu's trigger, so the menu follows it as it scrolls.
   const contextMenuPositioning = useMemo(
-    () => ({
-      getAnchorRect: () =>
-        contextMenuPoint ? { height: 1, width: 1, x: contextMenuPoint.x, y: contextMenuPoint.y } : null,
-      placement: 'bottom-start' as const,
-    }),
+    () =>
+      contextMenuPoint?.kind === 'point'
+        ? {
+            getAnchorRect: () => ({ height: 1, width: 1, x: contextMenuPoint.x, y: contextMenuPoint.y }),
+            placement: 'bottom-start' as const,
+          }
+        : { placement: 'bottom-end' as const },
     [contextMenuPoint]
   );
   const handleContextMenuOpenChange = useCallback(
@@ -277,9 +282,16 @@ const ProjectWorkflowDetailPanel = ({
     },
     [onContextMenuClose]
   );
+  // Focus returns to whatever opened the menu: the title's menu button, or the right-clicked card.
   const contextMenuIds = useMemo(
-    () => (entry ? { trigger: getWorkflowLibraryCardId(entry.document.id) } : undefined),
-    [entry]
+    () =>
+      entry
+        ? {
+            content: getWorkflowLibraryCardMenuContentId(entry.document.id),
+            trigger: contextMenuTriggerId ?? getWorkflowLibraryCardId(entry.document.id),
+          }
+        : undefined,
+    [contextMenuTriggerId, entry]
   );
   const moreActionsIds = useTooltipTriggerIds();
   const handleThumbnailError = useCallback(
@@ -494,7 +506,7 @@ const ProjectWorkflowDetailPanel = ({
         open={contextMenuPoint !== null}
         positioning={contextMenuPositioning}
         onOpenChange={handleContextMenuOpenChange}
-        onPointerDownOutside={keepOpenForCardRightClick}
+        onPointerDownOutside={keepCardMenuOpenForRetarget}
       >
         <Portal>
           <Menu.Positioner>

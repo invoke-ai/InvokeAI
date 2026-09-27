@@ -579,7 +579,11 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
   // Editing the copy: rename it through the local view. The library is not written.
   await openProjectWorkflows();
   assert.equal(await cards.count(), 2);
-  await dialog.getByRole('button', { exact: true, name: 'More actions' }).click();
+  // The rail's menu, not a tile's: every tile now carries its own More-actions button.
+  await dialog
+    .locator('[data-project-workflow-detail]')
+    .getByRole('button', { exact: true, name: 'More actions' })
+    .click();
   await page.getByRole('menuitem', { name: /^Rename…/ }).click();
   const renameDialog = page.getByRole('dialog', { exact: true, name: 'Rename workflow' });
   await renameDialog.waitFor();

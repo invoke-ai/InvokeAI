@@ -56,7 +56,12 @@ import type { OpenLibraryWorkflowMode } from './useOpenLibraryWorkflow';
 
 import { formatRelativeTime } from './relativeTime';
 import { planLibraryWorkflowOpen } from './useOpenLibraryWorkflow';
-import { getWorkflowLibraryCardId } from './WorkflowLibraryCard';
+import {
+  getWorkflowLibraryCardId,
+  getWorkflowLibraryCardMenuContentId,
+  keepCardMenuOpenForRetarget,
+  type WorkflowCardMenuAnchor,
+} from './WorkflowLibraryCard';
 import {
   resolveEntryRequirements,
   useModelRequirementDeps,
@@ -71,7 +76,9 @@ const INSTALL_HOVER = { opacity: 0.85 } as const;
 
 export interface WorkflowLibraryDetailPanelProps {
   /** Where a card's right-click asked for the actions menu; null while it is closed. */
-  contextMenuPoint: { x: number; y: number } | null;
+  contextMenuPoint: WorkflowCardMenuAnchor | null;
+  /** What opened the menu last, kept through its close so focus returns there. */
+  contextMenuTriggerId: string | null;
   entry: WorkflowLibraryEntry | null;
   /** The shell closes the library when a fork takes the user to a new project. */
   onClose: () => void;
@@ -86,18 +93,6 @@ export interface WorkflowLibraryDetailPanelProps {
   /** The project's workflows, so the rail can offer the existing copies of this template. */
   projectWorkflows: readonly ProjectWorkflowEntry[];
 }
-
-/** A right-click on another card moves the menu there (its own handler re-anchors it) rather than dismissing it. */
-const keepOpenForCardRightClick = (event: { detail: { originalEvent: Event }; preventDefault(): void }) => {
-  const original = event.detail.originalEvent;
-
-  if (original instanceof PointerEvent && original.button === 2 && isCardTarget(original.target)) {
-    event.preventDefault();
-  }
-};
-
-const isCardTarget = (target: EventTarget | null): boolean =>
-  target instanceof Element && target.closest('[data-workflow-card]') !== null;
 
 const toFileSlug = (name: string): string => name.trim().replaceAll(/\s+/g, '-').toLowerCase() || 'workflow';
 
@@ -125,6 +120,7 @@ const ProjectCopyItem = ({
 
 export const WorkflowLibraryDetailPanel = ({
   contextMenuPoint,
+  contextMenuTriggerId,
   entry,
   onClose,
   onContextMenuClose,
@@ -381,12 +377,15 @@ export const WorkflowLibraryDetailPanel = ({
   const openDeleteConfirm = useCallback(() => setIsDeleteConfirmOpen(true), []);
   const closeDeleteConfirm = useCallback(() => setIsDeleteConfirmOpen(false), []);
 
+  // A pointer point is a fixed rect; the tile button is the menu's trigger, so the menu follows it as it scrolls.
   const contextMenuPositioning = useMemo(
-    () => ({
-      getAnchorRect: () =>
-        contextMenuPoint ? { height: 1, width: 1, x: contextMenuPoint.x, y: contextMenuPoint.y } : null,
-      placement: 'bottom-start' as const,
-    }),
+    () =>
+      contextMenuPoint?.kind === 'point'
+        ? {
+            getAnchorRect: () => ({ height: 1, width: 1, x: contextMenuPoint.x, y: contextMenuPoint.y }),
+            placement: 'bottom-start' as const,
+          }
+        : { placement: 'bottom-end' as const },
     [contextMenuPoint]
   );
   const handleContextMenuOpenChange = useCallback(
@@ -397,9 +396,16 @@ export const WorkflowLibraryDetailPanel = ({
     },
     [onContextMenuClose]
   );
+  // Focus returns to whatever opened the menu: the title's menu button, or the right-clicked card.
   const contextMenuIds = useMemo(
-    () => (entry ? { trigger: getWorkflowLibraryCardId(entry.item.workflow_id) } : undefined),
-    [entry]
+    () =>
+      entry
+        ? {
+            content: getWorkflowLibraryCardMenuContentId(entry.item.workflow_id),
+            trigger: contextMenuTriggerId ?? getWorkflowLibraryCardId(entry.item.workflow_id),
+          }
+        : undefined,
+    [contextMenuTriggerId, entry]
   );
   // The chooser is anchored to the button that opened it, so closing returns focus there.
   const openButtonId = entry ? `${getWorkflowLibraryCardId(entry.item.workflow_id)}-open` : undefined;
@@ -630,7 +636,7 @@ export const WorkflowLibraryDetailPanel = ({
         open={contextMenuPoint !== null}
         positioning={contextMenuPositioning}
         onOpenChange={handleContextMenuOpenChange}
-        onPointerDownOutside={keepOpenForCardRightClick}
+        onPointerDownOutside={keepCardMenuOpenForRetarget}
       >
         <Portal>
           <Menu.Positioner>

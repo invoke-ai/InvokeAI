@@ -7,7 +7,7 @@ import { Scrollable } from '@platform/ui';
 import { useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { WorkflowLibraryCard, type WorkflowLibraryCardProps } from './WorkflowLibraryCard';
+import { WorkflowLibraryCard, type WorkflowCardMenuAnchor, type WorkflowLibraryCardProps } from './WorkflowLibraryCard';
 
 /** How close to the bottom (in viewports) counts as "fetch the next page". */
 const NEAR_BOTTOM_VIEWPORTS = 1.5;
@@ -19,6 +19,8 @@ export interface WorkflowLibraryGridProps {
   activeWorkflowId?: string | null;
   entries: readonly WorkflowLibraryEntry[];
   error: string | null;
+  /** What has the actions menu open, so that tile's control can name it. */
+  openMenuAnchor?: WorkflowCardMenuAnchor | null;
   /** Missing-model counts by workflow id; absent ids render no badge. */
   missingCounts?: ReadonlyMap<string, number>;
   selectedWorkflowId: string | null;
@@ -52,6 +54,7 @@ export const WorkflowLibraryGrid = ({
   entries,
   error,
   missingCounts = NO_MISSING_COUNTS,
+  openMenuAnchor = null,
   onContextMenu,
   onOpen,
   onSelect,
@@ -106,6 +109,13 @@ export const WorkflowLibraryGrid = ({
                 entry={entry}
                 isActive={entry.item.workflow_id === activeWorkflowId}
                 isSelected={entry.item.workflow_id === selectedWorkflowId}
+                menuOpenedBy={
+                  openMenuAnchor?.workflowId === entry.item.workflow_id
+                    ? openMenuAnchor.kind === 'trigger'
+                      ? 'button'
+                      : 'card'
+                    : null
+                }
                 missingCount={missingCounts.get(entry.item.workflow_id) ?? 0}
                 onContextMenu={onContextMenu}
                 onOpen={onOpen}

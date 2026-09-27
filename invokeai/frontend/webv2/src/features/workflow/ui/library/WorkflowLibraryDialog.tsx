@@ -23,6 +23,8 @@ import { CloseButton, SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '
 import { lazy, Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { WorkflowCardMenuAnchor } from './WorkflowLibraryCard';
+
 import { buildLibraryGraphPreviewSource } from './libraryPreviewSource';
 import { ProjectWorkflowsView } from './ProjectWorkflowsView';
 import {
@@ -109,7 +111,10 @@ export const WorkflowLibraryDialog = ({
   const [previewRequest, setPreviewRequest] = useState<PreviewRequest | null>(null);
   // Close before clearing the request so the lazy dialog remains mounted through its exit transition.
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
-  const [contextMenuPoint, setContextMenuPoint] = useState<{ x: number; y: number } | null>(null);
+  const [contextMenuPoint, setContextMenuPoint] = useState<WorkflowCardMenuAnchor | null>(null);
+  // The element focus returns to when the menu closes. It outlives the open menu: the menu is told it closed only
+  // after React has rendered the close, so the trigger it restores focus to must still be the one that opened it.
+  const [contextMenuTriggerId, setContextMenuTriggerId] = useState<string | null>(null);
   const searchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const closeDialog = useCallback(() => {
@@ -262,11 +267,23 @@ export const WorkflowLibraryDialog = ({
     setContextMenuPoint(null);
   }, []);
   const handleCardContextMenu = useCallback(
-    (workflowId: string, point: { x: number; y: number }) => {
+    (workflowId: string, point: WorkflowCardMenuAnchor) => {
       if (tab === 'project') {
         setWorkflowLibrarySelection({ projectId, workflowId });
       } else {
         setSelectedWorkflowId(workflowId);
+      }
+
+      setContextMenuTriggerId(point.kind === 'trigger' ? point.triggerId : null);
+
+      // The menu button that opened the menu closes it again.
+      if (
+        point.kind === 'trigger' &&
+        contextMenuPoint?.kind === 'trigger' &&
+        contextMenuPoint.triggerId === point.triggerId
+      ) {
+        setContextMenuPoint(null);
+        return;
       }
 
       // An open menu does not follow a new anchor: close it and reopen it at the
@@ -379,6 +396,7 @@ export const WorkflowLibraryDialog = ({
                 {isProjectTab ? (
                   <ProjectWorkflowsView
                     contextMenuPoint={contextMenuPoint}
+                    contextMenuTriggerId={contextMenuTriggerId}
                     selectedWorkflowId={projectSelectionId}
                     onAddWorkflow={goToTemplates}
                     onClose={closeDialog}
@@ -393,6 +411,7 @@ export const WorkflowLibraryDialog = ({
                       entries={entries}
                       error={error}
                       missingCounts={missingCounts}
+                      openMenuAnchor={contextMenuPoint}
                       selectedWorkflowId={activeWorkflowId}
                       status={status}
                       onContextMenu={handleCardContextMenu}
@@ -401,6 +420,7 @@ export const WorkflowLibraryDialog = ({
                     />
                     <WorkflowLibraryDetailPanel
                       contextMenuPoint={contextMenuPoint}
+                      contextMenuTriggerId={contextMenuTriggerId}
                       entry={activeEntry}
                       projectWorkflows={projectWorkflows}
                       onClose={closeDialog}
