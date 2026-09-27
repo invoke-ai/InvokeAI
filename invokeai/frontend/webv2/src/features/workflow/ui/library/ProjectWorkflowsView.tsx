@@ -455,8 +455,10 @@ const ProjectWorkflowDetailPanel = ({
             {isActive ? t('workflowLibrary.activeWorkflow') : t('workflowLibrary.open')}
           </Button>
           <Menu.Root ids={moreActionsIds}>
-            <Tooltip content={t('workflowLibrary.moreActions')} ids={moreActionsIds}>
-              <Menu.Trigger asChild>
+            {/* Inside a dialog the tooltip must sit inside the menu trigger: wrapped the other way round, the
+                menu never takes focus and the first pointer move onto it closes it. */}
+            <Menu.Trigger asChild>
+              <Tooltip content={t('workflowLibrary.moreActions')} ids={moreActionsIds}>
                 <IconButton aria-label={t('workflowLibrary.moreActions')} size="sm" variant="outline">
                   <EllipsisIcon />
                 </IconButton>

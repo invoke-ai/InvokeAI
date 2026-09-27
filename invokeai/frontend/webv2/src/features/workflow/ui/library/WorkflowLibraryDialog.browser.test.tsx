@@ -738,6 +738,20 @@ describe('WorkflowLibraryDialog', () => {
     expect(detail()?.textContent).toContain('Landscape Pass');
   });
 
+  it('hands focus to the template rail menu it opens', async () => {
+    await openWith(LOADED_SNAPSHOT);
+    await act(() => card('wf-landscape')?.click());
+
+    const trigger = document.querySelector<HTMLElement>('[data-workflow-detail] [aria-label="More actions"]');
+    expect(trigger).not.toBeNull();
+    await act(async () => {
+      trigger?.click();
+      await settleFrame();
+    });
+
+    await vi.waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull(), { timeout: 2000 });
+  });
+
   it('opens the rail actions for a card from a right-click and runs them', async () => {
     await openWith(LOADED_SNAPSHOT);
 
@@ -1120,6 +1134,15 @@ describe('WorkflowLibraryDialog — This project', () => {
 
     expect(COMMANDS.selectWorkflow).toHaveBeenLastCalledWith('wf-bundled');
     expect(onOpenChange).toHaveBeenCalledTimes(2);
+  });
+
+  it('hands focus to the rail menu it opens, so the pointer can move onto it without closing it', async () => {
+    await renderDialog();
+
+    await click(railMenuTrigger());
+
+    // Inside the dialog a menu that never took focus closes on the first pointer move onto it.
+    await vi.waitFor(() => expect(document.activeElement?.closest('[role="menu"]')).not.toBeNull(), { timeout: 2000 });
   });
 
   it('shows the active workflow in the rail with Open disabled, since it is already open', async () => {
