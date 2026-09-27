@@ -1989,6 +1989,7 @@ describe('queue runtime', () => {
     });
     activeProgressTargetStore.clear();
     const clear = vi.spyOn(activeProgressTargetStore, 'clear');
+    const set = vi.spyOn(activeProgressTargetStore, 'set');
 
     try {
       runtime.start();
@@ -1996,12 +1997,15 @@ describe('queue runtime', () => {
 
       if (hasWorkflowCall) {
         expect(clear).not.toHaveBeenCalledWith({ itemIndex: 1, queueItemId: queueItem.id });
+        expect(set).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: queueItem.id });
       } else {
         expect(clear).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: queueItem.id });
+        expect(set).not.toHaveBeenCalledWith({ itemIndex: 1, queueItemId: queueItem.id });
       }
     } finally {
       await runtime.dispose();
       clear.mockRestore();
+      set.mockRestore();
     }
   });
 

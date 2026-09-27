@@ -621,7 +621,7 @@ export const createQueueCoordinator = (
     const wait = waits.get(queueItem.id);
     if (wait) {
       const target = getProgressImageTarget(wait.localQueueItemId, queueItem.id);
-      if (queueItem.status === 'in_progress') {
+      if (queueItem.status === 'in_progress' || (queueItem.status === 'waiting' && wait.hasWorkflowCall)) {
         activeProgressTarget.set(target);
       } else if ((queueItem.status === 'pending' || queueItem.status === 'waiting') && !wait.hasWorkflowCall) {
         activeProgressTarget.clear(target);
