@@ -13,6 +13,26 @@ export interface GeneratedImageContract {
   width: number;
 }
 
+/** A video a local run produced, as routed back from the queue. */
+export interface GeneratedVideoContract {
+  /** Board the backend holds the video on; unset when uncategorized. */
+  boardId?: string;
+  category: GalleryImage['imageCategory'];
+  /** Backend creation timestamp, when known. */
+  createdAt?: string;
+  durationSeconds: number;
+  fps?: number;
+  height: number;
+  isIntermediate: boolean;
+  mediaOrigin?: string;
+  queuedAt: string;
+  sourceQueueItemId: string;
+  thumbnailUrl: string;
+  videoName: string;
+  videoUrl: string;
+  width: number;
+}
+
 export type GalleryView = 'images' | 'assets';
 
 export type GalleryOrderDir = 'ASC' | 'DESC';

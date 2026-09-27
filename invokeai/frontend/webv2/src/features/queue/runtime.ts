@@ -5,6 +5,7 @@ import type {
   QueueEnqueueWorkflowRequest,
   QueueResultImage,
   QueueResultImageOptions,
+  QueueResultVideo,
   QueueRunOrigin,
 } from '@features/queue/core/types';
 import type { BackendConnectionStatus } from '@platform/transport/types';
@@ -91,8 +92,14 @@ export interface QueueHistoryCommands {
     images: QueueResultImage[];
     projectId: string;
     queueItemId: string;
+    videos: QueueResultVideo[];
   }): void;
-  routeResults(payload: { images: QueueResultImage[]; projectId: string; queueItemId: string }): void;
+  routeResults(payload: {
+    images: QueueResultImage[];
+    projectId: string;
+    queueItemId: string;
+    videos: QueueResultVideo[];
+  }): void;
   setConnectionStatus(payload: { error?: string; status: BackendConnectionStatus }): void;
   setStatus(payload: {
     error?: string;
@@ -817,6 +824,10 @@ export const createQueueRuntime = ({
     });
     resultReadFlush = flush.finally(() => {
       resultReadFlush = undefined;
+      // A read queued after the loop drained but before this settled found the flush still set and did not start one.
+      if (pendingResultReads.length > 0) {
+        scheduleResultReadFlush();
+      }
     });
   };
   const runResultRead = <T>(operation: () => Promise<T>): Promise<T> =>
@@ -848,14 +859,14 @@ export const createQueueRuntime = ({
   };
 
   /**
-   * Attach generated videos to the destination board; repeat attachment is idempotent. Categorization failures are
-   * recorded but never turn successful generation into failure.
+   * Attach generated videos to the destination board (repeat attachment is idempotent) and hydrate them for display.
+   * Failures are recorded but never turn successful generation into failure.
    */
-  const addResultVideosToDestination = async (
+  const deliverResultVideos = async (
     projectId: string,
     queueItem: QueueItem,
     backendItemIds: number[]
-  ): Promise<void> => {
+  ): Promise<QueueResultVideo[]> => {
     // Skip known cancelled backend items. Resumed cancellation records can be incomplete, so remaining attachments
     // are best-effort.
     const deliverableItemIds = backendItemIds.filter(
@@ -863,33 +874,11 @@ export const createQueueRuntime = ({
     );
 
     if (!isActive() || queueItem.snapshot.destination !== 'gallery' || deliverableItemIds.length === 0) {
-      return;
+      return [];
     }
 
     const boardId = queueItem.snapshot.galleryBoardId;
-
-    if (!boardId || boardId === 'none') {
-      return;
-    }
-
-    try {
-      const imageOptions = getQueueItemResultImageOptions(queueItem);
-      const options = queueItem.snapshot.filterIntermediateResults
-        ? { ...imageOptions, excludeIntermediate: true }
-        : imageOptions;
-      const namesPerItem = await mapWithConcurrency(deliverableItemIds, QUEUE_RUNTIME_CONCURRENCY, (backendItemId) =>
-        runResultRead(() => backend.getResultVideoNames(backendItemId, options))
-      );
-      // Exclude video primitives' echoed input clips from generated results.
-      const inputMedia = collectGraphInputMediaNames(getQueueItemCompiledGraph(queueItem));
-      const videoNames = [...new Set(namesPerItem.flat())].filter((name) => !inputMedia.videoNames.has(name));
-
-      if (videoNames.length === 0 || !isActive()) {
-        return;
-      }
-
-      await destinations.addVideosToGalleryBoard(boardId, videoNames);
-    } catch (error) {
+    const recordError = (error: unknown): void => {
       if (isActive()) {
         commands.recordError({
           area: 'queue-results',
@@ -898,6 +887,50 @@ export const createQueueRuntime = ({
           projectId,
         });
       }
+    };
+    let namesPerItem: string[][];
+
+    try {
+      const imageOptions = getQueueItemResultImageOptions(queueItem);
+      const options = queueItem.snapshot.filterIntermediateResults
+        ? { ...imageOptions, excludeIntermediate: true }
+        : imageOptions;
+      namesPerItem = await mapWithConcurrency(deliverableItemIds, QUEUE_RUNTIME_CONCURRENCY, (backendItemId) =>
+        runResultRead(() => backend.getResultVideoNames(backendItemId, options))
+      );
+    } catch (error) {
+      recordError(error);
+      return [];
+    }
+
+    // Exclude video primitives' echoed input clips from generated results.
+    const inputMedia = collectGraphInputMediaNames(getQueueItemCompiledGraph(queueItem));
+    const videoNames = [...new Set(namesPerItem.flat())].filter((name) => !inputMedia.videoNames.has(name));
+
+    if (videoNames.length === 0 || !isActive()) {
+      return [];
+    }
+
+    if (boardId && boardId !== 'none') {
+      try {
+        await destinations.addVideosToGalleryBoard(boardId, videoNames);
+      } catch (error) {
+        // A board-attach failure must not keep a finished video out of view.
+        recordError(error);
+      }
+    }
+
+    if (!isActive()) {
+      return [];
+    }
+
+    try {
+      return await runResultRead(() =>
+        backend.getResultVideos(videoNames, queueItem.id, queueItem.snapshot.submittedAt)
+      );
+    } catch (error) {
+      recordError(error);
+      return [];
     }
   };
 
@@ -950,13 +983,13 @@ export const createQueueRuntime = ({
 
       const images = await deliverVisibleImages(queueItem, allImages);
       // The run-end video pass retries live routing and covers earlier-session completions; it must never throw.
-      await addResultVideosToDestination(projectId, queueItem, backendItemIds);
+      const videos = await deliverResultVideos(projectId, queueItem, backendItemIds);
 
       if (!isAttemptCurrent(attempt)) {
         return;
       }
 
-      commands.routeResults({ images, projectId, queueItemId: queueItem.id });
+      commands.routeResults({ images, projectId, queueItemId: queueItem.id, videos });
       if (queueItem.snapshot.destination === 'gallery') {
         commands.refreshBackendData();
       }
@@ -1009,7 +1042,7 @@ export const createQueueRuntime = ({
 
       const visibleImages = await deliverVisibleImages(queueItem, images);
       // Never throws — a board-attach hiccup must not block routePartialResults below.
-      await addResultVideosToDestination(projectId, queueItem, [backendItemId]);
+      const videos = await deliverResultVideos(projectId, queueItem, [backendItemId]);
 
       if (!isAttemptCurrent(attempt)) {
         return;
@@ -1026,6 +1059,7 @@ export const createQueueRuntime = ({
         images: visibleImages,
         projectId,
         queueItemId: queueItem.id,
+        videos,
       });
       if (queueItem.snapshot.destination === 'gallery') {
         commands.refreshBackendData();
@@ -1876,7 +1910,10 @@ export const createQueueRuntime = ({
     coordinator.dispose();
     pendingResultRoutes.clear();
     await resultRoutingFlush?.catch(() => undefined);
-    await resultReadFlush?.catch(() => undefined);
+    // A settling flush may start another for reads queued while it drained.
+    for (let flush = resultReadFlush; flush; flush = resultReadFlush) {
+      await flush.catch(() => undefined);
+    }
     await Promise.all(
       [...cancellationOperations.values(), ...submissionOperations.values(), ...lockRequests.values()].map(
         (operation) => operation.catch(() => undefined)

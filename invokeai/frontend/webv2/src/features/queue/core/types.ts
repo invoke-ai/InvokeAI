@@ -142,6 +142,25 @@ export interface QueueResultImage {
   width: number;
 }
 
+export interface QueueResultVideo {
+  /** Board the video is on when read (after any destination attach); unset when uncategorized. */
+  boardId?: string;
+  category: 'general' | 'control' | 'mask' | 'user' | 'other';
+  /** Backend creation timestamp; `queuedAt` is the submission instant. */
+  createdAt?: string;
+  durationSeconds: number;
+  fps?: number;
+  height: number;
+  isIntermediate: boolean;
+  mediaOrigin?: string;
+  queuedAt: string;
+  sourceQueueItemId: string;
+  thumbnailUrl: string;
+  videoName: string;
+  videoUrl: string;
+  width: number;
+}
+
 export type QueueItemStatus = 'pending' | 'in_progress' | 'waiting' | 'completed' | 'failed' | 'canceled';
 export type TerminalQueueItemStatus = Extract<QueueItemStatus, 'completed' | 'failed' | 'canceled'>;
 export type QueueConnectionStatus = 'connecting' | 'connected' | 'disconnected';
@@ -306,6 +325,8 @@ export interface QueueBackendPort extends QueueFeatureCommands {
   ): Promise<QueueResultImage[]>;
   /** Names of the videos a completed backend item produced (no DTO hydration needed). */
   getResultVideoNames(itemId: number, options?: QueueResultVideoOptions): Promise<string[]>;
+  /** Hydrate result videos for display; videos that are gone or unreadable are omitted. */
+  getResultVideos(videoNames: string[], sourceQueueItemId: string, queuedAt: string): Promise<QueueResultVideo[]>;
   listItems(): Promise<QueueBackendItem[]>;
   readCurrent(scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemReadModel | null>;
   readItemIds(order: 'asc' | 'desc', scope?: QueueQueryScope, signal?: AbortSignal): Promise<QueueItemIdsReadModel>;

@@ -1,4 +1,4 @@
-import type { QueueItemStatus } from '@features/queue/core/types';
+import type { QueueItemStatus, QueueResultVideo } from '@features/queue/core/types';
 
 /** Private HTTP wire contracts. These names and fields mirror backend JSON. */
 export interface QueueNodeFieldValueDTO {
@@ -42,6 +42,21 @@ export interface QueueImageDTO {
   image_url: string;
   is_intermediate: boolean;
   thumbnail_url: string;
+  width: number;
+}
+
+export interface QueueVideoDTO {
+  board_id?: string | null;
+  created_at: string;
+  duration: number;
+  fps?: number | null;
+  height: number;
+  is_intermediate: boolean;
+  media_origin?: string | null;
+  video_category: QueueResultVideo['category'];
+  thumbnail_url: string;
+  video_name: string;
+  video_url: string;
   width: number;
 }
 

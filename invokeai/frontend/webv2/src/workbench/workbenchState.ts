@@ -72,6 +72,8 @@ import {
   type GalleryBoardDeletionResult,
   type GallerySettings,
   type GeneratedImageContract,
+  type GeneratedVideoContract,
+  generatedVideoToGalleryItem,
 } from '@features/gallery/contracts';
 import { planSeedSubmission } from '@platform/core/seed';
 import { describeError } from '@platform/logging/normalize';
@@ -376,6 +378,7 @@ type WorkbenchReducerAction =
       queueItemId: string;
       backendItemId: number;
       images: GeneratedImageContract[];
+      videos?: GeneratedVideoContract[];
     }
   | { type: 'markQueueItemBackendCancelled'; projectId: string; queueItemId: string; backendItemId: number }
   | { type: 'setQueueItemCancellationPending'; projectId: string; queueItemId: string; pending: boolean }
@@ -385,7 +388,13 @@ type WorkbenchReducerAction =
       queueItemId: string;
       state: NonNullable<QueueItem['localRecoveryState']>;
     }
-  | { type: 'routeQueueItemResults'; projectId: string; queueItemId: string; images: GeneratedImageContract[] }
+  | {
+      type: 'routeQueueItemResults';
+      projectId: string;
+      queueItemId: string;
+      images: GeneratedImageContract[];
+      videos?: GeneratedVideoContract[];
+    }
   | { type: 'restoreQueueItemsFromJournal'; projectId: string; items: unknown[] }
   | { type: 'appendCanvasStagingCandidate'; projectId: string; candidate: CanvasStagingCandidateContract }
   | {
@@ -2871,14 +2880,14 @@ const shouldResumeLiveFollowOnSubmit = (project: Project): boolean =>
   !project.settings.showProgressImagesInViewer && getLiveFollowPausedAt(project) !== null;
 
 /** Only generations submitted after the deliberate selection may replace it. */
-const isSubmittedAfterLiveFollowPause = (project: Project, image: GalleryImage | undefined): boolean => {
+const isSubmittedAfterLiveFollowPause = (project: Project, sourceQueueItemId: string): boolean => {
   const pausedAt = getLiveFollowPausedAt(project);
 
-  if (pausedAt === null || !image) {
+  if (pausedAt === null) {
     return true;
   }
 
-  const submittedAt = project.queue.items.find((item) => item.id === image.sourceQueueItemId)?.snapshot.submittedAt;
+  const submittedAt = project.queue.items.find((item) => item.id === sourceQueueItemId)?.snapshot.submittedAt;
 
   return submittedAt !== undefined && submittedAt > pausedAt;
 };
@@ -2944,6 +2953,40 @@ const getQueueItemStatusAfterBackendCancellation = (
   return completedBackendItemIds.size > 0 || (item.resultImages?.length ?? 0) > 0 ? 'completed' : 'cancelled';
 };
 
+/** Whether a newly routed result may take the Gallery selection (and so the settled Preview). */
+const shouldSelectGalleryResult = (
+  project: Project,
+  galleryValues: Record<string, unknown>,
+  sourceQueueItemId: string
+): boolean =>
+  typeof galleryValues.selectedImageName !== 'string' ||
+  (project.settings.showProgressImagesInViewer && isSubmittedAfterLiveFollowPause(project, sourceQueueItemId));
+
+const getGalleryResultSelectionValues = (
+  galleryValues: Record<string, unknown>,
+  item: GalleryItem
+): Record<string, unknown> => {
+  const itemKey = toGalleryItemKey(item);
+  const gallerySettings = getGallerySettings(galleryValues);
+
+  return {
+    ...(item.kind === 'video' ? { compareImage: null } : {}),
+    selectedImage: item,
+    selectedImageName: itemKey,
+    selectedImageNames: [itemKey],
+    selectedImagePage: 0,
+    selectedImageQuery: {
+      boardId: item.boardId,
+      galleryView: item.category === 'general' ? 'images' : 'assets',
+      imageOrderDir: gallerySettings.imageOrderDir,
+      page: 0,
+      paginationMode: gallerySettings.paginationMode,
+      searchTerm: '',
+      starredOnly: false,
+    },
+  };
+};
+
 const updateGalleryWithResultImages = (project: Project, images: GeneratedImageContract[]): Project => {
   if (images.length === 0) {
     return project;
@@ -2959,35 +3002,51 @@ const updateGalleryWithResultImages = (project: Project, images: GeneratedImageC
   const newImages: GalleryImage[] = incomingImages
     .filter((image) => !previousImageNames.has(image.imageName))
     .map((image) => normalizeGalleryImage(image, queueBoardIds.get(image.sourceQueueItemId)));
-  const shouldSelectIncomingImage =
-    typeof galleryValues.selectedImageName !== 'string' ||
-    (project.settings.showProgressImagesInViewer && isSubmittedAfterLiveFollowPause(project, newImages[0]));
-  const nextSelectedImage = shouldSelectIncomingImage ? newImages[0] : undefined;
-  const nextSelectedItem = nextSelectedImage ? legacyGeneratedImageToGalleryItem(nextSelectedImage) : undefined;
-  const nextSelectedItemKey = nextSelectedItem ? toGalleryItemKey(nextSelectedItem) : undefined;
-  const gallerySettings = getGallerySettings(galleryValues);
+  const nextSelectedImage =
+    newImages[0] && shouldSelectGalleryResult(project, galleryValues, newImages[0].sourceQueueItemId)
+      ? newImages[0]
+      : undefined;
   return updateProjectWidgetValues(project, 'gallery', () => ({
     ...galleryValues,
     recentImages: getBoundedRecentImages([...newImages, ...previousImages]),
-    selectedImage: nextSelectedItem ?? galleryValues.selectedImage,
-    selectedImageName: nextSelectedItemKey ?? galleryValues.selectedImageName,
-    selectedImageNames: nextSelectedItemKey
-      ? [nextSelectedItemKey]
-      : getPersistedSelectedGalleryItemKeys(galleryValues),
     ...(nextSelectedImage
-      ? {
-          selectedImagePage: 0,
-          selectedImageQuery: {
-            boardId: nextSelectedImage.boardId,
-            galleryView: nextSelectedImage.imageCategory === 'general' ? 'images' : 'assets',
-            imageOrderDir: gallerySettings.imageOrderDir,
-            page: 0,
-            paginationMode: gallerySettings.paginationMode,
-            searchTerm: '',
-            starredOnly: false,
-          },
-        }
-      : {}),
+      ? getGalleryResultSelectionValues(galleryValues, legacyGeneratedImageToGalleryItem(nextSelectedImage))
+      : { selectedImageNames: getPersistedSelectedGalleryItemKeys(galleryValues) }),
+  }));
+};
+
+/**
+ * Videos are not kept in recent images, so the queue item records which ones were routed: only the newest video not
+ * routed before may take the selection, or a repeat pass would take it back from a later run.
+ */
+const routeGalleryResultVideos = (
+  project: Project,
+  queueItemId: string,
+  videos: readonly GeneratedVideoContract[],
+  /** The project before this routing pass selected any image, so a run's video outranks its own images. */
+  policyProject: Project = project
+): Project => {
+  const routedNames = new Set(project.queue.items.find((item) => item.id === queueItemId)?.resultVideoNames);
+  const newVideos = videos.filter((video) => !routedNames.has(video.videoName));
+  const video = newVideos.at(-1);
+
+  if (!video) {
+    return project;
+  }
+
+  const nextProject = updateQueueItem(project, queueItemId, (item) => ({
+    ...item,
+    resultVideoNames: [...(item.resultVideoNames ?? []), ...newVideos.map((newVideo) => newVideo.videoName)],
+  }));
+  if (!shouldSelectGalleryResult(policyProject, getWidgetValues(policyProject, 'gallery'), video.sourceQueueItemId)) {
+    return nextProject;
+  }
+
+  const galleryValues = getWidgetValues(nextProject, 'gallery');
+
+  return updateProjectWidgetValues(nextProject, 'gallery', () => ({
+    ...galleryValues,
+    ...getGalleryResultSelectionValues(galleryValues, generatedVideoToGalleryItem(video)),
   }));
 };
 
@@ -2995,7 +3054,8 @@ const routeQueueItemPartialResults = (
   project: Project,
   queueItemId: string,
   backendItemId: number,
-  images: GeneratedImageContract[]
+  images: GeneratedImageContract[],
+  videos: readonly GeneratedVideoContract[] = []
 ): Project => {
   const queueItem = project.queue.items.find((item) => item.id === queueItemId);
   const destination = queueItem?.snapshot.destination ?? project.invocation.destination;
@@ -3009,7 +3069,13 @@ const routeQueueItemPartialResults = (
   }));
 
   if (destination === 'gallery') {
-    return updateGalleryWithResultImages(nextProject, images);
+    // A run's video is its primary output; it takes the selection over any images routed alongside it.
+    return routeGalleryResultVideos(
+      updateGalleryWithResultImages(nextProject, images),
+      queueItemId,
+      videos,
+      nextProject
+    );
   }
 
   if (images.length === 0) {
@@ -3067,7 +3133,8 @@ const recordWorkflowRunPreview = (
 const routeQueueItemResults = (
   sourceProject: Project,
   queueItemId: string,
-  images: GeneratedImageContract[]
+  images: GeneratedImageContract[],
+  videos: readonly GeneratedVideoContract[] = []
 ): Project => {
   const queueItem = sourceProject.queue.items.find((item) => item.id === queueItemId);
   const project = recordWorkflowRunPreview(sourceProject, queueItem, images);
@@ -3083,7 +3150,13 @@ const routeQueueItemResults = (
   }));
 
   if (destination === 'gallery') {
-    return updateGalleryWithResultImages(nextProject, images);
+    // A run's video is its primary output; it takes the selection over any images routed alongside it.
+    return routeGalleryResultVideos(
+      updateGalleryWithResultImages(nextProject, images),
+      queueItemId,
+      videos,
+      nextProject
+    );
   }
 
   // Stage results only into the submitted documentRevision; wholesale canvas swaps invalidate staging while
@@ -4381,7 +4454,7 @@ export const __workbenchReducerInternal = (
       }
 
       return updateProjectById(state, action.projectId, (project) =>
-        routeQueueItemPartialResults(project, action.queueItemId, action.backendItemId, action.images)
+        routeQueueItemPartialResults(project, action.queueItemId, action.backendItemId, action.images, action.videos)
       );
     }
     case 'markQueueItemBackendCancelled': {
@@ -4434,7 +4507,7 @@ export const __workbenchReducerInternal = (
       }
 
       const nextState = updateProjectById(state, action.projectId, (project) =>
-        routeQueueItemResults(project, action.queueItemId, action.images)
+        routeQueueItemResults(project, action.queueItemId, action.images, action.videos)
       );
 
       if (action.images.length === 0) {
