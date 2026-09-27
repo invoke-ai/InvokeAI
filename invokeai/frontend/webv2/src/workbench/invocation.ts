@@ -27,6 +27,7 @@ import { areArraysEqual, createStableSelector } from '@platform/state/selectors'
 import { compileContributingLayers } from '@workbench/canvas-engine/api';
 
 import { getBlockingControlLayerIssues } from './controlLayerChecks';
+import { getActiveProjectGraph } from './projectWorkflows';
 import { getProjectWidgetValues } from './widgetState';
 
 export interface InvocationSourceMeta {
@@ -136,7 +137,7 @@ export const getInvocationRouteInput = (project: Project): InvocationRouteInput 
   workflowValues: getProjectWidgetValues(project, 'workflow'),
   invocation: project.invocation,
   mountedWidgetIds: getMountedWidgetIds(project),
-  projectGraph: project.projectGraph,
+  projectGraph: getActiveProjectGraph(project),
   projectId: project.id,
 });
 
@@ -182,8 +183,18 @@ export const resolveInvocationRoute = (
   project: Project,
   mode: InvocationMode = 'global',
   route: InvocationRoute = project.invocation,
-  models?: readonly ModelConfig[]
-): ResolvedInvocationRoute => resolveInvocationRouteInput(getInvocationRouteInput(project), mode, route, models);
+  models?: readonly ModelConfig[],
+  /** Validate a specific project workflow (a captured submission target) instead of the active one. */
+  workflowDocument?: ProjectGraphState
+): ResolvedInvocationRoute =>
+  resolveInvocationRouteInput(
+    workflowDocument
+      ? { ...getInvocationRouteInput(project), projectGraph: workflowDocument }
+      : getInvocationRouteInput(project),
+    mode,
+    route,
+    models
+  );
 
 export const resolveInvocationRouteInput = (
   input: InvocationRouteInput,

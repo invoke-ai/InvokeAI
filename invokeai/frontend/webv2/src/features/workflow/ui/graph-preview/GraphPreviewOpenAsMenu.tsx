@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { Menu, Portal } from '@chakra-ui/react';
 import { previewGraphToDocument } from '@features/workflow/core/graphToDocument';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
-import { useSaveWorkflowToLibrary } from '@features/workflow/ui/library/useSaveWorkflowToLibrary';
+import { useWorkflowPublication } from '@features/workflow/ui/library/useWorkflowPublication';
 import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
 import {
   useWorkflowGraphPreview,
@@ -43,7 +43,7 @@ export const GraphPreviewOpenAsMenu = ({
   const { workflows } = useWorkflowHostCommands();
   const graphPreview = useWorkflowGraphPreview();
   const notifications = useWorkflowNotifications();
-  const { saveDocumentAsNew } = useSaveWorkflowToLibrary();
+  const { saveDocumentAsNew } = useWorkflowPublication();
   // A hook (not `getInvocationTemplatesSnapshot()`) so the "Edit in workflow
   // editor" item's disabled state updates live if the menu is opened while
   // templates are still loading.
@@ -65,8 +65,8 @@ export const GraphPreviewOpenAsMenu = ({
       );
     }
 
-    // `replace` emits its own success notification and undo entry.
-    workflows.replace(document, t('graphPreview.openedFromPreview'));
+    // The preview becomes a workflow of its own beside the project's others (or takes over an untouched blank).
+    workflows.addWorkflow(document, { label: t('graphPreview.openedFromPreview'), reusePlaceholder: true });
     graphPreview.openWorkflowEditor();
     onClose();
   }, [graph, templatesSnapshot, notifications, t, workflows, graphPreview, onClose]);
@@ -87,10 +87,15 @@ export const GraphPreviewOpenAsMenu = ({
 
     document.name = graph.label ?? sourceLabel;
 
-    const id = await saveDocumentAsNew(document);
+    // The publication reports its own outcome; a lost answer is retried by the same captured request.
+    const result = await saveDocumentAsNew(document, document.name);
 
-    if (id !== null) {
-      notifications.success(t('graphPreview.savedToLibrary'));
+    if (result.status === 'failed') {
+      const retried = await result.retry();
+
+      if (retried.status === 'failed') {
+        notifications.error(t('graphPreview.saveToLibraryFailed'), retried.message);
+      }
     }
   }, [graph, templatesSnapshot, sourceLabel, saveDocumentAsNew, notifications, t]);
   const handleSaveToLibrary = useCallback(() => void saveToLibrary(), [saveToLibrary]);

@@ -407,7 +407,6 @@ export const parseWorkflowJson = (raw: unknown): ParsedWorkflow => {
     edges,
     form: parseForm(parsed.data.form, parsed.data.exposedFields, nodeIds, warnings),
     id: createWorkflowId('workflow'),
-    libraryWorkflowId: parsed.data.id,
     name: parsed.data.name,
     nodes,
     notes: parsed.data.notes,
@@ -431,8 +430,14 @@ const serializeInvocationNode = (node: Extract<WorkflowNode, { type: 'invocation
   };
 };
 
-/** Serializes the document to legacy WorkflowV3 JSON (loadable by the v6 editor and the library backend). */
-export const serializeWorkflowJson = (document: ProjectGraphState): Record<string, unknown> => ({
+/**
+ * Serializes the document to legacy WorkflowV3 JSON (loadable by the v6 editor and the library backend). The JSON
+ * carries a library record id only when the caller names one: a portable file or a new template has none.
+ */
+export const serializeWorkflowJson = (
+  document: ProjectGraphState,
+  options: { libraryWorkflowId?: string } = {}
+): Record<string, unknown> => ({
   author: document.author,
   contact: document.contact,
   description: document.description,
@@ -442,7 +447,7 @@ export const serializeWorkflowJson = (document: ProjectGraphState): Record<strin
     elements: structuredClone(document.form.elements),
     rootElementId: document.form.rootElementId,
   },
-  ...(document.libraryWorkflowId ? { id: document.libraryWorkflowId } : {}),
+  ...(options.libraryWorkflowId ? { id: options.libraryWorkflowId } : {}),
   meta: { category: 'user', version: '3.0.0' },
   name: document.name,
   nodes: document.nodes.map((node) =>

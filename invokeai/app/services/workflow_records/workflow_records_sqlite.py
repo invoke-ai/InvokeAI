@@ -1,4 +1,5 @@
 import sqlite3
+import uuid
 from pathlib import Path
 from typing import Optional
 
@@ -15,18 +16,26 @@ from invokeai.app.services.workflow_records.workflow_records_base import Workflo
 from invokeai.app.services.workflow_records.workflow_records_common import (
     WORKFLOW_LIBRARY_DEFAULT_USER_ID,
     Workflow,
+    WorkflowAccessDeniedError,
     WorkflowCategory,
+    WorkflowIdConflictError,
+    WorkflowImmutableError,
     WorkflowNotFoundError,
     WorkflowRecordDTO,
     WorkflowRecordListItemDTO,
     WorkflowRecordListItemDTOValidator,
     WorkflowRecordOrderBy,
+    WorkflowRevisionConflictError,
     WorkflowValidator,
     WorkflowWithoutID,
 )
 from invokeai.app.util.misc import uuid_string
 
 SQL_TIME_FORMAT = "%Y-%m-%d %H:%M:%f"
+
+_RECORD_COLUMNS = (
+    "workflow_id, workflow, name, created_at, updated_at, opened_at, last_run_at, user_id, is_public, revision"
+)
 
 
 class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
@@ -39,17 +48,18 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         self._sync_default_workflows()
 
     def get(self, workflow_id: str) -> WorkflowRecordDTO:
-        """Gets a workflow by ID. Updates the opened_at column."""
+        """Gets a workflow by ID."""
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT workflow_id, workflow, name, created_at, updated_at, opened_at, last_run_at, user_id, is_public
-                FROM workflow_library
-                WHERE workflow_id = ?;
-                """,
-                (workflow_id,),
-            )
-            row = cursor.fetchone()
+            return self._get_on_cursor(cursor, workflow_id)
+
+    @staticmethod
+    def _get_on_cursor(cursor: sqlite3.Cursor, workflow_id: str) -> WorkflowRecordDTO:
+        """Reads one record on the caller's transaction; `get()` on an open transaction would commit it early."""
+        cursor.execute(
+            f"SELECT {_RECORD_COLUMNS} FROM workflow_library WHERE workflow_id = ?;",
+            (workflow_id,),
+        )
+        row = cursor.fetchone()
         if row is None:
             raise WorkflowNotFoundError(f"Workflow with id {workflow_id} not found")
         return WorkflowRecordDTO.from_dict(dict(row))
@@ -59,91 +69,129 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         workflow: WorkflowWithoutID,
         user_id: str = WORKFLOW_LIBRARY_DEFAULT_USER_ID,
         is_public: bool = False,
+        workflow_id: Optional[str] = None,
     ) -> WorkflowRecordDTO:
         if workflow.meta.category is WorkflowCategory.Default:
             raise ValueError("Default workflows cannot be created via this method")
+        if workflow_id is not None:
+            try:
+                uuid.UUID(workflow_id)
+            except ValueError as e:
+                raise ValueError("A reserved workflow id must be a UUID") from e
 
-        workflow_with_id = Workflow(**workflow.model_dump(), id=uuid_string())
+        workflow_with_id = Workflow(**workflow.model_dump(), id=workflow_id or uuid_string())
         document_json = workflow_with_id.model_dump_json()
         references = extract_media_references_from_json(document_json)
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                INSERT OR IGNORE INTO workflow_library (
-                    workflow_id,
-                    workflow,
-                    user_id,
-                    is_public
+            if workflow_id is not None:
+                existing = self._match_reserved_record(cursor, workflow_with_id, user_id)
+                if existing is not None:
+                    return existing
+            try:
+                cursor.execute(
+                    """--sql
+                    INSERT INTO workflow_library (
+                        workflow_id,
+                        workflow,
+                        user_id,
+                        is_public,
+                        revision
+                    )
+                    VALUES (?, ?, ?, ?, 1);
+                    """,
+                    (workflow_with_id.id, document_json, user_id, is_public),
                 )
-                VALUES (?, ?, ?, ?);
-                """,
-                (workflow_with_id.id, document_json, user_id, is_public),
-            )
+            except sqlite3.IntegrityError as e:
+                # Only a reserved id can collide; a generated one is unique for practical purposes.
+                raise WorkflowIdConflictError(workflow_with_id.id) from e
             self._index_references(cursor, workflow_with_id.id, references, user_id=user_id)
-        return self.get(workflow_with_id.id)
+            return self._get_on_cursor(cursor, workflow_with_id.id)
 
-    def update(self, workflow: Workflow, user_id: Optional[str] = None) -> WorkflowRecordDTO:
+    @staticmethod
+    def _match_reserved_record(cursor: sqlite3.Cursor, workflow: Workflow, user_id: str) -> Optional[WorkflowRecordDTO]:
+        """A retried creation is accepted only when the record it finds is this owner's identical submission.
+
+        Any other record under the id is a conflict; its content and owner are not revealed to the caller.
+        """
+        cursor.execute(
+            f"SELECT {_RECORD_COLUMNS} FROM workflow_library WHERE workflow_id = ?;",
+            (workflow.id,),
+        )
+        row = cursor.fetchone()
+        if row is None:
+            return None
+        existing = WorkflowRecordDTO.from_dict(dict(row))
+        if existing.user_id != user_id or existing.workflow.model_dump() != workflow.model_dump():
+            raise WorkflowIdConflictError(workflow.id)
+        return existing
+
+    def update(
+        self, workflow: Workflow, user_id: Optional[str] = None, expected_revision: Optional[int] = None
+    ) -> WorkflowRecordDTO:
         if workflow.meta.category is WorkflowCategory.Default:
-            raise ValueError("Default workflows cannot be updated")
+            raise ValueError("A workflow cannot be updated into the default category")
 
         document_json = workflow.model_dump_json()
         references = extract_media_references_from_json(document_json)
         with self._db.transaction() as cursor:
-            if user_id is not None:
-                cursor.execute(
-                    """--sql
-                    UPDATE workflow_library
-                    SET workflow = ?
-                    WHERE workflow_id = ? AND category = 'user' AND user_id = ?;
-                    """,
-                    (document_json, workflow.id, user_id),
-                )
-            else:
-                cursor.execute(
-                    """--sql
-                    UPDATE workflow_library
-                    SET workflow = ?
-                    WHERE workflow_id = ? AND category = 'user';
-                    """,
-                    (document_json, workflow.id),
-                )
-            if cursor.rowcount:
-                self._index_references(
-                    cursor,
-                    workflow.id,
-                    references,
-                    user_id=user_id if user_id is not None else self._owner_of(cursor, workflow.id),
-                )
-        return self.get(workflow.id)
+            # `category` is generated from the stored JSON, so it still describes the record as it is, not as
+            # the request would rewrite it.
+            cursor.execute(
+                "SELECT category, user_id, revision FROM workflow_library WHERE workflow_id = ?;",
+                (workflow.id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise WorkflowNotFoundError(f"Workflow with id {workflow.id} not found")
+            stored_category, owner_id, current_revision = row
+            if stored_category == WorkflowCategory.Default.value:
+                raise WorkflowImmutableError(workflow.id)
+            owner = str(owner_id) if owner_id is not None else WORKFLOW_LIBRARY_DEFAULT_USER_ID
+            if user_id is not None and owner != user_id:
+                raise WorkflowAccessDeniedError(workflow.id)
+            if expected_revision is not None and current_revision != expected_revision:
+                raise WorkflowRevisionConflictError(workflow.id, expected_revision, current_revision)
+
+            cursor.execute(
+                """--sql
+                UPDATE workflow_library
+                SET workflow = ?, revision = revision + 1
+                WHERE workflow_id = ? AND revision = ?;
+                """,
+                (document_json, workflow.id, current_revision),
+            )
+            if cursor.rowcount == 0:
+                # Another connection won between the read and this compare-and-swap.
+                cursor.execute("SELECT revision FROM workflow_library WHERE workflow_id = ?;", (workflow.id,))
+                raced = cursor.fetchone()
+                if raced is None:
+                    raise WorkflowNotFoundError(f"Workflow with id {workflow.id} not found")
+                raise WorkflowRevisionConflictError(workflow.id, expected_revision or current_revision, raced[0])
+            self._index_references(cursor, workflow.id, references, user_id=owner)
+            return self._get_on_cursor(cursor, workflow.id)
 
     def delete(self, workflow_id: str, user_id: Optional[str] = None) -> None:
-        if self.get(workflow_id).workflow.meta.category is WorkflowCategory.Default:
-            raise ValueError("Default workflows cannot be deleted")
-
         with self._db.transaction() as cursor:
-            if user_id is not None:
-                cursor.execute(
-                    """--sql
-                    DELETE from workflow_library
-                    WHERE workflow_id = ? AND category = 'user' AND user_id = ?;
-                    """,
-                    (workflow_id, user_id),
-                )
-            else:
-                cursor.execute(
-                    """--sql
-                    DELETE from workflow_library
-                    WHERE workflow_id = ? AND category = 'user';
-                    """,
-                    (workflow_id,),
-                )
-            if cursor.rowcount:
-                # The row is gone, so its owner is the only fact left to delete by; every owner's
-                # rows for this id are dropped since workflow ids are globally unique.
-                cursor.execute(
-                    "DELETE FROM media_references WHERE owner_kind = 'workflow' AND owner_id = ?;",
-                    (workflow_id,),
-                )
+            cursor.execute(
+                "SELECT category, user_id FROM workflow_library WHERE workflow_id = ?;",
+                (workflow_id,),
+            )
+            row = cursor.fetchone()
+            if row is None:
+                raise WorkflowNotFoundError(f"Workflow with id {workflow_id} not found")
+            stored_category, owner_id = row
+            if stored_category == WorkflowCategory.Default.value:
+                raise WorkflowImmutableError(workflow_id)
+            owner = str(owner_id) if owner_id is not None else WORKFLOW_LIBRARY_DEFAULT_USER_ID
+            if user_id is not None and owner != user_id:
+                raise WorkflowAccessDeniedError(workflow_id)
+            cursor.execute("DELETE from workflow_library WHERE workflow_id = ?;", (workflow_id,))
+            # The row is gone, so its owner is the only fact left to delete by; every owner's
+            # rows for this id are dropped since workflow ids are globally unique.
+            cursor.execute(
+                "DELETE FROM media_references WHERE owner_kind = 'workflow' AND owner_id = ?;",
+                (workflow_id,),
+            )
         return None
 
     def update_is_public(self, workflow_id: str, is_public: bool, user_id: Optional[str] = None) -> WorkflowRecordDTO:
@@ -170,6 +218,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                 elif not is_public and "shared" in tags_list:
                     tags_list.remove("shared")
                 updated_workflow = workflow.model_copy(update={"tags": ", ".join(tags_list)})
+                # Visibility is bookkeeping: the `shared` tag rewrite does not advance the content revision, so
+                # an editor holding the previous revision is not asked to resolve a conflict it cannot see.
                 cursor.execute(
                     """--sql
                     UPDATE workflow_library
@@ -177,7 +227,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                     """,
                     (updated_workflow.model_dump_json(), is_public, workflow_id),
                 )
-        return self.get(workflow_id)
+            return self._get_on_cursor(cursor, workflow_id)
 
     @staticmethod
     def _index_references(
@@ -187,12 +237,6 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
         replace_media_references(
             cursor, owner_kind="workflow", user_id=user_id, owner_id=workflow_id, references=references
         )
-
-    @staticmethod
-    def _owner_of(cursor: sqlite3.Cursor, workflow_id: str) -> str:
-        cursor.execute("SELECT user_id FROM workflow_library WHERE workflow_id = ?;", (workflow_id,))
-        row = cursor.fetchone()
-        return str(row[0]) if row is not None and row[0] is not None else WORKFLOW_LIBRARY_DEFAULT_USER_ID
 
     def get_many(
         self,
@@ -227,7 +271,8 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                         last_run_at,
                         tags,
                         user_id,
-                        is_public
+                        is_public,
+                        revision
                     FROM workflow_library
                     """
             count_query = "SELECT COUNT(*) FROM workflow_library"
@@ -589,41 +634,36 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
                 workflows_from_file.append(workflow_from_file)
 
-                try:
-                    workflow_from_db = self.get(workflow_from_file.id).workflow
-                    if workflow_from_file != workflow_from_db:
-                        self._invoker.services.logger.debug(
-                            f"Updating library workflow {workflow_from_file.name} ({workflow_from_file.id})"
-                        )
-                        workflows_to_update.append(workflow_from_file)
-                    continue
-                except WorkflowNotFoundError:
+                # Read on this cursor: `get()` would open a nested transaction and commit this one early.
+                cursor.execute("SELECT workflow FROM workflow_library WHERE workflow_id = ?;", (workflow_from_file.id,))
+                row = cursor.fetchone()
+                if row is None:
                     self._invoker.services.logger.debug(
                         f"Adding missing default workflow {workflow_from_file.name} ({workflow_from_file.id})"
                     )
                     workflows_to_add.append(workflow_from_file)
                     continue
+                if workflow_from_file != WorkflowValidator.validate_json(row[0]):
+                    self._invoker.services.logger.debug(
+                        f"Updating library workflow {workflow_from_file.name} ({workflow_from_file.id})"
+                    )
+                    workflows_to_update.append(workflow_from_file)
 
-            library_workflows_from_db = self.get_many(
-                order_by=WorkflowRecordOrderBy.Name,
-                direction=SQLiteDirection.Ascending,
-                categories=[WorkflowCategory.Default],
-            ).items
+            cursor.execute("SELECT workflow_id, name FROM workflow_library WHERE category = 'default';")
+            library_workflows_from_db = cursor.fetchall()
 
             workflows_from_file_ids = [w.id for w in workflows_from_file]
 
-            for w in library_workflows_from_db:
-                if w.workflow_id not in workflows_from_file_ids:
-                    self._invoker.services.logger.debug(
-                        f"Deleting obsolete default workflow {w.name} ({w.workflow_id})"
-                    )
+            for workflow_id, name in library_workflows_from_db:
+                if workflow_id not in workflows_from_file_ids:
+                    self._invoker.services.logger.debug(f"Deleting obsolete default workflow {name} ({workflow_id})")
                     # We cannot use the `delete` method here, as it only deletes non-default workflows
                     cursor.execute(
                         """--sql
                         DELETE from workflow_library
                         WHERE workflow_id = ?;
                         """,
-                        (w.workflow_id,),
+                        (workflow_id,),
                     )
 
             for w in workflows_to_add:
@@ -632,19 +672,21 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
                     """--sql
                     INSERT INTO workflow_library (
                         workflow_id,
-                        workflow
+                        workflow,
+                        revision
                     )
-                    VALUES (?, ?);
+                    VALUES (?, ?, 1);
                     """,
                     (w.id, w.model_dump_json()),
                 )
 
             for w in workflows_to_update:
-                # We cannot use the `update` method here, as it only updates non-default workflows
+                # We cannot use the `update` method here, as it refuses default workflows. A changed bundle is
+                # new content, so its revision advances like any other write.
                 cursor.execute(
                     """--sql
                     UPDATE workflow_library
-                    SET workflow = ?
+                    SET workflow = ?, revision = revision + 1
                     WHERE workflow_id = ?;
                     """,
                     (w.model_dump_json(), w.id),

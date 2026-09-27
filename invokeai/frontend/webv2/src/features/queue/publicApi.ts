@@ -1,4 +1,4 @@
-import type { QueueFeatureCommands, QueueQueryScope, QueueReadModel, QueueWorkflowRunSink } from './core/types';
+import type { QueueFeatureCommands, QueueQueryScope, QueueReadModel } from './core/types';
 import type { QueueItemProgressPort, QueueRealtimeRuntime } from './data/realtimeRuntime';
 import type {
   QueueHistoryPort,
@@ -63,7 +63,6 @@ export const createProductionQueueRuntime = ({
   locks,
   modelLoads,
   nodeExecution,
-  workflowRuns,
 }: {
   destinations: QueueResultDestinationPort;
   ensureProjectPersisted?(projectId: string): Promise<'ready' | 'refused' | 'retry'>;
@@ -73,7 +72,6 @@ export const createProductionQueueRuntime = ({
   locks?: QueueRunLockPort;
   modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
-  workflowRuns?: QueueWorkflowRunSink;
 }): QueueRuntime =>
   createQueueRuntime({
     backend: queueBackend,
@@ -85,5 +83,4 @@ export const createProductionQueueRuntime = ({
     locks,
     modelLoads,
     nodeExecution,
-    workflowRuns,
   });

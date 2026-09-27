@@ -93,3 +93,23 @@ describe('node execution lifecycle', () => {
     });
   });
 });
+
+describe('node execution origin', () => {
+  it('names the run it reflects, notifies origin subscribers, and forgets the origin with the nodes', () => {
+    const listener = vi.fn();
+    const unsubscribe = nodeExecutionStore.subscribeOrigin(listener);
+
+    nodeExecutionStore.setOrigin({ projectId: 'p', workflowId: 'a' });
+    nodeExecutionStore.setOrigin({ projectId: 'p', workflowId: 'a' });
+    expect(nodeExecutionStore.getOrigin()).toEqual({ projectId: 'p', workflowId: 'a' });
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    nodeExecutionStore.started({ invocation_source_id: 'node-1' });
+    nodeExecutionStore.clearAll();
+    expect(nodeExecutionStore.getOrigin()).toBeNull();
+    expect(nodeExecutionStore.get('node-1')).toBeNull();
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    unsubscribe();
+  });
+});

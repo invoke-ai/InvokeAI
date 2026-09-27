@@ -154,12 +154,12 @@ export const exportLibraryProject = async (
 
   assertAccountScopeCurrent(owner);
 
-  const [{ deserializeProjectDocument }, { serializeProjectDocumentV2 }] = await Promise.all([
+  const [{ deserializeProjectDocument }, { serializeProjectDocumentV3 }] = await Promise.all([
     import('./projectHydration'),
     import('./projectDocument'),
   ]);
   const loaded = deserializeProjectDocument(record.data);
-  const document = loaded.status === 'loaded' ? serializeProjectDocumentV2(loaded.project) : record.data;
+  const document = loaded.status === 'loaded' ? serializeProjectDocumentV3(loaded.project) : record.data;
 
   return exportProjectDocument(record.name, record.project_id, document, record.minimum_canvas_schema_version, {
     ...options,
@@ -231,7 +231,11 @@ export const importProjectFile = async (
     throw new InvkFormatError('damaged', 'The project document will not rehydrate.');
   }
 
-  const project = loaded.project;
+  // An imported archive never inherits library write targets from the ids its workflows carry.
+  // Lazy like the other document modules here: this file is shared with the Launchpad, which never loads the
+  // workflow core eagerly.
+  const { stripProjectWorkflowSources } = await import('@workbench/projectWorkflows');
+  const project = { ...loaded.project, workflows: stripProjectWorkflowSources(loaded.project.workflows) };
 
   const { applyAuthoritativeProjectBoard, serializeProjectDocument } = await import('./projectDocument');
   const canonicalDocument = serializeProjectDocument(project);
