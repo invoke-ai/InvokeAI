@@ -1010,13 +1010,33 @@ describe('WorkflowLibraryDialog — This project', () => {
   const selectCard = (workflowId: string) => click(card(workflowId));
 
   const menuItem = (value: string) => document.querySelector<HTMLElement>(`[data-menu-item="${value}"]`);
+  const railMenuTrigger = () => rail()?.querySelector<HTMLElement>('[aria-label="More actions"]');
+  // The trigger's data-state belongs to its tooltip; the menu's own state is aria-expanded. The menu opens on a
+  // later frame, so read it only once its items are in the document.
   const openRailMenu = async () => {
-    const trigger = rail()?.querySelector<HTMLElement>('[aria-label="More actions"]');
+    const trigger = railMenuTrigger();
     expect(trigger).not.toBeNull();
 
-    if (trigger?.getAttribute('data-state') !== 'open') {
+    if (trigger?.getAttribute('aria-expanded') !== 'true') {
       await click(trigger);
     }
+
+    await vi.waitFor(
+      () => {
+        expect(railMenuTrigger()?.getAttribute('aria-expanded')).toBe('true');
+        expect(document.querySelector('[data-menu-item]')).not.toBeNull();
+      },
+      { timeout: 2000 }
+    );
+  };
+  // Escape only reaches the menu once it holds focus, which lands a frame later; toggling the trigger closes it
+  // regardless. A closed menu keeps its items mounted, so aria-expanded is what says it has closed.
+  const closeRailMenu = async () => {
+    if (railMenuTrigger()?.getAttribute('aria-expanded') === 'true') {
+      await click(railMenuTrigger());
+    }
+
+    await vi.waitFor(() => expect(railMenuTrigger()?.getAttribute('aria-expanded')).toBe('false'), { timeout: 2000 });
   };
   const clickRailMenuItem = async (value: string) => {
     await openRailMenu();
@@ -1168,9 +1188,7 @@ describe('WorkflowLibraryDialog — This project', () => {
     expect(menuItem('save-to-library')).not.toBeNull();
     expect(menuItem('update-template')).toBeNull();
 
-    await act(async () => {
-      await userEvent.keyboard('{Escape}');
-    });
+    await closeRailMenu();
     await selectCard('wf-user');
     await openRailMenu();
 
