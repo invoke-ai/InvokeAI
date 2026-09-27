@@ -1,5 +1,10 @@
 import type { QueueItem } from '@features/queue/core/historyTypes';
-import type { QueueBackendInvocation, QueueBackendPort, QueueResultImage } from '@features/queue/core/types';
+import type {
+  QueueBackendInvocation,
+  QueueBackendPort,
+  QueueResultImage,
+  QueueResultVideo,
+} from '@features/queue/core/types';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
 import { buildQueueItemOrigin } from '@features/queue/data/events';
@@ -57,6 +62,7 @@ const createTestBackend = (overrides: Partial<QueueBackendPort> = {}): QueueBack
   getItem: vi.fn(),
   getResultImages: vi.fn().mockResolvedValue([]),
   getResultVideoNames: vi.fn().mockResolvedValue([]),
+  getResultVideos: vi.fn().mockResolvedValue([]),
   listItems: vi.fn().mockResolvedValue([]),
   on: vi.fn(() => vi.fn()),
   onConnectionChange: vi.fn((listener) => {
@@ -303,6 +309,7 @@ describe('queue runtime', () => {
       getItem: vi.fn(),
       getResultImages: vi.fn(),
       getResultVideoNames: vi.fn().mockResolvedValue([]),
+      getResultVideos: vi.fn().mockResolvedValue([]),
       listItems,
       on: vi.fn(() => vi.fn()),
       onConnectionChange: vi.fn((listener) => {
@@ -2015,6 +2022,7 @@ describe('queue runtime', () => {
 describe('queue runtime video board routing', () => {
   const createHarness = (options: {
     getResultVideoNames: QueueBackendPort['getResultVideoNames'];
+    getResultVideos?: QueueBackendPort['getResultVideos'];
     galleryBoardId?: string | null;
     getResultImages?: QueueBackendPort['getResultImages'];
     /** Nodes of the compiled submission graph — media values here mark run INPUTS. */
@@ -2043,6 +2051,11 @@ describe('queue runtime video board routing', () => {
       getItem: vi.fn(),
       getResultImages: options.getResultImages ?? vi.fn().mockResolvedValue([]),
       getResultVideoNames: options.getResultVideoNames,
+      getResultVideos:
+        options.getResultVideos ??
+        vi.fn((videoNames: string[], sourceQueueItemId: string, queuedAt: string) =>
+          Promise.resolve(videoNames.map((videoName) => resultVideo(videoName, sourceQueueItemId, queuedAt)))
+        ),
       // Reconcile an already-completed backend run to exercise both settlement paths without sockets.
       listItems: vi.fn().mockResolvedValue([
         {
@@ -2116,17 +2129,37 @@ describe('queue runtime video board routing', () => {
       },
     });
 
-    return { commands, destinations, runtime };
+    return { backend, commands, destinations, runtime };
   };
+
+  const resultVideo = (videoName: string, sourceQueueItemId: string, queuedAt: string): QueueResultVideo => ({
+    category: 'general',
+    durationSeconds: 5,
+    height: 512,
+    isIntermediate: false,
+    queuedAt,
+    sourceQueueItemId,
+    thumbnailUrl: `http://test/v/${videoName}/thumbnail`,
+    videoName,
+    videoUrl: `http://test/v/${videoName}`,
+    width: 512,
+  });
 
   it('lands result videos on the enqueue-time board, excluding intermediates', async () => {
     const getResultVideoNames = vi.fn().mockResolvedValue(['clip-1.mp4']);
-    const { destinations, runtime } = createHarness({ getResultVideoNames });
+    const { commands, destinations, runtime } = createHarness({ getResultVideoNames });
 
     runtime.start();
 
     await vi.waitFor(() => {
       expect(destinations.addVideosToGalleryBoard).toHaveBeenCalledWith('board-1', ['clip-1.mp4']);
+      // Both passes queue follow-up reads while earlier ones drain; none may be stranded.
+      expect(commands.routePartialResults).toHaveBeenCalledWith(
+        expect.objectContaining({ videos: [expect.objectContaining({ videoName: 'clip-1.mp4' })] })
+      );
+      expect(commands.routeResults).toHaveBeenCalledWith(
+        expect.objectContaining({ videos: [expect.objectContaining({ videoName: 'clip-1.mp4' })] })
+      );
     });
     // filterIntermediateResults on the snapshot maps to the video-side intermediate filter.
     expect(getResultVideoNames).toHaveBeenCalledWith(77, expect.objectContaining({ excludeIntermediate: true }));
@@ -2152,19 +2185,37 @@ describe('queue runtime video board routing', () => {
     runtime.dispose();
   });
 
-  it('skips the board attach entirely when no board was active at enqueue', async () => {
+  it("routes an uncategorized run's videos for display without a board attach", async () => {
     const getResultVideoNames = vi.fn().mockResolvedValue(['clip-1.mp4']);
     const { commands, destinations, runtime } = createHarness({ galleryBoardId: null, getResultVideoNames });
+    const routedClip = expect.objectContaining({ videos: [expect.objectContaining({ videoName: 'clip-1.mp4' })] });
 
     runtime.start();
 
-    // Wait for full settlement first so the negative assertions below are meaningful.
     await vi.waitFor(() => {
-      expect(commands.routeResults).toHaveBeenCalled();
+      expect(commands.routePartialResults).toHaveBeenCalledWith(routedClip);
+      expect(commands.routeResults).toHaveBeenCalledWith(routedClip);
     });
     expect(destinations.addImagesToGalleryBoard).not.toHaveBeenCalled();
     expect(destinations.addVideosToGalleryBoard).not.toHaveBeenCalled();
-    expect(getResultVideoNames).not.toHaveBeenCalled();
+
+    runtime.dispose();
+  });
+
+  it('still shows a finished video when its board attach fails', async () => {
+    const { commands, destinations, runtime } = createHarness({
+      getResultVideoNames: vi.fn().mockResolvedValue(['clip-1.mp4']),
+    });
+    destinations.addVideosToGalleryBoard.mockRejectedValue(new Error('attach failed'));
+
+    runtime.start();
+
+    await vi.waitFor(() => {
+      expect(commands.routePartialResults).toHaveBeenCalledWith(
+        expect.objectContaining({ videos: [expect.objectContaining({ videoName: 'clip-1.mp4' })] })
+      );
+    });
+    expect(commands.recordError).toHaveBeenCalledWith(expect.objectContaining({ message: 'attach failed' }));
 
     runtime.dispose();
   });

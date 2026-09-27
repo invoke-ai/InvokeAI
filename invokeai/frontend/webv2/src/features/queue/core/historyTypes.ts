@@ -37,6 +37,8 @@ export interface QueueItem {
   backendBatchId?: string;
   error?: string;
   resultImages?: QueueResultImage[];
+  /** Videos already routed to the Gallery; a repeat routing pass must not reselect them. */
+  resultVideoNames?: string[];
 }
 
 export interface QueueState {

@@ -4,6 +4,7 @@ import type {
   QueueEnqueueWorkflowRequest,
   QueueResultImage,
   QueueResultImageOptions,
+  QueueResultVideo,
   QueueResultVideoOptions,
 } from '@features/queue/core/types';
 
@@ -19,7 +20,7 @@ import { assertAccountScopeCurrent, captureAccountScope } from '@platform/state/
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 import { absolutizeApiUrl, ApiError, apiFetch, apiFetchJson } from '@platform/transport/http';
 
-import type { QueueImageDTO, QueueServerItemDTO } from './serverTypes';
+import type { QueueImageDTO, QueueServerItemDTO, QueueVideoDTO } from './serverTypes';
 
 import { buildQueueItemOrigin } from './events';
 import { getQueueItem } from './serverApi';
@@ -278,4 +279,59 @@ export const getResultVideoNames = async (itemId: number, options?: QueueResultV
 
   assertAccountScopeCurrent(owner);
   return videoNames.filter((_, index) => !intermediateFlags[index]);
+};
+
+const getResultVideo = async (
+  videoName: string,
+  queuedAt: string,
+  sourceQueueItemId: string,
+  signal: AbortSignal
+): Promise<QueueResultVideo | null> => {
+  try {
+    const video = await apiFetchJson<QueueVideoDTO>(`/api/v1/videos/i/${encodeURIComponent(videoName)}`, { signal });
+
+    if (!Number.isFinite(video.duration)) {
+      return null;
+    }
+
+    return {
+      ...(video.board_id ? { boardId: video.board_id } : {}),
+      category: video.video_category,
+      createdAt: normalizeServerTimestamp(video.created_at),
+      durationSeconds: video.duration,
+      ...(typeof video.fps === 'number' ? { fps: video.fps } : {}),
+      height: video.height,
+      isIntermediate: video.is_intermediate,
+      ...(video.media_origin ? { mediaOrigin: video.media_origin } : {}),
+      queuedAt,
+      sourceQueueItemId,
+      thumbnailUrl: absolutizeApiUrl(video.thumbnail_url),
+      videoName: video.video_name,
+      videoUrl: absolutizeApiUrl(video.video_url),
+      width: video.width,
+    };
+  } catch (error) {
+    if (signal.aborted) {
+      throw error;
+    }
+    // Display hydration is best-effort: a video that is gone or unreadable is simply not selected.
+    return null;
+  }
+};
+
+export const getResultVideos = async (
+  videoNames: string[],
+  sourceQueueItemId: string,
+  queuedAt: string
+): Promise<QueueResultVideo[]> => {
+  const owner = captureAccountScope();
+  const videos = await mapWithConcurrency(
+    videoNames,
+    8,
+    (videoName) => getResultVideo(videoName, queuedAt, sourceQueueItemId, owner.signal),
+    { signal: owner.signal }
+  );
+
+  assertAccountScopeCurrent(owner);
+  return videos.filter((video): video is QueueResultVideo => video !== null);
 };
