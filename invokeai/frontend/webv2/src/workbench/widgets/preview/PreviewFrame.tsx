@@ -361,6 +361,18 @@ const PreviewImageFrame = ({
   );
 };
 
+/**
+ * The player remounts per item, so its audio settings live here for the page session: the first clip starts at half
+ * volume (the browser default of full volume is usually too loud) and later clips keep the viewer's last choice.
+ * A viewer preference, not account data, so it is deliberately not cleared on account changes.
+ */
+const previewVideoAudio = { muted: false, volume: 0.5 };
+
+const rememberPreviewVideoAudio = (event: SyntheticEvent<HTMLVideoElement>): void => {
+  previewVideoAudio.muted = event.currentTarget.muted;
+  previewVideoAudio.volume = event.currentTarget.volume;
+};
+
 const PreviewVideo = ({
   dragItem,
   frameHeight,
@@ -439,6 +451,10 @@ const PreviewVideo = ({
   const setVideoRef = useCallback(
     (video: HTMLVideoElement | null) => {
       videoRef.current = video;
+      if (video) {
+        video.muted = previewVideoAudio.muted;
+        video.volume = previewVideoAudio.volume;
+      }
       onCopyAvailabilityChange?.(source.itemKey, isVideoFrameCopyAvailable(video));
     },
     [onCopyAvailabilityChange, source.itemKey]
@@ -898,6 +914,7 @@ const PreviewVideo = ({
           onSeeked={publishCopyAvailability}
           onSeeking={handleSpanSeeking}
           onTimeUpdate={enforceSpan}
+          onVolumeChange={rememberPreviewVideoAudio}
           onWaiting={publishCopyAvailability}
         />
         {hasFailed ? (
