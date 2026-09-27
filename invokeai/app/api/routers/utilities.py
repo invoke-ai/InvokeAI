@@ -2,6 +2,7 @@ import asyncio
 import logging
 import re
 import threading
+from contextlib import ExitStack
 from pathlib import Path
 from typing import Optional
 from urllib.parse import quote
@@ -34,6 +35,7 @@ from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, ProgressCallback, TextLLMPipeline
+from invokeai.backend.util.device_pool import idle_device_borrowed
 from invokeai.backend.util.devices import TorchDevice
 
 logger = logging.getLogger(__name__)
@@ -466,26 +468,31 @@ def _run_expand_prompt(
         else AutoTokenizer.from_pretrained(model_abs_path, local_files_only=True)
     )
 
-    with _model_load_lock:
-        loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
+    # Outside the session queue: take an idle GPU (and its lock) for the load and the run. The borrow is
+    # taken once the load lock is ours, so a request queued behind another's load holds no GPU meanwhile;
+    # borrowing never blocks, so this ordering cannot deadlock.
+    with ExitStack() as gpu:
+        with _model_load_lock:
+            gpu.enter_context(idle_device_borrowed(purpose="Expand Prompt"))
+            loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
 
-    with torch.no_grad(), loaded_model.model_on_device() as (_, model):
-        pipeline = TextLLMPipeline(model, tokenizer, processor)
-        model_device = next(model.parameters()).device
+        with torch.no_grad(), loaded_model.model_on_device() as (_, model):
+            pipeline = TextLLMPipeline(model, tokenizer, processor)
+            model_device = next(model.parameters()).device
 
-        progress_callback = _make_progress_callback(events, task_id, user_id)
+            progress_callback = _make_progress_callback(events, task_id, user_id)
 
-        effective_seed = seed if seed is not None else get_random_seed()
-        output = pipeline.run(
-            prompt=prompt,
-            system_prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
-            max_new_tokens=max_tokens,
-            seed=effective_seed,
-            device=model_device,
-            dtype=TorchDevice.choose_torch_dtype(),
-            progress_callback=progress_callback,
-            image=image,
-        )
+            effective_seed = seed if seed is not None else get_random_seed()
+            output = pipeline.run(
+                prompt=prompt,
+                system_prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
+                max_new_tokens=max_tokens,
+                seed=effective_seed,
+                device=model_device,
+                dtype=TorchDevice.choose_torch_dtype(),
+                progress_callback=progress_callback,
+                image=image,
+            )
 
     return output, effective_seed
 
@@ -575,34 +582,36 @@ def _run_image_to_prompt(
     if task_id is not None:
         events.emit_llm_task_progress(task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model")
 
-    with _model_load_lock:
-        loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
+    # Read before the borrow below, so neither disk read holds a GPU.
+    image = ApiDependencies.invoker.services.images.get_pil_image(image_name).convert("RGB")
+    processor = AutoProcessor.from_pretrained(_resolve_model_path(model_config.path), local_files_only=True)
+    if not isinstance(processor, LlavaOnevisionProcessor):
+        raise TypeError(f"Expected LlavaOnevisionProcessor, got {type(processor).__name__}")
 
-    # Load the image from InvokeAI's image store.
-    image = ApiDependencies.invoker.services.images.get_pil_image(image_name)
-    image = image.convert("RGB")
+    # Outside the session queue: take an idle GPU (and its lock) for the load and the run. The borrow is
+    # taken once the load lock is ours, so a request queued behind another's load holds no GPU meanwhile;
+    # borrowing never blocks, so this ordering cannot deadlock.
+    with ExitStack() as gpu:
+        with _model_load_lock:
+            gpu.enter_context(idle_device_borrowed(purpose="Image to Prompt"))
+            loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
 
-    with torch.no_grad(), loaded_model.model_on_device() as (_, model):
-        if not isinstance(model, LlavaOnevisionForConditionalGeneration):
-            raise TypeError(f"Expected LlavaOnevisionForConditionalGeneration, got {type(model).__name__}")
+        with torch.no_grad(), loaded_model.model_on_device() as (_, model):
+            if not isinstance(model, LlavaOnevisionForConditionalGeneration):
+                raise TypeError(f"Expected LlavaOnevisionForConditionalGeneration, got {type(model).__name__}")
 
-        model_abs_path = _resolve_model_path(model_config.path)
-        processor = AutoProcessor.from_pretrained(model_abs_path, local_files_only=True)
-        if not isinstance(processor, LlavaOnevisionProcessor):
-            raise TypeError(f"Expected LlavaOnevisionProcessor, got {type(processor).__name__}")
+            pipeline = LlavaOnevisionPipeline(model, processor)
+            model_device = next(model.parameters()).device
 
-        pipeline = LlavaOnevisionPipeline(model, processor)
-        model_device = next(model.parameters()).device
+            progress_callback = _make_progress_callback(events, task_id, user_id)
 
-        progress_callback = _make_progress_callback(events, task_id, user_id)
-
-        output = pipeline.run(
-            prompt=instruction,
-            images=[image],
-            device=model_device,
-            dtype=TorchDevice.choose_torch_dtype(),
-            progress_callback=progress_callback,
-        )
+            output = pipeline.run(
+                prompt=instruction,
+                images=[image],
+                device=model_device,
+                dtype=TorchDevice.choose_torch_dtype(),
+                progress_callback=progress_callback,
+            )
 
     return output
 
