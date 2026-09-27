@@ -52,20 +52,31 @@ def _make_loader(device: str = "cuda") -> ModelLoader:
     return loader
 
 
-def _make_config(model_type: ModelType, fp8: bool, base: BaseModelType = BaseModelType.Flux):
+def _make_config(
+    model_type: ModelType,
+    fp8: bool,
+    base: BaseModelType = BaseModelType.Flux,
+    fmt: ModelFormat = ModelFormat.Diffusers,
+):
+    """A stand-in for a model record.
+
+    `format` is not optional here, as it is not optional on a real config: `Config_Base` refuses a
+    concrete class that does not declare base, type and format, and the gate now asks all three --
+    whether the loader for that key implements the cast is part of the answer
+    (`load/fp8_capability.py`). A double without a format would be a shape production never sees.
+    """
     return SimpleNamespace(
         type=model_type,
         base=base,
+        format=fmt,
         name="test",
         default_settings=SimpleNamespace(fp8_storage=fp8),
     )
 
 
 def _make_quantized_config(fmt: ModelFormat = ModelFormat.GGUFQuantized):
-    """A config carrying a quantized `format`, which `_make_config` deliberately omits."""
-    config = _make_config(ModelType.Main, fp8=True)
-    config.format = fmt
-    return config
+    """A config whose `format` is one of the already-quantized ones."""
+    return _make_config(ModelType.Main, fp8=True, fmt=fmt)
 
 
 _STORAGE_PROBE = "invokeai.backend.model_manager.load.load_default._device_supports_fp8_storage"
@@ -574,6 +585,45 @@ def test_should_use_fp8_allows_z_image():
     loader = _make_loader(device="cuda")
     with _device_holds_fp8():
         assert loader._should_use_fp8(_make_config(ModelType.Main, fp8=True, base=BaseModelType.ZImage)) is True
+
+
+def test_should_use_fp8_refuses_a_loader_that_declared_it_does_not_implement_the_cast():
+    """A Z-Image ControlNet asks for fp8 and its loader never casts, so the gate must say no.
+
+    Not the same question as the one above: Z-Image *main* implements the cast. Both are
+    `base=z-image`, which is why the answer cannot live on the architecture -- it lives on the
+    loader key, and `ZImageControlCheckpointModel` declares `Unimplemented` there.
+
+    The device probe must not run for it either: an inert request is no reason to touch the GPU.
+    """
+    loader = _make_loader(device="cuda")
+    config = _make_config(ModelType.ControlNet, fp8=True, base=BaseModelType.ZImage, fmt=ModelFormat.Checkpoint)
+    with patch(_STORAGE_PROBE) as mock_probe:
+        assert loader._should_use_fp8(config) is False
+    mock_probe.assert_not_called()
+
+
+def test_an_inert_fp8_request_is_reported_rather_than_ignored(caplog):
+    """The setting survives on records that predate the declarations -- identification used to set it
+    itself for any float8 denoiser -- and such a loader never reaches `_should_use_fp8` at all. So the
+    load says once why nothing happened, which is the one thing the silent version never did.
+    """
+    loader = _make_loader(device="cuda")
+    config = _make_config(ModelType.Main, fp8=True, base=BaseModelType.MiniMaxH3, fmt=ModelFormat.Checkpoint)
+
+    with caplog.at_level("INFO", logger="test"):
+        loader._report_inert_fp8_request(config, SubModelType.Transformer)
+    assert "does nothing here" in caplog.text
+    assert "mixed-precision islands" in caplog.text
+
+    caplog.clear()
+    # Not for the components that were never going to be cast, or a Main model would repeat itself
+    # once per submodel, nor for a model that asked for nothing.
+    with caplog.at_level("INFO", logger="test"):
+        loader._report_inert_fp8_request(config, SubModelType.Tokenizer)
+        loader._report_inert_fp8_request(_make_config(ModelType.Main, fp8=False), SubModelType.Transformer)
+        loader._report_inert_fp8_request(_make_config(ModelType.Main, fp8=True), SubModelType.Transformer)
+    assert caplog.text == ""
 
 
 def test_wrap_forward_reaches_custom_linear_after_apply_custom_layers():

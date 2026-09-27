@@ -65,6 +65,7 @@ from invokeai.backend.quantization.int8_convrot import (
     reject_unmarked_int8_weights,
     resolve_quantized_module_paths,
 )
+from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.quantization.nvfp4 import (
     NVFP4_FORMAT,
     install_nvfp4_layers,
@@ -373,9 +374,15 @@ class _LTX2ComponentLoading:
                 "(int8_tensorwise checkpoint, dequantized per forward)"
             )
         else:
-            self._ram_cache.make_room(
-                predict_cast_state_dict_size(sd, model_dtype, keep_fp8=False, model=model, skip_patterns=skip_patterns)
-                + nvfp4_bytes
+            reserve_for_load(
+                self._ram_cache.make_room,
+                sd,
+                model_dtype,
+                keep_fp8=False,
+                model=model,
+                skip_patterns=skip_patterns,
+                fp8_layers={},
+                nvfp4_payloads=nvfp4_payloads,
             )
             cast_state_dict(sd, model_dtype, keep_fp8=False, model=model, skip_patterns=skip_patterns)
 

@@ -3,8 +3,14 @@ import type { AnyModelDefaultSettings } from '@features/models/core/types';
 
 import { createListCollection, Grid, HStack, Icon, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
 import { updateModel } from '@features/models/data/api';
+import {
+  ensureFp8StorageSupportLoaded,
+  isFp8StorageSupported,
+  useFp8StorageSupportSelector,
+} from '@features/models/data/fp8StorageSupportStore';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
 import { ModelSelect } from '@features/models/ui/components/ModelSelect';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, Combobox, FieldLabel, Panel, Select } from '@platform/ui';
@@ -150,7 +156,15 @@ export const DefaultSettingsSection = ({
   onSaved: () => void;
 }) => {
   const { t } = useTranslation();
-  const fields = useMemo(() => getFieldsForModel(model), [model]);
+  // Whether FP8 Storage reaches this model depends on its format and on its loader, so the backend
+  // answers it. Fetched here because this section is the only thing that asks, and the table is static
+  // per backend build. While it is unknown the row stays hidden: a control that arrives a moment late
+  // is better than one that does nothing.
+  useMountEffect(() => {
+    void ensureFp8StorageSupportLoaded();
+  });
+  const fp8StorageSupported = useFp8StorageSupportSelector((snapshot) => isFp8StorageSupported(snapshot, model));
+  const fields = useMemo(() => getFieldsForModel(model, fp8StorageSupported), [fp8StorageSupported, model]);
   const [draft, setDraft] = useState<DefaultSettingsDraft>(() => ({
     modelKey: model.key,
     settings: { ...model.default_settings },

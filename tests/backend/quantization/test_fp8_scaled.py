@@ -38,7 +38,11 @@ from invokeai.backend.quantization.fp8_scaled import (
     strip_layer_path_prefix,
     warn_on_unattached_scales,
 )
-from tests.backend.quantization.test_block_scale_tiles import stored_layout
+from tests.fixtures.quantized_payloads import (
+    MX_BLOCK_SIZE,
+    mxfp8_marker,
+    mxfp8_tensors,
+)
 
 cuda_fp8 = pytest.mark.skipif(
     not (torch.cuda.is_available() and device_supports_fp8_matmul(torch.device("cuda"))),
@@ -1046,23 +1050,34 @@ class TestMxfp8:
 
     @staticmethod
     def _mx_layer(exponents: torch.Tensor, marker: dict | None) -> tuple[dict, dict]:
-        """One MXFP8 layer in checkpoint layout: fp8 codes, a tiled exponent grid, and the hints."""
-        rows, blocks = exponents.shape
-        sd = {
-            "lin.weight": torch.ones(rows, blocks * 32).to(FP8_DTYPE),
-            "lin.weight_scale": stored_layout(exponents.to(torch.float64)).to(torch.uint8),
-        }
-        return sd, ({"lin": marker} if marker else {})
+        """One MXFP8 layer and its hints, the layout coming from the shared builder.
+
+        The hints stay a parameter here because half these cells are about a layer that says the
+        wrong thing about itself, or nothing at all.
+        """
+        tensors, _expected = mxfp8_tensors("lin", exponents)
+        return dict(tensors), ({"lin": marker} if marker else {})
+
+    @staticmethod
+    def _mx_layer_with_expectation(exponents: torch.Tensor) -> tuple[dict, dict, torch.Tensor]:
+        """The well-formed case, plus the decoded scale the builder says to expect."""
+        tensors, expected = mxfp8_tensors("lin", exponents)
+        return dict(tensors), {"lin": mxfp8_marker()}, expected
 
     def test_the_exponents_are_decoded_and_unswizzled(self) -> None:
         """Distinct exponents across the grid, so a read in the stored order lands the wrong one on
-        all but a few entries."""
+        all but a few entries.
+
+        Against the expectation the shared builder returns, not a restatement of it here: that value
+        is derived from the hand-written tile formula and the spec's bias, so it is the one statement
+        of the decode that does not come from the decode.
+        """
         exponents = torch.arange(128 * 4, dtype=torch.int64).reshape(128, 4) % 8 + 124
 
-        sd, hints = self._mx_layer(exponents, {"format": "mxfp8", "block_size": 32})
+        sd, hints, expected = self._mx_layer_with_expectation(exponents)
         layers = extract_fp8_scaled_layers(sd, layer_hints=hints)
 
-        assert torch.equal(layers["lin"].weight_scale, torch.exp2(exponents.float() - 127))
+        assert torch.equal(layers["lin"].weight_scale, expected)
 
     def test_a_grid_no_marker_or_header_names_is_refused(self) -> None:
         """The dtype alone is not evidence. Reading an unknown producer's uint8 grid as MXFP8 is
@@ -1515,3 +1530,50 @@ class TestMalformedWeightScale:
         tensor a (32) must match tensor b (7)" from inside the fold, naming neither layer nor file."""
         with pytest.raises(ValueError, match="neither per-tensor nor per-output-channel"):
             expand_weight_scale(torch.ones(32, 16), torch.full((7,), 2.0))
+
+
+class TestTheDecodeWidensTheGridOutsideThisPrediction:
+    """Why this predictor cannot answer about an MXFP8 build, and what does.
+
+    `extract_fp8_scaled_layers` pops every scale key and hands back a mapping, and for an MXFP8 layer
+    it does more than move them: `decode_mx_block_scales` replaces the stored `uint8` exponent grid
+    with a float32 one four times the size. That happens before the caller's `make_room`, so those
+    bytes are resident while the cache decides what to evict -- and this function cannot see them,
+    because it walks the state dict they have left.
+
+    That is a property of its contract rather than a defect in it: it answers about the dict, exactly,
+    and `TestPredictionIsSplitAware` pins the equality. Adding the mapping's bytes here would turn the
+    answer into a peak and redden all three of those parametrizations. The question belongs to
+    `reserve_for_load`, which is handed both halves; `tests/backend/quantization/test_load_plan.py`
+    is where the grid is asserted to be inside the reservation.
+
+    Kept here because the measurement is what motivates that function: on the released 12.6 GiB Krea-2
+    build the grids total 1.455 GiB across 256 layers, more than the ~1.21 GB fold transient of its
+    largest layer, and every seam used to omit them.
+    """
+
+    @staticmethod
+    def _mx_layer(rows: int = 512, blocks: int = 16) -> tuple[dict, dict, torch.nn.Module]:
+        exponents = (torch.arange(rows * blocks, dtype=torch.int64).reshape(rows, blocks) % 8) + 124
+        sd, hints, _expected = TestMxfp8._mx_layer_with_expectation(exponents)
+        model = torch.nn.Module()
+        model.add_module("lin", torch.nn.Linear(blocks * MX_BLOCK_SIZE, rows, bias=False))
+        return sd, hints, model
+
+    def test_the_decode_widens_the_grid_and_this_prediction_does_not_see_it(self) -> None:
+        """The stored grid leaves the state dict and a four-times-larger one takes its place in a
+        mapping this function is handed but, by its contract, does not weigh."""
+        sd, hints, model = self._mx_layer()
+        stored_bytes = sd["lin.weight_scale"].nelement() * sd["lin.weight_scale"].element_size()
+
+        layers = extract_fp8_scaled_layers(sd, layer_hints=hints)
+        grid = layers["lin"].weight_scale
+
+        assert "lin.weight_scale" not in sd
+        assert grid.dtype is torch.float32 and stored_bytes * 4 == grid.nelement() * grid.element_size()
+        # `keep_fp8=True`, the branch where `scaled_layers` and `model` are consulted at all. The MX
+        # layer is charged 2 B/element either way, because a block-wise scale is never matmul-usable.
+        assert (
+            predict_cast_state_dict_size(sd, torch.bfloat16, keep_fp8=True, model=model, scaled_layers=layers)
+            == sd["lin.weight"].nelement() * 2
+        )
