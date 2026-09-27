@@ -3,7 +3,7 @@ import type { WorkflowLibraryBrowseSnapshot, WorkflowLibraryEntry } from '@featu
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 import type { ChangeEvent } from 'react';
 
-import { Dialog, HStack, Input, Portal, SegmentGroup, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Dialog, HStack, Input, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import {
   ensureWorkflowLibraryBrowseLoaded,
   getWorkflowLibraryBrowseSnapshot,
@@ -19,8 +19,8 @@ import {
   type WorkflowLibraryTab,
 } from '@features/workflow/ui/workflowUiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { CloseButton } from '@platform/ui';
-import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { CloseButton, SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui';
+import { lazy, Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { buildLibraryGraphPreviewSource } from './libraryPreviewSource';
@@ -206,27 +206,25 @@ export const WorkflowLibraryDialog = ({
   }, []);
 
   const handleTabChange = useCallback(
-    (event: { value: string | null }) => {
+    (value: WorkflowLibraryTab) => {
       setContextMenuPoint(null);
 
-      if (event.value === 'project') {
+      if (value === 'project') {
         setWorkflowLibraryTab('project');
         return;
       }
 
       // The store applies filter patches literally, so clearing the tag when the
       // category changes (its chips do not carry over) is the UI's job.
-      if (event.value === 'default' || event.value === 'user') {
-        setWorkflowLibraryTab(event.value);
+      setWorkflowLibraryTab(value);
 
-        if (category !== event.value) {
-          setWorkflowLibraryBrowseFilter({ category: event.value, tag: null });
-        }
+      if (category !== value) {
+        setWorkflowLibraryBrowseFilter({ category: value, tag: null });
       }
     },
     [category]
   );
-  const goToTemplates = useCallback(() => handleTabChange({ value: 'default' }), [handleTabChange]);
+  const goToTemplates = useCallback(() => handleTabChange('default'), [handleTabChange]);
 
   const handleTagSelect = useCallback((nextTag: string | null) => setWorkflowLibraryBrowseFilter({ tag: nextTag }), []);
 
@@ -289,6 +287,9 @@ export const WorkflowLibraryDialog = ({
   );
 
   const isProjectTab = tab === 'project';
+  const tabsIdBase = useId();
+  const activeTab: WorkflowLibraryTab = isProjectTab ? 'project' : category;
+  const tabItems = useMemo(() => TAB_ITEMS.map((item) => ({ id: item.value, label: t(item.labelKey) })), [t]);
 
   return (
     <>
@@ -340,20 +341,14 @@ export const WorkflowLibraryDialog = ({
                         onChange={handleSearchChange}
                       />
                     )}
-                    <SegmentGroup.Root
-                      flexShrink={0}
-                      size="xs"
-                      value={isProjectTab ? 'project' : category}
-                      onValueChange={handleTabChange}
-                    >
-                      <SegmentGroup.Indicator />
-                      {TAB_ITEMS.map((item) => (
-                        <SegmentGroup.Item key={item.value} value={item.value}>
-                          <SegmentGroup.ItemHiddenInput />
-                          <SegmentGroup.ItemText>{t(item.labelKey)}</SegmentGroup.ItemText>
-                        </SegmentGroup.Item>
-                      ))}
-                    </SegmentGroup.Root>
+                    <SegmentTabs
+                      activeId={activeTab}
+                      ariaLabel={t('workflowLibrary.title')}
+                      idBase={tabsIdBase}
+                      isCompact
+                      tabs={tabItems}
+                      onSelect={handleTabChange}
+                    />
 
                     <Dialog.CloseTrigger asChild>
                       <CloseButton
@@ -371,12 +366,15 @@ export const WorkflowLibraryDialog = ({
                 </Stack>
               </Dialog.Header>
               <Dialog.Body
+                aria-labelledby={segmentTabsTabId(tabsIdBase, activeTab)}
                 data-library-tab={tab}
                 data-pending-preview={previewGraphId || undefined}
                 display="flex"
                 flex="1"
                 gap="3"
+                id={segmentTabsPanelId(tabsIdBase)}
                 minH="0"
+                role="tabpanel"
               >
                 {isProjectTab ? (
                   <ProjectWorkflowsView

@@ -469,11 +469,11 @@ describe('WorkflowLibraryDialog', () => {
   };
 
   const clickSegment = async (value: string) => {
-    const label = document.querySelector<HTMLInputElement>(`input[value="${value}"]`)?.closest('label');
-    expect(label).not.toBeNull();
+    const tab = document.querySelector<HTMLButtonElement>(`[role="tab"][id$="-tab-${value}"]`);
+    expect(tab).not.toBeNull();
 
     await act(async () => {
-      label?.click();
+      tab?.click();
       await settleFrame();
     });
   };
@@ -923,12 +923,12 @@ describe('WorkflowLibraryDialog', () => {
     await openWith(LOADED_SNAPSHOT);
 
     const close = document.querySelector<HTMLButtonElement>('button[aria-label="Close"]');
-    const segments = document.querySelector<HTMLElement>('[data-scope="segment-group"][data-part="root"]');
+    const segments = document.querySelector<HTMLElement>('[role="tablist"][aria-label="Workflows"]');
     expect(close).not.toBeNull();
     expect(segments).not.toBeNull();
 
-    // Same row container as the title/search/segment cluster…
-    expect(segments?.parentElement?.contains(close as Node)).toBe(true);
+    // Same row container as the title/search/tab cluster…
+    expect(segments?.parentElement?.parentElement?.contains(close as Node)).toBe(true);
     // …and on its baseline rather than the dialog's absolute top corner.
     const closeBox = close?.getBoundingClientRect();
     const segmentBox = segments?.getBoundingClientRect();
