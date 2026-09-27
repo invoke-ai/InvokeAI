@@ -30,8 +30,7 @@ from invokeai.backend.quantization.nvfp4 import (
     predict_nvfp4_install_size,
     split_nvfp4_rows,
 )
-from tests.backend.quantization.test_block_scale_tiles import stored_layout
-from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_tensors
+from tests.fixtures.quantized_payloads import comfy_quant_marker, nvfp4_tensors, stored_layout
 
 FIXTURE = Path(__file__).parent / "data" / "z_image_turbo_nvfp4_slices.safetensors"
 
