@@ -9,8 +9,10 @@ import {
   createLibraryWorkflow,
   deleteLibraryWorkflow,
   getLibraryWorkflowCached,
+  getLibraryWorkflowRecord,
   getLibraryWorkflowRecordCached,
   invalidateWorkflowLibraryCache,
+  updateLibraryWorkflow,
 } from '@features/workflow/queries';
 import { MenuActionItem } from '@features/workflow/ui/MenuActionItem';
 import {
@@ -31,6 +33,7 @@ import {
   ConfirmDialog,
   IconButton,
   MenuContent,
+  RenameDialog,
   Scrollable,
   Tooltip,
   useTooltipTriggerIds,
@@ -42,6 +45,7 @@ import {
   EllipsisIcon,
   GitForkIcon,
   ImageOffIcon,
+  PencilIcon,
   Trash2Icon,
   WorkflowIcon,
 } from 'lucide-react';
@@ -288,6 +292,43 @@ export const WorkflowLibraryDetailPanel = ({
   }, [entry, notify, onDuplicated, t]);
   const handleDuplicate = useCallback(() => void duplicate(), [duplicate]);
 
+  const [isRenameOpen, setIsRenameOpen] = useState(false);
+  const openRename = useCallback(() => setIsRenameOpen(true), []);
+  const closeRename = useCallback(() => setIsRenameOpen(false), []);
+  // A rename is a content write at the record's current revision: the live record, never a cached one, is the base.
+  const submitRename = useCallback(
+    async (nextName: string) => {
+      if (!entry) {
+        return;
+      }
+
+      const owner = captureAccountScope();
+
+      try {
+        const record = await getLibraryWorkflowRecord(entry.item.workflow_id, owner.signal);
+
+        assertAccountScopeCurrent(owner);
+        await updateLibraryWorkflow(
+          entry.item.workflow_id,
+          { ...record.workflow, name: nextName },
+          { expectedRevision: record.revision, signal: owner.signal }
+        );
+        assertAccountScopeCurrent(owner);
+        invalidateWorkflowLibraryCache(entry.item.workflow_id);
+        notify.success(t('workflowLibrary.renamed'));
+      } catch (error) {
+        if (!isAccountScopeCurrent(owner)) {
+          return;
+        }
+
+        notify.error(t('workflowLibrary.renameFailed'), getApiErrorMessage(error, t('common.unknownError')));
+        // Rejecting keeps the dialog, and the typed name, open for another try.
+        throw error;
+      }
+    },
+    [entry, notify, t]
+  );
+
   const fork = useCallback(async () => {
     if (!entry) {
       return;
@@ -446,6 +487,15 @@ export const WorkflowLibraryDetailPanel = ({
         onSelect={handleDownload}
       />
       {item.category === 'user' ? (
+        <MenuActionItem
+          hint={t('workflowLibrary.renameTemplateHint')}
+          icon={PencilIcon}
+          label={t('workflowLibrary.renameWithEllipsis')}
+          value="rename"
+          onSelect={openRename}
+        />
+      ) : null}
+      {item.category === 'user' ? (
         // Bundled defaults are not the account's to delete.
         <MenuActionItem
           hint={t('workflowLibrary.deleteHint')}
@@ -558,8 +608,8 @@ export const WorkflowLibraryDetailPanel = ({
                 <IconButton aria-label={t('workflowLibrary.moreActions')} size="sm" variant="outline">
                   <EllipsisIcon />
                 </IconButton>
-              </Menu.Trigger>
-            </Tooltip>
+              </Tooltip>
+            </Menu.Trigger>
             <Portal>
               <Menu.Positioner>
                 <MenuContent minW="16rem">{actionItems}</MenuContent>
@@ -616,6 +666,15 @@ export const WorkflowLibraryDetailPanel = ({
         </Portal>
       </Menu.Root>
 
+      <RenameDialog
+        initialName={name}
+        isOpen={isRenameOpen}
+        label={t('workflowLibrary.templateName')}
+        submitLabel={t('workflowLibrary.rename')}
+        title={t('workflowLibrary.renameTemplateTitle')}
+        onClose={closeRename}
+        onSubmit={submitRename}
+      />
       <ConfirmDialog
         body={t('workflowLibrary.deleteConfirmBody', { name })}
         confirmLabel={t('workflowLibrary.delete')}

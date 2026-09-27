@@ -34,6 +34,7 @@ const TRANSLATIONS: Record<string, string> = {
   'widgets.workflow.copyJson': 'Copy workflow JSON',
   'widgets.workflow.copyJsonFailed': 'Failed to copy workflow JSON',
   'widgets.workflow.detailsWithEllipsis': 'Workflow details…',
+  'widgets.workflow.renameWithEllipsis': 'Rename workflow…',
   'widgets.workflow.exportJson': 'Export workflow JSON',
   'widgets.workflow.importJsonWithEllipsis': 'Import workflow JSON…',
   'widgets.workflow.library': 'Workflow library',
@@ -213,6 +214,14 @@ describe('WorkflowMenuItems', () => {
     await act(() => menuItem('Save to library…')?.click());
 
     expect(workflowUiStore.getSnapshot().publicationIntent).toEqual({ kind: 'save-as-new', workflowId: 'workflow-1' });
+  });
+
+  it('asks the dialog host to rename the active workflow, naming it', async () => {
+    await renderMenu(createProjectGraph('workflow-1'));
+
+    await act(() => menuItem('Rename workflow…')?.click());
+
+    expect(workflowUiStore.getSnapshot().renameRequest).toMatchObject({ workflowId: 'workflow-1' });
   });
 
   it('offers a template update only for a workflow whose source can be written', async () => {

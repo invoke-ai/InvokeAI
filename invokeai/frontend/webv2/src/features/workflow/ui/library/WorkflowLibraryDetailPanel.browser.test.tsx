@@ -63,10 +63,17 @@ const queries = vi.hoisted(() => ({
   getLibraryWorkflowCached: vi.fn((_workflowId: string, _signal?: AbortSignal) =>
     Promise.resolve({} as Record<string, unknown>)
   ),
+  getLibraryWorkflowRecord: vi.fn((_workflowId: string, _signal?: AbortSignal) =>
+    Promise.resolve({} as Record<string, unknown>)
+  ),
   getLibraryWorkflowRecordCached: vi.fn((_workflowId: string, _signal?: AbortSignal) =>
     Promise.resolve({} as Record<string, unknown>)
   ),
   invalidateWorkflowLibraryCache: vi.fn(),
+  updateLibraryWorkflow: vi.fn(
+    (_workflowId: string, _workflow: Record<string, unknown>, _options?: { expectedRevision?: number }) =>
+      Promise.resolve({} as Record<string, unknown>)
+  ),
 }));
 
 vi.mock('@features/workflow/queries', async (importOriginal) => ({
@@ -92,6 +99,13 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.downloadJsonHint': 'For bug reports and sharing',
   'workflowLibrary.duplicate': 'Duplicate',
   'workflowLibrary.duplicateFailed': 'Failed to duplicate workflow',
+  'workflowLibrary.rename': 'Rename',
+  'workflowLibrary.renameFailed': 'Rename failed',
+  'workflowLibrary.renameTemplateHint': "Changes the template's name in the library",
+  'workflowLibrary.renameTemplateTitle': 'Rename template',
+  'workflowLibrary.renameWithEllipsis': 'Rename…',
+  'workflowLibrary.renamed': 'Template renamed',
+  'workflowLibrary.templateName': 'Template name',
   'workflowLibrary.duplicateHint': 'Saves a copy under Yours, original untouched',
   'workflowLibrary.duplicateName': '{{name}} copy',
   'workflowLibrary.duplicated': 'Saved a copy under Yours',
@@ -713,6 +727,68 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(JSON.parse(contents)).toStrictEqual(RAW_WORKFLOW);
     expect(fileName).toBe('image-to-video.json');
     expect(mimeType).toBe('application/json');
+  });
+
+  it('renames a user template over the live record at its current revision', async () => {
+    queries.getLibraryWorkflowRecord.mockResolvedValueOnce({
+      revision: 4,
+      workflow: { name: 'Text to image', nodes: [], notes: 'kept' },
+      workflow_id: 'wf-text-to-image',
+    });
+
+    await renderPanel(TEXT_TO_IMAGE);
+    await clickMenuItem('rename');
+
+    const input = document.querySelector<HTMLInputElement>('input[name="renameValue"]');
+    expect(input?.value).toBe('Text to image');
+
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    await act(async () => {
+      setValue?.call(input, 'Portraits');
+      input?.dispatchEvent(new Event('input', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      input?.closest('form')?.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+      await settleFrame();
+      await settleFrame();
+    });
+
+    expect(queries.updateLibraryWorkflow).toHaveBeenCalledWith(
+      'wf-text-to-image',
+      { name: 'Portraits', nodes: [], notes: 'kept' },
+      expect.objectContaining({ expectedRevision: 4 })
+    );
+    expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledWith('wf-text-to-image');
+  });
+
+  it('keeps the rename dialog open, with the typed name, when the library refuses the rename', async () => {
+    queries.getLibraryWorkflowRecord.mockResolvedValueOnce({
+      revision: 4,
+      workflow: { name: 'Text to image', nodes: [] },
+      workflow_id: 'wf-text-to-image',
+    });
+    queries.updateLibraryWorkflow.mockRejectedValueOnce(new Error('stale'));
+
+    await renderPanel(TEXT_TO_IMAGE);
+    await clickMenuItem('rename');
+
+    const input = document.querySelector<HTMLInputElement>('input[name="renameValue"]');
+    const setValue = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')?.set;
+    await act(async () => {
+      setValue?.call(input, 'Portraits');
+      input?.dispatchEvent(new Event('input', { bubbles: true }));
+      await Promise.resolve();
+    });
+    await act(async () => {
+      input?.closest('form')?.querySelector<HTMLButtonElement>('button[type="submit"]')?.click();
+      await settleFrame();
+      await settleFrame();
+    });
+
+    expect(NOTIFICATIONS.error).toHaveBeenCalledWith('Rename failed', expect.any(String));
+    expect(document.querySelector<HTMLInputElement>('input[name="renameValue"]')?.value).toBe('Portraits');
+    expect(queries.invalidateWorkflowLibraryCache).not.toHaveBeenCalled();
   });
 
   it('deletes only after the confirmation is accepted', async () => {

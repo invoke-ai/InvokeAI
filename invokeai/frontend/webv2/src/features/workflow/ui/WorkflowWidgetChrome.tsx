@@ -20,7 +20,7 @@ import {
   parseWorkflowJson,
 } from '@features/workflow/utility';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { Button, IconButton, Tooltip } from '@platform/ui';
+import { Button, IconButton, RenameDialog, Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import {
   BookmarkIcon,
@@ -32,7 +32,7 @@ import {
   RefreshCwIcon,
   TriangleAlertIcon,
 } from 'lucide-react';
-import { useCallback, useEffect, useRef, type ChangeEvent, type ElementType } from 'react';
+import { useCallback, useEffect, useRef, useState, type ChangeEvent, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowWidgetLabelProps, WorkflowWidgetViewProps } from './contracts';
@@ -57,6 +57,7 @@ import {
 import {
   openWorkflowLibraryAtProjectWorkflow,
   requestWorkflowImport,
+  requestWorkflowRename,
   requestWorkflowPublication,
   setAddNodeOpen,
   setWorkflowLibraryOpen,
@@ -172,6 +173,7 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
     [activeWorkflowId]
   );
   const openLibrary = useCallback(() => setWorkflowLibraryOpen(true), []);
+  const renameActiveWorkflow = useCallback(() => requestWorkflowRename(activeWorkflowId), [activeWorkflowId]);
   // Nothing is replaced: a new workflow is added beside the others, so no confirmation stands in the way.
   const newWorkflow = useCallback(() => createWorkflow(), [createWorkflow]);
 
@@ -182,6 +184,9 @@ export const WorkflowMenuItems = (_props: WorkflowWidgetViewProps) => {
       </Menu.ItemGroupLabel>
       <Menu.Item value="details" onClick={openDetailsPanel}>
         {t('widgets.workflow.detailsWithEllipsis')}
+      </Menu.Item>
+      <Menu.Item value="rename" onClick={renameActiveWorkflow}>
+        {t('widgets.workflow.renameWithEllipsis')}
       </Menu.Item>
       <Menu.Item value="library" onClick={openLibrary}>
         {t('widgets.workflow.libraryWithEllipsis')}
@@ -294,7 +299,7 @@ export const WorkflowHeaderActions = ({ region }: WorkflowWidgetViewProps) => {
 };
 
 export const WorkflowDialogHost = () => {
-  const { addWorkflow, editGraph } = useProjectGraphCommands();
+  const { addWorkflow, editGraph, renameWorkflow } = useProjectGraphCommands();
   const { project: projectStore } = useWorkflowUi();
   const notify = useWorkflowNotifications();
   const { t } = useTranslation();
@@ -305,6 +310,36 @@ export const WorkflowDialogHost = () => {
   const isAddNodeOpen = workflowUiStore.useSelector((snapshot) => snapshot.isAddNodeOpen);
   const isLibraryOpen = workflowUiStore.useSelector((snapshot) => snapshot.isLibraryOpen);
   const lastImportRequestRef = useRef(importRequestCount);
+  // A rename request opens the dialog once, for the workflow it named, and only while that workflow is the active
+  // one; closing records the request as handled.
+  const renameRequest = workflowUiStore.useSelector((snapshot) => snapshot.renameRequest);
+  const [handledRenameRequestId, setHandledRenameRequestId] = useState(0);
+  const activeWorkflowId = useWorkflowProjectSelector((project) => project.activeWorkflowId);
+  const renameTargetId = renameRequest?.workflowId ?? null;
+  const renameTargetName = useWorkflowProjectSelector(
+    (project) => project.workflows.find((entry) => entry.document.id === renameTargetId)?.document.name ?? ''
+  );
+  const isRenameOpen =
+    renameRequest !== null &&
+    renameRequest.requestId > handledRenameRequestId &&
+    renameRequest.workflowId === activeWorkflowId;
+
+  // A request whose workflow stopped being active is over; it must not come back when that workflow returns.
+  if (renameRequest !== null && renameRequest.requestId > handledRenameRequestId && !isRenameOpen) {
+    setHandledRenameRequestId(renameRequest.requestId);
+  }
+  const closeRename = useCallback(
+    () => setHandledRenameRequestId(renameRequest?.requestId ?? 0),
+    [renameRequest?.requestId]
+  );
+  const submitRename = useCallback(
+    (name: string) => {
+      if (renameTargetId !== null) {
+        renameWorkflow(renameTargetId, name);
+      }
+    },
+    [renameTargetId, renameWorkflow]
+  );
 
   // Editor session state (viewports) is keyed by workflow; release it once its workflow leaves the project.
   useMountEffect(() => {
@@ -536,6 +571,16 @@ export const WorkflowDialogHost = () => {
         onOpenChange={setAddNodeOpen}
       />
       <WorkflowLibraryDialog isOpen={isLibraryOpen} onOpenChange={setWorkflowLibraryOpen} />
+      <RenameDialog
+        key={renameRequest?.requestId ?? 0}
+        initialName={renameTargetName}
+        isOpen={isRenameOpen}
+        label={t('workflowLibrary.workflowName')}
+        submitLabel={t('workflowLibrary.rename')}
+        title={t('workflowLibrary.renameTitle')}
+        onClose={closeRename}
+        onSubmit={submitRename}
+      />
       <WorkflowPublicationHost />
       <PendingWorkflowLoader />
     </>

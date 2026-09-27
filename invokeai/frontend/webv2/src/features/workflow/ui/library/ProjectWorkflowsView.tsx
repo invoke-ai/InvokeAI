@@ -329,6 +329,7 @@ const ProjectWorkflowDetailPanel = ({
         onSelect={handleOpen}
       />
       <MenuActionItem
+        hint={t('workflowLibrary.renameProjectWorkflowHint')}
         icon={PencilIcon}
         label={t('workflowLibrary.renameWithEllipsis')}
         value="rename"
@@ -462,8 +463,8 @@ const ProjectWorkflowDetailPanel = ({
                 <IconButton aria-label={t('workflowLibrary.moreActions')} size="sm" variant="outline">
                   <EllipsisIcon />
                 </IconButton>
-              </Menu.Trigger>
-            </Tooltip>
+              </Tooltip>
+            </Menu.Trigger>
             <Portal>
               <Menu.Positioner>
                 <MenuContent minW="16rem">{actionItems}</MenuContent>

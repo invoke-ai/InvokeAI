@@ -40,6 +40,8 @@ export interface WorkflowUiSnapshot {
   librarySelection: { projectId: string; workflowId: string } | null;
   /** Bumped to ask the dialog host to open the JSON file picker. */
   importRequestCount: number;
+  /** A rename the dialog host should offer; it names the workflow it was asked for. */
+  renameRequest: { requestId: number; workflowId: string } | null;
   /** A workflow a shell surface (command palette, an image's context menu) asked to load; consumed by the widget chrome. */
   pendingWorkflowLoad: WorkflowLoadRequest | null;
   /** A publication the always-mounted host should start a dialog for. */
@@ -64,6 +66,7 @@ const INITIAL_WORKFLOW_UI_SNAPSHOT: WorkflowUiSnapshot = {
   collapsedPreviewNodeIds: new Set(),
   importRequestCount: 0,
   isAddNodeOpen: false,
+  renameRequest: null,
   isLibraryOpen: false,
   librarySelection: null,
   libraryTab: 'project',
@@ -152,6 +155,13 @@ export const setNodePreviewCollapsed = (nodeId: string, collapsed: boolean): voi
   }
 
   workflowUiStore.patchSnapshot({ collapsedPreviewNodeIds });
+};
+
+let nextRenameRequestId = 0;
+
+export const requestWorkflowRename = (workflowId: string): void => {
+  nextRenameRequestId += 1;
+  workflowUiStore.patchSnapshot({ renameRequest: { requestId: nextRenameRequestId, workflowId } });
 };
 
 export const requestWorkflowImport = (): void => {
