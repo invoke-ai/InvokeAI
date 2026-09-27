@@ -169,6 +169,12 @@ Notes:
 - It is purely a placement optimization and does not change generated images.
 - A borrowed GPU is used exclusively for the encoder while it runs, so it never interferes with a generation session running on that same GPU.
 
+#### Prompt Tools and Image Indexing on Multiple GPUs
+
+**Expand Prompt**, **Image to Prompt** and image embedding for the image map and search by image run outside the generation queue. With two or more GPUs configured, each such request takes an idle GPU for as long as it runs — the first idle one in `generation_devices` order — so it no longer competes for memory with a generation running on another GPU. While a GPU is lent this way, queued generations start on the other GPUs rather than waiting for it, and these requests never take every GPU at once, so the queue always has one to start on. When no GPU can be taken, the request runs on the default device as it did before. There is no setting for this, and a single-GPU install behaves as it always has.
+
+Background indexing of new images already waits until no generation is running, so it simply takes the first idle GPU; it is search by image that benefits during a generation.
+
 #### Image Subfolder Strategy
 
 By default, generated images are stored in a single flat directory under `outputs/images/`. The `image_subfolder_strategy` setting lets you organize newly-created images into subfolders automatically. You can edit this setting in `invokeai.yaml` or, as an admin user, in the Settings panel.
