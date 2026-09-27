@@ -43,10 +43,15 @@ const template: InvocationTemplate = {
   version: '1.0.0',
 };
 
+// A holder rather than the template itself: a test swaps in a new object, which memoized tabs notice.
+const templatesState = vi.hoisted(() => ({ templates: {} as Record<string, unknown> }));
+
+templatesState.templates = { resize: template };
+
 vi.mock('@features/workflow/react', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useInvocationTemplatesSelector: (selector: (snapshot: unknown) => unknown) =>
-    selector({ error: null, status: 'loaded', templates: { resize: template } }),
+    selector({ error: null, status: 'loaded', templates: templatesState.templates }),
 }));
 
 vi.mock('react-i18next', () => ({
@@ -192,5 +197,68 @@ describe('NodeInspector outputs tab', () => {
     expect(host.textContent).toContain('Failed — Out of memory');
     expect(host.textContent).not.toContain('1024');
     expect(host.querySelector('img')).toBeNull();
+  });
+});
+
+// Module scope: an adapter built inside the describe reads as a per-render object to the JSX prop lint.
+const detailsSnapshot = { ...projectSnapshot, workflowValues: { inspectorTab: 'details' } };
+const baseAdapter = createAdapter(createExecutionPort().port);
+const detailsAdapter = {
+  ...baseAdapter,
+  project: { ...baseAdapter.project, getSnapshot: () => detailsSnapshot },
+} as WorkflowUiAdapter;
+
+describe('NodeInspector details tab node updates', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    workflowSelectionStore.patchSnapshot({ hoveredNodeId: null, selectedNodeIds: [node.id], selectionRequest: null });
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    templatesState.templates = { resize: template };
+  });
+
+  const renderDetails = () =>
+    act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={detailsAdapter}>
+            <NodeInspector projectGraph={projectGraph} />
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      )
+    );
+  const updateButton = () =>
+    Array.from(host.querySelectorAll('button')).find((button) => button.textContent === 'nodes.updateNodeTo');
+
+  it('offers an in-place update for a newer same-major template and explains an incompatible one', async () => {
+    await renderDetails();
+    expect(updateButton()).toBeUndefined();
+
+    const newer = { ...template, version: '1.2.0' };
+
+    templatesState.templates = { resize: newer };
+    await renderDetails();
+
+    updateButton()!.focus();
+    await act(() => updateButton()!.click());
+    expect(document.activeElement?.getAttribute('role')).toBe('tab');
+    expect(detailsAdapter.commands.editGraph).toHaveBeenCalledWith({
+      nodeIds: [node.id],
+      templates: { resize: newer },
+      type: 'updateNodes',
+    });
+
+    templatesState.templates = { resize: { ...template, version: '2.0.0' } };
+    await renderDetails();
+    expect(updateButton()).toBeUndefined();
+    expect(host.textContent).toContain('nodes.nodeVersionIncompatible');
   });
 });

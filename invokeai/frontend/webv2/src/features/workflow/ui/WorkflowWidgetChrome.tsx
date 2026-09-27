@@ -1,6 +1,7 @@
 import type { InvocationTemplate, XYPosition } from '@features/workflow/contracts';
 
 import { Box, HStack, Icon, Menu, Text } from '@chakra-ui/react';
+import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { invalidateWorkflowLibraryCache, updateLibraryWorkflow } from '@features/workflow/queries';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
@@ -497,7 +498,9 @@ export const WorkflowDialogHost = () => {
       file
         .text()
         .then((text) => {
-          const { document, warnings } = parseWorkflowJson(JSON.parse(text));
+          const { document: parsed, warnings: parseWarnings } = parseWorkflowJson(JSON.parse(text));
+          const { document, warnings: updateWarnings } = updateLoadedWorkflowNodes(parsed, t);
+          const warnings = [...parseWarnings, ...updateWarnings];
 
           replace(document, `Imported "${file.name}"`);
 
@@ -512,7 +515,7 @@ export const WorkflowDialogHost = () => {
           );
         });
     },
-    [notify, replace]
+    [notify, replace, t]
   );
   const handleImportFile = useCallback(
     (event: ChangeEvent<HTMLInputElement>) => {

@@ -1,0 +1,312 @@
+---
+title: Video Recall API
+description: REST endpoints that let an external process recall or remix video generation parameters and place gallery or uploaded videos into a user's Video panel.
+---
+
+## Overview
+
+The Video Recall API is the video counterpart of the
+[Recall Parameters API](/development/guides/recall-api/). It lets an external process — a media
+browser, a script, another application — drive a user's open **Video** panel:
+
+- **Recall / Remix** — apply video generation parameters (prompts, model and
+  components, frames, steps, guidance, LoRAs, first/last frames, initial video,
+  Ref2VA references). Remix applies everything except the seed.
+- **Send Video** — place a video in the panel's **Initial Video** slot, the same
+  outcome as the gallery's *Extend in Video* action.
+- **Use as Ref Video** — append a video to the reference list of models that take
+  reference videos (today, MiniMax H3 Ref2VA).
+
+Send Video and Use as Ref Video take either the name of a video already in the
+gallery or a video file, which is uploaded into the gallery first.
+
+## How it works
+
+1. **Request** — the client POSTs to one of the endpoints below.
+2. **Validation and resolution** — model names are resolved to installed models,
+   gallery media is checked for existence and read access, and uploads are
+   ingested exactly as `POST /api/v1/videos/upload` ingests them.
+3. **Event** — the backend emits one `video_recall_requested` socket event to the
+   calling user's own room. Other users, including administrators, do not receive
+   it.
+4. **Frontend** — the user's open webv2 sessions apply the event to the Video
+   panel of the project that was active when it arrived. See
+   [Frontend behavior](#frontend-behavior). The legacy frontend ignores it.
+
+## Endpoints
+
+| Endpoint | Body | Action |
+|---|---|---|
+| `POST /api/v1/recall/video/{queue_id}` | JSON parameters | Recall / Remix |
+| `POST /api/v1/recall/video/{queue_id}/initial-video?video_name=…` | none | Send a gallery video |
+| `POST /api/v1/recall/video/{queue_id}/initial-video/upload` | multipart `file` | Upload, then send |
+| `POST /api/v1/recall/video/{queue_id}/reference-video?video_name=…` | none | Use a gallery video as a reference |
+| `POST /api/v1/recall/video/{queue_id}/reference-video/upload` | multipart `file` | Upload, then use as a reference |
+
+`queue_id` is the frontend's queue, normally `default`.
+
+### Recall / Remix
+
+`POST /api/v1/recall/video/{queue_id}`
+
+| Query parameter | Default | Meaning |
+|---|---|---|
+| `mode` | `recall` | `recall` sends every field; `remix` never sends `seed`, so the panel's own seed stands |
+| `strict` | `false` | `false` changes only the fields you send. `true` treats the body as a whole generation record: LoRAs, media and a MiniMax H3 hybrid base you do not send are cleared, as the gallery's *Recall All* does with a video's own metadata. |
+
+Fields naming a model or medium that cannot be used are dropped and listed in the
+response's `skipped`; the rest are sent. So are trim bounds or a conditioning role
+whose medium was dropped. A LoRA or reference list whose every entry was dropped
+is left out entirely rather than sent empty, so it cannot clear the panel's list.
+Unknown fields, and values outside the bounds below, are rejected with `422`.
+
+Media fields in one request are read in the Video panel's precedence, highest first:
+
+1. `ltx2_conditioning_video` — a whole-generation conditioning clip excludes every
+   other medium.
+2. `minimax_h3_references` (non-empty) — references replace the frame slots; a
+   `source_video` rides alongside them.
+3. `source_video` — an initial video replaces `first_frame_image`, which extend
+   mode takes from the clip itself.
+4. `first_frame_image`, `last_frame_image`.
+
+A medium that a higher-precedence one in the same request excludes is not sent, and
+the response's `overridden` maps it to the field that won — for example
+`{"first_frame_image": "source_video"}`. Only media that could be found take
+precedence: a `source_video` that is missing from the gallery overrides nothing.
+Send only the fields you mean to set; the Swagger page offers minimal examples.
+
+### Send Video and Use as Ref Video
+
+The name-only routes take `video_name` as a query parameter; the video must be in
+the gallery and readable by the caller.
+
+The `/upload` routes take a `multipart/form-data` body with the same shape as
+`POST /api/v1/videos/upload`: a `file` part and an optional `metadata` part (a
+stringified JSON object). The file is ingested into the gallery — converted when
+it is not already a browser-safe MP4, with any metadata embedded in an
+InvokeAI-produced MP4 preserved — and announced to open galleries before it is
+placed. They accept an optional `board_id` query parameter (the default is
+Uncategorized); uploading to a board requires permission to add media to it. They
+share the upload route's size limit and concurrency slots, so a busy server can
+answer `429` with a `Retry-After` header.
+
+Whether the video is usable depends on the model selected in the panel, which is
+never switched on the caller's behalf: an initial video needs a model that can
+extend a clip, and a reference video needs a model that takes reference videos,
+with room for another.
+
+## Frontend behavior
+
+webv2 applies each event, in arrival order, to the Video panel of the project that
+was active when the event arrived. Video recall events are ordered among themselves;
+image recall events (`POST /api/v1/recall`) are ordered separately. A notification
+reports each change applied or declined. An event whose project was closed before it
+could be applied is dropped. When something was applied and that project is still on
+screen, the Video widget is brought to the front: its tab is selected (expanding its
+region and opening its panel), a floating window is raised (and unrolled if shaded)
+rather than docked, and
+the widget is opened if the layout has none. Nothing moves while the user is typing
+in a text field; the notification still reports the change.
+
+- **Recall / Remix** runs the same mapping as the gallery's *Recall All* and
+  *Remix Video*: the model is resolved against the installed catalog (switching
+  family resets frames, fps and resolution to the new model's grid before the
+  sent values land), frames snap to the model's grid, `width`/`height` are applied
+  only when they match one of the model's resolution presets, and media names are
+  looked up in the gallery for their dimensions, with missing ones dropped. Without
+  `strict`, the panel keeps the media you do not send. A medium you send fills its
+  slot and displaces only the slots it conflicts with (an initial video and a first
+  frame are exclusive; references displace the frame slots), and a
+  `minimax_h3_references` list replaces the panel's references. Media the panel's
+  model cannot use is ignored rather than displacing anything. On a Ref2VA panel that
+  extends from its references, the initial video keeps its continuity reference
+  through either change, as the *Initial Video* field keeps it, or is removed when a
+  sent reference list leaves no video slot for it.
+- **Send Video** does what dropping the clip on the panel's *Initial Video* field
+  does. On a MiniMax H3 Ref2VA panel that extends from its references, the clip's
+  continuity reference is linked into the references, and the request is declined
+  when all three video reference slots are taken. On a model that cannot extend a
+  clip, the video is still set and the notification says it will go unused.
+- **Use as Ref Video** appends the video with the defaults the *References* field
+  gives a new video: soundtrack-only conditioning for an uploaded audio file,
+  otherwise video and audio from a short sample of the clip. It is declined when
+  the panel's model takes no reference videos or all its video slots are taken.
+
+The gallery's context menu offers the same *Extend in Video* and *Use as Reference
+Video* actions for any video in the gallery.
+
+## Request schema
+
+Field names are the keys of the video metadata record described in
+[Media Metadata](/development/architecture/media-metadata/). The request is not a
+record, though: models are given by name, LoRAs as `model_name`, and record-only
+keys such as `generation_mode`, `metadata_version` or `app_version` are rejected.
+Every field is optional.
+
+### Scalars
+
+| Field | Type | Notes |
+|---|---|---|
+| `positive_prompt` | string | |
+| `negative_prompt` | string or `null` | An explicit `null` turns the negative prompt off |
+| `seed` | integer, 0 – 4294967295 | Never sent when `mode=remix` |
+| `num_frames` | integer ≥ 1 | |
+| `fps` | integer, 1 – 120 | |
+| `width`, `height` | integer ≥ 1 | |
+| `steps` | integer ≥ 1 | |
+| `cfg_scale` | number ≥ 1 | |
+| `wan_guidance_scale_low_noise` | number ≥ 1 | Wan A14B low-noise expert |
+| `ltx2_audio_cfg_scale`, `ltx2_modality_scale` | number ≥ 1 | LTX-2 guidance |
+| `ltx2_stg_scale` | number ≥ 0 | LTX-2 spatiotemporal guidance |
+| `ltx2_context_frames` | integer ≥ 1 | LTX-2 extension context |
+| `minimax_h3_hybrid_start_block` | integer ≥ 0 | MiniMax H3 Ref2VA hybrid |
+
+### Models
+
+Each model field takes an installed model's **key** or **name** (1–255
+characters). Only a model of the slot's type and family fills a slot: a name
+shared with models of other families resolves to the one that fits, and a model
+from the wrong family is skipped.
+
+| Field | Model type | Family |
+|---|---|---|
+| `model` | main | Wan, MiniMax H3 or LTX-2 |
+| `vae` | VAE | Wan |
+| `wan_t5_encoder_model` | Wan UMT5 encoder | any |
+| `wan_transformer_low_noise`, `wan_component_source` | main | Wan |
+| `minimax_h3_transformer_model`, `minimax_h3_component_source`, `minimax_h3_hybrid_base_model` | main | MiniMax H3 |
+| `minimax_h3_text_encoder_model` | Qwen3-VL encoder | MiniMax H3 |
+| `ltx2_component_source` | main | LTX-2 |
+| `ltx2_text_encoder_model` | Gemma-4 encoder | LTX-2 |
+| `loras` | up to 32 of `{ "model_name": str, "weight": number = 1.0 }` | Wan, MiniMax H3 or LTX-2 |
+
+An empty `loras` list asks for no LoRAs.
+
+### Media
+
+Media is named by its gallery name.
+
+| Field | Shape |
+|---|---|
+| `first_frame_image`, `last_frame_image` | `{ "image_name": str }` |
+| `source_video` | `{ "video_name": str }` — the initial video |
+| `source_video_start_frame`, `source_video_end_frame` | integers, both or neither, start ≤ end; inclusive trim of `source_video` |
+| `ltx2_conditioning_video` | `{ "video_name": str }`; requires `ltx2_conditioning_role` |
+| `ltx2_conditioning_role` | `"audio"` or `"video"`; requires `ltx2_conditioning_video` |
+| `minimax_h3_references` | in conditioning order, up to 3 of `{ "kind": "video", "video_name": str, "conditioning"?: "video_audio" \| "video" \| "audio", "start_frame"?: int, "end_frame"?: int }` (trim bounds both or neither) and up to 9 of `{ "kind": "image", "image_name": str, "detail"?: "max" \| "match" }`. An empty list asks for no references. |
+
+Referencing media the caller may not read is refused with `403`.
+
+## Examples
+
+### cURL
+
+```bash
+# Recall a Wan setup
+curl -X POST http://localhost:9090/api/v1/recall/video/default \
+  -H "Content-Type: application/json" \
+  -d '{
+        "positive_prompt": "a heron takes flight over a misty lake",
+        "model": "Wan 2.2 I2V A14B",
+        "num_frames": 81,
+        "steps": 30,
+        "seed": 1234,
+        "loras": [{"model_name": "Wan Lightning High Noise", "weight": 1.0}],
+        "first_frame_image": {"image_name": "0b6f…png"}
+      }'
+
+# Remix: the seed is never sent
+curl -X POST "http://localhost:9090/api/v1/recall/video/default?mode=remix" \
+  -H "Content-Type: application/json" \
+  -d '{"positive_prompt": "a heron lands on a misty lake", "model": "Wan 2.2 I2V A14B"}'
+
+# Send a gallery video to Initial Video
+curl -X POST "http://localhost:9090/api/v1/recall/video/default/initial-video?video_name=4c1e….mp4"
+
+# Upload a clip onto a board and use it as a Ref2VA reference
+curl -X POST "http://localhost:9090/api/v1/recall/video/default/reference-video/upload?board_id=<board-id>" \
+  -F "file=@dance.mp4"
+```
+
+In multi-user mode, add `-H "Authorization: Bearer <token>"`.
+
+### Python
+
+```python
+import requests
+
+BASE = "http://localhost:9090/api/v1/recall/video/default"
+
+response = requests.post(BASE, json={"positive_prompt": "neon city at night", "model": "LTX-2.3 Distilled"})
+print(response.json()["skipped"])
+
+with open("dance.mp4", "rb") as clip:
+    response = requests.post(f"{BASE}/reference-video/upload", files={"file": ("dance.mp4", clip, "video/mp4")})
+print(response.json()["video"]["video_name"])
+```
+
+## Responses
+
+Recall / Remix:
+
+```json
+{
+  "status": "success",
+  "queue_id": "default",
+  "parameters": { "positive_prompt": "…", "model": { "key": "…", "hash": "…", "name": "…", "base": "wan", "type": "main" } },
+  "skipped": ["loras[1]"],
+  "overridden": {}
+}
+```
+
+`status` is `no_parameters_provided` for an empty body and `nothing_resolved`
+when every field was dropped; no event is emitted in either case. `parameters` is
+exactly what the frontend receives. `skipped` lists fields whose model or medium
+could not be used; `overridden` maps media fields that lost to a higher-precedence
+medium in the same request to the field that won.
+
+Send Video / Use as Ref Video:
+
+```json
+{ "status": "success", "queue_id": "default", "action": "reference_video", "video": { "video_name": "…", "…": "…" }, "uploaded": true }
+```
+
+`video` is the gallery video's full record.
+
+## Errors
+
+| Status | Cause |
+|---|---|
+| `401` | Multi-user mode without a valid token |
+| `400` | The upload ended before its body was complete |
+| `403` | The caller may not read a referenced image or video, or may not add media to `board_id` |
+| `404` | `video_name` (Send Video / Use as Ref Video) is not in the gallery, or `board_id` does not exist |
+| `409` | Image storage maintenance is running (Recall / Remix) |
+| `413` | The upload exceeds the video upload size limit |
+| `415` | The upload is not a supported video or audio file, or could not be converted |
+| `422` | Malformed JSON or multipart body, an unknown field, a value out of bounds, or `metadata` that is not a JSON object |
+| `429` | Too many concurrent video uploads |
+| `500` | The uploaded video could not be stored |
+
+## WebSocket event
+
+`video_recall_requested`, delivered once to the calling user's room:
+
+| Field | Type | Meaning |
+|---|---|---|
+| `queue_id` | string | From the request path |
+| `user_id` | string | The caller |
+| `action` | `"parameters"` \| `"initial_video"` \| `"reference_video"` | What to do |
+| `mode` | `"recall"` \| `"remix"` \| null | `parameters` only |
+| `strict` | boolean | `parameters` only |
+| `parameters` | object \| null | `parameters` only: the resolved fields, with models as `{key, hash, name, base, type}` |
+| `video` | object \| null | Placements only: `{video_name, width, height, duration, fps, media_origin}` |
+
+## Implementation
+
+- Router: `invokeai/app/api/routers/video_recall.py`
+- Upload ingest shared with `/videos/upload`: `ingest_uploaded_video` in `invokeai/app/api/routers/videos.py`
+- Upload limits: `VideoUploadLimitASGIMiddleware` in `invokeai/app/api_app.py`
+- Event: `VideoRecallRequestedEvent` in `invokeai/app/services/events/events_common.py`; routing in `invokeai/app/api/sockets.py`
+- Tests: `tests/app/routers/test_video_recall.py`

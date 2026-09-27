@@ -71,7 +71,6 @@ from invokeai.backend.quantization.fp8_scaled import (
     is_scale_metadata_key,
     iter_weight_scale_pairs,
     parse_quantization_metadata,
-    predict_cast_state_dict_size,
     read_safetensors_metadata,
     reject_undecoded_mx_scale,
     should_keep_fp8_weights,
@@ -84,11 +83,11 @@ from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.int8_convrot import (
     reject_int8_layers_a_plain_fold_cannot_decode,
 )
+from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.quantization.nvfp4 import (
     NVFP4Payload,
     install_nvfp4_layers,
     pop_nvfp4_layers,
-    predict_nvfp4_install_size,
 )
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
@@ -1288,16 +1287,15 @@ class MistralEncoderCheckpointLoader(ModelLoader):
         # One reservation, before the dequantizing branch or the split widens a single weight -- `make_room` makes
         # that much room rather than adding to an earlier one. The state dict is sized by the predicate the split and
         # the cast below decide with, the nvfp4 layers as they will be held.
-        self._ram_cache.make_room(
-            predict_cast_state_dict_size(
-                sd,
-                model_dtype,
-                keep_fp8=keep_raw_fp8,
-                model=model,
-                skip_patterns=skip_patterns,
-                scaled_layers=fp8_layers,
-            )
-            + predict_nvfp4_install_size(model, nvfp4_payloads, model_dtype, skip_patterns)
+        reserve_for_load(
+            self._ram_cache.make_room,
+            sd,
+            model_dtype,
+            keep_fp8=keep_raw_fp8,
+            model=model,
+            skip_patterns=skip_patterns,
+            fp8_layers=fp8_layers,
+            nvfp4_payloads=nvfp4_payloads,
         )
 
         if not fp8_layers:

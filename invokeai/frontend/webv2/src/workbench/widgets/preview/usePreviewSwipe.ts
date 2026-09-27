@@ -295,19 +295,19 @@ export const usePreviewSwipe = ({
         return;
       }
 
-      if (gesture.phase !== 'tracking' || event.type === 'pointercancel') {
-        if (gesture.phase === 'tracking') {
-          settleTo(0, RETURN_MS);
-        } else {
-          restoreIfStranded();
-        }
-
+      if (gesture.phase !== 'tracking') {
+        restoreIfStranded();
         return;
       }
 
-      release(gesture, event.timeStamp);
+      // A cancel means the browser or a native control took the touch over mid-swipe, not that the user changed their
+      // mind: decide it like a lift at the last move, so a swipe that was clearly going somewhere still gets there.
+      release(
+        gesture,
+        event.type === 'pointercancel' ? (gesture.samples.at(-1)?.time ?? event.timeStamp) : event.timeStamp
+      );
     },
-    [release, restoreIfStranded, settleTo]
+    [release, restoreIfStranded]
   );
 
   // Document-level so a finger that leaves the stage still moves and releases the track.

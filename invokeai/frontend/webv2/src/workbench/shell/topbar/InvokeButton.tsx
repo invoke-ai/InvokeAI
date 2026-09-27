@@ -125,7 +125,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
 
 const InvokeTooltipContent = ({ shortcutParts, state }: { shortcutParts: string[] | null; state: InvocationState }) => {
   const { t } = useTranslation();
-  const { batchCount, blockingReasons, invocation, isPreparing, isValid, promptExpansion } = state;
+  const { batchCount, blockingReasons, invocation, isPreparing, isValid, promptExpansion, workflowBatchSize } = state;
   const destination = getDestinationLabel(invocation.destination);
   const promptCount = promptExpansion.count;
   const summary =
@@ -133,7 +133,11 @@ const InvokeTooltipContent = ({ shortcutParts, state }: { shortcutParts: string[
       ? promptExpansion.isLoading
         ? t('topbar.invoke.expandingPrompts')
         : `${plural(promptCount, 'prompt')} × ${plural(batchCount, 'iteration')} → ${plural(promptCount * batchCount, 'generation')}`
-      : `Workflow × ${plural(batchCount, 'run')} → ${plural(batchCount, 'generation')}`;
+      : workflowBatchSize === undefined
+        ? `Workflow × ${plural(batchCount, 'run')} → ${plural(batchCount, 'generation')}`
+        : workflowBatchSize === null
+          ? `Workflow × ${plural(batchCount, 'run')} × batch (size resolves on invoke)`
+          : `Workflow × ${plural(batchCount, 'run')} × ${plural(workflowBatchSize, 'batch item')} → ${plural(batchCount * workflowBatchSize, 'generation')}`;
 
   return (
     <Stack gap="1.5" minW="14rem" p="2">

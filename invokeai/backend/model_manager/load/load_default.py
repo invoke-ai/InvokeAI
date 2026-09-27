@@ -13,6 +13,7 @@ import torch
 from invokeai.app.services.config import InvokeAIAppConfig
 from invokeai.backend.model_manager.configs.base import Diffusers_Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
+from invokeai.backend.model_manager.load.fp8_capability import fp8_storage_verdict
 from invokeai.backend.model_manager.load.load_base import LoadedModel, ModelLoaderBase
 from invokeai.backend.model_manager.load.memory_snapshot import GB, MemorySnapshot
 from invokeai.backend.model_manager.load.model_cache.cache_record import CacheRecord
@@ -25,7 +26,6 @@ from invokeai.backend.model_manager.load.model_cache.model_cache import (
 from invokeai.backend.model_manager.load.model_util import calc_model_size_by_fs
 from invokeai.backend.model_manager.load.optimizations import skip_torch_weight_init
 from invokeai.backend.model_manager.taxonomy import (
-    QUANTIZED_MODEL_FORMATS,
     AnyModel,
     SubModelType,
 )
@@ -43,6 +43,33 @@ _FP8_STORAGE_SUPPORTED: set[str] = set()
 # cache above: the probe is retried on every request (a failure may be transient), but repeating
 # the warning on every model load would bury the log.
 _FP8_PROBE_FAILURE_REPORTED: set[str] = set()
+
+# Components FP8 storage is never applied to, whatever the model asks for.
+#
+# The prompt enhancer is a causal LM run autoregressively (one full forward per generated token), so
+# layerwise casting would pay the bf16<->fp8 round trip on every token — and its entire job is text
+# quality, which fp8 rounding degrades. Its tokenizer is listed for symmetry (it is not an nn.Module,
+# so casting is a no-op today only by accident).
+#
+# Unlike the model-kind rules in `fp8_capability.py`, these are about which *component* of a model is
+# being loaded, which no client can see and nothing outside this file asks about.
+_FP8_EXCLUDED_SUBMODEL_TYPES: frozenset[SubModelType] = frozenset(
+    {
+        SubModelType.TextEncoder,
+        SubModelType.TextEncoder2,
+        SubModelType.TextEncoder3,
+        SubModelType.Tokenizer,
+        SubModelType.Tokenizer2,
+        SubModelType.Tokenizer3,
+        SubModelType.PromptEnhancer,
+        SubModelType.PromptEnhancerTokenizer,
+        SubModelType.Scheduler,
+        SubModelType.SafetyChecker,
+        SubModelType.VAE,
+        SubModelType.VAEDecoder,
+        SubModelType.VAEEncoder,
+    }
+)
 
 
 def put_in_eval_mode(model: AnyModel) -> AnyModel:
@@ -332,6 +359,7 @@ class ModelLoader(ModelLoaderBase):
                 pass
 
             config.path = str(self._get_model_path(config))
+            self._report_inert_fp8_request(config, submodel_type)
 
             # Fast path (multi-GPU): if another device already loaded this exact model, its canonical
             # CPU weights are still resident in the shared store along with an empty (meta-weight)
@@ -425,66 +453,57 @@ class ModelLoader(ModelLoaderBase):
             variant=config.repo_variant if isinstance(config, Diffusers_Config_Base) else None,
         )
 
+    @staticmethod
+    def _fp8_storage_asked_for(config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> bool:
+        """Whether this record asks for FP8 Storage on a component that could take it.
+
+        The half of the gate that is about the *request* rather than about the model kind or the
+        device. Shared with `_report_inert_fp8_request`, which has to ask the same question from the
+        other side: restating it there is how two answers drift apart, which is the defect this whole
+        change is about.
+
+        `getattr`, because `AnyModelConfig` is a union and only some members carry default settings.
+        Text encoders, tokenizers, schedulers and VAEs never take the cast whatever the record says.
+        """
+        if submodel_type in _FP8_EXCLUDED_SUBMODEL_TYPES:
+            return False
+        return getattr(getattr(config, "default_settings", None), "fp8_storage", None) is True
+
     def _should_use_fp8(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> bool:
         """Check if FP8 layerwise casting should be applied to a model."""
-        from invokeai.backend.model_manager.taxonomy import ModelType
-
-        # Already-quantized models are excluded. Their weights are packed integer payloads, not
-        # values we may re-encode, and casting them is not a no-op:
-        #   - GGUF raises `Operation changed the dtype of GGMLTensor unexpectedly`.
-        #   - bnb NF4 corrupts *silently* — `bnb.nn.LinearNF4` subclasses `nn.Linear`, so the packed
-        #     uint8 payload is cast to float8, inference still returns finite numbers, and the model
-        #     just produces garbage.
-        # No quantized-format loader calls `_apply_fp8_layerwise_casting` today, so this is a guard
-        # against the next loader that gets wired up (they are being added one model at a time)
-        # rather than a fix for a live crash.
-        # The payload is packed integers, not values FP8 storage may re-encode.
-        if hasattr(config, "format") and config.format in QUANTIZED_MODEL_FORMATS:
+        if not self._fp8_storage_asked_for(config, submodel_type):
             return False
 
-        # VAEs are excluded — fp8 storage causes noticeable quality degradation in decode.
-        if hasattr(config, "type") and config.type == ModelType.VAE:
+        # Whether the setting can reach a model of this kind at all -- its type, its format, and
+        # whether this loader implements the cast -- is decided in `fp8_capability.py`, because the UI
+        # that offers the control and the identification that enables it have to give the same answer
+        # as this gate. Deciding it here as well is how they came to disagree.
+        if not fp8_storage_verdict(config.base, config.type, config.format).supported:
             return False
 
-        # LoRAs (including ControlLoRA) are excluded — they are not run as a standalone forward pass,
-        # they are patched into a base model, so the layerwise-casting hooks would never fire. The
-        # toggle is also hidden in the UI for ControlLoRA; this guard handles legacy persisted values.
-        if hasattr(config, "type") and config.type in (ModelType.LoRA, ModelType.ControlLoRa):
-            return False
+        # Device support is probed last, so it runs only for a model that actually wants FP8 -- not on
+        # the first load of any tokenizer/VAE/scheduler, and not on API or install threads, where it
+        # would force XPU lazy SYCL init on a thread that never generates.
+        return _device_supports_fp8_storage(self._torch_device, self._logger)
 
-        # Don't apply FP8 to text encoders, tokenizers, schedulers, VAEs, etc.
-        # The prompt enhancer is a causal LM run autoregressively (one full forward per generated
-        # token), so layerwise casting would pay the bf16<->fp8 round trip on every token — and its
-        # entire job is text quality, which fp8 rounding degrades. Its tokenizer is listed for
-        # symmetry (it is not an nn.Module, so casting is a no-op today only by accident).
-        _excluded_submodel_types = {
-            SubModelType.TextEncoder,
-            SubModelType.TextEncoder2,
-            SubModelType.TextEncoder3,
-            SubModelType.Tokenizer,
-            SubModelType.Tokenizer2,
-            SubModelType.Tokenizer3,
-            SubModelType.PromptEnhancer,
-            SubModelType.PromptEnhancerTokenizer,
-            SubModelType.Scheduler,
-            SubModelType.SafetyChecker,
-            SubModelType.VAE,
-            SubModelType.VAEDecoder,
-            SubModelType.VAEEncoder,
-        }
-        if submodel_type in _excluded_submodel_types:
-            return False
+    def _report_inert_fp8_request(self, config: AnyModelConfig, submodel_type: Optional[SubModelType]) -> None:
+        """Say so when a record asks for FP8 Storage that this kind of model cannot take.
 
-        # Check default_settings.fp8_storage (Main models, ControlNet)
-        if hasattr(config, "default_settings") and config.default_settings is not None:
-            if hasattr(config.default_settings, "fp8_storage") and config.default_settings.fp8_storage is True:
-                # Device support is probed last, so it runs only for a model that actually wants
-                # FP8 -- not on the first load of any tokenizer/VAE/scheduler, and not on API or
-                # install threads, where it would force XPU lazy SYCL init on a thread that never
-                # generates.
-                return _device_supports_fp8_storage(self._torch_device, self._logger)
+        Nothing else would. A loader that does not implement the cast never calls `_should_use_fp8`
+        either, so until now the setting was ignored without a word -- the failure mode this whole
+        change is about. The control is no longer offered for such models, and identification no longer
+        writes one, but records from before this change still carry the value. Those are left alone: the
+        setting is inert, and if such a loader later implements the cast the stored request starts being
+        honoured, which is what its owner asked for.
 
-        return False
+        Once per cold load, and only for the submodel that would have been cast, so a Main model does
+        not repeat it for its tokenizer and its VAE.
+        """
+        if not self._fp8_storage_asked_for(config, submodel_type):
+            return
+        verdict = fp8_storage_verdict(config.base, config.type, config.format)
+        if not verdict.supported:
+            self._logger.info(f"FP8 Storage is set for '{config.name}' but does nothing here: {verdict.reason}")
 
     def _keep_fp8_weights(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> bool:
         """Whether a checkpoint's fp8 weights should stay packed rather than be folded into bf16.

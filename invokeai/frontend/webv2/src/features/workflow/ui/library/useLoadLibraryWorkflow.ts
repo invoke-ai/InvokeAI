@@ -1,5 +1,6 @@
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 
+import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { getLibraryWorkflowCached, touchLibraryWorkflowOpenedAt } from '@features/workflow/queries';
 import { requestWorkflowFitView } from '@features/workflow/ui/editor/flowInstanceStore';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
@@ -48,7 +49,9 @@ export const useLoadLibraryWorkflow = (onLoaded: () => void): LoadLibraryWorkflo
         const raw = await getLibraryWorkflowCached(item.workflow_id, owner.signal);
 
         assertAccountScopeCurrent(owner);
-        const { document, warnings } = parseWorkflowJson(raw);
+        const { document: parsed, warnings: parseWarnings } = parseWorkflowJson(raw);
+        const { document, warnings: updateWarnings } = updateLoadedWorkflowNodes(parsed, t);
+        const warnings = [...parseWarnings, ...updateWarnings];
 
         assertAccountScopeCurrent(owner);
         setLoadPhase('applying');

@@ -3367,6 +3367,102 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       return node?.type === 'invocation' ? node.data.inputs.seed?.value : undefined;
     };
 
+    it('carries batch-node groups on the submission and sizes the placeholders for every session', () => {
+      const floatField = {
+        ...(seedTemplate.inputs.seed as NonNullable<(typeof seedTemplate.inputs)['seed']>),
+        maximum: null,
+        minimum: null,
+        name: 'value',
+        title: 'Value',
+        type: { batch: false, cardinality: 'SINGLE' as const, name: 'FloatField' },
+      };
+      const batchTemplates = {
+        float: {
+          ...seedTemplate,
+          inputs: { value: floatField },
+          outputType: 'float_output',
+          title: 'Float',
+          type: 'float',
+        },
+        float_batch: {
+          ...seedTemplate,
+          inputs: {
+            batch_group_id: {
+              ...floatField,
+              default: 'None',
+              name: 'batch_group_id',
+              options: ['None', 'Group 1'],
+              title: 'Batch Group',
+              type: { batch: false, cardinality: 'SINGLE' as const, name: 'EnumField' },
+            },
+            floats: {
+              ...floatField,
+              default: [],
+              name: 'floats',
+              required: true,
+              title: 'Floats',
+              type: { batch: true, cardinality: 'COLLECTION' as const, name: 'FloatField' },
+            },
+          },
+          outputType: 'float_output',
+          title: 'Float Batch',
+          type: 'float_batch',
+        },
+        noise: seedTemplate,
+      };
+      let state = primeWorkflow(42, 'fixed');
+
+      workflowTemplatesMock.snapshot = { error: null, status: 'loaded', templates: batchTemplates };
+
+      const invocationNode = (id: string, type: string, inputs: Record<string, unknown>) => ({
+        data: {
+          inputs: Object.fromEntries(Object.entries(inputs).map(([name, value]) => [name, { label: '', name, value }])),
+          isIntermediate: true,
+          isOpen: true,
+          label: '',
+          nodePack: 'invokeai',
+          notes: '',
+          type,
+          useCache: true,
+          version: '1.0.0',
+        },
+        id,
+        position: { x: 0, y: 0 },
+        type: 'invocation' as const,
+      });
+
+      state = workbenchReducer(state, {
+        action: { node: invocationNode('float-1', 'float', { value: 0.5 }), type: 'addNode' },
+        type: 'applyProjectGraphAction',
+      });
+      state = workbenchReducer(state, {
+        action: {
+          edge: {
+            id: 'batch-edge',
+            source: 'batch-1',
+            sourceHandle: 'value',
+            target: 'float-1',
+            targetHandle: 'value',
+            type: 'default',
+          },
+          node: invocationNode('batch-1', 'float_batch', { batch_group_id: 'None', floats: [1.5, 2.5] }),
+          type: 'addNodeAndEdge',
+        },
+        type: 'applyProjectGraphAction',
+      });
+      state = submitWorkflow(state);
+
+      expect(readSubmission(state)).toMatchObject({
+        batchCount: 3,
+        batchData: [[{ fieldName: 'value', items: [1.5, 2.5], nodeId: 'float-1' }]],
+        kind: 'workflow',
+      });
+      // Batch nodes never reach the backend graph; the fed input keeps its static value for the server to overwrite.
+      expect(readSubmission(state)).toMatchObject({ graph: { nodes: { 'float-1': { value: 0.5 } } } });
+      expect(Object.keys((readSubmission(state) as { graph: { nodes: object } }).graph.nodes)).not.toContain('batch-1');
+      expect(getActiveProject(state).queue.items[0]?.snapshot.presentation.batchCount).toBe(6);
+    });
+
     it('zips a stepping seed into the batch, advances the node, and continues on the next submission', () => {
       let state = submitWorkflow(primeWorkflow(42, 'increment'));
 

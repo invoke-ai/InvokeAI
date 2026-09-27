@@ -1,4 +1,5 @@
 import { getLibraryWorkflow, touchLibraryWorkflowOpenedAt } from '@features/workflow/data/api';
+import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { requestWorkflowFitView } from '@features/workflow/ui/editor/flowInstanceStore';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNotifications } from '@features/workflow/ui/WorkflowUiContext';
@@ -45,10 +46,13 @@ export const PendingWorkflowLoader = () => {
         }
 
         assertAccountScopeCurrent(owner);
-        const { document: parsed, warnings } = parseWorkflowJson(raw);
+        const { document: parsed, warnings: parseWarnings } = parseWorkflowJson(raw);
+        const { document: updated, warnings: updateWarnings } = updateLoadedWorkflowNodes(parsed, t);
+        const warnings = [...parseWarnings, ...updateWarnings];
+
         // An embedded document may still carry the id of the library record it was
         // saved from; loading it must not start autosaving over that record.
-        const document = source.kind === 'library' ? parsed : { ...parsed, libraryWorkflowId: undefined };
+        const document = source.kind === 'library' ? updated : { ...updated, libraryWorkflowId: undefined };
 
         replace(document, label);
         requestWorkflowFitView(document.nodes);

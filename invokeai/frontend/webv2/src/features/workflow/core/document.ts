@@ -4,6 +4,7 @@ import type {
   ContainerFormElement,
   FieldIdentifier,
   InvocationTemplate,
+  InvocationTemplates,
   NodeFieldFormElement,
   ProjectGraphState,
   WorkflowCurrentImageNode,
@@ -20,7 +21,9 @@ import type {
   XYPosition,
 } from './types';
 
+import { isWorkflowGeneratorVariant } from './batch';
 import {
+  CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX,
   clearSavedWorkflowDynamicFields,
   setCallSavedWorkflowStatus,
   syncCallSavedWorkflowFields,
@@ -284,6 +287,278 @@ const removeNodeFieldElements = (form: WorkflowForm, removedNodeIds: Set<string>
     .filter((element) => element.type === 'node-field' && removedNodeIds.has(element.data.fieldIdentifier.nodeId))
     .reduce((nextForm, element) => removeFormElement(nextForm, element.id), form);
 
+// #region Node updates
+
+export type WorkflowNodeUpdateStatus = 'current' | 'updatable' | 'incompatible' | 'newer';
+
+type Version = [number, number, number];
+
+/** `1.2.3`, with an optional `v`, a missing patch, or a prerelease tag (custom node packs use them). */
+const parseVersion = (version: string): Version | null => {
+  const match = /^v?(\d+)\.(\d+)(?:\.(\d+))?(?:[-+][\w.-]+)?$/.exec(version.trim());
+
+  return match ? [Number(match[1]), Number(match[2]), Number(match[3] ?? 0)] : null;
+};
+
+const compareVersions = (a: Version, b: Version): number => a[0] - b[0] || a[1] - b[1] || a[2] - b[2];
+
+/**
+ * Whether a stored node can take its template's version. Only a same-major template merges safely: a template
+ * bumps its major when a value-preserving merge would leave the node invalid (the legacy rule).
+ */
+export const getNodeUpdateStatus = (
+  node: WorkflowInvocationNode,
+  template: InvocationTemplate
+): WorkflowNodeUpdateStatus => {
+  if (node.data.type !== template.type) {
+    return 'incompatible';
+  }
+
+  if (node.data.version === template.version) {
+    return 'current';
+  }
+
+  const nodeVersion = parseVersion(node.data.version);
+  const templateVersion = parseVersion(template.version);
+
+  if (!nodeVersion || !templateVersion || nodeVersion[0] !== templateVersion[0]) {
+    return 'incompatible';
+  }
+
+  const order = compareVersions(nodeVersion, templateVersion);
+
+  return order === 0 ? 'current' : order > 0 ? 'newer' : 'updatable';
+};
+
+/** Node types whose undeclared inputs the backend accepts (`extra='allow'`), so an update must carry them over. */
+const EXTRA_INPUT_NODE_TYPES = new Set(['core_metadata']);
+
+interface InvocationNodeUpdate {
+  node: WorkflowInvocationNode;
+  droppedInputNames: string[];
+  /** Inputs whose exposed form elements now belong to another input (`collection` → `images`). */
+  renamedInputs: Record<string, string>;
+}
+
+/**
+ * Fresh template defaults underneath the node's own values: existing labels, values, and node settings win, new
+ * inputs start at their defaults, inputs the template no longer declares are dropped (dynamic and extra inputs
+ * aside). The id is kept so edges survive.
+ */
+const updateInvocationNodeToTemplate = (
+  node: WorkflowInvocationNode,
+  template: InvocationTemplate,
+  connectedInputNames: ReadonlySet<string>
+): InvocationNodeUpdate => {
+  const fresh = buildInvocationNode(template, node.position);
+  const inputs: Record<string, WorkflowFieldInstance> = {};
+  const renamedInputs: Record<string, string> = {};
+  const droppedInputNames: string[] = [];
+
+  for (const [name, freshInstance] of Object.entries(fresh.data.inputs)) {
+    const existing = node.data.inputs[name];
+
+    inputs[name] = existing
+      ? { ...freshInstance, ...existing, value: existing.value === undefined ? freshInstance.value : existing.value }
+      : freshInstance;
+  }
+
+  for (const [name, instance] of Object.entries(node.data.inputs)) {
+    if (name in inputs) {
+      continue;
+    }
+
+    if (
+      EXTRA_INPUT_NODE_TYPES.has(node.data.type) ||
+      node.data.dynamicInputTemplates?.[name] !== undefined ||
+      name.startsWith(CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX)
+    ) {
+      inputs[name] = instance;
+    } else {
+      droppedInputNames.push(name);
+    }
+  }
+
+  const sourceVersion = parseVersion(node.data.version);
+
+  // `image_collection` 1.0.2 moved its direct list from `collection` to `images`; a connected `collection` keeps
+  // feeding the node and is left alone.
+  if (node.data.type === 'image_collection' && sourceVersion && compareVersions(sourceVersion, [1, 0, 2]) < 0) {
+    const collection = node.data.inputs.collection;
+    const images = inputs.images;
+
+    if (images) {
+      renamedInputs.collection = 'images';
+
+      if (
+        collection &&
+        Array.isArray(collection.value) &&
+        !(Array.isArray(images.value) && images.value.length > 0) &&
+        !connectedInputNames.has('collection')
+      ) {
+        inputs.images = { ...images, value: collection.value };
+
+        if (inputs.collection) {
+          inputs.collection = { ...inputs.collection, value: fresh.data.inputs.collection?.value };
+        }
+      }
+    }
+  }
+
+  // `minimax_h3_denoise` 1.3.0 turned the free frame count into a choice list; a count still on the grid becomes
+  // that choice, anything else falls back to the default.
+  if (node.data.type === 'minimax_h3_denoise' && sourceVersion && compareVersions(sourceVersion, [1, 3, 0]) < 0) {
+    const frames = inputs.num_frames;
+    const frameTemplate = template.inputs.num_frames;
+
+    if (frames && frameTemplate?.options && typeof frames.value === 'number') {
+      const choice = String(frames.value);
+
+      inputs.num_frames = {
+        ...frames,
+        value: frameTemplate.options.includes(choice) ? choice : frameTemplate.default,
+      };
+    }
+  }
+
+  return {
+    droppedInputNames,
+    node: { ...node, data: { ...node.data, inputs, version: template.version } },
+    renamedInputs,
+  };
+};
+
+export interface WorkflowNodesUpdate {
+  document: ProjectGraphState;
+  updatedNodeIds: string[];
+  /** Nodes whose template is newer by a major or older than the node; they need deleting and re-adding. */
+  skippedNodeIds: string[];
+  /** Edges and form elements that pointed at inputs the updated templates no longer declare. */
+  droppedEdgeIds: string[];
+  droppedFormElementIds: string[];
+}
+
+/** Nodes an `updateNodes` action would move; drives the update-all count and the per-node menu item. */
+export const getUpdatableNodeIds = (document: Pick<ProjectGraphState, 'nodes'>, templates: InvocationTemplates) =>
+  document.nodes.flatMap((node) => {
+    const template = isInvocationNode(node) ? templates[node.data.type] : undefined;
+
+    return isInvocationNode(node) && template && getNodeUpdateStatus(node, template) === 'updatable' ? [node.id] : [];
+  });
+
+/**
+ * Moves the given nodes (every invocation node by default) to their templates' versions, dropping edges and form
+ * elements that pointed at inputs the templates no longer declare. Returns the same document when nothing changed.
+ */
+export const updateWorkflowNodes = (
+  document: ProjectGraphState,
+  templates: InvocationTemplates,
+  nodeIds?: readonly string[]
+): WorkflowNodesUpdate => {
+  const wanted = nodeIds ? new Set(nodeIds) : null;
+  const updatedNodeIds: string[] = [];
+  const skippedNodeIds: string[] = [];
+  const droppedByNode = new Map<string, Set<string>>();
+  const renamedByNode = new Map<string, Record<string, string>>();
+  // One pass over the edges; a per-node scan is quadratic on the large graphs the load path opens.
+  const connectedInputsByNode = new Map<string, Set<string>>();
+
+  for (const edge of document.edges) {
+    if (edge.targetHandle) {
+      const handles = connectedInputsByNode.get(edge.target) ?? new Set<string>();
+
+      handles.add(edge.targetHandle);
+      connectedInputsByNode.set(edge.target, handles);
+    }
+  }
+
+  const nodes = document.nodes.map((node) => {
+    if (!isInvocationNode(node) || (wanted && !wanted.has(node.id))) {
+      return node;
+    }
+
+    const template = templates[node.data.type];
+
+    if (!template) {
+      return node;
+    }
+
+    const status = getNodeUpdateStatus(node, template);
+
+    if (status === 'current') {
+      return node;
+    }
+
+    if (status !== 'updatable') {
+      skippedNodeIds.push(node.id);
+      return node;
+    }
+
+    const update = updateInvocationNodeToTemplate(node, template, connectedInputsByNode.get(node.id) ?? new Set());
+
+    updatedNodeIds.push(node.id);
+
+    if (update.droppedInputNames.length > 0) {
+      droppedByNode.set(node.id, new Set(update.droppedInputNames));
+    }
+
+    if (Object.keys(update.renamedInputs).length > 0) {
+      renamedByNode.set(node.id, update.renamedInputs);
+    }
+
+    return update.node;
+  });
+
+  if (updatedNodeIds.length === 0) {
+    return { document, droppedEdgeIds: [], droppedFormElementIds: [], skippedNodeIds, updatedNodeIds };
+  }
+
+  const droppedEdgeIds = document.edges
+    .filter((edge) => edge.targetHandle && droppedByNode.get(edge.target)?.has(edge.targetHandle))
+    .map((edge) => edge.id);
+  const droppedEdgeIdSet = new Set(droppedEdgeIds);
+  const edges = document.edges.filter((edge) => !droppedEdgeIdSet.has(edge.id));
+  const droppedFormElementIds: string[] = [];
+  let form = document.form;
+
+  for (const element of Object.values(document.form.elements)) {
+    if (element.type !== 'node-field') {
+      continue;
+    }
+
+    const { fieldName, nodeId } = element.data.fieldIdentifier;
+    const renamedTo = renamedByNode.get(nodeId)?.[fieldName];
+
+    if (renamedTo) {
+      // The renamed input may already be exposed; one element per field keeps the form lookups unambiguous.
+      if (findNodeFieldElement(form, { fieldName: renamedTo, nodeId })) {
+        form = removeFormElement(form, element.id);
+      } else {
+        form = {
+          ...form,
+          elements: {
+            ...form.elements,
+            [element.id]: { ...element, data: { ...element.data, fieldIdentifier: { fieldName: renamedTo, nodeId } } },
+          },
+        };
+      }
+    } else if (droppedByNode.get(nodeId)?.has(fieldName)) {
+      form = removeFormElement(form, element.id);
+      droppedFormElementIds.push(element.id);
+    }
+  }
+
+  return {
+    document: { ...document, edges, form, nodes },
+    droppedEdgeIds,
+    droppedFormElementIds,
+    skippedNodeIds,
+    updatedNodeIds,
+  };
+};
+
+// #endregion
+
 export type ProjectGraphAction =
   | { type: 'addNode'; node: WorkflowNode }
   | { type: 'addNodeAndEdge'; node: WorkflowNode; edge: WorkflowEdge | WorkflowEdge[] }
@@ -296,6 +571,8 @@ export type ProjectGraphAction =
   | { type: 'setNodeIsIntermediate'; nodeId: string; isIntermediate: boolean }
   | { type: 'setNodeUseCache'; nodeId: string; useCache: boolean }
   | { type: 'setFieldValue'; nodeId: string; fieldName: string; value: unknown }
+  /** Moves nodes to their templates' versions; the reducer has no template access, so the action carries them. */
+  | { type: 'updateNodes'; templates: InvocationTemplates; nodeIds?: readonly string[] }
   | {
       type: 'syncCallSavedWorkflowFields';
       nodeId: string;
@@ -358,6 +635,7 @@ const undoLabels: Partial<Record<ProjectGraphAction['type'], string>> = {
   setNodeNotes: 'Edit workflow node notes',
   setNodeUseCache: 'Change workflow node caching',
   unexposeField: 'Remove workflow field from form',
+  updateNodes: 'Update workflow nodes',
 };
 
 export interface ProjectGraphUndoEntry {
@@ -366,18 +644,35 @@ export interface ProjectGraphUndoEntry {
   mergeKey?: string;
 }
 
+const isScalarList = (value: unknown): boolean =>
+  Array.isArray(value) && value.every((item) => typeof item === 'string' || typeof item === 'number' || item === null);
+
+const getGeneratorVariant = (value: unknown): string | null => {
+  const type = typeof value === 'object' && value !== null ? (value as { type?: unknown }).type : undefined;
+
+  return typeof type === 'string' && isWorkflowGeneratorVariant(type) ? type : null;
+};
+
 const getUndoMergeKey = (action: ProjectGraphAction): string | undefined => {
   switch (action.type) {
     case 'setFieldDescription':
     case 'setFieldLabel':
       return `${action.type}:${action.nodeId}:${action.fieldName}`;
     case 'setFieldValue':
-      // Typed text and dragged numbers stream; a pick (model, board, switch) is one step of its own.
-      return action.fieldName === 'workflow_id'
-        ? undefined
-        : typeof action.value === 'string' || typeof action.value === 'number'
-          ? `${action.type}:${action.nodeId}:${action.fieldName}`
-          : undefined;
+      // Typed text and dragged numbers stream, as do the rows of a scalar list; a pick (model, board,
+      // switch, image list) is one step of its own.
+      if (action.fieldName === 'workflow_id') {
+        return undefined;
+      }
+
+      if (typeof action.value === 'string' || typeof action.value === 'number' || isScalarList(action.value)) {
+        return `${action.type}:${action.nodeId}:${action.fieldName}`;
+      }
+
+      // Generator settings are typed too; switching the variant starts a new step.
+      const variant = getGeneratorVariant(action.value);
+
+      return variant ? `${action.type}:${action.nodeId}:${action.fieldName}:${variant}` : undefined;
     case 'setNodeLabel':
     case 'setNodeNotes':
       return `${action.type}:${action.nodeId}`;
@@ -547,6 +842,9 @@ const applyProjectGraphAction = (document: ProjectGraphState, action: ProjectGra
     }
     case 'setNodePosition': {
       return updateNode(document, action.nodeId, (node) => ({ ...node, position: { ...action.position } }));
+    }
+    case 'updateNodes': {
+      return updateWorkflowNodes(document, action.templates, action.nodeIds).document;
     }
     case 'setNodeLabel': {
       // Narrowed per branch so TS keeps the node type / data correlation through the spread.

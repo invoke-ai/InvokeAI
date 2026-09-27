@@ -265,6 +265,11 @@ export const buildLayerWorkflowGraph = (options: BuildLayerWorkflowGraphOptions)
     throw new Error(`Workflow is not ready: ${readiness.reasons.join(' ')}`);
   }
 
+  // A layer runs exactly one graph; batch data has nowhere to go.
+  if (readiness.batch) {
+    throw new Error('Layer workflows cannot contain batch nodes.');
+  }
+
   const compiled = compileProjectGraph(cloned, templates);
   const graph = compiled.backendGraph;
 

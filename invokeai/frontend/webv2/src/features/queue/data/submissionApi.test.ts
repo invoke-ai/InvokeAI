@@ -338,6 +338,24 @@ describe('enqueueWorkflow', () => {
     expect(getSubmittedBody().batch.batch_id).toBeUndefined();
   });
 
+  it('sends batch-node groups in the backend shape and lets it multiply them across runs', async () => {
+    const { enqueueWorkflow } = await import('./submissionApi');
+
+    await enqueueWorkflow({
+      ...createWorkflowRequest(),
+      batchData: [
+        [{ fieldName: 'cfg', items: [1, 2], nodeId: 'denoise' }],
+        [{ fieldName: 'image', items: [{ image_name: 'a.png' }], nodeId: 'sink' }],
+      ],
+    });
+
+    expect(getSubmittedBody().batch.runs).toBe(2);
+    expect(getSubmittedBody().batch.data).toEqual([
+      [{ field_name: 'cfg', items: [1, 2], node_path: 'denoise' }],
+      [{ field_name: 'image', items: [{ image_name: 'a.png' }], node_path: 'sink' }],
+    ]);
+  });
+
   it('includes the serialized parent workflow in the batch', async () => {
     const { enqueueWorkflow } = await import('./submissionApi');
     const workflow = {

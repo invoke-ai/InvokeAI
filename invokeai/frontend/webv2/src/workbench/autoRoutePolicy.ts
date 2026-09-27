@@ -101,6 +101,7 @@ const GRAPH_EDIT_CONFIDENCE = {
   retryCallSavedWorkflow: false,
   syncCallSavedWorkflowFields: false,
   unexposeField: false,
+  updateNodes: false,
 } satisfies Record<ProjectGraphAction['type'], boolean>;
 
 export const isHighConfidenceGraphEdit = (action: ProjectGraphAction): boolean => GRAPH_EDIT_CONFIDENCE[action.type];

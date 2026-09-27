@@ -21,6 +21,8 @@ export interface ResolvedInvocationRoute extends InvocationRoute {
   validationMessage?: string | ForLoopValidationReason;
   /** Every reason the route cannot run right now (legacy `reasonsWhyCannotEnqueue` equivalent). */
   validationReasons: Array<string | ForLoopValidationReason>;
+  /** Present when the workflow has batch nodes; size is null until an async generator resolves on invoke. */
+  workflowBatch?: { size: number | null };
 }
 
 export interface InvocationControllerState extends InvocationRoute {

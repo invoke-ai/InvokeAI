@@ -39,6 +39,7 @@ const image = (imageName: string): GalleryImage => ({
 
 const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions => ({
   canUseAsReferenceImage: false,
+  canUseAsReferenceVideo: false,
   copyImage: vi.fn(() => Promise.resolve()),
   createCanvasFromImages: vi.fn(() => Promise.resolve()),
   deleteItems,
@@ -63,7 +64,9 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   setItemsStarred: vi.fn(() => Promise.resolve()),
   setImagesStarred: vi.fn(() => Promise.resolve()),
   savePromptAsTemplate: vi.fn(),
+  sendToInitialVideo: vi.fn(),
   useAsReferenceImage: vi.fn(),
+  useAsReferenceVideo: vi.fn(),
 });
 
 let host: HTMLDivElement | null = null;
@@ -326,6 +329,31 @@ describe('ImageContextMenu new canvas from image', () => {
     const calls = vi.mocked(actions.createCanvasFromImages).mock.calls;
     expect(calls).toHaveLength(1);
     expect(calls[0]?.[0].map((entry) => entry.imageName)).toEqual(images.map((entry) => entry.imageName));
+  });
+});
+
+describe('ImageContextMenu video placement', () => {
+  const renderVideoMenu = (actions: ImageActions, video: GalleryItem) =>
+    renderItemMenu(actions, { itemRefs: [{ kind: 'video', name: video.name }], items: [video], x: 20, y: 20 });
+
+  it('hands the video to the Initial Video and reference actions', async () => {
+    const video = item('video', 'clip.mp4');
+    const actions = { ...createActions(vi.fn()), canUseAsReferenceVideo: true };
+    await renderVideoMenu(actions, video);
+
+    await interact(() => getMenuItem('Extend in Video').click());
+    expect(actions.sendToInitialVideo).toHaveBeenCalledExactlyOnceWith(video);
+
+    await interact(() => getMenuItem('Use as Reference Video').click());
+    expect(actions.useAsReferenceVideo).toHaveBeenCalledExactlyOnceWith(video);
+  });
+
+  it('disables Use as Reference Video when the Video panel cannot take another', async () => {
+    const actions = createActions(vi.fn());
+    await renderVideoMenu(actions, item('video', 'clip.mp4'));
+
+    expect(getMenuItem('Use as Reference Video').getAttribute('aria-disabled')).toBe('true');
+    expect(getMenuItem('Extend in Video').getAttribute('aria-disabled')).not.toBe('true');
   });
 });
 

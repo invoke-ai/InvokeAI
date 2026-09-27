@@ -2,7 +2,12 @@ import { describe, expect, it } from 'vitest';
 
 import type { GeneratePromptBatchPlanInput } from './promptBatch';
 
-import { buildGeneratePromptBatchPlan, generateSeedSequence } from './promptBatch';
+import {
+  buildGeneratePromptBatchPlan,
+  buildQueueWorkflowBatchPlan,
+  generateSeedSequence,
+  isQueueWorkflowBatchDatum,
+} from './promptBatch';
 
 const SEED_MAX = 4_294_967_295;
 
@@ -159,5 +164,67 @@ describe('buildGeneratePromptBatchPlan with several prompts', () => {
 
     expect(plan.data[0][1].items).toEqual(['']);
     expect(plan.expectedImageCount).toBe(1);
+  });
+});
+
+describe('buildQueueWorkflowBatchPlan', () => {
+  const seed = { fieldName: 'seed', nodeId: 'noise', seed: 10, seedStep: 1 as const };
+  const cfg = { fieldName: 'cfg', items: [1, 2], nodeId: 'denoise' };
+  const prompt = { fieldName: 'text', items: ['a', 'b', 'c'], nodeId: 'prompt' };
+  const image = {
+    fieldName: 'image',
+    items: [{ image_name: 'x.png' }, { image_name: 'y.png' }, { image_name: 'z.png' }],
+    nodeId: 'sink',
+  };
+
+  it('repeats one graph, or lets the backend multiply the groups, while every seed holds', () => {
+    expect(buildQueueWorkflowBatchPlan({ batchCount: 3, batchData: undefined, seeds: [] })).toEqual({ runs: 3 });
+    expect(
+      buildQueueWorkflowBatchPlan({ batchCount: 2, batchData: [[cfg], [prompt, image]], seeds: undefined })
+    ).toEqual({
+      data: [
+        [{ field_name: 'cfg', items: [1, 2], node_path: 'denoise' }],
+        [
+          { field_name: 'text', items: ['a', 'b', 'c'], node_path: 'prompt' },
+          { field_name: 'image', items: image.items, node_path: 'sink' },
+        ],
+      ],
+      runs: 2,
+    });
+  });
+
+  it('keeps the seed-only plan: one zipped group of seeds over the runs', () => {
+    expect(buildQueueWorkflowBatchPlan({ batchCount: 3, batchData: [], seeds: [seed] })).toEqual({
+      data: [[{ field_name: 'seed', items: [10, 11, 12], node_path: 'noise' }]],
+      runs: 1,
+    });
+  });
+
+  it('gives every session its own seed by expanding the product run-major into one zipped group', () => {
+    const plan = buildQueueWorkflowBatchPlan({ batchCount: 2, batchData: [[cfg], [prompt, image]], seeds: [seed] });
+
+    expect(plan.runs).toBe(1);
+    expect(plan.data).toHaveLength(1);
+
+    const group = plan.data?.[0] ?? [];
+    const byField = Object.fromEntries(group.map((datum) => [datum.field_name, datum.items]));
+
+    // 2 runs × (2 cfg × 3 prompts) = 12 sessions, seeds walking straight through them.
+    expect(byField.seed).toEqual([10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21]);
+    // The first group varies slowest within a run, the run repeats the whole product.
+    expect(byField.cfg).toEqual([1, 1, 1, 2, 2, 2, 1, 1, 1, 2, 2, 2]);
+    expect(byField.text).toEqual(['a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c', 'a', 'b', 'c']);
+    expect(byField.image).toEqual([...image.items, ...image.items, ...image.items, ...image.items]);
+    expect(new Set(group.map((datum) => datum.items.length)).size).toBe(1);
+  });
+
+  it('recognises a persisted batch datum and rejects malformed ones', () => {
+    expect(isQueueWorkflowBatchDatum(cfg)).toBe(true);
+    expect(isQueueWorkflowBatchDatum(image)).toBe(true);
+    expect(isQueueWorkflowBatchDatum({ ...cfg, items: [] })).toBe(false);
+    expect(isQueueWorkflowBatchDatum({ ...cfg, items: [Number.NaN] })).toBe(false);
+    expect(isQueueWorkflowBatchDatum({ ...cfg, items: [{ image_name: '' }] })).toBe(false);
+    expect(isQueueWorkflowBatchDatum({ ...cfg, nodeId: '' })).toBe(false);
+    expect(isQueueWorkflowBatchDatum({ ...cfg, items: Array.from({ length: 10_001 }, () => 1) })).toBe(false);
   });
 });

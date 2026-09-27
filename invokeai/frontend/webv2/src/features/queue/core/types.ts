@@ -1,6 +1,11 @@
-import type { QueuePromptSeedBehaviour, QueueSeedStep, QueueWorkflowSeed } from '@features/queue/core/promptBatch';
+import type {
+  QueuePromptSeedBehaviour,
+  QueueSeedStep,
+  QueueWorkflowBatchDatum,
+  QueueWorkflowSeed,
+} from '@features/queue/core/promptBatch';
 
-export type { QueueSeedStep, QueueWorkflowSeed };
+export type { QueueSeedStep, QueueWorkflowBatchDatum, QueueWorkflowSeed };
 
 export interface QueueBackendInvocation {
   id: string;
@@ -47,6 +52,8 @@ export interface QueueEnqueueWorkflowRequest extends QueueEnqueueRequestBase {
   workflow?: Record<string, unknown>;
   /** The seed inputs that vary between the `batchCount` runs; the graph carries each one's first seed. */
   seeds?: QueueWorkflowSeed[];
+  /** Batch-node value lists: outer groups multiply, inner datums zip. */
+  batchData?: QueueWorkflowBatchDatum[][];
 }
 
 export interface QueueEnqueueGenerateRequest extends QueueEnqueueRequestBase {
@@ -84,6 +91,8 @@ export type QueueCompiledSubmission =
       workflow?: Record<string, unknown>;
       /** The seed inputs that vary between runs, expanded into one zipped batch group at send time. */
       seeds?: QueueWorkflowSeed[];
+      /** Batch-node value lists resolved at compile time: outer groups multiply, inner datums zip. */
+      batchData?: QueueWorkflowBatchDatum[][];
       /** Capture the bound library ID at compile time so completion attribution survives later editor changes. */
       libraryWorkflowId?: string;
     }

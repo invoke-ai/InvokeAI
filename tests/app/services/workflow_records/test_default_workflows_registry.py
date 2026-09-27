@@ -27,8 +27,8 @@ WAN_WORKFLOWS = sorted(
 
 def test_wan_workflow_glob_finds_the_bundled_workflows() -> None:
     # Guard against the glob silently matching nothing (e.g. after a rename).
-    # 12 Wan workflows + 6 MiniMax H3 video workflows + 1 LTX-2 video workflow.
-    assert len(WAN_WORKFLOWS) == 19
+    # 12 Wan workflows + 6 MiniMax H3 video workflows + 10 LTX-2 video workflows.
+    assert len(WAN_WORKFLOWS) == 28
 
 
 @pytest.mark.parametrize("workflow_path", WAN_WORKFLOWS, ids=lambda p: p.stem)

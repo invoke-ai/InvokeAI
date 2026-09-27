@@ -32,6 +32,7 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_MiniMaxH3_Config,
     Main_Diffusers_MiniMaxH3_Config,
 )
+from invokeai.backend.model_manager.load.fp8_capability import Unimplemented
 from invokeai.backend.model_manager.load.load_default import ModelLoader
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.load.model_loaders._single_file_guards import (
@@ -79,7 +80,15 @@ def _raise_if_no_weight_shards(submodel_path: Path, submodel_label: str) -> None
         )
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.MiniMaxH3, type=ModelType.Main, format=ModelFormat.Diffusers)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.MiniMaxH3,
+    type=ModelType.Main,
+    format=ModelFormat.Diffusers,
+    fp8_storage=Unimplemented(
+        "the transformer keeps fp32 patch projections and output heads beside bf16 blocks, and the cast "
+        "derives one compute dtype from the first float parameter; that has to be checked here first"
+    ),
+)
 class MiniMaxH3DiffusersModel(ModelLoader):
     """Loader for MiniMax H3 diffusers-format models (FL2VA)."""
 
@@ -165,7 +174,15 @@ class MiniMaxH3DiffusersModel(ModelLoader):
                 raise ValueError(f"Unsupported submodel type {submodel_type} for MiniMax H3 models.")
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.MiniMaxH3, type=ModelType.Main, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.MiniMaxH3,
+    type=ModelType.Main,
+    format=ModelFormat.Checkpoint,
+    fp8_storage=Unimplemented(
+        "the same mixed-precision islands as the diffusers path, and the int8-convrot build additionally "
+        "keeps packed int8 linears resident"
+    ),
+)
 class MiniMaxH3CheckpointModel(ModelLoader):
     """Loader for MiniMax H3 single-file transformer checkpoints (bf16 or Comfy int8-convrot,
     full or AdaLN-pruned).

@@ -18,6 +18,8 @@ import {
   buildConnectorNode,
   createWorkflowGraphIndex,
   createWorkflowId,
+  getNodeUpdateStatus,
+  getUpdatableNodeIds,
   getWorkflowSourceFieldType,
   getWorkflowTargetFieldType,
   LOOP_LINKAGE_FIELD,
@@ -888,6 +890,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     event.preventDefault();
     setContextMenu({
       kind: 'node',
+      canUpdate:
+        node.type === 'invocation' &&
+        node.data.template !== null &&
+        getNodeUpdateStatus(node.data.documentNode, node.data.template.template) === 'updatable',
       isNodeOpen: node.type === 'invocation' ? node.data.documentNode.data.isOpen : null,
       nodeId: node.id,
       x: event.clientX,
@@ -909,6 +915,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       ) {
         setContextMenu({
           kind: 'node',
+          canUpdate: false,
           isNodeOpen: null,
           x: event.clientX,
           y: event.clientY,
@@ -937,6 +944,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         event.stopPropagation();
         setContextMenu({
           kind: 'node',
+          canUpdate: false,
           isNodeOpen: null,
           x: event.clientX,
           y: event.clientY,
@@ -1099,6 +1107,19 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
 
     setContextMenu(null);
   }, [contextMenu, editGraph]);
+  const onContextMenuUpdate = useCallback(() => {
+    if (contextMenu?.kind === 'node' && contextMenu.nodeId) {
+      editGraph({ nodeIds: [contextMenu.nodeId], templates, type: 'updateNodes' });
+    }
+
+    setContextMenu(null);
+  }, [contextMenu, editGraph, templates]);
+  const updatableNodeCount = useMemo(
+    () => getUpdatableNodeIds(projectGraph, templates).length,
+    [projectGraph, templates]
+  );
+  // No id list: the reducer already skips every node that cannot move.
+  const onUpdateNodes = useCallback(() => editGraph({ templates, type: 'updateNodes' }), [editGraph, templates]);
 
   if (isPreparing) {
     return <WorkflowEditorPreparingState edgeCount={projectGraph.edges.length} nodeCount={projectGraph.nodes.length} />;
@@ -1166,8 +1187,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         <EditorToolbar
           nodeOpacity={nodeOpacity}
           tool={tool}
+          updatableNodeCount={updatableNodeCount}
           onNodeOpacityChange={setNodeOpacity}
           onToolChange={setTool}
+          onUpdateNodes={onUpdateNodes}
         />
         {workflowShowMinimap && (!isLargeGraph || isMinimapReady) ? <FlowMiniMap /> : null}
       </ReactFlow>
@@ -1190,6 +1213,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         onDuplicate={onContextMenuDuplicate}
         onPaste={onContextMenuPaste}
         onToggleOpen={onContextMenuToggleOpen}
+        onUpdate={onContextMenuUpdate}
       />
     </Box>
   );

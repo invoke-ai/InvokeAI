@@ -15,6 +15,8 @@ import {
   isDirectInputField,
   isShuffleableField,
   isWorkflowFieldValueDefault,
+  getWorkflowBatchGroupId,
+  isWorkflowBatchNodeType,
 } from '@features/workflow/utility';
 import { FieldLabel, IconButton, Tooltip } from '@platform/ui';
 import { DicesIcon, RotateCcwIcon } from 'lucide-react';
@@ -23,6 +25,7 @@ import { useTranslation } from 'react-i18next';
 
 /** Resolves a form element's node, field instance, and input template against the document. */
 export const useNodeFieldBinding = (element: NodeFieldFormElement, projectGraph: ProjectGraphState) => {
+  const { t } = useTranslation();
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const { fieldName, nodeId } = element.data.fieldIdentifier;
   const node = projectGraph.nodes.find((candidate) => candidate.id === nodeId);
@@ -31,8 +34,13 @@ export const useNodeFieldBinding = (element: NodeFieldFormElement, projectGraph:
     ? (invocationNode.data.dynamicInputTemplates?.[fieldName] ?? templates[invocationNode.data.type]?.inputs[fieldName])
     : undefined;
   const instance = invocationNode?.data.inputs[fieldName];
+  const groupId =
+    invocationNode && isWorkflowBatchNodeType(invocationNode.data.type)
+      ? getWorkflowBatchGroupId(invocationNode)
+      : null;
+  const groupSuffix = groupId === null ? '' : ` (${groupId === 'None' ? t('nodes.noBatchGroup') : groupId})`;
   const nodeContext = invocationNode
-    ? invocationNode.data.label || templates[invocationNode.data.type]?.title || invocationNode.data.type
+    ? `${invocationNode.data.label || templates[invocationNode.data.type]?.title || invocationNode.data.type}${groupSuffix}`
     : '';
 
   return { fieldName, instance, invocationNode, nodeContext, nodeId, template };

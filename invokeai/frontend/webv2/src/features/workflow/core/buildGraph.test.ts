@@ -112,7 +112,7 @@ describe('getProjectGraphReadiness', () => {
   it('is ready when required inputs are connected or filled', () => {
     const { doc } = buildDocument();
 
-    expect(getProjectGraphReadiness(doc, loadedSnapshot)).toEqual({ canInvoke: true, reasons: [] });
+    expect(getProjectGraphReadiness(doc, loadedSnapshot)).toEqual({ batch: null, canInvoke: true, reasons: [] });
   });
 
   it('treats resolved connector output edges as connected required inputs', () => {
@@ -147,7 +147,7 @@ describe('getProjectGraphReadiness', () => {
       type: 'addEdge',
     });
 
-    expect(getProjectGraphReadiness(doc, loadedSnapshot)).toEqual({ canInvoke: true, reasons: [] });
+    expect(getProjectGraphReadiness(doc, loadedSnapshot)).toEqual({ batch: null, canInvoke: true, reasons: [] });
   });
 
   it('reports missing required inputs and unknown node types', () => {
@@ -159,7 +159,11 @@ describe('getProjectGraphReadiness', () => {
       value: '',
     });
 
-    expect(getProjectGraphReadiness(withEmptyString, loadedSnapshot)).toEqual({ canInvoke: true, reasons: [] });
+    expect(getProjectGraphReadiness(withEmptyString, loadedSnapshot)).toEqual({
+      batch: null,
+      canInvoke: true,
+      reasons: [],
+    });
 
     const withMissingValue = projectGraphReducer(doc, {
       fieldName: 'value',
@@ -233,7 +237,7 @@ describe('getProjectGraphReadiness', () => {
         status: 'loaded',
         templates: { 'optional-constrained': constrainedTemplate },
       })
-    ).toEqual({ canInvoke: true, reasons: [] });
+    ).toEqual({ batch: null, canInvoke: true, reasons: [] });
 
     doc = projectGraphReducer(doc, { fieldName: 'count', nodeId: node.id, type: 'setFieldValue', value: 10 });
 
@@ -243,7 +247,7 @@ describe('getProjectGraphReadiness', () => {
         status: 'loaded',
         templates: { 'optional-constrained': constrainedTemplate },
       })
-    ).toEqual({ canInvoke: false, reasons: ['"optional-constrained" has invalid input "count".'] });
+    ).toEqual({ batch: null, canInvoke: false, reasons: ['"optional-constrained" has invalid input "count".'] });
   });
 
   it('treats only explicitly externally satisfied connection inputs as ready', () => {
@@ -270,6 +274,7 @@ describe('getProjectGraphReadiness', () => {
     };
 
     expect(getProjectGraphReadiness(doc, snapshot, { externallySatisfiedInputs: new Set(['sink:image']) })).toEqual({
+      batch: null,
       canInvoke: false,
       reasons: ['"connection-sink" is missing a connection for "Mask image".'],
     });
@@ -277,7 +282,7 @@ describe('getProjectGraphReadiness', () => {
       getProjectGraphReadiness(doc, snapshot, {
         externallySatisfiedInputs: new Set(['sink:image', 'sink:mask']),
       })
-    ).toEqual({ canInvoke: true, reasons: [] });
+    ).toEqual({ batch: null, canInvoke: true, reasons: [] });
   });
 
   it('does not let external satisfaction bypass a required direct value', () => {
@@ -298,6 +303,7 @@ describe('getProjectGraphReadiness', () => {
     };
 
     expect(getProjectGraphReadiness(doc, snapshot, { externallySatisfiedInputs: new Set(['sink:image']) })).toEqual({
+      batch: null,
       canInvoke: false,
       reasons: ['"direct-sink" is missing required input "Layer image".'],
     });
@@ -596,6 +602,7 @@ describe('compileProjectGraph', () => {
     const loopTemplates = { for: forTemplate, for_return: returnTemplate, sink: sinkTemplate };
 
     expect(getProjectGraphReadiness(document, { error: null, status: 'loaded', templates: loopTemplates })).toEqual({
+      batch: null,
       canInvoke: false,
       reasons: [{ key: 'nodes.forLoopLinkageInvalid' }],
     });
@@ -603,6 +610,17 @@ describe('compileProjectGraph', () => {
 });
 
 describe('planWorkflowSubmission', () => {
+  /** These graphs have no batch nodes, so a plan is always produced. */
+  const planSubmission = (...args: Parameters<typeof planWorkflowSubmission>) => {
+    const result = planWorkflowSubmission(...args);
+
+    if (!result) {
+      throw new Error('Expected a submission plan');
+    }
+
+    return result;
+  };
+
   const SEED_MAX = 4_294_967_295;
   const seedInput = input('seed', {
     default: 0,
@@ -652,7 +670,7 @@ describe('planWorkflowSubmission', () => {
 
   it('repeats an unchanged graph while every seed holds', () => {
     const { doc, ids } = buildSeeded([{ seed: 7 }, { seed: 9, seedMode: 'fixed' }]);
-    const plan = planWorkflowSubmission(doc, seededTemplates, { batchCount: 3 });
+    const plan = planSubmission(doc, seededTemplates, { batchCount: 3 });
 
     expect(plan).toMatchObject({ batchCount: 3, seedAdvances: [], seeds: [] });
     expect(plan.graph.backendGraph.nodes[ids[0] as string]?.seed).toBe(7);
@@ -665,7 +683,7 @@ describe('planWorkflowSubmission', () => {
       { seed: 100, seedMode: 'decrement' },
       { seed: 5 },
     ]);
-    const plan = planWorkflowSubmission(doc, seededTemplates, { batchCount: 3 });
+    const plan = planSubmission(doc, seededTemplates, { batchCount: 3 });
 
     expect(plan.seeds).toEqual([
       { fieldName: 'seed', nodeId: ids[0], seed: 42, seedStep: 1 },
@@ -688,7 +706,7 @@ describe('planWorkflowSubmission', () => {
     node.data.inputs.seed = { label: 'Seed', name: 'seed', seedMode: 'increment', value: 42 };
     const document = { ...createProjectGraph('dynamic-seed-plan'), nodes: [node] };
 
-    const plan = planWorkflowSubmission(document, { dynamic_node: dynamicTemplate }, { batchCount: 2 });
+    const plan = planSubmission(document, { dynamic_node: dynamicTemplate }, { batchCount: 2 });
 
     expect(plan.seeds).toEqual([{ fieldName: 'seed', nodeId: node.id, seed: 42, seedStep: 1 }]);
     expect(plan.graph.backendGraph.nodes[node.id]?.seed).toBe(42);
@@ -696,7 +714,7 @@ describe('planWorkflowSubmission', () => {
 
   it('wraps the authored seed and the advance over the inclusive seed range', () => {
     const { doc } = buildSeeded([{ seed: 1, seedMode: 'decrement' }]);
-    const plan = planWorkflowSubmission(doc, seededTemplates, { batchCount: 3 });
+    const plan = planSubmission(doc, seededTemplates, { batchCount: 3 });
 
     expect(plan.seeds[0]).toMatchObject({ seed: 1, seedStep: -1 });
     expect(plan.seedAdvances[0]?.toSeed).toBe(SEED_MAX - 1);
@@ -712,7 +730,7 @@ describe('planWorkflowSubmission', () => {
     const start = Math.floor(0.25 * SEED_MAX);
 
     try {
-      const plan = planWorkflowSubmission(doc, seededTemplates, { batchCount: 2 });
+      const plan = planSubmission(doc, seededTemplates, { batchCount: 2 });
 
       expect(plan.seeds).toEqual([
         { fieldName: 'seed', nodeId: ids[0], seed: start, seedStep: 1 },
@@ -741,7 +759,7 @@ describe('planWorkflowSubmission', () => {
       },
       type: 'addEdge',
     });
-    const plan = planWorkflowSubmission(connected, seededTemplates, { batchCount: 2 });
+    const plan = planSubmission(connected, seededTemplates, { batchCount: 2 });
 
     expect(plan).toMatchObject({ seedAdvances: [], seeds: [] });
     expect(plan.graph.backendGraph.nodes[ids[0] as string]).not.toHaveProperty('seed');
@@ -758,7 +776,7 @@ describe('planWorkflowSubmission', () => {
       type: 'setFieldValue',
       value: undefined,
     });
-    const plan = planWorkflowSubmission(emptied, seededTemplates, { batchCount: 2 });
+    const plan = planSubmission(emptied, seededTemplates, { batchCount: 2 });
 
     expect(plan.seeds).toEqual([{ fieldName: 'seed', nodeId: ids[0], seed: 0, seedStep: 1 }]);
     expect(plan.graph.backendGraph.nodes[ids[0] as string]?.seed).toBe(0);
@@ -884,5 +902,181 @@ describe('integer Literal enum values in the compiled graph', () => {
     expect(compileProjectGraph(doc, parsedTemplates).backendGraph?.nodes[node.id]).toMatchObject({
       max_seq_len: 256,
     });
+  });
+});
+
+describe('batch nodes', () => {
+  const list = (name: string, typeName: string): FieldInputTemplate =>
+    input(name, { required: true, type: { batch: true, cardinality: 'COLLECTION', name: typeName } });
+  const batchTemplates = {
+    ...templates,
+    float_batch: template('float_batch', {
+      batch_group_id: input('batch_group_id', {
+        default: 'None',
+        options: ['None', 'Group 1'],
+        type: { batch: false, cardinality: 'SINGLE', name: 'EnumField' },
+      }),
+      floats: list('floats', 'FloatField'),
+    }),
+    float_generator: template('float_generator', {
+      generator: input('generator', {
+        default: { count: 10, start: 0, step: 0.1, type: 'float_generator_arithmetic_sequence' },
+        input: 'direct',
+        required: true,
+        type: { batch: false, cardinality: 'SINGLE', name: 'FloatGeneratorField' },
+      }),
+    }),
+    noise: template('noise', {
+      cfg: input('cfg', { default: 7, type: { batch: false, cardinality: 'SINGLE', name: 'FloatField' } }),
+      seed: input('seed', {
+        default: 0,
+        maximum: 4_294_967_295,
+        minimum: 0,
+        type: { batch: false, cardinality: 'SINGLE', name: 'IntegerField' },
+      }),
+    }),
+  };
+  const snapshot: InvocationTemplatesSnapshot = { error: null, status: 'loaded', templates: batchTemplates };
+  const build = (floats: number[], generator?: Record<string, unknown>) => {
+    const noise = buildInvocationNode(batchTemplates.noise, { x: 0, y: 0 });
+    const batch = buildInvocationNode(batchTemplates.float_batch, { x: 0, y: 100 });
+    let doc = createProjectGraph('batch-plan');
+
+    doc = projectGraphReducer(doc, { node: noise, type: 'addNode' });
+    doc = projectGraphReducer(doc, { node: batch, type: 'addNode' });
+    doc = projectGraphReducer(doc, { fieldName: 'floats', nodeId: batch.id, type: 'setFieldValue', value: floats });
+    doc = projectGraphReducer(doc, {
+      edge: {
+        id: 'b->n',
+        source: batch.id,
+        sourceHandle: 'value',
+        target: noise.id,
+        targetHandle: 'cfg',
+        type: 'default',
+      },
+      type: 'addEdge',
+    });
+
+    if (generator) {
+      const gen = buildInvocationNode(batchTemplates.float_generator, { x: 0, y: 200 });
+
+      doc = projectGraphReducer(doc, { node: gen, type: 'addNode' });
+      doc = projectGraphReducer(doc, {
+        fieldName: 'generator',
+        nodeId: gen.id,
+        type: 'setFieldValue',
+        value: generator,
+      });
+      doc = projectGraphReducer(doc, {
+        edge: {
+          id: 'g->b',
+          source: gen.id,
+          sourceHandle: 'floats',
+          target: batch.id,
+          targetHandle: 'floats',
+          type: 'default',
+        },
+        type: 'addEdge',
+      });
+    }
+
+    return { batchId: batch.id, doc, noiseId: noise.id };
+  };
+
+  it('is ready with a fed, wired batch node and reports the batch size', () => {
+    const { doc } = build([1.5, 2.5]);
+
+    expect(getProjectGraphReadiness(doc, snapshot)).toEqual({ batch: { size: 2 }, canInvoke: true, reasons: [] });
+  });
+
+  it("still judges each entry of a batch node's own list, so a cleared row cannot reach the queue", () => {
+    const { doc } = build([1.5, null as unknown as number]);
+
+    expect(getProjectGraphReadiness(doc, snapshot)).toMatchObject({
+      canInvoke: false,
+      reasons: ['"float_batch" has invalid input "floats".'],
+    });
+  });
+
+  it('refuses a batch whose runs would overflow the queue before anything is submitted', () => {
+    const { doc } = build([1.5, 2.5]);
+
+    expect(getProjectGraphReadiness(doc, snapshot, { batchCount: 5_000 })).toEqual({
+      batch: { size: 2 },
+      canInvoke: true,
+      reasons: [],
+    });
+    expect(getProjectGraphReadiness(doc, snapshot, { batchCount: 5_001 })).toMatchObject({
+      canInvoke: false,
+      reasons: ['This batch would queue 10,002 sessions; the queue accepts at most 10,000.'],
+    });
+  });
+
+  it('blocks on batch reasons and leaves the size unknown while a generator is unresolved', () => {
+    const { doc } = build([]);
+
+    expect(getProjectGraphReadiness(doc, snapshot)).toMatchObject({
+      batch: { size: 0 },
+      canInvoke: false,
+      reasons: ['Batch node "float_batch" has an empty collection.'],
+    });
+
+    // A batch node's own list is the planner's business: a generator-fed batch has no list of its own.
+    const generated = build([], { count: 3, start: 1, step: 1, type: 'float_generator_arithmetic_sequence' });
+
+    expect(getProjectGraphReadiness(generated.doc, snapshot)).toEqual({
+      batch: { size: 3 },
+      canInvoke: true,
+      reasons: [],
+    });
+
+    // A cleared or off-rule setting is readable, so the field names it and the planner reports nothing more.
+    const cleared = build([], { count: null, start: 1, step: 1, type: 'float_generator_arithmetic_sequence' });
+
+    expect(getProjectGraphReadiness(cleared.doc, snapshot)).toEqual({
+      batch: { size: null },
+      canInvoke: false,
+      reasons: ['"float_generator" has invalid input "generator".'],
+    });
+  });
+
+  it("compiles the executable graph without batch or generator nodes and keeps the fed input's static value", () => {
+    const { batchId, doc, noiseId } = build([1.5, 2.5], {
+      count: 3,
+      start: 1,
+      step: 1,
+      type: 'float_generator_arithmetic_sequence',
+    });
+    const compiled = compileProjectGraph(doc, batchTemplates);
+
+    expect(Object.keys(compiled.backendGraph.nodes)).toEqual([noiseId]);
+    expect(compiled.backendGraph.edges).toEqual([]);
+    expect(compiled.backendGraph.nodes[noiseId]?.cfg).toBe(7);
+    expect(compiled.nodes.map((node) => node.id)).not.toContain(batchId);
+  });
+
+  it('plans batch data beside the seed walk, sized for every session, and nothing while the batch is blocked', () => {
+    const { doc, noiseId } = build([1.5, 2.5]);
+    const stepping = projectGraphReducer(doc, {
+      fieldName: 'seed',
+      nodeId: noiseId,
+      seedMode: 'increment',
+      type: 'setFieldSeedMode',
+    });
+    const plan = planWorkflowSubmission(stepping, batchTemplates, { batchCount: 3 });
+
+    expect(plan).toMatchObject({
+      batchCount: 3,
+      batchData: [[{ fieldName: 'cfg', items: [1.5, 2.5], nodeId: noiseId }]],
+      batchSize: 2,
+      seeds: [{ fieldName: 'seed', nodeId: noiseId, seed: 0, seedStep: 1 }],
+    });
+    // Three runs of two sessions: the next authored seed sits past all six.
+    expect(plan?.seedAdvances).toEqual([
+      { fieldName: 'seed', fromSeed: 0, nodeId: noiseId, seedMode: 'increment', toSeed: 6 },
+    ]);
+
+    expect(planWorkflowSubmission(build([]).doc, batchTemplates, { batchCount: 1 })).toBeNull();
+    expect(planWorkflowSubmission(doc, batchTemplates, { batchCount: 6_000 })).toBeNull();
   });
 });

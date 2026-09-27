@@ -32,23 +32,29 @@ export type WorkflowNodeOutcome = 'completed' | 'failed';
 
 export interface WorkflowNodeChromeState {
   invalid?: boolean;
+  /** The node's version differs from its template's; it still runs, so the tint is a warning, not an error. */
+  outdated?: boolean;
   outcome?: WorkflowNodeOutcome | null;
   running?: boolean;
   selected: boolean;
 }
 
-const getNodeBorderColor = ({ invalid, outcome, running }: WorkflowNodeChromeState): string => {
+const getNodeBorderColor = ({ invalid, outcome, outdated, running }: WorkflowNodeChromeState): string => {
   if (invalid) {
     return 'red.solid';
   }
   if (running) {
     return 'brand.solid';
   }
-  if (outcome === 'completed') {
-    return 'fg.success';
-  }
+  // A failed run outranks a stale version: the nodes that cannot be updated are the ones most likely to fail.
   if (outcome === 'failed') {
     return 'border.error';
+  }
+  if (outdated) {
+    return 'border.warning';
+  }
+  if (outcome === 'completed') {
+    return 'fg.success';
   }
 
   return 'border.emphasized';

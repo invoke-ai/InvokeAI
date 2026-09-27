@@ -37,6 +37,12 @@ export interface FieldInputTemplate {
   exclusiveMinimum: number | null;
   exclusiveMaximum: number | null;
   multipleOf: number | null;
+  /** Item-count bounds of a collection; absent on templates built before lists were editable. */
+  minItems?: number | null;
+  maxItems?: number | null;
+  /** String length bounds, applied per item for string collections. */
+  minLength?: number | null;
+  maxLength?: number | null;
   uiModelBase: string[] | null;
   uiModelFormat: string[] | null;
   uiModelType: string[] | null;

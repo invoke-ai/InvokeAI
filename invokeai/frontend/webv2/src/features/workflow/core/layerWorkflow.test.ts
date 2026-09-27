@@ -272,6 +272,50 @@ describe('layer workflow binding discovery', () => {
   });
 });
 
+describe('layer workflow batch guard', () => {
+  it('never runs a document with batch nodes, which a single layer graph cannot expand', () => {
+    const floatType = { batch: false, cardinality: 'SINGLE' as const, name: 'FloatField' };
+    const processorTemplate = template(
+      'processor',
+      {
+        cfg: input('cfg', { default: 7, input: 'direct', title: 'CFG', type: floatType }),
+        source: input('source', { input: 'direct', title: 'Source', uiOrder: 0 }),
+      },
+      { image: output('image', { title: 'Result' }) }
+    );
+    const batchTemplate = template('float_batch', {
+      batch_group_id: input('batch_group_id', {
+        default: 'None',
+        input: 'direct',
+        options: ['None'],
+        type: { batch: false, cardinality: 'SINGLE', name: 'EnumField' },
+      }),
+      floats: input('floats', {
+        default: [],
+        required: true,
+        type: { batch: true, cardinality: 'COLLECTION', name: 'FloatField' },
+      }),
+    });
+    const templates = { float_batch: batchTemplate, processor: processorTemplate };
+    const processor = node('processor', processorTemplate);
+    const batch = node('batch', batchTemplate);
+
+    batch.data.inputs.floats = { label: '', name: 'floats', value: [1, 2] };
+
+    const plain = document([processor]);
+    const batched = document(
+      [processor, batch],
+      [{ id: 'e', source: 'batch', sourceHandle: 'value', target: 'processor', targetHandle: 'cfg', type: 'default' }]
+    );
+    const outputBinding = getLayerWorkflowOutputs(plain, templates)[0]!;
+
+    expect(getRunnableLayerWorkflowInputs(plain, loaded(templates), outputBinding)).toEqual([
+      binding('processor', 'source', 'processor → Source'),
+    ]);
+    expect(getRunnableLayerWorkflowInputs(batched, loaded(templates), outputBinding)).toEqual([]);
+  });
+});
+
 describe('layer workflow dialog selection', () => {
   it('defaults to Gallery and the first output that has a runnable input', () => {
     const firstOutput = binding('first-output', 'image', 'First output');

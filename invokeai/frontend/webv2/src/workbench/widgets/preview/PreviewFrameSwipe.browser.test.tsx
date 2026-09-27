@@ -458,6 +458,25 @@ describe('PreviewFrame touch swipe', () => {
     expect(carousel.onNavigate).not.toHaveBeenCalled();
   });
 
+  it('completes a video swipe that the browser or the player cancels midway', async () => {
+    const carousel = await renderCarousel({ items: [makeItem('red'), makeItem('clip', 'video'), makeItem('blue')] });
+    const video = carousel.media();
+    const y = video.getBoundingClientRect().top + 20;
+    const base = performance.now();
+
+    // Nothing native is left to claim one-finger travel on the stage.
+    expect(getComputedStyle(carousel.content().parentElement!).touchAction).toBe('none');
+
+    await interact(() => touch('pointerdown', video, 200, y, base), 0);
+    await interact(() => touch('pointermove', document, 170, y, base + 16), 0);
+    await interact(() => touch('pointermove', document, 140, y, base + 32), 0);
+    // The cancel arrives well after the last move; the flick it interrupted still counts.
+    await interact(() => touch('pointercancel', document, 140, y, base + 400), 0);
+    await vi.waitFor(() => expect(carousel.media().getAttribute('alt')).toBe('blue'));
+
+    expect(carousel.onNavigate).toHaveBeenCalledExactlyOnceWith(1);
+  });
+
   it('swipes a video from its picture but leaves the native control bar alone', async () => {
     const carousel = await renderCarousel({ items: [makeItem('red'), makeItem('clip', 'video'), makeItem('blue')] });
     const video = carousel.media();

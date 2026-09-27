@@ -2,6 +2,12 @@ import { SEED_MAX } from '@platform/core/seed';
 
 import type { FieldInputTemplate, FieldType, WorkflowFieldInstance } from './types';
 
+import {
+  getWorkflowGeneratorInvalidReason,
+  isWorkflowGeneratorFieldTypeName,
+  parseWorkflowGeneratorValue,
+} from './batch';
+
 export const getEffectiveWorkflowFieldDescription = (
   instance: WorkflowFieldInstance | undefined,
   template: FieldInputTemplate | undefined
@@ -17,8 +23,11 @@ const STATEFUL_FIELD_TYPE_NAMES = new Set([
   'ColorField',
   'EnumField',
   'FloatField',
+  'FloatGeneratorField',
   'ImageField',
+  'ImageGeneratorField',
   'IntegerField',
+  'IntegerGeneratorField',
   // Collection loaders accept scalar or list LoRA fields; edit lists inline without extra selector/collector
   // nodes.
   'LoRAField',
@@ -26,6 +35,9 @@ const STATEFUL_FIELD_TYPE_NAMES = new Set([
   'SchedulerField',
   'SavedWorkflowField',
   'StringField',
+  'StringGeneratorField',
+  'StylePresetField',
+  'SystemPromptField',
   'VideoField',
 ]);
 
@@ -44,20 +56,26 @@ const MODEL_FIELD_TYPE_NAMES = new Set([
 export const isModelFieldType = (type: FieldType): boolean => MODEL_FIELD_TYPE_NAMES.has(type.name);
 
 /** Collection field types with a direct-input list widget; other collections are connection-only. */
-const DIRECT_COLLECTION_FIELD_TYPE_NAMES = new Set(['ImageField']);
+const DIRECT_COLLECTION_FIELD_TYPE_NAMES = new Set(['FloatField', 'ImageField', 'IntegerField', 'StringField']);
+
+/** A list the editor can author item by item. */
+export const isEditableCollectionFieldType = (type: FieldType): boolean =>
+  type.cardinality === 'COLLECTION' && DIRECT_COLLECTION_FIELD_TYPE_NAMES.has(type.name);
 
 /** True when the field renders an editable control on the node / linear form. */
 export const isDirectInputField = (template: FieldInputTemplate): boolean =>
   template.input !== 'connection' &&
   isStatefulFieldType(template.type) &&
-  (template.type.cardinality !== 'COLLECTION' || DIRECT_COLLECTION_FIELD_TYPE_NAMES.has(template.type.name));
+  (template.type.cardinality !== 'COLLECTION' || isEditableCollectionFieldType(template.type));
 
 /** A field can be exposed to the Linear UI when it can be edited directly. */
 export const isExposableField = (template: FieldInputTemplate): boolean => isDirectInputField(template);
 
-/** Numeric fields whose linear-form element can show a randomize button. */
+/** Scalar numeric fields whose linear-form element can show a randomize button. */
 export const isShuffleableField = (template: FieldInputTemplate): boolean =>
-  (template.type.name === 'IntegerField' || template.type.name === 'FloatField') && isDirectInputField(template);
+  (template.type.name === 'IntegerField' || template.type.name === 'FloatField') &&
+  template.type.cardinality !== 'COLLECTION' &&
+  isDirectInputField(template);
 
 const countDecimals = (value: number): number => {
   const [, fraction = ''] = String(value).split('.');
@@ -129,11 +147,27 @@ const isNonEmptyString = (value: unknown): value is string => typeof value === '
 const hasNonEmptyStringProp = (value: unknown, prop: string): boolean =>
   typeof value === 'object' && value !== null && isNonEmptyString((value as Record<string, unknown>)[prop]);
 
-/** A LoRA model identifier paired with its weight — one entry of a LoRA collection field. */
+/** The id inside a record-reference value such as `{ style_preset_id }`, or null when absent. */
+export const getFieldRecordId = (value: unknown, prop: string): string | null =>
+  hasNonEmptyStringProp(value, prop) ? ((value as Record<string, string>)[prop] as string) : null;
+
+/** A LoRA model identifier paired with its weight — one entry of a LoRA collection field. `null` is a cleared weight. */
 export interface LoraFieldCollectionEntry {
   lora: { base: string; hash: string; key: string; name: string; type: string };
-  weight: number;
+  weight: number | null;
 }
+
+/**
+ * The Generate LoRA weight bounds, restated: `@features/generation/settings` is side-effectful and would pull the
+ * Generate settings core into the workflow boot graph. A core test pins the two together.
+ */
+export const LORA_FIELD_WEIGHT_RANGE = { max: 10, min: -10 } as const;
+
+export const isLoraFieldWeightValid = (weight: unknown): weight is number =>
+  typeof weight === 'number' &&
+  Number.isFinite(weight) &&
+  weight >= LORA_FIELD_WEIGHT_RANGE.min &&
+  weight <= LORA_FIELD_WEIGHT_RANGE.max;
 
 /** Require complete backend model identifiers; key-only entries cannot render meaningfully or enqueue successfully. */
 export const isLoraFieldCollectionEntry = (value: unknown): value is LoraFieldCollectionEntry => {
@@ -145,9 +179,26 @@ export const isLoraFieldCollectionEntry = (value: unknown): value is LoraFieldCo
 
   return (
     ['base', 'hash', 'key', 'name', 'type'].every((prop) => hasNonEmptyStringProp(entry.lora, prop)) &&
-    typeof entry.weight === 'number' &&
-    Number.isFinite(entry.weight)
+    (entry.weight === null || (typeof entry.weight === 'number' && Number.isFinite(entry.weight)))
   );
+};
+
+const getLoraCollectionInvalidReason = (items: readonly unknown[]): string | null => {
+  for (const [index, item] of items.entries()) {
+    if (!isLoraFieldCollectionEntry(item)) {
+      return `Item ${index + 1} is not a readable LoRA.`;
+    }
+
+    if (item.weight === null) {
+      return `Item ${index + 1} has no weight.`;
+    }
+
+    if (!isLoraFieldWeightValid(item.weight)) {
+      return `Item ${index + 1} needs a weight from ${LORA_FIELD_WEIGHT_RANGE.min} to ${LORA_FIELD_WEIGHT_RANGE.max}.`;
+    }
+  }
+
+  return null;
 };
 
 /**
@@ -205,6 +256,60 @@ const isNumberFieldValueValid = (template: FieldInputTemplate, value: unknown): 
   return true;
 };
 
+const isStringFieldValueValid = (template: FieldInputTemplate, value: unknown): boolean => {
+  if (typeof value !== 'string') {
+    return false;
+  }
+
+  const minLength = finiteNumberOrNull(template.minLength);
+  const maxLength = finiteNumberOrNull(template.maxLength);
+
+  return (minLength === null || value.length >= minLength) && (maxLength === null || value.length <= maxLength);
+};
+
+/** One entry of an editable list, judged by the template's per-item rules. */
+export const isWorkflowCollectionItemValid = (template: FieldInputTemplate, item: unknown): boolean => {
+  switch (template.type.name) {
+    case 'StringField':
+      return isStringFieldValueValid(template, item);
+    case 'IntegerField':
+    case 'FloatField':
+      return isNumberFieldValueValid(template, item);
+    case 'ImageField':
+      return hasNonEmptyStringProp(item, 'image_name');
+    default:
+      return item !== undefined && item !== null;
+  }
+};
+
+/** Count rules first, then the first bad entry, so the message names one thing to fix. */
+const getCollectionInvalidReason = (template: FieldInputTemplate, items: readonly unknown[]): string | null => {
+  const minItems = finiteNumberOrNull(template.minItems);
+  const maxItems = finiteNumberOrNull(template.maxItems);
+
+  if (minItems !== null && minItems > 0 && items.length === 0) {
+    return 'Collection is empty.';
+  }
+
+  if (minItems !== null && items.length < minItems) {
+    return `Needs at least ${minItems} items.`;
+  }
+
+  if (maxItems !== null && items.length > maxItems) {
+    return `Allows at most ${maxItems} items.`;
+  }
+
+  const badIndex = items.findIndex((item) => !isWorkflowCollectionItemValid(template, item));
+
+  if (badIndex === -1) {
+    return null;
+  }
+
+  return items[badIndex] === null || items[badIndex] === undefined
+    ? `Item ${badIndex + 1} is empty.`
+    : `Item ${badIndex + 1} is invalid.`;
+};
+
 const isColorValueValid = (value: unknown): boolean => {
   if (typeof value !== 'object' || value === null) {
     return false;
@@ -220,11 +325,28 @@ const isColorValueValid = (value: unknown): boolean => {
 };
 
 export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: unknown): boolean => {
+  if (isWorkflowGeneratorFieldTypeName(template.type.name)) {
+    const generator = parseWorkflowGeneratorValue(template.type.name, value);
+
+    return generator !== null && getWorkflowGeneratorInvalidReason(generator) === null;
+  }
+
+  if (
+    template.type.cardinality === 'COLLECTION' &&
+    (template.type.name === 'StringField' ||
+      template.type.name === 'IntegerField' ||
+      template.type.name === 'FloatField' ||
+      template.type.name === 'ImageField')
+  ) {
+    return Array.isArray(value) && getCollectionInvalidReason(template, value) === null;
+  }
+
   switch (template.type.name) {
     case 'SavedWorkflowField':
+      return typeof value === 'string';
     case 'StringField':
       // An empty string is a legitimate string value (e.g. a blank negative prompt).
-      return typeof value === 'string';
+      return isStringFieldValueValid(template, value);
     case 'IntegerField':
     case 'FloatField':
       return isNumberFieldValueValid(template, value);
@@ -246,9 +368,16 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
     case 'LoRAField':
       // An empty list is a legitimate value: a collection loader with no LoRAs passes its
       // models through untouched.
-      return Array.isArray(value) ? value.every(isLoraFieldCollectionEntry) : isLoraFieldCollectionEntry(value);
+      return (
+        (Array.isArray(value) || isLoraFieldCollectionEntry(value)) &&
+        getLoraCollectionInvalidReason(toLoraFieldCollectionList(value)) === null
+      );
     case 'SchedulerField':
       return isNonEmptyString(value);
+    case 'StylePresetField':
+      return hasNonEmptyStringProp(value, 'style_preset_id');
+    case 'SystemPromptField':
+      return hasNonEmptyStringProp(value, 'system_prompt_id');
     case 'BoardField':
       return (
         value === undefined ||
@@ -258,10 +387,6 @@ export const isWorkflowFieldValueValid = (template: FieldInputTemplate, value: u
         hasNonEmptyStringProp(value, 'board_id')
       );
     case 'ImageField':
-      if (template.type.cardinality === 'COLLECTION') {
-        return Array.isArray(value) && value.every((item) => hasNonEmptyStringProp(item, 'image_name'));
-      }
-
       return hasNonEmptyStringProp(value, 'image_name');
     case 'VideoField':
       // COLLECTION video values are arrays no direct-input widget authors; keep the
@@ -297,6 +422,25 @@ export const getWorkflowFieldInvalidReason = ({
     return null;
   }
 
+  // An editable list reports which count or entry rule it breaks; the generic reasons cannot say.
+  if (template.type.cardinality === 'COLLECTION' && Array.isArray(value) && isDirectInputField(template)) {
+    return getCollectionInvalidReason(template, value);
+  }
+
+  if (template.type.name === 'LoRAField' && isDirectInputField(template) && !isEmptyOptionalValue(value)) {
+    return getLoraCollectionInvalidReason(toLoraFieldCollectionList(value));
+  }
+
+  if (
+    isWorkflowGeneratorFieldTypeName(template.type.name) &&
+    isDirectInputField(template) &&
+    !isEmptyOptionalValue(value)
+  ) {
+    const generator = parseWorkflowGeneratorValue(template.type.name, value);
+
+    return generator === null ? 'Invalid value.' : getWorkflowGeneratorInvalidReason(generator);
+  }
+
   if (!template.required) {
     return isDirectInputField(template) && !isWorkflowFieldValueValid(template, value) ? 'Invalid value.' : null;
   }
@@ -309,7 +453,11 @@ export const getWorkflowFieldInvalidReason = ({
     return null;
   }
 
-  return isDirectInputField(template) ? 'Required value.' : 'Required connection.';
+  if (!isDirectInputField(template)) {
+    return 'Required connection.';
+  }
+
+  return isEmptyOptionalValue(value) ? 'Required value.' : 'Invalid value.';
 };
 
 // Raw hex (not Chakra tokens) because xyflow handles are styled inline.

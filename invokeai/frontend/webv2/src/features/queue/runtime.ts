@@ -14,7 +14,9 @@ import {
   isQueuePromptSeedBehaviour,
   isQueueSeedStep,
   isQueueWorkflowSeed,
+  isQueueWorkflowBatchDatum,
   MAX_QUEUE_BATCH_ITEMS,
+  type QueueWorkflowSeed,
 } from '@features/queue/core/promptBatch';
 import { shouldSubmitPendingQueueItem } from '@features/queue/core/submissionRules';
 import { progressImageStore } from '@features/queue/data/progressImageStore';
@@ -148,6 +150,46 @@ const areQueueWorkflowSeedsValid = (seeds: unknown, graph: { nodes?: Record<stri
   });
 };
 
+/**
+ * Every group zips datums of one length onto fields of nodes the graph still has, no field is fed twice (by
+ * another group or by a seed), and the product stays within what the queue accepts.
+ */
+const areQueueWorkflowBatchGroupsValid = (
+  batchData: unknown,
+  graph: { nodes?: Record<string, unknown> },
+  seeds: readonly QueueWorkflowSeed[] | undefined,
+  batchCount: number
+): boolean => {
+  if (!Array.isArray(batchData) || batchData.length === 0) {
+    return false;
+  }
+
+  const targets = new Set((seeds ?? []).map((seed) => `${seed.nodeId}:${seed.fieldName}`));
+  let sessions = 1;
+
+  for (const group of batchData) {
+    if (!Array.isArray(group) || group.length === 0 || !group.every(isQueueWorkflowBatchDatum)) {
+      return false;
+    }
+
+    const length = group[0].items.length;
+
+    for (const datum of group) {
+      const target = `${datum.nodeId}:${datum.fieldName}`;
+
+      if (datum.items.length !== length || !graph.nodes || !(datum.nodeId in graph.nodes) || targets.has(target)) {
+        return false;
+      }
+
+      targets.add(target);
+    }
+
+    sessions *= length;
+  }
+
+  return sessions * batchCount <= MAX_QUEUE_BATCH_ITEMS;
+};
+
 export const createQueueItemBackendSubmission = (
   project: Pick<QueueHistoryProject, 'id'>,
   queueItem: QueueItem
@@ -221,6 +263,13 @@ export const createQueueItemBackendSubmission = (
 
   if (submission.seeds !== undefined && !areQueueWorkflowSeedsValid(submission.seeds, submission.graph)) {
     return { error: 'Queue item has malformed workflow seed metadata.', kind: 'invalid' };
+  }
+
+  if (
+    submission.batchData !== undefined &&
+    !areQueueWorkflowBatchGroupsValid(submission.batchData, submission.graph, submission.seeds, submission.batchCount)
+  ) {
+    return { error: 'Queue item has malformed workflow batch metadata.', kind: 'invalid' };
   }
 
   // `libraryWorkflowId` is provenance for the completed-run sink, not something

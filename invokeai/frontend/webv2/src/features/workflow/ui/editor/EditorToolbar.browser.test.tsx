@@ -74,6 +74,38 @@ describe('editor toolbar', () => {
     expect(new Set(buttonBoxes())).toEqual(new Set(['28x28']));
   });
 
+  it('offers to update outdated nodes only while there are some, without breaking the toolbar grid', async () => {
+    await render(1);
+    expect(host!.querySelector('button[aria-label="nodes.updateAllNodes"]')).toBeNull();
+
+    const onUpdateNodes = vi.fn();
+
+    await settle(() => {
+      root?.render(
+        <ChakraProvider value={system}>
+          <EditorToolbar
+            nodeOpacity={1}
+            tool="pan"
+            updatableNodeCount={2}
+            onNodeOpacityChange={vi.fn()}
+            onToolChange={vi.fn()}
+            onUpdateNodes={onUpdateNodes}
+          />
+        </ChakraProvider>
+      );
+    });
+
+    const update = host!.querySelector<HTMLButtonElement>('button[aria-label="nodes.updateAllNodes"]')!;
+
+    expect(update).not.toBeNull();
+    expect(new Set(buttonBoxes())).toEqual(new Set(['28x28']));
+    update.focus();
+    await settle(() => update.click());
+    expect(onUpdateNodes).toHaveBeenCalledOnce();
+    // The button leaves with the last outdated node; focus is already on its neighbour.
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Fit view');
+  });
+
   it('states node opacity the way the tool buttons state themselves', async () => {
     await render(0.5);
     const opacity = host!.querySelector<HTMLButtonElement>('button[aria-label="Node opacity"]')!;

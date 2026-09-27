@@ -1,12 +1,12 @@
 ---
 title: Video Workflows
-description: A plain-language guide to the ready-made Wan 2.2 and MiniMax H3 video workflows that ship with InvokeAI — which one to pick, and how to run it.
-lastUpdated: 2026-08-22
+description: A plain-language guide to the ready-made Wan 2.2, MiniMax H3 and LTX-2 video workflows that ship with InvokeAI — which one to pick, and how to run it.
+lastUpdated: 2026-09-25
 ---
 
 import { Card, CardGrid, Steps, LinkButton } from '@astrojs/starlight/components';
 
-InvokeAI ships **sixteen ready-made video workflows** — ten for **Wan 2.2** and six for **MiniMax H3** — so you can start generating video without wiring up nodes yourself. Each one is a complete recipe — open it from the **Workflows** library, pick your models, type a prompt (and/or drop in an image), and press **Invoke**.
+InvokeAI ships **twenty-six ready-made video workflows** — ten for **Wan 2.2**, six for **MiniMax H3** and ten for **LTX-2** — so you can start generating video without wiring up nodes yourself. Each one is a complete recipe — open it from the **Workflows** library, pick your models, type a prompt (and/or drop in an image), and press **Invoke**.
 
 This page helps you choose the right workflow and run it. For how the models work under the hood, VRAM details, and troubleshooting, see the [Video Generation guide](/concepts/video-generation/).
 
@@ -22,7 +22,7 @@ Video generation is a prototype feature. These workflows and the models behind t
 
 ## Before you start
 
-**1. Install the video models.** Open the **Model Manager** and install a starter bundle: **Wan 2.2 Text-to-Video**, **Wan 2.2 Image-to-Video**, and/or **MiniMax H3**. The [Video Generation guide explains the bundles and what fits your GPU](/concepts/video-generation/#the-models).
+**1. Install the video models.** Open the **Model Manager** and install a starter bundle: **Wan 2.2 Text-to-Video**, **Wan 2.2 Image-to-Video**, **MiniMax H3**, and/or **LTX-2.5**. The [Video Generation guide explains the bundles and what fits your GPU](/concepts/video-generation/#the-models).
 
 **2. You'll select models when you open a workflow.** The shipped workflows come with their model slots **left empty on purpose** — every InvokeAI install stores models a little differently, so a workflow can't point at yours automatically. When you open one, look at its **Notes** panel (the note icon in the workflow editor): it lists exactly which model to pick in each slot. Drop those in once and you're set.
 
@@ -34,19 +34,22 @@ Whenever a workflow won't run because a model field is empty, open its **Notes**
 
 ## Which workflow should I use?
 
-The Wan workflows come in three families — **Text to Video**, **Image to Video**, and **Extend Video** — each with a high-quality option, a "concept LoRA" variant, and a lighter low-VRAM option — plus an **Interpolate** workflow that bridges two images and an **Extend Video to Image** variant that steers a continuation toward a target frame. The six **MiniMax H3** workflows cover the same conditioning modes — plus reference-conditioned generation — and add sound.
+The Wan workflows come in three families — **Text to Video**, **Image to Video**, and **Extend Video** — each with a high-quality option, a "concept LoRA" variant, and a lighter low-VRAM option — plus an **Interpolate** workflow that bridges two images and an **Extend Video to Image** variant that steers a continuation toward a target frame. The six **MiniMax H3** workflows cover the same conditioning modes — plus reference-conditioned generation — and add sound. The ten **LTX-2** workflows cover every one of those modes with sound, add **audio-to-video** and **video-to-audio**, and include a two-stage high-resolution text-to-video and a LoRA-collection variant.
 
 | I want to… | Use | Notes |
 |---|---|---|
 | Make a clip from a text description | **Text to Video - Wan 2.2 Lightning** | Best quality, fast. Start here. |
-| Make a clip **with a soundtrack** | **Text to Video - MiniMax H3** | H3 generates synchronized stereo audio with every video. |
-| Animate an existing image | **Image to Video - Wan 2.2 Lightning** or **First Frame to Video - MiniMax H3** | Your image becomes the first frame. |
-| Make a video that *ends on* an image | **Last Frame to Video - MiniMax H3** | H3 only — the video builds toward your image. |
-| Make a video between two images | **Interpolate 2 Images to Video - Wan 2.2 Lightning** or **First and Last Frame to Video - MiniMax H3** | Provide a start and end image; the model interpolates between them. |
-| Make a video longer than one generation | **Extend Video - Wan 2.2 Lightning** or **Extend Video - MiniMax H3** | Continues an existing video and stitches the pieces together. |
+| Make a clip **with a soundtrack** | **Text to Video - LTX-2** or **Text to Video - MiniMax H3** | Both generate synchronized stereo audio with every video. |
+| Make a **high-resolution** clip | **Text to Video - LTX-2 Two-Stage** | Generates at half size, upscales, then refines at 1024p or 1536p. Slow. |
+| Animate an existing image | **Image to Video - Wan 2.2 Lightning**, **First Frame to Video - MiniMax H3** or **First Frame to Video - LTX-2** | Your image becomes the first frame. |
+| Make a video that *ends on* an image | **Last Frame to Video - MiniMax H3** or **Last Frame to Video - LTX-2** | The video builds toward your image. |
+| Make a video between two images | **Interpolate 2 Images to Video - Wan 2.2 Lightning**, **First and Last Frame to Video - MiniMax H3** or **First and Last Frame to Video - LTX-2** | Provide a start and end image; the model interpolates between them. |
+| Make a video longer than one generation | **Extend Video - Wan 2.2 Lightning**, **Extend Video - MiniMax H3** or **Extend Video - LTX-2** | Continues an existing video and stitches the pieces together. H3 and LTX-2 continue the soundtrack too. |
 | Make a clip **in the style/likeness of reference media** | **Reference to Video - MiniMax H3** | Conditions on up to 3 reference videos and 9 images (Ref2VA transformer required); reference order changes the result. |
-| Extend a video toward a specific end frame | **Extend Video to Image - Wan 2.2 Lightning** | Continues a video and interpolates the new part to a target image. |
-| Add my own style/subject LoRAs | the **w/ Concept LoRAs** variant of a Wan workflow | Same as the base workflow, plus slots for your LoRAs. |
+| Extend a video toward a specific end frame | **Extend Video to Image - Wan 2.2 Lightning** or **Extend Video to Image - LTX-2** | Continues a video and interpolates the new part to a target image. |
+| Make a picture **for a soundtrack** — a song, a voice recording | **Audio to Video - LTX-2** | The audio is kept as-is; the video is generated to match it, including lip movement. |
+| Add a **soundtrack to a silent or existing clip** | **Video to Audio - LTX-2** | Your footage is kept as-is; a new stereo soundtrack is generated for it. |
+| Add my own style/subject LoRAs | the **w/ Concept LoRAs** variant of a Wan workflow, or **Text to Video - LTX-2 w/ LoRA Collection** | Same as the base workflow, plus your LoRAs. |
 | Run on a smaller GPU (≈12–16 GB) | a **TI2V-5B (Low Quality)** workflow | Smaller model, lower memory, lower quality. |
 
 If you're not sure, start with **Text to Video - Wan 2.2 Lightning** to get a feel for it, then move to Image-to-Video and Extend — or straight to **Text to Video - MiniMax H3** if you want audio and have the hardware for it.
@@ -159,18 +162,66 @@ MiniMax H3 is distributed under a restrictive community license that excludes ce
 
 ---
 
+## Bundled LTX-2 workflows
+
+Every LTX-2 workflow outputs an MP4 with a **jointly generated stereo soundtrack** (or, for audio-to-video, your own). Each works with either transformer: the **Dev** build runs the guided 30-step recipe, and the **Distilled** build a fixed 8 steps that ignore the Steps and CFG fields. The canvas comes from your image, source video or clip where there is one — except in Audio to Video, which generates the picture — and otherwise the **Width** and **Height** fields set only the aspect ratio. **Target Resolution** sets the size.
+
+<CardGrid>
+  <Card title="Text to Video - LTX-2" icon="pencil">
+    Type a prompt, get a ~5-second clip with sound. Describe the audio you expect, not just the picture.
+  </Card>
+  <Card title="Text to Video - LTX-2 Two-Stage" icon="pencil">
+    The high-resolution version: generates at half the canvas, doubles it with LTX-2's latent upscaler, then refines it at full size. Defaults to 1024p (1792×1024 at 16:9); 1536p also works, but 512p–768p fail here — use the plain Text to Video workflow for those. Much slower — minutes on Distilled, far longer on Dev.
+  </Card>
+  <Card title="Text to Video - LTX-2 w/ LoRA Collection" icon="pencil">
+    Text-to-video plus a list of your own LTX-2 LoRAs, each with its own weight. Leave the list empty to run the base model.
+  </Card>
+  <Card title="First Frame to Video - LTX-2" icon="star">
+    Your image becomes the opening frame; the video and its soundtrack continue from it.
+  </Card>
+  <Card title="Last Frame to Video - LTX-2" icon="star">
+    Provide an **ending** image and the video builds toward it.
+  </Card>
+  <Card title="First and Last Frame to Video - LTX-2" icon="random">
+    Provide both; the clip starts on the first image and lands on the second. Give the two images the same aspect ratio.
+  </Card>
+  <Card title="Extend Video - LTX-2" icon="clock">
+    Continue an existing clip. The continuation starts from the source's last few frames **and its closing sound**, and joins onto it with a cross-fade over the same span, so the picture and the soundtrack both carry across the join. **Context Frames** sets how much of the source is carried in.
+  </Card>
+  <Card title="Extend Video to Image - LTX-2" icon="clock">
+    The same, with a **Last Frame** image: the continuation ends on your image. Give it the source clip's aspect ratio.
+  </Card>
+  <Card title="Audio to Video - LTX-2" icon="seti:audio">
+    Drop in a clip — or an audio file uploaded to the gallery — and LTX-2 generates a picture for its soundtrack, down to lip movement. The soundtrack decides the length, and the output carries the original recording. Say in the prompt who or what is making the sound.
+  </Card>
+  <Card title="Video to Audio - LTX-2" icon="seti:video">
+    Drop in a clip and LTX-2 generates a soundtrack for it. The clip decides the length and frame rate, and the output is your original footage with the new audio.
+  </Card>
+</CardGrid>
+
+:::tip[Tuning the LTX-2 workflows]
+* **Use a single-pass resolution** (512p, 704p or 768p) everywhere except the Two-Stage workflow. The other workflows have no refine pass, so 1024p and 1536p render *smaller* than 768p. Audio-to-video and video-to-audio cannot run two-stage at all.
+* **Number of Frames** must be on LTX-2's 8·n + 1 grid (9, 17, … 121, … 241); unlike the Video panel, the workflows do not snap other values, and the run fails at the Denoise node. The frame rate sets how much audio is generated, as well as the clip's duration.
+* **Extending:** **Context Frames** defaults to 17 (about 0.7 s at 24 fps) — enough for motion, but only about one syllable of sound. For singing or other rhythmic material, raise it along the same grid (25, 33, 41, 49 …). **Number of Frames** *includes* the context, so the extension adds Number of Frames − Context Frames new frames; raise both together.
+* **The Distilled LoRA** (the 8-step fast path for the Dev transformer) goes in the LoRA Collection workflow's list. Also set **Schedule** to `distilled`, **Steps** to 8 and **CFG** to 1 in the form — the `auto` schedule follows the checkpoint, not the LoRA.
+
+The **Notes** panel of each lists the models to select in the form's **Model** section: an LTX-2.5 transformer for **Model**, the LTX-2.5 Components install for **Components**, and the Gemma-4 text encoder for **Text Encoder**.
+:::
+
+---
+
 ## Running a workflow
 
 <Steps>
 
 1. **Open the Workflows tab** and load one of the workflows from the library.
 
-2. **Read the Notes** (note icon) and select the models it lists — the main model, VAE, and text encoder, plus the Lightning LoRA pair on the A14B workflows, or the H3 loader's three selections plus the Turbo LoRA on the MiniMax workflows.
+2. **Read the Notes** (note icon) and select the models it lists — the main model, VAE, and text encoder, plus the Lightning LoRA pair on the A14B workflows, the H3 loader's three selections plus the Turbo LoRA on the MiniMax workflows, or the LTX-2 loader's three selections on the LTX-2 workflows.
 
 3. **Set your inputs:**
    - *Text to Video* — type a **positive prompt** describing the scene and motion.
    - *Image to Video / First (or Last) Frame to Video* — drop a starting (or ending) **image** into the image field, and optionally add a prompt.
-   - *Extend Video* — provide a **starting video** and use the sliders to pick where the continuation begins.
+   - *Extend Video* — provide a **starting video** and trim it with the **Start Frame** and **End Frame** sliders (they appear once the video is loaded); the continuation picks up from the end of the trimmed range.
 
 4. **(Optional) adjust resolution.** The defaults are chosen to balance speed and memory. If you hit an out-of-memory error, lower the resolution preset — see the [VRAM tips](#which-one-fits-my-gpu) below.
 

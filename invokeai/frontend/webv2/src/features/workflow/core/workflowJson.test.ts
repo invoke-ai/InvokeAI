@@ -557,3 +557,54 @@ describe('field label overrides', () => {
     });
   });
 });
+
+describe('batch and generator nodes', () => {
+  it('keeps legacy generator values and batch group ids verbatim through a load and save', () => {
+    const generator = {
+      count: 3,
+      max: 1,
+      min: 0,
+      seed: null,
+      type: 'float_generator_random_distribution_uniform',
+      values: [0.2, 0.4, 0.6],
+    };
+    const { document, warnings } = parseWorkflowJson({
+      edges: [],
+      name: 'Batch',
+      nodes: [
+        {
+          data: {
+            id: 'g',
+            inputs: { generator: { label: '', name: 'generator', value: generator } },
+            type: 'float_generator',
+          },
+          id: 'g',
+          position: { x: 0, y: 0 },
+          type: 'invocation',
+        },
+        {
+          data: {
+            id: 'b',
+            inputs: {
+              batch_group_id: { label: '', name: 'batch_group_id', value: 'Group 2' },
+              floats: { label: '', name: 'floats', value: [1, 2] },
+            },
+            type: 'float_batch',
+          },
+          id: 'b',
+          position: { x: 0, y: 0 },
+          type: 'invocation',
+        },
+      ],
+      version: '1.0.0',
+    });
+    const serialized = serializeWorkflowJson(document) as {
+      nodes: Array<{ data: { inputs: Record<string, { value: unknown }> } }>;
+    };
+
+    expect(warnings).toEqual([]);
+    expect(serialized.nodes[0]?.data.inputs.generator?.value).toEqual(generator);
+    expect(serialized.nodes[1]?.data.inputs.batch_group_id?.value).toBe('Group 2');
+    expect(serialized.nodes[1]?.data.inputs.floats?.value).toEqual([1, 2]);
+  });
+});

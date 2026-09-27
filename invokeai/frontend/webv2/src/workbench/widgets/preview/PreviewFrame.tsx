@@ -835,8 +835,10 @@ const PreviewVideo = ({
       fill="flex"
       padding={padding}
       paddingBottom={paddingBottom}
-      // Horizontal travel is the swipe's; without a swipe the browser keeps its native gestures.
-      touchAction={swipeNavigation ? 'pan-y pinch-zoom' : undefined}
+      // One-finger travel is the swipe's, exactly as on the image stage: any native pan left available here lets the
+      // browser (or the player's own controls) claim a swipe midway and cancel it. Without a swipe the browser keeps
+      // its native gestures.
+      touchAction={swipeNavigation ? 'none' : undefined}
       onPointerDown={swipeNavigation ? handleStagePointerDown : undefined}
     >
       <FittedFrame

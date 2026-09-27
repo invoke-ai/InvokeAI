@@ -1,15 +1,19 @@
 import { describe, expect, it } from 'vitest';
 
-import type { InvocationTemplate, ProjectGraphState, WorkflowEdge } from './types';
+import type { InvocationTemplate, ProjectGraphState, WorkflowEdge, WorkflowInvocationNode } from './types';
 
+import { CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX } from './callSavedWorkflow';
 import {
   buildInvocationNode,
   createProjectGraph,
   getFormChildren,
+  getNodeUpdateStatus,
   getProjectGraphUndoEntry,
+  getUpdatableNodeIds,
   isFieldExposed,
   normalizeProjectGraph,
   projectGraphReducer,
+  updateWorkflowNodes,
 } from './document';
 
 const template: InvocationTemplate = {
@@ -425,6 +429,23 @@ describe('getProjectGraphUndoEntry', () => {
     expect(getProjectGraphUndoEntry({ fieldName: 'a', nodeId: 'n', type: 'setFieldValue', value: true })).toEqual({
       label: 'Edit workflow field value',
     });
+    // Typing into a scalar list row streams like a scalar; picking images into a list does not.
+    expect(
+      getProjectGraphUndoEntry({ fieldName: 'a', nodeId: 'n', type: 'setFieldValue', value: [1, null, 'x'] })?.mergeKey
+    ).toBe('setFieldValue:n:a');
+    expect(
+      getProjectGraphUndoEntry({ fieldName: 'a', nodeId: 'n', type: 'setFieldValue', value: [{ image_name: 'a' }] })
+        ?.mergeKey
+    ).toBeUndefined();
+    // Typing generator settings folds per variant; switching variants starts a new step.
+    expect(
+      getProjectGraphUndoEntry({
+        fieldName: 'generator',
+        nodeId: 'n',
+        type: 'setFieldValue',
+        value: { input: 'a,b', splitOn: ',', type: 'string_generator_parse_string' },
+      })?.mergeKey
+    ).toBe('setFieldValue:n:generator:string_generator_parse_string');
     expect(
       getProjectGraphUndoEntry({ fieldName: 'workflow_id', nodeId: 'n', type: 'setFieldValue', value: 'workflow-a' })
     ).toEqual({
@@ -435,5 +456,267 @@ describe('getProjectGraphUndoEntry', () => {
     });
     expect(getProjectGraphUndoEntry({ nodeId: 'n', position: { x: 1, y: 1 }, type: 'setNodePosition' })).toBeNull();
     expect(getProjectGraphUndoEntry({ isOpen: false, nodeId: 'n', type: 'setNodeIsOpen' })).toBeNull();
+  });
+});
+
+describe('node updates', () => {
+  const input = (
+    name: string,
+    overrides: Partial<InvocationTemplate['inputs'][string]> = {}
+  ): InvocationTemplate['inputs'][string] => ({
+    ...(template.inputs.a as InvocationTemplate['inputs'][string]),
+    name,
+    title: name.toUpperCase(),
+    ...overrides,
+  });
+  const templateV110: InvocationTemplate = {
+    ...template,
+    inputs: { a: input('a'), b: input('b', { default: 5 }) },
+    version: '1.1.0',
+  };
+  const oldNode = (): WorkflowInvocationNode => ({
+    ...buildInvocationNode(template, { x: 4, y: 8 }),
+    data: {
+      ...buildInvocationNode(template, { x: 4, y: 8 }).data,
+      inputs: {
+        a: { label: 'Custom A', name: 'a', value: 3 },
+        z: { label: '', name: 'z', value: 'obsolete' },
+      },
+      label: 'My add',
+      notes: 'keep me',
+      useCache: false,
+    },
+    id: 'add-1',
+  });
+
+  it('reports whether a node can move to its template version', () => {
+    const node = oldNode();
+
+    expect(getNodeUpdateStatus(node, template)).toBe('current');
+    expect(getNodeUpdateStatus(node, templateV110)).toBe('updatable');
+    expect(getNodeUpdateStatus(node, { ...template, version: '2.0.0' })).toBe('incompatible');
+    expect(getNodeUpdateStatus(node, { ...template, version: 'next' })).toBe('incompatible');
+    expect(getNodeUpdateStatus(node, { ...template, type: 'subtract' })).toBe('incompatible');
+    expect(getNodeUpdateStatus({ ...node, data: { ...node.data, version: '1.2.0' } }, templateV110)).toBe('newer');
+    // Custom node packs ship prerelease tags and short versions; they still compare by their numbers.
+    expect(getNodeUpdateStatus({ ...node, data: { ...node.data, version: 'v1.0.0-beta.2' } }, templateV110)).toBe(
+      'updatable'
+    );
+    expect(getNodeUpdateStatus({ ...node, data: { ...node.data, version: '1.1' } }, templateV110)).toBe('current');
+  });
+
+  it('lists the nodes an update would move, leaving newer and incompatible ones out', () => {
+    const doc = {
+      ...createProjectGraph('update-test'),
+      nodes: [
+        oldNode(),
+        { ...oldNode(), data: { ...oldNode().data, version: '1.5.0' }, id: 'newer' },
+        { ...oldNode(), data: { ...oldNode().data, version: '0.9.0' }, id: 'major' },
+        { ...oldNode(), data: { ...oldNode().data, version: '1.1.0' }, id: 'current' },
+        { ...oldNode(), data: { ...oldNode().data, type: 'unknown' }, id: 'no-template' },
+      ],
+    };
+
+    expect(getUpdatableNodeIds(doc, { add: templateV110 })).toEqual(['add-1']);
+  });
+
+  it('merges fresh defaults under the stored node, drops inputs the template lost, and cleans their edges and form elements', () => {
+    const node = oldNode();
+    let doc: ProjectGraphState = {
+      ...createProjectGraph('update-test'),
+      edges: [
+        { id: 'e-a', source: 'src', sourceHandle: 'value', target: 'add-1', targetHandle: 'a', type: 'default' },
+        { id: 'e-z', source: 'src', sourceHandle: 'value', target: 'add-1', targetHandle: 'z', type: 'default' },
+      ],
+      nodes: [buildInvocationNode({ ...template, type: 'src' }, { x: 0, y: 0 }), node],
+    };
+
+    doc = { ...doc, nodes: doc.nodes.map((n) => (n.id === doc.nodes[0]?.id ? { ...n, id: 'src' } : n)) };
+    doc = projectGraphReducer(doc, { fieldIdentifier: { fieldName: 'a', nodeId: 'add-1' }, type: 'exposeField' });
+    doc = projectGraphReducer(doc, { fieldIdentifier: { fieldName: 'z', nodeId: 'add-1' }, type: 'exposeField' });
+
+    const update = updateWorkflowNodes(doc, { add: templateV110 });
+    const updated = update.document.nodes.find((n) => n.id === 'add-1');
+
+    expect(update.updatedNodeIds).toEqual(['add-1']);
+    expect(update.skippedNodeIds).toEqual([]);
+    expect(update.droppedEdgeIds).toEqual(['e-z']);
+    expect(update.droppedFormElementIds).toHaveLength(1);
+    expect(updated?.type === 'invocation' && updated.data).toMatchObject({
+      inputs: {
+        a: { label: 'Custom A', name: 'a', value: 3 },
+        b: { label: '', name: 'b', value: 5 },
+      },
+      label: 'My add',
+      notes: 'keep me',
+      useCache: false,
+      version: '1.1.0',
+    });
+    expect(updated?.type === 'invocation' ? Object.keys(updated.data.inputs) : []).toEqual(['a', 'b']);
+    expect(updated?.position).toEqual({ x: 4, y: 8 });
+    expect(update.document.edges.map((edge) => edge.id)).toEqual(['e-a']);
+    expect(isFieldExposed(update.document.form, { fieldName: 'a', nodeId: 'add-1' })).toBe(true);
+    expect(isFieldExposed(update.document.form, { fieldName: 'z', nodeId: 'add-1' })).toBe(false);
+  });
+
+  it('fills a cleared value from the template but keeps dynamic and extra-input node inputs', () => {
+    const cleared: WorkflowInvocationNode = {
+      ...oldNode(),
+      data: {
+        ...oldNode().data,
+        dynamicInputTemplates: { dyn: input('dyn') },
+        inputs: {
+          a: { label: '', name: 'a', value: undefined },
+          dyn: { label: '', name: 'dyn', value: 'dynamic' },
+          [`${CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX}x`]: {
+            label: '',
+            name: `${CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX}x`,
+            value: 1,
+          },
+        },
+      },
+    };
+    const doc = { ...createProjectGraph('update-test'), nodes: [cleared] };
+    const updated = updateWorkflowNodes(doc, { add: templateV110 }).document.nodes[0];
+
+    expect(updated?.type === 'invocation' ? updated.data.inputs : {}).toMatchObject({
+      a: { value: 1 },
+      b: { value: 5 },
+      dyn: { value: 'dynamic' },
+      [`${CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX}x`]: { value: 1 },
+    });
+
+    const metadata: WorkflowInvocationNode = {
+      ...oldNode(),
+      data: {
+        ...oldNode().data,
+        inputs: { extra: { label: '', name: 'extra', value: 'kept' } },
+        type: 'core_metadata',
+      },
+    };
+    const metadataUpdate = updateWorkflowNodes(
+      { ...createProjectGraph('update-test'), nodes: [metadata] },
+      { core_metadata: { ...templateV110, type: 'core_metadata' } }
+    ).document.nodes[0];
+
+    expect(metadataUpdate?.type === 'invocation' ? metadataUpdate.data.inputs.extra?.value : null).toBe('kept');
+  });
+
+  it('skips nodes newer than or a major away from their template and returns the same document when nothing changes', () => {
+    const newer: WorkflowInvocationNode = { ...oldNode(), data: { ...oldNode().data, version: '1.5.0' }, id: 'newer' };
+    const major: WorkflowInvocationNode = { ...oldNode(), data: { ...oldNode().data, version: '0.9.0' }, id: 'major' };
+    const current: WorkflowInvocationNode = {
+      ...oldNode(),
+      data: { ...oldNode().data, version: '1.1.0' },
+      id: 'current',
+    };
+    const doc = { ...createProjectGraph('update-test'), nodes: [newer, major, current] };
+    const update = updateWorkflowNodes(doc, { add: templateV110 });
+
+    expect(update.document).toBe(doc);
+    expect(update.updatedNodeIds).toEqual([]);
+    expect(update.skippedNodeIds).toEqual(['newer', 'major']);
+    expect(updateWorkflowNodes(doc, {}).document).toBe(doc);
+  });
+
+  it('moves an old image_collection list from collection to images unless collection is connected', () => {
+    const imageList = { batch: false, cardinality: 'COLLECTION' as const, name: 'ImageField' };
+    const collectionTemplate: InvocationTemplate = {
+      ...template,
+      inputs: {
+        collection: input('collection', { default: undefined, input: 'connection', type: imageList }),
+        images: input('images', { default: [], type: imageList }),
+      },
+      type: 'image_collection',
+      version: '1.0.2',
+    };
+    const images = [{ image_name: 'a.png' }];
+    const node = (id: string): WorkflowInvocationNode => ({
+      ...oldNode(),
+      data: {
+        ...oldNode().data,
+        inputs: { collection: { label: '', name: 'collection', value: images } },
+        type: 'image_collection',
+        version: '1.0.1',
+      },
+      id,
+    });
+    let doc: ProjectGraphState = {
+      ...createProjectGraph('update-test'),
+      edges: [
+        { id: 'e', source: 'src', sourceHandle: 'x', target: 'wired', targetHandle: 'collection', type: 'default' },
+      ],
+      nodes: [node('free'), node('wired')],
+    };
+
+    doc = projectGraphReducer(doc, {
+      fieldIdentifier: { fieldName: 'collection', nodeId: 'free' },
+      type: 'exposeField',
+    });
+
+    const update = updateWorkflowNodes(doc, { image_collection: collectionTemplate });
+    const free = update.document.nodes.find((n) => n.id === 'free');
+    const wired = update.document.nodes.find((n) => n.id === 'wired');
+
+    expect(free?.type === 'invocation' ? free.data.inputs : {}).toMatchObject({
+      collection: { value: undefined },
+      images: { value: images },
+    });
+    expect(wired?.type === 'invocation' ? wired.data.inputs : {}).toMatchObject({
+      collection: { value: images },
+      images: { value: [] },
+    });
+    // The exposed form element follows the value to its new input.
+    expect(isFieldExposed(update.document.form, { fieldName: 'images', nodeId: 'free' })).toBe(true);
+    expect(isFieldExposed(update.document.form, { fieldName: 'collection', nodeId: 'free' })).toBe(false);
+  });
+
+  it('turns a stored minimax_h3_denoise frame count into the matching choice or the default', () => {
+    const framesTemplate: InvocationTemplate = {
+      ...template,
+      inputs: {
+        num_frames: input('num_frames', {
+          default: '124',
+          options: ['90', '124'],
+          type: { batch: false, cardinality: 'SINGLE', name: 'EnumField' },
+        }),
+      },
+      type: 'minimax_h3_denoise',
+      version: '1.4.0',
+    };
+    const node = (id: string, frames: number): WorkflowInvocationNode => ({
+      ...oldNode(),
+      data: {
+        ...oldNode().data,
+        inputs: { num_frames: { label: '', name: 'num_frames', value: frames } },
+        type: 'minimax_h3_denoise',
+        version: '1.2.0',
+      },
+      id,
+    });
+    const update = updateWorkflowNodes(
+      { ...createProjectGraph('update-test'), nodes: [node('on-grid', 90), node('off-grid', 100)] },
+      { minimax_h3_denoise: framesTemplate }
+    );
+    const value = (id: string) => {
+      const n = update.document.nodes.find((candidate) => candidate.id === id);
+
+      return n?.type === 'invocation' ? n.data.inputs.num_frames?.value : null;
+    };
+
+    expect(value('on-grid')).toBe('90');
+    expect(value('off-grid')).toBe('124');
+  });
+
+  it('applies through the reducer and is idempotent once every node is current', () => {
+    const doc = { ...createProjectGraph('update-test'), nodes: [oldNode()] };
+    const next = projectGraphReducer(doc, {
+      nodeIds: ['add-1'],
+      templates: { add: templateV110 },
+      type: 'updateNodes',
+    });
+
+    expect(next.nodes[0]?.type === 'invocation' ? next.nodes[0].data.version : null).toBe('1.1.0');
+    expect(projectGraphReducer(next, { templates: { add: templateV110 }, type: 'updateNodes' })).toBe(next);
   });
 });

@@ -1114,6 +1114,35 @@
         ]
       }
     },
+    "/api/v2/models/fp8_storage_support": {
+      "get": {
+        "tags": ["model_manager"],
+        "summary": "List Fp8 Storage Support",
+        "description": "Which kinds of model FP8 Storage actually reaches, so a client stops offering it for the rest.\n\nKeyed `(base, type, format)` -- the key model loaders are registered under, because the answer\ndiffers along all three: FLUX main implements the cast and FLUX ControlNet does not, and a GGUF\nmain model must never be re-encoded. A key with no row is not supported; that is also what the\nserver itself concludes for one.\n\nA static table, the same for every install and every user. Fetch it once and join it against model\nrecords locally. Whether the *device* can do fp8 is deliberately not in here -- that probe belongs\non the loading thread, not behind an HTTP handler.\n\nDeclared `def`, not `async def`: it awaits nothing, so FastAPI runs it in a threadpool instead of\non the event loop. See docs/contributing/blocking-work-in-api-routes.",
+        "operationId": "list_fp8_storage_support",
+        "responses": {
+          "200": {
+            "description": "Whether FP8 Storage does anything, per loader key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/Fp8StorageSupport"
+                  },
+                  "type": "array",
+                  "title": "Response List Fp8 Storage Support"
+                }
+              }
+            }
+          }
+        },
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ]
+      }
+    },
     "/api/v2/models/": {
       "get": {
         "tags": ["model_manager"],
@@ -15446,6 +15475,537 @@
                 "schema": {
                   "$ref": "#/components/schemas/HTTPValidationError"
                 }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recall/video/{queue_id}": {
+      "post": {
+        "tags": ["recall"],
+        "summary": "Recall Video Parameters",
+        "description": "Apply video generation parameters to the current user's Video panel.\n\nModels and media that cannot be used are dropped and listed in `skipped`; the rest are applied.",
+        "operationId": "recall_video_parameters",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "mode",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": ["recall", "remix"],
+              "type": "string",
+              "description": "`recall` applies every field; `remix` applies everything except the seed",
+              "default": "recall",
+              "title": "Mode"
+            },
+            "description": "`recall` applies every field; `remix` applies everything except the seed"
+          },
+          {
+            "name": "strict",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "When true, the parameters are treated as a whole generation record: LoRAs and media not included are cleared from the Video panel. When false, only the included fields change.",
+              "default": false,
+              "title": "Strict"
+            },
+            "description": "When true, the parameters are treated as a whole generation record: LoRAs and media not included are cleared from the Video panel. When false, only the included fields change."
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VideoRecallParameter",
+                "description": "Video parameters to recall. Every field is optional: send only the ones to change."
+              },
+              "examples": {
+                "prompt_and_model": {
+                  "summary": "Prompt and model",
+                  "value": {
+                    "positive_prompt": "a heron takes flight over a misty lake",
+                    "model": "Wan 2.2 I2V A14B (Diffusers)"
+                  }
+                },
+                "first_frame": {
+                  "summary": "Start from a gallery image",
+                  "value": {
+                    "model": "Wan 2.2 I2V A14B (Diffusers)",
+                    "first_frame_image": {
+                      "image_name": "<gallery image name>.png"
+                    }
+                  }
+                },
+                "extend_video": {
+                  "summary": "Extend a gallery video",
+                  "value": {
+                    "positive_prompt": "the camera keeps panning left",
+                    "source_video": {
+                      "video_name": "<gallery video name>.mp4"
+                    },
+                    "source_video_start_frame": 0,
+                    "source_video_end_frame": 80
+                  }
+                },
+                "ref2va_references": {
+                  "summary": "MiniMax H3 Ref2VA references",
+                  "value": {
+                    "model": "MiniMax H3 Ref2VA Transformer (int8, pruned)",
+                    "minimax_h3_references": [
+                      {
+                        "kind": "image",
+                        "image_name": "<gallery image name>.png"
+                      },
+                      {
+                        "kind": "video",
+                        "video_name": "<gallery video name>.mp4",
+                        "conditioning": "video_audio"
+                      }
+                    ]
+                  }
+                },
+                "every_field": {
+                  "summary": "Every field (a reference, not a request to send as-is)",
+                  "description": "Every accepted field with a placeholder value. Delete the ones you do not mean to set: media fields override one another (conditioning video, then references, then source video, then frames), so as-is only the conditioning video would apply, and the placeholder names would be skipped as not found.",
+                  "value": {
+                    "positive_prompt": "a heron takes flight over a misty lake",
+                    "negative_prompt": "blurry, low quality",
+                    "seed": 1234,
+                    "num_frames": 81,
+                    "fps": 16,
+                    "width": 832,
+                    "height": 480,
+                    "steps": 30,
+                    "cfg_scale": 5.0,
+                    "wan_guidance_scale_low_noise": 4.0,
+                    "ltx2_audio_cfg_scale": 7.0,
+                    "ltx2_stg_scale": 1.0,
+                    "ltx2_modality_scale": 3.0,
+                    "ltx2_context_frames": 49,
+                    "minimax_h3_hybrid_start_block": 25,
+                    "model": "<video model name or key>",
+                    "vae": "<Wan VAE name or key>",
+                    "wan_t5_encoder_model": "<Wan UMT5 encoder name or key>",
+                    "wan_transformer_low_noise": "<Wan low-noise expert name or key>",
+                    "wan_component_source": "<Wan Diffusers install name or key>",
+                    "minimax_h3_transformer_model": "<MiniMax H3 transformer name or key>",
+                    "minimax_h3_component_source": "<MiniMax H3 Diffusers install name or key>",
+                    "minimax_h3_text_encoder_model": "<MiniMax H3 Qwen3-VL encoder name or key>",
+                    "minimax_h3_hybrid_base_model": "<MiniMax H3 FL2VA transformer name or key>",
+                    "ltx2_component_source": "<LTX-2 components name or key>",
+                    "ltx2_text_encoder_model": "<LTX-2 Gemma-4 encoder name or key>",
+                    "loras": [
+                      {
+                        "model_name": "<LoRA name or key>",
+                        "weight": 1.0
+                      }
+                    ],
+                    "first_frame_image": {
+                      "image_name": "<gallery image name>.png"
+                    },
+                    "last_frame_image": {
+                      "image_name": "<gallery image name>.png"
+                    },
+                    "source_video": {
+                      "video_name": "<gallery video name>.mp4"
+                    },
+                    "source_video_start_frame": 0,
+                    "source_video_end_frame": 80,
+                    "ltx2_conditioning_video": {
+                      "video_name": "<gallery video name>.mp4"
+                    },
+                    "ltx2_conditioning_role": "audio",
+                    "minimax_h3_references": [
+                      {
+                        "kind": "image",
+                        "image_name": "<gallery image name>.png",
+                        "detail": "max"
+                      },
+                      {
+                        "kind": "video",
+                        "video_name": "<gallery video name>.mp4",
+                        "conditioning": "video_audio",
+                        "start_frame": 0,
+                        "end_frame": 48
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoRecallParametersResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recall/video/{queue_id}/initial-video": {
+      "post": {
+        "tags": ["recall"],
+        "summary": "Recall Initial Video",
+        "description": "Place a gallery video in the current user's Video panel as the Initial Video.",
+        "operationId": "recall_initial_video",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "video_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "description": "The name of the gallery video",
+              "title": "Video Name"
+            },
+            "description": "The name of the gallery video"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoRecallMediaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recall/video/{queue_id}/initial-video/upload": {
+      "post": {
+        "tags": ["recall"],
+        "summary": "Recall Initial Video Upload",
+        "description": "Upload a video into the gallery and place it in the current user's Video panel as the Initial Video.",
+        "operationId": "recall_initial_video_upload",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The board to upload the video to; Uncategorized when omitted",
+              "title": "Board Id"
+            },
+            "description": "The board to upload the video to; Uncategorized when omitted"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoRecallMediaResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The video exceeds the upload size limit"
+          },
+          "415": {
+            "description": "The file is not a supported video or audio file"
+          },
+          "429": {
+            "description": "Too many concurrent video uploads"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "contentMediaType": "application/octet-stream",
+                    "title": "File"
+                  },
+                  "metadata": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Metadata",
+                    "description": "The metadata to associate with the video, must be a stringified JSON dict"
+                  }
+                },
+                "type": "object",
+                "required": ["file"],
+                "title": "Body_upload_video"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recall/video/{queue_id}/reference-video": {
+      "post": {
+        "tags": ["recall"],
+        "summary": "Recall Reference Video",
+        "description": "Append a gallery video to the current user's reference videos (models that take them, e.g. MiniMax H3 Ref2VA).",
+        "operationId": "recall_reference_video",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "video_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "description": "The name of the gallery video",
+              "title": "Video Name"
+            },
+            "description": "The name of the gallery video"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoRecallMediaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recall/video/{queue_id}/reference-video/upload": {
+      "post": {
+        "tags": ["recall"],
+        "summary": "Recall Reference Video Upload",
+        "description": "Upload a video into the gallery and append it to the current user's reference videos.",
+        "operationId": "recall_reference_video_upload",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The board to upload the video to; Uncategorized when omitted",
+              "title": "Board Id"
+            },
+            "description": "The board to upload the video to; Uncategorized when omitted"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoRecallMediaResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The video exceeds the upload size limit"
+          },
+          "415": {
+            "description": "The file is not a supported video or audio file"
+          },
+          "429": {
+            "description": "Too many concurrent video uploads"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "contentMediaType": "application/octet-stream",
+                    "title": "File"
+                  },
+                  "metadata": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Metadata",
+                    "description": "The metadata to associate with the video, must be a stringified JSON dict"
+                  }
+                },
+                "type": "object",
+                "required": ["file"],
+                "title": "Body_upload_video"
               }
             }
           }
@@ -38598,6 +39158,28 @@
         "required": ["path", "is_installed"],
         "title": "FoundModel"
       },
+      "Fp8StorageSupport": {
+        "properties": {
+          "base": {
+            "$ref": "#/components/schemas/BaseModelType"
+          },
+          "type": {
+            "$ref": "#/components/schemas/ModelType"
+          },
+          "format": {
+            "$ref": "#/components/schemas/ModelFormat"
+          },
+          "supported": {
+            "type": "boolean",
+            "title": "Supported",
+            "description": "Whether FP8 Storage changes anything for a model of this kind."
+          }
+        },
+        "type": "object",
+        "required": ["base", "type", "format", "supported"],
+        "title": "Fp8StorageSupport",
+        "description": "One row of the served table: a loader key and the finished answer.\n\nThe reason is not served. Both markers hide the control identically, so a client has nothing to\ndo with the difference; it stays in the declaration, where the backlog lives."
+      },
       "FreeUConfig": {
         "description": "Configuration for the FreeU hyperparameters.\n- https://huggingface.co/docs/diffusers/main/en/using-diffusers/freeu\n- https://github.com/ChenyangSi/FreeU",
         "properties": {
@@ -47481,6 +48063,54 @@
         "type": "object",
         "title": "ImageRecordChanges",
         "description": "A set of changes to apply to an image record.\n\nOnly limited changes are valid:\n  - `image_category`: change the category of an image\n  - `session_id`: change the session associated with an image\n  - `is_intermediate`: change the image's `is_intermediate` flag\n  - `starred`: change whether the image is starred"
+      },
+      "ImageRefParameter": {
+        "properties": {
+          "image_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Image Name",
+            "description": "The name of a gallery image"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["image_name"],
+        "title": "ImageRefParameter"
+      },
+      "ImageReferenceParameter": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "image",
+            "title": "Kind"
+          },
+          "image_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Image Name",
+            "description": "The name of a gallery image"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["max", "match"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail",
+            "description": "The reference image's detail mode"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "image_name"],
+        "title": "ImageReferenceParameter"
       },
       "ImageResizeInvocation": {
         "category": "image",
@@ -105052,6 +105682,29 @@
           "$ref": "#/components/schemas/VideoOutput"
         }
       },
+      "VideoLoRARecallParameter": {
+        "properties": {
+          "model_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Model Name",
+            "description": "The name (or key) of the LoRA model"
+          },
+          "weight": {
+            "type": "number",
+            "maximum": 10.0,
+            "minimum": -10.0,
+            "title": "Weight",
+            "description": "The weight for the LoRA",
+            "default": 1.0
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["model_name"],
+        "title": "VideoLoRARecallParameter"
+      },
       "VideoNamesBatch": {
         "properties": {
           "video_names": {
@@ -105152,6 +105805,688 @@
         "title": "VideoOutput",
         "type": "object"
       },
+      "VideoRecallMediaResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "const": "success",
+            "title": "Status"
+          },
+          "queue_id": {
+            "type": "string",
+            "title": "Queue Id"
+          },
+          "action": {
+            "type": "string",
+            "enum": ["parameters", "initial_video", "reference_video"],
+            "title": "Action"
+          },
+          "video": {
+            "$ref": "#/components/schemas/VideoDTO"
+          },
+          "uploaded": {
+            "type": "boolean",
+            "title": "Uploaded",
+            "description": "Whether the video was uploaded into the gallery by this request"
+          }
+        },
+        "type": "object",
+        "required": ["status", "queue_id", "action", "video", "uploaded"],
+        "title": "VideoRecallMediaResponse"
+      },
+      "VideoRecallParameter": {
+        "properties": {
+          "positive_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Positive Prompt",
+            "description": "Positive prompt text"
+          },
+          "negative_prompt": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Negative Prompt",
+            "description": "Negative prompt text; an explicit null turns the negative prompt off"
+          },
+          "seed": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 4294967295.0,
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Seed",
+            "description": "Random seed; ignored when remixing"
+          },
+          "num_frames": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Num Frames",
+            "description": "Number of frames to generate"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "maximum": 120.0,
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fps",
+            "description": "Output frame rate"
+          },
+          "width": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Width",
+            "description": "Output width in pixels"
+          },
+          "height": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Height",
+            "description": "Output height in pixels"
+          },
+          "steps": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Steps",
+            "description": "Number of denoising steps"
+          },
+          "cfg_scale": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cfg Scale",
+            "description": "CFG scale"
+          },
+          "wan_guidance_scale_low_noise": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wan Guidance Scale Low Noise",
+            "description": "Wan A14B: the low-noise expert's CFG scale"
+          },
+          "ltx2_audio_cfg_scale": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltx2 Audio Cfg Scale",
+            "description": "LTX-2: audio CFG scale"
+          },
+          "ltx2_stg_scale": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltx2 Stg Scale",
+            "description": "LTX-2: spatiotemporal guidance scale"
+          },
+          "ltx2_modality_scale": {
+            "anyOf": [
+              {
+                "type": "number",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltx2 Modality Scale",
+            "description": "LTX-2: modality guidance scale"
+          },
+          "ltx2_context_frames": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltx2 Context Frames",
+            "description": "LTX-2: frames of the initial video an extension continues from"
+          },
+          "minimax_h3_hybrid_start_block": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimax H3 Hybrid Start Block",
+            "description": "MiniMax H3 Ref2VA: first block taken from the hybrid FL2VA base"
+          },
+          "model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Model",
+            "description": "The main video model's name (or key)"
+          },
+          "vae": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Vae",
+            "description": "Wan: a standalone VAE's name (or key)"
+          },
+          "wan_t5_encoder_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wan T5 Encoder Model",
+            "description": "Wan: standalone UMT5 encoder"
+          },
+          "wan_transformer_low_noise": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wan Transformer Low Noise",
+            "description": "Wan A14B: low-noise expert"
+          },
+          "wan_component_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Wan Component Source",
+            "description": "Wan: Diffusers component source"
+          },
+          "minimax_h3_transformer_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimax H3 Transformer Model",
+            "description": "MiniMax H3: transformer override"
+          },
+          "minimax_h3_component_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimax H3 Component Source",
+            "description": "MiniMax H3: Diffusers component source"
+          },
+          "minimax_h3_text_encoder_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimax H3 Text Encoder Model",
+            "description": "MiniMax H3: Qwen3-VL encoder"
+          },
+          "minimax_h3_hybrid_base_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimax H3 Hybrid Base Model",
+            "description": "MiniMax H3 Ref2VA: FL2VA base"
+          },
+          "ltx2_component_source": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltx2 Component Source",
+            "description": "LTX-2: component source"
+          },
+          "ltx2_text_encoder_model": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 255,
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltx2 Text Encoder Model",
+            "description": "LTX-2: Gemma-4 encoder"
+          },
+          "loras": {
+            "anyOf": [
+              {
+                "items": {
+                  "$ref": "#/components/schemas/VideoLoRARecallParameter"
+                },
+                "type": "array",
+                "maxItems": 32
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Loras",
+            "description": "LoRAs with their weights; an empty list asks for none"
+          },
+          "first_frame_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageRefParameter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "First-frame image"
+          },
+          "last_frame_image": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ImageRefParameter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Last-frame image"
+          },
+          "source_video": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VideoRefParameter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Initial video to extend"
+          },
+          "source_video_start_frame": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Video Start Frame",
+            "description": "First frame of the initial video to use (inclusive)"
+          },
+          "source_video_end_frame": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Video End Frame",
+            "description": "Last frame of the initial video to use (inclusive)"
+          },
+          "ltx2_conditioning_video": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VideoRefParameter"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "LTX-2: a clip whose audio (or picture) conditions the whole generation"
+          },
+          "ltx2_conditioning_role": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["audio", "video"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ltx2 Conditioning Role",
+            "description": "LTX-2: which stream of `ltx2_conditioning_video` is the condition; required with it"
+          },
+          "minimax_h3_references": {
+            "anyOf": [
+              {
+                "items": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/ImageReferenceParameter"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VideoReferenceParameter"
+                    }
+                  ],
+                  "discriminator": {
+                    "propertyName": "kind",
+                    "mapping": {
+                      "image": "#/components/schemas/ImageReferenceParameter",
+                      "video": "#/components/schemas/VideoReferenceParameter"
+                    }
+                  }
+                },
+                "type": "array",
+                "maxItems": 12
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minimax H3 References",
+            "description": "MiniMax H3 Ref2VA references in conditioning order: at most 3 videos and 9 images; an empty list asks for none"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "title": "VideoRecallParameter",
+        "description": "Video generation parameters to apply to the Video panel.\n\nField names follow the video metadata record (see the Media Metadata architecture doc). Models\nare given by name (or key) and resolved to installed models; media by gallery name. Bounds are\nthe ones the Video panel accepts, so a value it would ignore is refused here instead."
+      },
+      "VideoRecallParametersResponse": {
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["success", "no_parameters_provided", "nothing_resolved"],
+            "title": "Status"
+          },
+          "queue_id": {
+            "type": "string",
+            "title": "Queue Id"
+          },
+          "parameters": {
+            "additionalProperties": true,
+            "type": "object",
+            "title": "Parameters",
+            "description": "The resolved parameters sent to the frontend"
+          },
+          "skipped": {
+            "items": {
+              "type": "string"
+            },
+            "type": "array",
+            "title": "Skipped",
+            "description": "Requested fields dropped because their model or media could not be used"
+          },
+          "overridden": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "type": "object",
+            "title": "Overridden",
+            "description": "Requested media fields dropped because another medium in the same request takes precedence over them, mapped to that field (e.g. first_frame_image -> source_video)"
+          }
+        },
+        "type": "object",
+        "required": ["status", "queue_id", "parameters", "skipped"],
+        "title": "VideoRecallParametersResponse"
+      },
+      "VideoRecallRequestedEvent": {
+        "description": "Event model for video_recall_requested",
+        "properties": {
+          "timestamp": {
+            "description": "The timestamp of the event",
+            "title": "Timestamp",
+            "type": "integer"
+          },
+          "queue_id": {
+            "description": "The ID of the queue",
+            "title": "Queue Id",
+            "type": "string"
+          },
+          "user_id": {
+            "description": "The ID of the user whose Video panel the recall targets",
+            "title": "User Id",
+            "type": "string"
+          },
+          "action": {
+            "description": "What the frontend should do with the payload",
+            "enum": ["parameters", "initial_video", "reference_video"],
+            "title": "Action",
+            "type": "string"
+          },
+          "mode": {
+            "anyOf": [
+              {
+                "enum": ["recall", "remix"],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For `parameters`: `remix` applies everything except the seed",
+            "title": "Mode"
+          },
+          "strict": {
+            "default": false,
+            "description": "For `parameters`: treat the payload as a whole generation record, clearing omitted LoRAs and media",
+            "title": "Strict",
+            "type": "boolean"
+          },
+          "parameters": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For `parameters`: recall fields, keyed like the video metadata record",
+            "title": "Parameters"
+          },
+          "video": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VideoRecallVideo"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For `initial_video` and `reference_video`: the video to place"
+          }
+        },
+        "required": ["timestamp", "queue_id", "user_id", "action", "mode", "strict", "parameters", "video"],
+        "title": "VideoRecallRequestedEvent",
+        "type": "object"
+      },
+      "VideoRecallVideo": {
+        "description": "The gallery video a video recall places into the Video panel.",
+        "properties": {
+          "video_name": {
+            "description": "The name of the gallery video",
+            "title": "Video Name",
+            "type": "string"
+          },
+          "width": {
+            "description": "The video's width in pixels",
+            "title": "Width",
+            "type": "integer"
+          },
+          "height": {
+            "description": "The video's height in pixels",
+            "title": "Height",
+            "type": "integer"
+          },
+          "duration": {
+            "description": "The video's duration in seconds",
+            "title": "Duration",
+            "type": "number"
+          },
+          "fps": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The video's frame rate, when known",
+            "title": "Fps"
+          },
+          "media_origin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "How the video entered the gallery, e.g. `audio_upload` for wrapped audio",
+            "title": "Media Origin"
+          }
+        },
+        "required": ["video_name", "width", "height", "duration"],
+        "title": "VideoRecallVideo",
+        "type": "object"
+      },
       "VideoRecordChanges": {
         "properties": {
           "video_category": {
@@ -105206,6 +106541,80 @@
         "type": "object",
         "title": "VideoRecordChanges",
         "description": "Allowed mutations on a video record."
+      },
+      "VideoRefParameter": {
+        "properties": {
+          "video_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Video Name",
+            "description": "The name of a gallery video"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["video_name"],
+        "title": "VideoRefParameter"
+      },
+      "VideoReferenceParameter": {
+        "properties": {
+          "kind": {
+            "type": "string",
+            "const": "video",
+            "title": "Kind"
+          },
+          "video_name": {
+            "type": "string",
+            "maxLength": 255,
+            "minLength": 1,
+            "title": "Video Name",
+            "description": "The name of a gallery video"
+          },
+          "conditioning": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": ["video_audio", "video", "audio"]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Conditioning",
+            "description": "Which of the clip's streams condition the generation"
+          },
+          "start_frame": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Start Frame",
+            "description": "First frame of the clip to use (inclusive)"
+          },
+          "end_frame": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0.0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "End Frame",
+            "description": "Last frame of the clip to use (inclusive)"
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": ["kind", "video_name"],
+        "title": "VideoReferenceParameter"
       },
       "VideoUploadedEvent": {
         "description": "Event model for video_uploaded",

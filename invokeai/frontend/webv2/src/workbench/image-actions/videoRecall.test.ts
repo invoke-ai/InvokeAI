@@ -418,6 +418,169 @@ describe('buildVideoRecallSettings', () => {
   });
 });
 
+describe('buildVideoRecallSettings — partial records from the external recall API', () => {
+  const catalog = [WAN_T2V, WAN_I2V, h3Model(), LIGHTNING_HIGH, LIGHTNING_LOW];
+  const heldLora = { isEnabled: true, model: LIGHTNING_HIGH as never, weight: 0.5 };
+  const holding = {
+    ...createDefaultVideoWidgetValues([WAN_I2V]),
+    firstFrameImage: { height: 720, image_name: 'held.png', width: 1280 },
+    loras: [heldLora],
+  };
+
+  it('accepts a request without generation_mode only when told it is one', () => {
+    const request = { positive_prompt: 'a heron' };
+
+    expect(buildVideoRecallSettings({ currentValues: holding, kind: 'all', metadata: request, models: catalog })).toBe(
+      null
+    );
+    expect(
+      buildVideoRecallSettings({
+        currentValues: holding,
+        kind: 'all',
+        metadata: request,
+        models: catalog,
+        requireGenerationMode: false,
+      })?.values.positivePrompt
+    ).toBe('a heron');
+  });
+
+  it('leaves the LoRAs, media and model a request does not name exactly as the panel has them', () => {
+    const result = buildVideoRecallSettings({
+      currentValues: holding,
+      kind: 'all',
+      metadata: { positive_prompt: 'a heron', steps: 30 },
+      models: catalog,
+      partial: true,
+      requireGenerationMode: false,
+    });
+
+    expect(result?.fields).toEqual(['prompts', 'steps']);
+    expect(result?.values).toEqual({ ...holding, positivePrompt: 'a heron', steps: 30 });
+  });
+
+  it('replaces the LoRA set only when the request names one, an empty list included', () => {
+    const cleared = buildVideoRecallSettings({
+      currentValues: holding,
+      kind: 'all',
+      metadata: { loras: [] },
+      models: catalog,
+      partial: true,
+      requireGenerationMode: false,
+    });
+
+    expect(cleared?.fields).toEqual(['loras']);
+    expect(cleared?.values.loras).toEqual([]);
+  });
+
+  it('names a media slot without clearing the others; hydration displaces only its rivals', () => {
+    const result = buildVideoRecallSettings({
+      currentValues: holding,
+      kind: 'all',
+      metadata: { last_frame_image: { image_name: 'last.png' } },
+      models: catalog,
+      partial: true,
+      requireGenerationMode: false,
+    });
+
+    expect(result?.mediaNames).toMatchObject({ firstFrameName: null, lastFrameName: 'last.png' });
+    expect(result?.values.firstFrameImage).toEqual(holding.firstFrameImage);
+  });
+
+  it('clears the references for an explicitly empty list, and only then', () => {
+    const panel = {
+      ...createDefaultVideoWidgetValues([h3Model()]),
+      references: [
+        { detail: 'max' as const, image: { height: 512, image_name: 'ref.png', width: 512 }, kind: 'image' as const },
+      ],
+    };
+    const build = (metadata: Record<string, unknown>) =>
+      buildVideoRecallSettings({
+        currentValues: panel,
+        kind: 'all',
+        metadata,
+        models: catalog,
+        partial: true,
+        requireGenerationMode: false,
+      });
+
+    expect(build({ minimax_h3_references: [] })).toMatchObject({ fields: ['media'], values: { references: [] } });
+    expect(build({ positive_prompt: 'p' })?.values.references).toEqual(panel.references);
+  });
+
+  it('keeps the panel hybrid base and may set its start block', () => {
+    const fl2vaBase: MainModelConfig = { ...h3Model('h3-fl2va-base'), format: 'checkpoint' };
+    const panel = {
+      ...createDefaultVideoWidgetValues([h3Model()]),
+      h3HybridBaseModel: fl2vaBase,
+      h3HybridStartBlock: 25,
+    };
+    const result = buildVideoRecallSettings({
+      currentValues: panel,
+      kind: 'all',
+      metadata: { minimax_h3_hybrid_start_block: 30 },
+      models: [...catalog, fl2vaBase],
+      partial: true,
+      requireGenerationMode: false,
+    });
+
+    expect(result?.values.h3HybridBaseModel).toBe(fl2vaBase);
+    expect(result?.values.h3HybridStartBlock).toBe(30);
+  });
+
+  it('reads an explicit null negative prompt as turning it off', () => {
+    const result = buildVideoRecallSettings({
+      currentValues: { ...holding, negativePrompt: 'blurry', negativePromptEnabled: true },
+      kind: 'all',
+      metadata: { negative_prompt: null },
+      models: catalog,
+      partial: true,
+      requireGenerationMode: false,
+    });
+
+    expect(result?.values).toMatchObject({ negativePrompt: '', negativePromptEnabled: false });
+  });
+});
+
+describe('buildVideoRecallSettings — leaving the accelerator', () => {
+  const catalog = [WAN_T2V, LIGHTNING_HIGH, LIGHTNING_LOW];
+  const defaults = createDefaultVideoWidgetValues([WAN_T2V]);
+  const accelerated = {
+    ...defaults,
+    acceleratorEnabled: true,
+    acceleratorLoraKeys: [LIGHTNING_HIGH.key, LIGHTNING_LOW.key],
+    cfgScale: 1,
+    loras: [LIGHTNING_HIGH, LIGHTNING_LOW].map((model) => ({ isEnabled: true, model: model as never, weight: 1 })),
+    steps: 4,
+  };
+  const recall = (metadata: Record<string, unknown>, partial: boolean) =>
+    buildVideoRecallSettings({
+      currentValues: accelerated,
+      kind: 'all',
+      metadata,
+      models: catalog,
+      partial,
+      requireGenerationMode: false,
+    });
+
+  it('restores the model sampling defaults when a whole record drops the accelerator LoRAs', () => {
+    expect(recall({ positive_prompt: 'p' }, false)?.values).toMatchObject({
+      acceleratorEnabled: false,
+      cfgScale: defaults.cfgScale,
+      loras: [],
+      steps: defaults.steps,
+    });
+    expect(defaults.steps).not.toBe(4);
+  });
+
+  it('keeps the sampling values the record names', () => {
+    expect(recall({ loras: [], steps: 12 }, true)?.values).toMatchObject({
+      acceleratorEnabled: false,
+      cfgScale: defaults.cfgScale,
+      steps: 12,
+    });
+  });
+});
+
 describe('ref2va reference recall', () => {
   const catalog = [WAN_T2V, WAN_I2V, h3Model(), LIGHTNING_HIGH, LIGHTNING_LOW];
   const currentValues = { ...createDefaultVideoWidgetValues([h3Model()]) };
@@ -935,6 +1098,27 @@ describe('LTX-2 recall', () => {
       stgScale: 1,
     });
     expect(result?.fields).toEqual(expect.arrayContaining(['steps', 'cfg']));
+  });
+
+  it('writes no control a partial recall leaves hidden behind the panel accelerator', () => {
+    const accelerated = {
+      ...createDefaultVideoWidgetValues([LTX2_DEV]),
+      acceleratorEnabled: true,
+      acceleratorLoraKeys: ['ltx2-distilled'],
+      cfgScale: 1,
+      steps: 8,
+    };
+    const result = buildVideoRecallSettings({
+      currentValues: accelerated,
+      kind: 'all',
+      metadata: { positive_prompt: 'p', steps: 30, cfg_scale: 4 },
+      models: catalog,
+      partial: true,
+      requireGenerationMode: false,
+    });
+
+    expect(result?.fields).toEqual(['prompts']);
+    expect(result?.values).toMatchObject({ acceleratorEnabled: true, cfgScale: 1, steps: 8 });
   });
 
   it('treats both LTX-2 modes as recallable video metadata', () => {

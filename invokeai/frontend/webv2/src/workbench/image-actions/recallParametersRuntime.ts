@@ -2,127 +2,58 @@ import type { SocketHub } from '@platform/transport/socketHub';
 import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchStore';
 import type { TFunction } from 'i18next';
 
-import { ensureModelsLoaded, getModelsSnapshot } from '@features/models';
-import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 
+import type { PendingRecallEvent, RecallRevealContext, RecallRuntime } from './recallEventRuntime';
+
 import { executeRecallParameters } from './executeRecallParameters';
+import { bringRecallWidgetToFront, createRecallEventRuntime } from './recallEventRuntime';
 import { isRecallParametersUpdatedEvent } from './recallParameters';
 
-export interface RecallParametersRuntime {
-  dispose(): void;
-}
-
-/** A raw socket payload with the project that was active when it arrived. */
-export interface PendingRecallEvent {
-  payload: unknown;
-  projectId: string;
-}
-
-const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-
-/**
- * Apply socket recall events to their arrival-time project, strictly in order so append observes preceding
- * replace. Buffered replay events run first.
- */
+/** Apply `recall_parameters_updated` events to their arrival-time project's Generate panel. */
 export const createRecallParametersRuntime = ({
   commands,
-  getSessionUserId = () => null,
+  getSessionUserId,
   hub,
   queries,
-  replay = [],
+  replay,
+  reveal,
   t,
 }: {
-  commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
-  /**
-   * The signed-in user in multi-user mode, or `null` to accept every event.
-   * Admin sockets also receive other users' recall events, which must not
-   * rewrite the admin's own panel.
-   */
+  commands: Pick<WorkbenchCommands, 'generation' | 'notifications' | 'widgets'>;
   getSessionUserId?: () => string | null;
   hub: Pick<SocketHub, 'on'>;
   queries: Pick<WorkbenchQueries, 'getProject' | 'getSnapshot'>;
   replay?: readonly PendingRecallEvent[];
+  reveal: RecallRevealContext;
   /** Resolves against the current language at call time; captured once, at attach. */
   t: TFunction;
-}): RecallParametersRuntime => {
-  let disposed = false;
-  let chain: Promise<void> = Promise.resolve();
+}): RecallRuntime =>
+  createRecallEventRuntime({
+    apply: async ({ parameters }, { models, owner, projectId }) => {
+      const applied = await executeRecallParameters({
+        commands,
+        t,
+        getGenerateValues: () => {
+          const project = queries.getProject(projectId);
+          return project ? getProjectWidgetValues(project, 'generate') : null;
+        },
+        models,
+        owner,
+        parameters,
+        projectId,
+      });
 
-  const enqueue = ({ payload, projectId }: PendingRecallEvent) => {
-    if (disposed || !isRecallParametersUpdatedEvent(payload)) {
-      return;
-    }
-
-    const sessionUserId = getSessionUserId();
-    if (sessionUserId !== null && payload.user_id !== sessionUserId) {
-      return;
-    }
-
-    const owner = captureAccountScope();
-    const { parameters } = payload;
-    const reportError = (error: unknown) => {
-      if (!disposed && isAccountScopeCurrent(owner)) {
-        commands.notifications.reportError({
-          area: 'recall-parameters',
-          message: toErrorMessage(error),
-          namespace: 'generation',
-          projectId,
-        });
+      if (applied) {
+        bringRecallWidgetToFront({ commands, owner, projectId, queries, reveal, typeId: 'generate' });
       }
-    };
-
-    chain = chain
-      .then(async () => {
-        if (disposed || !isAccountScopeCurrent(owner)) {
-          return;
-        }
-
-        // The models store never rejects; a failed catalog fetch is recorded as
-        // its error status, which would otherwise read as "no model selected".
-        await ensureModelsLoaded();
-        if (disposed || !isAccountScopeCurrent(owner)) {
-          return;
-        }
-
-        const snapshot = getModelsSnapshot();
-        if (snapshot.status === 'error') {
-          reportError(snapshot.error ?? 'Failed to load models.');
-          return;
-        }
-
-        await executeRecallParameters({
-          commands,
-          t,
-          getGenerateValues: () => {
-            const project = queries.getProject(projectId);
-            return project ? getProjectWidgetValues(project, 'generate') : null;
-          },
-          models: snapshot.models,
-          owner,
-          parameters,
-          projectId,
-        });
-      })
-      // One failing event must not wedge the chain for every later one.
-      .catch(reportError);
-  };
-
-  for (const pending of replay) {
-    enqueue(pending);
-  }
-
-  const detach = hub.on('recall_parameters_updated', (payload: unknown) => {
-    enqueue({ payload, projectId: queries.getSnapshot().activeProject.id });
-  });
-
-  return {
-    dispose: () => {
-      if (disposed) {
-        return;
-      }
-      disposed = true;
-      detach();
     },
-  };
-};
+    area: 'recall-parameters',
+    commands,
+    eventName: 'recall_parameters_updated',
+    getSessionUserId,
+    hub,
+    isEvent: isRecallParametersUpdatedEvent,
+    queries,
+    replay,
+  });

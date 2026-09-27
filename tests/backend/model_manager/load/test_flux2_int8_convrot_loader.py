@@ -512,6 +512,12 @@ def test_room_is_reserved_before_the_scales_are_folded(monkeypatch, tmp_path) ->
 
     The model-less prediction is exact here because it is only taken when nothing stays quantized,
     and that is the only case in which either step widens anything.
+
+    It also has to cover the scales themselves. `extract_fp8_scaled_layers` recovers them eleven lines
+    above this reservation and the fold consumes them immediately below, so they are resident across
+    it and are no longer in the dict any prediction walks -- on an MXFP8 build that is ~0.125 B per
+    weight element of decoded exponent grid. Asserted by value, because this is the one reservation in
+    the series whose amount changed rather than only its position.
     """
     state_dict, _ = _scaled_fp8_checkpoint()
     run, config = _driver(monkeypatch, tmp_path, state_dict, observe=("dequantize_fp8_scaled",))
@@ -520,3 +526,18 @@ def test_room_is_reserved_before_the_scales_are_folded(monkeypatch, tmp_path) ->
 
     assert [step for step, _ in run.order] == ["dequantize_fp8_scaled"], run.order
     assert all(reserved for _step, reserved in run.order), run.order
+
+    # Counted by destination, not by source key: the conversion runs before the extraction, so a
+    # fused `qkv`'s one scalar scale is recovered against each of the three projections it becomes and
+    # is charged once per destination. That replication is why the count follows `destinations` here
+    # exactly as it does in `_expected_reservation`, and it is a slight over-charge of the same tensor
+    # -- conservative, which is the safe direction for a reservation.
+    destinations = len(QUANTIZED) + 2 * 2
+    recovered = destinations * torch.float32.itemsize
+    widened = sum(
+        tensor.nelement() * torch.bfloat16.itemsize
+        for key, tensor in state_dict.items()
+        if not (key.endswith(".weight_scale") or key.endswith(".input_scale"))
+    )
+    assert recovered > 0, "otherwise this cell could not notice the term being dropped"
+    assert run.reserved[0] == widened + recovered

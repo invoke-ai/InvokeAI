@@ -39,7 +39,10 @@ import {
   formatOutputFieldValue,
   getEffectiveWorkflowFieldDescription,
   getFieldTypeLabel,
+  getNodeUpdateStatus,
   getOutputFieldNamesByScope,
+  getWorkflowBatchGroupId,
+  isWorkflowBatchNodeType,
   getOutputFieldRows,
   getWorkflowFieldInvalidReason,
   isDirectInputField,
@@ -122,6 +125,7 @@ const NodeShell = ({
   hasMissingRequiredInput,
   children,
   isMissing,
+  isOutdated,
   isRunning,
   outcome,
   selected,
@@ -129,6 +133,7 @@ const NodeShell = ({
   hasMissingRequiredInput?: boolean;
   children: React.ReactNode;
   isMissing?: boolean;
+  isOutdated?: boolean;
   isRunning?: boolean;
   outcome?: WorkflowNodeOutcome | null;
   selected: boolean;
@@ -136,7 +141,16 @@ const NodeShell = ({
   const isInvalid = isMissing || hasMissingRequiredInput;
 
   return (
-    <Box w={NODE_WIDTH} {...getWorkflowNodeShellProps({ invalid: isInvalid, outcome, running: isRunning, selected })}>
+    <Box
+      w={NODE_WIDTH}
+      {...getWorkflowNodeShellProps({
+        invalid: isInvalid,
+        outcome,
+        outdated: isOutdated,
+        running: isRunning,
+        selected,
+      })}
+    >
       {children}
     </Box>
   );
@@ -281,6 +295,74 @@ const OutputFieldTooltip = ({ template }: { template: FieldOutputTemplate }) => 
   );
 };
 
+/** One line naming the node's version against its template's, for the tooltip and the inspector. */
+const getUpdateStatusText = (
+  t: ReturnType<typeof useTranslation>['t'],
+  node: WorkflowInvocationNode,
+  template: InvocationNodeTemplateView['template']
+): string | null => {
+  const status = getNodeUpdateStatus(node, template);
+  const versions = { from: node.data.version, to: template.version };
+
+  return status === 'current'
+    ? null
+    : status === 'updatable'
+      ? t('nodes.nodeUpdateAvailable', versions)
+      : status === 'newer'
+        ? t('nodes.nodeNewerThanBackend', versions)
+        : t('nodes.nodeVersionIncompatible', versions);
+};
+
+const UPDATE_TOOLTIP_POSITIONING = { placement: 'top-end' } as const;
+
+/** Legacy's group tints, so a zipped group reads as one colour across the canvas. */
+const BATCH_GROUP_COLORS: Record<string, string> = {
+  'Group 1': 'green.fg',
+  'Group 2': 'blue.fg',
+  'Group 3': 'purple.fg',
+  'Group 4': 'red.fg',
+  'Group 5': 'yellow.fg',
+};
+
+/** A batch node's group beside its title: zipped groups share a colour, an ungrouped node says so. */
+const BatchGroupSuffix = ({ node }: { node: WorkflowInvocationNode }) => {
+  const { t } = useTranslation();
+
+  if (!isWorkflowBatchNodeType(node.data.type)) {
+    return null;
+  }
+
+  const groupId = getWorkflowBatchGroupId(node);
+
+  return (
+    <Text color={BATCH_GROUP_COLORS[groupId] ?? 'fg.subtle'} flexShrink={0} fontSize="2xs" fontWeight="600">
+      ({groupId === 'None' ? t('nodes.noBatchGroup') : groupId})
+    </Text>
+  );
+};
+
+/** Header mark for a node whose version is not its template's; the tooltip says what can be done about it. */
+const NodeUpdateIcon = ({
+  node,
+  template,
+}: {
+  node: WorkflowInvocationNode;
+  template: InvocationNodeTemplateView['template'];
+}) => {
+  const { t } = useTranslation();
+  const label = getUpdateStatusText(t, node, template);
+
+  if (label === null) {
+    return null;
+  }
+
+  return (
+    <Tooltip content={label} positioning={UPDATE_TOOLTIP_POSITIONING} showArrow>
+      <Icon aria-label={label} as={TriangleAlertIcon} boxSize="3.5" color="fg.warning" flexShrink={0} role="img" />
+    </Tooltip>
+  );
+};
+
 const NodeInfoTooltipContent = ({
   node,
   template,
@@ -291,6 +373,7 @@ const NodeInfoTooltipContent = ({
   const { t } = useTranslation();
   const title = node.data.label ? `${node.data.label} (${template.title})` : template.title;
   const nodePack = node.data.nodePack || template.nodePack;
+  const updateStatusText = getUpdateStatusText(t, node, template);
 
   return (
     <Stack gap="1" maxW="20rem">
@@ -298,6 +381,7 @@ const NodeInfoTooltipContent = ({
       <Text color="fg.subtle">{t('nodes.nodeType', { type: template.type })}</Text>
       <Text color="fg.subtle">{t('nodes.nodePackLabel', { name: nodePack })}</Text>
       <Text color="fg.subtle">{t('nodes.nodeVersion', { version: node.data.version })}</Text>
+      {updateStatusText ? <Text color="fg.warning">{updateStatusText}</Text> : null}
       <Text color="fg.subtle">{t('nodes.nodeClassification', { classification: template.classification })}</Text>
       <Text color="fg.subtle">{t('nodes.nodeCategory', { category: template.category })}</Text>
       {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
@@ -771,18 +855,22 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
   const inputTemplates = templateView?.inputTemplates ?? [];
   const outputTemplates = templateView?.outputTemplates ?? [];
   const title = node.data.label || templateView?.template.title || node.data.type;
+  const isOutdated = templateView ? getNodeUpdateStatus(node, templateView.template) !== 'current' : false;
 
   return (
     <NodeShell
       isMissing={!templateView}
+      isOutdated={isOutdated}
       isRunning={execution?.status === 'running'}
       outcome={getExecutionOutcome(execution)}
       selected={selected ?? false}
     >
       <Flex {...getWorkflowNodeHeaderProps()}>
         <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={title} />
+        <BatchGroupSuffix node={node} />
         <Box flex="1" />
         <NodeOutcomeIcon execution={execution} node={node} />
+        {templateView && isOutdated ? <NodeUpdateIcon node={node} template={templateView.template} /> : null}
       </Flex>
       {templateView ? (
         <CompactNodeBody inputCount={inputTemplates.length} outputCount={outputTemplates.length} />
@@ -826,6 +914,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
   }
 
   const template = templateView.template;
+  const isOutdated = getNodeUpdateStatus(node, template) !== 'current';
   const connectedFieldNames = new Set(data.connectedTargetHandles);
   const exposedFieldNames = new Set(data.exposedFieldNames);
   const inputTemplates = templateView.inputTemplates;
@@ -843,6 +932,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
   return (
     <NodeShell
       hasMissingRequiredInput={isMissingRequiredInput}
+      isOutdated={isOutdated}
       isRunning={isRunning}
       outcome={getExecutionOutcome(execution)}
       selected={selected ?? false}
@@ -863,8 +953,10 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
         ) : (
           <>
             <NodeTitle node={node} title={node.data.label || template.title} />
+            <BatchGroupSuffix node={node} />
             <Box flex="1" />
             <NodeOutcomeIcon execution={execution} node={node} />
+            {isOutdated ? <NodeUpdateIcon node={node} template={template} /> : null}
             <NodeInfoIcon node={node} template={template} />
           </>
         )}

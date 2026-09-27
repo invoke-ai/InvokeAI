@@ -1,15 +1,16 @@
 import type { InvocationTemplate, ProjectGraphState, WorkflowInvocationNode } from '@features/workflow/contracts';
 import type { WorkflowNodeExecutionState } from '@features/workflow/ui/contracts';
 import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
+import type { ProjectGraphAction } from '@features/workflow/utility';
 
 /* eslint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-array-as-prop -- each render mounts a fresh flow on purpose */
 import { ChakraProvider } from '@chakra-ui/react';
 import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { setNodePreviewCollapsed } from '@features/workflow/ui/workflowUiStore';
-import { createProjectGraph } from '@features/workflow/utility';
+import { createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
 import { system } from '@theme/system';
-import { ReactFlow } from '@xyflow/react';
-import { act } from 'react';
+import { applyNodeChanges, ReactFlow, type NodeChange } from '@xyflow/react';
+import { act, startTransition, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
@@ -419,5 +420,406 @@ describe('InvocationFlowNode edge stacking', () => {
     expect(overSelected.every((hit) => selectedNode.contains(hit))).toBe(true);
     expect(overOther.length).toBeGreaterThan(0);
     expect(overOther.some((hit) => hit.closest('.react-flow__edge') !== null)).toBe(true);
+  });
+});
+
+describe('InvocationFlowNode field entry', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.cssText = 'width: 480px; height: 520px;';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  const entryInput = (name: string, title: string, typeName: string) => ({
+    ...template.inputs.a!,
+    input: 'any' as const,
+    name,
+    required: true,
+    title,
+    type: { batch: false, cardinality: 'SINGLE' as const, name: typeName },
+  });
+  const entryTemplate: InvocationTemplate = {
+    ...template,
+    inputs: {
+      prompt: entryInput('prompt', 'Prompt', 'StringField'),
+      steps: entryInput('steps', 'Steps', 'IntegerField'),
+      weight: entryInput('weight', 'Weight', 'FloatField'),
+    },
+    outputs: {},
+    title: 'Entry',
+    type: 'entry',
+  };
+  const entryTemplates = { entry: entryTemplate };
+  const entryNode: WorkflowInvocationNode = {
+    ...documentNode,
+    data: {
+      ...documentNode.data,
+      inputs: {
+        prompt: { label: '', name: 'prompt', value: 'hello world' },
+        steps: { label: '', name: 'steps', value: 20 },
+        weight: { label: '', name: 'weight', value: 0.5 },
+      },
+      type: 'entry',
+    },
+    id: 'entry-node',
+  };
+
+  /** An undoable graph store standing in for the project aggregate. */
+  const createGraphStore = (initial: ProjectGraphState) => {
+    const listeners = new Set<() => void>();
+    const history: ProjectGraphState[] = [];
+    let graph = initial;
+    const publish = (next: ProjectGraphState) => {
+      graph = next;
+      listeners.forEach((listener) => listener());
+    };
+
+    return {
+      editGraph: (action: ProjectGraphAction) => {
+        history.push(graph);
+        publish(projectGraphReducer(graph, action));
+      },
+      getSnapshot: () => graph,
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+      undo: () => {
+        const previous = history.pop();
+        if (previous) {
+          publish(previous);
+        }
+      },
+    };
+  };
+  type GraphStore = ReturnType<typeof createGraphStore>;
+
+  const fieldValue = (store: GraphStore, name: string) => {
+    const node = store.getSnapshot().nodes.find((candidate) => candidate.id === entryNode.id);
+    return node?.type === 'invocation' ? node.data.inputs[name]?.value : undefined;
+  };
+
+  /**
+   * Mirrors WorkflowEditorView: the flow model is rebuilt from the graph in a transition after an effect, so a
+   * committed value echoes back to the node a beat after the keystroke that produced it. xyflow's node changes
+   * (measured sizes) are applied as the editor does; a rebuilt node without them is hidden until remeasured and
+   * drops the next keystroke.
+   */
+  const DeferredFlow = ({ store }: { store: GraphStore }) => {
+    const graph = useSyncExternalStore(store.subscribe, store.getSnapshot);
+    const [flowNodes, setFlowNodes] = useState(() => toFlowNodes(graph, [], entryTemplates));
+    const onNodesChange = useCallback(
+      (changes: NodeChange<(typeof flowNodes)[number]>[]) =>
+        setFlowNodes((current) => applyNodeChanges(changes, current)),
+      []
+    );
+
+    useEffect(() => {
+      startTransition(() => {
+        setFlowNodes((current) => toFlowNodes(graph, current, entryTemplates));
+      });
+    }, [graph]);
+
+    return <ReactFlow edges={[]} nodes={flowNodes} nodeTypes={nodeTypes} onNodesChange={onNodesChange} />;
+  };
+
+  const renderEntryNode = async () => {
+    const store = createGraphStore({ ...createProjectGraph('entry-test'), nodes: [entryNode] });
+    const adapter = {
+      ...createAdapter({ get: () => null, subscribe: () => () => {} }),
+      commands: {
+        bindLibraryWorkflow: vi.fn(),
+        editGraph: store.editGraph,
+        redo: vi.fn(),
+        replace: vi.fn(),
+        undo: store.undo,
+      },
+      getProjectGraph: store.getSnapshot,
+      project: {
+        getSnapshot: () => ({ ...projectSnapshot, projectGraph: store.getSnapshot() }),
+        subscribe: store.subscribe,
+      },
+    } as unknown as WorkflowUiAdapter;
+
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={adapter}>
+            <DeferredFlow store={store} />
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      )
+    );
+
+    const field = (label: string) =>
+      host.querySelector<HTMLInputElement>(`.react-flow__node input[aria-label="${label}"]`)!;
+
+    return { field, store };
+  };
+  const focusAtEnd = (input: HTMLInputElement) =>
+    act(async () => {
+      await userEvent.click(input);
+      await userEvent.keyboard('{End}');
+    });
+  const keys = (sequence: string) =>
+    act(async () => {
+      await userEvent.keyboard(sequence);
+    });
+  /** Lets the deferred flow-model rebuild land so the assertion sees the echoed value, not just the draft. */
+  const settle = () =>
+    act(async () => {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+    });
+  const rowError = (input: HTMLInputElement) =>
+    input.closest('[data-scope="field"][data-part="root"]')?.querySelector('[data-part="error-text"]')?.textContent ??
+    null;
+
+  it('keeps focus and caret in a text field while the deferred flow model catches up', async () => {
+    const { field, store } = await renderEntryNode();
+    const prompt = field('Prompt');
+
+    await focusAtEnd(prompt);
+    await keys('{Home}{ArrowRight}{ArrowRight}XYZ');
+    expect(prompt.value).toBe('heXYZllo world');
+    expect([prompt.selectionStart, prompt.selectionEnd]).toEqual([5, 5]);
+
+    await settle();
+    expect(document.activeElement).toBe(prompt);
+    expect(field('Prompt')).toBe(prompt);
+    expect(prompt.value).toBe('heXYZllo world');
+    expect([prompt.selectionStart, prompt.selectionEnd]).toEqual([5, 5]);
+    expect(fieldValue(store, 'prompt')).toBe('heXYZllo world');
+
+    await keys('{Shift>}{End}{/Shift}there');
+    expect(prompt.value).toBe('heXYZthere');
+    expect([prompt.selectionStart, prompt.selectionEnd]).toEqual([10, 10]);
+    await keys('{Control>}a{/Control}{Backspace}');
+    await settle();
+    expect(prompt.value).toBe('');
+    expect(fieldValue(store, 'prompt')).toBe('');
+    expect(document.activeElement).toBe(prompt);
+    expect(rowError(prompt)).toBeNull();
+
+    // Undo from elsewhere (a toolbar button has focus) restores the text without pulling focus into a field.
+    const weight = field('Weight');
+    await act(async () => {
+      await userEvent.click(host);
+    });
+    await act(() => store.undo());
+    await settle();
+    expect(prompt.value).toBe('heXYZthere');
+    expect(document.activeElement).not.toBe(prompt);
+    expect(document.activeElement).not.toBe(weight);
+  });
+
+  it('edits a float field in place and reports drafts, clears, and a leading minus through the graph', async () => {
+    const { field, store } = await renderEntryNode();
+    const weight = field('Weight');
+
+    await focusAtEnd(weight);
+    await keys('{Home}2');
+    expect(weight.value).toBe('20.5');
+    await settle();
+    await keys('3');
+    expect(weight.value).toBe('230.5');
+    expect(fieldValue(store, 'weight')).toBe(230.5);
+    expect(document.activeElement).toBe(weight);
+
+    await keys('{Control>}a{/Control}0.60');
+    await settle();
+    expect(weight.value).toBe('0.60');
+    expect(fieldValue(store, 'weight')).toBe(0.6);
+
+    await keys('{Control>}a{/Control}2');
+    await settle();
+    expect(weight.value).toBe('2');
+    expect(fieldValue(store, 'weight')).toBe(2);
+
+    await keys('{Backspace}');
+    await settle();
+    expect(weight.value).toBe('');
+    expect(fieldValue(store, 'weight')).toBeUndefined();
+    expect(document.activeElement).toBe(weight);
+    expect(rowError(weight)).toBe('Required value.');
+
+    await keys('7{Home}-');
+    await settle();
+    expect(weight.value).toBe('-7');
+    expect(fieldValue(store, 'weight')).toBe(-7);
+    expect(rowError(weight)).toBeNull();
+
+    await keys('{Home}{Delete}');
+    await settle();
+    expect(weight.value).toBe('7');
+    expect(fieldValue(store, 'weight')).toBe(7);
+
+    await act(() => weight.blur());
+    await settle();
+    expect(weight.value).toBe('7');
+  });
+
+  it('keeps a fractional integer visible and flagged until it is corrected', async () => {
+    const { field, store } = await renderEntryNode();
+    const steps = field('Steps');
+
+    await focusAtEnd(steps);
+    await keys('.5');
+    await settle();
+    expect(steps.value).toBe('20.5');
+    expect(fieldValue(store, 'steps')).toBe(20.5);
+    expect(steps.getAttribute('aria-invalid')).toBe('true');
+    expect(rowError(steps)).toBe('Invalid value.');
+
+    await keys('{Backspace}{Backspace}');
+    await settle();
+    expect(steps.value).toBe('20');
+    expect(fieldValue(store, 'steps')).toBe(20);
+    expect(steps.getAttribute('aria-invalid')).toBeNull();
+    expect(rowError(steps)).toBeNull();
+  });
+});
+
+describe('InvocationFlowNode template version', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.cssText = 'width: 480px; height: 520px;';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  const render = (nodes: ReturnType<typeof toFlowNodes>) =>
+    act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={createAdapter(createExecutionPort().port)}>
+            <ReactFlow edges={[]} nodes={nodes} nodeTypes={nodeTypes} />
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      )
+    );
+  const updateIcon = () => host.querySelector('.react-flow__node [role="img"][aria-label^="nodes.node"]');
+  const borderColor = () => getComputedStyle(host.querySelector<HTMLElement>('.react-flow__node > div')!).borderColor;
+
+  it('marks a node whose template moved on with a warning border and an update tooltip, and leaves a current one alone', async () => {
+    await render(flowNodes);
+    expect(updateIcon()).toBeNull();
+    const currentBorder = borderColor();
+
+    await render(toFlowNodes(projectGraph, [], { preview: { ...template, version: '1.1.0' } }));
+    expect(updateIcon()?.getAttribute('aria-label')).toBe('nodes.nodeUpdateAvailable');
+    expect(borderColor()).not.toBe(currentBorder);
+
+    await render(toFlowNodes(projectGraph, [], { preview: { ...template, version: '2.0.0' } }));
+    expect(updateIcon()?.getAttribute('aria-label')).toBe('nodes.nodeVersionIncompatible');
+  });
+});
+
+describe('InvocationFlowNode batch nodes', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.cssText = 'width: 480px; height: 520px;';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  const batchTemplate: InvocationTemplate = {
+    ...template,
+    inputs: {
+      batch_group_id: {
+        ...(template.inputs.a as InvocationTemplate['inputs'][string]),
+        default: 'None',
+        input: 'direct',
+        name: 'batch_group_id',
+        options: ['None', 'Group 1', 'Group 2'],
+        title: 'Batch Group',
+        type: { batch: false, cardinality: 'SINGLE', name: 'EnumField' },
+      },
+      floats: {
+        ...(template.inputs.a as InvocationTemplate['inputs'][string]),
+        default: [],
+        input: 'any',
+        name: 'floats',
+        title: 'Floats',
+        type: { batch: true, cardinality: 'COLLECTION', name: 'FloatField' },
+      },
+    },
+    outputs: {
+      value: {
+        description: '',
+        name: 'value',
+        title: 'Value',
+        type: { batch: false, cardinality: 'SINGLE', name: 'FloatField' },
+      },
+    },
+    type: 'float_batch',
+  };
+  const batchNode = (groupId: string): WorkflowInvocationNode => ({
+    ...documentNode,
+    data: {
+      ...documentNode.data,
+      inputs: {
+        batch_group_id: { label: '', name: 'batch_group_id', value: groupId },
+        floats: { label: '', name: 'floats', value: [1, 2] },
+      },
+      type: 'float_batch',
+    },
+    id: 'batch-node',
+  });
+  const render = (groupId: string) => {
+    const graph: ProjectGraphState = { ...createProjectGraph('batch-test'), nodes: [batchNode(groupId)] };
+
+    return act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={createAdapter(createExecutionPort().port)}>
+            <ReactFlow
+              edges={[]}
+              nodes={toFlowNodes(graph, [], { float_batch: batchTemplate })}
+              nodeTypes={nodeTypes}
+            />
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      )
+    );
+  };
+  const header = () => host.querySelector<HTMLElement>('.react-flow__node > div > div')!;
+
+  it('names the group beside the title, draws the batch list handle as a diamond, and keeps the footer off', async () => {
+    await render('Group 2');
+    expect(header().textContent).toContain('(Group 2)');
+    expect(host.querySelector<HTMLElement>('.react-flow__handle[data-handleid="floats"]')?.style.transform).toContain(
+      'rotate(45deg)'
+    );
+    expect(host.textContent).not.toContain('Use Cache');
+
+    await render('None');
+    expect(header().textContent).toContain('(nodes.noBatchGroup)');
   });
 });

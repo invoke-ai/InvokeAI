@@ -1,0 +1,1737 @@
+{
+  "name": "Extend Video to Image - LTX-2",
+  "author": "Invoke",
+  "description": "Continue an existing clip with LTX-2 and land it on a destination image. The continuation opens on the source's last frames and closing sound, ends on your image, and is cross-faded onto the source.",
+  "version": "1.0.0",
+  "contact": "",
+  "tags": "ltx, ltx2, video, extend, audio, last frame",
+  "notes": "The Last Frame image is cover-cropped onto the SOURCE clip's canvas, so give it the clip's aspect ratio. The extension ends on it: Number of Frames is the generated clip's length including the Context Frames it opens with, so the image lands Number of Frames - Context Frames frames after the join.\n\nTarget Resolution: use 512p, 704p or 768p. The two-stage presets (1024p, 1536p) generate at half their named size and finish in a refine pass this single-pass template does not have, so they render SMALLER than 768p rather than larger.\n\nContext Frames decides how much of the source the model sees. The default 17 (about 0.7s at 24 fps) carries motion but only ~1 syllable of sound -- enough for tone, not for cadence. Raise it (25/33/41/49...) when continuing rhythmic material such as singing, and raise Number of Frames with it so the extension is not mostly replay.\n\nEach InvokeAI install assigns its own internal model IDs, so the model fields ship blank -- pick these in the form after loading (all from the LTX-2.5 starter bundle):\n\n- Model: LTX-2.5 Dev Transformer (int8) or LTX-2.5 Distilled Transformer (int8). The Denoise node's 'auto' schedule follows the checkpoint: Dev runs the guided 30-step recipe, Distilled a fixed 8 steps with no guidance (its Steps and guidance values are ignored, and the log says so).\n- Components: LTX-2.5 Components (VAEs, vocoder, text connectors, latent upscaler).\n- Text Encoder: LTX-2.5 Text Encoder (Gemma-4 12B, int8). Required: no LTX-2 model carries one.\n\nThe negative prompt is pre-filled with the release's own default list and is used only on Dev with a CFG or Audio CFG above 1. On Distilled, turning off 'Encode Negative' on the Prompt node skips its encode.",
+  "exposedFields": [
+    {
+      "nodeId": "source_video",
+      "fieldName": "video"
+    },
+    {
+      "nodeId": "source_video",
+      "fieldName": "start_frame"
+    },
+    {
+      "nodeId": "source_video",
+      "fieldName": "end_frame"
+    },
+    {
+      "nodeId": "last_frame",
+      "fieldName": "image"
+    },
+    {
+      "nodeId": "extend_conditioning",
+      "fieldName": "context_frames"
+    },
+    {
+      "nodeId": "denoise_latents",
+      "fieldName": "num_frames"
+    },
+    {
+      "nodeId": "positive_prompt",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "negative_prompt",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "ideal_dimensions",
+      "fieldName": "target_resolution"
+    },
+    {
+      "nodeId": "steps",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "seed",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "model_loader",
+      "fieldName": "model"
+    },
+    {
+      "nodeId": "model_loader",
+      "fieldName": "component_source"
+    },
+    {
+      "nodeId": "model_loader",
+      "fieldName": "text_encoder_model"
+    }
+  ],
+  "meta": {
+    "version": "4.0.0",
+    "category": "default"
+  },
+  "nodes": [
+    {
+      "id": "negative_prompt",
+      "type": "invocation",
+      "data": {
+        "id": "negative_prompt",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "string",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Negative Prompt",
+            "description": "What to steer the generation away from.",
+            "value": "has_subtitles, has_blurbox, transition from black, transition to black, speech_ending_short, blurry, out of focus, overexposed, underexposed, low contrast, washed out colors, excessive noise, grainy texture, poor lighting, flickering, motion blur, distorted proportions, unnatural skin tones, deformed facial features, asymmetrical face, missing facial features, extra limbs, disfigured hands, wrong hand count, artifacts around text, inconsistent perspective, camera shake, incorrect depth of field, background too sharp, background clutter, distracting reflections, harsh shadows, inconsistent lighting direction, color banding, cartoonish rendering, 3D CGI look, unrealistic materials, uncanny valley effect, incorrect ethnicity, wrong gender, exaggerated expressions, wrong gaze direction, mismatched lip sync, silent or muted audio, distorted voice, robotic voice, echo, background noise, off-sync audio, incorrect dialogue, added dialogue, repetitive speech, jittery movement, awkward pauses, incorrect timing, unnatural transitions, inconsistent framing, tilted camera, flat lighting, inconsistent tone, cinematic oversaturation, stylized filters, or AI artifacts."
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 260
+      }
+    },
+    {
+      "id": "positive_prompt",
+      "type": "invocation",
+      "data": {
+        "id": "positive_prompt",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "string",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Prompt",
+            "description": "Describe what to generate.",
+            "value": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 0
+      }
+    },
+    {
+      "id": "seed",
+      "type": "invocation",
+      "data": {
+        "id": "seed",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "integer",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Seed",
+            "description": "Reuse a seed to repeat a result.",
+            "value": 0
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 520
+      }
+    },
+    {
+      "id": "model_loader",
+      "type": "invocation",
+      "data": {
+        "id": "model_loader",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "ltx2_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": "Model",
+            "description": "",
+            "value": null
+          },
+          "component_source": {
+            "name": "component_source",
+            "label": "Components",
+            "description": "",
+            "value": null
+          },
+          "text_encoder_model": {
+            "name": "text_encoder_model",
+            "label": "Text Encoder",
+            "description": "",
+            "value": null
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 700
+      }
+    },
+    {
+      "id": "pos_cond",
+      "type": "invocation",
+      "data": {
+        "id": "pos_cond",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "ltx2_text_encoder",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "negative_prompt": {
+            "name": "negative_prompt",
+            "label": "",
+            "description": "",
+            "value": "has_subtitles, has_blurbox, transition from black, transition to black, speech_ending_short, blurry, out of focus, overexposed, underexposed, low contrast, washed out colors, excessive noise, grainy texture, poor lighting, flickering, motion blur, distorted proportions, unnatural skin tones, deformed facial features, asymmetrical face, missing facial features, extra limbs, disfigured hands, wrong hand count, artifacts around text, inconsistent perspective, camera shake, incorrect depth of field, background too sharp, background clutter, distracting reflections, harsh shadows, inconsistent lighting direction, color banding, cartoonish rendering, 3D CGI look, unrealistic materials, uncanny valley effect, incorrect ethnicity, wrong gender, exaggerated expressions, wrong gaze direction, mismatched lip sync, silent or muted audio, distorted voice, robotic voice, echo, background noise, off-sync audio, incorrect dialogue, added dialogue, repetitive speech, jittery movement, awkward pauses, incorrect timing, unnatural transitions, inconsistent framing, tilted camera, flat lighting, inconsistent tone, cinematic oversaturation, stylized filters, or AI artifacts."
+          },
+          "encode_negative": {
+            "name": "encode_negative",
+            "label": "",
+            "description": "",
+            "value": true
+          },
+          "max_sequence_length": {
+            "name": "max_sequence_length",
+            "label": "",
+            "description": "",
+            "value": 1024
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 460,
+        "y": 0
+      }
+    },
+    {
+      "id": "denoise_latents",
+      "type": "invocation",
+      "data": {
+        "id": "denoise_latents",
+        "version": "1.5.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "num_frames is the GENERATED clip's length and must exceed context_frames -- at or below it the output would be all replay. width/height must match the Extend Conditioning node's.",
+        "type": "ltx2_denoise",
+        "inputs": {
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1248
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 704
+          },
+          "num_frames": {
+            "name": "num_frames",
+            "label": "Number of Frames",
+            "description": "",
+            "value": 121
+          },
+          "fps": {
+            "name": "fps",
+            "label": "",
+            "description": "",
+            "value": 24
+          },
+          "steps": {
+            "name": "steps",
+            "label": "",
+            "description": "",
+            "value": 30
+          },
+          "cfg_scale": {
+            "name": "cfg_scale",
+            "label": "",
+            "description": "",
+            "value": 3
+          },
+          "audio_cfg_scale": {
+            "name": "audio_cfg_scale",
+            "label": "",
+            "description": "",
+            "value": 7
+          },
+          "stg_scale": {
+            "name": "stg_scale",
+            "label": "",
+            "description": "",
+            "value": 1
+          },
+          "modality_scale": {
+            "name": "modality_scale",
+            "label": "",
+            "description": "",
+            "value": 3
+          },
+          "guidance_rescale": {
+            "name": "guidance_rescale",
+            "label": "",
+            "description": "",
+            "value": 0.7
+          },
+          "schedule": {
+            "name": "schedule",
+            "label": "",
+            "description": "",
+            "value": "auto"
+          },
+          "seed": {
+            "name": "seed",
+            "label": "",
+            "description": "",
+            "value": 0
+          },
+          "noise_scale": {
+            "name": "noise_scale",
+            "label": "",
+            "description": "",
+            "value": 0.909375
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 900,
+        "y": 0
+      }
+    },
+    {
+      "id": "extension_clip",
+      "type": "invocation",
+      "data": {
+        "id": "extension_clip",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Decodes the generated half. The join below is the finished result.",
+        "type": "ltx2_latents_to_video",
+        "inputs": {
+          "fps": {
+            "name": "fps",
+            "label": "",
+            "description": "",
+            "value": 24
+          },
+          "tile_size": {
+            "name": "tile_size",
+            "label": "",
+            "description": "",
+            "value": 512
+          },
+          "temporal_tile": {
+            "name": "temporal_tile",
+            "label": "",
+            "description": "",
+            "value": 16
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false
+      },
+      "position": {
+        "x": 1380,
+        "y": 0
+      }
+    },
+    {
+      "id": "source_video",
+      "type": "invocation",
+      "data": {
+        "id": "source_video",
+        "version": "1.3.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Trims the source. The extension continues from wherever this trim ENDS.",
+        "type": "extract_video_range",
+        "inputs": {
+          "video": {
+            "name": "video",
+            "label": "Source Video",
+            "description": "",
+            "value": null
+          },
+          "start_frame": {
+            "name": "start_frame",
+            "label": "Start Frame",
+            "description": "",
+            "value": 0
+          },
+          "end_frame": {
+            "name": "end_frame",
+            "label": "End Frame",
+            "description": "",
+            "value": -1
+          },
+          "fps": {
+            "name": "fps",
+            "label": "",
+            "description": "",
+            "value": 0
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false
+      },
+      "position": {
+        "x": 420,
+        "y": 1000
+      }
+    },
+    {
+      "id": "source_clip_collect",
+      "type": "invocation",
+      "data": {
+        "id": "source_clip_collect",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "collect",
+        "inputs": {},
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1380,
+        "y": 900
+      }
+    },
+    {
+      "id": "clips_to_join",
+      "type": "invocation",
+      "data": {
+        "id": "clips_to_join",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "collect",
+        "inputs": {},
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1700,
+        "y": 900
+      }
+    },
+    {
+      "id": "video_output",
+      "type": "invocation",
+      "data": {
+        "id": "video_output",
+        "version": "1.2.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Joins source + extension. `transition_frames` arrives over an edge from context_frames -- the crossfade must consume exactly the held frames or they play twice.",
+        "type": "video_concat",
+        "inputs": {
+          "videos": {
+            "name": "videos",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "transition": {
+            "name": "transition",
+            "label": "",
+            "description": "",
+            "value": "crossfade"
+          },
+          "transition_frames": {
+            "name": "transition_frames",
+            "label": "",
+            "description": "",
+            "value": 17
+          },
+          "fps": {
+            "name": "fps",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "size_mismatch": {
+            "name": "size_mismatch",
+            "label": "",
+            "description": "",
+            "value": "match_first"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": false
+      },
+      "position": {
+        "x": 2020,
+        "y": 640
+      }
+    },
+    {
+      "id": "extend_conditioning",
+      "type": "invocation",
+      "data": {
+        "id": "extend_conditioning",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Reads the TAIL of the trimmed clip. `context_frames` is the knob this template exists for: the number of source frames carried into the continuation, snapped DOWN to the VAE's 8n+1 grid (17, 25, 33, 41, 49...). It drives three things at once -- the held picture, the held soundtrack, and the crossfade length, which is why it is wired to the join rather than set there. Larger = smoother motion and more rhythmic context, but more of the generation spent replaying footage you already have.",
+        "type": "ltx2_extend_conditioning",
+        "inputs": {
+          "video": {
+            "name": "video",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "fps": {
+            "name": "fps",
+            "label": "",
+            "description": "",
+            "value": 24.0
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1248
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 704
+          },
+          "context_frames": {
+            "name": "context_frames",
+            "label": "Context Frames",
+            "description": "How many frames from the initial video to carry into the extension. More frames improves continuity, but reduces the overall length of the clip.",
+            "value": 17,
+            "descriptionOverride": true
+          },
+          "tile_size": {
+            "name": "tile_size",
+            "label": "",
+            "description": "",
+            "value": 512
+          },
+          "temporal_tile": {
+            "name": "temporal_tile",
+            "label": "",
+            "description": "",
+            "value": 16
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 900,
+        "y": 760
+      }
+    },
+    {
+      "id": "core_metadata",
+      "type": "invocation",
+      "data": {
+        "id": "core_metadata",
+        "version": "2.7.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Recorded on the output. The prompt, seed, model, canvas, frame count and steps arrive over edges from the nodes that set them. The frame rate is recorded as 24 and CFG as 3 whatever the source and the Denoise node say: the join delivers the source's own frame rate, and edit this node if you change CFG.",
+        "type": "core_metadata",
+        "inputs": {
+          "generation_mode": {
+            "name": "generation_mode",
+            "label": "",
+            "description": "",
+            "value": "ltx2_extend_video"
+          },
+          "positive_prompt": {
+            "name": "positive_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "negative_prompt": {
+            "name": "negative_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "seed": {
+            "name": "seed",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "rand_device": {
+            "name": "rand_device",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "cfg_scale": {
+            "name": "cfg_scale",
+            "label": "",
+            "description": "",
+            "value": 3
+          },
+          "cfg_rescale_multiplier": {
+            "name": "cfg_rescale_multiplier",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "steps": {
+            "name": "steps",
+            "label": "",
+            "description": "",
+            "value": 30
+          },
+          "scheduler": {
+            "name": "scheduler",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "seamless_x": {
+            "name": "seamless_x",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "seamless_y": {
+            "name": "seamless_y",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "clip_skip": {
+            "name": "clip_skip",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "model": {
+            "name": "model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "controlnets": {
+            "name": "controlnets",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "ipAdapters": {
+            "name": "ipAdapters",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "t2iAdapters": {
+            "name": "t2iAdapters",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "loras": {
+            "name": "loras",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "strength": {
+            "name": "strength",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "init_image": {
+            "name": "init_image",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "vae": {
+            "name": "vae",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "qwen3_encoder": {
+            "name": "qwen3_encoder",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "mistral_encoder": {
+            "name": "mistral_encoder",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "ideogram4_caption": {
+            "name": "ideogram4_caption",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "num_frames": {
+            "name": "num_frames",
+            "label": "",
+            "description": "",
+            "value": 121
+          },
+          "first_frame_image": {
+            "name": "first_frame_image",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "last_frame_image": {
+            "name": "last_frame_image",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "source_video": {
+            "name": "source_video",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "source_video_start_frame": {
+            "name": "source_video_start_frame",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "source_video_end_frame": {
+            "name": "source_video_end_frame",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "fps": {
+            "name": "fps",
+            "label": "",
+            "description": "",
+            "value": 24
+          },
+          "wan_guidance_scale_low_noise": {
+            "name": "wan_guidance_scale_low_noise",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "wan_t5_encoder_model": {
+            "name": "wan_t5_encoder_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "wan_transformer_low_noise": {
+            "name": "wan_transformer_low_noise",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "wan_component_source": {
+            "name": "wan_component_source",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_transformer_model": {
+            "name": "minimax_h3_transformer_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_text_encoder_model": {
+            "name": "minimax_h3_text_encoder_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_component_source": {
+            "name": "minimax_h3_component_source",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_hybrid_base_model": {
+            "name": "minimax_h3_hybrid_base_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_hybrid_start_block": {
+            "name": "minimax_h3_hybrid_start_block",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "minimax_h3_references": {
+            "name": "minimax_h3_references",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "hrf_enabled": {
+            "name": "hrf_enabled",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "hrf_method": {
+            "name": "hrf_method",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "hrf_strength": {
+            "name": "hrf_strength",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "positive_style_prompt": {
+            "name": "positive_style_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "negative_style_prompt": {
+            "name": "negative_style_prompt",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_model": {
+            "name": "refiner_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_cfg_scale": {
+            "name": "refiner_cfg_scale",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_steps": {
+            "name": "refiner_steps",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_scheduler": {
+            "name": "refiner_scheduler",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_positive_aesthetic_score": {
+            "name": "refiner_positive_aesthetic_score",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_negative_aesthetic_score": {
+            "name": "refiner_negative_aesthetic_score",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "refiner_start": {
+            "name": "refiner_start",
+            "label": "",
+            "description": "",
+            "value": null
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 460,
+        "y": 420
+      }
+    },
+    {
+      "id": "ideal_dimensions",
+      "type": "invocation",
+      "data": {
+        "id": "ideal_dimensions",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Derives the canvas from the SOURCE clip so the denoise and the conditioning cannot disagree. Only the source's aspect ratio is used; target_resolution pins the short edge to a trained preset and each axis is rounded to 32 (the VAE's spatial compression), which is why a clip's own pixel size cannot be wired straight through. base_width/base_height are wired out rather than width/height: identical on 512p/704p/768p, and on 1024p/1536p they are the canvas a single pass is actually trained for. THIS TEMPLATE IS A SINGLE PASS, so use 512p, 704p or 768p: the two-stage presets (1024p, 1536p) generate at HALF their named size and rely on a refine pass this graph does not have, so picking 1024p here renders at a 512 short edge, not 1024.",
+        "type": "ltx2_ideal_dimensions",
+        "inputs": {
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1024
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 1024
+          },
+          "target_resolution": {
+            "name": "target_resolution",
+            "label": "Target Resolution",
+            "description": "",
+            "value": "704p"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 420,
+        "y": 1300
+      }
+    },
+    {
+      "id": "steps",
+      "type": "invocation",
+      "data": {
+        "id": "steps",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Dev's released recipe is 30. The Distilled checkpoint always runs 8.",
+        "type": "integer",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Steps",
+            "description": "Number of denoising steps.",
+            "value": 30
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 380
+      }
+    },
+    {
+      "id": "last_frame",
+      "type": "invocation",
+      "data": {
+        "id": "last_frame",
+        "version": "1.0.2",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "image",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": "Last Frame",
+            "description": "Last frame of the extended clip",
+            "value": null,
+            "descriptionOverride": true
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 1300
+      }
+    },
+    {
+      "id": "last_frame_conditioning",
+      "type": "invocation",
+      "data": {
+        "id": "last_frame_conditioning",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Frame index -1 means the clip's last frame, resolved against the run's own frame count. It is appended to the model's sequence as a keyframe rather than overwriting a frame, so it can coexist with a first frame or an extension's opening.",
+        "type": "ltx2_image_conditioning",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1248
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 704
+          },
+          "strength": {
+            "name": "strength",
+            "label": "",
+            "description": "",
+            "value": 1.0
+          },
+          "frame_index": {
+            "name": "frame_index",
+            "label": "",
+            "description": "",
+            "value": -1
+          },
+          "crf": {
+            "name": "crf",
+            "label": "",
+            "description": "",
+            "value": 18
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 900,
+        "y": 1300
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-model_loader-text_encoder-pos_cond-text_encoder",
+      "source": "model_loader",
+      "sourceHandle": "text_encoder",
+      "target": "pos_cond",
+      "targetHandle": "text_encoder",
+      "type": "default"
+    },
+    {
+      "id": "edge-positive_prompt-value-pos_cond-prompt",
+      "source": "positive_prompt",
+      "sourceHandle": "value",
+      "target": "pos_cond",
+      "targetHandle": "prompt",
+      "type": "default"
+    },
+    {
+      "id": "edge-negative_prompt-value-pos_cond-negative_prompt",
+      "source": "negative_prompt",
+      "sourceHandle": "value",
+      "target": "pos_cond",
+      "targetHandle": "negative_prompt",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-transformer-denoise_latents-transformer",
+      "source": "model_loader",
+      "sourceHandle": "transformer",
+      "target": "denoise_latents",
+      "targetHandle": "transformer",
+      "type": "default"
+    },
+    {
+      "id": "edge-pos_cond-conditioning-denoise_latents-positive_conditioning",
+      "source": "pos_cond",
+      "sourceHandle": "conditioning",
+      "target": "denoise_latents",
+      "targetHandle": "positive_conditioning",
+      "type": "default"
+    },
+    {
+      "id": "edge-pos_cond-negative_conditioning-denoise_latents-negative_conditioning",
+      "source": "pos_cond",
+      "sourceHandle": "negative_conditioning",
+      "target": "denoise_latents",
+      "targetHandle": "negative_conditioning",
+      "type": "default"
+    },
+    {
+      "id": "edge-seed-value-denoise_latents-seed",
+      "source": "seed",
+      "sourceHandle": "value",
+      "target": "denoise_latents",
+      "targetHandle": "seed",
+      "type": "default"
+    },
+    {
+      "id": "edge-denoise_latents-video_latents-extension_clip-video_latents",
+      "source": "denoise_latents",
+      "sourceHandle": "video_latents",
+      "target": "extension_clip",
+      "targetHandle": "video_latents",
+      "type": "default"
+    },
+    {
+      "id": "edge-denoise_latents-audio_latents-extension_clip-audio_latents",
+      "source": "denoise_latents",
+      "sourceHandle": "audio_latents",
+      "target": "extension_clip",
+      "targetHandle": "audio_latents",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-vae-extension_clip-vae",
+      "source": "model_loader",
+      "sourceHandle": "vae",
+      "target": "extension_clip",
+      "targetHandle": "vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-audio_vae-extension_clip-audio_vae",
+      "source": "model_loader",
+      "sourceHandle": "audio_vae",
+      "target": "extension_clip",
+      "targetHandle": "audio_vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-vocoder-extension_clip-vocoder",
+      "source": "model_loader",
+      "sourceHandle": "vocoder",
+      "target": "extension_clip",
+      "targetHandle": "vocoder",
+      "type": "default"
+    },
+    {
+      "id": "edge-source_video-video-source_clip_collect-item",
+      "source": "source_video",
+      "sourceHandle": "video",
+      "target": "source_clip_collect",
+      "targetHandle": "item",
+      "type": "default"
+    },
+    {
+      "id": "edge-source_clip_collect-collection-clips_to_join-collection",
+      "source": "source_clip_collect",
+      "sourceHandle": "collection",
+      "target": "clips_to_join",
+      "targetHandle": "collection",
+      "type": "default"
+    },
+    {
+      "id": "edge-extension_clip-video-clips_to_join-item",
+      "source": "extension_clip",
+      "sourceHandle": "video",
+      "target": "clips_to_join",
+      "targetHandle": "item",
+      "type": "default"
+    },
+    {
+      "id": "edge-clips_to_join-collection-video_output-videos",
+      "source": "clips_to_join",
+      "sourceHandle": "collection",
+      "target": "video_output",
+      "targetHandle": "videos",
+      "type": "default"
+    },
+    {
+      "id": "edge-source_video-video-extend_conditioning-video",
+      "source": "source_video",
+      "sourceHandle": "video",
+      "target": "extend_conditioning",
+      "targetHandle": "video",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-vae-extend_conditioning-vae",
+      "source": "model_loader",
+      "sourceHandle": "vae",
+      "target": "extend_conditioning",
+      "targetHandle": "vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-extend_conditioning-video_conditioning-denoise_latents-video_conditioning",
+      "source": "extend_conditioning",
+      "sourceHandle": "video_conditioning",
+      "target": "denoise_latents",
+      "targetHandle": "video_conditioning",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-audio_vae-extend_conditioning-audio_vae",
+      "source": "model_loader",
+      "sourceHandle": "audio_vae",
+      "target": "extend_conditioning",
+      "targetHandle": "audio_vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-vocoder-extend_conditioning-vocoder",
+      "source": "model_loader",
+      "sourceHandle": "vocoder",
+      "target": "extend_conditioning",
+      "targetHandle": "vocoder",
+      "type": "default"
+    },
+    {
+      "id": "edge-source_video-fps-extend_conditioning-fps",
+      "source": "source_video",
+      "sourceHandle": "fps",
+      "target": "extend_conditioning",
+      "targetHandle": "fps",
+      "type": "default"
+    },
+    {
+      "id": "edge-extend_conditioning-audio_conditioning-denoise_latents-audio_prefix_conditioning",
+      "source": "extend_conditioning",
+      "sourceHandle": "audio_conditioning",
+      "target": "denoise_latents",
+      "targetHandle": "audio_prefix_conditioning",
+      "type": "default"
+    },
+    {
+      "id": "edge-extend_conditioning-context_frames-video_output-transition_frames",
+      "source": "extend_conditioning",
+      "sourceHandle": "context_frames",
+      "target": "video_output",
+      "targetHandle": "transition_frames",
+      "type": "default"
+    },
+    {
+      "id": "edge-source_video-fps-denoise_latents-fps",
+      "source": "source_video",
+      "sourceHandle": "fps",
+      "target": "denoise_latents",
+      "targetHandle": "fps",
+      "type": "default"
+    },
+    {
+      "id": "edge-source_video-fps-extension_clip-fps",
+      "source": "source_video",
+      "sourceHandle": "fps",
+      "target": "extension_clip",
+      "targetHandle": "fps",
+      "type": "default"
+    },
+    {
+      "id": "edge-seed-value-core_metadata-seed",
+      "source": "seed",
+      "sourceHandle": "value",
+      "target": "core_metadata",
+      "targetHandle": "seed",
+      "type": "default"
+    },
+    {
+      "id": "edge-positive_prompt-value-core_metadata-positive_prompt",
+      "source": "positive_prompt",
+      "sourceHandle": "value",
+      "target": "core_metadata",
+      "targetHandle": "positive_prompt",
+      "type": "default"
+    },
+    {
+      "id": "edge-negative_prompt-value-core_metadata-negative_prompt",
+      "source": "negative_prompt",
+      "sourceHandle": "value",
+      "target": "core_metadata",
+      "targetHandle": "negative_prompt",
+      "type": "default"
+    },
+    {
+      "id": "edge-core_metadata-metadata-extension_clip-metadata",
+      "source": "core_metadata",
+      "sourceHandle": "metadata",
+      "target": "extension_clip",
+      "targetHandle": "metadata",
+      "type": "default"
+    },
+    {
+      "id": "edge-core_metadata-metadata-video_output-metadata",
+      "source": "core_metadata",
+      "sourceHandle": "metadata",
+      "target": "video_output",
+      "targetHandle": "metadata",
+      "type": "default"
+    },
+    {
+      "id": "edge-source_video-width-ideal_dimensions-width",
+      "source": "source_video",
+      "sourceHandle": "width",
+      "target": "ideal_dimensions",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-ideal_dimensions-base_width-denoise_latents-width",
+      "source": "ideal_dimensions",
+      "sourceHandle": "base_width",
+      "target": "denoise_latents",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-ideal_dimensions-base_width-extend_conditioning-width",
+      "source": "ideal_dimensions",
+      "sourceHandle": "base_width",
+      "target": "extend_conditioning",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-ideal_dimensions-base_width-core_metadata-width",
+      "source": "ideal_dimensions",
+      "sourceHandle": "base_width",
+      "target": "core_metadata",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-source_video-height-ideal_dimensions-height",
+      "source": "source_video",
+      "sourceHandle": "height",
+      "target": "ideal_dimensions",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-ideal_dimensions-base_height-denoise_latents-height",
+      "source": "ideal_dimensions",
+      "sourceHandle": "base_height",
+      "target": "denoise_latents",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-ideal_dimensions-base_height-extend_conditioning-height",
+      "source": "ideal_dimensions",
+      "sourceHandle": "base_height",
+      "target": "extend_conditioning",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-ideal_dimensions-base_height-core_metadata-height",
+      "source": "ideal_dimensions",
+      "sourceHandle": "base_height",
+      "target": "core_metadata",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-steps-value-denoise_latents-steps",
+      "source": "steps",
+      "sourceHandle": "value",
+      "target": "denoise_latents",
+      "targetHandle": "steps",
+      "type": "default"
+    },
+    {
+      "id": "edge-steps-value-core_metadata-steps",
+      "source": "steps",
+      "sourceHandle": "value",
+      "target": "core_metadata",
+      "targetHandle": "steps",
+      "type": "default"
+    },
+    {
+      "id": "edge-denoise_latents-num_frames-core_metadata-num_frames",
+      "source": "denoise_latents",
+      "sourceHandle": "num_frames",
+      "target": "core_metadata",
+      "targetHandle": "num_frames",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-model-core_metadata-model",
+      "source": "model_loader",
+      "sourceHandle": "model",
+      "target": "core_metadata",
+      "targetHandle": "model",
+      "type": "default"
+    },
+    {
+      "id": "edge-last_frame-image-last_frame_conditioning-image",
+      "source": "last_frame",
+      "sourceHandle": "image",
+      "target": "last_frame_conditioning",
+      "targetHandle": "image",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-vae-last_frame_conditioning-vae",
+      "source": "model_loader",
+      "sourceHandle": "vae",
+      "target": "last_frame_conditioning",
+      "targetHandle": "vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-last_frame_conditioning-video_conditioning-denoise_latents-keyframe_conditioning",
+      "source": "last_frame_conditioning",
+      "sourceHandle": "video_conditioning",
+      "target": "denoise_latents",
+      "targetHandle": "keyframe_conditioning",
+      "type": "default"
+    },
+    {
+      "id": "edge-ideal_dimensions-base_width-last_frame_conditioning-width",
+      "source": "ideal_dimensions",
+      "sourceHandle": "base_width",
+      "target": "last_frame_conditioning",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-ideal_dimensions-base_height-last_frame_conditioning-height",
+      "source": "ideal_dimensions",
+      "sourceHandle": "base_height",
+      "target": "last_frame_conditioning",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-last_frame-image-core_metadata-last_frame_image",
+      "source": "last_frame",
+      "sourceHandle": "image",
+      "target": "core_metadata",
+      "targetHandle": "last_frame_image",
+      "type": "default"
+    }
+  ],
+  "form": {
+    "elements": {
+      "heading-initial-video": {
+        "id": "heading-initial-video",
+        "type": "heading",
+        "parentId": "root",
+        "data": {
+          "content": "Initial Video"
+        }
+      },
+      "field-source_video-video": {
+        "id": "field-source_video-video",
+        "type": "node-field",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "source_video",
+            "fieldName": "video"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "field-source_video-start_frame": {
+        "id": "field-source_video-start_frame",
+        "type": "node-field",
+        "parentId": "container-trim",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "source_video",
+            "fieldName": "start_frame"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "field-source_video-end_frame": {
+        "id": "field-source_video-end_frame",
+        "type": "node-field",
+        "parentId": "container-trim",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "source_video",
+            "fieldName": "end_frame"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "container-trim": {
+        "id": "container-trim",
+        "type": "container",
+        "parentId": "root",
+        "data": {
+          "layout": "row",
+          "children": [
+            "field-source_video-start_frame",
+            "field-source_video-end_frame"
+          ]
+        }
+      },
+      "field-extend_conditioning-context_frames": {
+        "id": "field-extend_conditioning-context_frames",
+        "type": "node-field",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "extend_conditioning",
+            "fieldName": "context_frames"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "heading-extension": {
+        "id": "heading-extension",
+        "type": "heading",
+        "parentId": "root",
+        "data": {
+          "content": "Extension"
+        }
+      },
+      "field-positive_prompt-value": {
+        "id": "field-positive_prompt-value",
+        "type": "node-field",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "positive_prompt",
+            "fieldName": "value"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "field-negative_prompt-value": {
+        "id": "field-negative_prompt-value",
+        "type": "node-field",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "negative_prompt",
+            "fieldName": "value"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "field-last_frame-image": {
+        "id": "field-last_frame-image",
+        "type": "node-field",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "last_frame",
+            "fieldName": "image"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "field-ideal_dimensions-target_resolution": {
+        "id": "field-ideal_dimensions-target_resolution",
+        "type": "node-field",
+        "parentId": "container-continuation",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "ideal_dimensions",
+            "fieldName": "target_resolution"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "field-denoise_latents-num_frames": {
+        "id": "field-denoise_latents-num_frames",
+        "type": "node-field",
+        "parentId": "container-continuation",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "denoise_latents",
+            "fieldName": "num_frames"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "container-continuation": {
+        "id": "container-continuation",
+        "type": "container",
+        "parentId": "root",
+        "data": {
+          "layout": "row",
+          "children": [
+            "field-ideal_dimensions-target_resolution",
+            "field-denoise_latents-num_frames"
+          ]
+        }
+      },
+      "field-steps-value": {
+        "id": "field-steps-value",
+        "type": "node-field",
+        "parentId": "container-sampling",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "steps",
+            "fieldName": "value"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "field-seed-value": {
+        "id": "field-seed-value",
+        "type": "node-field",
+        "parentId": "container-sampling",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "seed",
+            "fieldName": "value"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "container-sampling": {
+        "id": "container-sampling",
+        "type": "container",
+        "parentId": "root",
+        "data": {
+          "layout": "row",
+          "children": [
+            "field-steps-value",
+            "field-seed-value"
+          ]
+        }
+      },
+      "heading-model": {
+        "id": "heading-model",
+        "type": "heading",
+        "parentId": "root",
+        "data": {
+          "content": "Model"
+        }
+      },
+      "field-model_loader-model": {
+        "id": "field-model_loader-model",
+        "type": "node-field",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "model_loader",
+            "fieldName": "model"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "field-model_loader-component_source": {
+        "id": "field-model_loader-component_source",
+        "type": "node-field",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "model_loader",
+            "fieldName": "component_source"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "field-model_loader-text_encoder_model": {
+        "id": "field-model_loader-text_encoder_model",
+        "type": "node-field",
+        "parentId": "root",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "model_loader",
+            "fieldName": "text_encoder_model"
+          },
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "root": {
+        "id": "root",
+        "type": "container",
+        "data": {
+          "layout": "column",
+          "children": [
+            "heading-initial-video",
+            "field-source_video-video",
+            "container-trim",
+            "field-extend_conditioning-context_frames",
+            "heading-extension",
+            "field-positive_prompt-value",
+            "field-negative_prompt-value",
+            "field-last_frame-image",
+            "container-continuation",
+            "container-sampling",
+            "heading-model",
+            "field-model_loader-model",
+            "field-model_loader-component_source",
+            "field-model_loader-text_encoder_model"
+          ]
+        }
+      }
+    },
+    "rootElementId": "root"
+  },
+  "id": "default_ltx2_extend_to_image"
+}

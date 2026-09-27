@@ -5,7 +5,7 @@
   "version": "1.0.0",
   "contact": "",
   "tags": "ltx, ltx2, video, extend, audio",
-  "notes": "Target Resolution: use 512p, 704p or 768p. The two-stage presets (1024p, 1536p) generate at half their named size and finish in a refine pass this single-pass template does not have, so they render SMALLER than 768p rather than larger.\n\ncontext_frames decides how much of the source the model sees. The default 17 (about 0.7s at 24 fps) carries motion but only ~1 syllable of sound -- enough for tone, not for cadence. Raise it (25/33/41/49...) when continuing rhythmic material such as singing, and raise num_frames with it so the extension is not mostly replay.",
+  "notes": "Target Resolution: use 512p, 704p or 768p. The two-stage presets (1024p, 1536p) generate at half their named size and finish in a refine pass this single-pass template does not have, so they render SMALLER than 768p rather than larger.\n\nContext Frames decides how much of the source the model sees. The default 17 (about 0.7s at 24 fps) carries motion but only ~1 syllable of sound -- enough for tone, not for cadence. Raise it (25/33/41/49...) when continuing rhythmic material such as singing, and raise Number of Frames with it so the extension is not mostly replay.\n\nEach InvokeAI install assigns its own internal model IDs, so the model fields ship blank -- pick these in the form after loading (all from the LTX-2.5 starter bundle):\n\n- Model: LTX-2.5 Dev Transformer (int8) or LTX-2.5 Distilled Transformer (int8). The Denoise node's 'auto' schedule follows the checkpoint: Dev runs the guided 30-step recipe, Distilled a fixed 8 steps with no guidance (its Steps and guidance values are ignored, and the log says so).\n- Components: LTX-2.5 Components (VAEs, vocoder, text connectors, latent upscaler).\n- Text Encoder: LTX-2.5 Text Encoder (Gemma-4 12B, int8). Required: no LTX-2 model carries one.\n\nThe negative prompt is pre-filled with the release's own default list and is used only on Dev with a CFG or Audio CFG above 1. On Distilled, turning off 'Encode Negative' on the Prompt node skips its encode.",
   "exposedFields": [
     {
       "nodeId": "source_video",
@@ -40,8 +40,8 @@
       "fieldName": "target_resolution"
     },
     {
-      "nodeId": "denoise_latents",
-      "fieldName": "steps"
+      "nodeId": "steps",
+      "fieldName": "value"
     },
     {
       "nodeId": "seed",
@@ -78,9 +78,9 @@
         "inputs": {
           "value": {
             "name": "value",
-            "label": "",
-            "description": "",
-            "value": ""
+            "label": "Negative Prompt",
+            "description": "What to steer the generation away from.",
+            "value": "has_subtitles, has_blurbox, transition from black, transition to black, speech_ending_short, blurry, out of focus, overexposed, underexposed, low contrast, washed out colors, excessive noise, grainy texture, poor lighting, flickering, motion blur, distorted proportions, unnatural skin tones, deformed facial features, asymmetrical face, missing facial features, extra limbs, disfigured hands, wrong hand count, artifacts around text, inconsistent perspective, camera shake, incorrect depth of field, background too sharp, background clutter, distracting reflections, harsh shadows, inconsistent lighting direction, color banding, cartoonish rendering, 3D CGI look, unrealistic materials, uncanny valley effect, incorrect ethnicity, wrong gender, exaggerated expressions, wrong gaze direction, mismatched lip sync, silent or muted audio, distorted voice, robotic voice, echo, background noise, off-sync audio, incorrect dialogue, added dialogue, repetitive speech, jittery movement, awkward pauses, incorrect timing, unnatural transitions, inconsistent framing, tilted camera, flat lighting, inconsistent tone, cinematic oversaturation, stylized filters, or AI artifacts."
           }
         },
         "isOpen": true,
@@ -105,8 +105,8 @@
         "inputs": {
           "value": {
             "name": "value",
-            "label": "",
-            "description": "",
+            "label": "Prompt",
+            "description": "Describe what to generate.",
             "value": ""
           }
         },
@@ -132,8 +132,8 @@
         "inputs": {
           "value": {
             "name": "value",
-            "label": "",
-            "description": "",
+            "label": "Seed",
+            "description": "Reuse a seed to repeat a result.",
             "value": 0
           }
         },
@@ -159,19 +159,19 @@
         "inputs": {
           "model": {
             "name": "model",
-            "label": "",
+            "label": "Model",
             "description": "",
             "value": null
           },
           "component_source": {
             "name": "component_source",
-            "label": "",
+            "label": "Components",
             "description": "",
             "value": null
           },
           "text_encoder_model": {
             "name": "text_encoder_model",
-            "label": "",
+            "label": "Text Encoder",
             "description": "",
             "value": null
           }
@@ -255,7 +255,7 @@
           },
           "num_frames": {
             "name": "num_frames",
-            "label": "",
+            "label": "Number of Frames",
             "description": "",
             "value": 121
           },
@@ -381,19 +381,19 @@
         "inputs": {
           "video": {
             "name": "video",
-            "label": "",
+            "label": "Source Video",
             "description": "",
             "value": null
           },
           "start_frame": {
             "name": "start_frame",
-            "label": "",
+            "label": "Start Frame",
             "description": "",
             "value": 0
           },
           "end_frame": {
             "name": "end_frame",
-            "label": "",
+            "label": "End Frame",
             "description": "",
             "value": -1
           },
@@ -541,9 +541,10 @@
           },
           "context_frames": {
             "name": "context_frames",
-            "label": "",
-            "description": "",
-            "value": 17
+            "label": "Context Frames",
+            "description": "How many frames from the initial video to carry into the extension. More frames improves continuity, but reduces the overall length of the clip.",
+            "value": 17,
+            "descriptionOverride": true
           },
           "tile_size": {
             "name": "tile_size",
@@ -575,7 +576,7 @@
         "version": "2.7.0",
         "nodePack": "invokeai",
         "label": "",
-        "notes": "Recorded on the output so runs can be told apart in the gallery. These literals are NOT synced to the nodes above -- change num_frames, steps or the canvas there and change them here too, or the metadata will describe a different run than the one you made.",
+        "notes": "Recorded on the output. The prompt, seed, model, canvas, frame count and steps arrive over edges from the nodes that set them. The frame rate is recorded as 24 and CFG as 3 whatever the source and the Denoise node say: the join delivers the source's own frame rate, and edit this node if you change CFG.",
         "type": "core_metadata",
         "inputs": {
           "generation_mode": {
@@ -937,7 +938,7 @@
           },
           "target_resolution": {
             "name": "target_resolution",
-            "label": "",
+            "label": "Target Resolution",
             "description": "",
             "value": "704p"
           }
@@ -949,6 +950,33 @@
       "position": {
         "x": 420,
         "y": 1300
+      }
+    },
+    {
+      "id": "steps",
+      "type": "invocation",
+      "data": {
+        "id": "steps",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Dev's released recipe is 30. The Distilled checkpoint always runs 8.",
+        "type": "integer",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Steps",
+            "description": "Number of denoising steps.",
+            "value": 30
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 0,
+        "y": 380
       }
     }
   ],
@@ -1264,222 +1292,291 @@
       "target": "core_metadata",
       "targetHandle": "height",
       "type": "default"
+    },
+    {
+      "id": "edge-steps-value-denoise_latents-steps",
+      "source": "steps",
+      "sourceHandle": "value",
+      "target": "denoise_latents",
+      "targetHandle": "steps",
+      "type": "default"
+    },
+    {
+      "id": "edge-steps-value-core_metadata-steps",
+      "source": "steps",
+      "sourceHandle": "value",
+      "target": "core_metadata",
+      "targetHandle": "steps",
+      "type": "default"
+    },
+    {
+      "id": "edge-denoise_latents-num_frames-core_metadata-num_frames",
+      "source": "denoise_latents",
+      "sourceHandle": "num_frames",
+      "target": "core_metadata",
+      "targetHandle": "num_frames",
+      "type": "default"
+    },
+    {
+      "id": "edge-model_loader-model-core_metadata-model",
+      "source": "model_loader",
+      "sourceHandle": "model",
+      "target": "core_metadata",
+      "targetHandle": "model",
+      "type": "default"
     }
   ],
   "form": {
     "elements": {
-      "heading-source": {
-        "id": "heading-source",
-        "parentId": "root",
+      "heading-initial-video": {
+        "id": "heading-initial-video",
         "type": "heading",
+        "parentId": "root",
         "data": {
-          "content": "Source"
+          "content": "Initial Video"
         }
       },
       "field-source_video-video": {
         "id": "field-source_video-video",
-        "parentId": "root",
         "type": "node-field",
+        "parentId": "root",
         "data": {
           "fieldIdentifier": {
             "nodeId": "source_video",
             "fieldName": "video"
           },
-          "showDescription": true
+          "showDescription": true,
+          "showShuffle": false
         }
       },
       "field-source_video-start_frame": {
         "id": "field-source_video-start_frame",
-        "parentId": "root",
         "type": "node-field",
+        "parentId": "container-trim",
         "data": {
           "fieldIdentifier": {
             "nodeId": "source_video",
             "fieldName": "start_frame"
           },
-          "showDescription": true
+          "showDescription": true,
+          "showShuffle": false
         }
       },
       "field-source_video-end_frame": {
         "id": "field-source_video-end_frame",
-        "parentId": "root",
         "type": "node-field",
+        "parentId": "container-trim",
         "data": {
           "fieldIdentifier": {
             "nodeId": "source_video",
             "fieldName": "end_frame"
           },
-          "showDescription": true
+          "showDescription": true,
+          "showShuffle": false
         }
       },
-      "heading-continuation": {
-        "id": "heading-continuation",
+      "container-trim": {
+        "id": "container-trim",
+        "type": "container",
         "parentId": "root",
-        "type": "heading",
         "data": {
-          "content": "Continuation"
+          "layout": "row",
+          "children": [
+            "field-source_video-start_frame",
+            "field-source_video-end_frame"
+          ]
         }
       },
       "field-extend_conditioning-context_frames": {
         "id": "field-extend_conditioning-context_frames",
-        "parentId": "root",
         "type": "node-field",
+        "parentId": "root",
         "data": {
           "fieldIdentifier": {
             "nodeId": "extend_conditioning",
             "fieldName": "context_frames"
           },
-          "showDescription": true
+          "showDescription": true,
+          "showShuffle": false
         }
       },
-      "field-denoise_latents-num_frames": {
-        "id": "field-denoise_latents-num_frames",
-        "parentId": "root",
-        "type": "node-field",
-        "data": {
-          "fieldIdentifier": {
-            "nodeId": "denoise_latents",
-            "fieldName": "num_frames"
-          },
-          "showDescription": true
-        }
-      },
-      "heading-generation": {
-        "id": "heading-generation",
-        "parentId": "root",
+      "heading-extension": {
+        "id": "heading-extension",
         "type": "heading",
+        "parentId": "root",
         "data": {
-          "content": "Generation"
+          "content": "Extension"
         }
       },
       "field-positive_prompt-value": {
         "id": "field-positive_prompt-value",
-        "parentId": "root",
         "type": "node-field",
+        "parentId": "root",
         "data": {
           "fieldIdentifier": {
             "nodeId": "positive_prompt",
             "fieldName": "value"
           },
-          "showDescription": true
+          "showDescription": true,
+          "showShuffle": false
         }
       },
       "field-negative_prompt-value": {
         "id": "field-negative_prompt-value",
-        "parentId": "root",
         "type": "node-field",
+        "parentId": "root",
         "data": {
           "fieldIdentifier": {
             "nodeId": "negative_prompt",
             "fieldName": "value"
           },
-          "showDescription": true
+          "showDescription": true,
+          "showShuffle": false
         }
       },
       "field-ideal_dimensions-target_resolution": {
         "id": "field-ideal_dimensions-target_resolution",
-        "parentId": "root",
         "type": "node-field",
+        "parentId": "container-continuation",
         "data": {
           "fieldIdentifier": {
             "nodeId": "ideal_dimensions",
             "fieldName": "target_resolution"
           },
-          "showDescription": true
+          "showDescription": true,
+          "showShuffle": false
         }
       },
-      "field-denoise_latents-steps": {
-        "id": "field-denoise_latents-steps",
-        "parentId": "root",
+      "field-denoise_latents-num_frames": {
+        "id": "field-denoise_latents-num_frames",
         "type": "node-field",
+        "parentId": "container-continuation",
         "data": {
           "fieldIdentifier": {
             "nodeId": "denoise_latents",
-            "fieldName": "steps"
+            "fieldName": "num_frames"
           },
-          "showDescription": true
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "container-continuation": {
+        "id": "container-continuation",
+        "type": "container",
+        "parentId": "root",
+        "data": {
+          "layout": "row",
+          "children": [
+            "field-ideal_dimensions-target_resolution",
+            "field-denoise_latents-num_frames"
+          ]
+        }
+      },
+      "field-steps-value": {
+        "id": "field-steps-value",
+        "type": "node-field",
+        "parentId": "container-sampling",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "steps",
+            "fieldName": "value"
+          },
+          "showDescription": true,
+          "showShuffle": false
         }
       },
       "field-seed-value": {
         "id": "field-seed-value",
-        "parentId": "root",
         "type": "node-field",
+        "parentId": "container-sampling",
         "data": {
           "fieldIdentifier": {
             "nodeId": "seed",
             "fieldName": "value"
           },
-          "showDescription": true
+          "showDescription": true,
+          "showShuffle": false
+        }
+      },
+      "container-sampling": {
+        "id": "container-sampling",
+        "type": "container",
+        "parentId": "root",
+        "data": {
+          "layout": "row",
+          "children": [
+            "field-steps-value",
+            "field-seed-value"
+          ]
         }
       },
       "heading-model": {
         "id": "heading-model",
-        "parentId": "root",
         "type": "heading",
+        "parentId": "root",
         "data": {
           "content": "Model"
         }
       },
       "field-model_loader-model": {
         "id": "field-model_loader-model",
-        "parentId": "root",
         "type": "node-field",
+        "parentId": "root",
         "data": {
           "fieldIdentifier": {
             "nodeId": "model_loader",
             "fieldName": "model"
           },
-          "showDescription": true
+          "showDescription": true,
+          "showShuffle": false
         }
       },
       "field-model_loader-component_source": {
         "id": "field-model_loader-component_source",
-        "parentId": "root",
         "type": "node-field",
+        "parentId": "root",
         "data": {
           "fieldIdentifier": {
             "nodeId": "model_loader",
             "fieldName": "component_source"
           },
-          "showDescription": true
+          "showDescription": true,
+          "showShuffle": false
         }
       },
       "field-model_loader-text_encoder_model": {
         "id": "field-model_loader-text_encoder_model",
-        "parentId": "root",
         "type": "node-field",
+        "parentId": "root",
         "data": {
           "fieldIdentifier": {
             "nodeId": "model_loader",
             "fieldName": "text_encoder_model"
           },
-          "showDescription": true
+          "showDescription": true,
+          "showShuffle": false
         }
       },
       "root": {
         "id": "root",
         "type": "container",
         "data": {
+          "layout": "column",
           "children": [
-            "heading-source",
+            "heading-initial-video",
             "field-source_video-video",
-            "field-source_video-start_frame",
-            "field-source_video-end_frame",
-            "heading-continuation",
+            "container-trim",
             "field-extend_conditioning-context_frames",
-            "field-denoise_latents-num_frames",
-            "heading-generation",
+            "heading-extension",
             "field-positive_prompt-value",
             "field-negative_prompt-value",
-            "field-ideal_dimensions-target_resolution",
-            "field-denoise_latents-steps",
-            "field-seed-value",
+            "container-continuation",
+            "container-sampling",
             "heading-model",
             "field-model_loader-model",
             "field-model_loader-component_source",
             "field-model_loader-text_encoder_model"
-          ],
-          "layout": "column"
+          ]
         }
       }
     },

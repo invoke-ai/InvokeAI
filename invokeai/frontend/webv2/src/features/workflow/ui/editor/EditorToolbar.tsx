@@ -8,11 +8,13 @@ import {
   EraserIcon,
   HandIcon,
   LassoIcon,
+  CircleArrowUpIcon,
   MaximizeIcon,
   ZoomInIcon,
   ZoomOutIcon,
 } from 'lucide-react';
-import { useCallback, useId, useMemo } from 'react';
+import { useCallback, useId, useMemo, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 
 /**
  * Pane drag follows the selected pan/box/lasso tool; eraser clicks delete. Shift selects while panning, and middle
@@ -40,14 +42,20 @@ const EDITOR_TOOLBAR_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2
 export const EditorToolbar = ({
   nodeOpacity,
   tool,
+  updatableNodeCount = 0,
   onNodeOpacityChange,
   onToolChange,
+  onUpdateNodes,
 }: {
   nodeOpacity: number;
   tool: EditorTool;
+  /** Nodes with a newer same-major template; the update button shows only while there are some. */
+  updatableNodeCount?: number;
   onNodeOpacityChange: (opacity: number) => void;
   onToolChange: (tool: EditorTool) => void;
+  onUpdateNodes?: () => void;
 }) => {
+  const { t } = useTranslation();
   const { fitView, zoomIn, zoomOut } = useReactFlow();
   const reduceMotion = useWorkflowPreferencesSelector((preferences) => preferences.reduceMotion);
   const opacityTriggerId = useId();
@@ -57,6 +65,12 @@ export const EditorToolbar = ({
   const onZoomInClick = useCallback(() => void zoomIn(), [zoomIn]);
   const onZoomOutClick = useCallback(() => void zoomOut(), [zoomOut]);
   const onFitViewClick = useCallback(() => void fitView({ duration: fitViewDuration }), [fitView, fitViewDuration]);
+  const fitViewRef = useRef<HTMLButtonElement>(null);
+  // The update button leaves with the last outdated node; keyboard focus steps to its stable neighbour first.
+  const onUpdateNodesClick = useCallback(() => {
+    fitViewRef.current?.focus();
+    onUpdateNodes?.();
+  }, [onUpdateNodes]);
   const onSliderValueChange = useCallback(
     (event: { value: number[] }) => onNodeOpacityChange((event.value[0] ?? 100) / 100),
     [onNodeOpacityChange]
@@ -78,7 +92,18 @@ export const EditorToolbar = ({
         <ToolbarSeparator />
         <ToolbarButton icon={ZoomInIcon} label="Zoom in" onClick={onZoomInClick} />
         <ToolbarButton icon={ZoomOutIcon} label="Zoom out" onClick={onZoomOutClick} />
-        <ToolbarButton icon={MaximizeIcon} label="Fit view" onClick={onFitViewClick} />
+        <ToolbarButton ref={fitViewRef} icon={MaximizeIcon} label="Fit view" onClick={onFitViewClick} />
+        {updatableNodeCount > 0 ? (
+          <>
+            <ToolbarSeparator />
+            <ToolbarButton
+              color="fg.warning"
+              icon={CircleArrowUpIcon}
+              label={t('nodes.updateAllNodes', { count: updatableNodeCount })}
+              onClick={onUpdateNodesClick}
+            />
+          </>
+        ) : null}
         <ToolbarSeparator />
         <Popover.Root ids={opacityIds} positioning={POPOVER_POSITIONING}>
           <Tooltip content="Node opacity" ids={opacityIds} positioning={TOOLTIP_POSITIONING}>

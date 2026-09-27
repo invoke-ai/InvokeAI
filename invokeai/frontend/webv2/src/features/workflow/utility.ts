@@ -1,3 +1,4 @@
+export * from './core/batch';
 export * from './core/connectorHandles';
 export * from './core/connectors';
 export * from './core/document';

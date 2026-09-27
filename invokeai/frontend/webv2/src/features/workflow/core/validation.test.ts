@@ -52,6 +52,14 @@ describe('validateConnectionTypes', () => {
   });
 
   it('rejects batch/non-batch mixes', () => {
+    // A generator's list only feeds a batch node's list, and a plain list never can.
+    expect(
+      validateConnectionTypes(
+        { ...collection('FloatField'), batch: true },
+        { ...collection('FloatField'), batch: true }
+      )
+    ).toBe(true);
+    expect(validateConnectionTypes(collection('FloatField'), { ...collection('FloatField'), batch: true })).toBe(false);
     expect(validateConnectionTypes({ ...single('IntegerField'), batch: true }, single('IntegerField'))).toBe(false);
   });
 });

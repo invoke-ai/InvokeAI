@@ -675,6 +675,24 @@ export const getDefaultReferenceClip = (
 });
 
 /**
+ * A gallery video as a new Ref2VA reference, with the add-path defaults: soundtrack-only conditioning for wrapped
+ * audio, and the default sample of the clip. Do not persist mediaOrigin on the clip: project import reuploads under a
+ * new name without rederiving it.
+ */
+export const createVideoReferenceEntry = (item: {
+  durationSeconds: number;
+  fps?: number;
+  height: number;
+  mediaOrigin?: string | null;
+  name: string;
+  width: number;
+}): Extract<VideoReferenceItem, { kind: 'video' }> => {
+  const conditioning = getDefaultReferenceConditioning(item.mediaOrigin);
+
+  return { clip: getDefaultReferenceClip(createVideoSourceClip(item), conditioning), conditioning, kind: 'video' };
+};
+
+/**
  * Default the first image to max detail and later images to generation-matched detail to limit repeatedly attended
  * reference rows; users may override each.
  */
@@ -893,6 +911,64 @@ export const applyReferenceExtendSourceVideo = (
   const videoCount = references.filter((entry) => entry.kind === 'video').length;
 
   return videoCount >= maxVideos ? references : [...references, linked];
+};
+
+/**
+ * The panel patch that makes `sourceVideo` the Initial Video, or clears it. An initial video displaces the first
+ * frame and a conditioning clip; on a reference-extend panel it also links its continuity anchor into the
+ * references. Returns null when that panel has no reference slot left for the anchor: the clip must not be set
+ * without it.
+ */
+export const getInitialVideoPatch = ({
+  maxVideos,
+  numFrames,
+  referenceExtend,
+  references,
+  sourceVideo,
+}: {
+  maxVideos: number;
+  numFrames: number;
+  referenceExtend: boolean;
+  references: VideoReferenceItem[];
+  sourceVideo: VideoSourceClip | null;
+}): Partial<VideoWidgetValues> | null => {
+  const displaced = sourceVideo ? { conditioningClip: null, firstFrameImage: null } : {};
+
+  if (!referenceExtend) {
+    return { sourceVideo, ...displaced };
+  }
+
+  const linked = applyReferenceExtendSourceVideo(references, sourceVideo, maxVideos, numFrames);
+
+  // Unchanged identity is the capacity refusal; clearing cannot overflow.
+  return sourceVideo && linked === references ? null : { references: linked, sourceVideo, ...displaced };
+};
+
+/**
+ * The panel patch for a new reference list. References displace the frame slots and a conditioning clip, and the
+ * initial video too unless the panel extends from it; generation continues from the last reference, so a
+ * reference-extend panel keeps its continuity anchor pinned last.
+ */
+export const getReferencesPatch = ({
+  referenceExtend,
+  references,
+}: {
+  referenceExtend: boolean;
+  references: VideoReferenceItem[];
+}): Partial<VideoWidgetValues> => {
+  const next = referenceExtend ? pinReferenceExtendAnchor(references) : references;
+
+  return {
+    references: next,
+    ...(next.length > 0
+      ? {
+          conditioningClip: null,
+          firstFrameImage: null,
+          lastFrameImage: null,
+          ...(referenceExtend ? {} : { sourceVideo: null }),
+        }
+      : {}),
+  };
 };
 
 /**

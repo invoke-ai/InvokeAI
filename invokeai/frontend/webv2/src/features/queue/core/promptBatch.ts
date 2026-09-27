@@ -32,12 +32,49 @@ export const generateSeedSequence = (start: number, count: number, step: QueueSe
   );
 };
 
+/** A value the backend substitutes into a node field per session. */
+export type QueueBatchItem = number | string | { image_name: string };
+
 /** One value list of a zipped batch group, in the backend's `BatchDatum` shape. */
 export interface QueueBatchDatum {
   field_name: string;
-  items: (number | string)[];
+  items: QueueBatchItem[];
   node_path: string;
 }
+
+/** A batch-node value list, as a workflow submission persists it (camelCase, like `QueueWorkflowSeed`). */
+export interface QueueWorkflowBatchDatum {
+  fieldName: string;
+  items: QueueBatchItem[];
+  nodeId: string;
+}
+
+const isQueueBatchItem = (value: unknown): value is QueueBatchItem =>
+  typeof value === 'string' ||
+  (typeof value === 'number' && Number.isFinite(value)) ||
+  (typeof value === 'object' &&
+    value !== null &&
+    typeof (value as { image_name?: unknown }).image_name === 'string' &&
+    (value as { image_name: string }).image_name.length > 0);
+
+export const isQueueWorkflowBatchDatum = (value: unknown): value is QueueWorkflowBatchDatum => {
+  if (typeof value !== 'object' || value === null) {
+    return false;
+  }
+
+  const datum = value as Partial<QueueWorkflowBatchDatum>;
+
+  return (
+    typeof datum.fieldName === 'string' &&
+    datum.fieldName.length > 0 &&
+    typeof datum.nodeId === 'string' &&
+    datum.nodeId.length > 0 &&
+    Array.isArray(datum.items) &&
+    datum.items.length > 0 &&
+    datum.items.length <= MAX_QUEUE_BATCH_ITEMS &&
+    datum.items.every(isQueueBatchItem)
+  );
+};
 
 export interface GeneratePromptBatchDatum extends QueueBatchDatum {
   field_name: 'value';
@@ -71,41 +108,99 @@ export const isQueueWorkflowSeed = (value: unknown): value is QueueWorkflowSeed 
   );
 };
 
-export interface WorkflowSeedBatchPlan {
-  /** One zipped group over every varying input, or undefined while every seed holds. */
+export interface WorkflowBatchPlan {
+  /** Batch groups in the backend's shape, or undefined when one graph repeats unchanged. */
   data?: QueueBatchDatum[][];
   runs: number;
 }
 
+const toBackendDatum = (datum: QueueWorkflowBatchDatum): QueueBatchDatum => ({
+  field_name: datum.fieldName,
+  items: datum.items,
+  node_path: datum.nodeId,
+});
+
 /**
- * A workflow batch repeats one graph unless a seed input varies, in which case
- * every varying input joins one zipped group so `batchCount` runs stay
- * `batchCount` runs. A single run needs no data: the plan already wrote each
- * start seed into the graph.
+ * Every combination the backend would produce from `groups`, in its order: the first group varies slowest, and
+ * each group's datums are read in step. Each entry maps a datum to the index of the item that combination uses.
  */
-export const buildWorkflowSeedBatchPlan = ({
+const expandCombinations = (groups: readonly (readonly QueueWorkflowBatchDatum[])[]): number[][] => {
+  let combinations: number[][] = [[]];
+
+  for (const group of groups) {
+    const length = group[0]?.items.length ?? 0;
+    const next: number[][] = [];
+
+    for (const prefix of combinations) {
+      for (let index = 0; index < length; index += 1) {
+        next.push([...prefix, index]);
+      }
+    }
+
+    combinations = next;
+  }
+
+  return combinations;
+};
+
+/**
+ * Without varying seeds the backend multiplies the batch groups itself and repeats the product `batchCount` times.
+ * Once a seed steps, every session must get its own seed, so the product is expanded here into one zipped group,
+ * run-major, with each seed walking straight through it.
+ */
+export const buildQueueWorkflowBatchPlan = ({
   batchCount,
+  batchData,
   seeds,
 }: {
   batchCount: number;
+  batchData: readonly (readonly QueueWorkflowBatchDatum[])[] | undefined;
   seeds: readonly QueueWorkflowSeed[] | undefined;
-}): WorkflowSeedBatchPlan => {
+}): WorkflowBatchPlan => {
   const runs = sanitizeBatchCount(batchCount);
+  const groups = (batchData ?? []).filter((group) => group.length > 0);
+  const hasSeeds = !!seeds && seeds.length > 0;
 
-  if (!seeds || seeds.length === 0 || runs === 1) {
-    return { runs };
+  if (!hasSeeds || (runs === 1 && groups.length === 0)) {
+    return groups.length > 0 ? { data: groups.map((group) => group.map(toBackendDatum)), runs } : { runs };
   }
 
-  return {
-    data: [
-      seeds.map((seed) => ({
-        field_name: seed.fieldName,
-        items: generateSeedSequence(seed.seed, runs, seed.seedStep),
-        node_path: seed.nodeId,
-      })),
-    ],
-    runs: 1,
-  };
+  if (groups.length === 0) {
+    return {
+      data: [
+        seeds.map((seed) => ({
+          field_name: seed.fieldName,
+          items: generateSeedSequence(seed.seed, runs, seed.seedStep),
+          node_path: seed.nodeId,
+        })),
+      ],
+      runs: 1,
+    };
+  }
+
+  const combinations = expandCombinations(groups);
+  const total = combinations.length * runs;
+  const zipped: QueueBatchDatum[] = seeds.map((seed) => ({
+    field_name: seed.fieldName,
+    items: generateSeedSequence(seed.seed, total, seed.seedStep),
+    node_path: seed.nodeId,
+  }));
+
+  groups.forEach((group, groupIndex) => {
+    for (const datum of group) {
+      const items: QueueBatchItem[] = [];
+
+      for (let run = 0; run < runs; run += 1) {
+        for (const combination of combinations) {
+          items.push(datum.items[combination[groupIndex] as number] as QueueBatchItem);
+        }
+      }
+
+      zipped.push({ field_name: datum.fieldName, items, node_path: datum.nodeId });
+    }
+  });
+
+  return { data: [zipped], runs: 1 };
 };
 
 export interface GeneratePromptBatchPlanInput {

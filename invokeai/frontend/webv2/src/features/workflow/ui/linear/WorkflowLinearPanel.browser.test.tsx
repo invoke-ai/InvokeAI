@@ -1,5 +1,5 @@
 import type * as DndKitCoreModule from '@dnd-kit/core';
-import type { ProjectGraphState } from '@features/workflow/contracts';
+import type { InvocationTemplate, ProjectGraphState, WorkflowInvocationNode } from '@features/workflow/contracts';
 import type { WorkflowUiAdapter } from '@features/workflow/react';
 import type { ProjectGraphAction } from '@features/workflow/utility';
 
@@ -15,6 +15,7 @@ import { userEvent } from 'vitest/browser';
 
 import { formEdgeDroppableId } from './formBuilderDnd';
 import { FormBuilderTab } from './FormBuilderTab';
+import { LinearFormView } from './LinearFormView';
 import { PanelModeToggle } from './WorkflowLinearPanel';
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -26,6 +27,66 @@ vi.mock('@dnd-kit/core', async (importOriginal) => {
 
   return { ...actual, useDroppable: vi.fn(actual.useDroppable) };
 });
+
+const entryInput = (
+  name: string,
+  title: string,
+  typeName: string,
+  required = true
+): InvocationTemplate['inputs'][string] => ({
+  default: undefined,
+  description: '',
+  exclusiveMaximum: null,
+  exclusiveMinimum: null,
+  fieldKind: 'input',
+  input: 'any',
+  maximum: null,
+  minimum: null,
+  multipleOf: null,
+  name,
+  options: null,
+  required,
+  title,
+  type: { batch: false, cardinality: 'SINGLE', name: typeName },
+  uiChoiceLabels: null,
+  uiComponent: null,
+  uiHidden: false,
+  uiModelBase: null,
+  uiModelFormat: null,
+  uiModelType: null,
+  uiOrder: null,
+});
+const entryTemplate: InvocationTemplate = {
+  category: 'test',
+  classification: 'stable',
+  description: '',
+  inputs: {
+    prompt: entryInput('prompt', 'Prompt', 'StringField'),
+    scale: entryInput('scale', 'Scale', 'FloatField', false),
+    sizes: {
+      ...entryInput('sizes', 'Sizes', 'IntegerField'),
+      minimum: 1,
+      type: { batch: false, cardinality: 'COLLECTION', name: 'IntegerField' },
+    },
+    steps: entryInput('steps', 'Steps', 'IntegerField'),
+    weight: entryInput('weight', 'Weight', 'FloatField'),
+  },
+  nodePack: 'invokeai',
+  outputType: 'test',
+  outputs: {},
+  tags: [],
+  title: 'Entry',
+  type: 'entry',
+  useCache: true,
+  version: '1.0.0',
+};
+
+// File-wide: every describe sees only the `entry` template as loaded; the builder fixtures expose no node fields.
+vi.mock('@features/workflow/react', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useInvocationTemplatesSelector: (selector: (snapshot: unknown) => unknown) =>
+    selector({ error: null, status: 'loaded', templates: { entry: entryTemplate } }),
+}));
 
 describe('Workflow Linear panel mode toggle', () => {
   let host: HTMLDivElement;
@@ -363,5 +424,218 @@ describe('Form builder drag and drop (dnd-kit)', () => {
 
     // End the drag cleanly so it doesn't leak into other tests.
     await interact(() => pointer('pointerup', handle.ownerDocument, midX, midY + 3));
+  });
+});
+
+describe('Linear form field entry', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    host = document.createElement('div');
+    host.style.width = '320px';
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+  });
+
+  const entryNode: WorkflowInvocationNode = {
+    data: {
+      inputs: {
+        prompt: { label: '', name: 'prompt', value: 'hello world' },
+        scale: { label: '', name: 'scale', value: 1.5 },
+        sizes: { label: '', name: 'sizes', value: [4, 8] },
+        steps: { label: '', name: 'steps', value: 20 },
+        weight: { label: '', name: 'weight', value: 0.5 },
+      },
+      isIntermediate: true,
+      isOpen: true,
+      label: '',
+      nodePack: 'invokeai',
+      notes: '',
+      type: 'entry',
+      useCache: true,
+      version: '1.0.0',
+    },
+    id: 'entry-node',
+    position: { x: 0, y: 0 },
+    type: 'invocation',
+  };
+
+  /** The entry node with every field exposed on the form. */
+  const buildGraph = (): ProjectGraphState => {
+    let doc = projectGraphReducer(createProjectGraph('linear-entry-test'), { node: entryNode, type: 'addNode' });
+
+    for (const fieldName of Object.keys(entryTemplate.inputs)) {
+      doc = projectGraphReducer(doc, { fieldIdentifier: { fieldName, nodeId: entryNode.id }, type: 'exposeField' });
+    }
+
+    return doc;
+  };
+
+  const renderForm = async () => {
+    let latest = buildGraph();
+    const Harness = () => {
+      const [projectGraph, setProjectGraph] = useState(latest);
+      const editGraph = useCallback((action: ProjectGraphAction) => {
+        setProjectGraph((current) => {
+          latest = projectGraphReducer(current, action);
+          return latest;
+        });
+      }, []);
+      const adapter = useMemo(
+        () =>
+          ({
+            commands: { bindLibraryWorkflow: vi.fn(), editGraph, redo: vi.fn(), replace: vi.fn(), undo: vi.fn() },
+            widgets: { open: vi.fn(), patchValues: vi.fn() },
+          }) as unknown as WorkflowUiAdapter,
+        [editGraph]
+      );
+
+      return (
+        <WorkflowUiProvider adapter={adapter}>
+          <LinearFormView projectGraph={projectGraph} />
+        </WorkflowUiProvider>
+      );
+    };
+
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <Harness />
+        </ChakraProvider>
+      );
+    });
+
+    const field = (label: string) => host.querySelector<HTMLInputElement>(`input[aria-label="${label}"]`)!;
+    const value = (name: string) => {
+      const node = latest.nodes.find((candidate) => candidate.id === entryNode.id);
+      return node?.type === 'invocation' ? node.data.inputs[name]?.value : undefined;
+    };
+    const error = (input: HTMLInputElement) =>
+      input.closest('[data-scope="field"][data-part="root"]')?.querySelector('[data-part="error-text"]')?.textContent ??
+      null;
+
+    return { error, field, value };
+  };
+  const focusAtEnd = (input: HTMLInputElement) =>
+    act(async () => {
+      await userEvent.click(input);
+      await userEvent.keyboard('{End}');
+    });
+  const keys = (sequence: string) =>
+    act(async () => {
+      await userEvent.keyboard(sequence);
+    });
+
+  it('keeps the caret while editing an exposed text field through the project graph', async () => {
+    const { error, field, value } = await renderForm();
+    const prompt = field('Prompt');
+
+    await focusAtEnd(prompt);
+    await keys('{Home}{ArrowRight}{ArrowRight}XYZ');
+    expect(prompt.value).toBe('heXYZllo world');
+    expect([prompt.selectionStart, prompt.selectionEnd]).toEqual([5, 5]);
+    expect(value('prompt')).toBe('heXYZllo world');
+    expect(field('Prompt')).toBe(prompt);
+
+    await keys('{Control>}a{/Control}{Backspace}');
+    expect(prompt.value).toBe('');
+    expect(value('prompt')).toBe('');
+    expect(document.activeElement).toBe(prompt);
+    expect(error(prompt)).toBeNull();
+  });
+
+  it('commits numeric drafts as typed and reports required, invalid, and optional-empty states', async () => {
+    const { error, field, value } = await renderForm();
+    const weight = field('Weight');
+
+    await focusAtEnd(weight);
+    await keys('0');
+    expect(weight.value).toBe('0.50');
+    expect(value('weight')).toBe(0.5);
+    await act(() => weight.blur());
+    expect(weight.value).toBe('0.5');
+
+    await focusAtEnd(weight);
+    await keys('{Control>}a{/Control}{Backspace}');
+    expect(weight.value).toBe('');
+    expect(value('weight')).toBeUndefined();
+    expect(document.activeElement).toBe(weight);
+    expect(error(weight)).toBe('Required value.');
+
+    await keys('-');
+    await keys('2');
+    expect(weight.value).toBe('-2');
+    expect(value('weight')).toBe(-2);
+    expect(error(weight)).toBeNull();
+
+    const steps = field('Steps');
+
+    await focusAtEnd(steps);
+    await keys('.5');
+    expect(steps.value).toBe('20.5');
+    expect(value('steps')).toBe(20.5);
+    expect(steps.getAttribute('aria-invalid')).toBe('true');
+    expect(error(steps)).toBe('Invalid value.');
+    await keys('{Backspace}{Backspace}');
+    expect(value('steps')).toBe(20);
+    expect(error(steps)).toBeNull();
+
+    const scale = field('Scale');
+
+    await focusAtEnd(scale);
+    await keys('{Control>}a{/Control}{Delete}');
+    expect(scale.value).toBe('');
+    expect(value('scale')).toBeUndefined();
+    expect(error(scale)).toBeNull();
+    await act(() => scale.blur());
+    expect(scale.value).toBe('');
+    expect(scale.getAttribute('aria-invalid')).toBeNull();
+  });
+
+  it('edits an exposed scalar list row by row and reports the first empty entry', async () => {
+    const { value } = await renderForm();
+    // Raw i18n keys: every list row shares one accessible name, so rows are found by position.
+    const listRow = (index: number) =>
+      host.querySelectorAll<HTMLInputElement>('input[aria-label="nodes.collectionItemLabel"]')[index - 1]!;
+    // Each row scopes its own Field.Root; the reason text belongs to the host field around the list.
+    const listError = (input: HTMLInputElement) =>
+      input
+        .closest('[data-scope="field"][data-part="root"]')
+        ?.parentElement?.closest('[data-scope="field"][data-part="root"]')
+        ?.querySelector('[data-part="error-text"]')?.textContent ?? null;
+
+    expect(listRow(2).value).toBe('8');
+
+    const addItem = Array.from(host.querySelectorAll('button')).find(
+      (button) => button.textContent === 'nodes.addItem'
+    )!;
+
+    await act(async () => {
+      await userEvent.click(addItem);
+    });
+    expect(value('sizes')).toEqual([4, 8, 1]);
+
+    const third = listRow(3);
+
+    await focusAtEnd(third);
+    await keys('6');
+    expect(third.value).toBe('16');
+    expect(value('sizes')).toEqual([4, 8, 16]);
+    expect(listError(third)).toBeNull();
+
+    await keys('{Control>}a{/Control}{Backspace}');
+    expect(value('sizes')).toEqual([4, 8, null]);
+    expect(third.getAttribute('aria-invalid')).toBe('true');
+    expect(listError(third)).toBe('Item 3 is empty.');
+    // The host field is invalid as a whole, yet only the offending row carries the invalid state.
+    expect(listRow(1).getAttribute('aria-invalid')).toBeNull();
+    expect(listRow(1).getAttribute('data-invalid')).toBeNull();
+    expect(listRow(2).getAttribute('aria-invalid')).toBeNull();
   });
 });

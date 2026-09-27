@@ -5,8 +5,16 @@ import type {
   InvocationTemplate,
   InvocationTemplates,
   InvocationTemplatesSnapshot,
+  ProjectGraphState,
 } from '@features/workflow/core/types';
 
+import {
+  getDefaultWorkflowGeneratorValue,
+  getWorkflowBatchCollectionField,
+  getWorkflowGeneratorOutputField,
+} from '@features/workflow/core/batch';
+import { updateWorkflowNodes } from '@features/workflow/core/document';
+import { isEditableCollectionFieldType } from '@features/workflow/core/fields';
 import { createLogger } from '@platform/logging/logger';
 import {
   captureAccountScope,
@@ -209,6 +217,23 @@ const getDefaultValueForType = (type: FieldType, options: unknown[] | null): unk
   }
 };
 
+/** The array schema of a list property: the property itself, or the array branch of an `Optional[list[...]]`. */
+const getArraySchema = (property: JsonObject): JsonObject | null => {
+  if (property.type === 'array') {
+    return property;
+  }
+
+  if (Array.isArray(property.anyOf)) {
+    const arrays = property.anyOf.filter(
+      (variant): variant is JsonObject => isJsonObject(variant) && variant.type === 'array'
+    );
+
+    return arrays.length === 1 ? (arrays[0] as JsonObject) : null;
+  }
+
+  return null;
+};
+
 const buildInputTemplate = (
   name: string,
   property: JsonObject,
@@ -216,6 +241,9 @@ const buildInputTemplate = (
   fieldKind: FieldInputTemplate['fieldKind']
 ): FieldInputTemplate => {
   const enumValues = getEnumValues(property);
+  const arraySchema = type.cardinality === 'COLLECTION' ? getArraySchema(property) : null;
+  // pydantic places a list's item constraints on `items`; scalar constraints stay on the property.
+  const constraints = arraySchema && isJsonObject(arraySchema.items) ? arraySchema.items : property;
   const options = enumValues
     ? enumValues.every(
         (value) =>
@@ -235,24 +263,39 @@ const buildInputTemplate = (
       )
     : null;
 
+  const required = property.orig_required === true;
+
   return {
     default:
-      type.name === 'EnumField' && property.default === null && property.orig_required !== true
+      type.name === 'EnumField' && property.default === null && !required
         ? undefined
         : property.default !== undefined && property.default !== null
           ? property.default
-          : getDefaultValueForType(type, options),
+          : // A required editable list starts empty so the widget has something to append to; a list
+            // without a widget stays absent so readiness still asks for its connection.
+            required && input !== 'connection' && isEditableCollectionFieldType(type)
+            ? []
+            : // The backend's generator models are empty; the editor owns their shape and their default.
+              (getDefaultWorkflowGeneratorValue(type.name) ?? getDefaultValueForType(type, options)),
     description: typeof property.description === 'string' ? property.description : '',
-    exclusiveMaximum: getNumberOrNull(property.exclusiveMaximum),
-    exclusiveMinimum: getNumberOrNull(property.exclusiveMinimum),
+    exclusiveMaximum: getNumberOrNull(constraints.exclusiveMaximum),
+    exclusiveMinimum: getNumberOrNull(constraints.exclusiveMinimum),
     fieldKind,
     input,
-    maximum: getNumberOrNull(property.maximum),
-    minimum: getNumberOrNull(property.minimum),
-    multipleOf: getNumberOrNull(property.multipleOf),
+    maximum: getNumberOrNull(constraints.maximum),
+    minimum: getNumberOrNull(constraints.minimum),
+    multipleOf: getNumberOrNull(constraints.multipleOf),
     name,
     options,
-    required: property.orig_required === true,
+    required,
+    ...(arraySchema
+      ? {
+          maxItems: getNumberOrNull(arraySchema.maxItems),
+          maxLength: getNumberOrNull(constraints.maxLength),
+          minItems: getNumberOrNull(arraySchema.minItems),
+          minLength: getNumberOrNull(constraints.minLength),
+        }
+      : {}),
     title: typeof property.title === 'string' ? property.title : startCase(name),
     type,
     uiChoiceLabels,
@@ -319,6 +362,11 @@ const parseInvocationSchema = (schema: JsonObject, schemas: JsonObject): Invocat
       continue;
     }
 
+    // A batch node's list only accepts a generator, and a generator's list only feeds a batch node.
+    if (getWorkflowBatchCollectionField(type) === name) {
+      fieldType.batch = true;
+    }
+
     inputs[name] = buildInputTemplate(name, rawProperty, fieldType, isInternal ? 'internal' : 'input');
   }
 
@@ -345,6 +393,10 @@ const parseInvocationSchema = (schema: JsonObject, schemas: JsonObject): Invocat
 
     if (!fieldType) {
       continue;
+    }
+
+    if (getWorkflowGeneratorOutputField(type) === name) {
+      fieldType.batch = true;
     }
 
     outputs[name] = {
@@ -453,6 +505,37 @@ export const useInvocationTemplatesSelector = store.useSelector;
 
 /** Imperative read for the workbench reducer and route validation. */
 export const getInvocationTemplatesSnapshot = (): InvocationTemplatesSnapshot => store.getSnapshot();
+
+/**
+ * Moves a freshly parsed document's nodes to the loaded templates before it enters the project, so an outdated
+ * workflow opens current, and words what the update could not keep. A document loaded before templates arrive is
+ * left as is; the editor's update actions cover it later.
+ */
+export const updateLoadedWorkflowNodes = (
+  document: ProjectGraphState,
+  translate: (key: string, options: { count: number }) => string
+): { document: ProjectGraphState; warnings: string[] } => {
+  const snapshot = store.getSnapshot();
+
+  if (snapshot.status !== 'loaded') {
+    return { document, warnings: [] };
+  }
+
+  const update = updateWorkflowNodes(document, snapshot.templates);
+  const warnings = [
+    ...(update.skippedNodeIds.length > 0
+      ? [translate('nodes.unableToUpdateNodes', { count: update.skippedNodeIds.length })]
+      : []),
+    ...(update.droppedEdgeIds.length > 0
+      ? [translate('nodes.updateDroppedEdges', { count: update.droppedEdgeIds.length })]
+      : []),
+    ...(update.droppedFormElementIds.length > 0
+      ? [translate('nodes.updateDroppedFormFields', { count: update.droppedFormElementIds.length })]
+      : []),
+  ];
+
+  return { document: update.document, warnings };
+};
 
 /** For readers that combine this store with another one; a single-store reader uses the selector. */
 export const subscribeInvocationTemplates = store.subscribe;

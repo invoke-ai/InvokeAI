@@ -197,6 +197,61 @@ describe('queue runtime', () => {
     expect(createQueueItemBackendSubmission({ id: 'project-1' }, asWorkflow([seed, seed]))).toEqual(invalid);
   });
 
+  it('replays persisted batch groups and rejects ones the graph or the backend would refuse', () => {
+    const asWorkflow = (batchData: unknown, seeds?: unknown) => {
+      const queueItem = createPendingQueueItem();
+      queueItem.snapshot.backendSubmission = {
+        batchCount: 2,
+        graph: {
+          edges: [],
+          id: 'backend-graph',
+          nodes: { denoise: { id: 'denoise', type: 'denoise' }, noise: { id: 'noise', seed: 7, type: 'noise' } },
+        },
+        kind: 'workflow',
+        ...(seeds === undefined ? {} : { seeds: seeds as never }),
+        batchData: batchData as never,
+      };
+      queueItem.snapshot.sourceId = 'workflow';
+      return queueItem;
+    };
+    const cfg = { fieldName: 'cfg', items: [1, 2], nodeId: 'denoise' };
+    const invalid = { error: 'Queue item has malformed workflow batch metadata.', kind: 'invalid' };
+
+    expect(createQueueItemBackendSubmission({ id: 'project-1' }, asWorkflow([[cfg]]))).toMatchObject({
+      kind: 'workflow',
+      request: { batchData: [[cfg]] },
+    });
+    expect(createQueueItemBackendSubmission({ id: 'project-1' }, asWorkflow([]))).toEqual(invalid);
+    expect(createQueueItemBackendSubmission({ id: 'project-1' }, asWorkflow([[]]))).toEqual(invalid);
+    expect(
+      createQueueItemBackendSubmission(
+        { id: 'project-1' },
+        asWorkflow([[cfg, { ...cfg, fieldName: 'steps', items: [1] }]])
+      )
+    ).toEqual(invalid);
+    expect(createQueueItemBackendSubmission({ id: 'project-1' }, asWorkflow([[{ ...cfg, nodeId: 'gone' }]]))).toEqual(
+      invalid
+    );
+    expect(createQueueItemBackendSubmission({ id: 'project-1' }, asWorkflow([[cfg], [cfg]]))).toEqual(invalid);
+    // The product must fit the queue together with the runs, as the planner enforced when it was queued.
+    expect(
+      createQueueItemBackendSubmission(
+        { id: 'project-1' },
+        asWorkflow([[{ ...cfg, items: Array.from({ length: 5_001 }, (_, i) => i) }]])
+      )
+    ).toEqual(invalid);
+    // A field a seed already walks cannot also be batched.
+    expect(
+      createQueueItemBackendSubmission(
+        { id: 'project-1' },
+        asWorkflow(
+          [[{ fieldName: 'seed', items: [1, 2], nodeId: 'noise' }]],
+          [{ fieldName: 'seed', nodeId: 'noise', seed: 7, seedStep: 1 }]
+        )
+      )
+    ).toEqual(invalid);
+  });
+
   it('rejects a generate item that records neither a seed step nor the legacy toggle', () => {
     const queueItem = createPendingQueueItem();
     delete (queueItem.snapshot.backendSubmission as Record<string, unknown>).seedStep;

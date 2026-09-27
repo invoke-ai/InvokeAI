@@ -88,6 +88,8 @@ export interface InvocationState {
   batchCount: number;
   blockingReasons: string[];
   invocation: InvocationRoute;
+  /** Sessions one workflow run produces through batch nodes; absent without batch nodes, null while unresolved. */
+  workflowBatchSize?: number | null;
   isPreparing: boolean;
   isValid: boolean;
   sources: GraphWidgetSource[];
@@ -187,5 +189,6 @@ export const useInvocationState = (): InvocationState => {
     sourceValues,
     sources: graphWidgetSources,
     visibleTypeIds,
+    ...(resolvedRoute.workflowBatch ? { workflowBatchSize: resolvedRoute.workflowBatch.size } : {}),
   };
 };

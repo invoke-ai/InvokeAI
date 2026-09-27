@@ -6,12 +6,21 @@
 import type { GenerateSettings } from '@features/generation/contracts';
 import type { ParseDynamicPromptsResponse } from '@features/generation/prompts';
 import type { ModelConfig } from '@features/models';
+import type { WorkflowGeneratorResolutions, WorkflowPendingGenerator } from '@features/workflow/utility';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { ResolvedInvocationRoute } from '@workbench/invocationContracts';
 import type { Project } from '@workbench/projectContracts';
 
 import { resolveDynamicPrompts } from '@features/generation/prompts';
-import { getEffectivePrompts, hasDynamicPromptSyntax, normalizeGenerateSettings } from '@features/generation/settings';
+import {
+  getEffectivePrompts,
+  hasDynamicPromptSyntax,
+  normalizeGenerateSettings,
+  sanitizeBatchCount,
+} from '@features/generation/settings';
+import { getWorkflowBatchCapReason } from '@features/workflow/graph';
+import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
+import { planWorkflowBatch } from '@features/workflow/utility';
 import { queryClient } from '@platform/query/client';
 import { isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 
@@ -24,6 +33,8 @@ import { getProjectWidgetValues } from './widgetState';
 
 /** Plain English, like the shell's other notices — this module has no i18n context. */
 const EXPANSION_FAILED_TITLE = 'The prompt could not be expanded';
+const GENERATOR_FAILED_TITLE = 'The batch generator could not be resolved';
+const BATCH_NOT_READY_TITLE = 'The batch is not ready';
 
 export interface SubmitResolvedInvocationDeps {
   /** The resolved route to submit — the caller has already checked it is valid. */
@@ -81,6 +92,67 @@ const resolveExpandedPrompts = async (settings: GenerateSettings): Promise<Parse
   }
 };
 
+/** The async generators (dynamic prompts, board listings) a workflow submission still has to resolve. */
+const getPendingWorkflowGenerators = (project: Project, route: ResolvedInvocationRoute): WorkflowPendingGenerator[] => {
+  const templatesSnapshot = getInvocationTemplatesSnapshot();
+
+  if (route.sourceId !== 'workflow' || templatesSnapshot.status !== 'loaded') {
+    return [];
+  }
+
+  return planWorkflowBatch(project.projectGraph, templatesSnapshot.templates).pendingGenerators;
+};
+
+/**
+ * Resolves the pending generators, the only asynchronous step before the reducer; their outputs travel with the
+ * action and the planner re-checks them against the document it compiles.
+ */
+const resolveWorkflowGeneratorsForRoute = async (
+  project: Project,
+  pending: readonly WorkflowPendingGenerator[],
+  owner: AccountScope,
+  commands: Pick<WorkbenchCommands, 'notifications'>
+): Promise<WorkflowGeneratorResolutions | null> => {
+  const templatesSnapshot = getInvocationTemplatesSnapshot();
+
+  if (templatesSnapshot.status !== 'loaded') {
+    return null;
+  }
+
+  // Loaded on demand: the resolver and its gallery/prompt query dependencies stay out of the boot graph.
+  const { resolveWorkflowGenerators } = await import('@features/workflow/generators');
+  const { errors, resolutions } = await resolveWorkflowGenerators(queryClient, pending);
+
+  if (!isAccountScopeCurrent(owner)) {
+    return null;
+  }
+
+  if (errors.length > 0) {
+    commands.notifications.add({ kind: 'error', message: errors[0], title: GENERATOR_FAILED_TITLE });
+    return null;
+  }
+
+  // Sizes were unknown until now: an empty board or a mismatched group only shows once the lists exist.
+  const resolvedPlan = planWorkflowBatch(project.projectGraph, templatesSnapshot.templates, {
+    generators: resolutions,
+  });
+
+  const capReason =
+    resolvedPlan.batchSize === null
+      ? null
+      : getWorkflowBatchCapReason(
+          resolvedPlan.batchSize * sanitizeBatchCount(getProjectWidgetValues(project, 'workflow').batchCount)
+        );
+  const reason = resolvedPlan.reasons[0] ?? capReason;
+
+  if (reason) {
+    commands.notifications.add({ kind: 'error', message: reason, title: BATCH_NOT_READY_TITLE });
+    return null;
+  }
+
+  return resolutions;
+};
+
 export const submitResolvedInvocation = async ({
   commands,
   formatControlLayerError,
@@ -92,6 +164,20 @@ export const submitResolvedInvocation = async ({
 }: SubmitResolvedInvocationDeps): Promise<void> => {
   if (!isAccountScopeCurrent(owner)) {
     return;
+  }
+
+  // Only a workflow with unresolved generators needs this round trip; every other route dispatches synchronously.
+  const pendingGenerators = getPendingWorkflowGenerators(project, route);
+  let workflowGenerators: WorkflowGeneratorResolutions | undefined;
+
+  if (pendingGenerators.length > 0) {
+    const resolved = await resolveWorkflowGeneratorsForRoute(project, pendingGenerators, owner, commands);
+
+    if (resolved === null) {
+      return;
+    }
+
+    workflowGenerators = resolved;
   }
 
   const expandableSettings = getExpandableSettings(project, route);
@@ -116,14 +202,16 @@ export const submitResolvedInvocation = async ({
 
     await dispatchResolvedInvocation(
       { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route },
-      expansion.prompts.length > 0 ? expansion.prompts : undefined
+      expansion.prompts.length > 0 ? expansion.prompts : undefined,
+      workflowGenerators
     );
     return;
   }
 
   await dispatchResolvedInvocation(
     { commands, formatControlLayerError, models, owner, prepareCanvasInvocation, project, route },
-    undefined
+    undefined,
+    workflowGenerators
   );
 };
 
@@ -137,7 +225,8 @@ const dispatchResolvedInvocation = async (
     project,
     route,
   }: SubmitResolvedInvocationDeps,
-  positivePrompts: string[] | undefined
+  positivePrompts: string[] | undefined,
+  workflowGenerators: WorkflowGeneratorResolutions | undefined
 ): Promise<void> => {
   if (route.sourceId === 'canvas') {
     // Await Canvas preparation to retain the submission guard until completion; pass the resolved destination so
@@ -164,5 +253,6 @@ const dispatchResolvedInvocation = async (
     models,
     positivePrompts,
     route,
+    ...(workflowGenerators ? { workflowGenerators } : {}),
   });
 };

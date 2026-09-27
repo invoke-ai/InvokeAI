@@ -238,8 +238,15 @@ describe('feature public-interface registry', () => {
     expect(checkDependency('workbench/widgets/canvas/invoke.ts', '@features/generation/canvasGraph')).toEqual([]);
     expect(checkDependency('workbench/WorkbenchContext.tsx', '@features/intermediates/holdLease')).toEqual([]);
     expect(
+      checkDependency('features/workflow/ui/fields/RecordPickerInput.tsx', '@features/generation/systemPrompts')
+    ).toEqual([]);
+    expect(checkDependency('workbench/invocationSubmit.ts', '@features/workflow/generators')).toEqual([]);
+    expect(
       checkDependency('workbench/invocationSubmit.ts', '@features/generation/data/dynamicPromptsQueries')
     ).toMatchObject([{ rule: 'feature-private-interface' }]);
+    expect(
+      checkDependency('features/workflow/ui/fields/RecordPickerInput.tsx', '@features/generation/data/systemPrompts')
+    ).toMatchObject([{ rule: 'feature-public-interface' }]);
   });
 
   it('treats unregistered features as fully private', () => {

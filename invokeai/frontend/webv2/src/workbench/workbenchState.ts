@@ -117,6 +117,7 @@ import {
   sanitizeBatchCount,
   syncGenerateWidgetValuesWithModels,
 } from '@features/generation/settings';
+import { MAX_QUEUE_BATCH_ITEMS } from '@features/queue';
 import { getGenerationDevicesSnapshot, resolveRandDeviceMetadata } from '@features/queue/devices';
 import {
   clearDeletedUpscaleInput,
@@ -151,6 +152,7 @@ import {
   projectGraphReducer,
   serializeWorkflowJsonForSubmission,
   type ProjectGraphAction,
+  type WorkflowGeneratorResolutions,
 } from '@features/workflow/utility';
 
 import {
@@ -315,6 +317,8 @@ type WorkbenchReducerAction =
       backendSupportsCancellation: boolean;
       /** Expanded positive prompts, resolved by the caller before dispatch. */
       positivePrompts?: string[];
+      /** Async workflow generator outputs, resolved by the caller before dispatch. */
+      workflowGenerators?: WorkflowGeneratorResolutions;
       route: InvocationRoute;
       models?: readonly ModelConfig[];
     }
@@ -2365,7 +2369,8 @@ const applyAutoRouteForRegionFront = (
 const compileInvocationSnapshot = (
   project: Project,
   route: InvocationRoute,
-  models?: readonly ModelConfig[]
+  models?: readonly ModelConfig[],
+  workflowGenerators?: WorkflowGeneratorResolutions
 ): {
   graph: GraphContract;
   widgetStates: WidgetStateMap;
@@ -2383,9 +2388,17 @@ const compileInvocationSnapshot = (
       return null;
     }
 
-    const { graph, ...workflow } = planWorkflowSubmission(project.projectGraph, templatesSnapshot.templates, {
+    const plan = planWorkflowSubmission(project.projectGraph, templatesSnapshot.templates, {
       batchCount: sanitizeBatchCount(widgetStates.workflow?.values.batchCount),
+      generators: workflowGenerators,
     });
+
+    // Null means a generator is still unresolved or was edited during its round trip; nothing is queued.
+    if (!plan) {
+      return null;
+    }
+
+    const { graph, ...workflow } = plan;
     const { id: _id, ...workflowJson } = serializeWorkflowJsonForSubmission(project.projectGraph);
 
     return {
@@ -3071,6 +3084,7 @@ const enqueueCompiledSnapshot = (
         : {
             batchCount: compiled.workflow.batchCount,
             ...(compiled.workflow.seeds.length ? { seeds: compiled.workflow.seeds } : {}),
+            ...(compiled.workflow.batchData.length ? { batchData: compiled.workflow.batchData } : {}),
             graph: backendGraph,
             kind: 'workflow',
             ...(compiled.workflowJson ? { workflow: compiled.workflowJson } : {}),
@@ -3146,7 +3160,12 @@ const enqueueCompiledSnapshot = (
         batchCount:
           backendSubmission.kind === 'invalid'
             ? 1
-            : backendSubmission.batchCount * (expandedPositivePrompts?.length ?? 1),
+            : Math.min(
+                MAX_QUEUE_BATCH_ITEMS,
+                backendSubmission.batchCount *
+                  (expandedPositivePrompts?.length ?? 1) *
+                  (compiled.workflow?.batchSize ?? 1)
+              ),
         height: presentationDimensions.height,
         // Use merged prompts so queue text stays consistent when the backend session arrives.
         ...(effectivePrompts?.positivePrompt ? { positivePrompt: effectivePrompts.positivePrompt } : {}),
@@ -3229,13 +3248,14 @@ const submitInvocationSnapshot = (
   backendSupportsCancellation: boolean,
   route = resolveInvocationRoute(project),
   models?: readonly ModelConfig[],
-  positivePrompts?: string[]
+  positivePrompts?: string[],
+  workflowGenerators?: WorkflowGeneratorResolutions
 ): Project => {
   if (!isInvocationRouteValid(route)) {
     return project;
   }
 
-  const compiledSnapshot = compileInvocationSnapshot(project, route, models);
+  const compiledSnapshot = compileInvocationSnapshot(project, route, models, workflowGenerators);
 
   if (!compiledSnapshot) {
     return project;
@@ -4162,7 +4182,8 @@ export const __workbenchReducerInternal = (
             action.backendSupportsCancellation,
             resolveInvocationRoute(project, 'global', action.route, action.models),
             action.models,
-            action.positivePrompts
+            action.positivePrompts,
+            action.workflowGenerators
           )
         ),
         state.activeProjectId

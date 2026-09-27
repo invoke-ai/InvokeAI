@@ -17,6 +17,7 @@ import {
   getGenerationValidationReasons,
   isSupportedGenerateModel,
   normalizeGenerateWidgetValues,
+  sanitizeBatchCount,
 } from '@features/generation/settings';
 import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues } from '@features/upscale';
 import { getVideoWidgetValidationReasons, normalizeVideoWidgetValues } from '@features/video';
@@ -195,7 +196,11 @@ export const resolveInvocationRouteInput = (
   const sourceWidgetId = sourceWidgetIds[sourceId];
   // Route-rendering surfaces subscribe to templates because readiness reads them imperatively.
   const projectGraphReadiness =
-    sourceId === 'workflow' ? getProjectGraphReadiness(input.projectGraph, getInvocationTemplatesSnapshot()) : null;
+    sourceId === 'workflow'
+      ? getProjectGraphReadiness(input.projectGraph, getInvocationTemplatesSnapshot(), {
+          batchCount: sanitizeBatchCount(input.workflowValues.batchCount),
+        })
+      : null;
   const validationReasons: Array<string | ForLoopValidationReason> = [];
 
   if (!isInvocationSourceAvailable(sourceId)) {
@@ -272,6 +277,7 @@ export const resolveInvocationRouteInput = (
     sourceValid,
     validationMessage: validationReasons[0],
     validationReasons,
+    ...(projectGraphReadiness?.batch ? { workflowBatch: projectGraphReadiness.batch } : {}),
   };
 };
 

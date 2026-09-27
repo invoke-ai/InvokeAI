@@ -10,7 +10,7 @@ import type {
 import {
   buildGeneratePromptBatchPlan,
   buildLegacyGeneratePromptBatchPlan,
-  buildWorkflowSeedBatchPlan,
+  buildQueueWorkflowBatchPlan,
   sanitizeBatchCount,
 } from '@features/queue/core/promptBatch';
 import { mapWithConcurrency } from '@platform/core/concurrency';
@@ -111,7 +111,11 @@ export const enqueueGenerate = async (request: QueueEnqueueGenerateRequest): Pro
 };
 
 export const enqueueWorkflow = async (request: QueueEnqueueWorkflowRequest): Promise<QueueEnqueueResult> => {
-  const plan = buildWorkflowSeedBatchPlan({ batchCount: request.batchCount, seeds: request.seeds });
+  const plan = buildQueueWorkflowBatchPlan({
+    batchCount: request.batchCount,
+    batchData: request.batchData,
+    seeds: request.seeds,
+  });
   const result = await apiFetchJson<unknown>('/api/v1/queue/default/enqueue_batch', {
     body: JSON.stringify({
       batch: {
