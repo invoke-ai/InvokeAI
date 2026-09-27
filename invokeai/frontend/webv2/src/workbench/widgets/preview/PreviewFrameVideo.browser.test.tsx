@@ -721,6 +721,31 @@ describe('PreviewFrame native video arm', () => {
     expect(load).toHaveBeenCalledTimes(3);
   });
 
+  it("starts at half volume and carries the viewer's volume to the next clip's player", async () => {
+    await renderVideo();
+    const firstVideo = getVideo();
+
+    expect(firstVideo.volume).toBe(0.5);
+    expect(firstVideo.muted).toBe(false);
+
+    await interact(() => {
+      firstVideo.volume = 0.2;
+      firstVideo.muted = true;
+    });
+    await renderVideo(() => true, { ...videoSource, itemKey: 'video:next.mp4' as const, label: 'Video next.mp4' });
+    const nextVideo = getVideo();
+
+    expect(nextVideo).not.toBe(firstVideo);
+    expect(nextVideo.volume).toBeCloseTo(0.2);
+    expect(nextVideo.muted).toBe(true);
+
+    // Restore the page-session default for the tests that follow.
+    await interact(() => {
+      nextVideo.volume = 0.5;
+      nextVideo.muted = false;
+    });
+  });
+
   it('keys retry state to the selected video item', async () => {
     await renderVideo();
     const firstVideo = getVideo();

@@ -1,4 +1,5 @@
 import type { GalleryImageItem, GalleryVideoItem, GeneratedImageContract } from '@features/gallery';
+import type { GeneratedVideoContract } from '@features/gallery/contracts';
 import type { GenerateWidgetValues, MainModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/api';
@@ -270,6 +271,20 @@ const createImage = (imageName: string, sourceQueueItemId: string): GeneratedIma
   queuedAt: '2026-06-09T00:00:00.000Z',
   sourceQueueItemId,
   thumbnailUrl: `/api/v1/images/i/${imageName}/thumbnail`,
+  width: 512,
+});
+
+const createVideo = (videoName: string, sourceQueueItemId: string, boardId?: string): GeneratedVideoContract => ({
+  ...(boardId === undefined ? {} : { boardId }),
+  category: 'general',
+  durationSeconds: 5,
+  height: 768,
+  isIntermediate: false,
+  queuedAt: '2026-06-09T00:00:00.000Z',
+  sourceQueueItemId,
+  thumbnailUrl: `/api/v1/videos/i/${videoName}/thumbnail`,
+  videoName,
+  videoUrl: `/api/v1/videos/i/${videoName}/full`,
   width: 512,
 });
 
@@ -4792,6 +4807,136 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('selects a finished Gallery video once, so a later result keeps the preview', () => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = submitGenerate(state);
+    const videoItem = getActiveProject(state).queue.items[0];
+    const projectId = getActiveProject(state).id;
+
+    state = workbenchReducer(state, {
+      backendItemId: 1,
+      images: [],
+      projectId,
+      queueItemId: videoItem.id,
+      type: 'routeQueueItemPartialResults',
+      videos: [createVideo('clip.mp4', videoItem.id, 'board-1')],
+    });
+    const selected = getProjectWidgetValues(getActiveProject(state), 'gallery');
+    expect(selected.selectedImageName).toBe('video:clip.mp4');
+    expect(selected.selectedImage).toMatchObject({
+      boardId: 'board-1',
+      durationSeconds: 5,
+      fullUrl: '/api/v1/videos/i/clip.mp4/full',
+      kind: 'video',
+    });
+
+    state = submitGenerate(state);
+    const imageItem = getActiveProject(state).queue.items[0];
+    state = workbenchReducer(state, {
+      images: [createImage('later.png', imageItem.id)],
+      projectId,
+      queueItemId: imageItem.id,
+      type: 'routeQueueItemResults',
+    });
+    // The video run's run-end pass re-reports the clip; it must not take the preview back.
+    state = workbenchReducer(state, {
+      images: [],
+      projectId,
+      queueItemId: videoItem.id,
+      type: 'routeQueueItemResults',
+      videos: [createVideo('clip.mp4', videoItem.id)],
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:later.png');
+  });
+
+  it('selects only videos from runs submitted after a manual selection', () => {
+    vi.useFakeTimers({ now: new Date('2026-06-10T00:00:00.000Z') });
+
+    try {
+      let state = primeGenerate();
+      state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+      state = submitGenerate(state);
+      const earlierItem = getActiveProject(state).queue.items[0];
+
+      vi.setSystemTime(new Date('2026-06-10T00:00:01.000Z'));
+      state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
+      vi.setSystemTime(new Date('2026-06-10T00:00:02.000Z'));
+      state = submitGenerate(state);
+      const laterItem = getActiveProject(state).queue.items[0];
+      const projectId = getActiveProject(state).id;
+
+      state = workbenchReducer(state, {
+        images: [],
+        projectId,
+        queueItemId: earlierItem.id,
+        type: 'routeQueueItemResults',
+        videos: [createVideo('earlier.mp4', earlierItem.id)],
+      });
+      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
+
+      state = workbenchReducer(state, {
+        images: [],
+        projectId,
+        queueItemId: laterItem.id,
+        type: 'routeQueueItemResults',
+        videos: [createVideo('later.mp4', laterItem.id)],
+      });
+      expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('video:later.mp4');
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("selects a run's video over images routed with it", () => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = workbenchReducer(state, {
+      settings: { showProgressImagesInViewer: false },
+      type: 'setActiveProjectSettings',
+    });
+    state = submitGenerate(state);
+    const queueItem = getActiveProject(state).queue.items[0];
+
+    state = workbenchReducer(state, {
+      images: [createImage('first-frame.png', queueItem.id)],
+      projectId: getActiveProject(state).id,
+      queueItemId: queueItem.id,
+      type: 'routeQueueItemResults',
+      videos: [createVideo('clip.mp4', queueItem.id)],
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('video:clip.mp4');
+  });
+
+  it('does not reselect a video a restored run showed before the reload', () => {
+    let state = primeGenerate();
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    const liveItem = getActiveProject(submitGenerate(state)).queue.items[0]!;
+    const projectId = getActiveProject(state).id;
+    state = workbenchReducer(state, { item: createGalleryImageItem('selected.png'), type: 'selectGalleryItem' });
+    state = workbenchReducer(state, {
+      settings: { showProgressImagesInViewer: true },
+      type: 'setActiveProjectSettings',
+    });
+    state = workbenchReducer(state, {
+      items: [{ ...liveItem, id: 'restored-item', resultVideoNames: ['clip.mp4'], status: 'running' }],
+      projectId,
+      type: 'restoreQueueItemsFromJournal',
+    });
+
+    state = workbenchReducer(state, {
+      images: [],
+      projectId,
+      queueItemId: 'restored-item',
+      type: 'routeQueueItemResults',
+      videos: [createVideo('clip.mp4', 'restored-item')],
+    });
+
+    expect(getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageName).toBe('image:selected.png');
   });
 
   it('leaves an explicit live-follow opt-out alone when submitting', () => {
