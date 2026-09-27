@@ -250,14 +250,38 @@ export interface WorkflowMetadata {
 
 /** The project-owned workflow document. `version: 2` distinguishes it from the Phase-1 placeholder graph. */
 export interface ProjectGraphState extends WorkflowMetadata {
+  /** Identifies this project copy; a library template id never becomes a document id. */
   id: string;
   version: 2;
-  /** Backend workflow-library binding when the document was loaded from or saved to the library. */
-  libraryWorkflowId?: string;
   nodes: WorkflowNode[];
   edges: WorkflowEdge[];
   form: WorkflowForm;
   updatedAt: string;
+}
+
+/**
+ * The library template a project workflow was opened from or last explicitly saved to. Kept beside the document,
+ * outside its edit history, so undoing an edit never undoes a save or restores an obsolete write target.
+ */
+export interface ProjectWorkflowSource {
+  libraryWorkflowId: string;
+  /** The template content revision loaded or last written; null when unknown (documents migrated from older schemas). */
+  revision: number | null;
+}
+
+/** The newest successful run's final output, owned by the project workflow that submitted it. */
+export interface ProjectWorkflowRunPreview {
+  imageName: string;
+  /** Submission instant; a newer submission wins over an older run that finishes later. */
+  submittedAt: string;
+  completedAt: string;
+}
+
+/** One workflow a project owns: its editable document plus metadata that is not part of graph editing. */
+export interface ProjectWorkflowEntry {
+  document: ProjectGraphState;
+  source?: ProjectWorkflowSource;
+  lastRun?: ProjectWorkflowRunPreview;
 }
 
 export interface InvocationTemplatesSnapshot {

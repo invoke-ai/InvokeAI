@@ -1,7 +1,7 @@
 import { Alert, Button, HStack, Stack } from '@chakra-ui/react';
 import { downloadText } from '@platform/browser/downloadBlob';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
-import { serializeProjectDocumentV2Json } from '@workbench/projects/projectDocument';
+import { serializeProjectDocumentV3Json } from '@workbench/projects/projectDocument';
 import { useProjectSyncSelector } from '@workbench/projects/syncStore';
 import {
   useActiveProject,
@@ -62,7 +62,7 @@ export const ProjectConflictBanner = () => {
   const exportDraft = useCallback(
     () =>
       run('export', () => {
-        const { documentJson } = serializeProjectDocumentV2Json(project);
+        const { documentJson } = serializeProjectDocumentV3Json(project);
         downloadText(documentJson, getExportName(projectName), 'application/json');
         return Promise.resolve();
       }),

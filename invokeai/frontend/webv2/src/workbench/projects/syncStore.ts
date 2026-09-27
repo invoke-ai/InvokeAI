@@ -87,6 +87,8 @@ export const useProjectSyncSelector = store.useSelector;
 
 export const getProjectSyncSnapshot = store.getSnapshot;
 
+export const subscribeProjectSync = store.subscribe;
+
 export const reportProjectSync = (update: Omit<ProjectSyncSnapshot, 'lastSyncedAt'>): void => {
   store.setSnapshot({
     ...update,

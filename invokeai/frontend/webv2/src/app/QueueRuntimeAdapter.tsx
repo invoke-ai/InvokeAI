@@ -2,7 +2,6 @@ import { invalidateGallery } from '@features/gallery/queries';
 import { modelLoadActivitySink } from '@features/models';
 import { nodeExecutionStore } from '@features/nodes';
 import { createProductionQueueRuntime, createProductionQueueReceiptAcknowledgements } from '@features/queue';
-import { createWorkflowRunCaptureSink } from '@features/workflow/queries';
 import { ensureInvocationTemplatesLoaded } from '@features/workflow/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -150,7 +149,6 @@ export const QueueRuntimeAdapter = () => {
         locks: createQueueRunLockPort(owner.storageSuffix),
         modelLoads: modelLoadActivitySink,
         nodeExecution: nodeExecutionStore,
-        workflowRuns: createWorkflowRunCaptureSink(),
       });
       runtime.start();
     };
