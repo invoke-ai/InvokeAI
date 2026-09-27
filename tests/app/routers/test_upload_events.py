@@ -306,6 +306,7 @@ def test_video_upload_announces_the_upload_with_its_board_visibility(
     response = _post_video(client, is_intermediate=False)
 
     assert response.status_code == 201
+    assert response.headers["location"] == "/videos/upload.mp4"
     events = _upload_events(mock_invoker)
     assert len(events) == 1
     event = events[0]

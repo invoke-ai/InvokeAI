@@ -177,6 +177,8 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     getSnapshot: (...args: unknown[]) => mocks.getSnapshot(...args),
     isActiveProject: vi.fn(() => true),
   }),
+  // Only the Video panel's reference capacity is selected; no test here exercises it.
+  useWorkbenchSelector: () => false,
 }));
 
 vi.mock('react-i18next', () => ({

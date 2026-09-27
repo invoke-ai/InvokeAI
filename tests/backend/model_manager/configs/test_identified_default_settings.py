@@ -148,3 +148,53 @@ def test_an_install_setting_keeps_the_architectures_other_defaults(tmp_path: Pat
 
     assert probed is not None and overridden is not None
     assert overridden.model_dump(exclude={"fp8_storage"}) == probed.model_dump(exclude={"fp8_storage"})
+
+
+def _anima_lllite_adapter(path: Path, weight_dtype: torch.dtype) -> Path:
+    """The smallest file identification reads as an Anima ControlNet-LLLite adapter.
+
+    Chosen because its loader is one of the seven that declare they do not implement FP8 Storage, and
+    it is the cheapest of those to identify. No published LLLite adapter is float8 -- they are 8-66 MB
+    bf16 files -- so this one is synthetic on purpose: the subject is the wiring, not the file.
+    """
+    save_file(
+        {
+            "lllite_conditioning1.conv1.weight": torch.zeros(8, 3, 4, 4).to(weight_dtype),
+            "lllite_dit_blocks_0.down.weight": torch.zeros(4, 8).to(weight_dtype),
+        },
+        str(path),
+    )
+    return path
+
+
+def test_fp8_storage_is_not_enabled_for_a_model_whose_loader_ignores_it(tmp_path: Path) -> None:
+    """The float8 probe is not the whole question, and used to be treated as though it were.
+
+    A Wan fp8 checkpoint or an Anima LLLite adapter is float8 on disk, so identification enabled FP8
+    Storage; neither loader touched the setting, so the record promised half the memory and the load
+    delivered none of it. `AnimaControlNetLLLiteModel` now declares `NotApplicable`, and identification
+    asks (`load/fp8_capability.py`).
+    """
+    result = ModelConfigFactory.from_model_on_disk(
+        _anima_lllite_adapter(tmp_path / "lllite.safetensors", torch.float8_e4m3fn), allow_unknown=False
+    )
+
+    assert result.config is not None and result.config.type is ModelType.ControlNet, result.details
+    settings = result.config.default_settings
+    assert (settings.fp8_storage if settings is not None else None) is None
+
+
+def test_an_explicit_install_request_is_dropped_for_such_a_model_too(tmp_path: Path) -> None:
+    """Add Models has one FP8 Storage checkbox for whatever is being installed, so the request arrives
+    for models that cannot use it. Storing it would leave a value the detail panel no longer shows and
+    therefore nobody can clear; the install's other settings are untouched."""
+    result = ModelConfigFactory.from_model_on_disk(
+        _anima_lllite_adapter(tmp_path / "lllite.safetensors", torch.bfloat16),
+        {"default_settings": {"fp8_storage": True, "preprocessor": "canny_edge_detection"}},
+        allow_unknown=False,
+    )
+
+    assert result.config is not None, result.details
+    assert result.config.default_settings is not None
+    assert result.config.default_settings.fp8_storage is None
+    assert result.config.default_settings.preprocessor == "canny_edge_detection"

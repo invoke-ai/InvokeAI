@@ -80,7 +80,16 @@ const createRuntime = (
   store: ReturnType<typeof createWorkbenchStore>,
   hub: Pick<SocketHub, 'on'>,
   options: Partial<Parameters<typeof createRecallParametersRuntime>[0]> = {}
-) => createRecallParametersRuntime({ commands: store.commands, hub, queries: store.queries, t, ...options });
+  // Nothing registers in this suite, so a reveal can only select or raise an instance already in the layout.
+) =>
+  createRecallParametersRuntime({
+    commands: store.commands,
+    hub,
+    queries: store.queries,
+    reveal: { getWidgetsForRegion: () => [], isEditingText: () => false },
+    t,
+    ...options,
+  });
 
 const t = ((key: string) => key) as unknown as TFunction;
 
@@ -273,6 +282,28 @@ describe('createRecallParametersRuntime', () => {
       expect.objectContaining({ kind: 'error', message: 'unexpected' })
     );
     expect(promptOf(store, projectId)).toBe('second');
+
+    runtime.dispose();
+  });
+
+  it('brings the Generate widget to the front once a recall applies', async () => {
+    const store = createWorkbenchStore();
+    const socket = createFakeSocketHub();
+    const projectId = store.queries.getSnapshot().activeProject.id;
+    store.commands.widgets.open({ projectId, region: 'left', widgetId: 'generate' });
+    store.commands.widgets.open({ projectId, region: 'left', widgetId: 'video' });
+    const activeType = () => {
+      const project = store.queries.getProject(projectId)!;
+      const active = project.widgetRegions.left.activeInstanceId;
+      return active ? project.widgetInstances[active]?.typeId : undefined;
+    };
+    expect(activeType()).toBe('video');
+    const runtime = createRuntime(store, socket.hub);
+
+    socket.emit('recall_parameters_updated', event({ positive_prompt: 'a lighthouse' }));
+    await flush();
+
+    expect(activeType()).toBe('generate');
 
     runtime.dispose();
   });

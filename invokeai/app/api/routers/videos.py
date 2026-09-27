@@ -5,7 +5,7 @@ import tempfile
 import traceback
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Annotated, BinaryIO, Optional
+from typing import Annotated, Any, BinaryIO, Optional
 
 from fastapi import Body, HTTPException, Query, Request, Response
 from fastapi import Path as PathParam
@@ -392,65 +392,57 @@ def _probe_decodable_video(path: Path) -> tuple[tuple[int, int, float, Optional[
     return metadata, first_frame
 
 
-@videos_router.post(
-    "/upload",
-    operation_id="upload_video",
-    responses={
-        201: {"description": "The video was uploaded successfully"},
-        415: {"description": "Video upload failed"},
-    },
-    status_code=201,
-    response_model=VideoDTO,
-    # The body is parsed by hand (see _stream_video_upload) so the file lands in exactly
-    # one temp file, which means FastAPI cannot infer the request schema from the
-    # signature. This spells out the same multipart body the `file` + `metadata`
-    # parameters used to generate, so the documented contract is unchanged.
-    openapi_extra={
-        "requestBody": {
-            "required": True,
-            "content": {
-                "multipart/form-data": {
-                    "schema": {
-                        "properties": {
-                            # Key order and shape mirror what FastAPI generates for the sibling
-                            # upload routes (see Body_upload_image), so the documented contract
-                            # stays byte-identical to what `file` + `metadata` produced.
-                            "file": {
-                                "type": "string",
-                                "contentMediaType": "application/octet-stream",
-                                "title": "File",
-                            },
-                            "metadata": {
-                                "anyOf": [{"type": "string"}, {"type": "null"}],
-                                "title": "Metadata",
-                                "description": "The metadata to associate with the video, must be a stringified JSON dict",
-                            },
+# The body of a video upload is parsed by hand (see _stream_video_upload) so the file lands in
+# exactly one temp file, which means FastAPI cannot infer the request schema from the route
+# signature. This spells out the same multipart body the `file` + `metadata` parameters used to
+# generate, so the documented contract is unchanged. Every route that ingests through
+# `ingest_uploaded_video` documents its body with it.
+VIDEO_UPLOAD_OPENAPI_EXTRA: dict[str, Any] = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "multipart/form-data": {
+                "schema": {
+                    "properties": {
+                        # Key order and shape mirror what FastAPI generates for the sibling
+                        # upload routes (see Body_upload_image), so the documented contract
+                        # stays byte-identical to what `file` + `metadata` produced.
+                        "file": {
+                            "type": "string",
+                            "contentMediaType": "application/octet-stream",
+                            "title": "File",
                         },
-                        "type": "object",
-                        "required": ["file"],
-                        "title": "Body_upload_video",
-                    }
+                        "metadata": {
+                            "anyOf": [{"type": "string"}, {"type": "null"}],
+                            "title": "Metadata",
+                            "description": "The metadata to associate with the video, must be a stringified JSON dict",
+                        },
+                    },
+                    "type": "object",
+                    "required": ["file"],
+                    "title": "Body_upload_video",
                 }
-            },
-        }
-    },
-)
-async def upload_video(
-    current_user: CurrentUserOrDefault,
+            }
+        },
+    }
+}
+
+
+async def ingest_uploaded_video(
     request: Request,
-    response: Response,
-    video_category: ImageCategory = Query(description="The category of the video"),
-    is_intermediate: bool = Query(description="Whether this is an intermediate video"),
-    board_id: Optional[str] = Query(default=None, description="The board to add this video to, if any"),
-    session_id: Optional[str] = Query(default=None, description="The session ID associated with this upload, if any"),
-    project_id: Optional[str] = Query(
-        default=None,
-        min_length=1,
-        max_length=255,
-        description="The caller's project this upload originates in, if any; recorded for intermediates cleanup",
-    ),
+    current_user: CurrentUserOrDefault,
+    *,
+    video_category: ImageCategory,
+    is_intermediate: bool,
+    board_id: Optional[str],
+    session_id: Optional[str] = None,
+    project_id: Optional[str] = None,
 ) -> VideoDTO:
-    """Uploads a video for the current user."""
+    """Stream a multipart video upload from `request` into the gallery and announce it.
+
+    Callers must be routes that `VideoUploadLimitASGIMiddleware` matches: the ingress size cap
+    and the concurrency slots are enforced there, before this runs.
+    """
     # Check board access for uploads to a specific board.
     board = await run_in_threadpool(_assert_board_write_access, board_id, current_user)
     await run_in_threadpool(assert_project_owned, project_id, current_user)
@@ -567,8 +559,6 @@ async def upload_video(
                 video_dto, user_id=current_user.user_id, board=board, shared_user_ids=shared_user_ids
             )
 
-        response.status_code = 201
-        response.headers["Location"] = video_dto.video_url
         return video_dto
     finally:
         # If create() succeeded the file was moved; this unlink is a no-op then.
@@ -580,6 +570,47 @@ async def upload_video(
             tmp_path.unlink(missing_ok=True)
         except Exception:
             pass
+
+
+@videos_router.post(
+    "/upload",
+    operation_id="upload_video",
+    responses={
+        201: {"description": "The video was uploaded successfully"},
+        415: {"description": "Video upload failed"},
+    },
+    status_code=201,
+    response_model=VideoDTO,
+    openapi_extra=VIDEO_UPLOAD_OPENAPI_EXTRA,
+)
+async def upload_video(
+    current_user: CurrentUserOrDefault,
+    request: Request,
+    response: Response,
+    video_category: ImageCategory = Query(description="The category of the video"),
+    is_intermediate: bool = Query(description="Whether this is an intermediate video"),
+    board_id: Optional[str] = Query(default=None, description="The board to add this video to, if any"),
+    session_id: Optional[str] = Query(default=None, description="The session ID associated with this upload, if any"),
+    project_id: Optional[str] = Query(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description="The caller's project this upload originates in, if any; recorded for intermediates cleanup",
+    ),
+) -> VideoDTO:
+    """Uploads a video for the current user."""
+    video_dto = await ingest_uploaded_video(
+        request,
+        current_user,
+        video_category=video_category,
+        is_intermediate=is_intermediate,
+        board_id=board_id,
+        session_id=session_id,
+        project_id=project_id,
+    )
+    response.status_code = 201
+    response.headers["Location"] = video_dto.video_url
+    return video_dto
 
 
 # Declared sync (`def`, not `async def`) so FastAPI runs it in the threadpool: every call

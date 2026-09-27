@@ -9,7 +9,6 @@ import {
   legacyGeneratedImageToGalleryItem,
   toGalleryItemKey,
 } from '@features/gallery';
-import { createVideoSourceClip } from '@features/video';
 import { MenuContent, MenuIconItem } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
@@ -24,6 +23,7 @@ import {
   EyeIcon,
   FileImageIcon,
   FileJsonIcon,
+  FilmIcon,
   FolderIcon,
   ImageIcon,
   ImagesIcon,
@@ -313,8 +313,6 @@ const SingleItemMenuItems = ({
     [actions, itemRef]
   );
   const handleDelete = useCallback(() => onRequestDeletion([itemRef]), [itemRef, onRequestDeletion]);
-  const { generation, widgets } = useWorkbenchCommands();
-  const openWidget = useOpenWorkbenchWidget();
   const [videoRecallCapabilities, setVideoRecallCapabilities] = useState<VideoRecallCapabilities>(
     EMPTY_VIDEO_RECALL_CAPABILITIES
   );
@@ -368,26 +366,15 @@ const SingleItemMenuItems = ({
   const handleVideoRecallPrompts = useMemo(() => makeVideoRecallHandler('prompts'), [makeVideoRecallHandler]);
   const handleVideoRecallSeed = useMemo(() => makeVideoRecallHandler('seed'), [makeVideoRecallHandler]);
   const handleExtendInVideo = useCallback(() => {
-    if (item.kind !== 'video') {
-      return;
+    if (item.kind === 'video') {
+      actions.sendToInitialVideo(item);
     }
-
-    openWidget('video', { preferredRegions: ['left'] });
-    // An initial video, a first frame, and Ref2VA references all claim the same
-    // conditioning slot: extending clears the rivals.
-    widgets.patchValues('video', {
-      firstFrameImage: null,
-      references: [],
-      sourceVideo: createVideoSourceClip({
-        durationSeconds: item.durationSeconds,
-        fps: item.fps,
-        height: item.height,
-        name: item.name,
-        width: item.width,
-      }),
-    });
-    generation.setSource('video');
-  }, [generation, item, openWidget, widgets]);
+  }, [actions, item]);
+  const handleUseAsReferenceVideo = useCallback(() => {
+    if (item.kind === 'video') {
+      actions.useAsReferenceVideo(item);
+    }
+  }, [actions, item]);
 
   return (
     <>
@@ -451,6 +438,13 @@ const SingleItemMenuItems = ({
             label="Extend in Video"
             value="extend-in-video"
             onClick={handleExtendInVideo}
+          />
+          <ContextMenuItem
+            disabled={!actions.canUseAsReferenceVideo}
+            icon={FilmIcon}
+            label="Use as Reference Video"
+            value="use-as-reference-video"
+            onClick={handleUseAsReferenceVideo}
           />
         </>
       ) : null}

@@ -17,12 +17,13 @@ move in opposite directions and cancel. Those are pinned separately below, again
 the dtype's range is rather than against the fixture's own numbers.
 """
 
+import pytest
 import torch
 
 from invokeai.backend.quantization.fp8_scaled import dequantize_fp8_scaled, extract_fp8_scaled_layers
 from invokeai.backend.quantization.int8_convrot import CONVROT_GROUP_SIZE, Int8ConvrotLinear
 from invokeai.backend.quantization.nvfp4 import NVFP4Linear
-from tests.fixtures.quantized_payloads import nvfp4_signed_tensors, quantize_convrot, quantize_scaled_fp8
+from tests.fixtures.quantized_payloads import mxfp8_tensors, nvfp4_signed_tensors, quantize_convrot, quantize_scaled_fp8
 
 CPU = torch.device("cpu")
 
@@ -129,3 +130,20 @@ def test_the_nvfp4_payload_unpacks_to_the_exact_weights_it_claims() -> None:
 
     assert linear.in_features == 64, "the packed weight's logical width was not doubled"
     assert torch.equal(decoded, expected)
+
+
+def test_an_mx_grid_that_is_not_whole_tiles_is_refused_rather_than_silently_zeroed() -> None:
+    """`stored_layout`'s index formula is a bijection only over whole tiles.
+
+    Off-tile it leaves NaN in the positions it never writes, and `.to(torch.uint8)` turns those into
+    zeros -- an exponent byte of 0 is `2**-127`, so the payload would look built and decode to
+    nothing. The builder is shared now, so this would be wrong in every suite that used it.
+    """
+    with pytest.raises(ValueError, match="tile layout"):
+        mxfp8_tensors("lin", torch.full((64, 4), 127))
+
+    with pytest.raises(ValueError, match="tile layout"):
+        mxfp8_tensors("lin", torch.full((128, 3), 127))
+
+    tensors, _expected = mxfp8_tensors("lin", torch.full((128, 4), 127))
+    assert tensors["lin.weight_scale"].shape == (128, 4)

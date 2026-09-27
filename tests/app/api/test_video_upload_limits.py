@@ -167,6 +167,74 @@ def test_other_routes_unaffected():
     assert calls == ["other"]
 
 
+@pytest.mark.parametrize(
+    ("path", "bounded"),
+    [
+        ("/api/v1/recall/video/default/initial-video/upload", True),
+        ("/api/v1/recall/video/default/reference-video/upload", True),
+        # The name-only siblings carry no body, so they must not compete for upload slots.
+        ("/api/v1/recall/video/default/initial-video", False),
+        ("/api/v1/recall/video/default/reference-video", False),
+    ],
+)
+def test_video_recall_uploads_share_the_video_upload_bound(path: str, bounded: bool):
+    app = FastAPI()
+    calls: list[str] = []
+
+    @app.post(path)
+    async def route() -> dict[str, bool]:
+        calls.append(path)
+        return {"ok": True}
+
+    client = TestClient(VideoUploadLimitASGIMiddleware(app, max_body_bytes=MAX_BODY, max_concurrent=MAX_CONCURRENT))
+
+    response = client.post(path, content=b"x" * (MAX_BODY + 1))
+
+    assert response.status_code == (413 if bounded else 200)
+    assert calls == ([] if bounded else [path])
+
+
+@pytest.mark.parametrize(
+    "path", ["/api/v1/videos/upload", "/api/v1/recall/video/default/reference-video/upload"], ids=["upload", "recall"]
+)
+def test_a_trailing_encoded_newline_does_not_slip_past_the_bound(path: str):
+    """Starlette's `^...$` route regex matches `/upload\n`, so the bound must match it too."""
+    app = FastAPI()
+    calls: list[str] = []
+
+    @app.post(path)
+    async def route() -> dict[str, bool]:
+        calls.append(path)
+        return {"ok": True}
+
+    client = TestClient(VideoUploadLimitASGIMiddleware(app, max_body_bytes=MAX_BODY, max_concurrent=MAX_CONCURRENT))
+
+    assert client.post(f"{path}%0A", content=b"x" * 10).status_code == 200, "the route must still be reachable"
+    response = client.post(f"{path}%0A", content=b"x" * (MAX_BODY + 1))
+
+    assert response.status_code == 413
+    assert calls == [path]
+
+
+def test_a_path_parameter_that_is_only_a_newline_stays_bounded():
+    """`PUT /projects/%0A` routes with project_id "\n"; stripping the newline must not unbound it."""
+    app = FastAPI()
+    calls: list[str] = []
+
+    @app.put("/api/v1/projects/{project_id}")
+    async def update(project_id: str) -> dict[str, bool]:
+        calls.append(project_id)
+        return {"ok": True}
+
+    client = TestClient(api_app.ProjectWriteLimitASGIMiddleware(app, max_body_bytes=MAX_BODY, max_concurrent=2))
+
+    assert client.put("/api/v1/projects/%0A", content=b"x").status_code == 200, "the route must still be reachable"
+    response = client.put("/api/v1/projects/%0A", content=b"x" * (MAX_BODY + 1))
+
+    assert response.status_code == 413
+    assert calls == ["\n"]
+
+
 def test_concurrency_bound_returns_429():
     app, calls = _build_app()
     middleware = VideoUploadLimitASGIMiddleware(app, max_body_bytes=MAX_BODY, max_concurrent=MAX_CONCURRENT)

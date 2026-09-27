@@ -22,6 +22,8 @@ import {
   getDefaultReferenceClip,
   getDefaultReferenceConditioning,
   getDefaultReferenceImageDetail,
+  getInitialVideoPatch,
+  getReferencesPatch,
   isVideoSettings,
   createVideoConditioningClip,
   isVideoSourceClip,
@@ -1486,5 +1488,40 @@ describe('reference sample window', () => {
       const next = resizeReferenceSampleWindow(clip(50, 199), -5);
       expect([next.startFrame, next.endFrame]).toEqual([50, 50]);
     });
+  });
+});
+
+describe('panel patches shared by the Video panel and gallery/API placement', () => {
+  const clip = createVideoSourceClip({ durationSeconds: 5, fps: 16, height: 480, name: 'clip.mp4', width: 832 });
+  const imageReference: VideoReferenceItem = {
+    detail: 'max',
+    image: { height: 512, image_name: 'ref.png', width: 512 },
+    kind: 'image',
+  };
+
+  it('sets an initial video on a plain panel without touching the references', () => {
+    expect(
+      getInitialVideoPatch({ maxVideos: 0, numFrames: 81, referenceExtend: false, references: [], sourceVideo: clip })
+    ).toEqual({ conditioningClip: null, firstFrameImage: null, sourceVideo: clip });
+  });
+
+  it('clears an initial video without displacing anything', () => {
+    expect(
+      getInitialVideoPatch({ maxVideos: 3, numFrames: 81, referenceExtend: true, references: [], sourceVideo: null })
+    ).toEqual({ references: [], sourceVideo: null });
+  });
+
+  it('lets references displace the initial video only on a panel that does not extend from it', () => {
+    expect(getReferencesPatch({ referenceExtend: false, references: [imageReference] })).toEqual({
+      conditioningClip: null,
+      firstFrameImage: null,
+      lastFrameImage: null,
+      references: [imageReference],
+      sourceVideo: null,
+    });
+    expect(getReferencesPatch({ referenceExtend: true, references: [imageReference] })).not.toHaveProperty(
+      'sourceVideo'
+    );
+    expect(getReferencesPatch({ referenceExtend: false, references: [] })).toEqual({ references: [] });
   });
 });

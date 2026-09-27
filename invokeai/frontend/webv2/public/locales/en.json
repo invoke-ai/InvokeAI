@@ -1197,7 +1197,7 @@
     "installBundle": "Install bundle",
     "installFailed": "Install failed",
     "installFp8Storage": "FP8 storage",
-    "installFp8StorageTooltip": "Store the weights in FP8 to roughly halve VRAM use. Checkpoints that already store FP8 weights get this automatically; GGUF, NF4 and SDNQ models are not affected.",
+    "installFp8StorageTooltip": "Store the weights in FP8 to roughly halve VRAM use. Applied only where the model's loader supports it — a checkpoint that already stores FP8 weights gets it automatically, and models it cannot help (GGUF, NF4 and SDNQ among them) are left alone.",
     "installInPlace": "Install in place",
     "installJobSummary_one": "{{count}} job · no active installs",
     "installJobSummary_other": "{{count}} jobs · no active installs",
@@ -4105,6 +4105,19 @@
       "referenceDetailMax": "Max detail (2048px, slower)",
       "referenceExtendCapFull": "Initial video not set",
       "referenceExtendCapFullDescription": "All 3 video reference slots are in use, so there is no room for the continuity reference this clip needs. Remove a video reference, then drop the clip again.",
+      "placement": {
+        "initialVideoFull": "All video reference slots are in use, so there is no room for the continuity reference this clip needs. Remove a video reference and try again.",
+        "initialVideoSet": "Initial video set",
+        "initialVideoUnused": "The selected video model can't extend a clip, so it won't use this initial video until you choose one that can.",
+        "referenceAdded": "Reference video added",
+        "referenceFull": "All video reference slots are in use. Remove a video reference and try again.",
+        "referenceNotAdded": "Reference video not added",
+        "referenceUnsupported": "The selected video model doesn't take reference videos. Choose one that does, such as MiniMax H3 Ref2VA."
+      },
+      "externalRecall": {
+        "nothingApplied": "Nothing recalled",
+        "nothingAppliedDescription": "None of the recalled settings apply to the Video panel's model."
+      },
       "referenceExtendHelp": "The generated video is appended to this clip at its End Frame, and samples the last ~5 seconds before the cutpoint to achieve video continuity.",
       "referenceImageCapRace": "All {{max}} image reference slots filled while this one was loading, so it was not added.",
       "referenceImageCost": "{{width}}×{{height}} · {{rows}} rows per step",

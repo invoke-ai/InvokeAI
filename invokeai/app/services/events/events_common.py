@@ -925,6 +925,67 @@ class RecallParametersUpdatedEvent(QueueEventBase):
         return cls(queue_id=queue_id, user_id=user_id, parameters=parameters)
 
 
+VideoRecallAction: TypeAlias = Literal["parameters", "initial_video", "reference_video"]
+VideoRecallMode: TypeAlias = Literal["recall", "remix"]
+
+
+class VideoRecallVideo(BaseModel):
+    """The gallery video a video recall places into the Video panel."""
+
+    video_name: str = Field(description="The name of the gallery video")
+    width: int = Field(description="The video's width in pixels")
+    height: int = Field(description="The video's height in pixels")
+    duration: float = Field(description="The video's duration in seconds")
+    fps: Optional[float] = Field(default=None, description="The video's frame rate, when known")
+    media_origin: Optional[str] = Field(
+        default=None, description="How the video entered the gallery, e.g. `audio_upload` for wrapped audio"
+    )
+
+
+@payload_schema.register
+class VideoRecallRequestedEvent(QueueEventBase):
+    """Event model for video_recall_requested"""
+
+    __event_name__ = "video_recall_requested"
+
+    user_id: str = Field(description="The ID of the user whose Video panel the recall targets")
+    action: VideoRecallAction = Field(description="What the frontend should do with the payload")
+    mode: Optional[VideoRecallMode] = Field(
+        default=None, description="For `parameters`: `remix` applies everything except the seed"
+    )
+    strict: bool = Field(
+        default=False,
+        description="For `parameters`: treat the payload as a whole generation record, clearing omitted LoRAs and media",
+    )
+    parameters: Optional[dict[str, Any]] = Field(
+        default=None, description="For `parameters`: recall fields, keyed like the video metadata record"
+    )
+    video: Optional[VideoRecallVideo] = Field(
+        default=None, description="For `initial_video` and `reference_video`: the video to place"
+    )
+
+    @classmethod
+    def build(
+        cls,
+        queue_id: str,
+        user_id: str,
+        action: VideoRecallAction,
+        mode: Optional[VideoRecallMode] = None,
+        strict: bool = False,
+        parameters: Optional[dict[str, Any]] = None,
+        video: Optional[VideoRecallVideo] = None,
+    ) -> "VideoRecallRequestedEvent":
+        return cls(
+            queue_id=queue_id,
+            user_id=user_id,
+            action=action,
+            mode=mode,
+            strict=strict,
+            parameters=parameters,
+            video=video,
+        )
+
+
 class ImageIndexEventBase(EventBase):
     """Base class for image index events"""
 

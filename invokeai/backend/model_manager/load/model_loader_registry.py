@@ -21,6 +21,7 @@ from typing import Callable, Dict, Optional, Tuple, Type, TypeVar
 from invokeai.backend.model_manager.configs.base import Config_Base
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.load import ModelLoaderBase
+from invokeai.backend.model_manager.load.fp8_capability import Fp8StorageDeclaration, declare_fp8_storage
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
 
 
@@ -30,7 +31,11 @@ class ModelLoaderRegistryBase(ABC):
     @classmethod
     @abstractmethod
     def register(
-        cls, type: ModelType, format: ModelFormat, base: BaseModelType = BaseModelType.Any
+        cls,
+        type: ModelType,
+        format: ModelFormat,
+        base: BaseModelType = BaseModelType.Any,
+        fp8_storage: Fp8StorageDeclaration = None,
     ) -> Callable[[Type[ModelLoaderBase]], Type[ModelLoaderBase]]:
         """Define a decorator which registers the subclass of loader."""
 
@@ -64,9 +69,19 @@ class ModelLoaderRegistry(ModelLoaderRegistryBase):
 
     @classmethod
     def register(
-        cls, type: ModelType, format: ModelFormat, base: BaseModelType = BaseModelType.Any
+        cls,
+        type: ModelType,
+        format: ModelFormat,
+        base: BaseModelType = BaseModelType.Any,
+        fp8_storage: Fp8StorageDeclaration = None,
     ) -> Callable[[Type[TModelLoader]], Type[TModelLoader]]:
-        """Define a decorator which registers the subclass of loader."""
+        """Define a decorator which registers the subclass of loader.
+
+        `fp8_storage` is where a loader says it does *not* implement FP8 Storage, as
+        `NotApplicable(reason)` or `Unimplemented(reason)`; the default means it does. The UI derived
+        that from the model type alone, and so offered a control that 19 of its 52 keys ignore --
+        see `fp8_capability.py` for why the answer belongs on this key and nowhere coarser.
+        """
 
         def decorator(subclass: Type[TModelLoader]) -> Type[TModelLoader]:
             key = cls._to_registry_key(base, type, format)
@@ -75,6 +90,7 @@ class ModelLoaderRegistry(ModelLoaderRegistryBase):
                     f"{subclass.__name__} is trying to register as a loader for {base}/{type}/{format}, but this type of model has already been registered by {cls._registry[key].__name__}"
                 )
             cls._registry[key] = subclass
+            declare_fp8_storage(base, type, format, fp8_storage)
             return subclass
 
         return decorator

@@ -11,6 +11,7 @@ from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.controlnet import ControlNet_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Anima_Config
+from invokeai.backend.model_manager.load.fp8_capability import NotApplicable
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import (
@@ -28,13 +29,13 @@ from invokeai.backend.quantization.fp8_scaled import (
     extract_fp8_scaled_layers,
     full_precision_hints_respected,
     parse_quantization_metadata,
-    predict_cast_state_dict_size,
     read_safetensors_metadata,
     reject_quantized_side_channel,
     split_fp8_scaled_layers,
     strip_layer_path_prefix,
     warn_on_unattached_scales,
 )
+from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.state_dict_loading import log_unexpected_keys, reject_incomplete_load
@@ -202,15 +203,15 @@ class AnimaCheckpointModel(ModelLoader):
         # not kept the prediction charges every float at `model_dtype`, folded yet or not, so the
         # number is the same on either side of the fold -- what changes is when the room exists.
         # Building the model first costs nothing: `init_empty_weights` leaves every param on meta.
-        self._ram_cache.make_room(
-            predict_cast_state_dict_size(
-                sd,
-                model_dtype,
-                keep_fp8=keep_fp8,
-                model=model,
-                skip_patterns=skip_patterns,
-                scaled_layers=fp8_layers,
-            )
+        reserve_for_load(
+            self._ram_cache.make_room,
+            sd,
+            model_dtype,
+            keep_fp8=keep_fp8,
+            model=model,
+            skip_patterns=skip_patterns,
+            fp8_layers=fp8_layers,
+            nvfp4_payloads={},
         )
 
         if fp8_layers and not keep_fp8:
@@ -258,7 +259,15 @@ class AnimaCheckpointModel(ModelLoader):
         return model
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.Anima,
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+    fp8_storage=NotApplicable(
+        "an LLLite adapter is 8-66 MB (every one in the starter catalog), so the saving is tens of "
+        "megabytes bought with an upcast on each of its per-Linear modules, every forward"
+    ),
+)
 class AnimaControlNetLLLiteModel(ModelLoader):
     """Class to load Anima ControlNet-LLLite adapter models from safetensors checkpoints.
 

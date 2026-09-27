@@ -84,6 +84,7 @@ vi.mock('./previewHeaderStore', () => ({
 }));
 
 vi.mock('@workbench/widgetState', () => ({
+  getProjectWidgetInstance: () => undefined,
   getProjectWidgetValues: () => ({ filmstripVisible: state.filmstripVisible, metadataOpen: false }),
 }));
 
