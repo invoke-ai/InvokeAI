@@ -567,11 +567,16 @@ class TestMeasuredDecodePeak:
         # 1280^2 sits between the 1024^2 (4570) and 1536^2 (3273) measurements.
         assert self._peak(1280) == 1280 * 1280 * 2 * 4570
 
-    def test_past_the_measured_range_takes_the_largest(self):
-        assert self._peak(3072) == 3072 * 3072 * 2 * 5132
+    def test_past_the_measured_range_takes_the_reservation_constant(self):
+        """Nothing was measured there, so the decision uses the figure the reservation uses -- guessing low would
+        leave a decode larger than anything measured untiled."""
+        assert self._peak(3072) == 3072 * 3072 * 2 * 5500
 
-    def test_a_cuda_card_is_priced_from_the_cuda_measurements(self):
-        assert self._peak(1536, hip=None) == 1536 * 1536 * 2 * 2690
+    @pytest.mark.parametrize("px, constant", [(1024, 2690), (1536, 2671), (1792, 2281), (2048, 2900)])
+    def test_a_cuda_card_is_priced_from_the_cuda_measurements(self, px, constant):
+        """CUDA has its own curve, and its grid stops at 1792px because 2048px ran out of memory when it was
+        measured; past that point the reservation constant takes over rather than the last value seen."""
+        assert self._peak(px, hip=None) == px * px * 2 * constant
 
     def test_the_peak_stays_under_the_reservation(self):
         """The reservation must remain the conservative figure of the two, or it would stop being an upper bound."""

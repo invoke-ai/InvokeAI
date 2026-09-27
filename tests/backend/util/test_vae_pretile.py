@@ -53,7 +53,8 @@ def test_the_pretile_gate_uses_the_memory_the_device_will_keep_resident(monkeypa
     A 16 GiB card whose budget is down to 12.5 GiB pages a 13.3 GiB decode (FLUX.1 at 1408px on
     MIOpen). No out-of-memory error is raised there, so the nodes' tiled retry never fires and the
     generation just crawls. Measured against the card total the decode looks fine (13.3 < 14.4 GiB),
-    so it is not tiled.
+    so it is not tiled. With no adapter-wide reading available this is the budget's own case; the
+    tests below cover what the gate does when it can tell whose memory it is.
     """
     total_bytes = 16 * 2**30
     budget_bytes = int(12.5 * 2**30)
@@ -67,6 +68,8 @@ def test_the_pretile_gate_uses_the_memory_the_device_will_keep_resident(monkeypa
     # `TorchDevice.cuda_mem_get_info` and one calling `wddm.video_memory_budget` are both covered.
     monkeypatch.setattr("invokeai.backend.util.devices.video_memory_budget", lambda device: budget_bytes)
     monkeypatch.setattr("invokeai.backend.util.wddm.video_memory_budget", lambda device: budget_bytes)
+    # Without this the gate reads the real card here, and any foreign usage below ~1.2 GiB flips the case.
+    monkeypatch.setattr("invokeai.backend.util.wddm.other_process_local_bytes", lambda device: None)
 
     assert estimate < VAE_PRETILE_VRAM_FRACTION * total_bytes, "test shape must look fine against the card total"
     assert estimate > budget_bytes, "test shape must exceed what Windows would keep resident"
@@ -74,17 +77,48 @@ def test_the_pretile_gate_uses_the_memory_the_device_will_keep_resident(monkeypa
     assert should_pretile_vae_decode(torch.device("cuda", 0), estimate) is True
 
 
-def test_the_gate_counts_memory_this_process_can_still_release(monkeypatch):
-    """Windows halves the budget once the process passes about 12 of 16 GiB, i.e. below what it already holds. The
-    cache evicts models for the reservation, so the ceiling is the budget plus this process's own allocations --
-    measured: comparing against the bare budget tiled a 7.0 GiB Z-Image decode against a 6.9 GiB line mid-session,
-    changing output that had been pixel-identical."""
+def test_a_budget_trimmed_by_our_own_residency_does_not_tile_a_decode_that_fits(monkeypatch):
+    """Windows trims the budget when the process itself grows -- measured on an RX 9060 XT, 15.09 GiB until it passes
+    about 12 of 16 GiB, then 7.62. The cache evicts those models for the reservation, so a decode that fits must not
+    be tiled on that reading: it tiled a 7.0 GiB Z-Image decode against a 6.9 GiB line mid-session, which changed
+    output that had been pixel-identical."""
     total_bytes = 16 * 2**30
     estimate = 7 * 2**30
 
     monkeypatch.setattr("torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes))
-    # Mid-session: 12 GiB of models resident, and Windows has trimmed the budget to 7.6 GiB in response.
+    # 12 GiB of our own models resident, and nothing else on the card.
     monkeypatch.setattr("torch.cuda.mem_get_info", lambda device: (4 * 2**30, total_bytes))
     monkeypatch.setattr("invokeai.backend.util.wddm.video_memory_budget", lambda device: int(7.6 * 2**30))
+    monkeypatch.setattr("invokeai.backend.util.wddm.other_process_local_bytes", lambda device: 0)
 
     assert should_pretile_vae_decode(torch.device("cuda", 0), estimate) is False
+
+
+def test_another_process_holding_the_card_tiles_even_while_the_budget_looks_fine(monkeypatch):
+    """The case the budget does not answer: measured with another program holding 8 GiB and Invoke idle, the budget
+    still read 15.09 GiB although only ~7.7 GiB could be had. Evicting Invoke's own models cannot recover memory it
+    does not hold, so a 8.9 GiB Qwen-Image decode has to be tiled here."""
+    total_bytes = 16 * 2**30
+    estimate = int(8.9 * 2**30)
+
+    monkeypatch.setattr("torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes))
+    # Invoke holds almost nothing; torch's free figure does not see the other process at all.
+    monkeypatch.setattr("torch.cuda.mem_get_info", lambda device: (total_bytes - 2**28, total_bytes))
+    monkeypatch.setattr("invokeai.backend.util.wddm.video_memory_budget", lambda device: int(15.09 * 2**30))
+    monkeypatch.setattr("invokeai.backend.util.wddm.other_process_local_bytes", lambda device: 8 * 2**30)
+
+    assert estimate < VAE_PRETILE_VRAM_FRACTION * total_bytes, "the card total and the budget both look fine"
+    assert should_pretile_vae_decode(torch.device("cuda", 0), estimate) is True
+
+
+def test_the_budget_is_the_fallback_when_the_counters_cannot_answer(monkeypatch):
+    """No adapter-wide figure means no way to tell whose memory it is; the budget is then the conservative answer."""
+    total_bytes = 16 * 2**30
+    estimate = 7 * 2**30
+
+    monkeypatch.setattr("torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes))
+    monkeypatch.setattr("torch.cuda.mem_get_info", lambda device: (4 * 2**30, total_bytes))
+    monkeypatch.setattr("invokeai.backend.util.wddm.video_memory_budget", lambda device: int(7.6 * 2**30))
+    monkeypatch.setattr("invokeai.backend.util.wddm.other_process_local_bytes", lambda device: None)
+
+    assert should_pretile_vae_decode(torch.device("cuda", 0), estimate) is True

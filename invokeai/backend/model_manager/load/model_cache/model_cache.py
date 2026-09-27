@@ -2557,8 +2557,12 @@ class ModelCache:
         # Under expandable segments the measurement credits no allocator-held blocks, so an offload
         # only shows up once empty_cache() unmaps its pages; without it every unlocked model would
         # be unloaded by the full shortfall. When a peer device is mid-session that release is
-        # deferred, and the bytes just freed are credited to the measurement instead -- they sit in
-        # this process's allocator, which reuses them for the load this is making room for.
+        # deferred, and the bytes just freed are credited to the measurement instead. That credit is
+        # the same optimistic figure `_get_reclaimable_allocator_bytes` refuses to grant -- the
+        # allocator holds those bytes, but a large contiguous allocation may not be servable from
+        # them -- so it is deliberately loop-local: it stops this loop offloading everything, and
+        # the load that follows re-measures for itself (`lock`, `make_room_in_vram`) and streams
+        # from RAM if the room did not materialize.
         empty_cache_per_offload = _expandable_segments_enabled()
         vram_bytes_freed_uncounted = 0
         # TODO(ryand): Give more thought to the offloading policy used here.

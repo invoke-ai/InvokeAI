@@ -14,10 +14,23 @@ _ALLOCATOR_ENV_VARS = ("PYTORCH_ALLOC_CONF", "PYTORCH_CUDA_ALLOC_CONF", "PYTORCH
 
 
 @pytest.fixture
-def rocm_windows(monkeypatch: pytest.MonkeyPatch):
-    """A Windows ROCm install with no allocator configuration in the environment."""
+def rocm_windows(monkeypatch: pytest.MonkeyPatch, tmp_path):
+    """A Windows ROCm install with no allocator configuration in the environment.
+
+    `_installed_torch_is_rocm` has two sources -- the distribution version and `hip` in torch's own `version.py` --
+    so both are stubbed. Leaving the file lookup real made every case that expects "not ROCm" read the host's torch
+    and fail on any ROCm developer machine, which is this change's own test bench.
+    """
     monkeypatch.setattr(sys, "platform", "win32")
     monkeypatch.setattr(torch_cuda_allocator, "_installed_torch_version", lambda: "2.12.0+rocm7.14.1")
+    cuda_build = tmp_path / "torch"
+    cuda_build.mkdir()
+    (cuda_build / "version.py").write_text("hip: Optional[str] = None\n", encoding="utf-8")
+    monkeypatch.setattr(
+        torch_cuda_allocator.importlib.util,
+        "find_spec",
+        lambda name: SimpleNamespace(submodule_search_locations=[str(cuda_build)]),
+    )
     monkeypatch.delitem(sys.modules, "torch")  # as at startup, before anything imports it
     for var in _ALLOCATOR_ENV_VARS:
         # setenv first so teardown also removes what the code under test sets: delenv on an absent

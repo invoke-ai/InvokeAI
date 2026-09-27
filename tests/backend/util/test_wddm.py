@@ -26,13 +26,15 @@ def _luid_low(handle: int) -> int:
 
 
 class _FakePdh:
-    """A PDH that reports the given ``GPU Process Memory`` instances' shared usage."""
+    """A PDH with the module's two counters: per-process shared usage, and adapter-wide dedicated usage."""
 
-    def __init__(self, instances: dict[str, int]):
+    def __init__(self, instances: dict[str, int], adapter_instances: dict[str, int] | None = None):
         self.instances = instances
+        self.adapter_instances = adapter_instances or {}
         self.counter_paths: list[str] = []
         self.closed = 0
         self._alive: list[object] = []
+        self._by_handle: dict[int, dict[str, int]] = {}
 
     def PdhOpenQueryW(self, source, user_data, query_ref):
         query_ref._obj.value = 1
@@ -40,20 +42,23 @@ class _FakePdh:
 
     def PdhAddEnglishCounterW(self, query, path, user_data, counter_ref):
         self.counter_paths.append(path)
-        counter_ref._obj.value = 2
+        handle = 2 + len(self.counter_paths)
+        counter_ref._obj.value = handle
+        self._by_handle[handle] = self.adapter_instances if "Adapter" in path else self.instances
         return 0
 
     def PdhCollectQueryData(self, query):
         return 0
 
     def PdhGetFormattedCounterArrayW(self, counter, fmt, size_ref, count_ref, buffer):
-        count = len(self.instances)
+        instances = self._by_handle[counter.value if hasattr(counter, "value") else counter]
+        count = len(instances)
         if buffer is None:
             size_ref._obj.value = ctypes.sizeof(wddm._PdhCounterValueItem) * count
             count_ref._obj.value = count
             return wddm._PDH_MORE_DATA
         items = (wddm._PdhCounterValueItem * count).from_buffer(buffer)
-        for item, (name, value) in zip(items, self.instances.items(), strict=True):
+        for item, (name, value) in zip(items, instances.items(), strict=True):
             item.szName = name
             item.FmtValue.largeValue = value
         self._alive.append(items)  # the name buffers live as long as the array object
@@ -205,10 +210,45 @@ def test_paged_bytes_reads_this_process_on_the_devices_adapter(windows_rocm, mon
 
     assert wddm.paged_bytes(DEVICE) == 3 * GIB
     assert wddm.paged_bytes(DEVICE) == 3 * GIB
-    assert pdh.counter_paths == [r"\GPU Process Memory(*)\Shared Usage"], "one query, opened on first use"
+    assert pdh.counter_paths == [
+        r"\GPU Process Memory(*)\Shared Usage",
+        r"\GPU Adapter Memory(*)\Dedicated Usage",
+    ], "one query with both counters, opened on first use"
 
     wddm.reset_cache()
     assert pdh.closed == 1
+
+
+def _adapter_instance(handle: int) -> str:
+    return f"luid_0x00000000_0x{_luid_low(handle):08x}_phys_0"
+
+
+@pytest.mark.parametrize(
+    ("adapter_gib", "ours_gib", "expected_gib"),
+    [(8.4, 0.2, 8.2), (12.2, 12.1, 0.0), (0.2, 6.0, 0.0)],
+    ids=["another-process-holds-the-card", "all-of-it-is-ours", "adapter-reads-below-our-own"],
+)
+def test_other_process_local_bytes_subtracts_our_own_usage(
+    windows_rocm, monkeypatch, adapter_gib, ours_gib, expected_gib
+):
+    """What bounds a decode is what OTHER processes hold: the budget does not track them (measured 15.09 GiB next to
+    an 8 GiB holder), and the per-process PDH counter swapped its instances while two processes shared the card, so
+    this comes from the adapter-wide figure minus torch's own-usage view. A reading below our own clamps to zero."""
+    windows_rocm(_FakeGdi32([(20, OUR_BUS, OUR_DEVICE)]))
+    total = 16 * GIB
+    pdh = _FakePdh({}, adapter_instances={_adapter_instance(20): int(adapter_gib * GIB)})
+    monkeypatch.setattr(wddm, "_load_pdh", functools.lru_cache(maxsize=1)(lambda: pdh))
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (total - int(ours_gib * GIB), total))
+
+    assert wddm.other_process_local_bytes(DEVICE) == pytest.approx(int(expected_gib * GIB), abs=GIB // 10)
+
+
+def test_other_process_local_bytes_is_unknown_without_an_adapter_reading(windows_rocm, monkeypatch):
+    windows_rocm(_FakeGdi32([(20, OUR_BUS, OUR_DEVICE)]))
+    pdh = _FakePdh({}, adapter_instances={_adapter_instance(21): 8 * GIB})  # a different adapter
+    monkeypatch.setattr(wddm, "_load_pdh", functools.lru_cache(maxsize=1)(lambda: pdh))
+
+    assert wddm.other_process_local_bytes(DEVICE) is None
 
 
 def test_paged_bytes_is_unknown_before_this_process_used_the_adapter(windows_rocm, monkeypatch):
