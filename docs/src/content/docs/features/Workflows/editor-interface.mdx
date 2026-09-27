@@ -3,7 +3,7 @@ title: Editor Interface
 description: Learn how to use the Workflow Editor in InvokeAI.
 sidebar:
   order: 2
-lastUpdated: 2026-02-20
+lastUpdated: 2026-09-26
 ---
 
 import { Card, CardGrid, Steps, Tabs, TabItem } from '@astrojs/starlight/components';
@@ -18,17 +18,26 @@ If you're not familiar with Diffusion, take a look at our [Diffusion Overview](.
 
 ## Features
 
-<Card title="Workflow Library" icon="open-book">
-  Save workflows to the Invoke database, allowing you to easily create, modify, and share workflows as needed. A curated set of default workflows is provided to help explain important node usage.
+:::note[Changed: the library no longer autosaves]
+Earlier releases wrote every edit of a workflow opened from the library straight back to that library entry. Workflows now belong to the project they are in and autosave there; the library changes only when you choose **Save to library…** or **Update library template**. If you relied on library autosave, save to the library explicitly when a workflow is ready to reuse.
+:::
+
+<Card title="Project Workflows and the Library" icon="open-book">
+  Each project owns its workflows. Everything you do in the editor autosaves with the project, alongside its canvas and settings, and every workflow keeps its own undo history for the session. The workflow library is a separate place for reusable templates: a curated set of bundled workflows plus the templates you save yourself.
 
   ![Workflow Library](./assets/workflow_library.png)
 
-  The library has two views:
+  Click the workflow name in the editor header to open the **Workflows** dialog. It has three views:
 
-  - **Browse Workflows** lists curated default workflows, filterable by a fixed set of category tags.
-  - **Your Workflows** lists workflows you have saved. The tag filter here is **dynamic** — it shows every unique tag found across your own workflows, with a count per tag.
+  - **This project** lists the workflows saved with the current project, with the active one marked. Open, rename, duplicate or remove them here, start a **New workflow**, or choose **Add workflow** to bring in a template. The active workflow can also be renamed from the editor header's **Workflow actions** menu.
+  - **Browse** lists curated bundled templates, filterable by a fixed set of category tags.
+  - **Yours** lists templates you have saved; each can be renamed, duplicated, downloaded or deleted from its card menu, opened from the **⋯** button beside the title or with a right-click. The tag filter here is **dynamic** — it shows every unique tag found across your own templates, with a count per tag.
 
-  Add comma-separated tags to a workflow (e.g. `portrait, SDXL, upscaling`) when saving it. The tags appear at the bottom of each workflow tile in the library and become selectable filters in the sidebar. Click one or more tags to narrow the list; click **Your Workflows** to clear the filter and show everything again. Tag counts update automatically when you create, edit, or delete a workflow.
+  Opening a template adds an independent copy to your project; the template itself is untouched. If the project already has a copy, **Open project copy** switches to it, and **Add another copy** makes a second one.
+
+  Editing or running a project workflow never changes the library. To publish, use **Save to library…** in the editor header: it creates a new template with the name you enter, using the workflow's current graph, form and input values as the template's defaults. A copy opened from one of your own templates can also **Update library template** explicitly; that replaces the template's content while the template and the project workflow each keep their own name. Because a template may have changed since you opened it, an update is checked against the revision you last saw; if the template moved on, you can save as new instead, or review the current template and replace it deliberately. Replacing a template affects workflows that call it through **Call Saved Workflow**.
+
+  Add comma-separated tags to a workflow (e.g. `portrait, SDXL, upscaling`) in its details. The tags appear at the bottom of each tile in the library and become selectable filters in the sidebar. Click one or more tags to narrow the list; click **Yours** to clear the filter and show everything again.
 </Card>
 <Card title="Linear View" icon="list-format">
   Create a custom UI for your workflow, making it easier to iterate on your generations. The Linear UI View is saved alongside the workflow, allowing you to share workflows and enable others to use them.

@@ -15,7 +15,9 @@ export const describeRefusedProject = (refused: RefusedWorkbenchProject, t: TFun
   return {
     message:
       refused.source === 'project-document'
-        ? t('projects.load.unsupportedVersion', { name })
+        ? t(refused.refusal.status === 'malformed' ? 'projects.load.malformed' : 'projects.load.unsupportedVersion', {
+            name,
+          })
         : refused.refusal.status === 'unsupported-version'
           ? t(
               refused.refusal.version < MIN_SUPPORTED_CANVAS_SCHEMA_VERSION

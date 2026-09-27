@@ -261,6 +261,7 @@ const createHarness = (options: { galleryRefreshCoalesceMs?: number } = {}): Har
     completed: vi.fn(),
     failed: vi.fn(),
     progress: vi.fn(),
+    setOrigin: vi.fn(),
     settleRunning: vi.fn(),
     started: vi.fn(),
   };
@@ -1875,6 +1876,47 @@ describe('queueCoordinator', () => {
 
     harness.coordinator.detachRun('local-2');
     expect(harness.nodeExecution.settleRunning).toHaveBeenLastCalledWith(new Set(['node-1']), 'canceled');
+  });
+
+  it('names the project workflow a run came from when its nodes start, and forgets it for unattributed runs', async () => {
+    harness.api.enqueueWorkflow
+      .mockResolvedValueOnce({ batchId: 'batch-1', enqueued: 1, itemIds: [1], requested: 1 })
+      .mockResolvedValueOnce({ batchId: 'batch-2', enqueued: 1, itemIds: [2], requested: 1 });
+    harness.coordinator.connect();
+    await harness.coordinator.submitWorkflow('local-1', workflowRequest, {
+      projectId: 'project-1',
+      workflowId: 'wf-a',
+    });
+    await harness.coordinator.submitWorkflow('local-2', { ...workflowRequest, sourceQueueItemId: 'local-2' });
+
+    harness.socket.fire('invocation_started', { ...createStatusEvent({ item_id: 1 }), invocation_source_id: 'node-1' });
+    expect(harness.nodeExecution.setOrigin).toHaveBeenLastCalledWith({ projectId: 'project-1', workflowId: 'wf-a' });
+
+    // A second copy with the same node id starts: the store is cleared and re-attributed before its state lands.
+    harness.socket.fire('invocation_started', { ...createStatusEvent({ item_id: 2 }), invocation_source_id: 'node-1' });
+    expect(harness.nodeExecution.clearAll).toHaveBeenCalled();
+    expect(harness.nodeExecution.setOrigin).toHaveBeenLastCalledWith(null);
+  });
+
+  it('attributes reconciled runs from their recorded origin', async () => {
+    harness.api.getItem.mockResolvedValue(
+      createQueueBackendItem({ id: 7, origin: buildQueueItemOrigin('local-7', 'project-1'), status: 'in_progress' })
+    );
+    harness.coordinator.connect();
+    await harness.coordinator.reconcile([
+      {
+        backendBatchId: 'batch-1',
+        backendItemIds: [7],
+        id: 'local-7',
+        origin: { projectId: 'project-1', workflowId: 'wf-b' },
+        projectId: 'project-1',
+        status: 'running',
+      },
+    ]);
+
+    harness.socket.fire('invocation_started', { ...createStatusEvent({ item_id: 7 }), invocation_source_id: 'node-1' });
+
+    expect(harness.nodeExecution.setOrigin).toHaveBeenLastCalledWith({ projectId: 'project-1', workflowId: 'wf-b' });
   });
 
   it('preserves a root failure when queue status precedes the root invocation error', async () => {

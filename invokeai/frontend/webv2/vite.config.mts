@@ -102,6 +102,27 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/workbench/shell/topbar/ProjectSwitcher.tsx',
 ] as const;
 
+// The workflow core, its UI barrel and the project workflow collection are one chunk: the editor boots with all of
+// them and the Launchpad palette reaches the barrel lazily, so splitting them by importer only adds requests.
+const WORKFLOW_CORE_MODULES = [
+  '/features/workflow/core/batch.ts',
+  '/features/workflow/core/callSavedWorkflow.ts',
+  '/features/workflow/core/connectors.ts',
+  '/features/workflow/core/document.ts',
+  '/features/workflow/core/fields.ts',
+  '/features/workflow/core/forLoops.ts',
+  '/features/workflow/core/graphIndex.ts',
+  '/features/workflow/core/types.ts',
+  '/features/workflow/core/validation.ts',
+  '/features/workflow/core/workflowJson.ts',
+  '/features/workflow/data/templates.ts',
+  '/features/workflow/react.ts',
+  '/features/workflow/ui/WorkflowUiContext.tsx',
+  '/features/workflow/ui/workflowUiStore.ts',
+  '/features/workflow/utility.ts',
+  '/workbench/projectWorkflows.ts',
+] as const;
+
 // Keep widget metadata separate so Launchpad settings cannot import editor boot UI.
 const WIDGET_METADATA_MODULES = [
   '/features/gallery/settingsContribution.ts',
@@ -283,6 +304,12 @@ export default defineConfig({
               name: 'editor-boot-shared',
               priority: 30,
               test: (id) => matchesAnySuffix(id, EDITOR_BOOT_SHARED_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'workflow-core',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, WORKFLOW_CORE_MODULES),
             },
             {
               includeDependenciesRecursively: false,

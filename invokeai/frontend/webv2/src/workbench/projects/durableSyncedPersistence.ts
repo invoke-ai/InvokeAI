@@ -60,9 +60,10 @@ import { createAccountOwnedProjectDraftStore } from './indexedDbDraftStore';
 import { seedProjectLibrary, upsertProjectSummary } from './library';
 import { selectCoverImageName } from './projectAssets';
 import {
-  PROJECT_DOCUMENT_SCHEMA_VERSION,
+  migrateProjectDocument,
   PROJECT_DOCUMENT_MAX_BYTES,
-  serializeProjectDocumentV2Json,
+  PROJECT_DOCUMENT_SCHEMA_VERSION,
+  serializeProjectDocumentV3Json,
 } from './projectDocument';
 import { assertProjectFlushed, ProjectFlushError } from './projectFlush';
 import { deserializeProjectDocument, deserializeProjectRecord } from './projectHydration';
@@ -287,7 +288,7 @@ const toSnapshot = (state: WorkbenchState, savedAt: string): HydratedWorkbenchSn
 const recordDocumentJson = (record: ProjectRecordDTO): string | null => {
   const loaded = deserializeProjectRecord(record);
 
-  return loaded.status === 'loaded' ? serializeProjectDocumentV2Json(loaded.project).documentJson : null;
+  return loaded.status === 'loaded' ? serializeProjectDocumentV3Json(loaded.project).documentJson : null;
 };
 
 const toProjectSummary = (record: ProjectRecordDTO): ProjectSummaryDTO => ({
@@ -832,7 +833,7 @@ export const createDurableSyncedWorkbenchPersistence = (
 
   const createProjectSavePlan = (inputProject: Project) => {
     const project = resolveInputProject(inputProject);
-    const serialized = serializeProjectDocumentV2Json(project);
+    const serialized = serializeProjectDocumentV3Json(project);
     const entry = syncEntries.get(project.id);
     const existingDraft = volatileDrafts.get(project.id);
     const needsDocumentUpgrade = projectsRequiringDocumentUpgrade.has(project.id);
@@ -850,7 +851,7 @@ export const createDurableSyncedWorkbenchPersistence = (
 
   const stageProject = async (
     project: Project,
-    serialized: ReturnType<typeof serializeProjectDocumentV2Json> = serializeProjectDocumentV2Json(project)
+    serialized: ReturnType<typeof serializeProjectDocumentV3Json> = serializeProjectDocumentV3Json(project)
   ) => {
     const store = await getDraftStore();
     const session = await getEditorSessionForService();
@@ -1455,7 +1456,7 @@ export const createDurableSyncedWorkbenchPersistence = (
     project: Project,
     store: ProjectDraftStore
   ): Promise<ProjectDraft> => {
-    const serialized = serializeProjectDocumentV2Json(project);
+    const serialized = serializeProjectDocumentV3Json(project);
     if (draft.documentJson === serialized.documentJson) {
       clearLocalDraftFailure(projectDraftFailureKey(project.id));
       volatileDrafts.set(project.id, draft);
@@ -1600,9 +1601,13 @@ export const createDurableSyncedWorkbenchPersistence = (
       const localProject = withAuthoritativeProjectBoard(loadedDraft.project, record.board_id);
       loadedDraft.draft = await alignLoadedDraftWithProject(loadedDraft.draft, localProject, store);
       const refusal: ProjectSchemaRefusal =
-        result.status === 'refused' && result.refused.source === 'project-document'
+        result.status === 'refused' &&
+        result.refused.source === 'project-document' &&
+        result.refused.refusal.status === 'unsupported-version'
           ? toDocumentSchemaRefusal(result.refused.refusal.version)
-          : result.status === 'refused' && result.refused.refusal.status === 'unsupported-version'
+          : result.status === 'refused' &&
+              result.refused.source === 'canvas' &&
+              result.refused.refusal.status === 'unsupported-version'
             ? toCanvasSchemaRefusal({
                 maxCanvasSchemaVersion: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
                 minimumCanvasSchemaVersion: result.refused.refusal.version,
@@ -1623,7 +1628,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       return { project: localProject, status: 'loaded' };
     }
 
-    const serverJson = serializeProjectDocumentV2Json(result.project).documentJson;
+    const serverJson = serializeProjectDocumentV3Json(result.project).documentJson;
     syncEntries.set(projectId, {
       minimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
       pushedDoc: serverJson,
@@ -1703,7 +1708,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       if (result.status === 'loaded') {
         syncEntries.set(record.project_id, {
           minimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
-          pushedDoc: serializeProjectDocumentV2Json(result.project).documentJson,
+          pushedDoc: serializeProjectDocumentV3Json(result.project).documentJson,
           revision: record.revision,
         });
         conflicts.delete(record.project_id);
@@ -2213,9 +2218,11 @@ export const createDurableSyncedWorkbenchPersistence = (
               const localProject = withAuthoritativeProjectBoard(loadedDraft.project, record.board_id);
               loadedDraft.draft = await alignLoadedDraftWithProject(loadedDraft.draft, localProject, store);
               const refusal: ProjectSchemaRefusal =
-                serverLoad.refused.source === 'project-document'
+                serverLoad.refused.source === 'project-document' &&
+                serverLoad.refused.refusal.status === 'unsupported-version'
                   ? toDocumentSchemaRefusal(serverLoad.refused.refusal.version)
-                  : serverLoad.refused.refusal.status === 'unsupported-version'
+                  : serverLoad.refused.source === 'canvas' &&
+                      serverLoad.refused.refusal.status === 'unsupported-version'
                     ? toCanvasSchemaRefusal({
                         maxCanvasSchemaVersion: MAX_SUPPORTED_CANVAS_SCHEMA_VERSION,
                         minimumCanvasSchemaVersion: serverLoad.refused.refusal.version,
@@ -2239,7 +2246,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           if (serverLoad.status !== 'loaded') {
             return;
           }
-          const serverJson = serializeProjectDocumentV2Json(serverLoad.project).documentJson;
+          const serverJson = serializeProjectDocumentV3Json(serverLoad.project).documentJson;
           syncEntries.set(projectId, {
             minimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
             pushedDoc: serverJson,
@@ -2485,7 +2492,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       let handedOffMutationLock = false;
       return enqueue(async () => {
         const projectId = inputProject.id;
-        const currentDocument = serializeProjectDocumentV2Json(inputProject);
+        const currentDocument = serializeProjectDocumentV3Json(inputProject);
         let owned = await requireDraft(projectId);
         if (
           owned.draft.documentJson !== currentDocument.documentJson &&
@@ -2551,7 +2558,12 @@ export const createDurableSyncedWorkbenchPersistence = (
               ].join('\u0000')
             );
             const name = `${sourceProjectName} (copy)`;
-            const document = { ...sourceDocument, id: copyProjectId, name };
+            // A draft staged by an older client copies forward in the current schema.
+            const migratedSource = migrateProjectDocument(sourceDocument);
+            if (migratedSource.status === 'malformed') {
+              throw new Error('The project draft cannot be copied: its document is malformed.');
+            }
+            const document = { ...migratedSource.document, id: copyProjectId, name };
             const documentJson = JSON.stringify(document);
             const documentByteSize = getUtf8ByteSize(documentJson);
             if (documentByteSize > PROJECT_DOCUMENT_MAX_BYTES) {
@@ -2598,7 +2610,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           getUtf8ByteSize(reservation.copyDocumentJson) !== reservation.copyDocumentByteSize ||
           document.id !== copyProjectId ||
           document.name !== name ||
-          document.documentSchemaVersion !== PROJECT_DOCUMENT_SCHEMA_VERSION
+          migrateProjectDocument(document).status === 'malformed'
         ) {
           throw new Error('The reserved project copy is damaged.');
         }
@@ -2754,7 +2766,7 @@ export const createDurableSyncedWorkbenchPersistence = (
           return result;
         }
         await deleteDraft(projectId);
-        const documentJson = serializeProjectDocumentV2Json(result.project).documentJson;
+        const documentJson = serializeProjectDocumentV3Json(result.project).documentJson;
         syncEntries.set(projectId, {
           minimumCanvasSchemaVersion: record.minimum_canvas_schema_version,
           pushedDoc: documentJson,

@@ -19,7 +19,7 @@ import {
 import { useTranslation } from 'react-i18next';
 
 import { deleteLibraryProject, refreshProjectLibrary } from './library';
-import { serializeProjectDocumentV2Json } from './projectDocument';
+import { serializeProjectDocumentV3Json } from './projectDocument';
 import { describeRefusedProject } from './projectLoadRefusal';
 
 const CLOSE_FLUSH_ATTEMPTS = 3;
@@ -143,7 +143,7 @@ export const useProjectActions = (): {
         }
         if (
           outcome.kind === 'acknowledged' &&
-          serializeProjectDocumentV2Json(queries.getProject(project.id) ?? current).documentJson !==
+          serializeProjectDocumentV3Json(queries.getProject(project.id) ?? current).documentJson !==
             outcome.documentJson
         ) {
           continue;

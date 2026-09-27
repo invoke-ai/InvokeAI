@@ -67,7 +67,14 @@ const readyEnrichment = (): WorkflowLibraryEntryEnrichment => ({
 
 const entry = (workflowId: string, enrichment: WorkflowLibraryEntryEnrichment): WorkflowLibraryEntry => ({
   enrichment,
-  item: { category: 'user', description: '', name: workflowId, thumbnail_url: null, workflow_id: workflowId },
+  item: {
+    category: 'user',
+    description: '',
+    name: workflowId,
+    revision: 1,
+    thumbnail_url: null,
+    workflow_id: workflowId,
+  },
   tags: [],
 });
 

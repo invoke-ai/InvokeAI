@@ -55,6 +55,7 @@ const buildWorkflowResponse = (overrides?: {
     opened_at: null,
     user_id: 'user-1',
     is_public: false,
+    revision: 1,
     thumbnail_url: null,
     workflow: {
       id: 'workflow-1',

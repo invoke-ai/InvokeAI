@@ -172,20 +172,47 @@ const preferencesSnapshot = {
   workflowSnapToGrid: false,
   workflowValidateConnections: true,
 };
-const projectSnapshot = {
+const PROJECT_ID = 'project-1';
+const projectSnapshotFor = (graph: ProjectGraphState) => ({
+  activeWorkflow: { document: graph },
+  activeWorkflowId: graph.id,
   galleryValues: {},
-  id: 'project-1',
+  id: PROJECT_ID,
   isWorkflowRunning: false,
-  projectGraph,
+  projectGraph: graph,
   workflowValues: {},
-};
+  workflows: [{ document: graph }],
+});
+const projectSnapshot = projectSnapshotFor(projectGraph);
 
-const createAdapter = (nodeExecution: WorkflowUiAdapter['nodeExecution']): WorkflowUiAdapter =>
+/** Execution ports report this editor's own workflow as the run's origin, so node state is shown. */
+const withOrigin = (
+  port: Pick<WorkflowUiAdapter['nodeExecution'], 'get' | 'subscribe'>
+): WorkflowUiAdapter['nodeExecution'] => ({
+  ...port,
+  getOrigin: () => ({ projectId: PROJECT_ID, workflowId: projectGraph.id }),
+  subscribeOrigin: () => () => {},
+});
+
+const createAdapter = (
+  nodeExecution: Pick<WorkflowUiAdapter['nodeExecution'], 'get' | 'subscribe'>
+): WorkflowUiAdapter =>
   ({
     capabilities: { getSnapshot: () => ({ canUseCache: true }), subscribe: () => () => {} },
-    commands: { bindLibraryWorkflow: vi.fn(), editGraph: vi.fn(), redo: vi.fn(), replace: vi.fn(), undo: vi.fn() },
+    commands: {
+      addWorkflow: vi.fn(),
+      createWorkflow: vi.fn(),
+      duplicateWorkflow: vi.fn(),
+      editGraph: vi.fn(),
+      redo: vi.fn(),
+      removeWorkflow: vi.fn(),
+      renameWorkflow: vi.fn(),
+      selectWorkflow: vi.fn(),
+      setWorkflowSource: vi.fn(),
+      undo: vi.fn(),
+    },
     getProjectGraph: () => projectGraph,
-    nodeExecution,
+    nodeExecution: withOrigin(nodeExecution),
     notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
     openAddModels: vi.fn(),
     performance: {
@@ -534,18 +561,13 @@ describe('InvocationFlowNode field entry', () => {
 
   const renderEntryNode = async () => {
     const store = createGraphStore({ ...createProjectGraph('entry-test'), nodes: [entryNode] });
+    const base = createAdapter({ get: () => null, subscribe: () => () => {} });
     const adapter = {
-      ...createAdapter({ get: () => null, subscribe: () => () => {} }),
-      commands: {
-        bindLibraryWorkflow: vi.fn(),
-        editGraph: store.editGraph,
-        redo: vi.fn(),
-        replace: vi.fn(),
-        undo: store.undo,
-      },
+      ...base,
+      commands: { ...base.commands, editGraph: store.editGraph, undo: store.undo },
       getProjectGraph: store.getSnapshot,
       project: {
-        getSnapshot: () => ({ ...projectSnapshot, projectGraph: store.getSnapshot() }),
+        getSnapshot: () => projectSnapshotFor(store.getSnapshot()),
         subscribe: store.subscribe,
       },
     } as unknown as WorkflowUiAdapter;

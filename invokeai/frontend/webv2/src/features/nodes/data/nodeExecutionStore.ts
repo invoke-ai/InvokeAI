@@ -6,7 +6,7 @@ import type {
 
 import { getFirstOutputImageName } from '@platform/core/outputImages';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
-import { createKeyedTransientStore } from '@platform/state/externalStore';
+import { createExternalStore, createKeyedTransientStore } from '@platform/state/externalStore';
 
 import { browserNodesDataPort } from './transport';
 
@@ -32,11 +32,33 @@ export interface NodeExecutionState {
   error: string | null;
 }
 
+/** The project workflow whose run the store reflects; editors showing another copy ignore the node states. */
+export interface NodeExecutionOrigin {
+  projectId: string;
+  workflowId: string;
+}
+
 const stateByNodeId = createKeyedTransientStore<string, NodeExecutionState>();
+const originStore = createExternalStore<{ origin: NodeExecutionOrigin | null }>({ origin: null });
 
 export const nodeExecutionStore = {
   clearAll(): void {
     stateByNodeId.clear();
+    if (originStore.getSnapshot().origin !== null) {
+      originStore.setSnapshot({ origin: null });
+    }
+  },
+  getOrigin(): NodeExecutionOrigin | null {
+    return originStore.getSnapshot().origin;
+  },
+  setOrigin(origin: NodeExecutionOrigin | null): void {
+    const current = originStore.getSnapshot().origin;
+    if (current?.projectId !== origin?.projectId || current?.workflowId !== origin?.workflowId) {
+      originStore.setSnapshot({ origin });
+    }
+  },
+  subscribeOrigin(listener: () => void): () => void {
+    return originStore.subscribe(listener);
   },
   get(nodeId: string): NodeExecutionState | null {
     return stateByNodeId.get(nodeId) ?? null;
@@ -128,6 +150,9 @@ export interface NodeExecutionSink {
   completed(event: NodeInvocationCompleteEvent): void;
   failed(event: NodeInvocationErrorEvent): void;
   get(nodeId: string): NodeExecutionState | null;
+  getOrigin(): NodeExecutionOrigin | null;
+  setOrigin(origin: NodeExecutionOrigin | null): void;
+  subscribeOrigin(listener: () => void): () => void;
   progress(nodeId: string, percentage: number | null, message: string): void;
   settleRunning(nodeIds: Iterable<string>, outcome: NodeExecutionOutcome, error?: string): void;
   started(event: NodeInvocationStartedEvent): void;

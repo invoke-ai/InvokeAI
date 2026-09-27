@@ -69,6 +69,7 @@ const buildItem = (workflowId: string, overrides: Partial<WorkflowLibraryListIte
   category: 'user',
   description: '',
   name: `Workflow ${workflowId}`,
+  revision: 1,
   tags: 'lora, upscaling',
   updated_at: '2026-08-18T00:00:00Z',
   workflow_id: workflowId,

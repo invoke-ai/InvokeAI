@@ -5,7 +5,7 @@ import type {
   QueueEnqueueWorkflowRequest,
   QueueResultImage,
   QueueResultImageOptions,
-  QueueWorkflowRunSink,
+  QueueRunOrigin,
 } from '@features/queue/core/types';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
@@ -113,6 +113,15 @@ const toErrorMessage = (error: unknown): string =>
 
 export const getQueueItemResultImageOptions = (queueItem: QueueItem): QueueResultImageOptions | undefined => {
   return queueItem.snapshot.resultNodeIds ? { resultNodeIds: queueItem.snapshot.resultNodeIds } : undefined;
+};
+
+/** Where a run's node progress belongs; records queued before projects owned several workflows have none. */
+const getQueueRunOrigin = (projectId: string, queueItem: QueueItem): QueueRunOrigin | undefined => {
+  const submission = (queueItem.snapshot as Partial<QueueItem['snapshot']>).backendSubmission;
+
+  return submission?.kind === 'workflow' && typeof submission.projectWorkflowId === 'string'
+    ? { projectId, workflowId: submission.projectWorkflowId }
+    : undefined;
 };
 
 /** Read compiled graphs to identify input passthroughs; legacy or invalid snapshots may lack them. */
@@ -293,9 +302,16 @@ export const createQueueItemBackendSubmission = (
     return { error: 'Queue item has malformed workflow batch metadata.', kind: 'invalid' };
   }
 
-  // `libraryWorkflowId` is provenance for the completed-run sink, not something
-  // the backend enqueue accepts; it stays on the snapshot and off the request.
-  const { kind: _, libraryWorkflowId: _libraryWorkflowId, ...compiled } = submission;
+  // Workflow provenance stays on the snapshot: the backend enqueue accepts neither the originating project
+  // workflow nor the library binding older records still carry.
+  const {
+    kind: _,
+    projectWorkflowId: _projectWorkflowId,
+    ...compiled
+  } = submission as typeof submission & {
+    libraryWorkflowId?: string;
+  };
+  delete (compiled as { libraryWorkflowId?: string }).libraryWorkflowId;
   return {
     kind: 'workflow',
     request: {
@@ -357,7 +373,6 @@ export const createQueueRuntime = ({
   locks,
   modelLoads,
   nodeExecution,
-  workflowRuns,
 }: {
   backend: QueueBackendPort;
   destinations: QueueResultDestinationPort;
@@ -368,7 +383,6 @@ export const createQueueRuntime = ({
   locks?: QueueRunLockPort;
   modelLoads: QueueModelLoadPort;
   nodeExecution: QueueNodeExecutionPort;
-  workflowRuns?: QueueWorkflowRunSink;
 }): QueueRuntime => {
   const owner = captureAccountScope();
   const commands = history.commands;
@@ -927,34 +941,6 @@ export const createQueueRuntime = ({
     return images;
   };
 
-  /**
-   * Notify the optional library sink only for bound workflows. Capture is decoration: sink failure must not fail
-   * settlement or prevent gallery refresh.
-   */
-  const notifyWorkflowRunCompleted = (projectId: string, queueItem: QueueItem, images: QueueResultImage[]): void => {
-    const submission = (queueItem.snapshot as Partial<QueueItem['snapshot']>).backendSubmission;
-
-    if (
-      !workflowRuns ||
-      submission?.kind !== 'workflow' ||
-      typeof submission.libraryWorkflowId !== 'string' ||
-      images.length === 0
-    ) {
-      return;
-    }
-
-    try {
-      workflowRuns.onWorkflowRunCompleted({
-        imageNames: images.map((image) => image.imageName),
-        libraryWorkflowId: submission.libraryWorkflowId,
-        projectId,
-        queueItemId: queueItem.id,
-      });
-    } catch {
-      // The sink owns its own error reporting; the run is already complete.
-    }
-  };
-
   const routeRunResults = async (
     coordinator: QueueCoordinator,
     projectId: string,
@@ -992,7 +978,6 @@ export const createQueueRuntime = ({
       }
 
       commands.routeResults({ images, projectId, queueItemId: queueItem.id });
-      notifyWorkflowRunCompleted(projectId, queueItem, images);
       if (queueItem.snapshot.destination === 'gallery') {
         commands.refreshBackendData();
       }
@@ -1263,7 +1248,11 @@ export const createQueueRuntime = ({
     const request =
       submission.kind === 'generate'
         ? coordinator.submitGenerate(currentQueueItem.id, submission.request)
-        : coordinator.submitWorkflow(currentQueueItem.id, submission.request);
+        : coordinator.submitWorkflow(
+            currentQueueItem.id,
+            submission.request,
+            getQueueRunOrigin(project.id, currentQueueItem)
+          );
     submissionOperations.set(runKey, request);
 
     await request
@@ -1581,6 +1570,7 @@ export const createQueueRuntime = ({
           backendItemIds: queueItem.backendItemIds,
           hasWorkflowCall: queueItemHasWorkflowCall(queueItem),
           id: queueItem.id,
+          origin: getQueueRunOrigin(project.id, queueItem),
           projectId: project.id,
           status: queueItem.status === 'running' ? 'running' : 'pending',
         }));

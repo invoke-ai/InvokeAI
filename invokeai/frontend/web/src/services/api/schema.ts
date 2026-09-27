@@ -3408,7 +3408,7 @@ export type paths = {
         head?: never;
         /**
          * Update Workflow
-         * @description Updates a workflow
+         * @description Updates a workflow's content and advances its revision.
          */
         patch: operations["update_workflow"];
         trace?: never;
@@ -6065,6 +6065,11 @@ export type components = {
         Body_create_workflow: {
             /** @description The workflow to create */
             workflow: components["schemas"]["WorkflowWithoutID"];
+            /**
+             * Workflow Id
+             * @description A client-reserved UUID for the new record. Retrying the same creation with the same id returns the record already created for it; another owner's record or different content under that id is a 409.
+             */
+            workflow_id?: string | null;
         };
         /** Body_delete_images_from_list */
         Body_delete_images_from_list: {
@@ -6247,6 +6252,11 @@ export type components = {
         Body_update_workflow: {
             /** @description The updated workflow */
             workflow: components["schemas"]["Workflow"];
+            /**
+             * Expected Revision
+             * @description The content revision the client last observed; when set, a different stored revision refuses the write with 409 instead of overwriting newer content.
+             */
+            expected_revision?: number | null;
         };
         /** Body_update_workflow_is_public */
         Body_update_workflow_is_public: {
@@ -49501,6 +49511,11 @@ export type components = {
              * @description Whether this workflow is shared with all users.
              */
             is_public: boolean;
+            /**
+             * Revision
+             * @description Monotonic content revision; every write of the workflow document increments it.
+             */
+            revision: number;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
         };
@@ -49546,6 +49561,11 @@ export type components = {
              * @description Whether this workflow is shared with all users.
              */
             is_public: boolean;
+            /**
+             * Revision
+             * @description Monotonic content revision; every write of the workflow document increments it.
+             */
+            revision: number;
             /**
              * Description
              * @description The description of the workflow.
@@ -49614,6 +49634,11 @@ export type components = {
              * @description Whether this workflow is shared with all users.
              */
             is_public: boolean;
+            /**
+             * Revision
+             * @description Monotonic content revision; every write of the workflow document increments it.
+             */
+            revision: number;
             /** @description The workflow. */
             workflow: components["schemas"]["Workflow"];
             /**
@@ -57245,7 +57270,10 @@ export interface operations {
         parameters: {
             query?: never;
             header?: never;
-            path?: never;
+            path: {
+                /** @description The workflow to update */
+                workflow_id: string;
+            };
             cookie?: never;
         };
         requestBody: {
@@ -57262,6 +57290,34 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WorkflowRecordDTO"];
                 };
+            };
+            /** @description The body's workflow id does not match the URL, or the update is malformed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The workflow is bundled or belongs to another account */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The workflow does not exist */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The workflow's content revision no longer matches `expected_revision` */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {
@@ -57345,6 +57401,20 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["WorkflowRecordDTO"];
                 };
+            };
+            /** @description The workflow or the reserved id is malformed */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The reserved id already names a different workflow */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description Validation Error */
             422: {

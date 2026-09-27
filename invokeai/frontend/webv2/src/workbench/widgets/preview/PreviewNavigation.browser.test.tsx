@@ -1699,6 +1699,7 @@ describe('preview keyboard navigation boundary', () => {
           completed: () => {},
           failed: () => {},
           progress: () => {},
+          setOrigin: () => {},
           settleRunning: () => {},
           started: () => {},
         },

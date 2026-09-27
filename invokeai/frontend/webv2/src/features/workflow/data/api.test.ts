@@ -4,57 +4,12 @@ const mocks = vi.hoisted(() => ({ apiFetch: vi.fn(), apiFetchJson: vi.fn() }));
 
 vi.mock('@platform/transport/http', () => ({ apiFetch: mocks.apiFetch, apiFetchJson: mocks.apiFetchJson }));
 
-import {
-  deleteLibraryWorkflowThumbnail,
-  getLibraryWorkflowRecord,
-  getAllWorkflowTags,
-  getWorkflowTagCounts,
-  listLibraryWorkflows,
-  setLibraryWorkflowThumbnail,
-  touchLibraryWorkflowLastRunAt,
-} from './api';
+import { getAllWorkflowTags, getLibraryWorkflowRecord, getWorkflowTagCounts, listLibraryWorkflows } from './api';
 
 describe('workflow library api', () => {
   beforeEach(() => {
     mocks.apiFetch.mockReset().mockResolvedValue(new Response());
     mocks.apiFetchJson.mockReset().mockResolvedValue({});
-  });
-
-  it('touches last_run_at with a PUT to the record-scoped endpoint', async () => {
-    await touchLibraryWorkflowLastRunAt('abc');
-
-    expect(mocks.apiFetch).toHaveBeenCalledWith('/api/v1/workflows/i/abc/last_run_at', {
-      method: 'PUT',
-      signal: undefined,
-    });
-  });
-
-  it('writes a thumbnail as multipart form data under the image field', async () => {
-    const blob = new Blob(['fake-image-bytes'], { type: 'image/png' });
-
-    await setLibraryWorkflowThumbnail('abc', blob);
-
-    expect(mocks.apiFetch).toHaveBeenCalledTimes(1);
-    const [path, init] = mocks.apiFetch.mock.calls[0] as [string, RequestInit];
-
-    expect(path).toBe('/api/v1/workflows/i/abc/thumbnail');
-    expect(init.method).toBe('PUT');
-    expect(init.body).toBeInstanceOf(FormData);
-
-    const uploaded = (init.body as FormData).get('image');
-
-    expect(uploaded).toBeInstanceOf(Blob);
-    expect((uploaded as Blob).size).toBe(blob.size);
-    expect((uploaded as Blob).type).toBe(blob.type);
-  });
-
-  it('deletes a thumbnail with a DELETE to the record-scoped endpoint', async () => {
-    await deleteLibraryWorkflowThumbnail('abc');
-
-    expect(mocks.apiFetch).toHaveBeenCalledWith('/api/v1/workflows/i/abc/thumbnail', {
-      method: 'DELETE',
-      signal: undefined,
-    });
   });
 
   it('forwards repeated tags query params when listing workflows', async () => {

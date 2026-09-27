@@ -53,6 +53,7 @@ describe('Upscale snapshot submission', () => {
     state = workbenchReducer(state, {
       backendSupportsCancellation: true,
       models: MODELS,
+      projectId: state.activeProjectId,
       route: { destination: 'gallery', destinationLocked: false, sourceId: 'upscale', sourceLocked: false },
       type: 'submitResolvedInvocationSnapshot',
     });

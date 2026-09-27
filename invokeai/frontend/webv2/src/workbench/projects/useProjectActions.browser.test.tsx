@@ -8,7 +8,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
-import { serializeProjectDocumentV2Json } from './projectDocument';
+import { serializeProjectDocumentV3Json } from './projectDocument';
 
 const harness = vi.hoisted(() => ({
   close: vi.fn<() => ProjectCommandResult>(),
@@ -125,11 +125,11 @@ describe('useProjectActions', () => {
     });
     harness.flush.mockImplementationOnce(async (project: Project) => {
       await firstReleased;
-      return { documentJson: serializeProjectDocumentV2Json(project).documentJson, kind: 'acknowledged' as const };
+      return { documentJson: serializeProjectDocumentV3Json(project).documentJson, kind: 'acknowledged' as const };
     });
     harness.flush.mockImplementationOnce((project: Project) =>
       Promise.resolve({
-        documentJson: serializeProjectDocumentV2Json(project).documentJson,
+        documentJson: serializeProjectDocumentV3Json(project).documentJson,
         kind: 'acknowledged' as const,
       })
     );
@@ -153,7 +153,7 @@ describe('useProjectActions', () => {
         queue: { items: [{ status: 'running' } as Project['queue']['items'][number]] },
       };
       return Promise.resolve({
-        documentJson: serializeProjectDocumentV2Json(project).documentJson,
+        documentJson: serializeProjectDocumentV3Json(project).documentJson,
         kind: 'acknowledged' as const,
       });
     });
@@ -173,7 +173,7 @@ describe('useProjectActions', () => {
     harness.close.mockReturnValue({ ok: false, reason: 'last-project' });
     harness.flush.mockImplementationOnce((project: Project) =>
       Promise.resolve({
-        documentJson: serializeProjectDocumentV2Json(project).documentJson,
+        documentJson: serializeProjectDocumentV3Json(project).documentJson,
         kind: 'acknowledged' as const,
       })
     );
@@ -194,7 +194,7 @@ describe('useProjectActions', () => {
       .mockReturnValueOnce({ ok: false, reason: 'active-queue-runs' });
     harness.flush.mockImplementationOnce((project: Project) =>
       Promise.resolve({
-        documentJson: serializeProjectDocumentV2Json(project).documentJson,
+        documentJson: serializeProjectDocumentV3Json(project).documentJson,
         kind: 'acknowledged' as const,
       })
     );

@@ -1,4 +1,4 @@
-import { apiFetch, apiFetchJson } from '@platform/transport/http';
+import { ApiError, apiFetch, apiFetchJson } from '@platform/transport/http';
 
 /** Round-trip library WorkflowV3 payloads through workflowJson when crossing the document boundary. */
 
@@ -9,6 +9,8 @@ export interface WorkflowLibraryListItem {
   name: string;
   description: string;
   category: WorkflowLibraryCategory;
+  /** Monotonic content revision; every write of the template's content increments it. */
+  revision: number;
   user_id?: string;
   is_public?: boolean;
   call_saved_workflow_compatibility?: WorkflowCallCompatibility | null;
@@ -99,40 +101,131 @@ export interface WorkflowRecordDTO extends WorkflowLibraryListItem {
 export const getLibraryWorkflowRecord = (workflowId: string, signal?: AbortSignal): Promise<WorkflowRecordDTO> =>
   apiFetchJson<WorkflowRecordDTO>(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`, { signal });
 
-/** Returns the stored workflow JSON, with the record id stamped in. */
-export const getLibraryWorkflow = async (
-  workflowId: string,
-  signal?: AbortSignal
-): Promise<Record<string, unknown>> => {
-  const record = await getLibraryWorkflowRecord(workflowId, signal);
+/** A write the server refused for a structured reason; other failures stay `ApiError`s. */
+export class WorkflowLibraryWriteRefusedError extends Error {
+  readonly reason: 'revision-conflict' | 'id-conflict' | 'bundled' | 'forbidden' | 'missing' | 'invalid';
+  /** The template's revision at refusal time, when the server reported one. */
+  readonly currentRevision: number | null;
 
-  return { ...record.workflow, id: record.workflow_id };
+  constructor(
+    reason: WorkflowLibraryWriteRefusedError['reason'],
+    message: string,
+    currentRevision: number | null = null
+  ) {
+    super(message);
+    this.name = 'WorkflowLibraryWriteRefusedError';
+    this.reason = reason;
+    this.currentRevision = currentRevision;
+  }
+}
+
+const parseErrorDetail = (error: ApiError): Record<string, unknown> | string | null => {
+  try {
+    const parsed = JSON.parse(error.message) as { detail?: unknown };
+
+    return typeof parsed.detail === 'string' || (typeof parsed.detail === 'object' && parsed.detail !== null)
+      ? (parsed.detail as Record<string, unknown> | string)
+      : null;
+  } catch {
+    return null;
+  }
 };
 
-export const createLibraryWorkflow = async (
+/** Translate the workflow endpoints' 400/403/404/409 answers; anything else is not a refusal the caller can act on. */
+export const toWorkflowLibraryWriteRefusal = (error: unknown): WorkflowLibraryWriteRefusedError | null => {
+  if (error instanceof WorkflowLibraryWriteRefusedError) {
+    return error;
+  }
+
+  if (!(error instanceof ApiError)) {
+    return null;
+  }
+
+  const detail = parseErrorDetail(error);
+  const message = typeof detail === 'string' ? detail : typeof detail?.message === 'string' ? detail.message : '';
+
+  if (error.status === 409 && typeof detail === 'object' && detail?.reason === 'revision-conflict') {
+    const current = detail.current_revision;
+
+    return new WorkflowLibraryWriteRefusedError(
+      'revision-conflict',
+      message,
+      typeof current === 'number' ? current : null
+    );
+  }
+
+  if (error.status === 409) {
+    return new WorkflowLibraryWriteRefusedError('id-conflict', message);
+  }
+
+  if (error.status === 403) {
+    return new WorkflowLibraryWriteRefusedError(/bundled/i.test(message) ? 'bundled' : 'forbidden', message);
+  }
+
+  if (error.status === 404) {
+    return new WorkflowLibraryWriteRefusedError('missing', message);
+  }
+
+  if (error.status === 400 || error.status === 422) {
+    return new WorkflowLibraryWriteRefusedError('invalid', message);
+  }
+
+  return null;
+};
+
+const rethrowAsRefusal = (error: unknown): never => {
+  throw toWorkflowLibraryWriteRefusal(error) ?? error;
+};
+
+export interface CreateLibraryWorkflowOptions {
+  /** A client-reserved UUID; resending it after a lost response returns the record the first send created. */
+  reservedId?: string;
+  signal?: AbortSignal;
+}
+
+export const createLibraryWorkflowRecord = async (
   workflow: Record<string, unknown>,
-  signal?: AbortSignal
-): Promise<string> => {
+  { reservedId, signal }: CreateLibraryWorkflowOptions = {}
+): Promise<WorkflowRecordDTO> => {
   const { id: _id, ...workflowWithoutId } = workflow;
-  const record = await apiFetchJson<WorkflowRecordDTO>('/api/v1/workflows/', {
-    body: JSON.stringify({ workflow: workflowWithoutId }),
-    method: 'POST',
-    signal,
-  });
 
-  return record.workflow_id;
+  try {
+    return await apiFetchJson<WorkflowRecordDTO>('/api/v1/workflows/', {
+      body: JSON.stringify({ workflow: workflowWithoutId, ...(reservedId ? { workflow_id: reservedId } : {}) }),
+      method: 'POST',
+      signal,
+    });
+  } catch (error) {
+    return rethrowAsRefusal(error);
+  }
 };
+
+export const createLibraryWorkflow = async (workflow: Record<string, unknown>, signal?: AbortSignal): Promise<string> =>
+  (await createLibraryWorkflowRecord(workflow, { signal })).workflow_id;
+
+export interface UpdateLibraryWorkflowOptions {
+  /** The revision the caller last observed; the server refuses the write once the template moved past it. */
+  expectedRevision?: number;
+  signal?: AbortSignal;
+}
 
 export const updateLibraryWorkflow = async (
   workflowId: string,
   workflow: Record<string, unknown>,
-  signal?: AbortSignal
-): Promise<void> => {
-  await apiFetchJson(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`, {
-    body: JSON.stringify({ workflow: { ...workflow, id: workflowId } }),
-    method: 'PATCH',
-    signal,
-  });
+  { expectedRevision, signal }: UpdateLibraryWorkflowOptions = {}
+): Promise<WorkflowRecordDTO> => {
+  try {
+    return await apiFetchJson<WorkflowRecordDTO>(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`, {
+      body: JSON.stringify({
+        workflow: { ...workflow, id: workflowId },
+        ...(expectedRevision === undefined ? {} : { expected_revision: expectedRevision }),
+      }),
+      method: 'PATCH',
+      signal,
+    });
+  } catch (error) {
+    return rethrowAsRefusal(error);
+  }
 };
 
 export const deleteLibraryWorkflow = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
@@ -141,25 +234,6 @@ export const deleteLibraryWorkflow = async (workflowId: string, signal?: AbortSi
 
 export const touchLibraryWorkflowOpenedAt = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
   await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/opened_at`, { method: 'PUT', signal });
-};
-
-export const touchLibraryWorkflowLastRunAt = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
-  await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/last_run_at`, { method: 'PUT', signal });
-};
-
-export const setLibraryWorkflowThumbnail = async (
-  workflowId: string,
-  image: Blob,
-  signal?: AbortSignal
-): Promise<void> => {
-  const body = new FormData();
-  body.append('image', image);
-
-  await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/thumbnail`, { body, method: 'PUT', signal });
-};
-
-export const deleteLibraryWorkflowThumbnail = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
-  await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/thumbnail`, { method: 'DELETE', signal });
 };
 
 export interface GetWorkflowTagCountsParams {
