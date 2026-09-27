@@ -19,6 +19,7 @@ export { executeImageRecall, getCurrentGenerateValues } from './executeImageReca
 export {
   appendReferenceVideo,
   applyVideoRecallMetadata,
+  getCurrentVideoValues,
   placeInitialVideo,
   type PlaceableVideo,
 } from './executeVideoRecall';
