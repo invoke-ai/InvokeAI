@@ -1,5 +1,6 @@
 import type { StarterModel } from '@features/models';
 import type { WorkflowModelRequirement } from '@features/workflow/core/modelRequirements';
+import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowLibraryEntry, WorkflowLibraryEntryEnrichment } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowGraphPreviewPort, WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
 
@@ -62,6 +63,9 @@ const queries = vi.hoisted(() => ({
   getLibraryWorkflowCached: vi.fn((_workflowId: string, _signal?: AbortSignal) =>
     Promise.resolve({} as Record<string, unknown>)
   ),
+  getLibraryWorkflowRecordCached: vi.fn((_workflowId: string, _signal?: AbortSignal) =>
+    Promise.resolve({} as Record<string, unknown>)
+  ),
   invalidateWorkflowLibraryCache: vi.fn(),
 }));
 
@@ -76,6 +80,9 @@ vi.mock('@platform/browser/downloadBlob', () => ({ downloadText }));
 
 const TRANSLATIONS: Record<string, string> = {
   'common.unknownError': 'Something went wrong',
+  'workflowLibrary.addAnotherCopy': 'Add another copy',
+  'workflowLibrary.addAnotherCopyHint': 'A second, independent copy in this project',
+  'workflowLibrary.chooseProjectCopy': 'Open which copy?',
   'workflowLibrary.delete': 'Delete',
   'workflowLibrary.deleteConfirmBody': 'Delete "{{name}}" from the workflow library? This cannot be undone.',
   'workflowLibrary.deleteConfirmTitle': 'Delete workflow',
@@ -99,7 +106,9 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.moreActions': 'More actions',
   'workflowLibrary.notRunYet': 'Not run yet',
   'workflowLibrary.open': 'Open',
-  'workflowLibrary.openHint': 'Replaces the current workflow',
+  'workflowLibrary.openHint': 'Adds a copy to this project',
+  'workflowLibrary.openProjectCopy': 'Open project copy',
+  'workflowLibrary.openProjectCopyHint': 'Switches to the copy this project already has',
   'workflowLibrary.previewGraph': 'Preview graph',
   'workflowLibrary.requirementInstallable': 'Not installed',
   'workflowLibrary.requirementInstalled': 'Installed',
@@ -204,6 +213,7 @@ const entry = (
   item: {
     category: 'user',
     description: `${overrides.name} description`,
+    revision: 1,
     thumbnail_url: null,
     ...overrides,
   },
@@ -244,6 +254,23 @@ const RAW_WORKFLOW: Record<string, unknown> = {
   meta: { category: 'default', version: '3.0.0' },
 };
 
+/** The library record behind IMAGE_TO_VIDEO, at the revision a fork must carry along. */
+const RAW_RECORD = {
+  ...IMAGE_TO_VIDEO.item,
+  revision: 7,
+  workflow: RAW_WORKFLOW,
+};
+
+/** Project copies of TEXT_TO_IMAGE: what Open resumes instead of adding another. */
+const projectCopy = (id: string, name: string, libraryWorkflowId = 'wf-text-to-image'): ProjectWorkflowEntry => ({
+  document: { ...createProjectGraph(id), name },
+  source: { libraryWorkflowId, revision: 1 },
+});
+const FIRST_COPY = projectCopy('copy-1', 'Text to image');
+const SECOND_COPY = projectCopy('copy-2', 'Text to image, tuned');
+const OTHER_TEMPLATE_COPY = projectCopy('copy-other', 'Something else', 'wf-image-to-video');
+const NO_COPIES: readonly ProjectWorkflowEntry[] = [];
+
 // #endregion
 
 const NOTIFICATIONS = { error: vi.fn(), info: vi.fn(), success: vi.fn() };
@@ -263,8 +290,9 @@ describe('WorkflowLibraryDetailPanel', () => {
   let onClose: () => void;
   let onDeleted: () => void;
   let onDuplicated: (workflowId: string) => void;
-  let onOpen: (item: WorkflowLibraryEntry['item']) => void;
+  let onOpen: (item: WorkflowLibraryEntry['item'], mode: 'resume-or-add' | 'add-copy') => void;
   let onPreview: (selected: WorkflowLibraryEntry) => void;
+  let onResume: (workflowId: string) => void;
 
   /** See `WorkflowLibraryDialog.browser.test.tsx`: keeps Chakra's observer-driven commits inside the act scope. */
   const settleFrame = () =>
@@ -272,7 +300,10 @@ describe('WorkflowLibraryDetailPanel', () => {
       setTimeout(resolve, 0);
     });
 
-  const renderPanel = async (selected: WorkflowLibraryEntry | null) => {
+  const renderPanel = async (
+    selected: WorkflowLibraryEntry | null,
+    projectWorkflows: readonly ProjectWorkflowEntry[] = NO_COPIES
+  ) => {
     await act(async () => {
       root.render(
         <StrictMode>
@@ -282,12 +313,14 @@ describe('WorkflowLibraryDetailPanel', () => {
                 <WorkflowLibraryDetailPanel
                   contextMenuPoint={null}
                   entry={selected}
+                  projectWorkflows={projectWorkflows}
                   onClose={onClose}
                   onContextMenuClose={NOOP}
                   onDeleted={onDeleted}
                   onDuplicated={onDuplicated}
                   onOpen={onOpen}
                   onPreview={onPreview}
+                  onResume={onResume}
                 />
               </WorkflowGraphPreviewProvider>
             </WorkflowUiProvider>
@@ -352,6 +385,7 @@ describe('WorkflowLibraryDetailPanel', () => {
     onDuplicated = vi.fn((_workflowId: string) => {});
     onOpen = vi.fn();
     onPreview = vi.fn();
+    onResume = vi.fn();
 
     models.activeInstallSources.current = new Set();
     models.installedModels.current = [INSTALLED_SDXL_MAIN, INSTALLED_WAN_VAE];
@@ -366,6 +400,8 @@ describe('WorkflowLibraryDetailPanel', () => {
     queries.deleteLibraryWorkflow.mockResolvedValue(undefined);
     queries.getLibraryWorkflowCached.mockClear();
     queries.getLibraryWorkflowCached.mockResolvedValue(RAW_WORKFLOW);
+    queries.getLibraryWorkflowRecordCached.mockClear();
+    queries.getLibraryWorkflowRecordCached.mockResolvedValue(RAW_RECORD);
     queries.invalidateWorkflowLibraryCache.mockClear();
 
     downloadText.mockClear();
@@ -404,7 +440,64 @@ describe('WorkflowLibraryDetailPanel', () => {
 
     await clickButton('Open');
 
-    expect(onOpen).toHaveBeenCalledWith(TEXT_TO_IMAGE.item);
+    // No project copy exists yet, so opening adds the first one.
+    expect(onOpen).toHaveBeenCalledWith(TEXT_TO_IMAGE.item, 'resume-or-add');
+    expect(onResume).not.toHaveBeenCalled();
+  });
+
+  it('resumes the one project copy of the template instead of adding another', async () => {
+    await renderPanel(TEXT_TO_IMAGE, [OTHER_TEMPLATE_COPY, FIRST_COPY]);
+
+    expect(buttonWithText('Open')).toBeUndefined();
+    expect(buttonWithText('Open project copy')).not.toBeUndefined();
+
+    await clickButton('Open project copy');
+
+    expect(onResume).toHaveBeenCalledWith('copy-1');
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('lets the user choose which of several project copies to resume', async () => {
+    await renderPanel(TEXT_TO_IMAGE, [FIRST_COPY, OTHER_TEMPLATE_COPY, SECOND_COPY]);
+
+    await clickButton('Open project copy');
+
+    const chooser = () => document.querySelector<HTMLElement>('[data-workflow-copy-chooser]');
+    await vi.waitFor(() => expect(chooser()).not.toBeNull());
+
+    // Only this template's copies, by name, in collection order.
+    const choices = [...(chooser()?.querySelectorAll<HTMLElement>('[data-menu-item]') ?? [])];
+    expect(choices.map((choice) => choice.dataset.menuItem)).toEqual(['resume:copy-1', 'resume:copy-2']);
+    expect(chooser()?.textContent).toContain('Text to image, tuned');
+    expect(chooser()?.textContent).not.toContain('Something else');
+    expect(onResume).not.toHaveBeenCalled();
+
+    await act(async () => {
+      choices[1]?.click();
+      await settleFrame();
+    });
+
+    expect(onResume).toHaveBeenCalledWith('copy-2');
+    expect(onOpen).not.toHaveBeenCalled();
+  });
+
+  it('offers another independent copy only once the project already has one', async () => {
+    await renderPanel(TEXT_TO_IMAGE);
+    await openMenu();
+
+    expect(menuItem('add-copy')).toBeNull();
+    expect(menuItem('open')?.textContent).toContain('Open');
+
+    await renderPanel(TEXT_TO_IMAGE, [FIRST_COPY]);
+    await openMenu();
+
+    expect(menuItem('open')?.textContent).toContain('Open project copy');
+    expect(menuItem('add-copy')?.textContent).toContain('Add another copy');
+
+    await clickMenuItem('add-copy');
+
+    expect(onOpen).toHaveBeenCalledWith(TEXT_TO_IMAGE.item, 'add-copy');
+    expect(onResume).not.toHaveBeenCalled();
   });
 
   it('opens the workflow from the keyboard, the path the double-click-only cards do not offer', async () => {
@@ -423,7 +516,7 @@ describe('WorkflowLibraryDetailPanel', () => {
       await settleFrame();
     });
 
-    expect(onOpen).toHaveBeenCalledWith(TEXT_TO_IMAGE.item);
+    expect(onOpen).toHaveBeenCalledWith(TEXT_TO_IMAGE.item, 'resume-or-add');
   });
 
   it('swaps the primary action for an install when starter models can fill the gaps', async () => {
@@ -585,17 +678,24 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(menuItem('duplicate')?.getAttribute('aria-disabled')).toBeNull();
   });
 
-  it('forks the cached workflow into a fresh project', async () => {
+  it('forks the cached workflow into a fresh project, carrying its library source and revision', async () => {
     await renderPanel(IMAGE_TO_VIDEO);
 
     await clickMenuItem('fork-into-project');
 
+    expect(queries.getLibraryWorkflowRecordCached).toHaveBeenCalledWith('wf-image-to-video', expect.anything());
     expect(OPEN_DOCUMENT_IN_NEW_PROJECT).toHaveBeenCalledTimes(1);
 
-    const [document_, label] = OPEN_DOCUMENT_IN_NEW_PROJECT.mock.calls[0] as [{ name: string }, string];
+    const [document_, label, source] = OPEN_DOCUMENT_IN_NEW_PROJECT.mock.calls[0] as [
+      { name: string },
+      string,
+      unknown,
+    ];
 
     expect(document_.name).toBe('Image to video');
     expect(label).toBe('Image to video');
+    // The copy can update its template later only if it knows which revision it started from.
+    expect(source).toEqual({ libraryWorkflowId: 'wf-image-to-video', revision: 7 });
     // The fork lands the user in a new project, so the library gets out of the way.
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(queries.createLibraryWorkflow).not.toHaveBeenCalled();

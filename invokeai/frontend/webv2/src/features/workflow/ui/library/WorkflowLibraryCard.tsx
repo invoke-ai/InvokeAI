@@ -23,6 +23,8 @@ export const getWorkflowLibraryCardId = (workflowId: string): string => `workflo
 
 export interface WorkflowLibraryCardProps {
   entry: WorkflowLibraryEntry;
+  /** The project's active workflow; the card says so in the header. */
+  isActive?: boolean;
   isSelected: boolean;
   /** Models this workflow needs that are not installed; 0 hides the badge. */
   missingCount: number;
@@ -33,6 +35,7 @@ export interface WorkflowLibraryCardProps {
 
 export const WorkflowLibraryCard = ({
   entry,
+  isActive = false,
   isSelected,
   missingCount,
   onContextMenu,
@@ -108,7 +111,14 @@ export const WorkflowLibraryCard = ({
         )}
       </Box>
       <Stack gap="1" minW="0" p="2.5" w="full">
-        <MiddleTruncate fontSize="xs" fontWeight="600" minW="0" text={item.name || t('workflowLibrary.untitled')} />
+        <HStack gap="1.5" minW="0">
+          <MiddleTruncate fontSize="xs" fontWeight="600" minW="0" text={item.name || t('workflowLibrary.untitled')} />
+          {isActive ? (
+            <Badge data-active-workflow flexShrink={0} size="xs" variant="solid">
+              {t('workflowLibrary.activeWorkflow')}
+            </Badge>
+          ) : null}
+        </HStack>
         <HStack gap="1.5" h="4" minW="0">
           {enrichment.status === 'pending' ? (
             // Show placeholders only while enriching; unreadable workflows leave facts absent.

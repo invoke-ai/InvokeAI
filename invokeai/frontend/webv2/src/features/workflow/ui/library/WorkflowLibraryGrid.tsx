@@ -15,6 +15,8 @@ const GRID_TEMPLATE_COLUMNS = 'repeat(3, minmax(0, 1fr))';
 const NO_MISSING_COUNTS: ReadonlyMap<string, number> = new Map();
 
 export interface WorkflowLibraryGridProps {
+  /** The project's active workflow, marked on its card in the This-project view. */
+  activeWorkflowId?: string | null;
   entries: readonly WorkflowLibraryEntry[];
   error: string | null;
   /** Missing-model counts by workflow id; absent ids render no badge. */
@@ -46,6 +48,7 @@ const dedupeByWorkflowId = (entries: readonly WorkflowLibraryEntry[]): WorkflowL
 };
 
 export const WorkflowLibraryGrid = ({
+  activeWorkflowId = null,
   entries,
   error,
   missingCounts = NO_MISSING_COUNTS,
@@ -101,6 +104,7 @@ export const WorkflowLibraryGrid = ({
               <WorkflowLibraryCard
                 key={entry.item.workflow_id}
                 entry={entry}
+                isActive={entry.item.workflow_id === activeWorkflowId}
                 isSelected={entry.item.workflow_id === selectedWorkflowId}
                 missingCount={missingCounts.get(entry.item.workflow_id) ?? 0}
                 onContextMenu={onContextMenu}

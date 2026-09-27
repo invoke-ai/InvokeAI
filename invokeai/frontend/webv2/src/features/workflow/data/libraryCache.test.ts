@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as libraryCacheModule from './libraryCache';
 
 const api = vi.hoisted(() => ({
-  getLibraryWorkflow: vi.fn(),
+  getLibraryWorkflowRecord: vi.fn(),
   listLibraryWorkflows: vi.fn(),
 }));
 
@@ -18,7 +18,7 @@ const params = { category: 'user' as const, page: 1, perPage: 20 };
 
 beforeEach(async () => {
   vi.resetModules();
-  api.getLibraryWorkflow.mockReset();
+  api.getLibraryWorkflowRecord.mockReset();
   api.listLibraryWorkflows.mockReset();
   cache = await import('./libraryCache');
   account = await import('@platform/state/accountLifecycle');
@@ -28,7 +28,7 @@ describe('workflow library account ownership', () => {
   it('clears pages and payloads synchronously on account invalidation', async () => {
     account.accountLifecycle.activate('user-a');
     api.listLibraryWorkflows.mockResolvedValue({ items: [], page: 1, pages: 1, per_page: 20, total: 0 });
-    api.getLibraryWorkflow.mockResolvedValue({ id: 'workflow-a' });
+    api.getLibraryWorkflowRecord.mockResolvedValue({ workflow: {}, workflow_id: 'workflow-a' });
 
     await cache.listLibraryWorkflowsCached(params);
     await cache.getLibraryWorkflowCached('workflow-a');
@@ -37,9 +37,9 @@ describe('workflow library account ownership', () => {
     account.accountLifecycle.invalidate();
 
     expect(cache.getCachedWorkflowPage(params)).toBeNull();
-    api.getLibraryWorkflow.mockResolvedValue({ id: 'after-clear' });
+    api.getLibraryWorkflowRecord.mockResolvedValue({ workflow: {}, workflow_id: 'after-clear' });
     await cache.getLibraryWorkflowCached('workflow-a');
-    expect(api.getLibraryWorkflow).toHaveBeenCalledTimes(2);
+    expect(api.getLibraryWorkflowRecord).toHaveBeenCalledTimes(2);
   });
 
   it('rejects delayed page and payload completions from the prior epoch', async () => {
@@ -51,7 +51,7 @@ describe('workflow library account ownership', () => {
         resolvePage = resolve;
       })
     );
-    api.getLibraryWorkflow.mockReturnValueOnce(
+    api.getLibraryWorkflowRecord.mockReturnValueOnce(
       new Promise((resolve) => {
         resolveWorkflow = resolve;
       })
@@ -60,7 +60,7 @@ describe('workflow library account ownership', () => {
     const oldPage = cache.listLibraryWorkflowsCached(params);
     const oldWorkflow = cache.getLibraryWorkflowCached('shared-id');
     const pageSignal = api.listLibraryWorkflows.mock.calls[0]?.[0]?.signal as AbortSignal;
-    const workflowSignal = api.getLibraryWorkflow.mock.calls[0]?.[1] as AbortSignal;
+    const workflowSignal = api.getLibraryWorkflowRecord.mock.calls[0]?.[1] as AbortSignal;
 
     expect(pageSignal.aborted).toBe(false);
     expect(workflowSignal.aborted).toBe(false);
@@ -70,14 +70,14 @@ describe('workflow library account ownership', () => {
     expect(pageSignal.aborted).toBe(true);
     expect(workflowSignal.aborted).toBe(true);
     resolvePage?.({ items: [{ workflow_id: 'a' }], page: 1, pages: 1, per_page: 20, total: 1 });
-    resolveWorkflow?.({ owner: 'a' });
+    resolveWorkflow?.({ workflow: { owner: 'a' }, workflow_id: 'shared-id' });
 
     await expect(oldPage).rejects.toThrow('no longer active');
     await expect(oldWorkflow).rejects.toThrow('no longer active');
     expect(cache.getCachedWorkflowPage(params)).toBeNull();
 
-    api.getLibraryWorkflow.mockResolvedValueOnce({ owner: 'b' });
-    await expect(cache.getLibraryWorkflowCached('shared-id')).resolves.toEqual({ owner: 'b' });
+    api.getLibraryWorkflowRecord.mockResolvedValueOnce({ workflow: { owner: 'b' }, workflow_id: 'shared-id' });
+    await expect(cache.getLibraryWorkflowCached('shared-id')).resolves.toEqual({ id: 'shared-id', owner: 'b' });
   });
 });
 

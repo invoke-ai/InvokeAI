@@ -7,6 +7,7 @@ import {
   assertMockBackendProfileName,
   collectCanvasLeaves,
   createMockBackendFixture,
+  getFixtureProjectWorkflowDocument,
   getMockBackendFixtureCounts,
   MOCK_BACKEND_FIXED_EPOCH,
 } from './mock-backend-fixtures.mjs';
@@ -131,6 +132,9 @@ const createState = (profile) => {
     queueItems: new Map(fixture.queueItems.map((item) => [item.item_id, clone(item)])),
     videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
     workflows: new Map(fixture.workflows.map((workflow) => [workflow.workflow_id, clone(workflow)])),
+    nextWorkflowNumber: fixture.workflows.length + 1,
+    /** Every workflow-library request since the last reset, so journeys can prove which writes happened. */
+    workflowRequests: [],
   };
 };
 
@@ -220,7 +224,7 @@ const getStateCounts = (state) => ({
   nodes: invocationNodeCount(state),
   projects: state.projects.size,
   queueItems: state.queueItems.size,
-  workflowNodes: state.projects.values().next().value?.data?.projectGraph?.nodes?.length ?? 0,
+  workflowNodes: getFixtureProjectWorkflowDocument(state.projects.values().next().value?.data)?.nodes?.length ?? 0,
 });
 
 const getProfileInfo = (state) => ({
@@ -1912,36 +1916,168 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           : json(404, { detail: 'Video not found' });
       }
 
-      const workflowMatch = /^\/api\/v1\/workflows\/i\/([^/]+)(?:\/opened_at)?$/.exec(path);
+      if (path.startsWith('/api/v1/workflows')) {
+        state.workflowRequests.push({ method, path });
+      }
+
+      if (method === 'GET' && path === '/__workflow-requests') {
+        return json(200, { requests: state.workflowRequests });
+      }
+
+      const workflowRecord = (workflow) => ({ ...workflow, thumbnail_url: workflow.thumbnail_url ?? null });
+      const workflowListItem = ({ workflow: _workflow, ...item }) => workflowRecord(item);
+      const workflowTags = (workflow) =>
+        String(workflow.tags ?? '')
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean);
+
+      if (path === '/api/v1/workflows/tags') {
+        const categories = url.searchParams.getAll('categories');
+        const tags = new Set();
+
+        for (const workflow of state.workflows.values()) {
+          if (categories.length === 0 || categories.includes(workflow.category)) {
+            workflowTags(workflow).forEach((tag) => tags.add(tag));
+          }
+        }
+
+        return json(200, [...tags].sort());
+      }
+
+      if (path === '/api/v1/workflows/counts_by_tag') {
+        const categories = url.searchParams.getAll('categories');
+        const counts = {};
+
+        for (const tag of url.searchParams.getAll('tags')) {
+          counts[tag] = [...state.workflows.values()].filter(
+            (workflow) =>
+              (categories.length === 0 || categories.includes(workflow.category)) &&
+              workflowTags(workflow).includes(tag)
+          ).length;
+        }
+
+        return json(200, counts);
+      }
+
+      const workflowMatch = /^\/api\/v1\/workflows\/i\/([^/]+)(\/opened_at)?$/.exec(path);
       if (workflowMatch) {
         const workflowId = decodeURIComponent(workflowMatch[1]);
+        const suffix = workflowMatch[2] ?? '';
         const workflow = state.workflows.get(workflowId);
 
         if (!workflow) {
           return json(404, { detail: 'Workflow not found' });
         }
 
-        return json(200, {
-          name: workflow.name,
-          workflow: workflow.workflow,
-          workflow_id: workflow.workflow_id,
-        });
+        if (suffix === '/opened_at' && method === 'PUT') {
+          workflow.opened_at = timestamp(state);
+          return json(200, null);
+        }
+
+        if (method === 'GET') {
+          return json(200, workflowRecord(workflow));
+        }
+
+        if (method === 'DELETE') {
+          if (workflow.category === 'default') {
+            return json(403, { detail: 'Bundled workflows cannot be deleted' });
+          }
+          state.workflows.delete(workflowId);
+          return json(200, null);
+        }
+
+        if (method === 'PATCH') {
+          const body = await readJsonBody(request);
+          const submitted = body.workflow ?? {};
+
+          if (submitted.id !== workflowId) {
+            return json(400, { detail: 'The workflow id in the body does not match the URL' });
+          }
+          if (workflow.category === 'default') {
+            return json(403, { detail: 'Bundled workflows cannot be modified' });
+          }
+          if (body.expected_revision !== undefined && body.expected_revision !== workflow.revision) {
+            return json(409, {
+              detail: {
+                current_revision: workflow.revision,
+                expected_revision: body.expected_revision,
+                message: `Workflow ${workflowId} is at revision ${String(workflow.revision)}`,
+                reason: 'revision-conflict',
+              },
+            });
+          }
+
+          const { id: _id, ...content } = submitted;
+
+          workflow.workflow = { ...content, meta: { ...content.meta, category: 'user' } };
+          workflow.name = content.name ?? workflow.name;
+          workflow.description = content.description ?? workflow.description;
+          workflow.tags = content.tags ?? workflow.tags;
+          workflow.revision += 1;
+          workflow.updated_at = timestamp(state);
+
+          return json(200, workflowRecord(workflow));
+        }
+      }
+
+      if (method === 'POST' && (path === '/api/v1/workflows' || path === '/api/v1/workflows/')) {
+        const body = await readJsonBody(request);
+        const { id: _id, ...content } = body.workflow ?? {};
+        const reservedId = typeof body.workflow_id === 'string' ? body.workflow_id : null;
+
+        if (reservedId !== null && !/^[0-9a-f-]{36}$/i.test(reservedId)) {
+          return json(400, { detail: 'A reserved workflow id must be a UUID' });
+        }
+
+        const existing = reservedId === null ? null : state.workflows.get(reservedId);
+
+        if (existing) {
+          // A retried creation is accepted only for the same content; anything else under the id is a conflict.
+          return JSON.stringify(existing.workflow) ===
+            JSON.stringify({ ...content, meta: { ...content.meta, category: 'user' } })
+            ? json(200, workflowRecord(existing))
+            : json(409, { detail: { message: 'The workflow id is already in use', reason: 'id-conflict' } });
+        }
+
+        const workflowId = reservedId ?? `mock-workflow-${String(state.nextWorkflowNumber++).padStart(4, '0')}`;
+        const created = {
+          category: 'user',
+          created_at: timestamp(state),
+          description: content.description ?? '',
+          is_public: true,
+          name: content.name ?? '',
+          opened_at: null,
+          revision: 1,
+          tags: content.tags ?? '',
+          thumbnail_url: null,
+          updated_at: null,
+          user_id: MOCK_USER_ID,
+          workflow: { ...content, meta: { ...content.meta, category: 'user' } },
+          workflow_id: workflowId,
+        };
+
+        created.updated_at = created.created_at;
+        state.workflows.set(workflowId, created);
+
+        return json(200, workflowRecord(created));
       }
 
       if (method === 'GET' && (path === '/api/v1/workflows' || path === '/api/v1/workflows/')) {
         const categories = url.searchParams.getAll('categories');
         const query = url.searchParams.get('query')?.trim().toLocaleLowerCase() ?? '';
-        const page = Math.max(1, Number(url.searchParams.get('page') ?? 1) || 1);
+        const tags = url.searchParams.getAll('tags');
+        // The API pages from 0; the client asks for page 0 first.
+        const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
         const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? 20) || 20);
         const items = [...state.workflows.values()].filter(
           (workflow) =>
             (categories.length === 0 || categories.includes(workflow.category)) &&
-            (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query))
+            (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
+            (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
         );
         const pages = Math.max(1, Math.ceil(items.length / perPage));
-        const pageItems = items
-          .slice((page - 1) * perPage, page * perPage)
-          .map(({ workflow: _workflow, ...item }) => item);
+        const pageItems = items.slice(page * perPage, (page + 1) * perPage).map(workflowListItem);
 
         return json(200, { items: pageItems, page, pages, total: items.length });
       }

@@ -195,7 +195,49 @@ const getBoardSnapshot = (projectId) => fetchJson(`/api/v1/projects/${encodeURIC
 const getLayerImageNames = (project) =>
   collectCanvasLeaves(project.data.canvas.document).map((layer) => layer.source.image.imageName);
 
-const getDocumentVideoName = (project) => project.data.projectGraph.nodes[0]?.data.inputs.video?.value?.video_name;
+/** The first workflow document of a project record, whichever document schema the record carries. */
+const getWorkflowDocuments = (project) =>
+  project.data.workflows?.entries?.map((entry) => entry.document) ?? [project.data.projectGraph].filter(Boolean);
+
+const getDocumentVideoName = (project) =>
+  getWorkflowDocuments(project)[0]?.nodes[0]?.data.inputs.video?.value?.video_name;
+
+const workflowRequests = async () => (await fetchJson('/__workflow-requests')).requests;
+
+const presetStrip = (page) => page.getByRole('tablist', { exact: true, name: 'Layout preset' });
+
+const centerViewTrigger = (page, label) => page.getByRole('button', { exact: true, name: `Center view: ${label}` });
+
+/** Preset names need not match their center views; pass the expected view explicitly. */
+const selectLayoutPreset = async (page, preset, centerView) => {
+  const name = new RegExp(`^${preset}(, unsaved changes)?$`);
+  const strip = presetStrip(page);
+  const selected = strip.getByRole('tab', { name, selected: true });
+
+  if ((await selected.count()) === 0) {
+    await strip.getByRole('tab', { name }).click();
+  }
+
+  await selected.waitFor();
+  await centerViewTrigger(page, centerView).waitFor();
+};
+
+/** Poll the server record until the project's saved workflows satisfy `predicate`. */
+const waitForSavedWorkflows = async (projectId, predicate, label) => {
+  const deadline = Date.now() + 15_000;
+
+  while (Date.now() < deadline) {
+    const record = await fetchJson(`/api/v1/projects/${encodeURIComponent(projectId)}`);
+
+    if (predicate(record)) {
+      return record;
+    }
+
+    await delay(100);
+  }
+
+  throw new Error(`The project record never reached the expected state: ${label}.`);
+};
 
 /** Import the archive at `archivePath` through the Launchpad, exactly as a person would. */
 const importArchive = async ({ archivePath, browser, contexts, errors, phase }) => {
@@ -380,7 +422,15 @@ const runRoundTrip = async ({ backend, browser, contexts, errors, tempDirectory 
   contexts.delete(importContext);
   assertNoBrowserErrors(errors);
 
+  // The fixture was a schema-2 document with one `projectGraph`; import canonicalizes it into the current
+  // schema with that graph as the only workflow and no library write target.
+  assert.equal(imported.data.documentSchemaVersion, 3);
+  assert.equal(imported.data.workflows.entries.length, 1);
+  assert.equal(imported.data.workflows.activeWorkflowId, imported.data.workflows.entries[0].document.id);
+  assert.equal(imported.data.workflows.entries[0].source, undefined);
+
   await runDuplication({ browser, contexts, errors, imported, importedBoardNames });
+  await runWorkflowCollection({ browser, contexts, errors, imported });
   await runMissingBinaryImport({ browser, contexts, entries, errors, tempDirectory });
 
   return {
@@ -443,6 +493,166 @@ const runDuplication = async ({ browser, contexts, errors, imported, importedBoa
     importedLayers.filter((name) => !importedBoardNames.includes(name)).sort()
   );
   assert.equal(getDocumentVideoName(copiedRecord), getDocumentVideoName(imported));
+
+  await context.close();
+  contexts.delete(context);
+  assertNoBrowserErrors(errors);
+};
+
+/**
+ * The primary workflow journey: open a template into the project, edit it, switch away and back, save it to the
+ * library under a new name, restart, and find both workflows intact. Project edits and runs issue no library writes;
+ * the This-project view fetches no templates.
+ */
+const runWorkflowCollection = async ({ browser, contexts, errors, imported }) => {
+  const projectId = imported.project_id;
+  const template = await fetchJson('/api/v1/workflows/', {
+    body: JSON.stringify({
+      workflow: {
+        author: '',
+        contact: '',
+        description: 'A template the journey opens into the project.',
+        edges: [],
+        exposedFields: [],
+        form: {
+          elements: { root: { data: { children: [], layout: 'column' }, id: 'root', type: 'container' } },
+          rootElementId: 'root',
+        },
+        meta: { category: 'user', version: '3.0.0' },
+        name: 'Journey Template',
+        nodes: [],
+        notes: '',
+        tags: 'journey',
+        version: '1.0.0',
+      },
+    }),
+    headers: { 'Content-Type': 'application/json' },
+    method: 'POST',
+  });
+  const requestsBefore = (await workflowRequests()).length;
+
+  const context = await browser.newContext();
+
+  contexts.add(context);
+  const page = await context.newPage();
+
+  observeBrowserErrors(page, 'workflow-collection', errors);
+  await page.goto(`${origin}/#/`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
+  await page.goto(`${origin}/#/app?project=${encodeURIComponent(projectId)}`, { waitUntil: 'domcontentloaded' });
+  await page.getByRole('main', { exact: true, name: imported.name }).waitFor();
+  await selectLayoutPreset(page, 'Automate', 'Workflow');
+
+  const workflowName = () => page.getByRole('button', { name: /^Open this project's workflows\. Current workflow: / });
+  const dialog = page.getByRole('dialog', { exact: true, name: 'Workflows' });
+  const cards = dialog.locator('[data-workflow-card]');
+  const openProjectWorkflows = async () => {
+    await workflowName().click();
+    await dialog.waitFor();
+    await dialog.locator('[data-library-tab="project"]').waitFor();
+  };
+  const currentWorkflowName = async () =>
+    (await workflowName().getAttribute('aria-label')).replace("Open this project's workflows. Current workflow: ", '');
+
+  // The migrated project owns exactly its old graph, marked active; opening the local view fetched nothing.
+  await openProjectWorkflows();
+  assert.equal(await cards.count(), 1);
+  await cards.first().locator('[data-active-workflow]').waitFor();
+  assert.equal(
+    (await workflowRequests()).slice(requestsBefore).some((entry) => entry.method === 'GET'),
+    false
+  );
+
+  // Add workflow leads to the template tabs; the template becomes an independent copy in this project.
+  await dialog.getByRole('button', { exact: true, name: 'Add workflow' }).click();
+  await dialog.locator('[data-library-tab="default"]').waitFor();
+  await dialog.getByText('Yours', { exact: true }).click();
+  await dialog.locator('[data-library-tab="user"]').waitFor();
+  await dialog.locator(`[data-workflow-card="${template.workflow_id}"]`).click();
+  await dialog
+    .locator(`[data-workflow-detail="${template.workflow_id}"]`)
+    .getByRole('button', { exact: true, name: 'Open' })
+    .click();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(await currentWorkflowName(), 'Journey Template');
+
+  // Editing the copy: rename it through the local view. The library is not written.
+  await openProjectWorkflows();
+  assert.equal(await cards.count(), 2);
+  await dialog.getByRole('button', { exact: true, name: 'More actions' }).click();
+  await page.getByRole('menuitem', { name: /^Rename…/ }).click();
+  const renameDialog = page.getByRole('dialog', { exact: true, name: 'Rename workflow' });
+  await renameDialog.waitFor();
+  await renameDialog.getByRole('textbox').fill('Journey Template edited');
+  await renameDialog.getByRole('button', { exact: true, name: 'Rename' }).click();
+  await renameDialog.waitFor({ state: 'hidden' });
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(await currentWorkflowName(), 'Journey Template edited');
+
+  // Switching to the other workflow and back keeps both documents.
+  await openProjectWorkflows();
+  await cards.filter({ hasText: 'Empty Workflow' }).dblclick();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(await currentWorkflowName(), 'Empty Workflow');
+  await openProjectWorkflows();
+  await cards.filter({ hasText: 'Journey Template edited' }).dblclick();
+  await dialog.waitFor({ state: 'hidden' });
+  assert.equal(await currentWorkflowName(), 'Journey Template edited');
+
+  const libraryWritesSoFar = (await workflowRequests())
+    .slice(requestsBefore)
+    .filter((entry) => entry.method === 'PATCH' || entry.method === 'POST' || entry.method === 'DELETE');
+
+  assert.deepEqual(libraryWritesSoFar, [], 'project edits must not write to the workflow library');
+
+  // Save the edited copy under a new library name, without duplicating it beforehand.
+  await page.getByRole('button', { exact: true, name: 'Save to library…' }).click();
+  const saveDialog = page.getByRole('dialog', { exact: true, name: 'Save to library' });
+  await saveDialog.waitFor();
+  await saveDialog.getByRole('textbox').fill('Journey Saved');
+  await saveDialog.getByRole('button', { exact: true, name: 'Save' }).click();
+  await page.getByText('Workflow saved', { exact: true }).waitFor();
+
+  const libraryWrites = (await workflowRequests())
+    .slice(requestsBefore)
+    .filter((entry) => entry.method === 'PATCH' || entry.method === 'POST' || entry.method === 'DELETE');
+
+  assert.deepEqual(libraryWrites, [{ method: 'POST', path: '/api/v1/workflows/' }]);
+
+  const library = await fetchJson('/api/v1/workflows/?categories=user&page=0&per_page=50');
+  const saved = library.items.find((item) => item.name === 'Journey Saved');
+
+  assert.ok(saved, 'the save created a new template');
+  assert.equal(saved.revision, 1);
+  assert.equal(library.items.find((item) => item.workflow_id === template.workflow_id)?.name, 'Journey Template');
+
+  // The project keeps both workflows; the saved copy now targets the new template, and the name stayed the copy's.
+  const record = await waitForSavedWorkflows(
+    projectId,
+    (candidate) =>
+      candidate.data.workflows?.entries?.length === 2 &&
+      candidate.data.workflows.entries[1].source?.libraryWorkflowId === saved.workflow_id,
+    'two workflows with the saved copy linked to its new template'
+  );
+
+  assert.equal(record.data.documentSchemaVersion, 3);
+  assert.deepEqual(
+    record.data.workflows.entries.map((entry) => entry.document.name),
+    ['Empty Workflow', 'Journey Template edited']
+  );
+  assert.deepEqual(record.data.workflows.entries[1].source, { libraryWorkflowId: saved.workflow_id, revision: 1 });
+  assert.equal(record.data.workflows.activeWorkflowId, record.data.workflows.entries[1].document.id);
+
+  // Restart: both workflows and the active selection come back from the server.
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.getByRole('main', { exact: true, name: imported.name }).waitFor();
+  await selectLayoutPreset(page, 'Automate', 'Workflow');
+  assert.equal(await currentWorkflowName(), 'Journey Template edited');
+  await openProjectWorkflows();
+  assert.equal(await cards.count(), 2);
+  await page.keyboard.press('Escape');
+  await dialog.waitFor({ state: 'hidden' });
 
   await context.close();
   contexts.delete(context);

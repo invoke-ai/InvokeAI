@@ -158,6 +158,7 @@ export const getSavedWorkflowListItemFromRecord = (record: WorkflowRecordDTO): W
   is_public: record.is_public,
   name: record.name,
   opened_at: record.opened_at,
+  revision: record.revision,
   tags: typeof record.workflow.tags === 'string' ? record.workflow.tags : record.tags,
   thumbnail_url: record.thumbnail_url,
   updated_at: record.updated_at,
