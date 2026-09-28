@@ -160,8 +160,10 @@ def test_an_nvfp4_mixed_checkpoint_keeps_its_nvfp4_layers_packed_under_either_fp
         assert module.weight.dtype is torch.uint8, path
         # Installed after the cast, which would otherwise round the global scale to the compute dtype.
         assert module.weight_scale_2.dtype is torch.float32, path
-        x = torch.randn(3, module.in_features, dtype=COMPUTE_DTYPE)
-        torch.testing.assert_close(module(x), x @ weight.to(COMPUTE_DTYPE).T)
+        # A float32 activation, not the compute dtype: torch 2.7's CPU bf16 GEMM faults with an illegal
+        # instruction on part of GitHub's windows runner fleet. These values are exact in either width.
+        x = torch.randn(3, module.in_features, dtype=torch.float32)
+        torch.testing.assert_close(module(x), x @ weight.T)
     for layer, weight in fp8_dequantized.items():
         v_proj = model.layers[layer].self_attn.v_proj
         if keep_fp8:
