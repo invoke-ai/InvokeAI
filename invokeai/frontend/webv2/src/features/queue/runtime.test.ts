@@ -7,6 +7,7 @@ import type {
 } from '@features/queue/core/types';
 import type { BackendConnectionStatus } from '@platform/transport/types';
 
+import { activeProgressTargetStore } from '@features/queue/data/activeProgressTargetStore';
 import { buildQueueItemOrigin } from '@features/queue/data/events';
 import { ApiError } from '@platform/transport/http';
 import { describe, expect, it, vi } from 'vitest';
@@ -1957,6 +1958,62 @@ describe('queue runtime', () => {
     expect(backend.enqueueGenerate).not.toHaveBeenCalled();
 
     runtime.dispose();
+  });
+
+  it.each([
+    { hasWorkflowCall: true, name: 'saved-workflow call', node: { id: 'call', type: 'call_saved_workflow' } },
+    { hasWorkflowCall: false, name: 'ordinary workflow', node: { id: 'denoise', type: 'denoise' } },
+  ])('recovery routes waiting preview correctly for $name', async ({ hasWorkflowCall, node }) => {
+    const queueItem = createPendingQueueItem();
+    queueItem.snapshot.backendSubmission = {
+      batchCount: 1,
+      graph: {
+        edges: [],
+        id: 'backend-graph',
+        nodes: { [node.id]: node },
+      },
+      kind: 'workflow',
+    };
+    queueItem.snapshot.sourceId = 'workflow';
+    queueItem.backendItemIds = [88];
+    queueItem.status = 'running';
+    const project = { id: 'project-1', queue: { items: [queueItem] } };
+    const getItem = vi.fn().mockResolvedValue({
+      id: 88,
+      origin: buildQueueItemOrigin(queueItem.id, project.id),
+      status: 'waiting',
+    });
+    const readProgressPreviews = vi.fn().mockResolvedValue([]);
+    const backend = createTestBackend({ getItem, readProgressPreviews });
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend,
+      history: {
+        commands: createTestCommands(),
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: vi.fn(() => vi.fn()),
+      },
+    });
+    activeProgressTargetStore.clear();
+    const clear = vi.spyOn(activeProgressTargetStore, 'clear');
+    const set = vi.spyOn(activeProgressTargetStore, 'set');
+
+    try {
+      runtime.start();
+      await vi.waitFor(() => expect(readProgressPreviews).toHaveBeenCalled());
+
+      if (hasWorkflowCall) {
+        expect(clear).not.toHaveBeenCalledWith({ itemIndex: 1, queueItemId: queueItem.id });
+        expect(set).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: queueItem.id });
+      } else {
+        expect(clear).toHaveBeenCalledWith({ itemIndex: 1, queueItemId: queueItem.id });
+        expect(set).not.toHaveBeenCalledWith({ itemIndex: 1, queueItemId: queueItem.id });
+      }
+    } finally {
+      await runtime.dispose();
+      clear.mockRestore();
+      set.mockRestore();
+    }
   });
 
   it('retains a running journal row when its project tab closes', async () => {
