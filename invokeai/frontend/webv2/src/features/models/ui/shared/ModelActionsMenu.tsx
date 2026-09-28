@@ -72,10 +72,13 @@ export const ModelActionMenuItems = ({
 
 /** Confirms whichever destructive action is pending (convert replaces the original checkpoint file). */
 export const ModelActionConfirmDialog = ({
+  finalFocusEl,
   onClose,
   onDeleted,
   pending,
 }: {
+  /** Focus destination on close; list rows resolve it late because a delete removes the opener. */
+  finalFocusEl?: () => HTMLElement | null;
   onClose: () => void;
   /** Called only when the delete completed in the current account scope. */
   onDeleted?: () => void;
@@ -92,6 +95,7 @@ export const ModelActionConfirmDialog = ({
           : t('models.deleteBody', { name: pending?.model.name ?? '' })
       }
       confirmLabel={pending?.kind === 'convert' ? t('models.convert') : t('models.deleteModel')}
+      finalFocusEl={finalFocusEl}
       isOpen={pending !== null}
       title={pending?.kind === 'convert' ? t('models.convertToDiffusers') : t('models.deleteModel')}
       onClose={onClose}
