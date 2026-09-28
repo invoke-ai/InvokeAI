@@ -1208,6 +1208,19 @@ const isSelectedComponentCompatible = (
   return !slotPolicy.filter || slotPolicy.filter(value as ModelConfig, getComponentPolicyContext(model, settings));
 };
 
+/** Whether `candidate` may fill `key` for `model`, by the rule the model-selection transition clears with. */
+export const isComponentCompatibleWithModel = (
+  model: GenerateModelConfig,
+  settings: GenerateSettings,
+  key: GenerateComponentValueKey,
+  candidate: ModelConfig
+): boolean => {
+  const nextSettings = { ...settings, [key]: candidate };
+  const slotPolicy = getComponentSectionPolicy(model, nextSettings).slots.find((slot) => slot.key === key);
+
+  return isSelectedComponentCompatible(slotPolicy, model, nextSettings, key);
+};
+
 type ReferenceModelCandidate = { base: string; key: string; name: string; type: string };
 
 const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is MainModelConfig =>
