@@ -90,6 +90,7 @@ import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
 import { WorkflowEdge } from './WorkflowEdge';
 import { WorkflowSelectionRequestRuntime } from './WorkflowSelectionRequestRuntime';
+import { WorkflowViewportRestoreRuntime } from './WorkflowViewportRestoreRuntime';
 import { getWorkflowViewport, getWorkflowViewportKey, setWorkflowViewport } from './workflowViewportStore';
 
 const nodeTypes: NodeTypes = {
@@ -1195,6 +1196,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         />
         {workflowShowMinimap && (!isLargeGraph || isMinimapReady) ? <FlowMiniMap /> : null}
       </ReactFlow>
+      <WorkflowViewportRestoreRuntime key={viewportKey} viewportKey={viewportKey} />
       {flowInstance ? (
         <WorkflowSelectionRequestRuntime
           flowInstance={flowInstance}

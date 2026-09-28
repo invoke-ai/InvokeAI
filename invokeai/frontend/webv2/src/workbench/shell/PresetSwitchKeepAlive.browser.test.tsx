@@ -1,10 +1,20 @@
 import { Box, ChakraProvider } from '@chakra-ui/react';
+import { getWorkflowFlowInstance } from '@features/workflow/ui/editor/flowInstanceStore';
+import { WorkflowEditorView } from '@features/workflow/ui/editor/WorkflowEditorView';
+import {
+  clearWorkflowViewports,
+  getWorkflowViewport,
+  getWorkflowViewportKey,
+} from '@features/workflow/ui/editor/workflowViewportStore';
+import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
+import { createProjectGraph } from '@features/workflow/utility';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import '@xyflow/react/dist/style.css';
 
 /**
  * Model preset application by replacing region ids while preserving merged widget instances for keep-alive
@@ -103,7 +113,35 @@ vi.mock('@features/models', () => ({ useModelLoads: () => [] }));
 vi.mock('@features/queue/contracts', () => ({
   getProjectQueueIndicatorState: () => ({ hasOpenQueueWork: false, progressState: null, runningQueueItemId: null }),
 }));
-vi.mock('@features/queue/react', () => ({ useQueueItemProgress: () => null }));
+vi.mock('@features/queue/react', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useQueueItemProgress: () => null,
+}));
+vi.mock('@features/workflow/react', async (importOriginal) => {
+  const original = await importOriginal<Record<string, unknown>>();
+  const callSavedWorkflowTemplate = {
+    category: 'workflow',
+    classification: 'stable',
+    description: '',
+    inputs: {},
+    nodePack: 'invokeai',
+    outputType: 'workflow_return_output',
+    outputs: {},
+    tags: [],
+    title: 'Call Saved Workflow',
+    type: 'call_saved_workflow',
+    useCache: true,
+    version: '1.0.0',
+  };
+  const templates = { call_saved_workflow: callSavedWorkflowTemplate };
+
+  return {
+    ...original,
+    ensureInvocationTemplatesLoaded: () => {},
+    useInvocationTemplatesSelector: (selector: (snapshot: unknown) => unknown) =>
+      selector({ status: 'loaded', templates }),
+  };
+});
 vi.mock('@workbench/focusRegions', () => ({ useFocusRegionProps: () => ({}) }));
 vi.mock('@workbench/widgetRegionViewModel', () => ({
   createWidgetRegionViewModelFromState: ({ regionState }: { regionState: { instanceIds: string[] } }) => ({
@@ -140,22 +178,124 @@ vi.mock('@workbench/WorkbenchContext', async () => {
       selector({ backendConnection: { status: 'connected' } }),
   };
 });
-vi.mock('@workbench/widget-frame', () => ({
-  // Loading state is not what this suite measures; the real component would
-  // suspend on a chunk that does not exist under the mocked registry.
-  WidgetIdentityIcon: () => <Box boxSize="3.5" />,
-  WidgetChromeSlotById: () => null,
-  WidgetRendererById: ({ instanceId }: { instanceId: string }) => (
-    <Box
-      data-hotkey-widget-instance-id={instanceId}
-      data-hotkey-widget-type-id={keepAliveMocks.typeIdByInstanceId[instanceId] ?? instanceId}
-      h="full"
-      w="full"
-    />
-  ),
-  WidgetSourceLockBadge: () => null,
-  useWidgetIntentPreloadProps: () => ({}),
-}));
+vi.mock('@workbench/widget-frame', () => {
+  const graph = {
+    ...createProjectGraph('workflow-a'),
+    nodes: [
+      {
+        data: {
+          callSavedWorkflowStatus: 'ready',
+          dynamicInputTemplates: {},
+          inputs: { workflow_id: { label: '', name: 'workflow_id', value: 'child-workflow' } },
+          isIntermediate: false,
+          isOpen: true,
+          label: '',
+          nodePack: 'invokeai',
+          notes: '',
+          type: 'call_saved_workflow',
+          useCache: true,
+          version: '1.0.0',
+        },
+        id: 'call-saved-workflow',
+        position: { x: 0, y: 0 },
+        type: 'invocation',
+      },
+    ],
+  };
+  const projectSnapshot = {
+    activeWorkflow: { document: graph },
+    activeWorkflowId: 'workflow-a',
+    galleryValues: {},
+    id: 'project-a',
+    isWorkflowRunning: false,
+    projectGraph: graph,
+    workflowValues: {},
+    workflows: [{ document: graph }],
+  };
+  const subscribe = () => () => {};
+  /* eslint-disable react-perf/jsx-no-new-object-as-prop -- Stable adapter and runtime fixtures for the mounted editor. */
+  const adapter = {
+    capabilities: { getSnapshot: () => ({ canUseCache: true }), subscribe },
+    commands: {
+      addWorkflow: () => 'new-workflow',
+      createWorkflow: () => 'new-workflow',
+      duplicateWorkflow: () => null,
+      editGraph: () => {},
+      redo: () => {},
+      removeWorkflow: () => {},
+      renameWorkflow: () => {},
+      selectWorkflow: () => {},
+      setWorkflowSource: () => {},
+      undo: () => {},
+    },
+    getProjectGraph: () => graph,
+    nodeExecution: {
+      get: () => null,
+      getOrigin: () => null,
+      subscribe,
+      subscribeOrigin: subscribe,
+    },
+    notifications: { error: () => {}, info: () => {}, success: () => {} },
+    openAddModels: () => {},
+    performance: {
+      mark: () => {},
+      measure: () => {},
+      time: <T,>(_name: string, _source: unknown, callback: () => T) => callback(),
+    },
+    persistence: {
+      getSnapshot: () => ({ error: null, hasLocalRecovery: true, lastSavedAt: null, status: 'saved' }),
+      subscribe,
+    },
+    preferences: {
+      getSnapshot: () => ({
+        reduceMotion: true,
+        themeId: 'classic',
+        workflowEdgeStyle: 'curved',
+        workflowEdgesBehindNodes: false,
+        workflowShowMinimap: false,
+        workflowSnapToGrid: false,
+        workflowValidateConnections: true,
+      }),
+      subscribe,
+    },
+    project: { getSnapshot: () => projectSnapshot, subscribe },
+    registerModalHotkeyLayer: () => () => {},
+    widgets: { open: () => {}, patchValues: () => {} },
+  };
+  const runtime = {
+    commands: { register: () => () => {} },
+    hotkeys: { register: () => () => {} },
+    instanceId: 'workflow:center',
+    region: 'center',
+    typeId: 'workflow',
+  } as const;
+  /* eslint-enable react-perf/jsx-no-new-object-as-prop */
+
+  const WorkflowEditorWidget = () => (
+    <WorkflowUiProvider adapter={adapter as never}>
+      <WorkflowEditorView runtime={runtime} />
+    </WorkflowUiProvider>
+  );
+
+  return {
+    // Loading state is not what this suite measures; the real component would
+    // suspend on a chunk that does not exist under the mocked registry.
+    WidgetIdentityIcon: () => <Box boxSize="3.5" />,
+    WidgetChromeSlotById: () => null,
+    WidgetRendererById: ({ instanceId }: { instanceId: string }) => (
+      <Box
+        data-hotkey-widget-instance-id={instanceId}
+        data-hotkey-widget-type-id={keepAliveMocks.typeIdByInstanceId[instanceId] ?? instanceId}
+        h="full"
+        w="full"
+      >
+        {instanceId === 'workflow:center' ? <WorkflowEditorWidget /> : null}
+      </Box>
+    ),
+    WidgetSourceLockBadge: () => null,
+    useWidgetIntentPreloadProps: () => ({}),
+  };
+});
 
 import { CenterArea } from './CenterArea';
 
@@ -214,6 +354,7 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
+  clearWorkflowViewports();
   keepAliveMocks.reset();
 });
 
@@ -239,6 +380,57 @@ describe('preset switch keep-alive', () => {
     expect(centerWidget('canvas')).toBe(canvasNode);
     expect(getComputedStyle(canvasNode).display).not.toBe('none');
     expect(getComputedStyle(centerWidget('workflow:center') as Element).display).toBe('none');
+  });
+
+  it('preserves the live workflow viewport when switching between editor and preview', async () => {
+    const { setActiveInstanceId } = await renderCenterArea();
+
+    await setActiveInstanceId('workflow:center');
+
+    const viewportKey = getWorkflowViewportKey('project-a', 'workflow-a', 'workflow:center');
+
+    await vi.waitFor(() => expect(getWorkflowFlowInstance()).not.toBeNull());
+    const flow = getWorkflowFlowInstance();
+
+    if (!flow) {
+      throw new Error('Expected the production workflow editor flow to mount.');
+    }
+
+    await act(async () => {
+      await flow.setViewport({ x: 212, y: 140, zoom: 0.72 }, { duration: 0 });
+    });
+
+    await vi.waitFor(() => expect(getWorkflowViewport(viewportKey)).toEqual({ x: 212, y: 140, zoom: 0.72 }));
+    expect(flow.getViewport()).toEqual({ x: 212, y: 140, zoom: 0.72 });
+    expect(host?.querySelectorAll('.react-flow__node')).toHaveLength(1);
+    const flowElement = host?.querySelector<HTMLElement>('.react-flow');
+    const nodeElement = host?.querySelector<HTMLElement>('.react-flow__node');
+
+    expect(flowElement).not.toBeNull();
+    expect(nodeElement).not.toBeNull();
+    if (!flowElement || !nodeElement) {
+      throw new Error('Expected the single call-workflow node inside React Flow.');
+    }
+    expect(nodeElement.textContent).toContain('Call Saved Workflow');
+
+    const flowBounds = flowElement.getBoundingClientRect();
+    const nodeBounds = nodeElement.getBoundingClientRect();
+
+    expect(nodeBounds.right).toBeGreaterThan(flowBounds.left);
+    expect(nodeBounds.left).toBeLessThan(flowBounds.right);
+    expect(nodeBounds.bottom).toBeGreaterThan(flowBounds.top);
+    expect(nodeBounds.top).toBeLessThan(flowBounds.bottom);
+
+    await setActiveInstanceId('preview');
+    await setActiveInstanceId('workflow:center');
+
+    await vi.waitFor(() => expect(getWorkflowFlowInstance()?.getViewport()).toEqual({ x: 212, y: 140, zoom: 0.72 }));
+
+    const restoredFlowElement = host?.querySelector<HTMLElement>('.react-flow');
+    const restoredNodeElement = host?.querySelector<HTMLElement>('.react-flow__node');
+
+    expect(restoredFlowElement).not.toBeNull();
+    expect(restoredNodeElement?.textContent).toContain('Call Saved Workflow');
   });
 
   it('leaves a hidden widget out of the tab order', async () => {
