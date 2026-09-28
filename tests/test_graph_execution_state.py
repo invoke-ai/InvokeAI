@@ -2951,6 +2951,74 @@ def test_graph_for_final_output_collection_materializes_after_last_direct_return
     assert after_node.value == ["alpha", "beta"]
 
 
+def test_graph_for_final_output_feeds_selected_if_branch_in_parent_frame():
+    graph = Graph()
+    graph.add_node(NestedAnyCollectionTestInvocation(id="outer_values", collection=[["alpha", "beta"], ["gamma"]]))
+    graph.add_node(IterateInvocation(id="outer_iter"))
+    graph.add_node(ForInvocation(id="inner_for"))
+    graph.add_node(ForReturnInvocation(id="inner_return"))
+    graph.add_node(AnyTypeTestInvocation(id="after"))
+    graph.add_node(IfInvocation(id="if", condition=False))
+    graph.add_edge(create_edge("outer_values", "collection", "outer_iter", "collection"))
+    graph.add_edge(create_edge("outer_iter", "item", "inner_for", "collection"))
+    graph.add_edge(create_edge("inner_for", "item", "inner_return", "output"))
+    graph.add_edge(create_edge("inner_for", "output_collection", "after", "value"))
+    graph.add_edge(create_edge("after", "value", "if", "false_input"))
+
+    state = GraphExecutionState(graph=add_test_loop_linkages(graph))
+    executed_source_ids = execute_all_nodes(state)
+
+    assert executed_source_ids.count("after") == 2
+    assert executed_source_ids.count("if") == 2
+    assert state.is_complete()
+    if_exec_ids = state.source_prepared_mapping["if"]
+    assert {
+        state._get_iteration_path(if_exec_id): tuple(state.results[if_exec_id].value) for if_exec_id in if_exec_ids
+    } == {
+        (0,): ("alpha", "beta"),
+        (1,): ("gamma",),
+    }
+
+
+def test_graph_static_nested_ifs_ignore_unselected_loop_branch_context():
+    graph = Graph()
+    graph.add_node(NestedAnyCollectionTestInvocation(id="a_values", collection=[["a0", "a1"], ["a2"]]))
+    graph.add_node(IterateInvocation(id="a_iter"))
+    graph.add_node(ForInvocation(id="a_for"))
+    graph.add_node(ForReturnInvocation(id="a_return"))
+    graph.add_node(NestedAnyCollectionTestInvocation(id="b_values", collection=[["b0"], ["b1"], ["b2"]]))
+    graph.add_node(IterateInvocation(id="b_iter"))
+    graph.add_node(ForInvocation(id="b_for"))
+    graph.add_node(ForReturnInvocation(id="b_return"))
+    graph.add_node(IfInvocation(id="inner_if", condition=False))
+    graph.add_node(IfInvocation(id="outer_if", condition=False))
+    graph.add_node(AnyTypeTestInvocation(id="result"))
+    graph.add_edge(create_edge("a_values", "collection", "a_iter", "collection"))
+    graph.add_edge(create_edge("a_iter", "item", "a_for", "collection"))
+    graph.add_edge(create_edge("a_for", "item", "a_return", "output"))
+    graph.add_edge(create_edge("b_values", "collection", "b_iter", "collection"))
+    graph.add_edge(create_edge("b_iter", "item", "b_for", "collection"))
+    graph.add_edge(create_edge("b_for", "item", "b_return", "output"))
+    graph.add_edge(create_edge("a_for", "output_collection", "inner_if", "false_input"))
+    graph.add_edge(create_edge("b_for", "output_collection", "inner_if", "true_input"))
+    graph.add_edge(create_edge("inner_if", "value", "outer_if", "false_input"))
+    graph.add_edge(create_edge("outer_if", "value", "result", "value"))
+
+    state = GraphExecutionState(graph=add_test_loop_linkages(graph))
+    executed_source_ids = execute_all_nodes(state)
+
+    result_exec_ids = state.source_prepared_mapping["result"]
+    assert {
+        state._get_iteration_path(result_exec_id): tuple(state.results[result_exec_id].value)
+        for result_exec_id in result_exec_ids
+    } == {
+        (0,): ("a0", "a1"),
+        (1,): ("a2",),
+    }
+    assert executed_source_ids.count("outer_if") == 2
+    assert state.is_complete()
+
+
 def test_graph_for_final_state_materializes_after_last_direct_return():
     graph = Graph()
     graph.add_node(ForInvocation(id="for", collection=["alpha", "beta"]))
