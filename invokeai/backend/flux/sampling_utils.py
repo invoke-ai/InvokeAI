@@ -66,8 +66,10 @@ def get_schedule(
         # schedule flattens with it -- the smallest non-zero timestep rises to 0.47, 0.97 and
         # 0.9997. `clip_timestep_schedule_fractional` then has almost nothing left below
         # `1 - denoising_start`. Steps surviving a 30-step request at `denoising_start=0.5`:
-        # 8 at 1 MP, 6 at 1.6 MP, 4 at 2.4 MP, 2 at 4.2 MP, and from ~3376px square every
-        # `denoising_start` a user can set leaves exactly one.
+        # 8 at 1 MP, 6 at 1.6 MP, 4 at 2.4 MP, 2 at 4.2 MP, and one from ~2112px square. From
+        # ~3376px square any `denoising_start` of 0.01 or more leaves one; only a full denoise from 0
+        # escapes the clip. Asking for more steps barely helps: at 2048px and 0.499, 100 keep 4 and
+        # 1000 keep 39.
         #
         # The effect is graded, not a cliff: between 1 MP and ~1.6 MP the unclamped schedule is not
         # degenerate, and holding mu there is a judgement -- never evaluate the fit outside the
