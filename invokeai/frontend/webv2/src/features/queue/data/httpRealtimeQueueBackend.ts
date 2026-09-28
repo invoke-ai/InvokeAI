@@ -30,6 +30,7 @@ import {
   getQueueEnqueueReceipt,
   getResultImages,
   getResultVideoNames,
+  getResultVideos,
 } from './submissionApi';
 
 /** Production adapter for the queue backend port. */
@@ -53,6 +54,7 @@ export const queueBackend: QueueBackendPort = {
   getItem: async (itemId) => mapQueueBackendItemDTO(await getQueueItem(itemId)),
   getResultImages,
   getResultVideoNames,
+  getResultVideos,
   listItems: async () => (await listAllQueueItems()).map(mapQueueBackendItemDTO),
   on: socketHub.on,
   onConnectionChange: socketHub.onConnectionChange,
