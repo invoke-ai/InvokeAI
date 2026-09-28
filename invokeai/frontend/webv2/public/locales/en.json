@@ -195,6 +195,9 @@
     "scrubber": {
       "editValue": "Edit {{label}}"
     },
+    "list": {
+      "selectItem": "Select {{name}}"
+    },
     "configure": "Configure",
     "copy": "Copy",
     "crop": "Crop",

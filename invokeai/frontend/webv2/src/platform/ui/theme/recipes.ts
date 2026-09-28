@@ -664,6 +664,8 @@ export const scrollAreaSlotRecipe = defineSlotRecipe({
       ...chakraSlotRecipes.scrollArea.base?.scrollbar,
       '&[data-orientation="vertical"]:not([data-overflow-y])': { display: 'none' },
       '&[data-orientation="horizontal"]:not([data-overflow-x])': { display: 'none' },
+      // Above sticky content (z-index 1) so opaque pinned headers never cover the thumb.
+      zIndex: 2,
     },
   },
 });
@@ -860,43 +862,202 @@ export const panelRecipe = defineRecipe({
   defaultVariants: { tone: 'surface', density: 'none' },
 });
 
+const rowFocusRing = {
+  outline: '2px solid',
+  outlineColor: 'accent.solid',
+  outlineOffset: '-2px',
+} as const;
+
+/** One row surface for every list-like control; `Row` and `ListItem` both build on it. */
+const rowSurface = {
+  borderRadius: 'sm',
+  textAlign: 'start',
+  transition: 'background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease',
+  w: 'full',
+  // Keep hover below selected emphasis so pointing does not resemble selection.
+  _hover: { bg: 'bg.muted/60' },
+  _disabled: { cursor: 'not-allowed', opacity: 0.5 },
+} as const;
+
+/** Emphasis levels: `accent` marks the one active row, `selected` marks checked rows. */
+const rowTones = {
+  none: {},
+  muted: { bg: 'bg.muted' },
+  selected: { bg: 'bg.emphasized/60', _hover: { bg: 'bg.emphasized/60' } },
+  emphasized: { bg: 'bg.emphasized', _hover: { bg: 'bg.emphasized' } },
+  brand: {
+    bg: 'brand.subtle',
+    color: 'brand.fg',
+    _hover: { bg: 'brand.subtle' },
+  },
+  accent: {
+    bg: 'accent.solid',
+    color: 'accent.contrast',
+    _hover: { bg: 'accent.solid' },
+  },
+} as const;
+
 export const rowRecipe = defineRecipe({
   base: {
+    ...rowSurface,
     alignItems: 'center',
-    borderRadius: 'sm',
     display: 'flex',
     gap: '2',
-    textAlign: 'start',
-    transition: 'background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease',
-    w: 'full',
-    // Keep hover below selected emphasis so pointing does not resemble selection.
-    _hover: { bg: 'bg.muted/60' },
-    _focusVisible: {
-      outline: '2px solid',
-      outlineColor: 'accent.solid',
-      outlineOffset: '-2px',
+    _focusVisible: rowFocusRing,
+  },
+  variants: {
+    active: rowTones,
+  },
+  defaultVariants: { active: 'none' },
+});
+
+/**
+ * A list row: an optional checkbox beside one primary button, never inside it. The ring wraps the whole row when
+ * the button has focus; the accent tone recolors muted text so it stays legible on the solid fill.
+ */
+export const listItemSlotRecipe = defineSlotRecipe({
+  slots: ['root', 'check', 'primary', 'body', 'titleLine', 'title', 'badges', 'description', 'trailing', 'actions'],
+  base: {
+    root: {
+      ...rowSurface,
+      alignItems: 'stretch',
+      display: 'flex',
+      minW: 0,
+      position: 'relative',
+      '&:has([data-list-primary]:focus-visible)': rowFocusRing,
+      // Rows of a page being replaced stay readable; only the pointer says the list is working.
+      '&[data-busy]': { cursor: 'progress' },
+      // Nothing to press: pointing must not look like an affordance.
+      '&[data-static]:hover': { bg: 'transparent' },
     },
-    _disabled: { cursor: 'not-allowed', opacity: 0.5 },
+    check: {
+      alignItems: 'center',
+      display: 'flex',
+      flexShrink: 0,
+      ps: '2',
+    },
+    primary: {
+      alignItems: 'center',
+      appearance: 'none',
+      bg: 'transparent',
+      border: 0,
+      borderRadius: 'inherit',
+      color: 'inherit',
+      display: 'flex',
+      flex: 1,
+      font: 'inherit',
+      minW: 0,
+      outline: 'none',
+      textAlign: 'start',
+    },
+    body: {
+      display: 'flex',
+      flex: 1,
+      flexDirection: 'column',
+      gap: '0.5',
+      minW: 0,
+    },
+    titleLine: {
+      alignItems: 'center',
+      display: 'flex',
+      gap: '1.5',
+      minW: 0,
+    },
+    title: {
+      fontSize: 'xs',
+      fontWeight: '600',
+      lineHeight: 'shorter',
+    },
+    badges: {
+      alignItems: 'center',
+      display: 'flex',
+      flexShrink: 0,
+      gap: '1',
+    },
+    description: {
+      color: 'fg.muted',
+      fontSize: '2xs',
+      lineHeight: 'shorter',
+      minW: 0,
+    },
+    trailing: {
+      alignItems: 'center',
+      color: 'fg.muted',
+      display: 'flex',
+      flexShrink: 0,
+      fontSize: '2xs',
+      gap: '1.5',
+    },
+    // Controls beside the primary button, never inside it.
+    actions: {
+      alignItems: 'center',
+      display: 'flex',
+      flexShrink: 0,
+      gap: '0.5',
+      pe: '1',
+    },
   },
   variants: {
     active: {
       none: {},
-      muted: { bg: 'bg.muted' },
-      selected: { bg: 'bg.emphasized/60', _hover: { bg: 'bg.emphasized/60' } },
-      emphasized: { bg: 'bg.emphasized', _hover: { bg: 'bg.emphasized' } },
-      brand: {
-        bg: 'brand.subtle',
-        color: 'brand.fg',
-        _hover: { bg: 'brand.subtle' },
-      },
+      selected: { root: rowTones.selected },
       accent: {
-        bg: 'accent.solid',
-        color: 'accent.contrast',
-        _hover: { bg: 'accent.solid' },
+        root: rowTones.accent,
+        description: { color: 'accent.contrast', opacity: 0.85 },
+        trailing: { color: 'accent.contrast' },
+      },
+    },
+    density: {
+      compact: {
+        root: { minH: '7' },
+        primary: { gap: '2', px: '2', py: '1' },
+      },
+      regular: {
+        root: { minH: '10' },
+        primary: { gap: '2', px: '2', py: '1.5' },
+      },
+      comfortable: {
+        root: { minH: '13' },
+        primary: { gap: '2.5', px: '2', py: '1.5' },
       },
     },
   },
-  defaultVariants: { active: 'none' },
+  defaultVariants: { active: 'none', density: 'regular' },
+});
+
+/** Section labels inside lists; the count sits beside the label in a quieter tone. */
+export const listSectionHeaderSlotRecipe = defineSlotRecipe({
+  slots: ['root', 'label', 'count'],
+  base: {
+    root: {
+      alignItems: 'flex-end',
+      display: 'flex',
+      gap: '1.5',
+      h: '8',
+      minW: 0,
+      pb: '1.5',
+      ps: '2',
+    },
+    label: {
+      color: 'fg.muted',
+      fontSize: '2xs',
+      fontWeight: '700',
+      letterSpacing: '0.04em',
+      lineHeight: 'shorter',
+      minW: 0,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      textTransform: 'uppercase',
+      whiteSpace: 'nowrap',
+    },
+    count: {
+      color: 'fg.muted',
+      flexShrink: 0,
+      fontSize: '2xs',
+      fontVariantNumeric: 'tabular-nums',
+      lineHeight: 'shorter',
+    },
+  },
 });
 
 export const chipRecipe = defineRecipe({
