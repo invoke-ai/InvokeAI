@@ -20,9 +20,12 @@ export const GalleryProgressSection = ({
   layout,
   getScrollElement,
 }: {
+  offsetTopPx,
   layout: GalleryProgressLayout;
   getScrollElement(): HTMLDivElement | null;
 }) => {
+  /** Height of the pinned content above this section in the shared scroll viewport. */
+  offsetTopPx: number;
   const { t } = useTranslation();
   const { progressSessions, pinnedProgressSessionId, liveFollowEnabled, followProgressSession } = useGalleryUi();
   const { actions, gallery } = useGalleryWidget();
@@ -100,6 +103,7 @@ export const GalleryProgressSection = ({
             fit={gallery.settings.thumbnailFit}
             getScrollElement={getScrollElement}
             pinnedSessionId={pinnedProgressSessionId}
+            offsetTopPx={offsetTopPx}
             liveFollowEnabled={liveFollowEnabled}
             onFollow={followProgressSession}
             restoreFocus={restoreFocus}
@@ -116,6 +120,7 @@ const GalleryProgressGrid = ({
   fit,
   getScrollElement,
   pinnedSessionId,
+  offsetTopPx,
   liveFollowEnabled,
   onFollow,
   restoreFocus,
@@ -125,6 +130,7 @@ const GalleryProgressGrid = ({
   fit: GalleryThumbnailFit;
   getScrollElement(): HTMLDivElement | null;
   pinnedSessionId: string | null;
+  offsetTopPx: number;
   liveFollowEnabled: boolean;
   onFollow(id: string, options: { revealPreview: boolean }): void;
   restoreFocus(): void;
@@ -132,10 +138,11 @@ const GalleryProgressGrid = ({
   const { columns, tileSize, headerHeight, paddingBottom, rowCount, rowHeight } = layout;
   const estimateSize = useCallback(() => rowHeight, [rowHeight]);
   const virtualizer = useVirtualizer({
+  const scrollMargin = offsetTopPx + headerHeight;
     count: rowCount,
     getScrollElement,
     estimateSize,
-    scrollMargin: headerHeight,
+    scrollMargin,
     overscan: 2,
   });
   const measure = useEffectEvent(() => virtualizer.measure());
@@ -150,7 +157,7 @@ const GalleryProgressGrid = ({
             <Box
               key={session.id}
               position="absolute"
-              top={`${row.start - headerHeight}px`}
+              top={`${row.start - scrollMargin}px`}
               left={`${column * rowHeight}px`}
             >
               <GalleryProgressTile
