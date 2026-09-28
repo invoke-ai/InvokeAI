@@ -1,6 +1,6 @@
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
 
-import type { GalleryImage, GalleryOrderDir, GeneratedImageContract } from './types';
+import type { GalleryImage, GalleryOrderDir, GeneratedImageContract, GeneratedVideoContract } from './types';
 
 export type GalleryItemKind = 'image' | 'video';
 
@@ -130,6 +130,23 @@ export const legacyGeneratedImageToGalleryItem = (image: LegacyGalleryImage): Ga
   starred: image.starred ?? false,
   thumbnailUrl: image.thumbnailUrl,
   width: image.width,
+});
+
+export const generatedVideoToGalleryItem = (video: GeneratedVideoContract): GalleryVideoItem => ({
+  boardId: video.boardId ?? 'none',
+  category: video.category,
+  createdAt: video.createdAt ?? video.queuedAt,
+  durationSeconds: video.durationSeconds,
+  ...(video.fps === undefined ? {} : { fps: video.fps }),
+  fullUrl: video.videoUrl,
+  height: video.height,
+  isIntermediate: video.isIntermediate,
+  kind: 'video',
+  ...(video.mediaOrigin === undefined ? {} : { mediaOrigin: video.mediaOrigin }),
+  name: video.videoName,
+  starred: false,
+  thumbnailUrl: video.thumbnailUrl,
+  width: video.width,
 });
 
 export const galleryImageItemToGalleryImage = (item: GalleryImageItem): GalleryImage => ({

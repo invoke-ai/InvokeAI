@@ -41,6 +41,17 @@ ltx2_5_components = StarterModel(
     format=ModelFormat.Diffusers,
 )
 
+ltx2_5_prompt_enhancer = StarterModel(
+    name="LTX-2.5 Prompt Enhancer (Gemma-4 E2B)",
+    base=BaseModelType.Any,
+    source="google/gemma-4-E2B-it",
+    description=(
+        "The prompt enhancer LTX-2.5 was released with, for Expand Prompt. Pair it with the seeded LTX-2.5 "
+        "system prompts; the Image-to-Video one also reads the first frame. Optional. (~10 GB)"
+    ),
+    type=ModelType.TextLLM,
+)
+
 ltx2_5_text_encoder_int8 = StarterModel(
     name="LTX-2.5 Text Encoder (Gemma-4 12B, int8)",
     base=BaseModelType.LTX2,

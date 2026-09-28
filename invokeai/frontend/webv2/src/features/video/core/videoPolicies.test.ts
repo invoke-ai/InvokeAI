@@ -22,6 +22,7 @@ import {
   getEffectiveVideoTiming,
   getVideoComponentSectionPolicy,
   getVideoDimensions,
+  getVideoExpandPromptSuggestion,
   getVideoModelAvailabilityReasons,
   getVideoModelPolicy,
   getVideoModelSelectionResult,
@@ -224,6 +225,38 @@ describe('getVideoDimensions', () => {
     });
 
     expect(getVideoDimensions(model, settings)).toBeNull();
+  });
+});
+
+describe('getVideoExpandPromptSuggestion', () => {
+  const frame = { height: 512, image_name: 'frame.png', width: 768 };
+  const promptSettings = {
+    acceleratorEnabled: false,
+    audioCfgScale: null,
+    cfgScale: 3,
+    cfgScaleLowNoise: null,
+    negativePromptEnabled: true,
+    wanLowNoiseModel: null,
+  };
+
+  it.each(['ltx2_dev', 'ltx2_distilled'])('suggests the LTX-2.5 enhancer and seeded prompts for %s', (variant) => {
+    const { enhancer } = getVideoPromptPolicy(ltx2(variant), promptSettings);
+
+    // The ids are the rows seeded by backend migration 2026_09_26_add_ltx2_system_prompts.
+    expect(getVideoExpandPromptSuggestion(enhancer, frame)).toEqual({
+      image: frame,
+      imageSystemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0010',
+      modelName: 'LTX-2.5 Prompt Enhancer (Gemma-4 E2B)',
+      modelSource: 'google/gemma-4-E2B-it',
+      systemPromptId: '0f8f5b2e-1c9e-4f2a-9a4e-1f1f1f1f0009',
+    });
+    expect(getVideoExpandPromptSuggestion(enhancer, null)?.image).toBeNull();
+  });
+
+  it('suggests nothing for a family without an enhancer', () => {
+    const { enhancer } = getVideoPromptPolicy(wanModel('t2v_a14b'), promptSettings);
+
+    expect(getVideoExpandPromptSuggestion(enhancer, frame)).toBeNull();
   });
 });
 

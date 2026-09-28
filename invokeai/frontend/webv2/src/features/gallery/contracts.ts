@@ -9,6 +9,7 @@ export type {
   GalleryOrderDir,
   GalleryView,
   GeneratedImageContract,
+  GeneratedVideoContract,
 } from './core/types';
 export { getGalleryBoardLabel, type GalleryBoardTranslate } from './core/boardLabels';
 export { normalizeGalleryImage } from './core/image';
@@ -18,6 +19,7 @@ export {
   compareGalleryItems,
   formatGalleryVideoDuration,
   galleryImageItemToGalleryImage,
+  generatedVideoToGalleryItem,
   isGalleryImageItem,
   legacyGeneratedImageToGalleryItem,
   parseGalleryItemKey,

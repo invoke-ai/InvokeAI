@@ -1,6 +1,6 @@
 import type { PromptHistoryItem } from '@features/generation/contracts';
 import type { PromptTemplateSnapshot } from '@features/generation/core/promptTemplates';
-import type { GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
+import type { ExpandPromptSuggestion, GenerateLora, GenerateModelConfig } from '@features/generation/core/types';
 import type { ChangeEvent, KeyboardEvent } from 'react';
 
 import { Box, Text } from '@chakra-ui/react';
@@ -29,6 +29,8 @@ interface PositivePromptFieldProps {
   batchCount?: number;
   /** Absent on surfaces whose prompt is not batch-expanded (Upscale). */
   dynamicPrompts?: DynamicPromptsFieldConfig | null;
+  /** Absent on surfaces whose model family has no prompt enhancer of its own. */
+  expandPromptSuggestion?: ExpandPromptSuggestion | null;
   /** Absent on surfaces with no template concept (Upscale). */
   promptTemplate?: PromptTemplateSnapshot | null;
   /** Show the merged prompt read-only instead of the authored text. */
@@ -55,6 +57,7 @@ const POSITIVE_PROMPT_TRIGGER_KEYS = ['<', '_'] as const;
 export const PositivePromptField = ({
   batchCount = 1,
   dynamicPrompts = null,
+  expandPromptSuggestion = null,
   heightPx,
   isTemplateViewMode = false,
   loras,
@@ -193,6 +196,7 @@ export const PositivePromptField = ({
         batchCount={batchCount}
         droppedImage={droppedImage}
         dynamicPrompts={dynamicPrompts}
+        expandPromptSuggestion={expandPromptSuggestion}
         isPromptTriggerPickerOpen={triggerPicker.isOpen}
         showSyntaxHighlighting={showSyntaxHighlighting}
         onInsertText={insertTextAtCaret}
@@ -213,6 +217,7 @@ export const PositivePromptField = ({
       draftValue,
       dynamicPrompts,
       effectivePositivePrompt,
+      expandPromptSuggestion,
       handleUsePrompt,
       droppedImage,
       insertTextAtCaret,

@@ -2868,3 +2868,37 @@ def test_video_leaving_eligibility_clears_its_failure_bookkeeping(
     status = service.get_status()
     assert status is not None
     assert status.failed == 0
+
+
+def test_gpu_embedding_runs_on_an_idle_gpu(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Indexing runs outside the session queue, so a batch borrows the idle GPU instead of the busy one."""
+    from unittest.mock import MagicMock
+
+    from tests.fixtures.device_pool import GPU0, GPU1, two_gpu_pool
+
+    seen: list[object] = []
+    model = torch.nn.Linear(1, 1)
+    loaded = MagicMock()
+    loaded.model_on_device.return_value.__enter__.return_value = (None, model)
+
+    def load_model(config: object) -> MagicMock:
+        seen.append(TorchDevice.get_session_device())
+        return loaded
+
+    service = ImageIndexService(encode_fn=_fake_encode, model_id=MODEL_ID)
+    service._invoker = SimpleNamespace(  # type: ignore[assignment]
+        services=SimpleNamespace(
+            configuration=SimpleNamespace(image_index_device=None),
+            model_manager=SimpleNamespace(load=SimpleNamespace(load_model=load_model)),
+        )
+    )
+    service._model_config = SimpleNamespace()  # type: ignore[assignment]
+    monkeypatch.setattr(
+        service, "_embed", lambda model, images, device: seen.append(TorchDevice.get_session_device()) or np.zeros(1)
+    )
+
+    with two_gpu_pool(busy=(GPU0,)):
+        service._encode_with_model([Image.new("RGB", (8, 8))])
+        assert TorchDevice.get_session_device() is None
+
+    assert seen == [GPU1, GPU1]

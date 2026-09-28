@@ -128,6 +128,10 @@ export const normalizeRestoredQueueItem = (value: unknown): WorkbenchQueueItem |
     cancellable: value.cancellable,
     ...(completedBackendItemIds === undefined ? {} : { completedBackendItemIds: [...completedBackendItemIds] }),
     id: value.id,
+    // Keeps a restored run from reselecting videos it already showed before the reload.
+    ...(Array.isArray(value.resultVideoNames) && value.resultVideoNames.every((name) => typeof name === 'string')
+      ? { resultVideoNames: [...value.resultVideoNames] }
+      : {}),
     snapshot: {
       backendSubmission: snapshot.backendSubmission as WorkbenchQueueItem['snapshot']['backendSubmission'],
       canvas: {
