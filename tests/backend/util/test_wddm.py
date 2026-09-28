@@ -26,32 +26,38 @@ def _luid_low(handle: int) -> int:
 
 
 class _FakePdh:
-    """A PDH with the module's two counters: per-process shared usage, and adapter-wide dedicated usage."""
+    """A PDH that reports the given ``GPU Process Memory`` instances' shared usage."""
 
-    def __init__(self, instances: dict[str, int], adapter_instances: dict[str, int] | None = None):
+    def __init__(
+        self,
+        instances: dict[str, int],
+        unavailable: tuple[str, ...] = (),
+        invalid: tuple[str, ...] = (),
+    ):
         self.instances = instances
-        self.adapter_instances = adapter_instances or {}
+        self.unavailable = unavailable
+        self.invalid = invalid
         self.counter_paths: list[str] = []
         self.closed = 0
         self._alive: list[object] = []
-        self._by_handle: dict[int, dict[str, int]] = {}
 
     def PdhOpenQueryW(self, source, user_data, query_ref):
         query_ref._obj.value = 1
         return 0
 
     def PdhAddEnglishCounterW(self, query, path, user_data, counter_ref):
+        if path in self.unavailable:
+            return -1073738824  # PDH_CSTATUS_NO_COUNTER
         self.counter_paths.append(path)
         handle = 2 + len(self.counter_paths)
         counter_ref._obj.value = handle
-        self._by_handle[handle] = self.adapter_instances if "Adapter" in path else self.instances
         return 0
 
     def PdhCollectQueryData(self, query):
         return 0
 
     def PdhGetFormattedCounterArrayW(self, counter, fmt, size_ref, count_ref, buffer):
-        instances = self._by_handle[counter.value if hasattr(counter, "value") else counter]
+        instances = self.instances
         count = len(instances)
         if buffer is None:
             size_ref._obj.value = ctypes.sizeof(wddm._PdhCounterValueItem) * count
@@ -61,6 +67,8 @@ class _FakePdh:
         for item, (name, value) in zip(items, instances.items(), strict=True):
             item.szName = name
             item.FmtValue.largeValue = value
+            if name in self.invalid:
+                item.FmtValue.CStatus = 0xC0000BB8  # PDH_CSTATUS_INVALID_DATA
         self._alive.append(items)  # the name buffers live as long as the array object
         count_ref._obj.value = count
         return 0
@@ -73,9 +81,10 @@ class _FakePdh:
 class _FakeGdi32:
     """Adapters as (handle, bus, device); every thunk returns NTSTATUS 0 unless told otherwise."""
 
-    def __init__(self, adapters, budget=15 * GIB, query_status=0):
+    def __init__(self, adapters, budget=15 * GIB, usage=0, query_status=0):
         self.adapters = adapters
         self.budget = budget
+        self.usage = usage
         self.query_status = query_status
         self.enum_calls = 0
         self.closed: list[int] = []
@@ -101,7 +110,7 @@ class _FakeGdi32:
 
     def D3DKMTQueryVideoMemoryInfo(self, ref):
         info = ref._obj
-        info.Budget = self.budget
+        info.Budget, info.CurrentUsage = self.budget, self.usage
         return self.query_status
 
     def D3DKMTCloseAdapter(self, ref):
@@ -140,6 +149,16 @@ def test_resolves_the_adapter_once(windows_rocm):
     gdi32.budget = 12 * GIB  # another GPU process started
     assert wddm.video_memory_budget(DEVICE) == 12 * GIB
     assert gdi32.enum_calls == 2, "one count call and one fill call, for the first query only"
+
+
+def test_usage_beyond_the_card_is_clamped_and_keeps_the_budget(windows_rocm):
+    """`CurrentUsage` counts bytes Windows has already paged out, so it can exceed the adapter's own size when the
+    process over-commits. Dropping the pair there would take the budget away from the model cache's free-VRAM cap in
+    exactly that state, so the usage is clamped instead."""
+    windows_rocm(_FakeGdi32([(20, OUR_BUS, OUR_DEVICE)], budget=15 * GIB, usage=17 * GIB))
+
+    assert wddm.local_video_memory(DEVICE) == (15 * GIB, 16 * GIB)  # the adapter's total
+    assert wddm.video_memory_budget(DEVICE) == 15 * GIB
 
 
 @pytest.mark.parametrize(
@@ -210,45 +229,32 @@ def test_paged_bytes_reads_this_process_on_the_devices_adapter(windows_rocm, mon
 
     assert wddm.paged_bytes(DEVICE) == 3 * GIB
     assert wddm.paged_bytes(DEVICE) == 3 * GIB
-    assert pdh.counter_paths == [
-        r"\GPU Process Memory(*)\Shared Usage",
-        r"\GPU Adapter Memory(*)\Dedicated Usage",
-    ], "one query with both counters, opened on first use"
+    assert pdh.counter_paths == [r"\GPU Process Memory(*)\Shared Usage"], (
+        "only the counter this answer needs, opened once"
+    )
 
     wddm.reset_cache()
     assert pdh.closed == 1
 
 
-def _adapter_instance(handle: int) -> str:
-    return f"luid_0x00000000_0x{_luid_low(handle):08x}_phys_0"
-
-
-@pytest.mark.parametrize(
-    ("adapter_gib", "ours_gib", "expected_gib"),
-    [(8.4, 0.2, 8.2), (12.2, 12.1, 0.0), (0.2, 6.0, 0.0)],
-    ids=["another-process-holds-the-card", "all-of-it-is-ours", "adapter-reads-below-our-own"],
-)
-def test_other_process_local_bytes_subtracts_our_own_usage(
-    windows_rocm, monkeypatch, adapter_gib, ours_gib, expected_gib
-):
-    """What bounds a decode is what OTHER processes hold: the budget does not track them (measured 15.09 GiB next to
-    an 8 GiB holder), and the per-process PDH counter swapped its instances while two processes shared the card, so
-    this comes from the adapter-wide figure minus torch's own-usage view. A reading below our own clamps to zero."""
+def test_a_counter_this_build_does_not_have_only_disables_what_reads_it(windows_rocm, monkeypatch):
+    """One query per counter: sharing one meant any missing counter took every PDH-backed answer with it."""
     windows_rocm(_FakeGdi32([(20, OUR_BUS, OUR_DEVICE)]))
-    total = 16 * GIB
-    pdh = _FakePdh({}, adapter_instances={_adapter_instance(20): int(adapter_gib * GIB)})
-    monkeypatch.setattr(wddm, "_load_pdh", functools.lru_cache(maxsize=1)(lambda: pdh))
-    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (total - int(ours_gib * GIB), total))
-
-    assert wddm.other_process_local_bytes(DEVICE) == pytest.approx(int(expected_gib * GIB), abs=GIB // 10)
-
-
-def test_other_process_local_bytes_is_unknown_without_an_adapter_reading(windows_rocm, monkeypatch):
-    windows_rocm(_FakeGdi32([(20, OUR_BUS, OUR_DEVICE)]))
-    pdh = _FakePdh({}, adapter_instances={_adapter_instance(21): 8 * GIB})  # a different adapter
+    pdh = _FakePdh({_instance(os.getpid(), 20): 3 * GIB}, unavailable=(r"\GPU Process Memory(*)\Shared Usage",))
     monkeypatch.setattr(wddm, "_load_pdh", functools.lru_cache(maxsize=1)(lambda: pdh))
 
-    assert wddm.other_process_local_bytes(DEVICE) is None
+    assert wddm.paged_bytes(DEVICE) is None
+    assert wddm.local_video_memory(DEVICE) is not None, "a D3DKMT answer does not depend on the counters"
+
+
+def test_an_instance_with_invalid_data_is_skipped(windows_rocm, monkeypatch):
+    """PDH leaves `largeValue` undefined unless the item's status says the data is good."""
+    windows_rocm(_FakeGdi32([(20, OUR_BUS, OUR_DEVICE)]))
+    me = _instance(os.getpid(), 20)
+    pdh = _FakePdh({me: 7 * GIB}, invalid=(me,))
+    monkeypatch.setattr(wddm, "_load_pdh", functools.lru_cache(maxsize=1)(lambda: pdh))
+
+    assert wddm.paged_bytes(DEVICE) is None
 
 
 def test_paged_bytes_is_unknown_before_this_process_used_the_adapter(windows_rocm, monkeypatch):

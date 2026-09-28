@@ -38,10 +38,8 @@ _PDH_FMT_LARGE = 0x00000400
 _PDH_MORE_DATA = 0x800007D2
 # The English counter path; PdhAddEnglishCounterW resolves it on a localized Windows too.
 _PDH_SHARED_USAGE_COUNTER = r"\GPU Process Memory(*)\Shared Usage"
-# Adapter-wide, i.e. every process on the adapter. Per-process attribution from `GPU Process Memory` was
-# measured to mix up its instances while two processes shared the card, so what "other processes hold" is
-# derived from this figure and torch's own-usage view instead.
-_PDH_ADAPTER_USAGE_COUNTER = r"\GPU Adapter Memory(*)\Dedicated Usage"
+# PDH_CSTATUS_VALID_DATA and PDH_CSTATUS_NEW_DATA; any other status leaves `largeValue` undefined.
+_PDH_VALID_DATA = (0x00000000, 0x00000001)
 
 
 # Win32 types spelled as fixed-width ctypes, so this module imports on every platform.
@@ -142,9 +140,9 @@ _lock = threading.Lock()
 _adapters: dict[int, Optional[_Adapter]] = {}
 
 _pdh_lock = threading.Lock()
-# The PDH query and its counters, opened on first use: (query, {counter name: handle}).
-_pdh_query: Optional[tuple[ctypes.c_void_p, dict[str, ctypes.c_void_p]]] = None
-_pdh_attempted = False
+# One PDH query per counter path, opened on first use: path -> (query, counter) or None when that counter is absent.
+# Per counter so that a counter this build does not have disables only what reads it.
+_pdh_queries: dict[str, Optional[tuple[ctypes.c_void_p, ctypes.c_void_p]]] = {}
 
 
 def _supported(device: torch.device) -> bool:
@@ -281,11 +279,11 @@ def _adapter_for(device: torch.device) -> Optional[tuple[ctypes.CDLL, _Adapter]]
     return None if adapter is None else (lib, adapter)
 
 
-def video_memory_budget(device: torch.device) -> Optional[int]:
-    """This process's WDDM budget on the device's adapter, in bytes: what Windows keeps resident before paging.
+def local_video_memory(device: torch.device) -> Optional[tuple[int, int]]:
+    """``(budget, current_usage)`` for this process on the device's adapter, both driver-side figures in bytes.
 
-    ``None`` off Windows ROCm, and whenever the driver cannot answer or answers something implausible. It is called
-    per generation and per decode, so every failure answers "unknown" here rather than reaching those callers.
+    ``None`` off Windows ROCm, and whenever the driver cannot answer or answers something implausible. Called per
+    generation and per decode, so every failure answers "unknown" here rather than reaching those callers.
     """
     if not _supported(device):
         return None
@@ -299,24 +297,47 @@ def video_memory_budget(device: torch.device) -> Optional[int]:
             return None
         if not 0 < info.Budget <= adapter.total_bytes:
             return None
-        return int(info.Budget)
+        # Clamped, not rejected: `CurrentUsage` counts bytes Windows has already paged out, so it can exceed the
+        # adapter's own size exactly when the process over-commits -- and dropping the pair there would also take the
+        # budget away from the model cache's free-VRAM cap, which is the caller that needs it most in that state.
+        return int(info.Budget), max(0, min(int(info.CurrentUsage), adapter.total_bytes))
     except Exception:
-        InvokeAILogger.get_logger(__name__).debug(f"WDDM budget lookup for {device} failed", exc_info=True)
+        InvokeAILogger.get_logger(__name__).debug(f"WDDM memory lookup for {device} failed", exc_info=True)
         return None
 
 
-def _open_gpu_memory_query(pdh: ctypes.CDLL) -> Optional[tuple[ctypes.c_void_p, dict[str, ctypes.c_void_p]]]:
+def video_memory_budget(device: torch.device) -> Optional[int]:
+    """This process's WDDM budget on the device's adapter, in bytes: what Windows keeps resident before paging."""
+    local = local_video_memory(device)
+    return None if local is None else local[0]
+
+
+def _open_counter_query(pdh: ctypes.CDLL, path: str) -> Optional[tuple[ctypes.c_void_p, ctypes.c_void_p]]:
     query = ctypes.c_void_p()
     if pdh.PdhOpenQueryW(None, None, ctypes.byref(query)) != 0:
         return None
-    counters: dict[str, ctypes.c_void_p] = {}
-    for name, path in (("shared", _PDH_SHARED_USAGE_COUNTER), ("adapter", _PDH_ADAPTER_USAGE_COUNTER)):
-        counter = ctypes.c_void_p()
-        if pdh.PdhAddEnglishCounterW(query, path, None, ctypes.byref(counter)) != 0:
-            pdh.PdhCloseQuery(query)
-            return None
-        counters[name] = counter
-    return query, counters
+    counter = ctypes.c_void_p()
+    if pdh.PdhAddEnglishCounterW(query, path, None, ctypes.byref(counter)) != 0:
+        pdh.PdhCloseQuery(query)
+        return None
+    return query, counter
+
+
+def _counter_values(path: str) -> dict[str, int]:
+    """That counter's value per instance, collected once. ``{}`` when the counter or the loader is unavailable."""
+    pdh = _load_pdh()
+    if pdh is None:
+        return {}
+    with _pdh_lock:
+        try:
+            if path not in _pdh_queries:
+                _pdh_queries[path] = _open_counter_query(pdh, path)
+            opened = _pdh_queries[path]
+            if opened is None:
+                return {}
+            return _usage_by_instance(pdh, *opened)
+        except Exception:
+            return {}
 
 
 def _usage_by_instance(pdh: ctypes.CDLL, query: ctypes.c_void_p, counter: ctypes.c_void_p) -> dict[str, int]:
@@ -332,7 +353,11 @@ def _usage_by_instance(pdh: ctypes.CDLL, query: ctypes.c_void_p, counter: ctypes
     if status != 0:
         return {}
     items = ctypes.cast(buffer, ctypes.POINTER(_PdhCounterValueItem))
-    return {items[i].szName.lower(): int(items[i].FmtValue.largeValue) for i in range(count.value) if items[i].szName}
+    return {
+        items[i].szName.lower(): int(items[i].FmtValue.largeValue)
+        for i in range(count.value)
+        if items[i].szName and items[i].FmtValue.CStatus in _PDH_VALID_DATA
+    }
 
 
 def paged_bytes(device: torch.device) -> Optional[int]:
@@ -342,80 +367,23 @@ def paged_bytes(device: torch.device) -> Optional[int]:
     hundred MB also appear briefly while weights are copied in. ``None`` off Windows ROCm and whenever the counters
     cannot answer, including before this process has used the adapter at all.
 
-    The first call opens the PDH query (~0.3 s); each later call collects it once (~0.3 ms).
+    The first call opens this counter's PDH query (~0.3 s); each later call collects it once (~0.3 ms).
     """
-    global _pdh_query, _pdh_attempted
-
     if not _supported(device):
         return None
     resolved = _adapter_for(device)
-    pdh = _load_pdh()
-    if resolved is None or pdh is None:
+    if resolved is None:
         return None
     instance = f"pid_{os.getpid()}_{_adapter_instance(resolved[1].luid)}"
-    with _pdh_lock:
-        try:
-            if not _pdh_attempted:
-                _pdh_attempted = True
-                _pdh_query = _open_gpu_memory_query(pdh)
-            if _pdh_query is None:
-                return None
-            query, counters = _pdh_query
-            return _usage_by_instance(pdh, query, counters["shared"]).get(instance)
-        except Exception:
-            return None
+    return _counter_values(_PDH_SHARED_USAGE_COUNTER).get(instance)
 
 
 def _adapter_instance(luid: int) -> str:
     return f"luid_0x{(luid >> 32) & 0xFFFFFFFF:08x}_0x{luid & 0xFFFFFFFF:08x}_phys_0"
 
 
-def other_process_local_bytes(device: torch.device) -> Optional[int]:
-    """Dedicated video memory on the device's adapter held by processes other than this one.
-
-    This is what bounds how large an allocation this process could still make after releasing everything of its own,
-    and it is the figure the budget does not answer. Measured on an RX 9060 XT (16 GB): with another program holding
-    8 GiB and Invoke idle, the budget still reported 15.09 GiB while only ~7.7 GiB could be had; with Invoke itself
-    holding 12 GiB and nothing else on the card, the budget read 7.62 GiB while releasing its own memory would have
-    freed almost the whole card.
-
-    ``None`` off Windows ROCm and whenever the counters cannot answer. One PDH sample, so a process that takes memory
-    in the same instant is missed; the model cache's own per-load measurement is what catches that.
-    """
-    global _pdh_query, _pdh_attempted
-
-    if not _supported(device):
-        return None
-    resolved = _adapter_for(device)
-    pdh = _load_pdh()
-    if resolved is None or pdh is None:
-        return None
-    instance = _adapter_instance(resolved[1].luid)
-    with _pdh_lock:
-        try:
-            if not _pdh_attempted:
-                _pdh_attempted = True
-                _pdh_query = _open_gpu_memory_query(pdh)
-            if _pdh_query is None:
-                return None
-            query, counters = _pdh_query
-            adapter_bytes = _usage_by_instance(pdh, query, counters["adapter"]).get(instance)
-        except Exception:
-            return None
-    if adapter_bytes is None:
-        return None
-    try:
-        free_bytes, total_bytes = torch.cuda.mem_get_info(device)
-    except Exception:
-        return None
-    # On a ROCm build under Windows torch's free figure is the total minus this process's own allocations.
-    return max(0, adapter_bytes - (total_bytes - free_bytes))
-
-
 def reset_cache() -> None:
     """Close the cached adapter handles and the PDH query, and forget the loaders (tests only)."""
-    global _pdh_query, _pdh_attempted
-
     with _lock:
         opened = [adapter for adapter in _adapters.values() if adapter is not None]
         _adapters.clear()
@@ -426,8 +394,10 @@ def reset_cache() -> None:
     _load_gdi32.cache_clear()
 
     with _pdh_lock:
-        query, _pdh_query, _pdh_attempted = _pdh_query, None, False
-    pdh = _load_pdh() if query is not None else None
-    if pdh is not None and query is not None:
-        pdh.PdhCloseQuery(query[0])
+        opened_queries = [opened for opened in _pdh_queries.values() if opened is not None]
+        _pdh_queries.clear()
+    pdh = _load_pdh() if opened_queries else None
+    if pdh is not None:
+        for query, _counter in opened_queries:
+            pdh.PdhCloseQuery(query)
     _load_pdh.cache_clear()

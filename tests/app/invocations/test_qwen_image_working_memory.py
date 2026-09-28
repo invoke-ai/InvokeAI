@@ -551,6 +551,14 @@ class TestMeasuredDecodePeak:
     """`qwen_image_untiled_decode_peak_bytes` prices the tiling decision from the measured curve, so a decode whose
     real peak fits is not tiled by a reservation's headroom."""
 
+    def _peak_hw(self, h: int, w: int, device: str = "cuda", hip: str | None = "7.2.0") -> int:
+        mock_vae = MagicMock(spec=AutoencoderKLQwenImage)
+        mock_vae.parameters.side_effect = lambda: iter([torch.zeros(1, dtype=torch.float16)])
+        with patch("torch.version.hip", hip):
+            return qwen_image_untiled_decode_peak_bytes(
+                torch.zeros(1, 16, 1, h // 8, w // 8), mock_vae, torch.device(device)
+            )
+
     def _peak(self, px: int, device: str = "cuda", hip: str | None = "7.2.0") -> int:
         mock_vae = MagicMock(spec=AutoencoderKLQwenImage)
         mock_vae.parameters.side_effect = lambda: iter([torch.zeros(1, dtype=torch.float16)])
@@ -563,9 +571,21 @@ class TestMeasuredDecodePeak:
     def test_a_measured_point_is_its_measured_peak(self, px, constant):
         assert self._peak(px) == px * px * 2 * constant
 
-    def test_between_two_points_takes_the_larger(self):
-        # 1280^2 sits between the 1024^2 (4570) and 1536^2 (3273) measurements.
-        assert self._peak(1280) == 1280 * 1280 * 2 * 4570
+    def test_between_two_points_interpolates_the_bytes(self):
+        """The per-pixel figure dips at 1536^2 while the bytes keep rising, so the bytes are what gets interpolated:
+        taking the larger neighbouring constant priced a smaller image above a larger one."""
+        at_1024 = self._peak(1024)
+        at_1536 = self._peak(1536)
+        at_1280 = self._peak(1280)
+
+        assert at_1024 < at_1280 < at_1536, "monotonic in area"
+        # 1280^2 sits between the 1024^2 and 1536^2 measurements; the chord between them decides it.
+        span = (at_1536 - at_1024) / (1536**2 - 1024**2)
+        assert at_1280 == pytest.approx(at_1024 + span * (1280**2 - 1024**2), rel=1e-6)
+
+    def test_a_smaller_image_is_never_priced_above_a_larger_one(self):
+        """1728x1856 against 1792^2 on CUDA: 0.13% less area, and bracket-max interpolation made it 2.3 GiB dearer."""
+        assert self._peak_hw(1728, 1856, hip=None) <= self._peak_hw(1792, 1792, hip=None)
 
     def test_past_the_measured_range_takes_the_reservation_constant(self):
         """Nothing was measured there, so the decision uses the figure the reservation uses -- guessing low would

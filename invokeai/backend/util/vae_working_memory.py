@@ -31,21 +31,25 @@ def should_pretile_vae_decode(
     decode just runs very slowly. ``device`` is where the VAE runs: a ``cpu_only`` VAE (and MPS, sharing system
     memory) is never tiled on these grounds.
 
-    On Windows the card's nameplate total is not what this decode can have: what the rest of the card is holding is.
-    The cache evicts Invoke's own models to honour the reservation, so the ceiling is the total minus what *other*
-    processes hold (`wddm.other_process_local_bytes`). Measured on an RX 9060 XT (16 GB), neither figure Windows
-    reports answers that on its own: with another program holding 8 GiB and Invoke idle the budget still read
-    15.09 GiB while only ~7.7 GiB could be had, and with Invoke holding 12 GiB and nothing else on the card the
-    budget read 7.62 GiB although releasing its own models would have freed almost all of it. Where the counters
-    cannot answer, the budget is the fallback: too pessimistic mid-session, but never too optimistic.
+    On Windows the ceiling is the video-memory budget rather than the card's nameplate total -- the budget is the point
+    past which Windows pages this process out. With one correction: a budget *below* what this process already holds is
+    Windows asking it to trim itself, and the cache does exactly that to honour the reservation, so the ceiling is then
+    what it holds. Measured on an RX 9060 XT (16 GB): with Invoke holding 12 GiB and nothing else on the card the
+    budget read 7.62 GiB, and comparing against that tiled a 7.0 GiB decode that fits, changing output that had been
+    pixel-identical.
+
+    Known limit: a foreign process that takes memory without the budget moving is invisible here. Windows keeps
+    reporting 15.09 GiB next to an 8 GiB holder, torch's free figure ignores other processes, and the adapter-wide
+    performance counter contradicts itself between processes (15.66 GiB read from the holding process against 0.18 GiB
+    from another, same instance, same instant), so there is no reading to base it on. Such a decode pages, and the
+    end-of-session paging warning is what surfaces it.
     """
     if device.type == "cuda":
         total_bytes = torch.cuda.get_device_properties(device).total_memory
-        budget_bytes = wddm.video_memory_budget(device)
-        if budget_bytes is not None:
-            other_bytes = wddm.other_process_local_bytes(device)
-            ceiling = total_bytes - other_bytes if other_bytes is not None else budget_bytes
-            total_bytes = min(total_bytes, ceiling)
+        local = wddm.local_video_memory(device)
+        if local is not None:
+            budget_bytes, usage_bytes = local
+            total_bytes = min(total_bytes, max(budget_bytes, usage_bytes))
     elif device.type == "xpu":
         total_bytes = torch.xpu.get_device_properties(device).total_memory
     else:
@@ -723,7 +727,9 @@ def qwen_image_untiled_decode_peak_bytes(
     """What an untiled decode of this latent is expected to peak at, for the up-front tiling decision only.
 
     Reservations keep using `estimate_vae_working_memory_qwen_image`, which is deliberately conservative. Between two
-    measured points this takes the larger of the two; past the last one it takes that reservation figure, since a
+    measured points this is the chord between them in bytes -- so an interior area can price below either neighbour's
+    per-pixel constant, which is the point: the constant dips while the bytes rise, and taking the larger neighbour
+    priced a smaller image above a larger one. Past the last measured area it takes the reservation figure, since a
     decode larger than anything measured is not one to guess low about.
     """
     h = LATENT_SCALE_FACTOR * image_tensor.shape[-2]
@@ -733,20 +739,23 @@ def qwen_image_untiled_decode_peak_bytes(
     points = _QWEN_VAE_MEASURED_DECODE_PEAKS["rocm" if is_rocm else "cuda"]
 
     area = h * w
-    measured = dict(points)
-    if area in measured:
-        constant = measured[area]
-    elif area > points[-1][0]:
+    if area > points[-1][0]:
         constant = _QWEN_VAE_RESERVATION_CONSTANTS["rocm" if is_rocm else "cuda"]["decode"]
-    else:
-        previous = points[0][1]
-        constant = previous
-        for measured_area, peak in points:
-            if measured_area > area:
-                constant = max(previous, peak)
-                break
-            previous = peak
-    return h * w * element_size * constant
+        return h * w * element_size * constant
+    # Interpolate the bytes, not the constant: the per-pixel figure dips (ROCm 3273 at 1536^2, CUDA 2281 at 1792^2)
+    # while the bytes themselves rise with area, so taking the larger neighbouring constant priced a smaller image
+    # above a larger one -- a 1728x1856 CUDA decode at 15.96 GiB against 1792^2 at 13.64 GiB. Measured points keep
+    # their measured value.
+    previous_area, previous_bytes = 0, 0
+    for measured_area, peak in points:
+        measured_bytes = measured_area * peak
+        if measured_area >= area:
+            if measured_area == area or previous_area == 0:
+                return int(area * element_size * peak)
+            span = (measured_bytes - previous_bytes) / (measured_area - previous_area)
+            return int(element_size * (previous_bytes + span * (area - previous_area)))
+        previous_area, previous_bytes = measured_area, measured_bytes
+    raise AssertionError("areas past the measured range are handled above")
 
 
 def estimate_vae_working_memory_qwen_image(
