@@ -10,12 +10,13 @@ import { CheckIcon, ChevronDownIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, type UIEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { Scrollable } from './Scrollable';
+
 const COMBOBOX_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
 
-const LIST_SCROLL_CSS = {
-  scrollbarColor: 'var(--chakra-colors-border-emphasized) transparent',
-  scrollbarWidth: 'thin',
-} as const;
+// Zag scrolls its content element by default; the Scrollable viewport is the scroll container here.
+const scrollHighlightedIntoView = ({ getElement }: { getElement: () => HTMLElement | null }) =>
+  getElement()?.scrollIntoView({ block: 'nearest' });
 
 export interface ComboboxOption extends CollectionItem {
   disabled?: boolean;
@@ -125,12 +126,18 @@ export const Combobox = ({
   const handleListScroll = useCallback(
     (event: UIEvent<HTMLDivElement>) => {
       const list = event.currentTarget;
+      // The scroll area dispatches no-op scrolls while the popup is still unmeasured; only real overflow counts.
+      const overflows = list.scrollHeight > list.clientHeight;
 
-      if (list.scrollHeight - list.scrollTop - list.clientHeight <= 24) {
+      if (overflows && list.scrollHeight - list.scrollTop - list.clientHeight <= 24) {
         onListScrollToBottom?.();
       }
     },
     [onListScrollToBottom]
+  );
+  const listViewportProps = useMemo(
+    () => (onListScrollToBottom ? { onScroll: handleListScroll } : undefined),
+    [handleListScroll, onListScrollToBottom]
   );
   const handleValueChange = useCallback(
     (details: ComboboxValueChangeDetails<ComboboxOption>) => {
@@ -152,7 +159,10 @@ export const Combobox = ({
   );
 
   return (
+    // Mount items only while open to avoid per-combobox scroll observers at rest.
     <ChakraCombobox.Root
+      lazyMount
+      unmountOnExit
       {...rootProps}
       allowCustomValue={false}
       closeOnSelect
@@ -163,6 +173,7 @@ export const Combobox = ({
       open={isOpen}
       openOnClick
       positioning={COMBOBOX_POSITIONING}
+      scrollToIndexFn={scrollHighlightedIntoView}
       selectionBehavior="replace"
       value={selectedValues}
       onInputValueChange={handleInputValueChange}
@@ -185,25 +196,21 @@ export const Combobox = ({
       <Portal>
         <ChakraCombobox.Positioner>
           <ChakraCombobox.Content>
-            {/* Keep this as Ark's scroll container so keyboard highlight remains visible. */}
-            <ChakraCombobox.List
-              css={LIST_SCROLL_CSS}
-              maxH="16rem"
-              overflowY="auto"
-              onScroll={onListScrollToBottom ? handleListScroll : undefined}
-            >
-              {collection.items.map((item) => (
-                <ChakraCombobox.Item key={item.value} item={item}>
-                  <ChakraCombobox.ItemText>{item.label}</ChakraCombobox.ItemText>
-                  <ChakraCombobox.ItemIndicator>
-                    <CheckIcon />
-                  </ChakraCombobox.ItemIndicator>
-                </ChakraCombobox.Item>
-              ))}
-              <ChakraCombobox.Empty color="fg.muted" fontSize="xs" px="3" py="2">
-                {noResultsText ?? t('common.noSchedulersFound')}
-              </ChakraCombobox.Empty>
-            </ChakraCombobox.List>
+            <Scrollable maxH="16rem" viewportProps={listViewportProps}>
+              <ChakraCombobox.List>
+                {collection.items.map((item) => (
+                  <ChakraCombobox.Item key={item.value} item={item}>
+                    <ChakraCombobox.ItemText>{item.label}</ChakraCombobox.ItemText>
+                    <ChakraCombobox.ItemIndicator>
+                      <CheckIcon />
+                    </ChakraCombobox.ItemIndicator>
+                  </ChakraCombobox.Item>
+                ))}
+                <ChakraCombobox.Empty color="fg.muted" fontSize="xs" px="3" py="2">
+                  {noResultsText ?? t('common.noSchedulersFound')}
+                </ChakraCombobox.Empty>
+              </ChakraCombobox.List>
+            </Scrollable>
           </ChakraCombobox.Content>
         </ChakraCombobox.Positioner>
       </Portal>
