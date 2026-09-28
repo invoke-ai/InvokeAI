@@ -8,7 +8,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { createProjectGraph, serializeWorkflowJson } from '@features/workflow/utility';
 import { system } from '@theme/system';
-import { act, StrictMode } from 'react';
+import { act, StrictMode, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -60,6 +60,7 @@ const queries = vi.hoisted(() => ({
     Promise.resolve('wf-copy')
   ),
   deleteLibraryWorkflow: vi.fn((_workflowId: string, _signal?: AbortSignal) => Promise.resolve()),
+  deleteLibraryWorkflowThumbnail: vi.fn((_workflowId: string, _signal?: AbortSignal) => Promise.resolve()),
   getLibraryWorkflowCached: vi.fn((_workflowId: string, _signal?: AbortSignal) =>
     Promise.resolve({} as Record<string, unknown>)
   ),
@@ -70,6 +71,7 @@ const queries = vi.hoisted(() => ({
     Promise.resolve({} as Record<string, unknown>)
   ),
   invalidateWorkflowLibraryCache: vi.fn(),
+  setLibraryWorkflowThumbnail: vi.fn((_workflowId: string, _image: Blob, _signal?: AbortSignal) => Promise.resolve()),
   updateLibraryWorkflow: vi.fn(
     (_workflowId: string, _workflow: Record<string, unknown>, _options?: { expectedRevision?: number }) =>
       Promise.resolve({} as Record<string, unknown>)
@@ -79,6 +81,21 @@ const queries = vi.hoisted(() => ({
 vi.mock('@features/workflow/queries', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   ...queries,
+}));
+
+/** The picker's own view is covered by its tests; here a pick hands over an item whose thumbnail is a data URL. */
+const pickedGalleryItem = vi.hoisted(() => ({
+  current: { kind: 'image', name: 'picked.gif', thumbnailUrl: '' } as Record<string, unknown>,
+}));
+
+vi.mock('@features/gallery/picker', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  GalleryPickerPopover: ({ children, onPick }: { children: ReactNode; onPick: (item: unknown) => void }) => (
+    <>
+      {children}
+      <button aria-label="Pick" data-gallery-pick type="button" onClick={() => onPick(pickedGalleryItem.current)} />
+    </>
+  ),
 }));
 
 const downloadText = vi.hoisted(() => vi.fn((_contents: string, _fileName: string, _mimeType: string) => {}));
@@ -106,6 +123,16 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.renameWithEllipsis': 'Rename…',
   'workflowLibrary.renamed': 'Template renamed',
   'workflowLibrary.templateName': 'Template name',
+  'workflowLibrary.thumbnail': 'Thumbnail',
+  'workflowLibrary.thumbnailFromGallery': 'From gallery',
+  'workflowLibrary.thumbnailNotAnImage': 'The chosen file is not an image.',
+  'workflowLibrary.thumbnailRemove': 'Remove thumbnail',
+  'workflowLibrary.thumbnailRemoveFailed': 'Failed to remove thumbnail',
+  'workflowLibrary.thumbnailRemoved': 'Thumbnail removed',
+  'workflowLibrary.thumbnailUpdateFailed': 'Failed to update thumbnail',
+  'workflowLibrary.thumbnailUpdated': 'Thumbnail updated',
+  'workflowLibrary.thumbnailUpdating': 'Updating thumbnail…',
+  'workflowLibrary.thumbnailUpload': 'Upload',
   'workflowLibrary.duplicateHint': 'Saves a copy under Yours, original untouched',
   'workflowLibrary.duplicateName': '{{name}} copy',
   'workflowLibrary.duplicated': 'Saved a copy under Yours',
@@ -418,6 +445,8 @@ describe('WorkflowLibraryDetailPanel', () => {
     queries.getLibraryWorkflowRecordCached.mockClear();
     queries.getLibraryWorkflowRecordCached.mockResolvedValue(RAW_RECORD);
     queries.invalidateWorkflowLibraryCache.mockClear();
+    queries.setLibraryWorkflowThumbnail.mockReset().mockResolvedValue(undefined);
+    queries.deleteLibraryWorkflowThumbnail.mockReset().mockResolvedValue(undefined);
 
     downloadText.mockClear();
     OPEN_DOCUMENT_IN_NEW_PROJECT.mockClear();
@@ -582,13 +611,20 @@ describe('WorkflowLibraryDetailPanel', () => {
     expect(buttonWithText('Open')).not.toBeUndefined();
   });
 
-  it('captions the thumbnail with the last run, the sample output, or nothing', async () => {
+  it('captions the thumbnail with the last run, a bundled sample output, or nothing', async () => {
     await renderPanel(TEXT_TO_IMAGE);
     expect(panel()?.textContent).toContain('Your last run · 2 days ago');
 
+    // A user template's image is one the user set, not a sample of what the workflow makes.
     await renderPanel(IMAGE_TO_VIDEO);
-    expect(panel()?.textContent).toContain('Sample output');
+    expect(panel()?.textContent).not.toContain('Sample output');
     expect(panel()?.textContent).not.toContain('Your last run');
+
+    await renderPanel({
+      ...DEFAULT_CATEGORY,
+      item: { ...DEFAULT_CATEGORY.item, thumbnail_url: IMAGE_TO_VIDEO.item.thumbnail_url },
+    });
+    expect(panel()?.textContent).toContain('Sample output');
 
     await renderPanel(DEFAULT_CATEGORY);
     expect(panel()?.textContent).not.toContain('Sample output');
@@ -902,6 +938,180 @@ describe('WorkflowLibraryDetailPanel', () => {
 
     // 'Wan 2.2' is a display label; the starter catalog indexes 'wan'.
     expect(OPEN_ADD_MODELS).toHaveBeenCalledWith('wan');
+  });
+
+  describe('thumbnail', () => {
+    const thumbnailGroup = () => document.querySelector<HTMLElement>('[role="group"][aria-label="Thumbnail"]');
+    const thumbnailButton = (text: string) =>
+      [...(thumbnailGroup()?.querySelectorAll('button') ?? [])].find(
+        (candidate) => (candidate.getAttribute('aria-label') ?? candidate.textContent ?? '').trim() === text
+      );
+
+    const chooseFile = async (file: File) => {
+      const input = thumbnailGroup()?.querySelector<HTMLInputElement>('input[type="file"]');
+      expect(input).not.toBeNull();
+
+      const transfer = new DataTransfer();
+      transfer.items.add(file);
+
+      await act(async () => {
+        input!.files = transfer.files;
+        input!.dispatchEvent(new Event('change', { bubbles: true }));
+        await settleFrame();
+      });
+    };
+
+    it("is editable only on the account's own templates, and offers Remove only once one is set", async () => {
+      await renderPanel(DEFAULT_CATEGORY);
+      expect(thumbnailGroup()).toBeNull();
+
+      await renderPanel(entry({ name: 'Plain', workflow_id: 'wf-plain' }, readyEnrichment(SDXL_REQUIREMENTS)));
+      expect(thumbnailButton('From gallery')).not.toBeUndefined();
+      expect(thumbnailButton('Upload')).not.toBeUndefined();
+      expect(thumbnailButton('Remove thumbnail')).toBeUndefined();
+
+      await renderPanel(TEXT_TO_IMAGE);
+      expect(thumbnailButton('Remove thumbnail')).not.toBeUndefined();
+    });
+
+    it('uploads a chosen file, holding the controls busy until the library answers', async () => {
+      let answer: () => void = NOOP;
+      queries.setLibraryWorkflowThumbnail.mockImplementation(
+        () =>
+          new Promise<void>((resolve) => {
+            answer = resolve;
+          })
+      );
+      const file = new File([new Uint8Array([1, 2, 3])], 'cover.png', { type: 'image/png' });
+
+      await renderPanel(TEXT_TO_IMAGE);
+      const status = panel()?.querySelector('[role="status"]');
+      expect(status?.textContent).toBe('');
+      thumbnailButton('Upload')?.focus();
+      await chooseFile(file);
+
+      expect(queries.setLibraryWorkflowThumbnail).toHaveBeenCalledWith('wf-text-to-image', file, expect.anything());
+      // The same live region carries the change, and the busy control keeps focus.
+      expect(panel()?.querySelector('[role="status"]')).toBe(status);
+      expect(status?.textContent).toBe('Updating thumbnail…');
+      expect(document.activeElement).toBe(thumbnailButton('Upload'));
+      expect(thumbnailButton('Upload')?.getAttribute('aria-disabled')).toBe('true');
+      expect(thumbnailButton('Remove thumbnail')?.getAttribute('aria-disabled')).toBe('true');
+      await act(async () => {
+        thumbnailButton('Remove thumbnail')?.click();
+        await settleFrame();
+      });
+      expect(queries.deleteLibraryWorkflowThumbnail).not.toHaveBeenCalled();
+      expect(panel()?.querySelector('[aria-busy="true"]')).not.toBeNull();
+      expect(queries.invalidateWorkflowLibraryCache).not.toHaveBeenCalled();
+
+      await act(async () => {
+        answer();
+        await settleFrame();
+      });
+
+      expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledWith('wf-text-to-image');
+      expect(thumbnailButton('Upload')?.hasAttribute('aria-disabled')).toBe(false);
+      expect(panel()?.querySelector('[aria-busy="true"]')).toBeNull();
+      expect(status?.textContent).toBe('Thumbnail updated');
+      expect(document.activeElement).toBe(thumbnailButton('Upload'));
+    });
+
+    it('does not carry a busy upload over to the next selected workflow', async () => {
+      queries.setLibraryWorkflowThumbnail.mockImplementation(() => new Promise<void>(NOOP));
+
+      await renderPanel(TEXT_TO_IMAGE);
+      await chooseFile(new File([new Uint8Array([1])], 'cover.png', { type: 'image/png' }));
+      expect(panel()?.querySelector('[aria-busy="true"]')).not.toBeNull();
+
+      await renderPanel(IMAGE_TO_VIDEO);
+      expect(panel()?.querySelector('[aria-busy="true"]')).toBeNull();
+      expect(thumbnailButton('Upload')?.hasAttribute('aria-disabled')).toBe(false);
+      expect(panel()?.querySelector('[role="status"]')?.textContent).toBe('');
+    });
+
+    it('reports a refused upload without refreshing the library', async () => {
+      queries.setLibraryWorkflowThumbnail.mockRejectedValue(new Error('Not an image'));
+
+      await renderPanel(TEXT_TO_IMAGE);
+      await chooseFile(new File([new Uint8Array([1])], 'cover.png', { type: 'image/png' }));
+
+      expect(NOTIFICATIONS.error).toHaveBeenCalledWith('Failed to update thumbnail', 'Not an image');
+      expect(queries.invalidateWorkflowLibraryCache).not.toHaveBeenCalled();
+      expect(panel()?.querySelector('[role="status"]')?.textContent).toBe('');
+    });
+    it('refuses a file that is not an image before sending anything', async () => {
+      await renderPanel(TEXT_TO_IMAGE);
+      await chooseFile(new File(['{}'], 'workflow.json', { type: 'application/json' }));
+
+      expect(queries.setLibraryWorkflowThumbnail).not.toHaveBeenCalled();
+      expect(NOTIFICATIONS.error).toHaveBeenCalledWith(
+        'Failed to update thumbnail',
+        'The chosen file is not an image.'
+      );
+    });
+
+    it('uploads the picked gallery image', async () => {
+      pickedGalleryItem.current = {
+        kind: 'image',
+        name: 'picked.gif',
+        thumbnailUrl: 'data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw==',
+      };
+
+      await renderPanel(TEXT_TO_IMAGE);
+      await act(async () => {
+        document.querySelector<HTMLElement>('[data-gallery-pick]')?.click();
+        await vi.waitFor(() => expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalled());
+      });
+
+      const [workflowId, image] = queries.setLibraryWorkflowThumbnail.mock.calls[0]!;
+      expect(workflowId).toBe('wf-text-to-image');
+      expect(image.type).toBe('image/gif');
+      expect(image.size).toBeGreaterThan(0);
+    });
+
+    it('does not upload a gallery image that failed to load', async () => {
+      pickedGalleryItem.current = { kind: 'image', name: 'gone.png', thumbnailUrl: '/gone-thumbnail.webp' };
+      const fetchSpy = vi
+        .spyOn(globalThis, 'fetch')
+        .mockResolvedValueOnce(new Response(null, { status: 404, statusText: 'Not Found' }));
+
+      await renderPanel(TEXT_TO_IMAGE);
+      await act(async () => {
+        document.querySelector<HTMLElement>('[data-gallery-pick]')?.click();
+        await vi.waitFor(() => expect(NOTIFICATIONS.error).toHaveBeenCalled());
+      });
+
+      expect(NOTIFICATIONS.error).toHaveBeenCalledWith('Failed to update thumbnail', expect.stringContaining('404'));
+      expect(fetchSpy).toHaveBeenCalledWith('/gone-thumbnail.webp', expect.anything());
+      expect(queries.setLibraryWorkflowThumbnail).not.toHaveBeenCalled();
+      fetchSpy.mockRestore();
+    });
+
+    it('removes the custom image, and reports a failure without refreshing the library', async () => {
+      await renderPanel(TEXT_TO_IMAGE);
+      thumbnailButton('Remove thumbnail')?.focus();
+      await act(async () => {
+        thumbnailButton('Remove thumbnail')?.click();
+        await settleFrame();
+      });
+
+      expect(queries.deleteLibraryWorkflowThumbnail).toHaveBeenCalledWith('wf-text-to-image', expect.anything());
+      expect(queries.invalidateWorkflowLibraryCache).toHaveBeenCalledWith('wf-text-to-image');
+      // Remove disappears with the refreshed record, so focus has already moved on.
+      expect(document.activeElement).toBe(thumbnailButton('Upload'));
+      expect(panel()?.querySelector('[role="status"]')?.textContent).toBe('Thumbnail removed');
+
+      queries.invalidateWorkflowLibraryCache.mockClear();
+      queries.deleteLibraryWorkflowThumbnail.mockRejectedValue(new Error('network down'));
+      await act(async () => {
+        thumbnailButton('Remove thumbnail')?.click();
+        await settleFrame();
+      });
+
+      expect(NOTIFICATIONS.error).toHaveBeenCalledWith('Failed to remove thumbnail', expect.any(String));
+      expect(queries.invalidateWorkflowLibraryCache).not.toHaveBeenCalled();
+    });
   });
 
   it('renders nothing actionable without a selection', async () => {
