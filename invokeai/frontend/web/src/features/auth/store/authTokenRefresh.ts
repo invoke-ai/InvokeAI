@@ -5,6 +5,9 @@ const MEDIA_AUTH_LOCK = 'invokeai-media-auth';
 const FALLBACK_LOCK_PREFIX = `${MEDIA_AUTH_LOCK}:`;
 const FALLBACK_LOCK_LEASE_MS = 30_000;
 const FALLBACK_LOCK_POLL_MS = 10;
+const PASSWORD_CHANGE_PREFIX = 'invokeai-password-change:';
+const PASSWORD_CHANGE_WAIT_MS = 30_000;
+const PASSWORD_CHANGE_POLL_MS = 100;
 
 // Bound on the media-cookie sync fetch made while holding the media-auth lock.
 export const MEDIA_COOKIE_SYNC_TIMEOUT_MS = 10_000;
@@ -181,6 +184,69 @@ const delay = (milliseconds: number) =>
   new Promise<void>((resolve) => {
     setTimeout(resolve, milliseconds);
   });
+
+type PasswordChangeMarker = {
+  sessionKey: string;
+  generation: number;
+  expiresAt: number;
+};
+
+/** Publish a bounded, cross-tab-visible intent before sending a password-changing request. */
+export const beginPasswordChange = (requestToken: string, requestGeneration: number): (() => void) => {
+  const sessionKey = getTokenSessionKey(requestToken);
+  // For an unreadable token, getTokenSessionKey returns its raw bytes. Do not copy a bearer
+  // credential into a second localStorage key merely to coordinate a request that will fail.
+  if (!sessionKey || sessionKey === requestToken) {
+    return () => {};
+  }
+  const key = `${PASSWORD_CHANGE_PREFIX}${globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`}`;
+  const marker: PasswordChangeMarker = {
+    sessionKey,
+    generation: requestGeneration,
+    expiresAt: Date.now() + PASSWORD_CHANGE_WAIT_MS,
+  };
+  localStorage.setItem(key, JSON.stringify(marker));
+  return () => localStorage.removeItem(key);
+};
+
+const hasPendingPasswordChange = (requestToken: string, requestGeneration: number): boolean => {
+  const sessionKey = getTokenSessionKey(requestToken);
+  if (!sessionKey || sessionKey === requestToken) {
+    return false;
+  }
+  for (let index = 0; index < localStorage.length; index++) {
+    const key = localStorage.key(index);
+    if (!key?.startsWith(PASSWORD_CHANGE_PREFIX)) {
+      continue;
+    }
+    try {
+      const marker = JSON.parse(localStorage.getItem(key) ?? '') as PasswordChangeMarker;
+      if (
+        marker.sessionKey === sessionKey &&
+        marker.generation === requestGeneration &&
+        marker.expiresAt > Date.now()
+      ) {
+        return true;
+      }
+    } catch {
+      // Ignore a damaged marker; it is not evidence of an in-flight replacement.
+    }
+  }
+  return false;
+};
+
+/** Defer an old-token 401 until the password-change result can commit its replacement. */
+export const waitForPasswordChange = async (requestToken: string, requestGeneration: number): Promise<void> => {
+  const deadline = Date.now() + PASSWORD_CHANGE_WAIT_MS;
+  while (
+    shouldEndSessionForUnauthorized(requestToken) &&
+    getAuthGeneration() === requestGeneration &&
+    hasPendingPasswordChange(requestToken, requestGeneration) &&
+    Date.now() < deadline
+  ) {
+    await delay(Math.min(PASSWORD_CHANGE_POLL_MS, deadline - Date.now()));
+  }
+};
 
 export const createMediaAuthLock = (owner: string) => {
   const key = `${FALLBACK_LOCK_PREFIX}${owner}`;

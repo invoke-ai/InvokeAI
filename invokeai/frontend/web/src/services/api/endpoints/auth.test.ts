@@ -1,7 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
 import type { BaseQueryApi } from '@reduxjs/toolkit/query';
-import { tokenRefreshed } from 'features/auth/store/authSlice';
-import { markTokenRefreshAccepted } from 'features/auth/store/authTokenRefresh';
+import { sessionExpiredLogout, tokenRefreshed } from 'features/auth/store/authSlice';
+import {
+  beginPasswordChange,
+  captureAuthGeneration,
+  markTokenRefreshAccepted,
+} from 'features/auth/store/authTokenRefresh';
 import { authApi } from 'services/api/endpoints/auth';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -45,6 +49,227 @@ const tokenFor = (nonce: number, epoch?: number) =>
   )}.signature`;
 
 describe('refreshed token acceptance', () => {
+  it.each([
+    ['profile update, old-token 401 first', false, 'auth/me', 'new_password'],
+    ['profile update, replacement first', true, 'auth/me', 'new_password'],
+    ['admin self-reset, old-token 401 first', false, 'auth/users/user-1', 'password'],
+    ['admin self-reset, replacement first', true, 'auth/users/user-1', 'password'],
+  ])('keeps a password-change replacement for %s', async (_, replacementFirst, passwordUrl, passwordField) => {
+    const requestToken = tokenFor(1, 0);
+    const replacement = tokenFor(2, 1);
+    localStorage.setItem('auth_token', requestToken);
+
+    let startPasswordChange!: () => void;
+    const passwordChangeStarted = new Promise<void>((resolve) => {
+      startPasswordChange = resolve;
+    });
+    let finishPasswordChange!: (response: Response) => void;
+    const passwordChangeResponse = new Promise<Response>((resolve) => {
+      finishPasswordChange = resolve;
+    });
+    let startStaleRequest!: () => void;
+    const staleRequestStarted = new Promise<void>((resolve) => {
+      startStaleRequest = resolve;
+    });
+    let finishStaleRequest!: (response: Response) => void;
+    const staleResponse = new Promise<Response>((resolve) => {
+      finishStaleRequest = resolve;
+    });
+    const dispatch = vi.fn((action: ReturnType<typeof sessionExpiredLogout> | ReturnType<typeof tokenRefreshed>) => {
+      if (action.type === sessionExpiredLogout.type) {
+        localStorage.removeItem('auth_token');
+      } else if (action.type === tokenRefreshed.type) {
+        localStorage.setItem('auth_token', action.payload);
+      }
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((input: string | URL | Request, init?: RequestInit) => {
+        const url = input instanceof Request ? input.url : input.toString();
+        if (url.endsWith(`/${passwordUrl}`)) {
+          expect((input as Request).headers.get('Authorization')).toBe(`Bearer ${requestToken}`);
+          startPasswordChange();
+          return passwordChangeResponse;
+        }
+        if (url.includes('/images/i/example.png')) {
+          expect((input as Request).headers.get('Authorization')).toBe(`Bearer ${requestToken}`);
+          startStaleRequest();
+          return staleResponse;
+        }
+        if (url.endsWith('/auth/media-cookie')) {
+          expect(new Headers(init?.headers).get('Authorization')).toBe(`Bearer ${replacement}`);
+          return Promise.resolve(new Response(null, { status: 204 }));
+        }
+        throw new Error(`Unexpected request: ${url}`);
+      })
+    );
+    const baseQueryApi = {
+      dispatch,
+      getState: () => ({}),
+      signal: new AbortController().signal,
+      abort: () => {},
+      endpoint: 'updateCurrentUser',
+      type: 'mutation',
+      forced: false,
+      extra: undefined,
+    } as unknown as BaseQueryApi;
+
+    const passwordChange = dynamicBaseQuery(
+      { url: buildV1Url(passwordUrl), method: 'PATCH', body: { [passwordField]: 'synthetic-test-password' } },
+      baseQueryApi,
+      {}
+    );
+    await passwordChangeStarted;
+    const staleRequest = dynamicBaseQuery(buildV1Url('images/i/example.png'), baseQueryApi, {});
+    await staleRequestStarted;
+    const finish = () =>
+      finishPasswordChange(
+        new Response('{}', {
+          headers: { 'content-type': 'application/json', 'X-Refreshed-Token': replacement },
+        })
+      );
+    if (replacementFirst) {
+      finish();
+      await passwordChange;
+      expect(dispatch).toHaveBeenCalledWith(tokenRefreshed(replacement));
+      expect(localStorage.getItem('auth_token')).toBe(replacement);
+    }
+    finishStaleRequest(new Response(null, { status: 401 }));
+    if (!replacementFirst) {
+      await Promise.resolve();
+      expect(dispatch).not.toHaveBeenCalledWith(sessionExpiredLogout());
+      finish();
+      await passwordChange;
+    }
+    expect((await staleRequest).error?.status).toBe(401);
+
+    expect(localStorage.getItem('auth_token')).toBe(replacement);
+    expect(dispatch).not.toHaveBeenCalledWith(sessionExpiredLogout());
+  });
+
+  it('logs out on an old-token 401 after a failed password change releases the transition', async () => {
+    const oldToken = tokenFor(1, 0);
+    localStorage.setItem('auth_token', oldToken);
+    let finishPasswordChange!: (response: Response) => void;
+    const passwordChangeResponse = new Promise<Response>((resolve) => {
+      finishPasswordChange = resolve;
+    });
+    const dispatch = vi.fn((action: ReturnType<typeof sessionExpiredLogout>) => {
+      if (action.type === sessionExpiredLogout.type) {
+        localStorage.removeItem('auth_token');
+      }
+    });
+    const fetchMock = vi.fn((input: string | URL | Request) => {
+      const url = input instanceof Request ? input.url : input.toString();
+      if (url.endsWith('/auth/me')) {
+        return passwordChangeResponse;
+      }
+      if (url.includes('/images/i/example.png')) {
+        return Promise.resolve(new Response(null, { status: 401 }));
+      }
+      throw new Error(`Unexpected request: ${url}`);
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    const baseQueryApi = {
+      dispatch,
+      getState: () => ({}),
+      signal: new AbortController().signal,
+      abort: () => {},
+      endpoint: 'updateCurrentUser',
+      type: 'mutation',
+      forced: false,
+      extra: undefined,
+    } as unknown as BaseQueryApi;
+
+    const change = dynamicBaseQuery(
+      { url: buildV1Url('auth/me'), method: 'PATCH', body: { new_password: 'synthetic-test-password' } },
+      baseQueryApi,
+      {}
+    );
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
+    const stale = dynamicBaseQuery(buildV1Url('images/i/example.png'), baseQueryApi, {});
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+    expect(dispatch).not.toHaveBeenCalledWith(sessionExpiredLogout());
+
+    finishPasswordChange(new Response(null, { status: 400 }));
+    expect((await change).error?.status).toBe(400);
+    expect((await stale).error?.status).toBe(401);
+    expect(dispatch).toHaveBeenCalledWith(sessionExpiredLogout());
+    expect(localStorage.getItem('auth_token')).toBeNull();
+  });
+
+  it('does not let this tab log out a password replacement being committed in another tab', async () => {
+    const oldToken = tokenFor(1, 0);
+    const replacement = tokenFor(2, 1);
+    localStorage.setItem('auth_token', oldToken);
+    // This tab did not send the password change. A second tab only shares storage with it.
+    const finishInOtherTab = beginPasswordChange(oldToken, captureAuthGeneration());
+    const dispatch = vi.fn((action: ReturnType<typeof sessionExpiredLogout>) => {
+      if (action.type === sessionExpiredLogout.type) {
+        localStorage.removeItem('auth_token');
+      }
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(null, { status: 401 })))
+    );
+    const request = dynamicBaseQuery(
+      buildV1Url('images/i/example.png'),
+      {
+        dispatch,
+        getState: () => ({}),
+        signal: new AbortController().signal,
+        abort: () => {},
+        endpoint: 'getImageDTO',
+        type: 'query',
+        forced: false,
+        extra: undefined,
+      } as unknown as BaseQueryApi,
+      {}
+    );
+
+    await Promise.resolve();
+    expect(dispatch).not.toHaveBeenCalledWith(sessionExpiredLogout());
+    localStorage.setItem('auth_token', replacement);
+    finishInOtherTab();
+    expect((await request).error?.status).toBe(401);
+    expect(localStorage.getItem('auth_token')).toBe(replacement);
+    expect(dispatch).not.toHaveBeenCalledWith(sessionExpiredLogout());
+  });
+
+  it('ends an expired session when no replacement is pending', async () => {
+    const expiredToken = tokenFor(1, 0);
+    localStorage.setItem('auth_token', expiredToken);
+    const dispatch = vi.fn((action: ReturnType<typeof sessionExpiredLogout>) => {
+      if (action.type === sessionExpiredLogout.type) {
+        localStorage.removeItem('auth_token');
+      }
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(() => Promise.resolve(new Response(null, { status: 401 })))
+    );
+
+    const result = await dynamicBaseQuery(
+      buildV1Url('images/i/example.png'),
+      {
+        dispatch,
+        getState: () => ({}),
+        signal: new AbortController().signal,
+        abort: () => {},
+        endpoint: 'getImageDTO',
+        type: 'query',
+        forced: false,
+        extra: undefined,
+      } as unknown as BaseQueryApi,
+      {}
+    );
+
+    expect(result.error?.status).toBe(401);
+    expect(dispatch).toHaveBeenCalledWith(sessionExpiredLogout());
+    expect(localStorage.getItem('auth_token')).toBeNull();
+  });
+
   it.each([
     ['an explicit epoch-zero token', tokenFor(1, 0)],
     ['a legacy token without an epoch claim', tokenFor(1)],
