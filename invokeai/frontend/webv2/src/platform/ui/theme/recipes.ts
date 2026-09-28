@@ -324,6 +324,12 @@ export const inputShellInteraction = {
   _hover: { ...formControlInteraction._hover, _focusWithin: formControlFocused },
 };
 
+/** A mode-tinted shell (e.g. semantic search) keeps its tint on hover; focus and errors still win. */
+export const warningInputShellInteraction = {
+  ...inputShellInteraction,
+  _hover: { ...inputShellInteraction._hover, borderColor: 'fg.warning' },
+};
+
 /** Scrubber borders follow keyboard/editor focus; pointer clicks use drag state instead. */
 export const scrubberInteraction = {
   ...formControlInteraction,

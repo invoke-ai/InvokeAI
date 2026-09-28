@@ -2,7 +2,7 @@ import type { BoxProps } from '@chakra-ui/react';
 import type { PointerEvent, ReactNode, Ref } from 'react';
 
 import { Box } from '@chakra-ui/react';
-import { inputShellInteraction } from '@theme/recipes';
+import { inputShellInteraction, warningInputShellInteraction } from '@theme/recipes';
 
 export interface InputShellProps extends BoxProps {
   ref?: Ref<HTMLDivElement>;
@@ -10,6 +10,8 @@ export interface InputShellProps extends BoxProps {
   startElement?: ReactNode;
   /** Trailing adornments (clear/help buttons), outside the content cell. */
   endElement?: ReactNode;
+  /** `warning` tints the fill and border for a distinct input mode. */
+  tone?: 'warning';
 }
 
 /** Chrome clicks focus the field like a native input; adornment controls keep their own clicks. */
@@ -29,14 +31,15 @@ const focusInnerInput = (event: PointerEvent<HTMLDivElement>) => {
 };
 
 /** Composite input chrome follows inner focus via focus-within; put aria-invalid on the shell for its error border. */
-export const InputShell = ({ children, endElement, ref, startElement, ...boxProps }: InputShellProps) => (
+export const InputShell = ({ children, endElement, ref, startElement, tone, ...boxProps }: InputShellProps) => (
   <Box
     ref={ref}
     alignItems="center"
-    borderColor="border"
+    bg={tone === 'warning' ? 'bg.warning' : undefined}
+    borderColor={tone === 'warning' ? 'fg.warning/60' : 'border'}
     borderRadius="control"
     borderWidth="1px"
-    css={inputShellInteraction}
+    css={tone === 'warning' ? warningInputShellInteraction : inputShellInteraction}
     cursor="text"
     display="flex"
     gap="1.5"
