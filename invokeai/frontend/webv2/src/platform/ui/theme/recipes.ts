@@ -107,7 +107,7 @@ export const tabsSlotRecipe = defineSlotRecipe({
           ...chakraSlotRecipes.tabs.variants?.variant?.line?.trigger,
           roundedTop: 'sm',
           _hover: {
-            '&:not([data-selected])': { bg: 'bg.muted/60', color: 'fg' },
+            '&:not([data-selected])': { bg: 'gray.hoverTint/10', color: 'fg' },
           },
         },
       },
