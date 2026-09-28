@@ -92,6 +92,30 @@ describe('custom setting modified indicators', () => {
     expect(modifiedIndicators()).toHaveLength(0);
   });
 
+  it('lists shortcuts under category headers and says so when a search matches nothing', async () => {
+    host.style.cssText = 'display:flex;flex-direction:column;height:600px;width:640px;';
+    await render(hotkeysSettings.fields[0]!);
+    await expect.poll(() => host.textContent).toContain('Open Command Palette');
+
+    const list = host.querySelector<HTMLElement>('[role="list"][aria-label="hotkeys.bindings"]')!;
+
+    expect(list).not.toBeNull();
+    expect(list.querySelectorAll('[role="listitem"]').length).toBeGreaterThan(0);
+    // Shortcut editors are separated by hairlines, one fewer than the rows in a section.
+    expect(list.querySelectorAll('[aria-hidden="true"]').length).toBeGreaterThan(0);
+    expect(host.querySelector('[data-list-pinned-header]')?.textContent).toContain('hotkeys.categories.app');
+
+    const search = host.querySelector<HTMLInputElement>('input[aria-label="hotkeys.searchPlaceholder"]')!;
+
+    await act(() => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+      setter.call(search, 'no shortcut is called this');
+      search.dispatchEvent(new Event('input', { bubbles: true }));
+    });
+    await expect.poll(() => host.textContent).toContain('hotkeys.noMatches');
+    expect(host.querySelector('[role="list"][aria-label="hotkeys.bindings"]')).toBeNull();
+  });
+
   it('marks a disabled shortcut but does not mark an explicit binding equal to its declared default', async () => {
     const errorSpy = vi.spyOn(console, 'error');
     await patchWorkbenchPreferences({ customHotkeys: { 'app.openCommandPalette': ['mod+k'] } });

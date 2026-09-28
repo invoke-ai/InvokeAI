@@ -770,6 +770,7 @@
     "disable": "Disable",
     "disabled": "Disabled",
     "duplicateBinding": "Duplicate binding in this hotkey",
+    "noMatches": "No hotkeys match your search",
     "pending": "Pending",
     "pressKeys": "Press keys",
     "resetAll": "Reset all",
