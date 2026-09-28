@@ -1,26 +1,48 @@
-import type { ProjectGraphState, WorkflowNode } from '@features/workflow/core/types';
+import type {
+  FieldInputTemplate,
+  InvocationTemplate,
+  InvocationTemplates,
+  ProjectGraphState,
+  WorkflowNode,
+} from '@features/workflow/core/types';
 import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext';
 import type { ProjectGraphAction } from '@features/workflow/utility';
 
 import { invalidateWorkflowLibraryCache } from '@features/workflow/data/libraryCache';
-import { createProjectGraph, projectGraphReducer } from '@features/workflow/utility';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import {
+  getSavedWorkflowPickerOwnedQuery,
+  getSavedWorkflowPickerSharedQuery,
+} from '@features/workflow/data/savedWorkflowFieldUtils';
+import { savedWorkflowPickerQueryOptions } from '@features/workflow/data/savedWorkflowQueries';
+import {
+  buildInvocationNode,
+  createProjectGraph,
+  projectGraphReducer,
+  serializeWorkflowJson,
+} from '@features/workflow/utility';
+import { queryClient } from '@platform/query/client';
+import { QueryClientProvider, useInfiniteQuery } from '@tanstack/react-query';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { getLibraryWorkflowRecordMock } = vi.hoisted(() => ({ getLibraryWorkflowRecordMock: vi.fn() }));
+const { getInvocationTemplatesSnapshotMock, getLibraryWorkflowRecordMock, listLibraryWorkflowsMock } = vi.hoisted(
+  () => ({
+    getInvocationTemplatesSnapshotMock: vi.fn(),
+    getLibraryWorkflowRecordMock: vi.fn(),
+    listLibraryWorkflowsMock: vi.fn(),
+  })
+);
 
 vi.mock('@features/workflow/data/api', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   getLibraryWorkflowRecord: getLibraryWorkflowRecordMock,
+  listLibraryWorkflows: listLibraryWorkflowsMock,
 }));
 
-// The reconciler only needs a loaded snapshot to run; the child record never
-// arrives in these tests, so the template contents are never read.
 vi.mock('@features/workflow/data/templates', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
-  getInvocationTemplatesSnapshot: () => ({ error: null, status: 'loaded', templates: {} }),
+  getInvocationTemplatesSnapshot: getInvocationTemplatesSnapshotMock,
   subscribeInvocationTemplates: () => () => undefined,
 }));
 
@@ -31,6 +53,110 @@ import { CallSavedWorkflowSyncRuntime } from './CallSavedWorkflowSyncRuntime';
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
 const MISSING_WORKFLOW_ID = 'missing-workflow';
+const PICKER_QUERY_KEY = savedWorkflowPickerQueryOptions(getSavedWorkflowPickerOwnedQuery()).queryKey;
+const CHILD_INVOCATION_TYPE = 'text_input';
+const CHILD_NODE_ID = 'input-node';
+const dynamicFieldName = (fieldName: string) => `saved_workflow_input::${CHILD_NODE_ID}::${fieldName}`;
+
+const makeStringField = (name: string, title: string, description: string): FieldInputTemplate => ({
+  default: '',
+  description,
+  exclusiveMaximum: null,
+  exclusiveMinimum: null,
+  fieldKind: 'input',
+  input: 'any',
+  maximum: null,
+  minimum: null,
+  multipleOf: null,
+  name,
+  options: null,
+  required: false,
+  title,
+  type: { batch: false, cardinality: 'SINGLE', name: 'StringField' },
+  uiChoiceLabels: null,
+  uiComponent: null,
+  uiHidden: false,
+  uiModelBase: null,
+  uiModelFormat: null,
+  uiModelType: null,
+  uiOrder: null,
+});
+
+const childInputTemplate: InvocationTemplate = {
+  category: 'test',
+  classification: 'stable',
+  description: 'Test inputs',
+  inputs: {
+    negative_prompt: makeStringField('negative_prompt', 'Negative prompt', 'Avoid these details'),
+    prompt: makeStringField('prompt', 'Prompt', 'Describe the image'),
+  },
+  nodePack: 'invokeai',
+  outputType: 'image_output',
+  outputs: {},
+  tags: [],
+  title: 'Text input',
+  type: CHILD_INVOCATION_TYPE,
+  useCache: true,
+  version: '1.0.0',
+};
+
+const buildLibraryChildWorkflow = (promptLabel: string, promptDescription: string, exposeNegativePrompt: boolean) => {
+  let document = createProjectGraph('library-child', 'Library child');
+  const node = buildInvocationNode(childInputTemplate, { x: 0, y: 0 });
+  node.id = CHILD_NODE_ID;
+  node.data.inputs.prompt = {
+    description: promptDescription,
+    label: promptLabel,
+    name: 'prompt',
+    value: 'initial prompt',
+  };
+  node.data.inputs.negative_prompt = {
+    label: 'Negative prompt',
+    name: 'negative_prompt',
+    value: 'initial negative prompt',
+  };
+  document = projectGraphReducer(document, { node, type: 'addNode' });
+  document = projectGraphReducer(document, {
+    fieldIdentifier: { fieldName: 'prompt', nodeId: CHILD_NODE_ID },
+    type: 'exposeField',
+  });
+
+  if (exposeNegativePrompt) {
+    document = projectGraphReducer(document, {
+      fieldIdentifier: { fieldName: 'negative_prompt', nodeId: CHILD_NODE_ID },
+      type: 'exposeField',
+    });
+  }
+
+  return serializeWorkflowJson(document);
+};
+
+const WorkflowPickerQueryProbe = () => {
+  useInfiniteQuery(savedWorkflowPickerQueryOptions(getSavedWorkflowPickerOwnedQuery()));
+  return null;
+};
+
+const WorkflowPickerVariantsProbe = () => {
+  const ownedQuery = useInfiniteQuery(savedWorkflowPickerQueryOptions(getSavedWorkflowPickerOwnedQuery('updated')));
+  const sharedQuery = useInfiniteQuery(savedWorkflowPickerQueryOptions(getSavedWorkflowPickerSharedQuery()));
+
+  return (
+    <>
+      <button
+        aria-label="Fetch next owned picker page"
+        data-testid="owned-next-page"
+        onClick={() => void ownedQuery.fetchNextPage()}
+        type="button"
+      />
+      <button
+        aria-label="Fetch next shared picker page"
+        data-testid="shared-next-page"
+        onClick={() => void sharedQuery.fetchNextPage()}
+        type="button"
+      />
+    </>
+  );
+};
 
 /** A call node as `parseWorkflowJson` produces it for a reloaded parent: an id, and status `loading`. */
 const buildCallNode = (
@@ -113,15 +239,14 @@ const settleUntilRequestsStop = async (getCount: () => number, sample = 25, maxS
  * Shared failing child-workflow IDs must settle every node to error without ping-ponging retries or remaining
  * loading forever.
  */
-describe('CallSavedWorkflowSyncRuntime with an unreachable child workflow', () => {
+describe('CallSavedWorkflowSyncRuntime', () => {
   let host: HTMLDivElement;
   let root: Root;
-  let queryClient: QueryClient;
 
   beforeEach(() => {
     host = document.createElement('div');
     document.body.append(host);
-    queryClient = new QueryClient();
+    queryClient.clear();
     getLibraryWorkflowRecordMock.mockReset();
     // The delay matters: the reconciler coalesces everything scheduled before
     // its next macrotask, so a synchronous rejection folds the `fetch` and
@@ -132,6 +257,8 @@ describe('CallSavedWorkflowSyncRuntime with an unreachable child workflow', () =
           setTimeout(() => reject(new Error('not found')), 10);
         })
     );
+    listLibraryWorkflowsMock.mockReset();
+    getInvocationTemplatesSnapshotMock.mockReturnValue({ error: null, status: 'loaded', templates: {} });
   });
 
   afterEach(async () => {
@@ -140,7 +267,12 @@ describe('CallSavedWorkflowSyncRuntime with an unreachable child workflow', () =
     host.remove();
   });
 
-  const mountWith = async (nodes: WorkflowNode[]) => {
+  const mountWith = async (
+    nodes: WorkflowNode[],
+    withPicker = false,
+    withRuntime = true,
+    withPickerVariants = false
+  ) => {
     let graph: ProjectGraphState = { ...createProjectGraph('parent'), nodes };
     const listeners = new Set<() => void>();
     const snapshot = () => ({
@@ -185,7 +317,9 @@ describe('CallSavedWorkflowSyncRuntime with an unreachable child workflow', () =
       root.render(
         <QueryClientProvider client={queryClient}>
           <WorkflowUiProvider adapter={adapter}>
-            <CallSavedWorkflowSyncRuntime />
+            {withRuntime ? <CallSavedWorkflowSyncRuntime /> : null}
+            {withPicker ? <WorkflowPickerQueryProbe /> : null}
+            {withPickerVariants ? <WorkflowPickerVariantsProbe /> : null}
           </WorkflowUiProvider>
         </QueryClientProvider>
       );
@@ -248,6 +382,116 @@ describe('CallSavedWorkflowSyncRuntime with an unreachable child workflow', () =
 
     expect(getLibraryWorkflowRecordMock).toHaveBeenCalledTimes(2);
     expect(readStatuses(readGraph())).toEqual(['error', 'error', 'error']);
+  });
+
+  it.each([
+    ['saving a new workflow', () => invalidateWorkflowLibraryCache('new-workflow')],
+    ['deleting a workflow', () => invalidateWorkflowLibraryCache()],
+    ['renaming a workflow', () => invalidateWorkflowLibraryCache('renamed-workflow')],
+  ])('refreshes picker results after %s', async (_operation, invalidateLibrary) => {
+    listLibraryWorkflowsMock
+      .mockResolvedValueOnce({ items: [{ workflow_id: 'old-item' }], page: 0, pages: 1, per_page: 20, total: 1 })
+      .mockResolvedValueOnce({ items: [{ workflow_id: 'new-item' }], page: 0, pages: 1, per_page: 20, total: 1 });
+
+    // Publication can occur outside the editor widget, so picker invalidation must work without its runtime mounted.
+    await mountWith([], true, false);
+    await settleUntilRequestsStop(() => listLibraryWorkflowsMock.mock.calls.length);
+
+    expect(listLibraryWorkflowsMock).toHaveBeenCalledTimes(1);
+
+    invalidateLibrary();
+    await settleUntilRequestsStop(() => listLibraryWorkflowsMock.mock.calls.length);
+
+    expect(listLibraryWorkflowsMock).toHaveBeenCalledTimes(2);
+    expect(queryClient.getQueryData(PICKER_QUERY_KEY)).toMatchObject({
+      pages: [{ items: [{ workflow_id: 'new-item' }] }],
+    });
+  });
+
+  it('refreshes every loaded owned and shared picker page', async () => {
+    let version = 1;
+    listLibraryWorkflowsMock.mockImplementation(({ isPublic, page }: { isPublic?: boolean; page: number }) =>
+      Promise.resolve({
+        items: [{ workflow_id: `v${version}-${isPublic ? 'shared' : 'owned'}-${page}` }],
+        page,
+        pages: 2,
+        per_page: 20,
+        total: 2,
+      })
+    );
+
+    await mountWith([], false, false, true);
+    await settleUntilRequestsStop(() => listLibraryWorkflowsMock.mock.calls.length);
+    expect(listLibraryWorkflowsMock).toHaveBeenCalledTimes(2);
+
+    await act(() => host.querySelector<HTMLButtonElement>('[data-testid="owned-next-page"]')?.click());
+    await settleUntilRequestsStop(() => listLibraryWorkflowsMock.mock.calls.length);
+    await act(() => host.querySelector<HTMLButtonElement>('[data-testid="shared-next-page"]')?.click());
+    await settleUntilRequestsStop(() => listLibraryWorkflowsMock.mock.calls.length);
+    expect(listLibraryWorkflowsMock).toHaveBeenCalledTimes(4);
+
+    version = 2;
+    invalidateWorkflowLibraryCache();
+    await settleUntilRequestsStop(() => listLibraryWorkflowsMock.mock.calls.length);
+
+    const ownedKey = savedWorkflowPickerQueryOptions(getSavedWorkflowPickerOwnedQuery('updated')).queryKey;
+    const sharedKey = savedWorkflowPickerQueryOptions(getSavedWorkflowPickerSharedQuery()).queryKey;
+    expect(listLibraryWorkflowsMock).toHaveBeenCalledTimes(8);
+    expect(queryClient.getQueryData(ownedKey)).toMatchObject({
+      pages: [{ items: [{ workflow_id: 'v2-owned-0' }] }, { items: [{ workflow_id: 'v2-owned-1' }] }],
+    });
+    expect(queryClient.getQueryData(sharedKey)).toMatchObject({
+      pages: [{ items: [{ workflow_id: 'v2-shared-0' }] }, { items: [{ workflow_id: 'v2-shared-1' }] }],
+    });
+  });
+
+  it('propagates a selected library workflow update into its call node inputs', async () => {
+    const childTemplates: InvocationTemplates = { [CHILD_INVOCATION_TYPE]: childInputTemplate };
+    getInvocationTemplatesSnapshotMock.mockReturnValue({ error: null, status: 'loaded', templates: childTemplates });
+    let currentRecord = {
+      name: 'Child workflow',
+      workflow: buildLibraryChildWorkflow('Prompt v1', 'Description v1', false),
+      workflow_id: 'updated-child',
+    };
+    getLibraryWorkflowRecordMock.mockImplementation(() => Promise.resolve(currentRecord));
+
+    const { readGraph, updateGraph } = await mountWith([buildCallNode('call-1', 'updated-child')]);
+    await settleUntilRequestsStop(() => getLibraryWorkflowRecordMock.mock.calls.length);
+
+    const promptInputName = dynamicFieldName('prompt');
+    let callNode = readGraph().nodes.find((node) => node.id === 'call-1');
+    expect(callNode?.type === 'invocation' && callNode.data.inputs[promptInputName]).toMatchObject({
+      description: 'Description v1',
+      label: 'Prompt v1',
+      value: 'initial prompt',
+    });
+
+    updateGraph(
+      projectGraphReducer(readGraph(), {
+        fieldName: promptInputName,
+        nodeId: 'call-1',
+        type: 'setFieldValue',
+        value: 'parent value',
+      })
+    );
+    currentRecord = {
+      ...currentRecord,
+      workflow: buildLibraryChildWorkflow('Prompt v2', 'Description v2', true),
+    };
+    invalidateWorkflowLibraryCache('updated-child');
+    await settleUntilRequestsStop(() => getLibraryWorkflowRecordMock.mock.calls.length);
+
+    callNode = readGraph().nodes.find((node) => node.id === 'call-1');
+    expect(getLibraryWorkflowRecordMock).toHaveBeenCalledTimes(2);
+    expect(callNode?.type === 'invocation' && callNode.data.inputs[promptInputName]).toMatchObject({
+      description: 'Description v2',
+      label: 'Prompt v2',
+      value: 'parent value',
+    });
+    expect(callNode?.type === 'invocation' && callNode.data.inputs[dynamicFieldName('negative_prompt')]).toMatchObject({
+      label: 'Negative prompt',
+      value: 'initial negative prompt',
+    });
   });
 
   it('keeps an invalidation armed while an existing detail request settles', async () => {

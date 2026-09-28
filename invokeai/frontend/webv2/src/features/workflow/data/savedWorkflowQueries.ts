@@ -11,6 +11,8 @@ import {
 export const savedWorkflowDetailQueryKey = (workflowId: string) =>
   ['workflow', 'call-saved', 'detail', workflowId] as const;
 
+export const savedWorkflowPickerQueryKeyPrefix = ['workflow', 'call-saved', 'picker'] as const;
+
 export const isSavedWorkflowDetailQueryKey = (
   queryKey: readonly unknown[]
 ): queryKey is readonly ['workflow', 'call-saved', 'detail', string] =>
@@ -81,7 +83,7 @@ export const savedWorkflowDetailQueryOptions = (workflowId: string) => ({
 });
 
 export const savedWorkflowPickerQueryOptions = (params: ListWorkflowsParams) => ({
-  queryKey: ['workflow', 'call-saved', 'picker', params] as const,
+  queryKey: [...savedWorkflowPickerQueryKeyPrefix, params] as const,
   queryFn: ({ pageParam, signal }: { pageParam: number; signal: AbortSignal }): Promise<WorkflowLibraryPage> =>
     listLibraryWorkflows({ ...params, page: pageParam, signal }),
   staleTime: 30_000,
