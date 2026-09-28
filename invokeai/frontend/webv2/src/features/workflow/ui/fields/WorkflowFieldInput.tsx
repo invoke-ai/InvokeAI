@@ -156,8 +156,12 @@ export interface WorkflowFieldInputProps {
   onSeedModeChange?: (seedMode: SeedMode) => void;
 }
 
-// The media well's hover, matching DropZone's pointer-hover accent preview.
-const MEDIA_INPUT_HOVER_PROPS = { borderColor: 'accent.solid' };
+// The media well's hover matches DropZone's accent preview; an invalid well keeps its error border and tints instead.
+const MEDIA_WELL_PROPS = { _hover: { borderColor: 'accent.solid' } };
+const MEDIA_WELL_INVALID_PROPS = {
+  borderColor: 'border.error',
+  _hover: { bg: 'bg.error/60', borderColor: 'border.error' },
+};
 
 /** A row of a list names itself by position; a scalar field is named by its title. */
 type ScalarInputProps = WorkflowFieldInputProps & { ariaLabel?: string };
@@ -828,16 +832,10 @@ const ImageCollectionInput = ({
   return (
     <Box position="relative" w="full" {...invalidAriaProps}>
       <ImageCollectionDropMonitor dropId={dropId} onDrop={appendNames} />
-      <Box
-        ref={setNodeRef}
-        boxShadow={invalid ? '0 0 0 1px {colors.red.solid}' : undefined}
-        className="nodrag"
-        position="relative"
-        rounded="sm"
-        w="full"
-      >
+      <Box ref={setNodeRef} className="nodrag" position="relative" rounded="sm" w="full">
         {names.length > 0 ? (
           <SimpleGrid
+            borderColor={invalid ? 'border.error' : undefined}
             borderWidth="1px"
             className="nowheel"
             columns={3}
@@ -872,9 +870,9 @@ const ImageCollectionInput = ({
                 h="full"
                 justifyContent="center"
                 rounded="sm"
-                transition="border-color var(--wb-motion-duration-fast) ease"
+                transition="border-color var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease"
                 w="full"
-                _hover={MEDIA_INPUT_HOVER_PROPS}
+                {...(invalid ? MEDIA_WELL_INVALID_PROPS : MEDIA_WELL_PROPS)}
               >
                 <Text as="span" color="fg" fontSize="xs" fontWeight="600">
                   {pickerLabel}
@@ -980,15 +978,7 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
     <Box position="relative" w="full" {...invalidAriaProps}>
       <MediaDropMonitor dropId={dropId} kind={kind} onDrop={onMediaDrop} />
       {/* The whole preview area is the drop target, like the legacy editor's widget. */}
-      <Box
-        ref={setNodeRef}
-        boxShadow={invalid ? '0 0 0 1px {colors.red.solid}' : undefined}
-        className="nodrag"
-        h="32"
-        position="relative"
-        rounded="sm"
-        w="full"
-      >
+      <Box ref={setNodeRef} className="nodrag" h="32" position="relative" rounded="sm" w="full">
         <GalleryPickerPopover accept={pickerAccept} label={pickerLabel} onPick={onPick}>
           <chakra.button
             aria-label={pickerLabel}
@@ -1007,9 +997,9 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
                 justifyContent="center"
                 overflow="hidden"
                 rounded="sm"
-                transition="border-color var(--wb-motion-duration-fast) ease"
+                transition="border-color var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease"
                 w="full"
-                _hover={MEDIA_INPUT_HOVER_PROPS}
+                {...(invalid ? MEDIA_WELL_INVALID_PROPS : MEDIA_WELL_PROPS)}
               >
                 {failedThumbnail !== mediaName ? (
                   <Image
@@ -1037,9 +1027,9 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
                 h="full"
                 justifyContent="center"
                 rounded="sm"
-                transition="border-color var(--wb-motion-duration-fast) ease"
+                transition="border-color var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease"
                 w="full"
-                _hover={MEDIA_INPUT_HOVER_PROPS}
+                {...(invalid ? MEDIA_WELL_INVALID_PROPS : MEDIA_WELL_PROPS)}
               >
                 <Text as="span" color="fg" fontSize="xs" fontWeight="600">
                   {pickerLabel}

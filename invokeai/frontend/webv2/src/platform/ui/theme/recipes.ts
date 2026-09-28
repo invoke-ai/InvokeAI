@@ -308,6 +308,8 @@ export const formControlInteraction = {
   _invalid: { borderColor: 'border.error' },
   _hover: {
     borderColor: 'border.emphasized',
+    // Hover must not repaint an invalid border neutral; tint instead so hover stays visible.
+    _invalid: { borderColor: 'border.error', bg: 'bg.error/60' },
     _expanded: formControlFocused,
     _focusVisible: formControlFocused,
   },

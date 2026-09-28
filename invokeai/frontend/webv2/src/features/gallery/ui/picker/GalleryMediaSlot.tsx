@@ -215,6 +215,7 @@ export const GalleryMediaSlot = ({
             cursor={disabled ? 'not-allowed' : undefined}
             disabled={isInert}
             isDisabled={isInert}
+            isInvalid={errorMessage !== null}
             isOver={isOver}
             minH="20"
             overflow="hidden"
