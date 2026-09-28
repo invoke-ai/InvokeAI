@@ -864,6 +864,32 @@ describe('GalleryImageGrid mixed item cells', () => {
     expect(onDragStart).not.toHaveBeenCalled();
   });
 
+  it.each([
+    { chord: '{Control>}{Enter}{/Control}', modifier: 'ctrlKey' },
+    { chord: '{Meta>}{Enter}{/Meta}', modifier: 'metaKey' },
+  ])(
+    'lets $modifier+Enter reach app hotkeys from a focused tile without activating it or starting a drag',
+    async ({ chord, modifier }) => {
+      const image = createItem('image', 'chord.png');
+      const reachedWindow = vi.fn();
+      window.addEventListener('keydown', reachedWindow);
+
+      try {
+        await renderGallery(createGallery({ items: [image] }));
+        const imageButton = getButton('Select chord.png for preview');
+
+        await interact(() => imageButton.focus());
+        await act(() => userEvent.keyboard(chord));
+
+        expect(reachedWindow).toHaveBeenCalledWith(expect.objectContaining({ key: 'Enter', [modifier]: true }));
+        expect(actionMocks.selectItem).not.toHaveBeenCalled();
+        expect(onDragStart).not.toHaveBeenCalled();
+      } finally {
+        window.removeEventListener('keydown', reachedWindow);
+      }
+    }
+  );
+
   it('preserves the ordered full selection when an unloaded video is dragged from a loaded image', async () => {
     await renderGallery(
       createGallery({
@@ -1592,13 +1618,17 @@ describe('shared gallery progress section', () => {
       createGallery({ items: [regular], selectedItemKey: 'image:starred.png', selectedItemKeys: ['image:starred.png'] })
     );
     registeredCommands.get('gallery.galleryNavDown')?.();
-    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(regular);
+    expect(followProgressSession).toHaveBeenLastCalledWith('run:1', { revealPreview: false });
     registeredCommands.get('gallery.galleryNavRight')?.();
     expect(followProgressSession).toHaveBeenLastCalledWith('run:1', { revealPreview: false });
+    registeredCommands.get('gallery.galleryNavUp')?.();
+    registeredCommands.get('gallery.galleryNavLeft')?.();
     expect(followProgressSession).toHaveBeenCalledTimes(3);
+    expect(actionMocks.selectItem).toHaveBeenCalledTimes(2);
   });
   it('skips waiting tiles, which cannot be followed, and steps past a collapsed section', async () => {
     const starred = createItem('image', 'starred.png', { starred: true });
+    const regular = createItem('image', 'regular.png');
     currentProgressSessions = [
       session,
       { ...session, id: 'run:2', itemIndex: 2, backendItemId: null, state: 'queued' },
@@ -1615,20 +1645,20 @@ describe('shared gallery progress section', () => {
     currentLiveFollowEnabled = false;
     await renderGallery(
       createGallery({
+        items: [regular],
         selectedItemKey: 'image:starred.png',
         selectedItemKeys: ['image:starred.png'],
         settings: { ...getGallerySettings({}), progressSectionCollapsed: true },
       })
     );
-    registeredCommands.get('gallery.galleryNavLeft')?.();
+    registeredCommands.get('gallery.galleryNavDown')?.();
+    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(regular);
     expect(followProgressSession).not.toHaveBeenCalled();
     expect(actionMocks.selectItem).toHaveBeenCalledTimes(2);
   });
-    expect(actionMocks.selectItem).toHaveBeenCalledTimes(2);
   it('steps out of a starred selection the strip does not show instead of resetting', async () => {
     const shown = Array.from({ length: 12 }, (_, index) =>
       createItem('image', `starred-${index}.png`, { starred: true })
-    const regular = createItem('image', 'regular.png');
     );
     const hidden = createItem('image', 'starred-hidden.png', { starred: true });
     const regular = createItem('image', 'regular.png');
@@ -1645,12 +1675,8 @@ describe('shared gallery progress section', () => {
     expect(shownCount).toBeLessThan(13);
 
     registeredCommands.get('gallery.galleryNavRight')?.();
-        items: [regular],
-    expect(followProgressSession).toHaveBeenLastCalledWith('run:1', { revealPreview: false });
-    registeredCommands.get('gallery.galleryNavUp')?.();
-    registeredCommands.get('gallery.galleryNavLeft')?.();
-    registeredCommands.get('gallery.galleryNavDown')?.();
     expect(actionMocks.selectItem).toHaveBeenLastCalledWith(regular);
+    registeredCommands.get('gallery.galleryNavLeft')?.();
     expect(actionMocks.selectItem).toHaveBeenLastCalledWith(shown[shownCount - 1]);
 
     // Under a collapsed disclosure the whole strip is hidden; the selection still steps into the listing.
