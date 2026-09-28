@@ -26,7 +26,7 @@ import type { GeneratePresetRecord } from './GenerationUiContext';
 
 import { flushGenerateDrafts } from './generateDraftRegistry';
 import { getGenerateFormCommitPatch } from './generateFormViewModel';
-import { useGenerationUi } from './GenerationUiContext';
+import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
 import { notifyGenerateModelSelectionCleared } from './modelSelectionNotice';
 import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from './promptFields/PromptPanelHeader';
 
@@ -138,7 +138,8 @@ export const GeneratePresetsPopover = () => {
   const projectId = ui.project.activeProjectId;
   const presets = ui.presets.presets;
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
-  const settings = useMemo(() => normalizeGenerateSettings(ui.project.generateValues), [ui.project.generateValues]);
+  const generateValues = useGenerateValues();
+  const settings = useMemo(() => normalizeGenerateSettings(generateValues), [generateValues]);
   const canSave = supportedModels.some((model) => model.key === settings?.modelKey);
 
   const filteredPresets = useMemo(() => {
@@ -229,13 +230,13 @@ export const GeneratePresetsPopover = () => {
 
       // Flush so the snapshot carries what the user sees, not a debounce behind it.
       flushGenerateDrafts();
-      const snapshot = normalizeGenerateSettings(ui.project.generateValues);
+      const snapshot = normalizeGenerateSettings(ui.generateValues.getSnapshot());
 
       if (snapshot) {
         ui.presets.save(label, { ...snapshot });
       }
     },
-    [dialog, ui.presets, ui.project.generateValues]
+    [dialog, ui.generateValues, ui.presets]
   );
 
   const cancelDelete = useCallback(() => setPendingDelete(null), []);
