@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 898192,
+        "brotliBytes": 901357,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 896907,
+        "gzipBytes": 900242,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2134258,
+        "initialRawBytes": 2144207,
         "largestAssetRawBytes": 778953,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 91583,
+        "ownedRawBytes": 92610,
         "requestCount": 36,
         "scriptRequestCount": 20,
         "sourceOwners": [
@@ -250,6 +250,11 @@
           "source:src/platform/ui/hints/hintsContext.tsx",
           "source:src/platform/ui/hints/index.ts",
           "source:src/platform/ui/index.ts",
+          "source:src/platform/ui/list/ListDivider.tsx",
+          "source:src/platform/ui/list/ListItem.tsx",
+          "source:src/platform/ui/list/ListSectionHeader.tsx",
+          "source:src/platform/ui/list/ListStack.tsx",
+          "source:src/platform/ui/list/listLayout.ts",
           "source:src/platform/ui/settings/contracts.ts",
           "source:src/platform/ui/theme/applyTheme.ts",
           "source:src/platform/ui/theme/recipes.ts",
@@ -328,17 +333,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1247542,
+        "brotliBytes": 1251847,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1241055,
+        "gzipBytes": 1245199,
         "imageRawBytes": 156376,
-        "initialRawBytes": 3207749,
+        "initialRawBytes": 3225507,
         "largestAssetRawBytes": 778953,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 143588,
-        "requestCount": 86,
-        "scriptRequestCount": 70,
+        "ownedRawBytes": 144687,
+        "requestCount": 84,
+        "scriptRequestCount": 68,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -764,6 +769,11 @@
           "source:src/platform/ui/hints/hintsContext.tsx",
           "source:src/platform/ui/hints/index.ts",
           "source:src/platform/ui/index.ts",
+          "source:src/platform/ui/list/ListDivider.tsx",
+          "source:src/platform/ui/list/ListItem.tsx",
+          "source:src/platform/ui/list/ListSectionHeader.tsx",
+          "source:src/platform/ui/list/ListStack.tsx",
+          "source:src/platform/ui/list/listLayout.ts",
           "source:src/platform/ui/settings/contracts.ts",
           "source:src/platform/ui/theme/applyTheme.ts",
           "source:src/platform/ui/theme/recipes.ts",
@@ -1052,7 +1062,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-09-26",
+  "capturedAt": "2026-09-28",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

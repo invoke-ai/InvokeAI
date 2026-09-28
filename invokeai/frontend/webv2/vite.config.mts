@@ -43,6 +43,16 @@ const ROUTE_SHARED_MODULES = [
   '/platform/transport/socketHub.ts',
   '/platform/ui/ConfirmDialog.tsx',
   '/platform/ui/MiddleTruncate.tsx',
+  // The queue widget and the Launchpad managers share the list row; a separate chunk would cost a request.
+  '/platform/ui/list/ListDivider.tsx',
+  '/platform/ui/list/ListItem.tsx',
+  '/platform/ui/list/ListSectionHeader.tsx',
+  '/platform/ui/list/ListStack.tsx',
+  '/platform/ui/list/listLayout.ts',
+  // Lazy lists (graph preview) share these with startup; left ungrouped they split into an extra startup chunk.
+  '/platform/react/usePreservedScrollOffset.ts',
+  '/platform/ui/Scrollable.tsx',
+  '/platform/ui/useScrollAreaPhantomHeal.ts',
   '/platform/ui/theme/applyTheme.ts',
   '/workbench/components/WorkbenchSplashScreen.tsx',
   '/workbench/hotkeys/catalog.ts',
