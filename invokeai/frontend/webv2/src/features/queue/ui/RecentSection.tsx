@@ -1,6 +1,8 @@
 import { Stack, Text } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { segmentTabsPanelId, segmentTabsTabId } from '@platform/ui';
+import { ListSectionHeader } from '@platform/ui/list/ListSectionHeader';
+import { ListStack } from '@platform/ui/list/ListStack';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -11,7 +13,6 @@ import { matchesFilter } from './queueFilters';
 import { QUEUE_FILTER_TABS_ID } from './QueueFilterTabs';
 import { QueueItemRow } from './QueueItemRow';
 import { clearPendingQueueItemReveal, type QueueItemRevealRequest } from './queueUiStore';
-import { SectionHeader } from './SectionHeader';
 
 /** Exclude running and next items from recent history because NOW & NEXT already shows them. */
 export const RecentSection = ({
@@ -41,16 +42,16 @@ export const RecentSection = ({
   return (
     <Stack
       aria-labelledby={segmentTabsTabId(QUEUE_FILTER_TABS_ID, filter)}
-      gap="2"
+      gap="1"
       id={segmentTabsPanelId(QUEUE_FILTER_TABS_ID)}
       role="tabpanel"
     >
       {cannotReveal && revealRequest ? (
         <UnavailableRevealConsumer key={revealRequest.requestId} request={revealRequest} />
       ) : null}
-      <SectionHeader count={filtered.length} title={t('common.recent')} />
+      <ListSectionHeader count={filtered.length} label={t('common.recent')} />
       {filtered.length === 0 ? (
-        <Text color={loadState === 'error' ? 'fg.error' : 'fg.subtle'} fontSize="2xs" px="1">
+        <Text color={loadState === 'error' ? 'fg.error' : 'fg.subtle'} fontSize="2xs" px="2">
           {loadState === 'loading'
             ? t('widgets.queue.loading')
             : loadState === 'error'
@@ -58,7 +59,7 @@ export const RecentSection = ({
               : t('common.nothingHereYet')}
         </Text>
       ) : (
-        <Stack gap="1">
+        <ListStack label={t('common.recent')}>
           {filtered.map((item) => (
             <QueueItemRow
               key={item.id}
@@ -66,7 +67,7 @@ export const RecentSection = ({
               revealRequest={item.id === revealRequest?.itemId ? revealRequest : null}
             />
           ))}
-        </Stack>
+        </ListStack>
       )}
     </Stack>
   );
