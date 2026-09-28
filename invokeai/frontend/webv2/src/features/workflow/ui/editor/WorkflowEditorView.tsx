@@ -90,7 +90,6 @@ import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
 import { WorkflowEdge } from './WorkflowEdge';
 import { WorkflowSelectionRequestRuntime } from './WorkflowSelectionRequestRuntime';
-import { WorkflowViewportRestoreRuntime } from './WorkflowViewportRestoreRuntime';
 import { getWorkflowViewport, getWorkflowViewportKey, setWorkflowViewport } from './workflowViewportStore';
 
 const nodeTypes: NodeTypes = {
@@ -281,6 +280,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     () => getWorkflowViewportKey(projectId, workflowId, runtime.instanceId),
     [projectId, runtime.instanceId, workflowId]
   );
+  // XYFlow recreates its controller when React Activity reveals this view and reads this object on reconnect.
+  const defaultViewport = useMemo(() => getWorkflowViewport(viewportKey) ?? { ...DEFAULT_VIEWPORT }, [viewportKey]);
   const perfSource = useMemo<WorkflowPerfSource>(
     () => ({
       area: 'editor',
@@ -290,7 +291,6 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     }),
     [projectId, runtime.instanceId, runtime.region, runtime.typeId]
   );
-  const defaultViewport = useMemo(() => getWorkflowViewport(viewportKey) ?? DEFAULT_VIEWPORT, [viewportKey]);
   const [flowModel, setFlowModel] = useState<WorkflowFlowModel | null>(() =>
     isLargeGraph
       ? null
@@ -1014,9 +1014,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   }, []);
   const onMoveEnd = useCallback(
     (_: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+      Object.assign(defaultViewport, viewport);
       setWorkflowViewport(viewportKey, viewport);
     },
-    [viewportKey]
+    [defaultViewport, viewportKey]
   );
   const onFlowInit = useCallback(
     (instance: WorkflowFlowInstance) => {
@@ -1196,7 +1197,6 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
         />
         {workflowShowMinimap && (!isLargeGraph || isMinimapReady) ? <FlowMiniMap /> : null}
       </ReactFlow>
-      <WorkflowViewportRestoreRuntime key={viewportKey} viewportKey={viewportKey} />
       {flowInstance ? (
         <WorkflowSelectionRequestRuntime
           flowInstance={flowInstance}

@@ -55,6 +55,7 @@ const keepAliveMocks = vi.hoisted(() => {
     preview: { createdAt: 1, id: 'preview', typeId: 'workflow' },
     'workflow:center': { createdAt: 1, id: 'workflow:center', typeId: 'workflow' },
   };
+  const callNodePosition = { x: 0, y: 0 };
   const createProject = ({
     activeInstanceId,
     projectId = 'project-a',
@@ -94,8 +95,12 @@ const keepAliveMocks = vi.hoisted(() => {
     getWidgetById: (typeId: string) => widgets[typeId],
     reset: () => {
       project = createProject({ activeInstanceId: 'canvas' });
+      callNodePosition.x = 0;
+      callNodePosition.y = 0;
     },
+    callNodePosition,
     setActiveInstanceId: (activeInstanceId: string | undefined) => publish(createProject({ activeInstanceId })),
+    setCallNodePosition: (position: { x: number; y: number }) => Object.assign(callNodePosition, position),
     setProjectId: (projectId: string) => publish(createProject({ activeInstanceId: 'canvas', projectId })),
     setRightInstanceId: (rightInstanceId: string) =>
       publish(createProject({ activeInstanceId: project.widgetRegions.center.activeInstanceId, rightInstanceId })),
@@ -197,7 +202,7 @@ vi.mock('@workbench/widget-frame', () => {
           version: '1.0.0',
         },
         id: 'call-saved-workflow',
-        position: { x: 0, y: 0 },
+        position: keepAliveMocks.callNodePosition,
         type: 'invocation',
       },
     ],
@@ -431,6 +436,113 @@ describe('preset switch keep-alive', () => {
 
     expect(restoredFlowElement).not.toBeNull();
     expect(restoredNodeElement?.textContent).toContain('Call Saved Workflow');
+  });
+
+  it('restores a viewport that keeps a lone call-workflow node visible', async () => {
+    keepAliveMocks.setCallNodePosition({ x: 500, y: 350 });
+    const { setActiveInstanceId } = await renderCenterArea();
+    const savedViewport = { x: -200, y: -180, zoom: 1 };
+
+    await setActiveInstanceId('workflow:center');
+
+    const viewportKey = getWorkflowViewportKey('project-a', 'workflow-a', 'workflow:center');
+
+    await vi.waitFor(() => expect(getWorkflowFlowInstance()).not.toBeNull());
+    const flow = getWorkflowFlowInstance();
+
+    if (!flow) {
+      throw new Error('Expected the production workflow editor flow to mount.');
+    }
+
+    const flowElement = host?.querySelector<HTMLElement>('.react-flow');
+    const nodeElement = host?.querySelector<HTMLElement>('.react-flow__node');
+
+    expect(flowElement).not.toBeNull();
+    expect(nodeElement).not.toBeNull();
+    if (!flowElement || !nodeElement) {
+      throw new Error('Expected the single call-workflow node inside React Flow.');
+    }
+    expect(nodeElement.textContent).toContain('Call Saved Workflow');
+
+    const flowBounds = flowElement.getBoundingClientRect();
+    const defaultNodeBounds = nodeElement.getBoundingClientRect();
+
+    expect(defaultNodeBounds.top).toBeGreaterThanOrEqual(flowBounds.bottom);
+
+    await act(async () => {
+      await flow.setViewport(savedViewport, { duration: 0 });
+    });
+
+    await vi.waitFor(() => expect(getWorkflowViewport(viewportKey)).toEqual(savedViewport));
+    expect(flow.getViewport()).toEqual(savedViewport);
+    expect(host?.querySelectorAll('.react-flow__node')).toHaveLength(1);
+    const nodeBounds = nodeElement.getBoundingClientRect();
+
+    expect(nodeBounds.right).toBeGreaterThan(flowBounds.left);
+    expect(nodeBounds.left).toBeLessThan(flowBounds.right);
+    expect(nodeBounds.bottom).toBeGreaterThan(flowBounds.top);
+    expect(nodeBounds.top).toBeLessThan(flowBounds.bottom);
+
+    const flowViewportElement = flowElement.querySelector<HTMLElement>('.react-flow__viewport');
+    expect(flowViewportElement).not.toBeNull();
+    if (!flowViewportElement) {
+      throw new Error('Expected the React Flow viewport element.');
+    }
+    const savedTransform = Array.from(
+      new DOMMatrixReadOnly(getComputedStyle(flowViewportElement).transform).toFloat64Array()
+    );
+    const readTransform = (style: string | null) => {
+      const elementStyle = document.createElement('div').style;
+      elementStyle.cssText = style ?? '';
+      return Array.from(new DOMMatrixReadOnly(elementStyle.transform).toFloat64Array());
+    };
+    await setActiveInstanceId('preview');
+
+    const visibleFrameTransforms: number[][] = [];
+    let shouldSampleVisibleFrames = true;
+    let animationFrameId: number | null = null;
+    const sampleVisibleFrame = () => {
+      if (!shouldSampleVisibleFrames) {
+        return;
+      }
+      if (flowElement.getClientRects().length > 0) {
+        visibleFrameTransforms.push(readTransform(flowViewportElement.getAttribute('style')));
+      }
+      animationFrameId = window.requestAnimationFrame(sampleVisibleFrame);
+    };
+    animationFrameId = window.requestAnimationFrame(sampleVisibleFrame);
+
+    await setActiveInstanceId('workflow:center');
+
+    await vi.waitFor(() => expect(getWorkflowFlowInstance()?.getViewport()).toEqual(savedViewport));
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    });
+    shouldSampleVisibleFrames = false;
+    if (animationFrameId !== null) {
+      window.cancelAnimationFrame(animationFrameId);
+    }
+    expect(visibleFrameTransforms.length).toBeGreaterThan(0);
+    expect(
+      visibleFrameTransforms.filter((transform) => transform.some((value, index) => value !== savedTransform[index]))
+    ).toEqual([]);
+
+    const restoredFlowElement = host?.querySelector<HTMLElement>('.react-flow');
+    const restoredNodeElement = host?.querySelector<HTMLElement>('.react-flow__node');
+
+    expect(restoredFlowElement).not.toBeNull();
+    expect(restoredNodeElement?.textContent).toContain('Call Saved Workflow');
+    if (!restoredFlowElement || !restoredNodeElement) {
+      throw new Error('Expected the call-workflow node after returning to the editor.');
+    }
+
+    const restoredFlowBounds = restoredFlowElement.getBoundingClientRect();
+    const restoredNodeBounds = restoredNodeElement.getBoundingClientRect();
+
+    expect(restoredNodeBounds.right).toBeGreaterThan(restoredFlowBounds.left);
+    expect(restoredNodeBounds.left).toBeLessThan(restoredFlowBounds.right);
+    expect(restoredNodeBounds.bottom).toBeGreaterThan(restoredFlowBounds.top);
+    expect(restoredNodeBounds.top).toBeLessThan(restoredFlowBounds.bottom);
   });
 
   it('leaves a hidden widget out of the tab order', async () => {
