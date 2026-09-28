@@ -43,6 +43,10 @@ export const getGalleryItemDragId = (
 
 export const getGalleryBoardDropId = (boardId: string): string => `gallery-board:${boardId}`;
 
+/** Real boards and Uncategorized hold items; date boards are views and accept no moves. */
+export const acceptsGalleryItemMoves = (boardKind: GalleryBoardKind): boolean =>
+  boardKind === 'board' || boardKind === 'uncategorized';
+
 /** Droppable id for the search field: dropping a gallery image there searches by similarity. */
 export const GALLERY_SEMANTIC_SEARCH_DROP_ID = 'gallery-semantic-search-drop';
 
@@ -131,7 +135,11 @@ export const resolveGalleryBoardDrop = (
   overData: unknown,
   loadedItems: readonly GalleryItem[]
 ): GalleryBoardDropResolution | null => {
-  if (!isGalleryItemDragData(activeData) || !isGalleryBoardDropData(overData) || overData.boardKind !== 'board') {
+  if (
+    !isGalleryItemDragData(activeData) ||
+    !isGalleryBoardDropData(overData) ||
+    !acceptsGalleryItemMoves(overData.boardKind)
+  ) {
     return null;
   }
 
