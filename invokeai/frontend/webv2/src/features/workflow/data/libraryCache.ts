@@ -1,3 +1,4 @@
+import { queryClient } from '@platform/query/client';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -11,6 +12,7 @@ import {
   type WorkflowLibraryPage,
   type WorkflowRecordDTO,
 } from './api';
+import { savedWorkflowPickerQueryKeyPrefix } from './savedWorkflowQueries';
 
 /**
  * Serve cached library pages immediately and revalidate; local mutations invalidate ordering and pagination
@@ -90,6 +92,7 @@ export const onWorkflowLibraryCacheInvalidated = (listener: WorkflowLibraryCache
 export const invalidateWorkflowLibraryCache = (workflowId?: string): void => {
   pageCache.clear();
   recordCache.clear();
+  void queryClient.invalidateQueries({ queryKey: savedWorkflowPickerQueryKeyPrefix });
 
   for (const listener of invalidationListeners) {
     listener(workflowId);
