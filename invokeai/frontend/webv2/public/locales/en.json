@@ -1687,7 +1687,7 @@
       "viewAllProjects": "View all projects"
     },
     "openProjects": {
-      "activeLabel": "Open projects. Current project: {{name}}",
+      "current": "Current",
       "label": "Open projects",
       "openEditor": "Open editor"
     },

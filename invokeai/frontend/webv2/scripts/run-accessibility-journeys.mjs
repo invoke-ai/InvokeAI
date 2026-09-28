@@ -311,21 +311,32 @@ const runKeyboardJourney = async (browser) => {
   try {
     await waitForHome(page);
 
-    const projectsTab = page.getByRole('tab', { exact: true, name: 'Projects' });
-    const fontsTab = page.getByRole('tab', { exact: true, name: 'Fonts' });
-    const modelsTab = page.getByRole('tab', { exact: true, name: 'Models' });
+    const rail = page.getByRole('navigation', { exact: true, name: 'Launchpad sections' });
+    const projectsLink = rail.getByRole('link', { exact: true, name: 'Projects' });
+    const fontsLink = rail.getByRole('link', { exact: true, name: 'Fonts' });
+    const modelsLink = rail.getByRole('link', { exact: true, name: 'Models' });
 
-    // Arrow navigation must cross rail groups while skipping headings.
-    await projectsTab.focus();
-    await projectsTab.press('ArrowDown');
-    await expectFocused(fontsTab, 'ArrowDown should move focus from Projects to Fonts.');
-    assert.match(page.url(), /#\/fonts$/);
-    assert.equal(await fontsTab.getAttribute('aria-selected'), 'true');
-    await fontsTab.press('ArrowDown');
-    await expectFocused(modelsTab, 'ArrowDown should move focus from Fonts to Models.');
+    // The rail's links are in visual order, so Tab and reading order follow what it shows.
+    const railLinkTops = await rail
+      .getByRole('link')
+      .evaluateAll((links) => links.map((link) => link.getBoundingClientRect().top));
+    assert.deepEqual(
+      railLinkTops,
+      [...railLinkTops].sort((a, b) => a - b),
+      'Launchpad rail links must follow their visual order.'
+    );
+
+    await fontsLink.focus();
+    await fontsLink.press('Enter');
+    await page.waitForURL(/#\/fonts$/);
+    assert.equal(await fontsLink.getAttribute('aria-current'), 'page');
+    await fontsLink.press('Tab');
+    await expectFocused(modelsLink, 'Tab should move focus from Fonts to Models.');
+    await modelsLink.press('Enter');
     await waitForModels(page);
     assert.match(page.url(), /#\/models$/);
-    assert.equal(await modelsTab.getAttribute('aria-selected'), 'true');
+    assert.equal(await modelsLink.getAttribute('aria-current'), 'page');
+    assert.equal(await fontsLink.getAttribute('aria-current'), null);
 
     const paletteTrigger = page.getByRole('button', { exact: true, name: 'Command palette' });
 
@@ -339,8 +350,8 @@ const runKeyboardJourney = async (browser) => {
     await paletteDialog.waitFor({ state: 'hidden' });
     await expectFocused(paletteTrigger, 'Closing the command palette should restore focus to its trigger.');
 
-    await projectsTab.focus();
-    await projectsTab.press('Enter');
+    await projectsLink.focus();
+    await projectsLink.press('Enter');
     await waitForProjects(page);
 
     const projectLink = page.getByRole('link', { exact: true, name: 'Open Fixture Project 001' });

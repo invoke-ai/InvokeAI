@@ -8,8 +8,6 @@ import { PaletteButton } from '@workbench/palette/PaletteButton';
 import { SettingsButton } from '@workbench/settings/SettingsButton';
 import { useTranslation } from 'react-i18next';
 
-import { OpenProjectsControl } from './OpenProjectsControl';
-
 const CONNECTION_LABEL_KEY: Record<Exclude<BackendConnectionStatus, 'connected'>, string> = {
   connecting: 'launchpad.connection.connecting',
   disconnected: 'launchpad.connection.disconnected',
@@ -61,7 +59,6 @@ export const LaunchpadTopBar = () => (
       <Text fontSize="sm" fontWeight="700">
         Invoke
       </Text>
-      <OpenProjectsControl />
     </HStack>
     <HStack gap="2">
       <ConnectionChip />

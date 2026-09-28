@@ -4,12 +4,11 @@ import { useCapabilities, UsersPage } from '@features/identity';
 import { requestIntermediatesFocus } from '@features/intermediates';
 import { ModelsPage } from '@features/models';
 import { NodesPage } from '@features/nodes';
-import { Tabs } from '@platform/ui';
-import { useLocation, useNavigate } from '@tanstack/react-router';
+import { useLocation } from '@tanstack/react-router';
 import { LaunchpadCommandPalette } from '@workbench/palette/LaunchpadCommandPalette';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { BlocksIcon, BoxIcon, FolderIcon, HouseIcon, TypeIcon, UsersIcon, type LucideIcon } from 'lucide-react';
-import { useCallback, useMemo, type ReactNode } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LaunchpadNav, type LaunchpadNavGroupId } from './LaunchpadNav';
@@ -59,7 +58,7 @@ const SECTION_PATHS: Record<LaunchpadSectionId, '/' | '/projects' | '/models' | 
   users: '/users',
 };
 
-const TABS_CSS: SystemStyleObject = {
+const SECTIONS_CSS: SystemStyleObject = {
   display: 'flex',
   flex: 1,
   flexDirection: { base: 'column', md: 'row' },
@@ -152,40 +151,35 @@ export const Launchpad = () => {
 
 const LaunchpadSections = ({ sections }: { sections: LaunchpadSection[] }) => {
   const location = useLocation();
-  const navigate = useNavigate();
   const requestedSectionId = getRequestedSectionId(location.pathname);
   const activeSectionId = getActiveSectionId(sections, requestedSectionId);
   const activeSectionLabel = sections.find((section) => section.id === activeSectionId)?.label ?? activeSectionId;
-  const handleValueChange = useCallback(
-    (details: { value: string }) => {
-      if (isSectionId(details.value)) {
-        void navigate({ to: SECTION_PATHS[details.value] });
-      }
-    },
-    [navigate]
+  const navItems = useMemo(
+    () => sections.map((section) => ({ ...section, to: SECTION_PATHS[section.id] })),
+    [sections]
   );
+  // Visited pages stay mounted (hidden) so returning to one keeps its state, as the former lazily mounted tabs did.
+  const [visitedIds, setVisitedIds] = useState<ReadonlySet<LaunchpadSectionId>>(() => new Set([activeSectionId]));
+
+  if (!visitedIds.has(activeSectionId)) {
+    setVisitedIds(new Set(visitedIds).add(activeSectionId));
+  }
 
   return (
-    <Tabs.Root
-      css={TABS_CSS}
-      lazyMount
-      size="sm"
-      orientation="vertical"
-      value={activeSectionId}
-      variant="subtle"
-      onValueChange={handleValueChange}
-    >
-      <LaunchpadNav items={sections} />
+    <Flex css={SECTIONS_CSS}>
+      <LaunchpadNav activeId={activeSectionId} items={navItems} />
       <Box aria-labelledby="launchpad-page-heading" as="main" flex="1" minH="0" minW="0" position="relative">
         <VisuallyHidden as="h1" id="launchpad-page-heading">
           {activeSectionLabel}
         </VisuallyHidden>
-        {sections.map((section) => (
-          <Tabs.Content key={section.id} h="full" m="0" minH="0" p="0" value={section.id}>
-            {section.render()}
-          </Tabs.Content>
-        ))}
+        {sections
+          .filter((section) => visitedIds.has(section.id))
+          .map((section) => (
+            <Box key={section.id} h="full" hidden={section.id !== activeSectionId} minH="0">
+              {section.render()}
+            </Box>
+          ))}
       </Box>
-    </Tabs.Root>
+    </Flex>
   );
 };
