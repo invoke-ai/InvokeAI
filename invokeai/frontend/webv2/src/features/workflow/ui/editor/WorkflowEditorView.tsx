@@ -280,6 +280,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     () => getWorkflowViewportKey(projectId, workflowId, runtime.instanceId),
     [projectId, runtime.instanceId, workflowId]
   );
+  // XYFlow recreates its controller when React Activity reveals this view and reads this object on reconnect.
+  const defaultViewport = useMemo(() => getWorkflowViewport(viewportKey) ?? { ...DEFAULT_VIEWPORT }, [viewportKey]);
   const perfSource = useMemo<WorkflowPerfSource>(
     () => ({
       area: 'editor',
@@ -289,7 +291,6 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
     }),
     [projectId, runtime.instanceId, runtime.region, runtime.typeId]
   );
-  const defaultViewport = useMemo(() => getWorkflowViewport(viewportKey) ?? DEFAULT_VIEWPORT, [viewportKey]);
   const [flowModel, setFlowModel] = useState<WorkflowFlowModel | null>(() =>
     isLargeGraph
       ? null
@@ -1013,9 +1014,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   }, []);
   const onMoveEnd = useCallback(
     (_: MouseEvent | TouchEvent | null, viewport: Viewport) => {
+      Object.assign(defaultViewport, viewport);
       setWorkflowViewport(viewportKey, viewport);
     },
-    [viewportKey]
+    [defaultViewport, viewportKey]
   );
   const onFlowInit = useCallback(
     (instance: WorkflowFlowInstance) => {
