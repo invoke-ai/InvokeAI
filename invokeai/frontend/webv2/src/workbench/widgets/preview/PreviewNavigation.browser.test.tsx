@@ -1,11 +1,12 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GalleryImage, GalleryImageItem, GalleryItemsPage, GalleryVideoItem } from '@features/gallery';
-import type { QueueItem } from '@features/queue/contracts';
+import type { InvocationProgressEvent, QueueItem, QueueItemStatusChangedEvent } from '@features/queue/contracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, useSensor, useSensors, type DndContextProps } from '@dnd-kit/core';
 import { requestGalleryItemReveal } from '@features/gallery/contracts';
+import { createQueueCoordinator, type QueueCoordinatorBackendPort } from '@features/queue/runtime/coordinator';
 import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { HoldToDragSensor, PrimaryMouseSensor } from '@workbench/shell/holdToDragSensor';
@@ -1642,6 +1643,236 @@ describe('preview keyboard navigation boundary', () => {
     ).toHaveLength(1);
   });
 
+  it('keeps the same-root preview through child gaps and browser focus changes until the next denoising step', async () => {
+    mocks.project.queue.items = [queueItem];
+    mocks.project.settings.showProgressImagesInViewer = true;
+    const visibilityStateDescriptor = Object.getOwnPropertyDescriptor(document, 'visibilityState');
+
+    const listeners = new Map<string, Set<(payload: never) => void>>();
+    const fire = (event: string, payload: unknown) => {
+      for (const handler of listeners.get(event) ?? []) {
+        handler(payload as never);
+      }
+    };
+    const getItem = vi.fn(() => Promise.resolve({ id: 1, status: 'waiting' as const }));
+    const backend = {
+      enqueueWorkflow: () => Promise.resolve({ batchId: 'batch-1', enqueued: 1, itemIds: [1], requested: 1 }),
+      getItem,
+      on: (event: string, handler: (payload: never) => void) => {
+        const handlers = listeners.get(event) ?? new Set();
+        handlers.add(handler);
+        listeners.set(event, handlers);
+        return () => handlers.delete(handler);
+      },
+      onConnectionChange: () => () => {},
+    } as unknown as QueueCoordinatorBackendPort;
+    let activeTarget: { itemIndex: number; queueItemId: string } | null = null;
+    const isActiveTarget = (target: { itemIndex: number; queueItemId: string }) =>
+      activeTarget?.itemIndex === target.itemIndex && activeTarget.queueItemId === target.queueItemId;
+    const coordinator = createQueueCoordinator(
+      { onGalleryRefresh: () => {} },
+      {
+        activeProgressTarget: {
+          clear: (target) => {
+            if (!target || isActiveTarget(target)) {
+              activeTarget = null;
+              mocks.useActiveProgressTarget.mockReturnValue(null);
+              mocks.runningProgressTargets = [];
+            }
+          },
+          set: (target) => {
+            activeTarget = target;
+            mocks.useActiveProgressTarget.mockReturnValue(target);
+            mocks.runningProgressTargets = [target];
+          },
+          waitForChild: (target: { itemIndex: number; queueItemId: string }) => {
+            activeTarget = target;
+            mocks.useActiveProgressTarget.mockReturnValue(target);
+            mocks.runningProgressTargets = [target];
+          },
+          settle: () => {},
+        } as NonNullable<Parameters<typeof createQueueCoordinator>[1]['activeProgressTarget']>,
+        backend,
+        modelLoads: { completed: () => {}, reset: () => {}, started: () => {} },
+        nodeExecution: {
+          clearAll: () => {},
+          completed: () => {},
+          failed: () => {},
+          progress: () => {},
+          setOrigin: () => {},
+          settleRunning: () => {},
+          started: () => {},
+        },
+        progress: { clear: () => {}, clearAll: () => {}, set: () => {} },
+        progressImage: {
+          bindSwapImages: () => {},
+          clear: (target) => {
+            if (!target || isActiveTarget(target)) {
+              mocks.useProgressImage.mockReturnValue(null);
+              mocks.slotProgressImage = null;
+            }
+          },
+          clearHeld: () => {},
+          hold: () => {},
+          set: (image, target) => {
+            const frame = target ? { ...image, target } : image;
+            mocks.useProgressImage.mockReturnValue(frame);
+            mocks.slotProgressImage = frame;
+          },
+        },
+        sweepIntervalMs: 60_000,
+      }
+    );
+    const target = { itemIndex: 1, queueItemId: 'queue-item-live' };
+    const createProgressEvent = (overrides: Partial<InvocationProgressEvent>): InvocationProgressEvent => ({
+      batch_id: 'batch-1',
+      destination: 'gallery',
+      image: null,
+      invocation_source_id: 'call-node',
+      item_id: 1,
+      message: 'Calling saved workflow',
+      origin: null,
+      percentage: 0.4,
+      queue_id: 'default',
+      revision: 1,
+      session_id: 'root-session',
+      timestamp: 1,
+      user_id: 'user-1',
+      ...overrides,
+    });
+    const stageFrame = () =>
+      host?.querySelector<HTMLImageElement>('img[src^="data:image/png"]:not([data-preview-filmstrip] img)');
+
+    coordinator.connect();
+    try {
+      await coordinator.submitWorkflow('queue-item-live', {
+        batchCount: 1,
+        destination: 'gallery',
+        graph: {
+          edges: [],
+          id: 'parent-workflow',
+          nodes: { 'call-node': { id: 'call-node', type: 'call_saved_workflow' } },
+        },
+        projectId: 'project-1',
+        sourceQueueItemId: 'queue-item-live',
+      });
+      await render();
+
+      fire(
+        'invocation_progress',
+        createProgressEvent({
+          image: { dataURL: 'data:image/png;base64,root-step', height: 64, width: 64 },
+          invocation_source_id: 'call-node',
+        })
+      );
+      await rerender();
+      expect(stageFrame()?.getAttribute('src')).toBe('data:image/png;base64,root-step');
+
+      // The coordinator's waiting path consumes these fields from the status event.
+      const waitingEvent: Pick<QueueItemStatusChangedEvent, 'item_id' | 'status' | 'status_sequence'> = {
+        item_id: 1,
+        status: 'waiting',
+        status_sequence: 2,
+      };
+      fire('queue_item_status_changed', waitingEvent);
+      await rerender();
+      expect(mocks.useActiveProgressTarget()).toEqual(target);
+      expect(stageFrame()?.getAttribute('src')).toBe('data:image/png;base64,root-step');
+
+      fire('queue_item_status_changed', waitingEvent);
+      await rerender();
+      expect(mocks.useActiveProgressTarget()).toEqual(target);
+      expect(stageFrame()?.getAttribute('src')).toBe('data:image/png;base64,root-step');
+
+      fire(
+        'invocation_progress',
+        createProgressEvent({
+          image: null,
+          invocation_source_id: 'child-node',
+          item_id: 2,
+          message: 'Child started without a frame',
+          percentage: null,
+          root_item_id: 1,
+          session_id: 'child-session',
+          workflow_call_parent_source_id: 'call-node',
+        })
+      );
+      await rerender();
+      expect(mocks.useActiveProgressTarget()).toEqual(target);
+      expect(stageFrame()?.getAttribute('src')).toBe('data:image/png;base64,root-step');
+
+      fire(
+        'invocation_progress',
+        createProgressEvent({
+          image: { dataURL: 'data:image/png;base64,child-step', height: 64, width: 64 },
+          invocation_source_id: 'child-node',
+          item_id: 2,
+          message: 'Child denoising',
+          percentage: 0.6,
+          root_item_id: 1,
+          session_id: 'child-session',
+          workflow_call_parent_source_id: 'call-node',
+        })
+      );
+      await rerender();
+      expect(mocks.useActiveProgressTarget()).toEqual(target);
+      expect(stageFrame()?.getAttribute('src')).toBe('data:image/png;base64,child-step');
+
+      await act(async () => {
+        window.dispatchEvent(new FocusEvent('blur'));
+        window.dispatchEvent(new FocusEvent('focus'));
+        await Promise.resolve();
+      });
+      await rerender();
+      expect(stageFrame()?.getAttribute('src')).toBe('data:image/png;base64,child-step');
+
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'hidden' });
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+        await Promise.resolve();
+      });
+      await rerender();
+      expect(getItem).not.toHaveBeenCalled();
+      expect(stageFrame()?.getAttribute('src')).toBe('data:image/png;base64,child-step');
+
+      Object.defineProperty(document, 'visibilityState', { configurable: true, value: 'visible' });
+      await act(async () => {
+        document.dispatchEvent(new Event('visibilitychange'));
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      await rerender();
+      expect(getItem).toHaveBeenCalledTimes(1);
+      expect(stageFrame()?.getAttribute('src')).toBe('data:image/png;base64,child-step');
+
+      // A nested child carries the same root ID, even though its parent is the first child item.
+      fire(
+        'invocation_progress',
+        createProgressEvent({
+          image: { dataURL: 'data:image/png;base64,grandchild-step', height: 64, width: 64 },
+          invocation_source_id: 'grandchild-node',
+          item_id: 3,
+          message: 'Nested child denoising',
+          parent_item_id: 2,
+          percentage: 0.7,
+          root_item_id: 1,
+          session_id: 'grandchild-session',
+          workflow_call_parent_source_id: 'nested-call-node',
+        })
+      );
+      await rerender();
+      expect(mocks.useActiveProgressTarget()).toEqual(target);
+      expect(stageFrame()?.getAttribute('src')).toBe('data:image/png;base64,grandchild-step');
+    } finally {
+      coordinator.dispose();
+      if (visibilityStateDescriptor) {
+        Object.defineProperty(document, 'visibilityState', visibilityStateDescriptor);
+      } else {
+        Reflect.deleteProperty(document, 'visibilityState');
+      }
+    }
+  });
+
   it("shows the followed slot's own frame even when the store-wide latest frame is gone", async () => {
     // Retain another live slot's frame when a neighboring batch releases its latest frame.
     mocks.project.queue.items = [queueItem];
@@ -1653,6 +1884,25 @@ describe('preview keyboard navigation boundary', () => {
     await render();
 
     expect(host?.querySelector<HTMLImageElement>('img[src="data:image/png;base64,video-step"]')).not.toBeNull();
+  });
+
+  it('keeps the selected gallery image when no root is followed and latest frame belongs to another root', async () => {
+    mocks.project.queue.items = [queueItem];
+    mocks.project.settings.showProgressImagesInViewer = false;
+    mocks.useActiveProgressTarget.mockReturnValue({ itemIndex: 1, queueItemId: queueItem.id });
+    mocks.useProgressImage.mockReturnValue({
+      dataUrl: 'data:image/png;base64,other-root',
+      height: 64,
+      target: { itemIndex: 1, queueItemId: 'other-root' },
+      width: 64,
+    });
+
+    await render();
+
+    expect(host?.querySelector<HTMLImageElement>('img[src="data:image/png;base64,other-root"]')).toBeNull();
+    expect([...host!.querySelectorAll('img')].map((image) => image.getAttribute('src'))).toContain(
+      '/images/newest/full'
+    );
   });
 
   it('follows a running slot over a settling one so a concurrent session is never hidden', async () => {
