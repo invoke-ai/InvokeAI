@@ -1,19 +1,25 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { NodePackInfo } from '@features/nodes/core/catalog';
+import type { ListRowProps } from '@platform/ui/list/List';
+import type { ListContextMenuAnchor } from '@platform/ui/list/ListItem';
 
-import { Badge, Flex, Icon, Input, InputGroup, Spinner, Stack } from '@chakra-ui/react';
+import { Badge, Flex, Icon, Input, InputGroup, Stack } from '@chakra-ui/react';
 import { filterNodePacks, isProblemPack, type NodePackFilters } from '@features/nodes/core/library';
 import { refreshCustomNodePacks } from '@features/nodes/data/nodesStore';
 import { openNodesManagerTab } from '@features/nodes/ui/nodesUiStore';
-import { Button, Row, Scrollable, Tooltip } from '@platform/ui';
+import { Button, Tooltip } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { List } from '@platform/ui/list/List';
+import { ListItem } from '@platform/ui/list/ListItem';
+import { listRowsFromItems } from '@platform/ui/list/listRows';
 import { ArrowRightIcon, BlocksIcon, PackageOpenIcon, SearchIcon, TriangleAlertIcon } from 'lucide-react';
-import { useDeferredValue, useMemo, useState } from 'react';
+import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { NodePackContextMenu, type NodePackContextMenuTarget } from './NodePackContextMenu';
 import { NodePackFilterMenu } from './NodePackFilterMenu';
+
+const getPackName = (pack: NodePackInfo): string => pack.name;
 
 export const NodePackList = ({
   activePackName,
@@ -37,24 +43,44 @@ export const NodePackList = ({
   const { t } = useTranslation();
   const [contextMenuTarget, setContextMenuTarget] = useState<NodePackContextMenuTarget | null>(null);
   const deferredFilters = useDeferredValue(filters);
-  const filtered = useMemo(() => filterNodePacks(packs, deferredFilters), [deferredFilters, packs]);
+  const rows = useMemo(
+    () => listRowsFromItems(filterNodePacks(packs, deferredFilters), getPackName),
+    [deferredFilters, packs]
+  );
+  const handleCloseContextMenu = useCallback(() => {
+    contextMenuTarget?.restoreFocus();
+    setContextMenuTarget(null);
+  }, [contextMenuTarget]);
 
-  if (status === 'error') {
-    return (
-      <Flex align="center" flex="1" justify="center" minH="0" p="3">
-        <EmptyState
-          danger
-          description={error}
-          icon={<Icon as={TriangleAlertIcon} />}
-          title={t('nodes.couldNotLoadPacks')}
-        >
-          <Button size="sm" variant="outline" onClick={() => void refreshCustomNodePacks()}>
-            {t('common.retry')}
-          </Button>
-        </EmptyState>
-      </Flex>
-    );
-  }
+  const renderItem = (pack: NodePackInfo, rowProps: ListRowProps) => (
+    <ListItem
+      {...rowProps}
+      leading={
+        <Icon as={BlocksIcon} boxSize="4" color={rowProps.isActive ? 'accent.contrast' : 'fg.subtle'} flexShrink={0} />
+      }
+      title={pack.name}
+      trailing={
+        isProblemPack(pack) ? (
+          // Zero registered nodes indicates import failure or pending reload/restart.
+          <Tooltip content={t('nodes.noNodesRegisteredHint')}>
+            <Badge colorPalette="orange" fontSize="2xs" variant="surface">
+              {pack.nodeCount}
+            </Badge>
+          </Tooltip>
+        ) : (
+          <Badge
+            colorPalette={rowProps.isActive ? undefined : 'gray'}
+            fontSize="2xs"
+            variant={rowProps.isActive ? 'solid' : 'surface'}
+          >
+            {pack.nodeCount}
+          </Badge>
+        )
+      }
+      onContextMenu={(anchor: ListContextMenuAnchor) => setContextMenuTarget({ ...anchor, pack })}
+      onPress={() => onSelect(pack.name)}
+    />
+  );
 
   return (
     <Stack flex="1" gap="2" minH="0" pt="3">
@@ -70,112 +96,52 @@ export const NodePackList = ({
         </InputGroup>
         <NodePackFilterMenu filters={filters} onChange={onFiltersChange} />
       </Flex>
-      <Scrollable h="full" label={t('nodes.installedPacks')} minH="0">
-        {status === 'idle' || status === 'loading' ? (
-          <Flex align="center" justify="center" py="10">
-            <Spinner color="fg.subtle" size="sm" />
-          </Flex>
-        ) : packs.length === 0 ? (
+      <List
+        activeKey={activePackName}
+        density="compact"
+        emptyState={
+          packs.length === 0 ? (
+            <EmptyState
+              description={t('nodes.noPacksDescription')}
+              icon={<Icon as={PackageOpenIcon} />}
+              title={t('nodes.noPacks')}
+            >
+              <Button size="sm" onClick={() => openNodesManagerTab('add')}>
+                {t('nodes.addNodes')}
+                <Icon as={ArrowRightIcon} />
+              </Button>
+            </EmptyState>
+          ) : (
+            <EmptyState
+              description={t('nodes.tryDifferentSearch')}
+              icon={<Icon as={SearchIcon} />}
+              title={t('nodes.noPacksMatch')}
+            >
+              <Button size="sm" variant="outline" onClick={() => openNodesManagerTab('add')}>
+                {t('nodes.addNodes')}
+                <Icon as={ArrowRightIcon} />
+              </Button>
+            </EmptyState>
+          )
+        }
+        errorState={
           <EmptyState
-            description={t('nodes.noPacksDescription')}
-            icon={<Icon as={PackageOpenIcon} />}
-            title={t('nodes.noPacks')}
+            danger
+            description={error}
+            icon={<Icon as={TriangleAlertIcon} />}
+            title={t('nodes.couldNotLoadPacks')}
           >
-            <Button size="sm" onClick={() => openNodesManagerTab('add')}>
-              {t('nodes.addNodes')}
-              <Icon as={ArrowRightIcon} />
+            <Button size="sm" variant="outline" onClick={() => void refreshCustomNodePacks()}>
+              {t('common.retry')}
             </Button>
           </EmptyState>
-        ) : filtered.length === 0 ? (
-          <EmptyState
-            description={t('nodes.tryDifferentSearch')}
-            icon={<Icon as={SearchIcon} />}
-            title={t('nodes.noPacksMatch')}
-          >
-            <Button size="sm" variant="outline" onClick={() => openNodesManagerTab('add')}>
-              {t('nodes.addNodes')}
-              <Icon as={ArrowRightIcon} />
-            </Button>
-          </EmptyState>
-        ) : (
-          <Stack gap="1" minW="0" p="1" px="3" w="full">
-            {filtered.map((pack) => (
-              <PackRow
-                key={pack.name}
-                isActive={pack.name === activePackName}
-                pack={pack}
-                problemHint={t('nodes.noNodesRegisteredHint')}
-                onContextMenu={(targetPack, x, y) => setContextMenuTarget({ pack: targetPack, x, y })}
-                onSelect={() => onSelect(pack.name)}
-              />
-            ))}
-          </Stack>
-        )}
-      </Scrollable>
-      <NodePackContextMenu
-        target={contextMenuTarget}
-        onClose={() => setContextMenuTarget(null)}
-        onUninstalled={onUninstalled}
+        }
+        label={t('nodes.installedPacks')}
+        renderItem={renderItem}
+        rows={rows}
+        status={status === 'error' ? 'error' : status === 'loaded' ? 'ready' : 'loading'}
       />
+      <NodePackContextMenu target={contextMenuTarget} onClose={handleCloseContextMenu} onUninstalled={onUninstalled} />
     </Stack>
   );
 };
-
-const PackRow = ({
-  isActive,
-  onContextMenu,
-  onSelect,
-  problemHint,
-  pack,
-}: {
-  isActive: boolean;
-  onContextMenu: (pack: NodePackInfo, x: number, y: number) => void;
-  onSelect: () => void;
-  /** Tooltip for the zero-node warning badge. */
-  problemHint: string;
-  pack: NodePackInfo;
-}) => (
-  <Row
-    active={isActive ? 'accent' : 'none'}
-    aria-current={isActive || undefined}
-    px="2"
-    py="1.5"
-    minW="0"
-    overflow="hidden"
-    role="button"
-    rounded="md"
-    tabIndex={0}
-    onClick={onSelect}
-    onContextMenu={(event) => {
-      event.preventDefault();
-      onContextMenu(pack, event.clientX, event.clientY);
-    }}
-    onKeyDown={(event) => {
-      if (event.key === 'Enter' || event.key === ' ') {
-        event.preventDefault();
-        onSelect();
-      }
-    }}
-  >
-    <Icon as={BlocksIcon} boxSize="4" color={isActive ? 'accent.contrast' : 'fg.subtle'} flexShrink={0} />
-    <MiddleTruncate fontSize="xs" fontWeight="600" maxW="full" text={pack.name} />
-    {isProblemPack(pack) ? (
-      // Zero registered nodes indicates import failure or pending reload/restart.
-      <Tooltip content={problemHint}>
-        <Badge colorPalette="orange" flexShrink={0} fontSize="2xs" ms="auto" variant="surface">
-          {pack.nodeCount}
-        </Badge>
-      </Tooltip>
-    ) : (
-      <Badge
-        colorPalette={isActive ? undefined : 'gray'}
-        flexShrink={0}
-        fontSize="2xs"
-        variant={isActive ? 'solid' : 'surface'}
-        ms="auto"
-      >
-        {pack.nodeCount}
-      </Badge>
-    )}
-  </Row>
-);
