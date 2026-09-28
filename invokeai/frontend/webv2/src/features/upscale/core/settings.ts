@@ -1,4 +1,5 @@
 import type {
+  ComponentModelConfig,
   GenerateLora,
   ImageWithDims,
   MainModelConfig,
@@ -25,6 +26,13 @@ import {
 import { isSeedMode, SEED_MAX } from '@platform/core/seed';
 
 import type { SpandrelModelConfig, TileControlNetModelConfig, UpscaleWidgetValues } from './types';
+
+import {
+  isUpscaleBase,
+  needsExplicitComponents,
+  supportedUpscaleArchitectureLabels,
+  upscaleArchitectureFor,
+} from './architectures';
 
 export const UPSCALE_SCALE_SLIDER_MIN = 2;
 export const UPSCALE_SCALE_SLIDER_MAX = 8;
@@ -55,7 +63,43 @@ const normalizePromptHeight = (value: unknown, min: number, max: number, fallbac
   isFiniteNumber(value) ? Math.min(max, Math.max(min, value)) : fallback;
 
 export const isSupportedUpscaleMainModel = (value: unknown): value is MainModelConfig =>
-  isMainModelConfig(value) && (value.base === 'sd-1' || value.base === 'sdxl');
+  isMainModelConfig(value) && isUpscaleBase(value.base);
+
+const isComponentModelOfType = (value: unknown, type: string): value is ComponentModelConfig =>
+  isRecord(value) && value.type === type && isModelIdentifierConfig(value);
+
+const pickComponent = (
+  stored: unknown,
+  models: readonly ModelConfig[],
+  type: string,
+  required: boolean
+): ComponentModelConfig | null => {
+  if (isComponentModelOfType(stored, type)) {
+    return stored;
+  }
+
+  // Only auto-pick where the architecture cannot run without one; elsewhere a stale selection is
+  // simply dropped rather than replaced with an arbitrary encoder.
+  return required
+    ? ((models.find((model) => isComponentModelOfType(model, type)) as ComponentModelConfig) ?? null)
+    : null;
+};
+
+const pickCompatibleVae = (
+  stored: unknown,
+  models: readonly ModelConfig[],
+  model: MainModelConfig | null
+): UpscaleWidgetValues['vae'] => {
+  if (stored && isVaeModelConfig(stored) && model && isVaeCompatibleWithGenerateModel(model, stored)) {
+    return stored;
+  }
+
+  return model
+    ? ((models.find(
+        (candidate) => isVaeModelConfig(candidate) && isVaeCompatibleWithGenerateModel(model, candidate)
+      ) as UpscaleWidgetValues['vae']) ?? null)
+    : null;
+};
 
 export const isSpandrelModelConfig = (value: unknown): value is SpandrelModelConfig =>
   isModelIdentifierConfig(value) && value.type === 'spandrel_image_to_image';
@@ -100,10 +144,12 @@ const normalizeLoras = (value: unknown): GenerateLora[] =>
 
 export const createDefaultUpscaleWidgetValues = (models: readonly ModelConfig[] = []): UpscaleWidgetValues => {
   const model = (models.find(isSupportedUpscaleMainModel) as MainModelConfig | undefined) ?? null;
+  const needsComponents = needsExplicitComponents(model);
 
   return {
     batchCount: 1,
     cfgScale: 2,
+    clipEmbedModel: pickComponent(null, models, 'clip_embed', needsComponents),
     clipSkip: 0,
     creativity: 0,
     inputImage: null,
@@ -120,11 +166,12 @@ export const createDefaultUpscaleWidgetValues = (models: readonly ModelConfig[] 
     seedMode: 'random',
     steps: 30,
     structure: 0,
+    t5EncoderModel: pickComponent(null, models, 't5_encoder', needsComponents),
     tileControlnetModel: models.find((candidate) => isTileControlNetCandidate(candidate, model)) ?? null,
     tileOverlap: 128,
     tileSize: 1024,
     upscaleModel: (models.find(isSpandrelModelConfig) as SpandrelModelConfig | undefined) ?? null,
-    vae: null,
+    vae: needsComponents ? pickCompatibleVae(null, models, model) : null,
     vaePrecision: 'fp32',
   };
 };
@@ -143,6 +190,7 @@ export const normalizeUpscaleWidgetValues = (value: unknown): UpscaleWidgetValue
   return {
     batchCount: sanitizeBatchCount(value.batchCount),
     cfgScale: isFiniteNumber(value.cfgScale) ? value.cfgScale : defaults.cfgScale,
+    clipEmbedModel: isComponentModelOfType(value.clipEmbedModel, 'clip_embed') ? value.clipEmbedModel : null,
     clipSkip: isFiniteNumber(value.clipSkip) ? value.clipSkip : defaults.clipSkip,
     creativity: isFiniteNumber(value.creativity) ? value.creativity : defaults.creativity,
     inputImage:
@@ -182,6 +230,7 @@ export const normalizeUpscaleWidgetValues = (value: unknown): UpscaleWidgetValue
         : defaults.seedMode,
     steps: isFiniteNumber(value.steps) ? value.steps : defaults.steps,
     structure: isFiniteNumber(value.structure) ? value.structure : defaults.structure,
+    t5EncoderModel: isComponentModelOfType(value.t5EncoderModel, 't5_encoder') ? value.t5EncoderModel : null,
     tileControlnetModel: isTileControlNetModelConfig(value.tileControlnetModel) ? value.tileControlnetModel : null,
     tileOverlap: isFiniteNumber(value.tileOverlap) ? value.tileOverlap : defaults.tileOverlap,
     tileSize: isFiniteNumber(value.tileSize) ? value.tileSize : defaults.tileSize,
@@ -208,11 +257,26 @@ export const syncUpscaleWidgetValuesWithModels = (
   const tileControlnetModel = isTileControlNetCandidate(storedControlNet, model)
     ? storedControlNet
     : (models.find((candidate) => isTileControlNetCandidate(candidate, model)) ?? null);
+  const needsComponents = needsExplicitComponents(model);
+  const t5EncoderModel = pickComponent(
+    values.t5EncoderModel ? modelsByKey.get(values.t5EncoderModel.key) : undefined,
+    models,
+    't5_encoder',
+    needsComponents
+  );
+  const clipEmbedModel = pickComponent(
+    values.clipEmbedModel ? modelsByKey.get(values.clipEmbedModel.key) : undefined,
+    models,
+    'clip_embed',
+    needsComponents
+  );
   const storedVae = values.vae ? modelsByKey.get(values.vae.key) : undefined;
   const vae =
     storedVae && isVaeModelConfig(storedVae) && model && isVaeCompatibleWithGenerateModel(model, storedVae)
       ? storedVae
-      : null;
+      : needsComponents
+        ? pickCompatibleVae(null, models, model)
+        : null;
   const loras = model
     ? values.loras.flatMap((lora) => {
         const installed = modelsByKey.get(lora.model.key);
@@ -227,6 +291,8 @@ export const syncUpscaleWidgetValuesWithModels = (
     values.model === model &&
     values.upscaleModel === upscaleModel &&
     values.tileControlnetModel === tileControlnetModel &&
+    values.t5EncoderModel === t5EncoderModel &&
+    values.clipEmbedModel === clipEmbedModel &&
     values.vae === vae &&
     loras.length === values.loras.length &&
     loras.every((lora, index) => lora.model === values.loras[index]?.model)
@@ -234,7 +300,7 @@ export const syncUpscaleWidgetValuesWithModels = (
     return values;
   }
 
-  return { ...values, loras, model, tileControlnetModel, upscaleModel, vae };
+  return { ...values, clipEmbedModel, loras, model, t5EncoderModel, tileControlnetModel, upscaleModel, vae };
 };
 
 const addRangeReason = (reasons: string[], label: string, value: number, min: number, max: number): void => {
@@ -252,15 +318,39 @@ export const getUpscaleValidationReasons = (values: UpscaleWidgetValues, models?
   if (!values.upscaleModel) {
     reasons.push('Upscale needs a Spandrel image-to-image model.');
   }
+  const architecture = upscaleArchitectureFor(values.model);
+
   if (!values.model) {
-    reasons.push('Upscale needs an SD1.5 or SDXL main model.');
-  } else if (!isSupportedUpscaleMainModel(values.model)) {
-    reasons.push('Upscale supports only SD1.5 and SDXL main models.');
+    reasons.push(`Upscale needs a ${supportedUpscaleArchitectureLabels()} main model.`);
+  } else if (!architecture) {
+    reasons.push(`Upscale supports only ${supportedUpscaleArchitectureLabels()} main models.`);
   }
-  if (!values.tileControlnetModel) {
-    reasons.push('Upscale needs a Tile or Union ControlNet compatible with the main model.');
-  } else if (!isTileControlNetCandidate(values.tileControlnetModel, values.model)) {
-    reasons.push('The Tile ControlNet must match the main model base and be a Tile or Union model.');
+
+  // `flux_denoise` refuses a Fill model without fill conditioning, which an upscale never supplies.
+  if (values.model?.base === 'flux' && values.model.variant === 'dev_fill') {
+    reasons.push('Upscale cannot use a FLUX Fill model.');
+  }
+
+  // Only asked for where the architecture has a tile ControlNet to anchor the second pass with.
+  if (architecture?.usesTileControlNet) {
+    if (!values.tileControlnetModel) {
+      reasons.push('Upscale needs a Tile or Union ControlNet compatible with the main model.');
+    } else if (!isTileControlNetCandidate(values.tileControlnetModel, values.model)) {
+      reasons.push('The Tile ControlNet must match the main model base and be a Tile or Union model.');
+    }
+  }
+
+  // A bare FLUX transformer cannot supply these itself, and `flux_model_loader` refuses without them.
+  if (needsExplicitComponents(values.model)) {
+    if (!values.t5EncoderModel) {
+      reasons.push('Upscale needs a T5 encoder for this main model.');
+    }
+    if (!values.clipEmbedModel) {
+      reasons.push('Upscale needs a CLIP Embed model for this main model.');
+    }
+    if (!values.vae) {
+      reasons.push('Upscale needs a VAE for this main model.');
+    }
   }
 
   addRangeReason(reasons, 'Scale', values.scale, UPSCALE_SCALE_MIN, UPSCALE_SCALE_MAX);
@@ -278,6 +368,10 @@ export const getUpscaleValidationReasons = (values: UpscaleWidgetValues, models?
       ...(values.model ? [values.model] : []),
       ...(values.upscaleModel ? [values.upscaleModel] : []),
       ...(values.tileControlnetModel ? [values.tileControlnetModel] : []),
+      // Required for FLUX, so a deleted encoder must block the run rather than fail mid-graph.
+      ...(values.t5EncoderModel ? [values.t5EncoderModel] : []),
+      ...(values.clipEmbedModel ? [values.clipEmbedModel] : []),
+      ...(values.vae ? [values.vae] : []),
     ];
 
     for (const selected of required) {

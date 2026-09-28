@@ -124,3 +124,82 @@ describe('compileUpscaleGraph', () => {
     expect(graph.nodes.core_metadata?.rand_device).toBe('xpu');
   });
 });
+
+const createFluxValues = (options: { withEncoders?: boolean } = {}) => {
+  const { withEncoders = true } = options;
+  const models = [
+    model('main', 'main', 'flux'),
+    model('spandrel', 'spandrel_image_to_image', 'any'),
+    model('lora', 'lora', 'flux'),
+    model('fluxvae', 'vae', 'flux'),
+    ...(withEncoders ? [model('t5', 't5_encoder', 'any'), model('clip', 'clip_embed', 'any')] : []),
+  ];
+  const values = createDefaultUpscaleWidgetValues(models);
+
+  return {
+    ...values,
+    inputImage: { height: 101, image_name: 'input.png', width: 203 },
+    loras: [{ isEnabled: true, model: models[2] as GenerateLora['model'], weight: 0.7 }],
+    positivePrompt: 'detail',
+  };
+};
+
+describe('compileUpscaleGraph for FLUX.1', () => {
+  it('drives the second pass with flux nodes and tiles both VAE ends', () => {
+    const { edges, nodes } = compileUpscaleGraph(createFluxValues(), 'gallery', { useCpuNoise: true }).backendGraph;
+
+    expect(nodes.model_loader).toMatchObject({ type: 'flux_model_loader' });
+    expect(nodes.model_loader?.t5_encoder_model).toMatchObject({ key: 't5' });
+    expect(nodes.model_loader?.clip_embed_model).toMatchObject({ key: 'clip' });
+    expect(nodes.i2l).toMatchObject({ tile_size: 1024, tiled: true, type: 'flux_vae_encode' });
+    expect(nodes.upscale_output).toMatchObject({ tile_size: 1024, tiled: true, type: 'flux_vae_decode' });
+    expect(nodes.denoise_latents).toMatchObject({ guidance: 2, num_steps: 30, type: 'flux_denoise' });
+    expect(nodes.denoise_latents?.denoising_start).toBeCloseTo(0.499);
+    expect(hasEdge(edges, 'i2l', 'latents', 'denoise_latents', 'latents')).toBe(true);
+    expect(hasEdge(edges, 'pos_cond_collect', 'collection', 'denoise_latents', 'positive_text_conditioning')).toBe(
+      true
+    );
+    expect(Object.values(nodes).some((node) => node.type.includes('lora_collection_loader'))).toBe(true);
+  });
+
+  it('fits the frame to the grid flux_denoise accepts, instead of whatever Spandrel rounded to', () => {
+    // Spandrel's autoscale floors to a multiple of 8; `flux_denoise` declares multiple_of=16 and
+    // raises on anything else -- after the upscale has already been paid for. The 203x101 fixture
+    // at 4x is exactly that case: Spandrel gives 808x400, and 808 is not a multiple of 16.
+    const { edges, nodes } = compileUpscaleGraph(createFluxValues(), 'gallery', { useCpuNoise: true }).backendGraph;
+
+    expect(nodes.fit_to_grid).toMatchObject({ height: 400, type: 'img_resize', width: 800 });
+    expect(nodes.denoise_latents).toMatchObject({ height: 400, width: 800 });
+    expect(hasEdge(edges, 'unsharp_2', 'image', 'fit_to_grid', 'image')).toBe(true);
+    expect(hasEdge(edges, 'fit_to_grid', 'image', 'i2l', 'image')).toBe(true);
+    expect(Number(nodes.denoise_latents?.width) % 16).toBe(0);
+    expect(Number(nodes.denoise_latents?.height) % 16).toBe(0);
+  });
+
+  it('leaves the SD path on the size Spandrel produced, which is already the grid it needs', () => {
+    const { nodes } = compileUpscaleGraph(createValues('sd-1'), 'gallery', { useCpuNoise: true }).backendGraph;
+
+    expect(nodes.fit_to_grid).toBeUndefined();
+  });
+
+  it('wires no ControlNet, because FLUX.1 has no tile model to anchor with', () => {
+    const { nodes } = compileUpscaleGraph(createFluxValues(), 'gallery', { useCpuNoise: true }).backendGraph;
+
+    expect(Object.values(nodes).some((node) => node.type === 'controlnet')).toBe(false);
+    expect(nodes.controlnet_collector).toBeUndefined();
+  });
+
+  it('names the pass without claiming a multi-diffusion that does not run', () => {
+    const flux = compileUpscaleGraph(createFluxValues(), 'gallery', { useCpuNoise: true });
+    const sd = compileUpscaleGraph(createValues('sd-1'), 'gallery', { useCpuNoise: true });
+
+    expect(flux.graph.label).not.toContain('multi-diffusion');
+    expect(sd.graph.label).toContain('multi-diffusion');
+  });
+
+  it('refuses to compile without the text encoders the loader demands', () => {
+    expect(() =>
+      compileUpscaleGraph(createFluxValues({ withEncoders: false }), 'gallery', { useCpuNoise: true })
+    ).toThrow(/T5 encoder/);
+  });
+});
