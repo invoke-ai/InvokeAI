@@ -101,6 +101,28 @@ def test_a_real_checkpoint_slice_decodes_to_its_bf16_build(layer: str) -> None:
     assert torch.equal(module(x), torch.nn.functional.linear(x, decoded.view(128, 128)))
 
 
+@pytest.mark.parametrize("dtype", [torch.bfloat16, torch.float16, torch.float32])
+def test_the_decode_lands_in_the_dtype_it_was_asked_for(dtype: torch.dtype) -> None:
+    """The per-forward decode has to honour the dtype it is handed, not one of its own.
+
+    A decode that fixes its own width is invisible to a forward run at that same width, and it breaks two
+    contracts at once: `F.linear` refuses an activation whose dtype the weight does not share, and the node's
+    working-memory reservation was sized from the compute dtype by `dequant_transient_bytes`. Asserted on the
+    decode rather than through a forward because `torch.equal` promotes, and because a bf16 CPU GEMM faults on
+    part of the hosted windows runner fleet with an illegal instruction (0xc000001d) -- see the nvfp4 loader tests,
+    which run their forward at float32 for that reason, and `test_int8_convrot_linear_bf16_path_tracks_fp32_reference`,
+    which skips on win32 for it. Worth revisiting when the windows lock moves off torch 2.7.x.
+    """
+    torch.manual_seed(5)
+    positive = torch.randint(0, 2, (128, 64), dtype=torch.bool)
+    module = _packed_linear(_signed_layer("proj", positive), "proj")
+
+    weight = module._dequantized_weight(torch.device("cpu"), dtype)
+
+    assert weight.dtype is dtype
+    assert torch.equal(weight, torch.where(positive, 0.5, -0.5).to(dtype))
+
+
 def test_popped_layers_keep_their_tensors_as_stored_and_leave_the_rest_for_the_fp8_path() -> None:
     fp8_weight = torch.randn(32, 32).to(torch.float8_e4m3fn)
     fp8_scale = torch.tensor(0.5)
