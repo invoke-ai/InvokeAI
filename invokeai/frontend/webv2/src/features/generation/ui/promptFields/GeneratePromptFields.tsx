@@ -162,6 +162,15 @@ export const GeneratePromptFields = ({
 
   const clearPromptTemplate = useCallback(() => applyPromptTemplate(null), [applyPromptTemplate]);
 
+  const savedPromptModels = useMemo(
+    () => ({
+      expandPromptModelKey: settings.expandPromptModelKey,
+      imageToPromptModelKey: settings.imageToPromptModelKey,
+      onChange: onCommitImmediate,
+    }),
+    [onCommitImmediate, settings.expandPromptModelKey, settings.imageToPromptModelKey]
+  );
+
   return (
     <Stack gap="1" py="2">
       <PositivePromptField
@@ -172,6 +181,7 @@ export const GeneratePromptFields = ({
         loras={settings.loras}
         projectId={projectId}
         promptTemplate={settings.promptTemplate}
+        savedPromptModels={savedPromptModels}
         selectedModel={selectedModel}
         showSyntaxHighlighting={showPromptSyntaxHighlighting}
         isTemplateViewMode={settings.promptTemplateViewMode}

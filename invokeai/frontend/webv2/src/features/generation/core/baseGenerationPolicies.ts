@@ -517,6 +517,8 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     negativePromptHeightPx: 56,
     positivePrompt: '',
     positivePromptHeightPx: 96,
+    expandPromptModelKey: null,
+    imageToPromptModelKey: null,
     promptTemplate: null,
     promptTemplateViewMode: false,
     qwen3EncoderModel: null,

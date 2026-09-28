@@ -6,7 +6,7 @@ import {
   getGenerateModelSelectionResult,
   isSupportedGenerateModel,
 } from '@features/generation/core/baseGenerationPolicies';
-import { normalizeGenerateSettings } from '@features/generation/core/settings';
+import { GENERATE_TOOL_MODEL_PICK_KEYS, normalizeGenerateSettings } from '@features/generation/core/settings';
 import { resolveGenerateWidgetValues } from '@features/generation/settings';
 import {
   Button,
@@ -45,6 +45,11 @@ const getPresetComparisonKey = (settings: GenerateSettings): string => {
   const comparable: Record<string, unknown> = { ...settings };
 
   delete comparable.batchCount;
+
+  for (const key of GENERATE_TOOL_MODEL_PICK_KEYS) {
+    delete comparable[key];
+  }
+
   delete comparable.negativePromptHeightPx;
   delete comparable.positivePromptHeightPx;
   delete comparable.promptTemplateViewMode;

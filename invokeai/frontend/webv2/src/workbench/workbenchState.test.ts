@@ -229,6 +229,8 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   negativePromptHeightPx: 56,
   positivePrompt: 'first prompt',
   positivePromptHeightPx: 96,
+  expandPromptModelKey: null,
+  imageToPromptModelKey: null,
   promptTemplate: null,
   promptTemplateViewMode: false,
   mistralEncoderModel: null,

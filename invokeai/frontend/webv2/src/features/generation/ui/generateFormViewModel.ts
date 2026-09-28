@@ -1,5 +1,6 @@
 import type { GenerateSettings, GenerateWidgetValues } from '@features/generation/core/types';
 
+import { GENERATE_TOOL_MODEL_PICK_KEYS } from '@features/generation/core/settings';
 import { createStableSelector } from '@platform/state/selectors';
 
 const PROMPT_FORM_KEYS = [
@@ -69,6 +70,10 @@ export const getGenerateFormCommitPatch = (
   const patch: Partial<GenerateWidgetValues> = { ...settings };
 
   delete patch.batchCount;
+
+  for (const key of GENERATE_TOOL_MODEL_PICK_KEYS) {
+    delete patch[key];
+  }
 
   return patch;
 };
