@@ -16,7 +16,7 @@ Hardware requirements vary significantly depending on model and image output siz
 The requirements below are rough guidelines for best performance. GPUs with less VRAM typically still work, if a bit slower. Follow the [Low VRAM Guide] to optimize performance.
 
 - All Apple Silicon (M1, M2, etc) Macs work, but 16GB+ memory is recommended.
-- AMD GPUs are supported on Linux only. The VRAM requirements are the same as Nvidia GPUs.
+- AMD GPUs are supported on Linux, and on Windows 11 for RDNA3, RDNA3.5 and RDNA4 GPUs (Radeon RX 7000 and 9000 series, Radeon AI PRO R9700, Ryzen AI 300 and Ryzen AI Max). The VRAM requirements are the same as Nvidia GPUs.
 - Intel Arc GPUs (Alchemist, Battlemage and newer) are supported on Windows and Linux `x86_64`. The VRAM requirements are the same as Nvidia GPUs.
 - Linux ARM64 (`aarch64`) devices — e.g. Raspberry Pi 5, other SBCs, ARM servers — are supported in CPU-only mode. Local generation is slow without a GPU, but API-backed models (e.g. GPT Image, Gemini) work well.
 
@@ -140,13 +140,15 @@ If, after restarting the app, this doesn't improve your performance, either rest
 
 ### AMD
 
-:::tip[Linux Only]{icon="linux"}
-  AMD GPUs are supported on Linux only, due to ROCm (the AMD equivalent of CUDA) support being Linux only.
-:::
-
 :::caution[Bumps Ahead]
   While the application does run on AMD GPUs, there are occasional bumps related to spotty torch support.
 :::
+
+#### Windows
+
+ROCm on Windows comes from AMD's own PyTorch wheels, which bundle the ROCm runtime, so there is no separate ROCm or HIP SDK install. You need Windows 11, an RDNA3, RDNA3.5 or RDNA4 GPU, and an up-to-date [AMD Software: Adrenalin Edition] driver. See AMD's [ROCm compatibility matrix] for details.
+
+#### Linux
 
 Run `rocm-smi` on your system's command line verify that drivers and ROCm are installed. If this command fails, or doesn't report versions, you will need to install them.
 
@@ -170,4 +172,6 @@ An alternative to installing ROCm locally is to use a [ROCm docker container] to
 [Intel Arc & Iris Xe Graphics driver]: https://www.intel.com/content/www/us/en/download/785597/intel-arc-iris-xe-graphics-windows.html
 [Intel client GPU install guide]: https://dgpu-docs.intel.com/driver/client/overview.html
 [ROCm Documentation]: https://rocmdocs.amd.com
+[ROCm compatibility matrix]: https://rocm.docs.amd.com/en/docs-10.0.0/compatibility/compatibility-matrix.html
+[AMD Software: Adrenalin Edition]: https://www.amd.com/en/support/download/drivers.html
 [ROCm docker container]: https://rocmdocs.amd.com/en/latest/Deep_learning/Deep_learning.html#docker-containers

@@ -17,6 +17,9 @@ from typing import Any
 # keeps their value.
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
+# Enables fused SDPA kernels on ROCm GPUs that AOTriton marks experimental. Ignored elsewhere.
+os.environ.setdefault("TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL", "1")
+
 
 def get_app():
     """Import the app and event loop. We wrap this in a function to more explicitly control when it happens, because
