@@ -288,11 +288,11 @@ class CoreMetadataInvocation(BaseInvocation):
         default=None,
         description="The Qwen3 text encoder model used for Z-Image inference",
     )
-    # FLUX.2 [dev] uses a Mistral text encoder where FLUX.2 Klein uses Qwen3, so it needs its own slot
-    # rather than reusing `qwen3_encoder` - the two are never both present on one image.
+    # FLUX.2 [dev] and ERNIE-Image use Mistral-family text encoders where FLUX.2 Klein uses Qwen3, so they
+    # need their own slot rather than reusing `qwen3_encoder` - the two are never both present on one image.
     mistral_encoder: Optional[ModelIdentifierField] = InputField(
         default=None,
-        description="The Mistral text encoder model used for FLUX.2 [dev] inference",
+        description="The Mistral text encoder model used for FLUX.2 [dev] or ERNIE-Image inference",
     )
     # Ideogram 4 assembles its structured JSON caption at generation time (ideogram4_caption_builder),
     # so this is a declared field rather than a static extra: the graph wires the builder's output to it

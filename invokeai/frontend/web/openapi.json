@@ -27406,7 +27406,7 @@
               }
             ],
             "default": null,
-            "description": "The Mistral text encoder model used for FLUX.2 [dev] inference",
+            "description": "The Mistral text encoder model used for FLUX.2 [dev] or ERNIE-Image inference",
             "field_kind": "input",
             "input": "any",
             "orig_default": null,

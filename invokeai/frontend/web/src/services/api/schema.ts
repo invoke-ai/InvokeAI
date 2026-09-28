@@ -9988,7 +9988,7 @@ export type components = {
              */
             qwen3_encoder?: components["schemas"]["ModelIdentifierField"] | null;
             /**
-             * @description The Mistral text encoder model used for FLUX.2 [dev] inference
+             * @description The Mistral text encoder model used for FLUX.2 [dev] or ERNIE-Image inference
              * @default null
              */
             mistral_encoder?: components["schemas"]["ModelIdentifierField"] | null;
