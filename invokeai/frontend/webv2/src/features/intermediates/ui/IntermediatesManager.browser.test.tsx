@@ -312,6 +312,10 @@ describe('IntermediatesManager', () => {
         expect.anything()
       )
     );
+    // Rows of every account name their owner, so assistive tech can tell identical project names apart.
+    await vi.waitFor(() =>
+      expect(host.querySelector('[aria-label^="intermediates.list.selectRowForOwner("]')).not.toBeNull()
+    );
     await act(() => buttonWithText('intermediates.owner.showMine', host).click());
     expect(host.querySelector('[aria-label="intermediates.owner.showEveryone"]')).not.toBeNull();
     expect(host.textContent).not.toContain('intermediates.owner.showMine');
@@ -540,7 +544,7 @@ describe('IntermediatesManager', () => {
     await vi.waitFor(() => expect(host.textContent).toContain('Portraits'));
 
     expect(host.textContent).toContain('intermediates.list.unassigned');
-    expect(host.querySelectorAll('[role="list"] li')).toHaveLength(3);
+    expect(host.querySelectorAll('[role="list"] [role="listitem"]')).toHaveLength(3);
     expect(host.textContent).toContain('intermediates.list.used');
     expect(host.textContent).toContain('intermediates.list.unused');
     expect(isDeleteUnavailable()).toBe(true);
@@ -710,11 +714,24 @@ describe('IntermediatesManager', () => {
     await act(() => checkbox('intermediates.list.selectAll').click());
     await act(() => checkbox('intermediates.list.selectRow(name=Project 1)').click());
     await vi.waitFor(() => expect(host.textContent).toContain('count=119'));
-    await act(() => buttonWithText('common.nextPage', host).click());
+    const nextPage = buttonWithText('common.nextPage', host);
+    await act(() => {
+      nextPage.focus();
+      nextPage.click();
+    });
     await vi.waitFor(() => expect(host.textContent).toContain('Project 55'));
+    // The page flipped under the pager, which keeps keyboard focus for the next press.
+    expect(document.activeElement).toBe(nextPage);
     expect(checkbox('intermediates.list.selectRow(name=Project 55)').checked).toBe(true);
     expect(checkbox('intermediates.list.selectAll').checked).toBe(false);
     await act(() => buttonWithText('common.nextPage', host).click());
+    await vi.waitFor(() => expect(host.textContent).toContain('Project 100'));
+    // The list is virtualized; the last row of the page mounts once it scrolls into view.
+    await act(() => {
+      const viewport = host.querySelector<HTMLElement>('[data-list-viewport]')!;
+      viewport.scrollTop = viewport.scrollHeight;
+      viewport.dispatchEvent(new Event('scroll'));
+    });
     await vi.waitFor(() => expect(host.textContent).toContain('Project 119'));
     expect(checkbox('intermediates.list.selectRow(name=Project 119)').checked).toBe(true);
     await act(() => buttonWithText('intermediates.list.delete', host).click());
