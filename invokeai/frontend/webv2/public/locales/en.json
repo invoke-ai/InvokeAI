@@ -988,6 +988,18 @@
         "Structure controls how closely the output image will keep to the layout of the original. Low structure allows major changes, while high structure strictly maintains the original composition and layout."
       ]
     },
+    "clipEmbed": {
+      "heading": "CLIP Embed",
+      "paragraphs": [
+        "FLUX.1 pairs its T5 encoder with a CLIP text encoder. A bare FLUX checkpoint does not carry one, so it must be chosen explicitly."
+      ]
+    },
+    "t5Encoder": {
+      "heading": "T5 Encoder",
+      "paragraphs": [
+        "FLUX.1 reads your prompt with a T5 text encoder. Most FLUX transformers ship as a bare checkpoint and cannot supply one, so it has to be selected here."
+      ]
+    },
     "tileControlNet": {
       "heading": "ControlNet",
       "paragraphs": [
@@ -2559,7 +2571,7 @@
       "lorasRemoved": "Removed {{count}} incompatible LoRA model(s).",
       "loraWeight": "{{name}} weight",
       "mainModel": "Main model",
-      "mainModelRequired": "Select an SD1.5 or SDXL main model.",
+      "mainModelRequired": "Select a supported main model.",
       "negativePrompt": "Negative prompt",
       "negativePromptAdd": "Negative prompt…",
       "negativePromptHide": "Turn off negative prompt",
@@ -2590,7 +2602,7 @@
       "scheduler": "Scheduler",
       "seed": "Seed",
       "selectLora": "Select a compatible LoRA…",
-      "selectMainModel": "Select an SD1.5 or SDXL model…",
+      "selectMainModel": "Select a supported model…",
       "selectSpandrelModel": "Select a Spandrel model…",
       "selectTileControlNet": "Select a Tile or Union ControlNet…",
       "settingsAdjusted": "Adjusted incompatible settings",
@@ -2603,6 +2615,14 @@
       "steps": "Steps",
       "structure": "Structure",
       "structureHelp": "Higher values preserve the source composition more strictly.",
+      "clipEmbed": "CLIP Embed",
+      "clipEmbedRequired": "This model needs a CLIP Embed model selected.",
+      "selectClipEmbed": "Select a CLIP Embed model",
+      "selectVae": "Select a VAE",
+      "selectT5Encoder": "Select a T5 encoder",
+      "t5Encoder": "T5 Encoder",
+      "t5EncoderRequired": "This model needs a T5 encoder selected.",
+      "vaeRequired": "This model needs a VAE selected.",
       "tileControlNet": "Tile ControlNet",
       "tileControlNetHelp": "Guides detail generation with the source image and must match the main model architecture.",
       "tileControlNetRequired": "Select a compatible Tile or Union ControlNet.",
