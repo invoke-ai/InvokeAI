@@ -3099,6 +3099,8 @@
       "detailsWithEllipsis": "Workflow details…",
       "renameWithEllipsis": "Rename workflow…",
       "exportJson": "Export workflow JSON",
+      "exportAsPng": "Download workflow as PNG",
+      "exportImageFailed": "Could not export workflow image.",
       "form": "Form",
       "importFailed": "Failed to import workflow",
       "importInvalid": "The file is not a valid workflow JSON.",

@@ -1,10 +1,15 @@
 import { Box, Icon, Popover, Portal, Slider, Stack, Text } from '@chakra-ui/react';
-import { useWorkflowPreferencesSelector } from '@features/workflow/ui/WorkflowUiContext';
+import {
+  useWorkflowNotifications,
+  useWorkflowPreferencesSelector,
+  useWorkflowProjectSelector,
+} from '@features/workflow/ui/WorkflowUiContext';
 import { IconButton, PopoverContent, Toolbar, ToolbarButton, ToolbarSeparator, Tooltip } from '@platform/ui';
 import { useReactFlow } from '@xyflow/react';
 import {
   BlendIcon,
   BoxSelectIcon,
+  CameraIcon,
   EraserIcon,
   HandIcon,
   LassoIcon,
@@ -13,7 +18,7 @@ import {
   ZoomInIcon,
   ZoomOutIcon,
 } from 'lucide-react';
-import { useCallback, useId, useMemo, useRef } from 'react';
+import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -39,10 +44,20 @@ const TOOLTIP_POSITIONING = { placement: 'right-start' } as const;
  */
 const EDITOR_TOOLBAR_TOP = 'var(--wb-center-chrome-inset, var(--chakra-spacing-2))';
 
+const waitForExportFrame = () =>
+  new Promise<void>((resolve) => {
+    if (document.visibilityState === 'hidden') {
+      window.setTimeout(resolve, 0);
+    } else {
+      window.requestAnimationFrame(() => resolve());
+    }
+  });
+
 export const EditorToolbar = ({
   nodeOpacity,
   tool,
   updatableNodeCount = 0,
+  onExportPendingChange,
   onNodeOpacityChange,
   onToolChange,
   onUpdateNodes,
@@ -52,19 +67,69 @@ export const EditorToolbar = ({
   /** Nodes with a newer same-major template; the update button shows only while there are some. */
   updatableNodeCount?: number;
   onNodeOpacityChange: (opacity: number) => void;
+  onExportPendingChange?: (isExporting: boolean) => void;
   onToolChange: (tool: EditorTool) => void;
   onUpdateNodes?: () => void;
 }) => {
   const { t } = useTranslation();
-  const { fitView, zoomIn, zoomOut } = useReactFlow();
+  const { fitView, getNodes, getNodesBounds, zoomIn, zoomOut } = useReactFlow();
   const reduceMotion = useWorkflowPreferencesSelector((preferences) => preferences.reduceMotion);
+  const workflowName = useWorkflowProjectSelector((project) => project.activeWorkflow.document.name);
+  const notifications = useWorkflowNotifications();
   const opacityTriggerId = useId();
+  const toolbarRef = useRef<HTMLDivElement>(null);
+  const isExportingWorkflowRef = useRef(false);
+  const [isExportingWorkflow, setIsExportingWorkflow] = useState(false);
   const fitViewDuration = reduceMotion ? 0 : 300;
+  const fallbackWorkflowName = t('workflow.untitled');
+  const exportFailedLabel = t('workflow.exportImageFailed');
   const opacityIds = useMemo(() => ({ trigger: opacityTriggerId }), [opacityTriggerId]);
   const opacityValue = useMemo(() => [Math.round(nodeOpacity * 100)], [nodeOpacity]);
   const onZoomInClick = useCallback(() => void zoomIn(), [zoomIn]);
   const onZoomOutClick = useCallback(() => void zoomOut(), [zoomOut]);
   const onFitViewClick = useCallback(() => void fitView({ duration: fitViewDuration }), [fitView, fitViewDuration]);
+  const onExportWorkflowClick = useCallback(() => {
+    if (isExportingWorkflowRef.current) {
+      return;
+    }
+
+    const flowElement = toolbarRef.current?.closest<HTMLElement>('.react-flow');
+    if (!flowElement) {
+      notifications.error(exportFailedLabel);
+      return;
+    }
+
+    isExportingWorkflowRef.current = true;
+    setIsExportingWorkflow(true);
+    onExportPendingChange?.(true);
+    void (async () => {
+      try {
+        await waitForExportFrame();
+        await waitForExportFrame();
+        const { exportWorkflowAsPng } = await import('./workflowImageExport');
+        await exportWorkflowAsPng({
+          bounds: getNodesBounds(getNodes()),
+          fallbackWorkflowName,
+          flowElement,
+          workflowName,
+        });
+      } catch {
+        notifications.error(exportFailedLabel);
+      } finally {
+        isExportingWorkflowRef.current = false;
+        setIsExportingWorkflow(false);
+        onExportPendingChange?.(false);
+      }
+    })();
+  }, [
+    exportFailedLabel,
+    fallbackWorkflowName,
+    getNodes,
+    getNodesBounds,
+    notifications,
+    onExportPendingChange,
+    workflowName,
+  ]);
   const fitViewRef = useRef<HTMLButtonElement>(null);
   // The update button leaves with the last outdated node; keyboard focus steps to its stable neighbour first.
   const onUpdateNodesClick = useCallback(() => {
@@ -77,7 +142,14 @@ export const EditorToolbar = ({
   );
 
   return (
-    <Box left="2" position="absolute" top={EDITOR_TOOLBAR_TOP} zIndex="5">
+    <Box
+      ref={toolbarRef}
+      data-workflow-export-control="true"
+      left="2"
+      position="absolute"
+      top={EDITOR_TOOLBAR_TOP}
+      zIndex="5"
+    >
       <Toolbar>
         {TOOLS.map(({ icon, id, label }) => (
           <EditorToolButton
@@ -93,6 +165,13 @@ export const EditorToolbar = ({
         <ToolbarButton icon={ZoomInIcon} label="Zoom in" onClick={onZoomInClick} />
         <ToolbarButton icon={ZoomOutIcon} label="Zoom out" onClick={onZoomOutClick} />
         <ToolbarButton ref={fitViewRef} icon={MaximizeIcon} label="Fit view" onClick={onFitViewClick} />
+        <ToolbarButton
+          disabled={isExportingWorkflow}
+          icon={CameraIcon}
+          label={t('workflow.exportAsPng')}
+          loading={isExportingWorkflow}
+          onClick={onExportWorkflowClick}
+        />
         {updatableNodeCount > 0 ? (
           <>
             <ToolbarSeparator />

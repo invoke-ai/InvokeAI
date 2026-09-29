@@ -153,7 +153,7 @@ const INFO_TOOLTIP_POSITIONING = { placement: 'top-end' } as const;
 /** The quiet header info affordance: a `fg.subtle` icon whose tooltip carries the node details. */
 export const WorkflowNodeInfoIcon = ({ content, label }: { content: ReactNode; label: string }) => (
   <Tooltip content={content} positioning={INFO_TOOLTIP_POSITIONING} showArrow>
-    <Icon aria-label={label} as={InfoIcon} boxSize="3.5" color="fg.subtle" />
+    <Icon aria-label={label} as={InfoIcon} boxSize="3.5" color="fg.subtle" data-node-info-icon="true" />
   </Tooltip>
 );
 
@@ -173,6 +173,7 @@ export const WorkflowNodeOutcomeIcon = ({
       as={outcome === 'completed' ? CircleCheckIcon : CircleAlertIcon}
       boxSize="3.5"
       color={outcome === 'completed' ? 'fg.success' : 'fg.error'}
+      data-node-status-indicator="true"
       flexShrink={0}
       role="img"
     />

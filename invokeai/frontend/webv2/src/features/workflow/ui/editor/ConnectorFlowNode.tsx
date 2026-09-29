@@ -50,7 +50,16 @@ const ConnectorFlowNodeComponent = ({ data, selected }: NodeProps<ConnectorFlowN
         <Handle id={CONNECTOR_INPUT_HANDLE} position={Position.Left} style={inputHandleStyle} type="target" />
       </Tooltip>
       <Tooltip content={getConnectorTitle(data.inputFieldType, data.outputFieldType)} showArrow>
-        <Box bg="bg" h="1rem" rounded="full" w="2.5rem" {...getWorkflowNodeChromeProps({ selected })} />
+        <Box
+          bg="bg"
+          data-connector-node-body="true"
+          data-is-selected={selected}
+          data-workflow-node-shell="true"
+          h="1rem"
+          rounded="full"
+          w="2.5rem"
+          {...getWorkflowNodeChromeProps({ selected })}
+        />
       </Tooltip>
       <Tooltip content={getHandleTypeTooltip(data.outputFieldType, 'Any output')} showArrow>
         <Handle id={CONNECTOR_OUTPUT_HANDLE} position={Position.Right} style={outputHandleStyle} type="source" />

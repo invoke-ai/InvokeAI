@@ -27,11 +27,17 @@ const CurrentImageFlowNodeComponent = ({ data, selected }: NodeProps<CurrentImag
   const latestImage = getLatestImage(galleryValues);
 
   return (
-    <Box overflow="hidden" w="20rem" {...getWorkflowNodeShellProps({ selected })}>
+    <Box
+      data-is-selected={selected}
+      data-workflow-node-shell="true"
+      overflow="hidden"
+      w="20rem"
+      {...getWorkflowNodeShellProps({ selected })}
+    >
       <Flex {...getWorkflowNodeHeaderProps()}>
         <Text fontWeight="700">{node.data.label || 'Current Image'}</Text>
         {progressImage ? (
-          <Text color="brand.solid" fontSize="2xs" ms="auto">
+          <Text color="brand.solid" data-node-status-indicator="true" fontSize="2xs" ms="auto">
             generating…
           </Text>
         ) : null}

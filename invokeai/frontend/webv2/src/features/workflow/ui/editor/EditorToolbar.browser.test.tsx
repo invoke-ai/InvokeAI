@@ -3,13 +3,37 @@ import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-vi.mock('@features/workflow/ui/WorkflowUiContext', () => ({ useWorkflowPreferencesSelector: () => false }));
+const toolbarMocks = vi.hoisted(() => ({
+  exportWorkflowAsPng: vi.fn(),
+  error: vi.fn(),
+  fitView: vi.fn(),
+  getNodes: vi.fn(() => [{ id: 'seed' }]),
+  getNodesBounds: vi.fn(() => ({ x: 12, y: 34, width: 56, height: 78 })),
+  info: vi.fn(),
+  onExportPendingChange: vi.fn(),
+  success: vi.fn(),
+  zoomIn: vi.fn(),
+  zoomOut: vi.fn(),
+}));
+
+vi.mock('@features/workflow/ui/WorkflowUiContext', () => ({
+  useWorkflowNotifications: () => ({
+    error: toolbarMocks.error,
+    info: toolbarMocks.info,
+    success: toolbarMocks.success,
+  }),
+  useWorkflowPreferencesSelector: () => false,
+  useWorkflowProjectSelector: (selector: (project: unknown) => unknown) =>
+    selector({ activeWorkflow: { document: { name: 'Test workflow' } } }),
+}));
+vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@xyflow/react', async (importOriginal) => ({
   ...(await importOriginal<object>()),
-  useReactFlow: () => ({ fitView: vi.fn(), zoomIn: vi.fn(), zoomOut: vi.fn() }),
+  useReactFlow: () => toolbarMocks,
 }));
+vi.mock('./workflowImageExport', () => ({ exportWorkflowAsPng: toolbarMocks.exportWorkflowAsPng }));
 
 const { EditorToolbar } = await import('./EditorToolbar');
 
@@ -25,9 +49,12 @@ const settle = (action: () => void): Promise<void> =>
     });
   });
 
+beforeEach(() => vi.clearAllMocks());
+
 const render = async (nodeOpacity: number) => {
   applyThemeToRoot('mono');
   host = document.createElement('div');
+  host.className = 'react-flow';
   host.style.cssText = 'height:520px;position:relative;width:320px';
   document.body.append(host);
   root = createRoot(host);
@@ -35,7 +62,13 @@ const render = async (nodeOpacity: number) => {
   await settle(() => {
     root?.render(
       <ChakraProvider value={system}>
-        <EditorToolbar nodeOpacity={nodeOpacity} tool="pan" onNodeOpacityChange={vi.fn()} onToolChange={vi.fn()} />
+        <EditorToolbar
+          nodeOpacity={nodeOpacity}
+          tool="pan"
+          onExportPendingChange={toolbarMocks.onExportPendingChange}
+          onNodeOpacityChange={vi.fn()}
+          onToolChange={vi.fn()}
+        />
       </ChakraProvider>
     );
   });
@@ -116,5 +149,38 @@ describe('editor toolbar', () => {
     expect(opacity.getAttribute('aria-pressed')).toBe('true');
     expect(paintedFill(opacity)).toBe(paintedFill(activeTool));
     expect(new Set(buttonBoxes())).toEqual(new Set(['28x28']));
+  });
+
+  it('offers a camera action for exporting the workflow image', async () => {
+    toolbarMocks.exportWorkflowAsPng.mockResolvedValue(undefined);
+    await render(1);
+
+    const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="workflow.exportAsPng"]')!;
+
+    expect(camera).not.toBeNull();
+    await settle(() => camera.click());
+    await vi.waitFor(() => expect(toolbarMocks.exportWorkflowAsPng).toHaveBeenCalledOnce());
+
+    expect(toolbarMocks.exportWorkflowAsPng).toHaveBeenCalledWith({
+      bounds: { x: 12, y: 34, width: 56, height: 78 },
+      fallbackWorkflowName: 'workflow.untitled',
+      flowElement: host,
+      workflowName: 'Test workflow',
+    });
+    expect(toolbarMocks.onExportPendingChange.mock.calls).toEqual([[true], [false]]);
+    expect(camera.disabled).toBe(false);
+  });
+
+  it('reports an export failure and releases the camera action', async () => {
+    toolbarMocks.exportWorkflowAsPng.mockRejectedValueOnce(new Error('rasterization failed'));
+    await render(1);
+
+    const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="workflow.exportAsPng"]')!;
+    await settle(() => camera.click());
+    await vi.waitFor(() => expect(toolbarMocks.error).toHaveBeenCalledWith('workflow.exportImageFailed'));
+
+    expect(toolbarMocks.error).toHaveBeenCalledWith('workflow.exportImageFailed');
+    expect(toolbarMocks.onExportPendingChange.mock.calls).toEqual([[true], [false]]);
+    expect(camera.disabled).toBe(false);
   });
 });

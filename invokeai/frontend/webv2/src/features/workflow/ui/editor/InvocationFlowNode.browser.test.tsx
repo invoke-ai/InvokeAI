@@ -16,7 +16,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
 import { toFlowEdges, toFlowNodes } from './flowAdapters';
-import { InvocationFlowNode } from './InvocationFlowNode';
+import { InvocationFlowNode, WorkflowImageExportProvider } from './InvocationFlowNode';
 
 import '@xyflow/react/dist/style.css';
 
@@ -243,19 +243,21 @@ describe('InvocationFlowNode output preview', () => {
     host.remove();
   });
 
-  const render = (adapter: WorkflowUiAdapter, zoom = 1) =>
+  const render = (adapter: WorkflowUiAdapter, zoom = 1, isExporting = false, nodes = flowNodes) =>
     act(() =>
       root.render(
         <ChakraProvider value={system}>
-          <WorkflowUiProvider adapter={adapter}>
-            <ReactFlow
-              defaultViewport={{ x: 0, y: 0, zoom }}
-              edges={[]}
-              minZoom={0.1}
-              nodes={flowNodes}
-              nodeTypes={nodeTypes}
-            />
-          </WorkflowUiProvider>
+          <WorkflowImageExportProvider isExporting={isExporting}>
+            <WorkflowUiProvider adapter={adapter}>
+              <ReactFlow
+                defaultViewport={{ x: 0, y: 0, zoom }}
+                edges={[]}
+                minZoom={0.1}
+                nodes={nodes}
+                nodeTypes={nodeTypes}
+              />
+            </WorkflowUiProvider>
+          </WorkflowImageExportProvider>
         </ChakraProvider>
       )
     );
@@ -318,6 +320,34 @@ describe('InvocationFlowNode output preview', () => {
 
     await vi.waitFor(() => expect(image()).toBeNull());
     expect(node().offsetHeight).toBe(layoutHeight);
+  });
+
+  it('renders full node content for image export when the viewport is zoomed out', async () => {
+    const execution = createExecutionPort();
+    const adapter = createAdapter(execution.port);
+    execution.set(completed(outputImage(400, 100)));
+
+    await render(adapter, 0.3, true);
+
+    await vi.waitFor(() => expect(image()).not.toBeNull());
+  });
+
+  it('renders full fields for compact nodes during image export', async () => {
+    const execution = createExecutionPort();
+    const adapter = createAdapter(execution.port);
+    const compactNode = {
+      ...documentNode,
+      data: { ...documentNode.data, inputs: { a: { label: '', name: 'a', value: 42 } } },
+    };
+    const compactTemplates = {
+      preview: { ...template, inputs: { a: { ...template.inputs.a!, input: 'any' as const } } },
+    };
+    const compactNodes = toFlowNodes({ ...projectGraph, nodes: [compactNode] }, [], compactTemplates, undefined, true);
+
+    await render(adapter, 1, true, compactNodes);
+
+    expect(host.querySelector('[data-node-input-field-title="true"]')?.textContent).toContain('A');
+    expect(host.querySelector<HTMLInputElement>('.react-flow__node input')?.value).toBe('42');
   });
 });
 
