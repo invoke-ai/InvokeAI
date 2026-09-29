@@ -1,6 +1,6 @@
 # Cleans translations by removing unused keys
 # Usage: python clean_translations.py
-# Note: Must be run from invokeai/frontend/web/scripts directory
+# Note: Must be run from invokeai/frontend/webv1/scripts directory
 #
 # After running the script, open `en.json` and check for empty objects (`{}`) and remove them manually.
 # Also, the script does not handle keys with underscores. They need to be checked manually.
@@ -75,7 +75,7 @@ def main():
             data = json.load(f)
     except FileNotFoundError as e:
         raise FileNotFoundError(
-            "Unable to find en.json file - must be run from invokeai/frontend/web/scripts directory"
+            "Unable to find en.json file - must be run from invokeai/frontend/webv1/scripts directory"
         ) from e
 
     cleaner = TranslationCleaner()

@@ -65,7 +65,7 @@ describe('architecture workflow', () => {
         if (!install) {
           continue;
         }
-        const expected = id.startsWith('frontend-webv2-') ? 'invokeai/frontend/webv2' : 'invokeai/frontend/web';
+        const expected = id.startsWith('frontend-webv2-') ? 'invokeai/frontend/webv2' : 'invokeai/frontend/webv1';
         expect(install.with?.['working-directory'] ?? action.inputs['working-directory'].default, path).toBe(expected);
         if (job.defaults?.run) {
           expect(job.defaults.run['working-directory'], path).toBe(expected);

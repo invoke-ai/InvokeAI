@@ -4,4 +4,4 @@ When users delete images, we show a confirmation dialog to prevent accidental de
 
 For example, if an image is currently set as a field in the workflow editor, we warn the user that deleting it will remove it from the node. We warn them even if they have opted out of the confirmation dialog.
 
-These "image usage" checks are done using redux selectors/util functions. See invokeai/frontend/web/src/features/deleteImageModal/store/state.ts
+These "image usage" checks are done using redux selectors/util functions. See invokeai/frontend/webv1/src/features/deleteImageModal/store/state.ts

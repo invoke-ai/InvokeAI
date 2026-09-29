@@ -46,7 +46,7 @@ echo
 
 # ---------------------- FRONTEND ----------------------
 
-for frontend in webv2 web; do
+for frontend in webv2 webv1; do
     pushd "../invokeai/frontend/$frontend" >/dev/null
     echo "Installing $frontend dependencies..."
     pnpm install --frozen-lockfile
@@ -81,7 +81,7 @@ echo -e "${BGREEN}Built PyPi distribution: ./dist${RESET}"
 if [[ -z ${CI} ]]; then
     echo
     echo "Cleaning up intermediate build files..."
-    rm -rf InvokeAI-Installer tmp ../invokeai/frontend/webv2/dist/ ../invokeai/frontend/web/dist/
+    rm -rf InvokeAI-Installer tmp ../invokeai/frontend/webv2/dist/ ../invokeai/frontend/webv1/dist/
 fi
 
 if [[ ! -z ${CI} ]]; then

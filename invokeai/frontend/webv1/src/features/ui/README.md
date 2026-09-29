@@ -4,9 +4,9 @@ We use https://github.com/mathuo/dockview for layout. This library supports resi
 
 The intention when adopting this library was to allow users to create their own custom layouts and save them. However, this feature is not yet implemented and each tab only has a predefined layout.
 
-This works well, but it _is_ fairly complex. You can see that we've needed to write a fairly involved API to manage the layouts: invokeai/frontend/web/src/features/ui/layouts/navigation-api.ts
+This works well, but it _is_ fairly complex. You can see that we've needed to write a fairly involved API to manage the layouts: invokeai/frontend/webv1/src/features/ui/layouts/navigation-api.ts
 
-And the layouts themselves are awkward to define, especially when compared to plain JSX: invokeai/frontend/web/src/features/ui/layouts/generate-tab-auto-layout.tsx
+And the layouts themselves are awkward to define, especially when compared to plain JSX: invokeai/frontend/webv1/src/features/ui/layouts/generate-tab-auto-layout.tsx
 
 This complexity may or may not be worth it.
 

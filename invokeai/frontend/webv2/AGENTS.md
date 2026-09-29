@@ -1,6 +1,6 @@
 # Webv2
 
-Read [ARCHITECTURE.md](ARCHITECTURE.md) for ownership/interface changes and affected owner-local READMEs for lifecycle/persistence. Stack: React 19, Vite, Chakra UI 3, TanStack Query/Router, @dnd-kit; legacy web differs. Webv2 is served by default; `--webv2` is a compatibility alias and `--web-legacy` selects `../web/`.
+Read [ARCHITECTURE.md](ARCHITECTURE.md) for ownership/interface changes and affected owner-local READMEs for lifecycle/persistence. Stack: React 19, Vite, Chakra UI 3, TanStack Query/Router, @dnd-kit; legacy web differs. Webv2 is served by default; `--webv2` is a compatibility alias and `--web-legacy` selects `../webv1/`.
 
 ## Ownership and state
 

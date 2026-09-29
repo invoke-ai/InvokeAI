@@ -15,7 +15,7 @@ RUN pnpm exec vite build
 
 FROM web-builder AS legacy-web-builder
 WORKDIR /legacy-build
-COPY invokeai/frontend/web/ ./
+COPY invokeai/frontend/webv1/ ./
 RUN --mount=type=cache,target=/pnpm/store \
     pnpm install --frozen-lockfile
 RUN pnpm exec vite build
@@ -103,7 +103,7 @@ CMD ["invokeai-web"]
 
 # --link requires buldkit w/ dockerfile syntax 1.4, does not work with podman
 COPY --link --from=web-builder /build/dist ${INVOKEAI_SRC}/invokeai/frontend/webv2/dist
-COPY --link --from=legacy-web-builder /legacy-build/dist ${INVOKEAI_SRC}/invokeai/frontend/web/dist
+COPY --link --from=legacy-web-builder /legacy-build/dist ${INVOKEAI_SRC}/invokeai/frontend/webv1/dist
 
 # add sources last to minimize image changes on code changes
 COPY invokeai ${INVOKEAI_SRC}/invokeai

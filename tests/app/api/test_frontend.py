@@ -13,12 +13,12 @@ from invokeai.frontend.cli.arg_parser import InvokeAIArgs
 
 @pytest.fixture
 def frontend_root(tmp_path: Path) -> Path:
-    for name, marker in [("webv2", "default frontend"), ("web", "legacy frontend")]:
+    for name, marker in [("webv2", "default frontend"), ("webv1", "legacy frontend")]:
         bundle = tmp_path / name / "dist"
         (bundle / "assets").mkdir(parents=True)
         (bundle / "index.html").write_text(marker)
         (bundle / "assets" / "main.js").write_text(f"console.log('{marker}')")
-    root = tmp_path / "web"
+    root = tmp_path / "webv1"
     (root / "static" / "docs").mkdir(parents=True)
     (root / "static" / "docs" / "invoke-favicon-docs.svg").write_text("<svg>docs favicon</svg>")
     return tmp_path / "webv2"
@@ -60,8 +60,8 @@ def test_conflicting_frontend_flags_are_rejected(monkeypatch: pytest.MonkeyPatch
 
 
 def test_missing_legacy_bundle_does_not_silently_serve_default(frontend_root: Path) -> None:
-    (frontend_root.parent / "web" / "dist").rename(frontend_root.parent / "old-dist")
-    with pytest.raises(RuntimeError, match="web"):
+    (frontend_root.parent / "webv1" / "dist").rename(frontend_root.parent / "old-dist")
+    with pytest.raises(RuntimeError, match="webv1"):
         mount_frontend(Starlette(), frontend_root, legacy=True)
 
 

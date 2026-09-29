@@ -6,11 +6,11 @@ It supports layers, drawing, erasing, undo/redo, exporting, backend filters (i.e
 
 ## Broad Strokes of Design
 
-The canvas is internally is a hierarchy of classes (modules). All canvas modules inherit from invokeai/frontend/web/src/features/controlLayers/konva/CanvasModuleBase.ts
+The canvas is internally is a hierarchy of classes (modules). All canvas modules inherit from invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasModuleBase.ts
 
 ### Modules
 
-The top-level module is the CanvasManager: invokeai/frontend/web/src/features/controlLayers/konva/CanvasManager.ts
+The top-level module is the CanvasManager: invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasManager.ts
 
 All canvas modules have:
 
@@ -22,11 +22,11 @@ All canvas modules have:
 
 Modules can do anything, they are simply plain-JS classes to encapsulate some functionality. Some are singletons. Some examples:
 
-- A singleton module that handles tool-specific interactions: invokeai/frontend/web/src/features/controlLayers/konva/CanvasTool/CanvasToolModule.ts
-- Singleton models for each tool e.g. the CanvasBrushToolModule: invokeai/frontend/web/src/features/controlLayers/konva/CanvasTool/CanvasBrushToolModule.ts
-- A singleton module to render the background of the canvas: invokeai/frontend/web/src/features/controlLayers/konva/CanvasBackgroundModule.ts
-- A strictly logical module that manages various caches of image data: invokeai/frontend/web/src/features/controlLayers/konva/CanvasCacheModule.ts
-- A non-singleton module that handles rendering a brush stroke: invokeai/frontend/web/src/features/controlLayers/konva/CanvasObject/CanvasObjectBrushLine.ts
+- A singleton module that handles tool-specific interactions: invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasTool/CanvasToolModule.ts
+- Singleton models for each tool e.g. the CanvasBrushToolModule: invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasTool/CanvasBrushToolModule.ts
+- A singleton module to render the background of the canvas: invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasBackgroundModule.ts
+- A strictly logical module that manages various caches of image data: invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasCacheModule.ts
+- A non-singleton module that handles rendering a brush stroke: invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasObject/CanvasObjectBrushLine.ts
 
 ### Layers (Entities) and Adapters modules
 
@@ -43,12 +43,12 @@ Each layer type has a corresponding "adapter" module that handles rendering the 
 
 Using the raster layer type as an example, it has a number of sub-modules:
 
-- A top-level module that coordinates everything: invokeai/frontend/web/src/features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer.ts
-- An object (e.g. brush strokes, shapes, images) renderer that draws the layer via Konva: invokeai/frontend/web/src/features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer.ts
-- A "buffer" object renderer, which renders in-progress objects (e.g. a brush stroke that is being drawn but not yet committed, important for performance): invokeai/frontend/web/src/features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer.ts
-- A module that handles previewing and applying backend filters: invokeai/frontend/web/src/features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer.ts
-- A module that handles selecting objects from the pixel data of a layer (aka segmentation tasks): invokeai/frontend/web/src/features/controlLayers/konva/CanvasSegmentAnythingModule.ts
-- A module that handles transforming the layer (scale, translate, rotate): invokeai/frontend/web/src/features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer.ts
+- A top-level module that coordinates everything: invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasEntity/CanvasEntityAdapterRasterLayer.ts
+- An object (e.g. brush strokes, shapes, images) renderer that draws the layer via Konva: invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer.ts
+- A "buffer" object renderer, which renders in-progress objects (e.g. a brush stroke that is being drawn but not yet committed, important for performance): invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasEntity/CanvasEntityBufferObjectRenderer.ts
+- A module that handles previewing and applying backend filters: invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasEntity/CanvasEntityFilterer.ts
+- A module that handles selecting objects from the pixel data of a layer (aka segmentation tasks): invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasSegmentAnythingModule.ts
+- A module that handles transforming the layer (scale, translate, rotate): invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasEntity/CanvasEntityTransformer.ts
 
 ## State mgmt
 
@@ -149,7 +149,7 @@ The usage of the buffer renderer module helps a lot here, as we only need to rec
 
 You'll see the relevant code for this in the transformer module. It encapsulates the bounds calculation logic and exposes an observable that holds the last-known visual bounds of the layer.
 
-The worker entrypoint is here invokeai/frontend/web/src/features/controlLayers/konva/CanvasWorkerModule.ts
+The worker entrypoint is here invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasWorkerModule.ts
 
 ## Rasterizing layers
 
@@ -167,7 +167,7 @@ The canvas is a means to an end: provide strong user control and agency for imag
 
 When generating an image, the raster layers must be composited toegher into a single image that is sent to the backend. All inpaint masks are similarly composited together into a single mask image. Regional guidance and control layers are not composited together, they are sent as individual images.
 
-This is handled in invokeai/frontend/web/src/features/controlLayers/konva/CanvasCompositorModule.ts
+This is handled in invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasCompositorModule.ts
 
 For each compositing task, the compositor creates a unique hash of the layer's state (e.g. objects, properties, etc.) and uses that to cache the resulting composited image's name (which ref a unique ref to the image file stored on disk). This avoids re-compositing layers that haven't changed since the last generation.
 
@@ -175,7 +175,7 @@ For each compositing task, the compositor creates a unique hash of the layer's s
 
 Image generation models can only generate images up to certain sizes without causing VRAM OOMs. So we need to give the user a way to specify the size of the generation area. This is done via the "generation bounding box" tool, which is a rectangle that the user can resize and move around the canvas.
 
-Here's the module for it invokeai/frontend/web/src/features/controlLayers/konva/CanvasTool/CanvasBboxToolModule.ts
+Here's the module for it invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasTool/CanvasBboxToolModule.ts
 
 Models all have width/height constraints - they must be multiples of a certain number (typically 8, 16 or 32). This is related to the internal "latents" representatino of images in diffusion models. So the generation bbox must be constrained to these multiples.
 
@@ -185,11 +185,11 @@ The typical use pattern for generating images on canvas is to generate a number 
 
 Once canvas generation starts, much of the canvas is locked down until the user finalizes the staging area, either by accepting a single image, adding one or more images as new layers, or discarding all staged images.
 
-The currently-selected staged image is previewed on the canvas and rendered via invokeai/frontend/web/src/features/controlLayers/konva/CanvasStagingAreaModule.ts
+The currently-selected staged image is previewed on the canvas and rendered via invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasStagingAreaModule.ts
 
 When the user accepts a staged image, it is added as a new raster layer (there are other options for adding as control, saving directly to gallery, etc).
 
-This subsystem tracks generated images by watching the queue of generation tasks. The relevant code for queue tracking is in invokeai/frontend/web/src/features/controlLayers/components/StagingArea/state.ts
+This subsystem tracks generated images by watching the queue of generation tasks. The relevant code for queue tracking is in invokeai/frontend/webv1/src/features/controlLayers/components/StagingArea/state.ts
 
 ## Future enhancements
 
@@ -213,7 +213,7 @@ There used to be a hacky example of this on the Konva docs but I can't find it a
 
 ### Abstract state bindings
 
-Currently the state bindings (redux, nanostores) are all over the place. There is a singleton module that handles much of the redux binding, but it's still a bit messy: invokeai/frontend/web/src/features/controlLayers/konva/CanvasStateApiModule.ts
+Currently the state bindings (redux, nanostores) are all over the place. There is a singleton module that handles much of the redux binding, but it's still a bit messy: invokeai/frontend/webv1/src/features/controlLayers/konva/CanvasStateApiModule.ts
 
 Many modules still directly subscribe to redux with their own selectors.
 

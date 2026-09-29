@@ -110,22 +110,22 @@ jobs:
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
         uses: ./.github/actions/install-frontend-deps
         with:
-          working-directory: invokeai/frontend/web
+          working-directory: invokeai/frontend/webv1
 
       - name: copy schema
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        run: cp invokeai/frontend/web/openapi.json invokeai/frontend/web/openapi_orig.json
+        run: cp invokeai/frontend/webv1/openapi.json invokeai/frontend/webv1/openapi_orig.json
         shell: bash
 
       - name: generate schema
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        run: cd invokeai/frontend/web && uv run ../../../scripts/generate_openapi_schema.py > openapi.json && pnpm prettier --write openapi.json
+        run: cd invokeai/frontend/webv1 && uv run ../../../scripts/generate_openapi_schema.py > openapi.json && pnpm prettier --write openapi.json
         shell: bash
 
       - name: compare files
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
         run: |
-          if ! diff invokeai/frontend/web/openapi.json invokeai/frontend/web/openapi_orig.json; then
+          if ! diff invokeai/frontend/webv1/openapi.json invokeai/frontend/webv1/openapi_orig.json; then
             echo "Files are different!";
             exit 1;
           fi

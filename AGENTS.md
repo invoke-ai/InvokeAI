@@ -15,7 +15,7 @@ Before editing, read `AGENTS.md` along each target path; scoped rules supplement
 | API, services, invocations | [app/AGENTS.md](invokeai/app/AGENTS.md) |
 | Inference and model management | [backend/AGENTS.md](invokeai/backend/AGENTS.md) |
 | Python tests | [tests/AGENTS.md](tests/AGENTS.md); also read guidance for the production code under test |
-| Legacy frontend and generated API artifacts | [web/AGENTS.md](invokeai/frontend/web/AGENTS.md) |
+| Legacy frontend and generated API artifacts | [webv1/AGENTS.md](invokeai/frontend/webv1/AGENTS.md) |
 | CI and contribution tooling | [.github/AGENTS.md](.github/AGENTS.md) |
 | Documentation | `docs/README.md` and `docs/package.json`; keep documentation about the implemented product current |
 

@@ -30,13 +30,13 @@ The image viewer is rendered in one of the main/center panel tabs.
 
 A handful of common actions are available as buttons in the image viewer header, matching the context menu actions.
 
-See invokeai/frontend/web/src/features/gallery/components/ContextMenu/README.md
+See invokeai/frontend/webv1/src/features/gallery/components/ContextMenu/README.md
 
 ### Progress viewer
 
 During generation, we might get "progress images" showing a low-res version of the image at each step in the denoising process. If these are available, the user can open a progress viewer overlay to see the image at each step.
 
-Socket subscriptions and related logic for handling progress images are in the image viewer context. See invokeai/frontend/web/src/features/gallery/components/ImageViewer/context.tsx
+Socket subscriptions and related logic for handling progress images are in the image viewer context. See invokeai/frontend/webv1/src/features/gallery/components/ImageViewer/context.tsx
 
 ### Metadata viewer
 

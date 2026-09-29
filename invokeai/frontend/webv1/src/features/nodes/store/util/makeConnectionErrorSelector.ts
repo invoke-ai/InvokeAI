@@ -8,7 +8,7 @@ import type { AnyEdge } from 'features/nodes/types/invocation';
 /**
  * Creates a selector that validates a pending connection.
  *
- * NOTE: The logic here must be duplicated in `invokeai/frontend/web/src/features/nodes/hooks/useIsValidConnection.ts`
+ * NOTE: The logic here must be duplicated in `invokeai/frontend/webv1/src/features/nodes/hooks/useIsValidConnection.ts`
  * TODO: Figure out how to do this without duplicating all the logic
  *
  * @param templates The invocation templates

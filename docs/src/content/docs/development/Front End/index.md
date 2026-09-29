@@ -9,7 +9,7 @@ Invoke's UI is made possible by many contributors and open-source libraries. Tha
 
 Follow the [dev environment](/development/setup/dev-environment/) guide to get set up. The default UI lives in `invokeai/frontend/webv2`. Run `make frontend-install`, then `make frontend-dev`; `make frontend-build` builds the bundle served by `invokeai-web`. The existing `frontendv2-*` targets remain aliases.
 
-`invokeai/frontend/web` is the legacy frontend. Build it with `make frontend-legacy-build` and select it with `invokeai-web --web-legacy`. `--webv2` remains a compatibility alias for the default UI. Close other editor tabs before switching frontends on the same origin. Existing browser storage and project recovery data retain their names and formats; switching frontends does not migrate or erase them.
+`invokeai/frontend/webv1` is the legacy frontend. Build it with `make frontend-legacy-build` and select it with `invokeai-web --web-legacy`. `--webv2` remains a compatibility alias for the default UI. Close other editor tabs before switching frontends on the same origin. Existing browser storage and project recovery data retain their names and formats; switching frontends does not migrate or erase them.
 
 ## Package scripts
 
@@ -33,7 +33,7 @@ If you make backend changes, it's important to regenerate the frontend types:
 
 ```sh
 set -o pipefail
-cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
+cd invokeai/frontend/webv1 && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 ```
 
 On macOS and Linux, you can run `make frontend-typegen` as a shortcut for the above snippet.

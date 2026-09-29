@@ -66,14 +66,14 @@ frontend-build:
 frontendv2-install: frontend-install
 
 frontend-legacy-install:
-	rm -rf invokeai/frontend/web/node_modules
-	cd invokeai/frontend/web && pnpm install
+	rm -rf invokeai/frontend/webv1/node_modules
+	cd invokeai/frontend/webv1 && pnpm install
 
 # Build the legacy frontend
 frontendv2-build: frontend-build
 
 frontend-legacy-build:
-	cd invokeai/frontend/web && pnpm build
+	cd invokeai/frontend/webv1 && pnpm build
 
 # Run the frontend test suite once
 frontend-test:
@@ -87,16 +87,16 @@ frontend-dev:
 frontendv2-dev: frontend-dev
 
 frontend-legacy-dev:
-	cd invokeai/frontend/web && pnpm run dev
+	cd invokeai/frontend/webv1 && pnpm run dev
 
 # Generate the OpenAPI Schema for the app
 frontend-openapi:
-	cd invokeai/frontend/web && \
+	cd invokeai/frontend/webv1 && \
 	python ../../../scripts/generate_openapi_schema.py > openapi.json && \
 	pnpm prettier --write openapi.json
 
 frontend-typegen:
-	set -o pipefail; cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
+	set -o pipefail; cd invokeai/frontend/webv1 && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 
 frontend-lint:
 	pnpm -C invokeai/frontend/webv2 lint

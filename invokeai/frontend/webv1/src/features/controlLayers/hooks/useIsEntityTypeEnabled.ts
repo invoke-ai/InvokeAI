@@ -17,7 +17,7 @@ export const useIsEntityTypeEnabled = (entityType: CanvasEntityType) => {
   const isExternal = useAppSelector(selectIsExternal);
 
   // TODO(psyche): consider using a constant to define which entity types are supported by which model,
-  // see invokeai/frontend/web/src/features/modelManagerV2/models.ts for ref
+  // see invokeai/frontend/webv1/src/features/modelManagerV2/models.ts for ref
   const isEntityTypeEnabled = useMemo<boolean>(() => {
     switch (entityType) {
       case 'regional_guidance':

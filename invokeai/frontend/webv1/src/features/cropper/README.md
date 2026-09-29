@@ -2,7 +2,7 @@
 
 This is a simple image cropping canvas app built with KonvaJS ("native" Konva, _not_ the react bindings).
 
-The editor implementation is here: invokeai/frontend/web/src/features/cropper/lib/editor.ts
+The editor implementation is here: invokeai/frontend/webv1/src/features/cropper/lib/editor.ts
 
 It is rendered in a modal.
 

@@ -6,7 +6,7 @@ It uses the native HTML5 drag and drop API and is very performant, though a bit 
 
 ## Implementation
 
-The core of our implementation is in invokeai/frontend/web/src/features/dnd/dnd.ts
+The core of our implementation is in invokeai/frontend/webv1/src/features/dnd/dnd.ts
 
 We support dragging and dropping of single or multiple images within the app. We have "dnd source" and "dnd target" abstractions.
 
@@ -36,6 +36,6 @@ Typically the isValid function just uses the source type guard function, and the
 
 We use the same library for other dnd things:
 
-- When dragging over some tabbed interface, hovering the tab for a moment will switch to it. See invokeai/frontend/web/src/common/hooks/useCallbackOnDragEnter.ts for a hook that implements this functionality.
-- Reordering of canvas layer lists. See invokeai/frontend/web/src/features/controlLayers/components/CanvasEntityList/CanvasEntityGroupList.tsx and invokeai/frontend/web/src/features/controlLayers/components/CanvasEntityList/useCanvasEntityListDnd.ts
-- Adding node fields to a workflow form builder and restructuring the form. This gets kinda complicated, as the form builder supports arbitrary nesting of containers with stacking of elements. See invokeai/frontend/web/src/features/nodes/components/sidePanel/builder/dnd-hooks.ts
+- When dragging over some tabbed interface, hovering the tab for a moment will switch to it. See invokeai/frontend/webv1/src/common/hooks/useCallbackOnDragEnter.ts for a hook that implements this functionality.
+- Reordering of canvas layer lists. See invokeai/frontend/webv1/src/features/controlLayers/components/CanvasEntityList/CanvasEntityGroupList.tsx and invokeai/frontend/webv1/src/features/controlLayers/components/CanvasEntityList/useCanvasEntityListDnd.ts
+- Adding node fields to a workflow form builder and restructuring the form. This gets kinda complicated, as the form builder supports arbitrary nesting of containers with stacking of elements. See invokeai/frontend/webv1/src/features/nodes/components/sidePanel/builder/dnd-hooks.ts

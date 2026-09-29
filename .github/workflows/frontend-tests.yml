@@ -45,7 +45,7 @@ jobs:
     timeout-minutes: 10 # expected run time: <2 min
     defaults:
       run:
-        working-directory: invokeai/frontend/web
+        working-directory: invokeai/frontend/webv1
     steps:
       - uses: actions/checkout@v6
 
@@ -64,13 +64,13 @@ jobs:
               - '.github/workflows/frontend-tests.yml'
               - '.nvmrc'
               - '.github/actions/install-frontend-deps/**'
-              - 'invokeai/frontend/web/**'
+              - 'invokeai/frontend/webv1/**'
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
         uses: ./.github/actions/install-frontend-deps
         with:
-          working-directory: invokeai/frontend/web
+          working-directory: invokeai/frontend/webv1
 
       - name: vitest
         if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
