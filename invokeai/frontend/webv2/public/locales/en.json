@@ -4112,6 +4112,11 @@
       "referenceExtendCapFull": "Initial video not set",
       "referenceExtendCapFullDescription": "All 3 video reference slots are in use, so there is no room for the continuity reference this clip needs. Remove a video reference, then drop the clip again.",
       "placement": {
+        "conditioningClipDisplaced": "A conditioning clip is used on its own, so the panel's other conditioning media was cleared.",
+        "conditioningClipNoPicture": "This is an uploaded audio file, so it has no picture to generate a soundtrack for. Use its soundtrack instead.",
+        "conditioningClipNotSet": "Conditioning clip not set",
+        "conditioningClipSet": "Conditioning clip set",
+        "conditioningClipUnsupported": "The selected video model can't generate from a conditioning clip. Choose one that can, such as LTX-2.",
         "initialVideoFull": "All video reference slots are in use, so there is no room for the continuity reference this clip needs. Remove a video reference and try again.",
         "initialVideoSet": "Initial video set",
         "initialVideoUnused": "The selected video model can't extend a clip, so it won't use this initial video until you choose one that can.",

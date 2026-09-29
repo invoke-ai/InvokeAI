@@ -172,9 +172,11 @@ def test_other_routes_unaffected():
     [
         ("/api/v1/recall/video/default/initial-video/upload", True),
         ("/api/v1/recall/video/default/reference-video/upload", True),
+        ("/api/v1/recall/video/default/conditioning-video/upload", True),
         # The name-only siblings carry no body, so they must not compete for upload slots.
         ("/api/v1/recall/video/default/initial-video", False),
         ("/api/v1/recall/video/default/reference-video", False),
+        ("/api/v1/recall/video/default/conditioning-video", False),
     ],
 )
 def test_video_recall_uploads_share_the_video_upload_bound(path: str, bounded: bool):

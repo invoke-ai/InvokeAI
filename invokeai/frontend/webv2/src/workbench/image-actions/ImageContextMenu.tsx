@@ -1,5 +1,6 @@
 import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
+import type { VideoConditioningRole } from '@features/video';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
 import { HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
@@ -16,6 +17,7 @@ import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ClapperboardIcon,
   AsteriskIcon,
+  AudioLinesIcon,
   ChevronRightIcon,
   CopyIcon,
   DownloadIcon,
@@ -26,6 +28,7 @@ import {
   FilmIcon,
   FolderIcon,
   ImageIcon,
+  ImagePlayIcon,
   ImagesIcon,
   LayersIcon,
   QuoteIcon,
@@ -375,6 +378,16 @@ const SingleItemMenuItems = ({
       actions.useAsReferenceVideo(item);
     }
   }, [actions, item]);
+  const makeConditioningClipHandler = useCallback(
+    (role: VideoConditioningRole) => () => {
+      if (item.kind === 'video') {
+        actions.useAsConditioningClip(item, role);
+      }
+    },
+    [actions, item]
+  );
+  const handleUseSoundtrack = useMemo(() => makeConditioningClipHandler('audio'), [makeConditioningClipHandler]);
+  const handleUsePicture = useMemo(() => makeConditioningClipHandler('video'), [makeConditioningClipHandler]);
 
   return (
     <>
@@ -446,6 +459,23 @@ const SingleItemMenuItems = ({
             value="use-as-reference-video"
             onClick={handleUseAsReferenceVideo}
           />
+          <ContextSubMenu icon={AudioLinesIcon} label="Use as Conditioning Clip">
+            <ContextMenuItem
+              disabled={!actions.canUseAsConditioningClip.audio}
+              icon={AudioLinesIcon}
+              label={t('widgets.video.conditioningRoleAudio')}
+              value="use-as-conditioning-audio"
+              onClick={handleUseSoundtrack}
+            />
+            {/* A wrapped audio upload's picture is a placeholder, so it has nothing to lend. */}
+            <ContextMenuItem
+              disabled={!actions.canUseAsConditioningClip.video || item.mediaOrigin === 'audio_upload'}
+              icon={ImagePlayIcon}
+              label={t('widgets.video.conditioningRoleVideo')}
+              value="use-as-conditioning-video"
+              onClick={handleUsePicture}
+            />
+          </ContextSubMenu>
         </>
       ) : null}
       {item.kind === 'video' && previewVideoActions && previewVideoActions.itemKey === toGalleryItemKey(item) ? (

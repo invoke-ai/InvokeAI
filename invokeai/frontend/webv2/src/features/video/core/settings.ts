@@ -958,6 +958,17 @@ export const getInitialVideoPatch = ({
 };
 
 /**
+ * The panel patch that sets the conditioning clip, or clears it. A clip claims a whole modality, so it displaces
+ * every other conditioning slot: the frames, the initial video and the references.
+ */
+export const getConditioningClipPatch = (
+  conditioningClip: VideoConditioningClip | null
+): Partial<VideoWidgetValues> => ({
+  conditioningClip,
+  ...(conditioningClip ? { firstFrameImage: null, lastFrameImage: null, references: [], sourceVideo: null } : {}),
+});
+
+/**
  * The panel patch for a new reference list. References displace the frame slots and a conditioning clip, and the
  * initial video too unless the panel extends from it; generation continues from the last reference, so a
  * reference-extend panel keeps its continuity anchor pinned last.
