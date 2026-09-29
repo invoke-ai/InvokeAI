@@ -86,9 +86,69 @@ export const useFocusRegionProps = (region: WidgetRegion) => {
 
   return {
     css: HIGHLIGHT_STYLES[region],
+    'data-focus-region': region,
     'data-highlighted': isHighlighted,
     onFocusCapture: (_event: FocusEvent<HTMLElement>) => setFocusedRegion(region),
     onPointerDownCapture: (_event: PointerEvent<HTMLElement>) => setFocusedRegion(region),
     position: 'relative' as const,
   };
+};
+
+/** A lazy widget mounts within a few frames of opening; stop looking after about half a second. */
+const OPENED_WIDGET_FRAME_BUDGET = 30;
+/** Frames to keep the move after it lands: a closing menu or dialog hands focus back to its trigger on the way out. */
+const OPENED_WIDGET_SETTLE_FRAMES = 30;
+/** Only the latest open moves focus: a control that opens two widgets means the second one. */
+let openedWidgetFocusRequest = 0;
+
+/**
+ * Moves keyboard focus into the region a control just opened a widget in, which also moves the region highlight there.
+ * Leaves focus alone when it is already inside that region, and gives up if the widget never shows.
+ */
+export const focusOpenedWidget = (region: WidgetRegion, typeId: string): void => {
+  // The control that opened the widget, where a closing menu or dialog would put focus back.
+  const opener = document.activeElement;
+  const request = ++openedWidgetFocusRequest;
+  let frames = 0;
+
+  const settle = (container: HTMLElement, remaining: number) => {
+    if (request !== openedWidgetFocusRequest) {
+      return;
+    }
+
+    const active = document.activeElement;
+
+    if (!container.contains(active) && (active === opener || active === document.body || active === null)) {
+      container.focus({ preventScroll: true });
+    }
+    if (remaining > 0) {
+      requestAnimationFrame(() => settle(container, remaining - 1));
+    }
+  };
+
+  const attempt = () => {
+    if (request !== openedWidgetFocusRequest) {
+      return;
+    }
+
+    const container = document.querySelector<HTMLElement>(`[data-focus-region="${region}"]`);
+    const shown = container?.querySelector(`[data-hotkey-widget-type-id="${CSS.escape(typeId)}"]`);
+
+    if (container && shown) {
+      if (!container.contains(document.activeElement)) {
+        if (!container.hasAttribute('tabindex')) {
+          container.tabIndex = -1;
+        }
+        settle(container, OPENED_WIDGET_SETTLE_FRAMES);
+      }
+      return;
+    }
+
+    frames += 1;
+    if (frames < OPENED_WIDGET_FRAME_BUDGET) {
+      requestAnimationFrame(attempt);
+    }
+  };
+
+  requestAnimationFrame(attempt);
 };

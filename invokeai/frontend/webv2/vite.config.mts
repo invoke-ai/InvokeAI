@@ -83,6 +83,8 @@ const ROUTE_SHARED_MODULES = [
 
 // Group dependencies shared by the editor shell and lazy widgets to reduce boot requests.
 const EDITOR_BOOT_SHARED_MODULES = [
+  // Shell regions, their hotkeys and every control that opens a widget read it; alone it cost a boot request.
+  '/workbench/focusRegions.tsx',
   '/features/gallery/ui/GalleryItemSearch.tsx',
   '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
