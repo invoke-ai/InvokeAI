@@ -21,7 +21,7 @@ from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvoca
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional, get_schedule
 from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_MAP, FLUX_SCHEDULER_MAP, ZIMAGE_SCHEDULER_MAP
 from invokeai.backend.flux2.sampling_utils import get_schedule_flux2
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelType
 
 
 def test_flux_prepare_noise_uses_external_noise():
@@ -94,6 +94,67 @@ def test_flux_add_noise_false_ignores_connected_noise():
         result = invocation._run_diffusion(mock_context)
 
     assert torch.equal(result, init_latents)
+
+
+@pytest.mark.parametrize(
+    ["variant", "expects_shift"],
+    [(FluxVariantType.Schnell, False), (FluxVariantType.Dev, True)],
+)
+def test_flux_derives_the_schedule_shift_and_token_count_from_the_model(variant: FluxVariantType, expects_shift: bool):
+    """Two wirings that live only at the node, and that cells on `get_schedule` cannot see.
+
+    `shift=not is_schnell` is the only thing deciding whether FLUX.1 shifts its schedule at all.
+    And `image_seq_len` is a *packed* token count -- 4096 for a 1024x1024 frame -- which is the unit
+    the shift's fit and its clamp are expressed in; passing latent dimensions instead would be four
+    times too large and, above one megapixel, now invisible because both values clamp alike.
+    """
+    invocation = FluxDenoiseInvocation.model_construct(
+        latents=MagicMock(latents_name="latents"),
+        add_noise=False,
+        width=1024,
+        height=1024,
+        num_steps=4,
+        denoising_start=0.25,
+        denoising_end=0.25,
+        positive_text_conditioning=MagicMock(conditioning_name="positive"),
+        transformer=MagicMock(transformer="transformer"),
+        seed=123,
+    )
+    init_latents = torch.full((1, 16, 128, 128), 2.0)
+    dummy_conditioning = SimpleNamespace(
+        t5_embeds=torch.zeros(1, 4, 16),
+        clip_embeds=torch.zeros(1, 768),
+        to=lambda **_: dummy_conditioning,
+    )
+    mock_context = MagicMock()
+    mock_context.tensors.load.return_value = init_latents
+    mock_context.conditioning.load.return_value = SimpleNamespace(conditionings=[dummy_conditioning])
+    mock_context.models.get_config.return_value = SimpleNamespace(
+        base=BaseModelType.Flux, type=ModelType.Main, variant=variant
+    )
+    schedule_calls: list[dict[str, object]] = []
+
+    with (
+        patch(
+            "invokeai.app.invocations.flux.flux_denoise.TorchDevice.choose_torch_device",
+            return_value=torch.device("cpu"),
+        ),
+        patch("invokeai.app.invocations.flux.flux_denoise.FLUXConditioningInfo", object),
+        patch(
+            "invokeai.app.invocations.flux.flux_denoise.RegionalPromptingExtension.from_text_conditioning",
+            return_value=MagicMock(),
+        ),
+        patch.object(invocation, "_load_redux_conditioning", return_value=[]),
+        patch(
+            "invokeai.app.invocations.flux.flux_denoise.get_schedule",
+            side_effect=lambda **kwargs: schedule_calls.append(kwargs) or [0.75],
+        ),
+    ):
+        invocation._run_diffusion(mock_context)
+
+    assert len(schedule_calls) == 1
+    assert schedule_calls[0]["shift"] is expects_shift
+    assert schedule_calls[0]["image_seq_len"] == 4096
 
 
 def test_flux2_prepare_noise_uses_external_noise():
