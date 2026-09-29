@@ -44,6 +44,7 @@ import { List } from '@platform/ui/list/List';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ListPager } from '@platform/ui/list/ListPager';
 import { listRowsFromItems } from '@platform/ui/list/listRows';
+import { ManagerColumn, ManagerDetailHeader } from '@platform/ui/ManagerLayout';
 import { MenuContent } from '@platform/ui/Menu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -65,9 +66,6 @@ const FONT_ACCEPT = '.ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/wof
 const FONT_PAGE_SIZE = 100;
 const NO_FONTS: readonly FontRecord[] = [];
 const getFontId = (font: FontRecord): string => font.id;
-// Match the Models and Nodes manager columns without coupling feature owners.
-const LIBRARY_WIDTH = 'clamp(22rem, 32vw, 28rem)';
-const HEADER_MIN_HEIGHT = '2.75rem';
 const FILTER_POSITION = { placement: 'bottom-end' } as const;
 const PREVIEW_TEXT_SX = { textWrap: 'pretty' } as const;
 const ERROR_ICON = <CircleAlertIcon />;
@@ -500,19 +498,12 @@ const FontLibrary = () => {
   return (
     <Flex aria-label={t('fonts.title')} role="region" h="full" minH="0" w="full">
       <input ref={inputRef} accept={FONT_ACCEPT} hidden multiple type="file" onChange={handleInputChange} />
-      <Flex borderEndWidth="1px" direction="column" flexShrink={0} h="full" minH="0" w={LIBRARY_WIDTH}>
-        <HStack borderBottomWidth="1px" flexShrink={0} gap="2" minH={HEADER_MIN_HEIGHT} px="3">
-          <Text as="h2" fontSize="sm" fontWeight="700">
-            {t('fonts.title')}
-          </Text>
-          <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums">
-            {query.data?.total ?? '–'}
-          </Text>
-          {canManageSharedFonts ? (
+      <ManagerColumn
+        actions={
+          canManageSharedFonts ? (
             <Button
               aria-label={t('fonts.rescan')}
               disabled={isRescanning}
-              ms="auto"
               size="2xs"
               variant="ghost"
               onClick={handleRescan}
@@ -520,8 +511,11 @@ const FontLibrary = () => {
               <RefreshCwIcon />
               {t('fonts.rescan')}
             </Button>
-          ) : null}
-        </HStack>
+          ) : null
+        }
+        count={query.data?.total ?? '–'}
+        title={t('fonts.title')}
+      >
         <HStack gap="1.5" p="3">
           <InputGroup startElement={SEARCH_ICON}>
             <Input
@@ -645,7 +639,7 @@ const FontLibrary = () => {
             onPrevious={handlePreviousPage}
           />
         ) : null}
-      </Flex>
+      </ManagerColumn>
       <Tabs.Root
         asChild
         lazyMount
@@ -655,7 +649,7 @@ const FontLibrary = () => {
         onValueChange={(event) => setActiveTab(event.value)}
       >
         <Flex direction="column" flex="1" minH="0" minW="0">
-          <Flex align="flex-end" borderBottomWidth="1px" flexShrink={0} minH={HEADER_MIN_HEIGHT} px="2">
+          <ManagerDetailHeader>
             <Tabs.List mb="-1px">
               <Tabs.Trigger value="details">
                 <Icon as={FileTypeIcon} boxSize="3" />
@@ -668,7 +662,7 @@ const FontLibrary = () => {
                 {t('fonts.addFonts')}
               </Tabs.Trigger>
             </Tabs.List>
-          </Flex>
+          </ManagerDetailHeader>
           <Box flex="1" minH="0">
             <Tabs.Content h="full" p="0" value="details">
               {activeFont ? (

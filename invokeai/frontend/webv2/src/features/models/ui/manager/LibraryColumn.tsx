@@ -1,5 +1,5 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import { Box, Flex, HStack, Icon, Text } from '@chakra-ui/react';
+import { Icon } from '@chakra-ui/react';
 import { collectBases, collectTypes, filterModels } from '@features/models/core/library';
 import { bulkDeleteModels, bulkReidentifyModels } from '@features/models/data/api';
 import { refreshModels, removeModelsFromStore, useModelsSelector } from '@features/models/data/modelsStore';
@@ -19,11 +19,10 @@ import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, IconButton, ConfirmDialog } from '@platform/ui';
 import { ListSelectionBar } from '@platform/ui/list/ListSelectionBar';
+import { ManagerColumn } from '@platform/ui/ManagerLayout';
 import { RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { HEADER_MIN_HEIGHT, LIBRARY_WIDTH } from './layoutConstants';
 
 const EMPTY_KEYS: string[] = [];
 
@@ -159,19 +158,7 @@ export const LibraryColumn = () => {
   };
 
   return (
-    <Flex direction="column" flexShrink={0} h="full" minH="0" position="relative" w={LIBRARY_WIDTH} borderEndWidth={1}>
-      <HStack align="center" borderBottomWidth={1} flexShrink={0} gap="2" minH={HEADER_MIN_HEIGHT} px="3">
-        <Text fontSize="sm" fontWeight="700">
-          {t('models.title')}
-        </Text>
-        <Text color="fg.muted" fontSize="xs">
-          {models.length}
-        </Text>
-        <Box ms="auto">
-          <MaintenanceMenu />
-        </Box>
-      </HStack>
-
+    <ManagerColumn actions={<MaintenanceMenu />} count={models.length} title={t('models.title')}>
       <ModelFilterBar
         availableBases={availableBases}
         availableTypes={availableTypes}
@@ -236,6 +223,6 @@ export const LibraryColumn = () => {
         onClose={() => setIsBulkReidentifyOpen(false)}
         onConfirm={handleBulkReidentify}
       />
-    </Flex>
+    </ManagerColumn>
   );
 };
