@@ -265,7 +265,7 @@ Both builds support every LTX-2 mode — text, first frame, last frame, first-to
 
 What to know in practice:
 
-* **Frames are 8·n + 1** (the video VAE encodes the first frame alone, then groups of eight): 9 to 481, default 121 — five seconds at the default 24 fps. The slider stops at 241; the field accepts more for a deliberate long render, but cost grows linearly with the frame count.
+* **Frames are 8·n + 1** (the video VAE encodes the first frame alone, then groups of eight): 9 to 481, default 121 — five seconds at the default 24 fps, up to twenty. Time and memory grow roughly linearly with the frame count, so a 481-frame clip costs about four times a default one.
 * **Frame rate is yours to set** (1–60 fps). It changes the clip's duration, and with it how much audio is generated — the two streams share one clock.
 * **Canvas presets pin the short edge**, with the long edge following your aspect ratio: 512p, 704p (default) and 768p render in one pass and snap to a multiple of 32; 1024p and 1536p are [two-stage](#two-stage-presets) and snap to 64, because the first pass runs at half of them.
 * **Image-to-video re-compresses your frame** as a single H.264 frame before encoding it. That is deliberate: the model was trained on frames that had been through a video codec, and a pristine PNG is far enough out of that distribution that the clip visibly drifts away from it over the first second.
