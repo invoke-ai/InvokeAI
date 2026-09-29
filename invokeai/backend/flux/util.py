@@ -1,5 +1,6 @@
 # Initially pulled from https://github.com/black-forest-labs/flux
 
+from collections.abc import Mapping
 from dataclasses import dataclass
 from typing import Any, Literal
 
@@ -126,13 +127,20 @@ def is_flux_family_vae(vae: Any) -> bool:
     `scaling_factor` is 1.5305.
     """
     config = getattr(vae, "config", None)
-    if config is None:
-        return False
+    return config is not None and is_flux_family_vae_config(config)
+
+
+def is_flux_family_vae_config(config: Mapping[str, Any]) -> bool:
+    """`is_flux_family_vae` on the config alone, which is what identification has of a `vae/` folder.
+
+    Identification and the nodes share this test so that a folder installed under `flux` is always
+    one `flux_vae_encode` and `pid_upscale` accept.
+    """
     params = get_flux_ae_params()
     return (
-        getattr(config, "latent_channels", None) == params.z_channels
-        and getattr(config, "scaling_factor", None) == params.scale_factor
-        and getattr(config, "shift_factor", None) == params.shift_factor
+        config.get("latent_channels") == params.z_channels
+        and config.get("scaling_factor") == params.scale_factor
+        and config.get("shift_factor") == params.shift_factor
     )
 
 

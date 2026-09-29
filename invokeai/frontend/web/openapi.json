@@ -1515,6 +1515,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
                     },
                     {
@@ -1531,6 +1534,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
@@ -1973,6 +1982,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
                     },
                     {
@@ -1989,6 +2001,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
@@ -2431,6 +2449,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
                     },
                     {
@@ -2447,6 +2468,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
@@ -2934,6 +2961,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
                     },
                     {
@@ -2950,6 +2980,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
@@ -3464,6 +3500,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
                     },
                     {
@@ -3480,6 +3519,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
@@ -4851,6 +4896,9 @@
                       "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
                     },
                     {
@@ -4867,6 +4915,12 @@
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
                     },
                     {
                       "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
@@ -18735,6 +18789,9 @@
             "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
           },
           {
+            "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+          },
+          {
             "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
           },
           {
@@ -18751,6 +18808,12 @@
           },
           {
             "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+          },
+          {
+            "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+          },
+          {
+            "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
           },
           {
             "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
@@ -83228,6 +83291,9 @@
                 "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
               },
               {
@@ -83244,6 +83310,12 @@
               },
               {
                 "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+              },
+              {
+                "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
               },
               {
                 "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
@@ -83932,6 +84004,9 @@
                     "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
                   },
                   {
@@ -83948,6 +84023,12 @@
                   },
                   {
                     "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+                  },
+                  {
+                    "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
                   },
                   {
                     "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
@@ -84521,6 +84602,9 @@
                 "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
               },
               {
@@ -84537,6 +84621,12 @@
               },
               {
                 "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+              },
+              {
+                "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
               },
               {
                 "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
@@ -84966,6 +85056,9 @@
                 "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
               },
               {
+                "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+              },
+              {
                 "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
               },
               {
@@ -84982,6 +85075,12 @@
               },
               {
                 "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+              },
+              {
+                "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+              },
+              {
+                "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
               },
               {
                 "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
@@ -85892,6 +85991,9 @@
                   "$ref": "#/components/schemas/VAE_Checkpoint_FLUX_Config"
                 },
                 {
+                  "$ref": "#/components/schemas/VAE_Checkpoint_SD3_Config"
+                },
+                {
                   "$ref": "#/components/schemas/VAE_Checkpoint_Flux2_Config"
                 },
                 {
@@ -85908,6 +86010,12 @@
                 },
                 {
                   "$ref": "#/components/schemas/VAE_Diffusers_SDXL_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/VAE_Diffusers_FLUX_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/VAE_Diffusers_SD3_Config"
                 },
                 {
                   "$ref": "#/components/schemas/VAE_Diffusers_Flux2_Config"
@@ -104922,6 +105030,154 @@
         ],
         "title": "VAE_Checkpoint_SD2_Config"
       },
+      "VAE_Checkpoint_SD3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "config_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Config Path",
+            "description": "Path to the config for this model, if any."
+          },
+          "type": {
+            "type": "string",
+            "const": "vae",
+            "title": "Type",
+            "default": "vae"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "base": {
+            "type": "string",
+            "const": "sd-3",
+            "title": "Base",
+            "default": "sd-3"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "config_path",
+          "type",
+          "format",
+          "cpu_only",
+          "base"
+        ],
+        "title": "VAE_Checkpoint_SD3_Config"
+      },
       "VAE_Checkpoint_SDXL_Config": {
         "properties": {
           "key": {
@@ -105226,6 +105482,146 @@
         "title": "VAE_Checkpoint_Wan_Config",
         "description": "Model config for Wan 2.2 VAE checkpoint models (AutoencoderKLWan).\n\nDistinguishes A14B (z_dim=16, standard Wan VAE) from TI2V-5B (z_dim=48,\nWan2.2-VAE) via the input channel count of ``decoder.conv_in.weight``."
       },
+      "VAE_Diffusers_FLUX_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "const": "vae",
+            "title": "Type",
+            "default": "vae"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "base": {
+            "type": "string",
+            "const": "flux",
+            "title": "Base",
+            "default": "flux"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "format",
+          "repo_variant",
+          "type",
+          "cpu_only",
+          "base"
+        ],
+        "title": "VAE_Diffusers_FLUX_Config"
+      },
       "VAE_Diffusers_Flux2_Config": {
         "properties": {
           "key": {
@@ -105506,6 +105902,146 @@
           "base"
         ],
         "title": "VAE_Diffusers_SD1_Config"
+      },
+      "VAE_Diffusers_SD3_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "format": {
+            "type": "string",
+            "const": "diffusers",
+            "title": "Format",
+            "default": "diffusers"
+          },
+          "repo_variant": {
+            "$ref": "#/components/schemas/ModelRepoVariant",
+            "default": ""
+          },
+          "type": {
+            "type": "string",
+            "const": "vae",
+            "title": "Type",
+            "default": "vae"
+          },
+          "cpu_only": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cpu Only",
+            "description": "Whether this model should run on CPU only"
+          },
+          "base": {
+            "type": "string",
+            "const": "sd-3",
+            "title": "Base",
+            "default": "sd-3"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "format",
+          "repo_variant",
+          "type",
+          "cpu_only",
+          "base"
+        ],
+        "title": "VAE_Diffusers_SD3_Config"
       },
       "VAE_Diffusers_SDXL_Config": {
         "properties": {
