@@ -35,6 +35,10 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.util.video_encoding import make_mp4_writer
 from invokeai.backend.model_manager.load.model_cache.utils import get_effective_device
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.qwen_image_vae import (
+    patch_qwen_image_vae_tiling,
+    resolve_qwen_image_vae_tile_size,
+)
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_wan
 from invokeai.backend.wan.vae_decode import iter_wan_vae_decode_chunks
 
@@ -133,6 +137,7 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
         # and budget for the tiled working set instead. (A cpu_only VAE runs in system
         # RAM, where the working set is not the constraint.)
         use_tiling = False
+        tile_size: int | None = None
         if not getattr(vae_info.config, "cpu_only", None):
             exec_device = TorchDevice.choose_torch_device()
             total_vram: int | None = None
@@ -142,7 +147,11 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
                 total_vram = torch.xpu.get_device_properties(exec_device).total_memory
             if total_vram is not None and estimated_working_memory > 0.9 * total_vram:
                 use_tiling = True
-                tile_size = int(getattr(vae_info.model, "tile_sample_min_height", 256))
+                # Resolved against the module constant, not read off `vae_info.model`: that is the
+                # cache's shared instance, so its current geometry is whatever the last invocation
+                # left rather than what this decode is about to ask for. The sentinel resolves to
+                # 256/192, which is also this VAE class's own default.
+                tile_size = resolve_qwen_image_vae_tile_size(0)
                 estimated_working_memory = estimate_vae_working_memory_wan(
                     operation="decode",
                     vae=vae_info.model,
@@ -176,13 +185,12 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
                 latents = latents.to(device=get_effective_device(vae), dtype=vae_dtype)
                 TorchDevice.empty_cache()
 
-                if use_tiling:
-                    vae.enable_tiling()
-                else:
-                    # AutoencoderKLWan is cached and shared with Anima. Clear any
-                    # tiling state left by a prior image decode before streaming.
-                    vae.disable_tiling()
-                try:
+                # `AutoencoderKLWan` is the cache's instance, shared with Anima and with the
+                # image decode. A bare `enable_tiling()` inherits whatever min/stride pair the
+                # module happens to carry, and an inconsistent pair drops whole bands of the frame;
+                # `disable_tiling()` clears the flag without restoring the geometry. The scope sets
+                # all four explicitly and puts back what was there.
+                with patch_qwen_image_vae_tiling(vae, tile_size):
                     with torch.inference_mode():
                         # Denormalise from denoiser space back to VAE space.
                         latents_mean = torch.tensor(vae.config.latents_mean).view(1, -1, 1, 1, 1).to(latents)
@@ -209,10 +217,6 @@ class WanLatentsToVideoInvocation(BaseInvocation, WithMetadata, WithBoard):
                             decoded = vae.decode(latents, return_dict=False)[0][0].cpu()
                             num_frames = decoded.shape[1]
                         del latents, latents_mean, latents_std
-                finally:
-                    # The VAE instance is cached and shared; don't leak tiling into other nodes.
-                    if use_tiling:
-                        vae.disable_tiling()
 
             TorchDevice.empty_cache()
 

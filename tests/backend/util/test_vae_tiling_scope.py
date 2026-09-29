@@ -10,31 +10,12 @@ import pytest
 import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
-from invokeai.backend.flux.modules.autoencoder import (
-    DEFAULT_TILE_OVERLAP,
+from invokeai.backend.util.vae_tiling_scope import (
     DEFAULT_TILE_SAMPLE_MIN_SIZE,
     MIN_TILE_SAMPLE_SIZE,
-    AutoEncoder,
-    AutoEncoderParams,
     resolve_tile_size,
+    scoped_vae_tiling,
 )
-from invokeai.backend.util.vae_tiling_scope import scoped_vae_tiling
-
-
-def _build_autoencoder() -> AutoEncoder:
-    params = AutoEncoderParams(
-        resolution=256,
-        in_channels=3,
-        ch=32,
-        out_ch=3,
-        ch_mult=[1, 2, 4, 4],
-        num_res_blocks=1,
-        z_channels=16,
-        scale_factor=0.3611,
-        shift_factor=0.1159,
-    )
-    torch.manual_seed(0)
-    return AutoEncoder(params).eval()
 
 
 class TestResolveTileSize:
@@ -53,80 +34,6 @@ class TestResolveTileSize:
     @pytest.mark.parametrize("size", [128, 256, 384, 512, 1024])
     def test_usable_values_pass_through(self, size):
         assert resolve_tile_size(size) == size
-
-
-class TestEveryFieldValueProducesTheRightShape:
-    """The sweep upstream #9427 used to catch silent truncation.
-
-    That bug cannot occur here -- the destination is preallocated at the exact output size and tiles
-    are merged into it, rather than a loop stepping by one quantity and slicing by another -- but the
-    guarantee is worth asserting rather than reasoning about, across the shapes most likely to leave
-    an awkward remainder.
-    """
-
-    @pytest.mark.parametrize("latent_hw", [(2, 2), (10, 10), (50, 50), (34, 18), (128, 72), (18, 34), (150, 10)])
-    @pytest.mark.parametrize("tile_size", [0, 8, 128, 256, 384, 512, 1024])
-    def test_output_shape_is_exact(self, latent_hw, tile_size):
-        ae = _build_autoencoder()
-        h, w = latent_hw
-        z = torch.randn(1, 16, h, w)
-        with torch.no_grad(), scoped_vae_tiling(ae, tile_size):
-            out = ae.decode(z)
-        assert out.shape == (1, 3, h * 8, w * 8)
-
-
-class TestStateIsRestored:
-    def test_the_normal_path_restores_everything(self):
-        ae = _build_autoencoder()
-        before = (ae.use_tiling, ae.tile_sample_min_size, ae.tile_overlap)
-        with scoped_vae_tiling(ae, 256):
-            assert ae.use_tiling is True
-            assert ae.tile_sample_min_size == 256
-        assert (ae.use_tiling, ae.tile_sample_min_size, ae.tile_overlap) == before
-
-    def test_the_untiled_path_restores_everything(self):
-        # Entering with tiling already on: the block must decode untiled and hand the state back.
-        ae = _build_autoencoder()
-        ae.enable_tiling(tile_sample_min_size=256)
-        before = (ae.use_tiling, ae.tile_sample_min_size, ae.tile_overlap)
-        with scoped_vae_tiling(ae, None):
-            assert ae.use_tiling is False
-        assert (ae.use_tiling, ae.tile_sample_min_size, ae.tile_overlap) == before
-
-    def test_an_exception_still_restores(self):
-        # The OOM retry path raises through this context manager, so `finally` is load-bearing.
-        ae = _build_autoencoder()
-        before = (ae.use_tiling, ae.tile_sample_min_size, ae.tile_overlap)
-        with pytest.raises(RuntimeError, match="boom"):
-            with scoped_vae_tiling(ae, 256):
-                raise RuntimeError("boom")
-        assert (ae.use_tiling, ae.tile_sample_min_size, ae.tile_overlap) == before
-
-    def test_geometry_does_not_leak_between_two_scopes(self):
-        """The bug this exists for: `disable_tiling()` clears the flag but keeps the geometry, so a
-        size set once would otherwise silently become the default for everyone afterwards."""
-        ae = _build_autoencoder()
-        with scoped_vae_tiling(ae, 256):
-            pass
-        assert ae.tile_sample_min_size == DEFAULT_TILE_SAMPLE_MIN_SIZE
-        assert ae.tile_overlap == DEFAULT_TILE_OVERLAP
-        with scoped_vae_tiling(ae, 0):
-            assert ae.tile_sample_min_size == DEFAULT_TILE_SAMPLE_MIN_SIZE
-
-    def test_a_tiled_decode_does_not_leave_the_shared_vae_tiled(self):
-        """Nine nodes reach this class and most never touch the tiling flag -- FLUX.1 encode, PiD,
-        and Anima's FLUX branch among them. A leaked flag would silently tile their work."""
-        ae = _build_autoencoder()
-        z = torch.randn(1, 16, 96, 96)
-        with torch.no_grad():
-            with scoped_vae_tiling(ae, 0):
-                ae.decode(z)
-            assert ae.use_tiling is False
-            # What an unguarded consumer would get next, decoded with no tiling call of its own.
-            after = ae.decode(z)
-            ae.disable_tiling()
-            expected = ae.decode(z)
-        assert torch.equal(after, expected)
 
 
 class TestDiffusersVaesAreHandledToo:
@@ -174,6 +81,57 @@ class TestDiffusersVaesAreHandledToo:
             assert vae.tile_sample_min_size == expected_sample
             assert vae.tile_latent_min_size == expected_sample // downsample
 
+    def test_an_exception_still_restores(self):
+        # The OOM retry path raises through this context manager, so `finally` is load-bearing.
+        vae = self._vae()
+        before = (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size)
+
+        with pytest.raises(RuntimeError, match="boom"):
+            with scoped_vae_tiling(vae, 256):
+                raise RuntimeError("boom")
+
+        assert (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size) == before
+
+    def test_entering_with_tiling_already_on_turns_it_off_and_puts_it_back(self):
+        """The branch `tile_size=None` exists for, and the only one no cell reached.
+
+        Every "default decodes untiled" cell elsewhere builds a fresh VAE, whose `use_tiling` is
+        already False -- so it asserts a value the fixture handed it. This one arrives with tiling on
+        and a non-stock geometry, which is what a shared cache instance looks like after
+        `latents_to_image.py` has called the bare `enable_tiling()` it still calls.
+        """
+        vae = self._vae()
+        vae.enable_tiling()
+        vae.tile_sample_min_size = 384
+        vae.tile_latent_min_size = 48
+        before = (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size)
+
+        with scoped_vae_tiling(vae, None):
+            assert vae.use_tiling is False
+
+        assert (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size) == before
+
+    def test_every_tile_size_the_field_accepts_assembles_the_full_latent(self):
+        """The decode sweep below, pointed at the encode.
+
+        `_tiled_encode` and `tiled_decode` are separate functions upstream, and `diffusers_latent_tile`
+        derives its snap from the decode expression alone -- justified by a docstring claim that the
+        two admit identical tiles. That claim is true today; this is what notices when a diffusers
+        bump makes it false, which would otherwise show up as a mis-shaped latent that still
+        generates.
+        """
+        vae = self._vae(block_out_channels=(4, 8, 16, 16), norm_num_groups=4).eval()
+        image = torch.zeros(1, 3, 512, 512)
+
+        wrong: list[tuple[int, tuple[int, ...]]] = []
+        for tile_size in range(128, 800, 8):
+            with torch.no_grad(), scoped_vae_tiling(vae, tile_size):
+                latent = vae.encode(image).latent_dist.mean
+            if latent.shape != (1, 4, 64, 64):
+                wrong.append((tile_size, tuple(latent.shape)))
+
+        assert not wrong
+
     def test_the_vaes_own_geometry_is_restored(self):
         vae = self._vae()
         before = (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size)
@@ -184,7 +142,7 @@ class TestDiffusersVaesAreHandledToo:
         assert (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size) == before
 
     def test_every_tile_size_the_field_accepts_assembles_the_full_image(self):
-        """The sweep the FLUX sibling above runs, pointed at the class that can actually fail it.
+        """A sweep over every value the node field accepts, on the class that can fail it.
 
         `tiled_decode` steps the latent loop by one quantity and crops each decoded tile by another,
         and the two agree only for some tile sizes. Setting `tile_sample_min_size` and

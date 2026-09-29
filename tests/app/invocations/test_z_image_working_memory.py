@@ -1,142 +1,81 @@
-"""Test that Z-Image VAE invocations properly estimate and request working memory."""
+"""The Z-Image VAE nodes reserve what they estimated.
+
+Narrow on purpose: `test_z_image_tiled_decode.py` covers *what* is estimated (tile-bounded or not),
+and this covers that the number reaches the model cache at all. Both nodes, because the reservation
+is wired separately in each and either can be dropped without the other noticing.
+
+The earlier version of this file wrapped each invocation in `except Exception: pass`, which made it
+pass whether or not the node worked -- only the two mock assertions were load-bearing. The nodes run
+for real here instead, against the tiny `AutoencoderKL` from `conftest`.
+"""
 
 from unittest.mock import MagicMock, patch
 
 import pytest
 import torch
-from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
 from invokeai.app.invocations.vae.z_image_image_to_latents import ZImageImageToLatentsInvocation
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder as FluxAutoEncoder
+from invokeai.app.invocations.vae.z_image_latents_to_image import ZImageLatentsToImageInvocation
 
 
-class TestZImageWorkingMemory:
-    """Test that Z-Image VAE invocations request working memory."""
+@pytest.fixture(autouse=True)
+def _pin_to_cpu(monkeypatch):
+    """Both nodes move their input to `choose_torch_device()`, which is CUDA on a machine that has
+    one -- while the VAE here stays on the CPU, so the encode would die on a device mismatch. The
+    previous version of this file hid exactly that behind `except Exception: pass`."""
+    monkeypatch.setattr(
+        "invokeai.backend.util.devices.TorchDevice.choose_torch_device", staticmethod(lambda: torch.device("cpu"))
+    )
 
-    @pytest.mark.parametrize("vae_type", [AutoencoderKL, FluxAutoEncoder])
-    def test_z_image_latents_to_image_requests_working_memory(self, vae_type):
-        """Test that ZImageLatentsToImageInvocation estimates and requests working memory."""
-        # Create mock VAE
-        mock_vae = MagicMock(spec=vae_type)
 
-        # Only set config for AutoencoderKL (FluxAutoEncoder doesn't use config)
-        if vae_type == AutoencoderKL:
-            mock_vae.config.scaling_factor = 1.0
-            mock_vae.config.shift_factor = None
+def _vae_info(vae) -> MagicMock:
+    vae_info = MagicMock()
+    vae_info.model = vae
+    # Decode places latents on the VAE's intended compute device (see #9373); this must be a real
+    # torch.device so `latents.to(device=...)` works instead of raising TypeError.
+    vae_info.compute_device = torch.device("cpu")
+    cm = MagicMock()
+    cm.__enter__ = MagicMock(return_value=(None, vae))
+    cm.__exit__ = MagicMock(return_value=None)
+    vae_info.model_on_device = MagicMock(return_value=cm)
+    return vae_info
 
-        # Create mock parameter for dtype detection
-        mock_param = torch.zeros(1)
-        mock_vae.parameters.return_value = iter([mock_param])
 
-        # Create mock vae_info
-        mock_vae_info = MagicMock()
-        mock_vae_info.model = mock_vae
-        # Decode places latents on the VAE's intended compute device (see #9373); this must be a
-        # real torch.device so `latents.to(device=...)` works instead of raising TypeError.
-        mock_vae_info.compute_device = torch.device("cpu")
+class TestTheEstimateReachesTheCache:
+    def test_the_decode_node_reserves_what_it_estimated(self, flux_shaped_vae):
+        vae = flux_shaped_vae()
+        vae_info = _vae_info(vae)
 
-        # Create mock context manager return value
-        mock_cm = MagicMock()
-        mock_cm.__enter__ = MagicMock(return_value=(None, mock_vae))
-        mock_cm.__exit__ = MagicMock(return_value=None)
-        mock_vae_info.model_on_device = MagicMock(return_value=mock_cm)
+        context = MagicMock()
+        context.models.load.return_value = vae_info
+        context.tensors.load.return_value = torch.zeros(1, 16, 64, 64)
+        context.config.get.return_value.force_tiled_decode = False
+        # `ImageOutput.build` validates these, so they cannot be bare MagicMocks.
+        context.images.save.return_value = MagicMock(image_name="test.png", width=512, height=512)
 
-        # Mock the context
-        mock_context = MagicMock()
-        mock_context.models.load.return_value = mock_vae_info
-
-        # Mock latents
-        mock_latents = torch.zeros(1, 16, 64, 64)
-        mock_context.tensors.load.return_value = mock_latents
-
-        estimation_path = "invokeai.app.invocations.vae.z_image_latents_to_image.estimate_vae_working_memory_flux"
-
-        with patch(estimation_path) as mock_estimate:
-            expected_memory = 1024 * 1024 * 500  # 500MB
-            mock_estimate.return_value = expected_memory
-
-            # Mock VAE decode to avoid actual computation
-            if vae_type == FluxAutoEncoder:
-                mock_vae.decode.return_value = torch.zeros(1, 3, 512, 512)
-            else:
-                mock_vae.decode.return_value = (torch.zeros(1, 3, 512, 512),)
-
-            # Mock image save
-            mock_image_dto = MagicMock()
-            mock_context.images.save.return_value = mock_image_dto
-
-            # Import and create invocation using model_construct to bypass validation
-            from invokeai.app.invocations.vae.z_image_latents_to_image import ZImageLatentsToImageInvocation
-
-            invocation = ZImageLatentsToImageInvocation.model_construct(
+        expected_memory = 500 * 1024 * 1024
+        path = "invokeai.app.invocations.vae.z_image_latents_to_image.estimate_vae_working_memory_flux"
+        with patch(path, return_value=expected_memory) as estimate:
+            ZImageLatentsToImageInvocation.model_construct(
                 latents=MagicMock(latents_name="test_latents"),
-                vae=MagicMock(vae=MagicMock(), seamless_axes=["x", "y"]),
-            )
+                vae=MagicMock(vae=MagicMock(), seamless_axes=[]),
+                tiled=False,
+                tile_size=0,
+            ).invoke(context)
 
-            try:
-                invocation.invoke(mock_context)
-            except Exception:
-                # We expect some errors due to mocking, but we just want to verify the working memory was requested
-                pass
+        estimate.assert_called_once()
+        vae_info.model_on_device.assert_called_once_with(working_mem_bytes=expected_memory)
 
-            # Verify that working memory estimation was called
-            mock_estimate.assert_called_once()
-            # Verify that model_on_device was called with the estimated working memory
-            mock_vae_info.model_on_device.assert_called_once_with(working_mem_bytes=expected_memory)
+    def test_the_encode_node_reserves_what_it_estimated(self, flux_shaped_vae):
+        vae = flux_shaped_vae()
+        vae_info = _vae_info(vae)
 
-    @pytest.mark.parametrize("vae_type", [AutoencoderKL, FluxAutoEncoder])
-    def test_z_image_image_to_latents_requests_working_memory(self, vae_type):
-        """Test that ZImageImageToLatentsInvocation estimates and requests working memory."""
-        # Create mock VAE
-        mock_vae = MagicMock(spec=vae_type)
+        expected_memory = 250 * 1024 * 1024
+        path = "invokeai.app.invocations.vae.z_image_image_to_latents.estimate_vae_working_memory_flux"
+        with patch(path, return_value=expected_memory) as estimate:
+            latents = ZImageImageToLatentsInvocation.vae_encode(vae_info, torch.zeros(1, 3, 512, 512))
 
-        # Only set config for AutoencoderKL (FluxAutoEncoder doesn't use config)
-        if vae_type == AutoencoderKL:
-            mock_vae.config.scaling_factor = 1.0
-            mock_vae.config.shift_factor = None
-
-        # Create mock parameter for dtype detection
-        mock_param = torch.zeros(1)
-        mock_vae.parameters.return_value = iter([mock_param])
-
-        # Create mock vae_info
-        mock_vae_info = MagicMock()
-        mock_vae_info.model = mock_vae
-
-        # Create mock context manager return value
-        mock_cm = MagicMock()
-        mock_cm.__enter__ = MagicMock(return_value=(None, mock_vae))
-        mock_cm.__exit__ = MagicMock(return_value=None)
-        mock_vae_info.model_on_device = MagicMock(return_value=mock_cm)
-
-        # Mock image tensor
-        mock_image_tensor = torch.zeros(1, 3, 512, 512)
-
-        # Mock the estimation function
-        estimation_path = "invokeai.app.invocations.vae.z_image_image_to_latents.estimate_vae_working_memory_flux"
-
-        with patch(estimation_path) as mock_estimate:
-            expected_memory = 1024 * 1024 * 250  # 250MB
-            mock_estimate.return_value = expected_memory
-
-            # Mock VAE encode to avoid actual computation
-            if vae_type == FluxAutoEncoder:
-                mock_vae.encode.return_value = torch.zeros(1, 16, 64, 64)
-            else:
-                mock_latent_dist = MagicMock()
-                mock_latent_dist.sample.return_value = torch.zeros(1, 16, 64, 64)
-                mock_encode_result = MagicMock()
-                mock_encode_result.latent_dist = mock_latent_dist
-                mock_vae.encode.return_value = mock_encode_result
-
-            # Call the static method directly
-            try:
-                ZImageImageToLatentsInvocation.vae_encode(mock_vae_info, mock_image_tensor)
-            except Exception:
-                # We expect some errors due to mocking, but we just want to verify the working memory was requested
-                pass
-
-            # Verify that working memory estimation was called
-            mock_estimate.assert_called_once()
-            # Verify that model_on_device was called with the estimated working memory
-            mock_vae_info.model_on_device.assert_called_once_with(working_mem_bytes=expected_memory)
+        estimate.assert_called_once()
+        vae_info.model_on_device.assert_called_once_with(working_mem_bytes=expected_memory)
+        # The encode really ran: a 512px image through an 8x, 16-channel VAE is a 64px latent.
+        assert latents.shape == (1, 16, 64, 64)

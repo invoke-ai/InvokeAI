@@ -17766,6 +17766,27 @@
             "input": "connection",
             "orig_required": true
           },
+          "tiled": {
+            "default": false,
+            "description": "Processing using overlapping tiles (reduce memory consumption)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 64 are raised to 64.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 8,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
           "type": {
             "const": "anima_i2l",
             "default": "anima_i2l",
@@ -17778,7 +17799,7 @@
         "tags": ["image", "latents", "vae", "i2l", "anima"],
         "title": "Image to Latents - Anima",
         "type": "object",
-        "version": "1.0.2",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -38797,6 +38818,27 @@
             "input": "connection",
             "orig_required": true
           },
+          "tiled": {
+            "default": false,
+            "description": "Processing using overlapping tiles (reduce memory consumption)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 8,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
           "type": {
             "const": "flux_vae_decode",
             "default": "flux_vae_decode",
@@ -38809,7 +38851,7 @@
         "tags": ["latents", "image", "vae", "l2i", "flux"],
         "title": "Latents to Image - FLUX",
         "type": "object",
-        "version": "1.0.2",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/ImageOutput"
         }
@@ -38875,6 +38917,27 @@
             "input": "connection",
             "orig_required": true
           },
+          "tiled": {
+            "default": false,
+            "description": "Processing using overlapping tiles (reduce memory consumption)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 8,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
           "type": {
             "const": "flux_vae_encode",
             "default": "flux_vae_encode",
@@ -38887,7 +38950,7 @@
         "tags": ["latents", "image", "vae", "i2l", "flux"],
         "title": "Image to Latents - FLUX",
         "type": "object",
-        "version": "1.0.1",
+        "version": "1.1.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -88565,7 +88628,7 @@
               }
             ],
             "default": null,
-            "description": "FLUX AutoEncoder VAE. PiD upscale runs the FLUX backbone and applies FLUX VAE scaling, and the encode path only supports InvokeAI's FLUX AutoEncoder \u2014 a diffusers AutoencoderKL (e.g. Z-Image) is not supported here.",
+            "description": "The FLUX.1 VAE, which Z-Image also uses. PiD upscale runs the FLUX backbone and undoes FLUX VAE scaling, so a VAE of another family is not accepted.",
             "field_kind": "input",
             "input": "connection",
             "orig_required": true
@@ -111614,7 +111677,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Generates latents from an image using Z-Image VAE (supports both Diffusers and FLUX VAE).",
+        "description": "Generates latents from an image using the Z-Image VAE.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -111703,6 +111766,27 @@
             "input": "connection",
             "orig_required": true
           },
+          "tiled": {
+            "default": false,
+            "description": "Processing using overlapping tiles (reduce memory consumption)",
+            "field_kind": "input",
+            "input": "any",
+            "orig_default": false,
+            "orig_required": false,
+            "title": "Tiled",
+            "type": "boolean"
+          },
+          "tile_size": {
+            "default": 0,
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.",
+            "field_kind": "input",
+            "input": "any",
+            "multipleOf": 8,
+            "orig_default": 0,
+            "orig_required": false,
+            "title": "Tile Size",
+            "type": "integer"
+          },
           "type": {
             "const": "z_image_i2l",
             "default": "z_image_i2l",
@@ -111715,7 +111799,7 @@
         "tags": ["image", "latents", "vae", "i2l", "z-image"],
         "title": "Image to Latents - Z-Image",
         "type": "object",
-        "version": "1.1.0",
+        "version": "1.2.0",
         "output": {
           "$ref": "#/components/schemas/LatentsOutput"
         }
@@ -111724,7 +111808,7 @@
         "category": "latents",
         "class": "invocation",
         "classification": "prototype",
-        "description": "Generates an image from latents using Z-Image VAE (supports both Diffusers and FLUX VAE).",
+        "description": "Generates an image from latents using the Z-Image VAE.",
         "node_pack": "invokeai",
         "properties": {
           "board": {
@@ -111825,7 +111909,7 @@
           },
           "tile_size": {
             "default": 0,
-            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage.",
+            "description": "The tile size for VAE tiling in pixels (image space). If set to 0, the default tile size for the model will be used. Larger tile sizes generally produce better results at the cost of higher memory usage. Values between 1 and 128 are raised to 128.",
             "field_kind": "input",
             "input": "any",
             "multipleOf": 8,

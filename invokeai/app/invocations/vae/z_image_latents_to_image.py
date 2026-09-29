@@ -1,6 +1,3 @@
-from contextlib import nullcontext
-from typing import Union
-
 import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 from einops import rearrange
@@ -18,15 +15,11 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder as FluxAutoEncoder
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.oom import is_oom_error
-from invokeai.backend.util.vae_tiling_scope import scoped_vae_tiling
+from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE, scoped_vae_tiling
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
-
-# Z-Image can use either the Diffusers AutoencoderKL or the FLUX AutoEncoder
-ZImageVAE = Union[AutoencoderKL, FluxAutoEncoder]
 
 
 @invocation(
@@ -38,28 +31,32 @@ ZImageVAE = Union[AutoencoderKL, FluxAutoEncoder]
     classification=Classification.Prototype,
 )
 class ZImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
-    """Generates an image from latents using Z-Image VAE (supports both Diffusers and FLUX VAE)."""
+    """Generates an image from latents using the Z-Image VAE."""
 
     latents: LatentsField = InputField(description=FieldDescriptions.latents, input=Input.Connection)
     vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection)
     tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
     # NOTE: tile_size = 0 is a special value. We use this rather than `int | None`, because the workflow UI does not
-    # offer a way to directly set None values. InvokeAI's FLUX AutoEncoder takes the size as given; on a diffusers
-    # AutoencoderKL it is snapped down to a tile that VAE's own tiled decode can assemble -- see `scoped_vae_tiling`.
-    tile_size: int = InputField(default=0, multiple_of=8, description=FieldDescriptions.vae_tile_size)
+    # offer a way to directly set None values. It is snapped down to a tile this VAE's own tiled decode can
+    # assemble -- see `scoped_vae_tiling`.
+    tile_size: int = InputField(
+        default=0,
+        multiple_of=8,
+        description=f"{FieldDescriptions.vae_tile_size} Values between 1 and "
+        f"{MIN_TILE_SAMPLE_SIZE} are raised to {MIN_TILE_SAMPLE_SIZE}.",
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> ImageOutput:
         latents = context.tensors.load(self.latents.latents_name)
 
         vae_info = context.models.load(self.vae.vae)
-        if not isinstance(vae_info.model, (AutoencoderKL, FluxAutoEncoder)):
+        if not isinstance(vae_info.model, AutoencoderKL):
             raise TypeError(
-                f"Expected AutoencoderKL or FluxAutoEncoder for Z-Image VAE, got {type(vae_info.model).__name__}. "
+                f"Expected AutoencoderKL for Z-Image VAE, got {type(vae_info.model).__name__}. "
                 "Ensure you are using a compatible VAE model."
             )
 
-        is_flux_vae = isinstance(vae_info.model, FluxAutoEncoder)
         use_tiling = self.tiled or context.config.get().force_tiled_decode
 
         # Estimate working memory needed for VAE decode
@@ -70,16 +67,16 @@ class ZImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             tile_size=self.tile_size if use_tiling else None,
         )
 
-        # FLUX VAE doesn't support seamless, so only apply for AutoencoderKL
-        seamless_context = (
-            nullcontext() if is_flux_vae else SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes)
-        )
+        # Seamless applies to every VAE this node accepts. It used to be skipped for the FLUX
+        # autoencoder, which had no circular-padding path -- that class is gone, and a standalone
+        # FLUX VAE now honours the axes the UI has always offered for it.
+        seamless_context = SeamlessExt.static_patch_model(vae_info.model, self.vae.seamless_axes)
 
         with seamless_context, vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             context.util.signal_progress("Running VAE")
-            if not isinstance(vae, (AutoencoderKL, FluxAutoEncoder)):
+            if not isinstance(vae, AutoencoderKL):
                 raise TypeError(
-                    f"Expected AutoencoderKL or FluxAutoEncoder, got {type(vae).__name__}. "
+                    f"Expected AutoencoderKL, got {type(vae).__name__}. "
                     "VAE model type changed unexpectedly after loading."
                 )
 
@@ -92,20 +89,15 @@ class ZImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
             # Clear memory as VAE decode can request a lot
             TorchDevice.empty_cache()
 
-            if not isinstance(vae, FluxAutoEncoder):
-                # AutoencoderKL - Apply scaling_factor and shift_factor from VAE config
-                # Z-Image uses: latents = latents / scaling_factor + shift_factor
-                # (the FLUX VAE handles scaling internally)
-                scaling_factor = vae.config.scaling_factor
-                shift_factor = getattr(vae.config, "shift_factor", None)
+            # `AutoencoderKL` leaves the scaling to the caller: latents / scaling_factor + shift_factor.
+            scaling_factor = vae.config.scaling_factor
+            shift_factor = getattr(vae.config, "shift_factor", None)
 
-                latents = latents / scaling_factor
-                if shift_factor is not None:
-                    latents = latents + shift_factor
+            latents = latents / scaling_factor
+            if shift_factor is not None:
+                latents = latents + shift_factor
 
             def decode() -> torch.Tensor:
-                if isinstance(vae, FluxAutoEncoder):
-                    return vae.decode(latents)
                 return vae.decode(latents, return_dict=False)[0]
 
             # The VAE belongs to the model cache and is shared with every other node that reaches
@@ -135,7 +127,10 @@ class ZImageLatentsToImageInvocation(BaseInvocation, WithMetadata, WithBoard):
                     # `ModelConfigFactory._detach_traceback`.
                     e.__traceback__ = None
                     TorchDevice.empty_cache()
-                    with scoped_vae_tiling(vae, self.tile_size):
+                    # 0, not `self.tile_size`: the retry exists because the untiled pass did not
+                    # fit, and the field may hold a size left over from a run where `tiled` was off.
+                    # The FLUX sibling retries at 0 for the same reason.
+                    with scoped_vae_tiling(vae, 0):
                         img = decode()
 
             img = img.clamp(-1, 1)
