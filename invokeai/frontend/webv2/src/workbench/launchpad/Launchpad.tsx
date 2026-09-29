@@ -104,66 +104,64 @@ export const Launchpad = () => {
     [navigate]
   );
 
-  const filtered = useMemo<LaunchpadSection[]>(
-    () =>
-      (
-        [
-          {
-            group: 'workspace',
-            icon: HouseIcon,
-            id: 'home',
-            label: t('launchpad.sections.home'),
-            render: () => <HomePage />,
-          },
-          {
-            group: 'workspace',
-            icon: FolderIcon,
-            id: 'projects',
-            label: t('launchpad.sections.projects'),
-            render: () => <ProjectsPage />,
-          },
-          {
-            condition: canManageModels,
-            group: 'manage',
-            icon: BoxIcon,
-            id: 'models',
-            label: t('launchpad.sections.models'),
-            render: () => <ModelsPage />,
-          },
-          {
-            group: 'manage',
-            icon: TypeIcon,
-            id: 'fonts',
-            label: t('launchpad.sections.fonts'),
-            render: () => <FontsPage />,
-          },
-          {
-            condition: canManageNodes,
-            group: 'manage',
-            icon: BlocksIcon,
-            id: 'nodes',
-            label: t('launchpad.sections.nodes'),
-            render: () => <NodesPage />,
-          },
-          {
-            condition: canManageUsers,
-            group: 'manage',
-            icon: UsersIcon,
-            id: 'users',
-            label: t('launchpad.sections.users'),
-            render: () => <UsersPage onManageIntermediates={manageIntermediatesOf} />,
-          },
-          {
-            group: 'footer',
-            icon: SettingsIcon,
-            id: 'preferences',
-            label: t('launchpad.sections.preferences'),
-            render: () => <PreferencesPage />,
-          },
-        ] satisfies (LaunchpadSection & { condition?: boolean })[]
-      ).filter((section) => section.condition ?? true),
-    [canManageModels, canManageNodes, canManageUsers, manageIntermediatesOf, t]
-  );
+  const filtered = useMemo<LaunchpadSection[]>(() => {
+    const sections = [
+      {
+        group: 'workspace',
+        icon: HouseIcon,
+        id: 'home',
+        label: t('launchpad.sections.home'),
+        render: () => <HomePage />,
+      },
+      {
+        group: 'workspace',
+        icon: FolderIcon,
+        id: 'projects',
+        label: t('launchpad.sections.projects'),
+        render: () => <ProjectsPage />,
+      },
+      {
+        condition: canManageModels,
+        group: 'manage',
+        icon: BoxIcon,
+        id: 'models',
+        label: t('launchpad.sections.models'),
+        render: () => <ModelsPage />,
+      },
+      {
+        condition: canManageNodes,
+        group: 'manage',
+        icon: BlocksIcon,
+        id: 'nodes',
+        label: t('launchpad.sections.nodes'),
+        render: () => <NodesPage />,
+      },
+      {
+        group: 'manage',
+        icon: TypeIcon,
+        id: 'fonts',
+        label: t('launchpad.sections.fonts'),
+        render: () => <FontsPage />,
+      },
+      {
+        condition: canManageUsers,
+        group: 'manage',
+        icon: UsersIcon,
+        id: 'users',
+        label: t('launchpad.sections.users'),
+        render: () => <UsersPage onManageIntermediates={manageIntermediatesOf} />,
+      },
+      {
+        group: 'footer',
+        icon: SettingsIcon,
+        id: 'preferences',
+        label: t('launchpad.sections.preferences'),
+        render: () => <PreferencesPage />,
+      },
+    ] satisfies (LaunchpadSection & { condition?: boolean })[];
+
+    return sections.filter((section) => section.condition ?? true);
+  }, [canManageModels, canManageNodes, canManageUsers, manageIntermediatesOf, t]);
 
   return (
     <ProjectActionsMenuProvider>

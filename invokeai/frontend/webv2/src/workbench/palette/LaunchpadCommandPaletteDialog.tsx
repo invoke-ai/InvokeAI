@@ -63,8 +63,8 @@ const LaunchpadCommandPaletteDialog = ({
       }),
       navEntry({ id: 'goToProjects', run: () => void navigate({ to: '/projects' }) }),
       ...(canManageModels ? [navEntry({ id: 'goToModels', run: () => void navigate({ to: '/models' }) })] : []),
-      navEntry({ id: 'goToFonts', keywords: 'font typeface typography', run: () => void navigate({ to: '/fonts' }) }),
       ...(canManageNodes ? [navEntry({ id: 'goToNodes', run: () => void navigate({ to: '/nodes' }) })] : []),
+      navEntry({ id: 'goToFonts', keywords: 'font typeface typography', run: () => void navigate({ to: '/fonts' }) }),
       ...(canManageUsers ? [navEntry({ id: 'goToUsers', run: () => void navigate({ to: '/users' }) })] : []),
       buildOpenSettingsEntry(t, () => void navigate({ to: '/preferences' })),
     ];

@@ -316,7 +316,7 @@ const runKeyboardJourney = async (browser) => {
 
     const rail = page.getByRole('navigation', { exact: true, name: 'Launchpad sections' });
     const projectsLink = rail.getByRole('link', { exact: true, name: 'Projects' });
-    const fontsLink = rail.getByRole('link', { exact: true, name: 'Fonts' });
+    const nodesLink = rail.getByRole('link', { exact: true, name: 'Nodes' });
     const modelsLink = rail.getByRole('link', { exact: true, name: 'Models' });
 
     // The rail's links are in visual order, so Tab and reading order follow what it shows.
@@ -335,10 +335,11 @@ const runKeyboardJourney = async (browser) => {
     assert.match(page.url(), /#\/models$/);
     assert.equal(await modelsLink.getAttribute('aria-current'), 'page');
     await modelsLink.press('Tab');
-    await expectFocused(fontsLink, 'Tab should move focus from Models to Fonts.');
-    await fontsLink.press('Enter');
-    await page.waitForURL(/#\/fonts$/);
-    assert.equal(await fontsLink.getAttribute('aria-current'), 'page');
+    await expectFocused(nodesLink, 'Tab should move focus from Models to Nodes.');
+    await nodesLink.press('Enter');
+    await waitForNodes(page);
+    assert.match(page.url(), /#\/nodes$/);
+    assert.equal(await nodesLink.getAttribute('aria-current'), 'page');
     assert.equal(await modelsLink.getAttribute('aria-current'), null);
 
     const paletteTrigger = page.getByRole('button', { exact: true, name: 'Command palette' });
