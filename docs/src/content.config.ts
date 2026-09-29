@@ -4,8 +4,10 @@ import { docsSchema, i18nSchema } from '@astrojs/starlight/schema';
 
 import { changelogsLoader } from 'starlight-changelogs/loader';
 
+import { generateDocsId } from './lib/sort-prefix.mjs';
+
 export const collections = {
-  docs: defineCollection({ loader: docsLoader(), schema: docsSchema() }),
+  docs: defineCollection({ loader: docsLoader({ generateId: generateDocsId }), schema: docsSchema() }),
   i18n: defineCollection({ loader: i18nLoader(), schema: i18nSchema() }),
   changelogs: defineCollection({
     loader: changelogsLoader([

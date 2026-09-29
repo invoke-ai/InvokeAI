@@ -167,6 +167,16 @@ const sidebar = [
 ]
 ```
 
+### Ordering Pages
+
+To control the sidebar order, prefix a page file or directory name with a number and a dot, such as `01.projects.mdx` or `04.Image Generation/`. The sidebar lists prefixed siblings in numeric order, followed by any unprefixed siblings in their usual order. Among prefixed siblings, the number replaces `sidebar.order`. The prefix never appears in URLs or sidebar labels: `concepts/04.Image Generation/01.introduction.mdx` is served at `/concepts/image-generation/introduction/`, under a group labelled "Image Generation".
+
+Any leading run of digits followed by a dot counts as a prefix, so avoid names like `2.0-migration.mdx` for other purposes. Two siblings that differ only in their prefix map to the same URL, and one of them is dropped.
+
+:::note
+If you renumber a file while `pnpm dev` is running, its page can disappear until you restart the dev server or touch the file. Builds are not affected.
+:::
+
 ### Page Metadata
 
 Before your page becomes available, you will need to add frontmatter to define the page's metadata such as its title, description, last update date, sidebar position, and etc.

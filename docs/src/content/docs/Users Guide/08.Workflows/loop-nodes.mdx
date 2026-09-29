@@ -1,0 +1,239 @@
+---
+title: Loop Nodes
+description: Repeat workflow steps over a collection and optionally carry values from one iteration to the next.
+sidebar:
+  order: 4
+lastUpdated: 2026-09-28
+---
+
+Loop nodes let a workflow repeat the same group of steps for every item in a collection. For example, a workflow can
+process every image found by a detector, try several seeds, or build a collection of results one item at a time.
+
+The main loop uses two nodes:
+
+- **For** starts the loop and provides one collection item at a time.
+- **ForReturn** marks the end of the loop body and sends the result back to the loop.
+
+## The Basic Pattern
+
+Connect the nodes in this order:
+
+```text
+Collection producer -> For.collection
+For.loop_linkage - - - - - - - - - - - - - - - - - > ForReturn.loop_linkage
+For.item -> work nodes -> ForReturn.output
+For.output_collection -> nodes after the loop
+```
+
+The `For` node has one iteration for each item in its `collection`. During an iteration, its `item`, `index`, `total`,
+and `state` outputs contain values for that iteration. The work nodes run, then `ForReturn` closes that iteration.
+
+The `For` node does not send its per-item `item` output directly to nodes after the loop. To run a node once after all
+iterations finish, connect that node to `For.output_collection` or `For.final_state`.
+
+You can connect `For.output_collection` directly to a branch input on an `If`. If that branch is selected, its consumer
+runs in the parent frame after the loop finishes; you do not need a `For.final_state` edge just to make it run.
+
+The editor draws a dashed green boundary around the loop body. This is a visual guide showing which nodes repeat; the
+boundary does not carry data. The dashed green line between `For.loop_linkage` and `ForReturn.loop_linkage` is a
+required association, not a data value. The remaining values move through the ports and edges you connect.
+
+The loop is not executable until its two boundary nodes are paired. Connect `For.loop_linkage` directly to the matching
+`ForReturn.loop_linkage`. When you add `ForReturn` from an iteration-output connection in the node picker, the editor
+can create this association for you. Replacing either boundary node requires pairing the replacement again.
+
+Deleting a connector preserves its through-connections by reconnecting the upstream source to surviving downstream
+targets. Deleting a complete loop-linkage alias collapses it to a direct `loop_linkage` edge; ordinary connector paths
+remain ordinary data edges.
+
+### A Simple Example
+
+To process every image in a collection:
+
+```text
+Image collection -> For.collection
+For.item -> Image Processor.image
+Image Processor.image -> ForReturn.output
+For.output_collection -> Save or display node
+```
+
+The processor runs once per image. The final `output_collection` contains the processed images in the same order as the
+input collection.
+
+`ForReturn.output` may be disconnected when the result is carried through loop state instead. A body still needs a
+dependency into `ForReturn`, such as a state update or a scalar `continue_condition`; there is no separate completion
+port for effects-only bodies.
+
+## What The For Outputs Mean
+
+| Output              | Meaning                                           | Use it for                                  |
+| ------------------- | ------------------------------------------------- | ------------------------------------------- |
+| `loop_linkage`      | The association port for the matching `ForReturn` | Pairing the loop boundaries; it is not data |
+| `item`              | The current collection item                       | The work done during this iteration         |
+| `index`             | The zero-based position of the current item       | Labels, counters, or position-based logic   |
+| `total`             | The collection length                             | Progress or position-based logic            |
+| `state`             | The current loop state                            | Values carried from earlier iterations      |
+| `output_collection` | All values returned through `ForReturn.output`    | Work that should happen after the loop      |
+| `final_state`       | The state from the last completed iteration       | Reading accumulated values after the loop   |
+
+The `item`, `index`, `total`, and `state` outputs belong inside the loop body. The `output_collection` and
+`final_state` outputs become available after the loop finishes. `loop_linkage` is only for pairing the two boundary
+nodes.
+
+Collection Cartesian products are limited to 100,000 item pairs. A product larger than 100,000 pairs fails with an
+error instead of expanding without bound.
+
+## Returning Results
+
+`ForReturn` closes the loop body. It has four useful inputs:
+
+- **Output** adds one value to `For.output_collection` for the current iteration. Null (`None`) values are retained, so
+  collection positions continue to match iteration order.
+- **State** supplies the state for the next iteration.
+- **Continue Condition** controls whether another item should be processed. It continues by default; connecting `False`
+  stops after the current iteration.
+- **Loop Linkage** pairs this node with its owning `For`. It must be connected directly to `For.loop_linkage`; it does
+  not provide a value to the loop body.
+
+The `Loop Linkage` connection is separate from the body data connections. It tells the engine which `ForReturn` closes
+which `For`, which matters when loops are nested or several loop boundaries are present in one workflow.
+
+## Carrying Values With State
+
+State is an optional set of named values that travels from one iteration to the next. It is useful for a running sum, a
+changing parameter, or several values that must be updated together.
+
+The state helper nodes make this easier:
+
+- **Empty Loop State** creates a blank state.
+- **Get Loop State Value** reads a value by name. Its `default` input is used when that name has not been set yet.
+- **Set Loop State Value** returns a copy of the state with one named value changed.
+- **Merge Loop State Values** returns a copy with several named values changed.
+
+A running value usually looks like this:
+
+```text
+For.state -> Get Loop State Value.state
+For.item -> Add or other calculation
+Get.value + For.item -> calculation
+calculation -> Set Loop State Value.value
+Set Loop State Value.state -> ForReturn.state
+For.final_state -> Get Loop State Value.state (after the loop)
+```
+
+Set the `default` on `Get Loop State Value` when the value does not exist during the first iteration. For example, use
+`0` for the initial value of a running sum.
+
+State is separate from `output_collection`:
+
+- Use `output` when each iteration produces a result that should be collected automatically.
+- Use state when the loop needs to remember or update a value while it runs.
+- Use both when the loop needs per-item results and an accumulator.
+
+## Making Collections For A Loop
+
+`For` accepts one collection input. Use collection-producing nodes before it when the values need to be calculated.
+
+### Range Nodes
+
+- **Integer Range** creates values from `start` up to, but not including, `stop`.
+- **Integer Range of Size** creates a requested number of values.
+- **Random Range** creates a collection of random integers using its seed and bounds.
+
+For example:
+
+```text
+Integer Range of Size -> For.collection
+For.item -> work nodes
+```
+
+This is useful when the loop should run a known number of times. The integer itself can be used as a seed, index, or
+ordinary numeric input.
+
+### Combining Collections
+
+These nodes make the collection relationship explicit before the loop:
+
+- **Concatenate Collections** puts every item from the first collection before every item from the second. The two
+  collections may have different lengths.
+- **Zip Collections** pairs items by position. Both collections must have the same length; a mismatch is an error.
+- **Cartesian Product of Collections** creates every possible pair, one item from each collection. The collections may
+  have different lengths. Products larger than 100,000 pairs fail with an error.
+
+Choose based on the relationship between the items:
+
+```text
+Concatenate: first phase, then second phase
+Zip:         first[0] with second[0], first[1] with second[1], ...
+Cartesian:   every item in first with every item in second
+```
+
+An empty input to `Concatenate` is harmless. An empty input to `Zip` is valid when both inputs are empty. An empty
+input to `Cartesian Product` produces no pairs.
+
+## For And Iterate
+
+Both `For` and `Iterate` repeat work over a collection, but they serve different purposes:
+
+- Use **Iterate** when a normal workflow needs to expand a collection into separate executions and **Collect** when
+  those executions should be gathered again.
+- Use **For** when the repeated work has a clear beginning and end, needs loop state, may stop early, or should expose
+  a final collection and final state.
+
+An `Iterate` can also be used inside a `For` for a bounded inner pass. The inner values must be gathered by one
+`Collect` before the outer `ForReturn`:
+
+```text
+For.item -> preparation -> Iterate.collection
+Iterate.item -> inner work -> Collect.item
+Collect.collection -> ForReturn.output
+```
+
+The outer loop waits for the inner `Iterate` and `Collect` to finish, then returns one collection for that outer item.
+One exact serial two-`Iterate` body is also supported: `For.item` feeds a preparation node and the first `Iterate`; its
+item feeds a second preparation node and `Iterate`, followed by one work node, one `Collect`, and `ForReturn`. For this
+bounded pattern, use a non-empty literal outer collection and one consumer of `For.output_collection`. Other
+arrangements, such as sibling internal `Iterate` nodes or an independent external `Iterate` feeding a `For` body, are
+unsupported.
+
+## Nested For Loops
+
+A `For` can contain another `For`. The inner loop must finish before the outer loop returns its current item:
+
+```text
+OuterFor.item -> InnerFor.collection
+InnerFor.item -> inner work -> InnerForReturn.output
+InnerFor.output_collection -> OuterForReturn.output
+```
+
+Each `For` must have its own matching `ForReturn`. The editor and saved workflow keep those pairings separate, so state
+from an inner loop does not automatically become state for the outer loop. Connect values explicitly when they need to
+cross a loop boundary.
+
+Multiple inner loops can be used as siblings when their final collections feed an ordinary collection-combining node.
+That node defines whether those collections are concatenated, zipped, or combined as a Cartesian product. The workflow
+does not choose one of those meanings automatically.
+
+## Empty Collections And Early Stop
+
+An empty collection is a successful loop with zero body iterations:
+
+- `output_collection` is empty.
+- `final_state` is the provided initial state, or an empty state.
+- No body node runs.
+
+Set `ForReturn.continue_condition` to `False` when the loop should stop after the current item. The results and state
+from completed iterations remain available through the normal final outputs.
+
+## Common Wiring Mistakes
+
+- Connect the collection to `For.collection`, not to `For.item`.
+- Connect `For.loop_linkage` directly to the matching `ForReturn.loop_linkage`.
+- Connect body work to `ForReturn.output` when its results should be collected.
+- Connect after-loop work to `For.output_collection` or `For.final_state`, not to `For.item` or `For.state`.
+- Give each nested `For` its own `ForReturn`.
+- Use `Zip Collections` only when the input lengths must match.
+- Use `Cartesian Product of Collections` carefully: large inputs can produce many pairs.
+
+For the execution and validation rules behind these connections, see the contributor reference:
+[`Loop Nodes Architecture`](/contributing/loop-nodes/).

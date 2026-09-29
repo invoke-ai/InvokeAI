@@ -18,6 +18,7 @@
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/roboto-mono": "^5.2.9",
     "astro": "^6.3.7",
+    "github-slugger": "^2.0.0",
     "mermaid": "^11.15.0",
     "rehype-external-links": "^3.0.0",
     "sharp": "^0.34.5",
