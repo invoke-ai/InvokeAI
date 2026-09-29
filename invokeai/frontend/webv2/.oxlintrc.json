@@ -32,6 +32,19 @@
     "prefer-template": "error",
     "radix": "error",
     "no-restricted-exports": "error",
+    // One resize affordance: the shared handle, not Chakra's splitter.
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@chakra-ui/react",
+            "importNames": ["Splitter", "useSplitter", "useSplitterContext"],
+            "message": "Use ResizeHandle from @platform/ui/ResizeHandle."
+          }
+        ]
+      }
+    ],
 
     "react/jsx-curly-brace-presence": [
       "error",

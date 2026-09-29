@@ -123,3 +123,56 @@ export const searchSettings = (
     return entries.length ? [{ ...section, entries }] : [];
   });
 };
+
+export interface SettingsAvailability {
+  canManageAppConfig: boolean;
+  /** Widget types in the open project, or `null` where no project is open (the Launchpad). */
+  widgetTypeIds: ReadonlySet<string> | null;
+}
+
+/** Only settings that can be edited here: project settings need a project, widget settings need that widget. */
+export const getAvailableSettings = (
+  sections: readonly SettingsSection[],
+  { canManageAppConfig, widgetTypeIds }: SettingsAvailability
+): SettingsSection[] =>
+  sections.flatMap((section) => {
+    if (section.id === 'server' && !canManageAppConfig) {
+      return [];
+    }
+    const entries = section.entries.filter(({ field }) => {
+      if (field.scope === 'project') {
+        return widgetTypeIds !== null;
+      }
+      if (field.scope === 'instance') {
+        return Boolean(section.widgetId && widgetTypeIds?.has(section.widgetId));
+      }
+      return true;
+    });
+    if (!entries.length) {
+      return [];
+    }
+    return [entries.length === section.entries.length ? section : { ...section, entries }];
+  });
+
+export interface SettingsBrowseState {
+  activeId: string;
+  query: string;
+  /** While searching, narrows the results to one section; `null` shows every match. */
+  searchSection: string | null;
+}
+
+export const isSettingsQuery = (query: string): boolean => query.trim().length > 0;
+
+/** What a settings surface shows for its section and search state; `sections` is never empty (Appearance is always available). */
+export const browseSettings = (
+  sections: readonly SettingsSection[],
+  { activeId, query, searchSection }: SettingsBrowseState,
+  t: TFunction
+) => {
+  const searching = isSettingsQuery(query);
+  const active = sections.find((section) => section.id === activeId) ?? sections[0];
+  const matches = searching ? searchSettings(sections, query, t) : [...sections];
+  const displayed = searching ? matches.filter((section) => !searchSection || section.id === searchSection) : [active];
+  const count = matches.reduce((total, section) => total + section.entries.length, 0);
+  return { active, count, displayed, matches, searching };
+};

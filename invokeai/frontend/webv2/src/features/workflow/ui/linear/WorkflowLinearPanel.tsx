@@ -1,10 +1,11 @@
-import { Flex, HStack, Icon, Splitter, VisuallyHidden } from '@chakra-ui/react';
+import { Box, Flex, HStack, Icon, VisuallyHidden } from '@chakra-ui/react';
 import { ensureInvocationTemplatesLoaded } from '@features/workflow/react';
 import { useWorkflowHostCommands, useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Scrollable, Tabs } from '@platform/ui';
+import { ResizeHandle } from '@platform/ui/ResizeHandle';
 import { EyeIcon, PencilIcon } from 'lucide-react';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { FormBuilderTab } from './FormBuilderTab';
@@ -21,12 +22,10 @@ type PanelModeItem = {
   mode: PanelMode;
 };
 
-/** Inspector share of the splitter, as a percentage of the panel height. */
+/** Inspector share of the edit panel's height, as a percentage; the content keeps at least a quarter. */
 const DEFAULT_INSPECTOR_SIZE_PCT = 35;
-const SPLITTER_PANELS = [
-  { id: 'content', minSize: 25 },
-  { id: 'inspector', minSize: 12 },
-];
+const MIN_INSPECTOR_SIZE_PCT = 12;
+const MAX_INSPECTOR_SIZE_PCT = 75;
 const PANEL_MODES: PanelModeItem[] = [
   { labelKey: 'common.view', icon: EyeIcon, mode: 'view' },
   { labelKey: 'common.edit', icon: PencilIcon, mode: 'edit' },
@@ -45,7 +44,7 @@ const getEditTab = (values: Record<string, unknown>): EditTab =>
 
 const getInspectorSizePct = (values: Record<string, unknown>): number =>
   typeof values.inspectorSizePct === 'number' && Number.isFinite(values.inspectorSizePct)
-    ? Math.min(75, Math.max(12, values.inspectorSizePct))
+    ? Math.min(MAX_INSPECTOR_SIZE_PCT, Math.max(MIN_INSPECTOR_SIZE_PCT, values.inspectorSizePct))
     : DEFAULT_INSPECTOR_SIZE_PCT;
 
 export const getWorkflowPanelState = (values: Record<string, unknown>): WorkflowPanelState => ({
@@ -168,29 +167,15 @@ const WorkflowLinearEditContent = ({
 }) => {
   const { t } = useTranslation();
   const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
-  const defaultSize = useMemo(() => [100 - inspectorSizePct, inspectorSizePct], [inspectorSizePct]);
-  const onResizeEnd = useCallback(
-    (details: { size: number[] }) => {
-      const inspectorSizePct = details.size[1];
-
-      if (typeof inspectorSizePct === 'number') {
-        patchValues({ inspectorSizePct });
-      }
-    },
+  const inspectorRef = useRef<HTMLDivElement>(null);
+  const onCommitInspectorSize = useCallback(
+    (inspectorSizePct: number) => patchValues({ inspectorSizePct }),
     [patchValues]
   );
 
   return (
-    <Splitter.Root
-      defaultSize={defaultSize}
-      flex="1"
-      gap="0"
-      minH="0"
-      orientation="vertical"
-      panels={SPLITTER_PANELS}
-      onResizeEnd={onResizeEnd}
-    >
-      <Splitter.Panel id="content" minH="0" minW="0" overflow="hidden">
+    <Flex direction="column" flex="1" minH="0">
+      <Box flex="1" minH="0" minW="0" overflow="hidden">
         {editTab === 'json' ? (
           <WorkflowJsonTab projectGraph={projectGraph} />
         ) : (
@@ -202,11 +187,22 @@ const WorkflowLinearEditContent = ({
             )}
           </Scrollable>
         )}
-      </Splitter.Panel>
-      <Splitter.ResizeTrigger aria-label={t('widgets.workflow.resizeNodeInspector')} id="content:inspector" />
-      <Splitter.Panel id="inspector" minH="0" overflow="hidden">
+      </Box>
+      <ResizeHandle
+        label={t('widgets.workflow.resizeNodeInspector')}
+        max={MAX_INSPECTOR_SIZE_PCT}
+        min={MIN_INSPECTOR_SIZE_PCT}
+        orientation="horizontal"
+        pane="after"
+        paneRef={inspectorRef}
+        sizeProperty="flexBasis"
+        unit="%"
+        value={inspectorSizePct}
+        onCommit={onCommitInspectorSize}
+      />
+      <Box ref={inspectorRef} flex={`0 0 ${inspectorSizePct}%`} minH="0" overflow="hidden">
         <NodeInspector projectGraph={projectGraph} />
-      </Splitter.Panel>
-    </Splitter.Root>
+      </Box>
+    </Flex>
   );
 };

@@ -7,7 +7,7 @@ import { HStack, Stack, Tag } from '@chakra-ui/react';
 import { getPromptPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { sanitizeBatchCount } from '@features/generation/core/batch';
 import { flattenPromptTemplateExpansion } from '@features/generation/core/promptTemplates';
-import { useGenerationUi } from '@features/generation/ui/GenerationUiContext';
+import { useGenerateValues, useGenerationUi } from '@features/generation/ui/GenerationUiContext';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -48,6 +48,8 @@ const getPromptValues = (values: Record<string, unknown>): GeneratePromptValues 
   positivePromptHeightPx: typeof values.positivePromptHeightPx === 'number' ? values.positivePromptHeightPx : 96,
 });
 
+const selectBatchCount = (values: Record<string, unknown>): number => sanitizeBatchCount(values.batchCount);
+
 export const GeneratePromptFields = ({
   onCommit,
   onCommitImmediate,
@@ -56,8 +58,9 @@ export const GeneratePromptFields = ({
   settings,
 }: GeneratePromptFieldsProps) => {
   const { t } = useTranslation();
-  const { generateValues, showPromptSyntaxHighlighting } = useGenerationUi().project;
-  const promptValues = getPromptValues(generateValues);
+  const { showPromptSyntaxHighlighting } = useGenerationUi().project;
+  const promptValues = useGenerateValues(getPromptValues);
+  const batchCount = useGenerateValues(selectBatchCount, Object.is);
   const promptPolicy = getPromptPolicy(selectedModel, settings);
 
   const usePromptHistoryItem = useCallback(
@@ -159,16 +162,26 @@ export const GeneratePromptFields = ({
 
   const clearPromptTemplate = useCallback(() => applyPromptTemplate(null), [applyPromptTemplate]);
 
+  const savedPromptModels = useMemo(
+    () => ({
+      expandPromptModelKey: settings.expandPromptModelKey,
+      imageToPromptModelKey: settings.imageToPromptModelKey,
+      onChange: onCommitImmediate,
+    }),
+    [onCommitImmediate, settings.expandPromptModelKey, settings.imageToPromptModelKey]
+  );
+
   return (
     <Stack gap="1" py="2">
       <PositivePromptField
-        batchCount={sanitizeBatchCount(generateValues.batchCount)}
+        batchCount={batchCount}
         dynamicPrompts={dynamicPrompts}
         heightPx={promptValues.positivePromptHeightPx}
         value={promptValues.positivePrompt}
         loras={settings.loras}
         projectId={projectId}
         promptTemplate={settings.promptTemplate}
+        savedPromptModels={savedPromptModels}
         selectedModel={selectedModel}
         showSyntaxHighlighting={showPromptSyntaxHighlighting}
         isTemplateViewMode={settings.promptTemplateViewMode}

@@ -17,6 +17,8 @@ const makeValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWidg
     aspectRatioIsLocked: true,
     aspectRatioValue: 1,
     clipSkip: 0,
+    expandPromptModelKey: null,
+    imageToPromptModelKey: null,
     height: 1024,
     negativePrompt: '',
     negativePromptEnabled: false,
@@ -63,11 +65,28 @@ describe('buildQueueRecallValues', () => {
   it('recalls all as the exact snapshot and remix with a randomized seed', () => {
     const snapshot = makeValues({ positivePrompt: 'snap', seedMode: 'fixed' });
 
-    expect(buildQueueRecallValues('all', { current, meta: {}, snapshot })).toBe(snapshot);
+    expect(buildQueueRecallValues('all', { current, meta: {}, snapshot })).toEqual(snapshot);
     expect(buildQueueRecallValues('remix', { current, meta: {}, snapshot })).toEqual({
       ...snapshot,
       seedMode: 'random',
     });
+  });
+
+  it('keeps the current prompt tool model picks when restoring a snapshot', () => {
+    const picked = makeValues({ expandPromptModelKey: 'llm-b', imageToPromptModelKey: 'vision-b' });
+    const snapshot = makeValues({
+      expandPromptModelKey: null,
+      imageToPromptModelKey: 'vision-a',
+      positivePrompt: 'snap',
+    });
+
+    for (const kind of ['all', 'remix'] as const) {
+      expect(buildQueueRecallValues(kind, { current: picked, meta: {}, snapshot })).toMatchObject({
+        expandPromptModelKey: 'llm-b',
+        imageToPromptModelKey: 'vision-b',
+        positivePrompt: 'snap',
+      });
+    }
   });
 
   it('merges prompts into the current values, preferring the snapshot', () => {

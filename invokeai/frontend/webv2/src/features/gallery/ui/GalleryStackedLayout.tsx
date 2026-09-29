@@ -4,6 +4,7 @@ import {
   GALLERY_BOARD_PANEL_MIN_HEIGHT_PX,
   GALLERY_MIN_GRID_HEIGHT_PX,
 } from '@features/gallery/core/settings';
+import { ResizeHandle } from '@platform/ui/ResizeHandle';
 import { segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -13,18 +14,19 @@ import { GalleryImageGrid } from './GalleryImageGrid';
 import { GalleryItemSearch } from './GalleryItemSearch';
 import { GalleryItemSortMenu } from './GalleryItemSortMenu';
 import { GallerySelectionBar } from './GallerySelectionBar';
-import { GALLERY_SPLIT_HANDLE_SIZE_PX, GallerySplitHandle } from './GallerySplitHandle';
 import { GalleryStarredFilterToggle } from './GalleryStarredFilterToggle';
 import { GalleryUploadButton } from './GalleryUploadButton';
 import { GalleryViewTabs } from './GalleryViewTabs';
 import { useGalleryWidget } from './GalleryWidgetContext';
+
+const SPLIT_DIVIDER_PX = 1;
 
 export const GalleryStackedLayout = () => {
   const { t } = useTranslation();
   const { actions, gallery } = useGalleryWidget();
   const { boardPanelCollapsed, boardPanelHeightPx } = gallery.settings;
   const viewTabsIdBase = useId();
-  const [dragHeightPx, setDragHeightPx] = useState<number | null>(null);
+  const boardPanelRef = useRef<HTMLDivElement>(null);
   const [containerContentHeightPx, setContainerContentHeightPx] = useState<number | null>(null);
   const [controlsHeightPx, setControlsHeightPx] = useState<number | null>(null);
   const containerObserverRef = useRef<ResizeObserver | null>(null);
@@ -72,14 +74,14 @@ export const GalleryStackedLayout = () => {
     }
 
     const availableHeightPx =
-      containerContentHeightPx - controlsHeightPx - GALLERY_SPLIT_HANDLE_SIZE_PX - 3 * 8 - GALLERY_MIN_GRID_HEIGHT_PX;
+      containerContentHeightPx - controlsHeightPx - SPLIT_DIVIDER_PX - 3 * 8 - GALLERY_MIN_GRID_HEIGHT_PX;
 
     return Math.min(
       GALLERY_BOARD_PANEL_MAX_HEIGHT_PX,
       Math.max(GALLERY_BOARD_PANEL_MIN_HEIGHT_PX, Math.floor(availableHeightPx))
     );
   }, [containerContentHeightPx, controlsHeightPx]);
-  const displayHeightPx = Math.min(dragHeightPx ?? boardPanelHeightPx, measuredMaximumPx);
+  const displayHeightPx = Math.min(boardPanelHeightPx, measuredMaximumPx);
 
   const handleCommitHeight = useCallback(
     (boardPanelHeightPx: number) => actions.updateSettings({ boardPanelHeightPx }),
@@ -103,17 +105,18 @@ export const GalleryStackedLayout = () => {
             {/* A flex box with a definite height and hidden overflow: the panel
                 sizes its own scroll area from this, and without the containment
                 its board list spills over the grid below. */}
-            <Flex flexShrink={0} h={`${displayHeightPx}px`} minH="0" overflow="hidden" w="full">
+            <Flex ref={boardPanelRef} flexShrink={0} h={`${displayHeightPx}px`} minH="0" overflow="hidden" w="full">
               <GalleryBoardsPanel />
             </Flex>
-            <GallerySplitHandle
+            <ResizeHandle
               label={t('widgets.gallery.resizeBoardPanel')}
               max={measuredMaximumPx}
               min={GALLERY_BOARD_PANEL_MIN_HEIGHT_PX}
               orientation="horizontal"
-              sizePx={displayHeightPx}
+              pane="before"
+              paneRef={boardPanelRef}
+              value={displayHeightPx}
               onCommit={handleCommitHeight}
-              onPreview={setDragHeightPx}
             />
           </>
         )}

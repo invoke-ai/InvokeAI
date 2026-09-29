@@ -694,7 +694,7 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
         <BuilderDropTargetContext value={dropTarget}>
           <Stack gap="2" p="3" w="full">
             {rootChildren.length === 0 ? (
-              <Text color="fg.subtle" fontSize="2xs">
+              <Text color="fg.muted" fontSize="2xs">
                 The form is empty. Pin fields from the Workflow editor's nodes, then arrange them here — drag card title
                 bars to reorder, drop them into containers, and add headings or dividers below.
               </Text>

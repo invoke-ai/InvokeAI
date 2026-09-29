@@ -1,4 +1,3 @@
-# Copyright (c) 2024 Lincoln D. Stein and the InvokeAI Development team
 """
 This module implements a system in which model loaders register the
 type, base and format of models that they know how to load.

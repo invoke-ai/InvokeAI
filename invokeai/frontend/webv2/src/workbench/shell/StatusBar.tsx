@@ -6,6 +6,7 @@ import { Box, Flex, Icon, Popover, Portal } from '@chakra-ui/react';
 import { useDndContext, useDroppable } from '@dnd-kit/core';
 import { horizontalListSortingStrategy } from '@dnd-kit/sortable';
 import { PopoverContent, Row, Tooltip } from '@platform/ui';
+import { useHighlightedRegion } from '@workbench/focusRegions';
 import {
   WidgetEnableMenu,
   WidgetInstanceContextMenu,
@@ -170,6 +171,8 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
   const isOverStart = showDropChrome && String(dnd.over?.id ?? '') === getWidgetRegionDropId('bottom');
   const handleContextClose = useCallback(() => setEnableMenuTarget(null), []);
   const handleInstanceClose = useCallback(() => setInstanceMenuTarget(null), []);
+  // The bottom panel's outline is drawn over this border.
+  const isBottomOutlined = useHighlightedRegion() === 'bottom';
 
   return (
     <WidgetStrip
@@ -177,7 +180,7 @@ export const StatusBar = ({ dropState }: { dropState: WidgetRegionDropState }) =
       as="footer"
       bg="bg.subtle"
       borderTopWidth="1px"
-      borderColor="border.subtle"
+      borderColor={isBottomOutlined ? 'transparent' : 'border.subtle'}
       color="fg.muted"
       dropState={dropState}
       flexShrink={0}

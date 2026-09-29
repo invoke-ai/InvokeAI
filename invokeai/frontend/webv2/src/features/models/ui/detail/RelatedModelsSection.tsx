@@ -13,11 +13,12 @@ import {
   useRelatedModelKeys,
 } from '@features/models/data/relationshipsStore';
 import { ModelSelect } from '@features/models/ui/components';
-import { SourceListItem } from '@features/models/ui/shared/SourceListItem';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { isAccountScopeCurrent, captureAccountScope } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { IconButton, FieldLabel, Tooltip } from '@platform/ui';
+import { ListItem } from '@platform/ui/list/ListItem';
+import { ListStack } from '@platform/ui/list/ListStack';
 import { Link2OffIcon } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -139,30 +140,11 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
           {t('models.noRelatedModels')}
         </Text>
       ) : (
-        <Stack gap="1.5">
+        <ListStack label={t('models.relatedModels')}>
           {relatedModels.map(({ key, model: relatedModel }) => (
-            <SourceListItem
+            <ListItem
               key={key}
-              badges={
-                relatedModel ? (
-                  <>
-                    <Badge
-                      colorPalette={getModelBaseColorPalette(relatedModel.base)}
-                      flexShrink={0}
-                      fontSize="2xs"
-                      size="sm"
-                      variant="surface"
-                    >
-                      {getModelBaseLabel(relatedModel.base)}
-                    </Badge>
-                    <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="sm" variant="surface">
-                      {getModelTypeLabel(relatedModel.type)}
-                    </Badge>
-                  </>
-                ) : undefined
-              }
-              title={relatedModel?.name ?? key}
-              trailing={
+              actions={
                 <Tooltip content={t('models.unlink')}>
                   <IconButton
                     aria-label={t('models.unlinkNamed', { name: relatedModel?.name ?? key })}
@@ -177,9 +159,27 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
                   </IconButton>
                 </Tooltip>
               }
+              badges={
+                relatedModel ? (
+                  <>
+                    <Badge
+                      colorPalette={getModelBaseColorPalette(relatedModel.base)}
+                      fontSize="2xs"
+                      size="sm"
+                      variant="surface"
+                    >
+                      {getModelBaseLabel(relatedModel.base)}
+                    </Badge>
+                    <Badge colorPalette="gray" fontSize="2xs" size="sm" variant="surface">
+                      {getModelTypeLabel(relatedModel.type)}
+                    </Badge>
+                  </>
+                ) : undefined
+              }
+              title={relatedModel?.name ?? key}
             />
           ))}
-        </Stack>
+        </ListStack>
       )}
     </Stack>
   );

@@ -18,6 +18,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
+import { focusOpenedWidget } from '@workbench/focusRegions';
 import { resolveAndSubmitGraphPreviewInvocation } from '@workbench/graphPreviewInvocation';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys';
 import {
@@ -287,7 +288,11 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
       project,
       registerModalHotkeyLayer: registerHotkeyModalLayer,
       widgets: {
-        open: (options) => commands.widgets.open(options),
+        // Workflow opens widgets from its buttons: the opened widget takes focus and the region highlight.
+        open: (options) => {
+          commands.widgets.open(options);
+          focusOpenedWidget(options.region, options.widgetId);
+        },
         patchValues: (widgetId, values) => commands.widgets.patchValues(widgetId, values),
       },
     }),

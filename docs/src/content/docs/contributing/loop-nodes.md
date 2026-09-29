@@ -84,6 +84,9 @@ Iteration-scoped outputs (`item`, `index`, `total`, and `state`) define the loop
 terminate at the linked `ForReturn`; they cannot escape directly to after-loop nodes. Final outputs cannot feed back
 into the loop body.
 
+Downstream consumers, including a selected `If` branch, may consume `output_collection` directly. Its parent-frame scope
+is preserved through branch selection, so a `final_state` edge is not needed just to make those consumers run.
+
 `ForReturn.output` and `ForReturn.state` are scheduler-facing result fields and are hidden as downstream editor
 outputs. They are still retained in execution results for aggregation, persistence, and resume. Ordinary state helper
 nodes (`state_empty`, `state_get`, `state_set`, and `state_merge`) carry explicit `LoopState` values through the body.

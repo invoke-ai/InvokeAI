@@ -1,6 +1,6 @@
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { OPEN_COMMAND_PALETTE_HOTKEY } from '@workbench/hotkeys/catalog';
-import { formatHotkeyForPlatform, toTinykeysBinding } from '@workbench/hotkeys/keys';
+import { MOD_KEY_LABEL, toTinykeysBinding } from '@workbench/hotkeys/keys';
 import { applyCustomHotkeys } from '@workbench/hotkeys/resolve';
 import { useWorkbenchPreferences, useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { lazy, Suspense } from 'react';
@@ -49,7 +49,7 @@ const OpenLaunchpadCommandPalette = () => {
   return (
     <Suspense fallback={null}>
       <LazyLaunchpadCommandPaletteDialog
-        modifierKeyLabel={formatHotkeyForPlatform('mod')[0]!}
+        modifierKeyLabel={MOD_KEY_LABEL}
         preferences={preferences}
         settingsEntryDeps={SETTINGS_ENTRY_DEPS}
         onClose={closeCommandPalette}

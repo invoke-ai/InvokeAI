@@ -170,8 +170,11 @@ def test_the_transformer_keeps_nvfp4_packed_and_scaled_fp8_only_where_something_
         assert isinstance(module, NVFP4Linear), path
         assert module.weight.dtype is torch.uint8, path
         assert module.weight_scale_2.dtype is torch.float32, path
-        x = torch.randn(3, module.in_features, dtype=COMPUTE_DTYPE)
-        expected_out = torch.nn.functional.linear(x, weight.to(COMPUTE_DTYPE), biases[path].to(COMPUTE_DTYPE))
+        # A float32 activation, not the compute dtype: torch 2.7's CPU bf16 GEMM faults with an illegal
+        # instruction on part of GitHub's windows runner fleet. These values are exact in either width.
+        x = torch.randn(3, module.in_features, dtype=torch.float32)
+        # The bias keeps the width the load rounded it to; the forward upcasts it to the activation.
+        expected_out = torch.nn.functional.linear(x, weight, biases[path].to(COMPUTE_DTYPE).float())
         torch.testing.assert_close(module(x), expected_out)
     fp8_layer = model.transformer_blocks[0].txt_mlp.net[2]
     if mode == "fold":
@@ -187,8 +190,8 @@ def test_the_transformer_keeps_nvfp4_packed_and_scaled_fp8_only_where_something_
     # without the scale before CustomLinear could apply it.
     fp8_bias = fp8_layer.bias.detach().to(COMPUTE_DTYPE)
     apply_custom_layers_to_model(model)
-    x = torch.randn(3, 64, dtype=COMPUTE_DTYPE)
-    expected_fp8_out = torch.nn.functional.linear(x, (fp8_values * 0.5).to(COMPUTE_DTYPE), fp8_bias)
+    x = torch.randn(3, 64, dtype=torch.float32)
+    expected_fp8_out = torch.nn.functional.linear(x, (fp8_values * 0.5).to(COMPUTE_DTYPE).float(), fp8_bias.float())
     torch.testing.assert_close(model.transformer_blocks[0].txt_mlp.net[2](x), expected_fp8_out)
     # The reservation lands before the fold and before the split, whichever runs.
     assert log == ([True, True] if mode == "fold" else [True])
@@ -276,9 +279,11 @@ def test_the_encoder_keeps_marker_named_nvfp4_layers_packed_under_their_transfor
         module = model.get_submodule(path)
         assert isinstance(module, NVFP4Linear), path
         assert module.weight_scale_2.dtype is torch.float32, path
-        x = torch.randn(3, module.in_features, dtype=COMPUTE_DTYPE)
-        bias = q_bias.to(COMPUTE_DTYPE) if module.bias is not None else None
-        torch.testing.assert_close(module(x), torch.nn.functional.linear(x, weight.to(COMPUTE_DTYPE), bias))
+        # A float32 activation, not the compute dtype: torch 2.7's CPU bf16 GEMM faults with an illegal
+        # instruction on part of GitHub's windows runner fleet. These values are exact in either width.
+        x = torch.randn(3, module.in_features, dtype=torch.float32)
+        bias = q_bias.to(COMPUTE_DTYPE).float() if module.bias is not None else None
+        torch.testing.assert_close(module(x), torch.nn.functional.linear(x, weight, bias))
     assert torch.equal(model.lm_head.weight, (fp8_values * 0.5).to(COMPUTE_DTYPE))
     assert torch.equal(model.model.visual.proj.weight, visual_weight.to(COMPUTE_DTYPE))
     assert log == [True]

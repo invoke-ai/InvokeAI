@@ -624,10 +624,18 @@ export const isWanLoraTargetingMain = (
 };
 
 /** Require core fields but default newer fields to preserve older project content. */
+/** Tool model picks: widget preferences that presets and whole-form replacements leave alone. */
+export const GENERATE_TOOL_MODEL_PICK_KEYS = [
+  'expandPromptModelKey',
+  'imageToPromptModelKey',
+] as const satisfies readonly (keyof GenerateSettings)[];
+
 /** Exclude arrangement keys from generation-intent routing, including template view but not template application. */
 export const GENERATE_UI_STATE_KEYS = {
   aspectRatioIsLocked: true,
   batchCount: true,
+  expandPromptModelKey: true,
+  imageToPromptModelKey: true,
   negativePromptHeightPx: true,
   positivePromptHeightPx: true,
   promptTemplateViewMode: true,
@@ -719,6 +727,8 @@ export const normalizeGenerateSettings = (values: unknown): GenerateSettings | n
       MAX_POSITIVE_PROMPT_HEIGHT_PX,
       DEFAULT_POSITIVE_PROMPT_HEIGHT_PX
     ),
+    expandPromptModelKey: typeof values.expandPromptModelKey === 'string' ? values.expandPromptModelKey : null,
+    imageToPromptModelKey: typeof values.imageToPromptModelKey === 'string' ? values.imageToPromptModelKey : null,
     // Preserve canonical object identity to avoid false Object.is changes and reconciliation loops.
     promptTemplate,
     promptTemplateViewMode: promptTemplate !== null && values.promptTemplateViewMode === true,

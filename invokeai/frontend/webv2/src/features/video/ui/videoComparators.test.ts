@@ -28,4 +28,11 @@ describe('areVideoValuesEqual', () => {
       )
     ).toBe(true);
   });
+
+  it('treats the duration head and the auto duration switch as part of the values', () => {
+    const head = { base: 'ltx-2', key: 'head', name: 'Duration head', type: 'ltx2_duration_head' } as never;
+
+    expect(areVideoValuesEqual(values, { ...values, ltx2DurationHeadModel: head })).toBe(false);
+    expect(areVideoValuesEqual(values, { ...values, autoDuration: !values.autoDuration })).toBe(false);
+  });
 });

@@ -2,8 +2,10 @@
 
 import logging
 import time
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
+from typing import AbstractSet
 
 import numpy as np
 import pytest
@@ -14,6 +16,7 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
 from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.image_index.image_index_base import ImageIndexServiceBase
 from invokeai.app.services.image_index.image_index_common import (
     ImageIndexStatus,
@@ -57,6 +60,7 @@ class FakeImageIndexService(ImageIndexServiceBase):
         self.spent_failed_scopes: dict[str, str] = {}
         self.search_calls: list[tuple[str | None, int]] = []
         self.search_kinds: list[tuple[str, ...] | None] = []
+        self.search_within: list[AbstractSet[str] | None] = []
         self.search_results: list[tuple[str, float]] = []
         self.text_unavailable = False
         self.embedded_texts: list[str] = []
@@ -103,10 +107,16 @@ class FakeImageIndexService(ImageIndexServiceBase):
         query_embedding: np.ndarray,
         limit: int,
         kinds: tuple[str, ...] | None = None,
+        within: AbstractSet[str] | None = None,
     ) -> list[tuple[IndexedItem, float]]:
         self.search_calls.append((user_id, limit))
         self.search_kinds.append(kinds)
-        results = [(item, score) for item, score in self.search_results if kinds is None or item.kind in kinds]
+        self.search_within.append(within)
+        results = [
+            (item, score)
+            for item, score in self.search_results
+            if (kinds is None or item.kind in kinds) and (within is None or item.name in within)
+        ]
         return results[:limit]
 
     def get_vocab_embeddings(self) -> tuple[list[str], np.ndarray]:
@@ -237,7 +247,7 @@ def mock_services(image_index_service: FakeImageIndexService, tmp_path: Path) ->
         video_files=None,  # type: ignore
         video_records=video_records,
         board_video_records=SqliteBoardVideoRecordStorage(db=db),
-        gallery=None,  # type: ignore
+        gallery=SqliteGalleryService(db=db),
         image_index_records=(index_records := ImageIndexRecordsSqlite(db=db)),
         image_index=image_index_service,
         intermediates=None,  # type: ignore
@@ -1285,6 +1295,68 @@ def test_multiuser_image_search_enforces_read_access_and_user_scope(
         headers=user2_headers,
     )
     assert image_index_service.search_calls[-1] == (user2_id, 100)
+
+
+def test_search_can_be_scoped_to_a_board_the_uncategorized_items_or_a_date(
+    image_index_service: FakeImageIndexService, mock_invoker: Invoker, client: TestClient
+) -> None:
+    _seed_embedded_image(mock_invoker, "on-board.png")
+    _seed_embedded_video(mock_invoker, "on-board.mp4")
+    _seed_embedded_image(mock_invoker, "loose.png")
+    board = mock_invoker.services.board_records.save("Cats", SYSTEM_USER_ID).board_id
+    mock_invoker.services.board_image_records.add_image_to_board(board, "on-board.png")
+    mock_invoker.services.board_video_records.add_video_to_board(board, "on-board.mp4")
+    image_index_service.search_results = [
+        (IndexedItem("image", "loose.png"), 0.9),
+        (IndexedItem("video", "on-board.mp4"), 0.8),
+        (IndexedItem("image", "on-board.png"), 0.7),
+    ]
+    today = str(mock_invoker.services.image_records.get("loose.png").created_at)[:10]
+
+    def names(**params: object) -> list[str]:
+        response = client.get("/api/v1/image_map/search", params={"q": "cat", "include_videos": True, **params})
+        assert response.status_code == 200, response.text
+        return [result["image_name"] for result in response.json()["results"]]
+
+    assert names() == ["loose.png", "on-board.mp4", "on-board.png"]
+    assert names(board_id=board) == ["on-board.mp4", "on-board.png"]
+    assert names(board_id="none") == ["loose.png"]
+    assert names(created_date=today) == ["loose.png", "on-board.mp4", "on-board.png"]
+    assert names(created_date="2001-01-01") == []
+    # An empty scope answers without embedding the query.
+    assert image_index_service.embedded_texts == ["cat"] * 4
+    # The scope reaches the service, which ranks within it before applying the limit.
+    assert image_index_service.search_within[0] is None
+    assert image_index_service.search_within[1] == {"on-board.png", "on-board.mp4"}
+    assert client.get("/api/v1/image_map/search", params={"q": "cat", "created_date": "not-a-date"}).status_code == 422
+
+    buffer = BytesIO()
+    Image.new("RGB", (4, 4)).save(buffer, format="PNG")
+    by_image = client.post(
+        "/api/v1/image_map/search_by_image",
+        params={"board_id": board},
+        files={"image": ("ref.png", buffer.getvalue(), "image/png")},
+    )
+    assert [result["image_name"] for result in by_image.json()["results"]] == ["on-board.png"]
+
+
+def test_multiuser_board_scoped_search_requires_read_access(
+    multiuser, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    _create_user(mock_invoker, "admin@test.com", is_admin=True)
+    user1_id = _create_user(mock_invoker, "user1@test.com")
+    _create_user(mock_invoker, "user2@test.com")
+    user2_headers = _login(client, "user2@test.com")
+    _seed_embedded_image(mock_invoker, "private1.png", user_id=user1_id)
+    board = mock_invoker.services.board_records.save("Private", user1_id).board_id
+    mock_invoker.services.board_image_records.add_image_to_board(board, "private1.png")
+
+    response = client.get("/api/v1/image_map/search", params={"q": "boats", "board_id": board}, headers=user2_headers)
+
+    assert response.status_code == 403
+    # Refused before the query is embedded or ranked.
+    assert image_index_service.embedded_texts == []
+    assert image_index_service.search_calls == []
 
 
 # --- Cluster labels ---

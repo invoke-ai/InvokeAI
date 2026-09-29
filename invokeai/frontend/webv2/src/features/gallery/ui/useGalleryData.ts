@@ -12,6 +12,7 @@ import {
   GALLERY_PAGE_SIZE,
   galleryBoardsOptions,
   galleryItemsInfiniteOptions,
+  getGalleryListingBoardsQuery,
   type GalleryItemsFilter,
 } from '@features/gallery/data/queries';
 import { parseDateTokens } from '@platform/search/dateTokens';
@@ -39,14 +40,7 @@ export interface GalleryData {
 const EMPTY_BOARDS: GalleryBoard[] = [];
 
 const useGalleryBoards = ({ settings }: { settings: GallerySettings }) => {
-  const query = useQuery(
-    galleryBoardsOptions({
-      includeArchived: settings.showArchivedBoards,
-      includeDateBoards: settings.showDateBoards,
-      orderBy: settings.boardOrderBy,
-      orderDir: settings.boardOrderDir,
-    })
-  );
+  const query = useQuery(galleryBoardsOptions(getGalleryListingBoardsQuery(settings)));
 
   return { boards: query.data ?? EMPTY_BOARDS };
 };

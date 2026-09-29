@@ -265,7 +265,7 @@ Both builds support every LTX-2 mode — text, first frame, last frame, first-to
 
 What to know in practice:
 
-* **Frames are 8·n + 1** (the video VAE encodes the first frame alone, then groups of eight): 9 to 481, default 121 — five seconds at the default 24 fps. The slider stops at 241; the field accepts more for a deliberate long render, but cost grows linearly with the frame count.
+* **Frames are 8·n + 1** (the video VAE encodes the first frame alone, then groups of eight): 9 to 481, default 121 — five seconds at the default 24 fps, up to twenty. Time and memory grow roughly linearly with the frame count, so a 481-frame clip costs about four times a default one.
 * **Frame rate is yours to set** (1–60 fps). It changes the clip's duration, and with it how much audio is generated — the two streams share one clock.
 * **Canvas presets pin the short edge**, with the long edge following your aspect ratio: 512p, 704p (default) and 768p render in one pass and snap to a multiple of 32; 1024p and 1536p are [two-stage](#two-stage-presets) and snap to 64, because the first pass runs at half of them.
 * **Image-to-video re-compresses your frame** as a single H.264 frame before encoding it. That is deliberate: the model was trained on frames that had been through a video codec, and a pristine PNG is far enough out of that distribution that the clip visibly drifts away from it over the first second.
@@ -296,6 +296,17 @@ Why use it rather than the Distilled transformer? It keeps a single ~19 GB trans
 #### Last frames and keyframes
 
 A **Last Frame** works alone or with a first frame, as on MiniMax H3. Unlike a first frame, which directly replaces the clip's opening, a last frame is added to the model's input as an extra *keyframe* positioned at the clip's final frame, and the generated frames are steered toward it. A last frame can also be combined with an **Initial Video** to steer where an extension lands.
+
+#### Auto duration
+
+LTX-2.5 ships with a small **duration head** that reads your prompt, as the model will see it, and predicts how long the shot it describes should run. With a duration head in the **Duration head** slot of **Model components**, an **Auto duration** switch appears above Frames:
+
+* With it on, the head chooses the clip's length, and **Frames becomes Max frames** — the longest clip it may choose. That number still sizes the run's memory, so it stays editable, and its help text shows the range in seconds. Raise it to allow longer shots.
+* The head chooses between one second (or the shortest clip LTX-2 makes) and Max frames, at the panel's FPS, and lands on the 8·n + 1 frame grid. If Max frames is too short to leave it a choice, the clip simply runs at that length.
+* It is off for audio-to-video, video-to-audio and extensions, where the source clip decides the length.
+* The length that ran is what the video records, so recalling it reproduces that exact clip; recall turns Auto duration off for that reason.
+
+The duration head is a separate, optional 3.6 MB install (**LTX-2.5 Duration Head** in the starter models). It is fetched from Lightricks' own repository, which is license-gated: the install needs a Hugging Face token from an account that has accepted the LTX-2.5 license. Once installed it is selected automatically; the switch stays off until you turn it on.
 
 #### Extending with LTX-2
 
@@ -330,6 +341,7 @@ Available separately in the starter models list:
 
 * **LTX-2.5 Distilled LoRA** (~8.9 GB) — the [fast path](#the-distilled-lora-fast-path-on-dev) for the Dev transformer. Not needed if you use the Distilled transformer.
 * **LTX-2.5 Dev Transformer (bf16)** (~38 GB) and **LTX-2.5 Text Encoder (Gemma-4 12B, bf16)** (~24 GB) — unquantized builds, for a 48 GB+ card or partial loading.
+* **LTX-2.5 Duration Head** (3.6 MB) — enables [Auto duration](#auto-duration). License-gated: needs a Hugging Face token whose account has accepted the LTX-2.5 license.
 
 LTX-2 does not condition on the last hidden state of its text encoder the way most models do: it stacks the hidden states of *every* Gemma layer and runs them through a separate connector model. That is why the encoder is a large, separate download.
 

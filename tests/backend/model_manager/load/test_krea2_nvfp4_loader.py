@@ -144,8 +144,11 @@ def test_header_named_nvfp4_layers_are_packed_under_their_diffusers_paths(loaded
         assert module.weight.dtype is torch.uint8, path
         # Installed after the cast, which would otherwise round the global scale to the compute dtype.
         assert module.weight_scale_2.dtype is torch.float32, path
-        x = torch.randn(3, module.in_features, dtype=COMPUTE_DTYPE)
-        torch.testing.assert_close(module(x), x @ loaded.expected[path].to(COMPUTE_DTYPE).T)
+        # A float32 activation, not the compute dtype: torch 2.7's CPU bf16 GEMM faults with an illegal
+        # instruction on part of GitHub's windows runner fleet. These values are exact in either width, and the
+        # decode's own dtype threading is pinned by tests/backend/quantization/test_nvfp4.py.
+        x = torch.randn(3, module.in_features, dtype=torch.float32)
+        torch.testing.assert_close(module(x), x @ loaded.expected[path].T)
 
 
 def test_the_neighbouring_layers_load_as_their_own_branch_leaves_them(loaded) -> None:
@@ -153,6 +156,8 @@ def test_the_neighbouring_layers_load_as_their_own_branch_leaves_them(loaded) ->
 
     time_embed = model.time_embed.linear_1
     assert type(time_embed) is torch.nn.Linear
+    # Separately from the values: `torch.equal` promotes, so it alone would accept any width.
+    assert time_embed.weight.dtype is COMPUTE_DTYPE
     assert torch.equal(time_embed.weight, loaded.expected["time_embed.linear_1"].to(COMPUTE_DTYPE))
     assert torch.equal(time_embed.bias, loaded.dense["tmlp.0.bias"].to(COMPUTE_DTYPE))
     assert torch.equal(model.img_in.weight, loaded.dense["first.weight"].to(COMPUTE_DTYPE))

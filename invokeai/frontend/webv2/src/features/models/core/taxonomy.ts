@@ -29,6 +29,7 @@ export const MODEL_CATEGORIES: CategoryDefinition[] = [
   { label: 'Gemma 2 Encoder', pluralLabel: 'Gemma 2 Encoders', type: 'gemma2_encoder' },
   { label: 'Gemma 4 Encoder', pluralLabel: 'Gemma 4 Encoders', type: 'gemma4_encoder' },
   { label: 'PiD Decoder', pluralLabel: 'PiD Decoders', type: 'pid_decoder' },
+  { label: 'LTX-2 Duration Head', pluralLabel: 'LTX-2 Duration Heads', type: 'ltx2_duration_head' },
   { label: 'CLIP Embed', pluralLabel: 'CLIP Embeds', type: 'clip_embed' },
   { label: 'CLIP Vision', pluralLabel: 'CLIP Visions', type: 'clip_vision' },
   { label: 'SigLIP', pluralLabel: 'SigLIPs', type: 'siglip' },

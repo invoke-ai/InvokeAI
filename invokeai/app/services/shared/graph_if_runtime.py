@@ -1,15 +1,126 @@
-"""Activation admission helpers operating on state-owned runtime and durable records."""
+"""If activation and selected-branch context helpers operating on graph execution state."""
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Callable, Optional
 
 from invokeai.app.invocations.logic import IfInvocation
 from invokeai.app.services.shared.execution_engine.primitives import ActivationGate
 from invokeai.app.services.shared.execution_engine.scheduler import ActivationDependency
-from invokeai.app.services.shared.graph_models import ExecutionToken
+from invokeai.app.services.shared.graph_models import Edge, ExecutionToken
 from invokeai.app.services.shared.graph_validation import IterateInvocation
 
 if TYPE_CHECKING:
     from invokeai.app.services.shared.graph import GraphExecutionState
+
+
+def _get_effective_iteration_paths_for_edge(
+    state: "GraphExecutionState",
+    edge: Edge,
+    visited_source_ids: set[str],
+    get_prepared_nodes_for_source: Callable[[str], set[str]],
+    get_prepared_edge_iteration_path: Callable[[Edge, str], tuple[int, ...]],
+) -> set[tuple[int, ...]]:
+    source_node_id = edge.source.node_id
+    prepared_nodes: set[str] = set()
+    if source_node_id in state.source_prepared_mapping:
+        prepared_nodes = get_prepared_nodes_for_source(source_node_id)
+        if not prepared_nodes and source_node_id in state.executed:
+            return set()
+    if prepared_nodes:
+        return {get_prepared_edge_iteration_path(edge, prepared_id) for prepared_id in prepared_nodes}
+    if source_node_id in visited_source_ids:
+        return set()
+
+    source_node = state.graph.get_node(source_node_id)
+    if isinstance(source_node, IfInvocation):
+        return set(
+            _get_if_iteration_paths(
+                state,
+                source_node_id,
+                visited_source_ids,
+                get_prepared_nodes_for_source,
+                get_prepared_edge_iteration_path,
+            )
+        )
+
+    input_edges = state.graph._get_input_edges(source_node_id)
+    if not input_edges:
+        return {()}
+    next_visited_source_ids = {*visited_source_ids, source_node_id}
+    return set().union(
+        *(
+            _get_effective_iteration_paths_for_edge(
+                state,
+                input_edge,
+                next_visited_source_ids,
+                get_prepared_nodes_for_source,
+                get_prepared_edge_iteration_path,
+            )
+            for input_edge in input_edges
+        )
+    )
+
+
+def _get_if_iteration_paths(
+    state: "GraphExecutionState",
+    node_id: str,
+    visited_source_ids: set[str],
+    get_prepared_nodes_for_source: Callable[[str], set[str]],
+    get_prepared_edge_iteration_path: Callable[[Edge, str], tuple[int, ...]],
+) -> list[tuple[int, ...]]:
+    """Infer the selected branch's effective iteration paths for an If output."""
+    node = state.graph.get_node(node_id)
+    assert isinstance(node, IfInvocation)
+    next_visited_source_ids = {*visited_source_ids, node_id}
+    condition_edges = state.graph._get_input_edges(node_id, "condition")
+
+    condition_selections: list[tuple[Optional[tuple[int, ...]], str]] = []
+    if condition_edges:
+        condition_edge = condition_edges[0]
+        if condition_edge.source.node_id not in state.source_prepared_mapping:
+            return []
+        for prepared_id in get_prepared_nodes_for_source(condition_edge.source.node_id):
+            if prepared_id not in state.results:
+                return []
+            condition_value = getattr(state.results[prepared_id], condition_edge.source.field)
+            condition_path = get_prepared_edge_iteration_path(condition_edge, prepared_id)
+            selected_field = "true_input" if condition_value else "false_input"
+            condition_selections.append((condition_path, selected_field))
+    else:
+        selected_field = "true_input" if node.condition else "false_input"
+        condition_selections.append((None, selected_field))
+
+    paths: set[tuple[int, ...]] = set()
+    has_selected_edges = False
+    for condition_path, selected_field in condition_selections:
+        selected_edges = state.graph._get_input_edges(node_id, selected_field)
+        has_selected_edges = has_selected_edges or bool(selected_edges)
+        if selected_edges:
+            branch_paths = set().union(
+                *(
+                    _get_effective_iteration_paths_for_edge(
+                        state,
+                        edge,
+                        next_visited_source_ids,
+                        get_prepared_nodes_for_source,
+                        get_prepared_edge_iteration_path,
+                    )
+                    for edge in selected_edges
+                )
+            )
+        else:
+            branch_paths = {condition_path or ()}
+
+        for branch_path in branch_paths:
+            if condition_path is None:
+                paths.add(branch_path)
+            elif condition_path[: len(branch_path)] == branch_path:
+                paths.add(condition_path)
+            elif branch_path[: len(condition_path)] == condition_path:
+                paths.add(branch_path)
+
+    if not paths:
+        return [] if has_selected_edges else [()]
+    return sorted(path for path in paths if not any(path != other and other[: len(path)] == path for other in paths))
 
 
 def _record_activation_dependencies(

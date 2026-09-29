@@ -183,6 +183,7 @@ vi.mock('@features/gallery/queries', () => ({
   flattenGalleryItemsData: (data: InfiniteData<GalleryItemsPage, number> | undefined) =>
     data?.pages.flatMap((page) => page.items) ?? [],
   galleryBoardsOptions: () => ({ queryFn: () => [], queryKey: ['test-boards'], staleTime: Infinity }),
+  getGalleryListingBoardsQuery: () => ({}),
   galleryStarredStripOptions: (query: { boardId: string; starred?: boolean }) => ({
     queryFn: () => {
       mocks.galleryStripFetches.push(query);
@@ -532,6 +533,7 @@ beforeEach(() => {
   delete (mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>).imageOrderDir;
   delete (mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>).paginationMode;
   delete (mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>).semanticImageQuery;
+  delete (mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>).selectedBoardId;
   delete (mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>).selectedImageQuery;
   delete (mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>).starredOnly;
   mocks.project.widgetInstances.gallery.state.values.recentImages = mocks.recentImages;
@@ -1450,6 +1452,36 @@ describe('preview keyboard navigation boundary', () => {
       0,
       true
     );
+  });
+
+  it('ranks the filmstrip within the board the gallery shows, not the board the selection was made in', async () => {
+    const galleryValues = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
+
+    // Picked while board A was shown; the gallery has since moved to board B with the search still active.
+    galleryValues.selectedBoardId = 'board-b';
+    galleryValues.selectedImageQuery = {
+      boardId: 'board-a',
+      galleryView: 'images',
+      imageOrderDir: 'DESC',
+      page: 0,
+      paginationMode: 'infinite',
+      searchTerm: '',
+    };
+    galleryValues.semanticImageQuery = { kind: 'text', query: 'sunset' };
+
+    await render();
+
+    expect(mocks.galleryItemFilters.at(-1)).toMatchObject({
+      boardId: 'board-b',
+      semanticQuery: { kind: 'text', query: 'sunset' },
+    });
+
+    // Without a search the filmstrip keeps stepping through the listing the item was picked from.
+    delete galleryValues.semanticImageQuery;
+    await rerender();
+
+    expect(mocks.galleryItemFilters.at(-1)).toMatchObject({ boardId: 'board-a' });
+    expect(mocks.galleryItemFilters.at(-1)).not.toHaveProperty('semanticQuery');
   });
 
   it('stamps the top of the board listing for a ranked pick even when the footer paginates the ranking', async () => {

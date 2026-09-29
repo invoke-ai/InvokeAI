@@ -35,8 +35,16 @@ vi.mock('./CustomSettingsEditors', () => ({
   default: ({ field }: SettingFieldProps) => <div data-custom-editor={field.id}>Custom settings editor</div>,
 }));
 
+const testProject = {
+  id: 'settings-test-project',
+  settings: { antialiasProgressImages: true, showProgressImagesInViewer: true, useCpuNoise: false },
+  widgetInstances: { 'settings-test-widget': { id: 'settings-test-widget', typeId: 'queue' } },
+};
+
 vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
   ...(await importOriginal<typeof workbenchContext>()),
+  useOptionalWorkbenchSelector: (selector: (snapshot: never) => unknown) =>
+    selector({ activeProject: testProject } as never),
   useActiveProjectId: () => 'settings-test-project',
   useWorkbenchQueries: () => ({
     isActiveProject: (projectId: string) => projectId === 'settings-test-project',
@@ -150,6 +158,21 @@ describe('settings dialog', () => {
     await act(() => page.getByText('Prefer numeric attention style', { exact: true }).click());
     await expect.poll(() => getWorkbenchPreferences().preferNumericAttentionStyle).toBe(false);
     await expect.element(modifiedIndicator).not.toBeInTheDocument();
+  });
+
+  it('lists project settings, and widget settings only for widgets in the open project', async () => {
+    await render();
+    await open();
+    const nav = page.getByRole('navigation', { name: i18n.t('settings.title'), exact: true });
+    await expect.element(nav.getByRole('button', { name: 'Project', exact: true })).toBeVisible();
+    await expect.element(nav.getByRole('button', { name: 'Queue', exact: true })).toBeVisible();
+    // Canvas settings are all per widget and this project has no canvas; Preview keeps its project setting.
+    await expect.element(nav.getByRole('button', { name: 'Canvas', exact: true })).not.toBeInTheDocument();
+    await act(() => nav.getByRole('button', { name: 'Preview', exact: true }).click());
+    await expect.element(page.getByText('Antialias progress images', { exact: true })).toBeVisible();
+    await expect
+      .element(page.getByText(i18n.t('settingsDialog.instanceUnavailable'), { exact: true }))
+      .not.toBeInTheDocument();
   });
 
   it('switches prepared sections without loading placeholders or mounting unselected custom editors', async () => {

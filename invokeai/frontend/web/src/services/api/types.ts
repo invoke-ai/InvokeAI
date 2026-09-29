@@ -127,6 +127,7 @@ export type WanT5EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'w
 type Gemma2EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'gemma2_encoder' }>;
 type Gemma4EncoderModelConfig = Extract<InternalAnyModelConfig, { type: 'gemma4_encoder' }>;
 type PiDDecoderModelConfig = Extract<InternalAnyModelConfig, { type: 'pid_decoder' }>;
+type LTX2DurationHeadModelConfig = Extract<InternalAnyModelConfig, { type: 'ltx2_duration_head' }>;
 export type SpandrelImageToImageModelConfig = Extract<InternalAnyModelConfig, { type: 'spandrel_image_to_image' }>;
 export type CheckpointModelConfig = Extract<InternalAnyModelConfig, { type: 'main'; format: 'checkpoint' }>;
 export type CLIPVisionModelConfig = Extract<InternalAnyModelConfig, { type: 'clip_vision' }>;
@@ -479,6 +480,10 @@ export const isGemma4EncoderModelConfig = (config: AnyModelConfig): config is Ge
 
 export const isPiDDecoderModelConfig = (config: AnyModelConfig): config is PiDDecoderModelConfig => {
   return config.type === 'pid_decoder';
+};
+
+export const isLTX2DurationHeadModelConfig = (config: AnyModelConfig): config is LTX2DurationHeadModelConfig => {
+  return config.type === 'ltx2_duration_head';
 };
 
 export const isCLIPEmbedModelConfigOrSubmodel = (

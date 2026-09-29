@@ -5,8 +5,8 @@ import type { PromptHistoryItem } from '@workbench/projectContracts';
 import type { TFunction } from 'i18next';
 
 import { getGalleryBoardLabel, type GalleryBoard, type GalleryImage } from '@features/gallery/contracts';
-import { ALL_READABLE_BOARDS_ID, listPaletteImages } from '@features/gallery/paletteSearch';
-import { galleryBoardsOptions } from '@features/gallery/queries';
+import { ALL_READABLE_BOARDS_ID, listPaletteImages, listPaletteSemanticImages } from '@features/gallery/paletteSearch';
+import { galleryBoardsOptions, imageIndexAvailabilityOptions } from '@features/gallery/queries';
 import { focusPositivePrompt } from '@features/generation/react';
 import { isGenerateModelSelectable } from '@features/generation/settings';
 import { ensureModelsLoaded, getModelBaseLabel, getModelsSnapshot } from '@features/models';
@@ -16,11 +16,12 @@ import { requestLibraryWorkflowLoad } from '@features/workflow/react';
 import { queryClient } from '@platform/query/client';
 import { isTimestampInRange } from '@platform/search/dateTokens';
 import { normalizeServerTimestamp } from '@platform/time/serverTimestamp';
-import { absolutizeApiUrl } from '@platform/transport/http';
+import { absolutizeApiUrl, ApiError } from '@platform/transport/http';
 
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
 
 import { getPaletteContributionKey } from './contributionKey';
+import { PaletteSearchUnavailableError } from './entries';
 import { getObjectIdentity } from './objectIdentity';
 
 /** Factories receive host-owned workbench callbacks; extension searches adapt to the same provider contract. */
@@ -272,21 +273,17 @@ export const createQueueItemsProvider = ({
   },
 });
 
-export const createImagesProvider = ({
-  openGalleryWidget,
-  openPreviewWidget,
-  selectBoard,
-  selectImage,
-  locale,
-  t,
-}: {
-  openGalleryWidget: () => void;
+interface ImageEntryDeps {
   openPreviewWidget: () => void;
-  selectBoard: (boardId: string) => void;
+  /** Shows the image in its own board with the gallery's filters cleared. */
+  revealImage: (image: GalleryImage) => void;
   selectImage: (image: GalleryImage) => void;
   locale?: string;
   t: TFunction;
-}): PaletteSearchProvider => {
+}
+
+/** Opening previews the image; the secondary action reveals it in its board. */
+const createImageEntryMapper = ({ locale, openPreviewWidget, revealImage, selectImage, t }: ImageEntryDeps) => {
   const titleFormatter = new Intl.DateTimeFormat(locale, {
     day: 'numeric',
     hour: 'numeric',
@@ -294,9 +291,40 @@ export const createImagesProvider = ({
     month: 'short',
   });
 
+  return (images: readonly GalleryImage[], boards: readonly GalleryBoard[], idPrefix: string): PaletteEntry[] => {
+    const boardNames = new Map(boards.map((board) => [board.id, getGalleryBoardLabel(board, t)] as const));
+
+    // Use date and time to distinguish promptless images generated on the same day.
+    return images.map<PaletteEntry>((image) => {
+      const createdAt = new Date(normalizeServerTimestamp(image.createdAt ?? image.queuedAt));
+
+      return {
+        group: 'Images',
+        groupLabel: t('commandPalette.groups.images'),
+        id: `${idPrefix}:${image.imageName}`,
+        isPersistentRecent: false,
+        run: () => {
+          openPreviewWidget();
+          selectImage(image);
+        },
+        secondary: {
+          label: t('commandPalette.actions.revealInGallery'),
+          run: () => revealImage(image),
+        },
+        subtitle: `${boardNames.get(image.boardId) ?? t('commandPalette.providers.uncategorized')} · ${image.width}×${image.height}`,
+        thumbnailUrl: image.thumbnailUrl,
+        title: Number.isNaN(createdAt.getTime()) ? image.imageName : titleFormatter.format(createdAt),
+      };
+    });
+  };
+};
+
+export const createImagesProvider = (deps: ImageEntryDeps): PaletteSearchProvider => {
+  const toEntries = createImageEntryMapper(deps);
+
   return {
     contextKey: 'global',
-    label: t('commandPalette.providers.images'),
+    label: deps.t('commandPalette.providers.images'),
     providerKey: getPaletteContributionKey('provider', 'images'),
     supportsCreatedAtRange: true,
     search: async (query, { signal }) => {
@@ -314,35 +342,42 @@ export const createImagesProvider = ({
         }),
         loadActiveBoards(),
       ]);
-      const boardNames = new Map(
-        boards.map((board: GalleryBoard) => [board.id, getGalleryBoardLabel(board, t)] as const)
-      );
-      // Use date and time to distinguish promptless images generated on the same day.
-      return page.images.map<PaletteEntry>((image) => {
-        const createdAt = new Date(normalizeServerTimestamp(image.createdAt ?? image.queuedAt));
 
-        return {
-          group: 'Images',
-          groupLabel: t('commandPalette.groups.images'),
-          id: `image:${image.imageName}`,
-          isPersistentRecent: false,
-          run: () => {
-            openPreviewWidget();
-            selectImage(image);
-          },
-          secondary: {
-            label: t('commandPalette.actions.revealInGallery'),
-            run: () => {
-              openGalleryWidget();
-              selectBoard(image.boardId);
-              selectImage(image);
-            },
-          },
-          subtitle: `${boardNames.get(image.boardId) ?? t('commandPalette.providers.uncategorized')} · ${image.width}×${image.height}`,
-          thumbnailUrl: image.thumbnailUrl,
-          title: Number.isNaN(createdAt.getTime()) ? image.imageName : titleFormatter.format(createdAt),
-        };
+      return toEntries(page.images, boards, 'image');
+    },
+  };
+};
+
+/**
+ * Ranks every accessible image by meaning, unlike the gallery's search, which stays within its board. Scoped-only:
+ * each search runs the server's text encoder, and cosine ranking matches any query, so root typing never triggers it.
+ */
+export const createSemanticImagesProvider = (deps: ImageEntryDeps): PaletteSearchProvider => {
+  const toEntries = createImageEntryMapper(deps);
+
+  return {
+    contextKey: 'global',
+    label: deps.t('commandPalette.providers.semanticImages'),
+    providerKey: getPaletteContributionKey('provider', 'semantic-images'),
+    scopedOnly: true,
+    search: async (query, { signal }) => {
+      const text = query.text.trim();
+
+      if (!text || (await queryClient.fetchQuery(imageIndexAvailabilityOptions())).state !== 'ready') {
+        return [];
+      }
+
+      const searched = listPaletteSemanticImages({ limit: 20, query: text, signal }).catch((error: unknown) => {
+        // 409: the index can't embed text, typically a model without a usable text encoder.
+        if (error instanceof ApiError && error.status === 409) {
+          throw new PaletteSearchUnavailableError(deps.t('commandPalette.states.semanticTextUnavailable'));
+        }
+
+        throw error;
       });
+      const [images, boards] = await Promise.all([searched, loadActiveBoards()]);
+
+      return toEntries(images, boards, 'semantic-image');
     },
   };
 };

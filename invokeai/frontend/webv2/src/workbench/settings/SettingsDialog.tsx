@@ -1,20 +1,6 @@
 import type { ChangeEvent, UIEvent } from 'react';
 
-import {
-  Box,
-  Dialog,
-  Flex,
-  HStack,
-  Icon,
-  Input,
-  InputGroup,
-  Kbd,
-  NativeSelect,
-  Stack,
-  Text,
-  VisuallyHidden,
-} from '@chakra-ui/react';
-import { useCapabilities } from '@features/identity';
+import { Box, Dialog, Flex, HStack, Icon, NativeSelect, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
 import { PanelHeader } from '@platform/ui/PanelHeader';
@@ -26,13 +12,14 @@ import {
   useWorkbenchQueries,
   useWorkbenchSubscription,
 } from '@workbench/WorkbenchContext';
-import { SearchIcon, XIcon } from 'lucide-react';
+import { SearchIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { SettingsSection } from './catalog';
 
-import { searchSettings, settingsCatalog } from './catalog';
+import { browseSettings, isSettingsQuery, settingsCatalog } from './catalog';
+import { SettingsBrowseBody, SettingsSearchField } from './SettingsBrowseBody';
 import {
   closeWorkbenchSettings,
   getSettingsSectionScroll,
@@ -41,9 +28,7 @@ import {
   setWorkbenchSettingsSection,
   settingsDialogStore,
 } from './settingsDialogStore';
-import { isFillSettingsEntry, SettingsEntryView } from './SettingsEntryView';
-import { SettingsScopeLabel } from './SettingsScopeLabel';
-import { patchWorkbenchPreferences, useWorkbenchSettingsSelector } from './store';
+import { useAvailableSettings } from './useAvailableSettings';
 
 /** Warm code, never mounted editors or data queries, before exposing section navigation. */
 export const prepareSettingsDialog = async (): Promise<void> => {
@@ -62,28 +47,14 @@ const SIDEBAR_BOTTOM_BORDER = { base: '1px', sm: '0' };
 const SEARCH_PADDING = { base: '12', sm: '3' };
 const MOBILE_DISPLAY = { base: 'block', sm: 'none' };
 const DESKTOP_DISPLAY = { base: 'none', sm: 'block' };
-const CONTENT_PADDING = { base: '4', md: '6' };
 const rememberScroll = (event: UIEvent<HTMLDivElement>) => {
   const current = settingsDialogStore.getSnapshot();
   if (!current.query.trim()) {
     rememberSettingsSectionScroll(current.sectionId, event.currentTarget.scrollTop);
   }
 };
-const SEARCH_START_ELEMENT = <Icon as={SearchIcon} boxSize="3.5" color="fg.muted" />;
-/** The `/` shortcut the dialog content handles (see `SettingsDialogHost`). */
-const SEARCH_HOTKEY_HINT = (
-  <Kbd aria-hidden pointerEvents="none" size="sm" variant="outline">
-    /
-  </Kbd>
-);
-const FILL_SECTION_PROPS = { display: 'flex', flex: '1', flexDirection: 'column', minH: '0' } as const;
-const FILL_BODY_PROPS = { ...FILL_SECTION_PROPS, pb: '4' } as const;
-const BODY_VIEWPORT_PROPS = { onScroll: rememberScroll };
-const BODY_CONTENT_PROPS = { px: CONTENT_PADDING, pb: '4' } as const;
 const clearSearch = () => setSettingsQuery('');
-const retrySave = () => {
-  void patchWorkbenchPreferences({});
-};
+const clearRevealedEntry = () => settingsDialogStore.patchSnapshot({ entryId: undefined });
 
 const ProjectLifetime = () => {
   const projectId = useActiveProjectId();
@@ -102,44 +73,27 @@ const ProjectLifetime = () => {
 const SettingsDialog = () => {
   const { t } = useTranslation();
   const hasWorkbench = useHasWorkbenchProvider();
-  const { canManageAppConfig } = useCapabilities();
   const state = settingsDialogStore.useSelector((snapshot) => snapshot);
-  const error = useWorkbenchSettingsSelector((snapshot) => snapshot.error);
-  const sections = settingsCatalog.filter((section) => section.id !== 'server' || canManageAppConfig);
-  const active = sections.find((section) => section.id === state.sectionId) ?? sections[0];
-  const searching = state.query.trim().length > 0;
-  const matches = searchSettings(sections, state.query, t);
-  const displayed = searching
-    ? matches.filter((section) => !state.searchSection || section.id === state.searchSection)
-    : [active];
-  const count = matches.reduce((total, section) => total + section.entries.length, 0);
+  const sections = useAvailableSettings();
+  const { active, count, displayed, matches, searching } = browseSettings(
+    sections,
+    { activeId: state.sectionId, query: state.query, searchSection: state.searchSection },
+    t
+  );
   const selectSection = useCallback(
     (sectionId: string) => {
-      if (searching) {
+      if (isSettingsQuery(state.query)) {
         settingsDialogStore.patchSnapshot({ searchSection: sectionId || null });
       } else {
         setWorkbenchSettingsSection(sectionId);
       }
     },
-    [searching]
+    [state.query]
   );
   const selectAllResults = useCallback(() => selectSection(''), [selectSection]);
   const changeSection = useCallback(
     (event: ChangeEvent<HTMLSelectElement>) => selectSection(event.target.value),
     [selectSection]
-  );
-  const changeQuery = useCallback((event: ChangeEvent<HTMLInputElement>) => setSettingsQuery(event.target.value), []);
-  // The end slot is a clear control while there is a query, and the `/` hint otherwise.
-  const searchEndElement = useMemo(
-    () =>
-      state.query ? (
-        <Button aria-label={t('settingsDialog.clearSearch')} me="-2" size="2xs" variant="ghost" onClick={clearSearch}>
-          <XIcon />
-        </Button>
-      ) : (
-        SEARCH_HOTKEY_HINT
-      ),
-    [state.query, t]
   );
   const attachBody = useCallback((element: HTMLDivElement | null) => {
     const current = settingsDialogStore.getSnapshot();
@@ -147,10 +101,10 @@ const SettingsDialog = () => {
       element.scrollTop = getSettingsSectionScroll(current.sectionId);
     }
   }, []);
-  // A filling editor (the hotkeys table) scrolls itself: the body hands it the
-  // height instead of wrapping it in a second scroll container.
-  const fills =
-    !searching && displayed.length === 1 && displayed[0].entries.some((entry) => isFillSettingsEntry(entry, 'dialog'));
+  const target = useMemo(
+    () => (state.target ? { sectionId: state.sectionId, target: state.target } : undefined),
+    [state.sectionId, state.target]
+  );
   return (
     <Flex h="full" minH="0" direction={DIRECTION}>
       {hasWorkbench ? <ProjectLifetime /> : null}
@@ -166,16 +120,7 @@ const SettingsDialog = () => {
         minH="0"
       >
         <Box p="3" pe={SEARCH_PADDING}>
-          <InputGroup endElement={searchEndElement} startElement={SEARCH_START_ELEMENT}>
-            <Input
-              data-settings-search
-              aria-label={t('settingsDialog.search')}
-              placeholder={t('settingsDialog.search')}
-              value={state.query}
-              size="sm"
-              onChange={changeQuery}
-            />
-          </InputGroup>
+          <SettingsSearchField size="sm" value={state.query} onChange={setSettingsQuery} />
         </Box>
         <Box display={MOBILE_DISPLAY} px="3" pb="3">
           <NativeSelect.Root size="sm">
@@ -185,7 +130,7 @@ const SettingsDialog = () => {
               onChange={changeSection}
             >
               {searching ? <option value="">{t('settingsDialog.allResults')}</option> : null}
-              {(searching ? matches : sections).map((section) => (
+              {matches.map((section) => (
                 <option key={section.id} value={section.id}>
                   {resolveSettingsText(section.label, t)}
                 </option>
@@ -208,7 +153,7 @@ const SettingsDialog = () => {
             </Button>
           ) : null}
           {GROUPS.map((group) => {
-            const groupSections = (searching ? matches : sections).filter((section) => section.group === group);
+            const groupSections = matches.filter((section) => section.group === group);
             if (!groupSections.length) {
               return null;
             }
@@ -243,56 +188,19 @@ const SettingsDialog = () => {
             </HStack>
           </PanelHeader>
         </Dialog.Header>
-        {error ? (
-          <HStack role="alert" px="4" py="2" bg="bg.error">
-            <Text fontSize="xs" color="fg.error" flex="1">
-              {error}
-            </Text>
-            <Button size="xs" onClick={retrySave}>
-              {t('common.retry')}
-            </Button>
-          </HStack>
-        ) : null}
-        <VisuallyHidden role="status">{searching ? t('settingsDialog.resultCount', { count }) : ''}</VisuallyHidden>
-        {fills ? (
-          <Box key={active.id} px={CONTENT_PADDING} {...FILL_BODY_PROPS}>
-            {displayed.map((section) => (
-              <SettingsSectionContent
-                key={section.id}
-                fill
-                section={section}
-                search={false}
-                onReveal={setWorkbenchSettingsSection}
-              />
-            ))}
-          </Box>
-        ) : (
-          <Scrollable
-            key={searching ? `search:${state.searchSection ?? ''}` : active.id}
-            contentProps={BODY_CONTENT_PROPS}
-            flex="1"
-            minH="0"
-            viewportProps={BODY_VIEWPORT_PROPS}
-            viewportRef={attachBody}
-          >
-            {displayed.map((section) => (
-              <SettingsSectionContent
-                key={section.id}
-                section={section}
-                search={searching}
-                onReveal={setWorkbenchSettingsSection}
-              />
-            ))}
-            {searching && !displayed.length ? (
-              <Stack align="center" py="12" gap="3">
-                <Text color="fg.muted">{t('settingsDialog.noResults')}</Text>
-                <Button size="sm" variant="outline" onClick={clearSearch}>
-                  {t('settingsDialog.clearSearch')}
-                </Button>
-              </Stack>
-            ) : null}
-          </Scrollable>
-        )}
+        <SettingsBrowseBody
+          count={count}
+          displayed={displayed}
+          revealEntryId={state.entryId}
+          searching={searching}
+          target={target}
+          viewKey={searching ? `search:${state.searchSection ?? ''}` : active.id}
+          viewportRef={attachBody}
+          onClearSearch={clearSearch}
+          onReveal={setWorkbenchSettingsSection}
+          onRevealed={clearRevealedEntry}
+          onScroll={rememberScroll}
+        />
       </Flex>
     </Flex>
   );
@@ -329,54 +237,4 @@ const SettingsNavigationItem = ({
   );
 };
 
-const SettingsSectionContent = ({
-  fill = false,
-  section,
-  search,
-  onReveal,
-}: {
-  fill?: boolean;
-  section: SettingsSection;
-  search: boolean;
-  onReveal: (sectionId: string, entryId?: string) => void;
-}) => {
-  const { t } = useTranslation();
-  const target = settingsDialogStore.useSelector((snapshot) =>
-    snapshot.sectionId === section.id ? snapshot.target : undefined
-  );
-  return (
-    <Box {...(fill ? FILL_SECTION_PROPS : undefined)}>
-      {!search && section.entries[0] ? (
-        <Box pt="3">
-          <SettingsScopeLabel scope={section.entries[0].field.scope} />
-        </Box>
-      ) : null}
-      {search ? (
-        <Stack gap="0.5" pt="5">
-          <Text as="h3" fontWeight="600" fontSize="sm">
-            {resolveSettingsText(section.label, t)}
-          </Text>
-          {section.entries[0] ? <SettingsScopeLabel scope={section.entries[0].field.scope} /> : null}
-        </Stack>
-      ) : null}
-      {section.entries.map((entry, index) => (
-        <SettingsEntryView
-          key={entry.field.id}
-          entry={entry}
-          section={section}
-          target={target}
-          search={search}
-          onReveal={onReveal}
-          showGroup={Boolean(
-            entry.field.group &&
-            resolveSettingsText(entry.field.group, t) !==
-              (section.entries[index - 1]?.field.group
-                ? resolveSettingsText(section.entries[index - 1].field.group!, t)
-                : '')
-          )}
-        />
-      ))}
-    </Box>
-  );
-};
 export default SettingsDialog;

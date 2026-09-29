@@ -1,7 +1,7 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { type AccountScope, accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
-import { act } from 'react';
+import { act, type ReactNode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 
@@ -25,6 +25,24 @@ vi.mock('@features/models/data/modelsStore', () => ({
     selector({ coverImageVersions: {} }),
 }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+
+/** The picker's own view is covered by its tests; a pick here hands over an item whose full image is a data URL. */
+const PICKED_PNG =
+  'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+vi.mock('@features/gallery/ui/picker/GalleryPickerPopover', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  GalleryPickerPopover: ({ children, onPick }: { children: ReactNode; onPick: (item: unknown) => void }) => (
+    <>
+      {children}
+      <button
+        aria-label="Pick"
+        data-gallery-pick
+        type="button"
+        onClick={() => onPick({ fullUrl: PICKED_PNG, kind: 'image', name: 'picked.png' })}
+      />
+    </>
+  ),
+}));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -74,32 +92,35 @@ describe('ModelImageUpload account ownership', () => {
     accountLifecycle.invalidate();
   });
 
-  const upload = async (file: File): Promise<void> => {
-    const input = host.querySelector<HTMLInputElement>('input[type="file"]')!;
+  const pick = () => act(() => host.querySelector<HTMLButtonElement>('[data-gallery-pick]')!.click());
 
-    Object.defineProperty(input, 'files', { configurable: true, value: [file] });
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-    await Promise.resolve();
-  };
-
-  it('commits an upload only while its account lifetime is current', async () => {
-    const file = new File(['image'], 'cover.png', { type: 'image/png' });
-
-    await act(() => upload(file));
+  it('sets a gallery image as the cover from its full image, only while its account lifetime is current', async () => {
+    await pick();
     await vi.waitFor(() => expect(onUpdated).toHaveBeenCalledOnce());
 
-    expect(dependencies.updateModelImage).toHaveBeenCalledWith(model.key, file, owner.signal);
+    const [key, file, signal] = dependencies.updateModelImage.mock.calls[0] as [string, File, AbortSignal];
+    expect(key).toBe(model.key);
+    expect(file).toBeInstanceOf(File);
+    expect(file.name).toBe('picked.png');
+    expect(file.type).toBe('image/png');
+    expect(signal).toBe(owner.signal);
     expect(dependencies.markCoverImageChanged).toHaveBeenCalledWith(model.key, true);
     expect(onError).not.toHaveBeenCalled();
   });
 
-  it('quietly drops an account A upload that resolves after account B activates', async () => {
+  it('offers no separate upload: new files arrive through the gallery picker', () => {
+    expect(host.querySelector('input[type="file"]')).toBeNull();
+    expect([...host.querySelectorAll('button')].map((button) => button.textContent)).not.toContain(
+      'widgets.gallery.picker.upload'
+    );
+  });
+
+  it('quietly drops an account A cover that resolves after account B activates', async () => {
     const request = deferred<void>();
-    const file = new File(['image'], 'cover.png', { type: 'image/png' });
     dependencies.updateModelImage.mockReturnValueOnce(request.promise);
 
-    await act(() => upload(file));
-    expect(dependencies.updateModelImage).toHaveBeenCalledWith(model.key, file, owner.signal);
+    await pick();
+    await vi.waitFor(() => expect(dependencies.updateModelImage).toHaveBeenCalled());
 
     await act(async () => {
       accountLifecycle.activate('model-image-b', ':user:model-image-b');

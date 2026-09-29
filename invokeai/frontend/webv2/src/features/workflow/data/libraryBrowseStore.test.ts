@@ -615,3 +615,95 @@ describe('workflow library user total probe', () => {
     expect(api.listLibraryWorkflows.mock.calls.filter(([params]) => params.perPage === 1)).toHaveLength(1);
   });
 });
+
+describe('workflow library view cache', () => {
+  const userItems = [buildItem('a'), buildItem('b')];
+  const listByCategory = (items: Record<string, WorkflowLibraryListItem[]>) =>
+    api.listLibraryWorkflows.mockImplementation(({ category }: { category: string }) =>
+      Promise.resolve(buildPage(items[category] ?? []))
+    );
+  const allEnriched = () =>
+    browse.getWorkflowLibraryBrowseSnapshot().entries.every((entry) => entry.enrichment.status === 'ready');
+
+  const browseYoursThenBrowse = async () => {
+    listByCategory({ default: [buildItem('x', { category: 'default' })], user: userItems });
+    await browse.ensureWorkflowLibraryBrowseLoaded();
+    await vi.waitFor(() => expect(allEnriched()).toBe(true));
+    const yours = browse.getWorkflowLibraryBrowseSnapshot().entries;
+
+    browse.setWorkflowLibraryBrowseFilter({ category: 'default', tag: null });
+    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loaded'));
+    api.listLibraryWorkflows.mockClear();
+    libraryCache.getLibraryWorkflowCached.mockClear();
+
+    return yours;
+  };
+
+  it('returns to a view browsed moments ago at once, without refetching or re-reading its rows', async () => {
+    const yours = await browseYoursThenBrowse();
+
+    browse.setWorkflowLibraryBrowseFilter({ category: 'user', tag: null });
+    const snapshot = browse.getWorkflowLibraryBrowseSnapshot();
+
+    expect(snapshot.status).toBe('loaded');
+    expect(snapshot.entries).toBe(yours);
+    await flushAsyncWork();
+    expect(api.listLibraryWorkflows).not.toHaveBeenCalled();
+    expect(libraryCache.getLibraryWorkflowCached).not.toHaveBeenCalled();
+  });
+
+  it('keeps a stale view on screen while it revalidates, then merges without re-reading unchanged rows', async () => {
+    const yours = await browseYoursThenBrowse();
+    const later = Date.now() + 60_000;
+    const now = vi.spyOn(Date, 'now').mockReturnValue(later);
+    const refreshed = createDeferred<WorkflowLibraryPage>();
+    api.listLibraryWorkflows.mockReturnValueOnce(refreshed.promise);
+
+    browse.setWorkflowLibraryBrowseFilter({ category: 'user', tag: null });
+
+    // The cached rows stay up while the refresh is in flight.
+    expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toBe(yours);
+    await vi.waitFor(() => expect(api.listLibraryWorkflows).toHaveBeenCalled());
+
+    refreshed.resolve(buildPage([...userItems, buildItem('c')]));
+    await vi.waitFor(() => expect(browse.getWorkflowLibraryBrowseSnapshot().entries).toHaveLength(3));
+
+    const entries = browse.getWorkflowLibraryBrowseSnapshot().entries;
+    expect(entries[0]).toBe(yours[0]);
+    expect(entries[1]).toBe(yours[1]);
+    await vi.waitFor(() => expect(libraryCache.getLibraryWorkflowCached).toHaveBeenCalledTimes(1));
+    expect(libraryCache.getLibraryWorkflowCached).toHaveBeenCalledWith('c', expect.anything());
+    now.mockRestore();
+  });
+
+  it('fetches a view afresh after a library change, which can alter any view', async () => {
+    await browseYoursThenBrowse();
+
+    invalidate();
+    await flushAsyncWork();
+    api.listLibraryWorkflows.mockClear();
+
+    browse.setWorkflowLibraryBrowseFilter({ category: 'user', tag: null });
+
+    expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loading');
+    await vi.waitFor(() => expect(api.listLibraryWorkflows).toHaveBeenCalled());
+  });
+
+  it('does not keep a view that a library change outdated when it is left before its refresh lands', async () => {
+    await browseYoursThenBrowse();
+    browse.setWorkflowLibraryBrowseFilter({ category: 'user', tag: null });
+
+    // The change's refresh is scheduled but has not run when the user moves on.
+    invalidate();
+    browse.setWorkflowLibraryBrowseFilter({ category: 'default', tag: null });
+    await flushAsyncWork();
+    api.listLibraryWorkflows.mockClear();
+
+    browse.setWorkflowLibraryBrowseFilter({ category: 'user', tag: null });
+
+    expect(browse.getWorkflowLibraryBrowseSnapshot().status).toBe('loading');
+    await vi.waitFor(() =>
+      expect(api.listLibraryWorkflows).toHaveBeenCalledWith(expect.objectContaining({ category: 'user' }))
+    );
+  });
+});

@@ -86,7 +86,8 @@ const patchGenerateSettings = vi.fn();
 const buildAdapter = (): GenerationUiAdapter =>
   ({
     models: { catalog: CATALOG, error: null, status: 'loaded' },
-    project: { activeProjectId: 'project-1', generateValues: STORED_VALUES },
+    generateValues: { getSnapshot: () => STORED_VALUES, subscribe: () => () => undefined },
+    project: { activeProjectId: 'project-1' },
     settings: { patchGenerateSettings },
   }) as unknown as GenerationUiAdapter;
 

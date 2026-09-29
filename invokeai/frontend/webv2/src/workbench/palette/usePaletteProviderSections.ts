@@ -3,9 +3,12 @@ import { useMemo } from 'react';
 
 import type { PaletteProviderQuery, PaletteSearchProvider, ProviderResultSection } from './entries';
 
+import { PaletteSearchUnavailableError } from './entries';
 import { getPaletteProviderQueryKey } from './providerQueryKey';
 
 export interface PaletteProviderQueryResult {
+  /** A failure's user-facing explanation, when the provider gave one. */
+  errorMessage: string | null;
   isError: boolean;
   isFetching: boolean;
   retry: () => void;
@@ -26,6 +29,7 @@ export const usePaletteProviderSections = ({
     combine: (results) =>
       results.map((result) => ({
         data: result.data,
+        errorMessage: result.error instanceof PaletteSearchUnavailableError ? result.error.message : null,
         isError: result.isError,
         isFetching: result.isFetching,
         retry: () => void result.refetch(),
@@ -43,6 +47,7 @@ export const usePaletteProviderSections = ({
   const results = useMemo<PaletteProviderQueryResult[]>(
     () =>
       queryResults.map((result) => ({
+        errorMessage: result.errorMessage,
         isError: result.isError,
         isFetching: result.isFetching,
         retry: result.retry,

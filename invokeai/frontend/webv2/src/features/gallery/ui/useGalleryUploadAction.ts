@@ -22,7 +22,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { GalleryActions } from './GalleryWidgetContext';
 
-import { useGalleryUi } from './GalleryUiContext';
+import { useGalleryHost, useOptionalGalleryUi } from './GalleryUiContext';
 
 const toErrorMessage = (error: unknown): string => (error instanceof Error ? error.message : String(error));
 const uploadLogger = createLogger({ area: 'upload', namespace: 'gallery' });
@@ -33,12 +33,16 @@ export const useGalleryUploadAction = ({
   selectedBoardId: selectedBoardIdOrGetter,
 }: {
   boards: GalleryBoard[];
-  /** Where the gallery is showing on completion; the newest upload visible there gets selected. Omit to leave the selection alone. */
+  /**
+   * Where the Gallery widget is showing on completion; the newest upload visible there gets selected. Omit to leave
+   * the selection alone, as hosts without a workbench must.
+   */
   getCurrentGalleryLocation?: () => { galleryView: GalleryView; selectedBoardId: string };
   /** A getter is read when the upload starts, for hosts that must not re-render on board changes. */
   selectedBoardId: string | (() => string);
 }): GalleryActions['uploadFiles'] => {
-  const { gallery, notifications } = useGalleryUi();
+  const { notifications } = useGalleryHost();
+  const gallery = useOptionalGalleryUi()?.gallery;
   const queryClient = useQueryClient();
   const { t } = useTranslation();
 
@@ -171,7 +175,7 @@ export const useGalleryUploadAction = ({
         );
 
         if (newestVisibleUpload) {
-          gallery.selectItem(newestVisibleUpload);
+          gallery?.selectItem(newestVisibleUpload);
         }
 
         void invalidateGallery(queryClient);
