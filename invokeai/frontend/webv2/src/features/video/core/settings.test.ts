@@ -183,6 +183,21 @@ describe('normalizeVideoSettings', () => {
     expect(normalized?.positivePrompt).toBe('a dog');
   });
 
+  it('turns auto duration off when the duration head it depends on is gone', () => {
+    const head = { base: 'ltx-2', key: 'duration', name: 'Duration Head', type: 'ltx2_duration_head' };
+
+    // Kept while the head is there...
+    expect(
+      normalizeVideoSettings({ ...createSettings(), autoDuration: true, ltx2DurationHeadModel: head })?.autoDuration
+    ).toBe(true);
+
+    // ...and dropped once it is not. Left on, the panel would disable the Frames control with
+    // nothing able to supply a length in its place.
+    expect(
+      normalizeVideoSettings({ ...createSettings(), autoDuration: true, ltx2DurationHeadModel: null })?.autoDuration
+    ).toBe(false);
+  });
+
   it('heals the hybrid start block to the recommended default and clamps it to the block range', () => {
     const { h3HybridStartBlock: _predatesHybrid, ...legacy } = createSettings();
 

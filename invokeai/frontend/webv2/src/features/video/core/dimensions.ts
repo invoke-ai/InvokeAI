@@ -266,6 +266,34 @@ export const LTX2_NUM_FRAMES_SLIDER_MAX = 241;
 export const LTX2_NUM_FRAMES_STEP = 8;
 export const LTX2_NUM_FRAMES_DEFAULT = 121;
 
+// The seconds range the duration head was trained to regress over, mirroring
+// LTX2_DURATION_MIN_SECONDS / _MAX_SECONDS in ltx2_duration.py. Outside it the head extrapolates,
+// so these bound what the node will accept rather than merely defaulting it.
+export const LTX2_DURATION_MIN_SECONDS = 1;
+export const LTX2_DURATION_MAX_SECONDS = 20;
+
+/**
+ * The seconds range the duration head may choose a length from.
+ *
+ * Under auto duration the Frames value is a ceiling, not a length: it is the number the user sized
+ * the run's memory for, and the head picks anything from the family's shortest clip up to it. Both
+ * ends are converted at the run's own rate and clamped into the head's trained range.
+ *
+ * Null when that range is empty -- a ceiling at or under the floor (under a second, or under the
+ * family's minimum) leaves the head nothing to choose, and the run uses the Frames value as set.
+ */
+export const ltx2AutoDurationBounds = (
+  fps: number,
+  framesMin: number,
+  framesCeiling: number
+): { maxSeconds: number; minSeconds: number } | null => {
+  const clamp = (seconds: number) => Math.min(LTX2_DURATION_MAX_SECONDS, Math.max(LTX2_DURATION_MIN_SECONDS, seconds));
+  const minSeconds = clamp(framesMin / fps);
+  const maxSeconds = clamp(framesCeiling / fps);
+
+  return maxSeconds > minSeconds ? { maxSeconds, minSeconds } : null;
+};
+
 /**
  * A frame count snapped *down* onto LTX-2's 8n + 1 grid. Mirrors `snap_num_frames_down` in
  * `invokeai/backend/ltx2/packing.py`: a clip supplies whatever it supplies, and the trailing

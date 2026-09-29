@@ -1406,6 +1406,7 @@
         "gemma2Encoder": "Gemma-2 Encoder",
         "gemma4Encoder": "Gemma-4 Encoder",
         "pidDecoder": "PiD Decoder",
+        "ltx2DurationHead": "LTX-2 Duration Head",
         "pidMode": "PiD Decode",
         "pidModeOff": "Off",
         "pidModeFit": "On (Fit to size)",
