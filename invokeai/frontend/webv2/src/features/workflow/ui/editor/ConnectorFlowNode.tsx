@@ -6,10 +6,11 @@ import {
   getWorkflowNodeHandleStyle,
   WORKFLOW_NODE_HANDLE_SIZE,
 } from '@features/workflow/ui/nodeChrome';
-import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE, getFieldTypeLabel } from '@features/workflow/utility';
+import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { ConnectorFlowNode as ConnectorFlowNodeType } from './flowAdapters';
 
@@ -27,19 +28,13 @@ const genericHandleStyle: React.CSSProperties = {
 const getConnectorHandleStyle = (type: FieldType | null, side: 'left' | 'right'): React.CSSProperties =>
   type ? getWorkflowNodeHandleStyle(type, side) : genericHandleStyle;
 
-const getConnectorTitle = (inputType: FieldType | null, outputType: FieldType | null): string => {
-  const inputLabel = inputType ? getFieldTypeLabel(inputType) : 'Any input';
-  const outputLabel = outputType ? getFieldTypeLabel(outputType) : 'Any output';
-
-  return `Connector: ${inputLabel} -> ${outputLabel}`;
-};
-
 const ConnectorFlowNodeComponent = ({ data, selected }: NodeProps<ConnectorFlowNodeType>) => {
   const node = data.documentNode;
   const isWorkflowImageExport = useIsWorkflowImageExport();
-  const inputTooltip = getHandleTypeTooltip(data.inputFieldType, 'Any input');
-  const connectorTooltip = getConnectorTitle(data.inputFieldType, data.outputFieldType);
-  const outputTooltip = getHandleTypeTooltip(data.outputFieldType, 'Any output');
+  const { t } = useTranslation();
+  const inputTooltip = getHandleTypeTooltip(data.inputFieldType, t('nodes.anyInput'), t);
+  const outputTooltip = getHandleTypeTooltip(data.outputFieldType, t('nodes.anyOutput'), t);
+  const connectorTooltip = t('nodes.connectorTitle', { input: inputTooltip, output: outputTooltip });
   const inputHandleStyle = useMemo(
     () => ({ ...getConnectorHandleStyle(data.inputFieldType, 'left'), left: -WORKFLOW_NODE_HANDLE_SIZE / 2 }),
     [data.inputFieldType]

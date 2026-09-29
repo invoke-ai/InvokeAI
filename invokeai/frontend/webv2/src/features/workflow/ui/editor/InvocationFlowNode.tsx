@@ -273,18 +273,6 @@ const NodeTitle = ({ node, title }: { node: WorkflowInvocationNode; title: strin
   );
 };
 
-const getInputModeLabel = (input: FieldInputTemplate['input']): string => {
-  if (input === 'connection') {
-    return 'Connection only';
-  }
-
-  if (input === 'direct') {
-    return 'Direct value only';
-  }
-
-  return 'Direct value or connection';
-};
-
 const InputFieldTooltip = ({
   description,
   isConnected,
@@ -297,19 +285,22 @@ const InputFieldTooltip = ({
   isExposed: boolean;
   label: string;
   template: FieldInputTemplate;
-}) => (
-  <Stack gap="0.5" maxW="18rem">
-    <Text fontWeight="700">{label}</Text>
-    <Text color="fg.subtle">Field: {template.name}</Text>
-    <Text color="fg.subtle">Type: {getFieldTypeLabel(template.type)}</Text>
-    <Text color="fg.subtle">
-      {template.required ? 'Required' : 'Optional'} · {getInputModeLabel(template.input)}
-    </Text>
-    {isConnected ? <Text color="fg.subtle">Connected by graph edge.</Text> : null}
-    {isExposed ? <Text color="fg.subtle">Pinned to Linear UI.</Text> : null}
-    {description ? <Text>{description}</Text> : null}
-  </Stack>
-);
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <Stack gap="0.5" maxW="18rem">
+      <Text fontWeight="700">{label}</Text>
+      <Text color="fg.subtle">
+        {t('nodes.fieldInfo', { name: template.name, type: getFieldTypeLabel(template.type) })} ·{' '}
+        {t(template.required ? 'nodes.required' : 'nodes.optional')} · {t(`nodes.inputModes.${template.input}`)}
+        {isConnected ? ` · ${t('nodes.providedByConnection')}` : null}
+        {isExposed ? ` · ${t('nodes.pinnedToLinearUi')}` : null}
+      </Text>
+      {description ? <Text>{description}</Text> : null}
+    </Stack>
+  );
+};
 
 const OutputFieldTooltip = ({
   includeTitle = true,
@@ -323,9 +314,9 @@ const OutputFieldTooltip = ({
   return (
     <Stack gap="0.5" maxW="18rem">
       {includeTitle ? <Text fontWeight="700">{template.title}</Text> : null}
-      <Text color="fg.subtle">{t('nodes.fieldName', { name: template.name })}</Text>
-      <Text color="fg.subtle">{t('nodes.fieldType', { type: getFieldTypeLabel(template.type) })}</Text>
-      <Text color="fg.subtle">{t('nodes.output')}</Text>
+      <Text color="fg.subtle">
+        {t('nodes.fieldInfo', { name: template.name, type: getFieldTypeLabel(template.type) })} · {t('nodes.output')}
+      </Text>
       {template.description ? <Text>{template.description}</Text> : null}
     </Stack>
   );
@@ -400,9 +391,11 @@ const NodeUpdateIcon = ({
 };
 
 const NodeInfoTooltipContent = ({
+  executionError,
   node,
   template,
 }: {
+  executionError?: string | null;
   node: WorkflowInvocationNode;
   template: InvocationNodeTemplateView['template'];
 }) => {
@@ -420,6 +413,11 @@ const NodeInfoTooltipContent = ({
       {updateStatusText ? <Text color="fg.warning">{updateStatusText}</Text> : null}
       <Text color="fg.subtle">{t('nodes.nodeClassification', { classification: template.classification })}</Text>
       <Text color="fg.subtle">{t('nodes.nodeCategory', { category: template.category })}</Text>
+      {executionError ? (
+        <Text color="fg.error">
+          {t('nodes.executionFailed')}: {executionError}
+        </Text>
+      ) : null}
       {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
       {node.data.notes ? <Text>{node.data.notes}</Text> : null}
     </Stack>
@@ -587,6 +585,7 @@ const InputFieldRow = ({
   template: FieldInputTemplate;
 }) => {
   const isWorkflowImageExport = useIsWorkflowImageExport();
+  const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
   const instance = node.data.inputs[template.name];
   const fieldIdentifier = { fieldName: template.name, nodeId: node.id };
@@ -599,7 +598,7 @@ const InputFieldRow = ({
     value: instance?.value,
   });
   const isInvalid = invalidReason !== null;
-  const handleTooltip = getHandleTypeTooltip(template.type);
+  const handleTooltip = getHandleTypeTooltip(template.type, t('nodes.any'), t);
   const canReset = showsControl && !isWorkflowFieldValueDefault(template, instance?.value);
 
   if (isSkeleton) {
@@ -763,7 +762,8 @@ const OutputFieldRow = ({
   template: FieldOutputTemplate;
 }) => {
   const isWorkflowImageExport = useIsWorkflowImageExport();
-  const handleTooltip = getHandleTypeTooltip(template.type);
+  const { t } = useTranslation();
+  const handleTooltip = getHandleTypeTooltip(template.type, t('nodes.any'), t);
   const value = latestResult === undefined ? null : formatOutputFieldValue(latestResult, template.name);
 
   return (
@@ -1055,7 +1055,11 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
       </Flex>
       {isWorkflowImageExport ? (
         <Box data-workflow-export-content="true" maxW="full" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
-          <NodeInfoTooltipContent node={node} template={template} />
+          <NodeInfoTooltipContent
+            executionError={execution?.status === 'failed' ? getNodeExecutionError(node, execution.error, t) : null}
+            node={node}
+            template={template}
+          />
         </Box>
       ) : null}
       <NodeProgressStrip execution={execution} />
