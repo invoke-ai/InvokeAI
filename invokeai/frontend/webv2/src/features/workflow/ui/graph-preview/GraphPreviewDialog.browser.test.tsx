@@ -430,7 +430,7 @@ describe('GraphPreviewDialog', () => {
     });
     // List mode loads on demand; wait for its rows before acting on them.
     if (mode === 'list') {
-      await vi.waitFor(() => expect(document.querySelector('[role="list"] [data-list-primary]')).not.toBeNull());
+      await expect.element(page.getByRole('list').getByRole('button').first()).toBeVisible();
     }
   };
 
