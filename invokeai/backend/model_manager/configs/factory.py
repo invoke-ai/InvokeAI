@@ -73,6 +73,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_OMI_SDXL_Config,
     LoraModelDefaultSettings,
 )
+from invokeai.backend.model_manager.configs.ltx2_duration_head import LTX2DurationHead_Checkpoint_Config
 from invokeai.backend.model_manager.configs.main import (
     Main_BnBNF4_FLUX_Config,
     Main_Checkpoint_Anima_Config,
@@ -577,6 +578,7 @@ AnyModelConfig = Annotated[
         Annotated[CLIPVision_Diffusers_Config, CLIPVision_Diffusers_Config.get_tag()],
         Annotated[SigLIP_Diffusers_Config, SigLIP_Diffusers_Config.get_tag()],
         Annotated[FLUXRedux_Checkpoint_Config, FLUXRedux_Checkpoint_Config.get_tag()],
+        Annotated[LTX2DurationHead_Checkpoint_Config, LTX2DurationHead_Checkpoint_Config.get_tag()],
         Annotated[LlavaOnevision_Diffusers_Config, LlavaOnevision_Diffusers_Config.get_tag()],
         Annotated[TextLLM_Diffusers_Config, TextLLM_Diffusers_Config.get_tag()],
         Annotated[ExternalApiModelConfig, ExternalApiModelConfig.get_tag()],

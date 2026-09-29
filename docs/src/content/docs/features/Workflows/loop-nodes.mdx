@@ -3,7 +3,7 @@ title: Loop Nodes
 description: Repeat workflow steps over a collection and optionally carry values from one iteration to the next.
 sidebar:
   order: 4
-lastUpdated: 2026-09-03
+lastUpdated: 2026-09-28
 ---
 
 Loop nodes let a workflow repeat the same group of steps for every item in a collection. For example, a workflow can
@@ -30,6 +30,9 @@ and `state` outputs contain values for that iteration. The work nodes run, then 
 
 The `For` node does not send its per-item `item` output directly to nodes after the loop. To run a node once after all
 iterations finish, connect that node to `For.output_collection` or `For.final_state`.
+
+You can connect `For.output_collection` directly to a branch input on an `If`. If that branch is selected, its consumer
+runs in the parent frame after the loop finishes; you do not need a `For.final_state` edge just to make it run.
 
 The editor draws a dashed green boundary around the loop body. This is a visual guide showing which nodes repeat; the
 boundary does not carry data. The dashed green line between `For.loop_linkage` and `ForReturn.loop_linkage` is a

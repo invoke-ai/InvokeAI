@@ -331,7 +331,10 @@ def test_an_nvfp4_checkpoint_loads_packed_with_its_qkv_split_on_tile_rows(monkey
     model = run.load(config)
 
     bf16 = torch.bfloat16
-    x = torch.randn(3, 64, dtype=bf16)
+    # A float32 activation, not the compute dtype: torch 2.7's CPU bf16 GEMM faults with an illegal instruction
+    # on part of GitHub's windows runner fleet. These values are exact in either width, and the bias below is
+    # still asserted at the width the load rounded it to.
+    x = torch.randn(3, 64, dtype=torch.float32)
     attention = model.layers[0].attention
     for projection, signs, magnitude in (
         (attention.to_q, qkv[:128], 0.5),
@@ -340,13 +343,16 @@ def test_an_nvfp4_checkpoint_loads_packed_with_its_qkv_split_on_tile_rows(monkey
     ):
         assert isinstance(projection, NVFP4Linear)
         assert projection.weight.dtype is torch.uint8
-        expected = torch.where(signs, magnitude, -magnitude).to(bf16)
+        expected = torch.where(signs, magnitude, -magnitude)
         assert torch.equal(projection(x), torch.nn.functional.linear(x, expected))
     adaln = model.layers[0].adaLN_modulation[0]
     assert isinstance(adaln, NVFP4Linear)
-    expected = torch.nn.functional.linear(x, torch.where(modulation, 0.5, -0.5).to(bf16), modulation_bias.to(bf16))
+    assert adaln.bias.dtype is bf16
+    expected = torch.nn.functional.linear(x, torch.where(modulation, 0.5, -0.5), modulation_bias.to(bf16).float())
     assert torch.equal(adaln(x), expected)
     assert type(model.t_embedder.mlp[0]) is torch.nn.Linear
+    # Separately from the values: `torch.equal` promotes, so it alone would accept any width.
+    assert model.t_embedder.mlp[0].weight.dtype is bf16
     assert torch.equal(model.t_embedder.mlp[0].weight, torch.where(timestep, 0.5, -0.5).to(bf16))
     assert torch.equal(model.all_x_embedder["2-1"].weight, embedder.to(bf16))
 

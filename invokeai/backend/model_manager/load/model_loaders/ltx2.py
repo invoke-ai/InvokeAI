@@ -36,6 +36,7 @@ from invokeai.backend.ltx2 import checkpoint_layout as layout
 from invokeai.backend.ltx2 import component_configs as cc
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
+from invokeai.backend.model_manager.configs.ltx2_duration_head import LTX2DurationHead_Checkpoint_Config
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_LTX2_Config, Main_Diffusers_LTX2_Config
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -599,3 +600,34 @@ class LTX2Gemma4EncoderModel(ModelLoader):
             raise RuntimeError(f"Missing keys loading {what}: {sorted(stray)[:5]}...")
         sd.clear()
         return model
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.LTX2, type=ModelType.LTX2DurationHead, format=ModelFormat.Checkpoint)
+class LTX2DurationHeadLoader(_LTX2ComponentLoading, ModelLoader):
+    """Loads the LTX-2 duration head.
+
+    The only LTX-2 component that needs no key conversion: it is published in diffusers layout
+    already, in bf16.
+
+    Widened to fp32 on the way in, for the same reason the audio VAE and the vocoder are: the head
+    emits a single scalar, and everything downstream is a threshold. A clamp and a floor onto the
+    8k+1 grid turn it into a frame count, so a prediction that lands near a grid boundary resolves
+    to one of two answers a whole 8 frames apart -- and bf16 carries about three decimal digits.
+    Paying 3.6 MB to take that coin-flip out of the shot's length is the cheapest trade here.
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        from diffusers.pipelines.ltx2.duration_head import LTX2DurationHead
+
+        if not isinstance(config, LTX2DurationHead_Checkpoint_Config):
+            raise ValueError(f"Unexpected model config type: {type(config)}.")
+
+        # The guarded reader, like every other LTX-2 component: a quantized build of the head carries
+        # the same 19 keys, and upcasting its weights without their scales would load cleanly and
+        # predict nonsense.
+        sd = _read_dense_component(Path(config.path), "LTX-2 duration head", self._logger)
+        return self._build_dense(LTX2DurationHead, sd, "LTX-2 duration head", torch.float32)

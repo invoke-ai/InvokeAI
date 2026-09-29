@@ -35,7 +35,6 @@ import {
   LTX2_NUM_FRAMES_DEFAULT,
   LTX2_NUM_FRAMES_MAX,
   LTX2_NUM_FRAMES_MIN,
-  LTX2_NUM_FRAMES_SLIDER_MAX,
   LTX2_EXTEND_CONTEXT_FRAMES,
   ltx2MaxExtendContextFrames,
   ltx2NewFramesForExtend,
@@ -58,6 +57,7 @@ import {
   WAN_NUM_FRAMES_MIN,
   WAN_NUM_FRAMES_STEP,
   WAN_TI2V_PIXEL_MULTIPLE,
+  ltx2AutoDurationBounds,
   type VideoDimensions,
   type VideoFramesChoices,
   type VideoFramesGrid,
@@ -94,11 +94,6 @@ export interface VideoTargetResolutionOption {
  */
 export interface VideoFramesGridPolicy extends VideoFramesGrid {
   kind: 'grid';
-  /**
-   * Where the slider stops, when that is below `max`. The field still accepts
-   * anything up to `max`: the cap is a recommendation about cost, not a limit.
-   */
-  sliderMax?: number;
 }
 
 export interface VideoFramesChoicesPolicy extends VideoFramesChoices {
@@ -353,7 +348,6 @@ const LTX2_FRAMES: VideoFramesGridPolicy = {
   kind: 'grid',
   max: LTX2_NUM_FRAMES_MAX,
   min: LTX2_NUM_FRAMES_MIN,
-  sliderMax: LTX2_NUM_FRAMES_SLIDER_MAX,
   step: LTX2_NUM_FRAMES_STEP,
 };
 
@@ -639,6 +633,45 @@ export interface EffectiveVideoTiming {
   fpsFromClip: boolean;
 }
 
+/**
+ * Whether this mode has a length left for the duration head to decide.
+ *
+ * A conditioning clip drives `num_frames` by its own edge, and a second edge into one input is a
+ * malformed graph. An extension has no such edge, but its frame count is the new material the user
+ * asked for, measured against the source it joins -- a prompt's natural length is not that number.
+ *
+ * Separate from `isAutoDurationActive` because the panel needs to say *why* the control is
+ * unavailable, which "not active" alone cannot tell it.
+ */
+export const isAutoDurationSupportedForMode = (
+  settings: Pick<
+    VideoSettings,
+    'conditioningClip' | 'firstFrameImage' | 'lastFrameImage' | 'references' | 'sourceVideo'
+  >
+): boolean => {
+  const mode = resolveVideoMode(settings);
+
+  return mode !== 'audio-to-video' && mode !== 'video-to-audio' && mode !== 'extend';
+};
+
+/**
+ * Whether the duration head will choose this run's length: the user asked for it, a head is
+ * selected, and the mode has a length left to decide.
+ */
+export const isAutoDurationActive = (
+  settings: Pick<
+    VideoSettings,
+    | 'autoDuration'
+    | 'conditioningClip'
+    | 'firstFrameImage'
+    | 'lastFrameImage'
+    | 'ltx2DurationHeadModel'
+    | 'references'
+    | 'sourceVideo'
+  >
+): boolean =>
+  Boolean(settings.autoDuration && settings.ltx2DurationHeadModel) && isAutoDurationSupportedForMode(settings);
+
 export const getEffectiveVideoTiming = (
   model: MainModelConfig | undefined,
   settings: Pick<
@@ -803,6 +836,31 @@ export interface VideoModelPolicy {
     audioOutput: boolean;
   };
 }
+
+/**
+ * The range the duration head chooses this run's length from, or null when it does not run.
+ *
+ * It runs when auto duration is on and the mode leaves the length open, and chooses between the
+ * family's shortest clip and the Frames value, which under auto duration is the ceiling the user
+ * sized the run for. A ceiling at or under that floor leaves nothing to choose: the head is skipped
+ * and the run uses the Frames value as set. The graph and the panel both read this, so the panel's
+ * description of the run is the run.
+ */
+export const getAutoDurationBounds = (
+  model: MainModelConfig | undefined,
+  settings: VideoSettings
+): { maxSeconds: number; minSeconds: number } | null => {
+  if (!isAutoDurationActive(settings)) {
+    return null;
+  }
+  const frames = getVideoModelPolicy(model, settings).frames;
+  if (frames.kind !== 'grid') {
+    return null;
+  }
+  const timing = getEffectiveVideoTiming(model, settings);
+
+  return ltx2AutoDurationBounds(timing.fps, frames.min, timing.numFrames);
+};
 
 export const getVideoModelPolicy = (model: MainModelConfig | undefined, settings: VideoSettings): VideoModelPolicy => {
   const config = getVideoConfig(model);
@@ -1291,7 +1349,8 @@ export type VideoComponentValueKey =
   | 'h3TransformerModel'
   | 'h3TextEncoderModel'
   | 'h3HybridBaseModel'
-  | 'ltx2TextEncoderModel';
+  | 'ltx2TextEncoderModel'
+  | 'ltx2DurationHeadModel';
 
 export interface VideoComponentPolicyContext {
   model: MainModelConfig;
@@ -1319,6 +1378,7 @@ export interface VideoComponentSectionPolicy {
 
 const VIDEO_COMPONENT_SETTING_LABELS: Record<VideoComponentValueKey, string> = {
   componentSourceModel: 'Component source',
+  ltx2DurationHeadModel: 'Duration head',
   ltx2TextEncoderModel: 'Gemma-4 encoder',
   h3HybridBaseModel: 'Hybrid quality base',
   h3TextEncoderModel: 'Text encoder (single file)',
@@ -1501,6 +1561,17 @@ export const getVideoComponentSectionPolicy = (
         required: () => true,
         valueKind: 'component',
       },
+      {
+        filter: (candidate) => candidate.type === 'ltx2_duration_head' && candidate.base === 'ltx-2',
+        helpTextKey: 'widgets.video.componentSlots.ltx2DurationHeadHelp',
+        key: 'ltx2DurationHeadModel',
+        label: 'Duration head',
+        // Optional, and deliberately has no `missingMessage`: without it a run simply uses the
+        // frame count the user set, which is what every LTX-2 run did before this model existed.
+        modelTypes: ['ltx2_duration_head'],
+        required: () => false,
+        valueKind: 'component',
+      },
     ]);
   }
 
@@ -1603,6 +1674,7 @@ const getVideoComponentPolicyContext = (
     componentSourceModel: settings.componentSourceModel,
     h3HybridBaseModel: settings.h3HybridBaseModel,
     ltx2TextEncoderModel: settings.ltx2TextEncoderModel,
+    ltx2DurationHeadModel: settings.ltx2DurationHeadModel,
     h3TextEncoderModel: settings.h3TextEncoderModel,
     h3TransformerModel: settings.h3TransformerModel,
     vae: settings.vae,
@@ -1690,6 +1762,13 @@ const findLtx2ComponentSource = (models: readonly ModelConfig[]): MainModelConfi
 const findLtx2TextEncoder = (models: readonly ModelConfig[]): ModelConfig | null =>
   models.find((candidate) => candidate.type === 'gemma4_encoder' && candidate.base === 'ltx-2') ?? null;
 
+/**
+ * An installed duration head, selected so its Auto duration switch is there to find. Selecting it
+ * turns nothing on: the switch itself stays off until the user flips it.
+ */
+const findLtx2DurationHead = (models: readonly ModelConfig[]): ModelConfig | null =>
+  models.find((candidate) => candidate.type === 'ltx2_duration_head' && candidate.base === 'ltx-2') ?? null;
+
 export const getDefaultVideoSettings = (
   model?: MainModelConfig,
   models: readonly ModelConfig[] = []
@@ -1698,6 +1777,8 @@ export const getDefaultVideoSettings = (
 
   const base: VideoSettings = {
     ltx2ExtendContextFrames: LTX2_EXTEND_CONTEXT_FRAMES,
+    ltx2DurationHeadModel: model && model.base === 'ltx-2' ? findLtx2DurationHead(models) : null,
+    autoDuration: false,
     acceleratorEnabled: false,
     acceleratorLoraKeys: [],
     aspectRatioId: '16:9',
@@ -2045,6 +2126,12 @@ export const getVideoModelSelectionResult = ({
     }
   }
 
+  // Auto duration belongs to the head it was turned on with. Once that head is gone, a head filled
+  // in below (or picked later) must not bring the switch back on by itself.
+  if (!next.ltx2DurationHeadModel) {
+    next.autoDuration = false;
+  }
+
   // Autofill required H3 components only when empty; preserve explicit compatible choices.
   if (model.base === 'minimax-h3' && model.format === 'checkpoint' && !next.componentSourceModel) {
     next.componentSourceModel = findH3ComponentSource(models);
@@ -2057,6 +2144,9 @@ export const getVideoModelSelectionResult = ({
     }
     if (!next.ltx2TextEncoderModel) {
       next.ltx2TextEncoderModel = findLtx2TextEncoder(models);
+    }
+    if (!next.ltx2DurationHeadModel) {
+      next.ltx2DurationHeadModel = findLtx2DurationHead(models);
     }
   }
 

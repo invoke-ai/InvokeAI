@@ -1773,6 +1773,9 @@
                       "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
                     },
                     {
@@ -2228,6 +2231,9 @@
                       "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
                     },
                     {
+                      "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
+                    },
+                    {
                       "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
                     },
                     {
@@ -2681,6 +2687,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
@@ -3181,6 +3190,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
@@ -3708,6 +3720,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
@@ -5092,6 +5107,9 @@
                     },
                     {
                       "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
+                    },
+                    {
+                      "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
                     },
                     {
                       "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
@@ -16120,6 +16138,197 @@
         }
       }
     },
+    "/api/v1/recall/video/{queue_id}/conditioning-video": {
+      "post": {
+        "tags": ["recall"],
+        "summary": "Recall Conditioning Video",
+        "description": "Set a gallery video as the current user's conditioning clip (models that take one, e.g. LTX-2).\n\nThe clip replaces the panel's other conditioning media: frames, initial video and references.",
+        "operationId": "recall_conditioning_video",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "video_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "description": "The name of the gallery video",
+              "title": "Video Name"
+            },
+            "description": "The name of the gallery video"
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": ["audio", "video"],
+              "type": "string",
+              "description": "Which stream of the video is the condition: `audio` generates a picture for its soundtrack, `video` generates a soundtrack for its picture",
+              "title": "Role"
+            },
+            "description": "Which stream of the video is the condition: `audio` generates a picture for its soundtrack, `video` generates a soundtrack for its picture"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoRecallMediaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recall/video/{queue_id}/conditioning-video/upload": {
+      "post": {
+        "tags": ["recall"],
+        "summary": "Recall Conditioning Video Upload",
+        "description": "Upload a video into the gallery and set it as the current user's conditioning clip.",
+        "operationId": "recall_conditioning_video_upload",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": ["audio", "video"],
+              "type": "string",
+              "description": "Which stream of the video is the condition: `audio` generates a picture for its soundtrack, `video` generates a soundtrack for its picture",
+              "title": "Role"
+            },
+            "description": "Which stream of the video is the condition: `audio` generates a picture for its soundtrack, `video` generates a soundtrack for its picture"
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The board to upload the video to; Uncategorized when omitted",
+              "title": "Board Id"
+            },
+            "description": "The board to upload the video to; Uncategorized when omitted"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoRecallMediaResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The video exceeds the upload size limit"
+          },
+          "415": {
+            "description": "The file is not a supported video or audio file"
+          },
+          "429": {
+            "description": "Too many concurrent video uploads"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "contentMediaType": "application/octet-stream",
+                    "title": "File"
+                  },
+                  "metadata": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Metadata",
+                    "description": "The metadata to associate with the video, must be a stringified JSON dict"
+                  }
+                },
+                "type": "object",
+                "required": ["file"],
+                "title": "Body_upload_video"
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v2/custom_nodes/": {
       "get": {
         "tags": ["custom_nodes"],
@@ -18761,6 +18970,9 @@
           },
           {
             "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
+          },
+          {
+            "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
           },
           {
             "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
@@ -41168,6 +41380,9 @@
                   "$ref": "#/components/schemas/LTX2DenoiseInvocation"
                 },
                 {
+                  "$ref": "#/components/schemas/LTX2DurationInvocation"
+                },
+                {
                   "$ref": "#/components/schemas/LTX2ExtendConditioningInvocation"
                 },
                 {
@@ -41931,6 +42146,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/LTX2DenoiseOutput"
+                },
+                {
+                  "$ref": "#/components/schemas/LTX2DurationOutput"
                 },
                 {
                   "$ref": "#/components/schemas/LTX2ExtendConditioningOutput"
@@ -51411,6 +51629,9 @@
                 "$ref": "#/components/schemas/LTX2DenoiseInvocation"
               },
               {
+                "$ref": "#/components/schemas/LTX2DurationInvocation"
+              },
+              {
                 "$ref": "#/components/schemas/LTX2ExtendConditioningInvocation"
               },
               {
@@ -52170,6 +52391,9 @@
               },
               {
                 "$ref": "#/components/schemas/LTX2DenoiseOutput"
+              },
+              {
+                "$ref": "#/components/schemas/LTX2DurationOutput"
               },
               {
                 "$ref": "#/components/schemas/LTX2ExtendConditioningOutput"
@@ -52991,6 +53215,9 @@
               },
               {
                 "$ref": "#/components/schemas/LTX2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/LTX2DurationInvocation"
               },
               {
                 "$ref": "#/components/schemas/LTX2ExtendConditioningInvocation"
@@ -54147,6 +54374,9 @@
           "ltx2_denoise": {
             "$ref": "#/components/schemas/LTX2DenoiseOutput"
           },
+          "ltx2_duration": {
+            "$ref": "#/components/schemas/LTX2DurationOutput"
+          },
           "ltx2_extend_conditioning": {
             "$ref": "#/components/schemas/LTX2ExtendConditioningOutput"
           },
@@ -54806,6 +55036,7 @@
           "lscale",
           "ltx2_audio_conditioning",
           "ltx2_denoise",
+          "ltx2_duration",
           "ltx2_extend_conditioning",
           "ltx2_ideal_dimensions",
           "ltx2_image_conditioning",
@@ -55546,6 +55777,9 @@
               },
               {
                 "$ref": "#/components/schemas/LTX2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/LTX2DurationInvocation"
               },
               {
                 "$ref": "#/components/schemas/LTX2ExtendConditioningInvocation"
@@ -56767,6 +57001,9 @@
               },
               {
                 "$ref": "#/components/schemas/LTX2DenoiseInvocation"
+              },
+              {
+                "$ref": "#/components/schemas/LTX2DurationInvocation"
               },
               {
                 "$ref": "#/components/schemas/LTX2ExtendConditioningInvocation"
@@ -61514,6 +61751,277 @@
         },
         "required": ["output_meta", "video_latents", "audio_latents", "width", "height", "num_frames", "type", "type"],
         "title": "LTX2DenoiseOutput",
+        "type": "object"
+      },
+      "LTX2DurationHead_Checkpoint_Config": {
+        "properties": {
+          "key": {
+            "type": "string",
+            "title": "Key",
+            "description": "A unique key for this model."
+          },
+          "hash": {
+            "type": "string",
+            "title": "Hash",
+            "description": "The hash of the model file(s)."
+          },
+          "path": {
+            "type": "string",
+            "title": "Path",
+            "description": "Path to the model on the filesystem. Relative paths are relative to the Invoke root directory."
+          },
+          "file_size": {
+            "type": "integer",
+            "title": "File Size",
+            "description": "The size of the model in bytes."
+          },
+          "name": {
+            "type": "string",
+            "title": "Name",
+            "description": "Name of the model."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Model description"
+          },
+          "source": {
+            "type": "string",
+            "title": "Source",
+            "description": "The original source of the model (path, URL or repo_id)."
+          },
+          "source_type": {
+            "$ref": "#/components/schemas/ModelSourceType",
+            "description": "The type of source"
+          },
+          "source_api_response": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Api Response",
+            "description": "The original API response from the source, as stringified JSON."
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Source Url",
+            "description": "Optional URL for the model (e.g. download page or model page)."
+          },
+          "cover_image": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cover Image",
+            "description": "Url for image to preview model"
+          },
+          "type": {
+            "type": "string",
+            "const": "ltx2_duration_head",
+            "title": "Type",
+            "default": "ltx2_duration_head"
+          },
+          "format": {
+            "type": "string",
+            "const": "checkpoint",
+            "title": "Format",
+            "default": "checkpoint"
+          },
+          "base": {
+            "type": "string",
+            "const": "ltx-2",
+            "title": "Base",
+            "default": "ltx-2"
+          }
+        },
+        "type": "object",
+        "required": [
+          "key",
+          "hash",
+          "path",
+          "file_size",
+          "name",
+          "description",
+          "source",
+          "source_type",
+          "source_api_response",
+          "source_url",
+          "cover_image",
+          "type",
+          "format",
+          "base"
+        ],
+        "title": "LTX2DurationHead_Checkpoint_Config",
+        "description": "Model config for the LTX-2 duration head, which predicts a shot's natural length from a prompt."
+      },
+      "LTX2DurationInvocation": {
+        "category": "video",
+        "class": "invocation",
+        "classification": "prototype",
+        "description": "Predicts the natural length of the shot a prompt describes, as an LTX-2 frame count.\n\nThe duration head reads the same connector outputs the transformer's prompt cross-attention\nconsumes, so it judges the prompt the model will actually see rather than its raw text. The\nprediction is clamped to `min_seconds`/`max_seconds` and then snapped down onto the VAE's\ncausal temporal grid (`8k + 1`), which is the only frame count a generation can run at.\n\nConditioning clips and video extension fix the frame count by construction -- the source\nfootage decides it -- so this node has nothing to say about those graphs.",
+        "node_pack": "invokeai",
+        "properties": {
+          "id": {
+            "description": "The id of this instance of an invocation. Must be unique among all instances of invocations.",
+            "field_kind": "node_attribute",
+            "title": "Id",
+            "type": "string"
+          },
+          "is_intermediate": {
+            "default": false,
+            "description": "Whether or not this is an intermediate invocation.",
+            "field_kind": "node_attribute",
+            "input": "direct",
+            "orig_required": true,
+            "title": "Is Intermediate",
+            "type": "boolean",
+            "ui_hidden": false,
+            "ui_type": "IsIntermediate"
+          },
+          "use_cache": {
+            "default": true,
+            "description": "Whether or not to use the cache",
+            "field_kind": "node_attribute",
+            "title": "Use Cache",
+            "type": "boolean"
+          },
+          "conditioning": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/LTX2ConditioningField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Prompt conditioning from the LTX-2 text encoder.",
+            "field_kind": "input",
+            "input": "connection",
+            "orig_required": true,
+            "title": "Conditioning"
+          },
+          "duration_head": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ModelIdentifierField"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "The LTX-2 duration head.",
+            "field_kind": "input",
+            "input": "any",
+            "orig_required": true,
+            "title": "Duration Head",
+            "ui_model_base": ["ltx-2"],
+            "ui_model_type": ["ltx2_duration_head"]
+          },
+          "fps": {
+            "default": 24.0,
+            "description": "Frames per second the clip will play at. The head predicts seconds, so this is what turns that into a frame count.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 120,
+            "minimum": 1,
+            "orig_default": 24.0,
+            "orig_required": false,
+            "title": "Fps",
+            "type": "number"
+          },
+          "min_seconds": {
+            "default": 1.0,
+            "description": "Shortest clip to allow.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "orig_default": 1.0,
+            "orig_required": false,
+            "title": "Min Seconds",
+            "type": "number"
+          },
+          "max_seconds": {
+            "default": 20.0,
+            "description": "Longest clip to allow.",
+            "field_kind": "input",
+            "input": "any",
+            "maximum": 20.0,
+            "minimum": 1.0,
+            "orig_default": 20.0,
+            "orig_required": false,
+            "title": "Max Seconds",
+            "type": "number"
+          },
+          "type": {
+            "const": "ltx2_duration",
+            "default": "ltx2_duration",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["type", "id"],
+        "tags": ["ltx", "ltx2", "video", "duration", "frames"],
+        "title": "Duration - LTX-2",
+        "type": "object",
+        "version": "1.0.0",
+        "output": {
+          "$ref": "#/components/schemas/LTX2DurationOutput"
+        }
+      },
+      "LTX2DurationOutput": {
+        "class": "output",
+        "description": "A predicted shot length, as both a frame count and the seconds it came from.",
+        "properties": {
+          "num_frames": {
+            "description": "Frame count on LTX-2's 8k+1 grid. Wire into the denoise node's `num_frames`.",
+            "field_kind": "output",
+            "title": "Num Frames",
+            "type": "integer",
+            "ui_hidden": false
+          },
+          "seconds": {
+            "description": "The head's unclamped prediction, in seconds.",
+            "field_kind": "output",
+            "title": "Seconds",
+            "type": "number",
+            "ui_hidden": false
+          },
+          "type": {
+            "const": "ltx2_duration_output",
+            "default": "ltx2_duration_output",
+            "field_kind": "node_attribute",
+            "title": "type",
+            "type": "string"
+          }
+        },
+        "required": ["output_meta", "num_frames", "seconds", "type", "type"],
+        "title": "LTX2DurationOutput",
         "type": "object"
       },
       "LTX2ExtendConditioningInvocation": {
@@ -82915,6 +83423,9 @@
                 "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
               },
               {
+                "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
               },
               {
@@ -83616,6 +84127,9 @@
                     "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
                   },
                   {
+                    "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
+                  },
+                  {
                     "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
                   },
                   {
@@ -84202,6 +84716,9 @@
                 "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
               },
               {
+                "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
+              },
+              {
                 "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
               },
               {
@@ -84642,6 +85159,9 @@
               },
               {
                 "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
+              },
+              {
+                "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
               },
               {
                 "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
@@ -85156,6 +85676,7 @@
           "text_llm",
           "external_image_generator",
           "pid_decoder",
+          "ltx2_duration_head",
           "unknown"
         ],
         "title": "ModelType",
@@ -85564,6 +86085,9 @@
                 },
                 {
                   "$ref": "#/components/schemas/FLUXRedux_Checkpoint_Config"
+                },
+                {
+                  "$ref": "#/components/schemas/LTX2DurationHead_Checkpoint_Config"
                 },
                 {
                   "$ref": "#/components/schemas/LlavaOnevision_Diffusers_Config"
@@ -105963,7 +106487,7 @@
           },
           "action": {
             "type": "string",
-            "enum": ["parameters", "initial_video", "reference_video"],
+            "enum": ["parameters", "initial_video", "reference_video", "conditioning_video"],
             "title": "Action"
           },
           "video": {
@@ -106523,7 +107047,7 @@
           },
           "action": {
             "description": "What the frontend should do with the payload",
-            "enum": ["parameters", "initial_video", "reference_video"],
+            "enum": ["parameters", "initial_video", "reference_video", "conditioning_video"],
             "title": "Action",
             "type": "string"
           },
@@ -106571,10 +107095,34 @@
               }
             ],
             "default": null,
-            "description": "For `initial_video` and `reference_video`: the video to place"
+            "description": "For `initial_video`, `reference_video` and `conditioning_video`: the video to place"
+          },
+          "conditioning_role": {
+            "anyOf": [
+              {
+                "enum": ["audio", "video"],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For `conditioning_video`: which stream of the video is the condition; the other is generated",
+            "title": "Conditioning Role"
           }
         },
-        "required": ["timestamp", "queue_id", "user_id", "action", "mode", "strict", "parameters", "video"],
+        "required": [
+          "timestamp",
+          "queue_id",
+          "user_id",
+          "action",
+          "mode",
+          "strict",
+          "parameters",
+          "video",
+          "conditioning_role"
+        ],
         "title": "VideoRecallRequestedEvent",
         "type": "object"
       },

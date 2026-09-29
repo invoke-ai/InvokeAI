@@ -22,6 +22,7 @@ import {
 import {
   applyReferenceExtendNumFrames,
   canPlaceReferenceExtendAnchor,
+  getConditioningClipPatch,
   getInitialVideoPatch,
   getReferencesPatch,
   isVideoTargetResolution,
@@ -34,9 +35,12 @@ import {
   getAcceleratorToggleResult,
   getEffectiveVideoTiming,
   getVideoDimensions,
+  getAutoDurationBounds,
   getVideoExpandPromptSuggestion,
   getVideoModelPolicy,
   getVideoModelSelectionResult,
+  isAutoDurationActive,
+  isAutoDurationSupportedForMode,
   isVideoModelSelectable,
 } from '@features/video/core/videoPolicies';
 import { createDefaultVideoWidgetValues, syncVideoWidgetValuesWithModels } from '@features/video/core/widgetValues';
@@ -55,6 +59,7 @@ import { VideoConceptsSection } from './VideoConceptsSection';
 import { VideoConditioningClipField } from './VideoConditioningClipField';
 import { VideoPromptFields } from './VideoFormFields';
 import { VideoFrameImageField } from './VideoFrameImageField';
+import { VideoLengthControls } from './VideoLengthControls';
 import { VideoReferenceListField } from './VideoReferenceListField';
 import { VideoSourceClipField } from './VideoSourceClipField';
 import { useVideoUi, useVideoUiActions } from './VideoUiContext';
@@ -145,6 +150,20 @@ export const VideoWidgetView = () => {
   // What the run will actually use: a conditioning clip decides the length, and in the video role
   // the frame rate too. The stored values stay put underneath, so clearing the clip restores them.
   const timing = useMemo(() => getEffectiveVideoTiming(values.model ?? undefined, values), [values]);
+  const autoDurationActive = useMemo(() => isAutoDurationActive(values), [values]);
+  const autoDurationBounds = useMemo(() => getAutoDurationBounds(values.model ?? undefined, values), [values]);
+  const autoDurationCeiling = useMemo(
+    () =>
+      autoDurationBounds
+        ? {
+            // The head converts seconds at the run's rate and floors onto the grid, the same as here.
+            frames: snapLtx2FramesDown(Math.round(autoDurationBounds.maxSeconds * timing.fps)),
+            seconds: autoDurationBounds.maxSeconds,
+          }
+        : null,
+    [autoDurationBounds, timing.fps]
+  );
+  const autoDurationSupported = useMemo(() => isAutoDurationSupportedForMode(values), [values]);
   const durationSeconds = getVideoDurationSeconds(
     timing.numFrames,
     // In extend mode the extension inherits the SOURCE clip's frame rate.
@@ -234,6 +253,7 @@ export const VideoWidgetView = () => {
       modalityScale: (modalityScale: number) => patch({ modalityScale }),
       stgScale: (stgScale: number) => patch({ stgScale }),
       fps: (fps: number) => patch({ fps }),
+      autoDuration: ({ checked }: { checked: boolean }) => patch({ autoDuration: checked }),
       steps: (steps: number) => patch({ steps }),
       // Snapped on the way out: the VAE encodes 8k + 1 frames and the node snaps a ragged request
       // down silently, so an unsnapped value would leave the panel showing a number the run did
@@ -274,11 +294,7 @@ export const VideoWidgetView = () => {
   // and each of those clears it in turn. The role a dropped clip arrives in comes from the gallery
   // record: an uploaded soundtrack has no picture to condition on.
   const setConditioningClip = useCallback(
-    (conditioningClip: VideoConditioningClip | null) =>
-      patch({
-        conditioningClip,
-        ...(conditioningClip ? { firstFrameImage: null, lastFrameImage: null, references: [], sourceVideo: null } : {}),
-      }),
+    (conditioningClip: VideoConditioningClip | null) => patch(getConditioningClipPatch(conditioningClip)),
     [patch]
   );
   // This setter tracks references separately from patch-only field setters. Rebudget the linked tail with frame
@@ -405,7 +421,7 @@ export const VideoWidgetView = () => {
       policy.frames.kind === 'grid'
         ? {
             inputMax: policy.frames.max,
-            max: policy.frames.sliderMax ?? policy.frames.max,
+            max: policy.frames.max,
             min: policy.frames.min,
             step: policy.frames.step,
           }
@@ -681,20 +697,18 @@ export const VideoWidgetView = () => {
               onValueChange={set.targetResolution}
             />
           </Field>
-          <ScrubberField
-            disabled={timing.numFramesFromClip}
-            helpText={
-              timing.numFramesFromClip
-                ? `${t('widgets.video.framesFromClip')}${durationText ? ` ${durationText}` : ''}`
-                : durationText
-            }
-            inputMax={framesSlider.inputMax}
-            label={t('widgets.video.frames')}
-            max={framesSlider.max}
-            min={framesSlider.min}
-            step={framesSlider.step}
-            value={timing.numFrames}
-            onChange={setNumFrames}
+          <VideoLengthControls
+            autoDuration={values.autoDuration}
+            autoDurationActive={autoDurationActive}
+            autoDurationCeiling={autoDurationCeiling}
+            autoDurationSupported={autoDurationSupported}
+            durationText={durationText}
+            framesSlider={framesSlider}
+            hasDurationHead={Boolean(values.ltx2DurationHeadModel)}
+            numFrames={timing.numFrames}
+            numFramesFromClip={timing.numFramesFromClip}
+            onAutoDurationChange={set.autoDuration}
+            onNumFramesChange={setNumFrames}
           />
           {policy.ui.fpsVisible ? (
             <ScrubberField

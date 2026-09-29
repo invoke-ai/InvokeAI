@@ -135,6 +135,28 @@ describe('syncVideoWidgetValuesWithModels', () => {
     expect(synced.modelKey).toBe(replacement.key);
   });
 
+  it('turns auto duration off with an uninstalled head, so a reinstall does not switch it back on', () => {
+    const ltx2 = {
+      base: 'ltx-2',
+      format: 'checkpoint',
+      key: 'ltx2',
+      name: 'LTX-2.5',
+      type: 'main',
+      variant: 'ltx2_dev',
+    };
+    const head = { base: 'ltx-2', key: 'head', name: 'Duration head', type: 'ltx2_duration_head' };
+    const values = {
+      ...createDefaultVideoWidgetValues([ltx2 as never]),
+      autoDuration: true,
+      ltx2DurationHeadModel: head as never,
+    };
+
+    const synced = syncVideoWidgetValuesWithModels(values, [ltx2 as never]);
+
+    expect(synced.ltx2DurationHeadModel).toBeNull();
+    expect(synced.autoDuration).toBe(false);
+  });
+
   it('drops components that no longer pass the slot filter for the resolved model', () => {
     const values = { ...createDefaultVideoWidgetValues([model]), vae: WAN_VAE_16 };
     // Catalog holds the H3 main only — the Wan VAE has no slot there.
