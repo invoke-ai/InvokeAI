@@ -32,6 +32,7 @@ import {
   getVideoDimensions,
   getVideoModelPolicy,
   getVideoTargetResolution,
+  getAutoDurationBounds,
   getVideoValidationReasons,
 } from './videoPolicies';
 
@@ -771,6 +772,31 @@ const buildLtx2VideoGraph = (settings: VideoSettings, model: MainModelConfig): B
   }
   addEdge(graph, seed, 'value', denoise, 'seed');
 
+  // The length the run will actually use, decided from the prompt the transformer will see.
+  //
+  // Only in the modes whose length is still open. A conditioning clip drives `num_frames` by its
+  // own edge further down, and a second edge into one input is a malformed graph rather than a
+  // fallback; an extension has no such edge, but its length is the continuation the user asked
+  // for, measured against the source it joins. The head chooses at most the Frames value, which
+  // under auto duration is the ceiling the run's memory was sized for.
+  const durationBounds = getAutoDurationBounds(model, settings);
+  const durationHead =
+    durationBounds && settings.ltx2DurationHeadModel
+      ? addNode(graph, {
+          duration_head: settings.ltx2DurationHeadModel,
+          fps: timing.fps,
+          id: 'duration',
+          type: 'ltx2_duration',
+          max_seconds: durationBounds.maxSeconds,
+          min_seconds: durationBounds.minSeconds,
+        })
+      : null;
+
+  if (durationHead) {
+    addEdge(graph, textEncoder, 'conditioning', durationHead, 'conditioning');
+    addEdge(graph, durationHead, 'num_frames', denoise, 'num_frames');
+  }
+
   let extendConditioning: BackendInvocationContract | null = null;
 
   /**
@@ -955,6 +981,12 @@ const buildLtx2VideoGraph = (settings: VideoSettings, model: MainModelConfig): B
     }
     addEdge(graph, seed, 'value', refine, 'seed');
     addEdge(graph, upsample, 'latents', refine, 'latents');
+    // Both passes must run at one frame count. Under auto duration the literal above is the
+    // panel's stale number, and `build_refine_state` checks the upsampled latents against it --
+    // so without this the run dies after the base pass and the upsampler, blaming the canvas.
+    if (durationHead) {
+      addEdge(graph, durationHead, 'num_frames', refine, 'num_frames');
+    }
     addEdge(graph, denoise, 'audio_latents', refine, 'audio_latents');
 
     // A second encode of every held frame, at the refine canvas. The refine pass re-noises every
@@ -1053,7 +1085,7 @@ const buildLtx2VideoGraph = (settings: VideoSettings, model: MainModelConfig): B
 
   const joined = join?.concat ?? null;
 
-  addVideoMetadata({
+  const metadata = addVideoMetadata({
     extras: {
       cfg_scale: guidance.cfg_scale,
       // What will actually be delivered: a continuation runs at the source's rate, every other mode
@@ -1099,6 +1131,12 @@ const buildLtx2VideoGraph = (settings: VideoSettings, model: MainModelConfig): B
     settings,
     width: dimensions.width,
   });
+
+  // The recorded length has to be the one that ran, not the one the panel was holding: under auto
+  // duration the panel's number is stale by construction, and recall reads this back.
+  if (durationHead) {
+    addEdge(graph, durationHead, 'num_frames', metadata, 'num_frames');
+  }
 
   return graph;
 };
