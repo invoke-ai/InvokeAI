@@ -584,8 +584,19 @@ class TestMeasuredDecodePeak:
         assert at_1280 == pytest.approx(at_1024 + span * (1280**2 - 1024**2), rel=1e-6)
 
     def test_a_smaller_image_is_never_priced_above_a_larger_one(self):
-        """1728x1856 against 1792^2 on CUDA: 0.13% less area, and bracket-max interpolation made it 2.3 GiB dearer."""
+        """1728x1856 against 1792^2 on CUDA: 0.13% less area, and bracket-max interpolation made it 2.3 GiB dearer.
+        1600x1472 against 1024x2304 is the ROCm counterpart: 20.05 GiB against 14.38 GiB before."""
         assert self._peak_hw(1728, 1856, hip=None) <= self._peak_hw(1792, 1792, hip=None)
+        assert self._peak_hw(1600, 1472) <= self._peak_hw(1024, 2304)
+
+    @pytest.mark.parametrize("hip", ["7.2.0", None], ids=["rocm", "cuda"])
+    def test_the_price_never_falls_as_the_area_grows(self, hip):
+        """Across the whole grid of sizes the decision sees, a larger output area is never priced lower -- the
+        property the single pairs above are instances of, for both backends' curves."""
+        sizes = range(512, 2561, 64)
+        prices = sorted((h * w, self._peak_hw(h, w, hip=hip)) for h in sizes for w in sizes)
+        inversions = [(a, b) for a, b in zip(prices, prices[1:], strict=False) if b[1] < a[1]]
+        assert inversions == []
 
     def test_past_the_measured_range_takes_the_reservation_constant(self):
         """Nothing was measured there, so the decision uses the figure the reservation uses -- guessing low would

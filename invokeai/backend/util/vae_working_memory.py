@@ -32,24 +32,34 @@ def should_pretile_vae_decode(
     memory) is never tiled on these grounds.
 
     On Windows the ceiling is the video-memory budget rather than the card's nameplate total -- the budget is the point
-    past which Windows pages this process out. With one correction: a budget *below* what this process already holds is
+    past which Windows pages this process out. With one correction: a budget *below* what this process keeps resident is
     Windows asking it to trim itself, and the cache does exactly that to honour the reservation, so the ceiling is then
-    what it holds. Measured on an RX 9060 XT (16 GB): with Invoke holding 12 GiB and nothing else on the card the
+    that residency. Measured on an RX 9060 XT (16 GB): with Invoke holding 12 GiB and nothing else on the card the
     budget read 7.62 GiB, and comparing against that tiled a 7.0 GiB decode that fits, changing output that had been
     pixel-identical.
 
-    Known limit: a foreign process that takes memory without the budget moving is invisible here. Windows keeps
-    reporting 15.09 GiB next to an 8 GiB holder, torch's free figure ignores other processes, and the adapter-wide
-    performance counter contradicts itself between processes (15.66 GiB read from the holding process against 0.18 GiB
-    from another, same instance, same instant), so there is no reading to base it on. Such a decode pages, and the
-    end-of-session paging warning is what surfaces it.
+    Residency, not ``CurrentUsage``: that also counts what Windows has already paged out, which a foreign process forces
+    exactly when the budget carries its pressure (next to an 8 GiB holder the budget stepped down to 7.58 GiB while our
+    ``CurrentUsage`` kept growing past our 7.70 GiB in VRAM). So the override is ``CurrentUsage`` minus this process's
+    paged bytes, and where either is unknown -- ``CurrentUsage`` beyond the card, or no counter reading -- the budget
+    alone decides (so a transient counter failure can tile a decode that the next run leaves untiled).
+
+    Known limit: the budget reacts to a foreign process only once this process grows into the memory it holds -- it
+    stays at 15.09 GiB next to an 8 GiB holder while Invoke holds little -- torch's free figure ignores other processes,
+    and the adapter-wide performance counter contradicts itself between processes (15.66 GiB read from the holding
+    process against 0.18 GiB from another, same instance, same instant). A decode sized before that point can still
+    page, and the end-of-session paging warning is what surfaces it.
     """
     if device.type == "cuda":
         total_bytes = torch.cuda.get_device_properties(device).total_memory
         local = wddm.local_video_memory(device)
         if local is not None:
             budget_bytes, usage_bytes = local
-            total_bytes = min(total_bytes, max(budget_bytes, usage_bytes))
+            ceiling_bytes = budget_bytes
+            paged = wddm.paged_bytes(device) if usage_bytes is not None else None
+            if paged is not None:
+                ceiling_bytes = max(budget_bytes, usage_bytes - paged)
+            total_bytes = min(total_bytes, ceiling_bytes)
     elif device.type == "xpu":
         total_bytes = torch.xpu.get_device_properties(device).total_memory
     else:

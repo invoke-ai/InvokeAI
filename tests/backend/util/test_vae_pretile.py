@@ -45,10 +45,8 @@ def test_the_pretile_gate_uses_the_memory_the_device_will_keep_resident(monkeypa
 
     This is the platform the feature was written for: the docstring justifies up-front tiling with
     "on Windows, drivers page an allocation that does not fit into system memory instead of failing
-    it (always for ROCm)". Windows pages once the process passes its WDDM budget, and another GPU
-    process lowers that budget within about a second -- which is exactly why this PR added
-    `TorchDevice.cuda_mem_get_info` to cap the model cache's free figure by `wddm.video_memory_budget`.
-    The tiling gate consults neither that budget nor free memory, only `total_memory`.
+    it (always for ROCm)". Windows pages once the process passes its WDDM budget, so the gate has to
+    compare against that budget rather than `total_memory`.
 
     A 16 GiB card whose budget is down to 12.5 GiB pages a 13.3 GiB decode (FLUX.1 at 1408px on
     MIOpen). No out-of-memory error is raised there, so the nodes' tiled retry never fires and the
@@ -60,12 +58,9 @@ def test_the_pretile_gate_uses_the_memory_the_device_will_keep_resident(monkeypa
     estimate = 1408 * 1408 * 2 * 3600  # 13.3 GiB: under 90% of the card, over the budget
 
     monkeypatch.setattr("torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes))
-    # torch cannot see the shortfall: on Windows ROCm its free figure is the device total minus this
-    # process's own live allocations, and this process has allocated nothing yet.
-    monkeypatch.setattr("torch.cuda.mem_get_info", lambda device: (total_bytes, total_bytes))
-    # Patch both binding sites: `devices` imports its own name, and the gate reads the budget/usage pair.
-    monkeypatch.setattr("invokeai.backend.util.devices.video_memory_budget", lambda device: budget_bytes)
+    # This process has allocated nothing yet, so its residency cannot lift the ceiling above the budget.
     monkeypatch.setattr("invokeai.backend.util.wddm.local_video_memory", lambda device: (budget_bytes, 0))
+    monkeypatch.setattr("invokeai.backend.util.wddm.paged_bytes", lambda device: 0)
 
     assert estimate < VAE_PRETILE_VRAM_FRACTION * total_bytes, "test shape must look fine against the card total"
     assert estimate > budget_bytes, "test shape must exceed what Windows would keep resident"
@@ -82,8 +77,8 @@ def test_a_budget_below_our_own_residency_does_not_tile_a_decode_that_fits(monke
     estimate = 7 * 2**30
 
     monkeypatch.setattr("torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes))
-    monkeypatch.setattr("torch.cuda.mem_get_info", lambda device: (4 * 2**30, total_bytes))
     monkeypatch.setattr("invokeai.backend.util.wddm.local_video_memory", lambda device: (int(7.6 * 2**30), 12 * 2**30))
+    monkeypatch.setattr("invokeai.backend.util.wddm.paged_bytes", lambda device: 0)  # alone: nothing paged out
 
     assert should_pretile_vae_decode(torch.device("cuda", 0), estimate) is False
 
@@ -95,13 +90,50 @@ def test_a_decode_beyond_both_the_budget_and_our_residency_is_tiled(monkeypatch)
     estimate = int(8.93 * 2**30)  # a Qwen-Image 1024px decode peak
 
     monkeypatch.setattr("torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=total_bytes))
-    monkeypatch.setattr("torch.cuda.mem_get_info", lambda device: (int(7.8 * 2**30), total_bytes))
     monkeypatch.setattr(
         "invokeai.backend.util.wddm.local_video_memory", lambda device: (int(7.55 * 2**30), int(8.2 * 2**30))
     )
+    monkeypatch.setattr("invokeai.backend.util.wddm.paged_bytes", lambda device: 0)
 
     assert estimate < VAE_PRETILE_VRAM_FRACTION * total_bytes, "the card total alone would let this through"
     assert should_pretile_vae_decode(torch.device("cuda", 0), estimate) is True
+
+
+QWEN_1024_DECODE = int(8.93 * 2**30)
+
+
+def _windows_rocm(monkeypatch, budget: float, usage: float | None, paged: float | None) -> None:
+    monkeypatch.setattr("torch.cuda.get_device_properties", lambda device: MagicMock(total_memory=16 * 2**30))
+    usage_bytes = None if usage is None else int(usage * 2**30)
+    monkeypatch.setattr(
+        "invokeai.backend.util.wddm.local_video_memory", lambda device: (int(budget * 2**30), usage_bytes)
+    )
+    paged_bytes = None if paged is None else int(paged * 2**30)
+    monkeypatch.setattr("invokeai.backend.util.wddm.paged_bytes", lambda device: paged_bytes)
+
+
+def test_usage_windows_has_paged_out_does_not_lift_the_ceiling(monkeypatch):
+    """Next to an 8 GiB holder the budget steps down to its share of the card while `CurrentUsage` keeps counting what
+    Windows paged out (measured: budget 7.58 GiB, usage 9.65 GiB, 7.70 GiB actually in VRAM). Only the resident part
+    may override the budget; taking the whole usage priced this decode against a 12 GiB ceiling and let it page."""
+    _windows_rocm(monkeypatch, budget=7.6, usage=12.0, paged=4.3)
+
+    assert should_pretile_vae_decode(torch.device("cuda", 0), QWEN_1024_DECODE) is True
+
+
+def test_usage_beyond_the_card_leaves_the_budget_in_charge(monkeypatch):
+    """An over-committed process reports more usage than the card has; that says nothing about residency, and
+    clamping it to the card size switched the correction off exactly while Windows was paging."""
+    _windows_rocm(monkeypatch, budget=7.6, usage=None, paged=4.3)
+
+    assert should_pretile_vae_decode(torch.device("cuda", 0), QWEN_1024_DECODE) is True
+
+
+def test_residency_unknown_leaves_the_budget_in_charge(monkeypatch):
+    """Without a paged-bytes reading the resident part is unknown, so a budget below our usage is taken as it is."""
+    _windows_rocm(monkeypatch, budget=7.6, usage=12.0, paged=None)
+
+    assert should_pretile_vae_decode(torch.device("cuda", 0), 7 * 2**30) is True
 
 
 def test_the_card_total_stands_when_windows_does_not_answer(monkeypatch):

@@ -7,11 +7,16 @@ system memory, silently and for as long as the allocation lives. What it will ke
 ``D3DKMTQueryVideoMemoryInfo`` reports (the figure ``IDXGIAdapter3::QueryVideoMemoryInfo`` returns, without COM).
 
 Measured on an RX 9060 XT (16 GB, torch 2.12+rocm7.14): alone, the budget is 15.09 of 15.92 GiB and paging starts
-once the committed local usage passes budget + 0.38 GiB; next to another GPU process, Windows lowers the budget within
-about a second. What this process can still allocate before paging is the budget minus its live allocations -- the
-device total minus torch's free figure. Not minus ``CurrentUsage``: that also counts memory HIP keeps after a free and
-hands back to the next allocation (1-2 GiB measured, still held after ``empty_cache()``), so it would hide what an
-offload just freed.
+once the committed local usage passes budget + 0.38 GiB; once the process itself holds about 12 GiB the budget drops to
+7.62 GiB without anything being paged -- Windows asking it to trim, not a limit it has hit. Next to another GPU process
+the budget is not "total minus the other process": it stays at 15.09 GiB while this process holds little and steps down
+once the two together pass about 12 GiB -- next to an 8 GiB holder, from 15.09 at 3.25 GiB of our own down to 7.58 at
+7.5 GiB, where this process then starts to page. So by the time this process could page, the budget is its share of the
+card.
+
+What this process can still allocate before paging is the budget minus its live allocations -- the device total minus
+torch's free figure. Not minus ``CurrentUsage``: that also counts memory HIP keeps after a free and hands back to the
+next allocation (1-2 GiB measured, still held after ``empty_cache()``), so it would hide what an offload just freed.
 
 Whether Windows has actually paged this process out is not visible through D3DKMT (``CurrentUsage`` counts paged bytes
 as local); it is visible in the ``GPU Process Memory`` performance counters Task Manager shows, read here through PDH.
@@ -141,7 +146,6 @@ _adapters: dict[int, Optional[_Adapter]] = {}
 
 _pdh_lock = threading.Lock()
 # One PDH query per counter path, opened on first use: path -> (query, counter) or None when that counter is absent.
-# Per counter so that a counter this build does not have disables only what reads it.
 _pdh_queries: dict[str, Optional[tuple[ctypes.c_void_p, ctypes.c_void_p]]] = {}
 
 
@@ -279,11 +283,12 @@ def _adapter_for(device: torch.device) -> Optional[tuple[ctypes.CDLL, _Adapter]]
     return None if adapter is None else (lib, adapter)
 
 
-def local_video_memory(device: torch.device) -> Optional[tuple[int, int]]:
+def local_video_memory(device: torch.device) -> Optional[tuple[int, Optional[int]]]:
     """``(budget, current_usage)`` for this process on the device's adapter, both driver-side figures in bytes.
 
-    ``None`` off Windows ROCm, and whenever the driver cannot answer or answers something implausible. Called per
-    generation and per decode, so every failure answers "unknown" here rather than reaching those callers.
+    ``None`` off Windows ROCm, and whenever the driver cannot answer or answers a budget that is implausible. The usage
+    alone is ``None`` when it exceeds the adapter (see below). Called per generation and per decode, so every failure
+    answers "unknown" here rather than reaching those callers.
     """
     if not _supported(device):
         return None
@@ -297,10 +302,11 @@ def local_video_memory(device: torch.device) -> Optional[tuple[int, int]]:
             return None
         if not 0 < info.Budget <= adapter.total_bytes:
             return None
-        # Clamped, not rejected: `CurrentUsage` counts bytes Windows has already paged out, so it can exceed the
-        # adapter's own size exactly when the process over-commits -- and dropping the pair there would also take the
-        # budget away from the model cache's free-VRAM cap, which is the caller that needs it most in that state.
-        return int(info.Budget), max(0, min(int(info.CurrentUsage), adapter.total_bytes))
+        # `CurrentUsage` counts bytes Windows has already paged out, so it exceeds the adapter's own size exactly when
+        # the process over-commits. It says nothing about residency then, so it is reported as unknown; the budget
+        # stands, since the model cache's free-VRAM cap is the caller that needs it most in that state.
+        usage = int(info.CurrentUsage)
+        return int(info.Budget), usage if 0 <= usage <= adapter.total_bytes else None
     except Exception:
         InvokeAILogger.get_logger(__name__).debug(f"WDDM memory lookup for {device} failed", exc_info=True)
         return None

@@ -151,13 +151,13 @@ def test_resolves_the_adapter_once(windows_rocm):
     assert gdi32.enum_calls == 2, "one count call and one fill call, for the first query only"
 
 
-def test_usage_beyond_the_card_is_clamped_and_keeps_the_budget(windows_rocm):
+def test_usage_beyond_the_card_is_unknown_and_keeps_the_budget(windows_rocm):
     """`CurrentUsage` counts bytes Windows has already paged out, so it can exceed the adapter's own size when the
-    process over-commits. Dropping the pair there would take the budget away from the model cache's free-VRAM cap in
-    exactly that state, so the usage is clamped instead."""
+    process over-commits. It says nothing about residency then, but the budget must survive: the model cache's
+    free-VRAM cap needs it most in exactly that state."""
     windows_rocm(_FakeGdi32([(20, OUR_BUS, OUR_DEVICE)], budget=15 * GIB, usage=17 * GIB))
 
-    assert wddm.local_video_memory(DEVICE) == (15 * GIB, 16 * GIB)  # the adapter's total
+    assert wddm.local_video_memory(DEVICE) == (15 * GIB, None)
     assert wddm.video_memory_budget(DEVICE) == 15 * GIB
 
 
@@ -237,14 +237,13 @@ def test_paged_bytes_reads_this_process_on_the_devices_adapter(windows_rocm, mon
     assert pdh.closed == 1
 
 
-def test_a_counter_this_build_does_not_have_only_disables_what_reads_it(windows_rocm, monkeypatch):
-    """One query per counter: sharing one meant any missing counter took every PDH-backed answer with it."""
+def test_a_missing_counter_answers_unknown(windows_rocm, monkeypatch):
+    """A Windows without the ``GPU Process Memory`` counters makes the paged amount unknown instead of failing."""
     windows_rocm(_FakeGdi32([(20, OUR_BUS, OUR_DEVICE)]))
     pdh = _FakePdh({_instance(os.getpid(), 20): 3 * GIB}, unavailable=(r"\GPU Process Memory(*)\Shared Usage",))
     monkeypatch.setattr(wddm, "_load_pdh", functools.lru_cache(maxsize=1)(lambda: pdh))
 
     assert wddm.paged_bytes(DEVICE) is None
-    assert wddm.local_video_memory(DEVICE) is not None, "a D3DKMT answer does not depend on the counters"
 
 
 def test_an_instance_with_invalid_data_is_skipped(windows_rocm, monkeypatch):
