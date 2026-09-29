@@ -294,6 +294,19 @@ class ModelLoader(ModelLoaderBase):
         model_base = self._app_config.models_path
         return (model_base / config.path).resolve()
 
+    def _torch_dtype_avoiding_float16(self) -> torch.dtype:
+        """The configured dtype, except float16: bfloat16 where the device has it, float32 otherwise.
+
+        For the FLUX autoencoders, which are broken in float16 -- the dtype `precision: auto` picks on
+        CUDA and MPS. A float32 or bfloat16 request is kept as it is.
+        """
+        if self._torch_dtype != torch.float16:
+            return self._torch_dtype
+        try:
+            return torch.empty(0, dtype=torch.bfloat16, device=self._torch_device).dtype
+        except TypeError:
+            return torch.float32
+
     def _get_execution_device(
         self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None
     ) -> Optional[torch.device]:
