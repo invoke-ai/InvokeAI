@@ -149,13 +149,13 @@ def test_the_fit_is_still_live_below_its_upper_point():
     [
         (MU_FIT_MAX_SEQ_LEN, "1024px: the anchor, a control -- unchanged by the clamp either way"),
         (16384, "2048px: 2 of 30 steps survived before the clamp"),
-        (36864, "3072px: 1 of 30 survived, whatever the user asked for"),
+        (36864, "3072px: 1 of 30 survived before the clamp"),
     ],
 )
 def test_the_clipped_schedule_keeps_the_same_steps_at_every_frame_size(image_seq_len: int, why: str):
-    """An extrapolated shift pushed the schedule above the `denoising_start` line, so the clip was
-    left with one or two steps no matter how many were requested -- an img2img or upscale pass that
-    silently did almost nothing.
+    """An extrapolated shift pushed the schedule above the `denoising_start` line, so the clip left one
+    or two of the 30 steps asked for here -- an img2img or upscale pass that silently did almost nothing.
+    Asking for more barely helped: at 2048px, 100 steps kept 4 and 1000 kept 39.
 
     0.499 is not arbitrary: it is what the upscale widget's creativity slider sends at its middle
     position, ((0 * -1 + 10) * 4.99) / 100 (`features/upscale/core/graph.ts`).

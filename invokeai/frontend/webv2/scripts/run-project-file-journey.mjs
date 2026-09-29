@@ -563,9 +563,7 @@ const runWorkflowCollection = async ({ browser, contexts, errors, imported }) =>
     false
   );
 
-  // Add workflow leads to the template tabs; the template becomes an independent copy in this project.
-  await dialog.getByRole('button', { exact: true, name: 'Add workflow' }).click();
-  await dialog.locator('[data-library-tab="default"]').waitFor();
+  // A template opened from the library tabs becomes an independent copy in this project.
   await dialog.getByText('Yours', { exact: true }).click();
   await dialog.locator('[data-library-tab="user"]').waitFor();
   await dialog.locator(`[data-workflow-card="${template.workflow_id}"]`).click();

@@ -118,12 +118,11 @@ export const GallerySearchField = ({
   return (
     <InputShell
       aria-invalid={isInvalid || undefined}
-      bg={isSemantic ? 'bg.warning' : undefined}
-      borderColor={isSemantic ? 'fg.warning' : undefined}
       data-mode={mode}
       endElement={endElement}
       position="relative"
       startElement={isSemantic ? SEMANTIC_START_ELEMENT : SEARCH_START_ELEMENT}
+      tone={isSemantic ? 'warning' : undefined}
     >
       {/* Flex-centred: Chakra reads a scale number in `lineHeight` as a
           unitless multiplier, which drops the text out of the field. */}

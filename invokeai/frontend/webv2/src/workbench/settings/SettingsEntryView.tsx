@@ -11,7 +11,6 @@ import { useTranslation } from 'react-i18next';
 
 import type { SettingsEntry, SettingsSection } from './catalog';
 
-import { settingsDialogStore } from './settingsDialogStore';
 import { SettingsScopeLabel } from './SettingsScopeLabel';
 
 const FILL_PROPS = { display: 'flex', flex: '1', flexDirection: 'column', minH: '0' } as const;
@@ -21,28 +20,34 @@ const LoadedSetting = ({
   fill,
   target,
   surface,
+  isRevealed,
+  onReveal,
+  onRevealed,
 }: {
   entry: SettingsEntry;
   fill: boolean;
   target?: SettingsTarget;
   surface: 'quick' | 'dialog';
+  isRevealed: boolean;
+  onReveal?: (sectionId: string, entryId: string) => void;
+  onRevealed?: () => void;
 }) => {
   const { Field } = use(entry.resource.load());
   const attach = useCallback(
     (element: HTMLDivElement | null) => {
-      if (!element || surface !== 'dialog' || settingsDialogStore.getSnapshot().entryId !== entry.field.id) {
+      if (!element || !isRevealed) {
         return;
       }
       const control = element.querySelector<HTMLElement>('input,button,[tabindex="0"]');
       element.scrollIntoView({ block: 'nearest' });
       control?.focus({ preventScroll: true });
-      settingsDialogStore.patchSnapshot({ entryId: undefined });
+      onRevealed?.();
     },
-    [entry.field.id, surface]
+    [isRevealed, onRevealed]
   );
   return (
     <Box ref={attach} {...(fill ? FILL_PROPS : undefined)}>
-      <Field field={entry.field} surface={surface} target={target} />
+      <Field field={entry.field} surface={surface} target={target} onReveal={onReveal} />
     </Box>
   );
 };
@@ -58,6 +63,8 @@ export const SettingsEntryView = ({
   surface = 'dialog',
   search = false,
   onReveal,
+  revealEntryId,
+  onRevealed,
   showGroup = false,
 }: {
   entry: SettingsEntry;
@@ -66,6 +73,9 @@ export const SettingsEntryView = ({
   surface?: 'quick' | 'dialog';
   search?: boolean;
   onReveal?: (sectionId: string, entryId: string) => void;
+  /** The entry to scroll to and focus once it loads; `onRevealed` then clears the request. */
+  revealEntryId?: string;
+  onRevealed?: () => void;
   showGroup?: boolean;
 }) => {
   const { t } = useTranslation();
@@ -146,7 +156,15 @@ export const SettingsEntryView = ({
             retryLabel={t('common.retry')}
           >
             <Suspense fallback={loading}>
-              <LoadedSetting entry={entry} fill={fill} target={target ?? undefined} surface={surface} />
+              <LoadedSetting
+                entry={entry}
+                fill={fill}
+                isRevealed={revealEntryId === entry.field.id}
+                target={target ?? undefined}
+                surface={surface}
+                onReveal={onReveal}
+                onRevealed={onRevealed}
+              />
             </Suspense>
           </RetryBoundary>
         )}

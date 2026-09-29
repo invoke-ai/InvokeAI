@@ -128,7 +128,7 @@ We very much thank the following sponsors:
 
 Invoke is a combined effort of [passionate and talented people from across the world][contributors]. We thank them for their time, hard work and effort.
 
-Original portions of the software are Copyright © 2024 by respective contributors.
+Copyright 2022-2026 InvokeAI Contributors. See [NOTICE](NOTICE).
 
 [features docs]: https://invoke.ai/
 [faq]: https://invoke.ai/troubleshooting/faq/

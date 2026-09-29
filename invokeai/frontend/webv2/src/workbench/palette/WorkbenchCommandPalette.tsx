@@ -1,7 +1,7 @@
 import { requestQueueItemReveal } from '@features/queue/reveal';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
-import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
+import { formatHotkeyForPlatform, MOD_KEY_LABEL } from '@workbench/hotkeys/keys';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
 import { useWorkbenchPreferences } from '@workbench/settings/store';
 import { openWidgetPlacement } from '@workbench/widgetPlacementCommands';
@@ -33,7 +33,7 @@ const OpenWorkbenchCommandPalette = () => {
         catalog={firstPartyHotkeyCatalog}
         formatHotkey={formatHotkeyForPlatform}
         getWidgetsForRegion={getWidgetsForRegion}
-        modifierKeyLabel={formatHotkeyForPlatform('mod')[0]!}
+        modifierKeyLabel={MOD_KEY_LABEL}
         openWidgetPlacement={openWidgetPlacement}
         preferences={preferences}
         requestQueueItemReveal={requestQueueItemReveal}

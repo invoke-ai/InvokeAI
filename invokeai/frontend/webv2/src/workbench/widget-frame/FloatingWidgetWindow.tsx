@@ -1,9 +1,10 @@
 import type { FloatingWidgetState } from '@workbench/layoutContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
-import { Box, Flex, HStack, Icon, Separator, Text } from '@chakra-ui/react';
+import { Flex, HStack, Icon, Separator, Text } from '@chakra-ui/react';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { IconButton } from '@platform/ui/Button';
+import { type PointerDragEnd, ResizeCorner, usePointerDrag } from '@platform/ui/ResizeHandle';
 import { Tooltip } from '@platform/ui/Tooltip';
 import {
   clampWindowToViewport,
@@ -27,9 +28,8 @@ import {
   Component,
   Suspense,
   useCallback,
-  useEffect,
+  useMemo,
   useRef,
-  useState,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
   type PointerEvent as ReactPointerEvent,
@@ -44,6 +44,15 @@ import { areWidgetRenderInstancesEqual } from './widgetRenderInstance';
 const FLOATING_BASE_Z_INDEX = 800;
 /** Keyboard step for moving and resizing, matching the panel resize handles. */
 const FLOATING_STEP_PX = 16;
+
+// CSS clamp keeps a grabbable sliver on-screen even for geometry persisted on a larger display (or after the
+// browser window shrinks); the commit clamp only covers drags on the current viewport.
+const toWindowPosition = (geometry: FloatingGeometry) => ({
+  height: `${geometry.heightPx}px`,
+  left: `clamp(${48 - geometry.widthPx}px, ${geometry.x}px, calc(100vw - 48px))`,
+  top: `clamp(0px, ${geometry.y}px, calc(100vh - 48px))`,
+  width: `${geometry.widthPx}px`,
+});
 
 /**
  * Isolate arbitrary widget controls from title-bar drag and double-click shade gestures; not every control is a
@@ -85,7 +94,9 @@ export const FloatingWidgetWindow = ({
     (project) => project.widgetInstances[instanceId],
     areWidgetRenderInstancesEqual
   );
-  const [dragGeometry, setDragGeometry] = useState<FloatingGeometry | null>(null);
+  const windowRef = useRef<HTMLDivElement>(null);
+  const liveGeometryRef = useRef<FloatingGeometry | null>(null);
+  const startDrag = usePointerDrag();
 
   const widget = instance ? getWidgetById(instance.typeId) : undefined;
 
@@ -97,54 +108,44 @@ export const FloatingWidgetWindow = ({
     [instanceId, widgets]
   );
 
-  const pointerSessionRef = useRef<AbortController | null>(null);
-
-  // Dispose window listeners on unmount because docking, presets, or project switches can interrupt drags.
-  useEffect(() => () => pointerSessionRef.current?.abort(), []);
-
-  const beginPointerOperation = useCallback(
-    (
-      event: ReactPointerEvent<HTMLDivElement>,
-      apply: (deltaX: number, deltaY: number, start: FloatingGeometry) => FloatingGeometry
-    ) => {
-      event.preventDefault();
-      // Capture keeps the gesture addressed to this window even when the
-      // pointer crosses an iframe or another window's chrome.
-      event.currentTarget.setPointerCapture(event.pointerId);
-
-      const startX = event.clientX;
-      const startY = event.clientY;
-      const start: FloatingGeometry = { heightPx: state.heightPx, widthPx: state.widthPx, x: state.x, y: state.y };
-      let next = start;
-      const pointerSession = new AbortController();
-
-      pointerSessionRef.current?.abort();
-      pointerSessionRef.current = pointerSession;
-
-      const handlePointerUp = () => {
-        pointerSession.abort();
-        pointerSessionRef.current = null;
-        setDragGeometry(null);
-        commitGeometry(next);
-      };
-
-      const handlePointerMove = (moveEvent: PointerEvent) => {
-        // End dragging on a move with no pressed button in case another application swallowed pointerup.
-        if (moveEvent.buttons === 0) {
-          handlePointerUp();
-
-          return;
+  // A gesture writes geometry inline so it renders without React; the committed render then replaces it.
+  const writeLiveGeometry = useCallback(
+    (geometry: FloatingGeometry | null) => {
+      const element = windowRef.current;
+      liveGeometryRef.current = geometry;
+      if (!element) {
+        return;
+      }
+      const position = geometry ? toWindowPosition(geometry) : null;
+      for (const property of ['left', 'top', 'width', 'height'] as const) {
+        if (position && !(property === 'height' && state.mode === 'shaded')) {
+          element.style.setProperty(property, position[property]);
+        } else {
+          element.style.removeProperty(property);
         }
-
-        next = apply(moveEvent.clientX - startX, moveEvent.clientY - startY, start);
-        setDragGeometry(next);
-      };
-
-      window.addEventListener('pointermove', handlePointerMove, { signal: pointerSession.signal });
-      window.addEventListener('pointerup', handlePointerUp, { signal: pointerSession.signal });
-      window.addEventListener('pointercancel', handlePointerUp, { signal: pointerSession.signal });
+      }
     },
-    [commitGeometry, state.heightPx, state.widthPx, state.x, state.y]
+    [state.mode]
+  );
+  const endGesture = useCallback(
+    (reason: PointerDragEnd) => {
+      const geometry = liveGeometryRef.current;
+      if (reason === 'escape') {
+        writeLiveGeometry(null);
+        return;
+      }
+      // Scheduled first so a throwing commit still clears the preview.
+      requestAnimationFrame(() => writeLiveGeometry(null));
+      if (geometry) {
+        commitGeometry(geometry);
+      }
+    },
+    [commitGeometry, writeLiveGeometry]
+  );
+  const cancelGesture = useCallback(() => writeLiveGeometry(null), [writeLiveGeometry]);
+  const startGeometry: FloatingGeometry = useMemo(
+    () => ({ heightPx: state.heightPx, widthPx: state.widthPx, x: state.x, y: state.y }),
+    [state.heightPx, state.widthPx, state.x, state.y]
   );
 
   const handleTitlePointerDown = useCallback(
@@ -153,24 +154,24 @@ export const FloatingWidgetWindow = ({
         return;
       }
 
-      beginPointerOperation(event, (deltaX, deltaY, start) => ({ ...start, x: start.x + deltaX, y: start.y + deltaY }));
+      startDrag(event, {
+        cursor: 'move',
+        onEnd: endGesture,
+        onMove: (deltaX, deltaY) =>
+          writeLiveGeometry({ ...startGeometry, x: startGeometry.x + deltaX, y: startGeometry.y + deltaY }),
+      });
     },
-    [beginPointerOperation, state.mode]
+    [endGesture, startDrag, startGeometry, state.mode, writeLiveGeometry]
   );
 
-  const handleResizePointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      if (event.button !== 0) {
-        return;
-      }
-
-      beginPointerOperation(event, (deltaX, deltaY, start) => ({
-        ...start,
-        heightPx: Math.max(FLOATING_MIN_HEIGHT_PX, start.heightPx + deltaY),
-        widthPx: Math.max(FLOATING_MIN_WIDTH_PX, start.widthPx + deltaX),
-      }));
-    },
-    [beginPointerOperation]
+  const handleResizeMove = useCallback(
+    (deltaX: number, deltaY: number) =>
+      writeLiveGeometry({
+        ...startGeometry,
+        heightPx: Math.max(FLOATING_MIN_HEIGHT_PX, startGeometry.heightPx + deltaY),
+        widthPx: Math.max(FLOATING_MIN_WIDTH_PX, startGeometry.widthPx + deltaX),
+      }),
+    [startGeometry, writeLiveGeometry]
   );
 
   // Provide keyboard move/resize alongside shade/maximize/dock, matching panel resize steps.
@@ -254,23 +255,16 @@ export const FloatingWidgetWindow = ({
   // Retain window chrome for missing or failed widgets so users can dock them back to the retry surface.
   const isEnabled = widget?.status === 'enabled';
   const label = widget ? resolveWidgetInstanceLabel(instance, widget.manifest, t) : (instance.title ?? instance.id);
-  const geometry = dragGeometry ?? state;
+  const position = toWindowPosition(state);
   const isMaximized = state.mode === 'maximized';
   const isShaded = state.mode === 'shaded';
-  // CSS clamp keeps a grabbable sliver on-screen even for geometry persisted
-  // on a larger display (or after the browser window shrinks) — the commit
-  // clamp only covers drags on the current viewport.
   const positionProps = isMaximized
     ? { h: '100vh', left: 0, top: 0, w: '100vw' }
-    : {
-        h: isShaded ? 'auto' : `${geometry.heightPx}px`,
-        left: `clamp(${48 - geometry.widthPx}px, ${geometry.x}px, calc(100vw - 48px))`,
-        top: `clamp(0px, ${geometry.y}px, calc(100vh - 48px))`,
-        w: `${geometry.widthPx}px`,
-      };
+    : { h: isShaded ? 'auto' : position.height, left: position.left, top: position.top, w: position.width };
 
   return (
     <Flex
+      ref={windowRef}
       bg="bg.subtle"
       borderColor="border.emphasized"
       borderWidth="1px"
@@ -375,21 +369,14 @@ export const FloatingWidgetWindow = ({
         </Flex>
       )}
       {isShaded || isMaximized ? null : (
-        <Box
-          aria-label={t('widgets.floating.resize')}
-          aria-valuemin={FLOATING_MIN_WIDTH_PX}
-          aria-valuenow={geometry.widthPx}
-          bottom="0"
-          cursor="nwse-resize"
-          h="4"
-          position="absolute"
-          right="0"
-          role="separator"
-          tabIndex={0}
-          touchAction="none"
-          w="4"
+        <ResizeCorner
+          label={t('widgets.floating.resize')}
+          valueMin={FLOATING_MIN_WIDTH_PX}
+          valueNow={state.widthPx}
+          onDragCancel={cancelGesture}
+          onDragEnd={endGesture}
+          onDragMove={handleResizeMove}
           onKeyDown={handleResizeKeyDown}
-          onPointerDown={handleResizePointerDown}
         />
       )}
     </Flex>

@@ -160,6 +160,7 @@ export const usePreviewNavigation = ({
   localItems,
   progressSessions,
   queueItems,
+  galleryBoardId,
   galleryPage,
   galleryPaginationMode,
   selectGalleryItem,
@@ -171,6 +172,8 @@ export const usePreviewNavigation = ({
   /** The live session on screen, when the preview is following one; the cursor sits on it. */
   followedSessionId: string | null;
   followSession: (sessionId: string) => void;
+  /** The board the gallery grid shows; a ranked list ranks within it, as the grid does. */
+  galleryBoardId: string;
   /** The page the gallery grid is on; a ranked list mirrors it (see below). */
   galleryPage: number;
   /** The gallery's own pagination mode, likewise mirrored by a ranked list. */
@@ -192,13 +195,13 @@ export const usePreviewNavigation = ({
     () => parseDateTokens(selectedImageQuery.searchTerm),
     [selectedImageQuery.searchTerm]
   );
-  const navigationBoardId = selectedImageQuery.boardId;
+  // A ranked filmstrip follows the gallery's current search, board and paging; a listing follows the selection's.
+  const navigationBoardId = semanticQuery ? galleryBoardId : selectedImageQuery.boardId;
   const navigationGalleryView = selectedImageQuery.galleryView;
   const navigationOrderDir = selectedImageQuery.imageOrderDir;
   // The grid partitions: its listing is unstarred-only, with the starred
   // items in the strip above it, unless the starred filter is on.
   const navigationStarredOnly = selectedImageQuery.starredOnly;
-  // A ranked filmstrip follows the gallery's current search.
   const navigationSemanticQuery = semanticQuery;
   const navigationSemanticKey = gallerySemanticReferenceKey(navigationSemanticQuery);
   // Following live has a cursor too, so the listing loads for the step off it.

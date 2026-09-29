@@ -1034,6 +1034,26 @@ describe('LTX-2 recall', () => {
   const catalog = [LTX2_DEV, LTX2_DISTILLED, LTX2_COMPONENTS, LTX2_ENCODER, WAN_T2V];
   const currentValues = createDefaultVideoWidgetValues([WAN_T2V]);
 
+  it('turns auto duration off when it restores a length, so the recalled clip runs at that length', () => {
+    // Same model, head installed and selected: model selection keeps both, so only recall's own rule
+    // can turn auto duration off. Left on, the recalled 121 frames would be a ceiling, not the length.
+    const head: GenerationModelCatalogItem = {
+      base: 'ltx-2',
+      key: 'duration-head',
+      name: 'LTX-2.5 Duration Head',
+      type: 'ltx2_duration_head',
+    };
+    const result = buildVideoRecallSettings({
+      currentValues: { ...createDefaultVideoWidgetValues([LTX2_DEV]), autoDuration: true, ltx2DurationHeadModel: head },
+      kind: 'all',
+      metadata: ltx2Metadata({ num_frames: 121 }),
+      models: [...catalog, head],
+    });
+
+    expect(result?.fields).toContain('frames');
+    expect(result?.values).toMatchObject({ autoDuration: false, ltx2DurationHeadModel: head, numFrames: 121 });
+  });
+
   it('recalls the context length a continuation was made with', () => {
     // Not recoverable from anything else in the record: the output length folds the source, the
     // generated half and the crossfade together, so without this a recall silently reinstates the

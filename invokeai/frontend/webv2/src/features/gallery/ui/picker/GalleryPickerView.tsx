@@ -6,10 +6,10 @@ import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { getGalleryUploadAccept, toGalleryItemKey } from '@features/gallery/core/items';
 import { BoardCover, BoardCoverIcon } from '@features/gallery/ui/GalleryBoardCover';
 import { getGalleryBoardGroups } from '@features/gallery/ui/galleryBoardGroups';
-import { GallerySearchHelp } from '@features/gallery/ui/GalleryItemSearch';
 import { GallerySearchField } from '@features/gallery/ui/GallerySearchField';
+import { GallerySearchHelp } from '@features/gallery/ui/GallerySearchHelp';
 import { getGalleryProjectBoardId, getGallerySelectedBoardId } from '@features/gallery/ui/galleryStateView';
-import { useGalleryUi } from '@features/gallery/ui/GalleryUiContext';
+import { useGalleryHost } from '@features/gallery/ui/GalleryUiContext';
 import { getGalleryUploadTargetLabel } from '@features/gallery/ui/GalleryUploadButton';
 import { GalleryViewSegmentTabs } from '@features/gallery/ui/GalleryViewTabs';
 import { useGalleryUploadAction } from '@features/gallery/ui/useGalleryUploadAction';
@@ -59,7 +59,7 @@ export const GalleryPickerView = ({
   onPick: (item: GalleryItem) => void;
 }) => {
   const { t } = useTranslation();
-  const { gallery: galleryCommands, galleryValues, projectName, widgets } = useGalleryUi();
+  const { galleryValues, projectName, revealInGallery } = useGalleryHost();
   const { data, gallerySelectedItem, scope, selectBoard, setSearchTerm, setView, settings, togglePane } =
     useGalleryPickerScope();
   const idBase = useId();
@@ -178,7 +178,8 @@ export const GalleryPickerView = ({
       searchTerm: scope.searchTerm,
       showArchived: settings.showArchivedBoards,
       showDates: settings.showDateBoards,
-      showOtherProjects: settings.showOtherProjectBoards,
+      // A pick can come from any project's board, whatever the Gallery widget hides for browsing.
+      showOtherProjects: true,
       t,
     });
 
@@ -194,7 +195,6 @@ export const GalleryPickerView = ({
     scope.searchTerm,
     settings.showArchivedBoards,
     settings.showDateBoards,
-    settings.showOtherProjectBoards,
     t,
   ]);
   const visibleBoardCount = boardGroups.reduce((count, group) => count + group.boards.length, 0);
@@ -291,16 +291,13 @@ export const GalleryPickerView = ({
   const handleClearSearch = useCallback(() => setSearchTerm(''), [setSearchTerm]);
 
   const openGallery = useCallback(() => {
-    if (data.selectedBoardId !== getGallerySelectedBoardId(galleryValues, data.boards)) {
-      galleryCommands.selectBoard(data.selectedBoardId);
-    }
+    const boardId =
+      data.selectedBoardId !== getGallerySelectedBoardId(galleryValues, data.boards) ? data.selectedBoardId : null;
 
-    galleryCommands.setView(scope.galleryView);
-
-    if (widgets.openGallery()) {
+    if (revealInGallery?.({ boardId, view: scope.galleryView })) {
       onClose();
     }
-  }, [data.boards, data.selectedBoardId, galleryCommands, galleryValues, onClose, scope.galleryView, widgets]);
+  }, [data.boards, data.selectedBoardId, galleryValues, onClose, revealInGallery, scope.galleryView]);
 
   const status = getGalleryPickerStatus({
     accept,
@@ -376,6 +373,7 @@ export const GalleryPickerView = ({
         <GalleryViewSegmentTabs
           activeView={scope.galleryView}
           board={selectedBoard}
+          iconLabels
           idBase={idBase}
           onSelect={setView}
         />
@@ -464,12 +462,12 @@ export const GalleryPickerView = ({
           <Button flexShrink={0} size="2xs" variant="subtle" onClick={onClose}>
             {t('common.done')}
           </Button>
-        ) : (
+        ) : revealInGallery ? (
           <Button color="fg.muted" flexShrink={0} size="2xs" variant="ghost" onClick={openGallery}>
             {t('widgets.gallery.picker.openGallery')}
             <Icon as={ExternalLinkIcon} boxSize="3" />
           </Button>
-        )}
+        ) : null}
       </HStack>
     </Stack>
   );

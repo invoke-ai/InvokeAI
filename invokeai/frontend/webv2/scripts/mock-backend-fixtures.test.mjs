@@ -764,3 +764,46 @@ test('the image map serves videos only on request and keeps its two endpoints co
     assert.equal(crossed.status, 404);
   });
 });
+
+test('workflow thumbnails round-trip their bytes and refresh the listed URL on every replacement', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    const path = '/api/v1/workflows/i/fixture-workflow-002/thumbnail';
+    const upload = (bytes, type) => {
+      const body = new FormData();
+
+      body.append('image', new Blob([bytes], { type }), 'thumbnail.png');
+      return fetch(`${backend.origin}${path}`, { body, method: 'PUT' });
+    };
+    const listedUrl = async () =>
+      (await getJson(backend, '/api/v1/workflows/?categories=user&per_page=100')).items.find(
+        (item) => item.workflow_id === 'fixture-workflow-002'
+      ).thumbnail_url;
+
+    assert.equal(await listedUrl(), null);
+    assert.equal((await fetch(`${backend.origin}${path}`)).status, 404);
+
+    assert.equal((await upload(new Uint8Array([1, 2, 3]), 'image/png')).status, 200);
+    const first = await listedUrl();
+    const served = await fetch(`${backend.origin}${first}`);
+    assert.equal(served.headers.get('content-type'), 'image/png');
+    assert.deepEqual(new Uint8Array(await served.arrayBuffer()), new Uint8Array([1, 2, 3]));
+
+    assert.equal((await upload(new Uint8Array([4]), 'image/webp')).status, 200);
+    const second = await listedUrl();
+    assert.notEqual(second, first);
+    assert.equal((await getJson(backend, '/api/v1/workflows/i/fixture-workflow-002')).thumbnail_url, second);
+
+    assert.equal((await upload(new Uint8Array([5]), 'text/plain')).status, 415);
+    const misnamed = new FormData();
+    misnamed.append('file', new Blob([new Uint8Array([6])], { type: 'image/png' }), 'image');
+    assert.equal((await fetch(`${backend.origin}${path}`, { body: misnamed, method: 'PUT' })).status, 415);
+    assert.equal(
+      (await fetch(`${backend.origin}/api/v1/workflows/i/default_fixture-workflow-001/thumbnail`, { method: 'DELETE' }))
+        .status,
+      403
+    );
+
+    await getJson(backend, path, { method: 'DELETE' });
+    assert.equal(await listedUrl(), null);
+  });
+});

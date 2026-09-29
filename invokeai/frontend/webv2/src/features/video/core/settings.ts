@@ -351,6 +351,12 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
   // Clear acceleration when any required accelerator LoRA disappears instead of claiming an inactive fast path.
   const acceleratorEnabled =
     values.acceleratorEnabled === true && areAcceleratorLorasPresent(acceleratorLoraKeys, loras);
+  // Same healing as the accelerator: a stored `true` whose model has since been uninstalled would
+  // otherwise leave the Frames control disabled with nothing able to fill in a length.
+  const ltx2DurationHeadModel = isModelIdentifierConfig(values.ltx2DurationHeadModel)
+    ? values.ltx2DurationHeadModel
+    : null;
+  const autoDuration = values.autoDuration === true && ltx2DurationHeadModel !== null;
 
   return {
     aspectRatioId: isVideoAspectRatioId(values.aspectRatioId) ? values.aspectRatioId : SETTINGS_FALLBACKS.aspectRatioId,
@@ -380,6 +386,8 @@ export const normalizeVideoSettings = (values: unknown): VideoSettings | null =>
     h3TextEncoderModel: isModelIdentifierConfig(values.h3TextEncoderModel) ? values.h3TextEncoderModel : null,
     h3TransformerModel: isMainModelConfig(values.h3TransformerModel) ? values.h3TransformerModel : null,
     ltx2TextEncoderModel: isModelIdentifierConfig(values.ltx2TextEncoderModel) ? values.ltx2TextEncoderModel : null,
+    ltx2DurationHeadModel: ltx2DurationHeadModel,
+    autoDuration,
     acceleratorEnabled,
     acceleratorLoraKeys: acceleratorEnabled ? acceleratorLoraKeys : [],
     lastFrameImage: !hasReferences && isImageWithDims(values.lastFrameImage) ? values.lastFrameImage : null,
@@ -478,6 +486,9 @@ export const isVideoSettings = (values: unknown): values is VideoSettings => {
     (values.h3TextEncoderModel === null || isModelIdentifierConfig(values.h3TextEncoderModel)) &&
     (values.h3HybridBaseModel === null || isMainModelConfig(values.h3HybridBaseModel)) &&
     (values.ltx2TextEncoderModel === null || isModelIdentifierConfig(values.ltx2TextEncoderModel)) &&
+    (values.ltx2DurationHeadModel === null || isModelIdentifierConfig(values.ltx2DurationHeadModel)) &&
+    // Same invariant normalize enforces: there is no auto duration without a head to decide it.
+    (values.autoDuration === false || (values.autoDuration === true && values.ltx2DurationHeadModel !== null)) &&
     hasFiniteNumber(values, 'h3HybridStartBlock')
   );
 };
@@ -513,6 +524,8 @@ export const cloneVideoWidgetValues = (values: VideoWidgetValues): VideoWidgetVa
   lastFrameImage: values.lastFrameImage ? { ...values.lastFrameImage } : null,
   loras: values.loras.map((lora) => ({ ...lora, model: { ...lora.model } })),
   ltx2TextEncoderModel: values.ltx2TextEncoderModel ? { ...values.ltx2TextEncoderModel } : null,
+  ltx2DurationHeadModel: values.ltx2DurationHeadModel ? { ...values.ltx2DurationHeadModel } : null,
+  autoDuration: values.autoDuration,
   model: values.model ? { ...values.model } : null,
   references: values.references.map((reference) =>
     reference.kind === 'video'
@@ -943,6 +956,17 @@ export const getInitialVideoPatch = ({
   // Unchanged identity is the capacity refusal; clearing cannot overflow.
   return sourceVideo && linked === references ? null : { references: linked, sourceVideo, ...displaced };
 };
+
+/**
+ * The panel patch that sets the conditioning clip, or clears it. A clip claims a whole modality, so it displaces
+ * every other conditioning slot: the frames, the initial video and the references.
+ */
+export const getConditioningClipPatch = (
+  conditioningClip: VideoConditioningClip | null
+): Partial<VideoWidgetValues> => ({
+  conditioningClip,
+  ...(conditioningClip ? { firstFrameImage: null, lastFrameImage: null, references: [], sourceVideo: null } : {}),
+});
 
 /**
  * The panel patch for a new reference list. References displace the frame slots and a conditioning clip, and the

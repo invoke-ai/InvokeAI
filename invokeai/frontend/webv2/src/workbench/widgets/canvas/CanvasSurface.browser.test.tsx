@@ -4,10 +4,11 @@ import type { EngineDeps, EngineRegistry } from '@workbench/canvas-operations/en
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { ResizeHandle } from '@platform/ui/ResizeHandle';
 import { system } from '@theme/system';
 import { createEngineRegistry } from '@workbench/canvas-operations/engineRegistry';
 import { createEmptyCanvasState } from '@workbench/canvasMigration';
-import { act, StrictMode } from 'react';
+import { act, StrictMode, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -208,5 +209,91 @@ describe('CanvasSurface browser lifecycle', () => {
     await delay(gracePeriodMs + 20);
     expect(registry.getEngine('project-a')).toBeUndefined();
     expect(registry.getEngine('project-b')).toBeUndefined();
+  });
+});
+
+const ignoreCommit = (): void => undefined;
+
+const ResizeDragHarness = ({ engine, showCanvas = true }: { engine: CanvasEngine; showCanvas?: boolean }) => {
+  const paneRef = useRef<HTMLDivElement>(null);
+
+  return (
+    <ChakraProvider value={system}>
+      <div style={{ display: 'flex' }}>
+        <div ref={paneRef} style={{ width: 100 }} />
+        <ResizeHandle
+          label="Resize pane"
+          max={300}
+          min={50}
+          orientation="vertical"
+          pane="before"
+          paneRef={paneRef}
+          value={100}
+          onCommit={ignoreCommit}
+        />
+        <div data-testid="surface-bounds" style={{ height: 120, width: 160 }}>
+          {showCanvas ? <CanvasSurface engine={engine} /> : null}
+        </div>
+      </div>
+    </ChakraProvider>
+  );
+};
+
+describe('CanvasSurface during a resize drag', () => {
+  it('keeps its bitmap until the drag ends, cropping instead of stretching', async () => {
+    const registry = createTrackedRegistry(20);
+    const { engine } = acquireTrackedEngine(registry, 'project-a', createEngineDeps(createEmptyCanvasState(64, 64)));
+    const host = document.createElement('div');
+    document.body.append(host);
+    const { root } = createTrackedRoot(host);
+
+    await act(async () => {
+      root.render(<ResizeDragHarness engine={engine} />);
+      await nextFrame();
+    });
+    const resize = vi.spyOn(engine.surface, 'resize');
+    const separator = host.querySelector<HTMLElement>('[role="separator"]')!;
+    const bounds = host.querySelector<HTMLElement>('[data-testid="surface-bounds"]')!;
+    const screen = host.querySelector('canvas')!;
+    const pointer = (type: string, buttons: number) =>
+      new PointerEvent(type, { bubbles: true, buttons, clientX: 0, pointerId: 1 });
+
+    await act(() => separator.dispatchEvent(pointer('pointerdown', 1)));
+    bounds.style.width = '200px';
+    await act(async () => {
+      await nextFrame();
+      await nextFrame();
+    });
+
+    expect(resize).not.toHaveBeenCalled();
+    expect(screen.style.width).toBe('160px');
+
+    await act(() => window.dispatchEvent(pointer('pointerup', 0)));
+
+    expect(resize).toHaveBeenCalledExactlyOnceWith(200, 120, globalThis.devicePixelRatio || 1);
+    expect(screen.style.width).toBe('200px');
+  });
+
+  it('sizes a canvas that first appears during a drag without waiting for it', async () => {
+    const registry = createTrackedRegistry(20);
+    const { engine } = acquireTrackedEngine(registry, 'project-a', createEngineDeps(createEmptyCanvasState(64, 64)));
+    const resize = vi.spyOn(engine.surface, 'resize');
+    const host = document.createElement('div');
+    document.body.append(host);
+    const { root } = createTrackedRoot(host);
+
+    await act(() => root.render(<ResizeDragHarness engine={engine} showCanvas={false} />));
+    const separator = host.querySelector<HTMLElement>('[role="separator"]')!;
+    await act(() =>
+      separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, buttons: 1, clientX: 0, pointerId: 1 }))
+    );
+    await act(() => root.render(<ResizeDragHarness engine={engine} />));
+
+    expect(resize).toHaveBeenCalledExactlyOnceWith(160, 120, globalThis.devicePixelRatio || 1);
+    expect(host.querySelector('canvas')!.style.width).toBe('160px');
+
+    await act(() =>
+      window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, buttons: 0, clientX: 0, pointerId: 1 }))
+    );
   });
 });

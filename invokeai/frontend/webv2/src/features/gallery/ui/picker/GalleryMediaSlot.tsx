@@ -8,20 +8,21 @@ import { getGalleryItemByRef } from '@features/gallery/data/backend';
 import { getGalleryImageThumbnailUrl } from '@features/gallery/data/imageUrls';
 import { getGalleryVideoThumbnailUrl } from '@features/gallery/data/videoUrls';
 import { FindInGalleryThumbnailButton } from '@features/gallery/ui/FindInGalleryButton';
-import { isGalleryItemDragData, useGalleryItemDroppable } from '@features/gallery/ui/galleryDnd';
-import { useGalleryUi } from '@features/gallery/ui/GalleryUiContext';
+import { GalleryDragScope, isGalleryItemDragData, useGalleryItemDroppable } from '@features/gallery/ui/galleryDnd';
+import { useGalleryHost } from '@features/gallery/ui/GalleryUiContext';
 import { useGalleryUploadInput } from '@features/gallery/ui/useGalleryUploadInput';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
-import { Button } from '@platform/ui/Button';
+import { Button, IconButton } from '@platform/ui/Button';
 import { DropTargetOverlay } from '@platform/ui/DropTargetOverlay';
 import { DropZone } from '@platform/ui/DropZone';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { Tooltip } from '@platform/ui/Tooltip';
 import { ChevronDownIcon, ImagePlusIcon, RefreshCwIcon, UploadIcon, XIcon } from 'lucide-react';
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { use, useCallback, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GalleryPickerAccept } from './galleryPicker';
@@ -36,6 +37,8 @@ const DROP_ZONE_FOCUS_PROPS = {
 };
 const DROP_ZONE_HOVER_PROPS = { bg: 'bg.muted', color: 'fg' };
 const DROP_ZONE_DISABLED_PROPS = { cursor: 'not-allowed', opacity: 0.6 };
+const TILE_ACTIONS_SHOWN = { opacity: 1, pointerEvents: 'auto' } as const;
+const preventClick = (event: MouseEvent) => event.preventDefault();
 
 export interface GalleryMediaSlotValue {
   height?: number;
@@ -66,12 +69,20 @@ const getDefaultLabels = (accept: GalleryPickerAccept, t: (key: string) => strin
 const getThumbnailUrl = (value: GalleryMediaSlotValue): string =>
   value.kind === 'video' ? getGalleryVideoThumbnailUrl(value.name) : getGalleryImageThumbnailUrl(value.name);
 
+/** Registered only inside the gallery drag scope; outside it (dialog hosts, the Launchpad) nothing can be dragged in. */
+const GalleryDragEndMonitor = ({ onDragEnd }: { onDragEnd: (event: DragEndEvent) => void }) => {
+  useDndMonitor({ onDragEnd });
+  return null;
+};
+
 /**
  * Own async resolution and report complete items through onChange. onUploadFile and custom thumbnails support
  * media stored outside the gallery.
  */
 export const GalleryMediaSlot = ({
   accept,
+  busy = false,
+  layout = 'row',
   disabled = false,
   disabledReason,
   dropId,
@@ -83,6 +94,13 @@ export const GalleryMediaSlot = ({
   onUploadFile,
 }: {
   accept: GalleryPickerAccept;
+  /** The consumer is still acting on a pick (storing it elsewhere, say); the slot shows it working and waits. */
+  busy?: boolean;
+  /**
+   * `row` (the default) names the value beside its thumbnail with actions below; `tile` is a square face for a cover
+   * image, filling the width it is given, with its actions overlaid. Size a tile with its container.
+   */
+  layout?: 'row' | 'tile';
   disabled?: boolean;
   /** Shown in place of the affordances while disabled (e.g. a mutual exclusion). */
   disabledReason?: string;
@@ -99,8 +117,11 @@ export const GalleryMediaSlot = ({
   onUploadFile?: (file: File) => void;
 }) => {
   const { t } = useTranslation();
-  const { notifications } = useGalleryUi();
-  const [isBusy, setIsBusy] = useState(false);
+  const { notifications } = useGalleryHost();
+  const isInDragScope = use(GalleryDragScope);
+  const [isResolving, setIsResolving] = useState(false);
+  const triggerRef = useRef<HTMLDivElement | null>(null);
+  const isBusy = isResolving || busy;
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const isInert = disabled || isBusy;
   const labels = useMemo(() => ({ ...getDefaultLabels(accept, t), ...labelOverrides }), [accept, labelOverrides, t]);
@@ -137,7 +158,7 @@ export const GalleryMediaSlot = ({
       const owner = captureAccountScope();
 
       setErrorMessage(null);
-      setIsBusy(true);
+      setIsResolving(true);
 
       try {
         const item = await getGalleryItemByRef(ref, owner.signal);
@@ -150,7 +171,7 @@ export const GalleryMediaSlot = ({
         }
       } finally {
         if (isAccountScopeCurrent(owner)) {
-          setIsBusy(false);
+          setIsResolving(false);
         }
       }
     },
@@ -167,8 +188,6 @@ export const GalleryMediaSlot = ({
     },
     [acceptsDrag, adoptRef, dropId, isInert]
   );
-
-  useDndMonitor({ onDragEnd: handleDragEnd });
 
   const uploadOptions = useMemo(() => ({ accept: getGalleryUploadAccept(accept), multiple: false }), [accept]);
   const handleUpload = useCallback(
@@ -194,7 +213,11 @@ export const GalleryMediaSlot = ({
     handleUpload,
     uploadOptions
   );
-  const handleClear = useCallback(() => onChange(null), [onChange]);
+  // Remove unmounts with the value; hand focus to the slot rather than letting it fall to the page.
+  const handleClear = useCallback(() => {
+    triggerRef.current?.focus();
+    onChange(null);
+  }, [onChange]);
   const handlePick = useCallback(
     (item: GalleryItem) => {
       setErrorMessage(null);
@@ -203,42 +226,118 @@ export const GalleryMediaSlot = ({
     [onChange]
   );
 
+  const isTile = layout === 'tile';
+  // Drops only arrive inside the gallery drag scope; elsewhere the hints must not promise them.
+  const emptyHint = disabled && disabledReason ? disabledReason : isBusy ? t('widgets.gallery.picker.working') : null;
+  const valueHint =
+    emptyHint ??
+    (isInDragScope ? t('widgets.gallery.picker.replaceHint') : t('widgets.gallery.picker.replaceClickHint'));
+  const valueThumbnail = value
+    ? (thumbnail ?? (
+        <Image
+          alt=""
+          boxSize="full"
+          objectFit={isTile ? 'cover' : 'contain'}
+          outline="1px solid"
+          outlineColor="border.image"
+          outlineOffset="-1px"
+          rounded="sm"
+          src={getThumbnailUrl(value)}
+        />
+      ))
+    : null;
+  const removeAction = value ? (
+    isTile ? (
+      <Tooltip content={labels.remove}>
+        <IconButton aria-label={labels.remove} disabled={isBusy} size="2xs" variant="solid" onClick={handleClear}>
+          <XIcon />
+        </IconButton>
+      </Tooltip>
+    ) : (
+      <Button disabled={isBusy} size="xs" variant="ghost" onClick={handleClear}>
+        <Icon as={XIcon} boxSize="3" />
+        {labels.remove}
+      </Button>
+    )
+  ) : null;
+  const uploadAction =
+    onUploadFile && !disabled ? (
+      isTile ? (
+        <Tooltip content={t('widgets.gallery.picker.upload')}>
+          <IconButton
+            aria-label={t('widgets.gallery.picker.upload')}
+            disabled={isBusy}
+            size="2xs"
+            variant="solid"
+            onClick={openUploadPicker}
+          >
+            <UploadIcon />
+          </IconButton>
+        </Tooltip>
+      ) : (
+        <Button disabled={isBusy} size="xs" variant="ghost" onClick={openUploadPicker}>
+          <Icon as={UploadIcon} boxSize="3" />
+          {t('widgets.gallery.picker.upload')}
+        </Button>
+      )
+    ) : null;
+
   return (
     <Stack gap="2">
       <Box ref={setNodeRef} className="group" position="relative">
         <GalleryPickerPopover accept={accept} label={labels.choose} onPick={handlePick}>
           <DropZone
+            ref={triggerRef}
             as="button"
             aria-busy={isBusy || undefined}
-            aria-disabled={disabled || undefined}
+            aria-disabled={isInert || undefined}
             aria-label={value ? labels.replace : labels.choose}
+            aspectRatio={isTile ? 1 : undefined}
             cursor={disabled ? 'not-allowed' : undefined}
-            disabled={isInert}
+            // Busy stays focusable (`aria-disabled`): Remove hands focus here while the action runs.
+            disabled={disabled}
             isDisabled={isInert}
+            onClickCapture={isBusy ? preventClick : undefined}
+            isInvalid={errorMessage !== null}
             isOver={isOver}
-            minH="20"
+            minH={isTile ? undefined : '20'}
             overflow="hidden"
+            position="relative"
             textAlign="start"
             w="full"
             _disabled={DROP_ZONE_DISABLED_PROPS}
             _focusVisible={DROP_ZONE_FOCUS_PROPS}
             _hover={isInert ? undefined : DROP_ZONE_HOVER_PROPS}
           >
-            {value ? (
+            {isTile ? (
+              <>
+                {valueThumbnail ? (
+                  <Box inset="0" position="absolute">
+                    {valueThumbnail}
+                  </Box>
+                ) : (
+                  <Stack align="center" color="fg.muted" gap="1.5" h="full" justify="center" px="2" textAlign="center">
+                    <Icon as={ImagePlusIcon} boxSize="5" />
+                    <Text color="fg" fontSize="xs" fontWeight="600">
+                      {labels.choose}
+                    </Text>
+                    {emptyHint && !isBusy ? (
+                      <Text color="fg.muted" fontSize="2xs">
+                        {emptyHint}
+                      </Text>
+                    ) : null}
+                  </Stack>
+                )}
+                {isBusy ? (
+                  <Stack align="center" bg="bg.muted/85" inset="0" justify="center" position="absolute">
+                    <Spinner size="sm" />
+                  </Stack>
+                ) : null}
+              </>
+            ) : value ? (
               <HStack align="stretch" gap="3" h="20" p="2">
                 <Box bg="blackAlpha.300" boxSize="16" flexShrink="0" overflow="hidden" rounded="sm">
-                  {thumbnail ?? (
-                    <Image
-                      alt=""
-                      boxSize="full"
-                      objectFit="contain"
-                      outline="1px solid"
-                      outlineColor="border.image"
-                      outlineOffset="-1px"
-                      rounded="sm"
-                      src={getThumbnailUrl(value)}
-                    />
-                  )}
+                  {valueThumbnail}
                 </Box>
                 <Stack align="start" flex="1" gap="1" justify="center" minW="0">
                   <MiddleTruncate color="fg" fontSize="xs" fontWeight="semibold" text={value.name} />
@@ -249,13 +348,7 @@ export const GalleryMediaSlot = ({
                   ) : null}
                   <HStack color="fg.muted" gap="1">
                     {isBusy ? <Spinner size="xs" /> : <Icon as={RefreshCwIcon} boxSize="2.5" />}
-                    <Text fontSize="2xs">
-                      {disabled && disabledReason
-                        ? disabledReason
-                        : isBusy
-                          ? t('widgets.gallery.picker.working')
-                          : t('widgets.gallery.picker.replaceHint')}
-                    </Text>
+                    <Text fontSize="2xs">{valueHint}</Text>
                   </HStack>
                 </Stack>
               </HStack>
@@ -270,44 +363,56 @@ export const GalleryMediaSlot = ({
                     <Icon as={ChevronDownIcon} boxSize="3" color="fg.subtle" />
                   </HStack>
                 )}
-                <Text color="fg.muted" fontSize="2xs" textAlign="center">
-                  {disabled && disabledReason
-                    ? disabledReason
-                    : isBusy
-                      ? t('widgets.gallery.picker.working')
-                      : t('widgets.gallery.picker.dropHint')}
-                </Text>
+                {emptyHint || isInDragScope ? (
+                  <Text color="fg.muted" fontSize="2xs" textAlign="center">
+                    {emptyHint ?? t('widgets.gallery.picker.dropHint')}
+                  </Text>
+                ) : null}
               </Stack>
             )}
           </DropZone>
         </GalleryPickerPopover>
         {value && onFind ? (
-          /*
-           * Keep the badge beside the button face to avoid nested buttons; matching row metrics align it without
-           * measurement.
-           */
-          <HStack gap="3" h="20" insetInline="0" p="2" pointerEvents="none" position="absolute" top="0">
-            <Box boxSize="16" flexShrink="0" position="relative">
+          isTile ? (
+            <Box left="1" position="absolute" top="1">
               <FindInGalleryThumbnailButton name={value.name} onFind={onFind} />
             </Box>
+          ) : (
+            /*
+             * Keep the badge beside the button face to avoid nested buttons; matching row metrics align it without
+             * measurement.
+             */
+            <HStack gap="3" h="20" insetInline="0" p="2" pointerEvents="none" position="absolute" top="0">
+              <Box boxSize="16" flexShrink="0" position="relative">
+                <FindInGalleryThumbnailButton name={value.name} onFind={onFind} />
+              </Box>
+            </HStack>
+          )
+        ) : null}
+        {isTile && (removeAction || uploadAction) ? (
+          // Siblings of the trigger, not children: a button must not nest inside another.
+          <HStack
+            gap="0.5"
+            opacity={0}
+            pointerEvents="none"
+            position="absolute"
+            right="1"
+            top="1"
+            transition="opacity var(--wb-motion-duration-fast) ease"
+            _groupFocusWithin={TILE_ACTIONS_SHOWN}
+            _groupHover={TILE_ACTIONS_SHOWN}
+          >
+            {uploadAction}
+            {removeAction}
           </HStack>
         ) : null}
         <DropTargetOverlay isActive={acceptsActiveDrag} isOver={isOver} label={labels.drop} />
+        {isInDragScope ? <GalleryDragEndMonitor onDragEnd={handleDragEnd} /> : null}
       </Box>
-      {(onUploadFile && !disabled) || value ? (
+      {!isTile && (uploadAction || removeAction) ? (
         <HStack justify="end">
-          {onUploadFile && !disabled ? (
-            <Button disabled={isBusy} size="xs" variant="ghost" onClick={openUploadPicker}>
-              <Icon as={UploadIcon} boxSize="3" />
-              {t('widgets.gallery.picker.upload')}
-            </Button>
-          ) : null}
-          {value ? (
-            <Button disabled={isBusy} size="xs" variant="ghost" onClick={handleClear}>
-              <Icon as={XIcon} boxSize="3" />
-              {labels.remove}
-            </Button>
-          ) : null}
+          {uploadAction}
+          {removeAction}
         </HStack>
       ) : null}
       {errorMessage ? (

@@ -1,10 +1,10 @@
-import type { SystemStyleObject } from '@chakra-ui/react';
+/* eslint-disable react-perf/jsx-no-jsx-as-prop */
 import type { QueueItemReadModel } from '@features/queue/core/types';
 
-import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Text } from '@chakra-ui/react';
 import { extractGenerationMeta, getResultImageName } from '@features/queue/core/generationMeta';
 import { useItemProgress } from '@features/queue/data/itemProgressStore';
-import { Row } from '@platform/ui/Row';
+import { ListItem } from '@platform/ui/list/ListItem';
 import { ChevronRightIcon } from 'lucide-react';
 import { memo, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -21,20 +21,6 @@ import { getStatusMeta } from './statusMeta';
 import { useDeviceLabel } from './useDeviceLabel';
 
 const CHEVRON_OPEN = { transform: 'rotate(90deg)' } as const;
-
-const QUEUE_ITEM_BUTTON_SX: SystemStyleObject = {
-  display: 'flex',
-  alignItems: 'center',
-  flex: 1,
-  gap: 2.5,
-  minH: 11,
-  minW: 0,
-  px: 2,
-  py: 1.5,
-  textAlign: 'start',
-  rounded: 'none',
-  transitionDuration: 'fastest',
-} as const;
 
 export const QueueItemRow = memo(
   ({ item, revealRequest }: { item: QueueItemReadModel; revealRequest?: QueueItemRevealRequest | null }) => {
@@ -80,58 +66,47 @@ export const QueueItemRow = memo(
     const showBorder = expanded || isFailed;
     const borderColor = showBorder ? (isFailed ? 'fg.error' : 'border') : 'transparent';
 
+    // The card is the list item: progress and details belong to the row, not to the list.
     return (
-      <Box ref={consumeReveal} overflow="hidden" rounded="md" borderWidth={1} borderColor={borderColor}>
-        <HStack gap="0">
-          <Row
-            aria-expanded={canExpand ? expanded : undefined}
-            as={canExpand ? 'button' : 'div'}
-            css={QUEUE_ITEM_BUTTON_SX}
-            onClick={canExpand ? toggle : undefined}
-            onFocus={canExpand ? preload : undefined}
-            onPointerEnter={canExpand ? preload : undefined}
-          >
-            <QueueItemThumbnail boxSize="8" imageName={resultImageName} liveImage={liveImage} />
-            <Stack flex="1" gap="0.5" minW="0">
-              <Text fontSize="xs" truncate>
-                {meta.positivePrompt?.trim() || t('widgets.queue.noPrompt')}
+      <Box ref={consumeReveal} borderColor={borderColor} borderWidth={1} overflow="hidden" role="listitem" rounded="md">
+        <ListItem
+          actions={isCancellable ? <CancelQueueItemButton itemId={item.id} /> : undefined}
+          description={
+            <HStack gap="1.5" minW="0">
+              <QueueStatusDot status={item.status} />
+              <Text
+                fontVariantNumeric="tabular-nums"
+                title={deviceLabel ? t('widgets.queue.device.tooltip', { name: deviceLabel.name }) : undefined}
+                truncate
+              >
+                {[
+                  statusLabel,
+                  ageLabel,
+                  deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : null,
+                ]
+                  .filter(Boolean)
+                  .join(' · ')}
               </Text>
-              <HStack gap="1.5" minW="0">
-                <QueueStatusDot status={item.status} />
-                <Text
-                  color="fg.muted"
-                  fontSize="2xs"
-                  fontVariantNumeric="tabular-nums"
-                  title={deviceLabel ? t('widgets.queue.device.tooltip', { name: deviceLabel.name }) : undefined}
-                  truncate
-                >
-                  {[
-                    statusLabel,
-                    ageLabel,
-                    deviceLabel ? t('widgets.queue.device.shortLabel', { index: deviceLabel.index }) : null,
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-                </Text>
-              </HStack>
-            </Stack>
-            {canExpand ? (
+            </HStack>
+          }
+          isExpanded={canExpand ? expanded : undefined}
+          leading={<QueueItemThumbnail boxSize="8" imageName={resultImageName} liveImage={liveImage} />}
+          role="presentation"
+          title={meta.positivePrompt?.trim() || t('widgets.queue.noPrompt')}
+          titleTruncate="end"
+          trailing={
+            canExpand ? (
               <Icon
                 as={ChevronRightIcon}
                 boxSize="4"
-                color="fg.muted"
-                flexShrink={0}
                 transition="transform var(--wb-motion-duration-fast) ease"
                 css={expanded ? CHEVRON_OPEN : undefined}
               />
-            ) : null}
-          </Row>
-          {isCancellable ? (
-            <Box flexShrink={0} pe="1">
-              <CancelQueueItemButton itemId={item.id} />
-            </Box>
-          ) : null}
-        </HStack>
+            ) : undefined
+          }
+          onIntent={canExpand ? preload : undefined}
+          onPress={canExpand ? toggle : undefined}
+        />
 
         {item.status === 'in_progress' ? (
           <Box px="2.5" pb="2">

@@ -55,7 +55,7 @@ vi.mock('@features/queue/contracts', () => ({
   getProjectQueueIndicatorState: () => ({ hasOpenQueueWork: false, progressState: null, runningQueueItemId: null }),
 }));
 vi.mock('@features/queue/react', () => ({ useQueueItemProgress: () => null }));
-vi.mock('@workbench/focusRegions', () => ({ useFocusRegionProps: () => ({}) }));
+vi.mock('@workbench/focusRegions', () => ({ useFocusRegionProps: () => ({}), useHighlightedRegion: () => null }));
 vi.mock('@workbench/widgetRegionViewModel', () => ({
   createWidgetRegionViewModelFromState: () => ({ placedItems: [centerAreaMocks.activeItem] }),
   getWidgetRegionItems: () => [],

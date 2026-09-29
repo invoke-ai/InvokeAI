@@ -29,6 +29,8 @@ import {
   getVideoModes,
   getVideoPromptPolicy,
   getVideoValidationReasons,
+  isAutoDurationActive,
+  isAutoDurationSupportedForMode,
   getWanExpertWiringWarning,
   isSupportedVideoModel,
   isValidVideoNumFrames,
@@ -2493,5 +2495,90 @@ describe('LTX-2 policy', () => {
     expect(reasons).toContain('Audio CFG must be at least 1.');
     expect(reasons).toContain('STG must be at least 0.');
     expect(reasons).toContain('Modality guidance must be at least 1.');
+  });
+});
+
+describe('auto duration', () => {
+  const HEAD = { base: 'ltx-2', key: 'head', name: 'Duration head', type: 'ltx2_duration_head' };
+  const settings = (overrides: Partial<VideoSettings>): VideoSettings =>
+    ({
+      ...getDefaultVideoSettings(ltx2('ltx2_dev')),
+      autoDuration: true,
+      ltx2DurationHeadModel: HEAD,
+      ...overrides,
+    }) as VideoSettings;
+
+  it('has a length to decide for a prompt-only or image-anchored run', () => {
+    expect(isAutoDurationSupportedForMode(settings({}))).toBe(true);
+    expect(
+      isAutoDurationSupportedForMode(settings({ firstFrameImage: { height: 704, image_name: 'a.png', width: 1248 } }))
+    ).toBe(true);
+  });
+
+  it.each([['audio' as const], ['video' as const]])(
+    'has none for a %s-conditioned run: the clip is the length',
+    (role) => {
+      const conditioned = settings({
+        conditioningClip: {
+          clip: { fps: 24, height: 704, numFrames: 49, video_name: 'c.mp4', width: 1248 },
+          fpsKnown: true,
+          role,
+        },
+      } as Partial<VideoSettings>);
+
+      expect(isAutoDurationSupportedForMode(conditioned)).toBe(false);
+      expect(isAutoDurationActive(conditioned)).toBe(false);
+    }
+  );
+
+  it('has none for a continuation: its length is the new material the user asked for', () => {
+    const extending = settings({
+      sourceVideo: {
+        endFrame: 48,
+        fps: 24,
+        height: 704,
+        numFrames: 49,
+        startFrame: 0,
+        video_name: 's.mp4',
+        width: 1248,
+      },
+    } as Partial<VideoSettings>);
+
+    expect(isAutoDurationSupportedForMode(extending)).toBe(false);
+    expect(isAutoDurationActive(extending)).toBe(false);
+  });
+
+  it('is inactive without a head, however the flag is stored', () => {
+    expect(isAutoDurationActive(settings({ ltx2DurationHeadModel: null }))).toBe(false);
+    expect(isAutoDurationActive(settings({ autoDuration: false }))).toBe(false);
+  });
+
+  it('selects an installed head for a new LTX-2 panel, with the switch still off', () => {
+    const defaults = getDefaultVideoSettings(ltx2('ltx2_dev'), [HEAD] as never);
+
+    expect(defaults.ltx2DurationHeadModel).toEqual(HEAD);
+    expect(defaults.autoDuration).toBe(false);
+  });
+
+  it('turns auto duration off with the head it came with when the family changes, and back on only by hand', () => {
+    const catalog = [HEAD] as never;
+    const toWan = getVideoModelSelectionResult({
+      currentSettings: settings({}),
+      model: wanModel('t2v_a14b'),
+      models: catalog,
+    });
+
+    expect(toWan.settings.ltx2DurationHeadModel).toBeNull();
+    expect(toWan.settings.autoDuration).toBe(false);
+
+    const backToLtx2 = getVideoModelSelectionResult({
+      currentSettings: toWan.settings,
+      model: ltx2('ltx2_dev'),
+      models: catalog,
+    });
+
+    // The head is found again so the switch is there to use, but the switch stays where the user left it.
+    expect(backToLtx2.settings.ltx2DurationHeadModel).toEqual(HEAD);
+    expect(backToLtx2.settings.autoDuration).toBe(false);
   });
 });

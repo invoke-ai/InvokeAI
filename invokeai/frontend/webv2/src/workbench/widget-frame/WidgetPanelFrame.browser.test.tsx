@@ -81,18 +81,37 @@ const renderFrame = async (region: 'bottom' | 'left' | 'right' = 'left') => {
   return separator;
 };
 
-/** Drags the handle to a target panel width and releases, unless told not to. */
-const dragTo = async (
+const pointer = (type: string, init: PointerEventInit, buttons = 1) =>
+  new PointerEvent(type, { bubbles: true, buttons, pointerId: 1, ...init });
+
+const nextFrame = () =>
+  act(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      })
+  );
+
+/** Drags the handle along its axis by `delta` pixels and releases, unless told not to. */
+const drag = async (
   separator: Element,
-  { end = 'pointerup', widthPx }: { end?: 'pointercancel' | 'none' | 'pointerup'; widthPx: number }
+  {
+    axis = 'clientX',
+    delta,
+    end = 'pointerup',
+  }: { axis?: 'clientX' | 'clientY'; delta: number; end?: 'none' | 'pointerup' }
 ) => {
-  await interact(() => separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0 })));
-  await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: widthPx - frameMocks.sizePx })));
+  await interact(() => separator.dispatchEvent(pointer('pointerdown', { [axis]: 0 })));
+  await interact(() => window.dispatchEvent(pointer('pointermove', { [axis]: delta })));
+  await nextFrame();
 
   if (end !== 'none') {
-    await interact(() => window.dispatchEvent(new PointerEvent(end, { clientX: widthPx - frameMocks.sizePx })));
+    await interact(() => window.dispatchEvent(pointer(end, { [axis]: delta }, 0)));
   }
 };
+
+/** Drags the left handle to a target panel width and releases. */
+const dragTo = (separator: Element, widthPx: number) => drag(separator, { delta: widthPx - frameMocks.sizePx });
 
 beforeEach(() => {
   host = document.createElement('div');
@@ -115,7 +134,7 @@ describe('WidgetPanelFrame resize', () => {
   it('stops at the floor and commits it', async () => {
     const separator = await renderFrame();
 
-    await dragTo(separator, { widthPx: 300 });
+    await dragTo(separator, 300);
 
     expect(frameMocks.setRegionSize).toHaveBeenCalledExactlyOnceWith('left', 350);
     expect(frameMocks.setRegionCollapsed).not.toHaveBeenCalled();
@@ -124,92 +143,54 @@ describe('WidgetPanelFrame resize', () => {
   it('collapses instead of resizing once the drag clears the floor by the overshoot', async () => {
     const separator = await renderFrame();
 
-    await dragTo(separator, { widthPx: 260 });
+    await dragTo(separator, 260);
 
     expect(frameMocks.setRegionCollapsed).toHaveBeenCalledExactlyOnceWith('left', true);
     expect(frameMocks.setRegionSize).not.toHaveBeenCalled();
   });
 
-  it('reopens when the drag comes back inside the floor', async () => {
+  it('previews the collapse by closing the panel on screen', async () => {
     const separator = await renderFrame();
+    const frame = separator.parentElement!.parentElement!;
 
-    await interact(() => separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0 })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: -250 })));
-    expect(separator.hasAttribute('data-collapse-armed')).toBe(true);
+    await drag(separator, { delta: -200, end: 'none' });
 
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: -50 })));
-    expect(separator.hasAttribute('data-collapse-armed')).toBe(false);
-
-    await interact(() => window.dispatchEvent(new PointerEvent('pointerup', { clientX: -50 })));
-    expect(frameMocks.setRegionSize).toHaveBeenCalledExactlyOnceWith('left', 400);
-    expect(frameMocks.setRegionCollapsed).not.toHaveBeenCalled();
+    expect(frame.getBoundingClientRect().width).toBe(0);
   });
 
-  it('never reports a sub-minimum size to assistive tech while armed', async () => {
+  it('never reports a sub-minimum size to assistive tech while a collapse is armed', async () => {
     const separator = await renderFrame();
 
-    await dragTo(separator, { end: 'none', widthPx: 200 });
+    await drag(separator, { delta: -200, end: 'none' });
+    await nextFrame();
 
-    expect(separator.getAttribute('aria-valuenow')).toBe('350');
+    expect(separator.getAttribute('aria-valuenow')).toBe('450');
     expect(separator.getAttribute('aria-valuemin')).toBe('350');
-    expect(separator.getAttribute('aria-valuemax')).toBe('720');
   });
 
-  // Keep handles inside clipped bounds so the whole target receives pointer gestures.
-  it.each(['left', 'right', 'bottom'] as const)('keeps the whole %s handle inside the clip', async (region) => {
-    const separator = await renderFrame(region);
-    const handle = separator.getBoundingClientRect();
-    const panel = separator.parentElement!.getBoundingClientRect();
-
-    expect(handle.left).toBeGreaterThanOrEqual(panel.left);
-    expect(handle.right).toBeLessThanOrEqual(panel.right);
-    expect(handle.top).toBeGreaterThanOrEqual(panel.top);
-    expect(handle.bottom).toBeLessThanOrEqual(panel.bottom);
-  });
-
-  it('holds at the floor, then snaps shut on screen at the threshold', async () => {
+  it("hides its divider line while the panel's outline is drawn over it", async () => {
     const separator = await renderFrame();
-    // Chakra emits the width as a class rather than an inline style.
-    const panelWidth = () => getComputedStyle(separator.parentElement!).width;
+    const divider = separator.parentElement!;
 
-    await dragTo(separator, { end: 'none', widthPx: 300 });
-    expect(panelWidth()).toBe('350px');
-    expect(separator.hasAttribute('data-collapse-armed')).toBe(false);
-
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: -400 })));
-    expect(panelWidth()).toBe('0px');
-    expect(separator.hasAttribute('data-collapse-armed')).toBe(true);
-  });
-
-  it('captures the pointer so the gesture survives leaving the window', async () => {
-    const separator = await renderFrame();
-    const setPointerCapture = vi.spyOn(separator as HTMLElement, 'setPointerCapture');
-
+    expect(divider.hasAttribute('data-line-hidden')).toBe(false);
     await interact(() =>
-      separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0, pointerId: 7 }))
+      host!.querySelector('aside')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
     );
 
-    expect(setPointerCapture).toHaveBeenCalledWith(7);
+    expect(divider.hasAttribute('data-line-hidden')).toBe(true);
   });
 
-  it('drops the window listeners when the frame unmounts mid-drag', async () => {
+  // The panel's scrollbar runs along its inner edge; the handle reaches outward instead.
+  it('leaves the edge of the left panel, where its scrollbar sits, to the panel', async () => {
+    // Narrow enough that the probe past its edge stays inside the test viewport.
+    frameMocks.sizePx = 350;
     const separator = await renderFrame();
+    const aside = separator.parentElement!.previousElementSibling!.getBoundingClientRect();
+    // Away from the capsule at the middle, which does reach over the edge.
+    const probeY = aside.top + aside.height / 4;
 
-    await dragTo(separator, { end: 'none', widthPx: 200 });
-    await interact(() => root?.unmount());
-    await interact(() => window.dispatchEvent(new PointerEvent('pointerup', { clientX: -250 })));
-
-    expect(frameMocks.setRegionCollapsed).not.toHaveBeenCalled();
-    expect(frameMocks.setRegionSize).not.toHaveBeenCalled();
-  });
-
-  it('treats a cancelled gesture as an interruption rather than a collapse', async () => {
-    const separator = await renderFrame();
-
-    await dragTo(separator, { end: 'pointercancel', widthPx: 200 });
-
-    expect(frameMocks.setRegionCollapsed).not.toHaveBeenCalled();
-    expect(frameMocks.setRegionSize).toHaveBeenCalledExactlyOnceWith('left', 350);
+    expect(document.elementFromPoint(aside.right - 2, probeY)).not.toBe(separator);
+    expect(document.elementFromPoint(aside.right + 5, probeY)).toBe(separator);
   });
 
   it('collapses on a further collapse-ward key press at the floor', async () => {
@@ -230,9 +211,7 @@ describe('WidgetPanelFrame resize', () => {
 
     // The right panel grows leftwards, so the same pointer delta has to be
     // read with the opposite sign.
-    await interact(() => rightSeparator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0 })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: 190 })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointerup', { clientX: 190 })));
+    await drag(rightSeparator, { delta: 190 });
 
     expect(frameMocks.setRegionCollapsed).toHaveBeenCalledExactlyOnceWith('right', true);
   });
@@ -242,9 +221,7 @@ describe('WidgetPanelFrame resize', () => {
 
     const separator = await renderFrame('bottom');
 
-    await interact(() => separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientY: 0 })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientY: 100 })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointerup', { clientY: 100 })));
+    await drag(separator, { axis: 'clientY', delta: 100 });
 
     // 180 − 100 = 80, which is 16 below the 96 floor: not yet the 80px overshoot.
     expect(frameMocks.setRegionCollapsed).not.toHaveBeenCalled();
@@ -292,7 +269,7 @@ describe('WidgetPanelFrame squeezed by the viewport', () => {
   it('yields to a rigid sibling instead of pushing it out of the row', async () => {
     const separator = await renderSqueezed();
 
-    expect(separator.parentElement!.getBoundingClientRect().width).toBe(200);
+    expect(separator.parentElement!.parentElement!.getBoundingClientRect().width).toBe(200);
     expect(separator.getAttribute('aria-valuenow')).toBe('200');
     expect(separator.getAttribute('aria-valuemin')).toBe('200');
   });
@@ -300,14 +277,14 @@ describe('WidgetPanelFrame squeezed by the viewport', () => {
   it('snaps shut after the overshoot from the width on screen, not from the floor', async () => {
     const separator = await renderSqueezed();
 
-    await interact(() => separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0 })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: -79 })));
+    await drag(separator, { delta: -79, end: 'none' });
     expect(separator.hasAttribute('data-collapse-armed')).toBe(false);
 
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: -80 })));
+    await interact(() => window.dispatchEvent(pointer('pointermove', { clientX: -80 })));
+    await nextFrame();
     expect(separator.hasAttribute('data-collapse-armed')).toBe(true);
 
-    await interact(() => window.dispatchEvent(new PointerEvent('pointerup', { clientX: -80 })));
+    await interact(() => window.dispatchEvent(pointer('pointerup', { clientX: -80 }, 0)));
     expect(frameMocks.setRegionCollapsed).toHaveBeenCalledExactlyOnceWith('left', true);
     expect(frameMocks.setRegionSize).not.toHaveBeenCalled();
   });

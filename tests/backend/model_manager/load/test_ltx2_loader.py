@@ -19,10 +19,12 @@ import torch
 
 from invokeai.backend.ltx2 import component_configs as cc
 from invokeai.backend.model_manager.configs.gemma4_encoder import Gemma4Encoder_Gemma4Encoder_LTX2_Config
+from invokeai.backend.model_manager.configs.ltx2_duration_head import LTX2DurationHead_Checkpoint_Config
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_LTX2_Config, Main_Diffusers_LTX2_Config
 from invokeai.backend.model_manager.load.model_loaders import ltx2
 from invokeai.backend.model_manager.load.model_loaders.ltx2 import (
     LTX2CheckpointModel,
+    LTX2DurationHeadLoader,
     LTX2FolderModel,
     LTX2Gemma4EncoderModel,
 )
@@ -620,3 +622,63 @@ def test_an_nvfp4_layer_missing_its_global_scale_is_refused_before_the_cache_is_
         run.load(_checkpoint_config(tmp_path, sd))
 
     assert run.reserved == []
+
+
+def _duration_head_loader(reserved: list[int]) -> LTX2DurationHeadLoader:
+    loader = object.__new__(LTX2DurationHeadLoader)
+    loader._ram_cache = SimpleNamespace(make_room=reserved.append)
+    loader._logger = SimpleNamespace(info=lambda *_a, **_k: None, warning=lambda *_a, **_k: None)
+    return loader
+
+
+def test_the_duration_head_loads_widened_and_predicts_on_the_grid(monkeypatch, tmp_path) -> None:
+    """A published (bf16) head loads in fp32 and answers through the exact calls the duration node makes.
+
+    The node calls `forward` and `predict_num_frames` by keyword; driving an unstubbed head here is
+    what catches diffusers renaming either, which the node's own tests (with a pinned regression)
+    cannot.
+    """
+    from diffusers.pipelines.ltx2.duration_head import LTX2DurationHead
+
+    torch.manual_seed(0)
+    reference = LTX2DurationHead().eval()
+    published = {key: value.to(torch.bfloat16).contiguous() for key, value in reference.state_dict().items()}
+    safetensors.torch.save_file(published, tmp_path / "head.safetensors")
+    _cpu(monkeypatch)
+    reserved: list[int] = []
+    config = LTX2DurationHead_Checkpoint_Config.model_construct(path=str(tmp_path / "head.safetensors"))
+
+    head = _duration_head_loader(reserved)._load_model(config)
+
+    assert all(p.dtype == torch.float32 and not p.is_meta for p in head.parameters())
+    assert reserved, "cache room is reserved before the widening cast"
+    video, audio = torch.randn(1, 16, 4096), torch.randn(1, 16, 2048, dtype=torch.bfloat16)
+    reference.load_state_dict({key: value.float() for key, value in published.items()})
+    with torch.no_grad():
+        seconds = head(video_tokens=video, audio_tokens=audio)
+        torch.testing.assert_close(seconds, reference(video_tokens=video, audio_tokens=audio))
+        frames = head.predict_num_frames(
+            video_tokens=video,
+            audio_tokens=audio,
+            frame_rate=24.0,
+            temporal_compression_ratio=8,
+            min_seconds=1.0,
+            max_seconds=20.0,
+        )
+    assert (frames - 1) % 8 == 0 and 24 <= frames <= 481
+
+
+def test_a_quantized_duration_head_is_refused_by_name(monkeypatch, tmp_path) -> None:
+    """Same keys, float8 weights: upcast without their scales it would load and predict nonsense."""
+    from diffusers.pipelines.ltx2.duration_head import LTX2DurationHead
+
+    sd = {key: value.contiguous() for key, value in LTX2DurationHead().state_dict().items()}
+    sd["video_input_proj.weight"] = sd["video_input_proj.weight"].to(torch.float8_e4m3fn)
+    safetensors.torch.save_file(sd, tmp_path / "head.safetensors")
+    _cpu(monkeypatch)
+    reserved: list[int] = []
+    config = LTX2DurationHead_Checkpoint_Config.model_construct(path=str(tmp_path / "head.safetensors"))
+
+    with pytest.raises(ValueError, match="float8"):
+        _duration_head_loader(reserved)._load_model(config)
+    assert reserved == []

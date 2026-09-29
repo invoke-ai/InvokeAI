@@ -43,7 +43,7 @@ export const useGalleryGridHotkeys = ({
   cursorKey: string | null;
   /** Everything on hand for star-state lookups, strip included. */
   loadedItems: readonly GalleryItem[];
-  /** The arrow-key sections in visual order: in progress, the starred strip, the listing. */
+  /** The arrow-key sections in visual order: the starred strip, in progress, the listing. */
   navigationSections: readonly (readonly GalleryNavigationEntry[])[];
   scrollToEntry: (entry: GalleryNavigationEntry) => void;
 }) => {

@@ -8,11 +8,10 @@ import { AddNodesView } from '@features/nodes/ui/add-nodes/AddNodesView';
 import { NodePackDetail } from '@features/nodes/ui/detail/NodePackDetail';
 import { updateNodesUi, useNodesUiSelector, type NodesManagerTab } from '@features/nodes/ui/nodesUiStore';
 import { Scrollable, Tabs } from '@platform/ui';
+import { ManagerDetailHeader } from '@platform/ui/ManagerLayout';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BlocksIcon, PlusIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
-
-import { HEADER_MIN_HEIGHT } from './layoutConstants';
 
 /** Right side of the nodes manager: selected pack details, Add Nodes, and activity footer. */
 export const DetailPane = () => {
@@ -33,7 +32,7 @@ export const DetailPane = () => {
       onValueChange={(event) => updateNodesUi({ activeTab: event.value as NodesManagerTab })}
     >
       <Flex direction="column" flex="1" minH="0" minW="0">
-        <Flex align="flex-end" borderBottomWidth={1} flexShrink={0} minH={HEADER_MIN_HEIGHT} px="2">
+        <ManagerDetailHeader>
           <Tabs.List mb="-1px">
             <Tabs.Trigger value="details">
               <Icon as={BlocksIcon} boxSize="3" />
@@ -44,7 +43,7 @@ export const DetailPane = () => {
               {t('nodes.addNodes')}
             </Tabs.Trigger>
           </Tabs.List>
-        </Flex>
+        </ManagerDetailHeader>
 
         <Box flex="1" minH="0">
           <Tabs.Content h="full" p="0" value="details">

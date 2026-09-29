@@ -17,6 +17,8 @@ import {
 } from '@features/queue/contracts';
 import { createUuid } from '@platform/browser/randomUuid';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
+import { shallowEqual } from '@platform/state/selectors';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import {
@@ -26,7 +28,7 @@ import {
 } from '@workbench/settings/store';
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
-import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectSelector, useWorkbenchCommands, useWorkbenchInternalStore } from '@workbench/WorkbenchContext';
 import { lazy, useCallback, useMemo } from 'react';
 
 export const getGenerationSelectedGalleryImage = getSelectedGalleryImageFromValues;
@@ -108,9 +110,18 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   useMountEffect(() => {
     void import('@features/models/react');
   });
+  const store = useWorkbenchInternalStore();
+  const generateValues = useMemo(
+    () =>
+      createProjectedExternalStore({
+        isEqual: shallowEqual<Record<string, unknown>>,
+        select: (snapshot) => getProjectWidgetValues(snapshot.activeProject, 'generate'),
+        source: store,
+      }),
+    [store]
+  );
   const projectState = useActiveProjectSelector((activeProject) => ({
     activeProjectId: activeProject.id,
-    generateValues: getProjectWidgetValues(activeProject, 'generate'),
     invocationSourceId: activeProject.invocation.sourceId,
   }));
   // Syntax highlighting is an account preference, not project data.
@@ -284,6 +295,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       account: accountGroup,
       capabilities: capabilitiesGroup,
       gallery: galleryGroup,
+      generateValues,
       models: modelsGroup,
       notifications: notificationsGroup,
       presets: presetsGroup,
@@ -298,6 +310,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       accountGroup,
       capabilitiesGroup,
       galleryGroup,
+      generateValues,
       modelsGroup,
       notificationsGroup,
       presetsGroup,

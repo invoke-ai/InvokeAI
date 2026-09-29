@@ -5,7 +5,7 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 const dependencies = vi.hoisted(() => ({
   canManageSharedFonts: false,
@@ -60,6 +60,9 @@ const font = {
 
 let host: HTMLDivElement;
 let root: Root;
+
+const pagerButton = (text: string): HTMLButtonElement | null =>
+  [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === text) ?? null;
 let queryClient: QueryClient;
 
 const renderPage = async (): Promise<void> => {
@@ -115,16 +118,17 @@ describe('FontsPage', () => {
     await renderPage();
     await vi.waitFor(() => expect(host.textContent).toContain('Example Sans Regular'));
     await vi.waitFor(() => expect(dependencies.ensure).toHaveBeenCalledOnce());
-    const row = host.querySelector<HTMLElement>('[role="button"][aria-pressed="false"]');
+    const row = host.querySelector<HTMLButtonElement>('[role="listitem"] [data-list-primary]:not([aria-current])');
     expect(row).not.toBeNull();
     expect(row!.textContent).toContain('Aa');
     expect(dependencies.retain).not.toHaveBeenCalled();
     await act(() => {
       row!.focus();
-      row!.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Enter' }));
     });
+    expect(document.activeElement).toBe(row);
+    await userEvent.keyboard('{Enter}');
     await vi.waitFor(() => expect(dependencies.ensure).toHaveBeenCalledTimes(2));
-    expect(row!.getAttribute('aria-pressed')).toBe('true');
+    expect(row!.getAttribute('aria-current')).toBe('true');
     expect(dependencies.retain).toHaveBeenCalledOnce();
     expect(host.querySelector('h3')?.textContent).toBe('Example Sans Regular');
     expect(host.textContent).toContain('fonts.previewText');
@@ -178,7 +182,7 @@ describe('FontsPage', () => {
     await vi.waitFor(() => expect(host.textContent).toContain('Example Sans Regular'));
     expect(requestedOffsets).toEqual([0]);
 
-    const nextPageButton = host.querySelector<HTMLButtonElement>('button[aria-label="common.nextPage"]');
+    const nextPageButton = pagerButton('common.nextPage');
     expect(nextPageButton).not.toBeNull();
     await act(() => nextPageButton!.click());
     await vi.waitFor(() => expect(host.textContent).toContain('Second Page Font'));
@@ -203,15 +207,15 @@ describe('FontsPage', () => {
 
     await renderPage();
     await vi.waitFor(() => expect(host.textContent).toContain('Example Sans Regular'));
-    const nextPageButton = host.querySelector<HTMLButtonElement>('button[aria-label="common.nextPage"]');
+    const nextPageButton = pagerButton('common.nextPage');
     expect(nextPageButton).not.toBeNull();
 
     await act(() => nextPageButton!.click());
     await vi.waitFor(() => expect(host.textContent).toContain('fonts.emptyTitle'));
 
-    const previousPageButton = host.querySelector<HTMLButtonElement>('button[aria-label="common.previousPage"]');
+    const previousPageButton = pagerButton('common.previousPage');
     expect(previousPageButton).not.toBeNull();
-    expect(previousPageButton).toBeEnabled();
+    expect(previousPageButton!.getAttribute('aria-disabled')).toBe('false');
     expect(requestedOffsets).toEqual([0, 100]);
   });
 
@@ -229,16 +233,21 @@ describe('FontsPage', () => {
     await renderPage();
     await vi.waitFor(() => expect(host.querySelector('[data-index="0"]')).not.toBeNull());
     queryClient.setQueryData(['fonts', { limit: 100, scope: 'private', search: '' }], data);
-    const viewport = host.querySelector<HTMLElement>('[aria-label="fonts.library"]')!;
+    const viewport = () => host.querySelector<HTMLElement>('[data-list-viewport]')!;
     await act(() => {
-      viewport.scrollTop = 800;
-      viewport.dispatchEvent(new Event('scroll'));
+      viewport().scrollTop = 800;
+      viewport().dispatchEvent(new Event('scroll'));
     });
-    await vi.waitFor(() => expect(viewport.scrollTop).toBe(800));
+    await vi.waitFor(() => expect(viewport().scrollTop).toBe(800));
     await page.getByRole('button', { name: 'fonts.filterMenu', exact: true }).click();
     await page.getByRole('menuitemradio', { name: 'fonts.filters.my', exact: true }).click();
-    await vi.waitFor(() => expect(viewport.scrollTop).toBe(0));
-    expect(host.querySelector('[data-index="0"]')).not.toBeNull();
+    // The filtered list is a fresh viewport at the top, with its first row directly under the pinned chrome.
+    await vi.waitFor(() => {
+      expect(viewport().scrollTop).toBe(0);
+      const firstRow = host.querySelector<HTMLElement>('[data-index="0"]');
+      expect(firstRow).not.toBeNull();
+      expect(firstRow!.getBoundingClientRect().top).toBeCloseTo(viewport().getBoundingClientRect().top, 0);
+    });
   });
 
   it('keeps the library rows directly below search after the page is hidden and shown', async () => {
@@ -253,7 +262,7 @@ describe('FontsPage', () => {
       queryKey: ['fonts', params],
     }));
     await renderPage();
-    const firstRow = () => host.querySelector<HTMLElement>('[data-index="0"] [role="button"]');
+    const firstRow = () => host.querySelector<HTMLElement>('[data-index="0"] [data-list-primary]');
     await vi.waitFor(() => expect(firstRow()).not.toBeNull());
     const search = host.querySelector<HTMLInputElement>('input[aria-label="fonts.searchLabel"]')!;
     for (let index = 0; index < 3; index += 1) {

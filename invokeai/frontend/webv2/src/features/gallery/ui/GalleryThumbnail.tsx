@@ -18,6 +18,9 @@ import { GalleryTileFrame } from './GalleryTileFrame';
 const THUMBNAIL_DRAG_CSS = { filter: 'saturate(0)' } as const;
 const THUMBNAIL_ARMED_CSS = { '&[data-drag-armed=true]': { filter: 'saturate(0)' } } as const;
 
+/** Modified chords are app hotkeys (Mod+Enter invokes), never tile activation or a keyboard drag. */
+const isModifiedKey = (event: KeyboardEvent) => event.ctrlKey || event.metaKey || event.altKey || event.shiftKey;
+
 const PREVIEW_IMAGE_STYLE = {
   borderRadius: '0.375rem',
   boxShadow: '0 8px 24px rgb(0 0 0 / 45%)',
@@ -85,6 +88,18 @@ const GalleryThumbnail = ({
     data: getGalleryItemDragData(dragItems),
     id: getGalleryItemDragId(toGalleryItemRef(item), 'gallery-grid', dragScope),
   });
+  const dragListeners = useMemo(
+    () =>
+      listeners && {
+        ...listeners,
+        onKeyDown: (event: KeyboardEvent) => {
+          if (!isModifiedKey(event)) {
+            listeners.onKeyDown?.(event);
+          }
+        },
+      },
+    [listeners]
+  );
 
   // Portal the drag preview to escape the grid's overflow clipping and transformed virtual rows.
   const tileRef = useRef<HTMLDivElement | null>(null);
@@ -153,7 +168,7 @@ const GalleryThumbnail = ({
   const handleClick = useCallback((event: MouseEvent) => onClick(item, event), [item, onClick]);
 
   const handleActivationKeyDown = useCallback((event: KeyboardEvent<HTMLButtonElement>) => {
-    if (event.key === 'Enter' || event.key === ' ') {
+    if (!isModifiedKey(event) && (event.key === 'Enter' || event.key === ' ')) {
       event.stopPropagation();
     }
   }, []);
@@ -179,7 +194,7 @@ const GalleryThumbnail = ({
   return (
     <GalleryTileFrame
       ref={setTileRef}
-      {...listeners}
+      {...dragListeners}
       alwaysShowDimensions={alwaysShowDimensions}
       boxShadow={isCompared ? 'inset 0 0 0 1px {colors.accent.solid}' : undefined}
       css={isDragging ? THUMBNAIL_DRAG_CSS : THUMBNAIL_ARMED_CSS}

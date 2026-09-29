@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
-
 from typing import Literal
 
 import numpy as np

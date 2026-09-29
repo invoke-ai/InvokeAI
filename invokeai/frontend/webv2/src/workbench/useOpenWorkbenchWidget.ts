@@ -5,6 +5,7 @@ import { useCallback } from 'react';
 
 import type { WorkbenchWidgetCommands } from './workbenchStore';
 
+import { focusOpenedWidget } from './focusRegions';
 import { openWidgetPlacement } from './widgetPlacementCommands';
 import { useOptionalWorkbenchCommands, useWorkbenchCommands } from './WorkbenchContext';
 import { useOptionalWorkbenchWidgetRegistry, useWorkbenchWidgetRegistry } from './WorkbenchWidgetRegistryContext';
@@ -22,13 +23,29 @@ export const openWorkbenchWidget = (
   return result.ok ? { ok: true, region: result.region as WidgetRegion } : { ok: false, reason: 'unavailable' };
 };
 
+/** For controls the user acts on: the widget they open also takes focus (see `focusOpenedWidget`). */
+const openAndFocus = (
+  widgets: WorkbenchWidgetCommands,
+  getWidgetsForRegion: (region: WidgetRegion) => RegisteredWidget[],
+  widgetId: WidgetTypeId,
+  options?: OpenWorkbenchWidgetOptions
+): OpenWorkbenchWidgetResult => {
+  const result = openWorkbenchWidget(widgets, getWidgetsForRegion, widgetId, options);
+
+  if (result.ok) {
+    focusOpenedWidget(result.region, widgetId);
+  }
+
+  return result;
+};
+
 export const useOpenWorkbenchWidget = () => {
   const { widgets } = useWorkbenchCommands();
   const { getWidgetsForRegion } = useWorkbenchWidgetRegistry();
 
   return useCallback(
     (widgetId: WidgetTypeId, options?: OpenWorkbenchWidgetOptions): OpenWorkbenchWidgetResult =>
-      openWorkbenchWidget(widgets, getWidgetsForRegion, widgetId, options),
+      openAndFocus(widgets, getWidgetsForRegion, widgetId, options),
     [getWidgetsForRegion, widgets]
   );
 };
@@ -43,7 +60,7 @@ export const useOptionalOpenWorkbenchWidget = () => {
         return { ok: false, reason: 'unavailable' };
       }
 
-      return openWorkbenchWidget(commands.widgets, registry.getWidgetsForRegion, widgetId, options);
+      return openAndFocus(commands.widgets, registry.getWidgetsForRegion, widgetId, options);
     },
     [commands, registry]
   );

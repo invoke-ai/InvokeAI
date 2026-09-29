@@ -2,10 +2,13 @@
 import type { HFLookupState } from '@features/models/ui/uiStore';
 
 import { Stack } from '@chakra-ui/react';
+import { InstallSourceButton } from '@features/models/ui/shared/InstallSourceButton';
 import { ResultsListHeader } from '@features/models/ui/shared/ResultsListHeader';
-import { InstallSourceButton, SourceListItem } from '@features/models/ui/shared/SourceListItem';
 import { useInstalledSourceKeys } from '@features/models/ui/shared/useInstalledSources';
-import { sourceFileName, useSourceNameFilter } from '@features/models/ui/shared/useSourceNameFilter';
+import { sourceFileName, sourceLocation, useSourceNameFilter } from '@features/models/ui/shared/useSourceNameFilter';
+import { ListItem } from '@platform/ui/list/ListItem';
+import { ListStack } from '@platform/ui/list/ListStack';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { useTranslation } from 'react-i18next';
 
 import { InstallOptions } from './InstallOptions';
@@ -51,21 +54,28 @@ export const HuggingFaceFiles = ({
         onInstallAll={installAll}
         onSearchChange={setFilter}
       />
-      {filteredUrls.map((url) => (
-        <SourceListItem
-          key={url}
-          title={sourceFileName(url)}
-          titleTooltip={url}
-          trailing={
-            <InstallSourceButton
-              installedModelKey={installedSourceKeys.get(url) ?? null}
-              isPending={pendingSources.has(url)}
-              source={url}
-              onInstall={() => onInstall(url)}
+      <ListStack dividers label={lookup.repo}>
+        {filteredUrls.map((url) => {
+          const location = sourceLocation(url);
+
+          return (
+            <ListItem
+              key={url}
+              actions={
+                <InstallSourceButton
+                  installedModelKey={installedSourceKeys.get(url) ?? null}
+                  isPending={pendingSources.has(url)}
+                  name={location ?? sourceFileName(url)}
+                  source={url}
+                  onInstall={() => onInstall(url)}
+                />
+              }
+              description={location ? <MiddleTruncate as="span" text={location} title={url} /> : undefined}
+              title={sourceFileName(url)}
             />
-          }
-        />
-      ))}
+          );
+        })}
+      </ListStack>
     </Stack>
   );
 };
