@@ -55,9 +55,14 @@ export const OpenProjectsNavSection = ({
     }
 
     const nameById = new Map(summaries.map((summary) => [summary.id, summary.name]));
+    // The current project leads; the rest keep their open order.
+    const ordered =
+      activeProjectId && openProjectIds.includes(activeProjectId)
+        ? [activeProjectId, ...openProjectIds.filter((id) => id !== activeProjectId)]
+        : openProjectIds;
 
-    return openProjectIds.map((id) => ({ id, name: nameById.get(id) ?? null }));
-  }, [openProjectIds, summaries]);
+    return ordered.map((id) => ({ id, name: nameById.get(id) ?? null }));
+  }, [activeProjectId, openProjectIds, summaries]);
 
   if (status !== 'ready' || (openProjectIds !== null && openProjects.length === 0)) {
     return null;
