@@ -25,7 +25,7 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
 
 ## TL;DR
 
-Ensure your Docker setup is able to use your GPU. Then:
+Ensure your Docker setup is able to use your GPU. The CUDA image needs an Nvidia driver from the R580 series or newer on the host and a GPU with compute capability 7.5 or newer (GTX 16xx, RTX 20xx and later). Then:
 
 ```bash
 docker run --runtime=nvidia --gpus=all --publish 9090:9090 ghcr.io/invoke-ai/invokeai

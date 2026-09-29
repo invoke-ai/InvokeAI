@@ -16,6 +16,7 @@ Hardware requirements vary significantly depending on model and image output siz
 The requirements below are rough guidelines for best performance. GPUs with less VRAM typically still work, if a bit slower. Follow the [Low VRAM Guide] to optimize performance.
 
 - All Apple Silicon (M1, M2, etc) Macs work, but 16GB+ memory is recommended.
+- Nvidia GPUs need compute capability 7.5 or newer (GTX 16xx, RTX 20xx and everything after) and a driver from the R580 series or newer. Maxwell, Pascal and Volta cards (GTX 9xx/10xx, Titan V, Tesla P40/P100/V100) are not supported by Invoke's CUDA build: stay on the previous Invoke release, or do a [manual install](../manual) with `--torch-backend=cu126`, whose PyTorch build still includes these GPUs (not tested by the Invoke team). With a driver that is too old, Invoke starts on the CPU and logs an error saying so; on an unsupported GPU it logs an error at startup and generation fails.
 - AMD GPUs are supported on Linux only. The VRAM requirements are the same as Nvidia GPUs.
 - Intel Arc GPUs (Alchemist, Battlemage and newer) are supported on Windows and Linux `x86_64`. The VRAM requirements are the same as Nvidia GPUs.
 - Linux ARM64 (`aarch64`) devices — e.g. Raspberry Pi 5, other SBCs, ARM servers — are supported in CPU-only mode. Local generation is slow without a GPU, but API-backed models (e.g. GPT Image, Gemini) work well.
@@ -24,7 +25,7 @@ The requirements below are rough guidelines for best performance. GPUs with less
 
 | Model Family | Best resolution | GPU (series) | VRAM (min) | RAM (min) | Notes |
 |---|---:|---|---:|---:|---|
-| SD1.5 | 512x512 | Nvidia 10xx+ | 4GB | 8GB |  |
+| SD1.5 | 512x512 | Nvidia 16xx+ | 4GB | 8GB |  |
 | SDXL | 1024x1024 | Nvidia 20xx+ | 8GB | 16GB |  |
 | FLUX.1 | 1024x1024 | Nvidia 20xx+ | 10GB | 32GB | Download totals: NF4 ~12GB, int8 ~18GB, bf16 ~33GB. The int8 transformer is 11.5GB resident on any supported GPU, so it streams on a 10GB card |
 | FLUX.2 Klein 4B | 1024x1024 | Nvidia 30xx+ | 12GB | 16GB | FP8 works with 8GB+; Diffusers + encoder |
@@ -111,6 +112,8 @@ Run `nvidia-smi` on your system's command line to verify that drivers and CUDA a
 Go to the [CUDA Toolkit Downloads] and carefully follow the instructions for your system to get everything installed.
 
 Confirm that `nvidia-smi` displays driver and CUDA versions after installation.
+
+Invoke's CUDA build (PyTorch 2.13 with CUDA 13.0) needs an Nvidia driver from the R580 series or newer. See [Hardware](#hardware) for the supported GPUs.
 
 #### Linux - via Nvidia Container Runtime
 

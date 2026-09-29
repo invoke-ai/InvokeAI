@@ -87,7 +87,7 @@ The following commands vary depending on the version of Invoke being installed a
 
   6. Determine the package specifier to use when installing. This is a performance optimization.
 
-      - If you have an Nvidia 20xx series GPU or older, use `invokeai[xformers]`.
+      - If you have an Nvidia 16xx or 20xx series GPU, use `invokeai[xformers]`.
       - If you have an Nvidia 30xx series GPU or newer, or do not have an Nvidia GPU, use `invokeai`.
 
   7. Determine the torch backend to use for installation, if any. This is necessary to get the right version of torch installed. This is achieved by using [UV's built in torch support.](https://docs.astral.sh/uv/guides/integration/pytorch/#automatic-backend-selection)
@@ -102,7 +102,7 @@ The following commands vary depending on the version of Invoke being installed a
             <TabItem label="Nvidia GPU">
               Use:
               ```sh
-              --torch-backend=cu128
+              --torch-backend=cu130
               ```
             </TabItem>
             <TabItem label="Intel Arc GPU">
@@ -122,7 +122,7 @@ The following commands vary depending on the version of Invoke being installed a
             <TabItem label="Linux + Nvidia GPU">
               Use:
               ```sh
-              --torch-backend=cu128
+              --torch-backend=cu130
               ```
             </TabItem>
             <TabItem label="Linux + no GPU">
@@ -130,7 +130,7 @@ The following commands vary depending on the version of Invoke being installed a
               ```sh
               --torch-backend=cpu
               ```
-              On ARM64 (`aarch64`, e.g. Raspberry Pi 5), do **not** use a torch backend — PyTorch's `cpu` index has no ARM64 torchvision wheels. The default PyPI wheels are CPU-only on ARM64 and work out of the box.
+              On ARM64 (`aarch64`, e.g. Raspberry Pi 5), do **not** use a torch backend. The default PyPI wheels are CPU-only on ARM64 and work out of the box.
             </TabItem>
             <TabItem label="Linux + AMD GPU">
               Use:

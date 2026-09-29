@@ -163,6 +163,17 @@ class TorchDevice:
         return cls._to_dtype("float32")
 
     @classmethod
+    def choose_noise_dtype(cls, legacy_dtype: torch.dtype) -> torch.dtype:
+        """The dtype to draw seeded noise in on the CPU, for the draws that used to happen in `legacy_dtype`.
+
+        float32 unless `noise_dtype` asks for the old draw. torch's float32 `randn`/`rand` give the same numbers on
+        every version, but its float16/bfloat16 ones changed after 2.7 (for tensors of 16 or more elements), so a
+        seed drawn in half precision gives a different image on macOS, which stays on torch 2.7, than on
+        Windows/Linux.
+        """
+        return legacy_dtype if get_config().noise_dtype == "float16" else torch.float32
+
+    @classmethod
     def get_device_name(cls, device: torch.device) -> str:
         """Return the human-readable name for a torch device (e.g. 'AMD Radeon PRO W7900', 'CPU').
 

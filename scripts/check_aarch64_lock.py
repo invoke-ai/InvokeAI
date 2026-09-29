@@ -1,7 +1,7 @@
 """Assert that `uv.lock` gives linux/aarch64 an installable torch and torchvision.
 
 Nothing else in CI covers aarch64. Three separate mechanisms in `pyproject.toml` conspire to make torch
-resolve from PyPI there instead of from the PyTorch WHL indexes (which ship no aarch64 torchvision wheel):
+resolve from PyPI there instead of from the PyTorch WHL indexes (whose pinned pairs had no aarch64 torchvision wheel):
 `tool.uv.environments`, the `[tool.uv.sources]` platform markers, and the aarch64 fallback pins in each
 torch extra. Break the sources markers and `uv lock` fails loudly, but break either of the other two and
 the lockfile simply stops mentioning torch on aarch64 while `uv lock --locked` stays green -- which is how
@@ -65,7 +65,7 @@ def has_aarch64_wheel(package: dict[str, Any], python_version: str) -> bool:
     minor = int(python_version.split(".")[1])
     accepted = {f"cp3{minor}", "py3", f"py3{minor}"}
     for wheel in package.get("wheels", []):
-        # The PyTorch WHL indexes percent-encode the `+` of local versions in wheel URLs (`torch-2.7.1%2Bcpu-...`).
+        # The PyTorch WHL indexes percent-encode the `+` of local versions in wheel URLs (`torch-2.13.0%2Bcpu-...`).
         filename = unquote(wheel.get("url", wheel.get("path", "")).rsplit("/", 1)[-1])
         if not filename.endswith(".whl"):
             continue
