@@ -174,6 +174,10 @@ export interface GenerateSettings {
   modelKey: string;
   positivePrompt: string;
   positivePromptHeightPx: number;
+  /** The text LLM last picked for Expand Prompt; unset or uninstalled falls back to the first installed one. */
+  expandPromptModelKey: string | null;
+  /** The vision model last picked for Image to Prompt, with the same fallback. */
+  imageToPromptModelKey: string | null;
   negativePromptEnabled: boolean;
   negativePrompt: string;
   negativePromptHeightPx: number;

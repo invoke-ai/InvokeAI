@@ -14,7 +14,12 @@ import { useTranslation } from 'react-i18next';
 
 import { BoardCover } from './GalleryBoardCover';
 import { GalleryBoardRowShell } from './GalleryBoardRowShell';
-import { getGalleryBoardDropData, getGalleryBoardDropId, isGalleryItemDragData } from './galleryDnd';
+import {
+  acceptsGalleryItemMoves,
+  getGalleryBoardDropData,
+  getGalleryBoardDropId,
+  isGalleryItemDragData,
+} from './galleryDnd';
 import { getBoardCounts } from './galleryStateView';
 
 export const GalleryBoardRow = ({
@@ -40,7 +45,7 @@ export const GalleryBoardRow = ({
   const boardLabel = getGalleryBoardLabel(board, t);
 
   const canDropItems =
-    board.kind === 'board' &&
+    acceptsGalleryItemMoves(board.kind) &&
     isGalleryItemDragData(dragData) &&
     dragData.items.some((ref) => loadedItemBoardIds.get(toGalleryItemKey(ref)) !== board.id);
 

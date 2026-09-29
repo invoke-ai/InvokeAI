@@ -5,7 +5,7 @@ import { createInstance } from 'i18next';
 import { EyeIcon } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { buildSettingsCatalog, searchSettings } from './catalog';
+import { buildSettingsCatalog, getAvailableSettings, searchSettings } from './catalog';
 
 const field = (id: string, overrides: Partial<SettingDefinition> = {}): SettingDefinition =>
   ({ id, kind: 'boolean', label: id, scope: 'preference', ...overrides }) as SettingDefinition;
@@ -141,5 +141,47 @@ describe('settings search', () => {
     expect(resultIds('   ')).toEqual(['display', 'vocabulary']);
     expect(searchSettings(sections, 'categories', i18n.t)[0]!.entries[0]!.field.kind).toBe('custom');
     expect(previewSettings.load).not.toHaveBeenCalled();
+  });
+});
+
+describe('settings availability', () => {
+  const sections = buildSettingsCatalog(
+    [
+      contribution('appearance', [field('motion')]),
+      contribution('project', [field('cpuNoise', { scope: 'project' })]),
+      contribution('preview', [field('antialias', { scope: 'project' })]),
+      contribution('server', [field('devices', { scope: 'server' })]),
+    ],
+    [widget(contribution('preview', [field('filmstrip', { scope: 'instance' }), field('confirm')]))]
+  );
+  const shown = (availability: Parameters<typeof getAvailableSettings>[1]) =>
+    getAvailableSettings(sections, availability).map((section) => [
+      section.id,
+      section.entries.map((entry) => entry.field.id),
+    ]);
+
+  it('leaves out project and widget settings where no project is open, and sections left empty', () => {
+    expect(shown({ canManageAppConfig: true, widgetTypeIds: null })).toEqual([
+      ['appearance', ['motion']],
+      ['preview', ['confirm']],
+      ['server', ['devices']],
+    ]);
+  });
+
+  it('keeps widget settings only for widgets the open project contains', () => {
+    expect(shown({ canManageAppConfig: true, widgetTypeIds: new Set(['gallery']) })).toEqual([
+      ['appearance', ['motion']],
+      ['project', ['cpuNoise']],
+      ['preview', ['confirm', 'antialias']],
+      ['server', ['devices']],
+    ]);
+    expect(shown({ canManageAppConfig: true, widgetTypeIds: new Set(['preview']) })[2]).toEqual([
+      'preview',
+      ['filmstrip', 'confirm', 'antialias'],
+    ]);
+  });
+
+  it('shows the server section only to accounts that can manage the app configuration', () => {
+    expect(shown({ canManageAppConfig: false, widgetTypeIds: null }).map(([id]) => id)).not.toContain('server');
   });
 });

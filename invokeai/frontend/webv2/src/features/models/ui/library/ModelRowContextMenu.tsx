@@ -1,4 +1,6 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
+import type { ListContextMenuAnchor } from '@platform/ui/list/ListItem';
+
 import { Menu, Portal } from '@chakra-ui/react';
 import { useModelsSelector } from '@features/models/data/modelsStore';
 import {
@@ -9,10 +11,8 @@ import {
 import { MenuContent } from '@platform/ui';
 import { useState } from 'react';
 
-export interface ModelContextMenuTarget {
+export interface ModelContextMenuTarget extends ListContextMenuAnchor {
   modelKey: string;
-  x: number;
-  y: number;
 }
 
 export const ModelRowContextMenu = ({
@@ -23,6 +23,8 @@ export const ModelRowContextMenu = ({
   target: ModelContextMenuTarget | null;
 }) => {
   const [pendingConfirm, setPendingConfirm] = useState<PendingModelAction>(null);
+  // Captured with the request: the menu target clears when the menu closes, before the dialog does.
+  const [confirmFocusTarget, setConfirmFocusTarget] = useState<(() => HTMLElement | null) | null>(null);
   const model = useModelsSelector((snapshot) => (target ? (snapshot.modelsByKey.get(target.modelKey) ?? null) : null));
 
   return (
@@ -46,13 +48,24 @@ export const ModelRowContextMenu = ({
           <Menu.Positioner>
             {model ? (
               <MenuContent minW="13rem">
-                <ModelActionMenuItems model={model} showConvertItem onRequestConfirm={setPendingConfirm} />
+                <ModelActionMenuItems
+                  model={model}
+                  showConvertItem
+                  onRequestConfirm={(pending) => {
+                    setConfirmFocusTarget(() => target?.focusTarget ?? null);
+                    setPendingConfirm(pending);
+                  }}
+                />
               </MenuContent>
             ) : null}
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      <ModelActionConfirmDialog pending={pendingConfirm} onClose={() => setPendingConfirm(null)} />
+      <ModelActionConfirmDialog
+        finalFocusEl={confirmFocusTarget ?? undefined}
+        pending={pendingConfirm}
+        onClose={() => setPendingConfirm(null)}
+      />
     </>
   );
 };

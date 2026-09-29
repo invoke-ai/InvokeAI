@@ -3,14 +3,18 @@ import type { GenerationModelCatalogItem } from '@features/generation/contracts'
 import type { ModelConfig } from '@features/models';
 import type { TFunction } from 'i18next';
 
-import { describe, expect, it, vi } from 'vitest';
+import { ApiError } from '@platform/transport/http';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-const { ensureModelsLoaded, fetchQuery, getModelsSnapshot, listPaletteImages } = vi.hoisted(() => ({
-  ensureModelsLoaded: vi.fn(() => Promise.resolve()),
-  fetchQuery: vi.fn(),
-  getModelsSnapshot: vi.fn(),
-  listPaletteImages: vi.fn(),
-}));
+const { ensureModelsLoaded, fetchQuery, getModelsSnapshot, listPaletteImages, listPaletteSemanticImages } = vi.hoisted(
+  () => ({
+    ensureModelsLoaded: vi.fn(() => Promise.resolve()),
+    fetchQuery: vi.fn(),
+    getModelsSnapshot: vi.fn(),
+    listPaletteImages: vi.fn(),
+    listPaletteSemanticImages: vi.fn(),
+  })
+);
 
 vi.mock('@features/models', () => ({
   ensureModelsLoaded,
@@ -22,14 +26,17 @@ vi.mock('@features/generation/react', () => ({ focusPositivePrompt: vi.fn() }));
 vi.mock('@features/gallery/paletteSearch', () => ({
   ALL_READABLE_BOARDS_ID: 'all',
   listPaletteImages: (...args: unknown[]) => listPaletteImages(...args),
+  listPaletteSemanticImages: (...args: unknown[]) => listPaletteSemanticImages(...args),
 }));
 vi.mock('@platform/query/client', () => ({ queryClient: { fetchQuery: (...args: unknown[]) => fetchQuery(...args) } }));
 
+import { PaletteSearchUnavailableError } from './entries';
 import {
   createBoardsProvider,
   createImagesProvider,
   createModelsProvider,
   createPromptHistoryProvider,
+  createSemanticImagesProvider,
 } from './paletteProviders';
 
 const model = (key: string, base: string, type = 'main'): ModelConfig =>
@@ -82,9 +89,8 @@ describe('localized gallery board labels', () => {
     listPaletteImages.mockResolvedValue({ images: [image], total: 1 });
     const provider = createImagesProvider({
       locale: 'en',
-      openGalleryWidget: vi.fn(),
       openPreviewWidget: vi.fn(),
-      selectBoard: vi.fn(),
+      revealImage: vi.fn(),
       selectImage: vi.fn(),
       t: galleryT,
     });
@@ -92,6 +98,80 @@ describe('localized gallery board labels', () => {
     const entries = await provider.search({ text: '' }, searchContext());
 
     expect(entries[0]?.subtitle).toBe('Uncategorized · 512×512');
+  });
+});
+
+describe('createSemanticImagesProvider', () => {
+  const board: GalleryBoard = { ...uncategorized, id: 'board-1', kind: 'board', name: 'Boats' };
+  const image = (imageName: string, createdAt: string) =>
+    ({
+      boardId: 'board-1',
+      createdAt,
+      height: 512,
+      imageCategory: 'general',
+      imageName,
+      imageUrl: `/full/${imageName}`,
+      starred: false,
+      thumbnailUrl: `/thumb/${imageName}`,
+      width: 768,
+    }) as GalleryImage;
+  let indexState: 'disabled' | 'ready';
+  const createProvider = () => {
+    const deps = {
+      locale: 'en',
+      openPreviewWidget: vi.fn(),
+      revealImage: vi.fn(),
+      selectImage: vi.fn(),
+      t: galleryT,
+    };
+
+    return { deps, provider: createSemanticImagesProvider(deps) };
+  };
+
+  beforeEach(() => {
+    indexState = 'ready';
+    listPaletteSemanticImages.mockReset();
+    fetchQuery.mockReset();
+    fetchQuery.mockImplementation(({ queryKey }: { queryKey: readonly unknown[] }) =>
+      Promise.resolve(queryKey.includes('image-index') ? { modelName: null, state: indexState } : [board])
+    );
+  });
+
+  it('ranks the whole library by meaning and opens or reveals each match', async () => {
+    const match = image('boat.png', '2026-08-02T10:00:00Z');
+    listPaletteSemanticImages.mockResolvedValue([match]);
+    const { deps, provider } = createProvider();
+
+    const [entry] = await provider.search({ text: '  sailing boat ' }, searchContext());
+
+    expect(listPaletteSemanticImages).toHaveBeenCalledWith(expect.objectContaining({ query: 'sailing boat' }));
+    expect(entry).toMatchObject({ id: 'semantic-image:boat.png', subtitle: 'Boats · 768×512' });
+
+    entry?.run();
+    expect(deps.openPreviewWidget).toHaveBeenCalled();
+    expect(deps.selectImage).toHaveBeenCalledWith(match);
+
+    entry?.secondary?.run();
+    expect(deps.revealImage).toHaveBeenCalledWith(match);
+  });
+
+  it('stays empty without a query or an index, and explains a missing text encoder', async () => {
+    const { provider } = createProvider();
+
+    await expect(provider.search({ text: ' ' }, searchContext())).resolves.toEqual([]);
+
+    indexState = 'disabled';
+    await expect(provider.search({ text: 'boat' }, searchContext())).resolves.toEqual([]);
+    expect(listPaletteSemanticImages).not.toHaveBeenCalled();
+
+    indexState = 'ready';
+    listPaletteSemanticImages.mockRejectedValueOnce(new ApiError('no text encoder', 409));
+    await expect(provider.search({ text: 'boat' }, searchContext())).rejects.toBeInstanceOf(
+      PaletteSearchUnavailableError
+    );
+
+    listPaletteSemanticImages.mockRejectedValueOnce(new ApiError('boom', 500));
+    await expect(provider.search({ text: 'boat' }, searchContext())).rejects.toThrow('boom');
   });
 });
 

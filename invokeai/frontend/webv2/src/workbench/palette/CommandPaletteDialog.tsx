@@ -24,14 +24,15 @@ const ENTER_HINT_KEYS = ['↵'];
 const ESC_HINT_KEYS = ['esc'];
 const TAB_HINT_KEYS = ['tab'];
 
-const FooterHint = ({ children, keys }: { children: string; keys: string[] }) => (
-  <HStack gap="1">
+/** Hints never wrap; a `shrink` hint truncates its label when a long translation leaves no room. */
+const FooterHint = ({ children, keys, shrink = false }: { children: string; keys: string[]; shrink?: boolean }) => (
+  <HStack flexShrink={shrink ? 1 : 0} gap="1" minW="0">
     {keys.map((key) => (
-      <Kbd key={key} size="sm" textTransform="lowercase">
+      <Kbd key={key} flexShrink={0} size="sm" textTransform="lowercase">
         {key}
       </Kbd>
     ))}
-    <Text>{children}</Text>
+    <Text truncate>{children}</Text>
   </HStack>
 );
 
@@ -116,7 +117,12 @@ const CommandPaletteContent = ({
   if (controller.rows.length === 0) {
     if (controller.scopeIsError && controller.scopeLabel) {
       emptyState = (
-        <EmptyState danger py="6" title={t('commandPalette.states.couldNotSearch', { label: controller.scopeLabel })}>
+        <EmptyState
+          danger
+          description={controller.scopeErrorMessage}
+          py="6"
+          title={t('commandPalette.states.couldNotSearch', { label: controller.scopeLabel })}
+        >
           <Button size="xs" variant="subtle" onClick={controller.onRetry}>
             {t('common.retry')}
           </Button>
@@ -145,7 +151,7 @@ const CommandPaletteContent = ({
           overflow="hidden"
           overscrollBehavior="contain"
           p="0"
-          w="min(560px, calc(100vw - 32px))"
+          w="min(640px, calc(100vw - 32px))"
           onKeyDown={controller.onContentKeyDown}
         >
           <Dialog.Title srOnly>{t('commandPalette.title')}</Dialog.Title>
@@ -262,7 +268,9 @@ const CommandPaletteContent = ({
               {controller.stage ? t('commandPalette.footer.pick') : t('commandPalette.footer.run')}
             </FooterHint>
             {controller.secondaryHint ? (
-              <FooterHint keys={modEnterHintKeys}>{controller.secondaryHint}</FooterHint>
+              <FooterHint keys={modEnterHintKeys} shrink>
+                {controller.secondaryHint}
+              </FooterHint>
             ) : null}
             {controller.hasScopeRows || controller.activeRow?.kind === 'scope' ? (
               <FooterHint keys={TAB_HINT_KEYS}>{t('commandPalette.footer.scope')}</FooterHint>

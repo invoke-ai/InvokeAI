@@ -1636,6 +1636,12 @@ def test_search_similar_ranks_by_cosine_and_respects_scope(
     # limit caps the result count; scores are descending.
     assert len(service.search_similar(None, unit(0), limit=1)) == 1
 
+    # A name restriction applies before the limit, so a narrow scope still gets its best matches.
+    assert [item for item, _ in service.search_similar(None, unit(0), limit=1, within={"far.png"})] == imgs("far.png")
+    assert service.search_similar(None, unit(0), limit=5, within=set()) == []
+    # Kind and name restrictions both apply.
+    assert service.search_similar(None, unit(0), limit=5, kinds=("video",), within={"a.png"}) == []
+
 
 def test_embed_image_normalizes_and_requires_running_service(
     images_service: ImageService, index_records: ImageIndexRecordsSqlite, service: ImageIndexService

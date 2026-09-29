@@ -7137,6 +7137,43 @@
               "title": "Include Videos"
             },
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item.",
+              "title": "Board Id"
+            },
+            "description": "Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item."
+          },
+          {
+            "name": "created_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict results to items created on this ISO date, as the date-based virtual boards list them.",
+              "title": "Created Date"
+            },
+            "description": "Restrict results to items created on this ISO date, as the date-based virtual boards list them."
           }
         ],
         "responses": {
@@ -7219,6 +7256,43 @@
               "title": "Include Videos"
             },
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item.",
+              "title": "Board Id"
+            },
+            "description": "Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item."
+          },
+          {
+            "name": "created_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict results to items created on this ISO date, as the date-based virtual boards list them.",
+              "title": "Created Date"
+            },
+            "description": "Restrict results to items created on this ISO date, as the date-based virtual boards list them."
           }
         ],
         "requestBody": {
@@ -27618,7 +27692,7 @@
               }
             ],
             "default": null,
-            "description": "The Mistral text encoder model used for FLUX.2 [dev] inference",
+            "description": "The Mistral text encoder model used for FLUX.2 [dev] or ERNIE-Image inference",
             "field_kind": "input",
             "input": "any",
             "orig_default": null,

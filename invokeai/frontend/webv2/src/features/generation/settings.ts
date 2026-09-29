@@ -36,6 +36,7 @@ export {
   getDefaultGenerateSettings,
   getDefaultReferenceImageConfig,
   getGenerateModelSelectionResult,
+  isComponentCompatibleWithModel,
   getDimensionGrid,
   getGenerationDimensions,
   getGenerationModelAvailabilityReasons,

@@ -119,9 +119,15 @@ if (uncoveredRoutes.length > 0) {
 const failures = measurements.flatMap((measurement) => checkRouteBudget(measurement, budgets[measurement.routeId]));
 const launchpad = measurements.find((measurement) => measurement.routeId === 'launchpad');
 const editor = measurements.find((measurement) => measurement.routeId === 'editor');
-// Shared settings metadata must not turn Launchpad overlays into editor boot paths.
+// Launchpad overlays and pages load lazily, but must still never pull in (and run) the editor: loading its modules
+// ahead of the /app route mis-orders their start-up. Shared gallery and settings code is where that creeps in.
 for (const source of [
+  'src/features/fonts/ui/FontsPage.tsx',
+  'src/features/gallery/ui/picker/GalleryPickerView.tsx',
+  'src/features/models/ui/ModelManagerView.tsx',
+  'src/features/nodes/ui/NodeManagerView.tsx',
   'src/workbench/palette/LaunchpadCommandPaletteDialog.tsx',
+  'src/workbench/settings/PreferencesPage.tsx',
   'src/workbench/settings/SettingsDialog.tsx',
 ]) {
   const overlay = measureRouteBuild(manifest, chunkSourceManifest, source, source, (file) => assetCache.get(file));

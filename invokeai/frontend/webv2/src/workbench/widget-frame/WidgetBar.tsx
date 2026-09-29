@@ -7,6 +7,7 @@ import { Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
 import { verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Row } from '@platform/ui/Row';
 import { Tooltip } from '@platform/ui/Tooltip';
+import { useHighlightedRegion } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -30,6 +31,8 @@ export interface WidgetBarGroup {
 }
 
 interface WidgetBarProps {
+  /** The region along the rail's inner border, whose outline covers that border while it shows. */
+  edgeRegion: WidgetRegion;
   side: 'left' | 'right';
   groups: WidgetBarGroup[];
   menuItems: WidgetBarItem[];
@@ -37,8 +40,9 @@ interface WidgetBarProps {
   onToggle: (item: WidgetBarItem) => void;
 }
 
-export const WidgetBar = ({ groups, menuItems, onSelect, onToggle, side }: WidgetBarProps) => {
+export const WidgetBar = ({ edgeRegion, groups, menuItems, onSelect, onToggle, side }: WidgetBarProps) => {
   const { t } = useTranslation();
+  const isEdgeOutlined = useHighlightedRegion() === edgeRegion;
   const region = side;
   const [enableMenuTarget, setEnableMenuTarget] = useState<{
     x: number;
@@ -77,7 +81,7 @@ export const WidgetBar = ({ groups, menuItems, onSelect, onToggle, side }: Widge
       })}
       as="nav"
       bg="bg.subtle"
-      borderColor="border.subtle"
+      borderColor={isEdgeOutlined ? 'transparent' : 'border.subtle'}
       borderRightWidth={side === 'left' ? '1px' : '0'}
       borderLeftWidth={side === 'right' ? '1px' : '0'}
       direction="column"

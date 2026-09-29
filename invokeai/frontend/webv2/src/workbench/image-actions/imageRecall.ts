@@ -13,7 +13,9 @@ import {
   deriveAspectRatioId,
   getCompatibleReferenceImages,
   getDimensionGrid,
+  getGenerateModelSelectionResult,
   getGenerationUiPolicy,
+  isComponentCompatibleWithModel,
   getModelDefaultVae,
   getSettingsWithModelDefaults,
   hasArchitectureCapabilities,
@@ -398,12 +400,79 @@ const getMetadataKrea2Rebalance = (
 const hasKrea2Rebalance = (metadata: unknown, model: GenerateModelConfig | undefined): boolean =>
   Object.keys(getMetadataKrea2Rebalance(metadata, model)).length > 0;
 
+type RecalledComponentSetting = keyof Pick<
+  GenerateWidgetValues,
+  | 'clipEmbedModel'
+  | 'componentSourceModel'
+  | 'gemma2EncoderModel'
+  | 'ideogram4UnconditionalModel'
+  | 'mistralEncoderModel'
+  | 'pidDecoderModel'
+  | 'qwen3EncoderModel'
+  | 'qwen3VLEncoderModel'
+  | 'qwenVLEncoderModel'
+  | 't5EncoderModel'
+  | 'wanLowNoiseModel'
+  | 'wanT5EncoderModel'
+>;
+
+interface RecalledComponent {
+  metadataKey: string;
+  setting: RecalledComponentSetting;
+  /** The setting holds a main model (a component source or second transformer), not an encoder. */
+  isMainModel?: true;
+}
+
+/**
+ * The component keys the generation graphs record; a key missing here is silently dropped by Remix. The first
+ * recorded key wins for a shared setting.
+ */
+const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
+  { isMainModel: true, metadataKey: 'qwen3_source', setting: 'componentSourceModel' },
+  { isMainModel: true, metadataKey: 'qwen_image_component_source', setting: 'componentSourceModel' },
+  { isMainModel: true, metadataKey: 'wan_component_source', setting: 'componentSourceModel' },
+  { isMainModel: true, metadataKey: 'ideogram4_unconditional_model', setting: 'ideogram4UnconditionalModel' },
+  { isMainModel: true, metadataKey: 'wan_transformer_low_noise', setting: 'wanLowNoiseModel' },
+  { metadataKey: 'clip_embed_model', setting: 'clipEmbedModel' },
+  { metadataKey: 'gemma2_encoder', setting: 'gemma2EncoderModel' },
+  { metadataKey: 'mistral_encoder', setting: 'mistralEncoderModel' },
+  { metadataKey: 'pid_decoder', setting: 'pidDecoderModel' },
+  { metadataKey: 'qwen3_encoder', setting: 'qwen3EncoderModel' },
+  { metadataKey: 'qwen3_vl_encoder', setting: 'qwen3VLEncoderModel' },
+  { metadataKey: 'qwen_image_qwen_vl_encoder', setting: 'qwenVLEncoderModel' },
+  { metadataKey: 't5_encoder', setting: 't5EncoderModel' },
+  { metadataKey: 'wan_t5_encoder_model', setting: 'wanT5EncoderModel' },
+];
+
+const getRecalledComponent = (
+  metadata: unknown,
+  component: RecalledComponent,
+  models: readonly ComponentModelConfig[]
+): ComponentModelConfig | null | undefined =>
+  component.isMainModel
+    ? getMetadataMainModel(metadata, component.metadataKey, models)
+    : getMetadataComponent(metadata, component.metadataKey, models);
+
+/** Recorded components that resolve to installed models; `null` clears a slot the image left empty. */
+const getComponentPatch = (
+  metadata: unknown,
+  models: readonly ComponentModelConfig[]
+): Partial<Record<RecalledComponentSetting, ComponentModelConfig | null>> => {
+  const patch: Partial<Record<RecalledComponentSetting, ComponentModelConfig | null>> = {};
+
+  for (const component of RECALLED_COMPONENTS) {
+    const recalled = getRecalledComponent(metadata, component, models);
+
+    if (recalled !== undefined && !(component.setting in patch)) {
+      patch[component.setting] = recalled;
+    }
+  }
+
+  return patch;
+};
+
 const hasComponentModels = (metadata: unknown, models: readonly ComponentModelConfig[]): boolean =>
-  getMetadataMainModel(metadata, 'qwen3_source', models) !== undefined ||
-  getMetadataMainModel(metadata, 'qwen_image_component_source', models) !== undefined ||
-  getMetadataComponent(metadata, 'mistral_encoder', models) !== undefined ||
-  getMetadataComponent(metadata, 'qwen3_encoder', models) !== undefined ||
-  getMetadataComponent(metadata, 'qwen_image_qwen_vl_encoder', models) !== undefined;
+  Object.keys(getComponentPatch(metadata, models)).length > 0;
 
 export const getMetadataReferenceImages = (metadata: unknown) => {
   if (!isRecord(metadata)) {
@@ -562,28 +631,17 @@ export const buildImageRecallSettings = ({
       fields.push('model');
     }
 
-    const qwen3SourceModel = getMetadataMainModel(metadata, 'qwen3_source', models);
-    const qwenImageSourceModel = getMetadataMainModel(metadata, 'qwen_image_component_source', models);
-    const componentSourceModel = qwen3SourceModel !== undefined ? qwen3SourceModel : qwenImageSourceModel;
-    const mistralEncoderModel = getMetadataComponent(metadata, 'mistral_encoder', models);
-    const qwen3EncoderModel = getMetadataComponent(metadata, 'qwen3_encoder', models);
-    const qwenVLEncoderModel = getMetadataComponent(metadata, 'qwen_image_qwen_vl_encoder', models);
-    const componentPatch = {
-      componentSourceModel: componentSourceModel !== undefined ? componentSourceModel : values.componentSourceModel,
-      mistralEncoderModel: mistralEncoderModel !== undefined ? mistralEncoderModel : values.mistralEncoderModel,
-      qwen3EncoderModel: qwen3EncoderModel !== undefined ? qwen3EncoderModel : values.qwen3EncoderModel,
-      qwenVLEncoderModel: qwenVLEncoderModel !== undefined ? qwenVLEncoderModel : values.qwenVLEncoderModel,
-    };
+    const componentPatch = getComponentPatch(metadata, models);
+    const recordedSettings = Object.keys(componentPatch) as RecalledComponentSetting[];
+    const effectiveModel = values.model;
+    // A recorded component that does not fit the effective model is skipped, so the current pick stays.
+    const fittingSettings = recordedSettings.filter((setting) => {
+      const component = componentPatch[setting];
 
-    if (
-      componentPatch.componentSourceModel !== values.componentSourceModel ||
-      componentPatch.mistralEncoderModel !== values.mistralEncoderModel ||
-      componentPatch.qwen3EncoderModel !== values.qwen3EncoderModel ||
-      componentPatch.qwenVLEncoderModel !== values.qwenVLEncoderModel
-    ) {
-      values = { ...values, ...componentPatch };
-      fields.push('components');
-    }
+      return !component || isComponentCompatibleWithModel(effectiveModel, values, setting, component);
+    });
+
+    values = { ...values, ...Object.fromEntries(fittingSettings.map((setting) => [setting, componentPatch[setting]])) };
 
     const rebalancePatch = getMetadataKrea2Rebalance(metadata, values.model);
 
@@ -597,6 +655,18 @@ export const buildImageRecallSettings = ({
     if (vae !== undefined) {
       values = { ...values, vae };
       fields.push('vae');
+    }
+
+    if (model || fittingSettings.length > 0) {
+      // Same transition as picking the model: clears picks left over from the previous model and fills an
+      // automatic FLUX.2 component source.
+      const { settings } = getGenerateModelSelectionResult({ currentValues: values, model: values.model, models });
+      values = { ...values, ...settings };
+    }
+
+    // Judged after the transition, which can complete or undo a recorded pick.
+    if (recordedSettings.some((setting) => values[setting]?.key !== currentValues[setting]?.key)) {
+      fields.push('components');
     }
 
     // Recalled reference images must fit the effective model — when the

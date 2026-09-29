@@ -6,9 +6,11 @@ import { Badge, Flex, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getModelBaseColorPalette, getModelBaseLabel } from '@features/models/core/baseIdentity';
 import { getModelTypeLabel } from '@features/models/core/taxonomy';
 import { useModelsSelector } from '@features/models/data/modelsStore';
-import { InstallSourceButton, SourceListItem } from '@features/models/ui/shared/SourceListItem';
+import { InstallSourceButton } from '@features/models/ui/shared/InstallSourceButton';
 import { findInstalledStarterModelKey, useInstalledSourceKeys } from '@features/models/ui/shared/useInstalledSources';
 import { Button } from '@platform/ui';
+import { ListItem } from '@platform/ui/list/ListItem';
+import { ListStack } from '@platform/ui/list/ListStack';
 import { KeyRoundIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -79,7 +81,7 @@ export const StarterList = ({
   }
 
   return (
-    <Stack gap="1.5">
+    <ListStack dividers label={t('models.starterModelsList')}>
       {models.map((model) => {
         const externalProviderId = getExternalProviderId(model.source);
         const dependencyCount = (model.dependencies ?? []).filter(
@@ -87,19 +89,11 @@ export const StarterList = ({
         ).length;
         const trailing = externalProviderId ? (
           configuredExternalProviders.has(externalProviderId) ? (
-            <Badge colorPalette="green" flexShrink={0} fontSize="2xs" size="sm" variant="surface">
+            <Badge colorPalette="green" fontSize="2xs" size="sm" variant="surface">
               {t('models.installed')}
             </Badge>
           ) : (
-            <Button
-              flexShrink={0}
-              size="2xs"
-              variant="outline"
-              onClick={(event) => {
-                event.stopPropagation();
-                onConfigureExternalProvider(externalProviderId);
-              }}
-            >
+            <Button size="2xs" variant="outline" onClick={() => onConfigureExternalProvider(externalProviderId)}>
               <Icon as={KeyRoundIcon} boxSize="3" />
               {t('common.configure')}
             </Button>
@@ -109,38 +103,38 @@ export const StarterList = ({
             installedModelKey={findInstalledStarterModelKey(model, installedSourceKeys, installedModels)}
             isInstalled={model.is_installed}
             isPending={pendingSources.has(model.source)}
+            name={model.name}
             source={model.source}
             onInstall={() => onInstall(model)}
           />
         );
 
         return (
-          <SourceListItem
+          <ListItem
             key={`${model.source}-${model.name}`}
+            actions={trailing}
             badges={
               <>
-                <Badge
-                  colorPalette={getModelBaseColorPalette(model.base)}
-                  flexShrink={0}
-                  fontSize="2xs"
-                  size="sm"
-                  variant="surface"
-                >
+                <Badge colorPalette={getModelBaseColorPalette(model.base)} fontSize="2xs" size="sm" variant="surface">
                   {getModelBaseLabel(model.base)}
                 </Badge>
-                <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="sm" variant="surface">
+                <Badge colorPalette="gray" fontSize="2xs" size="sm" variant="surface">
                   {getModelTypeLabel(model.type)}
                 </Badge>
               </>
             }
-            description={`${model.description}${
-              dependencyCount > 0 ? t('models.installsDependencies', { count: dependencyCount }) : ''
-            }`}
+            // Starter descriptions carry the dependency note; allow a second line rather than cutting it off.
+            description={
+              <Text as="span" lineClamp={2}>
+                {`${model.description}${
+                  dependencyCount > 0 ? t('models.installsDependencies', { count: dependencyCount }) : ''
+                }`}
+              </Text>
+            }
             title={model.name}
-            trailing={trailing}
           />
         );
       })}
-    </Stack>
+    </ListStack>
   );
 };

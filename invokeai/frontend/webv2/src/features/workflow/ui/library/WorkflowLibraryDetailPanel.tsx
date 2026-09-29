@@ -3,7 +3,7 @@ import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowLibraryEntry } from '@features/workflow/data/libraryBrowseStore';
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 
-import { Badge, Box, Flex, HStack, Icon, Image, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, HStack, Menu, Portal, Stack, Text } from '@chakra-ui/react';
 import { getStarterModelInstallSources, useInstallActions } from '@features/models';
 import {
   createLibraryWorkflow,
@@ -44,7 +44,6 @@ import {
   DownloadIcon,
   EllipsisIcon,
   GitForkIcon,
-  ImageOffIcon,
   PencilIcon,
   Trash2Icon,
   WorkflowIcon,
@@ -54,7 +53,6 @@ import { useTranslation } from 'react-i18next';
 
 import type { OpenLibraryWorkflowMode } from './useOpenLibraryWorkflow';
 
-import { formatRelativeTime } from './relativeTime';
 import { planLibraryWorkflowOpen } from './useOpenLibraryWorkflow';
 import {
   getWorkflowLibraryCardId,
@@ -62,6 +60,7 @@ import {
   keepCardMenuOpenForRetarget,
   type WorkflowCardMenuAnchor,
 } from './WorkflowLibraryCard';
+import { WorkflowLibraryThumbnail } from './WorkflowLibraryThumbnail';
 import {
   resolveEntryRequirements,
   useModelRequirementDeps,
@@ -71,7 +70,6 @@ import {
 /** Install missing models before offering Open; keep the detail rail mounted across selections to prevent flashing. */
 
 const DETAIL_RAIL_WIDTH = '18rem';
-const THUMBNAIL_ASPECT_RATIO = 3 / 2;
 const INSTALL_HOVER = { opacity: 0.85 } as const;
 
 export interface WorkflowLibraryDetailPanelProps {
@@ -137,9 +135,6 @@ export const WorkflowLibraryDetailPanel = ({
   const { openDocumentInNewProject } = useWorkflowGraphPreview();
   const openAddModels = useOpenAddModels();
   const { installMany } = useInstallActions();
-  // Keyed by URL rather than a boolean, so a selection change re-arms the
-  // thumbnail without an effect resetting the flag.
-  const [failedThumbnailUrl, setFailedThumbnailUrl] = useState<string | null>(null);
   const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
   // Guard duplicate creation until the copy exists, including copies landing outside the visible category.
   const [isDuplicatePending, setIsDuplicatePending] = useState(false);
@@ -190,8 +185,6 @@ export const WorkflowLibraryDetailPanel = ({
       onPreview(entry);
     }
   }, [entry, onPreview]);
-
-  const handleThumbnailError = useCallback(() => setFailedThumbnailUrl(entry?.item.thumbnail_url ?? null), [entry]);
 
   // Close the library before navigating to Add Models.
   const handleFindModel = useCallback(
@@ -440,14 +433,6 @@ export const WorkflowLibraryDetailPanel = ({
 
   const { item, tags } = entry;
   const name = item.name || t('workflowLibrary.untitled');
-  const showThumbnail = Boolean(item.thumbnail_url) && item.thumbnail_url !== failedThumbnailUrl;
-  const lastRun = item.last_run_at ? formatRelativeTime(item.last_run_at, new Date()) : '';
-  const caption = lastRun
-    ? t('workflowLibrary.lastRun', { when: lastRun })
-    : showThumbnail
-      ? t('workflowLibrary.sampleOutput')
-      : null;
-
   const hasCopies = openPlan !== null && openPlan.kind !== 'add';
   const openLabel = hasCopies ? t('workflowLibrary.openProjectCopy') : t('workflowLibrary.open');
 
@@ -528,32 +513,11 @@ export const WorkflowLibraryDetailPanel = ({
     >
       <Scrollable flex="1" label={name} minH="0">
         <Stack gap="2" minW="0" p="2.5">
-          <Stack gap="1" minW="0">
-            <Box aspectRatio={THUMBNAIL_ASPECT_RATIO} bg="bg.muted" overflow="hidden" rounded="md" w="full">
-              {showThumbnail ? (
-                <Image
-                  alt=""
-                  h="full"
-                  objectFit="cover"
-                  src={item.thumbnail_url ?? undefined}
-                  w="full"
-                  onError={handleThumbnailError}
-                />
-              ) : (
-                <Flex align="center" direction="column" gap="1" h="full" justify="center" w="full">
-                  <Icon aria-hidden as={ImageOffIcon} boxSize="5" color="fg.subtle" opacity={0.6} />
-                  <Text color="fg.subtle" fontSize="2xs">
-                    {t('workflowLibrary.notRunYet')}
-                  </Text>
-                </Flex>
-              )}
-            </Box>
-            {caption ? (
-              <Text color="fg.subtle" fontSize="2xs">
-                {caption}
-              </Text>
-            ) : null}
-          </Stack>
+          <WorkflowLibraryThumbnail
+            key={item.workflow_id}
+            item={item}
+            workflowDocument={entry.enrichment.status === 'ready' ? entry.enrichment.document : null}
+          />
 
           {/*
            * Wrap full names, including delimiter-free strings, in the detail rail; zero content min-width permits

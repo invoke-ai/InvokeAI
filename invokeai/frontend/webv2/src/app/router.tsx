@@ -156,6 +156,22 @@ const fontsHomeRoute = createRoute({
   path: 'fonts',
 });
 
+const validatePreferencesSearch = (search: Record<string, unknown>): { setting?: string } => ({
+  setting: typeof search.setting === 'string' && search.setting.length > 0 ? search.setting : undefined,
+});
+
+const preferencesHomeRoute = createRoute({
+  ...launchpadRouteOptions,
+  path: 'preferences',
+  validateSearch: validatePreferencesSearch,
+});
+
+const preferencesSectionRoute = createRoute({
+  ...launchpadRouteOptions,
+  path: 'preferences/$section',
+  validateSearch: validatePreferencesSearch,
+});
+
 const workbenchRoute = createRoute({
   beforeLoad: async ({ cause, search }) => {
     // Preload the editor during the session peek; the module loader deduplicates the lazy-route import.
@@ -236,6 +252,8 @@ export const router = createRouter({
       nodesHomeRoute,
       usersHomeRoute,
       fontsHomeRoute,
+      preferencesHomeRoute,
+      preferencesSectionRoute,
       workbenchRoute,
     ]),
     loginRoute,

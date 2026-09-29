@@ -10030,7 +10030,7 @@ export type components = {
              */
             qwen3_encoder?: components["schemas"]["ModelIdentifierField"] | null;
             /**
-             * @description The Mistral text encoder model used for FLUX.2 [dev] inference
+             * @description The Mistral text encoder model used for FLUX.2 [dev] or ERNIE-Image inference
              * @default null
              */
             mistral_encoder?: components["schemas"]["ModelIdentifierField"] | null;
@@ -54161,6 +54161,10 @@ export interface operations {
                 limit?: number;
                 /** @description Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names. */
                 include_videos?: boolean;
+                /** @description Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item. */
+                board_id?: string | null;
+                /** @description Restrict results to items created on this ISO date, as the date-based virtual boards list them. */
+                created_date?: string | null;
             };
             header?: never;
             path?: never;
@@ -54197,6 +54201,10 @@ export interface operations {
                 limit?: number;
                 /** @description Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names. */
                 include_videos?: boolean;
+                /** @description Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item. */
+                board_id?: string | null;
+                /** @description Restrict results to items created on this ISO date, as the date-based virtual boards list them. */
+                created_date?: string | null;
             };
             header?: never;
             path?: never;

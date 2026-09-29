@@ -3,6 +3,7 @@ import type { SettingFieldProps } from '@platform/ui/settings/contracts';
 import type { WorkbenchThemeId } from '@theme/themes';
 
 import { Box, chakra, Checkbox, Flex, HStack, Icon, SimpleGrid, Stack, Text, useSlotRecipe } from '@chakra-ui/react';
+import { INTERMEDIATES_SETTING_ID } from '@features/intermediates';
 import { Button, ConfirmDialog } from '@platform/ui';
 import { resolveSettingsText } from '@platform/ui/settings/contracts';
 import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingIndicator';
@@ -20,7 +21,6 @@ import { clearWorkspaceData, rememberWorkspaceClearFailure } from './clearWorksp
 import { GenerationDevicesSettings } from './GenerationDevicesSettings';
 import { HotkeysSettingsSection } from './HotkeysSettingsSection';
 import { ImageMapVocabularySettings } from './ImageMapVocabularySettings';
-import { setWorkbenchSettingsSection } from './settingsDialogStore';
 import {
   clearWorkbenchSettings,
   DEFAULT_PREFERENCES,
@@ -159,7 +159,7 @@ export const LoggingResetSettings = () => {
   );
 };
 
-export const WorkspaceSettings = () => {
+export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onReveal'>) => {
   const { t } = useTranslation();
   const commands = useOptionalWorkbenchCommands();
   const mountedPersistence = useOptionalWorkbenchPersistenceService();
@@ -185,7 +185,7 @@ export const WorkspaceSettings = () => {
   const resetLayout = useCallback(() => commands?.layout.reset(), [commands]);
   const openClearConfirm = useCallback(() => setIsClearConfirmOpen(true), []);
   const closeClearConfirm = useCallback(() => setIsClearConfirmOpen(false), []);
-  const openIntermediates = useCallback(() => setWorkbenchSettingsSection('intermediates', 'intermediatesManager'), []);
+  const openIntermediates = useCallback(() => onReveal?.('intermediates', INTERMEDIATES_SETTING_ID), [onReveal]);
 
   return (
     <Stack gap="3">
@@ -196,10 +196,12 @@ export const WorkspaceSettings = () => {
             Reset layout
           </Button>
         ) : null}
-        <Button size="sm" variant="outline" onClick={openIntermediates}>
-          <BrushCleaningIcon />
-          {t('settings.catalog.manageIntermediates')}
-        </Button>
+        {onReveal ? (
+          <Button size="sm" variant="outline" onClick={openIntermediates}>
+            <BrushCleaningIcon />
+            {t('settings.catalog.manageIntermediates')}
+          </Button>
+        ) : null}
         <Button
           borderColor="border.emphasized"
           color="fg.error"
@@ -234,7 +236,7 @@ const formatSettingLabel = (value: string): string =>
     .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
     .join(' ');
 
-const CustomSettingField = ({ field }: SettingFieldProps) => {
+const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
   const { t } = useTranslation();
   const isModified = useWorkbenchPreferenceSelector((preferences) => {
     if (field.id === 'themeId') {
@@ -262,7 +264,7 @@ const CustomSettingField = ({ field }: SettingFieldProps) => {
       editor = <LoggingResetSettings />;
       break;
     case 'workspaceActions':
-      editor = <WorkspaceSettings />;
+      editor = <WorkspaceSettings onReveal={onReveal} />;
       break;
     case 'about':
       editor = <AboutSettings />;
