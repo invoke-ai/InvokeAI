@@ -286,6 +286,11 @@ const getLegacyChunkName = (id: string): string | null => {
     return 'yaml';
   }
 
+  // Only a workflow thumbnail snapshot loads it, on demand.
+  if (id.includes('/node_modules/html-to-image/')) {
+    return 'html-to-image';
+  }
+
   if (id.includes('/node_modules/fflate/')) {
     return 'fflate';
   }

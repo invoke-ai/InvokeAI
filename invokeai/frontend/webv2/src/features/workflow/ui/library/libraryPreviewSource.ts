@@ -45,6 +45,7 @@ const deferGraphPreview = <Props extends object>(pick: (module: GraphPreviewModu
 };
 
 export const DeferredGraphPreviewDialog = deferGraphPreview((module) => module.GraphPreviewDialog);
+export const DeferredGraphPreviewSnapshot = deferGraphPreview((module) => module.GraphPreviewSnapshot);
 
 /**
  * Preview the entry's saved document without active-project destination or live updates; catch malformed cached

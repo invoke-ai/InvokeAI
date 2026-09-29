@@ -513,7 +513,11 @@ export const WorkflowLibraryDetailPanel = ({
     >
       <Scrollable flex="1" label={name} minH="0">
         <Stack gap="2" minW="0" p="2.5">
-          <WorkflowLibraryThumbnail key={item.workflow_id} item={item} />
+          <WorkflowLibraryThumbnail
+            key={item.workflow_id}
+            item={item}
+            workflowDocument={entry.enrichment.status === 'ready' ? entry.enrichment.document : null}
+          />
 
           {/*
            * Wrap full names, including delimiter-free strings, in the detail rail; zero content min-width permits

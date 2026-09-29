@@ -3548,6 +3548,7 @@
       "source:src/features/workflow/ui/graph-preview/GraphPreviewFlow.tsx",
       "source:src/features/workflow/ui/graph-preview/GraphPreviewOpenAsMenu.tsx",
       "source:src/features/workflow/ui/graph-preview/GraphPreviewSidePanel.tsx",
+      "source:src/features/workflow/ui/graph-preview/GraphPreviewSnapshot.tsx",
       "source:src/features/workflow/ui/graph-preview/flowTheme.ts",
       "source:src/features/workflow/ui/graph-preview/index.ts",
       "source:src/features/workflow/ui/graph-preview/nodeSummaries.ts",

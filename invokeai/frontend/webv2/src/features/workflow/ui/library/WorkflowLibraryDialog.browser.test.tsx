@@ -18,6 +18,7 @@ import type {
 } from '@features/workflow/ui/WorkflowUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { GalleryHostProvider, type GalleryHost } from '@features/gallery/picker';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import {
   openWorkflowLibraryAtProjectWorkflow,
@@ -35,6 +36,13 @@ import { userEvent } from 'vitest/browser';
 import '@features/workflow/ui/graph-preview/GraphPreviewDialog';
 
 import { WorkflowLibraryDialog } from './WorkflowLibraryDialog';
+
+/** In the app the workbench derives this from its Gallery adapter; the library's thumbnail slot reads it. */
+const GALLERY_HOST: GalleryHost = {
+  galleryValues: {},
+  notifications: { add: vi.fn(), reportError: vi.fn() },
+  projectName: '',
+};
 
 // Provide the fixture node's reactive template snapshot so preview compilation can run without backend schema
 // loading.
@@ -420,9 +428,11 @@ describe('WorkflowLibraryDialog', () => {
         <StrictMode>
           <ChakraProvider value={system}>
             <WorkflowUiProvider adapter={UI_ADAPTER}>
-              <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-                <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={onOpenChange} />
-              </WorkflowGraphPreviewProvider>
+              <GalleryHostProvider host={GALLERY_HOST}>
+                <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                  <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={onOpenChange} />
+                </WorkflowGraphPreviewProvider>
+              </GalleryHostProvider>
             </WorkflowUiProvider>
           </ChakraProvider>
         </StrictMode>
@@ -1078,9 +1088,11 @@ describe('WorkflowLibraryDialog — This project', () => {
         <StrictMode>
           <ChakraProvider value={system}>
             <WorkflowUiProvider adapter={UI_ADAPTER}>
-              <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-                <WorkflowLibraryDialog isOpen onOpenChange={onOpenChange} />
-              </WorkflowGraphPreviewProvider>
+              <GalleryHostProvider host={GALLERY_HOST}>
+                <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                  <WorkflowLibraryDialog isOpen onOpenChange={onOpenChange} />
+                </WorkflowGraphPreviewProvider>
+              </GalleryHostProvider>
             </WorkflowUiProvider>
           </ChakraProvider>
         </StrictMode>

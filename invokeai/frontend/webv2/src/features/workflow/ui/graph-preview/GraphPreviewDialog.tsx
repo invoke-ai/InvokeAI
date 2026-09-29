@@ -14,6 +14,9 @@ import { GraphPreviewFlow } from './GraphPreviewFlow';
 import { GraphPreviewOpenAsMenu } from './GraphPreviewOpenAsMenu';
 import { GraphPreviewSidePanel } from './GraphPreviewSidePanel';
 
+// Loaded through this module so the snapshot shares the dialog's chunk; a second entry splits the flow out of it.
+export { GraphPreviewSnapshot } from './GraphPreviewSnapshot';
+
 interface GraphPreviewDialogProps {
   graphId: string;
   isOpen: boolean;
