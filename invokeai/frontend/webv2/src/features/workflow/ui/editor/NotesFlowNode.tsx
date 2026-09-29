@@ -22,7 +22,15 @@ const NotesFlowNodeComponent = ({ data, selected }: NodeProps<NotesFlowNodeType>
   );
 
   return (
-    <Box bg="bg.subtle" p="2" rounded="lg" w="16rem" {...getWorkflowNodeChromeProps({ selected })}>
+    <Box
+      bg="bg.subtle"
+      data-is-selected={selected}
+      data-workflow-node-shell="true"
+      p="2"
+      rounded="lg"
+      w="16rem"
+      {...getWorkflowNodeChromeProps({ selected })}
+    >
       <Input
         aria-label="Note title"
         className="nodrag"
