@@ -1,19 +1,21 @@
 import type { FieldType } from '@features/workflow/contracts';
 
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex, Stack, Text } from '@chakra-ui/react';
 import {
   getWorkflowNodeChromeProps,
   getWorkflowNodeHandleStyle,
   WORKFLOW_NODE_HANDLE_SIZE,
 } from '@features/workflow/ui/nodeChrome';
-import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE, getFieldTypeLabel } from '@features/workflow/utility';
+import { CONNECTOR_INPUT_HANDLE, CONNECTOR_OUTPUT_HANDLE } from '@features/workflow/utility';
 import { Tooltip } from '@platform/ui';
 import { Handle, Position, type NodeProps } from '@xyflow/react';
 import { memo, useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import type { ConnectorFlowNode as ConnectorFlowNodeType } from './flowAdapters';
 
 import { getHandleTypeTooltip } from './handleTooltip';
+import { useIsWorkflowImageExport } from './InvocationFlowNode';
 
 /** An untyped ("any") connector end: a plain grid-tinted dot rather than a field-typed handle. */
 const genericHandleStyle: React.CSSProperties = {
@@ -26,15 +28,13 @@ const genericHandleStyle: React.CSSProperties = {
 const getConnectorHandleStyle = (type: FieldType | null, side: 'left' | 'right'): React.CSSProperties =>
   type ? getWorkflowNodeHandleStyle(type, side) : genericHandleStyle;
 
-const getConnectorTitle = (inputType: FieldType | null, outputType: FieldType | null): string => {
-  const inputLabel = inputType ? getFieldTypeLabel(inputType) : 'Any input';
-  const outputLabel = outputType ? getFieldTypeLabel(outputType) : 'Any output';
-
-  return `Connector: ${inputLabel} -> ${outputLabel}`;
-};
-
 const ConnectorFlowNodeComponent = ({ data, selected }: NodeProps<ConnectorFlowNodeType>) => {
   const node = data.documentNode;
+  const isWorkflowImageExport = useIsWorkflowImageExport();
+  const { t } = useTranslation();
+  const inputTooltip = getHandleTypeTooltip(data.inputFieldType, t('nodes.anyInput'), t);
+  const outputTooltip = getHandleTypeTooltip(data.outputFieldType, t('nodes.anyOutput'), t);
+  const connectorTooltip = t('nodes.connectorTitle', { input: inputTooltip, output: outputTooltip });
   const inputHandleStyle = useMemo(
     () => ({ ...getConnectorHandleStyle(data.inputFieldType, 'left'), left: -WORKFLOW_NODE_HANDLE_SIZE / 2 }),
     [data.inputFieldType]
@@ -46,15 +46,54 @@ const ConnectorFlowNodeComponent = ({ data, selected }: NodeProps<ConnectorFlowN
 
   return (
     <Flex align="center" data-connector-node-id={node.id} justify="center" position="relative">
-      <Tooltip content={getHandleTypeTooltip(data.inputFieldType, 'Any input')} showArrow>
+      <Tooltip content={inputTooltip} showArrow>
         <Handle id={CONNECTOR_INPUT_HANDLE} position={Position.Left} style={inputHandleStyle} type="target" />
       </Tooltip>
-      <Tooltip content={getConnectorTitle(data.inputFieldType, data.outputFieldType)} showArrow>
-        <Box bg="bg" h="1rem" rounded="full" w="2.5rem" {...getWorkflowNodeChromeProps({ selected })} />
+      <Tooltip content={connectorTooltip} showArrow>
+        <Box
+          bg="bg"
+          data-connector-node-body="true"
+          data-is-selected={selected}
+          data-workflow-node-shell="true"
+          h="1rem"
+          rounded="full"
+          w="2.5rem"
+          {...getWorkflowNodeChromeProps({ selected })}
+        />
       </Tooltip>
-      <Tooltip content={getHandleTypeTooltip(data.outputFieldType, 'Any output')} showArrow>
+      <Tooltip content={outputTooltip} showArrow>
         <Handle id={CONNECTOR_OUTPUT_HANDLE} position={Position.Right} style={outputHandleStyle} type="source" />
       </Tooltip>
+      {isWorkflowImageExport ? (
+        <Stack
+          align="center"
+          bg="bg"
+          borderColor="border.subtle"
+          borderWidth="1px"
+          data-workflow-export-content="true"
+          gap="0.5"
+          left="50%"
+          maxW="14rem"
+          overflowWrap="anywhere"
+          position="absolute"
+          px="2"
+          py="1"
+          rounded="sm"
+          top="calc(100% + 0.25rem)"
+          transform="translateX(-50%)"
+          zIndex="2"
+        >
+          <Text data-workflow-export-connector-tooltip="true" fontSize="2xs">
+            {inputTooltip}
+          </Text>
+          <Text data-workflow-export-connector-tooltip="true" fontSize="2xs" fontWeight="600">
+            {connectorTooltip}
+          </Text>
+          <Text data-workflow-export-connector-tooltip="true" fontSize="2xs">
+            {outputTooltip}
+          </Text>
+        </Stack>
+      ) : null}
     </Flex>
   );
 };

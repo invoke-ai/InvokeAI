@@ -220,18 +220,28 @@ describe('resolveInvocationRoute — upscale source', () => {
     );
   });
 
-  it('rejects unsupported main-model bases and non-Tile ControlNets', () => {
+  it('rejects a main-model base the widget has no builder for', () => {
+    // FLUX.1 used to stand in for "unsupported" here; it is supported now, so this needs a base
+    // that genuinely has no entry in UPSCALE_ARCHITECTURES.
     const input = createInput();
-    const values = {
-      ...input.upscaleValues,
-      model: upscaleModel('flux-upscale', 'main', 'flux', 'FLUX'),
-      tileControlnetModel: upscaleModel('depth-upscale', 'controlnet', 'flux', 'FLUX Depth ControlNet'),
-    };
-    const models = [values.model, values.tileControlnetModel, upscaleModels[1]!];
+    const values = { ...input.upscaleValues, model: upscaleModel('sd3-upscale', 'main', 'sd-3', 'SD3') };
+    const models = [values.model, upscaleModels[1]!];
     const result = resolveInvocationRouteInput({ ...input, upscaleValues: values }, 'global', route, models);
 
     expect(result.sourceValid).toBe(false);
-    expect(result.validationReasons).toContain('Upscale supports only SD1.5 and SDXL main models.');
+    expect(result.validationReasons).toContain('Upscale supports only SD1.5, SDXL or FLUX.1 main models.');
+  });
+
+  it('rejects a ControlNet that is not a Tile model for its base', () => {
+    const input = createInput();
+    const values = {
+      ...input.upscaleValues,
+      tileControlnetModel: upscaleModel('depth-upscale', 'controlnet', 'sdxl', 'SDXL Depth ControlNet'),
+    };
+    const models = [...upscaleModels, values.tileControlnetModel];
+    const result = resolveInvocationRouteInput({ ...input, upscaleValues: values }, 'global', route, models);
+
+    expect(result.sourceValid).toBe(false);
     expect(result.validationReasons).toContain(
       'The Tile ControlNet must match the main model base and be a Tile or Union model.'
     );

@@ -54,7 +54,16 @@ import { Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, RotateCcwIcon, TriangleAlertIcon } from 'lucide-react';
-import { memo, useId, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import {
+  createContext,
+  memo,
+  useContext,
+  useId,
+  useState,
+  type ChangeEvent,
+  type KeyboardEvent,
+  type ReactNode,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InvocationFlowNode as InvocationFlowNodeType, InvocationNodeTemplateView } from './flowAdapters';
@@ -67,8 +76,25 @@ const ROW_PADDING_X = 12;
 /** Below this viewport zoom, field content renders as skeleton bars (ComfyUI-style) for performance/readability. */
 const CONTENT_VISIBILITY_ZOOM = 0.4;
 
+const WorkflowImageExportContext = createContext(false);
+
+export const WorkflowImageExportProvider = ({
+  children,
+  isExporting,
+}: {
+  children: ReactNode;
+  isExporting: boolean;
+}) => <WorkflowImageExportContext value={isExporting}>{children}</WorkflowImageExportContext>;
+
+export const useIsWorkflowImageExport = () => useContext(WorkflowImageExportContext);
+
 /** True while the viewport is zoomed out far enough that field content is unreadable noise. */
-const useIsZoomedOut = (): boolean => useStore((state) => state.transform[2] < CONTENT_VISIBILITY_ZOOM);
+const useIsZoomedOut = (): boolean => {
+  const isWorkflowImageExport = useIsWorkflowImageExport();
+  const isZoomedOut = useStore((state) => state.transform[2] < CONTENT_VISIBILITY_ZOOM);
+
+  return isZoomedOut && !isWorkflowImageExport;
+};
 
 /** The node-level loading hint is only useful while a selected child signature is being fetched. */
 export const shouldShowCallSavedWorkflowLoadingHint = (node: WorkflowInvocationNode): boolean =>
@@ -142,6 +168,8 @@ const NodeShell = ({
 
   return (
     <Box
+      data-is-selected={selected}
+      data-workflow-node-shell="true"
       w={NODE_WIDTH}
       {...getWorkflowNodeShellProps({
         invalid: isInvalid,
@@ -182,12 +210,14 @@ const NodeOutcomeIcon = ({
 
 /** Thin progress strip under the header while the node's invocation executes. */
 const NodeProgressStrip = ({ execution }: { execution: NodeExecutionState | null }) => {
-  if (execution?.status !== 'running') {
+  const isWorkflowImageExport = useIsWorkflowImageExport();
+
+  if (isWorkflowImageExport || execution?.status !== 'running') {
     return null;
   }
 
   return (
-    <Box bg="bg.muted" h="2px" overflow="hidden" position="relative" w="full">
+    <Box bg="bg.muted" data-node-progress-strip="true" h="2px" overflow="hidden" position="relative" w="full">
       <Box
         bg="brand.solid"
         h="full"
@@ -243,18 +273,6 @@ const NodeTitle = ({ node, title }: { node: WorkflowInvocationNode; title: strin
   );
 };
 
-const getInputModeLabel = (input: FieldInputTemplate['input']): string => {
-  if (input === 'connection') {
-    return 'Connection only';
-  }
-
-  if (input === 'direct') {
-    return 'Direct value only';
-  }
-
-  return 'Direct value or connection';
-};
-
 const InputFieldTooltip = ({
   description,
   isConnected,
@@ -267,29 +285,38 @@ const InputFieldTooltip = ({
   isExposed: boolean;
   label: string;
   template: FieldInputTemplate;
-}) => (
-  <Stack gap="0.5" maxW="18rem">
-    <Text fontWeight="700">{label}</Text>
-    <Text color="fg.subtle">Field: {template.name}</Text>
-    <Text color="fg.subtle">Type: {getFieldTypeLabel(template.type)}</Text>
-    <Text color="fg.subtle">
-      {template.required ? 'Required' : 'Optional'} · {getInputModeLabel(template.input)}
-    </Text>
-    {isConnected ? <Text color="fg.subtle">Connected by graph edge.</Text> : null}
-    {isExposed ? <Text color="fg.subtle">Pinned to Linear UI.</Text> : null}
-    {description ? <Text>{description}</Text> : null}
-  </Stack>
-);
-
-const OutputFieldTooltip = ({ template }: { template: FieldOutputTemplate }) => {
+}) => {
   const { t } = useTranslation();
 
   return (
     <Stack gap="0.5" maxW="18rem">
-      <Text fontWeight="700">{template.title}</Text>
-      <Text color="fg.subtle">{t('nodes.fieldName', { name: template.name })}</Text>
-      <Text color="fg.subtle">{t('nodes.fieldType', { type: getFieldTypeLabel(template.type) })}</Text>
-      <Text color="fg.subtle">{t('nodes.output')}</Text>
+      <Text fontWeight="700">{label}</Text>
+      <Text color="fg.subtle">
+        {t('nodes.fieldInfo', { name: template.name, type: getFieldTypeLabel(template.type) })} ·{' '}
+        {t(template.required ? 'nodes.required' : 'nodes.optional')} · {t(`nodes.inputModes.${template.input}`)}
+        {isConnected ? ` · ${t('nodes.providedByConnection')}` : null}
+        {isExposed ? ` · ${t('nodes.pinnedToLinearUi')}` : null}
+      </Text>
+      {description ? <Text>{description}</Text> : null}
+    </Stack>
+  );
+};
+
+const OutputFieldTooltip = ({
+  includeTitle = true,
+  template,
+}: {
+  includeTitle?: boolean;
+  template: FieldOutputTemplate;
+}) => {
+  const { t } = useTranslation();
+
+  return (
+    <Stack gap="0.5" maxW="18rem">
+      {includeTitle ? <Text fontWeight="700">{template.title}</Text> : null}
+      <Text color="fg.subtle">
+        {t('nodes.fieldInfo', { name: template.name, type: getFieldTypeLabel(template.type) })} · {t('nodes.output')}
+      </Text>
       {template.description ? <Text>{template.description}</Text> : null}
     </Stack>
   );
@@ -364,9 +391,11 @@ const NodeUpdateIcon = ({
 };
 
 const NodeInfoTooltipContent = ({
+  isFailed = false,
   node,
   template,
 }: {
+  isFailed?: boolean;
   node: WorkflowInvocationNode;
   template: InvocationNodeTemplateView['template'];
 }) => {
@@ -384,6 +413,7 @@ const NodeInfoTooltipContent = ({
       {updateStatusText ? <Text color="fg.warning">{updateStatusText}</Text> : null}
       <Text color="fg.subtle">{t('nodes.nodeClassification', { classification: template.classification })}</Text>
       <Text color="fg.subtle">{t('nodes.nodeCategory', { category: template.category })}</Text>
+      {isFailed ? <Text color="fg.error">{t('nodes.executionFailed')}</Text> : null}
       {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
       {node.data.notes ? <Text>{node.data.notes}</Text> : null}
     </Stack>
@@ -550,18 +580,21 @@ const InputFieldRow = ({
   node: WorkflowInvocationNode;
   template: FieldInputTemplate;
 }) => {
+  const isWorkflowImageExport = useIsWorkflowImageExport();
+  const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
   const instance = node.data.inputs[template.name];
   const fieldIdentifier = { fieldName: template.name, nodeId: node.id };
   const showsControl = !isConnected && isDirectInputField(template);
   const label = instance?.label || template.title;
+  const description = getEffectiveWorkflowFieldDescription(instance, template);
   const invalidReason = getWorkflowFieldInvalidReason({
     isConnected,
     template,
     value: instance?.value,
   });
   const isInvalid = invalidReason !== null;
-  const handleTooltip = getHandleTypeTooltip(template.type);
+  const handleTooltip = getHandleTypeTooltip(template.type, t('nodes.any'), t);
   const canReset = showsControl && !isWorkflowFieldValueDefault(template, instance?.value);
 
   if (isSkeleton) {
@@ -605,7 +638,7 @@ const InputFieldRow = ({
             positioning={{ placement: 'top-start' }}
             content={
               <InputFieldTooltip
-                description={getEffectiveWorkflowFieldDescription(instance, template)}
+                description={description}
                 isConnected={isConnected}
                 isExposed={isExposed}
                 label={label}
@@ -615,6 +648,7 @@ const InputFieldRow = ({
           >
             <Text
               color={isInvalid ? 'fg.error' : isConnected ? 'fg.muted' : 'fg'}
+              data-node-input-field-title="true"
               fontSize="2xs"
               lineHeight="shorter"
               minW="0"
@@ -672,10 +706,26 @@ const InputFieldRow = ({
             ) : null}
           </HStack>
         </HStack>
+        {isWorkflowImageExport ? (
+          <Stack data-workflow-export-content="true" gap="0.5" mt="0.5" overflowWrap="anywhere" w="full">
+            <InputFieldTooltip
+              description={description}
+              isConnected={isConnected}
+              isExposed={isExposed}
+              label={label}
+              template={template}
+            />
+            {template.input !== 'direct' ? (
+              <Text data-workflow-export-connector-tooltip="true" fontSize="2xs">
+                {handleTooltip}
+              </Text>
+            ) : null}
+          </Stack>
+        ) : null}
         {showsControl ? (
           <Box mt="0.5" w="full">
             <WorkflowFieldInput
-              id={`${node.id}-${template.name}-value`}
+              id={`${isWorkflowImageExport ? 'export-' : ''}${node.id}-${template.name}-value`}
               invalid={isInvalid}
               nodeId={node.id}
               seedMode={getWorkflowFieldSeedMode(instance)}
@@ -707,12 +757,20 @@ const OutputFieldRow = ({
   latestResult: unknown;
   template: FieldOutputTemplate;
 }) => {
-  const handleTooltip = getHandleTypeTooltip(template.type);
+  const isWorkflowImageExport = useIsWorkflowImageExport();
+  const { t } = useTranslation();
+  const handleTooltip = getHandleTypeTooltip(template.type, t('nodes.any'), t);
   const value = latestResult === undefined ? null : formatOutputFieldValue(latestResult, template.name);
 
   return (
     <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
-      <Flex align="center" h="5" justify="flex-end" position="relative">
+      <Flex
+        align="center"
+        h={isWorkflowImageExport ? 'auto' : '5'}
+        justify="flex-end"
+        minH={isWorkflowImageExport ? '5' : undefined}
+        position="relative"
+      >
         <Tooltip content={handleTooltip} positioning={{ placement: 'left-start' }} showArrow>
           <Handle
             id={template.name}
@@ -725,6 +783,22 @@ const OutputFieldRow = ({
           <Flex justify="flex-end" w="full">
             <SkeletonBar w="40%" />
           </Flex>
+        ) : isWorkflowImageExport ? (
+          <Box flexShrink={0} maxW="full" textAlign="end">
+            <Text
+              color="fg.muted"
+              data-workflow-export-content="true"
+              data-workflow-export-output-title="true"
+              fontSize="2xs"
+              lineHeight="shorter"
+              maxW="full"
+              overflowWrap="anywhere"
+              textAlign="end"
+              whiteSpace="normal"
+            >
+              {template.title}
+            </Text>
+          </Box>
         ) : (
           <HStack gap="1.5" justify="flex-end" minW="0" w="full">
             {value ? (
@@ -758,6 +832,19 @@ const OutputFieldRow = ({
           </HStack>
         )}
       </Flex>
+      {isWorkflowImageExport ? (
+        <Stack data-workflow-export-content="true" gap="0.5" maxW="full" px={WORKFLOW_NODE_DENSITY.rowPaddingX}>
+          <Text data-workflow-export-connector-tooltip="true" fontSize="2xs" overflowWrap="anywhere">
+            {handleTooltip}
+          </Text>
+          <OutputFieldTooltip includeTitle={false} template={template} />
+          {value ? (
+            <Text color="fg.subtle" fontSize="2xs" maxW="full" overflowWrap="anywhere" whiteSpace="pre-wrap">
+              {value.full}
+            </Text>
+          ) : null}
+        </Stack>
+      ) : null}
     </Box>
   );
 };
@@ -892,6 +979,7 @@ const CompactInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeT
 const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNodeType>) => {
   const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
+  const isWorkflowImageExport = useIsWorkflowImageExport();
   const isZoomedOut = useIsZoomedOut();
   const node = data.documentNode;
   const templateView = data.template;
@@ -921,13 +1009,14 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
   const outputTemplates = templateView.outputTemplates;
   const outputTemplatesByName = new Map(outputTemplates.map((template) => [template.name, template]));
   const outputRows = getOutputFieldRows(getOutputFieldNamesByScope(outputTemplates));
-  const isOpen = node.data.isOpen;
+  const isOpen = node.data.isOpen || isWorkflowImageExport;
   const isRunning = execution?.status === 'running';
   const isMissingRequiredInput = hasMissingRequiredInputs(node, inputTemplates, connectedFieldNames);
-  const isCompact = data.isCompact && !selected;
+  const isCompact = data.isCompact && !selected && !isWorkflowImageExport;
   const withFooter = !isZoomedOut && templateView.isExecutable && templateView.hasImageOutput;
-  const withOutputPreview = Boolean(execution?.outputImageUrl);
-  const latestResult = execution?.latestOutput;
+  const resultExecution = isWorkflowImageExport && execution?.status !== 'completed' ? null : execution;
+  const withOutputPreview = Boolean(resultExecution?.outputImageUrl);
+  const latestResult = resultExecution?.latestOutput;
 
   return (
     <NodeShell
@@ -961,6 +1050,11 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           </>
         )}
       </Flex>
+      {isWorkflowImageExport ? (
+        <Box data-workflow-export-content="true" maxW="full" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
+          <NodeInfoTooltipContent isFailed={execution?.status === 'failed'} node={node} template={template} />
+        </Box>
+      ) : null}
       <NodeProgressStrip execution={execution} />
       {isOpen && isCompact ? (
         <>
@@ -1004,9 +1098,9 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
       ) : (
         <HiddenHandles inputTemplates={inputTemplates} outputTemplates={outputTemplates} />
       )}
-      {isOpen && execution?.outputImageUrl ? (
+      {isOpen && resultExecution?.outputImageUrl ? (
         <NodeOutputPreview
-          imageUrl={execution.outputImageUrl}
+          imageUrl={resultExecution.outputImageUrl}
           isSkeleton={isZoomedOut}
           nodeId={node.id}
           roundedBottom={!withFooter}
@@ -1017,11 +1111,14 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
   );
 };
 
-const InvocationFlowNodeComponent = (props: NodeProps<InvocationFlowNodeType>) =>
-  props.data.isCompact && !props.selected ? (
+const InvocationFlowNodeComponent = (props: NodeProps<InvocationFlowNodeType>) => {
+  const isWorkflowImageExport = useIsWorkflowImageExport();
+
+  return props.data.isCompact && !props.selected && !isWorkflowImageExport ? (
     <CompactInvocationNode {...props} />
   ) : (
     <ExpandedInvocationNode {...props} />
   );
+};
 
 export const InvocationFlowNode = memo(InvocationFlowNodeComponent);

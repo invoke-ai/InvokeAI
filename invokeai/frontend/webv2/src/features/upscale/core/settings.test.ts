@@ -10,6 +10,8 @@ import {
   getUpscaleOutputDimensions,
   getUpscaleValidationReasons,
   normalizeUpscaleWidgetValues,
+  spandrelAutoscaleDimension,
+  upscaleDenoiseDimension,
   syncUpscaleWidgetValuesWithModels,
   UPSCALE_PRESETS,
 } from './settings';
@@ -118,5 +120,98 @@ describe('upscale settings', () => {
     const values = { ...defaults, inputImage: { height: 10, image_name: 'delete.png', width: 10 } };
 
     expect(clearDeletedUpscaleInput(values, new Set(['delete.png'])).inputImage).toBeNull();
+  });
+});
+
+describe('architecture-driven validation', () => {
+  const upscaleReady = (models: ModelConfig[]) => ({
+    ...createDefaultUpscaleWidgetValues(models),
+    inputImage: { height: 64, image_name: 'in.png', width: 64 },
+  });
+
+  it('does not demand a tile ControlNet for an architecture that has none', () => {
+    // The inversion this change is built on: compileUpscaleGraph used to throw without one.
+    const values = upscaleReady([
+      model('main', 'main', 'flux'),
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      model('t5', 't5_encoder', 'any'),
+      model('clip', 'clip_embed', 'any'),
+      model('fluxvae', 'vae', 'flux'),
+    ]);
+
+    expect(getUpscaleValidationReasons(values)).toEqual([]);
+    expect(values.tileControlnetModel).toBeNull();
+  });
+
+  it('still demands one where the architecture uses it', () => {
+    const values = upscaleReady([model('main', 'main', 'sdxl'), model('spandrel', 'spandrel_image_to_image', 'any')]);
+
+    expect(getUpscaleValidationReasons(values)).toContain(
+      'Upscale needs a Tile or Union ControlNet compatible with the main model.'
+    );
+  });
+
+  it.each([
+    ['t5_encoder', 'Upscale needs a T5 encoder for this main model.'],
+    ['clip_embed', 'Upscale needs a CLIP Embed model for this main model.'],
+    ['vae', 'Upscale needs a VAE for this main model.'],
+  ])('names the missing %s a bare FLUX checkpoint cannot supply', (missing, reason) => {
+    const installed = [
+      model('main', 'main', 'flux'),
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      model('t5', 't5_encoder', 'any'),
+      model('clip', 'clip_embed', 'any'),
+      model('fluxvae', 'vae', 'flux'),
+    ].filter((candidate) => candidate.type !== missing);
+
+    expect(getUpscaleValidationReasons(upscaleReady(installed))).toContain(reason);
+  });
+
+  it('exempts a self-contained SDNQ pipeline, which ships its own parts', () => {
+    const sdnq = { ...model('main', 'main', 'flux'), format: 'sdnq_quantized' } as ModelConfig;
+    const values = upscaleReady([sdnq, model('spandrel', 'spandrel_image_to_image', 'any')]);
+
+    expect(getUpscaleValidationReasons(values)).toEqual([]);
+  });
+
+  it('refuses a FLUX Fill model, which the denoise node cannot run without fill conditioning', () => {
+    const fill = { ...model('main', 'main', 'flux'), variant: 'dev_fill' } as ModelConfig;
+    const values = upscaleReady([
+      fill,
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      model('t5', 't5_encoder', 'any'),
+      model('clip', 'clip_embed', 'any'),
+      model('fluxvae', 'vae', 'flux'),
+    ]);
+
+    expect(getUpscaleValidationReasons(values)).toContain('Upscale cannot use a FLUX Fill model.');
+  });
+
+  it('blocks the run when a required component has been uninstalled', () => {
+    // Without this the Invoke button stays enabled and the graph dies after Spandrel has run.
+    const installed = [
+      model('main', 'main', 'flux'),
+      model('spandrel', 'spandrel_image_to_image', 'any'),
+      model('t5', 't5_encoder', 'any'),
+      model('clip', 'clip_embed', 'any'),
+      model('fluxvae', 'vae', 'flux'),
+    ];
+    const values = upscaleReady(installed);
+    const withoutT5 = installed.filter((candidate) => candidate.key !== 't5');
+
+    expect(getUpscaleValidationReasons(values, withoutT5)).toContain('t5 is no longer installed.');
+  });
+});
+
+describe('upscaleDenoiseDimension', () => {
+  it('floors to the grid the architecture demands, not to the one Spandrel used', () => {
+    // 1020 * 2 = 2040: a legal Spandrel size that flux_denoise rejects.
+    expect(spandrelAutoscaleDimension(1020, 2)).toBe(2040);
+    expect(upscaleDenoiseDimension(1020, 2, 8)).toBe(2040);
+    expect(upscaleDenoiseDimension(1020, 2, 16)).toBe(2032);
+  });
+
+  it('never returns zero for a tiny frame', () => {
+    expect(upscaleDenoiseDimension(4, 1, 16)).toBe(16);
   });
 });

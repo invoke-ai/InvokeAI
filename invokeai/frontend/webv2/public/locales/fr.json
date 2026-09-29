@@ -1,1 +1,33 @@
-{}
+{
+  "nodes": {
+    "fieldInfo": "Champ : {{name}} · Type : {{type}}",
+    "fieldName": "Champ : {{name}}",
+    "fieldType": "Type : {{type}}",
+    "required": "Obligatoire",
+    "optional": "Facultatif",
+    "inputModes": {
+      "connection": "Connexion uniquement",
+      "direct": "Valeur directe uniquement",
+      "any": "Valeur directe ou connexion"
+    },
+    "pinnedToLinearUi": "Épinglé dans l’interface linéaire.",
+    "batch": "en lot",
+    "providedByConnection": "Fourni par une connexion.",
+    "any": "Tout",
+    "anyInput": "N’importe quelle entrée",
+    "anyOutput": "N’importe quelle sortie",
+    "connectorTitle": "Connecteur : {{input}} → {{output}}",
+    "nodeType": "Type : {{type}}",
+    "nodePackLabel": "Pack de nœuds : {{name}}",
+    "nodeVersion": "Version : {{version}}",
+    "nodeClassification": "Classification : {{classification}}",
+    "nodeCategory": "Catégorie : {{category}}",
+    "nodeUpdateAvailable": "Version {{from}} → {{to}} : mise à jour disponible",
+    "nodeNewerThanBackend": "La version {{from}} est plus récente que celle prise en charge par cette installation d’Invoke ({{to}}) ; mettez Invoke à jour",
+    "nodeVersionIncompatible": "La version {{from}} ne peut pas être mise à jour vers {{to}} ; supprimez et ajoutez de nouveau le nœud",
+    "noBatchGroup": "sans groupe",
+    "executionFailed": "Échec",
+    "childWorkflowError": "Erreur dans le workflow enfant : {{error}}",
+    "output": "Sortie"
+  }
+}

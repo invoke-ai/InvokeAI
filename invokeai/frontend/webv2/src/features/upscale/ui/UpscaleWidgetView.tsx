@@ -10,6 +10,7 @@ import {
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   isMainModelConfig,
+  isModelIdentifierConfig,
   isVaeModelConfig,
   SCHEDULER_OPTIONS,
 } from '@features/generation/settings';
@@ -17,11 +18,13 @@ import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { ModelSelect } from '@features/models/react';
 import {
   createDefaultUpscaleWidgetValues,
+  needsExplicitComponents,
   getUpscaleOutputDimensions,
   isSpandrelModelConfig,
   isSupportedUpscaleMainModel,
   isTileControlNetCandidate,
   normalizeUpscaleWidgetValues,
+  upscaleArchitectureFor,
   syncUpscaleWidgetValuesWithModels,
   UPSCALE_CREATIVITY_MAX,
   UPSCALE_CREATIVITY_MIN,
@@ -65,6 +68,8 @@ const MAIN_MODEL_TYPES: readonly ModelTaxonomyType[] = ['main'];
 const LORA_MODEL_TYPES: readonly ModelTaxonomyType[] = ['lora'];
 const CONTROLNET_MODEL_TYPES: readonly ModelTaxonomyType[] = ['controlnet'];
 const VAE_MODEL_TYPES: readonly ModelTaxonomyType[] = ['vae'];
+const T5_ENCODER_MODEL_TYPES: readonly ModelTaxonomyType[] = ['t5_encoder'];
+const CLIP_EMBED_MODEL_TYPES: readonly ModelTaxonomyType[] = ['clip_embed'];
 
 const SCALE_MARKS = [1, 2, 4, 8, 16];
 const CREATIVITY_MARKS = [UPSCALE_CREATIVITY_MIN, 0, UPSCALE_CREATIVITY_MAX];
@@ -328,12 +333,22 @@ export const UpscaleWidgetView = () => {
   );
   const selectedLoraKeys = useMemo(() => new Set(values.loras.map((lora) => lora.model.key)), [values.loras]);
 
+  // A control with nothing to steer is worse than no control, so the widget follows the table
+  // rather than showing every field for every architecture.
+  const architecture = upscaleArchitectureFor(values.model);
+  const showTileControlNet = architecture?.usesTileControlNet ?? false;
+  const showComponentPickers = needsExplicitComponents(values.model);
+
   const activePresetId = useMemo(
     () =>
       PRESET_ENTRIES.find(
-        ([, preset]) => values.creativity === preset.creativity && values.structure === preset.structure
+        ([, preset]) =>
+          values.creativity === preset.creativity &&
+          // Structure is hidden where nothing consumes it, so a stale value must not keep every
+          // preset unhighlighted with nothing on screen to explain why.
+          (!showTileControlNet || values.structure === preset.structure)
       )?.[0] ?? null,
-    [values.creativity, values.structure]
+    [showTileControlNet, values.creativity, values.structure]
   );
   const applyPreset = useCallback(
     ({ value }: { value: string | null }) => {
@@ -392,6 +407,15 @@ export const UpscaleWidgetView = () => {
   );
 
   const vaePrecisionValue = useMemo(() => [values.vaePrecision], [values.vaePrecision]);
+
+  const setT5Encoder = useCallback(
+    (model: ModelConfig | null) => patch({ t5EncoderModel: isModelIdentifierConfig(model) ? model : null }),
+    [patch]
+  );
+  const setClipEmbed = useCallback(
+    (model: ModelConfig | null) => patch({ clipEmbedModel: isModelIdentifierConfig(model) ? model : null }),
+    [patch]
+  );
 
   const sharedBadge = useMemo(
     () => (
@@ -481,18 +505,20 @@ export const UpscaleWidgetView = () => {
             value={values.creativity}
             onChange={set.creativity}
           />
-          <ScrubberField
-            error={errors.structure}
-            helpText={t('widgets.upscale.structureHelp')}
-            hint="structure"
-            label={t('widgets.upscale.structure')}
-            marks={STRUCTURE_MARKS}
-            max={UPSCALE_STRUCTURE_MAX}
-            min={UPSCALE_STRUCTURE_MIN}
-            step={1}
-            value={values.structure}
-            onChange={set.structure}
-          />
+          {showTileControlNet && (
+            <ScrubberField
+              error={errors.structure}
+              helpText={t('widgets.upscale.structureHelp')}
+              hint="structure"
+              label={t('widgets.upscale.structure')}
+              marks={STRUCTURE_MARKS}
+              max={UPSCALE_STRUCTURE_MAX}
+              min={UPSCALE_STRUCTURE_MIN}
+              step={1}
+              value={values.structure}
+              onChange={set.structure}
+            />
+          )}
         </Stack>
       </GenerationSettingsSection>
 
@@ -586,22 +612,56 @@ export const UpscaleWidgetView = () => {
 
       <GenerationSettingsSection label={t('widgets.upscale.advanced')}>
         <Stack gap="3" p="2">
-          <Field
-            error={values.tileControlnetModel ? undefined : t('widgets.upscale.tileControlNetRequired')}
-            helpText={values.tileControlnetModel ? t('widgets.upscale.tileControlNetHelp') : undefined}
-            hint="tileControlNet"
-            label={t('widgets.upscale.tileControlNet')}
-          >
-            <ModelSelect
-              filter={tileControlNetFilter}
-              invalid={!values.tileControlnetModel}
-              modelTypes={CONTROLNET_MODEL_TYPES}
-              placeholder={t('widgets.upscale.selectTileControlNet')}
-              size="xs"
-              value={values.tileControlnetModel?.key ?? null}
-              onChange={setTileControlNet}
-            />
-          </Field>
+          {showTileControlNet && (
+            <Field
+              error={values.tileControlnetModel ? undefined : t('widgets.upscale.tileControlNetRequired')}
+              helpText={values.tileControlnetModel ? t('widgets.upscale.tileControlNetHelp') : undefined}
+              hint="tileControlNet"
+              label={t('widgets.upscale.tileControlNet')}
+            >
+              <ModelSelect
+                filter={tileControlNetFilter}
+                invalid={!values.tileControlnetModel}
+                modelTypes={CONTROLNET_MODEL_TYPES}
+                placeholder={t('widgets.upscale.selectTileControlNet')}
+                size="xs"
+                value={values.tileControlnetModel?.key ?? null}
+                onChange={setTileControlNet}
+              />
+            </Field>
+          )}
+          {showComponentPickers && (
+            <>
+              <Field
+                error={values.t5EncoderModel ? undefined : t('widgets.upscale.t5EncoderRequired')}
+                hint="t5Encoder"
+                label={t('widgets.upscale.t5Encoder')}
+              >
+                <ModelSelect
+                  invalid={!values.t5EncoderModel}
+                  modelTypes={T5_ENCODER_MODEL_TYPES}
+                  placeholder={t('widgets.upscale.selectT5Encoder')}
+                  size="xs"
+                  value={values.t5EncoderModel?.key ?? null}
+                  onChange={setT5Encoder}
+                />
+              </Field>
+              <Field
+                error={values.clipEmbedModel ? undefined : t('widgets.upscale.clipEmbedRequired')}
+                hint="clipEmbed"
+                label={t('widgets.upscale.clipEmbed')}
+              >
+                <ModelSelect
+                  invalid={!values.clipEmbedModel}
+                  modelTypes={CLIP_EMBED_MODEL_TYPES}
+                  placeholder={t('widgets.upscale.selectClipEmbed')}
+                  size="xs"
+                  value={values.clipEmbedModel?.key ?? null}
+                  onChange={setClipEmbed}
+                />
+              </Field>
+            </>
+          )}
           <ScrubberField
             error={errors.tileSize}
             helpText={t('widgets.upscale.tileSizeHelp')}
@@ -628,15 +688,17 @@ export const UpscaleWidgetView = () => {
           />
           <SimpleGrid columns={ADVANCED_GRID_COLUMNS} gap="2">
             <Field
+              error={showComponentPickers && !values.vae ? t('widgets.upscale.vaeRequired') : undefined}
               hint="vae"
               label={t('widgets.upscale.vae')}
-              helpText={values.vae ? undefined : t('widgets.upscale.bundledVae')}
+              helpText={values.vae || showComponentPickers ? undefined : t('widgets.upscale.bundledVae')}
             >
               <ModelSelect
                 filter={vaeFilter}
-                isClearable
+                invalid={showComponentPickers && !values.vae}
+                isClearable={!showComponentPickers}
                 modelTypes={VAE_MODEL_TYPES}
-                placeholder={t('widgets.upscale.bundledVae')}
+                placeholder={showComponentPickers ? t('widgets.upscale.selectVae') : t('widgets.upscale.bundledVae')}
                 size="xs"
                 value={values.vae?.key ?? null}
                 onChange={set.vae}
