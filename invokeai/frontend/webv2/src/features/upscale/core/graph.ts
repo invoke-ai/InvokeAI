@@ -17,11 +17,10 @@ import {
 } from '@features/generation/graph';
 import { coerceSchedulerForGraph } from '@features/generation/settings';
 
-import type { UpscaleBase } from './architectures';
+import type { UpscaleBase } from './settings';
 import type { CompiledUpscaleGraph, UpscaleWidgetValues } from './types';
 
-import { upscaleArchitectureFor, upscaleDenoiseDimension } from './architectures';
-import { getUpscaleValidationReasons } from './settings';
+import { getUpscaleValidationReasons, upscaleArchitectureFor, upscaleDenoiseDimension } from './settings';
 
 export const getUpscaleDenoisingStart = (creativity: number): number => ((creativity * -1 + 10) * 4.99) / 100;
 

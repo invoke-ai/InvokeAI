@@ -4,13 +4,14 @@ import type { ModelConfig } from '@features/models';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
-import { spandrelAutoscaleDimension, upscaleDenoiseDimension } from './architectures';
 import {
   clearDeletedUpscaleInput,
   createDefaultUpscaleWidgetValues,
   getUpscaleOutputDimensions,
   getUpscaleValidationReasons,
   normalizeUpscaleWidgetValues,
+  spandrelAutoscaleDimension,
+  upscaleDenoiseDimension,
   syncUpscaleWidgetValuesWithModels,
   UPSCALE_PRESETS,
 } from './settings';

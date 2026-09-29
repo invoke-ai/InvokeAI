@@ -5,7 +5,7 @@ import type { UpscaleWidgetValues } from '@features/upscale/core/types';
 import { HStack, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
 import { NegativePromptField, PositivePromptField } from '@features/generation/components';
 import { areProjectPromptDraftsEqual } from '@features/generation/settings';
-import { upscaleArchitectureFor } from '@features/upscale/core/architectures';
+import { upscaleArchitectureFor } from '@features/upscale/core/settings';
 import { IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Trash2Icon } from 'lucide-react';

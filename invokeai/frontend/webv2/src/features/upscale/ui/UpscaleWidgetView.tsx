@@ -16,14 +16,15 @@ import {
 } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
 import { ModelSelect } from '@features/models/react';
-import { needsExplicitComponents, upscaleArchitectureFor } from '@features/upscale/core/architectures';
 import {
   createDefaultUpscaleWidgetValues,
+  needsExplicitComponents,
   getUpscaleOutputDimensions,
   isSpandrelModelConfig,
   isSupportedUpscaleMainModel,
   isTileControlNetCandidate,
   normalizeUpscaleWidgetValues,
+  upscaleArchitectureFor,
   syncUpscaleWidgetValuesWithModels,
   UPSCALE_CREATIVITY_MAX,
   UPSCALE_CREATIVITY_MIN,
