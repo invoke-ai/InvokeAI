@@ -62,12 +62,15 @@ jobs:
           files_yaml: |
             frontend:
               - '.github/workflows/frontend-tests.yml'
+              - '.nvmrc'
               - '.github/actions/install-frontend-deps/**'
               - 'invokeai/frontend/web/**'
 
       - name: install dependencies
         if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
         uses: ./.github/actions/install-frontend-deps
+        with:
+          working-directory: invokeai/frontend/web
 
       - name: vitest
         if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
@@ -91,6 +94,7 @@ jobs:
           files_yaml: |
             webv2:
               - '.github/workflows/frontend-tests.yml'
+              - '.nvmrc'
               - '.github/actions/install-frontend-deps/**'
               - 'invokeai/frontend/webv2/**'
 

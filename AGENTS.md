@@ -19,7 +19,7 @@ Before editing, read `AGENTS.md` along each target path; scoped rules supplement
 | CI and contribution tooling | [.github/AGENTS.md](.github/AGENTS.md) |
 | Documentation | `docs/README.md` and `docs/package.json`; keep documentation about the implemented product current |
 
-Ordinary frontend work targets **webv2**, served with `--webv2`; default launches select legacy web. Verify build/launch targets for UI investigations. Legacy web owns generated OpenAPI/type artifacts.
+Ordinary frontend work targets **webv2**, served by default; `--webv2` remains a compatibility alias and `--web-legacy` selects legacy web. Verify build/launch targets for UI investigations. Legacy web owns generated OpenAPI/type artifacts.
 
 ## Engineering standard
 

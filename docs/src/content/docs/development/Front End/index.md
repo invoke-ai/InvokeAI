@@ -7,28 +7,32 @@ Invoke's UI is made possible by many contributors and open-source libraries. Tha
 
 ## Dev environment
 
-Follow the [dev environment](/development/setup/dev-environment/) guide to get set up. Run the UI using `pnpm dev`.
+Follow the [dev environment](/development/setup/dev-environment/) guide to get set up. The default UI lives in `invokeai/frontend/webv2`. Run `make frontend-install`, then `make frontend-dev`; `make frontend-build` builds the bundle served by `invokeai-web`. The existing `frontendv2-*` targets remain aliases.
+
+`invokeai/frontend/web` is the legacy frontend. Build it with `make frontend-legacy-build` and select it with `invokeai-web --web-legacy`. `--webv2` remains a compatibility alias for the default UI. Close other editor tabs before switching frontends on the same origin. Existing browser storage and project recovery data retain their names and formats; switching frontends does not migrate or erase them.
 
 ## Package scripts
 
-- `dev`: run the frontend in dev mode, enabling hot reloading
-- `build`: run all checks (dpdm, eslint, prettier, tsc, knip) and then build the frontend
-- `lint:dpdm`: check circular dependencies
-- `lint:eslint`: check code quality
-- `lint:prettier`: check code formatting
-- `lint:tsc`: check type issues
-- `lint:knip`: check for unused exports or objects
-- `lint`: run all checks concurrently
-- `fix`: run `eslint` and `prettier`, fixing fixable issues
-- `test:ui`: run `vitest` with the fancy web UI
+Run these in `invokeai/frontend/webv2`:
+
+- `dev`: run the frontend with hot reloading
+- `build`: run formatting, lint, types, and architecture checks, then build
+- `lint`: run formatting, Oxc lint, TypeScript, and architecture checks
+- `fix`: fix supported lint and formatting issues
+- `test`: run the unit suite
+- `test:browser`: run Chromium interaction tests
+- `check:release`: run the complete release gates, including performance, project-file, and accessibility journeys
+
+The legacy package has its own scripts and lockfile. See each package's `AGENTS.md` for its commands and ownership rules.
 
 ## Type generation
 
-We use [openapi-typescript] to generate types from the app's OpenAPI schema. The generated types are committed to the repo in [schema.ts].
+The legacy `web` package owns generation, including shared backend contracts consumed by webv2. We use [openapi-typescript] to generate types from the app's OpenAPI schema. The generated types are committed to the repo in [schema.ts].
 
 If you make backend changes, it's important to regenerate the frontend types:
 
 ```sh
+set -o pipefail
 cd invokeai/frontend/web && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 ```
 
@@ -53,7 +57,7 @@ Only the English source strings (i.e. `en.json`) should be changed on this repo.
       "request": "launch",
       "name": "Invoke UI",
       "url": "http://localhost:5173",
-      "webRoot": "${workspaceFolder}/invokeai/frontend/web"
+      "webRoot": "${workspaceFolder}/invokeai/frontend/webv2"
     }
   ]
 }
@@ -85,11 +89,7 @@ Ping `@psychedelicious` on [discord] in the `#frontend-dev` channel or in the fe
 
 ## Code conventions
 
-- This is a fairly complex app with a deep component tree. Please use memoization (`useCallback`, `useMemo`, `memo`) with enthusiasm.
-- If you need to add some global, ephemeral state, please use [nanostores] if possible.
-- Be careful with your redux selectors. If they need to be parameterized, consider creating them inside a `useMemo`.
-- Feel free to use `lodash` (via `lodash-es`) to make the intent of your code clear.
-- Please add comments describing the "why", not the "how" (unless it is really arcane).
+Follow `invokeai/frontend/webv2/AGENTS.md` and its `ARCHITECTURE.md` for ownership, state, React, persistence, and product-quality rules. The linked Redux and control-layer guides describe the legacy frontend.
 
 ## Commit format
 
@@ -102,11 +102,7 @@ Please use the [conventional commits] spec for the web UI, with a scope of "ui":
 
 ## Tests
 
-We don't do any UI testing at this time, but consider adding tests for sensitive logic.
-
-We use `vitest`, and tests should be next to the file they are testing. If the logic is in `something.ts`, the tests should be in `something.test.ts`.
-
-In some situations, we may want to test types. For example, if you use `zod` to create a schema that should match a generated type, it's best to add a test to confirm that the types match. Use `tsafe`'s assert for this.
+Colocate unit tests and Chromium browser tests with the owning code. Use real browser storage and interaction where mocks cannot establish correctness. Run `pnpm check:release` before milestone readiness; browser screenshots and interaction review complement automated gates.
 
 ## Submitting a PR
 

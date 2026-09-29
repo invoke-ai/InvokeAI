@@ -79,6 +79,8 @@ jobs:
             src:
               - 'pyproject.toml'
               - '.github/workflows/typegen-checks.yml'
+              - '.nvmrc'
+              - '.github/actions/install-frontend-deps/**'
               - 'scripts/generate_openapi_schema.py'
               - 'invokeai/**'
               # The schema is generated from Python and compared against legacy web's artifacts.
@@ -107,6 +109,8 @@ jobs:
       - name: install frontend dependencies
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
         uses: ./.github/actions/install-frontend-deps
+        with:
+          working-directory: invokeai/frontend/web
 
       - name: copy schema
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
@@ -115,7 +119,7 @@ jobs:
 
       - name: generate schema
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        run: cd invokeai/frontend/web && uv run ../../../scripts/generate_openapi_schema.py | pnpm typegen
+        run: set -o pipefail; cd invokeai/frontend/web && uv run ../../../scripts/generate_openapi_schema.py | pnpm typegen
         shell: bash
 
       - name: compare files

@@ -19,9 +19,9 @@ from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoin
 from starlette.middleware.gzip import GZipMiddleware, GZipResponder, IdentityResponder
 from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
-import invokeai.frontend.web as web_dir
+import invokeai.frontend.webv2 as webv2_dir
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.no_cache_staticfiles import NoCacheStaticFiles
+from invokeai.app.api.frontend import mount_frontend
 from invokeai.app.api.routers import (
     app_info,
     auth,
@@ -788,10 +788,7 @@ def overridden_redoc(request: Request) -> HTMLResponse:
     )
 
 
-web_root_path = Path(list(web_dir.__path__)[0])
-ui_root_path = web_root_path
-if InvokeAIArgs.did_parse and getattr(InvokeAIArgs.args, "webv2", False):
-    ui_root_path = web_root_path.parent / "webv2"
+web_root_path = Path(list(webv2_dir.__path__)[0])
 
 if app_config.unsafe_disable_picklescan:
     logger.warning(
@@ -800,9 +797,6 @@ if app_config.unsafe_disable_picklescan:
     )
 
 try:
-    app.mount("/", NoCacheStaticFiles(directory=Path(ui_root_path, "dist"), html=True), name="ui")
-except RuntimeError:
-    logger.warning(f"No UI found at {ui_root_path}/dist, skipping UI mount")
-app.mount(
-    "/static", NoCacheStaticFiles(directory=Path(web_root_path, "static/")), name="static"
-)  # docs favicon is in here
+    mount_frontend(app, web_root_path, legacy=getattr(InvokeAIArgs.args, "web_legacy", False))
+except RuntimeError as error:
+    logger.warning(f"No UI found, skipping UI mount: {error}")
