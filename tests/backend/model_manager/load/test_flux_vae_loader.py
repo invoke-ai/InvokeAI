@@ -12,7 +12,7 @@ Two things can break silently and are pinned here:
   same checkpoint, so the constructed config is compared against the values `black-forest-labs`
   publishes rather than against the code that produced it.
 * **the refusal.** `VAE_Checkpoint_FLUX_Config` recognises a FLUX VAE by `encoder.conv_in` plus 16
-  latent channels, and `_get_base_or_raise` maps *every* 16-channel checkpoint to `flux`. The SD 3.5
+  latent channels, and files every 16-channel checkpoint whose name says nothing under `flux`. The SD 3.5
   and CogView 4 autoencoders are identical in shape to this one -- 244 keys, same shapes, differing
   only in `scaling_factor`/`shift_factor` -- so a standalone diffusers-layout file, which carries no
   config, cannot be attributed to a latent space. The loader refuses it rather than stamping FLUX's
@@ -135,9 +135,9 @@ class TestWhatIsRefused:
     def test_an_sd35_shaped_checkpoint_is_not_silently_loaded_as_flux(self, tmp_path):
         """The same hazard stated as the thing a user would actually install.
 
-        SD 3.5's VAE is published in the diffusers layout, is 16-channel, and is what
-        `_get_base_or_raise` labels `flux`. If this ever starts loading, the cell above is the one
-        that explains why it must not.
+        SD 3.5's VAE is published in the diffusers layout and is 16-channel; saved under its published
+        name, `diffusion_pytorch_model.safetensors`, it names no backbone, so identification labels it
+        `flux`. If this ever starts loading, the cell above is the one that explains why it must not.
         """
         from safetensors.torch import save_file
 

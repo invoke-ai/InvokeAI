@@ -155,11 +155,11 @@ class FluxVAELoader(ModelLoader):
 
     **Only the BFL `ae.safetensors` layout is accepted, and that is deliberate.**
 
-    `VAE_Checkpoint_FLUX_Config` recognises a FLUX VAE by `encoder.conv_in`/`decoder.conv_in` plus 16
-    latent channels, and `_get_base_or_raise` maps *every* 16-channel checkpoint to `flux` -- there
-    is no SD 3.5 or CogView 4 branch. Those two autoencoders are architecturally identical to this
-    one: same 244 keys, same shapes, differing only in `scaling_factor`/`shift_factor` (1.5305/0.0609
-    and 1.0/0.0 against 0.3611/0.1159).
+    The SD 3.5 and CogView 4 autoencoders are architecturally identical to this one: same 244 keys,
+    same shapes, differing only in `scaling_factor`/`shift_factor` (1.5305/0.0609 and 1.0/0.0 against
+    0.3611/0.1159). A single file carries only the weights, so identification files a 16-channel
+    checkpoint under `flux` unless its name or an explicit `base` says SD3 -- which means `flux` can be
+    no more than the default for a file that names nothing, and CogView 4 has no branch at all.
 
     A standalone diffusers-layout file carries no config, so loading one would mean stamping FLUX's
     constants onto weights that may be SD 3.5's -- which loads cleanly, generates without error, and
@@ -170,7 +170,7 @@ class FluxVAELoader(ModelLoader):
 
     So a diffusers-layout single file is refused, as it was before this loader could read that layout
     at all. The unambiguous route for one still works: install the `vae/` folder, which carries its
-    own `config.json` and loads through the generic `VAELoader`.
+    own `config.json`, is identified from it, and loads through the generic `VAELoader`.
     """
 
     def _load_model(
@@ -203,15 +203,7 @@ class FluxVAELoader(ModelLoader):
             raise ValueError(f"{model_path.name} is not a FLUX.1 autoencoder: it has no '{_FLUX_VAE_BFL_MARKER}'.")
 
         load_state_dict_ignoring_extras(model, payload, source="FLUX VAE checkpoint", assign=True)
-        # VAE is broken in float16, which mps defaults to
-        if self._torch_dtype == torch.float16:
-            try:
-                vae_dtype = torch.empty(0, dtype=torch.bfloat16, device=self._torch_device).dtype
-            except TypeError:
-                vae_dtype = torch.float32
-        else:
-            vae_dtype = self._torch_dtype
-        model.to(vae_dtype)
+        model.to(self._torch_dtype_avoiding_float16())
 
         return model
 
@@ -229,14 +221,7 @@ class Flux2VAEDiffusersLoader(ModelLoader):
 
         model_path = Path(config.path)
 
-        # VAE is broken in float16, which mps defaults to
-        if self._torch_dtype == torch.float16:
-            try:
-                vae_dtype = torch.empty(0, dtype=torch.bfloat16, device=self._torch_device).dtype
-            except TypeError:
-                vae_dtype = torch.float32
-        else:
-            vae_dtype = self._torch_dtype
+        vae_dtype = self._torch_dtype_avoiding_float16()
 
         model = AutoencoderKLFlux2.from_pretrained(
             model_path,
@@ -329,15 +314,7 @@ class Flux2VAELoader(ModelLoader):
 
         load_state_dict_ignoring_extras(model, sd, source="FLUX.2 VAE checkpoint", assign=True)
 
-        # VAE is broken in float16, which mps defaults to
-        if self._torch_dtype == torch.float16:
-            try:
-                vae_dtype = torch.empty(0, dtype=torch.bfloat16, device=self._torch_device).dtype
-            except TypeError:
-                vae_dtype = torch.float32
-        else:
-            vae_dtype = self._torch_dtype
-        model.to(vae_dtype)
+        model.to(self._torch_dtype_avoiding_float16())
 
         model = self._apply_fp8_layerwise_casting(model, config, submodel_type)
         return model
