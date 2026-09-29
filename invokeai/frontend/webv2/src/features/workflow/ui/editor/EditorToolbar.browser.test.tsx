@@ -4,6 +4,7 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 const toolbarMocks = vi.hoisted(() => ({
   exportWorkflowAsPng: vi.fn(),
@@ -169,6 +170,24 @@ describe('editor toolbar', () => {
     });
     expect(toolbarMocks.onExportPendingChange.mock.calls).toEqual([[true], [false]]);
     expect(camera.disabled).toBe(false);
+  });
+
+  it('shows the translated label as a camera tooltip', async () => {
+    await render(1);
+
+    const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="workflow.exportAsPng"]')!;
+    await act(async () => {
+      await userEvent.hover(camera);
+      await new Promise<void>((resolve) => {
+        globalThis.setTimeout(resolve, 500);
+      });
+    });
+
+    const tooltip = [...document.querySelectorAll('[role="tooltip"]')].find(
+      (element) => element.textContent === 'workflow.exportAsPng'
+    );
+
+    expect(tooltip).not.toBeUndefined();
   });
 
   it('reports an export failure and releases the camera action', async () => {
