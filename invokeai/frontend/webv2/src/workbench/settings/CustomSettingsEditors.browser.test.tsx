@@ -10,7 +10,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { appearanceSettings, developerSettings, hotkeysSettings } from './applicationContributions';
+import { appearanceSettings, developerSettings, hotkeysSettings, workspaceSettings } from './applicationContributions';
 import CustomSettingField from './CustomSettingsEditors';
 import { DEFAULT_PREFERENCES, getWorkbenchPreferences, patchWorkbenchPreferences } from './store';
 
@@ -27,12 +27,12 @@ await i18n.use(initReactI18next).init({
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 let host: HTMLDivElement;
 let root: Root;
-const render = async (field: SettingDefinition) => {
+const render = async (field: SettingDefinition, onReveal?: (sectionId: string, entryId: string) => void) => {
   await act(() =>
     root.render(
       <ChakraProvider value={system}>
         <I18nextProvider i18n={i18n}>
-          <CustomSettingField field={field} surface="dialog" />
+          <CustomSettingField field={field} surface="dialog" onReveal={onReveal} />
         </I18nextProvider>
       </ChakraProvider>
     )
@@ -132,5 +132,17 @@ describe('custom setting modified indicators', () => {
     );
     errorSpy.mockRestore();
     expect(snapshotWarnings).toEqual([]);
+  });
+});
+
+describe('workspace settings', () => {
+  it('opens the intermediates manager through the surface hosting it', async () => {
+    const onReveal = vi.fn();
+    await render(workspaceSettings.fields[0]!, onReveal);
+    const manage = [...host.querySelectorAll('button')].find(
+      (button) => button.textContent === i18n.t('settings.catalog.manageIntermediates')
+    );
+    await act(() => manage!.click());
+    expect(onReveal).toHaveBeenCalledWith('intermediates', 'intermediatesManager');
   });
 });

@@ -15,6 +15,7 @@ import { recallProjectPromptHistoryItem, selectProjectGenerateModel } from '@wor
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { getLayoutPresetCommandTitleOverrides } from '@workbench/layoutPresetSnapshots';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
+import { useAvailableSettings } from '@workbench/settings/useAvailableSettings';
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
@@ -87,6 +88,7 @@ const WorkbenchCommandPaletteDialog = ({
   const presentWidgetTypeIds = useActiveProjectSelector((project) =>
     [...new Set(Object.values(project.widgetInstances).map((instance) => instance.typeId))].sort()
   );
+  const settingsSections = useAvailableSettings();
   const paletteStore = extensions.stores.palette;
   const paletteContributions = useSyncExternalStore(paletteStore.subscribe, paletteStore.list, paletteStore.list);
   const commandTitleOverrides = useMemo(
@@ -127,7 +129,7 @@ const WorkbenchCommandPaletteDialog = ({
           formatHotkey
         )
       ),
-      ...buildSettingsEntries(preferences, settingsEntryDeps, t),
+      ...buildSettingsEntries(preferences, settingsEntryDeps, t, settingsSections),
     ],
     [
       catalog,
@@ -139,6 +141,7 @@ const WorkbenchCommandPaletteDialog = ({
       preferences,
       presentWidgetTypeIds,
       settingsEntryDeps,
+      settingsSections,
       t,
     ]
   );

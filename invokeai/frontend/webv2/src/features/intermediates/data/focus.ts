@@ -1,6 +1,9 @@
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
+/** The settings entry the manager lives in; entry points reveal it so focus lands in the manager. */
+export const INTERMEDIATES_SETTING_ID = 'intermediatesManager';
+
 /**
  * What an entry point wants the manager to start on: a project to preselect, or an account to filter by. The manager
  * reads it while rendering and consumes it once that render commits, so a discarded render cannot lose it and a
