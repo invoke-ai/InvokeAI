@@ -1,38 +1,37 @@
-import type { ChakraProps } from '@invoke-ai/ui-library';
-import { Flex, FormControlGroup } from '@invoke-ai/ui-library';
-import { useIsExecutableNode } from 'features/nodes/hooks/useIsBatchNode';
-import { useNodeHasGalleryOutput } from 'features/nodes/hooks/useNodeHasGalleryOutput';
+import type { SystemStyleObject } from '@invoke-ai/ui-library';
+import { Flex } from '@invoke-ai/ui-library';
 import { DRAG_HANDLE_CLASSNAME } from 'features/nodes/types/constants';
 import { memo } from 'react';
 
-import SaveToGalleryCheckbox from './SaveToGalleryCheckbox';
-import UseCacheCheckbox from './UseCacheCheckbox';
+import { NodeSettingFooterControl } from './NodeSettingFooterControl';
 
 type Props = {
   nodeId: string;
 };
 
-const props: ChakraProps = { w: 'unset' };
+const sx: SystemStyleObject = {
+  w: 'full',
+  borderBottomRadius: 'base',
+  // One row per setting, so each connection handle lines up with the label it belongs to
+  flexDir: 'column',
+  px: 2,
+  py: 1,
+  // The add/remove form element buttons are hidden by default and shown on hover
+  '& .node-setting-action-button': {
+    display: 'none',
+  },
+  _hover: {
+    '& .node-setting-action-button': {
+      display: 'inline-flex',
+    },
+  },
+};
 
 const InvocationNodeFooter = ({ nodeId }: Props) => {
-  const hasGalleryOutput = useNodeHasGalleryOutput();
-  const isExecutableNode = useIsExecutableNode();
   return (
-    <Flex
-      className={DRAG_HANDLE_CLASSNAME}
-      layerStyle="nodeFooter"
-      w="full"
-      borderBottomRadius="base"
-      gap={4}
-      px={2}
-      py={0}
-      h={8}
-      justifyContent="space-between"
-    >
-      <FormControlGroup formControlProps={props} formLabelProps={props}>
-        {isExecutableNode && <UseCacheCheckbox nodeId={nodeId} />}
-        {isExecutableNode && hasGalleryOutput && <SaveToGalleryCheckbox nodeId={nodeId} />}
-      </FormControlGroup>
+    <Flex className={DRAG_HANDLE_CLASSNAME} layerStyle="nodeFooter" sx={sx}>
+      <NodeSettingFooterControl nodeId={nodeId} setting="use_cache" />
+      <NodeSettingFooterControl nodeId={nodeId} setting="save_to_gallery" />
     </Flex>
   );
 };

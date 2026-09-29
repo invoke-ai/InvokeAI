@@ -178,10 +178,10 @@ export const zAnyEdge = z.union([zDefaultInvocationNodeEdge, zCollapsedInvocatio
 export type AnyEdge = z.infer<typeof zAnyEdge>;
 // #endregion
 
-export const isBatchNodeType = (type: string) =>
+const isBatchNodeType = (type: string) =>
   ['image_batch', 'string_batch', 'integer_batch', 'float_batch'].includes(type);
 
-export const isGeneratorNodeType = (type: string) =>
+const isGeneratorNodeType = (type: string) =>
   ['image_generator', 'string_generator', 'integer_generator', 'float_generator'].includes(type);
 
 export const isBatchNode = (node: InvocationNode) => isBatchNodeType(node.data.type);
@@ -190,6 +190,29 @@ const isGeneratorNode = (node: InvocationNode) => isGeneratorNodeType(node.data.
 export const isExecutableNode = (node: InvocationNode) => {
   return !isBatchNode(node) && !isGeneratorNode(node);
 };
+
+/**
+ * True when the node produces an output that lands in the gallery - currently ImageField or VideoField.
+ *
+ * The `image` and `video` primitive nodes are excluded because they pass through an existing asset without saving a
+ * new copy.
+ */
+const getNodeHasGalleryOutput = (template: InvocationTemplate): boolean =>
+  Object.values(template.outputs).some(
+    (output) =>
+      (output.type.name === 'ImageField' && template.type !== 'image') ||
+      (output.type.name === 'VideoField' && template.type !== 'video')
+  );
+
+/**
+ * True when the node renders a footer.
+ *
+ * The footer hosts the node attribute fields (`use_cache`, `is_intermediate`), including their connection handles.
+ * A node without a footer therefore has nowhere to attach an edge for those fields, so this predicate also decides
+ * whether such a connection may be made at all.
+ */
+export const getHasNodeFooter = (template: InvocationTemplate): boolean =>
+  !isBatchNodeType(template.type) && !isGeneratorNodeType(template.type) && getNodeHasGalleryOutput(template);
 
 export const getInvocationNodeInputTemplate = (
   nodeData: Pick<InvocationNodeData, 'inputs'> & Partial<Pick<InvocationNodeData, 'dynamicInputTemplates'>>,

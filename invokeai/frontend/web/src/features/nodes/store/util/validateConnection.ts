@@ -11,7 +11,13 @@ import { getHasCycles } from 'features/nodes/store/util/getHasCycles';
 import { validateConnectionTypes } from 'features/nodes/store/util/validateConnectionTypes';
 import type { FieldType } from 'features/nodes/types/field';
 import type { AnyEdge, AnyNode, InvocationNode } from 'features/nodes/types/invocation';
-import { getInvocationNodeInputTemplate, isConnectorNode, isInvocationNode } from 'features/nodes/types/invocation';
+import {
+  getHasNodeFooter,
+  getInvocationNodeInputTemplate,
+  isConnectorNode,
+  isInvocationNode,
+} from 'features/nodes/types/invocation';
+import { isNodeAttributeFieldName } from 'features/nodes/types/nodeAttributeFields';
 import type { SetNonNullable } from 'type-fest';
 
 type Connection = SetNonNullable<NullableConnection>;
@@ -298,6 +304,13 @@ export const validateConnection: ValidateConnectionFunc = (
 
     if (targetFieldTemplate.input === 'direct') {
       return 'nodes.cannotConnectToDirectInput';
+    }
+
+    if (isNodeAttributeFieldName(c.targetHandle) && !getHasNodeFooter(targetTemplate)) {
+      // Node attribute fields are exposed in the node footer. Without a footer there is no handle to attach to and
+      // no way for the user to see the connection, so the edge would be invisible and - for batch and generator
+      // nodes, which `buildNodesGraph` drops entirely - have no effect at all.
+      return 'nodes.cannotConnectToUnavailableNodeSetting';
     }
 
     if (!effectiveSource) {

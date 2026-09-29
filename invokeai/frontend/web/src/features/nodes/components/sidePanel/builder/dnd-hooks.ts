@@ -33,8 +33,14 @@ import {
 } from 'features/nodes/store/nodesSlice';
 import { selectFormRootElementId, selectNodesSlice, selectWorkflowForm } from 'features/nodes/store/selectors';
 import type { FieldInputTemplate, StatefulFieldValue } from 'features/nodes/types/field';
-import type { ElementId, FormElement } from 'features/nodes/types/workflow';
-import { buildNodeFieldElement, isContainerElement, isNodeFieldElement } from 'features/nodes/types/workflow';
+import type { ElementId, FormElement, NodeSettingName } from 'features/nodes/types/workflow';
+import {
+  buildNodeFieldElement,
+  buildNodeSettingElement,
+  isContainerElement,
+  isNodeFieldElement,
+  isNodeSettingElement,
+} from 'features/nodes/types/workflow';
 import type { RefObject } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { flushSync } from 'react-dom';
@@ -76,6 +82,21 @@ const buildNodeFieldDndData = (
 });
 const isNodeFieldDndData = (data: Record<string | symbol, unknown>): data is NodeFieldDndData => {
   return uniqueNodeFieldDndKey in data;
+};
+
+const uniqueNodeSettingDndKey = Symbol('node-setting');
+type NodeSettingDndData = {
+  [uniqueNodeSettingDndKey]: true;
+  nodeId: string;
+  setting: NodeSettingName;
+};
+const buildNodeSettingDndData = (nodeId: string, setting: NodeSettingName): NodeSettingDndData => ({
+  [uniqueNodeSettingDndKey]: true,
+  nodeId,
+  setting,
+});
+const isNodeSettingDndData = (data: Record<string | symbol, unknown>): data is NodeSettingDndData => {
+  return uniqueNodeSettingDndKey in data;
 };
 
 /**
@@ -145,6 +166,29 @@ const useNodeFieldElementExists = () => {
 };
 
 /**
+ * Checks if a node setting element exists in the form.
+ *
+ * @param form The form to check
+ * @param nodeId The id of the node
+ * @param setting The name of the setting
+ *
+ * @returns True if the element exists, false otherwise
+ */
+const useNodeSettingElementExists = () => {
+  const store = useAppStore();
+  const nodeSettingElementExists = useCallback(
+    (nodeId: string, setting: NodeSettingName): boolean => {
+      const form = selectWorkflowForm(store.getState());
+      return Object.values(form.elements)
+        .filter(isNodeSettingElement)
+        .some((el) => el.data.nodeId === nodeId && el.data.setting === setting);
+    },
+    [store]
+  );
+  return nodeSettingElementExists;
+};
+
+/**
  * Wrapper around `getAllowedDropRegions` that provides the form state from the store.
  * @see {@link getAllowedDropRegions}
  */
@@ -180,6 +224,11 @@ const getSourceElement = (source: ElementDragPayload) => {
   if (isNodeFieldDndData(source.data)) {
     const { nodeId, fieldName, fieldTemplate } = source.data;
     return buildNodeFieldElement(nodeId, fieldName, fieldTemplate.type);
+  }
+
+  if (isNodeSettingDndData(source.data)) {
+    const { nodeId, setting } = source.data;
+    return buildNodeSettingElement(nodeId, setting);
   }
 
   if (isFormElementDndData(source.data)) {
@@ -220,7 +269,8 @@ export const useBuilderDndMonitor = () => {
 
   useEffect(() => {
     return monitorForElements({
-      canMonitor: ({ source }) => isFormElementDndData(source.data) || isNodeFieldDndData(source.data),
+      canMonitor: ({ source }) =>
+        isFormElementDndData(source.data) || isNodeFieldDndData(source.data) || isNodeSettingDndData(source.data),
       onDrop: ({ location, source }) => {
         const target = location.current.dropTargets[0];
         if (!target) {
@@ -392,6 +442,7 @@ export const useFormElementDnd = (
   const getElement = useGetElement();
   const getAllowedDropRegions = useGetAllowedDropRegions();
   const nodeFieldElementExists = useNodeFieldElementExists();
+  const nodeSettingElementExists = useNodeSettingElementExists();
 
   useEffect(() => {
     if (isRootElement) {
@@ -426,6 +477,9 @@ export const useFormElementDnd = (
         getIsSticky: () => false,
         canDrop: ({ source }) => {
           if (isNodeFieldDndData(source.data) && !nodeFieldElementExists(source.data.nodeId, source.data.fieldName)) {
+            return true;
+          }
+          if (isNodeSettingDndData(source.data) && !nodeSettingElementExists(source.data.nodeId, source.data.setting)) {
             return true;
           }
           if (isFormElementDndData(source.data)) {
@@ -480,6 +534,7 @@ export const useFormElementDnd = (
     getAllowedDropRegions,
     getElement,
     nodeFieldElementExists,
+    nodeSettingElementExists,
     isRootElement,
   ]);
 
@@ -508,7 +563,11 @@ export const useRootElementDropTarget = (droppableRef: RefObject<HTMLDivElement 
           if (rootElement.data.children.length !== 0) {
             return false;
           }
-          if (isNodeFieldDndData(source.data) || isFormElementDndData(source.data)) {
+          if (
+            isNodeFieldDndData(source.data) ||
+            isNodeSettingDndData(source.data) ||
+            isFormElementDndData(source.data)
+          ) {
             return true;
           }
           return false;
@@ -581,6 +640,49 @@ export const useNodeFieldDnd = (
       })
     );
   }, [dragHandleRef, draggableRef, fieldName, fieldTemplate, nodeId]);
+
+  return isDragging;
+};
+
+/**
+ * Hook that provides dnd functionality for node settings.
+ *
+ * @param nodeId: The id of the node
+ * @param setting: The name of the setting
+ * @param draggableRef The ref of the draggable HTML element
+ * @param dragHandleRef The ref of the drag handle HTML element
+ *
+ * @returns Whether the node setting is currently being dragged
+ */
+export const useNodeSettingDnd = (
+  nodeId: string,
+  setting: NodeSettingName,
+  draggableRef: RefObject<HTMLElement | null>,
+  dragHandleRef: RefObject<HTMLElement | null>
+) => {
+  const [isDragging, setIsDragging] = useState(false);
+
+  useEffect(() => {
+    const draggableElement = draggableRef.current;
+    const dragHandleElement = dragHandleRef.current;
+    if (!draggableElement || !dragHandleElement) {
+      return;
+    }
+    return combine(
+      dndInputFix(draggableElement),
+      draggable({
+        element: draggableElement,
+        dragHandle: dragHandleElement,
+        getInitialData: () => buildNodeSettingDndData(nodeId, setting),
+        onDragStart: () => {
+          setIsDragging(true);
+        },
+        onDrop: () => {
+          setIsDragging(false);
+        },
+      })
+    );
+  }, [dragHandleRef, draggableRef, nodeId, setting]);
 
   return isDragging;
 };
