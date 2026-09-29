@@ -182,7 +182,6 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.activeWorkflow': 'Active',
   'workflowLibrary.addAnotherCopy': 'Add another copy',
   'workflowLibrary.addAnotherCopyHint': 'A second, independent copy in this project',
-  'workflowLibrary.addWorkflow': 'Add workflow',
   'workflowLibrary.chooseProjectCopy': 'Open which copy?',
   'workflowLibrary.allTag': 'All',
   'workflowLibrary.applying': 'Applying workflow…',
@@ -1202,17 +1201,6 @@ describe('WorkflowLibraryDialog — This project', () => {
 
     expect(COMMANDS.createWorkflow).toHaveBeenCalledTimes(1);
     expect(onOpenChange).not.toHaveBeenCalled();
-  });
-
-  it('moves to the bundled templates when asked to add a workflow', async () => {
-    await renderDialog();
-
-    await clickText('Add workflow');
-
-    expect(workflowUiStore.getSnapshot().libraryTab).toBe('default');
-    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ category: 'default', tag: null });
-    expect(document.querySelector('[data-library-tab="default"]')).not.toBeNull();
-    expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalled();
   });
 
   it('opens a workflow from a double-click or the rail, then closes', async () => {

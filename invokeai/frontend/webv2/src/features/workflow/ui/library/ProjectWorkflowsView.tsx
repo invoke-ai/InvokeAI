@@ -60,7 +60,6 @@ export interface ProjectWorkflowsViewProps {
   /** What opened the menu last, kept through its close so focus returns there. */
   contextMenuTriggerId: string | null;
   selectedWorkflowId: string | null;
-  onAddWorkflow: () => void;
   onClose: () => void;
   onContextMenu: WorkflowLibraryCardProps['onContextMenu'];
   onContextMenuClose: () => void;
@@ -72,7 +71,6 @@ export const ProjectWorkflowsView = ({
   contextMenuPoint,
   contextMenuTriggerId,
   selectedWorkflowId,
-  onAddWorkflow,
   onClose,
   onContextMenu,
   onContextMenuClose,
@@ -153,10 +151,6 @@ export const ProjectWorkflowsView = ({
             <Button size="xs" variant="outline" onClick={handleNewWorkflow}>
               <PlusIcon />
               {t('workflowLibrary.newWorkflow')}
-            </Button>
-            <Button size="xs" variant="outline" onClick={onAddWorkflow}>
-              <BookmarkIcon />
-              {t('workflowLibrary.addWorkflow')}
             </Button>
           </HStack>
         </HStack>

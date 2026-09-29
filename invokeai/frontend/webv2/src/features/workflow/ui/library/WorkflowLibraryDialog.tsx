@@ -226,7 +226,6 @@ export const WorkflowLibraryDialog = ({
     },
     [category]
   );
-  const goToTemplates = useCallback(() => handleTabChange('default'), [handleTabChange]);
 
   const handleTagSelect = useCallback((nextTag: string | null) => setWorkflowLibraryBrowseFilter({ tag: nextTag }), []);
 
@@ -396,7 +395,6 @@ export const WorkflowLibraryDialog = ({
                     contextMenuPoint={contextMenuPoint}
                     contextMenuTriggerId={contextMenuTriggerId}
                     selectedWorkflowId={projectSelectionId}
-                    onAddWorkflow={goToTemplates}
                     onClose={closeDialog}
                     onContextMenu={handleCardContextMenu}
                     onContextMenuClose={closeContextMenu}
