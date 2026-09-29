@@ -57,7 +57,8 @@ export const EditorToolbar = ({
   nodeOpacity,
   tool,
   updatableNodeCount = 0,
-  onExportPendingChange,
+  onExportPrepare,
+  onExportComplete,
   onNodeOpacityChange,
   onToolChange,
   onUpdateNodes,
@@ -67,7 +68,8 @@ export const EditorToolbar = ({
   /** Nodes with a newer same-major template; the update button shows only while there are some. */
   updatableNodeCount?: number;
   onNodeOpacityChange: (opacity: number) => void;
-  onExportPendingChange?: (isExporting: boolean) => void;
+  onExportPrepare: () => Promise<HTMLElement>;
+  onExportComplete: () => void;
   onToolChange: (tool: EditorTool) => void;
   onUpdateNodes?: () => void;
 }) => {
@@ -77,7 +79,6 @@ export const EditorToolbar = ({
   const workflowName = useWorkflowProjectSelector((project) => project.activeWorkflow.document.name);
   const notifications = useWorkflowNotifications();
   const opacityTriggerId = useId();
-  const toolbarRef = useRef<HTMLDivElement>(null);
   const isExportingWorkflowRef = useRef(false);
   const [isExportingWorkflow, setIsExportingWorkflow] = useState(false);
   const fitViewDuration = reduceMotion ? 0 : 300;
@@ -93,17 +94,11 @@ export const EditorToolbar = ({
       return;
     }
 
-    const flowElement = toolbarRef.current?.closest<HTMLElement>('.react-flow');
-    if (!flowElement) {
-      notifications.error(exportFailedLabel);
-      return;
-    }
-
     isExportingWorkflowRef.current = true;
     setIsExportingWorkflow(true);
-    onExportPendingChange?.(true);
     void (async () => {
       try {
+        const flowElement = await onExportPrepare();
         await waitForExportFrame();
         await waitForExportFrame();
         const { exportWorkflowAsPng } = await import('./workflowImageExport');
@@ -118,7 +113,7 @@ export const EditorToolbar = ({
       } finally {
         isExportingWorkflowRef.current = false;
         setIsExportingWorkflow(false);
-        onExportPendingChange?.(false);
+        onExportComplete();
       }
     })();
   }, [
@@ -127,7 +122,8 @@ export const EditorToolbar = ({
     getNodes,
     getNodesBounds,
     notifications,
-    onExportPendingChange,
+    onExportPrepare,
+    onExportComplete,
     workflowName,
   ]);
   const fitViewRef = useRef<HTMLButtonElement>(null);
@@ -142,14 +138,7 @@ export const EditorToolbar = ({
   );
 
   return (
-    <Box
-      ref={toolbarRef}
-      data-workflow-export-control="true"
-      left="2"
-      position="absolute"
-      top={EDITOR_TOOLBAR_TOP}
-      zIndex="5"
-    >
+    <Box data-workflow-export-control="true" left="2" position="absolute" top={EDITOR_TOOLBAR_TOP} zIndex="5">
       <Toolbar>
         {TOOLS.map(({ icon, id, label }) => (
           <EditorToolButton

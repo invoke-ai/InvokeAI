@@ -15,7 +15,8 @@ const toolbarMocks = vi.hoisted(() => ({
   getNodes: vi.fn(() => [{ id: 'seed' }]),
   getNodesBounds: vi.fn(() => ({ x: 12, y: 34, width: 56, height: 78 })),
   info: vi.fn(),
-  onExportPendingChange: vi.fn(),
+  onExportPrepare: vi.fn(),
+  onExportComplete: vi.fn(),
   success: vi.fn(),
   zoomIn: vi.fn(),
   zoomOut: vi.fn(),
@@ -72,6 +73,7 @@ const render = async (nodeOpacity: number) => {
   host.style.cssText = 'height:520px;position:relative;width:320px';
   document.body.append(host);
   root = createRoot(host);
+  toolbarMocks.onExportPrepare.mockResolvedValue(host);
 
   await settle(() => {
     root?.render(
@@ -80,7 +82,8 @@ const render = async (nodeOpacity: number) => {
           <EditorToolbar
             nodeOpacity={nodeOpacity}
             tool="pan"
-            onExportPendingChange={toolbarMocks.onExportPendingChange}
+            onExportPrepare={toolbarMocks.onExportPrepare}
+            onExportComplete={toolbarMocks.onExportComplete}
             onNodeOpacityChange={vi.fn()}
             onToolChange={vi.fn()}
           />
@@ -137,6 +140,8 @@ describe('editor toolbar', () => {
               nodeOpacity={1}
               tool="pan"
               updatableNodeCount={2}
+              onExportPrepare={toolbarMocks.onExportPrepare}
+              onExportComplete={toolbarMocks.onExportComplete}
               onNodeOpacityChange={vi.fn()}
               onToolChange={vi.fn()}
               onUpdateNodes={onUpdateNodes}
@@ -169,9 +174,17 @@ describe('editor toolbar', () => {
     expect(new Set(buttonBoxes())).toEqual(new Set(['28x28']));
   });
 
-  it('offers a camera action for exporting the workflow image', async () => {
-    toolbarMocks.exportWorkflowAsPng.mockResolvedValue(undefined);
+  it('captures the prepared export view and keeps the camera pending until rasterization finishes', async () => {
+    let finish: () => void = () => {};
+    toolbarMocks.exportWorkflowAsPng.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finish = resolve;
+        })
+    );
     await render(1);
+    const exportElement = document.createElement('div');
+    toolbarMocks.onExportPrepare.mockResolvedValueOnce(exportElement);
 
     const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="Download workflow as PNG"]')!;
 
@@ -182,10 +195,13 @@ describe('editor toolbar', () => {
     expect(toolbarMocks.exportWorkflowAsPng).toHaveBeenCalledWith({
       bounds: { x: 12, y: 34, width: 56, height: 78 },
       fallbackWorkflowName: 'Untitled Workflow',
-      flowElement: host,
+      flowElement: exportElement,
       workflowName: 'Test workflow',
     });
-    expect(toolbarMocks.onExportPendingChange.mock.calls).toEqual([[true], [false]]);
+    expect(camera.disabled).toBe(true);
+    expect(toolbarMocks.onExportComplete).not.toHaveBeenCalled();
+    finish();
+    await vi.waitFor(() => expect(toolbarMocks.onExportComplete).toHaveBeenCalledOnce());
     expect(camera.disabled).toBe(false);
   });
 
@@ -207,16 +223,18 @@ describe('editor toolbar', () => {
     expect(tooltip).not.toBeUndefined();
   });
 
-  it('reports an export failure and releases the camera action', async () => {
-    toolbarMocks.exportWorkflowAsPng.mockRejectedValueOnce(new Error('rasterization failed'));
+  it.each(['prepare', 'rasterize'])('reports a %s failure and releases the camera action', async (stage) => {
     await render(1);
+    (stage === 'prepare' ? toolbarMocks.onExportPrepare : toolbarMocks.exportWorkflowAsPng).mockRejectedValueOnce(
+      new Error('export failed')
+    );
 
     const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="Download workflow as PNG"]')!;
     await settle(() => camera.click());
     await vi.waitFor(() => expect(toolbarMocks.error).toHaveBeenCalledWith('Could not export workflow image.'));
 
     expect(toolbarMocks.error).toHaveBeenCalledWith('Could not export workflow image.');
-    expect(toolbarMocks.onExportPendingChange.mock.calls).toEqual([[true], [false]]);
+    expect(toolbarMocks.onExportComplete).toHaveBeenCalledOnce();
     expect(camera.disabled).toBe(false);
   });
 

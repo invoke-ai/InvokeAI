@@ -391,7 +391,7 @@ const NodeUpdateIcon = ({
 };
 
 const NodeInfoTooltipContent = ({
-  executionError,
+  executionError = null,
   node,
   template,
 }: {
@@ -413,9 +413,10 @@ const NodeInfoTooltipContent = ({
       {updateStatusText ? <Text color="fg.warning">{updateStatusText}</Text> : null}
       <Text color="fg.subtle">{t('nodes.nodeClassification', { classification: template.classification })}</Text>
       <Text color="fg.subtle">{t('nodes.nodeCategory', { category: template.category })}</Text>
-      {executionError ? (
+      {executionError !== null ? (
         <Text color="fg.error">
-          {t('nodes.executionFailed')}: {executionError}
+          {t('nodes.executionFailed')}
+          {executionError ? `: ${executionError}` : null}
         </Text>
       ) : null}
       {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
@@ -729,7 +730,7 @@ const InputFieldRow = ({
         {showsControl ? (
           <Box mt="0.5" w="full">
             <WorkflowFieldInput
-              id={`${node.id}-${template.name}-value`}
+              id={`${isWorkflowImageExport ? 'export-' : ''}${node.id}-${template.name}-value`}
               invalid={isInvalid}
               nodeId={node.id}
               seedMode={getWorkflowFieldSeedMode(instance)}
@@ -1018,8 +1019,9 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
   const isMissingRequiredInput = hasMissingRequiredInputs(node, inputTemplates, connectedFieldNames);
   const isCompact = data.isCompact && !selected && !isWorkflowImageExport;
   const withFooter = !isZoomedOut && templateView.isExecutable && templateView.hasImageOutput;
-  const withOutputPreview = Boolean(execution?.outputImageUrl);
-  const latestResult = execution?.latestOutput;
+  const resultExecution = isWorkflowImageExport && execution?.status !== 'completed' ? null : execution;
+  const withOutputPreview = Boolean(resultExecution?.outputImageUrl);
+  const latestResult = resultExecution?.latestOutput;
 
   return (
     <NodeShell
@@ -1056,7 +1058,9 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
       {isWorkflowImageExport ? (
         <Box data-workflow-export-content="true" maxW="full" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
           <NodeInfoTooltipContent
-            executionError={execution?.status === 'failed' ? getNodeExecutionError(node, execution.error, t) : null}
+            executionError={
+              execution?.status === 'failed' ? (getNodeExecutionError(node, execution.error, t) ?? '') : null
+            }
             node={node}
             template={template}
           />
@@ -1105,9 +1109,9 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
       ) : (
         <HiddenHandles inputTemplates={inputTemplates} outputTemplates={outputTemplates} />
       )}
-      {isOpen && execution?.outputImageUrl ? (
+      {isOpen && resultExecution?.outputImageUrl ? (
         <NodeOutputPreview
-          imageUrl={execution.outputImageUrl}
+          imageUrl={resultExecution.outputImageUrl}
           isSkeleton={isZoomedOut}
           nodeId={node.id}
           roundedBottom={!withFooter}

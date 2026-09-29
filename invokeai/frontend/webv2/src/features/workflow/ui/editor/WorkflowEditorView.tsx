@@ -2,8 +2,8 @@ import type { ProjectGraphState, WorkflowEdge as WorkflowDocumentEdge, XYPositio
 import type { WorkflowPerfSource, WorkflowRuntimeApi } from '@features/workflow/ui/contracts';
 
 import { Box, Flex, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
-import '@xyflow/react/dist/style.css';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
+import '@xyflow/react/dist/style.css';
 import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@features/workflow/ui/graph-preview';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
@@ -58,6 +58,9 @@ import {
   startTransition,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
+import { flushSync } from 'react-dom';
+
+import type { WorkflowImageExportView } from './WorkflowImageExportView';
 
 import { buildDuplicateElements, buildPasteElements, copyNodesToClipboard, useHasClipboardNodes } from './clipboard';
 import { ConnectorFlowNode } from './ConnectorFlowNode';
@@ -76,7 +79,7 @@ import {
   releaseWorkflowFlowInstance,
   type WorkflowFlowInstance,
 } from './flowInstanceStore';
-import { InvocationFlowNode, WorkflowImageExportProvider } from './InvocationFlowNode';
+import { InvocationFlowNode } from './InvocationFlowNode';
 import LoopBodyBoundaryOverlay from './LoopBodyBoundaryOverlay';
 import { NodeContextMenu, type WorkflowContextMenuState } from './NodeContextMenu';
 import { NotesFlowNode } from './NotesFlowNode';
@@ -242,15 +245,9 @@ export const getInitialRenderFlowModel = (model: WorkflowFlowModel, viewport: Vi
 export const getRenderedFlowModel = (
   model: WorkflowFlowModel | null,
   viewport: Viewport,
-  {
-    isExportingWorkflow,
-    isFullGraphMounted,
-    isLargeGraph,
-  }: { isExportingWorkflow: boolean; isFullGraphMounted: boolean; isLargeGraph: boolean }
+  { isFullGraphMounted, isLargeGraph }: { isFullGraphMounted: boolean; isLargeGraph: boolean }
 ): WorkflowFlowModel | null =>
-  model && isLargeGraph && !isExportingWorkflow && !isFullGraphMounted
-    ? getInitialRenderFlowModel(model, viewport)
-    : model;
+  model && isLargeGraph && !isFullGraphMounted ? getInitialRenderFlowModel(model, viewport) : model;
 
 const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
@@ -324,7 +321,18 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const shouldDeferInitialBuild = isLargeGraph && flowModel === null;
   const [flowInstance, setFlowInstance] = useState<WorkflowFlowInstance | null>(null);
   const [isFullGraphMounted, setIsFullGraphMounted] = useState(!isLargeGraph);
-  const [isExportingWorkflow, setIsExportingWorkflow] = useState(false);
+  const [ExportView, setExportView] = useState<typeof WorkflowImageExportView | null>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const onExportPrepare = useCallback(async () => {
+    const { WorkflowImageExportView } = await import('./WorkflowImageExportView');
+    flushSync(() => setExportView(() => WorkflowImageExportView));
+    const element = exportRef.current?.querySelector<HTMLElement>('.react-flow');
+    if (!element) {
+      throw new Error('Workflow export view did not mount');
+    }
+    return element;
+  }, []);
+  const onExportComplete = useCallback(() => setExportView(null), []);
   const [tool, setTool] = useState<EditorTool>('pan');
   const [nodeOpacity, setNodeOpacity] = useState(1);
   const [isMinimapReady, setIsMinimapReady] = useState(!isLargeGraph);
@@ -411,8 +419,8 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   });
   const pointerToolHandlers = tool === 'lasso' ? lassoHandlers : tool === 'eraser' ? eraserHandlers : {};
   const renderedFlowModel = useMemo(
-    () => getRenderedFlowModel(flowModel, defaultViewport, { isExportingWorkflow, isFullGraphMounted, isLargeGraph }),
-    [defaultViewport, flowModel, isExportingWorkflow, isFullGraphMounted, isLargeGraph]
+    () => getRenderedFlowModel(flowModel, defaultViewport, { isFullGraphMounted, isLargeGraph }),
+    [defaultViewport, flowModel, isFullGraphMounted, isLargeGraph]
   );
   const renderedFlowNodes = renderedFlowModel?.nodes ?? EMPTY_FLOW_NODES;
   const renderedFlowEdges = renderedFlowModel?.edges ?? EMPTY_FLOW_EDGES;
@@ -1149,68 +1157,81 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       onContextMenuCapture={onEditorContextMenuCapture}
       {...pointerToolHandlers}
     >
-      <WorkflowImageExportProvider isExporting={isExportingWorkflow}>
-        <ReactFlow<WorkflowFlowNode, WorkflowFlowEdge>
-          key={viewportKey}
+      <ReactFlow<WorkflowFlowNode, WorkflowFlowEdge>
+        key={viewportKey}
+        colorMode={getFlowColorMode(themeId)}
+        connectionLineType={edgeType === 'step' ? ConnectionLineType.Step : ConnectionLineType.Bezier}
+        defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
+        defaultViewport={defaultViewport}
+        deleteKeyCode={DELETE_KEY_CODES}
+        elevateEdgesOnSelect={!workflowEdgesBehindNodes}
+        edges={renderedFlowEdges}
+        edgeTypes={edgeTypes}
+        isValidConnection={isValidConnection}
+        maxZoom={2}
+        minZoom={0.1}
+        nodes={renderedFlowNodes}
+        nodeTypes={nodeTypes}
+        onlyRenderVisibleElements={isLargeGraph}
+        panOnDrag={panOnDrag}
+        proOptions={proOptions}
+        selectionMode={SelectionMode.Partial}
+        selectionOnDrag={tool === 'box-select'}
+        snapGrid={SNAP_GRID}
+        snapToGrid={workflowSnapToGrid || isSnapHeld}
+        style={flowStyle}
+        onConnect={onConnect}
+        onConnectEnd={onConnectEnd}
+        onReconnect={onReconnect}
+        onReconnectEnd={onReconnectEnd}
+        onReconnectStart={onReconnectStart}
+        onEdgeClick={onEdgeClick}
+        onEdgesChange={onEdgesChange}
+        onInit={onFlowInit}
+        onNodeClick={onNodeClick}
+        onNodeContextMenu={onNodeContextMenu}
+        onNodeMouseEnter={onNodeMouseEnter}
+        onNodeMouseLeave={onNodeMouseLeave}
+        onNodesChange={onNodesChange}
+        onMoveEnd={onMoveEnd}
+        onPaneContextMenu={onPaneContextMenu}
+        onSelectionChange={onSelectionChange}
+      >
+        <Background
+          bgColor="var(--xy-background-color)"
+          color="var(--wb-flow-grid)"
+          gap={GRID_SIZE}
+          id={`workflow-grid-${backgroundId}`}
+          size={1.5}
+          variant={BackgroundVariant.Dots}
+        />
+        <LoopBodyBoundaryOverlay edges={projectGraph.edges} nodes={projectGraph.nodes} />
+        <EditorToolbar
+          nodeOpacity={nodeOpacity}
+          tool={tool}
+          updatableNodeCount={updatableNodeCount}
+          onExportPrepare={onExportPrepare}
+          onExportComplete={onExportComplete}
+          onNodeOpacityChange={setNodeOpacity}
+          onToolChange={setTool}
+          onUpdateNodes={onUpdateNodes}
+        />
+        {workflowShowMinimap && (!isLargeGraph || isMinimapReady) ? <FlowMiniMap /> : null}
+      </ReactFlow>
+      {ExportView ? (
+        <ExportView
+          containerRef={exportRef}
           colorMode={getFlowColorMode(themeId)}
-          connectionLineType={edgeType === 'step' ? ConnectionLineType.Step : ConnectionLineType.Bezier}
           defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
-          defaultViewport={defaultViewport}
-          deleteKeyCode={DELETE_KEY_CODES}
-          elevateEdgesOnSelect={!workflowEdgesBehindNodes}
-          edges={renderedFlowEdges}
+          edges={flowEdges}
           edgeTypes={edgeTypes}
-          isValidConnection={isValidConnection}
-          maxZoom={2}
-          minZoom={0.1}
-          nodes={renderedFlowNodes}
+          nodes={flowNodes}
           nodeTypes={nodeTypes}
-          onlyRenderVisibleElements={isLargeGraph && !isExportingWorkflow}
-          panOnDrag={panOnDrag}
-          proOptions={proOptions}
-          selectionMode={SelectionMode.Partial}
-          selectionOnDrag={tool === 'box-select'}
-          snapGrid={SNAP_GRID}
-          snapToGrid={workflowSnapToGrid || isSnapHeld}
           style={flowStyle}
-          onConnect={onConnect}
-          onConnectEnd={onConnectEnd}
-          onReconnect={onReconnect}
-          onReconnectEnd={onReconnectEnd}
-          onReconnectStart={onReconnectStart}
-          onEdgeClick={onEdgeClick}
-          onEdgesChange={onEdgesChange}
-          onInit={onFlowInit}
-          onNodeClick={onNodeClick}
-          onNodeContextMenu={onNodeContextMenu}
-          onNodeMouseEnter={onNodeMouseEnter}
-          onNodeMouseLeave={onNodeMouseLeave}
-          onNodesChange={onNodesChange}
-          onMoveEnd={onMoveEnd}
-          onPaneContextMenu={onPaneContextMenu}
-          onSelectionChange={onSelectionChange}
         >
-          <Background
-            bgColor="var(--xy-background-color)"
-            color="var(--wb-flow-grid)"
-            gap={GRID_SIZE}
-            id={`workflow-grid-${backgroundId}`}
-            size={1.5}
-            variant={BackgroundVariant.Dots}
-          />
           <LoopBodyBoundaryOverlay edges={projectGraph.edges} nodes={projectGraph.nodes} />
-          <EditorToolbar
-            nodeOpacity={nodeOpacity}
-            tool={tool}
-            updatableNodeCount={updatableNodeCount}
-            onExportPendingChange={setIsExportingWorkflow}
-            onNodeOpacityChange={setNodeOpacity}
-            onToolChange={setTool}
-            onUpdateNodes={onUpdateNodes}
-          />
-          {workflowShowMinimap && (!isLargeGraph || isMinimapReady) ? <FlowMiniMap /> : null}
-        </ReactFlow>
-      </WorkflowImageExportProvider>
+        </ExportView>
+      ) : null}
       {flowInstance ? (
         <WorkflowSelectionRequestRuntime
           flowInstance={flowInstance}

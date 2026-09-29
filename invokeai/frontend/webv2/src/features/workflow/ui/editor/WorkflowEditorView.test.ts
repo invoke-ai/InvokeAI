@@ -49,7 +49,7 @@ describe('getInitialRenderFlowModel', () => {
     expect(windowed.edges.map((edge) => edge.id)).toEqual(['inside']);
   });
 
-  it('renders the full graph during image export, even before the large-graph window expands', () => {
+  it('keeps the visible large graph windowed until its initial mount completes', () => {
     const nodes = Array.from({ length: WORKFLOW_INITIAL_RENDER_NODE_COUNT + 2 }, (_, index) =>
       createNode(`node-${index}`, index)
     );
@@ -65,13 +65,12 @@ describe('getInitialRenderFlowModel', () => {
       model,
       { x: 0, y: 0, zoom: 1 },
       {
-        isExportingWorkflow: true,
         isFullGraphMounted: false,
         isLargeGraph: true,
       }
     );
 
-    expect(rendered?.nodes).toHaveLength(nodes.length);
-    expect(rendered?.edges.map((edge) => edge.id)).toEqual(['inside', 'outside']);
+    expect(rendered?.nodes).toHaveLength(WORKFLOW_INITIAL_RENDER_NODE_COUNT);
+    expect(rendered?.edges.map((edge) => edge.id)).toEqual(['inside']);
   });
 });

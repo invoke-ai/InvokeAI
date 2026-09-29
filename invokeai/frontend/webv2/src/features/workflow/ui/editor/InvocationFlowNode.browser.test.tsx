@@ -11,7 +11,7 @@ import { buildCurrentImageNode, createProjectGraph, projectGraphReducer } from '
 import { system } from '@theme/system';
 import { applyNodeChanges, ReactFlow, type NodeChange } from '@xyflow/react';
 import { createInstance } from 'i18next';
-import { act, startTransition, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
+import { act, createRef, startTransition, useCallback, useEffect, useState, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
@@ -21,6 +21,7 @@ import { CurrentImageFlowNode } from './CurrentImageFlowNode';
 import { toFlowEdges, toFlowNodes } from './flowAdapters';
 import { InvocationFlowNode, WorkflowImageExportProvider } from './InvocationFlowNode';
 import { exportWorkflowAsPng, WORKFLOW_EXPORT_TIMEOUT_MS } from './workflowImageExport';
+import { WorkflowImageExportView } from './WorkflowImageExportView';
 
 import '@xyflow/react/dist/style.css';
 
@@ -548,6 +549,93 @@ describe('InvocationFlowNode output preview', () => {
       'display: none'
     );
     expect(capturedClone?.textContent).toContain('Failed: Child workflow error: Child node failed');
+  });
+
+  it('keeps the visible collapsed node unchanged while an expanded offscreen snapshot is rasterizing', async () => {
+    const node = { ...documentNode, data: { ...documentNode.data, isOpen: false, notes: 'Snapshot metadata' } };
+    const directNode = { ...documentNode, id: 'direct-node', position: { x: 20, y: 100 } };
+    const graph = { ...projectGraph, nodes: [node, directNode] };
+    const directTemplate = { ...template, inputs: { a: { ...template.inputs.a!, input: 'direct' as const } } };
+    const nodes = toFlowNodes(graph, [], { preview: directTemplate });
+    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
+    const exportRef = createRef<HTMLDivElement>();
+    host.style.position = 'relative';
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <WorkflowUiProvider adapter={adapter}>
+            <div data-visible-editor style={{ height: '100%', width: '100%' }}>
+              <ReactFlow nodes={nodes} edges={[]} nodeTypes={nodeTypes} />
+            </div>
+            <WorkflowImageExportView containerRef={exportRef} nodes={nodes} edges={[]} nodeTypes={nodeTypes} />
+          </WorkflowUiProvider>
+        </ChakraProvider>
+      )
+    );
+    const visible = host.querySelector<HTMLElement>('[data-visible-editor]')!;
+    const visibleNode = visible.querySelector<HTMLElement>('.react-flow__node')!;
+    const beforeHeight = visibleNode.getBoundingClientRect().height;
+    expect(beforeHeight).toBeGreaterThan(0);
+    let finish: (blob: Blob) => void = () => {};
+    let capturedClone: HTMLElement | undefined;
+    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+      capturedClone = clone;
+      return new Promise<Blob>((resolve) => {
+        finish = resolve;
+      });
+    });
+    const capture = exportWorkflowAsPng({
+      bounds: { x: 20, y: 20, width: 300, height: 260 },
+      fallbackWorkflowName: 'Untitled Workflow',
+      flowElement: exportRef.current!.querySelector<HTMLElement>('.react-flow')!,
+      workflowName: 'Isolated snapshot',
+    });
+    await vi.waitFor(() => expect(capturedClone).toBeDefined());
+    expect(visible.textContent).not.toContain('Snapshot metadata');
+    expect(visible.querySelector('button[aria-label="Expand node"]')).not.toBeNull();
+    expect(visibleNode.getBoundingClientRect().height).toBe(beforeHeight);
+    const visibleInput = visible.querySelector<HTMLInputElement>('input');
+    const offscreenInput = exportRef.current!.querySelector<HTMLInputElement>('input');
+    expect(visibleInput).not.toBeNull();
+    expect(offscreenInput).not.toBeNull();
+    expect(visibleInput?.id).not.toBe(offscreenInput?.id);
+    expect(capturedClone?.textContent).toContain('Snapshot metadata');
+    await page.screenshot({ path: '../../../../../artifacts/workflow-export-pending.png' });
+    finish(new Blob(['png'], { type: 'image/png' }));
+    await capture;
+  });
+
+  it.each(['running', 'failed'] as const)('omits retained results from a %s retry snapshot', async (status) => {
+    const execution = createExecutionPort();
+    const completed = {
+      error: null,
+      latestOutput: { value: 'previous result' },
+      outputImageUrl: 'data:image/png;base64,cHJldmlvdXM=',
+      progress: null,
+      progressMessage: null,
+      status: 'completed' as const,
+    };
+    execution.set(completed);
+    const adapter = createAdapter(execution.port);
+    await render(adapter, 1, true);
+    expect(host.textContent).toContain('previous result');
+    await act(() => execution.set({ ...completed, status }));
+    let capturedClone: HTMLElement | undefined;
+    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+      capturedClone = clone;
+      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
+    });
+    await exportWorkflowAsPng({
+      bounds: { x: 20, y: 20, width: 300, height: 260 },
+      fallbackWorkflowName: 'Untitled Workflow',
+      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
+      workflowName: 'Retry',
+    });
+    expect(capturedClone?.textContent).not.toContain('previous result');
+    expect(capturedClone?.querySelector('img')).toBeNull();
+    if (status === 'failed') {
+      expect(capturedClone?.textContent).toContain('Failed');
+    }
   });
 
   it('blocks a third capture after two timeouts and recovers when one rasterization settles', async () => {
