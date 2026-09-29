@@ -3,7 +3,7 @@ import threading
 import time
 from pathlib import Path
 from queue import Empty, Queue
-from typing import TYPE_CHECKING, Any, Callable, Optional
+from typing import TYPE_CHECKING, AbstractSet, Any, Callable, Optional
 
 import numpy as np
 import torch
@@ -697,18 +697,24 @@ class ImageIndexService(ImageIndexServiceBase):
         query_embedding: np.ndarray,
         limit: int,
         kinds: Optional[tuple[MediaKind, ...]] = None,
+        within: Optional[AbstractSet[str]] = None,
     ) -> list[tuple[IndexedItem, float]]:
         found_items, matrix = self.get_accessible_embeddings(user_id)
         if matrix.size == 0:
             return []
 
         scores = matrix @ query_embedding.astype(matrix.dtype)
-        # Restricting by kind selects among the SCORES, not among the rows: masking the matrix
-        # would copy it, and it is the largest array in the process (~300 MB at 100k x 768).
+        # Restricting by kind or name selects among the SCORES, not among the rows: masking the
+        # matrix would copy it, and it is the largest array in the process (~300 MB at 100k x 768).
         # The dot product over rows nobody asked for is a rounding error beside that.
         candidates = np.arange(len(found_items))
-        if kinds is not None:
-            candidates = candidates[[found_items[index].kind in kinds for index in candidates]]
+        if kinds is not None or within is not None:
+            candidates = candidates[
+                [
+                    (kinds is None or item.kind in kinds) and (within is None or item.name in within)
+                    for item in found_items
+                ]
+            ]
             if candidates.size == 0:
                 return []
             scores = scores[candidates]

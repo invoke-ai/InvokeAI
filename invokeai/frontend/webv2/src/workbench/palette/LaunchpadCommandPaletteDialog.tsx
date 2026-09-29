@@ -2,7 +2,7 @@ import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 
 import { useCapabilities } from '@features/identity';
 import { useNavigate, useSearch } from '@tanstack/react-router';
-import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
+import { useAvailableSettings } from '@workbench/settings/useAvailableSettings';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -27,6 +27,22 @@ const LaunchpadCommandPaletteDialog = ({
   const navigate = useNavigate();
   const search = useSearch({ strict: false }) as { project?: string };
   const { canManageModels, canManageNodes, canManageUsers } = useCapabilities();
+  const settingsSections = useAvailableSettings();
+  // Launchpad settings are a page, not the editor's dialog.
+  const launchpadSettingsDeps = useMemo<SettingsEntryDeps>(
+    () => ({
+      ...settingsEntryDeps,
+      openSettingsSection: (destination) => {
+        const { entryId, sectionId } = typeof destination === 'string' ? { sectionId: destination } : destination;
+        void navigate({
+          params: { section: sectionId },
+          search: entryId ? { setting: entryId } : {},
+          to: '/preferences/$section',
+        });
+      },
+    }),
+    [navigate, settingsEntryDeps]
+  );
 
   const entries = useMemo<PaletteEntry[]>(() => {
     const navEntry = ({ id, keywords, run }: { id: string; keywords?: string; run: () => void }): PaletteEntry => ({
@@ -46,15 +62,25 @@ const LaunchpadCommandPaletteDialog = ({
         run: () => void navigate({ search: search.project ? { project: search.project } : {}, to: '/app' }),
       }),
       navEntry({ id: 'goToProjects', run: () => void navigate({ to: '/projects' }) }),
-      navEntry({ id: 'goToFonts', keywords: 'font typeface typography', run: () => void navigate({ to: '/fonts' }) }),
       ...(canManageModels ? [navEntry({ id: 'goToModels', run: () => void navigate({ to: '/models' }) })] : []),
       ...(canManageNodes ? [navEntry({ id: 'goToNodes', run: () => void navigate({ to: '/nodes' }) })] : []),
+      navEntry({ id: 'goToFonts', keywords: 'font typeface typography', run: () => void navigate({ to: '/fonts' }) }),
       ...(canManageUsers ? [navEntry({ id: 'goToUsers', run: () => void navigate({ to: '/users' }) })] : []),
-      buildOpenSettingsEntry(t, () => openWorkbenchSettings()),
+      buildOpenSettingsEntry(t, () => void navigate({ to: '/preferences' })),
     ];
 
-    return [...navigation, ...buildSettingsEntries(preferences, settingsEntryDeps, t)];
-  }, [canManageModels, canManageNodes, canManageUsers, navigate, preferences, search.project, settingsEntryDeps, t]);
+    return [...navigation, ...buildSettingsEntries(preferences, launchpadSettingsDeps, t, settingsSections)];
+  }, [
+    canManageModels,
+    canManageNodes,
+    canManageUsers,
+    launchpadSettingsDeps,
+    navigate,
+    preferences,
+    search.project,
+    settingsSections,
+    t,
+  ]);
 
   return <CommandPaletteDialog entries={entries} isOpen modifierKeyLabel={modifierKeyLabel} onClose={onClose} />;
 };

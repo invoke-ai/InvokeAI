@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
 """
 Abstract base class for storing and retrieving model configuration records.
 """

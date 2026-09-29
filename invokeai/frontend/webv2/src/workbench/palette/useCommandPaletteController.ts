@@ -47,6 +47,7 @@ export interface CommandPaletteController {
   placeholder: string;
   query: string;
   rows: PaletteRow[];
+  scopeErrorMessage: string | null;
   scopeIsError: boolean;
   scopeIsFetching: boolean;
   scopeLabel: string | null;
@@ -264,6 +265,7 @@ export const useCommandPaletteController = ({
         : t('commandPalette.placeholders.root'),
     query,
     rows,
+    scopeErrorMessage: scopedQueryResult?.errorMessage ?? null,
     scopeIsError: Boolean(scopeProvider && scopedQueryResult?.isError),
     scopeIsFetching: Boolean(scopeProvider && (scopedQueryResult?.isFetching || isWaitingForDebounce)),
     scopeLabel: scopeProvider?.label.toLowerCase() ?? null,

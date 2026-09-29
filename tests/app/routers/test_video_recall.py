@@ -648,6 +648,50 @@ class TestGalleryVideoPlacement:
         event = _only_recall_event(invoker)
         assert event.video is not None and event.video.media_origin == "audio_upload"
 
+    @pytest.mark.parametrize("role", ["audio", "video"])
+    def test_a_conditioning_video_carries_its_role(self, invoker: Invoker, client: TestClient, role: str) -> None:
+        _save_video(invoker, "clip.mp4")
+
+        response = client.post(
+            "/api/v1/recall/video/default/conditioning-video", params={"video_name": "clip.mp4", "role": role}
+        )
+
+        assert response.status_code == 200
+        assert response.json()["action"] == "conditioning_video"
+        event = _only_recall_event(invoker)
+        assert event.action == "conditioning_video"
+        assert event.conditioning_role == role
+        assert event.video is not None and event.video.video_name == "clip.mp4"
+
+    @pytest.mark.parametrize("params", [{}, {"role": "both"}], ids=["missing", "unknown"])
+    def test_a_conditioning_video_needs_a_valid_role(
+        self, invoker: Invoker, client: TestClient, params: dict[str, str]
+    ) -> None:
+        _save_video(invoker, "clip.mp4")
+
+        response = client.post(
+            "/api/v1/recall/video/default/conditioning-video", params={"video_name": "clip.mp4", **params}
+        )
+
+        assert response.status_code == 422
+        assert _recall_events(invoker) == []
+
+    @pytest.mark.parametrize(
+        ("action", "role"), [("conditioning_video", None), ("reference_video", "audio")], ids=["missing", "stray"]
+    )
+    def test_the_event_carries_a_role_with_and_only_with_a_conditioning_video(
+        self, action: str, role: str | None
+    ) -> None:
+        with pytest.raises(ValueError):
+            VideoRecallRequestedEvent.build("default", "owner", action, conditioning_role=role)  # type: ignore[arg-type]
+
+    def test_other_placements_carry_no_role(self, invoker: Invoker, client: TestClient) -> None:
+        _save_video(invoker, "clip.mp4")
+
+        client.post("/api/v1/recall/video/default/reference-video", params={"video_name": "clip.mp4", "role": "audio"})
+
+        assert _only_recall_event(invoker).conditioning_role is None
+
     def test_an_unknown_video_is_a_404(self, invoker: Invoker, client: TestClient) -> None:
         response = client.post("/api/v1/recall/video/default/initial-video", params={"video_name": "nope.mp4"})
 
@@ -714,6 +758,32 @@ class TestUploadedVideoPlacement:
         assert response.status_code == 200
         assert upload_ready.call_args.kwargs["board_id"] is None
         assert _only_recall_event(invoker).action == "initial_video"
+
+    def test_an_uploaded_conditioning_video_carries_its_role(
+        self, invoker: Invoker, client: TestClient, upload_ready: MagicMock
+    ) -> None:
+        response = client.post(
+            "/api/v1/recall/video/default/conditioning-video/upload",
+            params={"role": "audio"},
+            files={"file": ("song.mp4", MP4_BYTES, "video/mp4")},
+        )
+
+        assert response.status_code == 200
+        recall = _only_recall_event(invoker)
+        assert recall.action == "conditioning_video"
+        assert recall.conditioning_role == "audio"
+
+    def test_an_uploaded_conditioning_video_without_a_role_is_refused_before_ingest(
+        self, invoker: Invoker, client: TestClient, upload_ready: MagicMock
+    ) -> None:
+        response = client.post(
+            "/api/v1/recall/video/default/conditioning-video/upload",
+            files={"file": ("song.mp4", MP4_BYTES, "video/mp4")},
+        )
+
+        assert response.status_code == 422
+        upload_ready.assert_not_called()
+        assert _recall_events(invoker) == []
 
     def test_a_rejected_upload_places_nothing(
         self, invoker: Invoker, client: TestClient, upload_ready: MagicMock

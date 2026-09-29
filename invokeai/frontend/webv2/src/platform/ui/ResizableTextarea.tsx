@@ -33,6 +33,14 @@ const resizeHandleAfter = {
   w: '10',
 } as const;
 
+// Fades content under the handle; the edge strips keep the border and its rounded corners opaque.
+const resizeHandleFade = {
+  maskImage: [
+    'linear-gradient(to bottom, black calc(100% - 1rem), transparent calc(100% - 0.25rem), transparent calc(100% - 1px), black calc(100% - 1px))',
+    'linear-gradient(to right, black {radii.control}, transparent {radii.control}, transparent calc(100% - {radii.control}), black calc(100% - {radii.control}))',
+  ].join(', '),
+} as const;
+
 const resizeHandleFocusVisible = { bg: 'accent.solid/20', outline: '2px solid {colors.accent.solid}' } as const;
 const resizeHandleHover = { _after: { bg: 'fg.subtle' } } as const;
 const resizeHandleDragging = { '&[data-dragging]::after': { bg: 'fg.subtle' } } as const;
@@ -135,23 +143,25 @@ export const ResizableTextarea = ({
 
   return (
     <Box position="relative">
-      {underlay}
-      <ScrollArea.Root
-        borderRadius="control"
-        h={`${displayHeightPx}px`}
-        size="xs"
-        variant="hover"
-        zIndex={underlay ? 1 : undefined}
-      >
-        <ScrollArea.Viewport asChild role="textbox">
-          <Textarea ref={textareaRef} resize="none" {...textareaProps} />
-        </ScrollArea.Viewport>
-        {/* Zag needs a content element to remeasure; the textarea itself is the viewport. */}
-        <ScrollArea.Content h="0" minW="0" overflow="hidden" position="absolute" />
-        <ScrollArea.Scrollbar>
-          <ScrollArea.Thumb />
-        </ScrollArea.Scrollbar>
-      </ScrollArea.Root>
+      <Box position="relative" css={resizeHandleFade}>
+        {underlay}
+        <ScrollArea.Root
+          borderRadius="control"
+          h={`${displayHeightPx}px`}
+          size="xs"
+          variant="hover"
+          zIndex={underlay ? 1 : undefined}
+        >
+          <ScrollArea.Viewport asChild role="textbox">
+            <Textarea ref={textareaRef} resize="none" {...textareaProps} />
+          </ScrollArea.Viewport>
+          {/* Zag needs a content element to remeasure; the textarea itself is the viewport. */}
+          <ScrollArea.Content h="0" minW="0" overflow="hidden" position="absolute" />
+          <ScrollArea.Scrollbar>
+            <ScrollArea.Thumb />
+          </ScrollArea.Scrollbar>
+        </ScrollArea.Root>
+      </Box>
       <Box
         aria-label={resizeHandleAriaLabel}
         aria-orientation="horizontal"

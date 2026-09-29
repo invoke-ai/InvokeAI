@@ -1,4 +1,3 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Default implementation of model loading in InvokeAI."""
 
 import copy

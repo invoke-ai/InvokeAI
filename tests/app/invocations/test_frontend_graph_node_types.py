@@ -172,7 +172,7 @@ def _annotation(cls: type[BaseInvocation], field_name: str) -> Any:
     (`BASE_GENERATION['ernie-image'].dimensions.grid`) with nothing relating the two.
     """
     field = cls.model_fields[field_name]
-    return Annotated[tuple([field.annotation, *field.metadata])] if field.metadata else field.annotation
+    return Annotated[(field.annotation, *field.metadata)] if field.metadata else field.annotation
 
 
 SILENTLY_IGNORED: dict[str, set[str]] = {

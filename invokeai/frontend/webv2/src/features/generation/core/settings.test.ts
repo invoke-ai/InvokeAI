@@ -66,6 +66,16 @@ describe('normalizeGenerateSettings', () => {
     ).toBe('random');
   });
 
+  it('reads prompt tool model picks, defaulting projects saved before them to none', () => {
+    expect(normalizeGenerateSettings(legacyStoredValues)).toMatchObject({
+      expandPromptModelKey: null,
+      imageToPromptModelKey: null,
+    });
+    expect(
+      normalizeGenerateSettings({ ...legacyStoredValues, expandPromptModelKey: 'llm', imageToPromptModelKey: 7 })
+    ).toMatchObject({ expandPromptModelKey: 'llm', imageToPromptModelKey: null });
+  });
+
   it('rejects values that name neither a seed mode nor the random toggle', () => {
     const { shouldRandomizeSeed: _, ...withoutSeedPolicy } = legacyStoredValues;
 

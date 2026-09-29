@@ -130,6 +130,19 @@ describe('galleryDnd', () => {
     });
   });
 
+  it('moves items out of their board when dropped on Uncategorized', () => {
+    const boarded = createItem('image', 'boarded.png', 'board-a');
+    const loose = createItem('image', 'loose.png', 'none');
+    const dragData = getGalleryItemDragData([
+      { kind: 'image', name: boarded.name },
+      { kind: 'image', name: loose.name },
+    ]);
+
+    expect(
+      resolveGalleryBoardDrop(dragData, getGalleryBoardDropData('none', 'uncategorized'), [boarded, loose])
+    ).toEqual({ boardId: 'none', items: [{ kind: 'image', name: boarded.name }] });
+  });
+
   it('rejects non-item drags, virtual-board drops, and drops with no item left to move', () => {
     const image = createItem('image', 'image.png', 'board-a');
     const dragData = getGalleryItemDragData([{ kind: 'image', name: image.name }]);

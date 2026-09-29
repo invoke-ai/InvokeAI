@@ -7137,6 +7137,43 @@
               "title": "Include Videos"
             },
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item.",
+              "title": "Board Id"
+            },
+            "description": "Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item."
+          },
+          {
+            "name": "created_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict results to items created on this ISO date, as the date-based virtual boards list them.",
+              "title": "Created Date"
+            },
+            "description": "Restrict results to items created on this ISO date, as the date-based virtual boards list them."
           }
         ],
         "responses": {
@@ -7219,6 +7256,43 @@
               "title": "Include Videos"
             },
             "description": "Include indexed videos among the returned items. Leave off unless the client resolves each item through the endpoint its `kind` names."
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item.",
+              "title": "Board Id"
+            },
+            "description": "Restrict results to this board's items; 'none' selects items on no board. Omit to rank every accessible item."
+          },
+          {
+            "name": "created_date",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Restrict results to items created on this ISO date, as the date-based virtual boards list them.",
+              "title": "Created Date"
+            },
+            "description": "Restrict results to items created on this ISO date, as the date-based virtual boards list them."
           }
         ],
         "requestBody": {
@@ -15980,6 +16054,197 @@
               "title": "Queue Id"
             },
             "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "board_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "The board to upload the video to; Uncategorized when omitted",
+              "title": "Board Id"
+            },
+            "description": "The board to upload the video to; Uncategorized when omitted"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoRecallMediaResponse"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The video exceeds the upload size limit"
+          },
+          "415": {
+            "description": "The file is not a supported video or audio file"
+          },
+          "429": {
+            "description": "Too many concurrent video uploads"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        },
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "contentMediaType": "application/octet-stream",
+                    "title": "File"
+                  },
+                  "metadata": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "title": "Metadata",
+                    "description": "The metadata to associate with the video, must be a stringified JSON dict"
+                  }
+                },
+                "type": "object",
+                "required": ["file"],
+                "title": "Body_upload_video"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recall/video/{queue_id}/conditioning-video": {
+      "post": {
+        "tags": ["recall"],
+        "summary": "Recall Conditioning Video",
+        "description": "Set a gallery video as the current user's conditioning clip (models that take one, e.g. LTX-2).\n\nThe clip replaces the panel's other conditioning media: frames, initial video and references.",
+        "operationId": "recall_conditioning_video",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "video_name",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 255,
+              "description": "The name of the gallery video",
+              "title": "Video Name"
+            },
+            "description": "The name of the gallery video"
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": ["audio", "video"],
+              "type": "string",
+              "description": "Which stream of the video is the condition: `audio` generates a picture for its soundtrack, `video` generates a soundtrack for its picture",
+              "title": "Role"
+            },
+            "description": "Which stream of the video is the condition: `audio` generates a picture for its soundtrack, `video` generates a soundtrack for its picture"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VideoRecallMediaResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/recall/video/{queue_id}/conditioning-video/upload": {
+      "post": {
+        "tags": ["recall"],
+        "summary": "Recall Conditioning Video Upload",
+        "description": "Upload a video into the gallery and set it as the current user's conditioning clip.",
+        "operationId": "recall_conditioning_video_upload",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "queue_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "description": "The queue id to perform this operation on",
+              "title": "Queue Id"
+            },
+            "description": "The queue id to perform this operation on"
+          },
+          {
+            "name": "role",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "enum": ["audio", "video"],
+              "type": "string",
+              "description": "Which stream of the video is the condition: `audio` generates a picture for its soundtrack, `video` generates a soundtrack for its picture",
+              "title": "Role"
+            },
+            "description": "Which stream of the video is the condition: `audio` generates a picture for its soundtrack, `video` generates a soundtrack for its picture"
           },
           {
             "name": "board_id",
@@ -27427,7 +27692,7 @@
               }
             ],
             "default": null,
-            "description": "The Mistral text encoder model used for FLUX.2 [dev] inference",
+            "description": "The Mistral text encoder model used for FLUX.2 [dev] or ERNIE-Image inference",
             "field_kind": "input",
             "input": "any",
             "orig_default": null,
@@ -106228,7 +106493,7 @@
           },
           "action": {
             "type": "string",
-            "enum": ["parameters", "initial_video", "reference_video"],
+            "enum": ["parameters", "initial_video", "reference_video", "conditioning_video"],
             "title": "Action"
           },
           "video": {
@@ -106788,7 +107053,7 @@
           },
           "action": {
             "description": "What the frontend should do with the payload",
-            "enum": ["parameters", "initial_video", "reference_video"],
+            "enum": ["parameters", "initial_video", "reference_video", "conditioning_video"],
             "title": "Action",
             "type": "string"
           },
@@ -106836,10 +107101,34 @@
               }
             ],
             "default": null,
-            "description": "For `initial_video` and `reference_video`: the video to place"
+            "description": "For `initial_video`, `reference_video` and `conditioning_video`: the video to place"
+          },
+          "conditioning_role": {
+            "anyOf": [
+              {
+                "enum": ["audio", "video"],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "For `conditioning_video`: which stream of the video is the condition; the other is generated",
+            "title": "Conditioning Role"
           }
         },
-        "required": ["timestamp", "queue_id", "user_id", "action", "mode", "strict", "parameters", "video"],
+        "required": [
+          "timestamp",
+          "queue_id",
+          "user_id",
+          "action",
+          "mode",
+          "strict",
+          "parameters",
+          "video",
+          "conditioning_role"
+        ],
         "title": "VideoRecallRequestedEvent",
         "type": "object"
       },

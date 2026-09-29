@@ -259,6 +259,8 @@ const openForceDialogReadyToConfirm = async (
   return dialog;
 };
 
+const INTERMEDIATES_FIELD = { id: 'intermediatesManager', kind: 'custom', label: '', scope: 'none' } as const;
+
 describe('IntermediatesManager', () => {
   beforeEach(() => {
     dependencies.getIntermediatesSummary
@@ -311,6 +313,10 @@ describe('IntermediatesManager', () => {
         expect.objectContaining({ ownerId: null }),
         expect.anything()
       )
+    );
+    // Rows of every account name their owner, so assistive tech can tell identical project names apart.
+    await vi.waitFor(() =>
+      expect(host.querySelector('[aria-label^="intermediates.list.selectRowForOwner("]')).not.toBeNull()
     );
     await act(() => buttonWithText('intermediates.owner.showMine', host).click());
     expect(host.querySelector('[aria-label="intermediates.owner.showEveryone"]')).not.toBeNull();
@@ -540,7 +546,7 @@ describe('IntermediatesManager', () => {
     await vi.waitFor(() => expect(host.textContent).toContain('Portraits'));
 
     expect(host.textContent).toContain('intermediates.list.unassigned');
-    expect(host.querySelectorAll('[role="list"] li')).toHaveLength(3);
+    expect(host.querySelectorAll('[role="list"] [role="listitem"]')).toHaveLength(3);
     expect(host.textContent).toContain('intermediates.list.used');
     expect(host.textContent).toContain('intermediates.list.unused');
     expect(isDeleteUnavailable()).toBe(true);
@@ -710,11 +716,24 @@ describe('IntermediatesManager', () => {
     await act(() => checkbox('intermediates.list.selectAll').click());
     await act(() => checkbox('intermediates.list.selectRow(name=Project 1)').click());
     await vi.waitFor(() => expect(host.textContent).toContain('count=119'));
-    await act(() => buttonWithText('common.nextPage', host).click());
+    const nextPage = buttonWithText('common.nextPage', host);
+    await act(() => {
+      nextPage.focus();
+      nextPage.click();
+    });
     await vi.waitFor(() => expect(host.textContent).toContain('Project 55'));
+    // The page flipped under the pager, which keeps keyboard focus for the next press.
+    expect(document.activeElement).toBe(nextPage);
     expect(checkbox('intermediates.list.selectRow(name=Project 55)').checked).toBe(true);
     expect(checkbox('intermediates.list.selectAll').checked).toBe(false);
     await act(() => buttonWithText('common.nextPage', host).click());
+    await vi.waitFor(() => expect(host.textContent).toContain('Project 100'));
+    // The list is virtualized; the last row of the page mounts once it scrolls into view.
+    await act(() => {
+      const viewport = host.querySelector<HTMLElement>('[data-list-viewport]')!;
+      viewport.scrollTop = viewport.scrollHeight;
+      viewport.dispatchEvent(new Event('scroll'));
+    });
     await vi.waitFor(() => expect(host.textContent).toContain('Project 119'));
     expect(checkbox('intermediates.list.selectRow(name=Project 119)').checked).toBe(true);
     await act(() => buttonWithText('intermediates.list.delete', host).click());
@@ -863,6 +882,35 @@ describe('IntermediatesManager', () => {
       timeout: 3_000,
     });
     expect(host.contains(document.activeElement)).toBe(true);
+  });
+
+  it('starts over on a new entry point request while its settings section is already showing', async () => {
+    host = document.createElement('div');
+    host.style.height = '640px';
+    host.style.display = 'flex';
+    host.style.flexDirection = 'column';
+    document.body.append(host);
+    root = createRoot(host);
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { requestIntermediatesFocus } = await import('@features/intermediates/data/focus');
+    const { IntermediatesSettingsField } = await import('./IntermediatesSettingsField');
+    requestIntermediatesFocus({ projectId: 'p1' });
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <IntermediatesSettingsField field={INTERMEDIATES_FIELD} surface="dialog" />
+          </QueryClientProvider>
+        </ChakraProvider>
+      );
+    });
+    await vi.waitFor(() => expect(checkbox('intermediates.list.selectRow(name=Portraits)').checked).toBe(true));
+    expect(checkbox('intermediates.list.selectRow(name=Landscapes)').checked).toBe(false);
+
+    // The Launchpad keeps the Preferences page mounted, so a later request arrives while the manager is showing.
+    await act(() => requestIntermediatesFocus({ projectId: 'p2' }));
+    await vi.waitFor(() => expect(checkbox('intermediates.list.selectRow(name=Landscapes)').checked).toBe(true));
+    expect(checkbox('intermediates.list.selectRow(name=Portraits)').checked).toBe(false);
   });
 
   it('asks the server once under StrictMode, follows the running operation and consumes the entry point intent on commit', async () => {

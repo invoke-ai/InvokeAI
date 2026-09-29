@@ -545,7 +545,9 @@ class RequestBodyLimitASGIMiddleware:
 # The video-recall routes that take an upload ingest it exactly as /videos/upload does, so they
 # share its ingress cap and concurrency slots. Their name-only siblings take no body and stay
 # outside the limiter, so a caller mid-upload is never refused a slot for a bodyless request.
-_VIDEO_RECALL_UPLOAD_PATH = re.compile(r"/api/v1/recall/video/[^/]+/(?:initial-video|reference-video)/upload")
+_VIDEO_RECALL_UPLOAD_PATH = re.compile(
+    r"/api/v1/recall/video/[^/]+/(?:initial-video|reference-video|conditioning-video)/upload"
+)
 
 
 def _is_video_upload(method: str, path: str) -> bool:

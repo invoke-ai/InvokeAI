@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
 """
 Select the files from a HuggingFace repository needed for a particular model variant.
 

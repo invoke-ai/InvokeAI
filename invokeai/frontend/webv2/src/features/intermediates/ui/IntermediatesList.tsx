@@ -1,13 +1,18 @@
-/* eslint-disable react-perf/jsx-no-new-function-as-prop */
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { IntermediatesRow } from '@features/intermediates/core/types';
+import type { ListRowProps } from '@platform/ui/list/List';
 import type { TFunction } from 'i18next';
+import type { ReactNode } from 'react';
 
-import { Badge, Checkbox, Flex, HStack, Icon, Image, Stack, Text } from '@chakra-ui/react';
+import { Badge, Flex, HStack, Icon, Image, Stack, Text } from '@chakra-ui/react';
 import { getIntermediatesRowKey, getKindInUse } from '@features/intermediates/core/types';
 import { formatBytes, formatCount } from '@platform/i18n/languages';
 import { absolutizeApiUrl } from '@platform/transport/http';
-import { Row } from '@platform/ui/Row';
+import { List } from '@platform/ui/list/List';
+import { ListItem } from '@platform/ui/list/ListItem';
+import { listRowsFromItems } from '@platform/ui/list/listRows';
 import { FolderIcon } from 'lucide-react';
+import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export const getRowLabel = (row: IntermediatesRow, unassignedLabel: string): string =>
@@ -81,89 +86,78 @@ const describeRow = (row: IntermediatesRow, showOwner: boolean, t: TFunction): s
 };
 
 export interface IntermediatesListProps {
+  emptyState: ReactNode;
+  errorState: ReactNode;
   /** The previous page stays visible while the next loads; it is shown, not selectable. */
   isBusy: boolean;
   rows: readonly IntermediatesRow[];
   showOwner: boolean;
+  status: 'loading' | 'error' | 'ready';
   isSelected: (row: IntermediatesRow) => boolean;
   onToggleRow: (row: IntermediatesRow) => void;
 }
 
 /** One row per project, as the sketch: checkbox, cover, name over owner, then the used and unused counts. */
-export const IntermediatesList = ({ isBusy, isSelected, onToggleRow, rows, showOwner }: IntermediatesListProps) => {
+export const IntermediatesList = ({
+  emptyState,
+  errorState,
+  isBusy,
+  isSelected,
+  onToggleRow,
+  rows,
+  showOwner,
+  status,
+}: IntermediatesListProps) => {
   const { t } = useTranslation();
   const unassigned = t('intermediates.list.unassigned');
+  const listRows = useMemo(() => listRowsFromItems(rows, getIntermediatesRowKey), [rows]);
+
+  const renderItem = (row: IntermediatesRow, rowProps: ListRowProps) => {
+    const label = getRowLabel(row, unassigned);
+    const used = getKindInUse(row.images) + getKindInUse(row.videos);
+    const unused = row.images.safe + row.videos.safe;
+
+    return (
+      <ListItem
+        {...rowProps}
+        badges={
+          row.projectId === null ? (
+            <Badge fontSize="2xs" variant="surface">
+              {t('intermediates.list.unassignedBadge')}
+            </Badge>
+          ) : undefined
+        }
+        checkLabel={
+          showOwner
+            ? t('intermediates.list.selectRowForOwner', { name: label, owner: getOwnerAccessibleLabel(row, t) })
+            : t('intermediates.list.selectRow', { name: label })
+        }
+        description={describeRow(row, showOwner, t)}
+        isChecked={isSelected(row)}
+        leading={<Cover imageName={row.coverImageName} />}
+        title={label}
+        trailing={
+          <HStack gap="4" pe="1">
+            <Figure label={t('intermediates.list.used')} value={used} />
+            <Figure label={t('intermediates.list.unused')} value={unused} />
+          </HStack>
+        }
+        onCheckedChange={() => onToggleRow(row)}
+        onPress={() => onToggleRow(row)}
+      />
+    );
+  };
 
   return (
-    <Stack
-      as="ul"
-      aria-busy={isBusy || undefined}
-      aria-label={t('intermediates.title')}
-      gap="0.5"
-      listStyleType="none"
-      m="0"
-      p="0"
-      role="list"
-    >
-      {rows.map((row) => {
-        const label = getRowLabel(row, unassigned);
-        const selected = isSelected(row);
-        const used = getKindInUse(row.images) + getKindInUse(row.videos);
-        const unused = row.images.safe + row.videos.safe;
-
-        return (
-          <Row
-            as="li"
-            active={selected ? 'selected' : 'none'}
-            cursor={isBusy ? 'progress' : 'pointer'}
-            data-selected={selected || undefined}
-            gap="2.5"
-            key={getIntermediatesRowKey(row)}
-            minW="0"
-            px="2"
-            py="1.5"
-            rounded="md"
-            onClick={isBusy ? undefined : () => onToggleRow(row)}
-          >
-            <Checkbox.Root
-              aria-label={
-                showOwner
-                  ? t('intermediates.list.selectRowForOwner', { name: label, owner: getOwnerAccessibleLabel(row, t) })
-                  : t('intermediates.list.selectRow', { name: label })
-              }
-              checked={selected}
-              colorPalette="accent"
-              disabled={isBusy}
-              size="xs"
-              onCheckedChange={() => onToggleRow(row)}
-              onClick={(event) => event.stopPropagation()}
-            >
-              <Checkbox.HiddenInput />
-              <Checkbox.Control />
-            </Checkbox.Root>
-            <Cover imageName={row.coverImageName} />
-            <Stack flex="1" gap="0.5" minW="0">
-              <HStack gap="1.5" minW="0">
-                <Text fontSize="xs" fontWeight="600" truncate>
-                  {label}
-                </Text>
-                {row.projectId === null ? (
-                  <Badge flexShrink={0} fontSize="2xs" variant="surface">
-                    {t('intermediates.list.unassignedBadge')}
-                  </Badge>
-                ) : null}
-              </HStack>
-              <Text color="fg.muted" fontSize="2xs" truncate>
-                {describeRow(row, showOwner, t)}
-              </Text>
-            </Stack>
-            <HStack flexShrink={0} gap="4" pe="1">
-              <Figure label={t('intermediates.list.used')} value={used} />
-              <Figure label={t('intermediates.list.unused')} value={unused} />
-            </HStack>
-          </Row>
-        );
-      })}
-    </Stack>
+    <List
+      density="comfortable"
+      emptyState={emptyState}
+      errorState={errorState}
+      isBusy={isBusy}
+      label={t('intermediates.title')}
+      renderItem={renderItem}
+      rows={listRows}
+      status={status}
+    />
   );
 };

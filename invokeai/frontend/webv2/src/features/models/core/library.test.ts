@@ -8,7 +8,6 @@ import {
   collectTypes,
   DEFAULT_LIBRARY_FILTERS,
   filterModels,
-  flattenGroupsToRows,
   getModelPickerGroups,
   groupModelsByType,
 } from './library';
@@ -82,15 +81,11 @@ describe('filterModels', () => {
 });
 
 describe('groupModelsByType', () => {
-  it('groups in canonical category order with headers flattened for virtualization', () => {
+  it('groups in canonical category order', () => {
     const groups = groupModelsByType(filterModels(library, DEFAULT_LIBRARY_FILTERS, NO_MISSING));
 
     expect(groups.map((group) => group.type)).toEqual(['main', 'lora', 'vae']);
-
-    const rows = flattenGroupsToRows(groups);
-
-    expect(rows[0]).toMatchObject({ kind: 'header' });
-    expect(rows).toHaveLength(groups.length + library.length);
+    expect(groups.reduce((count, group) => count + group.models.length, 0)).toBe(library.length);
   });
 });
 

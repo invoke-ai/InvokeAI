@@ -36,6 +36,19 @@ export const getVideoQueueRecallCapabilities = (
   workflow: false,
 });
 
+/** The prompt tool model picks are the widget's preference, not part of what was submitted. */
+const withCurrentToolModelPicks = (
+  values: GenerateWidgetValues,
+  current: GenerateWidgetValues | null
+): GenerateWidgetValues =>
+  current
+    ? {
+        ...values,
+        expandPromptModelKey: current.expandPromptModelKey ?? null,
+        imageToPromptModelKey: current.imageToPromptModelKey ?? null,
+      }
+    : values;
+
 export const buildQueueRecallValues = (
   kind: ImageRecallKind,
   {
@@ -49,11 +62,11 @@ export const buildQueueRecallValues = (
   }
 ): GenerateWidgetValues | null => {
   if (kind === 'all') {
-    return snapshot;
+    return snapshot ? withCurrentToolModelPicks(snapshot, current) : null;
   }
 
   if (kind === 'remix') {
-    return snapshot ? { ...snapshot, seedMode: 'random' } : null;
+    return snapshot ? withCurrentToolModelPicks({ ...snapshot, seedMode: 'random' }, current) : null;
   }
 
   if (!current) {

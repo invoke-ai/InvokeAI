@@ -28,7 +28,11 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
-vi.mock('./LaunchpadCommandPaletteDialog', () => ({ default: () => <div data-testid="launchpad-palette" /> }));
+vi.mock('./LaunchpadCommandPaletteDialog', () => ({
+  default: ({ modifierKeyLabel }: { modifierKeyLabel: string }) => (
+    <div data-modifier-key-label={modifierKeyLabel} data-testid="launchpad-palette" />
+  ),
+}));
 
 import { LaunchpadCommandPalette } from './LaunchpadCommandPalette';
 import { PaletteButton } from './PaletteButton';
@@ -90,6 +94,10 @@ describe('Launchpad command-palette hotkeys', () => {
 
     await press({ code: 'KeyK', ctrlKey: true, key: 'k' });
     expectPaletteState('open');
+    // The lazy dialog's footer renders this as the Mod+Enter hint's first keycap.
+    await expect
+      .poll(() => document.querySelector('[data-testid="launchpad-palette"]')?.getAttribute('data-modifier-key-label'))
+      .toBe(navigator.platform.toLowerCase().includes('mac') ? 'cmd' : 'ctrl');
 
     await press({ code: 'KeyK', ctrlKey: true, key: 'k' });
     expectPaletteState('closed');

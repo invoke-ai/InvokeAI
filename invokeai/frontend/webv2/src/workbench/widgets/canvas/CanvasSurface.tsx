@@ -3,6 +3,7 @@ import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngi
 import type { CSSProperties, PointerEvent as ReactPointerEvent } from 'react';
 
 import { Box } from '@chakra-ui/react';
+import { isResizeDragActive, subscribeResizeDrag } from '@platform/ui/ResizeHandle';
 import { shouldFocusCanvasSurface } from '@workbench/widgets/canvas/surfaceFocus';
 import { TextEditPortal } from '@workbench/widgets/canvas/TextEditPortal';
 import { useRef } from 'react';
@@ -39,22 +40,49 @@ export const CanvasSurface = ({ engine }: { engine: CanvasSurfaceEngine }) => {
 
     engine.surface.attach(screen, overlay);
 
-    const syncSize = () => {
+    // A handle drag defers the resize and full recomposition to its release; pixel CSS sizes make the interim
+    // canvas crop or reveal rather than stretch.
+    let isSizeStale = false;
+    let syncedSize = '';
+    const syncSize = (canDefer: boolean) => {
+      if (canDefer && isResizeDragActive()) {
+        isSizeStale = true;
+        return;
+      }
+      isSizeStale = false;
+      const width = container.clientWidth;
+      const height = container.clientHeight;
       const dpr = globalThis.devicePixelRatio || 1;
-      engine.surface.resize(container.clientWidth, container.clientHeight, dpr);
+      // Resizing reallocates and recomposes everything, so an unchanged size is skipped.
+      if (canDefer && syncedSize === `${width}x${height}@${dpr}`) {
+        return;
+      }
+      syncedSize = `${width}x${height}@${dpr}`;
+      for (const canvas of [screen, overlay]) {
+        canvas.style.width = `${width}px`;
+        canvas.style.height = `${height}px`;
+      }
+      engine.surface.resize(width, height, dpr);
     };
 
-    syncSize();
+    // The first sync never waits: the fit below needs a sized viewport.
+    syncSize(false);
     // Fit the document into view the first time this canvas is shown, once the
     // viewport is sized. The shell keeps widgets mounted across layout switches,
     // so this callback re-runs on every re-show and an unconditional fit would
     // reset the user's zoom and pan each time they came back.
     engine.viewport.fitToViewOnFirstShow();
 
-    const observer = new ResizeObserver(syncSize);
+    const observer = new ResizeObserver(() => syncSize(true));
     observer.observe(container);
+    const unsubscribeResizeDrag = subscribeResizeDrag(() => {
+      if (isSizeStale) {
+        syncSize(true);
+      }
+    });
 
     return () => {
+      unsubscribeResizeDrag();
       observer.disconnect();
       engine.surface.detach();
     };
@@ -80,11 +108,10 @@ export const CanvasSurface = ({ engine }: { engine: CanvasSurfaceEngine }) => {
 };
 
 const CANVAS_STYLE: CSSProperties = {
-  height: '100%',
-  inset: 0,
+  left: 0,
   position: 'absolute',
+  top: 0,
   touchAction: 'none',
-  width: '100%',
 };
 
 const OVERLAY_STYLE: CSSProperties = { ...CANVAS_STYLE, zIndex: 1 };

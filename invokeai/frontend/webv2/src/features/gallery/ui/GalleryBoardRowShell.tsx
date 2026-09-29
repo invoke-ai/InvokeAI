@@ -7,7 +7,8 @@ import { useMemo, type MouseEvent, type ReactNode, type Ref } from 'react';
 const ROW_CONTAINER_CSS = {
   '&:hover .board-row-actions, &:focus-within .board-row-actions': { opacity: 1 },
   '&:hover .board-row-hover, &:focus-within .board-row-hover': { opacity: 1 },
-  _hover: { bg: 'bg.muted' },
+  // A tint rather than a surface token: the picker popover's own background is bg.muted, which hid the hover there.
+  _hover: { bg: 'gray.hoverTint/10' },
   borderRadius: 'sm',
   transition: 'background var(--wb-motion-duration-fast) ease',
 } as const;

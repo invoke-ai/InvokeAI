@@ -257,12 +257,10 @@ export const getLtx2StageCanvases = (
 
 // LTX-2's causal VAE encodes the first frame alone and then groups of 8, so
 // (n - 1) % 8 == 0. 121 frames is 5 s at the model's 24 fps default, the length
-// the released pipeline generates; the slider stops at 241 (10 s) because the
-// sequence length — and with it both time and VRAM — grows linearly past it,
-// while the field still accepts up to 481 for a deliberate long render.
+// the released pipeline generates; 481 is 20 s, the longest clip the family
+// generates. Time and VRAM grow roughly linearly with the frame count.
 export const LTX2_NUM_FRAMES_MIN = 9;
 export const LTX2_NUM_FRAMES_MAX = 481;
-export const LTX2_NUM_FRAMES_SLIDER_MAX = 241;
 export const LTX2_NUM_FRAMES_STEP = 8;
 export const LTX2_NUM_FRAMES_DEFAULT = 121;
 

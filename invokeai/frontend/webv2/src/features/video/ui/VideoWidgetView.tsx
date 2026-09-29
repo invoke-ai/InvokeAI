@@ -22,6 +22,7 @@ import {
 import {
   applyReferenceExtendNumFrames,
   canPlaceReferenceExtendAnchor,
+  getConditioningClipPatch,
   getInitialVideoPatch,
   getReferencesPatch,
   isVideoTargetResolution,
@@ -293,11 +294,7 @@ export const VideoWidgetView = () => {
   // and each of those clears it in turn. The role a dropped clip arrives in comes from the gallery
   // record: an uploaded soundtrack has no picture to condition on.
   const setConditioningClip = useCallback(
-    (conditioningClip: VideoConditioningClip | null) =>
-      patch({
-        conditioningClip,
-        ...(conditioningClip ? { firstFrameImage: null, lastFrameImage: null, references: [], sourceVideo: null } : {}),
-      }),
+    (conditioningClip: VideoConditioningClip | null) => patch(getConditioningClipPatch(conditioningClip)),
     [patch]
   );
   // This setter tracks references separately from patch-only field setters. Rebudget the linked tail with frame
@@ -424,7 +421,7 @@ export const VideoWidgetView = () => {
       policy.frames.kind === 'grid'
         ? {
             inputMax: policy.frames.max,
-            max: policy.frames.sliderMax ?? policy.frames.max,
+            max: policy.frames.max,
             min: policy.frames.min,
             step: policy.frames.step,
           }

@@ -232,6 +232,25 @@ export const deleteLibraryWorkflow = async (workflowId: string, signal?: AbortSi
   await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}`, { method: 'DELETE', signal });
 };
 
+/**
+ * The server stores a 256px copy and serves it from a fixed path; every list/get response appends a fresh query to
+ * `thumbnail_url`, so invalidating the library cache is what makes a replaced image load.
+ */
+export const setLibraryWorkflowThumbnail = async (
+  workflowId: string,
+  image: Blob,
+  signal?: AbortSignal
+): Promise<void> => {
+  const body = new FormData();
+
+  body.append('image', image);
+  await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/thumbnail`, { body, method: 'PUT', signal });
+};
+
+export const deleteLibraryWorkflowThumbnail = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
+  await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/thumbnail`, { method: 'DELETE', signal });
+};
+
 export const touchLibraryWorkflowOpenedAt = async (workflowId: string, signal?: AbortSignal): Promise<void> => {
   await apiFetch(`/api/v1/workflows/i/${encodeURIComponent(workflowId)}/opened_at`, { method: 'PUT', signal });
 };

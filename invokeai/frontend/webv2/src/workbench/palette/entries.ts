@@ -1,5 +1,6 @@
 import type { DateRange } from '@platform/search/dateTokens';
 import type { CustomHotkeys, HotkeyDefinition } from '@workbench/hotkeys/types';
+import type { SettingsSection } from '@workbench/settings/catalog';
 import type { SettingsDestination, SettingsSectionId, WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { TFunction } from 'i18next';
 
@@ -69,6 +70,14 @@ export interface PaletteProviderQuery {
   range?: DateRange;
 }
 
+/** A provider throws this when it cannot search for a reason worth telling the user; its message is shown. */
+export class PaletteSearchUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PaletteSearchUnavailableError';
+  }
+}
+
 export interface PaletteSearchContext {
   signal: AbortSignal;
 }
@@ -86,6 +95,8 @@ export interface PaletteSearchProvider {
    * could only return broad unfiltered results.
    */
   supportsCreatedAtRange?: boolean;
+  /** Searches only once the user scopes into it; root mode offers just its scope row. For costly searches. */
+  scopedOnly?: boolean;
   search: (query: PaletteProviderQuery, context: PaletteSearchContext) => Promise<PaletteEntry[]> | PaletteEntry[];
 }
 
@@ -295,10 +306,12 @@ export const buildOpenSettingsEntry = (t: TFunction, openSettings: () => void, k
   title: t('commandPalette.appEntries.openSettings'),
 });
 
+/** `sections` are the settings the host can edit (see `useAvailableSettings`); the whole catalog by default. */
 export const buildSettingsEntries = (
   preferences: WorkbenchPreferences,
   deps: SettingsEntryDeps,
-  t: TFunction
+  t: TFunction,
+  sections: readonly SettingsSection[] = settingsCatalog
 ): PaletteEntry[] => {
   const directPreferenceIds = new Set(preferenceSettingsFields.map(({ field }) => field.id));
   directPreferenceIds.add('themeId');
@@ -382,7 +395,7 @@ export const buildSettingsEntries = (
     title: themeTitle,
   };
 
-  const sections = settingsCatalog.map<PaletteEntry>(({ id, label }) => ({
+  const sectionEntries = sections.map<PaletteEntry>(({ id, label }) => ({
     group: 'Settings',
     groupLabel: t('commandPalette.groups.settings'),
     id: `settings.section.${id}`,
@@ -391,7 +404,7 @@ export const buildSettingsEntries = (
     run: () => deps.openSettingsSection(id),
     title: t('commandPalette.settings.settingsSection', { section: resolveSettingsText(label, t) }),
   }));
-  const fields = settingsCatalog.flatMap((section) =>
+  const fields = sections.flatMap((section) =>
     section.entries
       .filter(({ field }) => field.scope !== 'preference' || !directPreferenceIds.has(field.id))
       .map<PaletteEntry>(({ field }) => ({
@@ -412,7 +425,7 @@ export const buildSettingsEntries = (
       }))
   );
 
-  return [...preferenceEntries, themeEntry, ...sections, ...fields];
+  return [...preferenceEntries, themeEntry, ...sectionEntries, ...fields];
 };
 
 interface RankedEntry {

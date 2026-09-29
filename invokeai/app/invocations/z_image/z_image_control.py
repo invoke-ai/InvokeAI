@@ -1,4 +1,3 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Z-Image Control invocation for spatial conditioning."""
 
 from pydantic import BaseModel, Field

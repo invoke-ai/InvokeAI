@@ -285,3 +285,68 @@ describe('FloatingWidgetWindow chrome', () => {
     expect(windowMocks.dockFloating).toHaveBeenCalledWith('image-map-instance');
   });
 });
+
+describe('FloatingWidgetWindow gestures', () => {
+  const pointer = (type: string, clientX: number, clientY: number, buttons: number) =>
+    new PointerEvent(type, { bubbles: true, buttons, clientX, clientY, pointerId: 1 });
+  const nextFrame = () =>
+    act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        })
+    );
+  const windowElement = () => host!.querySelector<HTMLElement>('[data-hotkey-widget-region="floating"]')!;
+
+  it('renders a corner resize live and commits it once on release', async () => {
+    await renderWindow();
+    const corner = host!.querySelector<HTMLElement>('[role="separator"][aria-valuemin]')!;
+
+    await act(() => corner.dispatchEvent(pointer('pointerdown', 0, 0, 1)));
+    await act(() => window.dispatchEvent(pointer('pointermove', 60, 40, 1)));
+    await nextFrame();
+
+    expect(windowElement().style.width).toBe('560px');
+    expect(windowElement().style.height).toBe('440px');
+    expect(windowMocks.setFloatingGeometry).not.toHaveBeenCalled();
+
+    await act(() => window.dispatchEvent(pointer('pointerup', 60, 40, 0)));
+    expect(windowMocks.setFloatingGeometry).toHaveBeenCalledOnce();
+
+    await nextFrame();
+    expect(windowElement().style.width).toBe('');
+  });
+
+  it('drops the live size when the window maximizes mid-resize', async () => {
+    await renderWindow();
+    const corner = host!.querySelector<HTMLElement>('[role="separator"][aria-valuemin]')!;
+
+    await act(() => corner.dispatchEvent(pointer('pointerdown', 0, 0, 1)));
+    await act(() => window.dispatchEvent(pointer('pointermove', 60, 40, 1)));
+    await nextFrame();
+    expect(windowElement().style.width).toBe('560px');
+
+    await renderWindow({ ...state, mode: 'maximized' });
+    await act(() => window.dispatchEvent(pointer('pointerup', 60, 40, 0)));
+
+    expect(windowElement().style.width).toBe('');
+    expect(windowMocks.setFloatingGeometry).not.toHaveBeenCalled();
+  });
+
+  it('moves by the title bar and abandons the move on Escape', async () => {
+    await renderWindow();
+    const titleBar = host!.querySelector<HTMLElement>('[aria-label="Move Image Map window"]')!;
+
+    await act(() => titleBar.dispatchEvent(pointer('pointerdown', 0, 0, 1)));
+    await act(() => window.dispatchEvent(pointer('pointermove', 30, 20, 1)));
+    await nextFrame();
+    expect(windowElement().style.left).toContain('70px');
+
+    await act(() => window.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'Escape' })));
+    await act(() => window.dispatchEvent(pointer('pointerup', 30, 20, 0)));
+    await nextFrame();
+
+    expect(windowMocks.setFloatingGeometry).not.toHaveBeenCalled();
+    expect(windowElement().style.left).toBe('');
+  });
+});

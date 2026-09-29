@@ -122,6 +122,8 @@ const toPreviewNodes = (
     id: node.id,
     position: positionHints?.[node.id] ?? positions[node.id] ?? { x: 0, y: 0 },
     type: 'preview' as const,
+    // Selection here is preview data, not xyflow's, so raise the selected node above overlapping neighbours manually.
+    ...(node.id === selectedNodeId ? { zIndex: 1 } : {}),
   }));
 };
 

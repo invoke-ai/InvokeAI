@@ -8,7 +8,7 @@ import {
   getGalleryRawSelectedBoardId,
   getGalleryView,
 } from '@features/gallery/ui/galleryStateView';
-import { useGalleryUi } from '@features/gallery/ui/GalleryUiContext';
+import { useGalleryHost } from '@features/gallery/ui/GalleryUiContext';
 import { useGalleryData } from '@features/gallery/ui/useGalleryData';
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 
@@ -28,7 +28,7 @@ export interface GalleryPickerScope {
  * differently.
  */
 export const useGalleryPickerScope = () => {
-  const { galleryValues } = useGalleryUi();
+  const { galleryValues } = useGalleryHost();
   const [scope, setScope] = useState<GalleryPickerScope>(() => ({
     boardId: getGalleryRawSelectedBoardId(galleryValues),
     galleryView: getGalleryView(galleryValues),

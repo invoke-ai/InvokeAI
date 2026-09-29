@@ -1,6 +1,3 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-
-
 import cv2 as cv
 import numpy
 from PIL import Image, ImageOps
