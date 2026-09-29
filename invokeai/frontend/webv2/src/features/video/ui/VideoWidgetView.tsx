@@ -424,7 +424,7 @@ export const VideoWidgetView = () => {
       policy.frames.kind === 'grid'
         ? {
             inputMax: policy.frames.max,
-            max: policy.frames.sliderMax ?? policy.frames.max,
+            max: policy.frames.max,
             min: policy.frames.min,
             step: policy.frames.step,
           }
