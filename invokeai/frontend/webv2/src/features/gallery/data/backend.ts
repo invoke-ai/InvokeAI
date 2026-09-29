@@ -792,11 +792,12 @@ export const searchGallerySemantic = async (
   query: Exclude<GallerySemanticQuery, { kind: 'cluster' }>,
   {
     boardId,
+    includeVideos = true,
     limit = SEMANTIC_SEARCH_MAX_RESULTS,
     signal,
-  }: { boardId?: string; limit?: number; signal?: AbortSignal } = {}
+  }: { boardId?: string; includeVideos?: boolean; limit?: number; signal?: AbortSignal } = {}
 ): Promise<GallerySemanticResult[]> => {
-  const scope = { ...toSemanticScopeParams(boardId), include_videos: true, limit };
+  const scope = { ...toSemanticScopeParams(boardId), include_videos: includeVideos, limit };
 
   if (query.kind === 'url') {
     const params = toSearchParams({ image_url: query.url, ...scope });
@@ -890,6 +891,24 @@ export const listSemanticGalleryItemNames = async ({
     items: results.map((result) => result.ref),
     total: results.length,
   };
+};
+
+/** Semantic text matches across every accessible image, for the command palette. */
+export const listPaletteSemanticImages = async ({
+  limit,
+  query,
+  signal,
+}: {
+  limit: number;
+  query: string;
+  signal?: AbortSignal;
+}): Promise<GalleryImage[]> => {
+  const results = await searchGallerySemantic({ kind: 'text', query }, { includeVideos: false, limit, signal });
+
+  return getGalleryImagesByNames(
+    results.map((result) => result.ref.name),
+    signal
+  );
 };
 
 export const listPaletteImages = async ({

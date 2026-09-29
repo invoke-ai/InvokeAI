@@ -15,7 +15,12 @@ vi.mock('@platform/transport/http', () => ({
   sleep: vi.fn(),
 }));
 
-import { hydrateGalleryDateBoardItemPage, listSemanticGalleryItemNames, searchGallerySemantic } from './backend';
+import {
+  hydrateGalleryDateBoardItemPage,
+  listPaletteSemanticImages,
+  listSemanticGalleryItemNames,
+  searchGallerySemantic,
+} from './backend';
 import { canonicalizeGalleryItemsFilter, type GalleryItemsFilter } from './queries';
 
 const backendImage = (name: string) => ({
@@ -142,6 +147,28 @@ describe('semantic search scope', () => {
       '/api/v1/image_map/search_by_image?board_id=board-1&include_videos=true&limit=10',
       '/api/v1/image_map/search_by_image?image_url=https%3A%2F%2Fexample.com%2Fcat.jpg&board_id=board-1&include_videos=true&limit=10',
     ]);
+  });
+});
+
+describe('listPaletteSemanticImages', () => {
+  it('ranks images across the whole library and keeps rank order through hydration', async () => {
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson
+      .mockResolvedValueOnce({
+        results: [
+          { image_name: 'first.png', kind: 'image', score: 0.9 },
+          { image_name: 'second.png', kind: 'image', score: 0.8 },
+        ],
+      })
+      .mockResolvedValueOnce([backendImage('second.png'), backendImage('first.png')]);
+
+    const images = await listPaletteSemanticImages({ limit: 20, query: 'boats' });
+
+    // No board or date scope, and images only: the palette opens results in Preview.
+    expect(mocks.apiFetchJson.mock.calls[0]?.[0]).toBe(
+      '/api/v1/image_map/search?include_videos=false&limit=20&q=boats'
+    );
+    expect(images.map((image) => image.imageName)).toEqual(['first.png', 'second.png']);
   });
 });
 

@@ -69,6 +69,14 @@ export interface PaletteProviderQuery {
   range?: DateRange;
 }
 
+/** A provider throws this when it cannot search for a reason worth telling the user; its message is shown. */
+export class PaletteSearchUnavailableError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'PaletteSearchUnavailableError';
+  }
+}
+
 export interface PaletteSearchContext {
   signal: AbortSignal;
 }
@@ -86,6 +94,8 @@ export interface PaletteSearchProvider {
    * could only return broad unfiltered results.
    */
   supportsCreatedAtRange?: boolean;
+  /** Searches only once the user scopes into it; root mode offers just its scope row. For costly searches. */
+  scopedOnly?: boolean;
   search: (query: PaletteProviderQuery, context: PaletteSearchContext) => Promise<PaletteEntry[]> | PaletteEntry[];
 }
 

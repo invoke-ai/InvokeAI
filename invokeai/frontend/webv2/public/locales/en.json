@@ -42,7 +42,8 @@
       "resultCount": "{{count}} results.",
       "retrySearch": "Retry {{label}} search",
       "searching": "Searching…",
-      "searchingSection": "{{label}} — Searching…"
+      "searchingSection": "{{label}} — Searching…",
+      "semanticTextUnavailable": "The image index can't search by text right now. Its embedding model may lack a text encoder; searching the gallery by image still works."
     },
     "date": {
       "aWeekAgo": "A week ago",
@@ -107,6 +108,7 @@
       "noTitle": "Untitled generation",
       "promptHistory": "Prompt history",
       "queueItems": "Queue items",
+      "semanticImages": "Images by meaning",
       "uncategorized": "Uncategorized",
       "workflow": "Workflow",
       "workflows": "Workflows"

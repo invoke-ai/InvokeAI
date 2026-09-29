@@ -117,7 +117,12 @@ const CommandPaletteContent = ({
   if (controller.rows.length === 0) {
     if (controller.scopeIsError && controller.scopeLabel) {
       emptyState = (
-        <EmptyState danger py="6" title={t('commandPalette.states.couldNotSearch', { label: controller.scopeLabel })}>
+        <EmptyState
+          danger
+          description={controller.scopeErrorMessage}
+          py="6"
+          title={t('commandPalette.states.couldNotSearch', { label: controller.scopeLabel })}
+        >
           <Button size="xs" variant="subtle" onClick={controller.onRetry}>
             {t('common.retry')}
           </Button>
