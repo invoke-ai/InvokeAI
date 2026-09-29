@@ -106,6 +106,7 @@ const EDITOR_BOOT_SHARED_MODULES = [
   '/features/generation/queries.ts',
   '/features/generation/runtime.ts',
   '/features/generation/ui/promptFields/promptAttentionHotkeys.ts',
+  '/platform/ui/ResizeHandle.tsx',
   '/platform/ui/SeedInput.tsx',
   '/workbench/shell/topbar/LayoutPresetAdminDialogs.tsx',
   '/workbench/shell/topbar/LayoutPresetStrip.tsx',

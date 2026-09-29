@@ -88,6 +88,22 @@ const renderShell = async (region: 'bottom' | 'left' | 'right') => {
   return separator;
 };
 
+/** A real gesture: buttons held while moving, one frame for the move to land, then release. */
+const drag = async (separator: Element, axis: 'clientX' | 'clientY', delta: number) => {
+  const pointer = (type: string, at: number, buttons: number) =>
+    new PointerEvent(type, { bubbles: true, buttons, pointerId: 1, [axis]: at });
+
+  await interact(() => separator.dispatchEvent(pointer('pointerdown', 0, 1)));
+  await interact(() => window.dispatchEvent(pointer('pointermove', delta, 1)));
+  await act(
+    () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      })
+  );
+  await interact(() => window.dispatchEvent(pointer('pointerup', delta, 0)));
+};
+
 const getRegion = (region: 'bottom' | 'left' | 'right') =>
   storeRef.current!.getSnapshot().activeProject.widgetRegions[region];
 
@@ -121,9 +137,7 @@ describe('drag-to-collapse against the real aggregate', () => {
     const separator = await renderShell('left');
     const startSizePx = getRegion('left').sizePx;
 
-    await interact(() => separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0 })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: 260 - startSizePx })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointerup', { clientX: 260 - startSizePx })));
+    await drag(separator, 'clientX', 260 - startSizePx);
 
     expect(getRegion('left').isCollapsed).toBe(true);
     expect(getRegion('left').sizePx).toBe(startSizePx);
@@ -134,9 +148,7 @@ describe('drag-to-collapse against the real aggregate', () => {
     const separator = await renderShell('right');
     const startSizePx = getRegion('right').sizePx;
 
-    await interact(() => separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0 })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: startSizePx - 260 })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointerup', { clientX: startSizePx - 260 })));
+    await drag(separator, 'clientX', startSizePx - 260);
 
     expect(getRegion('right').isCollapsed).toBe(true);
   });
@@ -145,9 +157,7 @@ describe('drag-to-collapse against the real aggregate', () => {
     const separator = await renderShell('bottom');
     const startSizePx = getRegion('bottom').sizePx;
 
-    await interact(() => separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientY: 0 })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientY: startSizePx - 10 })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointerup', { clientY: startSizePx - 10 })));
+    await drag(separator, 'clientY', startSizePx - 10);
 
     expect(getRegion('bottom').isCollapsed).toBe(true);
   });
@@ -156,9 +166,7 @@ describe('drag-to-collapse against the real aggregate', () => {
     const separator = await renderShell('left');
     const startSizePx = getRegion('left').sizePx;
 
-    await interact(() => separator.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: 0 })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointermove', { clientX: 340 - startSizePx })));
-    await interact(() => window.dispatchEvent(new PointerEvent('pointerup', { clientX: 340 - startSizePx })));
+    await drag(separator, 'clientX', 340 - startSizePx);
 
     expect(getRegion('left').isCollapsed).toBe(false);
     expect(getRegion('left').sizePx).toBe(350);

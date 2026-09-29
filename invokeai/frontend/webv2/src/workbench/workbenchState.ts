@@ -529,14 +529,6 @@ export const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: nu
 export const getPanelCollapseThreshold = (region: WidgetRegion): number =>
   getPanelSizeBounds(region).min - PANEL_COLLAPSE_OVERSHOOT_PX;
 
-/** Reopens halfway back from the collapse threshold to prevent boundary flicker. */
-export const shouldSnapPanelShut = (region: WidgetRegion, rawSizePx: number, isSnapped: boolean): boolean =>
-  shouldSnapPanelShutAt(getPanelCollapseThreshold(region), rawSizePx, isSnapped);
-
-/** Measure overshoot from the rendered width when the viewport squeezes a panel below its minimum. */
-export const shouldSnapPanelShutAt = (thresholdPx: number, rawSizePx: number, isSnapped: boolean): boolean =>
-  rawSizePx <= thresholdPx + (isSnapped ? PANEL_COLLAPSE_OVERSHOOT_PX / 2 : 0);
-
 /** The collapse threshold for a panel currently rendered at `visibleSizePx`. */
 export const getVisiblePanelCollapseThreshold = (region: WidgetRegion, visibleSizePx: number): number =>
   Math.min(getPanelCollapseThreshold(region), visibleSizePx - PANEL_COLLAPSE_OVERSHOOT_PX);

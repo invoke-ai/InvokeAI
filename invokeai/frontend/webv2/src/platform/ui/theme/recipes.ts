@@ -1181,3 +1181,98 @@ export const dataListSlotRecipe = defineSlotRecipe({
     },
   },
 });
+
+const resizeGripIdle = { bg: 'border.emphasized' } as const;
+const resizeGripActive = { bg: 'fg.subtle' } as const;
+const resizeGripFocused = { bg: 'accent.solid' } as const;
+const resizeGrip = {
+  ...resizeGripIdle,
+  borderRadius: 'full',
+  content: '""',
+  position: 'absolute',
+  transition: 'background var(--wb-motion-duration-fast) ease',
+} as const;
+
+// A capsule on the divider line; odd sizes keep its edges on whole pixels either side of the 1px line.
+const resizeCapsule = {
+  bg: 'bg',
+  borderColor: 'border.emphasized',
+  borderRadius: 'full',
+  borderWidth: '1px',
+  boxShadow: 'xs',
+  content: '""',
+  position: 'absolute',
+  transition: 'border-color var(--wb-motion-duration-fast) ease',
+} as const;
+const resizeCapsuleStates = {
+  '&:hover::after, &[data-dragging]::after': { borderColor: 'fg.subtle' },
+  '&:focus-visible::after': { outline: '2px solid {colors.accent.solid}', outlineOffset: '1px' },
+  '&[data-collapse-armed]::after': { opacity: 0 },
+} as const;
+
+/**
+ * Every resize affordance: a hairline divider with a capsule grip at its middle. The hit strip covers the line and
+ * extends toward the end side, away from the scrollbar of the pane before it.
+ */
+export const resizeHandleSlotRecipe = defineSlotRecipe({
+  slots: ['root', 'handle'],
+  base: {
+    root: {
+      flexShrink: '0',
+      position: 'relative',
+      zIndex: 3,
+      // The line is a border, not a 1px background: at fractional display scales a background can round to two
+      // device pixels while every other border draws one. A pseudo-element keeps the hit strip's offsets unshifted.
+      _before: { borderColor: 'border.subtle', content: '""', inset: '0', position: 'absolute' },
+      '&:has([data-collapse-armed])::before': { borderColor: 'transparent' },
+    },
+    handle: {
+      outline: 'none',
+      position: 'absolute',
+      touchAction: 'none',
+    },
+  },
+  variants: {
+    orientation: {
+      vertical: {
+        root: { alignSelf: 'stretch', w: '1px', _before: { borderLeftWidth: '1px' } },
+        handle: {
+          bottom: '0',
+          cursor: 'col-resize',
+          left: '-1px',
+          top: '0',
+          w: '9px',
+          _after: { ...resizeCapsule, h: '25px', left: '-3px', top: '50%', transform: 'translateY(-50%)', w: '9px' },
+          ...resizeCapsuleStates,
+        },
+      },
+      horizontal: {
+        root: { alignSelf: 'stretch', h: '1px', _before: { borderTopWidth: '1px' } },
+        handle: {
+          cursor: 'row-resize',
+          h: '9px',
+          left: '0',
+          right: '0',
+          top: '-1px',
+          _after: { ...resizeCapsule, h: '9px', left: '50%', top: '-3px', transform: 'translateX(-50%)', w: '25px' },
+          ...resizeCapsuleStates,
+        },
+      },
+      // The grip bent into an L along the window's bottom-right corner.
+      corner: {
+        root: {},
+        handle: {
+          bottom: '0',
+          cursor: 'nwse-resize',
+          h: '4',
+          right: '0',
+          w: '4',
+          _before: { ...resizeGrip, bottom: '3px', h: '3px', right: '3px', w: '3' },
+          _after: { ...resizeGrip, bottom: '3px', h: '3', right: '3px', w: '3px' },
+          '&:hover::before, &:hover::after, &[data-dragging]::before, &[data-dragging]::after': resizeGripActive,
+          '&:focus-visible::before, &:focus-visible::after': resizeGripFocused,
+        },
+      },
+    },
+  },
+});

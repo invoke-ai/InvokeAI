@@ -747,6 +747,7 @@
           "source:src/platform/ui/Popover.tsx",
           "source:src/platform/ui/RenameDialog.tsx",
           "source:src/platform/ui/ResizableTextarea.tsx",
+          "source:src/platform/ui/ResizeHandle.tsx",
           "source:src/platform/ui/RetryBoundary.tsx",
           "source:src/platform/ui/Row.tsx",
           "source:src/platform/ui/Scrollable.tsx",

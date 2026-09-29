@@ -40,7 +40,6 @@ import {
   clampPanelSize,
   createDraftProject,
   getPanelCollapseThreshold,
-  shouldSnapPanelShut,
   normalizeWorkbenchAccount,
   normalizeWorkbenchProject,
 } from './workbenchState';
@@ -821,21 +820,6 @@ describe('workbench panel resize bounds', () => {
     expect(clampPanelSize('left', 900)).toBe(720);
     expect(clampPanelSize('left', 700)).toBe(700);
     expect(clampPanelSize('left', 100)).toBe(350);
-  });
-
-  it('snaps shut past the overshoot and reopens with hysteresis', () => {
-    expect(shouldSnapPanelShut('left', 350, false)).toBe(false);
-    expect(shouldSnapPanelShut('left', 271, false)).toBe(false);
-    expect(shouldSnapPanelShut('left', 270, false)).toBe(true);
-    // Once shut, dragging back only reopens past the halfway band.
-    expect(shouldSnapPanelShut('left', 290, true)).toBe(true);
-    expect(shouldSnapPanelShut('left', 311, true)).toBe(false);
-  });
-
-  it('measures the overshoot against whichever floor the region has', () => {
-    expect(shouldSnapPanelShut('bottom', 96, false)).toBe(false);
-    expect(shouldSnapPanelShut('bottom', 17, false)).toBe(false);
-    expect(shouldSnapPanelShut('bottom', 16, false)).toBe(true);
   });
 
   it('exposes the collapse threshold as a size below the floor', () => {
