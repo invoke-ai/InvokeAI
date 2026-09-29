@@ -519,7 +519,7 @@ describe('InvocationFlowNode output preview', () => {
     expect(exportedText).toContain('N’importe quelle sortie');
   });
 
-  it('includes a failed node reason in the export even though its outcome icon is hidden', async () => {
+  it('marks a failed node in the export without including its backend diagnostic', async () => {
     const execution = createExecutionPort(callNodeId);
     execution.set({
       error: 'Child node failed',
@@ -537,6 +537,7 @@ describe('InvocationFlowNode output preview', () => {
     });
 
     await render(adapter, 1, true, callFlowNodes);
+    await page.screenshot({ path: '../../../../../artifacts/workflow-export-failed-label.png' });
     const flowElement = host.querySelector<HTMLElement>('.react-flow')!;
     await exportWorkflowAsPng({
       bounds: { x: 20, y: 20, width: 300, height: 260 },
@@ -548,7 +549,9 @@ describe('InvocationFlowNode output preview', () => {
     expect(capturedClone?.querySelector('[data-node-status-indicator="true"]')?.getAttribute('style')).toContain(
       'display: none'
     );
-    expect(capturedClone?.textContent).toContain('Failed: Child workflow error: Child node failed');
+    expect(capturedClone?.textContent).toContain('Failed');
+    expect(capturedClone?.textContent).not.toContain('Child node failed');
+    expect(capturedClone?.textContent).not.toContain('Child workflow error');
   });
 
   it('keeps the visible collapsed node unchanged while an expanded offscreen snapshot is rasterizing', async () => {

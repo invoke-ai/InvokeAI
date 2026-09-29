@@ -391,11 +391,11 @@ const NodeUpdateIcon = ({
 };
 
 const NodeInfoTooltipContent = ({
-  executionError = null,
+  isFailed = false,
   node,
   template,
 }: {
-  executionError?: string | null;
+  isFailed?: boolean;
   node: WorkflowInvocationNode;
   template: InvocationNodeTemplateView['template'];
 }) => {
@@ -413,12 +413,7 @@ const NodeInfoTooltipContent = ({
       {updateStatusText ? <Text color="fg.warning">{updateStatusText}</Text> : null}
       <Text color="fg.subtle">{t('nodes.nodeClassification', { classification: template.classification })}</Text>
       <Text color="fg.subtle">{t('nodes.nodeCategory', { category: template.category })}</Text>
-      {executionError !== null ? (
-        <Text color="fg.error">
-          {t('nodes.executionFailed')}
-          {executionError ? `: ${executionError}` : null}
-        </Text>
-      ) : null}
+      {isFailed ? <Text color="fg.error">{t('nodes.executionFailed')}</Text> : null}
       {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
       {node.data.notes ? <Text>{node.data.notes}</Text> : null}
     </Stack>
@@ -1057,13 +1052,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
       </Flex>
       {isWorkflowImageExport ? (
         <Box data-workflow-export-content="true" maxW="full" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
-          <NodeInfoTooltipContent
-            executionError={
-              execution?.status === 'failed' ? (getNodeExecutionError(node, execution.error, t) ?? '') : null
-            }
-            node={node}
-            template={template}
-          />
+          <NodeInfoTooltipContent isFailed={execution?.status === 'failed'} node={node} template={template} />
         </Box>
       ) : null}
       <NodeProgressStrip execution={execution} />
