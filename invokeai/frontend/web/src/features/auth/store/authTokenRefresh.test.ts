@@ -4,10 +4,15 @@ import {
   beginAuthTransition,
   captureAuthGeneration,
   createMediaAuthLock,
+  markTokenRefreshAccepted,
   runWithMediaAuthLock,
   shouldAcceptRefreshedToken,
   shouldEndSessionForUnauthorized,
+  shouldThrottleRefreshedToken,
 } from './authTokenRefresh';
+
+const tokenFor = (userId: string, nonce: number, epoch: number) =>
+  `header.${btoa(JSON.stringify({ user_id: userId, nonce, token_epoch: epoch }))}.signature`;
 
 describe('refreshed token acceptance', () => {
   beforeAll(() => {
@@ -53,11 +58,90 @@ describe('refreshed token acceptance', () => {
     expect(shouldAcceptRefreshedToken('token-a', generation)).toBe(false);
   });
 
+  it('accepts a password-change replacement after a routine refresh of the same session committed first', () => {
+    // The request carried T0; a routine refresh T0' (same user and epoch) committed before the
+    // password change's epoch-advancing replacement R arrived.
+    const requestToken = tokenFor('user', 1, 0);
+    localStorage.setItem('auth_token', requestToken);
+    const generation = captureAuthGeneration();
+    localStorage.setItem('auth_token', tokenFor('user', 2, 0));
+
+    expect(shouldAcceptRefreshedToken(requestToken, generation, tokenFor('user', 3, 1))).toBe(true);
+  });
+
+  it('still rejects a routine refresh superseded by a newer refresh of the same session', () => {
+    const requestToken = tokenFor('user', 1, 0);
+    localStorage.setItem('auth_token', requestToken);
+    const generation = captureAuthGeneration();
+    localStorage.setItem('auth_token', tokenFor('user', 2, 0));
+
+    expect(shouldAcceptRefreshedToken(requestToken, generation, tokenFor('user', 3, 0))).toBe(false);
+  });
+
+  it('rejects an epoch replacement once the stored token is no longer the same session', () => {
+    const requestToken = tokenFor('user', 1, 0);
+    localStorage.setItem('auth_token', requestToken);
+    const generation = captureAuthGeneration();
+    const replacement = tokenFor('user', 3, 1);
+
+    // Already moved past this epoch (e.g. a newer replacement committed first).
+    localStorage.setItem('auth_token', tokenFor('user', 4, 2));
+    expect(shouldAcceptRefreshedToken(requestToken, generation, replacement)).toBe(false);
+
+    // Another user's token.
+    localStorage.setItem('auth_token', tokenFor('other', 5, 0));
+    expect(shouldAcceptRefreshedToken(requestToken, generation, replacement)).toBe(false);
+
+    // Logged out.
+    localStorage.removeItem('auth_token');
+    expect(shouldAcceptRefreshedToken(requestToken, generation, replacement)).toBe(false);
+  });
+
+  it('rejects an epoch replacement after a login transition started', () => {
+    const requestToken = tokenFor('user', 1, 0);
+    localStorage.setItem('auth_token', requestToken);
+    const generation = captureAuthGeneration();
+    beginAuthTransition();
+    localStorage.setItem('auth_token', tokenFor('user', 2, 0));
+
+    expect(shouldAcceptRefreshedToken(requestToken, generation, tokenFor('user', 3, 1))).toBe(false);
+  });
+
   it('recovers from a malformed stored generation', () => {
     localStorage.setItem('auth_generation', 'not-a-number');
 
     expect(captureAuthGeneration()).toBe(0);
     expect(beginAuthTransition()).toBe(1);
+  });
+
+  it('does not throttle the replacement token that advances the current user revocation epoch', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(100_000);
+    markTokenRefreshAccepted();
+
+    expect(shouldThrottleRefreshedToken(tokenFor('user', 1, 0), tokenFor('user', 2, 1))).toBe(false);
+
+    now.mockRestore();
+  });
+
+  it('keeps routine, cross-user, and unreadable replacements throttled', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(200_000);
+    markTokenRefreshAccepted();
+
+    expect(shouldThrottleRefreshedToken(tokenFor('user', 1, 1), tokenFor('user', 2, 1))).toBe(true);
+    expect(shouldThrottleRefreshedToken(tokenFor('user-a', 1, 0), tokenFor('user-b', 2, 1))).toBe(true);
+    expect(shouldThrottleRefreshedToken('opaque-old', 'opaque-new')).toBe(true);
+
+    now.mockRestore();
+  });
+
+  it('accepts a routine same-epoch replacement after the throttle window', () => {
+    const now = vi.spyOn(Date, 'now').mockReturnValue(300_000);
+    markTokenRefreshAccepted();
+    now.mockReturnValue(360_001);
+
+    expect(shouldThrottleRefreshedToken(tokenFor('user', 1, 1), tokenFor('user', 2, 1))).toBe(false);
+
+    now.mockRestore();
   });
 
   it('serializes media-cookie writes', async () => {
