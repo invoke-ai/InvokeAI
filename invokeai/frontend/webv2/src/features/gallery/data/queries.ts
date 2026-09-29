@@ -1,5 +1,6 @@
 import type { GalleryItem, GalleryItemsPage } from '@features/gallery/core/items';
 import type { GallerySemanticQuery, GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
+import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoardOrderBy, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
@@ -60,9 +61,9 @@ export interface GalleryItemsFilter {
   orderDir?: GalleryOrderDir;
   searchTerm: string;
   /**
-   * When set, items come from semantic image-similarity search (relevance
-   * order) instead of the board listing; board/order/starred controls do not
-   * apply to a ranked result set.
+   * When set, items come from semantic image-similarity search over the board
+   * (relevance order) instead of the board listing; order/starred controls do
+   * not apply to a ranked result set.
    */
   semanticQuery?: GallerySemanticReference | null;
   /** true = only starred items, false = only unstarred; absent = all. */
@@ -121,10 +122,10 @@ export const canonicalizeGalleryItemsFilter = (filter: GalleryItemsFilter): Cano
   const semantic = filter.semanticQuery ? toGallerySemanticQuery(filter.semanticQuery) : undefined;
 
   if (semantic) {
-    // Pin irrelevant filter fields to canonical values: semantic rankings depend only on the query, and distinct
-    // keys would repeat uploads or downloads.
+    // Pin irrelevant filter fields to canonical values: rankings depend only on the query and its board (a cluster is
+    // a fixed member list with no board), and distinct keys would repeat uploads or downloads.
     return {
-      boardId: '',
+      boardId: semantic.kind === 'cluster' ? '' : filter.boardId,
       galleryView: 'images',
       orderDir: 'DESC',
       searchTerm: '',
@@ -193,7 +194,7 @@ const galleryItemNamesOptionsForOwner = (owner: AccountScope, filter: CanonicalG
     queryFn: async ({ signal }) => {
       const requestSignal = AbortSignal.any([signal, owner.signal]);
       const result = await (filter.semantic
-        ? listSemanticGalleryItemNames({ query: filter.semantic, signal: requestSignal })
+        ? listSemanticGalleryItemNames({ boardId: filter.boardId, query: filter.semantic, signal: requestSignal })
         : isDateBoardId(filter.boardId)
           ? listGalleryDateBoardItemNames({ ...filter, signal: requestSignal })
           : listGalleryItemNames({ ...filter, signal: requestSignal }));
@@ -373,6 +374,14 @@ export const galleryBoardsOptions = (query: GalleryBoardsQuery = {}) => {
     staleTime: 60_000,
   });
 };
+
+/** The boards query the gallery grid resolves its selected board against. */
+export const getGalleryListingBoardsQuery = (settings: GallerySettings): GalleryBoardsQuery => ({
+  includeArchived: settings.showArchivedBoards,
+  includeDateBoards: settings.showDateBoards,
+  orderBy: settings.boardOrderBy,
+  orderDir: settings.boardOrderDir,
+});
 
 const getNextPageParam = (
   window: GalleryItemsWindow,

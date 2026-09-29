@@ -27,7 +27,13 @@ def _mock_wan_vae(
     vae.config.scale_factor_temporal = temporal_scale
     vae.config.latents_mean = [0.0] * z_dim
     vae.config.latents_std = [1.0] * z_dim
+    # `patch_qwen_image_vae_tiling` snapshots and restores all five, and `enable_tiling` writes
+    # all four geometry values rather than inheriting any.
+    vae.use_tiling = False
     vae.tile_sample_min_height = 256
+    vae.tile_sample_min_width = 256
+    vae.tile_sample_stride_height = 192
+    vae.tile_sample_stride_width = 192
     return vae
 
 
@@ -298,6 +304,9 @@ class TestWanInvocationsRequestWorkingMemory:
 
     def test_latents_to_video_falls_back_to_tiling_when_estimate_exceeds_vram(self):
         vae = _mock_wan_vae()
+        # Not 256: the point of the change is that the tile comes from a module constant rather than
+        # from the shared cache instance, and with 256 on the instance both implementations agree.
+        vae.tile_sample_min_height = 999
         vae_info = _mock_vae_info(vae)
         mock_context = self._video_context(vae_info)
 
@@ -320,8 +329,15 @@ class TestWanInvocationsRequestWorkingMemory:
 
         assert mock_estimate.call_count == 2
         assert mock_estimate.call_args_list[1].kwargs["tile_size"] == 256
-        vae.enable_tiling.assert_called_once()
-        vae.disable_tiling.assert_called_once()
+        # All four geometry values are set explicitly rather than inherited from the shared module:
+        # `enable_tiling` falls back to whatever the instance carries for any argument left out, and
+        # a min below the inherited stride drops whole bands of the frame.
+        vae.enable_tiling.assert_called_once_with(
+            tile_sample_min_height=256,
+            tile_sample_min_width=256,
+            tile_sample_stride_height=192,
+            tile_sample_stride_width=192,
+        )
         vae_info.model_on_device.assert_called_once_with(working_mem_bytes=4 * 2**30)
 
     def test_latents_to_video_skips_tiling_for_cpu_only_vae(self):

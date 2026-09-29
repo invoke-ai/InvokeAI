@@ -1,16 +1,21 @@
+import type { GalleryImage } from '@features/gallery/contracts';
 import type { HotkeyDefinition } from '@workbench/hotkeys/types';
 import type { WorkbenchPreferences } from '@workbench/settings/contracts';
 import type { openWidgetPlacement as OpenWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import type { getWidgetsForRegion as GetWidgetsForRegion } from '@workbench/widgetRegistry';
 import type { TFunction } from 'i18next';
 
+import { imageIndexAvailabilityOptions } from '@features/gallery/queries';
 import { flushGenerateDrafts, notifyGenerateModelSelectionCleared } from '@features/generation/react';
 import { getModelsSnapshot } from '@features/models';
 import { getQueueQueryScope, getQueueReadModelOptions } from '@features/queue/queries';
 import { queryClient } from '@platform/query/client';
+import { useQuery } from '@tanstack/react-query';
 import { recallProjectPromptHistoryItem, selectProjectGenerateModel } from '@workbench/generationSettingsOrchestration';
+import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { getLayoutPresetCommandTitleOverrides } from '@workbench/layoutPresetSnapshots';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
+import { useAvailableSettings } from '@workbench/settings/useAvailableSettings';
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
@@ -34,6 +39,7 @@ import {
   createModelsProvider,
   createPromptHistoryProvider,
   createQueueItemsProvider,
+  createSemanticImagesProvider,
   createWorkflowsProvider,
 } from './paletteProviders';
 
@@ -82,6 +88,7 @@ const WorkbenchCommandPaletteDialog = ({
   const presentWidgetTypeIds = useActiveProjectSelector((project) =>
     [...new Set(Object.values(project.widgetInstances).map((instance) => instance.typeId))].sort()
   );
+  const settingsSections = useAvailableSettings();
   const paletteStore = extensions.stores.palette;
   const paletteContributions = useSyncExternalStore(paletteStore.subscribe, paletteStore.list, paletteStore.list);
   const commandTitleOverrides = useMemo(
@@ -122,7 +129,7 @@ const WorkbenchCommandPaletteDialog = ({
           formatHotkey
         )
       ),
-      ...buildSettingsEntries(preferences, settingsEntryDeps, t),
+      ...buildSettingsEntries(preferences, settingsEntryDeps, t, settingsSections),
     ],
     [
       catalog,
@@ -134,11 +141,14 @@ const WorkbenchCommandPaletteDialog = ({
       preferences,
       presentWidgetTypeIds,
       settingsEntryDeps,
+      settingsSections,
       t,
     ]
   );
 
   const workbenchCommands = useWorkbenchCommands();
+  const findGalleryItem = useFindGalleryItem();
+  const isImageIndexReady = useQuery(imageIndexAvailabilityOptions()).data?.state === 'ready';
   const searchStore = extensions.stores.search;
   const extensionSearchProviders = useSyncExternalStore(searchStore.subscribe, searchStore.list, searchStore.list);
   const readCurrentGenerateContext = useCallback(() => {
@@ -171,6 +181,14 @@ const WorkbenchCommandPaletteDialog = ({
         widgets,
       });
 
+    const imageEntryDeps = {
+      openPreviewWidget: () => openWidget('preview'),
+      revealImage: (image: GalleryImage) => findGalleryItem({ kind: 'image', name: image.imageName }),
+      selectImage: (image: GalleryImage) => gallery.selectImage(image),
+      locale: i18n.resolvedLanguage,
+      t,
+    };
+
     return [
       createWorkflowsProvider({ openWorkflowWidget: () => openWidget('workflow'), t }),
       createBoardsProvider({
@@ -201,14 +219,9 @@ const WorkbenchCommandPaletteDialog = ({
         openModelManager: () => void executeCommand('app.selectModelsTab'),
         t,
       }),
-      createImagesProvider({
-        openGalleryWidget: () => openWidget('gallery'),
-        openPreviewWidget: () => openWidget('preview'),
-        selectBoard: (boardId) => gallery.selectBoard(boardId),
-        selectImage: (image) => gallery.selectImage(image),
-        locale: i18n.resolvedLanguage,
-        t,
-      }),
+      createImagesProvider(imageEntryDeps),
+      // Offered only on a ready index; otherwise its scope row would lead to an unexplained empty list.
+      ...(isImageIndexReady ? [createSemanticImagesProvider(imageEntryDeps)] : []),
       createQueueItemsProvider({
         contextKey: queueScope.originPrefix ?? 'all-projects',
         loadQueue: () => queryClient.fetchQuery(getQueueReadModelOptions(queueScope)),
@@ -241,6 +254,8 @@ const WorkbenchCommandPaletteDialog = ({
   }, [
     executeCommand,
     extensionSearchProviders,
+    findGalleryItem,
+    isImageIndexReady,
     extensions,
     i18n.resolvedLanguage,
     notify,

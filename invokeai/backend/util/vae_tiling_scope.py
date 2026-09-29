@@ -1,15 +1,15 @@
-"""Scoped VAE tiling state.
+"""Scoped VAE tiling state, and the tile size a node's field resolves to.
 
 The VAE instances these helpers take belong to the model cache and are shared across invocations and
-across *nodes*: the FLUX.1 autoencoder is reached by nine call sites, and a diffusers AutoencoderKL
-loaded for Z-Image is reached by several more. Tiling is a property of one decode, not of the model,
-so it has to be restored rather than merely turned off -- `disable_tiling()` clears the flag but
-leaves the geometry, and most of the consumers never touch the flag at all.
+across *nodes*: the FLUX.1 autoencoder is reached by nine call sites, and the diffusers
+`AutoencoderKL` it is loaded as also serves Z-Image. Tiling is a property of one decode, not of the
+model, so it has to be restored rather than merely turned off -- `disable_tiling()` clears the flag
+but leaves the geometry, and most of the consumers never touch the flag at all.
 
 Two siblings solve the same problem for their own classes: `patch_qwen_image_vae_tiling` for the
-Qwen-Image VAE, and `stable_diffusion.vae_tiling.patch_vae_tiling_params` for SD's. Neither fits
-here -- the SD one is typed to AutoencoderKL/AutoencoderTiny, patches three diffusers-specific
-attributes the FLUX autoencoder does not have, and leaves `use_tiling` to the caller.
+Qwen-Image and Wan VAEs, whose geometry is named `tile_sample_min_height`/`tile_sample_stride_*` and
+which have no `tile_overlap_factor` at all, and `stable_diffusion.vae_tiling.patch_vae_tiling_params`
+for SD's, which leaves `use_tiling` to the caller.
 
 `diffusers_latent_tile` and `diffusers_vae_downsample` state constraints of the diffusers VAE
 classes rather than of this module, which is why they are public: the SD sibling derived the tile
@@ -20,15 +20,22 @@ third copy of that arithmetic is the failure mode this module exists to stop.
 from contextlib import contextmanager
 from typing import Any, Iterator
 
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder, resolve_tile_size
+# Tile geometry for tiled encode and decode, in output-pixel units. 512px is the geometry the
+# diffusers VAEs and the Anima node use.
+DEFAULT_TILE_SAMPLE_MIN_SIZE = 512
 
-# Attributes that carry tiling state, across the VAE classes that reach these nodes: InvokeAI's FLUX
-# AutoEncoder and diffusers' AutoencoderKL. Read defensively -- a class that has none of them simply
-# has nothing to restore.
+# A cost floor, not a correctness one: the geometry stays valid all the way down, but the tile count
+# grows with the inverse square of the tile size. At 2048x2048 a 128px tile already emits 289 tiles;
+# a 16px tile would emit ~16k, and the per-tile kernel-launch overhead dominates long before that.
+# Small tiles are also measurably less accurate, because more tiles mean the blend bands sit closer
+# to the tiles' own borders, so the low end of a node field is clamped rather than honoured.
+MIN_TILE_SAMPLE_SIZE = 128
+
+# Attributes that carry tiling state on the `AutoencoderKL` family. Read defensively -- a class that
+# has none of them simply has nothing to restore.
 _TILING_ATTRS = (
     "use_tiling",
     "tile_sample_min_size",
-    "tile_overlap",
     "tile_latent_min_size",
     "tile_overlap_factor",
 )
@@ -41,28 +48,40 @@ _MISSING = object()
 _MIN_DIFFUSERS_LATENT_TILE = 4
 
 
+def resolve_tile_size(tile_size: int) -> int:
+    """Resolve a node's ``tile_size`` field to the size the VAE will actually be given.
+
+    ``tile_size <= 0`` is the nodes' "use the default" sentinel -- the workflow UI cannot represent
+    ``None`` in a number input and sends 0, and a negative value is not worth failing a generation
+    over. It resolves to the module-level default rather than to whatever is currently set on the
+    VAE: the instance belongs to the model cache, so reading it back would return whatever the
+    previous invocation left there.
+    """
+    if tile_size <= 0:
+        return DEFAULT_TILE_SAMPLE_MIN_SIZE
+    return max(tile_size, MIN_TILE_SAMPLE_SIZE)
+
+
 @contextmanager
 def scoped_vae_tiling(vae: Any, tile_size: int | None) -> Iterator[None]:
     """Set the VAE's tiling state for the duration of the block, then restore exactly what was there.
 
-    `tile_size=None` decodes in a single pass; `0` means "the VAE's own default"; any other value is
-    the tile size in output pixels.
+    `tile_size=None` runs in a single pass; `0` is the node fields' sentinel and resolves to
+    `DEFAULT_TILE_SAMPLE_MIN_SIZE`, *not* to the VAE's own `sample_size` -- which is 1024 for the
+    FLUX.1 autoencoder and would not tile a 1024px image at all. Any other value is the tile size in
+    output pixels, floored at `MIN_TILE_SAMPLE_SIZE`.
     """
     original = {name: getattr(vae, name, _MISSING) for name in _TILING_ATTRS}
     try:
         if tile_size is None:
             vae.disable_tiling()
-        elif _accepts_tile_size(vae):
-            # resolve_tile_size owns the 0/negative sentinel and the cost floor, so every caller
-            # gets the same answer for the same field value.
-            vae.enable_tiling(tile_sample_min_size=resolve_tile_size(tile_size))
         else:
             # Diffusers' `AutoencoderKL.enable_tiling()` takes no arguments and leaves the geometry
-            # at the VAE's own `sample_size` -- 1024 for Z-Image, which means a 1024px decode does
-            # not tile at all while the caller's working-memory reservation assumes it did. Setting
-            # the two attributes afterwards is how the rest of this codebase sizes a diffusers VAE's
-            # tiles; see `flux2/ref_image_extension.py`, which forces 512 for the same reason. Both
-            # are in `_TILING_ATTRS`, so the finally block puts them back.
+            # at the VAE's own `sample_size` -- 1024 for the FLUX.1 autoencoder, which means a
+            # 1024px decode does not tile at all while the caller's working-memory reservation
+            # assumes it did. Setting the two attributes afterwards is how the rest of this codebase
+            # sizes a diffusers VAE's tiles; see `flux2/ref_image_extension.py`, which forces 512
+            # for the same reason. Both are in `_TILING_ATTRS`, so the finally block puts them back.
             downsample = diffusers_vae_downsample(vae)
             latent_tile = diffusers_latent_tile(resolve_tile_size(tile_size), downsample, vae.tile_overlap_factor)
             vae.enable_tiling()
@@ -73,11 +92,6 @@ def scoped_vae_tiling(vae: Any, tile_size: int | None) -> Iterator[None]:
         for name, value in original.items():
             if value is not _MISSING:
                 setattr(vae, name, value)
-
-
-def _accepts_tile_size(vae: Any) -> bool:
-    """True if `enable_tiling` takes a tile size. Diffusers' AutoencoderKL takes no arguments."""
-    return isinstance(vae, AutoEncoder)
 
 
 def diffusers_vae_downsample(vae: Any) -> int:

@@ -7,6 +7,7 @@ import { Button, CloseButton } from './Button';
 export const ConfirmDialog = ({
   body,
   confirmLabel,
+  finalFocusEl,
   isDestructive = true,
   isOpen,
   onClose,
@@ -15,6 +16,8 @@ export const ConfirmDialog = ({
 }: {
   body: ReactNode;
   confirmLabel: string;
+  /** Where focus returns on close when the opener may no longer exist, e.g. a row the confirmed action deleted. */
+  finalFocusEl?: () => HTMLElement | null;
   isDestructive?: boolean;
   isOpen: boolean;
   onClose: () => void;
@@ -64,6 +67,7 @@ export const ConfirmDialog = ({
     <Dialog.Root
       closeOnEscape={!isPending}
       closeOnInteractOutside={!isPending}
+      finalFocusEl={finalFocusEl}
       open={isOpen}
       role="alertdialog"
       size="sm"

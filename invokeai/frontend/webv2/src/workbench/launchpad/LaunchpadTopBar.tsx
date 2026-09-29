@@ -5,10 +5,7 @@ import { AccountMenu } from '@features/identity';
 import { useConnectionStatusSelector } from '@platform/transport/connectionStore';
 import { InvokeMark } from '@platform/ui/InvokeMark';
 import { PaletteButton } from '@workbench/palette/PaletteButton';
-import { SettingsButton } from '@workbench/settings/SettingsButton';
 import { useTranslation } from 'react-i18next';
-
-import { OpenProjectsControl } from './OpenProjectsControl';
 
 const CONNECTION_LABEL_KEY: Record<Exclude<BackendConnectionStatus, 'connected'>, string> = {
   connecting: 'launchpad.connection.connecting',
@@ -61,13 +58,11 @@ export const LaunchpadTopBar = () => (
       <Text fontSize="sm" fontWeight="700">
         Invoke
       </Text>
-      <OpenProjectsControl />
     </HStack>
     <HStack gap="2">
       <ConnectionChip />
       <HStack gap="0.5">
         <PaletteButton />
-        <SettingsButton />
         <AccountMenu />
       </HStack>
     </HStack>

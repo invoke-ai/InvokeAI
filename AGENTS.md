@@ -7,7 +7,7 @@
 
 ## Find the right owner
 
-Before editing, read `AGENTS.md` along each target path; scoped rules supplement this file. Keep policy in `AGENTS.md`; `CLAUDE.md` files only import their sibling.
+Before editing, read `AGENTS.md` along each target path; scoped rules supplement this file. Keep policy in `AGENTS.md`.
 
 | Area | Guidance and source of truth |
 | --- | --- |

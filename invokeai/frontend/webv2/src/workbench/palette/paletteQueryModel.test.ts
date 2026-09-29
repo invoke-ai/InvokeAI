@@ -73,6 +73,19 @@ describe('derivePaletteQueryModel', () => {
     expect(result.liveProviderQuery).toEqual({ range: { from: '2026-07-14', to: undefined }, text: '' });
   });
 
+  it('runs a scoped-only provider once the user scopes into it, never from the root query', () => {
+    const images = provider('images');
+    const semantic = { ...provider('semantic'), scopedOnly: true };
+
+    expect(
+      derivePaletteQueryModel({ providers: [images, semantic], state: queriedState('boats') }).activeProviders
+    ).toEqual([images]);
+    expect(
+      derivePaletteQueryModel({ providers: [images, semantic], state: enterPaletteScope('semantic', 'boats') })
+        .activeProviders
+    ).toEqual([semantic]);
+  });
+
   it('reports when the live query is ahead of the debounced provider query', () => {
     const result = derivePaletteQueryModel({ providers: [provider('entities')], state: queriedState('new', 'old') });
 

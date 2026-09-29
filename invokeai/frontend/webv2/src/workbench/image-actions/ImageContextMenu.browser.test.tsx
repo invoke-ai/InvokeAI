@@ -38,6 +38,7 @@ const image = (imageName: string): GalleryImage => ({
 });
 
 const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions => ({
+  canUseAsConditioningClip: { audio: false, video: false },
   canUseAsReferenceImage: false,
   canUseAsReferenceVideo: false,
   copyImage: vi.fn(() => Promise.resolve()),
@@ -66,6 +67,7 @@ const createActions = (deleteItems: ImageActions['deleteItems']): ImageActions =
   savePromptAsTemplate: vi.fn(),
   sendToInitialVideo: vi.fn(),
   useAsReferenceImage: vi.fn(),
+  useAsConditioningClip: vi.fn(),
   useAsReferenceVideo: vi.fn(),
 });
 
@@ -354,6 +356,58 @@ describe('ImageContextMenu video placement', () => {
 
     expect(getMenuItem('Use as Reference Video').getAttribute('aria-disabled')).toBe('true');
     expect(getMenuItem('Extend in Video').getAttribute('aria-disabled')).not.toBe('true');
+  });
+
+  const openConditioningSubmenu = async (): Promise<void> => {
+    await hoverItem(getMenuItem('Use as Conditioning Clip'));
+    await settleUntil(
+      () =>
+        Array.from(document.querySelectorAll('[role="menuitem"]')).some(
+          (candidate) => candidate.textContent?.trim() === 'widgets.video.conditioningRoleAudio'
+        ),
+      'the conditioning clip submenu to open',
+      5000
+    );
+  };
+
+  it('hands the video to the conditioning clip action in the chosen role', async () => {
+    const video = item('video', 'clip.mp4');
+    const actions = { ...createActions(vi.fn()), canUseAsConditioningClip: { audio: true, video: true } };
+    await renderVideoMenu(actions, video);
+    await openConditioningSubmenu();
+
+    await interact(() => getMenuItem('widgets.video.conditioningRoleAudio').click());
+
+    expect(actions.useAsConditioningClip).toHaveBeenCalledExactlyOnceWith(video, 'audio');
+  });
+
+  it('enables each role from its own capability flag', async () => {
+    const video = item('video', 'clip.mp4');
+    const actions = { ...createActions(vi.fn()), canUseAsConditioningClip: { audio: false, video: true } };
+    await renderVideoMenu(actions, video);
+    await openConditioningSubmenu();
+
+    expect(getMenuItem('widgets.video.conditioningRoleAudio').getAttribute('aria-disabled')).toBe('true');
+    await interact(() => getMenuItem('widgets.video.conditioningRoleVideo').click());
+    expect(actions.useAsConditioningClip).toHaveBeenCalledExactlyOnceWith(video, 'video');
+  });
+
+  it('disables the roles the Video panel cannot take, and the picture of a wrapped audio upload', async () => {
+    const song = { ...item('video', 'song.mp4'), mediaOrigin: 'audio_upload' };
+    const actions = { ...createActions(vi.fn()), canUseAsConditioningClip: { audio: true, video: true } };
+    await renderVideoMenu(actions, song);
+    await openConditioningSubmenu();
+
+    expect(getMenuItem('widgets.video.conditioningRoleAudio').getAttribute('aria-disabled')).not.toBe('true');
+    expect(getMenuItem('widgets.video.conditioningRoleVideo').getAttribute('aria-disabled')).toBe('true');
+
+    await interact(() => root?.unmount());
+    host?.remove();
+    await renderVideoMenu(createActions(vi.fn()), item('video', 'clip.mp4'));
+    await openConditioningSubmenu();
+
+    expect(getMenuItem('widgets.video.conditioningRoleAudio').getAttribute('aria-disabled')).toBe('true');
+    expect(getMenuItem('widgets.video.conditioningRoleVideo').getAttribute('aria-disabled')).toBe('true');
   });
 });
 

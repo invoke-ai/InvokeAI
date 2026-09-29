@@ -20,7 +20,7 @@ import { useTranslation } from 'react-i18next';
 
 import { getGenerateFormCommitPatch } from './generateFormViewModel';
 import { GenerateSettingsForm } from './GenerateSettingsForm';
-import { useGenerationUi } from './GenerationUiContext';
+import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
 
 export const GenerateWidgetView = () => {
   const { t } = useTranslation();
@@ -29,7 +29,7 @@ export const GenerateWidgetView = () => {
   const capabilitiesError = useArchitectureCapabilitiesSelector((snapshot) => snapshot.error);
   const [hasRequestedRetry, setHasRequestedRetry] = useState(false);
   const projectId = ui.project.activeProjectId;
-  const storedValues = ui.project.generateValues;
+  const storedValues = useGenerateValues();
   const error = ui.models.error;
   const models = ui.models.catalog;
   const status = ui.models.status;
@@ -91,14 +91,7 @@ export const GenerateWidgetView = () => {
         ui.settings.patchGenerateSettings(getGenerateFormCommitPatch(next.values), projectId);
       }
     },
-    [models, projectId, supportedModels, ui]
-  );
-
-  const patchSettings = useCallback(
-    (values: Partial<GenerateSettings>) => {
-      ui.settings.patchGenerateSettings(values, projectId);
-    },
-    [projectId, ui]
+    [models, projectId, supportedModels, ui.settings]
   );
 
   // Gate the form so edits cannot persist fallback architecture defaults.
@@ -162,7 +155,7 @@ export const GenerateWidgetView = () => {
         settings={settings}
         supportedModels={supportedModels}
         onCommitSettings={commitSettings}
-        onPatchSettings={patchSettings}
+        onPatchSettings={ui.settings.patchGenerateSettings}
       />
     </Box>
   );

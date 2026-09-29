@@ -1,10 +1,10 @@
-/* eslint-disable react-perf/jsx-no-new-function-as-prop */
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop */
+import type { ListRowProps } from '@platform/ui/list/List';
 import type { ChangeEvent } from 'react';
 
 import {
   Badge,
   Box,
-  Center,
   Flex,
   HStack,
   Icon,
@@ -38,11 +38,15 @@ import {
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { Button, ConfirmDialog, IconButton, Row, Scrollable, SegmentedControl, Tabs } from '@platform/ui';
+import { Button, ConfirmDialog, IconButton, Scrollable, SegmentedControl, Tabs } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
+import { List } from '@platform/ui/list/List';
+import { ListItem } from '@platform/ui/list/ListItem';
+import { ListPager } from '@platform/ui/list/ListPager';
+import { listRowsFromItems } from '@platform/ui/list/listRows';
+import { ManagerColumn, ManagerDetailHeader } from '@platform/ui/ManagerLayout';
 import { MenuContent } from '@platform/ui/Menu';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useVirtualizer } from '@tanstack/react-virtual';
 import {
   ArrowRightIcon,
   CircleAlertIcon,
@@ -60,10 +64,8 @@ import { useTranslation } from 'react-i18next';
 
 const FONT_ACCEPT = '.ttf,.otf,.woff,.woff2,font/ttf,font/otf,font/woff,font/woff2';
 const FONT_PAGE_SIZE = 100;
-const FONT_ROW_HEIGHT = 56;
-// Match the Models and Nodes manager columns without coupling feature owners.
-const LIBRARY_WIDTH = 'clamp(22rem, 32vw, 28rem)';
-const HEADER_MIN_HEIGHT = '2.75rem';
+const NO_FONTS: readonly FontRecord[] = [];
+const getFontId = (font: FontRecord): string => font.id;
 const FILTER_POSITION = { placement: 'bottom-end' } as const;
 const PREVIEW_TEXT_SX = { textWrap: 'pretty' } as const;
 const ERROR_ICON = <CircleAlertIcon />;
@@ -312,7 +314,6 @@ const FontLibrary = () => {
   const [deleteTarget, setDeleteTarget] = useState<FontRecord | null>(null);
   const [isRescanning, setIsRescanning] = useState(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const uploadChainRef = useRef<Promise<void>>(Promise.resolve());
   const [offset, setOffset] = useState(0);
   const params = useMemo<FontListParams>(
@@ -325,15 +326,11 @@ const FontLibrary = () => {
     [filter, offset, search]
   );
   const query = useQuery(fontsQueryOptions(params));
-  const fonts = query.data?.items ?? [];
-  // eslint-disable-next-line react/incompatible-library -- TanStack Virtual exposes imperative functions that the compiler cannot memoize safely.
-  const virtualizer = useVirtualizer({
-    count: fonts.length,
-    estimateSize: () => FONT_ROW_HEIGHT,
-    getItemKey: (index) => fonts[index]?.id ?? index,
-    getScrollElement: () => scrollRef.current,
-    overscan: 4,
-  });
+  const fonts = query.data?.items ?? NO_FONTS;
+  const rows = useMemo(() => listRowsFromItems(fonts, getFontId), [fonts]);
+  // A new page, filter or search replaces every row: remount the list so it starts from the top whether or not
+  // the query is cached.
+  const listKey = `${filter}:${offset}:${search}`;
 
   const invalidateFonts = useCallback(() => queryClient.invalidateQueries({ queryKey: fontKeys.all }), [queryClient]);
   const handleFiles = useCallback(
@@ -478,15 +475,13 @@ const FontLibrary = () => {
   const hasPreviousPage = offset > 0;
   const hasNextPage = query.data !== undefined && offset + fonts.length < query.data.total;
   const handlePreviousPage = useCallback(() => {
-    virtualizer.scrollToOffset(0);
     setOffset((current) => Math.max(0, current - FONT_PAGE_SIZE));
-  }, [virtualizer]);
+  }, []);
   const handleNextPage = useCallback(() => {
     if (hasNextPage) {
-      virtualizer.scrollToOffset(0);
       setOffset((current) => current + FONT_PAGE_SIZE);
     }
-  }, [hasNextPage, virtualizer]);
+  }, [hasNextPage]);
   const showPagination = offset > 0 || (query.data?.total ?? 0) > FONT_PAGE_SIZE;
   const canDelete = useCallback(
     (font: FontRecord) => font.source === 'uploaded' && (font.scope === 'private' || canManageSharedFonts),
@@ -503,19 +498,12 @@ const FontLibrary = () => {
   return (
     <Flex aria-label={t('fonts.title')} role="region" h="full" minH="0" w="full">
       <input ref={inputRef} accept={FONT_ACCEPT} hidden multiple type="file" onChange={handleInputChange} />
-      <Flex borderEndWidth="1px" direction="column" flexShrink={0} h="full" minH="0" w={LIBRARY_WIDTH}>
-        <HStack borderBottomWidth="1px" flexShrink={0} gap="2" minH={HEADER_MIN_HEIGHT} px="3">
-          <Text as="h2" fontSize="sm" fontWeight="700">
-            {t('fonts.title')}
-          </Text>
-          <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums">
-            {query.data?.total ?? '–'}
-          </Text>
-          {canManageSharedFonts ? (
+      <ManagerColumn
+        actions={
+          canManageSharedFonts ? (
             <Button
               aria-label={t('fonts.rescan')}
               disabled={isRescanning}
-              ms="auto"
               size="2xs"
               variant="ghost"
               onClick={handleRescan}
@@ -523,8 +511,11 @@ const FontLibrary = () => {
               <RefreshCwIcon />
               {t('fonts.rescan')}
             </Button>
-          ) : null}
-        </HStack>
+          ) : null
+        }
+        count={query.data?.total ?? '–'}
+        title={t('fonts.title')}
+      >
         <HStack gap="1.5" p="3">
           <InputGroup startElement={SEARCH_ICON}>
             <Input
@@ -533,7 +524,6 @@ const FontLibrary = () => {
               size="xs"
               value={search}
               onChange={(event) => {
-                virtualizer.scrollToOffset(0);
                 setSearch(event.currentTarget.value);
                 setOffset(0);
               }}
@@ -556,7 +546,6 @@ const FontLibrary = () => {
                   <Menu.RadioItemGroup
                     value={filter}
                     onValueChange={(event) => {
-                      virtualizer.scrollToOffset(0);
                       setFilter(event.value as FontFilter);
                       setOffset(0);
                     }}
@@ -576,140 +565,81 @@ const FontLibrary = () => {
             </Portal>
           </Menu.Root>
         </HStack>
-        {query.isPending ? (
-          <Center flex="1" minH="32">
-            <Spinner color="fg.muted" size="sm" />
-          </Center>
-        ) : query.isError ? (
-          <EmptyState
-            danger
-            description={getApiErrorMessage(query.error, t('fonts.couldNotLoad'))}
-            icon={ERROR_ICON}
-            title={t('fonts.couldNotLoad')}
-          >
-            <Button size="xs" variant="outline" onClick={handleRetry}>
-              {t('common.retry')}
-            </Button>
-          </EmptyState>
-        ) : fonts.length === 0 ? (
-          <EmptyState
-            description={search.trim() ? t('fonts.noSearchMatchesDescription') : t('fonts.emptyDescription')}
-            icon={search.trim() ? EMPTY_SEARCH_ICON : EMPTY_ICON}
-            title={search.trim() ? t('fonts.noSearchMatches') : t('fonts.emptyTitle')}
-          >
-            {search.trim() ? (
-              <Button
-                size="xs"
-                variant="outline"
-                onClick={() => {
-                  virtualizer.scrollToOffset(0);
-                  setSearch('');
-                  setOffset(0);
-                }}
-              >
-                {t('common.clearSearch')}
+        <List
+          key={listKey}
+          activeKey={selectedFont?.id ?? null}
+          density="comfortable"
+          emptyState={
+            <EmptyState
+              description={search.trim() ? t('fonts.noSearchMatchesDescription') : t('fonts.emptyDescription')}
+              icon={search.trim() ? EMPTY_SEARCH_ICON : EMPTY_ICON}
+              title={search.trim() ? t('fonts.noSearchMatches') : t('fonts.emptyTitle')}
+            >
+              {search.trim() ? (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  onClick={() => {
+                    setSearch('');
+                    setOffset(0);
+                  }}
+                >
+                  {t('common.clearSearch')}
+                </Button>
+              ) : (
+                <Button size="sm" onClick={() => setActiveTab('add')}>
+                  {t('fonts.addFonts')}
+                  <Icon as={ArrowRightIcon} />
+                </Button>
+              )}
+            </EmptyState>
+          }
+          errorState={
+            <EmptyState
+              danger
+              description={query.isError ? getApiErrorMessage(query.error, t('fonts.couldNotLoad')) : null}
+              icon={ERROR_ICON}
+              title={t('fonts.couldNotLoad')}
+            >
+              <Button size="xs" variant="outline" onClick={handleRetry}>
+                {t('common.retry')}
               </Button>
-            ) : (
-              <Button size="sm" onClick={() => setActiveTab('add')}>
-                {t('fonts.addFonts')}
-                <Icon as={ArrowRightIcon} />
-              </Button>
-            )}
-          </EmptyState>
-        ) : (
-          <Scrollable flex="1" h="full" label={t('fonts.library')} minH="0" viewportRef={scrollRef}>
-            <Box h={`${virtualizer.getTotalSize()}px`} position="relative" w="full">
-              {virtualizer.getVirtualItems().map((item) => {
-                const font = fonts[item.index];
-                if (!font) {
-                  return null;
-                }
-                return (
-                  <Box
-                    data-index={item.index}
-                    key={item.key}
-                    left="0"
-                    position="absolute"
-                    h={`${FONT_ROW_HEIGHT}px`}
-                    top="0"
-                    transform={`translateY(${item.start}px)`}
-                    w="full"
-                  >
-                    <Box h="full" px="3" py="0.5">
-                      <Row
-                        active={selectedFont?.id === font.id ? 'accent' : 'none'}
-                        aria-pressed={selectedFont?.id === font.id}
-                        gap="2"
-                        h="full"
-                        minW="0"
-                        overflow="hidden"
-                        px="2"
-                        py="2"
-                        role="button"
-                        rounded="md"
-                        tabIndex={0}
-                        onClick={() => {
-                          setSelectedFont(font);
-                          setActiveTab('details');
-                        }}
-                        onKeyDown={(event) => {
-                          if (event.key === 'Enter' || event.key === ' ') {
-                            event.preventDefault();
-                            setSelectedFont(font);
-                            setActiveTab('details');
-                          }
-                        }}
-                      >
-                        <FontPreview
-                          compact
-                          key={`${font.id}:${font.contentHash}:${font.style}:${font.weight}`}
-                          font={font}
-                        />
-                        <Stack gap="0.5" minW="0" flex="1">
-                          <Text fontSize="xs" fontWeight="600" truncate>
-                            {font.label || font.family}
-                          </Text>
-                          <Text fontSize="2xs" opacity="0.75" truncate>
-                            {font.filename}
-                          </Text>
-                        </Stack>
-                        <Badge flexShrink={0} fontSize="2xs" variant="surface">
-                          {t(getScopeLabelKey(font.scope))}
-                        </Badge>
-                      </Row>
-                    </Box>
-                  </Box>
-                );
-              })}
-            </Box>
-          </Scrollable>
-        )}
+            </EmptyState>
+          }
+          label={t('fonts.library')}
+          renderItem={(font: FontRecord, rowProps: ListRowProps) => (
+            <ListItem
+              {...rowProps}
+              description={font.filename}
+              leading={
+                <FontPreview compact key={`${font.id}:${font.contentHash}:${font.style}:${font.weight}`} font={font} />
+              }
+              title={font.label || font.family}
+              trailing={
+                <Badge fontSize="2xs" variant="surface">
+                  {t(getScopeLabelKey(font.scope))}
+                </Badge>
+              }
+              onPress={() => {
+                setSelectedFont(font);
+                setActiveTab('details');
+              }}
+            />
+          )}
+          rows={rows}
+          status={query.isPending ? 'loading' : query.isError ? 'error' : 'ready'}
+        />
         {showPagination ? (
-          <HStack justify="center" minH="8">
-            <Button
-              aria-label={t('common.previousPage')}
-              disabled={!hasPreviousPage || query.isFetching}
-              size="2xs"
-              variant="ghost"
-              onClick={handlePreviousPage}
-            >
-              {t('common.previousPage')}
-            </Button>
-            <Text aria-live="polite" color="fg.muted" fontSize="2xs">
-              {t('common.pageNumber', { page: Math.floor(offset / FONT_PAGE_SIZE) + 1 })}
-            </Text>
-            <Button
-              aria-label={t('common.nextPage')}
-              disabled={!hasNextPage || query.isFetching}
-              size="2xs"
-              variant="ghost"
-              onClick={handleNextPage}
-            >
-              {t('common.nextPage')}
-            </Button>
-          </HStack>
+          <ListPager
+            hasNext={hasNextPage}
+            hasPrevious={hasPreviousPage}
+            isBusy={query.isFetching}
+            page={Math.floor(offset / FONT_PAGE_SIZE) + 1}
+            onNext={handleNextPage}
+            onPrevious={handlePreviousPage}
+          />
         ) : null}
-      </Flex>
+      </ManagerColumn>
       <Tabs.Root
         asChild
         lazyMount
@@ -719,7 +649,7 @@ const FontLibrary = () => {
         onValueChange={(event) => setActiveTab(event.value)}
       >
         <Flex direction="column" flex="1" minH="0" minW="0">
-          <Flex align="flex-end" borderBottomWidth="1px" flexShrink={0} minH={HEADER_MIN_HEIGHT} px="2">
+          <ManagerDetailHeader>
             <Tabs.List mb="-1px">
               <Tabs.Trigger value="details">
                 <Icon as={FileTypeIcon} boxSize="3" />
@@ -732,7 +662,7 @@ const FontLibrary = () => {
                 {t('fonts.addFonts')}
               </Tabs.Trigger>
             </Tabs.List>
-          </Flex>
+          </ManagerDetailHeader>
           <Box flex="1" minH="0">
             <Tabs.Content h="full" p="0" value="details">
               {activeFont ? (

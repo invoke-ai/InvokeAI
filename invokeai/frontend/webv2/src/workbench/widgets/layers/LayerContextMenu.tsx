@@ -32,6 +32,7 @@ import {
   renderableSourceOf,
 } from '@workbench/canvas-engine/api';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
+import { focusOpenedWidget } from '@workbench/focusRegions';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
@@ -620,6 +621,7 @@ const LayerMenu = ({
 
   const handleOpenProperties = useCallback(() => {
     widgets.open({ region: 'right', widgetId: 'layers' });
+    focusOpenedWidget('right', 'layers');
     requestLayerProperties(layer.id);
   }, [layer.id, widgets]);
 

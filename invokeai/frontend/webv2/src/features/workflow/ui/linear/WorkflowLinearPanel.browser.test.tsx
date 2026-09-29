@@ -521,9 +521,13 @@ describe('Linear form field entry', () => {
 
     return { error, field, value };
   };
+  // Focused directly rather than clicked: what is under test is the caret surviving the edit's round trip
+  // through the project graph. A click has to hit-test the input, and each field label and reset button
+  // carries a tooltip that can open over it -- on the CI runner one did, and intercepted the click until
+  // the test timed out.
   const focusAtEnd = (input: HTMLInputElement) =>
     act(async () => {
-      await userEvent.click(input);
+      input.focus();
       await userEvent.keyboard('{End}');
     });
   const keys = (sequence: string) =>

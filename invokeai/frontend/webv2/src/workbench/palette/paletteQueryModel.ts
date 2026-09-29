@@ -73,7 +73,7 @@ export const derivePaletteQueryModel = ({
     !stage &&
     !isCommandsScope;
   const isPureDateQuery = liveProviderQuery.range !== undefined && liveProviderQuery.text.length === 0;
-  const baseProviders = scopeProvider ? [scopeProvider] : providers;
+  const baseProviders = scopeProvider ? [scopeProvider] : providers.filter((provider) => !provider.scopedOnly);
   const activeProviders =
     stage || isCommandsScope
       ? NO_PROVIDERS

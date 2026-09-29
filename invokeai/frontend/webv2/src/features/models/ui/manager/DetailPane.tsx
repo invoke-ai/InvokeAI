@@ -7,12 +7,11 @@ import { ModelDetail } from '@features/models/ui/detail/ModelDetail';
 import { InstallQueueBar } from '@features/models/ui/install-queue/InstallQueueBar';
 import { updateModelsUi, useModelsUiSelector, type ModelManagerTab } from '@features/models/ui/uiStore';
 import { Scrollable, Tabs } from '@platform/ui';
+import { ManagerDetailHeader } from '@platform/ui/ManagerLayout';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BoxIcon, KeyRoundIcon, PlusIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { HEADER_MIN_HEIGHT } from './layoutConstants';
 
 /** The tabbed detail pane: selected model, Add Models, API Keys, and queue footer. */
 export const DetailPane = () => {
@@ -44,7 +43,7 @@ export const DetailPane = () => {
         value={activeTab}
         onValueChange={(event) => updateModelsUi({ activeTab: event.value as ModelManagerTab })}
       >
-        <Flex align="flex-end" borderBottomWidth={1} flexShrink={0} minH={HEADER_MIN_HEIGHT} px="2">
+        <ManagerDetailHeader>
           <Tabs.List mb="-1px">
             <Tabs.Trigger value="details">
               <Icon as={BoxIcon} boxSize="3" />
@@ -59,7 +58,7 @@ export const DetailPane = () => {
               {t('models.apiKeys')}
             </Tabs.Trigger>
           </Tabs.List>
-        </Flex>
+        </ManagerDetailHeader>
 
         <Box flex="1" minH="0">
           <Tabs.Content h="full" m="0" p="0" value="details">

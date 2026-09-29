@@ -12,7 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 import { flushGenerateDrafts } from './generateDraftRegistry';
 import { GeneratePresetsPopover } from './GeneratePresetsPopover';
-import { useGenerationUi } from './GenerationUiContext';
+import { useGenerateValues, useGenerationUi } from './GenerationUiContext';
 import {
   getModelDefaultsPatch,
   getModelDefaultSettings,
@@ -24,29 +24,43 @@ export const GenerateHeaderActions = () => {
   const ui = useGenerationUi();
   const models = ui.models.catalog;
   const projectId = ui.project.activeProjectId;
-  const settings = normalizeGenerateSettings(ui.project.generateValues);
   const supportedModels = useMemo(() => models.filter(isSupportedGenerateModel), [models]);
-  const selectedModel = useMemo(
-    () => supportedModels.find((model) => model.key === settings?.modelKey),
-    [supportedModels, settings?.modelKey]
-  );
   const vaeModels = useMemo(
     () => models.filter((model): model is ModelConfig & VaeModelConfig => model.type === 'vae'),
     [models]
   );
-  const modelDefaultSettings =
-    settings && selectedModel ? getModelDefaultSettings(settings, selectedModel, vaeModels) : null;
-  const isAtModelDefaults =
-    settings && modelDefaultSettings ? settingsMatchModelDefaults(settings, modelDefaultSettings) : false;
+  const resolveDefaults = (values: Record<string, unknown>) => {
+    const settings = normalizeGenerateSettings(values);
+    const selectedModel = settings && supportedModels.find((model) => model.key === settings.modelKey);
+
+    return settings && selectedModel ? { selectedModel, settings } : null;
+  };
+  // Select only what the button shows, so ordinary edits do not re-render the header.
+  const { hasSelectedModel, isAtModelDefaults } = useGenerateValues((values) => {
+    const resolved = resolveDefaults(values);
+
+    return {
+      hasSelectedModel: resolved !== null,
+      isAtModelDefaults:
+        resolved !== null &&
+        settingsMatchModelDefaults(
+          resolved.settings,
+          getModelDefaultSettings(resolved.settings, resolved.selectedModel, vaeModels)
+        ),
+    };
+  });
 
   const resetToModelDefaults = () => {
-    if (!selectedModel || !settings) {
-      return;
-    }
-
-    // Flush before patching so reset preserves pending prompt edits.
+    // Flush before reading so reset preserves pending prompt edits.
     flushGenerateDrafts();
-    ui.settings.patchGenerateSettings(getModelDefaultsPatch(settings, selectedModel, vaeModels), projectId);
+    const resolved = resolveDefaults(ui.generateValues.getSnapshot());
+
+    if (resolved) {
+      ui.settings.patchGenerateSettings(
+        getModelDefaultsPatch(resolved.settings, resolved.selectedModel, vaeModels),
+        projectId
+      );
+    }
   };
 
   const resetLabel = t('widgets.generate.resetAllToModelDefaults');
@@ -58,7 +72,7 @@ export const GenerateHeaderActions = () => {
         <IconButton
           aria-label={resetLabel}
           color="fg.muted"
-          disabled={!selectedModel || isAtModelDefaults}
+          disabled={!hasSelectedModel || isAtModelDefaults}
           size="2xs"
           variant="ghost"
           onClick={resetToModelDefaults}

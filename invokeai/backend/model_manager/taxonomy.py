@@ -106,6 +106,7 @@ class ModelType(str, Enum):
     TextLLM = "text_llm"
     ExternalImageGenerator = "external_image_generator"
     PiDDecoder = "pid_decoder"
+    LTX2DurationHead = "ltx2_duration_head"
     Unknown = "unknown"
 
 

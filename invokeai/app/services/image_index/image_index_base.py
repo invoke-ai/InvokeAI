@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import Literal, Optional
+from typing import AbstractSet, Literal, Optional
 
 import numpy as np
 from PIL import Image
@@ -135,14 +135,17 @@ class ImageIndexServiceBase(ABC):
         query_embedding: np.ndarray,
         limit: int,
         kinds: Optional[tuple[MediaKind, ...]] = None,
+        within: Optional[AbstractSet[str]] = None,
     ) -> list[tuple[IndexedItem, float]]:
         """Rank the user's accessible embedded items by cosine similarity.
 
         Embeddings are L2-normalized, so similarity is a dot product. Pass
-        user_id=None for the admin scope, and `kinds` to restrict results to
-        those media kinds (None means every kind). Returns (item, score)
-        pairs, best first. Call off the event loop — the accessible embedding
-        matrix may be read from the database on a cache miss.
+        user_id=None for the admin scope, `kinds` to restrict results to
+        those media kinds (None means every kind), and `within` to restrict
+        them to those item names, such as one board's listing (None means
+        every accessible item). Returns (item, score) pairs, best first.
+        Call off the event loop — the accessible embedding matrix may be
+        read from the database on a cache miss.
         """
         pass
 

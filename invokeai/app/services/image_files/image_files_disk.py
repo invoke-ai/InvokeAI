@@ -1,4 +1,3 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 import errno
 import io
 import json

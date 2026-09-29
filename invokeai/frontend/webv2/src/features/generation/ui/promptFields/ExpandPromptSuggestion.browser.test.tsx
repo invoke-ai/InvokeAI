@@ -1,10 +1,11 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop */
 import type { ExpandPromptSuggestion } from '@features/generation/core/types';
+import type { SavedPromptModels } from '@features/generation/ui/promptFields/PositivePromptActions';
 import type { ChangeEvent } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
-import { expandPrompt } from '@features/generation/data/promptUtilities';
+import { expandPrompt, imageToPrompt } from '@features/generation/data/promptUtilities';
 import { PositivePromptField } from '@features/generation/ui/promptFields/PositivePromptField';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -42,6 +43,9 @@ const prompt = (id: string, content: string) => ({
   name: id,
   userId: 'system',
 });
+const VISION_A = { base: 'any', key: 'llava-a', name: 'LLaVA A', type: 'llava_onevision' };
+const VISION_B = { base: 'any', key: 'llava-b', name: 'LLaVA B', type: 'llava_onevision' };
+
 const PROMPTS = [prompt('default', 'DEFAULT'), prompt('t2v', 'T2V'), prompt('i2v', 'I2V')];
 
 const FRAME = { height: 512, image_name: 'frame.png', width: 768 };
@@ -54,7 +58,7 @@ const LTX_SUGGESTION: ExpandPromptSuggestion = {
 };
 
 // Read at render time by the mocks below, so each test can set them before rendering.
-let catalog: (typeof TEXT_ONLY | typeof ENHANCER)[] = [];
+let catalog: (typeof TEXT_ONLY | typeof ENHANCER | typeof VISION_A)[] = [];
 let arePromptsLoading = false;
 
 const StubSelect = ({
@@ -101,7 +105,7 @@ vi.mock('@features/generation/ui/GenerationUiContext', async (importOriginal) =>
   useGenerationUi: () => ({
     account: { isAdmin: false, userId: 'system' },
     capabilities: { canManagePromptTemplates: false, canManageSharedSystemPrompts: false },
-    gallery: { selectedImage: null },
+    gallery: { selectedImage: { imageName: 'selected.png' } },
     models: { catalog, ensureLoaded: vi.fn(), openManager: vi.fn() },
     notifications: { reportError: vi.fn() },
     project: { activeProjectId: 'project-1' },
@@ -137,6 +141,7 @@ vi.mock('@features/generation/ui/promptFields/useSystemPrompts', () => ({
 vi.mock('@features/generation/data/promptUtilities', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   expandPrompt: vi.fn(() => Promise.resolve({ expanded_prompt: 'rewritten', seed: 1 })),
+  imageToPrompt: vi.fn(() => Promise.resolve({ prompt: 'described' })),
 }));
 
 vi.mock('@features/generation/data/wildcards', () => ({
@@ -153,6 +158,7 @@ let root: Root | null = null;
 
 beforeEach(() => {
   vi.mocked(expandPrompt).mockClear();
+  vi.mocked(imageToPrompt).mockClear();
   catalog = [TEXT_ONLY, ENHANCER];
   arePromptsLoading = false;
 });
@@ -164,7 +170,7 @@ afterEach(async () => {
   root = null;
 });
 
-const renderField = (suggestion: ExpandPromptSuggestion | null) =>
+const renderField = (suggestion: ExpandPromptSuggestion | null, savedPromptModels?: SavedPromptModels) =>
   root?.render(
     <I18nextProvider i18n={i18n}>
       <QueryClientProvider client={new QueryClient()}>
@@ -175,6 +181,7 @@ const renderField = (suggestion: ExpandPromptSuggestion | null) =>
               heightPx={96}
               loras={[]}
               projectId="project-1"
+              savedPromptModels={savedPromptModels}
               selectedModel={undefined}
               showSyntaxHighlighting={false}
               value="she waves"
@@ -188,14 +195,25 @@ const renderField = (suggestion: ExpandPromptSuggestion | null) =>
     </I18nextProvider>
   );
 
-const renderAndOpen = async (suggestion: ExpandPromptSuggestion | null) => {
+const renderAndOpen = async (
+  suggestion: ExpandPromptSuggestion | null,
+  savedPromptModels?: SavedPromptModels,
+  trigger = 'widgets.generate.expandPrompt'
+) => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
 
-  await act(() => renderField(suggestion));
-  await act(() => host?.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.expandPrompt"]')?.click());
+  await act(() => renderField(suggestion, savedPromptModels));
+  await act(() => host?.querySelector<HTMLButtonElement>(`[aria-label="${trigger}"]`)?.click());
 };
+
+const savedModels = (overrides: Partial<SavedPromptModels> = {}): SavedPromptModels => ({
+  expandPromptModelKey: null,
+  imageToPromptModelKey: null,
+  onChange: vi.fn(),
+  ...overrides,
+});
 
 const select = (label: string) => document.querySelector<HTMLSelectElement>(`select[aria-label="${label}"]`);
 const choose = (label: string, value: string) =>
@@ -263,15 +281,14 @@ it("keeps the user's own system prompt over the suggestion", async () => {
   expect(await runExpand()).toMatchObject({ image_name: 'frame.png', system_prompt: 'DEFAULT' });
 });
 
-it('points to the starter models when the suggested enhancer is not installed', async () => {
+it('points to the starter models and falls back to an installed model when the enhancer is missing', async () => {
   catalog = [TEXT_ONLY];
   await renderAndOpen(LTX_SUGGESTION);
 
-  expect(select('text llm')?.value).toBe('');
+  expect(select('text llm')?.value).toBe('qwen');
   expect(document.body.textContent).toContain('LTX-2.5 Prompt Enhancer (Gemma-4 E2B) is not installed');
-  // No model is chosen, so there is nothing to say about reading images yet.
-  expect(document.body.textContent).not.toContain('widgets.generate.expandFirstFrameUnreadable');
-  expect(expandButton()?.disabled).toBe(true);
+  expect(document.body.textContent).toContain('widgets.generate.expandFirstFrameUnreadable');
+  expect(await runExpand()).toMatchObject({ model_key: 'qwen', system_prompt: 'T2V' });
 });
 
 it('waits for the system prompts before expanding', async () => {
@@ -281,10 +298,51 @@ it('waits for the system prompts before expanding', async () => {
   expect(expandButton()?.disabled).toBe(true);
 });
 
-it('preselects nothing without a suggestion', async () => {
+it('starts from the first listed model without a suggestion', async () => {
   await renderAndOpen(null);
 
-  expect(select('text llm')?.value).toBe('');
+  // Listed by name: "Gemma-4 E2B" before "Qwen".
+  expect(select('text llm')?.value).toBe('e2b');
   expect(document.body.textContent).not.toContain('is not installed');
-  expect(expandButton()?.disabled).toBe(true);
+  expect(await runExpand()).toMatchObject({ model_key: 'e2b' });
+});
+
+it("uses the surface's saved pick over the suggestion and saves a different one", async () => {
+  const saved = savedModels({ expandPromptModelKey: 'qwen' });
+  await renderAndOpen(LTX_SUGGESTION, saved);
+
+  expect(select('text llm')?.value).toBe('qwen');
+  await choose('text llm', 'e2b');
+  expect(saved.onChange).toHaveBeenCalledExactlyOnceWith({ expandPromptModelKey: 'e2b' });
+
+  // Once saved, picking the same model again saves nothing.
+  await act(() => renderField(LTX_SUGGESTION, { ...saved, expandPromptModelKey: 'e2b' }));
+  await choose('text llm', 'e2b');
+  expect(saved.onChange).toHaveBeenCalledOnce();
+});
+
+it('falls back when the saved pick is no longer installed', async () => {
+  await renderAndOpen(null, savedModels({ expandPromptModelKey: 'uninstalled' }));
+
+  expect(select('text llm')?.value).toBe('e2b');
+});
+
+it('starts Image to Prompt from the first listed vision model and saves a different pick', async () => {
+  catalog = [VISION_B, VISION_A];
+  const saved = savedModels();
+  await renderAndOpen(null, saved, 'widgets.generate.imageToPrompt');
+
+  expect(select('text llm')?.value).toBe('llava-a');
+  const generateButton = () =>
+    [...document.querySelectorAll<HTMLButtonElement>('button')].find(
+      (button) => button.textContent === 'widgets.generate.generatePrompt'
+    );
+  await act(() => generateButton()?.click());
+  expect(imageToPrompt).toHaveBeenCalledWith(
+    expect.objectContaining({ image_name: 'selected.png', model_key: 'llava-a' })
+  );
+
+  await act(() => host?.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.imageToPrompt"]')?.click());
+  await choose('text llm', 'llava-b');
+  expect(saved.onChange).toHaveBeenCalledExactlyOnceWith({ imageToPromptModelKey: 'llava-b' });
 });

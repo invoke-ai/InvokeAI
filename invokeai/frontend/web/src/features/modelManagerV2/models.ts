@@ -13,6 +13,7 @@ import {
   isIPAdapterModelConfig,
   isLLaVAModelConfig,
   isLoRAModelConfig,
+  isLTX2DurationHeadModelConfig,
   isMistralEncoderModelConfig,
   isNonRefinerMainModelConfig,
   isPiDDecoderModelConfig,
@@ -120,6 +121,11 @@ const MODEL_CATEGORIES: Record<ModelCategoryType, ModelCategoryData> = {
     category: 'pid_decoder',
     i18nKey: 'modelManager.pidDecoder',
     filter: isPiDDecoderModelConfig,
+  },
+  ltx2_duration_head: {
+    category: 'ltx2_duration_head',
+    i18nKey: 'modelManager.ltx2DurationHead',
+    filter: isLTX2DurationHeadModelConfig,
   },
   control_lora: {
     category: 'control_lora',
@@ -241,6 +247,7 @@ export const MODEL_TYPE_TO_LONG_NAME: Record<ModelType, string> = {
   text_llm: 'Text LLM',
   external_image_generator: 'External Image Generator',
   pid_decoder: 'PiD Decoder',
+  ltx2_duration_head: 'LTX-2 Duration Head',
   unknown: 'Unknown',
 };
 

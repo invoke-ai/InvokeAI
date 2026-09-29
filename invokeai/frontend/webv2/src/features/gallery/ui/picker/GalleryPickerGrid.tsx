@@ -36,12 +36,12 @@ const ACTIVE_TILE_CSS: SystemStyleObject = {
   outlineOffset: '-4px',
 };
 
-const PICKABLE_TILE_CSS: SystemStyleObject = { cursor: 'pointer' };
+// Tiles keep the default arrow like every other control; only full or unsupported ones say they won't pick.
+const TILE_CSS: SystemStyleObject = { cursor: 'default' };
 const INERT_TILE_CSS: SystemStyleObject = { cursor: 'not-allowed', opacity: 0.35 };
-const ADDED_TILE_CSS: SystemStyleObject = { cursor: 'default' };
 
 const getTileCss = (state: GalleryPickerTileState, isActive: boolean): SystemStyleObject => {
-  const base = state === 'pickable' ? PICKABLE_TILE_CSS : state === 'added' ? ADDED_TILE_CSS : INERT_TILE_CSS;
+  const base = state === 'pickable' || state === 'added' ? TILE_CSS : INERT_TILE_CSS;
 
   return isActive ? { ...base, ...ACTIVE_TILE_CSS } : base;
 };

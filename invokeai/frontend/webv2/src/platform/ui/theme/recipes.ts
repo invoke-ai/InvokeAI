@@ -107,7 +107,7 @@ export const tabsSlotRecipe = defineSlotRecipe({
           ...chakraSlotRecipes.tabs.variants?.variant?.line?.trigger,
           roundedTop: 'sm',
           _hover: {
-            '&:not([data-selected])': { bg: 'bg.muted/60', color: 'fg' },
+            '&:not([data-selected])': { bg: 'gray.hoverTint/10', color: 'fg' },
           },
         },
       },
@@ -308,6 +308,8 @@ export const formControlInteraction = {
   _invalid: { borderColor: 'border.error' },
   _hover: {
     borderColor: 'border.emphasized',
+    // Hover must not repaint an invalid border neutral; tint instead so hover stays visible.
+    _invalid: { borderColor: 'border.error', bg: 'bg.error/60' },
     _expanded: formControlFocused,
     _focusVisible: formControlFocused,
   },
@@ -320,6 +322,12 @@ export const inputShellInteraction = {
   ...formControlInteraction,
   _focusWithin: formControlFocused,
   _hover: { ...formControlInteraction._hover, _focusWithin: formControlFocused },
+};
+
+/** A mode-tinted shell (e.g. semantic search) keeps its tint on hover; focus and errors still win. */
+export const warningInputShellInteraction = {
+  ...inputShellInteraction,
+  _hover: { ...inputShellInteraction._hover, borderColor: 'fg.warning' },
 };
 
 /** Scrubber borders follow keyboard/editor focus; pointer clicks use drag state instead. */
@@ -601,12 +609,21 @@ export const comboboxSlotRecipe = defineSlotRecipe({
   },
 });
 
+/**
+ * Dialogs stack from the modal token, below the popover token menus and popovers use. zag copies a menu's z-index to its
+ * positioner once, before the layer index lands, so a menu opened in a second, stacked dialog sat under that dialog.
+ */
+const DIALOG_LAYER = { '--dialog-z-index': 'zIndex.modal' } as const;
+
 export const dialogSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.dialog,
   base: {
     ...chakraSlotRecipes.dialog.base,
+    backdrop: { ...chakraSlotRecipes.dialog.base?.backdrop, ...DIALOG_LAYER },
+    positioner: { ...chakraSlotRecipes.dialog.base?.positioner, ...DIALOG_LAYER },
     content: {
       ...chakraSlotRecipes.dialog.base?.content,
+      ...DIALOG_LAYER,
       bg: 'bg.subtle',
       borderColor: 'border.subtle',
       borderWidth: '1px',
@@ -662,6 +679,8 @@ export const scrollAreaSlotRecipe = defineSlotRecipe({
       ...chakraSlotRecipes.scrollArea.base?.scrollbar,
       '&[data-orientation="vertical"]:not([data-overflow-y])': { display: 'none' },
       '&[data-orientation="horizontal"]:not([data-overflow-x])': { display: 'none' },
+      // Above sticky content (z-index 1) so opaque pinned headers never cover the thumb.
+      zIndex: 2,
     },
   },
 });
@@ -858,43 +877,202 @@ export const panelRecipe = defineRecipe({
   defaultVariants: { tone: 'surface', density: 'none' },
 });
 
+const rowFocusRing = {
+  outline: '2px solid',
+  outlineColor: 'accent.solid',
+  outlineOffset: '-2px',
+} as const;
+
+/** One row surface for every list-like control; `Row` and `ListItem` both build on it. */
+const rowSurface = {
+  borderRadius: 'sm',
+  textAlign: 'start',
+  transition: 'background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease',
+  w: 'full',
+  // Keep hover below selected emphasis so pointing does not resemble selection.
+  _hover: { bg: 'bg.muted/60' },
+  _disabled: { cursor: 'not-allowed', opacity: 0.5 },
+} as const;
+
+/** Emphasis levels: `accent` marks the one active row, `selected` marks checked rows. */
+const rowTones = {
+  none: {},
+  muted: { bg: 'bg.muted' },
+  selected: { bg: 'bg.emphasized/60', _hover: { bg: 'bg.emphasized/60' } },
+  emphasized: { bg: 'bg.emphasized', _hover: { bg: 'bg.emphasized' } },
+  brand: {
+    bg: 'brand.subtle',
+    color: 'brand.fg',
+    _hover: { bg: 'brand.subtle' },
+  },
+  accent: {
+    bg: 'accent.solid',
+    color: 'accent.contrast',
+    _hover: { bg: 'accent.solid' },
+  },
+} as const;
+
 export const rowRecipe = defineRecipe({
   base: {
+    ...rowSurface,
     alignItems: 'center',
-    borderRadius: 'sm',
     display: 'flex',
     gap: '2',
-    textAlign: 'start',
-    transition: 'background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease',
-    w: 'full',
-    // Keep hover below selected emphasis so pointing does not resemble selection.
-    _hover: { bg: 'bg.muted/60' },
-    _focusVisible: {
-      outline: '2px solid',
-      outlineColor: 'accent.solid',
-      outlineOffset: '-2px',
+    _focusVisible: rowFocusRing,
+  },
+  variants: {
+    active: rowTones,
+  },
+  defaultVariants: { active: 'none' },
+});
+
+/**
+ * A list row: an optional checkbox beside one primary button, never inside it. The ring wraps the whole row when
+ * the button has focus; the accent tone recolors muted text so it stays legible on the solid fill.
+ */
+export const listItemSlotRecipe = defineSlotRecipe({
+  slots: ['root', 'check', 'primary', 'body', 'titleLine', 'title', 'badges', 'description', 'trailing', 'actions'],
+  base: {
+    root: {
+      ...rowSurface,
+      alignItems: 'stretch',
+      display: 'flex',
+      minW: 0,
+      position: 'relative',
+      '&:has([data-list-primary]:focus-visible)': rowFocusRing,
+      // Rows of a page being replaced stay readable; only the pointer says the list is working.
+      '&[data-busy]': { cursor: 'progress' },
+      // Nothing to press: pointing must not look like an affordance.
+      '&[data-static]:hover': { bg: 'transparent' },
     },
-    _disabled: { cursor: 'not-allowed', opacity: 0.5 },
+    check: {
+      alignItems: 'center',
+      display: 'flex',
+      flexShrink: 0,
+      ps: '2',
+    },
+    primary: {
+      alignItems: 'center',
+      appearance: 'none',
+      bg: 'transparent',
+      border: 0,
+      borderRadius: 'inherit',
+      color: 'inherit',
+      display: 'flex',
+      flex: 1,
+      font: 'inherit',
+      minW: 0,
+      outline: 'none',
+      textAlign: 'start',
+    },
+    body: {
+      display: 'flex',
+      flex: 1,
+      flexDirection: 'column',
+      gap: '0.5',
+      minW: 0,
+    },
+    titleLine: {
+      alignItems: 'center',
+      display: 'flex',
+      gap: '1.5',
+      minW: 0,
+    },
+    title: {
+      fontSize: 'xs',
+      fontWeight: '600',
+      lineHeight: 'shorter',
+    },
+    badges: {
+      alignItems: 'center',
+      display: 'flex',
+      flexShrink: 0,
+      gap: '1',
+    },
+    description: {
+      color: 'fg.muted',
+      fontSize: '2xs',
+      lineHeight: 'shorter',
+      minW: 0,
+    },
+    trailing: {
+      alignItems: 'center',
+      color: 'fg.muted',
+      display: 'flex',
+      flexShrink: 0,
+      fontSize: '2xs',
+      gap: '1.5',
+    },
+    // Controls beside the primary button, never inside it.
+    actions: {
+      alignItems: 'center',
+      display: 'flex',
+      flexShrink: 0,
+      gap: '0.5',
+      pe: '1',
+    },
   },
   variants: {
     active: {
       none: {},
-      muted: { bg: 'bg.muted' },
-      selected: { bg: 'bg.emphasized/60', _hover: { bg: 'bg.emphasized/60' } },
-      emphasized: { bg: 'bg.emphasized', _hover: { bg: 'bg.emphasized' } },
-      brand: {
-        bg: 'brand.subtle',
-        color: 'brand.fg',
-        _hover: { bg: 'brand.subtle' },
-      },
+      selected: { root: rowTones.selected },
       accent: {
-        bg: 'accent.solid',
-        color: 'accent.contrast',
-        _hover: { bg: 'accent.solid' },
+        root: rowTones.accent,
+        description: { color: 'accent.contrast', opacity: 0.85 },
+        trailing: { color: 'accent.contrast' },
+      },
+    },
+    density: {
+      compact: {
+        root: { minH: '7' },
+        primary: { gap: '2', px: '2', py: '1' },
+      },
+      regular: {
+        root: { minH: '10' },
+        primary: { gap: '2', px: '2', py: '1.5' },
+      },
+      comfortable: {
+        root: { minH: '13' },
+        primary: { gap: '2.5', px: '2', py: '1.5' },
       },
     },
   },
-  defaultVariants: { active: 'none' },
+  defaultVariants: { active: 'none', density: 'regular' },
+});
+
+/** Section labels inside lists; the count sits beside the label in a quieter tone. */
+export const listSectionHeaderSlotRecipe = defineSlotRecipe({
+  slots: ['root', 'label', 'count'],
+  base: {
+    root: {
+      alignItems: 'flex-end',
+      display: 'flex',
+      gap: '1.5',
+      h: '8',
+      minW: 0,
+      pb: '1.5',
+      ps: '2',
+    },
+    label: {
+      color: 'fg.muted',
+      fontSize: '2xs',
+      fontWeight: '700',
+      letterSpacing: '0.04em',
+      lineHeight: 'shorter',
+      minW: 0,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+      textTransform: 'uppercase',
+      whiteSpace: 'nowrap',
+    },
+    count: {
+      color: 'fg.muted',
+      flexShrink: 0,
+      fontSize: '2xs',
+      fontVariantNumeric: 'tabular-nums',
+      lineHeight: 'shorter',
+    },
+  },
 });
 
 export const chipRecipe = defineRecipe({
@@ -1008,6 +1186,104 @@ export const dataListSlotRecipe = defineSlotRecipe({
         borderColor: 'border.subtle',
         borderTopWidth: '1px',
         paddingTop: '1.5',
+      },
+    },
+  },
+});
+
+const resizeGripIdle = { bg: 'border.emphasized' } as const;
+const resizeGripActive = { bg: 'fg.subtle' } as const;
+const resizeGripFocused = { bg: 'accent.solid' } as const;
+const resizeGrip = {
+  ...resizeGripIdle,
+  borderRadius: 'full',
+  content: '""',
+  position: 'absolute',
+  transition: 'background var(--wb-motion-duration-fast) ease',
+} as const;
+
+// A capsule on the divider line; odd sizes keep its edges on whole pixels either side of the 1px line.
+const resizeCapsule = {
+  bg: 'bg',
+  borderColor: 'border.emphasized',
+  borderRadius: 'full',
+  borderWidth: '1px',
+  boxShadow: 'xs',
+  content: '""',
+  position: 'absolute',
+  transition: 'border-color var(--wb-motion-duration-fast) ease',
+} as const;
+const resizeCapsuleStates = {
+  '&:hover::after, &[data-dragging]::after': { borderColor: 'fg.subtle' },
+  '&:focus-visible::after': { outline: '2px solid {colors.accent.solid}', outlineOffset: '1px' },
+  '&[data-collapse-armed]::after': { opacity: 0 },
+  // A region outline runs along the hidden line and behind the capsule, which takes its colour.
+  '[data-line-hidden] > &::after': { borderColor: 'accent.solid' },
+} as const;
+
+/**
+ * Every resize affordance: a hairline divider with a capsule grip at its middle. The hit strip covers the line and
+ * extends toward the end side, away from the scrollbar of the pane before it.
+ */
+export const resizeHandleSlotRecipe = defineSlotRecipe({
+  slots: ['root', 'handle'],
+  base: {
+    root: {
+      flexShrink: '0',
+      position: 'relative',
+      // Above region outlines (zIndex 4) so the capsule masks an outline passing through it.
+      zIndex: 5,
+      // The line is a border, not a 1px background: at fractional display scales a background can round to two
+      // device pixels while every other border draws one. A pseudo-element keeps the hit strip's offsets unshifted.
+      _before: { borderColor: 'border.subtle', content: '""', inset: '0', position: 'absolute' },
+      '&[data-line-hidden]::before, &:has([data-collapse-armed])::before': { borderColor: 'transparent' },
+    },
+    handle: {
+      outline: 'none',
+      position: 'absolute',
+      touchAction: 'none',
+    },
+  },
+  variants: {
+    orientation: {
+      vertical: {
+        root: { alignSelf: 'stretch', w: '1px', _before: { borderLeftWidth: '1px' } },
+        handle: {
+          bottom: '0',
+          cursor: 'col-resize',
+          left: '-1px',
+          top: '0',
+          w: '9px',
+          _after: { ...resizeCapsule, h: '25px', left: '-3px', top: '50%', transform: 'translateY(-50%)', w: '9px' },
+          ...resizeCapsuleStates,
+        },
+      },
+      horizontal: {
+        root: { alignSelf: 'stretch', h: '1px', _before: { borderTopWidth: '1px' } },
+        handle: {
+          cursor: 'row-resize',
+          h: '9px',
+          left: '0',
+          right: '0',
+          top: '-1px',
+          _after: { ...resizeCapsule, h: '9px', left: '50%', top: '-3px', transform: 'translateX(-50%)', w: '25px' },
+          ...resizeCapsuleStates,
+        },
+      },
+      // The grip bent into an L along the window's bottom-right corner.
+      corner: {
+        root: {},
+        handle: {
+          bottom: '0',
+          cursor: 'nwse-resize',
+          h: '4',
+          right: '0',
+          w: '4',
+          _before: { ...resizeGrip, bottom: '3px', h: '3px', right: '3px', w: '3' },
+          _after: { ...resizeGrip, bottom: '3px', h: '3', right: '3px', w: '3px' },
+          '&:hover::before, &:hover::after, &[data-dragging]::before, &[data-dragging]::after': resizeGripActive,
+          '&:focus-visible::before, &:focus-visible::after': resizeGripFocused,
+        },
       },
     },
   },

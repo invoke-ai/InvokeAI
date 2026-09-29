@@ -32,7 +32,7 @@ interface GenerateDimensionFieldsProps {
 type Dimensions = Pick<GenerateSettings, 'height' | 'width'>;
 
 /** The ratio to enforce, preferring the stored value and falling back to the current dimensions. */
-const getActiveRatio = (settings: GenerateSettings): number =>
+const getActiveRatio = (settings: Pick<GenerateSettings, 'aspectRatioValue' | 'height' | 'width'>): number =>
   settings.aspectRatioValue > 0
     ? settings.aspectRatioValue
     : settings.height > 0
@@ -304,7 +304,7 @@ export const GenerateDimensionFields = ({
       return { ...displayDimensions, [key]: nextValue };
     }
 
-    const ratio = getActiveRatio({ ...settings, ...displayDimensions });
+    const ratio = getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions });
 
     return key === 'width'
       ? { height: shouldSnap ? clampDimension(nextValue / ratio, dimensionGrid) : nextValue / ratio, width: nextValue }
@@ -382,7 +382,7 @@ export const GenerateDimensionFields = ({
   const optimizeSize = () => {
     const optimal = dimensions.optimal;
     const ratio = isRatioConstrained
-      ? getActiveRatio({ ...settings, ...displayDimensions })
+      ? getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
       : displayDimensions.height > 0
         ? displayDimensions.width / displayDimensions.height
         : 1;
@@ -508,7 +508,11 @@ export const GenerateDimensionFields = ({
             grid={dimensionGrid}
             handleLabel={t('widgets.generate.sizePreviewHandle')}
             isRatioConstrained={isRatioConstrained}
-            ratio={isRatioConstrained ? getActiveRatio({ ...settings, ...displayDimensions }) : dimensionRatio}
+            ratio={
+              isRatioConstrained
+                ? getActiveRatio({ aspectRatioValue: settings.aspectRatioValue, ...displayDimensions })
+                : dimensionRatio
+            }
             recommended={recommendedDimensions}
             onCommitDims={(dims) => {
               setDraftDimensions(dims);

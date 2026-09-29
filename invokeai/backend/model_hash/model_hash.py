@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
-
 import hashlib
 import os
 from pathlib import Path

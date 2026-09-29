@@ -17,7 +17,12 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers._access import assert_image_read_access, assert_video_read_access
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.api.routers.videos import VIDEO_UPLOAD_OPENAPI_EXTRA, ingest_uploaded_video
-from invokeai.app.services.events.events_common import VideoRecallAction, VideoRecallMode, VideoRecallVideo
+from invokeai.app.services.events.events_common import (
+    VideoRecallAction,
+    VideoRecallConditioningRole,
+    VideoRecallMode,
+    VideoRecallVideo,
+)
 from invokeai.app.services.image_records.image_records_common import ImageCategory
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
 from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
@@ -176,7 +181,7 @@ class VideoRecallParameter(BaseModel):
     ltx2_conditioning_video: Optional[VideoRefParameter] = Field(
         default=None, description="LTX-2: a clip whose audio (or picture) conditions the whole generation"
     )
-    ltx2_conditioning_role: Optional[Literal["audio", "video"]] = Field(
+    ltx2_conditioning_role: Optional[VideoRecallConditioningRole] = Field(
         default=None, description="LTX-2: which stream of `ltx2_conditioning_video` is the condition; required with it"
     )
     minimax_h3_references: Optional[list[ReferenceParameter]] = Field(
@@ -535,7 +540,12 @@ def recall_video_parameters(
 
 
 def _emit_video_placement(
-    queue_id: str, user_id: str, action: VideoRecallAction, video: VideoDTO, uploaded: bool
+    queue_id: str,
+    user_id: str,
+    action: VideoRecallAction,
+    video: VideoDTO,
+    uploaded: bool,
+    conditioning_role: Optional[VideoRecallConditioningRole] = None,
 ) -> VideoRecallMediaResponse:
     ApiDependencies.invoker.services.events.emit_video_recall_requested(
         queue_id,
@@ -549,19 +559,24 @@ def _emit_video_placement(
             fps=video.fps,
             media_origin=video.media_origin,
         ),
+        conditioning_role=conditioning_role,
     )
     return VideoRecallMediaResponse(status="success", queue_id=queue_id, action=action, video=video, uploaded=uploaded)
 
 
 def _place_gallery_video(
-    queue_id: str, action: VideoRecallAction, video_name: str, current_user: CurrentUserOrDefault
+    queue_id: str,
+    action: VideoRecallAction,
+    video_name: str,
+    current_user: CurrentUserOrDefault,
+    conditioning_role: Optional[VideoRecallConditioningRole] = None,
 ) -> VideoRecallMediaResponse:
     assert_video_read_access(video_name, current_user)
     try:
         video = ApiDependencies.invoker.services.videos.get_dto(video_name)
     except VideoRecordNotFoundException:
         raise HTTPException(status_code=404, detail="Video not found")
-    return _emit_video_placement(queue_id, current_user.user_id, action, video, uploaded=False)
+    return _emit_video_placement(queue_id, current_user.user_id, action, video, False, conditioning_role)
 
 
 async def _place_uploaded_video(
@@ -570,14 +585,22 @@ async def _place_uploaded_video(
     action: VideoRecallAction,
     board_id: Optional[str],
     current_user: CurrentUserOrDefault,
+    conditioning_role: Optional[VideoRecallConditioningRole] = None,
 ) -> VideoRecallMediaResponse:
     video = await ingest_uploaded_video(
         request, current_user, video_category=ImageCategory.GENERAL, is_intermediate=False, board_id=board_id
     )
-    return _emit_video_placement(queue_id, current_user.user_id, action, video, uploaded=True)
+    return _emit_video_placement(queue_id, current_user.user_id, action, video, True, conditioning_role)
 
 
 _VIDEO_NAME_QUERY = Query(..., min_length=1, max_length=255, description="The name of the gallery video")
+_CONDITIONING_ROLE_QUERY = Query(
+    ...,
+    description=(
+        "Which stream of the video is the condition: `audio` generates a picture for its soundtrack, "
+        "`video` generates a soundtrack for its picture"
+    ),
+)
 _BOARD_ID_QUERY = Query(default=None, description="The board to upload the video to; Uncategorized when omitted")
 _UPLOAD_RESPONSES: dict[int | str, dict[str, Any]] = {
     413: {"description": "The video exceeds the upload size limit"},
@@ -646,3 +669,39 @@ async def recall_reference_video_upload(
 ) -> VideoRecallMediaResponse:
     """Upload a video into the gallery and append it to the current user's reference videos."""
     return await _place_uploaded_video(request, queue_id, "reference_video", board_id, current_user)
+
+
+@video_recall_router.post(
+    "/{queue_id}/conditioning-video",
+    operation_id="recall_conditioning_video",
+    response_model=VideoRecallMediaResponse,
+)
+def recall_conditioning_video(
+    current_user: CurrentUserOrDefault,
+    queue_id: str = Path(..., description="The queue id to perform this operation on"),
+    video_name: str = _VIDEO_NAME_QUERY,
+    role: VideoRecallConditioningRole = _CONDITIONING_ROLE_QUERY,
+) -> VideoRecallMediaResponse:
+    """Set a gallery video as the current user's conditioning clip (models that take one, e.g. LTX-2).
+
+    The clip replaces the panel's other conditioning media: frames, initial video and references.
+    """
+    return _place_gallery_video(queue_id, "conditioning_video", video_name, current_user, role)
+
+
+@video_recall_router.post(
+    "/{queue_id}/conditioning-video/upload",
+    operation_id="recall_conditioning_video_upload",
+    response_model=VideoRecallMediaResponse,
+    responses=_UPLOAD_RESPONSES,
+    openapi_extra=VIDEO_UPLOAD_OPENAPI_EXTRA,
+)
+async def recall_conditioning_video_upload(
+    current_user: CurrentUserOrDefault,
+    request: Request,
+    queue_id: str = Path(..., description="The queue id to perform this operation on"),
+    role: VideoRecallConditioningRole = _CONDITIONING_ROLE_QUERY,
+    board_id: Optional[str] = _BOARD_ID_QUERY,
+) -> VideoRecallMediaResponse:
+    """Upload a video into the gallery and set it as the current user's conditioning clip."""
+    return await _place_uploaded_video(request, queue_id, "conditioning_video", board_id, current_user, role)

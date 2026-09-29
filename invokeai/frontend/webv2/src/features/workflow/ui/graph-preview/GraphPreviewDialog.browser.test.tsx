@@ -428,6 +428,10 @@ describe('GraphPreviewDialog', () => {
     await act(() => {
       tab?.click();
     });
+    // List mode loads on demand; wait for its rows before acting on them.
+    if (mode === 'list') {
+      await vi.waitFor(() => expect(document.querySelector('[role="list"] [data-list-primary]')).not.toBeNull());
+    }
   };
 
   const clickButtonWithText = async (text: string) => {
@@ -620,6 +624,27 @@ describe('GraphPreviewDialog', () => {
 
     // List-mode reveal must wait for the remounted flow's onInit rather than use the destroyed previous instance.
     expect(fitViewMock).toHaveBeenCalledWith(expect.objectContaining({ nodes: [{ id: 'denoise_latents' }] }));
+  });
+
+  it('lists nodes as a named list and marks the selected node when returning to list mode', async () => {
+    await renderDialog(FIXTURE_SOURCE);
+
+    await switchToMode('list');
+    const list = () => document.querySelector<HTMLElement>('[role="list"][aria-label="Nodes"]');
+
+    expect(list()).not.toBeNull();
+    expect(list()!.querySelectorAll('[role="listitem"]').length).toBeGreaterThan(1);
+    expect(list()!.querySelector('[aria-current="true"]')).toBeNull();
+
+    await clickButtonWithText('denoise_latents');
+    await switchToMode('list');
+
+    const current = list()!.querySelector<HTMLElement>('[data-list-primary][aria-current="true"]');
+
+    expect(current?.textContent).toContain('denoise_latents');
+    // The selected node is the list's single tab stop, so keyboard users land on it.
+    expect(current?.tabIndex).toBe(0);
+    expect(list()!.querySelectorAll('[data-list-primary][tabindex="0"]')).toHaveLength(1);
   });
 
   it('show node selects the seed node and inspector shows the randomized override', async () => {
