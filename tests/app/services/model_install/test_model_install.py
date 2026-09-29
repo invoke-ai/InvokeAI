@@ -1052,6 +1052,58 @@ def test_restart_failed_uses_parts_created_before_download_started(
     assert enqueue_remote_download.call_args.kwargs["clear_partials"] is True
 
 
+def test_resume_reports_restart_from_scratch_on_fresh_parts(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resuming replaces download_parts; a vanished partial file must still be reported on the new parts."""
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    old_part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    old_part.bytes = 4
+    old_part.download_path = tmp_path / "model.safetensors"  # no .downloading file on disk
+    job = ModelInstallJob(id=4242, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
+    job._install_tmpdir = tmp_path
+    job.download_parts = {old_part}
+    job.status = InstallStatus.PAUSED
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    submit_multifile_download = MagicMock()
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", submit_multifile_download)
+
+    mm2_installer.resume_job(job)
+
+    submit_multifile_download.assert_called_once()
+    assert old_part not in job.download_parts
+    parts = job.model_dump(mode="json")["download_parts"]
+    assert len(parts) == 1
+    assert parts[0]["resume_from_scratch"] is True
+    assert "Partial file missing" in parts[0]["resume_message"]
+
+
+def test_resume_does_not_report_restart_from_scratch_when_partial_exists(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    old_part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    old_part.bytes = 4
+    old_part.download_path = tmp_path / "model.safetensors"
+    (tmp_path / "model.safetensors.downloading").write_bytes(b"1234")
+    job = ModelInstallJob(id=4243, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
+    job._install_tmpdir = tmp_path
+    job.download_parts = {old_part}
+    job.status = InstallStatus.PAUSED
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", MagicMock())
+
+    mm2_installer.resume_job(job)
+
+    parts = job.model_dump(mode="json")["download_parts"]
+    assert len(parts) == 1
+    assert parts[0]["resume_from_scratch"] is False
+
+
 def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
     source = URLModelSource(url=Url("https://test.com/missing_model.safetensors"))
     job = mm2_installer.import_model(source)
