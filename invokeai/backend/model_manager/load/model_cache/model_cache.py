@@ -2152,6 +2152,39 @@ class ModelCache:
         vram_cur_available_to_cache = vram_total_available_to_cache - self._get_vram_in_use()
         return vram_cur_available_to_cache
 
+    def _get_physical_vram_available(self) -> int:
+        """VRAM a load *outside* the cache can still take on the execution device, less the configured working-memory
+        reserve.
+
+        Unlike `_get_vram_available`, this ignores `max_vram_cache_size_gb`: the cap limits how much of the card the
+        cache may occupy, but an out-of-cache model (e.g. the BitsAndBytes-quantized Qwen encoder) is not subject to
+        it - its only limit is what the device physically has free. Measuring the cap here would report a shortfall
+        on every run and offload every unlocked model regardless of how much room the card has.
+
+        Memory the torch allocator holds reserved-but-unallocated counts as available too: that is where offloaded
+        weights go until the offload's trailing `empty_cache()`, and the allocator reuses it for the next allocation,
+        so the offload loop can see its progress.
+        """
+        working_mem_bytes = int(self._execution_device_working_mem_gb * GB)
+        device = self._execution_device
+        if device.type == "cuda":
+            vram_free, _vram_total = torch.cuda.mem_get_info(device)
+            reusable = torch.cuda.memory_reserved(device) - torch.cuda.memory_allocated(device)
+        elif device.type == "xpu" and _has_dedicated_vram(device):
+            vram_free, _vram_total = TorchDevice.xpu_mem_get_info(device)
+            reusable = torch.xpu.memory_reserved(device) - torch.xpu.memory_allocated(device)
+        elif device.type in ("mps", "xpu"):
+            # Shared-memory devices: "VRAM" is system RAM, and the device allocator's cached-but-unused memory is
+            # still the pool an offloaded model's weights land in (as in `_get_vram_available`).
+            vram_free = psutil.virtual_memory().available
+            if device.type == "mps":
+                reusable = torch.mps.driver_allocated_memory() - torch.mps.current_allocated_memory()
+            else:
+                reusable = torch.xpu.memory_reserved(device) - torch.xpu.memory_allocated(device)
+        else:
+            raise ValueError(f"Unsupported execution device: {device.type}")
+        return vram_free + reusable - working_mem_bytes
+
     def _get_vram_in_use(self) -> int:
         """Get the amount of VRAM currently in use by the cache."""
         if self._execution_device.type == "cuda":
@@ -2302,13 +2335,24 @@ class ModelCache:
             + f"vram_available={(vram_available / MB):.0f} MB, "
         )
 
-    def _offload_unlocked_models(self, vram_bytes_required: int, working_mem_bytes: Optional[int] = None) -> int:
+    def _offload_unlocked_models(
+        self,
+        vram_bytes_required: int,
+        working_mem_bytes: Optional[int] = None,
+        vram_available_fn: Optional[Callable[[], int]] = None,
+    ) -> int:
         """Offload models from the execution_device until vram_bytes_required bytes are available, or all models are
         offloaded. Of course, locked models are not offloaded.
+
+        `vram_available_fn` is the availability check the loop satisfies; it defaults to the cache's own budget
+        (`_get_vram_available`, which honours `max_vram_cache_size_gb`). An out-of-cache load passes
+        `_get_physical_vram_available` instead, because the cap does not apply to it.
 
         Returns:
             int: The number of bytes freed based on believed model sizes. The actual change in VRAM may be different.
         """
+        if vram_available_fn is None:
+            vram_available_fn = lambda: self._get_vram_available(working_mem_bytes)  # noqa: E731
         self._logger.debug(
             f"Offloading unlocked models with goal of making room for {vram_bytes_required / MB:.2f}MB of VRAM."
         )
@@ -2317,7 +2361,7 @@ class ModelCache:
         cache_entries_increasing_size = sorted(self._cached_models.values(), key=lambda x: x.cached_model.total_bytes())
         for cache_entry in cache_entries_increasing_size:
             # We do not fully trust the count of bytes freed, so we check again on each iteration.
-            vram_available = self._get_vram_available(working_mem_bytes)
+            vram_available = vram_available_fn()
             vram_bytes_to_free = vram_bytes_required - vram_available
             if vram_bytes_to_free <= 0:
                 break
@@ -2748,6 +2792,35 @@ class ModelCache:
             gc.collect()
             TorchDevice.empty_cache()
         return len(dropped)
+
+    @synchronized
+    def make_room_in_vram(self, vram_bytes_needed: int) -> int:
+        """Offload unlocked models from VRAM to RAM until `vram_bytes_needed` bytes are free on the execution device.
+
+        This is the entry point for code that has to put a model on the GPU *outside* the cache - e.g. a
+        BitsAndBytes-quantized text encoder, which is pinned to the device it was quantized on and so cannot be
+        managed by the cache. Such a load competes with cached models for VRAM, but never passes through `lock()`,
+        which is where the cache normally makes room for the model being locked. Without an explicit request, the
+        out-of-cache load only sees whatever VRAM the resident models happened to leave free.
+
+        The same policy as `lock()` is used (`_offload_unlocked_models`): unlocked models are offloaded to RAM until
+        the availability check is satisfied, and kept in the cache so a later use re-streams weights instead of
+        rebuilding from disk. Locked (in-use) models are never touched. The configured working-memory reserve is
+        kept free on top of the request, exactly as in `lock()`. The availability check is the device's *physical*
+        free memory (`_get_physical_vram_available`), not the cache's own budget: `max_vram_cache_size_gb` caps what
+        the cache may occupy, not what an out-of-cache model may.
+
+        A CPU execution device has no VRAM to make room in, so the call is a no-op there (as `lock()` is) and
+        reports 0.
+
+        Returns the VRAM available to the caller *after* offloading, re-measured (physically free VRAM less the
+        working-memory reserve, so it can be negative) rather than the believed sizes of the offloaded models: a
+        locked model can leave the request unmet, and the caller has to be able to tell before it allocates.
+        """
+        if self._execution_device.type == "cpu":
+            return 0
+        self._offload_unlocked_models(vram_bytes_needed, vram_available_fn=self._get_physical_vram_available)
+        return self._get_physical_vram_available()
 
     @synchronized
     def offload_model_from_vram(self, model_key: str) -> int:

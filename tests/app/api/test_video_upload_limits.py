@@ -8,8 +8,10 @@ straight into one temp file, enforcing MAX_UPLOAD_SIZE as the bytes arrive — d
 """
 
 import asyncio
+import gc
 import tempfile
 import time
+import tracemalloc
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -1110,3 +1112,73 @@ def test_chunked_body_aborted_once_over_cap():
     # Only the first chunk (under the cap) reached the app as a body message.
     body_bytes = sum(len(m.get("body", b"")) for m in seen if m["type"] == "http.request")
     assert body_bytes == 600
+
+
+def _metadata_part_head() -> bytes:
+    return f'--{BOUNDARY}\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n'.encode()
+
+
+def _closing_boundary() -> bytes:
+    return f"\r\n--{BOUNDARY}--\r\n".encode()
+
+
+@pytest.mark.parametrize("chunk_size", [1, 2, 3])
+def test_upload_metadata_buffer_is_bounded_by_its_size_not_its_chunk_count(chunk_size: int):
+    """A client that dribbles the metadata field in tiny pieces must not amplify what the
+    server retains.
+
+    The parser hands the field over in whatever pieces the client sent it. Buffering one
+    `bytes` object per piece retained 8-22x the payload (per-object overhead dominates;
+    single-byte `bytes` are interned, so 2-byte pieces are the worst case), which turned
+    the 1 MiB metadata cap into a ~22 MiB one per upload. The buffer must be flat so the
+    cap bounds memory, not just payload.
+    """
+    payload = b"x" * (64 * 1024)
+    with tempfile.TemporaryFile() as destination:
+        callbacks = videos._VideoUploadStreamParser(destination)
+        parser = MultipartParser(BOUNDARY.encode(), callbacks.callbacks)
+        parser.write(_metadata_part_head())
+
+        was_tracing = tracemalloc.is_tracing()
+        if not was_tracing:
+            tracemalloc.start()
+        try:
+            gc.collect()  # so an unrelated collection mid-loop cannot skew the delta
+            before, _ = tracemalloc.get_traced_memory()
+            for start in range(0, len(payload), chunk_size):
+                parser.write(payload[start : start + chunk_size])
+            after, _ = tracemalloc.get_traced_memory()
+        finally:
+            if not was_tracing:
+                tracemalloc.stop()
+
+        retained = after - before
+        # bytearray over-allocates by at most ~12.5%; anything near 2x means per-chunk objects.
+        assert retained < 2 * len(payload), f"retained {retained / len(payload):.1f}x the payload"
+
+        parser.write(_closing_boundary())
+        parser.finalize()
+        assert callbacks.metadata == payload.decode()
+
+
+def test_upload_metadata_cap_counts_the_whole_field_across_chunks(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(videos, "MAX_UPLOAD_METADATA_SIZE", 32)
+
+    def parse(payload: bytes, chunk_size: int) -> videos._VideoUploadStreamParser:
+        with tempfile.TemporaryFile() as destination:
+            callbacks = videos._VideoUploadStreamParser(destination)
+            parser = MultipartParser(BOUNDARY.encode(), callbacks.callbacks)
+            parser.write(_metadata_part_head())
+            for start in range(0, len(payload), chunk_size):
+                parser.write(payload[start : start + chunk_size])
+            parser.write(_closing_boundary())
+            parser.finalize()
+            return callbacks
+
+    # Exactly at the cap, split unevenly across chunks: accepted and reassembled intact.
+    assert parse(b"a" * 32, chunk_size=5).metadata == "a" * 32
+
+    # One byte over, where no single chunk is anywhere near the cap: still rejected.
+    with pytest.raises(HTTPException) as error:
+        parse(b"a" * 33, chunk_size=5)
+    assert error.value.status_code == 413

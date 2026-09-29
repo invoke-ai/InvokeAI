@@ -26,6 +26,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras, reject_incomplete_load
 
 if TYPE_CHECKING:
     # torch is imported lazily inside the helpers below; this is annotations-only.
@@ -368,7 +369,9 @@ class Krea2CheckpointModel(ModelLoader):
         for k in sd.keys():
             sd[k] = sd[k].to(model_dtype)
 
-        model.load_state_dict(sd, assign=True, strict=False)
+        load_state_dict_ignoring_extras(
+            model, sd, source="Krea-2 single-file checkpoint", assign=True, allow_missing=True
+        )
         _reject_incomplete_load(model, what="Krea-2 single-file checkpoint")
         # `assign=True` aliases every param to its `sd` tensor. Drop the dict's references before
         # the FP8 cast, or each param's `model_dtype` original stays reachable while its fp8 copy is
@@ -421,7 +424,7 @@ class Krea2GGUFCheckpointModel(ModelLoader):
         with accelerate.init_empty_weights():
             model = Krea2Transformer2DModel(**KREA2_TRANSFORMER_CONFIG)
 
-        model.load_state_dict(sd, assign=True, strict=False)
+        load_state_dict_ignoring_extras(model, sd, source="Krea-2 GGUF checkpoint", assign=True, allow_missing=True)
         # Reject GGUF layouts that don't fully populate the diffusers Krea2Transformer2DModel (city96/
         # ComfyUI GGUFs may use key names needing conversion). Failing here beats a confusing meta-tensor
         # crash mid-inference.
@@ -504,28 +507,14 @@ def _remap_qwen3vl_singlefile_keys(sd: dict[str, Any]) -> dict[str, Any]:
 
 
 def _reject_incomplete_load(model: Any, *, what: str) -> None:
-    """Raise if a ``load_state_dict(strict=False)`` left required tensors on the meta device.
+    """Krea-2's alias for the shared meta-device completeness sweep.
 
     ``strict=False`` is used to tolerate benign extra/renamed keys, but it also silently accepts a
     checkpoint that omits required weights — those tensors stay on the meta device and only fail much
     later during inference. Reject such loads here, naming the offending tensors, so an incomplete,
     misidentified, or differently-converted checkpoint fails at load time with an actionable message.
-
-    Both parameters *and persistent buffers* are checked: ``accelerate.init_empty_weights()`` places
-    buffers on the meta device too, so a native/GGUF checkpoint that omits a persistent buffer would
-    slip past a parameters-only guard and fail mid-inference instead of at load time.
     """
-    still_meta = [
-        name
-        for name, tensor in (*model.named_parameters(), *model.named_buffers())
-        if getattr(tensor, "is_meta", False)
-    ]
-    if still_meta:
-        raise RuntimeError(
-            f"{what} is incomplete: {len(still_meta)} tensor(s) were not provided by the checkpoint "
-            f"and remain uninitialized (meta device). First few: {still_meta[:8]}. The file is likely "
-            "incomplete, misidentified, or uses a key layout that needs conversion."
-        )
+    reject_incomplete_load(model, what=what)
 
 
 @ModelLoaderRegistry.register(base=BaseModelType.Any, type=ModelType.Qwen3VLEncoder, format=ModelFormat.Checkpoint)
@@ -605,7 +594,9 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
         for k in sd.keys():
             sd[k] = sd[k].to(model_dtype)
 
-        model.load_state_dict(sd, assign=True, strict=False)
+        load_state_dict_ignoring_extras(
+            model, sd, source="Qwen3-VL encoder checkpoint", assign=True, allow_missing=True
+        )
         _reject_incomplete_load(model, what="Qwen3-VL encoder checkpoint")
 
         # Keep an fp8 encoder running in fp8 (storage=float8_e4m3fn, per-layer upcast to the compute

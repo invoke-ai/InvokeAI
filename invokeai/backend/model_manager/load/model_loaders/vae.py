@@ -26,6 +26,7 @@ from invokeai.backend.model_manager.taxonomy import (
 )
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
+from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras
 
 
 def _is_sdnq_vae_folder(path: Path) -> bool:
@@ -247,7 +248,7 @@ class VAELoader(GenericDiffusersLoader):
         with accelerate.init_empty_weights():
             model = AutoencoderKLWan(**init_kwargs)
 
-        model.load_state_dict(sd, strict=True, assign=True)
+        load_state_dict_ignoring_extras(model, sd, source="Wan VAE checkpoint", assign=True)
         model.eval()
         return model
 
@@ -302,7 +303,7 @@ class VAELoader(GenericDiffusersLoader):
         with accelerate.init_empty_weights():
             model = AutoencoderKLQwenImage()
 
-        model.load_state_dict(sd, strict=True, assign=True)
+        load_state_dict_ignoring_extras(model, sd, source="Qwen-Image VAE checkpoint", assign=True)
         model.eval()
         return model
 

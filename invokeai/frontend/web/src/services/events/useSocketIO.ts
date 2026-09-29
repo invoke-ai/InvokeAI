@@ -31,6 +31,19 @@ declare global {
  * Bounded, because retrying is only ever right when the client is still welcome: a client that
  * is not gets a connect error, which socket.io does not retry, and the attempts stop there. The
  * count lives with the socket, so a session change (which builds a new one) starts it over.
+ *
+ * The bound covers server-initiated disconnects and nothing else. When one of these retries fails
+ * at the transport level instead — the server is restarting, a proxy is down — socket.io's
+ * manager takes over: `socket.connect()` re-arms its reconnection, and a failed attempt surfaces
+ * as `connect_error` rather than `disconnect`, so the counter here never sees it. That handoff
+ * is unbounded, with the manager's defaults (infinite attempts, 1s doubling to a 5s ceiling, ±50%
+ * jitter), and deliberately so. The server drops sockets for authorization changes and then
+ * expects the client back; capping the manager — `reconnection: false`, or a
+ * `reconnectionAttempts` limit — would strand the tab in exactly the case this retry exists for,
+ * a server briefly unreachable right after such a change, and would hand the same dead end to
+ * every ordinary outage, which the manager rides out on its own today. The two drivers do not
+ * race: a retry here fires once per server disconnect, which needs a connected socket, and
+ * `Socket.connect()` does not open the manager while it is between its own attempts. (#9542)
  */
 const MAX_SERVER_DISCONNECT_RECONNECTS = 5;
 const SERVER_DISCONNECT_RECONNECT_DELAY_MS = 1000;
@@ -116,8 +129,9 @@ export const useSocketIO = () => {
     const disposeEventListeners = setEventListeners({ socket, store, setIsConnected: $isConnected.set });
 
     // See MAX_SERVER_DISCONNECT_RECONNECTS. Only `io server disconnect` is ours to retry —
-    // socket.io reconnects transport-level drops itself, and `io client disconnect` is this
-    // effect's own teardown.
+    // socket.io reconnects transport-level drops itself, including a retry of ours that fails
+    // at the transport level (a `connect_error`, never a `disconnect`), and `io client
+    // disconnect` is this effect's own teardown.
     let serverDisconnects = 0;
     let reconnectTimeout: ReturnType<typeof setTimeout> | undefined;
     const reconnectAfterServerDisconnect = (reason: string) => {

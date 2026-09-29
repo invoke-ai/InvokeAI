@@ -193,6 +193,82 @@ class TestQwenImageWorkingMemory:
             assert mock_estimate.call_args.kwargs["operation"] == "decode"
             mock_vae_info.model_on_device.assert_called_once_with(working_mem_bytes=expected_memory)
 
+    def test_qwen_image_to_latents_normalizes_in_fp32_with_bf16_vae(self):
+        mock_vae, mock_vae_info = self._mock_vae_info()
+        mock_vae.dtype = torch.bfloat16
+        mock_vae.config.z_dim = 16
+        means = torch.linspace(-0.2, 0.2, 16).tolist()
+        stds = torch.linspace(0.65, 1.35, 16).tolist()
+        mock_vae.config.latents_mean = means
+        mock_vae.config.latents_std = stds
+        raw_latents = torch.linspace(-1.1, 1.3, 32, dtype=torch.float32).reshape(1, 16, 1, 1, 2).to(torch.bfloat16)
+        posterior = MagicMock()
+        posterior.mode.return_value = raw_latents
+        mock_vae.encode.return_value.latent_dist = posterior
+
+        with (
+            patch(
+                "invokeai.app.invocations.qwen_image_image_to_latents.estimate_vae_working_memory_qwen_image",
+                return_value=1,
+            ),
+            patch(
+                "invokeai.app.invocations.qwen_image_image_to_latents.TorchDevice.choose_torch_device",
+                return_value=torch.device("cpu"),
+            ),
+        ):
+            latents = QwenImageImageToLatentsInvocation.vae_encode(
+                mock_vae_info, torch.zeros(1, 3, 8, 16, dtype=torch.float32)
+            )
+
+        mean_tensor = torch.tensor(means, dtype=torch.float32).view(1, 16, 1, 1, 1)
+        std_tensor = torch.tensor(stds, dtype=torch.float32).view(1, 16, 1, 1, 1)
+        expected = (raw_latents.to(torch.float32) - mean_tensor) / std_tensor
+        encoded_image = mock_vae.encode.call_args.args[0]
+        assert encoded_image.dtype == torch.bfloat16
+        assert latents.dtype == torch.float32
+        torch.testing.assert_close(latents, expected)
+
+    def test_qwen_latents_to_image_denormalizes_in_fp32_before_bf16_decode(self):
+        mock_vae, mock_vae_info = self._mock_vae_info()
+        mock_vae.dtype = torch.bfloat16
+        mock_vae.config.z_dim = 16
+        means = torch.linspace(-0.2, 0.2, 16).tolist()
+        stds = torch.linspace(0.65, 1.35, 16).tolist()
+        mock_vae.config.latents_mean = means
+        mock_vae.config.latents_std = stds
+        mock_vae.decode.side_effect = RuntimeError("stop after decode")
+        normalized_latents = torch.linspace(-1.1, 1.3, 64, dtype=torch.float32).reshape(1, 16, 1, 2, 2)
+
+        mock_context = MagicMock()
+        mock_context.models.load.return_value = mock_vae_info
+        mock_context.tensors.load.return_value = normalized_latents
+        mock_context.config.get.return_value.force_tiled_decode = False
+
+        with (
+            patch(
+                "invokeai.app.invocations.qwen_image_latents_to_image.estimate_vae_working_memory_qwen_image",
+                return_value=1,
+            ),
+            patch(
+                "invokeai.app.invocations.qwen_image_latents_to_image.SeamlessExt.static_patch_model",
+                return_value=nullcontext(),
+            ),
+            patch("invokeai.app.invocations.qwen_image_latents_to_image.TorchDevice.empty_cache"),
+        ):
+            invocation = QwenImageLatentsToImageInvocation.model_construct(
+                latents=MagicMock(latents_name="test_latents"),
+                vae=MagicMock(vae=MagicMock(), seamless_axes=[]),
+            )
+            with pytest.raises(RuntimeError, match="stop after decode"):
+                invocation.invoke(mock_context)
+
+        mean_tensor = torch.tensor(means, dtype=torch.float32).view(1, 16, 1, 1, 1)
+        std_tensor = torch.tensor(stds, dtype=torch.float32).view(1, 16, 1, 1, 1)
+        expected = (normalized_latents * std_tensor + mean_tensor).to(torch.bfloat16)
+        decoded_latents = mock_vae.decode.call_args.args[0]
+        assert decoded_latents.dtype == torch.bfloat16
+        assert torch.equal(decoded_latents, expected)
+
     def test_seamless_patch_is_applied_to_converted_anima_vae(self):
         original_vae, mock_vae_info = self._mock_vae_info()
         converted_vae = MagicMock(spec=AutoencoderKLQwenImage)

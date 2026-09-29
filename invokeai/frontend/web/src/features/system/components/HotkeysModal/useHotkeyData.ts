@@ -7,6 +7,7 @@ import {
   type HotkeyKeyboardLayoutMap,
   IS_MAC_OS,
 } from 'features/system/components/HotkeysModal/hotkeyStrings';
+import { getRegisteredHotkeyOptions } from 'features/system/components/HotkeysModal/registeredHotkeyOptions';
 import { useKeyboardLayoutMap } from 'features/system/components/HotkeysModal/useKeyboardLayoutMap';
 import { selectCustomHotkeys } from 'features/system/store/hotkeysSlice';
 import { useMemo } from 'react';
@@ -276,21 +277,10 @@ export const useRegisteredHotkeys = ({ id, category, callback, options, dependen
     } satisfies Options;
   }, [data.isEnabled, options]);
 
-  const _optionsWithCanvasTextGuard = useMemo(() => {
-    return {
-      ..._options,
-      enabled: (event, hotkeysEvent) => {
-        // Suppress all registered hotkeys while text editing is still uncommitted.
-        if (isUncommittedCanvasTextSessionActive()) {
-          return false;
-        }
-        if (typeof _options.enabled === 'function') {
-          return _options.enabled(event, hotkeysEvent);
-        }
-        return _options.enabled ?? true;
-      },
-    } satisfies Options;
-  }, [_options, isUncommittedCanvasTextSessionActive]);
+  const _optionsWithCanvasTextGuard = useMemo(
+    () => getRegisteredHotkeyOptions(_options, isUncommittedCanvasTextSessionActive),
+    [_options, isUncommittedCanvasTextSessionActive]
+  );
 
   return useHotkeys(data.hotkeys, callback, _optionsWithCanvasTextGuard, dependencies);
 };

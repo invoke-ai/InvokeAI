@@ -260,6 +260,50 @@ describe('useSocketIO (mounted)', () => {
     expect(sockets[0]?.connect).toHaveBeenCalledTimes(1);
   });
 
+  it('hands a retry that fails at the transport level to socket.io, uncounted', () => {
+    act(() => {
+      store.dispatch(setCredentials({ token: tokenFor(user.user_id, 1), user }));
+    });
+    mount();
+
+    act(() => {
+      sockets[0]?.fire('disconnect', 'io server disconnect');
+    });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    expect(sockets[0]?.connect).toHaveBeenCalledTimes(2);
+
+    // The server is not back yet: the retry fails at the transport level. socket.io reports that
+    // as a `connect_error`, not a `disconnect`, and its manager — re-armed by `connect()` — owns
+    // the recovery from here (#9542). The bounded counter must not see it, and this hook must not
+    // add a second driver to race the manager's.
+    act(() => {
+      sockets[0]?.fire('connect_error', new Error('xhr poll error'));
+    });
+    act(() => {
+      vi.advanceTimersByTime(60_000);
+    });
+
+    expect(sockets[0]?.connect).toHaveBeenCalledTimes(2);
+  });
+
+  it('leaves the manager free to reconnect without bound after a retry fails', () => {
+    act(() => {
+      store.dispatch(setCredentials({ token: tokenFor(user.user_id, 1), user }));
+    });
+    mount();
+
+    // Deliberate (#9542): the server disconnects sockets for authorization changes and expects
+    // the client back, so a retry that lands while the server is briefly unreachable must be
+    // followed by the manager's own reconnection. `reconnection: false` or a `reconnectionAttempts`
+    // cap would leave this tab with no events and no Invoke button until a reload — in that case,
+    // and in every ordinary outage the manager rides out today.
+    const options = io.mock.calls[0]?.[1];
+    expect(options?.reconnection).not.toBe(false);
+    expect(options?.reconnectionAttempts).toBeUndefined();
+  });
+
   it('gives up after a bounded number of server disconnects', () => {
     act(() => {
       store.dispatch(setCredentials({ token: tokenFor(user.user_id, 1), user }));

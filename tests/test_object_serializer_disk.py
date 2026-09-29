@@ -7,7 +7,10 @@ from threading import Barrier
 import pytest
 import torch
 
-from invokeai.app.services.object_serializer.object_serializer_common import ObjectNotFoundError
+from invokeai.app.services.object_serializer.object_serializer_common import (
+    InvalidObjectNameError,
+    ObjectNotFoundError,
+)
 from invokeai.app.services.object_serializer.object_serializer_disk import ObjectSerializerDisk
 from invokeai.app.services.object_serializer.object_serializer_forward_cache import ObjectSerializerForwardCache
 
@@ -304,3 +307,80 @@ def test_obj_serializer_fwd_cache_concurrent_cache_misses_are_not_serialized(
         loaded = [future.result(timeout=10) for future in futures]
 
     assert {obj.foo for obj in loaded} == {f"obj-{i}" for i in range(len(names))}
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        "../escaped",
+        "../../../../etc/passwd",
+        "sub/nested",
+        "/etc/passwd",
+        "..",
+        ".",
+        "",
+        "foo/../../bar",
+        # Windows-shaped payloads must be rejected on posix too, so a posix-only CI run still covers them.
+        "..\\escaped",
+        "sub\\nested",
+        "C:\\Windows\\win.ini",
+        "C:relative",
+        "nul\x00byte",
+    ],
+)
+def test_obj_serializer_disk_rejects_traversal_names(obj_serializer: ObjectSerializerDisk[MockDataclass], name: str):
+    """Object names arrive from the client inside node fields (e.g. `TensorField.tensor_name`), so a name that is
+    not a plain filename must never be joined onto the output directory."""
+    with pytest.raises(InvalidObjectNameError):
+        obj_serializer.load(name)
+    with pytest.raises(InvalidObjectNameError):
+        obj_serializer.delete(name)
+    with pytest.raises(InvalidObjectNameError):
+        obj_serializer._get_path(name)
+
+
+def test_obj_serializer_disk_traversal_name_does_not_read_outside_dir(tmp_path: Path):
+    """The end-to-end shape of the reported issue: a file outside the store, named by a `..` traversal, must not
+    be deserialized."""
+    store = tmp_path / "store"
+    store.mkdir()
+    secret = tmp_path / "secret.pt"
+    torch.save(torch.ones((2, 2), dtype=torch.bool), secret)
+
+    obj_serializer = ObjectSerializerDisk[torch.Tensor](store, safe_globals=[torch.Tensor])
+    with pytest.raises(InvalidObjectNameError):
+        obj_serializer.load(f"../{secret.name}")
+
+
+def test_obj_serializer_disk_accepts_generated_names(obj_serializer: ObjectSerializerDisk[MockDataclass]):
+    """The guard must not reject the names the serializer itself hands out."""
+    name = obj_serializer.save(MockDataclass(foo="bar"))
+    assert obj_serializer._get_path(name).parent == obj_serializer._output_dir
+    assert obj_serializer.load(name).foo == "bar"
+
+
+def test_obj_serializer_fwd_cache_rejects_traversal_names(fwd_cache: ObjectSerializerForwardCache[MockDataclass]):
+    """The forward cache must not launder a traversal name past the disk serializer's guard."""
+    with pytest.raises(InvalidObjectNameError):
+        fwd_cache.load("../escaped")
+    with pytest.raises(InvalidObjectNameError):
+        fwd_cache.delete("../escaped")
+
+
+class UnregisteredClass:
+    """Deliberately never passed to `add_safe_globals`."""
+
+    def __init__(self) -> None:
+        self.foo = "bar"
+
+
+def test_obj_serializer_disk_does_not_unpickle_arbitrary_objects(tmp_path: Path):
+    """Object names are untrusted, so even a name that stays inside the store must not reach a full unpickle: a
+    file planted in the store (or swapped for one) must not be able to instantiate arbitrary classes."""
+    obj_serializer = ObjectSerializerDisk[MockDataclass](tmp_path, safe_globals=[MockDataclass])
+    name = "planted"
+    torch.save(UnregisteredClass(), tmp_path / name)
+
+    with pytest.raises(Exception) as exc_info:
+        obj_serializer.load(name)
+    assert "UnregisteredClass" in str(exc_info.value) or "weights_only" in str(exc_info.value)
