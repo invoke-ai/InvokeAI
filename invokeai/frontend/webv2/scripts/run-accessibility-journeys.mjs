@@ -329,17 +329,17 @@ const runKeyboardJourney = async (browser) => {
       'Launchpad rail links must follow their visual order.'
     );
 
-    await fontsLink.focus();
-    await fontsLink.press('Enter');
-    await page.waitForURL(/#\/fonts$/);
-    assert.equal(await fontsLink.getAttribute('aria-current'), 'page');
-    await fontsLink.press('Tab');
-    await expectFocused(modelsLink, 'Tab should move focus from Fonts to Models.');
+    await modelsLink.focus();
     await modelsLink.press('Enter');
     await waitForModels(page);
     assert.match(page.url(), /#\/models$/);
     assert.equal(await modelsLink.getAttribute('aria-current'), 'page');
-    assert.equal(await fontsLink.getAttribute('aria-current'), null);
+    await modelsLink.press('Tab');
+    await expectFocused(fontsLink, 'Tab should move focus from Models to Fonts.');
+    await fontsLink.press('Enter');
+    await page.waitForURL(/#\/fonts$/);
+    assert.equal(await fontsLink.getAttribute('aria-current'), 'page');
+    assert.equal(await modelsLink.getAttribute('aria-current'), null);
 
     const paletteTrigger = page.getByRole('button', { exact: true, name: 'Command palette' });
 

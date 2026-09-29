@@ -123,19 +123,19 @@ export const Launchpad = () => {
             render: () => <ProjectsPage />,
           },
           {
-            group: 'manage',
-            icon: TypeIcon,
-            id: 'fonts',
-            label: t('launchpad.sections.fonts'),
-            render: () => <FontsPage />,
-          },
-          {
             condition: canManageModels,
             group: 'manage',
             icon: BoxIcon,
             id: 'models',
             label: t('launchpad.sections.models'),
             render: () => <ModelsPage />,
+          },
+          {
+            group: 'manage',
+            icon: TypeIcon,
+            id: 'fonts',
+            label: t('launchpad.sections.fonts'),
+            render: () => <FontsPage />,
           },
           {
             condition: canManageNodes,
