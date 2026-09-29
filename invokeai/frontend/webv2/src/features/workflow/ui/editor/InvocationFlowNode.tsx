@@ -210,12 +210,14 @@ const NodeOutcomeIcon = ({
 
 /** Thin progress strip under the header while the node's invocation executes. */
 const NodeProgressStrip = ({ execution }: { execution: NodeExecutionState | null }) => {
-  if (execution?.status !== 'running') {
+  const isWorkflowImageExport = useIsWorkflowImageExport();
+
+  if (isWorkflowImageExport || execution?.status !== 'running') {
     return null;
   }
 
   return (
-    <Box bg="bg.muted" h="2px" overflow="hidden" position="relative" w="full">
+    <Box bg="bg.muted" data-node-progress-strip="true" h="2px" overflow="hidden" position="relative" w="full">
       <Box
         bg="brand.solid"
         h="full"
@@ -309,12 +311,18 @@ const InputFieldTooltip = ({
   </Stack>
 );
 
-const OutputFieldTooltip = ({ template }: { template: FieldOutputTemplate }) => {
+const OutputFieldTooltip = ({
+  includeTitle = true,
+  template,
+}: {
+  includeTitle?: boolean;
+  template: FieldOutputTemplate;
+}) => {
   const { t } = useTranslation();
 
   return (
     <Stack gap="0.5" maxW="18rem">
-      <Text fontWeight="700">{template.title}</Text>
+      {includeTitle ? <Text fontWeight="700">{template.title}</Text> : null}
       <Text color="fg.subtle">{t('nodes.fieldName', { name: template.name })}</Text>
       <Text color="fg.subtle">{t('nodes.fieldType', { type: getFieldTypeLabel(template.type) })}</Text>
       <Text color="fg.subtle">{t('nodes.output')}</Text>
@@ -703,17 +711,21 @@ const InputFieldRow = ({
             ) : null}
           </HStack>
         </HStack>
-        {isWorkflowImageExport && description ? (
-          <Text
-            color="fg.subtle"
-            data-workflow-export-content="true"
-            fontSize="2xs"
-            mt="0.5"
-            overflowWrap="anywhere"
-            whiteSpace="pre-wrap"
-          >
-            {description}
-          </Text>
+        {isWorkflowImageExport ? (
+          <Stack data-workflow-export-content="true" gap="0.5" mt="0.5" overflowWrap="anywhere" w="full">
+            <InputFieldTooltip
+              description={description}
+              isConnected={isConnected}
+              isExposed={isExposed}
+              label={label}
+              template={template}
+            />
+            {template.input !== 'direct' ? (
+              <Text data-workflow-export-connector-tooltip="true" fontSize="2xs">
+                {handleTooltip}
+              </Text>
+            ) : null}
+          </Stack>
         ) : null}
         {showsControl ? (
           <Box mt="0.5" w="full">
@@ -756,7 +768,13 @@ const OutputFieldRow = ({
 
   return (
     <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
-      <Flex align="center" h="5" justify="flex-end" position="relative">
+      <Flex
+        align="center"
+        h={isWorkflowImageExport ? 'auto' : '5'}
+        justify="flex-end"
+        minH={isWorkflowImageExport ? '5' : undefined}
+        position="relative"
+      >
         <Tooltip content={handleTooltip} positioning={{ placement: 'left-start' }} showArrow>
           <Handle
             id={template.name}
@@ -771,17 +789,19 @@ const OutputFieldRow = ({
           </Flex>
         ) : isWorkflowImageExport ? (
           <Box flexShrink={0} maxW="full" textAlign="end">
-            <Tooltip content={<OutputFieldTooltip template={template} />} positioning={{ placement: 'top-end' }}>
-              <MiddleTruncate
-                as="span"
-                color="fg.muted"
-                fontSize="2xs"
-                justifyContent="flex-end"
-                lineHeight="shorter"
-                maxW="full"
-                text={template.title}
-              />
-            </Tooltip>
+            <Text
+              color="fg.muted"
+              data-workflow-export-content="true"
+              data-workflow-export-output-title="true"
+              fontSize="2xs"
+              lineHeight="shorter"
+              maxW="full"
+              overflowWrap="anywhere"
+              textAlign="end"
+              whiteSpace="normal"
+            >
+              {template.title}
+            </Text>
           </Box>
         ) : (
           <HStack gap="1.5" justify="flex-end" minW="0" w="full">
@@ -816,29 +836,18 @@ const OutputFieldRow = ({
           </HStack>
         )}
       </Flex>
-      {isWorkflowImageExport && value ? (
-        <Text
-          color="fg.subtle"
-          data-workflow-export-content="true"
-          fontSize="2xs"
-          maxW="full"
-          overflowWrap="anywhere"
-          whiteSpace="pre-wrap"
-        >
-          {value.full}
-        </Text>
-      ) : null}
-      {isWorkflowImageExport && template.description ? (
-        <Text
-          color="fg.subtle"
-          data-workflow-export-content="true"
-          fontSize="2xs"
-          maxW="full"
-          overflowWrap="anywhere"
-          whiteSpace="pre-wrap"
-        >
-          {template.description}
-        </Text>
+      {isWorkflowImageExport ? (
+        <Stack data-workflow-export-content="true" gap="0.5" maxW="full" px={WORKFLOW_NODE_DENSITY.rowPaddingX}>
+          <Text data-workflow-export-connector-tooltip="true" fontSize="2xs" overflowWrap="anywhere">
+            {handleTooltip}
+          </Text>
+          <OutputFieldTooltip includeTitle={false} template={template} />
+          {value ? (
+            <Text color="fg.subtle" fontSize="2xs" maxW="full" overflowWrap="anywhere" whiteSpace="pre-wrap">
+              {value.full}
+            </Text>
+          ) : null}
+        </Stack>
       ) : null}
     </Box>
   );
@@ -1044,26 +1053,10 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           </>
         )}
       </Flex>
-      {isWorkflowImageExport && (template.description || node.data.notes) ? (
-        <Stack gap="1" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
-          {template.description ? (
-            <Text
-              color="fg.subtle"
-              data-workflow-export-content="true"
-              fontSize="2xs"
-              fontStyle="italic"
-              overflowWrap="anywhere"
-              whiteSpace="pre-wrap"
-            >
-              {template.description}
-            </Text>
-          ) : null}
-          {node.data.notes ? (
-            <Text data-workflow-export-content="true" fontSize="2xs" overflowWrap="anywhere" whiteSpace="pre-wrap">
-              {node.data.notes}
-            </Text>
-          ) : null}
-        </Stack>
+      {isWorkflowImageExport ? (
+        <Box data-workflow-export-content="true" maxW="full" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
+          <NodeInfoTooltipContent node={node} template={template} />
+        </Box>
       ) : null}
       <NodeProgressStrip execution={execution} />
       {isOpen && isCompact ? (

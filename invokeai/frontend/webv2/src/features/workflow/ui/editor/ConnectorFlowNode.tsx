@@ -1,6 +1,6 @@
 import type { FieldType } from '@features/workflow/contracts';
 
-import { Box, Flex } from '@chakra-ui/react';
+import { Box, Flex, Stack, Text } from '@chakra-ui/react';
 import {
   getWorkflowNodeChromeProps,
   getWorkflowNodeHandleStyle,
@@ -14,6 +14,7 @@ import { memo, useMemo } from 'react';
 import type { ConnectorFlowNode as ConnectorFlowNodeType } from './flowAdapters';
 
 import { getHandleTypeTooltip } from './handleTooltip';
+import { useIsWorkflowImageExport } from './InvocationFlowNode';
 
 /** An untyped ("any") connector end: a plain grid-tinted dot rather than a field-typed handle. */
 const genericHandleStyle: React.CSSProperties = {
@@ -35,6 +36,10 @@ const getConnectorTitle = (inputType: FieldType | null, outputType: FieldType | 
 
 const ConnectorFlowNodeComponent = ({ data, selected }: NodeProps<ConnectorFlowNodeType>) => {
   const node = data.documentNode;
+  const isWorkflowImageExport = useIsWorkflowImageExport();
+  const inputTooltip = getHandleTypeTooltip(data.inputFieldType, 'Any input');
+  const connectorTooltip = getConnectorTitle(data.inputFieldType, data.outputFieldType);
+  const outputTooltip = getHandleTypeTooltip(data.outputFieldType, 'Any output');
   const inputHandleStyle = useMemo(
     () => ({ ...getConnectorHandleStyle(data.inputFieldType, 'left'), left: -WORKFLOW_NODE_HANDLE_SIZE / 2 }),
     [data.inputFieldType]
@@ -46,10 +51,10 @@ const ConnectorFlowNodeComponent = ({ data, selected }: NodeProps<ConnectorFlowN
 
   return (
     <Flex align="center" data-connector-node-id={node.id} justify="center" position="relative">
-      <Tooltip content={getHandleTypeTooltip(data.inputFieldType, 'Any input')} showArrow>
+      <Tooltip content={inputTooltip} showArrow>
         <Handle id={CONNECTOR_INPUT_HANDLE} position={Position.Left} style={inputHandleStyle} type="target" />
       </Tooltip>
-      <Tooltip content={getConnectorTitle(data.inputFieldType, data.outputFieldType)} showArrow>
+      <Tooltip content={connectorTooltip} showArrow>
         <Box
           bg="bg"
           data-connector-node-body="true"
@@ -61,9 +66,39 @@ const ConnectorFlowNodeComponent = ({ data, selected }: NodeProps<ConnectorFlowN
           {...getWorkflowNodeChromeProps({ selected })}
         />
       </Tooltip>
-      <Tooltip content={getHandleTypeTooltip(data.outputFieldType, 'Any output')} showArrow>
+      <Tooltip content={outputTooltip} showArrow>
         <Handle id={CONNECTOR_OUTPUT_HANDLE} position={Position.Right} style={outputHandleStyle} type="source" />
       </Tooltip>
+      {isWorkflowImageExport ? (
+        <Stack
+          align="center"
+          bg="bg"
+          borderColor="border.subtle"
+          borderWidth="1px"
+          data-workflow-export-content="true"
+          gap="0.5"
+          left="50%"
+          maxW="14rem"
+          overflowWrap="anywhere"
+          position="absolute"
+          px="2"
+          py="1"
+          rounded="sm"
+          top="calc(100% + 0.25rem)"
+          transform="translateX(-50%)"
+          zIndex="2"
+        >
+          <Text data-workflow-export-connector-tooltip="true" fontSize="2xs">
+            {inputTooltip}
+          </Text>
+          <Text data-workflow-export-connector-tooltip="true" fontSize="2xs" fontWeight="600">
+            {connectorTooltip}
+          </Text>
+          <Text data-workflow-export-connector-tooltip="true" fontSize="2xs">
+            {outputTooltip}
+          </Text>
+        </Stack>
+      ) : null}
     </Flex>
   );
 };

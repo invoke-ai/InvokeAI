@@ -15,9 +15,10 @@ import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { page, userEvent } from 'vitest/browser';
 
+import { ConnectorFlowNode } from './ConnectorFlowNode';
 import { toFlowEdges, toFlowNodes } from './flowAdapters';
 import { InvocationFlowNode, WorkflowImageExportProvider } from './InvocationFlowNode';
-import { exportWorkflowAsPng } from './workflowImageExport';
+import { exportWorkflowAsPng, WORKFLOW_EXPORT_TIMEOUT_MS } from './workflowImageExport';
 
 import '@xyflow/react/dist/style.css';
 
@@ -29,13 +30,31 @@ vi.mock('@platform/browser/downloadBlob', () => ({ downloadBlob: vi.fn() }));
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key: string, options?: { error?: string }) =>
+    t: (
+      key: string,
+      options?: {
+        category?: string;
+        classification?: string;
+        error?: string;
+        name?: string;
+        type?: string;
+        version?: string;
+      }
+    ) =>
       ({
         'nodes.childWorkflowError': `Child workflow error: ${options?.error ?? ''}`,
         'nodes.executionFailed': 'Failed',
         'nodes.executionCompleted': 'Completed',
+        'nodes.fieldName': `Field: ${options?.name ?? ''}`,
+        'nodes.fieldType': `Type: ${options?.type ?? ''}`,
         'nodes.latestOutput': 'Latest output',
         'nodes.latestOutputImage': 'Latest output of this node',
+        'nodes.nodeCategory': `Category: ${options?.category ?? ''}`,
+        'nodes.nodeClassification': `Classification: ${options?.classification ?? ''}`,
+        'nodes.nodePackLabel': `Node pack: ${options?.name ?? ''}`,
+        'nodes.nodeType': `Node type: ${options?.type ?? ''}`,
+        'nodes.nodeVersion': `Node version: ${options?.version ?? ''}`,
+        'nodes.output': 'Output',
       })[key] ?? key,
   }),
 }));
@@ -110,7 +129,7 @@ const documentNode: WorkflowInvocationNode = {
 const projectGraph: ProjectGraphState = { ...createProjectGraph('preview-test'), nodes: [documentNode] };
 const templates = { preview: template };
 const flowNodes = toFlowNodes(projectGraph, [], templates);
-const nodeTypes = { invocation: InvocationFlowNode };
+const nodeTypes = { connector: ConnectorFlowNode, invocation: InvocationFlowNode };
 
 const callNodeId = 'call-node';
 const callNode: WorkflowInvocationNode = {
@@ -275,11 +294,20 @@ describe('InvocationFlowNode output preview', () => {
 
   it('keeps node and field descriptions plus full output values in the exported graph clone', async () => {
     const longOutput = 'x'.repeat(60);
+    const longOutputTitle = 'An output title that is deliberately long enough to wrap instead of truncating';
     const exportTemplate: InvocationTemplate = {
       ...template,
+      category: 'Export category',
+      classification: 'stable',
       description: 'Node export description',
       inputs: { a: { ...template.inputs.a!, description: 'Template field description' } },
-      outputs: { value: { ...template.outputs.value!, description: 'Output export description' } },
+      outputs: {
+        value: {
+          ...template.outputs.value!,
+          description: 'Output export description',
+          title: longOutputTitle,
+        },
+      },
     };
     const exportNode: WorkflowInvocationNode = {
       ...documentNode,
@@ -292,7 +320,13 @@ describe('InvocationFlowNode output preview', () => {
         notes: 'Node export note',
       },
     };
-    const exportGraph = { ...projectGraph, nodes: [exportNode] };
+    const exportConnector = {
+      data: { label: '' },
+      id: 'export-connector',
+      position: { x: 380, y: 300 },
+      type: 'connector' as const,
+    };
+    const exportGraph = { ...projectGraph, nodes: [exportNode, exportConnector] };
     const exportNodes = toFlowNodes(exportGraph, [], { preview: exportTemplate });
     const execution = createExecutionPort();
     const adapter = createAdapter(execution.port);
@@ -327,8 +361,116 @@ describe('InvocationFlowNode output preview', () => {
     expect(capturedClone?.textContent).toContain('Node export note');
     expect(capturedClone?.textContent).toContain('Field export description');
     expect(capturedClone?.textContent).toContain('Output export description');
+    expect(capturedClone?.textContent).toContain('Node type: preview');
+    expect(capturedClone?.textContent).toContain('Node pack: invokeai');
+    expect(capturedClone?.textContent).toContain('Node version: 1.0.0');
+    expect(capturedClone?.textContent).toContain('Classification: stable');
+    expect(capturedClone?.textContent).toContain('Category: Export category');
+    expect(capturedClone?.textContent).toContain('Field: a');
+    expect(capturedClone?.textContent).toContain('Type: Integer');
+    expect(capturedClone?.textContent).toContain('Connection only');
+    expect(capturedClone?.textContent).toContain('Output');
+    expect(capturedClone?.textContent).toContain('Any input');
+    expect(capturedClone?.textContent).toContain('Connector: Any input -> Any output');
+    expect(capturedClone?.textContent).toContain('Any output');
     expect(capturedClone?.textContent).toContain(longOutput);
+    const outputTitle = capturedClone?.querySelector<HTMLElement>('[data-workflow-export-output-title="true"]');
+    expect(outputTitle?.textContent).toBe(longOutputTitle);
+    expect(outputTitle && getComputedStyle(outputTitle).whiteSpace).not.toBe('nowrap');
+    expect(capturedClone?.querySelectorAll('[data-workflow-export-connector-tooltip="true"]')).toHaveLength(5);
     expect(capturedClone?.querySelectorAll('[data-workflow-export-content="true"]').length).toBeGreaterThanOrEqual(4);
+  });
+
+  it('keeps running progress in the editor but omits it from the exported graph clone', async () => {
+    const execution = createExecutionPort();
+    const adapter = createAdapter(execution.port);
+    let capturedClone: HTMLElement | undefined;
+    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+      capturedClone = clone;
+      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
+    });
+
+    await render(adapter);
+    await act(() =>
+      execution.set({
+        error: null,
+        latestOutput: null,
+        outputImageUrl: null,
+        progress: 0.5,
+        progressMessage: null,
+        status: 'running',
+      })
+    );
+    expect(host.querySelector('[data-node-progress-strip="true"]')).not.toBeNull();
+
+    await render(adapter, 1, true);
+
+    const flowElement = host.querySelector<HTMLElement>('.react-flow')!;
+    await exportWorkflowAsPng({
+      bounds: { x: 20, y: 20, width: 300, height: 260 },
+      fallbackWorkflowName: 'Untitled Workflow',
+      flowElement,
+      workflowName: 'Running workflow',
+    });
+
+    expect(capturedClone?.querySelector('[data-node-progress-strip="true"]')).toBeNull();
+  });
+
+  it('blocks a third capture after two timeouts and recovers when one rasterization settles', async () => {
+    vi.useFakeTimers();
+    exportMocks.toBlob.mockClear();
+    const finishRasterizations: Array<(blob: Blob | null) => void> = [];
+    let signalBothStarted: () => void = () => {};
+    const bothStarted = new Promise<void>((resolve) => {
+      signalBothStarted = resolve;
+    });
+    exportMocks.toBlob.mockImplementation(
+      () =>
+        new Promise<Blob | null>((resolve) => {
+          finishRasterizations.push(resolve);
+          if (finishRasterizations.length === 2) {
+            signalBothStarted();
+          }
+        })
+    );
+    const execution = createExecutionPort();
+    const adapter = createAdapter(execution.port);
+    const exportOptions = {
+      bounds: { x: 20, y: 20, width: 300, height: 260 },
+      fallbackWorkflowName: 'Untitled Workflow',
+      flowElement: undefined as unknown as HTMLElement,
+      workflowName: 'Stalled workflow',
+    };
+
+    try {
+      await render(adapter, 1, true);
+      exportOptions.flowElement = host.querySelector<HTMLElement>('.react-flow')!;
+      const firstExport = exportWorkflowAsPng(exportOptions);
+      const secondExport = exportWorkflowAsPng(exportOptions);
+      const firstTimedOut = expect(firstExport).rejects.toThrow('timed out');
+      const secondTimedOut = expect(secondExport).rejects.toThrow('timed out');
+
+      await bothStarted;
+      expect(exportMocks.toBlob).toHaveBeenCalledTimes(2);
+      await vi.advanceTimersByTimeAsync(WORKFLOW_EXPORT_TIMEOUT_MS);
+      await Promise.all([firstTimedOut, secondTimedOut]);
+
+      await expect(exportWorkflowAsPng(exportOptions)).rejects.toThrow('still running');
+      expect(exportMocks.toBlob).toHaveBeenCalledTimes(2);
+
+      finishRasterizations[0]!(null);
+      await vi.advanceTimersByTimeAsync(0);
+      exportMocks.toBlob.mockResolvedValueOnce(new Blob(['png'], { type: 'image/png' }));
+      await exportWorkflowAsPng(exportOptions);
+      expect(exportMocks.toBlob).toHaveBeenCalledTimes(3);
+
+      finishRasterizations[1]!(null);
+      await vi.advanceTimersByTimeAsync(0);
+    } finally {
+      finishRasterizations.forEach((finish) => finish(null));
+      await vi.advanceTimersByTimeAsync(0);
+      vi.useRealTimers();
+    }
   });
 
   it('keeps one preview height across differently shaped outputs and folds it away per node', async () => {
