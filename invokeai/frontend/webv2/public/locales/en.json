@@ -1707,7 +1707,8 @@
       "nodes": "Nodes",
       "projects": "Projects",
       "users": "Users",
-      "fonts": "Fonts"
+      "fonts": "Fonts",
+      "preferences": "Preferences"
     },
     "sectionsLabel": "Launchpad sections"
   },

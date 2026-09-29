@@ -1,14 +1,23 @@
 import { Box, Flex, VisuallyHidden, type SystemStyleObject } from '@chakra-ui/react';
 import { FontsPage } from '@features/fonts/launchpad';
 import { useCapabilities, UsersPage } from '@features/identity';
-import { requestIntermediatesFocus } from '@features/intermediates';
+import { INTERMEDIATES_SETTING_ID, requestIntermediatesFocus } from '@features/intermediates';
 import { ModelsPage } from '@features/models';
 import { NodesPage } from '@features/nodes';
-import { useLocation } from '@tanstack/react-router';
+import { useLocation, useNavigate } from '@tanstack/react-router';
 import { LaunchpadCommandPalette } from '@workbench/palette/LaunchpadCommandPalette';
-import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
-import { BlocksIcon, BoxIcon, FolderIcon, HouseIcon, TypeIcon, UsersIcon, type LucideIcon } from 'lucide-react';
-import { useMemo, useState, type ReactNode } from 'react';
+import { PreferencesPage } from '@workbench/settings/launchpad';
+import {
+  BlocksIcon,
+  BoxIcon,
+  FolderIcon,
+  HouseIcon,
+  SettingsIcon,
+  TypeIcon,
+  UsersIcon,
+  type LucideIcon,
+} from 'lucide-react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { LaunchpadNav, type LaunchpadNavGroupId } from './LaunchpadNav';
@@ -22,7 +31,7 @@ import { ProjectActionsMenuProvider } from './projects/ProjectActionsMenuHost';
  * across the route split.
  */
 
-type LaunchpadSectionId = 'home' | 'projects' | 'models' | 'nodes' | 'users' | 'fonts';
+type LaunchpadSectionId = 'home' | 'projects' | 'models' | 'nodes' | 'users' | 'fonts' | 'preferences';
 
 interface LaunchpadSection {
   id: LaunchpadSectionId;
@@ -34,13 +43,13 @@ interface LaunchpadSection {
 }
 
 const DEFAULT_SECTION_ID: LaunchpadSectionId = 'home';
-const SECTION_IDS: readonly string[] = ['home', 'projects', 'models', 'nodes', 'users', 'fonts'];
+const SECTION_IDS: readonly string[] = ['home', 'projects', 'models', 'nodes', 'users', 'fonts', 'preferences'];
 
 const isSectionId = (value: string): value is LaunchpadSectionId => SECTION_IDS.includes(value);
 
-/** `/` is Home; every other section is its own path. */
+/** `/` is Home; every other section is its own path, which may continue into the section (`/preferences/hotkeys`). */
 const normalizeSectionId = (value: string): LaunchpadSectionId | null => {
-  const id = value.replace(/^\/+/, '');
+  const id = value.replace(/^\/+/, '').split('/')[0] ?? '';
 
   if (id === '') {
     return 'home';
@@ -49,11 +58,15 @@ const normalizeSectionId = (value: string): LaunchpadSectionId | null => {
   return isSectionId(id) ? id : null;
 };
 
-const SECTION_PATHS: Record<LaunchpadSectionId, '/' | '/projects' | '/models' | '/nodes' | '/users' | '/fonts'> = {
+const SECTION_PATHS: Record<
+  LaunchpadSectionId,
+  '/' | '/projects' | '/models' | '/nodes' | '/users' | '/fonts' | '/preferences'
+> = {
   fonts: '/fonts',
   home: '/',
   models: '/models',
   nodes: '/nodes',
+  preferences: '/preferences',
   projects: '/projects',
   users: '/users',
 };
@@ -75,14 +88,21 @@ const getActiveSectionId = (
     ? requestedSectionId
     : DEFAULT_SECTION_ID;
 
-const manageIntermediatesOf = (userId: string, label: string): void => {
-  requestIntermediatesFocus({ ownerId: userId, ownerLabel: label });
-  openWorkbenchSettings('intermediates');
-};
-
 export const Launchpad = () => {
   const { canManageModels, canManageNodes, canManageUsers } = useCapabilities();
   const { t } = useTranslation();
+  const navigate = useNavigate();
+  const manageIntermediatesOf = useCallback(
+    (userId: string, label: string) => {
+      requestIntermediatesFocus({ ownerId: userId, ownerLabel: label });
+      void navigate({
+        params: { section: 'intermediates' },
+        search: { setting: INTERMEDIATES_SETTING_ID },
+        to: '/preferences/$section',
+      });
+    },
+    [navigate]
+  );
 
   const filtered = useMemo<LaunchpadSection[]>(
     () =>
@@ -133,9 +153,16 @@ export const Launchpad = () => {
             label: t('launchpad.sections.users'),
             render: () => <UsersPage onManageIntermediates={manageIntermediatesOf} />,
           },
+          {
+            group: 'footer',
+            icon: SettingsIcon,
+            id: 'preferences',
+            label: t('launchpad.sections.preferences'),
+            render: () => <PreferencesPage />,
+          },
         ] satisfies (LaunchpadSection & { condition?: boolean })[]
       ).filter((section) => section.condition ?? true),
-    [canManageModels, canManageNodes, canManageUsers, t]
+    [canManageModels, canManageNodes, canManageUsers, manageIntermediatesOf, t]
   );
 
   return (

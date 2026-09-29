@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 901357,
+        "brotliBytes": 893510,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 900242,
+        "gzipBytes": 892809,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2144207,
-        "largestAssetRawBytes": 778953,
+        "initialRawBytes": 2118301,
+        "largestAssetRawBytes": 749035,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 92610,
+        "ownedRawBytes": 93111,
         "requestCount": 36,
         "scriptRequestCount": 20,
         "sourceOwners": [
@@ -320,10 +320,11 @@
           "source:src/workbench/projects/session.ts",
           "source:src/workbench/projects/syncStore.ts",
           "source:src/workbench/projects/useProjectFileActions.ts",
-          "source:src/workbench/settings/SettingsButton.tsx",
           "source:src/workbench/settings/SettingsDialogHost.tsx",
           "source:src/workbench/settings/dialogResource.ts",
+          "source:src/workbench/settings/launchpad.tsx",
           "source:src/workbench/settings/settingsDialogStore.ts",
+          "source:src/workbench/settings/settingsSearchShortcut.ts",
           "source:src/workbench/settings/store.ts"
         ]
       },
@@ -333,17 +334,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1251847,
+        "brotliBytes": 1242105,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1245199,
+        "gzipBytes": 1236729,
         "imageRawBytes": 156376,
-        "initialRawBytes": 3225507,
-        "largestAssetRawBytes": 778953,
+        "initialRawBytes": 3202228,
+        "largestAssetRawBytes": 749035,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 144687,
-        "requestCount": 84,
-        "scriptRequestCount": 68,
+        "ownedRawBytes": 144143,
+        "requestCount": 77,
+        "scriptRequestCount": 61,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -947,14 +948,15 @@
           "source:src/workbench/queue-integration/queueRunRestoration.ts",
           "source:src/workbench/queue-integration/useActiveQueueProgress.ts",
           "source:src/workbench/queue-integration/useQueueRecoveryProjectIds.ts",
-          "source:src/workbench/settings/SettingsButton.tsx",
           "source:src/workbench/settings/SettingsDialogHost.tsx",
           "source:src/workbench/settings/WidgetSettingsButton.tsx",
           "source:src/workbench/settings/applicationContributions.ts",
           "source:src/workbench/settings/catalog.ts",
           "source:src/workbench/settings/clearWorkspaceData.ts",
           "source:src/workbench/settings/dialogResource.ts",
+          "source:src/workbench/settings/launchpad.tsx",
           "source:src/workbench/settings/settingsDialogStore.ts",
+          "source:src/workbench/settings/settingsSearchShortcut.ts",
           "source:src/workbench/settings/store.ts",
           "source:src/workbench/shell/BottomPanel.tsx",
           "source:src/workbench/shell/CenterArea.tsx",
@@ -1063,7 +1065,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-09-28",
+  "capturedAt": "2026-09-29",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

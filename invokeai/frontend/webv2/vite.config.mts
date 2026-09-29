@@ -20,6 +20,8 @@ const PROJECT_ROOT = fileURLToPath(new URL('.', import.meta.url));
 // Group eager dependencies shared by both routes to avoid extra chunk requests.
 const ROUTE_SHARED_MODULES = [
   '/features/fonts/data/keys.ts',
+  // Launchpad entry points and the intermediates settings metadata both read it.
+  '/features/intermediates/data/focus.ts',
   '/features/fonts/launchpad.tsx',
   '/features/fonts/react.tsx',
   '/features/fonts/runtime.ts',
@@ -55,6 +57,8 @@ const ROUTE_SHARED_MODULES = [
   '/platform/ui/useScrollAreaPhantomHeal.ts',
   '/platform/ui/theme/applyTheme.ts',
   '/workbench/components/WorkbenchSplashScreen.tsx',
+  // The splash screen's image URL module; left ungrouped it can split into its own startup chunk.
+  '/assets/SplashImage.webp',
   '/workbench/hotkeys/catalog.ts',
   '/workbench/hotkeys/modalLayer.ts',
   '/workbench/launchpad/formatRelativeTime.ts',
@@ -73,6 +77,8 @@ const ROUTE_SHARED_MODULES = [
   '/workbench/projects/projectFileToasts.ts',
   '/workbench/projects/useProjectFileActions.ts',
   '/workbench/settings/SettingsDialogHost.tsx',
+  '/workbench/settings/launchpad.tsx',
+  '/workbench/settings/settingsSearchShortcut.ts',
 ] as const;
 
 // Group dependencies shared by the editor shell and lazy widgets to reduce boot requests.
@@ -137,11 +143,14 @@ const WORKFLOW_CORE_MODULES = [
 // Keep widget metadata separate so Launchpad settings cannot import editor boot UI.
 const WIDGET_METADATA_MODULES = [
   '/features/gallery/settingsContribution.ts',
+  '/features/intermediates/settingsContribution.ts',
   '/features/queue/widget.ts',
   '/features/workflow/widget.ts',
   '/workbench/settings/applicationContributions.ts',
   '/workbench/settings/catalog.ts',
   '/workbench/widgets/canvas/canvasSettings.ts',
+  // canvasSettings reads these keys; grouped elsewhere they can close an import cycle with the editor context.
+  '/workbench/widgets/canvas/invoke/canvasCompositing.ts',
   '/workbench/widgets/canvas/settingsContribution.ts',
   '/workbench/widgets/image-map/settingsContribution.ts',
   '/workbench/widgets/layers/panes/editorPaneLayout.ts',

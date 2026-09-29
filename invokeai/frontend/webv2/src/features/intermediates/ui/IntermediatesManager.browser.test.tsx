@@ -259,6 +259,8 @@ const openForceDialogReadyToConfirm = async (
   return dialog;
 };
 
+const INTERMEDIATES_FIELD = { id: 'intermediatesManager', kind: 'custom', label: '', scope: 'none' } as const;
+
 describe('IntermediatesManager', () => {
   beforeEach(() => {
     dependencies.getIntermediatesSummary
@@ -880,6 +882,35 @@ describe('IntermediatesManager', () => {
       timeout: 3_000,
     });
     expect(host.contains(document.activeElement)).toBe(true);
+  });
+
+  it('starts over on a new entry point request while its settings section is already showing', async () => {
+    host = document.createElement('div');
+    host.style.height = '640px';
+    host.style.display = 'flex';
+    host.style.flexDirection = 'column';
+    document.body.append(host);
+    root = createRoot(host);
+    queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const { requestIntermediatesFocus } = await import('@features/intermediates/data/focus');
+    const { IntermediatesSettingsField } = await import('./IntermediatesSettingsField');
+    requestIntermediatesFocus({ projectId: 'p1' });
+    await act(() => {
+      root.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient}>
+            <IntermediatesSettingsField field={INTERMEDIATES_FIELD} surface="dialog" />
+          </QueryClientProvider>
+        </ChakraProvider>
+      );
+    });
+    await vi.waitFor(() => expect(checkbox('intermediates.list.selectRow(name=Portraits)').checked).toBe(true));
+    expect(checkbox('intermediates.list.selectRow(name=Landscapes)').checked).toBe(false);
+
+    // The Launchpad keeps the Preferences page mounted, so a later request arrives while the manager is showing.
+    await act(() => requestIntermediatesFocus({ projectId: 'p2' }));
+    await vi.waitFor(() => expect(checkbox('intermediates.list.selectRow(name=Landscapes)').checked).toBe(true));
+    expect(checkbox('intermediates.list.selectRow(name=Portraits)').checked).toBe(false);
   });
 
   it('asks the server once under StrictMode, follows the running operation and consumes the entry point intent on commit', async () => {

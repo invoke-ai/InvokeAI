@@ -2,11 +2,11 @@ import type { ProjectSummary } from '@workbench/projects/library';
 import type { MouseEvent, ReactNode } from 'react';
 
 import { Menu, Portal } from '@chakra-ui/react';
-import { requestIntermediatesFocus } from '@features/intermediates';
+import { INTERMEDIATES_SETTING_ID, requestIntermediatesFocus } from '@features/intermediates';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { RenameDialog } from '@platform/ui/RenameDialog';
+import { useNavigate } from '@tanstack/react-router';
 import { isProjectSummaryCompatible } from '@workbench/projects/library';
-import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
 import { createContext, useCallback, useContext, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -175,6 +175,7 @@ const HostedProjectActionsMenu = ({
   onRequestDialog: (dialog: DialogRequest) => void;
 }) => {
   const actions = useProjectCardActions(request.summary);
+  const navigate = useNavigate();
   const isCompatible = isProjectSummaryCompatible(request.summary);
   const projectSearch = useMemo(() => ({ project: request.summary.id }), [request.summary.id]);
   const positioning = useMemo(() => {
@@ -210,11 +211,15 @@ const HostedProjectActionsMenu = ({
     [actions, onRequestDialog, request.summary.name]
   );
   const handleDeleteIntermediates = useCallback(() => {
-    // The manager lives in Settings; it reads this intent once when its section mounts.
+    // The manager lives in Preferences; it reads this intent when it starts.
     requestIntermediatesFocus({ projectId: request.summary.id });
-    openWorkbenchSettings('intermediates', request.returnFocus ?? undefined);
     onClose();
-  }, [onClose, request.returnFocus, request.summary.id]);
+    void navigate({
+      params: { section: 'intermediates' },
+      search: { setting: INTERMEDIATES_SETTING_ID },
+      to: '/preferences/$section',
+    });
+  }, [navigate, onClose, request.summary.id]);
   const handleDelete = useCallback(
     () => onRequestDialog({ actions, kind: 'delete', name: request.summary.name }),
     [actions, onRequestDialog, request.summary.name]

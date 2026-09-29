@@ -163,15 +163,18 @@ const surfaces = [
     ready: waitForProjects,
   },
   {
-    id: 'launchpad-settings-intermediates-representative',
+    id: 'launchpad-preferences-intermediates-representative',
     path: '/#/projects',
     ready: async (page) => {
-      await page.getByRole('button', { exact: true, name: 'Settings' }).click();
-      const dialog = page.getByRole('dialog', { name: /^Settings:/ });
-      await dialog
-        .getByRole('navigation', { exact: true, name: 'Settings' })
-        .getByRole('button', { name: 'Intermediates' })
+      await page
+        .getByRole('navigation', { exact: true, name: 'Launchpad sections' })
+        .getByRole('link', { exact: true, name: 'Preferences' })
         .click();
+      await page
+        .getByRole('list', { exact: true, name: 'Settings section' })
+        .getByRole('button', { exact: true, name: 'Intermediates' })
+        .click();
+      await page.getByRole('heading', { exact: true, level: 2, name: 'Intermediates' }).waitFor();
       await page.getByRole('textbox', { exact: true, name: 'Search projects' }).waitFor();
       await page.getByRole('checkbox', { exact: true, name: 'Select Fixture Project 001' }).waitFor();
     },
