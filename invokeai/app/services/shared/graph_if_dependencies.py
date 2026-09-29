@@ -1,5 +1,3 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-
 from typing import TYPE_CHECKING
 
 from invokeai.app.invocations.call_saved_workflow import CallSavedWorkflowInvocation

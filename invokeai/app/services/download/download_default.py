@@ -1,4 +1,3 @@
-# Copyright (c) 2023,2026 Lincoln D. Stein
 """Implementation of multithreaded download queue for invokeai."""
 
 import os

@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Team
 """Implementation of ModelManagerServiceBase."""
 
 from typing import Optional

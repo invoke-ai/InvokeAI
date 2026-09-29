@@ -28,7 +28,12 @@ from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
 from invokeai.backend.util.devices import TorchDevice
-from invokeai.backend.util.qwen_image_vae import as_qwen_image_vae
+from invokeai.backend.util.qwen_image_vae import (
+    QWEN_IMAGE_VAE_MIN_TILE_SIZE,
+    as_qwen_image_vae,
+    patch_qwen_image_vae_tiling,
+    resolve_qwen_image_vae_tile_size,
+)
 from invokeai.backend.util.vae_working_memory import (
     estimate_vae_working_memory_anima,
 )
@@ -39,7 +44,7 @@ from invokeai.backend.util.vae_working_memory import (
     title="Image to Latents - Anima",
     tags=["image", "latents", "vae", "i2l", "anima"],
     category="image",
-    version="1.0.2",
+    version="1.1.0",
     classification=Classification.Prototype,
 )
 class AnimaImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
@@ -47,9 +52,20 @@ class AnimaImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     image: ImageField = InputField(description="The image to encode.")
     vae: VAEField = InputField(description=FieldDescriptions.vae, input=Input.Connection)
+    tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
+    # NOTE: tile_size = 0 is a special value meaning "use the model's default", matching the
+    # Qwen-Image and SD i2l nodes. `int | None` is avoided because the workflow UI cannot send None.
+    tile_size: int = InputField(
+        default=0,
+        multiple_of=8,
+        description=f"{FieldDescriptions.vae_tile_size} Values between 1 and "
+        f"{QWEN_IMAGE_VAE_MIN_TILE_SIZE} are raised to {QWEN_IMAGE_VAE_MIN_TILE_SIZE}.",
+    )
 
     @staticmethod
-    def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor) -> torch.Tensor:
+    def vae_encode(
+        vae_info: LoadedModel, image_tensor: torch.Tensor, tiled: bool = False, tile_size: int = 0
+    ) -> torch.Tensor:
         try:
             # Also raises ValueError for a Wan VAE of another geometry (Wan 2.2's 48-channel VAE).
             as_qwen_image_vae(vae_info.model)
@@ -63,11 +79,14 @@ class AnimaImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
                 "under 'anima', 'qwen-image', or a 16-channel 'wan' VAE."
             ) from e
 
+        # Resolved before estimating, so the reservation matches the tiles the VAE will use, and
+        # against a module constant rather than the cached module's current geometry.
+        effective_tile_size = resolve_qwen_image_vae_tile_size(tile_size) if tiled else None
         estimated_working_memory = estimate_vae_working_memory_anima(
             operation="encode",
             image_tensor=image_tensor,
             vae=vae_info.model,
-            tile_size=None,
+            tile_size=effective_tile_size,
         )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             vae = as_qwen_image_vae(vae)
@@ -75,10 +94,12 @@ class AnimaImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
             vae_dtype = next(iter(vae.parameters())).dtype
             image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
 
-            with torch.inference_mode():
-                # The cached VAE instance is shared with the decode invocation, which
-                # may have enabled tiling — encode untiled for exactness.
-                vae.disable_tiling()
+            # The cached VAE instance is shared with the decode invocation, which may have enabled
+            # tiling. That used to be handled by switching tiling off here and leaving it off, which
+            # also meant this node could never tile; the scope sets exactly what this encode asked
+            # for and restores what was there, so "untiled for exactness" is still the default
+            # without being the only option.
+            with torch.inference_mode(), patch_qwen_image_vae_tiling(vae, effective_tile_size):
                 # Both VAE classes expect 5D input [B, C, T, H, W]
                 if image_tensor.ndim == 4:
                     image_tensor = image_tensor.unsqueeze(2)  # [B, C, H, W] -> [B, C, 1, H, W]
@@ -109,7 +130,12 @@ class AnimaImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
         # `vae_encode` refuses a foreign encoder with a message that says which VAE to pick instead.
         vae_info = context.models.load(self.vae.vae)
         context.util.signal_progress("Running Anima VAE encode")
-        latents = self.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
+        latents = self.vae_encode(
+            vae_info=vae_info,
+            image_tensor=image_tensor,
+            tiled=self.tiled or context.config.get().force_tiled_decode,
+            tile_size=self.tile_size,
+        )
 
         latents = latents.to("cpu")
         name = context.tensors.save(tensor=latents)

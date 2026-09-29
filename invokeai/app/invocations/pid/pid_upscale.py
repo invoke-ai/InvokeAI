@@ -37,8 +37,7 @@ from invokeai.app.invocations.model import Gemma2EncoderField, PiDDecoderField, 
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.invocations.vae.flux_vae_encode import FluxVaeEncodeInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder
-from invokeai.backend.flux.util import get_flux_ae_params
+from invokeai.backend.flux.util import get_flux_ae_params, is_flux_family_vae
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.pid._src.networks.pid_net import PidNet
 from invokeai.backend.pid.decode import (
@@ -72,9 +71,8 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
 
     image: ImageField = InputField(description="Image to upscale.")
     vae: VAEField = InputField(
-        description="FLUX AutoEncoder VAE. PiD upscale runs the FLUX backbone and applies FLUX VAE "
-        "scaling, and the encode path only supports InvokeAI's FLUX AutoEncoder — a diffusers "
-        "AutoencoderKL (e.g. Z-Image) is not supported here.",
+        description="The FLUX.1 VAE, which Z-Image also uses. PiD upscale runs the FLUX backbone "
+        "and undoes FLUX VAE scaling, so a VAE of another family is not accepted.",
         input=Input.Connection,
     )
     gemma2_encoder: Gemma2EncoderField = InputField(
@@ -118,17 +116,19 @@ class PiDUpscaleInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_tensor = einops.rearrange(image_tensor, "c h w -> 1 c h w")
 
         vae_info = context.models.load(self.vae.vae)
-        # vae_encode + the FLUX scaling below only support InvokeAI's FLUX AutoEncoder. Reject any other
-        # VAE (e.g. a Z-Image diffusers AutoencoderKL) up front with a clear error rather than failing on a
-        # stripped assert inside vae_encode under `python -O`.
-        if not isinstance(vae_info.model, AutoEncoder):
+        # Reject a foreign VAE up front with a clear error rather than failing on a stripped assert
+        # inside `vae_encode` under `python -O`. The check is on the latent normalisation rather than
+        # on the class: the FLUX.1 autoencoder is an `AutoencoderKL` now, and so are SD, SD 3.5 and
+        # CogView 4 -- and the scaling this node undoes below is precisely what differs between them.
+        if not is_flux_family_vae(vae_info.model):
             raise ValueError(
-                f"PiD Upscale requires a FLUX AutoEncoder VAE, but got {type(vae_info.model).__name__}. "
-                "A diffusers AutoencoderKL (e.g. Z-Image) is not supported by this node."
+                "PiD Upscale requires the FLUX.1 autoencoder (Z-Image uses the same one). The VAE "
+                f"given is a {type(vae_info.model).__name__} with a different latent normalisation, "
+                "so its latents do not mean what the PiD decoder expects."
             )
         context.util.signal_progress("Running VAE encode")
         normalised_latent = FluxVaeEncodeInvocation.vae_encode(vae_info=vae_info, image_tensor=image_tensor)
-        # FluxAutoEncoder.encode emits `scale * (raw - shift)`. PiD expects raw, so undo it.
+        # The FLUX VAE encode emits `scale * (raw - shift)`. PiD expects raw, so undo it.
         ae = get_flux_ae_params()
         raw_latent = normalised_latent / ae.scale_factor + ae.shift_factor
         raw_latent = raw_latent.to("cpu")  # park while we swap to Gemma

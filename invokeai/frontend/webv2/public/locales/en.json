@@ -328,7 +328,7 @@
   },
   "splash": {
     "artworkBy": "Artwork by {{artist}}",
-    "copyright": "© {{year}} Invoke AI | All rights reserved",
+    "copyright": "© 2022-{{year}} InvokeAI Contributors | All rights reserved",
     "loadingApplication": "Loading Application",
     "loadingWorkspace": "Loading workspace",
     "openingProject": "Opening project",

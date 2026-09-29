@@ -314,13 +314,14 @@ class TestClassicVaeEstimators:
         ) == (2048 * 2048 * 2 * 2200)
 
     def test_flux1_decode_prices_the_score_matrix_by_tile_when_tiled(self):
-        from invokeai.backend.flux.modules.autoencoder import AutoEncoder
+        from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
+
         from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
 
         latents = torch.zeros(1, 16, 2048 // 8, 2048 // 8)
-        untiled = estimate_vae_working_memory_flux("decode", latents, self._vae(AutoEncoder))
+        untiled = estimate_vae_working_memory_flux("decode", latents, self._vae(AutoencoderKL))
         assert untiled == self._score_bytes(2048)
 
-        tiled = estimate_vae_working_memory_flux("decode", latents, self._vae(AutoEncoder), tile_size=1024)
+        tiled = estimate_vae_working_memory_flux("decode", latents, self._vae(AutoencoderKL), tile_size=1024)
         assert tiled < self._score_bytes(2048)
         assert tiled >= self._score_bytes(1024), "a 1024px tile still materializes its own 16384-token score matrix"
