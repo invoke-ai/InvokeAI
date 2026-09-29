@@ -1,4 +1,5 @@
 import type { ModelConfig } from '@features/models';
+import type { VideoConditioningRole } from '@features/video';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { SocketHub } from '@platform/transport/socketHub';
 import type { WorkbenchCommands, WorkbenchQueries } from '@workbench/workbenchStore';
@@ -12,7 +13,13 @@ import type { PendingRecallEvent, RecallRevealContext, RecallRuntime } from './r
 // Through the package entry, not the modules themselves: the gallery's actions share these modules, and importing
 // them from this lazy runtime directly would split them out of the image-actions chunk into one more request on
 // every editor route.
-import { appendReferenceVideo, applyVideoRecallMetadata, getCurrentVideoValues, placeInitialVideo } from './index';
+import {
+  appendReferenceVideo,
+  applyVideoRecallMetadata,
+  getCurrentVideoValues,
+  placeConditioningClip,
+  placeInitialVideo,
+} from './index';
 import { bringRecallWidgetToFront, createRecallEventRuntime } from './recallEventRuntime';
 
 /** The `video` of a `video_recall_requested` event: a gallery video, as the backend describes it. */
@@ -35,6 +42,7 @@ export type VideoRecallRequestedEvent = { user_id: string } & (
       strict: boolean;
     }
   | { action: 'initial_video' | 'reference_video'; video: VideoRecallEventVideo }
+  | { action: 'conditioning_video'; conditioning_role: VideoConditioningRole; video: VideoRecallEventVideo }
 );
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -66,6 +74,12 @@ export const isVideoRecallRequestedEvent = (payload: unknown): payload is VideoR
     );
   }
 
+  if (payload.action === 'conditioning_video') {
+    return (
+      (payload.conditioning_role === 'audio' || payload.conditioning_role === 'video') && isEventVideo(payload.video)
+    );
+  }
+
   return (payload.action === 'initial_video' || payload.action === 'reference_video') && isEventVideo(payload.video);
 };
 
@@ -80,7 +94,7 @@ const toPlaceableVideo = (video: VideoRecallEventVideo): PlaceableVideo => ({
 
 /**
  * Apply `video_recall_requested` events to their arrival-time project's Video panel: recall or remix parameters,
- * set the Initial Video, or append a reference video. The panel's model is never switched to make a video fit; a
+ * set the Initial Video, append a reference video, or set the conditioning clip. The panel's model is never switched to make a video fit; a
  * placement it cannot take is declined with a notice. The Video widget is revealed when the project is still the
  * one on screen.
  */
@@ -162,6 +176,37 @@ export const createVideoRecallRuntime = ({
               }
         );
         applied = true;
+      }
+    } else if (event.action === 'conditioning_video') {
+      const placement = placeConditioningClip({
+        models,
+        role: event.conditioning_role,
+        video: toPlaceableVideo(event.video),
+        videoValues,
+      });
+
+      if (placement.status === 'placed') {
+        commands.widgets.patchValues('video', placement.patch, projectId);
+        commands.notifications.add(
+          placement.displaced
+            ? {
+                kind: 'info',
+                message: t('widgets.video.placement.conditioningClipDisplaced'),
+                title: t('widgets.video.placement.conditioningClipSet'),
+              }
+            : { kind: 'success', title: t('widgets.video.placement.conditioningClipSet') }
+        );
+        applied = true;
+      } else {
+        commands.notifications.add({
+          kind: 'info',
+          message: t(
+            placement.status === 'no-picture'
+              ? 'widgets.video.placement.conditioningClipNoPicture'
+              : 'widgets.video.placement.conditioningClipUnsupported'
+          ),
+          title: t('widgets.video.placement.conditioningClipNotSet'),
+        });
       }
     } else {
       const placement = appendReferenceVideo({ models, video: toPlaceableVideo(event.video), videoValues });

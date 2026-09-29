@@ -4142,6 +4142,48 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/recall/video/{queue_id}/conditioning-video": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recall Conditioning Video
+         * @description Set a gallery video as the current user's conditioning clip (models that take one, e.g. LTX-2).
+         *
+         *     The clip replaces the panel's other conditioning media: frames, initial video and references.
+         */
+        post: operations["recall_conditioning_video"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recall/video/{queue_id}/conditioning-video/upload": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Recall Conditioning Video Upload
+         * @description Upload a video into the gallery and set it as the current user's conditioning clip.
+         */
+        post: operations["recall_conditioning_video_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v2/custom_nodes/": {
         parameters: {
             query?: never;
@@ -47474,7 +47516,7 @@ export type components = {
              * Action
              * @enum {string}
              */
-            action: "parameters" | "initial_video" | "reference_video";
+            action: "parameters" | "initial_video" | "reference_video" | "conditioning_video";
             video: components["schemas"]["VideoDTO"];
             /**
              * Uploaded
@@ -47709,7 +47751,7 @@ export type components = {
              * @description What the frontend should do with the payload
              * @enum {string}
              */
-            action: "parameters" | "initial_video" | "reference_video";
+            action: "parameters" | "initial_video" | "reference_video" | "conditioning_video";
             /**
              * Mode
              * @description For `parameters`: `remix` applies everything except the seed
@@ -47731,10 +47773,16 @@ export type components = {
                 [key: string]: unknown;
             } | null;
             /**
-             * @description For `initial_video` and `reference_video`: the video to place
+             * @description For `initial_video`, `reference_video` and `conditioning_video`: the video to place
              * @default null
              */
             video: components["schemas"]["VideoRecallVideo"] | null;
+            /**
+             * Conditioning Role
+             * @description For `conditioning_video`: which stream of the video is the condition; the other is generated
+             * @default null
+             */
+            conditioning_role: ("audio" | "video") | null;
         };
         /**
          * VideoRecallVideo
@@ -58929,6 +58977,113 @@ export interface operations {
     recall_reference_video_upload: {
         parameters: {
             query?: {
+                /** @description The board to upload the video to; Uncategorized when omitted */
+                board_id?: string | null;
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** File */
+                    file: Blob;
+                    /**
+                     * Metadata
+                     * @description The metadata to associate with the video, must be a stringified JSON dict
+                     */
+                    metadata?: string | null;
+                };
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoRecallMediaResponse"];
+                };
+            };
+            /** @description The video exceeds the upload size limit */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The file is not a supported video or audio file */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+            /** @description Too many concurrent video uploads */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    recall_conditioning_video: {
+        parameters: {
+            query: {
+                /** @description The name of the gallery video */
+                video_name: string;
+                /** @description Which stream of the video is the condition: `audio` generates a picture for its soundtrack, `video` generates a soundtrack for its picture */
+                role: "audio" | "video";
+            };
+            header?: never;
+            path: {
+                /** @description The queue id to perform this operation on */
+                queue_id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["VideoRecallMediaResponse"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    recall_conditioning_video_upload: {
+        parameters: {
+            query: {
+                /** @description Which stream of the video is the condition: `audio` generates a picture for its soundtrack, `video` generates a soundtrack for its picture */
+                role: "audio" | "video";
                 /** @description The board to upload the video to; Uncategorized when omitted */
                 board_id?: string | null;
             };

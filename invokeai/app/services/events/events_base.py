@@ -43,6 +43,7 @@ from invokeai.app.services.events.events_common import (
     RecallParametersUpdatedEvent,
     UserAccessChangedEvent,
     VideoRecallAction,
+    VideoRecallConditioningRole,
     VideoRecallMode,
     VideoRecallRequestedEvent,
     VideoRecallVideo,
@@ -166,9 +167,14 @@ class EventServiceBase:
         strict: bool = False,
         parameters: dict | None = None,
         video: VideoRecallVideo | None = None,
+        conditioning_role: VideoRecallConditioningRole | None = None,
     ) -> None:
         """Emitted when an external caller asks for a user's Video panel to be updated"""
-        self.dispatch(VideoRecallRequestedEvent.build(queue_id, user_id, action, mode, strict, parameters, video))
+        self.dispatch(
+            VideoRecallRequestedEvent.build(
+                queue_id, user_id, action, mode, strict, parameters, video, conditioning_role
+            )
+        )
 
     # endregion
 
