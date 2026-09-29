@@ -918,6 +918,17 @@ describe('WorkflowLibraryDialog', () => {
     expect(preview?.textContent).toContain('integer');
   });
 
+  it('commits the first preview in the click that opens it once the library has loaded the dialog', async () => {
+    await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
+    await act(() => card('wf-preview-fixture')?.click());
+    await vi.dynamicImportSettled();
+
+    // A Suspense reveal here lets StrictMode replay the open dialog's effects after its focus trap started.
+    act(() => (buttonWithText('Preview graph') as HTMLButtonElement).click());
+
+    expect(document.querySelector('[data-preview-dialog]')?.getAttribute('data-preview-open')).toBe('true');
+  });
+
   it('disables the Preview action for an entry whose enrichment is not ready', async () => {
     await openWith(LOADED_SNAPSHOT);
 

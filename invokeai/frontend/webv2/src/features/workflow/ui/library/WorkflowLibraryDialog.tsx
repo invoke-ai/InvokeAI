@@ -20,12 +20,16 @@ import {
 } from '@features/workflow/ui/workflowUiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { CloseButton, SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui';
-import { lazy, Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { WorkflowCardMenuAnchor } from './WorkflowLibraryCard';
 
-import { buildLibraryGraphPreviewSource } from './libraryPreviewSource';
+import {
+  buildLibraryGraphPreviewSource,
+  DeferredGraphPreviewDialog,
+  preloadGraphPreview,
+} from './libraryPreviewSource';
 import { ProjectWorkflowsView } from './ProjectWorkflowsView';
 import {
   type OpenLibraryWorkflowMode,
@@ -36,13 +40,6 @@ import { WorkflowLibraryDetailPanel } from './WorkflowLibraryDetailPanel';
 import { WorkflowLibraryGrid } from './WorkflowLibraryGrid';
 import { WorkflowLibraryTagChips } from './WorkflowLibraryTagChips';
 import { useWorkflowLibraryMissingCounts } from './WorkflowRequirementsList';
-
-/** Load graph preview only on request to keep xyflow outside the library dialog's initial chunk. */
-const LazyGraphPreviewDialog = lazy(() =>
-  import('@features/workflow/ui/graph-preview/GraphPreviewDialog').then((module) => ({
-    default: module.GraphPreviewDialog,
-  }))
-);
 
 const SEARCH_DEBOUNCE_MS = 300;
 
@@ -315,6 +312,7 @@ export const WorkflowLibraryDialog = ({
           <Dialog.Backdrop />
           <Dialog.Positioner>
             <Dialog.Content
+              ref={preloadGraphPreview}
               aria-busy={isLoadPending}
               h="80vh"
               maxH="80vh"
@@ -441,7 +439,7 @@ export const WorkflowLibraryDialog = ({
       </Dialog.Root>
       {previewRequest && previewSource ? (
         <Suspense fallback={null}>
-          <LazyGraphPreviewDialog
+          <DeferredGraphPreviewDialog
             graphId={previewGraphId}
             hideInvoke
             isOpen={isPreviewOpen}
