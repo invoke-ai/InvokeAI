@@ -1,6 +1,12 @@
 import type { GalleryVideoItem } from '@features/gallery';
 import type { ModelConfig } from '@features/models';
-import type { VideoReferenceItem, VideoWidgetValues } from '@features/video';
+import type {
+  VideoConditioningRole,
+  VideoGenerationMode,
+  VideoModelPolicy,
+  VideoReferenceItem,
+  VideoWidgetValues,
+} from '@features/video';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 
@@ -10,6 +16,7 @@ import {
   createVideoConditioningClip,
   createVideoReferenceEntry,
   createVideoSourceClip,
+  getConditioningClipPatch,
   getDefaultReferenceConditioning,
   getInitialVideoPatch,
   getReferencesPatch,
@@ -219,10 +226,7 @@ export const applyVideoRecallMetadata = async ({
         names.sourceVideoName = null;
         names.sourceVideoTrim = null;
       }
-      if (
-        names.conditioningClip &&
-        !modes.includes(names.conditioningClip.role === 'audio' ? 'audio-to-video' : 'video-to-audio')
-      ) {
+      if (names.conditioningClip && !modes.includes(CONDITIONING_ROLE_MODE[names.conditioningClip.role])) {
         names.conditioningClip = null;
       }
     }
@@ -556,9 +560,10 @@ export type ReferenceVideoPlacement =
   | { patch: Partial<VideoWidgetValues>; status: 'appended' }
   | { status: 'full' | 'unsupported' };
 
-const getReferenceVideoRoom = (values: VideoWidgetValues): 'available' | 'full' | 'unsupported' => {
-  const policy = values.model ? getVideoModelPolicy(values.model, values) : null;
-
+const getReferenceVideoRoom = (
+  values: VideoWidgetValues,
+  policy = values.model ? getVideoModelPolicy(values.model, values) : null
+): 'available' | 'full' | 'unsupported' => {
   if (!policy?.references || !policy.modes.includes('reference')) {
     return 'unsupported';
   }
@@ -567,15 +572,6 @@ const getReferenceVideoRoom = (values: VideoWidgetValues): 'available' | 'full' 
     ? 'available'
     : 'full';
 };
-
-/** Whether the Video panel's model takes reference videos and has room for another. */
-export const canAppendReferenceVideo = ({
-  models,
-  videoValues,
-}: {
-  models: readonly ModelConfig[];
-  videoValues: Record<string, unknown>;
-}): boolean => getReferenceVideoRoom(getCurrentVideoValues({ models, videoValues })) === 'available';
 
 /** Append the video to the Video panel's references with the defaults the References field gives a new video. */
 export const appendReferenceVideo = ({
@@ -602,5 +598,84 @@ export const appendReferenceVideo = ({
       references: [...values.references, createVideoReferenceEntry(video)],
     }),
     status: 'appended',
+  };
+};
+
+/** The generation mode a conditioning clip in each role asks of the model. */
+const CONDITIONING_ROLE_MODE = {
+  audio: 'audio-to-video',
+  video: 'video-to-audio',
+} as const satisfies Record<VideoConditioningRole, VideoGenerationMode>;
+
+export type ConditioningClipPlacement =
+  | {
+      /** Whether the clip cleared other conditioning media: frames, the initial video or references. */
+      displaced: boolean;
+      patch: Partial<VideoWidgetValues>;
+      status: 'placed';
+    }
+  /** `no-picture`: a wrapped audio upload has only a placeholder picture, so it can only lend its soundtrack. */
+  | { status: 'no-picture' | 'unsupported' };
+
+const canConditionInRole = (policy: VideoModelPolicy | null, role: VideoConditioningRole): boolean =>
+  Boolean(policy?.modes.includes(CONDITIONING_ROLE_MODE[role]));
+
+/**
+ * Set the video as the Video panel's conditioning clip in `role`. The panel's own field refuses a clip while other
+ * conditioning media is set; this explicit action clears that media instead, as Extend in Video displaces a first
+ * frame, and reports it. Unlike the Initial Video, a clip the panel's model cannot use is declined: it would clear
+ * the other media for nothing.
+ */
+export const placeConditioningClip = ({
+  models,
+  role,
+  video,
+  videoValues,
+}: {
+  models: readonly ModelConfig[];
+  role: VideoConditioningRole;
+  video: PlaceableVideo;
+  videoValues: Record<string, unknown>;
+}): ConditioningClipPlacement => {
+  if (role === 'video' && video.mediaOrigin === 'audio_upload') {
+    return { status: 'no-picture' };
+  }
+
+  const values = getCurrentVideoValues({ models, videoValues });
+
+  if (!canConditionInRole(values.model ? getVideoModelPolicy(values.model, values) : null, role)) {
+    return { status: 'unsupported' };
+  }
+
+  return {
+    displaced: Boolean(
+      values.firstFrameImage || values.lastFrameImage || values.sourceVideo || values.references.length > 0
+    ),
+    patch: getConditioningClipPatch({ ...createVideoConditioningClip(video), role }),
+    status: 'placed',
+  };
+};
+
+/** Which gallery-video placements the Video panel's model can take right now. */
+export interface VideoPlacementRoom {
+  conditioningAudio: boolean;
+  conditioningVideo: boolean;
+  referenceVideo: boolean;
+}
+
+export const getVideoPlacementRoom = ({
+  models,
+  videoValues,
+}: {
+  models: readonly ModelConfig[];
+  videoValues: Record<string, unknown>;
+}): VideoPlacementRoom => {
+  const values = getCurrentVideoValues({ models, videoValues });
+  const policy = values.model ? getVideoModelPolicy(values.model, values) : null;
+
+  return {
+    conditioningAudio: canConditionInRole(policy, 'audio'),
+    conditioningVideo: canConditionInRole(policy, 'video'),
+    referenceVideo: getReferenceVideoRoom(values, policy) === 'available',
   };
 };

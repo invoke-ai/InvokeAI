@@ -20,6 +20,7 @@ export {
   appendReferenceVideo,
   applyVideoRecallMetadata,
   getCurrentVideoValues,
+  placeConditioningClip,
   placeInitialVideo,
   type PlaceableVideo,
 } from './executeVideoRecall';

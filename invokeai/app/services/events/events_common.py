@@ -2,7 +2,7 @@ from typing import TYPE_CHECKING, Any, ClassVar, Coroutine, Generic, Literal, Op
 
 from fastapi_events.handlers.local import local_handler
 from fastapi_events.registry.payload_schema import registry as payload_schema
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from invokeai.app.services.board_records.board_records_common import BoardVisibility
 from invokeai.app.services.image_records.image_records_common import ImageCategory
@@ -925,7 +925,8 @@ class RecallParametersUpdatedEvent(QueueEventBase):
         return cls(queue_id=queue_id, user_id=user_id, parameters=parameters)
 
 
-VideoRecallAction: TypeAlias = Literal["parameters", "initial_video", "reference_video"]
+VideoRecallAction: TypeAlias = Literal["parameters", "initial_video", "reference_video", "conditioning_video"]
+VideoRecallConditioningRole: TypeAlias = Literal["audio", "video"]
 VideoRecallMode: TypeAlias = Literal["recall", "remix"]
 
 
@@ -961,8 +962,18 @@ class VideoRecallRequestedEvent(QueueEventBase):
         default=None, description="For `parameters`: recall fields, keyed like the video metadata record"
     )
     video: Optional[VideoRecallVideo] = Field(
-        default=None, description="For `initial_video` and `reference_video`: the video to place"
+        default=None, description="For `initial_video`, `reference_video` and `conditioning_video`: the video to place"
     )
+    conditioning_role: Optional[VideoRecallConditioningRole] = Field(
+        default=None,
+        description="For `conditioning_video`: which stream of the video is the condition; the other is generated",
+    )
+
+    @model_validator(mode="after")
+    def _role_iff_conditioning_video(self) -> "VideoRecallRequestedEvent":
+        if (self.action == "conditioning_video") != (self.conditioning_role is not None):
+            raise ValueError("conditioning_role is given with, and only with, a conditioning_video action")
+        return self
 
     @classmethod
     def build(
@@ -974,6 +985,7 @@ class VideoRecallRequestedEvent(QueueEventBase):
         strict: bool = False,
         parameters: Optional[dict[str, Any]] = None,
         video: Optional[VideoRecallVideo] = None,
+        conditioning_role: Optional[VideoRecallConditioningRole] = None,
     ) -> "VideoRecallRequestedEvent":
         return cls(
             queue_id=queue_id,
@@ -983,6 +995,7 @@ class VideoRecallRequestedEvent(QueueEventBase):
             strict=strict,
             parameters=parameters,
             video=video,
+            conditioning_role=conditioning_role,
         )
 
 
