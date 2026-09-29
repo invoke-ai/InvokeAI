@@ -168,6 +168,18 @@ describe('WidgetPanelFrame resize', () => {
     expect(separator.getAttribute('aria-valuemin')).toBe('350');
   });
 
+  it("hides its divider line while the panel's outline is drawn over it", async () => {
+    const separator = await renderFrame();
+    const divider = separator.parentElement!;
+
+    expect(divider.hasAttribute('data-line-hidden')).toBe(false);
+    await interact(() =>
+      host!.querySelector('aside')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    );
+
+    expect(divider.hasAttribute('data-line-hidden')).toBe(true);
+  });
+
   // The panel's scrollbar runs along its inner edge; the handle reaches outward instead.
   it('leaves the edge of the left panel, where its scrollbar sits, to the panel', async () => {
     // Narrow enough that the probe past its edge stays inside the test viewport.

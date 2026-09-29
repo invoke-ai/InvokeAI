@@ -17,7 +17,7 @@ import { IconButton } from '@platform/ui/Button';
 import { PanelHeader } from '@platform/ui/PanelHeader';
 import { isResizeDragActive, ResizeHandle, subscribeResizeDrag } from '@platform/ui/ResizeHandle';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { useFocusRegionProps } from '@workbench/focusRegions';
+import { useFocusRegionProps, useHighlightedRegion } from '@workbench/focusRegions';
 import { isWidgetRegion } from '@workbench/layoutContracts';
 import { WidgetSettingsButton } from '@workbench/settings/WidgetSettingsButton';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
@@ -78,6 +78,10 @@ export const WidgetPanelFrame = ({
   const visibleSizePx = measuredSizePx === null ? displaySizePx : Math.min(measuredSizePx, displaySizePx);
   const { max: maxPanelSizePx, min: minPanelSizePx } = getPanelSizeBounds(region);
   const focusRegionProps = useFocusRegionProps(region);
+  // This panel's outline, or a side divider's center neighbour, is drawn over the divider. The bottom divider spans
+  // the side panels too, so only its own outline hides it.
+  const highlightedRegion = useHighlightedRegion();
+  const isDividerOutlined = highlightedRegion === region || (highlightedRegion === 'center' && !isBottom);
 
   const commitSize = useCallback(
     (sizePx: number) => {
@@ -103,6 +107,7 @@ export const WidgetPanelFrame = ({
     <ResizeHandle
       collapse={collapse}
       label={`Resize ${region} widget panel`}
+      lineHidden={isDividerOutlined}
       max={maxPanelSizePx}
       min={minPanelSizePx}
       orientation={isBottom ? 'horizontal' : 'vertical'}
@@ -123,6 +128,7 @@ export const WidgetPanelFrame = ({
       minW="0"
       ref={bindFrame}
       w={isBottom ? 'full' : `${displaySizePx}px`}
+      {...focusRegionProps}
     >
       {isLeft ? null : handle}
       <Flex
@@ -137,7 +143,6 @@ export const WidgetPanelFrame = ({
         data-hotkey-widget-instance-id={instanceId}
         data-hotkey-widget-region={region}
         data-hotkey-widget-type-id={typeId}
-        {...focusRegionProps}
       >
         {children}
       </Flex>

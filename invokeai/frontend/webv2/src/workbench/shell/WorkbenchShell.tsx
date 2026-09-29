@@ -125,6 +125,8 @@ export const WorkbenchShell = () => {
   );
   const canShowLeftPanel = leftRailItems.some((item) => item.id === leftRegion.activeInstanceId);
   const canShowRightPanel = rightRailItems.some((item) => item.id === rightRegion.activeInstanceId);
+  const isLeftPanelShown = panels.isLeftOpen && !leftRegion.isCollapsed && canShowLeftPanel;
+  const isRightPanelShown = panels.isRightOpen && !rightRegion.isCollapsed && canShowRightPanel;
   const leftDropState = useMemo(
     () => getRegionDropState(placementProject, activeDrag, 'left', getWidgetById),
     [activeDrag, placementProject]
@@ -310,20 +312,18 @@ export const WorkbenchShell = () => {
               role="region"
             >
               <WidgetBar
+                edgeRegion={isLeftPanelShown ? 'left' : 'center'}
                 groups={leftRailGroups}
                 menuItems={leftMenuItems}
                 side="left"
                 onSelect={handleSelect}
                 onToggle={handleToggleLeft}
               />
-              {panels.isLeftOpen && !leftRegion.isCollapsed && canShowLeftPanel ? (
-                <LeftPanel instanceId={leftRegion.activeInstanceId} />
-              ) : null}
+              {isLeftPanelShown ? <LeftPanel instanceId={leftRegion.activeInstanceId} /> : null}
               <CenterArea />
-              {panels.isRightOpen && !rightRegion.isCollapsed && canShowRightPanel ? (
-                <RightPanel instanceId={rightRegion.activeInstanceId} />
-              ) : null}
+              {isRightPanelShown ? <RightPanel instanceId={rightRegion.activeInstanceId} /> : null}
               <WidgetBar
+                edgeRegion={isRightPanelShown ? 'right' : 'center'}
                 groups={rightRailGroups}
                 menuItems={rightMenuItems}
                 side="right"

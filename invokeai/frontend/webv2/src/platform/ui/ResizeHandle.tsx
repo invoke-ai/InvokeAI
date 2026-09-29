@@ -159,6 +159,8 @@ export interface ResizeCollapse {
 export interface ResizeHandleProps {
   collapse?: ResizeCollapse;
   label: string;
+  /** Hides the divider line while something else, such as a region outline, is drawn over it. */
+  lineHidden?: boolean;
   max: number;
   min: number;
   /** The divider line's direction: a vertical divider resizes widths. */
@@ -183,6 +185,7 @@ export interface ResizeHandleProps {
 export const ResizeHandle = ({
   collapse,
   label,
+  lineHidden = false,
   max,
   min,
   orientation,
@@ -318,7 +321,7 @@ export const ResizeHandle = ({
   );
 
   return (
-    <chakra.div css={styles.root}>
+    <chakra.div css={styles.root} data-line-hidden={lineHidden || undefined}>
       <chakra.div
         ref={handleRef}
         aria-label={label}

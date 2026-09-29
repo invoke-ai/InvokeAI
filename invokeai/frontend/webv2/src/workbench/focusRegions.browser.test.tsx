@@ -25,7 +25,7 @@ afterEach(async () => {
 });
 
 describe('focus region highlight', () => {
-  it('draws the highlight at the widget edge', async () => {
+  it('lays the highlight over the borders beside the region', async () => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -46,6 +46,7 @@ describe('focus region highlight', () => {
     await act(() => region?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
 
     expect(region?.getAttribute('data-highlighted')).toBe('true');
-    expect(getComputedStyle(region!, '::after').inset).toBe('0px');
+    const highlight = getComputedStyle(region!, '::after');
+    expect([highlight.top, highlight.right, highlight.bottom, highlight.left]).toEqual(['0px', '-1px', '0px', '-1px']);
   });
 });

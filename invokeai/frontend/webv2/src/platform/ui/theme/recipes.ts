@@ -1208,6 +1208,8 @@ const resizeCapsuleStates = {
   '&:hover::after, &[data-dragging]::after': { borderColor: 'fg.subtle' },
   '&:focus-visible::after': { outline: '2px solid {colors.accent.solid}', outlineOffset: '1px' },
   '&[data-collapse-armed]::after': { opacity: 0 },
+  // A region outline runs along the hidden line and behind the capsule, which takes its colour.
+  '[data-line-hidden] > &::after': { borderColor: 'accent.solid' },
 } as const;
 
 /**
@@ -1220,11 +1222,12 @@ export const resizeHandleSlotRecipe = defineSlotRecipe({
     root: {
       flexShrink: '0',
       position: 'relative',
-      zIndex: 3,
+      // Above region outlines (zIndex 4) so the capsule masks an outline passing through it.
+      zIndex: 5,
       // The line is a border, not a 1px background: at fractional display scales a background can round to two
       // device pixels while every other border draws one. A pseudo-element keeps the hit strip's offsets unshifted.
       _before: { borderColor: 'border.subtle', content: '""', inset: '0', position: 'absolute' },
-      '&:has([data-collapse-armed])::before': { borderColor: 'transparent' },
+      '&[data-line-hidden]::before, &:has([data-collapse-armed])::before': { borderColor: 'transparent' },
     },
     handle: {
       outline: 'none',
