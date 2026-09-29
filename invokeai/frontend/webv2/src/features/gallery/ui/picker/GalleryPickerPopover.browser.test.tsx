@@ -81,7 +81,9 @@ const uncategorized: GalleryBoard = {
   kind: 'uncategorized',
   name: '',
 };
-const boards = [board, uncategorized];
+/** Another project's board: the Gallery widget hides these by default, the picker lists them. */
+const otherProjectBoard: GalleryBoard = { ...board, id: 'cats', imageCount: 0, name: 'Cats', projectId: 'project-b' };
+const boards = [board, uncategorized, otherProjectBoard];
 
 /** Newest first, matching the picker's DESC order. */
 const ORDER = ['a.png', 'b.png', 'c.mp4', 'cat.png', 'e.png', 'f.png', 'loose.png'];
@@ -369,9 +371,11 @@ describe('GalleryPickerPopover', () => {
 
   it('switches to the Assets view from the tabs', async () => {
     const { dialog } = await openPicker();
+    // Icons label the tabs in the picker's narrow header; the view names stay their accessible names.
     const assetsTab = [...dialog.querySelectorAll<HTMLButtonElement>('[role="tab"]')].find((tab) =>
-      tab.textContent?.includes('common.assets')
+      tab.getAttribute('aria-label')?.startsWith('common.assets')
     );
+    expect(assetsTab?.textContent).not.toContain('common.assets');
 
     await act(() => assetsTab?.click());
     await settle();
@@ -424,6 +428,7 @@ describe('GalleryPickerPopover', () => {
     expect(input.value).toBe('');
     expect(getStatus(dialog)).toBe('widgets.gallery.picker.boardCount');
     expect(getBoardRow(dialog, 'Dogs')?.getAttribute('aria-current')).toBe('true');
+    expect(getBoardRow(dialog, 'Cats')).toBeDefined();
 
     // Enter with an empty search must not silently switch boards.
     await pressKey(input, 'Enter');

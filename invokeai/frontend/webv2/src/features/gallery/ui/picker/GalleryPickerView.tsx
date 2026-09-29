@@ -178,7 +178,8 @@ export const GalleryPickerView = ({
       searchTerm: scope.searchTerm,
       showArchived: settings.showArchivedBoards,
       showDates: settings.showDateBoards,
-      showOtherProjects: settings.showOtherProjectBoards,
+      // A pick can come from any project's board, whatever the Gallery widget hides for browsing.
+      showOtherProjects: true,
       t,
     });
 
@@ -194,7 +195,6 @@ export const GalleryPickerView = ({
     scope.searchTerm,
     settings.showArchivedBoards,
     settings.showDateBoards,
-    settings.showOtherProjectBoards,
     t,
   ]);
   const visibleBoardCount = boardGroups.reduce((count, group) => count + group.boards.length, 0);
@@ -376,6 +376,7 @@ export const GalleryPickerView = ({
         <GalleryViewSegmentTabs
           activeView={scope.galleryView}
           board={selectedBoard}
+          iconLabels
           idBase={idBase}
           onSelect={setView}
         />

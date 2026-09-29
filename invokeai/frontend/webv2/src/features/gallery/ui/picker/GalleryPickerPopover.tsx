@@ -69,7 +69,7 @@ export const GalleryPickerPopover = ({
             flexDirection="column"
             maxH="min(26rem, var(--available-height))"
             p="0"
-            w="clamp(18rem, var(--reference-width), 28rem)"
+            w="clamp(20rem, var(--reference-width), 28rem)"
           >
             <Suspense fallback={PICKER_FALLBACK}>
               <GalleryPickerView

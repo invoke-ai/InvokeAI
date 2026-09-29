@@ -3,6 +3,8 @@ import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { Box, chakra, HStack, Text } from '@chakra-ui/react';
 import { Fragment, useCallback } from 'react';
 
+import { Tooltip } from './Tooltip';
+
 const TAB_HOVER_PROPS = { bg: 'gray.hoverTint/8', color: 'fg' };
 const TAB_SHOWN_BG = 'gray.hoverTint/15';
 
@@ -13,6 +15,8 @@ export interface SegmentTab<T extends string = string> {
   id: T;
   /** Usually a string; gallery tabs carry a dimmed count span. */
   label: ReactNode;
+  /** The tab's name when its label is an icon; it is also shown as the tab's tooltip. */
+  ariaLabel?: string;
 }
 
 /** Roving focus for a horizontal tablist: arrows cycle, Home/End jump. */
@@ -92,6 +96,7 @@ export const SegmentTabs = <T extends string>({
             />
           ) : null}
           <SegmentTabButton
+            ariaLabel={tab.ariaLabel}
             id={tab.id}
             idBase={idBase}
             isSelected={tab.id === activeId}
@@ -110,6 +115,7 @@ export const segmentTabsPanelId = (idBase: string): string => `${idBase}-panel`;
 export const segmentTabsTabId = (idBase: string, tabId: string): string => `${idBase}-tab-${tabId}`;
 
 const SegmentTabButton = <T extends string>({
+  ariaLabel,
   id,
   idBase,
   isSelected,
@@ -117,6 +123,7 @@ const SegmentTabButton = <T extends string>({
   label,
   onSelect,
 }: {
+  ariaLabel?: string;
   id: T;
   idBase: string;
   isSelected: boolean;
@@ -127,9 +134,10 @@ const SegmentTabButton = <T extends string>({
 }) => {
   const select = useCallback(() => onSelect(id), [id, onSelect]);
 
-  return (
+  const button = (
     <chakra.button
       aria-controls={isShown ? segmentTabsPanelId(idBase) : undefined}
+      aria-label={ariaLabel}
       aria-selected={isSelected}
       bg={isShown ? TAB_SHOWN_BG : 'transparent'}
       color={isShown ? 'fg' : 'fg.muted'}
@@ -153,4 +161,6 @@ const SegmentTabButton = <T extends string>({
       </Text>
     </chakra.button>
   );
+
+  return ariaLabel ? <Tooltip content={ariaLabel}>{button}</Tooltip> : button;
 };
