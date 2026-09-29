@@ -2,11 +2,14 @@
 import type { FoundModel } from '@features/models/core/types';
 
 import { HStack, Icon, Stack, Text } from '@chakra-ui/react';
+import { InstallSourceButton } from '@features/models/ui/shared/InstallSourceButton';
 import { ResultsListHeader } from '@features/models/ui/shared/ResultsListHeader';
-import { InstallSourceButton, SourceListItem } from '@features/models/ui/shared/SourceListItem';
 import { useInstalledSourceKeys } from '@features/models/ui/shared/useInstalledSources';
-import { sourceFileName, useSourceNameFilter } from '@features/models/ui/shared/useSourceNameFilter';
+import { sourceFileName, sourceLocation, useSourceNameFilter } from '@features/models/ui/shared/useSourceNameFilter';
 import { IconButton } from '@platform/ui';
+import { ListItem } from '@platform/ui/list/ListItem';
+import { ListStack } from '@platform/ui/list/ListStack';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
@@ -86,23 +89,29 @@ export const ScanResults = ({
         onInstallAll={installAll}
         onSearchChange={setFilter}
       />
-      {filteredResults.map((result) => (
-        <SourceListItem
-          key={result.path}
-          description={result.path}
-          title={sourceFileName(result.path)}
-          titleTooltip={result.path}
-          trailing={
-            <InstallSourceButton
-              installedModelKey={installedSourceKeys.get(result.path) ?? null}
-              isInstalled={isRowInstalled(result)}
-              isPending={pendingSources.has(result.path)}
-              source={result.path}
-              onInstall={() => onInstall(result.path)}
+      <ListStack dividers label={scan.path}>
+        {filteredResults.map((result) => {
+          const location = sourceLocation(result.path, scan.path);
+
+          return (
+            <ListItem
+              key={result.path}
+              actions={
+                <InstallSourceButton
+                  installedModelKey={installedSourceKeys.get(result.path) ?? null}
+                  isInstalled={isRowInstalled(result)}
+                  isPending={pendingSources.has(result.path)}
+                  name={location ?? sourceFileName(result.path)}
+                  source={result.path}
+                  onInstall={() => onInstall(result.path)}
+                />
+              }
+              description={location ? <MiddleTruncate as="span" text={location} title={result.path} /> : undefined}
+              title={sourceFileName(result.path)}
             />
-          }
-        />
-      ))}
+          );
+        })}
+      </ListStack>
     </Stack>
   );
 };

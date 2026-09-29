@@ -1,4 +1,3 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 from __future__ import annotations
 
 from typing import TYPE_CHECKING

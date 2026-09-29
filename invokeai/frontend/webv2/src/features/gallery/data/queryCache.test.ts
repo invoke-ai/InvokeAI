@@ -1,4 +1,5 @@
 import type { GalleryItem, GalleryItemMutationResult, GalleryItemsPage } from '@features/gallery/core/items';
+import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GalleryBoard } from '@features/gallery/core/types';
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
@@ -270,24 +271,21 @@ describe('Gallery item cache patches', () => {
     }
   });
 
-  it('keeps moved items in ranked similarity windows regardless of the selected board', () => {
-    // A semantic window inherits whatever board happens to be selected, but
-    // its membership is similarity, not board: moving an image must update
-    // its board in place, never evict it from the ranked list.
+  it('evicts moved items from board-scoped similarity windows but keeps them in a map cluster', () => {
     const client = createClient();
     const target = createItem('ranked.png', 'board-1');
     const untouched = createItem('also-ranked.png', 'board-1');
-    const semanticKey = galleryKeys.items(
-      captureAccountScope(),
-      canonicalizeGalleryItemsFilter({
-        boardId: 'board-1',
-        galleryView: 'images',
-        searchTerm: '',
-        semanticQuery: { imageName: 'ref.png', kind: 'image' },
-      })
-    );
+    const getKey = (semanticQuery: GallerySemanticReference) =>
+      galleryKeys.items(
+        captureAccountScope(),
+        canonicalizeGalleryItemsFilter({ boardId: 'board-1', galleryView: 'images', searchTerm: '', semanticQuery })
+      );
+    const semanticKey = getKey({ imageName: 'ref.png', kind: 'image' });
+    // A cluster is a fixed member list from the map, not a board listing.
+    const clusterKey = getKey({ clusterId: 'cluster-1', kind: 'cluster', label: 'Cats' });
 
     client.setQueryData(semanticKey, createData([[target, untouched]]));
+    client.setQueryData(clusterKey, createData([[target, untouched]]));
 
     patchGalleryItemCaches(client, {
       boardId: 'board-2',
@@ -295,10 +293,13 @@ describe('Gallery item cache patches', () => {
       result: getResult([{ kind: 'image', name: target.name }]),
     });
 
-    const after = getData(client, semanticKey);
+    const ranked = getData(client, semanticKey);
+    const cluster = getData(client, clusterKey);
 
-    expect(after.pages.flatMap((page) => page.items)).toEqual([{ ...target, boardId: 'board-2' }, untouched]);
-    expect(after.pages.map((page) => page.total)).toEqual([2]);
+    expect(ranked.pages.flatMap((page) => page.items)).toEqual([untouched]);
+    expect(ranked.pages.map((page) => page.total)).toEqual([1]);
+    expect(cluster.pages.flatMap((page) => page.items)).toEqual([{ ...target, boardId: 'board-2' }, untouched]);
+    expect(cluster.pages.map((page) => page.total)).toEqual([2]);
   });
 
   describe('starred strip entries', () => {

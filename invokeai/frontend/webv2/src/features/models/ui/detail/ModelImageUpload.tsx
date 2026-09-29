@@ -1,20 +1,24 @@
-/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
+/* eslint-disable react-perf/jsx-no-new-function-as-prop */
+import type { GalleryItem } from '@features/gallery';
+import type { GalleryHost, GalleryPickerAccept } from '@features/gallery/picker';
 import type { ModelConfig } from '@features/models/core/types';
 
-import { Box, Flex, Icon, Image, Stack, Text } from '@chakra-ui/react';
+import { Box, Image } from '@chakra-ui/react';
+import { GalleryMediaSlot } from '@features/gallery/mediaSlot';
+import { GalleryHostProvider } from '@features/gallery/picker';
 import { deleteModelImage, getModelImageUrl, updateModelImage } from '@features/models/data/api';
 import { markCoverImageChanged, useModelsSelector } from '@features/models/data/modelsStore';
+import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { getApiErrorMessage } from '@platform/transport/http';
-import { DropZone, IconButton, Tooltip } from '@platform/ui';
-import { ImageIcon, UploadIcon, XIcon } from 'lucide-react';
-import { useRef, useState, type DragEvent } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const ACCEPTED_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp']);
-
-const dragContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer.types).includes('Files');
+const IMAGE_ONLY: GalleryPickerAccept = ['image'];
+/** The model manager lives on the Launchpad: no project board to seed from and no Gallery widget to reveal. */
+const NO_GALLERY_VALUES: Record<string, unknown> = {};
 
 interface ModelImageUploadProps {
   model: Pick<ModelConfig, 'cover_image' | 'key' | 'name'>;
@@ -26,35 +30,67 @@ export const ModelImageUpload = (props: ModelImageUploadProps) => (
   <ModelImageUploadForModel key={`${props.model.key}:${props.model.cover_image ?? ''}`} {...props} />
 );
 
+/** The cover is chosen like any image slot, as a square tile: from the gallery, where the picker also uploads files. */
 const ModelImageUploadForModel = ({ model, onError, onUpdated }: ModelImageUploadProps) => {
   const { t } = useTranslation();
-  const inputRef = useRef<HTMLInputElement | null>(null);
-  const dragDepthRef = useRef(0);
   const imageVersion = useModelsSelector((snapshot) => snapshot.coverImageVersions[model.key]);
   const [hasImage, setHasImage] = useState(Boolean(model.cover_image));
-  const [isDropActive, setIsDropActive] = useState(false);
-  // Upload and delete share one busy flag: the tile hosts one action at a time.
+  // Setting and removing share one busy flag: the slot hosts one action at a time.
   const { isBusy, run } = useScopedAction();
+  const notify = useNotify();
+  const galleryHost = useMemo<GalleryHost>(
+    () => ({
+      galleryValues: NO_GALLERY_VALUES,
+      notifications: {
+        add: ({ kind, message, title }) => notify[kind](title, message),
+        reportError: ({ message }) => notify.error(message),
+      },
+      projectName: '',
+    }),
+    [notify]
+  );
+  const value = useMemo(
+    () => (hasImage ? { kind: 'image' as const, name: t('models.modelCoverAlt', { name: model.name }) } : null),
+    [hasImage, model.name, t]
+  );
+  const thumbnail = useMemo(
+    () => (
+      <Image
+        alt=""
+        boxSize="full"
+        fit="cover"
+        src={getModelImageUrl(model.key, imageVersion ? String(imageVersion) : undefined)}
+        onError={() => setHasImage(false)}
+      />
+    ),
+    [imageVersion, model.key]
+  );
 
-  const handleFile = async (file: File | undefined) => {
-    if (!file) {
-      return;
-    }
-
-    if (!ACCEPTED_TYPES.has(file.type)) {
-      onError(t('models.useSupportedImage'));
-      return;
-    }
-
+  // The server keeps the full image as the cover, so take the original rather than the gallery thumbnail.
+  const setCover = (item: GalleryItem) => {
     const modelKey = model.key;
 
-    await run(
+    void run(
       async (owner) => {
-        await updateModelImage(modelKey, file, owner.signal);
+        const response = await fetch(item.fullUrl, { signal: owner.signal });
+
+        if (!response.ok) {
+          throw new Error(`${response.status} ${response.statusText}`);
+        }
+
+        const blob = await response.blob();
+
+        assertAccountScopeCurrent(owner);
+        if (!ACCEPTED_TYPES.has(blob.type)) {
+          onError(t('models.useSupportedImage'));
+          return;
+        }
+
+        await updateModelImage(modelKey, new File([blob], item.name, { type: blob.type }), owner.signal);
 
         assertAccountScopeCurrent(owner);
         setHasImage(true);
-        // Bumps the cache-bust version so this tile and list thumbnails reload.
+        // Bumps the cache-bust version so this slot and list thumbnails reload.
         markCoverImageChanged(modelKey, true);
         onUpdated();
       },
@@ -62,10 +98,10 @@ const ModelImageUploadForModel = ({ model, onError, onUpdated }: ModelImageUploa
     );
   };
 
-  const handleDelete = async () => {
+  const removeCover = () => {
     const modelKey = model.key;
 
-    await run(
+    void run(
       async (owner) => {
         await deleteModelImage(modelKey, owner.signal);
 
@@ -79,132 +115,18 @@ const ModelImageUploadForModel = ({ model, onError, onUpdated }: ModelImageUploa
   };
 
   return (
-    <DropZone
-      aria-busy={isBusy || undefined}
-      aria-label={t('models.uploadCoverImageFor', { name: model.name })}
-      bg={isDropActive ? 'accent.muted' : 'bg.emphasized'}
-      borderStyle={hasImage ? 'solid' : 'dashed'}
-      boxSize="24"
-      flexShrink={0}
-      isOver={isDropActive}
-      overflow="hidden"
-      position="relative"
-      role="button"
-      tabIndex={0}
-      className="group"
-      _focusVisible={{ outline: '2px solid {colors.accent.solid}', outlineOffset: '2px' }}
-      onClick={() => {
-        if (!isBusy) {
-          inputRef.current?.click();
-        }
-      }}
-      onKeyDown={(event) => {
-        if ((event.key === 'Enter' || event.key === ' ') && !isBusy) {
-          event.preventDefault();
-          inputRef.current?.click();
-        }
-      }}
-      onDragEnter={(event) => {
-        if (!dragContainsFiles(event)) {
-          return;
-        }
-
-        event.preventDefault();
-        dragDepthRef.current += 1;
-        setIsDropActive(true);
-      }}
-      onDragLeave={(event) => {
-        if (!dragContainsFiles(event)) {
-          return;
-        }
-
-        dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
-
-        if (dragDepthRef.current === 0) {
-          setIsDropActive(false);
-        }
-      }}
-      onDragOver={(event) => {
-        if (dragContainsFiles(event)) {
-          event.preventDefault();
-        }
-      }}
-      onDrop={(event) => {
-        if (!dragContainsFiles(event)) {
-          return;
-        }
-
-        event.preventDefault();
-        dragDepthRef.current = 0;
-        setIsDropActive(false);
-        void handleFile(event.dataTransfer.files[0]);
-      }}
-    >
-      <input
-        ref={inputRef}
-        accept="image/png,image/jpeg,image/webp"
-        hidden
-        type="file"
-        onChange={(event) => {
-          void handleFile(event.currentTarget.files?.[0] ?? undefined);
-          event.currentTarget.value = '';
-        }}
-        onClick={(event) => event.stopPropagation()}
-      />
-      {hasImage ? (
-        <Image
-          alt={t('models.modelCoverAlt', { name: model.name })}
-          boxSize="full"
-          fit="cover"
-          src={getModelImageUrl(model.key, imageVersion ? String(imageVersion) : undefined)}
-          onError={() => setHasImage(false)}
+    <GalleryHostProvider host={galleryHost}>
+      <Box flexShrink={0} w="28">
+        <GalleryMediaSlot
+          accept={IMAGE_ONLY}
+          busy={isBusy}
+          dropId={`model-cover:${model.key}`}
+          layout="tile"
+          thumbnail={thumbnail}
+          value={value}
+          onChange={(item) => (item ? setCover(item) : removeCover())}
         />
-      ) : (
-        <Stack align="center" boxSize="full" color="fg.subtle" gap="1" justify="center">
-          <Icon as={ImageIcon} boxSize="5" />
-          <Text fontSize="2xs">{t('models.addImage')}</Text>
-        </Stack>
-      )}
-      {isDropActive ? (
-        <Flex
-          align="center"
-          bg="bg.muted/85"
-          boxSize="full"
-          inset="0"
-          justify="center"
-          pointerEvents="none"
-          position="absolute"
-        >
-          <Icon as={UploadIcon} boxSize="5" color="accent.solid" />
-        </Flex>
-      ) : null}
-      {hasImage && !isDropActive ? (
-        <Box
-          opacity={0}
-          pointerEvents="none"
-          position="absolute"
-          right="1"
-          top="1"
-          transition="opacity var(--wb-motion-duration-fast) ease"
-          _groupFocusWithin={{ opacity: 1, pointerEvents: 'auto' }}
-          _groupHover={{ opacity: 1, pointerEvents: 'auto' }}
-        >
-          <Tooltip content={t('models.removeImage')}>
-            <IconButton
-              aria-label={t('models.removeModelImage')}
-              colorPalette="red"
-              size="2xs"
-              variant="solid"
-              onClick={(event) => {
-                event.stopPropagation();
-                void handleDelete();
-              }}
-            >
-              <Icon as={XIcon} boxSize="3" />
-            </IconButton>
-          </Tooltip>
-        </Box>
-      ) : null}
-    </DropZone>
+      </Box>
+    </GalleryHostProvider>
   );
 };

@@ -303,11 +303,11 @@ describe('WidgetRenderer failure containment', () => {
     await resolve({ view: ThrowingView });
     await expect.poll(() => host?.querySelector('[data-testid="widget-failure"]')).not.toBeNull();
 
-    const panel = host?.querySelector<HTMLElement>('aside');
-    expect(panel).not.toBeNull();
+    const frame = host?.querySelector<HTMLElement>('aside')?.parentElement;
+    expect(frame).toBeDefined();
     // Panel width survives the crash, so the region does not collapse or overflow.
-    expect(panel?.getBoundingClientRect().width).toBe(384);
+    expect(frame?.getBoundingClientRect().width).toBe(384);
     // And the drag handle is still there to resize with.
-    expect(panel?.querySelector('[role="separator"]')).not.toBeNull();
+    expect(frame?.querySelector('[role="separator"]')).not.toBeNull();
   });
 });

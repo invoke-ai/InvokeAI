@@ -273,6 +273,7 @@ export const GalleryImageGrid = () => {
     }
 
     return [
+      stripEntries,
       isProgressOpen
         ? progressSessions.map((session) => ({
             id: session.id,
@@ -280,7 +281,6 @@ export const GalleryImageGrid = () => {
             navigable: session.state === 'running',
           }))
         : [],
-      stripEntries,
       gallery.items.map((item) => ({ item, kind: 'item' })),
     ];
   }, [
@@ -352,7 +352,23 @@ export const GalleryImageGrid = () => {
   };
   const scrollToEntry = (entry: GalleryNavigationEntry) => {
     if (entry.kind === 'session') {
-      viewportRef.current?.scrollTo({ top: 0 });
+      // In-progress tiles sit below the starred strip; scroll only when the target tile's row is out of view.
+      const viewport = viewportRef.current;
+      const sessionIndex = progressSessions.findIndex((session) => session.id === entry.id);
+
+      if (viewport && sessionIndex >= 0) {
+        const rowTop =
+          starredLayout.height +
+          progressLayout.headerHeight +
+          Math.floor(sessionIndex / progressLayout.columns) * progressLayout.rowHeight;
+        const rowBottom = rowTop + progressLayout.rowHeight;
+
+        if (rowTop < viewport.scrollTop) {
+          viewport.scrollTo({ top: rowTop - progressLayout.headerHeight });
+        } else if (rowBottom > viewport.scrollTop + viewport.clientHeight) {
+          viewport.scrollTo({ top: rowBottom - viewport.clientHeight });
+        }
+      }
     } else {
       scrollToItemKey(toGalleryItemKey(entry.item));
     }
@@ -632,7 +648,6 @@ export const GalleryImageGrid = () => {
                   mb={`${GALLERY_PINNED_FOOTER_PX - 1}px`}
                   minW="0"
                 >
-                  <GalleryProgressSection layout={progressLayout} getScrollElement={getScrollElement} />
                   {starredCells.length > 0 ? (
                     <GalleryStarredSection
                       cells={starredCells}
@@ -645,6 +660,11 @@ export const GalleryImageGrid = () => {
                       onToggle={handleToggleStarredSection}
                     />
                   ) : null}
+                  <GalleryProgressSection
+                    getScrollElement={getScrollElement}
+                    layout={progressLayout}
+                    offsetTopPx={starredLayout.height}
+                  />
                 </Box>
               ) : null}
               {isEmpty ? (

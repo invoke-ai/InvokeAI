@@ -14,6 +14,8 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
+import { fullyFilledSettingsFor, generateGraphCases } from '@features/generation/core/graphCoverage.testing';
+import { compileGenerateGraph } from '@features/generation/graph';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import { buildImageRecallSettings, getImageRecallCapabilities, type ImageRecallKind } from './imageRecall';
@@ -22,6 +24,27 @@ const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDX
 const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
 const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
 const krea2Model: MainModelConfig = { base: 'krea-2', key: 'krea2-model', name: 'Krea 2', type: 'main' };
+const flux2DevModel: MainModelConfig = {
+  base: 'flux2',
+  key: 'flux2-dev',
+  name: 'FLUX.2 dev',
+  type: 'main',
+  variant: 'dev',
+};
+const krea2Qwen3VL: ComponentModelConfig = {
+  base: 'any',
+  key: 'qwen3-vl-4b',
+  name: 'Qwen3-VL 4B',
+  type: 'qwen3_vl_encoder',
+  variant: 'qwen3_vl_4b',
+};
+const ideogram4Qwen3VL: ComponentModelConfig = {
+  base: 'any',
+  key: 'qwen3-vl-8b',
+  name: 'Qwen3-VL 8B',
+  type: 'qwen3_vl_encoder',
+  variant: 'qwen3_vl_8b',
+};
 const vaeModel: VaeModelConfig = { base: 'sd-1', key: 'vae-model', name: 'SD 1.5 VAE', type: 'vae' };
 const qwenImageVae: VaeModelConfig = { base: 'qwen-image', key: 'qwen-vae', name: 'Qwen VAE', type: 'vae' };
 const animaQwen3: ComponentModelConfig = {
@@ -79,6 +102,8 @@ const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWi
   negativePromptHeightPx: 56,
   positivePrompt: '',
   positivePromptHeightPx: 96,
+  expandPromptModelKey: null,
+  imageToPromptModelKey: null,
   promptTemplate: null,
   promptTemplateViewMode: false,
   mistralEncoderModel: null,
@@ -670,14 +695,69 @@ describe('image recall', () => {
       currentValues: createValues(),
       image,
       kind: 'all',
-      metadata: { mistral_encoder: { key: mistralEncoder.key } },
+      metadata: { mistral_encoder: { key: mistralEncoder.key }, model: { key: flux2DevModel.key } },
       models: [mistralEncoder],
-      supportedModels: [],
+      supportedModels: [flux2DevModel],
       vaeModels: [],
     });
 
     expect(result?.values.mistralEncoderModel).toBe(mistralEncoder);
     expect(result?.fields).toContain('components');
+  });
+
+  it('remixes a Krea-2 image with its Qwen3-VL encoder', () => {
+    const krea2Metadata = { model: { key: krea2Model.key }, qwen3_vl_encoder: { key: krea2Qwen3VL.key } };
+    const recallInput = {
+      currentValues: createValues(),
+      image,
+      metadata: krea2Metadata,
+      models: [krea2Qwen3VL],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    };
+
+    expect(buildImageRecallSettings({ ...recallInput, kind: 'remix' })?.values.qwen3VLEncoderModel).toBe(krea2Qwen3VL);
+    expect(
+      getImageRecallCapabilities({ ...recallInput, metadata: { qwen3_vl_encoder: krea2Metadata.qwen3_vl_encoder } })
+        .remix
+    ).toBe(true);
+  });
+
+  it('keeps a fitting pick when the recorded component does not fit the current model', () => {
+    // The image's Ideogram model is gone, so Remix stays on the current Krea-2 model and its 4B encoder.
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: krea2Model, modelKey: krea2Model.key, qwen3VLEncoderModel: krea2Qwen3VL }),
+      image,
+      kind: 'remix',
+      metadata: {
+        model: { key: 'uninstalled-ideogram' },
+        positive_prompt: 'a lighthouse',
+        qwen3_vl_encoder: { key: ideogram4Qwen3VL.key },
+      },
+      models: [krea2Qwen3VL, ideogram4Qwen3VL],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.qwen3VLEncoderModel).toEqual(krea2Qwen3VL);
+    expect(result?.fields).toEqual(['prompts']);
+  });
+
+  it('drops components that do not fit the remixed model, recorded or left over', () => {
+    const recall = (metadata: Record<string, unknown>) =>
+      buildImageRecallSettings({
+        // Ideogram 4's 8B encoder does not fit Krea-2, which takes the 4B variant.
+        currentValues: createValues({ qwen3VLEncoderModel: ideogram4Qwen3VL }),
+        image,
+        kind: 'remix',
+        metadata: { model: { key: krea2Model.key }, ...metadata },
+        models: [krea2Qwen3VL, ideogram4Qwen3VL],
+        supportedModels: [krea2Model],
+        vaeModels: [],
+      })?.values.qwen3VLEncoderModel;
+
+    expect(recall({})).toBeNull();
+    expect(recall({ qwen3_vl_encoder: { key: ideogram4Qwen3VL.key } })).toBeNull();
   });
 
   it('clears component models when recalled metadata explicitly stores null', () => {
@@ -793,5 +873,58 @@ describe('image recall', () => {
       expect(capabilities.all).toBe(true);
       expect(capabilities.remix).toBe(true);
     });
+  });
+});
+
+/** Remix from the metadata a fully filled graph records, starting from SDXL defaults. */
+const remixRoundTrip = ({ base, shape }: (typeof generateGraphCases)[number]) => {
+  const { filled, model, settings } = fullyFilledSettingsFor(base, shape);
+  const graph = compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph;
+  const recordedMetadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+  const serializedMetadata = JSON.stringify(recordedMetadata);
+  // A slot the graph leaves unused (e.g. a bundled model's) is not recorded, so there is nothing to restore.
+  const recorded = filled.filter((key) => serializedMetadata.includes(`"${settings[key]?.key}"`));
+  const components = recorded.map((key) => settings[key]).filter((component) => component !== null);
+  const result = buildImageRecallSettings({
+    currentValues: createValues(),
+    image,
+    kind: 'remix',
+    metadata: recordedMetadata,
+    models: components.filter((component) => component.type !== 'vae'),
+    supportedModels: [model],
+    vaeModels: components.filter((component): component is VaeModelConfig => component.type === 'vae'),
+  });
+  const keysOf = (values: GenerateWidgetValues | undefined) =>
+    Object.fromEntries(recorded.map((key) => [key, values?.[key]?.key ?? null]));
+
+  return { expected: keysOf(settings as GenerateWidgetValues), recorded, restored: keysOf(result?.values) };
+};
+
+describe('remix round trip', () => {
+  // Every component a graph records must come back; one recorded under a key Remix does not know fails here.
+  it.each(generateGraphCases)('restores the components $label records', (graphCase) => {
+    const { expected, restored } = remixRoundTrip(graphCase);
+
+    expect(restored).toEqual(expected);
+  });
+
+  it('exercises every component setting Remix restores', () => {
+    const recorded = new Set(generateGraphCases.flatMap((graphCase) => remixRoundTrip(graphCase).recorded));
+
+    expect([...recorded].sort()).toEqual([
+      'clipEmbedModel',
+      'componentSourceModel',
+      'gemma2EncoderModel',
+      'ideogram4UnconditionalModel',
+      'mistralEncoderModel',
+      'pidDecoderModel',
+      'qwen3EncoderModel',
+      'qwen3VLEncoderModel',
+      'qwenVLEncoderModel',
+      't5EncoderModel',
+      'vae',
+      'wanLowNoiseModel',
+      'wanT5EncoderModel',
+    ]);
   });
 });

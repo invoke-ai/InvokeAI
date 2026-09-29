@@ -12,6 +12,19 @@ const TILE_CSS: SystemStyleObject = {
   '&:hover .gallery-thumb-overlay, &:focus-within .gallery-thumb-overlay': { opacity: 1 },
 };
 
+/** An inner ring over the image thickens the selected edge without resizing the tile content; shared by every tile. */
+export const SELECTED_TILE_CSS: SystemStyleObject = {
+  _after: {
+    borderRadius: 'sm',
+    boxShadow: 'inset 0 0 0 2px {colors.accent.solid}',
+    content: '""',
+    inset: 0,
+    pointerEvents: 'none',
+    position: 'absolute',
+    zIndex: 1,
+  },
+};
+
 const BADGE_TRANSITION = 'opacity var(--wb-motion-duration-medium) ease';
 
 export interface GalleryTileFrameProps extends Omit<BoxProps, 'children'> {
@@ -33,7 +46,10 @@ export const GalleryTileFrame = ({
   ...boxProps
 }: GalleryTileFrameProps) => {
   const duration = item.kind === 'video' ? formatGalleryVideoDuration(item.durationSeconds) : null;
-  const tileCss = useMemo(() => (css ? [TILE_CSS, css] : TILE_CSS), [css]);
+  const tileCss = useMemo(
+    () => [TILE_CSS, isSelected ? SELECTED_TILE_CSS : undefined, css].filter((entry) => entry !== undefined),
+    [css, isSelected]
+  );
 
   return (
     <Box

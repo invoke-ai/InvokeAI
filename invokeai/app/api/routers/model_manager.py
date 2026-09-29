@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein
 """FastAPI route for model configuration records."""
 
 import asyncio

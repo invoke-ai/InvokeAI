@@ -17,6 +17,7 @@ import {
   getGalleryPage,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,
+  getGallerySelectedBoardId,
   getGallerySettings,
   getSelectedGalleryItemFromValues,
   getBoundedRecentImages,
@@ -28,7 +29,7 @@ import {
   toGalleryItemKey,
   toGalleryItemRef,
 } from '@features/gallery/contracts';
-import { galleryBoardsOptions } from '@features/gallery/queries';
+import { galleryBoardsOptions, getGalleryListingBoardsQuery } from '@features/gallery/queries';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
 import {
   consumeQueueItemSwapProgressImage,
@@ -96,6 +97,8 @@ export const getVideoFrameCopyNotice = (
   result.ok
     ? { kind: 'success', title: translate('widgets.preview.copyCurrentFrameSuccess') }
     : { kind: 'error', title: translate(VIDEO_FRAME_COPY_FAILURE_KEYS[result.reason]) };
+
+const EMPTY_BOARDS: GalleryBoard[] = [];
 
 const fallbackBoards: GalleryBoard[] = [
   {
@@ -203,6 +206,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     ...galleryBoardsOptions(),
     enabled: hasSelectedItem,
   });
+  // A ranked filmstrip mirrors the grid, which ranks within the board it resolves; share the grid's board list.
+  const gallerySettings = getGallerySettings(galleryValues);
+  const galleryBoardsQuery = useQuery({
+    ...galleryBoardsOptions(getGalleryListingBoardsQuery(gallerySettings)),
+    enabled: gallerySemanticQuery !== null,
+  });
+  const galleryBoardId = getGallerySelectedBoardId(galleryValues, galleryBoardsQuery.data ?? EMPTY_BOARDS);
   const boards = boardsQuery.data ?? fallbackBoards;
   const boardName = getBoardName(
     boards,
@@ -239,8 +249,9 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     selectGalleryItem: selectGalleryItemAtPage,
     selectedImageQuery,
     selectedItem,
+    galleryBoardId,
     galleryPage: getGalleryPage(galleryValues),
-    galleryPaginationMode: getGallerySettings(galleryValues).paginationMode,
+    galleryPaginationMode: gallerySettings.paginationMode,
     selectedItemKey,
     semanticQuery: gallerySemanticQuery,
   });

@@ -111,4 +111,13 @@ describe('getGenerateFormCommitPatch', () => {
     expect(patch.batchCount).toBeUndefined();
     expect(patch.positivePrompt).toBe('keep prompt');
   });
+
+  it('leaves the saved prompt tool models alone, so applying a preset keeps them', () => {
+    const patch = getGenerateFormCommitPatch(
+      createSettings({ expandPromptModelKey: 'preset-llm', imageToPromptModelKey: 'preset-vision' })
+    );
+
+    expect(patch).not.toHaveProperty('expandPromptModelKey');
+    expect(patch).not.toHaveProperty('imageToPromptModelKey');
+  });
 });

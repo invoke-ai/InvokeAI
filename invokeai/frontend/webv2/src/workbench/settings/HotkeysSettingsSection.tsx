@@ -1,7 +1,12 @@
+import type { ListRowProps } from '@platform/ui/list/List';
+import type { ListSection } from '@platform/ui/list/listRows';
 import type { HotkeyCategory, HotkeyDefinition } from '@workbench/hotkeys';
 
-import { Badge, Box, Flex, HStack, Icon, Input, InputGroup, Kbd, ScrollArea, Stack, Text } from '@chakra-ui/react';
+import { Badge, HStack, Icon, Input, InputGroup, Kbd, Stack, Text } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui';
+import { EmptyState } from '@platform/ui/EmptyState';
+import { List } from '@platform/ui/list/List';
+import { listRowsFromSections } from '@platform/ui/list/listRows';
 import { ModifiedSettingIndicator } from '@platform/ui/settings/ModifiedSettingIndicator';
 import {
   firstPartyHotkeyCatalog,
@@ -13,15 +18,16 @@ import {
 import { ShortcutKeyGlyph } from '@workbench/hotkeys/keyGlyphs';
 import { patchWorkbenchPreferences, useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { CheckIcon, PlusIcon, RotateCcwIcon, SearchIcon, Trash2Icon, XIcon } from 'lucide-react';
-import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
-import { useVirtualizer } from 'react-hook-tanstack-virtual';
+import { Fragment, useCallback, useDeferredValue, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type HotkeyConflict = { hotkey: HotkeyDefinition; title: string };
 
-type HotkeyRow =
-  | { kind: 'category'; category: HotkeyCategory; title: string }
-  | { kind: 'hotkey'; hotkey: HotkeyDefinition; effectiveKeys: string[]; isCustomized: boolean };
+interface HotkeyEntry {
+  hotkey: HotkeyDefinition;
+  effectiveKeys: string[];
+  isCustomized: boolean;
+}
 
 const CATEGORY_LABEL_KEYS: Record<HotkeyCategory, string> = {
   app: 'hotkeys.categories.app',
@@ -34,13 +40,9 @@ const CATEGORY_LABEL_KEYS: Record<HotkeyCategory, string> = {
 const CATEGORY_ORDER: HotkeyCategory[] = ['app', 'canvas', 'workflows', 'viewer', 'gallery'];
 
 const SEARCH_START_ELEMENT = <Icon as={SearchIcon} boxSize="3.5" />;
+const NO_MATCHES_ICON = <Icon as={SearchIcon} />;
 
-// Virtualizer internals mutate while computing a range; subscribe only to rendered values.
-const selectVirtualRows = ({
-  measureElement,
-  totalSize,
-  virtualItems,
-}: ReturnType<typeof useVirtualizer<HTMLDivElement, HTMLElement>>) => ({ measureElement, totalSize, virtualItems });
+const getEntryKey = (entry: HotkeyEntry): string => entry.hotkey.id;
 
 const normalizeKeys = (keys: string[]): string[] => keys.map(normalizeHotkeyString).filter(Boolean);
 
@@ -123,17 +125,19 @@ const buildConflictMap = (
 const isHotkeyCustomized = (hotkey: HotkeyDefinition, customHotkeys: Record<string, string[]>): boolean =>
   Object.prototype.hasOwnProperty.call(customHotkeys, hotkey.id);
 
-const buildRows = ({
+const buildSections = ({
   catalog,
   customHotkeys,
   searchTerm,
+  t,
 }: {
   catalog: HotkeyDefinition[];
   customHotkeys: Record<string, string[]>;
   searchTerm: string;
-}): HotkeyRow[] => {
+  t: (key: string) => string;
+}): ListSection<HotkeyEntry>[] => {
   const needle = searchTerm.trim().toLowerCase();
-  const rows: HotkeyRow[] = [];
+  const sections: ListSection<HotkeyEntry>[] = [];
 
   for (const category of CATEGORY_ORDER) {
     const hotkeys = catalog
@@ -151,23 +155,18 @@ const buildRows = ({
         return haystack.includes(needle);
       });
 
-    if (hotkeys.length === 0) {
-      continue;
-    }
-
-    rows.push({ category, kind: 'category', title: CATEGORY_LABEL_KEYS[category] });
-
-    for (const hotkey of hotkeys) {
-      rows.push({
+    sections.push({
+      items: hotkeys.map((hotkey) => ({
         effectiveKeys: normalizeKeys(customHotkeys[hotkey.id] ?? hotkey.defaultKeys),
         hotkey,
         isCustomized: isHotkeyCustomized(hotkey, customHotkeys),
-        kind: 'hotkey',
-      });
-    }
+      })),
+      key: category,
+      label: t(CATEGORY_LABEL_KEYS[category]),
+    });
   }
 
-  return rows;
+  return sections;
 };
 
 export const HotkeysSettingsSection = () => {
@@ -176,24 +175,14 @@ export const HotkeysSettingsSection = () => {
   const extensionHotkeys = useExtensionHotkeyDefinitions();
   const [searchTerm, setSearchTerm] = useState('');
   const deferredSearchTerm = useDeferredValue(searchTerm);
-  const scrollRef = useRef<HTMLDivElement | null>(null);
   const catalog = useMemo(() => [...firstPartyHotkeyCatalog, ...extensionHotkeys], [extensionHotkeys]);
   const rows = useMemo(
-    () => buildRows({ catalog, customHotkeys, searchTerm: deferredSearchTerm }),
-    [catalog, customHotkeys, deferredSearchTerm]
+    () =>
+      listRowsFromSections(buildSections({ catalog, customHotkeys, searchTerm: deferredSearchTerm, t }), getEntryKey),
+    [catalog, customHotkeys, deferredSearchTerm, t]
   );
   const conflictMap = useMemo(() => buildConflictMap(catalog, customHotkeys), [catalog, customHotkeys]);
   const modifiedCount = Object.keys(customHotkeys).length;
-  const virtualizer = useVirtualizer(
-    {
-      count: rows.length,
-      estimateSize: (index) => (rows[index]?.kind === 'category' ? 36 : 86),
-      getScrollElement: () => scrollRef.current,
-      measureElement: (element) => element.getBoundingClientRect().height,
-      overscan: 8,
-    },
-    selectVirtualRows
-  );
 
   const saveHotkey = useCallback(
     (hotkeyId: string, keys: string[]) => {
@@ -219,7 +208,23 @@ export const HotkeysSettingsSection = () => {
     setSearchTerm(event.currentTarget.value);
   }, []);
 
-  const virtualRows = virtualizer.virtualItems;
+  const emptyState = useMemo(() => <EmptyState icon={NO_MATCHES_ICON} title={t('hotkeys.noMatches')} />, [t]);
+  const renderItem = useCallback(
+    (entry: HotkeyEntry, rowProps: ListRowProps) => (
+      <HotkeyListRow
+        key={entry.effectiveKeys.join('\n')}
+        conflictMap={conflictMap}
+        effectiveKeys={entry.effectiveKeys}
+        hotkey={entry.hotkey}
+        isCustomized={entry.isCustomized}
+        positionInSet={rowProps.positionInSet}
+        setSize={rowProps.setSize}
+        onReset={resetHotkey}
+        onSave={saveHotkey}
+      />
+    ),
+    [conflictMap, resetHotkey, saveHotkey]
+  );
 
   return (
     <Stack h="full" minH="0">
@@ -240,6 +245,7 @@ export const HotkeysSettingsSection = () => {
 
       <InputGroup startElement={SEARCH_START_ELEMENT}>
         <Input
+          aria-label={t('hotkeys.searchPlaceholder')}
           placeholder={t('hotkeys.searchPlaceholder')}
           size="xs"
           value={searchTerm}
@@ -247,98 +253,19 @@ export const HotkeysSettingsSection = () => {
         />
       </InputGroup>
 
-      <ScrollArea.Root flex="1" minH="0" rounded="md" size="xs" variant="hover" w="full">
-        <ScrollArea.Viewport ref={scrollRef} aria-label={t('hotkeys.bindings')} h="full" w="full">
-          <ScrollArea.Content w="full">
-            <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
-              {virtualRows.map((row) => {
-                const item = rows[row.index];
-
-                if (!item) {
-                  return null;
-                }
-
-                return (
-                  <Box
-                    key={row.key}
-                    ref={virtualizer.measureElement}
-                    data-index={row.index}
-                    position="absolute"
-                    top="0"
-                    transform={`translateY(${row.start}px)`}
-                    w="full"
-                  >
-                    <VirtualHotkeyRow
-                      conflictMap={conflictMap}
-                      item={item}
-                      resetHotkey={resetHotkey}
-                      saveHotkey={saveHotkey}
-                    />
-                  </Box>
-                );
-              })}
-            </Box>
-          </ScrollArea.Content>
-        </ScrollArea.Viewport>
-        <ScrollArea.Scrollbar>
-          <ScrollArea.Thumb />
-        </ScrollArea.Scrollbar>
-      </ScrollArea.Root>
+      <List
+        density="comfortable"
+        dividers
+        emptyState={emptyState}
+        estimatedRowHeight={64}
+        label={t('hotkeys.bindings')}
+        renderItem={renderItem}
+        rowHeight="measured"
+        rows={rows}
+        // The Settings dialog body paints bg.subtle; pinned category headers must match it.
+        surface="bg.subtle"
+      />
     </Stack>
-  );
-};
-
-const CategoryRow = ({ title }: { title: string }) => {
-  const { t } = useTranslation();
-
-  return (
-    <Flex align="center" borderBottomWidth="1px" pb="2" pt="4">
-      <Text color="fg.muted" fontSize="2xs" fontWeight="800" letterSpacing="0.08em" textTransform="uppercase">
-        {t(title)}
-      </Text>
-    </Flex>
-  );
-};
-
-const VirtualHotkeyRow = ({
-  conflictMap,
-  item,
-  resetHotkey,
-  saveHotkey,
-}: {
-  conflictMap: Map<string, HotkeyConflict[]>;
-  item: HotkeyRow;
-  resetHotkey: (hotkeyId: string) => void;
-  saveHotkey: (hotkeyId: string, keys: string[]) => void;
-}) => {
-  const handleReset = useCallback(() => {
-    if (item.kind === 'hotkey') {
-      resetHotkey(item.hotkey.id);
-    }
-  }, [item, resetHotkey]);
-  const handleSave = useCallback(
-    (keys: string[]) => {
-      if (item.kind === 'hotkey') {
-        saveHotkey(item.hotkey.id, keys);
-      }
-    },
-    [item, saveHotkey]
-  );
-
-  if (item.kind === 'category') {
-    return <CategoryRow title={item.title} />;
-  }
-
-  return (
-    <HotkeyListRow
-      key={item.effectiveKeys.join('\n')}
-      conflictMap={conflictMap}
-      effectiveKeys={item.effectiveKeys}
-      hotkey={item.hotkey}
-      isCustomized={item.isCustomized}
-      onReset={handleReset}
-      onSave={handleSave}
-    />
   );
 };
 
@@ -349,13 +276,17 @@ const HotkeyListRow = ({
   isCustomized,
   onReset,
   onSave,
+  positionInSet,
+  setSize,
 }: {
   conflictMap: Map<string, HotkeyConflict[]>;
   effectiveKeys: string[];
   hotkey: HotkeyDefinition;
   isCustomized: boolean;
-  onReset: () => void;
-  onSave: (keys: string[]) => void;
+  onReset: (hotkeyId: string) => void;
+  onSave: (hotkeyId: string, keys: string[]) => void;
+  positionInSet: number;
+  setSize: number;
 }) => {
   const { t } = useTranslation();
   const [draftKeys, setDraftKeys] = useState(effectiveKeys);
@@ -398,19 +329,29 @@ const HotkeyListRow = ({
       return;
     }
 
-    onSave(draftKeys);
+    onSave(hotkey.id, draftKeys);
     setEditingIndex(null);
-  }, [canSave, draftKeys, onSave]);
+  }, [canSave, draftKeys, hotkey.id, onSave]);
 
   const disableHotkey = useCallback(() => {
-    onSave([]);
+    onSave(hotkey.id, []);
     setEditingIndex(null);
-  }, [onSave]);
+  }, [hotkey.id, onSave]);
+  const resetThisHotkey = useCallback(() => onReset(hotkey.id), [hotkey.id, onReset]);
 
   const cancelChipEdit = useCallback(() => setEditingIndex(null), []);
 
   return (
-    <Flex borderBottomWidth="1px" gap="3" py="2.5">
+    // An inline editor, not a ListItem: its controls keep their own tab order inside the list.
+    <HStack
+      align="flex-start"
+      aria-posinset={positionInSet}
+      aria-setsize={setSize}
+      gap="3"
+      px="2"
+      py="2"
+      role="listitem"
+    >
       <Stack flex="1" gap="1" minW="0">
         <HStack gap="2">
           <Text color="fg" fontSize="sm" fontWeight="600" truncate>
@@ -483,13 +424,13 @@ const HotkeyListRow = ({
             </Button>
           ) : null}
           {isCustomized ? (
-            <IconButton aria-label={t('hotkeys.resetHotkey')} size="xs" variant="ghost" onClick={onReset}>
+            <IconButton aria-label={t('hotkeys.resetHotkey')} size="xs" variant="ghost" onClick={resetThisHotkey}>
               <RotateCcwIcon />
             </IconButton>
           ) : null}
         </HStack>
       </Stack>
-    </Flex>
+    </HStack>
   );
 };
 

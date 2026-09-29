@@ -1,4 +1,3 @@
-# Copyright (c) 2024, Brandon W. Rising and the InvokeAI Development Team
 """Class for Flux model loading in InvokeAI."""
 
 from pathlib import Path

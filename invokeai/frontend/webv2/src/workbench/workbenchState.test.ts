@@ -40,7 +40,6 @@ import {
   clampPanelSize,
   createDraftProject,
   getPanelCollapseThreshold,
-  shouldSnapPanelShut,
   normalizeWorkbenchAccount,
   normalizeWorkbenchProject,
 } from './workbenchState';
@@ -229,6 +228,8 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   negativePromptHeightPx: 56,
   positivePrompt: 'first prompt',
   positivePromptHeightPx: 96,
+  expandPromptModelKey: null,
+  imageToPromptModelKey: null,
   promptTemplate: null,
   promptTemplateViewMode: false,
   mistralEncoderModel: null,
@@ -819,21 +820,6 @@ describe('workbench panel resize bounds', () => {
     expect(clampPanelSize('left', 900)).toBe(720);
     expect(clampPanelSize('left', 700)).toBe(700);
     expect(clampPanelSize('left', 100)).toBe(350);
-  });
-
-  it('snaps shut past the overshoot and reopens with hysteresis', () => {
-    expect(shouldSnapPanelShut('left', 350, false)).toBe(false);
-    expect(shouldSnapPanelShut('left', 271, false)).toBe(false);
-    expect(shouldSnapPanelShut('left', 270, false)).toBe(true);
-    // Once shut, dragging back only reopens past the halfway band.
-    expect(shouldSnapPanelShut('left', 290, true)).toBe(true);
-    expect(shouldSnapPanelShut('left', 311, true)).toBe(false);
-  });
-
-  it('measures the overshoot against whichever floor the region has', () => {
-    expect(shouldSnapPanelShut('bottom', 96, false)).toBe(false);
-    expect(shouldSnapPanelShut('bottom', 17, false)).toBe(false);
-    expect(shouldSnapPanelShut('bottom', 16, false)).toBe(true);
   });
 
   it('exposes the collapse threshold as a size below the floor', () => {
@@ -5066,13 +5052,13 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
   });
 
-  it('exits a similarity search when the view moves to another board', () => {
+  it('carries a similarity search to another board, which it then ranks within, from the first page', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, { boardId: 'board-a', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, {
       type: 'patchWidgetValues',
-      values: { galleryPage: 4, semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      values: { galleryPage: 4, semanticImageQuery: { kind: 'text', query: 'sunset' }, semanticSearchText: 'sunset' },
       widgetId: 'gallery',
     });
 
@@ -5080,7 +5066,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
 
-    expect(values.semanticImageQuery).toBeNull();
+    expect(values.semanticImageQuery).toEqual({ kind: 'text', query: 'sunset' });
+    expect(values.semanticSearchText).toBe('sunset');
     expect(values.selectedBoardId).toBe('board-b');
     expect(values.galleryPage).toBe(0);
   });
@@ -5104,8 +5091,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
   });
 
-  it('leaves the page stamped on the selection alone when a search is dismissed by a board move', () => {
-    // This selection predates search; its board page remains valid and must not be reset with ranking pages.
+  it('leaves the page stamped on the selection alone when a map cluster is dismissed by a board move', () => {
+    // This selection predates the cluster; its board page remains valid and must not be reset with ranking pages.
+    // The cluster id is deliberately unregistered: a stale cluster ends with the board all the same.
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, { boardId: 'board-a', type: 'selectGalleryBoard' });
@@ -5116,7 +5104,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
     state = workbenchReducer(state, {
       type: 'patchWidgetValues',
-      values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      values: { semanticImageQuery: { clusterId: 'cluster-gone', kind: 'cluster', label: 'Cats' } },
       widgetId: 'gallery',
     });
 
@@ -5442,26 +5430,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       expect(galleryValues(state).searchTerm).toBe('');
     });
 
-    it('leaves semantic mode with the ranking on a board move or a tab switch, not on a re-click', () => {
+    it('leaves semantic mode on a tab switch, not on a re-click of the current tab', () => {
       let state = createInitialWorkbenchState();
-
-      state = workbenchReducer(state, { boardId: 'board-a', type: 'selectGalleryBoard' });
-      state = workbenchReducer(state, { searchTerm: 'sunset', type: 'setGallerySearchTerm' });
-      state = workbenchReducer(state, { enabled: true, type: 'setGallerySemanticSearchMode' });
-      state = workbenchReducer(state, { boardId: 'board-a', type: 'selectGalleryBoard' });
-
-      expect(galleryValues(state)).toMatchObject({
-        semanticImageQuery: { kind: 'text', query: 'sunset' },
-        semanticSearchText: 'sunset',
-      });
-
-      state = workbenchReducer(state, { boardId: 'board-b', type: 'selectGalleryBoard' });
-
-      expect(galleryValues(state)).toMatchObject({
-        searchTerm: '',
-        semanticImageQuery: null,
-        semanticSearchText: null,
-      });
 
       state = workbenchReducer(state, { enabled: true, type: 'setGallerySemanticSearchMode' });
       state = workbenchReducer(state, { text: 'beach', type: 'setGallerySemanticSearchText' });

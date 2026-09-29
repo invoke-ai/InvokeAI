@@ -192,8 +192,7 @@ export const Picker = <T,>({
               ))}
           </ScrollArea.Content>
         </ScrollArea.Viewport>
-        {/* Keep the scrollbar above opaque sticky headers at z-index 1. */}
-        <ScrollArea.Scrollbar zIndex="2">
+        <ScrollArea.Scrollbar>
           <ScrollArea.Thumb />
         </ScrollArea.Scrollbar>
       </ScrollArea.Root>

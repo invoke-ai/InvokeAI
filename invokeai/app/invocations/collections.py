@@ -1,6 +1,3 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
-
-
 from typing import Any
 
 import numpy as np

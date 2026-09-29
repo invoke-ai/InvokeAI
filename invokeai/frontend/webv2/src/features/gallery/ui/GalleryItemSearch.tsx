@@ -1,37 +1,27 @@
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 
-import { Box, Code, HStack, Icon, Popover, Portal, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Text } from '@chakra-ui/react';
 import { semanticReferenceFromDataTransfer } from '@features/gallery/core/semanticImageQuery';
 import { imageIndexAvailabilityOptions } from '@features/gallery/data/queries';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { describeDateRange, findInvalidDateToken, formatIsoDate, parseDateTokens } from '@platform/search/dateTokens';
-import { CloseButton, IconButton, ToggleIconButton } from '@platform/ui/Button';
+import { CloseButton, ToggleIconButton } from '@platform/ui/Button';
 import { InputShell } from '@platform/ui/InputShell';
-import { PopoverContent } from '@platform/ui/Popover';
 import { useQuery } from '@tanstack/react-query';
-import { CircleHelpIcon, ImageIcon, MapIcon, SparklesIcon } from 'lucide-react';
+import { ImageIcon, MapIcon, SparklesIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 import { GALLERY_SEMANTIC_SEARCH_DROP_ID, useGalleryImageDroppable } from './galleryDnd';
 import { GallerySearchField } from './GallerySearchField';
+import { GallerySearchHelp } from './GallerySearchHelp';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const SEARCH_HINT_ID = 'gallery-search-hint';
-const HELP_POSITIONING = { placement: 'bottom-end' } as const;
-
 /** Debounce typing because each semantic commit embeds and reranks on the server. */
 export const SEMANTIC_SEARCH_COMMIT_DEBOUNCE_MS = 300;
-
-/** The `key:value` forms `parseDateTokens` accepts, as shown in the help popover. */
-const DATE_TOKEN_EXAMPLES = [
-  { descriptionKey: 'widgets.gallery.searchHelpFrom', key: 'from:2026-07-14' },
-  { descriptionKey: 'widgets.gallery.searchHelpTo', key: 'to:yesterday' },
-  { descriptionKey: 'widgets.gallery.searchHelpDate', key: 'date:today' },
-  { descriptionKey: 'widgets.gallery.searchHelpRelative', key: 'from:7d' },
-] as const;
 
 /** The full identity of the reference, surfaced as the chip's hover title. */
 const getSemanticReferenceTitle = (reference: GallerySemanticReference): string => {
@@ -225,10 +215,17 @@ export const GalleryItemSearch = () => {
     return invalid ? t('widgets.gallery.dateFilterInvalid', { value: invalid.raw }) : null;
   }, [gallery.searchTerm, isSemanticMode, t]);
 
+  // The index leaves archived boards out, so a ranked search scoped to one can only come back empty. Clusters are
+  // explicit member lists, not rankings, so they are exempt.
+  const isRankedSearch =
+    isSemanticMode || (gallery.semanticImageQuery !== null && gallery.semanticImageQuery.kind !== 'cluster');
+  const isArchivedBoard = gallery.boards.some((board) => board.id === gallery.selectedBoardId && board.archived);
   const semanticHint =
     isSemanticMode && indexAvailability?.state === 'model_missing'
       ? t('widgets.gallery.semanticSearchModelMissing', { model: indexAvailability.modelName ?? '' })
-      : null;
+      : isRankedSearch && isArchivedBoard
+        ? t('widgets.gallery.semanticSearchArchivedBoard')
+        : null;
 
   const hint = invalidHint ?? semanticHint;
 
@@ -418,46 +415,5 @@ const GallerySemanticChip = ({
             : t('widgets.gallery.semanticSimilarTo', { name })}
       </Text>
     </InputShell>
-  );
-};
-
-/** Documents the closed date-token grammar the search box accepts. */
-export const GallerySearchHelp = () => {
-  const { t } = useTranslation();
-
-  return (
-    <Popover.Root positioning={HELP_POSITIONING}>
-      <Popover.Trigger asChild>
-        <IconButton aria-label={t('widgets.gallery.searchHelpTitle')} color="fg.subtle" size="2xs" variant="ghost">
-          <Icon as={CircleHelpIcon} boxSize="3.5" />
-        </IconButton>
-      </Popover.Trigger>
-      <Portal>
-        <Popover.Positioner>
-          <PopoverContent maxW="18rem" p="3">
-            <Stack gap="2">
-              <Text fontSize="xs" fontWeight="600">
-                {t('widgets.gallery.searchHelpTitle')}
-              </Text>
-              <Text color="fg.muted" fontSize="2xs">
-                {t('widgets.gallery.searchHelpIntro')}
-              </Text>
-              <Stack gap="1.5">
-                {DATE_TOKEN_EXAMPLES.map(({ descriptionKey, key }) => (
-                  <HStack key={key} align="start" gap="2">
-                    <Code flexShrink={0} fontSize="2xs" px="1">
-                      {key}
-                    </Code>
-                    <Text color="fg.muted" fontSize="2xs">
-                      {t(descriptionKey)}
-                    </Text>
-                  </HStack>
-                ))}
-              </Stack>
-            </Stack>
-          </PopoverContent>
-        </Popover.Positioner>
-      </Portal>
-    </Popover.Root>
   );
 };

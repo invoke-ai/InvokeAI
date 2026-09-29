@@ -172,6 +172,7 @@ export const zModelType = z.enum([
   'prompt_enhancer',
   'external_image_generator',
   'pid_decoder',
+  'ltx2_duration_head',
   'unknown',
 ]);
 export type ModelType = z.infer<typeof zModelType>;

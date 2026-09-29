@@ -775,16 +775,32 @@ const toSemanticResults = (body: SemanticSearchBody): GallerySemanticResult[] =>
     score: result.score,
   }));
 
+/** Date boards scope by creation day; no board, or the all-readable scope, ranks everything accessible. */
+const toSemanticScopeParams = (boardId: string | undefined): { board_id?: string; created_date?: string } => {
+  if (boardId === undefined || boardId === ALL_READABLE_BOARDS_ID) {
+    return {};
+  }
+
+  return isDateBoardId(boardId) ? { created_date: getDateFromBoardId(boardId) } : { board_id: boardId };
+};
+
 /**
  * Text and gallery-image searches use GET; URLs and registered files use POST. include_videos opts into kind-aware
- * result hydration.
+ * result hydration. The server ranks within `boardId` before applying the limit.
  */
 export const searchGallerySemantic = async (
   query: Exclude<GallerySemanticQuery, { kind: 'cluster' }>,
-  { limit = SEMANTIC_SEARCH_MAX_RESULTS, signal }: { limit?: number; signal?: AbortSignal } = {}
+  {
+    boardId,
+    includeVideos = true,
+    limit = SEMANTIC_SEARCH_MAX_RESULTS,
+    signal,
+  }: { boardId?: string; includeVideos?: boolean; limit?: number; signal?: AbortSignal } = {}
 ): Promise<GallerySemanticResult[]> => {
+  const scope = { ...toSemanticScopeParams(boardId), include_videos: includeVideos, limit };
+
   if (query.kind === 'url') {
-    const params = toSearchParams({ image_url: query.url, include_videos: true, limit });
+    const params = toSearchParams({ image_url: query.url, ...scope });
 
     return toSemanticResults(
       await apiFetchJson<SemanticSearchBody>(`/api/v1/image_map/search_by_image?${params}`, {
@@ -806,21 +822,16 @@ export const searchGallerySemantic = async (
     form.append('image', entry.blob, entry.label || 'image');
 
     return toSemanticResults(
-      await apiFetchJson<SemanticSearchBody>(
-        `/api/v1/image_map/search_by_image?${toSearchParams({ include_videos: true, limit })}`,
-        {
-          body: form,
-          method: 'POST',
-          signal,
-        }
-      )
+      await apiFetchJson<SemanticSearchBody>(`/api/v1/image_map/search_by_image?${toSearchParams(scope)}`, {
+        body: form,
+        method: 'POST',
+        signal,
+      })
     );
   }
 
   const params = toSearchParams(
-    query.kind === 'text'
-      ? { include_videos: true, limit, q: query.query }
-      : { image_name: query.imageName, include_videos: true, limit }
+    query.kind === 'text' ? { ...scope, q: query.query } : { image_name: query.imageName, ...scope }
   );
 
   return toSemanticResults(await apiFetchJson<SemanticSearchBody>(`/api/v1/image_map/search?${params}`, { signal }));
@@ -855,9 +866,11 @@ export const fetchImageIndexAvailability = async (signal: AbortSignal): Promise<
 
 /** Kind-qualified refs retain relevance order for page hydration, range selection, and deletion neighbors. */
 export const listSemanticGalleryItemNames = async ({
+  boardId,
   query,
   signal,
 }: {
+  boardId?: string;
   query: GallerySemanticQuery;
   signal?: AbortSignal;
 }): Promise<GalleryItemNames> => {
@@ -872,12 +885,30 @@ export const listSemanticGalleryItemNames = async ({
     };
   }
 
-  const results = await searchGallerySemantic(query, { signal });
+  const results = await searchGallerySemantic(query, { boardId, signal });
 
   return {
     items: results.map((result) => result.ref),
     total: results.length,
   };
+};
+
+/** Semantic text matches across every accessible image, for the command palette. */
+export const listPaletteSemanticImages = async ({
+  limit,
+  query,
+  signal,
+}: {
+  limit: number;
+  query: string;
+  signal?: AbortSignal;
+}): Promise<GalleryImage[]> => {
+  const results = await searchGallerySemantic({ kind: 'text', query }, { includeVideos: false, limit, signal });
+
+  return getGalleryImagesByNames(
+    results.map((result) => result.ref.name),
+    signal
+  );
 };
 
 export const listPaletteImages = async ({

@@ -13,10 +13,13 @@ import { useTranslation } from 'react-i18next';
  * zero.
  */
 export const UninstallPackDialog = ({
+  finalFocusEl,
   onClose,
   onUninstalled,
   pack,
 }: {
+  /** Focus destination on close; list rows resolve it late because the uninstall removes the opener. */
+  finalFocusEl?: () => HTMLElement | null;
   onClose: () => void;
   onUninstalled?: (packName: string) => void;
   pack: NodePackInfo | null;
@@ -51,6 +54,7 @@ export const UninstallPackDialog = ({
         workflowCount > 0 ? t('nodes.uninstallBodyWithWorkflows', { count: workflowCount }) : t('nodes.uninstallBody')
       }
       confirmLabel={t('nodes.uninstallPack')}
+      finalFocusEl={finalFocusEl}
       isOpen={pack !== null}
       title={t('nodes.uninstallTitle', { name: pack?.name ?? t('nodes.nodePack') })}
       onClose={onClose}

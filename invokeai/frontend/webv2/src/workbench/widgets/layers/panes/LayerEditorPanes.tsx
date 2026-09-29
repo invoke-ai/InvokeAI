@@ -1,12 +1,12 @@
-import type { KeyboardEvent as ReactKeyboardEvent, PointerEvent as ReactPointerEvent, ReactNode } from 'react';
+import type { ReactNode } from 'react';
 
 import { Box, Flex, Icon } from '@chakra-ui/react';
-import { useMountEffect } from '@platform/react/useMountEffect';
 import { IconButton } from '@platform/ui/Button';
+import { ResizeHandle } from '@platform/ui/ResizeHandle';
 import { SEGMENT_TABS_HEIGHT_PX, SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { ChevronDownIcon, ChevronUpIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type {
@@ -31,11 +31,8 @@ import { PropertiesPane } from './PropertiesPane';
 import { SwatchesPane } from './SwatchesPane';
 import { TransformPane } from './TransformPane';
 
-const RESIZE_STEP_PX = 16;
 /** Parity with the shell panels: releasing at the floor stops there; collapse asks for a real push past it. */
 const COLLAPSE_OVERSHOOT_PX = 80;
-const HANDLE_HOVER_PROPS = { bg: 'accent.solid', opacity: 0.45 };
-const HANDLE_FOCUS_PROPS = { bg: 'accent.solid', opacity: 0.65, outline: '2px solid {colors.accent.solid}' };
 
 interface PaneBlockLabels {
   collapse: string;
@@ -76,122 +73,46 @@ const LayerPaneBlock = ({
   panes: ReadonlyArray<{ id: string; label: string }>;
 }) => {
   const { isCollapsed, sizePx } = layout;
-  // A drag previews the size locally; the store hears about it on release.
-  const [previewSizePx, setPreviewSizePx] = useState<number | null>(null);
-  const drag = useRef<AbortController | null>(null);
+  const blockRef = useRef<HTMLDivElement>(null);
   const toggleRef = useRef<HTMLButtonElement>(null);
-  // Toward the panel's middle: the direction a drag or grow-key moves the handle.
-  const growSign = edge === 'top' ? 1 : -1;
   const panelId = segmentTabsPanelId(blockId);
-
-  useMountEffect(() => () => drag.current?.abort());
 
   const patch = useCallback(
     (next: Partial<PaneBlockLayout>) => onLayoutChange({ ...layout, ...next }),
     [layout, onLayoutChange]
   );
   const toggle = useCallback(() => patch({ isCollapsed: !isCollapsed }), [isCollapsed, patch]);
-  const commitSize = useCallback(
-    (next: number) => {
-      const clamped = clampSize(next);
-      if (clamped !== sizePx) {
-        patch({ sizePx: clamped });
-      }
-    },
-    [clampSize, patch, sizePx]
-  );
-  const onSeparatorPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      const startY = event.clientY;
-      const controller = new AbortController();
-      drag.current?.abort();
-      drag.current = controller;
-      let latest = sizePx;
-      try {
-        event.currentTarget.setPointerCapture(event.pointerId);
-      } catch {
-        // The window listeners carry the drag without capture.
-      }
-      const move = (moveEvent: PointerEvent) => {
-        latest = sizePx + (moveEvent.clientY - startY) * growSign;
-        // Past the overshoot the preview snaps to the strip, so the release's collapse is never a surprise.
-        setPreviewSizePx(latest <= minSizePx - COLLAPSE_OVERSHOOT_PX ? SEGMENT_TABS_HEIGHT_PX : clampSize(latest));
-      };
-      const finish = (apply: boolean) => () => {
-        controller.abort();
-        setPreviewSizePx(null);
-        if (!apply) {
-          return;
+  const commitSize = useCallback((next: number) => patch({ sizePx: clampSize(next) }), [clampSize, patch]);
+  const collapse = useMemo(
+    () => ({
+      at: minSizePx - COLLAPSE_OVERSHOOT_PX,
+      onCollapse: (source: 'keyboard' | 'pointer') => {
+        // The separator unmounts, so keyboard focus moves to the strip first.
+        if (source === 'keyboard') {
+          toggleRef.current?.focus();
         }
-        if (latest <= minSizePx - COLLAPSE_OVERSHOOT_PX) {
-          patch({ isCollapsed: true });
-          return;
-        }
-        commitSize(latest);
-      };
-      window.addEventListener('pointermove', move, { signal: controller.signal });
-      window.addEventListener('pointerup', finish(true), { signal: controller.signal });
-      window.addEventListener('pointercancel', finish(false), { signal: controller.signal });
-    },
-    [clampSize, commitSize, growSign, minSizePx, patch, sizePx]
-  );
-  const onSeparatorKeyDown = useCallback(
-    (event: ReactKeyboardEvent<HTMLDivElement>) => {
-      const step = event.shiftKey ? RESIZE_STEP_PX * 2 : RESIZE_STEP_PX;
-      const grow = edge === 'top' ? 'ArrowDown' : 'ArrowUp';
-      const shrink = edge === 'top' ? 'ArrowUp' : 'ArrowDown';
-      const change =
-        event.key === grow
-          ? step
-          : event.key === shrink
-            ? -step
-            : event.key === 'End'
-              ? maxSizePx - sizePx
-              : event.key === 'Home'
-                ? minSizePx - sizePx
-                : undefined;
-      if (change === undefined) {
-        return;
-      }
-      event.preventDefault();
-      // A further collapse-ward step at the floor collapses; the separator unmounts, so focus moves to the strip first.
-      if (change < 0 && sizePx <= minSizePx) {
-        toggleRef.current?.focus();
         patch({ isCollapsed: true });
-        return;
-      }
-      commitSize(sizePx + change);
-    },
-    [commitSize, edge, maxSizePx, minSizePx, patch, sizePx]
+      },
+      preview: SEGMENT_TABS_HEIGHT_PX,
+    }),
+    [minSizePx, patch]
   );
   const collapseLabel = isCollapsed ? labels.expand : labels.collapse;
   const collapseIcon =
     edge === 'top' ? (isCollapsed ? ChevronDownIcon : ChevronUpIcon) : isCollapsed ? ChevronUpIcon : ChevronDownIcon;
   const separator = !isCollapsed ? (
-    <Box flexShrink={0} h="1px" position="relative" zIndex="1">
-      <Box
-        aria-label={labels.resize}
-        aria-orientation="horizontal"
-        aria-valuemax={maxSizePx}
-        aria-valuemin={minSizePx}
-        aria-valuenow={sizePx}
-        cursor="ns-resize"
-        h="2"
-        left="0"
-        opacity="0"
-        position="absolute"
-        right="0"
-        role="separator"
-        tabIndex={0}
-        top="-4px"
-        transition="opacity var(--wb-motion-duration-fast) ease"
-        _focusVisible={HANDLE_FOCUS_PROPS}
-        _hover={HANDLE_HOVER_PROPS}
-        onKeyDown={onSeparatorKeyDown}
-        onPointerDown={onSeparatorPointerDown}
-      />
-    </Box>
+    <ResizeHandle
+      collapse={collapse}
+      label={labels.resize}
+      max={maxSizePx}
+      min={minSizePx}
+      orientation="horizontal"
+      pane={edge === 'top' ? 'before' : 'after'}
+      paneRef={blockRef}
+      sizeProperty="flexBasis"
+      value={sizePx}
+      onCommit={commitSize}
+    />
   ) : null;
   const collapseButton = useMemo(
     () => (
@@ -235,31 +156,34 @@ const LayerPaneBlock = ({
     </Box>
   ) : null;
 
-  return (
+  // Expanded, the separator draws the dividing line; collapsed, the strip keeps a border.
+  const block = (
     <Flex
+      ref={blockRef}
       borderColor="border.subtle"
       data-layer-pane-block={blockId}
       data-pane-collapsed={isCollapsed ? '' : undefined}
       direction="column"
-      flex={isCollapsed ? '0 0 auto' : `0 1 ${previewSizePx ?? sizePx}px`}
+      flex={isCollapsed ? '0 0 auto' : `0 1 ${sizePx}px`}
       minH={`${SEGMENT_TABS_HEIGHT_PX}px`}
       overflow="hidden"
-      {...(edge === 'top' ? { borderBottomWidth: '1px' } : { borderTopWidth: '1px' })}
+      {...(isCollapsed ? (edge === 'top' ? { borderBottomWidth: '1px' } : { borderTopWidth: '1px' }) : {})}
     >
-      {edge === 'top' ? (
-        <>
-          {strip}
-          {panel}
-          {separator}
-        </>
-      ) : (
-        <>
-          {separator}
-          {strip}
-          {panel}
-        </>
-      )}
+      {strip}
+      {panel}
     </Flex>
+  );
+
+  return edge === 'top' ? (
+    <>
+      {block}
+      {separator}
+    </>
+  ) : (
+    <>
+      {separator}
+      {block}
+    </>
   );
 };
 

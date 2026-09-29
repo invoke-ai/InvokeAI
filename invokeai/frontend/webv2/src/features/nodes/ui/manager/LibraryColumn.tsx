@@ -1,11 +1,10 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import { Box, Flex, HStack, Text } from '@chakra-ui/react';
 import { useCustomNodesSelector } from '@features/nodes/data/nodesStore';
 import { NodePackList } from '@features/nodes/ui/library/NodePackList';
 import { openNodePackDetail, updateNodesUi, useNodesUiSelector } from '@features/nodes/ui/nodesUiStore';
+import { ManagerColumn } from '@platform/ui/ManagerLayout';
 import { useTranslation } from 'react-i18next';
 
-import { HEADER_MIN_HEIGHT, LIBRARY_WIDTH } from './layoutConstants';
 import { ReloadNodesButton } from './ReloadNodesButton';
 
 /** Persistent custom-node pack list, matching the model manager's library column. */
@@ -18,19 +17,7 @@ export const LibraryColumn = () => {
   const status = useCustomNodesSelector((snapshot) => snapshot.status);
 
   return (
-    <Flex borderEndWidth={1} direction="column" flexShrink={0} h="full" minH="0" position="relative" w={LIBRARY_WIDTH}>
-      <HStack align="center" borderBottomWidth={1} flexShrink={0} gap="2" minH={HEADER_MIN_HEIGHT} px="3">
-        <Text fontSize="sm" fontWeight="700">
-          {t('nodes.nodePacks')}
-        </Text>
-        <Text color="fg.muted" fontSize="xs">
-          {nodePacks.length}
-        </Text>
-        <Box ms="auto">
-          <ReloadNodesButton />
-        </Box>
-      </HStack>
-
+    <ManagerColumn actions={<ReloadNodesButton />} count={nodePacks.length} title={t('nodes.nodePacks')}>
       <NodePackList
         activePackName={activePackName}
         error={error}
@@ -45,6 +32,6 @@ export const LibraryColumn = () => {
           }
         }}
       />
-    </Flex>
+    </ManagerColumn>
   );
 };

@@ -1,5 +1,6 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
 import type { NodePackInfo } from '@features/nodes/core/catalog';
+import type { ListContextMenuAnchor } from '@platform/ui/list/ListItem';
 
 import { Icon, Menu, Portal } from '@chakra-ui/react';
 import { UninstallPackDialog } from '@features/nodes/ui/shared/UninstallPackDialog';
@@ -9,10 +10,8 @@ import { ClipboardCopyIcon, Trash2Icon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export interface NodePackContextMenuTarget {
+export interface NodePackContextMenuTarget extends ListContextMenuAnchor {
   pack: NodePackInfo;
-  x: number;
-  y: number;
 }
 
 export const NodePackContextMenu = ({
@@ -27,6 +26,8 @@ export const NodePackContextMenu = ({
   const { t } = useTranslation();
   const notify = useNotify();
   const [pendingUninstall, setPendingUninstall] = useState<NodePackInfo | null>(null);
+  // Captured with the request: the menu target clears when the menu closes, before the dialog does.
+  const [uninstallFocusTarget, setUninstallFocusTarget] = useState<(() => HTMLElement | null) | null>(null);
   const pack = target?.pack ?? null;
 
   const handleCopyPath = async (path: string) => {
@@ -64,7 +65,14 @@ export const NodePackContextMenu = ({
                   <Menu.ItemText fontSize="xs">{t('nodes.copyPath')}</Menu.ItemText>
                 </Menu.Item>
                 <Menu.Separator />
-                <Menu.Item data-danger="" value="uninstall" onClick={() => setPendingUninstall(pack)}>
+                <Menu.Item
+                  data-danger=""
+                  value="uninstall"
+                  onClick={() => {
+                    setUninstallFocusTarget(() => target?.focusTarget ?? null);
+                    setPendingUninstall(pack);
+                  }}
+                >
                   <Icon as={Trash2Icon} boxSize="3.5" />
                   <Menu.ItemText fontSize="xs">{t('nodes.uninstall')}</Menu.ItemText>
                 </Menu.Item>
@@ -74,6 +82,7 @@ export const NodePackContextMenu = ({
         </Portal>
       </Menu.Root>
       <UninstallPackDialog
+        finalFocusEl={uninstallFocusTarget ?? undefined}
         pack={pendingUninstall}
         onClose={() => setPendingUninstall(null)}
         onUninstalled={onUninstalled}

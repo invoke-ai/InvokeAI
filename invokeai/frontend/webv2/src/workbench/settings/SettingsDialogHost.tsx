@@ -3,30 +3,12 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { CloseButton } from '@platform/ui';
 import { RetryBoundary } from '@platform/ui/RetryBoundary';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
-import { Suspense, use, useMemo, type KeyboardEvent } from 'react';
+import { Suspense, use, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { settingsDialogResource as dialogResource } from './dialogResource';
 import { closeWorkbenchSettings, settingsDialogStore } from './settingsDialogStore';
-const isEditingTarget = (target: EventTarget | null): boolean =>
-  target instanceof HTMLElement &&
-  (target.isContentEditable || ['INPUT', 'SELECT', 'TEXTAREA'].includes(target.tagName));
-
-/** `/` from anywhere in the dialog jumps to its search, unless a field is being edited. */
-const focusSearchOnSlash = (event: KeyboardEvent<HTMLDivElement>) => {
-  if (event.key !== '/' || event.ctrlKey || event.metaKey || event.altKey || isEditingTarget(event.target)) {
-    return;
-  }
-
-  const search = event.currentTarget.querySelector<HTMLInputElement>('[data-settings-search]');
-
-  if (search) {
-    event.preventDefault();
-    search.focus();
-    search.select();
-  }
-};
-
+import { focusSettingsSearchOnSlash } from './settingsSearchShortcut';
 const LoadedDialog = () => {
   const { default: SettingsDialog } = use(dialogResource.load());
   return <SettingsDialog />;
@@ -79,7 +61,7 @@ export const SettingsDialogHost = () => {
           <Dialog.Content
             aria-label={t('settings.title')}
             h="min(48rem, calc(100dvh - 2rem))"
-            onKeyDown={focusSearchOnSlash}
+            onKeyDown={focusSettingsSearchOnSlash}
             maxW="64rem"
             w="calc(100dvw - 2rem)"
             overflow="hidden"

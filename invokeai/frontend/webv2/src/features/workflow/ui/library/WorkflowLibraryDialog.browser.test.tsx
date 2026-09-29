@@ -18,6 +18,7 @@ import type {
 } from '@features/workflow/ui/WorkflowUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { GalleryHostProvider, type GalleryHost } from '@features/gallery/picker';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import {
   openWorkflowLibraryAtProjectWorkflow,
@@ -35,6 +36,13 @@ import { userEvent } from 'vitest/browser';
 import '@features/workflow/ui/graph-preview/GraphPreviewDialog';
 
 import { WorkflowLibraryDialog } from './WorkflowLibraryDialog';
+
+/** In the app the workbench derives this from its Gallery adapter; the library's thumbnail slot reads it. */
+const GALLERY_HOST: GalleryHost = {
+  galleryValues: {},
+  notifications: { add: vi.fn(), reportError: vi.fn() },
+  projectName: '',
+};
 
 // Provide the fixture node's reactive template snapshot so preview compilation can run without backend schema
 // loading.
@@ -174,7 +182,6 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.activeWorkflow': 'Active',
   'workflowLibrary.addAnotherCopy': 'Add another copy',
   'workflowLibrary.addAnotherCopyHint': 'A second, independent copy in this project',
-  'workflowLibrary.addWorkflow': 'Add workflow',
   'workflowLibrary.chooseProjectCopy': 'Open which copy?',
   'workflowLibrary.allTag': 'All',
   'workflowLibrary.applying': 'Applying workflow…',
@@ -420,9 +427,11 @@ describe('WorkflowLibraryDialog', () => {
         <StrictMode>
           <ChakraProvider value={system}>
             <WorkflowUiProvider adapter={UI_ADAPTER}>
-              <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-                <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={onOpenChange} />
-              </WorkflowGraphPreviewProvider>
+              <GalleryHostProvider host={GALLERY_HOST}>
+                <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                  <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={onOpenChange} />
+                </WorkflowGraphPreviewProvider>
+              </GalleryHostProvider>
             </WorkflowUiProvider>
           </ChakraProvider>
         </StrictMode>
@@ -918,6 +927,17 @@ describe('WorkflowLibraryDialog', () => {
     expect(preview?.textContent).toContain('integer');
   });
 
+  it('commits the first preview in the click that opens it once the library has loaded the dialog', async () => {
+    await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
+    await act(() => card('wf-preview-fixture')?.click());
+    await vi.dynamicImportSettled();
+
+    // A Suspense reveal here lets StrictMode replay the open dialog's effects after its focus trap started.
+    act(() => (buttonWithText('Preview graph') as HTMLButtonElement).click());
+
+    expect(document.querySelector('[data-preview-dialog]')?.getAttribute('data-preview-open')).toBe('true');
+  });
+
   it('disables the Preview action for an entry whose enrichment is not ready', async () => {
     await openWith(LOADED_SNAPSHOT);
 
@@ -1067,9 +1087,11 @@ describe('WorkflowLibraryDialog — This project', () => {
         <StrictMode>
           <ChakraProvider value={system}>
             <WorkflowUiProvider adapter={UI_ADAPTER}>
-              <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-                <WorkflowLibraryDialog isOpen onOpenChange={onOpenChange} />
-              </WorkflowGraphPreviewProvider>
+              <GalleryHostProvider host={GALLERY_HOST}>
+                <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                  <WorkflowLibraryDialog isOpen onOpenChange={onOpenChange} />
+                </WorkflowGraphPreviewProvider>
+              </GalleryHostProvider>
             </WorkflowUiProvider>
           </ChakraProvider>
         </StrictMode>
@@ -1179,17 +1201,6 @@ describe('WorkflowLibraryDialog — This project', () => {
 
     expect(COMMANDS.createWorkflow).toHaveBeenCalledTimes(1);
     expect(onOpenChange).not.toHaveBeenCalled();
-  });
-
-  it('moves to the bundled templates when asked to add a workflow', async () => {
-    await renderDialog();
-
-    await clickText('Add workflow');
-
-    expect(workflowUiStore.getSnapshot().libraryTab).toBe('default');
-    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ category: 'default', tag: null });
-    expect(document.querySelector('[data-library-tab="default"]')).not.toBeNull();
-    expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalled();
   });
 
   it('opens a workflow from a double-click or the rail, then closes', async () => {

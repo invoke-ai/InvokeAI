@@ -738,6 +738,13 @@ const LTX2_COMPONENTS: MainModelConfig = {
 };
 const LTX2_ENCODER = { base: 'ltx-2', key: 'gemma4', name: 'LTX-2.5 Text Encoder', type: 'gemma4_encoder' as const };
 
+const LTX2_DURATION_HEAD = {
+  base: 'ltx-2',
+  key: 'duration',
+  name: 'LTX-2.5 Duration Head',
+  type: 'ltx2_duration_head' as const,
+};
+
 const LTX2_SOURCE_CLIP = {
   endFrame: 94,
   fps: 24,
@@ -1347,5 +1354,109 @@ describe('compileVideoGraph — LTX-2', () => {
     expect(() => compileVideoGraph(ltx2SettingsFor(model, { ltx2TextEncoderModel: null }), model)).toThrow(
       /Gemma-4 text encoder/
     );
+  });
+});
+
+describe('compileVideoGraph — LTX-2 auto duration', () => {
+  const autoSettings = (model: MainModelConfig, overrides: Partial<VideoSettings> = {}) =>
+    ltx2SettingsFor(model, { autoDuration: true, ltx2DurationHeadModel: LTX2_DURATION_HEAD, ...overrides });
+
+  it('lets the duration head set the frame count on both the denoise and the recorded metadata', () => {
+    const model = ltx2Model('ltx2_dev');
+    const { backendGraph } = compileVideoGraph(autoSettings(model), model);
+    const duration = nodeOfType(backendGraph, 'ltx2_duration');
+    const denoise = nodeOfType(backendGraph, 'ltx2_denoise');
+    const metadata = nodeOfType(backendGraph, 'core_metadata');
+
+    expect(duration.duration_head).toEqual(LTX2_DURATION_HEAD);
+    expect(hasEdge(backendGraph, duration.id, 'num_frames', denoise.id, 'num_frames')).toBe(true);
+    // Without this the clip's metadata records the stale panel value, and recall replays a length
+    // the run never used.
+    expect(hasEdge(backendGraph, duration.id, 'num_frames', metadata.id, 'num_frames')).toBe(true);
+  });
+
+  it('reads the prompt through the same conditioning the transformer will see', () => {
+    const model = ltx2Model('ltx2_dev');
+    const { backendGraph } = compileVideoGraph(autoSettings(model), model);
+    const duration = nodeOfType(backendGraph, 'ltx2_duration');
+    const encoder = nodeOfType(backendGraph, 'ltx2_text_encoder');
+
+    expect(hasEdge(backendGraph, encoder.id, 'conditioning', duration.id, 'conditioning')).toBe(true);
+  });
+
+  it('stays out of a continuation, whose length the source clip already fixes', () => {
+    const model = ltx2Model('ltx2_dev');
+    const settings = autoSettings(model, { sourceVideo: LTX2_SOURCE_CLIP });
+    const { backendGraph } = compileVideoGraph(settings, model);
+
+    // Two edges into one `num_frames` is a malformed graph, not a preference that loses.
+    expect(nodesOfType(backendGraph, 'ltx2_duration')).toHaveLength(0);
+  });
+
+  it('runs both passes of a two-stage preset at the length it chose', () => {
+    const model = ltx2Model('ltx2_dev');
+    const { backendGraph } = compileVideoGraph(autoSettings(model, { targetResolution: '1024p' }), model);
+    const duration = nodeOfType(backendGraph, 'ltx2_duration');
+    const denoises = nodesOfType(backendGraph, 'ltx2_denoise');
+
+    expect(denoises).toHaveLength(2);
+    // The refine pass validates the upsampled latents against its own num_frames, so a stale
+    // literal here fails the run *after* the base pass and the upsampler have both done their work.
+    for (const denoise of denoises) {
+      expect(
+        hasEdge(backendGraph, duration.id, 'num_frames', denoise.id, 'num_frames'),
+        `${denoise.id} does not take its frame count from the duration head`
+      ).toBe(true);
+    }
+  });
+
+  it('lets the head choose at most the Frames value, at the rate the clip will play', () => {
+    const model = ltx2Model('ltx2_dev');
+    const { backendGraph } = compileVideoGraph(autoSettings(model, { fps: 60, numFrames: 241 }), model);
+    const duration = nodeOfType(backendGraph, 'ltx2_duration');
+
+    // Frames is the ceiling the run's memory was sized for; the head reads seconds at the run's rate.
+    expect(duration.fps).toBe(60);
+    expect(duration.max_seconds).toBe(241 / 60);
+    expect(duration.min_seconds).toBe(1);
+  });
+
+  it('skips the head when the Frames ceiling leaves it no range to choose from', () => {
+    const model = ltx2Model('ltx2_dev');
+    // 17 frames at 24 fps is 0.7 s, under the head's 1 s floor: the clip runs at 17 frames.
+    const { backendGraph } = compileVideoGraph(autoSettings(model, { fps: 24, numFrames: 17 }), model);
+
+    expect(nodesOfType(backendGraph, 'ltx2_duration')).toHaveLength(0);
+    expect(nodeOfType(backendGraph, 'ltx2_denoise').num_frames).toBe(17);
+  });
+
+  it.each(['audio' as const, 'video' as const])(
+    'stays out of a %s-conditioned run, whose clip already drives the frame count',
+    (role) => {
+      const model = ltx2Model('ltx2_dev');
+      const settings = autoSettings(model, {
+        conditioningClip: { clip: { ...LTX2_SOURCE_CLIP, video_name: 'clip.mp4' }, fpsKnown: true, role },
+      });
+      const { backendGraph } = compileVideoGraph(settings, model);
+      const denoise = nodeOfType(backendGraph, 'ltx2_denoise');
+
+      // The conditioning node already edges into num_frames; a second edge is a malformed graph.
+      expect(nodesOfType(backendGraph, 'ltx2_duration')).toHaveLength(0);
+      expect(
+        backendGraph.edges.filter(
+          (edge) => edge.destination.node_id === denoise.id && edge.destination.field === 'num_frames'
+        )
+      ).toHaveLength(1);
+    }
+  );
+
+  it('does nothing without a duration head selected', () => {
+    const model = ltx2Model('ltx2_dev');
+    const settings = ltx2SettingsFor(model, { autoDuration: true, ltx2DurationHeadModel: null });
+    const { backendGraph } = compileVideoGraph(settings, model);
+    const denoise = nodeOfType(backendGraph, 'ltx2_denoise');
+
+    expect(nodesOfType(backendGraph, 'ltx2_duration')).toHaveLength(0);
+    expect(denoise.num_frames).toBe(settings.numFrames);
   });
 });
