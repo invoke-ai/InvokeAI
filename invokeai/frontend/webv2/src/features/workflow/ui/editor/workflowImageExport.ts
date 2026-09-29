@@ -7,10 +7,12 @@ const WORKFLOW_GRID_SIZE = 25;
 export const EXPORT_PADDING = 100;
 export const EXPORT_SCALE = 2;
 export const EXPORT_MAX_CANVAS_DIMENSION = 16_384;
+export const EXPORT_MAX_CANVAS_PIXELS = 16_777_216;
 export const WORKFLOW_EXPORT_TIMEOUT_MS = 30_000;
 const WORKFLOW_EXPORT_IMAGE_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
-// html-to-image has no abort signal; block another capture until a timed-out rasterization settles.
-let isWorkflowRasterizationPending = false;
+// html-to-image has no abort signal; bound captures that remain active after their caller times out.
+const MAX_ACTIVE_WORKFLOW_RASTERIZATIONS = 2;
+let activeWorkflowRasterizations = 0;
 export const EXPORT_STYLE_PROPERTIES = [
   'box-sizing',
   'display',
@@ -171,7 +173,7 @@ export const getWorkflowContentBounds = (
     maxY = Math.max(maxY, pathBounds.y + pathBounds.height);
   });
 
-  if (includeInputFieldLabels) {
+  {
     const flowRect = flowElement.getBoundingClientRect();
     const viewport = flowElement.querySelector<HTMLElement>('.react-flow__viewport');
     const viewportRect = viewport?.getBoundingClientRect() ?? flowRect;
@@ -182,21 +184,27 @@ export const getWorkflowContentBounds = (
       .map(Number);
     const zoom = matrix?.[0] && Number.isFinite(matrix[0]) && matrix[0] > 0 ? matrix[0] : 1;
 
-    flowElement.querySelectorAll<HTMLElement>('[data-node-input-field-title="true"]').forEach((label) => {
-      const labelRect = label.getBoundingClientRect();
-      const intrinsicWidth = Math.max(labelRect.width, label.scrollWidth);
-      const intrinsicHeight = Math.max(labelRect.height, label.scrollHeight);
-      const overflowWidth = Math.max(0, intrinsicWidth - labelRect.width) / zoom;
-      const direction = getComputedStyle(label).direction;
-      const labelX = (labelRect.left - viewportRect.left) / zoom - (direction === 'rtl' ? overflowWidth : 0);
-      const labelY = (labelRect.top - viewportRect.top) / zoom;
+    const contentElements = new Set<HTMLElement>([
+      ...(includeInputFieldLabels
+        ? flowElement.querySelectorAll<HTMLElement>('[data-node-input-field-title="true"]')
+        : []),
+      ...flowElement.querySelectorAll<HTMLElement>('[data-workflow-export-content="true"]'),
+    ]);
+    contentElements.forEach((element) => {
+      const elementRect = element.getBoundingClientRect();
+      const intrinsicWidth = Math.max(elementRect.width, element.scrollWidth * zoom);
+      const intrinsicHeight = Math.max(elementRect.height, element.scrollHeight * zoom);
+      const overflowWidth = Math.max(0, intrinsicWidth - elementRect.width) / zoom;
+      const direction = getComputedStyle(element).direction;
+      const elementX = (elementRect.left - viewportRect.left) / zoom - (direction === 'rtl' ? overflowWidth : 0);
+      const elementY = (elementRect.top - viewportRect.top) / zoom;
       const labelWidth = intrinsicWidth / zoom;
       const labelHeight = intrinsicHeight / zoom;
 
-      minX = Math.min(minX, labelX);
-      minY = Math.min(minY, labelY);
-      maxX = Math.max(maxX, labelX + labelWidth);
-      maxY = Math.max(maxY, labelY + labelHeight);
+      minX = Math.min(minX, elementX);
+      minY = Math.min(minY, elementY);
+      maxX = Math.max(maxX, elementX + labelWidth);
+      maxY = Math.max(maxY, elementY + labelHeight);
     });
   }
 
@@ -209,7 +217,12 @@ export const getWorkflowImageDimensions = (bounds: Rect): WorkflowImageDimension
   const width = Math.max(1, Math.ceil(paddedBounds.width));
   const height = Math.max(1, Math.ceil(paddedBounds.height));
 
-  const scale = Math.min(EXPORT_SCALE, EXPORT_MAX_CANVAS_DIMENSION / width, EXPORT_MAX_CANVAS_DIMENSION / height);
+  const scale = Math.min(
+    EXPORT_SCALE,
+    EXPORT_MAX_CANVAS_DIMENSION / width,
+    EXPORT_MAX_CANVAS_DIMENSION / height,
+    Math.sqrt(EXPORT_MAX_CANVAS_PIXELS / (width * height))
+  );
   const canvasWidth = Math.max(1, Math.floor(width * scale));
   const canvasHeight = Math.max(1, Math.floor(height * scale));
 
@@ -450,22 +463,18 @@ const prepareExportClone = (clone: HTMLElement, bounds: Rect, dimensions: Workfl
 };
 
 const toBlobWithTimeout = async (clone: HTMLElement, options: ReturnType<typeof getWorkflowExportOptions>) => {
-  if (isWorkflowRasterizationPending) {
+  if (activeWorkflowRasterizations >= MAX_ACTIVE_WORKFLOW_RASTERIZATIONS) {
     throw new Error('A previous workflow image export is still running');
   }
 
   let timeoutId: ReturnType<typeof setTimeout> | undefined;
   let timedOut = false;
-  isWorkflowRasterizationPending = true;
+  activeWorkflowRasterizations += 1;
+  const releaseRasterizationSlot = () => {
+    activeWorkflowRasterizations -= 1;
+  };
   const rasterize = import('html-to-image').then(({ toBlob }) => (timedOut ? null : toBlob(clone, options)));
-  void rasterize.then(
-    () => {
-      isWorkflowRasterizationPending = false;
-    },
-    () => {
-      isWorkflowRasterizationPending = false;
-    }
-  );
+  void rasterize.then(releaseRasterizationSlot, releaseRasterizationSlot);
 
   try {
     return await Promise.race([
@@ -499,7 +508,7 @@ export const exportWorkflowAsPng = async ({
   workflowName: string;
   fallbackWorkflowName: string;
 }): Promise<void> => {
-  if (isWorkflowRasterizationPending) {
+  if (activeWorkflowRasterizations >= MAX_ACTIVE_WORKFLOW_RASTERIZATIONS) {
     throw new Error('A previous workflow image export is still running');
   }
 

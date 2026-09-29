@@ -81,8 +81,8 @@ export const EditorToolbar = ({
   const isExportingWorkflowRef = useRef(false);
   const [isExportingWorkflow, setIsExportingWorkflow] = useState(false);
   const fitViewDuration = reduceMotion ? 0 : 300;
-  const fallbackWorkflowName = t('workflow.untitled');
-  const exportFailedLabel = t('workflow.exportImageFailed');
+  const fallbackWorkflowName = t('widgets.workflow.untitled');
+  const exportFailedLabel = t('widgets.workflow.exportImageFailed');
   const opacityIds = useMemo(() => ({ trigger: opacityTriggerId }), [opacityTriggerId]);
   const opacityValue = useMemo(() => [Math.round(nodeOpacity * 100)], [nodeOpacity]);
   const onZoomInClick = useCallback(() => void zoomIn(), [zoomIn]);
@@ -168,7 +168,7 @@ export const EditorToolbar = ({
         <ToolbarButton
           disabled={isExportingWorkflow}
           icon={CameraIcon}
-          label={t('workflow.exportAsPng')}
+          label={t('widgets.workflow.exportAsPng')}
           loading={isExportingWorkflow}
           onClick={onExportWorkflowClick}
         />

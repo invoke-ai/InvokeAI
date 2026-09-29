@@ -97,7 +97,7 @@ describe('workflow image export edge cases', () => {
     vi.useRealTimers();
   });
 
-  it('settles and cleans up when rasterization never settles', async () => {
+  it('allows one bounded retry when a previous rasterization never settles', async () => {
     vi.useFakeTimers();
     let finishRasterization: (blob: Blob | null) => void = () => undefined;
     vi.mocked(toBlob).mockReturnValue(
@@ -120,21 +120,16 @@ describe('workflow image export edge cases', () => {
       await rejection;
       expect(stagingWrapper.remove).toHaveBeenCalledOnce();
 
-      const retry = exportWorkflowAsPng(exportOptions);
-      const retryRejection = expect(retry).rejects.toThrow('still running');
-
-      await vi.advanceTimersByTimeAsync(0);
-      await retryRejection;
-      expect(toBlob).toHaveBeenCalledOnce();
-      expect(stagingWrapper.remove).toHaveBeenCalledOnce();
-      finishRasterization(null);
-      await vi.advanceTimersByTimeAsync(0);
-
-      vi.mocked(toBlob).mockResolvedValueOnce(new Blob(['png'], { type: 'image/png' }));
+      const retryBlob = new Blob(['png'], { type: 'image/png' });
+      vi.mocked(toBlob).mockResolvedValueOnce(retryBlob);
       await exportWorkflowAsPng(exportOptions);
       expect(toBlob).toHaveBeenCalledTimes(2);
       expect(stagingWrapper.remove).toHaveBeenCalledTimes(2);
+      finishRasterization(null);
+      await vi.advanceTimersByTimeAsync(0);
     } finally {
+      finishRasterization(null);
+      await vi.advanceTimersByTimeAsync(0);
       vi.useRealTimers();
     }
   });
@@ -153,6 +148,21 @@ describe('workflow image export edge cases', () => {
 
     expect(downloadBlob).toHaveBeenCalledWith(blob, 'Workflow- 01 - test-.png');
     expect(stagingWrapper.remove).toHaveBeenCalledOnce();
+  });
+
+  it('uses the translated untitled name when downloading an unnamed workflow', async () => {
+    const blob = new Blob(['png'], { type: 'image/png' });
+    vi.mocked(toBlob).mockResolvedValue(blob);
+    const { flowElement } = createExportDom();
+
+    await exportWorkflowAsPng({
+      flowElement: flowElement as unknown as HTMLElement,
+      bounds: { x: 0, y: 0, width: 100, height: 100 },
+      workflowName: '',
+      fallbackWorkflowName: 'Untitled Workflow',
+    });
+
+    expect(downloadBlob).toHaveBeenCalledWith(blob, 'Untitled Workflow.png');
   });
 
   it('configures failed image embedding to degrade instead of aborting export', () => {
@@ -189,6 +199,62 @@ describe('workflow image export edge cases', () => {
     expect(
       getWorkflowContentBounds(flowElement as unknown as HTMLElement, { x: 0, y: 0, width: 500, height: 100 })
     ).toMatchObject({ x: 0, y: 0, width: 690, height: 100 });
+  });
+
+  it('includes inline export descriptions in content bounds', () => {
+    const description = {
+      getBoundingClientRect: () => ({ left: 650, top: 250, width: 100, height: 50 }),
+      scrollWidth: 100,
+      scrollHeight: 50,
+    };
+    const viewport = { getBoundingClientRect: () => ({ left: 100, top: 200, width: 1000, height: 1000 }) };
+    const flowElement = {
+      getBoundingClientRect: () => ({ left: 100, top: 200 }),
+      querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
+      querySelectorAll: (selector: string) =>
+        selector === '[data-workflow-export-content="true"]' ? [description] : [],
+    };
+
+    expect(
+      getWorkflowContentBounds(
+        flowElement as unknown as HTMLElement,
+        { x: 0, y: 0, width: 500, height: 100 },
+        {
+          includeInputFieldLabels: false,
+        }
+      )
+    ).toMatchObject({ x: 0, y: 0, width: 650, height: 100 });
+  });
+
+  it('measures export content in logical coordinates when the workflow is zoomed out', () => {
+    const description = {
+      getBoundingClientRect: () => ({ left: 50, top: 50, width: 100, height: 25 }),
+      scrollWidth: 200,
+      scrollHeight: 50,
+    };
+    const viewport = { getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 1000 }) };
+    const flowElement = {
+      getBoundingClientRect: () => ({ left: 0, top: 0 }),
+      querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
+      querySelectorAll: (selector: string) =>
+        selector === '[data-workflow-export-content="true"]' ? [description] : [],
+    };
+
+    vi.stubGlobal('getComputedStyle', (element: unknown) => ({
+      direction: 'ltr',
+      transform: element === viewport ? 'matrix(0.5, 0, 0, 0.5, 0, 0)' : 'none',
+    }));
+    try {
+      expect(
+        getWorkflowContentBounds(
+          flowElement as unknown as HTMLElement,
+          { x: 0, y: 0, width: 100, height: 100 },
+          { includeInputFieldLabels: false }
+        )
+      ).toEqual({ x: 0, y: 0, width: 300, height: 150 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('measures overflowing labels after export styles are applied', async () => {

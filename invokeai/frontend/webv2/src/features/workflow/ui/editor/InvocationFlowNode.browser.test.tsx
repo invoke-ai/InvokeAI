@@ -17,8 +17,13 @@ import { page, userEvent } from 'vitest/browser';
 
 import { toFlowEdges, toFlowNodes } from './flowAdapters';
 import { InvocationFlowNode, WorkflowImageExportProvider } from './InvocationFlowNode';
+import { exportWorkflowAsPng } from './workflowImageExport';
 
 import '@xyflow/react/dist/style.css';
+
+const exportMocks = vi.hoisted(() => ({ toBlob: vi.fn() }));
+vi.mock('html-to-image', () => ({ toBlob: exportMocks.toBlob }));
+vi.mock('@platform/browser/downloadBlob', () => ({ downloadBlob: vi.fn() }));
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -267,6 +272,64 @@ describe('InvocationFlowNode output preview', () => {
       (button) => button.textContent === 'Latest output'
     )!;
   const nodeHeight = () => host.querySelector<HTMLElement>('.react-flow__node')!.getBoundingClientRect().height;
+
+  it('keeps node and field descriptions plus full output values in the exported graph clone', async () => {
+    const longOutput = 'x'.repeat(60);
+    const exportTemplate: InvocationTemplate = {
+      ...template,
+      description: 'Node export description',
+      inputs: { a: { ...template.inputs.a!, description: 'Template field description' } },
+      outputs: { value: { ...template.outputs.value!, description: 'Output export description' } },
+    };
+    const exportNode: WorkflowInvocationNode = {
+      ...documentNode,
+      data: {
+        ...documentNode.data,
+        inputs: {
+          a: { description: 'Field export description', descriptionOverride: true, label: 'A', name: 'a', value: 1 },
+        },
+        isOpen: false,
+        notes: 'Node export note',
+      },
+    };
+    const exportGraph = { ...projectGraph, nodes: [exportNode] };
+    const exportNodes = toFlowNodes(exportGraph, [], { preview: exportTemplate });
+    const execution = createExecutionPort();
+    const adapter = createAdapter(execution.port);
+    let capturedClone: HTMLElement | undefined;
+    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+      capturedClone = clone;
+      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
+    });
+
+    await render(adapter, 1, true, exportNodes);
+    await act(() =>
+      execution.set({
+        error: null,
+        latestOutput: { value: longOutput },
+        outputImageUrl: null,
+        progress: null,
+        progressMessage: null,
+        status: 'completed',
+      })
+    );
+    await page.screenshot({ path: '../../../../../artifacts/workflow-export-content.png' });
+
+    const flowElement = host.querySelector<HTMLElement>('.react-flow')!;
+    await exportWorkflowAsPng({
+      bounds: { x: 20, y: 20, width: 300, height: 260 },
+      fallbackWorkflowName: 'Untitled Workflow',
+      flowElement,
+      workflowName: 'Export content',
+    });
+
+    expect(capturedClone?.textContent).toContain('Node export description');
+    expect(capturedClone?.textContent).toContain('Node export note');
+    expect(capturedClone?.textContent).toContain('Field export description');
+    expect(capturedClone?.textContent).toContain('Output export description');
+    expect(capturedClone?.textContent).toContain(longOutput);
+    expect(capturedClone?.querySelectorAll('[data-workflow-export-content="true"]').length).toBeGreaterThanOrEqual(4);
+  });
 
   it('keeps one preview height across differently shaped outputs and folds it away per node', async () => {
     const execution = createExecutionPort();

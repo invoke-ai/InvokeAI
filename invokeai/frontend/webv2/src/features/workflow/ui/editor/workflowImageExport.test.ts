@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import {
   EXPORT_MAX_CANVAS_DIMENSION,
+  EXPORT_MAX_CANVAS_PIXELS,
   EXPORT_PADDING,
   EXPORT_SCALE,
   EXPORT_STYLE_PROPERTIES,
@@ -28,11 +29,13 @@ describe('workflow image export', () => {
     });
   });
 
-  it('preserves the aspect ratio when large exports reach the canvas limit', () => {
+  it('keeps large exports within the total canvas pixel budget', () => {
     const dimensions = getWorkflowImageDimensions({ x: 0, y: 0, width: 9000, height: 9000 });
 
-    expect(dimensions.canvasWidth).toBe(EXPORT_MAX_CANVAS_DIMENSION);
-    expect(dimensions.canvasHeight).toBe(EXPORT_MAX_CANVAS_DIMENSION);
+    expect(dimensions.canvasWidth).toBeLessThanOrEqual(EXPORT_MAX_CANVAS_DIMENSION);
+    expect(dimensions.canvasHeight).toBeLessThanOrEqual(EXPORT_MAX_CANVAS_DIMENSION);
+    expect(dimensions.canvasWidth * dimensions.canvasHeight).toBeLessThanOrEqual(EXPORT_MAX_CANVAS_PIXELS);
+    expect(dimensions.canvasWidth / dimensions.canvasHeight).toBeCloseTo(1);
   });
 
   it('keeps capture clone local to an offscreen staging wrapper', () => {

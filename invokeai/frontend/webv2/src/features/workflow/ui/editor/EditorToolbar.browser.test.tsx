@@ -1,8 +1,10 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
+import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
+import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
 
@@ -17,6 +19,7 @@ const toolbarMocks = vi.hoisted(() => ({
   success: vi.fn(),
   zoomIn: vi.fn(),
   zoomOut: vi.fn(),
+  workflowName: 'Test workflow',
 }));
 
 vi.mock('@features/workflow/ui/WorkflowUiContext', () => ({
@@ -27,9 +30,8 @@ vi.mock('@features/workflow/ui/WorkflowUiContext', () => ({
   }),
   useWorkflowPreferencesSelector: () => false,
   useWorkflowProjectSelector: (selector: (project: unknown) => unknown) =>
-    selector({ activeWorkflow: { document: { name: 'Test workflow' } } }),
+    selector({ activeWorkflow: { document: { name: toolbarMocks.workflowName } } }),
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@xyflow/react', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useReactFlow: () => toolbarMocks,
@@ -37,6 +39,14 @@ vi.mock('@xyflow/react', async (importOriginal) => ({
 vi.mock('./workflowImageExport', () => ({ exportWorkflowAsPng: toolbarMocks.exportWorkflowAsPng }));
 
 const { EditorToolbar } = await import('./EditorToolbar');
+
+const i18n = createInstance();
+await i18n.use(initReactI18next).init({
+  fallbackNS: 'translation',
+  interpolation: { escapeValue: false },
+  lng: 'en',
+  resources: { en: { translation: await fetch('/locales/en.json').then((response) => response.json()) } },
+});
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
@@ -50,7 +60,10 @@ const settle = (action: () => void): Promise<void> =>
     });
   });
 
-beforeEach(() => vi.clearAllMocks());
+beforeEach(() => {
+  vi.clearAllMocks();
+  toolbarMocks.workflowName = 'Test workflow';
+});
 
 const render = async (nodeOpacity: number) => {
   applyThemeToRoot('mono');
@@ -62,15 +75,17 @@ const render = async (nodeOpacity: number) => {
 
   await settle(() => {
     root?.render(
-      <ChakraProvider value={system}>
-        <EditorToolbar
-          nodeOpacity={nodeOpacity}
-          tool="pan"
-          onExportPendingChange={toolbarMocks.onExportPendingChange}
-          onNodeOpacityChange={vi.fn()}
-          onToolChange={vi.fn()}
-        />
-      </ChakraProvider>
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <EditorToolbar
+            nodeOpacity={nodeOpacity}
+            tool="pan"
+            onExportPendingChange={toolbarMocks.onExportPendingChange}
+            onNodeOpacityChange={vi.fn()}
+            onToolChange={vi.fn()}
+          />
+        </ChakraProvider>
+      </I18nextProvider>
     );
   });
 };
@@ -110,26 +125,28 @@ describe('editor toolbar', () => {
 
   it('offers to update outdated nodes only while there are some, without breaking the toolbar grid', async () => {
     await render(1);
-    expect(host!.querySelector('button[aria-label="nodes.updateAllNodes"]')).toBeNull();
+    expect(host!.querySelector('button[aria-label^="Update "]')).toBeNull();
 
     const onUpdateNodes = vi.fn();
 
     await settle(() => {
       root?.render(
-        <ChakraProvider value={system}>
-          <EditorToolbar
-            nodeOpacity={1}
-            tool="pan"
-            updatableNodeCount={2}
-            onNodeOpacityChange={vi.fn()}
-            onToolChange={vi.fn()}
-            onUpdateNodes={onUpdateNodes}
-          />
-        </ChakraProvider>
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <EditorToolbar
+              nodeOpacity={1}
+              tool="pan"
+              updatableNodeCount={2}
+              onNodeOpacityChange={vi.fn()}
+              onToolChange={vi.fn()}
+              onUpdateNodes={onUpdateNodes}
+            />
+          </ChakraProvider>
+        </I18nextProvider>
       );
     });
 
-    const update = host!.querySelector<HTMLButtonElement>('button[aria-label="nodes.updateAllNodes"]')!;
+    const update = host!.querySelector<HTMLButtonElement>('button[aria-label="Update 2 outdated nodes"]')!;
 
     expect(update).not.toBeNull();
     expect(new Set(buttonBoxes())).toEqual(new Set(['28x28']));
@@ -156,7 +173,7 @@ describe('editor toolbar', () => {
     toolbarMocks.exportWorkflowAsPng.mockResolvedValue(undefined);
     await render(1);
 
-    const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="workflow.exportAsPng"]')!;
+    const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="Download workflow as PNG"]')!;
 
     expect(camera).not.toBeNull();
     await settle(() => camera.click());
@@ -164,7 +181,7 @@ describe('editor toolbar', () => {
 
     expect(toolbarMocks.exportWorkflowAsPng).toHaveBeenCalledWith({
       bounds: { x: 12, y: 34, width: 56, height: 78 },
-      fallbackWorkflowName: 'workflow.untitled',
+      fallbackWorkflowName: 'Untitled Workflow',
       flowElement: host,
       workflowName: 'Test workflow',
     });
@@ -175,7 +192,7 @@ describe('editor toolbar', () => {
   it('shows the translated label as a camera tooltip', async () => {
     await render(1);
 
-    const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="workflow.exportAsPng"]')!;
+    const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="Download workflow as PNG"]')!;
     await act(async () => {
       await userEvent.hover(camera);
       await new Promise<void>((resolve) => {
@@ -184,7 +201,7 @@ describe('editor toolbar', () => {
     });
 
     const tooltip = [...document.querySelectorAll('[role="tooltip"]')].find(
-      (element) => element.textContent === 'workflow.exportAsPng'
+      (element) => element.textContent === 'Download workflow as PNG'
     );
 
     expect(tooltip).not.toBeUndefined();
@@ -194,12 +211,27 @@ describe('editor toolbar', () => {
     toolbarMocks.exportWorkflowAsPng.mockRejectedValueOnce(new Error('rasterization failed'));
     await render(1);
 
-    const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="workflow.exportAsPng"]')!;
+    const camera = host!.querySelector<HTMLButtonElement>('button[aria-label="Download workflow as PNG"]')!;
     await settle(() => camera.click());
-    await vi.waitFor(() => expect(toolbarMocks.error).toHaveBeenCalledWith('workflow.exportImageFailed'));
+    await vi.waitFor(() => expect(toolbarMocks.error).toHaveBeenCalledWith('Could not export workflow image.'));
 
-    expect(toolbarMocks.error).toHaveBeenCalledWith('workflow.exportImageFailed');
+    expect(toolbarMocks.error).toHaveBeenCalledWith('Could not export workflow image.');
     expect(toolbarMocks.onExportPendingChange.mock.calls).toEqual([[true], [false]]);
     expect(camera.disabled).toBe(false);
+  });
+
+  it('uses the translated untitled workflow name for an unnamed export', async () => {
+    toolbarMocks.workflowName = '';
+    toolbarMocks.exportWorkflowAsPng.mockResolvedValue(undefined);
+    await render(1);
+
+    await settle(() =>
+      host!.querySelector<HTMLButtonElement>('button[aria-label="Download workflow as PNG"]')!.click()
+    );
+    await vi.waitFor(() => expect(toolbarMocks.exportWorkflowAsPng).toHaveBeenCalledOnce());
+
+    expect(toolbarMocks.exportWorkflowAsPng).toHaveBeenCalledWith(
+      expect.objectContaining({ fallbackWorkflowName: 'Untitled Workflow', workflowName: '' })
+    );
   });
 });
