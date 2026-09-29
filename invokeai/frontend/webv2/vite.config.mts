@@ -83,23 +83,8 @@ const ROUTE_SHARED_MODULES = [
 
 // Group dependencies shared by the editor shell and lazy widgets to reduce boot requests.
 const EDITOR_BOOT_SHARED_MODULES = [
-  '/app/GalleryUiAdapter.tsx',
-  '/features/gallery/picker.ts',
-  '/features/gallery/ui/GalleryBoardCover.tsx',
-  '/features/gallery/ui/GalleryBoardRowShell.tsx',
   '/features/gallery/ui/GalleryItemSearch.tsx',
-  '/features/gallery/ui/GallerySearchField.tsx',
-  '/features/gallery/ui/GalleryTileFrame.tsx',
-  '/features/gallery/ui/GalleryUploadButton.tsx',
-  '/features/gallery/ui/GalleryViewTabs.tsx',
-  '/features/gallery/ui/GalleryWidgetContext.tsx',
-  '/features/gallery/ui/galleryBoardGroups.ts',
-  '/features/gallery/ui/galleryBoardLabels.ts',
-  '/features/gallery/ui/galleryGridLayout.ts',
-  '/features/gallery/ui/picker/GalleryPickerPopover.tsx',
-  '/features/gallery/ui/useGalleryData.ts',
-  '/features/gallery/ui/useGalleryUploadAction.ts',
-  '/features/gallery/ui/useGalleryUploadInput.ts',
+  '/app/GalleryUiAdapter.tsx',
   '/features/generation/core/prompt/ast.ts',
   '/features/generation/core/prompt/attention.ts',
   '/features/generation/data/architectureCapabilitiesApi.ts',
@@ -157,6 +142,37 @@ const WIDGET_METADATA_MODULES = [
   '/workbench/widgets/manifests.ts',
   '/workbench/widgets/preview/settingsContribution.ts',
   '/workbench/widgets/preview/previewSettings.ts',
+] as const;
+
+// The gallery picker and the pieces its view shares with the Gallery widget. The Launchpad's model manager uses the
+// picker, so it cannot sit in editor-boot-shared (which imports the editor itself: loading that early mis-orders the
+// editor's modules) nor in gallery-state (which the Launchpad home loads, so it would pay for the picker there).
+// Its query and drag modules join it, so the editor trades their separate chunks for this one; backend.ts stays out because
+// the Launchpad home reads it for recent outputs.
+const GALLERY_PICKER_MODULES = [
+  '/features/gallery/ui/galleryDnd.ts',
+  '/features/gallery/utility.ts',
+  '/features/gallery/ui/GalleryDragCursor.tsx',
+  '/features/gallery/core/boardLabels.ts',
+  '/features/gallery/data/queries.ts',
+  '/features/gallery/data/queryCache.ts',
+  '/features/gallery/ui/GallerySearchHelp.tsx',
+  '/platform/state/compareAndSwapRollback.ts',
+  '/features/gallery/picker.ts',
+  '/features/gallery/ui/GalleryBoardCover.tsx',
+  '/features/gallery/ui/GalleryBoardRowShell.tsx',
+  '/features/gallery/ui/GallerySearchField.tsx',
+  '/features/gallery/ui/GalleryTileFrame.tsx',
+  '/features/gallery/ui/GalleryUploadButton.tsx',
+  '/features/gallery/ui/GalleryViewTabs.tsx',
+  '/features/gallery/ui/GalleryWidgetContext.tsx',
+  '/features/gallery/ui/galleryBoardGroups.ts',
+  '/features/gallery/ui/galleryBoardLabels.ts',
+  '/features/gallery/ui/galleryGridLayout.ts',
+  '/features/gallery/ui/picker/GalleryPickerPopover.tsx',
+  '/features/gallery/ui/useGalleryData.ts',
+  '/features/gallery/ui/useGalleryUploadAction.ts',
+  '/features/gallery/ui/useGalleryUploadInput.ts',
 ] as const;
 
 // Gallery's shared state projection and UI port travel together.
@@ -306,6 +322,12 @@ export default defineConfig({
               name: 'canvas-layer-shared',
               priority: 30,
               test: (id) => matchesAnySuffix(id, CANVAS_LAYER_SHARED_MODULES),
+            },
+            {
+              includeDependenciesRecursively: false,
+              name: 'gallery-picker',
+              priority: 30,
+              test: (id) => matchesAnySuffix(id, GALLERY_PICKER_MODULES),
             },
             {
               includeDependenciesRecursively: false,

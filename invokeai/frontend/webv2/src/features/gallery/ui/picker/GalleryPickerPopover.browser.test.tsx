@@ -2,10 +2,12 @@
 import type { GalleryItem } from '@features/gallery/core/items';
 import type { GalleryBoard } from '@features/gallery/core/types';
 import type { GalleryUiAdapter } from '@features/gallery/react';
+import type { GalleryHost } from '@features/gallery/ui/GalleryUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { getGalleryUploadAccept, legacyGeneratedImageToGalleryItem } from '@features/gallery/core/items';
 import { GalleryUiProvider } from '@features/gallery/react';
+import { GalleryHostProvider } from '@features/gallery/ui/GalleryUiContext';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, useCallback, useState } from 'react';
@@ -159,18 +161,24 @@ const settle = async () => {
   }
 };
 
-const renderPicker = async (picker?: React.ReactElement) => {
+/** A host without a workbench (the Launchpad): no Gallery widget scope to seed from or reveal. */
+const launchpadHost: GalleryHost = { galleryValues: {}, notifications, projectName: '' };
+
+const renderPicker = async (picker?: React.ReactElement, { withoutWorkbench = false } = {}) => {
+  const content = picker ?? (
+    <GalleryPickerPopover accept={['image']} label="Choose image" onPick={onPick}>
+      <button type="button">Choose image</button>
+    </GalleryPickerPopover>
+  );
   await act(() =>
     root?.render(
       <ChakraProvider value={system}>
         <QueryClientProvider client={queryClient!}>
-          <GalleryUiProvider adapter={adapter}>
-            {picker ?? (
-              <GalleryPickerPopover accept={['image']} label="Choose image" onPick={onPick}>
-                <button type="button">Choose image</button>
-              </GalleryPickerPopover>
-            )}
-          </GalleryUiProvider>
+          {withoutWorkbench ? (
+            <GalleryHostProvider host={launchpadHost}>{content}</GalleryHostProvider>
+          ) : (
+            <GalleryUiProvider adapter={adapter}>{content}</GalleryUiProvider>
+          )}
         </QueryClientProvider>
       </ChakraProvider>
     )
@@ -185,8 +193,8 @@ const renderPicker = async (picker?: React.ReactElement) => {
   return trigger;
 };
 
-const openPicker = async (picker?: React.ReactElement) => {
-  const trigger = await renderPicker(picker);
+const openPicker = async (picker?: React.ReactElement, options?: { withoutWorkbench?: boolean }) => {
+  const trigger = await renderPicker(picker, options);
 
   await act(() => trigger.click());
   await settle();
@@ -555,5 +563,22 @@ describe('GalleryPickerPopover', () => {
     expect(galleryCommands.selectBoard).not.toHaveBeenCalled();
     expect(openGallery).toHaveBeenCalledOnce();
     expect(document.querySelector(OPEN_DIALOG)).not.toBeNull();
+  });
+
+  it('picks without a workbench and offers no hand-off to a Gallery widget there', async () => {
+    const { dialog } = await openPicker(undefined, { withoutWorkbench: true });
+    const [first] = getOptions(dialog);
+
+    expect(first).toBeDefined();
+    expect(
+      [...dialog.querySelectorAll('button')].some((button) =>
+        button.textContent?.includes('widgets.gallery.picker.openGallery')
+      )
+    ).toBe(false);
+
+    await act(() => first!.click());
+
+    expect(onPick).toHaveBeenCalledOnce();
+    expect(document.querySelector(OPEN_DIALOG)).toBeNull();
   });
 });

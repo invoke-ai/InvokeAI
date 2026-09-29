@@ -3,7 +3,7 @@ import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoard, GalleryBoardDeletionResult, GalleryImage, GalleryView } from '@features/gallery/core/types';
 import type { QueueProgressSession } from '@features/queue/contracts';
 
-import { createContext, use, type ComponentType, type ReactNode } from 'react';
+import { createContext, use, useMemo, type ComponentType, type ReactNode } from 'react';
 
 export interface GalleryItemActions {
   deleteItems(items: GalleryItemRef[]): Promise<void>;
@@ -154,4 +154,53 @@ export const useGalleryUi = (): GalleryUiAdapter => {
   }
 
   return adapter;
+};
+
+/** For hooks shared with hosts that have no workbench; they use it only for Gallery widget side effects. */
+export const useOptionalGalleryUi = (): GalleryUiAdapter | null => use(GalleryUiContext);
+
+/**
+ * What gallery surfaces outside the Gallery widget (the picker, media slots) need from their host. The workbench
+ * derives it from its UI adapter; a host without a workbench (the Launchpad) supplies one with GalleryHostProvider.
+ */
+export interface GalleryHost {
+  galleryValues: Record<string, unknown>;
+  notifications: GalleryNotificationsPort;
+  projectName: string;
+  /** Shows the Gallery widget at a view, switching board when one is given; absent where there is no widget. */
+  revealInGallery?: (location: { boardId: string | null; view: GalleryView }) => boolean;
+}
+
+const GalleryHostContext = createContext<GalleryHost | null>(null);
+
+export const GalleryHostProvider = ({ children, host }: { children: ReactNode; host: GalleryHost }) => (
+  <GalleryHostContext value={host}>{children}</GalleryHostContext>
+);
+
+export const useGalleryHost = (): GalleryHost => {
+  const host = use(GalleryHostContext);
+  const adapter = use(GalleryUiContext);
+  const derived = useMemo<GalleryHost | null>(
+    () =>
+      adapter && {
+        galleryValues: adapter.galleryValues,
+        notifications: adapter.notifications,
+        projectName: adapter.projectName,
+        revealInGallery: ({ boardId, view }) => {
+          if (boardId !== null) {
+            adapter.gallery.selectBoard(boardId);
+          }
+          adapter.gallery.setView(view);
+          return adapter.widgets.openGallery();
+        },
+      },
+    [adapter]
+  );
+  const resolved = host ?? derived;
+
+  if (!resolved) {
+    throw new Error('Gallery surfaces require a GalleryHostProvider or an App-composed GalleryUiProvider.');
+  }
+
+  return resolved;
 };

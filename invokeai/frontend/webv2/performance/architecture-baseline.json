@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 893510,
+        "brotliBytes": 893586,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 892809,
+        "gzipBytes": 892942,
         "imageRawBytes": 156376,
-        "initialRawBytes": 2118301,
+        "initialRawBytes": 2118609,
         "largestAssetRawBytes": 749035,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 93111,
+        "ownedRawBytes": 93082,
         "requestCount": 36,
         "scriptRequestCount": 20,
         "sourceOwners": [
@@ -334,17 +334,17 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1242105,
+        "brotliBytes": 1243382,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1236729,
+        "gzipBytes": 1237668,
         "imageRawBytes": 156376,
-        "initialRawBytes": 3202228,
+        "initialRawBytes": 3203516,
         "largestAssetRawBytes": 749035,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 144143,
-        "requestCount": 77,
-        "scriptRequestCount": 61,
+        "ownedRawBytes": 144128,
+        "requestCount": 74,
+        "scriptRequestCount": 58,
         "sourceOwners": [
           "package:@ark-ui/react",
           "package:@chakra-ui/react",
@@ -511,6 +511,7 @@
           "source:src/features/gallery/ui/GalleryDragCursor.tsx",
           "source:src/features/gallery/ui/GalleryItemSearch.tsx",
           "source:src/features/gallery/ui/GallerySearchField.tsx",
+          "source:src/features/gallery/ui/GallerySearchHelp.tsx",
           "source:src/features/gallery/ui/GalleryTileFrame.tsx",
           "source:src/features/gallery/ui/GalleryUiContext.tsx",
           "source:src/features/gallery/ui/GalleryUploadButton.tsx",

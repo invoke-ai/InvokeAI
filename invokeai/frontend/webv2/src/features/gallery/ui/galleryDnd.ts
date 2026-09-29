@@ -3,6 +3,7 @@ import type { GalleryBoardKind } from '@features/gallery/core/types';
 
 import { useDndContext, useDroppable, type UseDroppableArguments } from '@dnd-kit/core';
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { createContext } from 'react';
 
 export interface GalleryItemDragData {
   kind: 'gallery-item';
@@ -40,6 +41,12 @@ export const getGalleryItemDragId = (
   source: GalleryItemDragSource,
   scope?: string
 ): GalleryItemDragId => `${source}${scope ? `#${scope}` : ''}:${toGalleryItemKey(item)}`;
+
+/**
+ * True inside the drag context that gallery items are dragged in (the workbench shell). dnd-kit cannot say whether a
+ * DndContext is mounted, and surfaces outside it (widget dialog hosts, the Launchpad) still render gallery drop targets.
+ */
+export const GalleryDragScope = createContext(false);
 
 export const getGalleryBoardDropId = (boardId: string): string => `gallery-board:${boardId}`;
 
