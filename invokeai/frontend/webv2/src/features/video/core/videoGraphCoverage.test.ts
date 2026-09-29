@@ -33,6 +33,7 @@ import {
   getDefaultVideoSettings,
   getVideoComponentSectionPolicy,
   getVideoValidationReasons,
+  isAutoDurationActive,
   isTwoStageSupportedForMode,
   isVideoModelSelectable,
   SUPPORTED_VIDEO_BASES,
@@ -157,6 +158,8 @@ interface Case {
   format: 'diffusers' | 'checkpoint';
   /** A preset to override the variant's default with; absent runs the default. */
   targetResolution?: VideoTargetResolution;
+  /** Fill the optional LTX-2 duration head slot and let it choose the length. */
+  autoDuration?: true;
   label: string;
 }
 
@@ -213,6 +216,37 @@ const cases: Case[] = SUPPORTED_VIDEO_BASES.flatMap((base) =>
   })
 );
 
+/**
+ * Auto duration is an optional slot plus a flag, so the matrix above -- which fills only *required*
+ * slots -- never reaches the `ltx2_duration` node. Added here rather than as another dimension of
+ * that matrix because it only affects one base. Every preset is kept, including the two-stage ones:
+ * those build a second denoise with a `num_frames` of its own, so restricting this to the default
+ * preset is exactly how a graph that dies after the base pass stays invisible.
+ */
+const DURATION_HEAD = {
+  base: 'ltx-2',
+  key: 'ltx2-duration-head',
+  name: 'LTX-2 duration head',
+  type: 'ltx2_duration_head',
+} as ModelConfig;
+
+const AUTO_DURATION_CASES: Case[] = cases
+  .filter((testCase) => testCase.base === 'ltx-2')
+  .filter((testCase) =>
+    // Asked of the policy, not of a list of modes kept here, so the two cannot drift.
+    isAutoDurationActive({
+      autoDuration: true,
+      conditioningClip: null,
+      firstFrameImage: null,
+      lastFrameImage: null,
+      ltx2DurationHeadModel: DURATION_HEAD,
+      references: [],
+      sourceVideo: null,
+      ...MODE_INPUTS[testCase.mode],
+    } as unknown as VideoSettings)
+  )
+  .map((testCase) => ({ ...testCase, autoDuration: true, label: `${testCase.label} / auto duration` }));
+
 const compileForCase = (testCase: Case): { filled: VideoComponentValueKey[]; graph: BackendGraphContract } => {
   const model = createModel(testCase);
   const { filled, settings } = satisfyRequiredComponents(model, {
@@ -222,6 +256,7 @@ const compileForCase = (testCase: Case): { filled: VideoComponentValueKey[]; gra
     seed: 1,
     seedMode: 'fixed',
     ...(testCase.targetResolution ? { targetResolution: testCase.targetResolution } : {}),
+    ...(testCase.autoDuration ? { autoDuration: true, ltx2DurationHeadModel: DURATION_HEAD as never } : {}),
   });
 
   // Compiling an invalid selection throws only the first reason; asserting here reports every
@@ -281,7 +316,7 @@ describe('video graph coverage', () => {
     const fieldsFor = (nodeType: string) =>
       (fields[nodeType] ??= { inputs: new Set(), literals: new Map(), outputs: new Set() });
 
-    for (const testCase of cases) {
+    for (const testCase of [...cases, ...AUTO_DURATION_CASES]) {
       const { graph } = compileForCase(testCase);
       const entry = (byBase[testCase.base] ??= { modes: [], nodeTypes: [] });
 

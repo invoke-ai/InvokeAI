@@ -61,6 +61,8 @@ export const areVideoValuesEqual = (left: VideoWidgetValues, right: VideoWidgetV
     stableStringify(left.h3TransformerModel) === stableStringify(right.h3TransformerModel) &&
     stableStringify(left.h3TextEncoderModel) === stableStringify(right.h3TextEncoderModel) &&
     stableStringify(left.ltx2TextEncoderModel) === stableStringify(right.ltx2TextEncoderModel) &&
+    stableStringify(left.ltx2DurationHeadModel) === stableStringify(right.ltx2DurationHeadModel) &&
+    left.autoDuration === right.autoDuration &&
     stableStringify(left.h3HybridBaseModel) === stableStringify(right.h3HybridBaseModel) &&
     left.h3HybridStartBlock === right.h3HybridStartBlock
   );

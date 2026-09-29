@@ -13,6 +13,7 @@ from invokeai.app.invocations.loops import (
     ForReturnInvocation,
     LoopState,
 )
+from invokeai.app.services.shared import graph_if_runtime
 from invokeai.app.services.shared.graph_models import Edge, EdgeConnection
 from invokeai.app.services.shared.graph_validation import (
     COLLECTION_FIELD,
@@ -59,14 +60,24 @@ class _ExecutionNodeBuilder:
         self,
         iteration_index: int,
         iteration_node_map: list[tuple[str, str]],
+        input_edges: Optional[list[Edge]] = None,
     ) -> Optional[tuple[int, ...]]:
         parent_paths: list[tuple[int, ...]] = []
         parent_iteration_axes: list[tuple[str, ...]] = []
         registry = self._state._prepared_registry()
+        input_edges_by_source: dict[str, list[Edge]] = {}
+        for edge in input_edges or []:
+            input_edges_by_source.setdefault(edge.source.node_id, []).append(edge)
         for source_node_id, prepared_id in iteration_node_map:
             parent_path = registry.get_iteration_path(prepared_id)
             if parent_path is None:
                 return None
+            source_edges = input_edges_by_source.get(source_node_id)
+            if source_edges:
+                parent_path = max(
+                    (self._get_prepared_edge_iteration_path(edge, prepared_id) for edge in source_edges),
+                    key=lambda path: (len(path), path),
+                )
             if parent_path:
                 parent_paths.append(parent_path)
                 parent_iteration_axes.append(self._get_iteration_axes(source_node_id))
@@ -202,7 +213,9 @@ class _ExecutionNodeBuilder:
         new_node = self._create_execution_node_copy(node, source_for_id, -1, deep_copy=False)
         assert isinstance(new_node, ForInvocation)
         new_edges = self._build_execution_edges(source_for_id, iteration_node_map)
-        iteration_path = self._get_known_iteration_path(-1, iteration_node_map)
+        iteration_path = self._get_known_iteration_path(
+            -1, iteration_node_map, self._state.graph._get_input_edges(source_for_id)
+        )
         if iteration_path is not None:
             self._state._prepared_registry().set_iteration_path(new_node.id, iteration_path)
         self._attach_execution_edges(new_node.id, new_edges)
@@ -1377,11 +1390,16 @@ class _ExecutionNodeBuilder:
             return []
 
         new_edges = self._build_execution_edges_for_fields(node_id, iteration_node_map, input_fields)
+        input_edges = self._state.graph._get_input_edges(node_id)
+        if input_fields is not None:
+            input_edges = [edge for edge in input_edges if edge.destination.field in input_fields]
         new_nodes: list[str] = []
         for iteration_index in iteration_indexes:
             new_node_iteration_path = iteration_path
             if new_node_iteration_path is None:
-                new_node_iteration_path = self._get_known_iteration_path(iteration_index, iteration_node_map)
+                new_node_iteration_path = self._get_known_iteration_path(
+                    iteration_index, iteration_node_map, input_edges
+                )
             elif isinstance(node, (ForInvocation, IterateInvocation)):
                 new_node_iteration_path += (iteration_index,)
             if enforce_admission and not self._state._is_source_activation_admitted(
@@ -1402,9 +1420,23 @@ class _ExecutionNodeBuilder:
         if not any(isinstance(node, IfInvocation) for node in self._state.graph.nodes.values()):
             return True
         if isinstance(self._state.graph.get_node(node_id), IfInvocation):
+            condition_edges = self._state.graph._get_input_edges(node_id, "condition")
+            if not condition_edges:
+                return any(
+                    self._state._is_source_activation_admitted(node_id, iteration_path)
+                    for iteration_path in graph_if_runtime._get_if_iteration_paths(
+                        self._state,
+                        node_id,
+                        set(),
+                        self._get_prepared_nodes_for_source,
+                        self._get_prepared_edge_iteration_path,
+                    )
+                )
             mappings = self._get_if_condition_iteration_mappings(node_id, graph)
+            input_edges = condition_edges
         else:
             mappings = self._get_parent_iteration_mappings(node_id, graph)
+            input_edges = self._state.graph._get_input_edges(node_id)
         mappings = list(mappings)
         if isinstance(self._state.graph.get_node(node_id), IfInvocation) and self.get_node_iterators(
             node_id, self.iterator_graph(graph)
@@ -1422,7 +1454,7 @@ class _ExecutionNodeBuilder:
             return self._state._is_source_activation_admitted(node_id)
         return any(
             self._state._is_source_activation_admitted(
-                node_id, self._get_known_iteration_path(-1, iteration_mapping) or ()
+                node_id, self._get_known_iteration_path(-1, iteration_mapping, input_edges) or ()
             )
             for iteration_mapping in mappings
         )
@@ -1733,6 +1765,55 @@ class _ExecutionNodeBuilder:
             for iteration_path, iteration_mappings in iteration_mapping_groups:
                 create_results = self.create_execution_node(next_node_id, iteration_mappings, iteration_path)
                 new_node_ids.extend(create_results)
+        elif isinstance(next_node, IfInvocation):
+            condition_paths = graph_if_runtime._get_if_iteration_paths(
+                self._state,
+                next_node_id,
+                set(),
+                self._get_prepared_nodes_for_source,
+                self._get_prepared_edge_iteration_path,
+            )
+            condition_edges = self._state.graph._get_input_edges(next_node_id, "condition")
+            if condition_edges:
+                iteration_mappings = list(self._get_if_condition_iteration_mappings(next_node_id, g))
+                if condition_paths:
+                    for iteration_path in condition_paths:
+                        matching_mappings = [
+                            iteration_mapping
+                            for iteration_mapping in iteration_mappings
+                            if (
+                                (
+                                    condition_path := self._get_known_iteration_path(
+                                        -1, iteration_mapping, condition_edges
+                                    )
+                                    or ()
+                                )[: len(iteration_path)]
+                                == iteration_path
+                                or iteration_path[: len(condition_path or ())] == (condition_path or ())
+                            )
+                        ]
+                        for iteration_mapping in matching_mappings:
+                            create_results = self.create_execution_node(
+                                next_node_id,
+                                iteration_mapping,
+                                iteration_path,
+                                input_fields={"condition"},
+                            )
+                            new_node_ids.extend(create_results)
+                else:
+                    for iteration_mapping in iteration_mappings:
+                        iteration_path = self._get_known_iteration_path(-1, iteration_mapping, condition_edges)
+                        create_results = self.create_execution_node(
+                            next_node_id,
+                            iteration_mapping,
+                            iteration_path,
+                            input_fields={"condition"},
+                        )
+                        new_node_ids.extend(create_results)
+            else:
+                for iteration_path in condition_paths:
+                    create_results = self.create_execution_node(next_node_id, [], iteration_path)
+                    new_node_ids.extend(create_results)
         else:
             parent_iterator_nodes = self.get_node_iterators(next_node_id)
             iteration_mappings_iter = (

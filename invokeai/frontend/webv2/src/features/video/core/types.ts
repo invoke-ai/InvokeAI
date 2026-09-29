@@ -167,6 +167,19 @@ export interface VideoSettings {
    */
   ltx2TextEncoderModel: ModelIdentifierConfig | null;
   /**
+   * LTX-2's duration head. Optional: without it the run uses the frame count the panel holds.
+   */
+  ltx2DurationHeadModel: ModelIdentifierConfig | null;
+  /**
+   * Let the duration head choose the clip's length instead of the Frames control.
+   *
+   * Healed against the head only: a stored `true` whose model is gone becomes `false`. It is
+   * deliberately NOT healed against the mode, which is transient -- dropping in a source clip and
+   * taking it out again would otherwise silently lose the setting. `isAutoDurationActive` is what
+   * decides whether it applies to a given run.
+   */
+  autoDuration: boolean;
+  /**
    * Hybrid loads FL2VA base weights and overlays selected Ref2VA AdaLN from h3HybridStartBlock onward while
    * retaining reference conditioning.
    */

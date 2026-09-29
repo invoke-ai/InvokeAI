@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  ltx2AutoDurationBounds,
   getVideoAspectRatioParts,
   ltx2ExtendJoinFitsInMemory,
   getVideoDurationSeconds,
@@ -325,5 +326,33 @@ describe('ltx2ExtendJoinFitsInMemory', () => {
     expect(ltx2ExtendJoinFitsInMemory(1920, 1080, 17)).toBe(true);
     expect(ltx2ExtendJoinFitsInMemory(2560, 1440, 17)).toBe(true);
     expect(ltx2ExtendJoinFitsInMemory(3840, 2160, 17)).toBe(false);
+  });
+});
+
+describe('ltx2AutoDurationBounds', () => {
+  it('caps the choice at the Frames value, converted at the rate the clip will play', () => {
+    // The Frames value is the ceiling the run's memory was sized for.
+    expect(ltx2AutoDurationBounds(24, 9, 121)).toEqual({ maxSeconds: 121 / 24, minSeconds: 1 });
+    expect(ltx2AutoDurationBounds(60, 9, 241)).toEqual({ maxSeconds: 241 / 60, minSeconds: 1 });
+  });
+
+  it('keeps both ends inside the range the head was trained on', () => {
+    // 481 frames at 24 fps is just past 20 s, where the head would extrapolate.
+    expect(ltx2AutoDurationBounds(24, 9, 481)?.maxSeconds).toBe(20);
+    // 9 frames at 24 fps is 0.375 s, under the head's 1 s floor.
+    expect(ltx2AutoDurationBounds(24, 9, 121)?.minSeconds).toBe(1);
+  });
+
+  it("uses the family's shortest clip as the floor when that is longer than a second", () => {
+    // At 1 fps the 9-frame minimum is 9 s.
+    expect(ltx2AutoDurationBounds(1, 9, 17)).toEqual({ maxSeconds: 17, minSeconds: 9 });
+  });
+
+  it('leaves nothing to choose when the ceiling is at or under the floor', () => {
+    // 17 frames at 24 fps is 0.7 s; 25 frames is 1.04 s, just over.
+    expect(ltx2AutoDurationBounds(24, 9, 17)).toBeNull();
+    expect(ltx2AutoDurationBounds(24, 9, 24)).toBeNull();
+    expect(ltx2AutoDurationBounds(24, 9, 25)).not.toBeNull();
+    expect(ltx2AutoDurationBounds(1, 9, 9)).toBeNull();
   });
 });
