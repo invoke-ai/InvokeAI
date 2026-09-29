@@ -159,6 +159,7 @@ export const syncVideoWidgetValuesWithModels = (
     h3TextEncoderModel: syncComponent('h3TextEncoderModel', base.h3TextEncoderModel),
     h3TransformerModel: syncComponent('h3TransformerModel', base.h3TransformerModel),
     loras,
+    ltx2DurationHeadModel: syncComponent('ltx2DurationHeadModel', base.ltx2DurationHeadModel),
     ltx2TextEncoderModel: syncComponent('ltx2TextEncoderModel', base.ltx2TextEncoderModel),
     model,
     modelKey: model?.key ?? base.modelKey,
@@ -166,6 +167,12 @@ export const syncVideoWidgetValuesWithModels = (
     wanLowNoiseModel: syncComponent('wanLowNoiseModel', base.wanLowNoiseModel),
     wanT5EncoderModel: syncComponent('wanT5EncoderModel', base.wanT5EncoderModel),
   };
+
+  // Auto duration belongs to the head it was turned on with: an uninstalled head takes it along, so
+  // reinstalling the head later does not silently switch it back on.
+  if (!next.ltx2DurationHeadModel) {
+    next.autoDuration = false;
+  }
 
   // Drop orphaned references when the replacement model lacks reference mode, preserving identity otherwise.
   if (next.references.length > 0 && model && !getVideoModes(model).includes('reference')) {
@@ -186,6 +193,8 @@ export const syncVideoWidgetValuesWithModels = (
     next.h3TextEncoderModel === values.h3TextEncoderModel &&
     next.h3HybridBaseModel === values.h3HybridBaseModel &&
     next.ltx2TextEncoderModel === values.ltx2TextEncoderModel &&
+    next.ltx2DurationHeadModel === values.ltx2DurationHeadModel &&
+    next.autoDuration === values.autoDuration &&
     next.references === values.references &&
     next.loras.length === values.loras.length &&
     next.loras.every((lora, index) => lora.model === values.loras[index]?.model);

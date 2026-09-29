@@ -28,6 +28,8 @@
     "ltx2_denoise audio_latents ltx2_latents_to_video audio_latents",
     "ltx2_denoise video_latents ltx2_latent_upsample video_latents",
     "ltx2_denoise video_latents ltx2_latents_to_video video_latents",
+    "ltx2_duration num_frames core_metadata num_frames",
+    "ltx2_duration num_frames ltx2_denoise num_frames",
     "ltx2_extend_conditioning audio_conditioning ltx2_denoise audio_prefix_conditioning",
     "ltx2_extend_conditioning context_frames video_concat transition_frames",
     "ltx2_extend_conditioning video_conditioning ltx2_denoise video_conditioning",
@@ -50,6 +52,7 @@
     "ltx2_model_loader vocoder ltx2_extend_conditioning vocoder",
     "ltx2_model_loader vocoder ltx2_latents_to_video vocoder",
     "ltx2_text_encoder conditioning ltx2_denoise positive_conditioning",
+    "ltx2_text_encoder conditioning ltx2_duration conditioning",
     "ltx2_text_encoder negative_conditioning ltx2_denoise negative_conditioning",
     "ltx2_video_conditioning num_frames ltx2_denoise num_frames",
     "ltx2_video_conditioning video_conditioning ltx2_denoise full_video_conditioning",
@@ -107,6 +110,7 @@
         "integer",
         "ltx2_audio_conditioning",
         "ltx2_denoise",
+        "ltx2_duration",
         "ltx2_extend_conditioning",
         "ltx2_image_conditioning",
         "ltx2_latent_upsample",
@@ -190,6 +194,7 @@
       "inputs": [
         "first_frame_image",
         "negative_prompt",
+        "num_frames",
         "positive_prompt",
         "seed"
       ],
@@ -461,6 +466,32 @@
       "outputs": [
         "audio_latents",
         "video_latents"
+      ]
+    },
+    "ltx2_duration": {
+      "inputs": [
+        "conditioning"
+      ],
+      "literalInputs": {
+        "duration_head": [],
+        "fps": [
+          24
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "max_seconds": [
+          5.041666666666667
+        ],
+        "min_seconds": [
+          1
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "num_frames"
       ]
     },
     "ltx2_extend_conditioning": {
