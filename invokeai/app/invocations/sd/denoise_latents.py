@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
 import inspect
 import os
 from contextlib import ExitStack, nullcontext

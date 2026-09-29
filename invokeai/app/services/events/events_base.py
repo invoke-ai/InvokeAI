@@ -1,6 +1,3 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-
-
 from typing import TYPE_CHECKING, Literal, Optional
 
 from invokeai.app.services.events.events_common import (

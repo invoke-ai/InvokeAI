@@ -1,4 +1,3 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Utility functions for Z-Image patchify operations."""
 
 from typing import List, Tuple
