@@ -4724,9 +4724,12 @@ export const __workbenchReducerInternal = (
           galleryPage: 0,
           selectedBoardId: action.boardId,
           selectedImageNames: [],
-          // Only actual board changes clear similarity ranking and semantic text. Preserve selection pages: they
-          // may still describe the pre-search board listing.
-          ...(values.selectedBoardId !== action.boardId ? { semanticImageQuery: null, semanticSearchText: null } : {}),
+          // A semantic search ranks within the board, so it follows the switch; a map cluster is a fixed member
+          // list and ends with an actual board change.
+          ...(values.selectedBoardId !== action.boardId &&
+          (values.semanticImageQuery as { kind?: unknown } | null | undefined)?.kind === 'cluster'
+            ? { semanticImageQuery: null, semanticSearchText: null }
+            : {}),
         }),
         action.projectId
       );
@@ -4823,7 +4826,7 @@ export const __workbenchReducerInternal = (
       return updateGalleryValues(
         state,
         (values) => {
-          // Apply delayed commits only when they still match the current field, mode, and board.
+          // Apply delayed commits only when they still match the current field and mode; a board switch keeps both.
           if (values.semanticSearchText !== action.text) {
             return values;
           }

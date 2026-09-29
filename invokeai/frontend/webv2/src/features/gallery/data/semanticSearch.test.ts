@@ -110,6 +110,41 @@ describe('searchGallerySemantic', () => {
   });
 });
 
+describe('semantic search scope', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue({ results: [] });
+  });
+
+  it('ranks within the gallery board, a date board by its day, and everything for the all-readable scope', async () => {
+    const query = { kind: 'text', query: 'boats' } as const;
+
+    await listSemanticGalleryItemNames({ boardId: 'board-1', query });
+    await listSemanticGalleryItemNames({ boardId: 'none', query });
+    await listSemanticGalleryItemNames({ boardId: 'by_date:2026-08-02', query });
+    await listSemanticGalleryItemNames({ boardId: 'all', query });
+
+    expect(mocks.apiFetchJson.mock.calls.map(([path]) => path)).toEqual([
+      '/api/v1/image_map/search?board_id=board-1&include_videos=true&limit=500&q=boats',
+      '/api/v1/image_map/search?board_id=none&include_videos=true&limit=500&q=boats',
+      '/api/v1/image_map/search?created_date=2026-08-02&include_videos=true&limit=500&q=boats',
+      '/api/v1/image_map/search?include_videos=true&limit=500&q=boats',
+    ]);
+  });
+
+  it('scopes by-image searches the same way', async () => {
+    const fileId = registerExternalImageFile(new Blob(['not-really-a-png']), 'cat.png');
+
+    await searchGallerySemantic({ fileId, kind: 'file' }, { boardId: 'board-1', limit: 10 });
+    await searchGallerySemantic({ kind: 'url', url: 'https://example.com/cat.jpg' }, { boardId: 'board-1', limit: 10 });
+
+    expect(mocks.apiFetchJson.mock.calls.map(([path]) => path)).toEqual([
+      '/api/v1/image_map/search_by_image?board_id=board-1&include_videos=true&limit=10',
+      '/api/v1/image_map/search_by_image?image_url=https%3A%2F%2Fexample.com%2Fcat.jpg&board_id=board-1&include_videos=true&limit=10',
+    ]);
+  });
+});
+
 describe('semantic page hydration', () => {
   beforeEach(() => {
     mocks.apiFetchJson.mockReset();

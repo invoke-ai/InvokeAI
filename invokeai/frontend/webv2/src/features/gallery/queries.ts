@@ -9,6 +9,7 @@ export {
   galleryItemsInfiniteOptions,
   galleryKeys,
   galleryStarredStripOptions,
+  getGalleryListingBoardsQuery,
   imageIndexAvailabilityOptions,
 } from './data/queries';
 export type {

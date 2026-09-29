@@ -97,7 +97,7 @@ const mapPageItems = (
   };
 };
 
-/** Ranked windows ignore board moves; starred-only listings lose items immediately when unstarred. */
+/** Cluster windows ignore board moves; starred-only listings lose items immediately when unstarred. */
 const patchRemovesItems = (filter: CanonicalGalleryItemsFilter, patch: GalleryItemCachePatch): boolean => {
   if (patch.kind === 'delete') {
     return true;
@@ -108,7 +108,7 @@ const patchRemovesItems = (filter: CanonicalGalleryItemsFilter, patch: GalleryIt
   }
 
   return (
-    filter.semantic === undefined &&
+    filter.semantic?.kind !== 'cluster' &&
     filter.boardId !== ALL_READABLE_BOARDS_ID &&
     filter.boardId !== patch.boardId &&
     !isDateBoardId(filter.boardId)

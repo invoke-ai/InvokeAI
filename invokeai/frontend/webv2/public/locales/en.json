@@ -3925,6 +3925,7 @@
       "semanticCluster": "Cluster: {{name}}",
       "semanticSimilarTo": "Similar to {{name}}",
       "semanticTextSearch": "Semantic search: {{name}}",
+      "semanticSearchArchivedBoard": "Archived boards aren't indexed, so semantic search finds nothing here.",
       "semanticSearchAriaLabel": "Semantic search",
       "semanticSearchInstallModel": "Install the “{{model}}” model to build the image index and enable semantic search.",
       "semanticSearchModelMissing": "Semantic search needs the embedding model “{{model}}”, which is not installed.",

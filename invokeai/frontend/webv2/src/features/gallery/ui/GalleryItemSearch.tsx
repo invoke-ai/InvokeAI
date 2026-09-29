@@ -225,10 +225,17 @@ export const GalleryItemSearch = () => {
     return invalid ? t('widgets.gallery.dateFilterInvalid', { value: invalid.raw }) : null;
   }, [gallery.searchTerm, isSemanticMode, t]);
 
+  // The index leaves archived boards out, so a ranked search scoped to one can only come back empty. Clusters are
+  // explicit member lists, not rankings, so they are exempt.
+  const isRankedSearch =
+    isSemanticMode || (gallery.semanticImageQuery !== null && gallery.semanticImageQuery.kind !== 'cluster');
+  const isArchivedBoard = gallery.boards.some((board) => board.id === gallery.selectedBoardId && board.archived);
   const semanticHint =
     isSemanticMode && indexAvailability?.state === 'model_missing'
       ? t('widgets.gallery.semanticSearchModelMissing', { model: indexAvailability.modelName ?? '' })
-      : null;
+      : isRankedSearch && isArchivedBoard
+        ? t('widgets.gallery.semanticSearchArchivedBoard')
+        : null;
 
   const hint = invalidHint ?? semanticHint;
 
