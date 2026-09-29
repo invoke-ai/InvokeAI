@@ -1,4 +1,3 @@
-# Copyright 2023, Lincoln D. Stein and the InvokeAI Team
 """
 Abstract base class and implementation for recursive directory search for models.
 
