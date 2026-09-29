@@ -609,12 +609,21 @@ export const comboboxSlotRecipe = defineSlotRecipe({
   },
 });
 
+/**
+ * Dialogs stack from the modal token, below the popover token menus and popovers use. zag copies a menu's z-index to its
+ * positioner once, before the layer index lands, so a menu opened in a second, stacked dialog sat under that dialog.
+ */
+const DIALOG_LAYER = { '--dialog-z-index': 'zIndex.modal' } as const;
+
 export const dialogSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.dialog,
   base: {
     ...chakraSlotRecipes.dialog.base,
+    backdrop: { ...chakraSlotRecipes.dialog.base?.backdrop, ...DIALOG_LAYER },
+    positioner: { ...chakraSlotRecipes.dialog.base?.positioner, ...DIALOG_LAYER },
     content: {
       ...chakraSlotRecipes.dialog.base?.content,
+      ...DIALOG_LAYER,
       bg: 'bg.subtle',
       borderColor: 'border.subtle',
       borderWidth: '1px',
