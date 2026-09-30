@@ -7,6 +7,7 @@ const WORKFLOW_GRID_SIZE = 25;
 export const EXPORT_PADDING = 100;
 export const EXPORT_SCALE = 2;
 export const WORKFLOW_EXPORT_TIMEOUT_MS = 30_000;
+export const WORKFLOW_EXPORT_IMAGE_TIMEOUT_MS = 5_000;
 const WORKFLOW_EXPORT_IMAGE_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 // html-to-image has no abort signal; bound captures that remain active after their caller times out.
 const MAX_ACTIVE_WORKFLOW_RASTERIZATIONS = 2;
@@ -511,6 +512,63 @@ const downloadPng = (blob: Blob, workflowName: string, fallbackWorkflowName: str
   downloadBlob(blob, `${sanitizeWorkflowImageFilename(workflowName, fallbackWorkflowName)}.png`);
 };
 
+const SOURCE_IMAGE_SELECTOR = '[data-workflow-export-field-value="true"] img';
+
+/** Decode concurrently before html-to-image freezes computed image dimensions. */
+const decodeSourceImages = async (flowElement: HTMLElement): Promise<Map<HTMLImageElement, string>> => {
+  const images = Array.from(flowElement.querySelectorAll<HTMLImageElement>(SOURCE_IMAGE_SELECTOR));
+  const decoded = new Map<HTMLImageElement, string>();
+  if (!images.length) {
+    return decoded;
+  }
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      Promise.all(
+        images.map((image) => {
+          const source = image.src;
+          return image.decode().then(
+            () => {
+              if (image.naturalWidth > 0 && image.naturalHeight > 0 && image.src === source) {
+                decoded.set(image, source);
+              }
+            },
+            () => undefined
+          );
+        })
+      ),
+      new Promise<void>((resolve) => {
+        timeoutId = setTimeout(resolve, WORKFLOW_EXPORT_IMAGE_TIMEOUT_MS);
+      }),
+    ]);
+    // Late decodes must not change which images this export includes.
+    return new Map(decoded);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
+
+const replaceFailedSourceImages = (
+  flowElement: HTMLElement,
+  clone: HTMLElement,
+  decoded: Map<HTMLImageElement, string>
+) => {
+  const sourceImages = flowElement.querySelectorAll<HTMLImageElement>(SOURCE_IMAGE_SELECTOR);
+  clone.querySelectorAll<HTMLImageElement>(SOURCE_IMAGE_SELECTOR).forEach((image, index) => {
+    const original = sourceImages[index];
+    if (original && decoded.get(original) === original.src && original.src === image.src) {
+      return;
+    }
+    const fallback = document.createElement('span');
+    fallback.textContent = image.alt;
+    fallback.style.overflowWrap = 'anywhere';
+    fallback.style.maxWidth = '100%';
+    image.replaceWith(fallback);
+  });
+};
+
 export const exportWorkflowAsPng = async ({
   flowElement,
   bounds,
@@ -526,12 +584,14 @@ export const exportWorkflowAsPng = async ({
     throw new Error('A previous workflow image export is still running');
   }
 
+  const decoded = await decodeSourceImages(flowElement);
   const contentBounds = getWorkflowContentBounds(flowElement, bounds, { includeInputFieldLabels: false });
   const dimensions = getWorkflowImageDimensions(contentBounds);
   const clone = flowElement.cloneNode(true) as HTMLElement;
   const stagingWrapper = document.createElement('div');
 
   try {
+    replaceFailedSourceImages(flowElement, clone, decoded);
     namespaceWorkflowExportIds(clone);
     prepareExportClone(clone, contentBounds, dimensions);
     Object.assign(stagingWrapper.style, getWorkflowExportStagingStyle(dimensions));

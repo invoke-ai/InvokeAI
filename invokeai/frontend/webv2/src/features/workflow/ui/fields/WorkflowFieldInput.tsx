@@ -1937,31 +1937,26 @@ const SNAPSHOT_VALUE_TEXT_PROPS = {
   whiteSpace: 'pre-wrap',
 } as const;
 
-/** Use the freshest cached name without fetching or notifying the child-signature synchronizer. */
+/** Prefer detail metadata: appending picker pages does not refresh earlier records. */
 const SavedWorkflowSnapshot = ({ workflowId }: { workflowId: string }) => {
   const queryClient = useQueryClient();
   const getName = useCallback(() => {
     const detailKey = savedWorkflowDetailQueryKey(workflowId);
     const record = queryClient.getQueryData<WorkflowRecordDTO>(detailKey);
-    let name = record?.name || workflowId;
-    let updatedAt = record?.name ? (queryClient.getQueryState(detailKey)?.dataUpdatedAt ?? 0) : -1;
-    for (const [key, pages] of queryClient.getQueriesData<InfiniteData<WorkflowLibraryPage>>({
+    if (record?.name) {
+      return record.name;
+    }
+    for (const [, pages] of queryClient.getQueriesData<InfiniteData<WorkflowLibraryPage>>({
       queryKey: savedWorkflowPickerQueryKeyPrefix,
     })) {
-      const pickerUpdatedAt = queryClient.getQueryState(key)?.dataUpdatedAt ?? 0;
-      if (pickerUpdatedAt < updatedAt) {
-        continue;
-      }
       for (const page of pages?.pages ?? []) {
         const workflow = page.items.find((item) => item.workflow_id === workflowId);
         if (workflow?.name) {
-          name = workflow.name;
-          updatedAt = pickerUpdatedAt;
-          break;
+          return workflow.name;
         }
       }
     }
-    return name;
+    return workflowId;
   }, [queryClient, workflowId]);
   const subscribe = useCallback(
     (onChange: () => void) =>
@@ -2022,7 +2017,7 @@ export const WorkflowFieldSnapshot = ({
               {names.map((name) => (
                 <Box key={name} aspectRatio="1" bg="bg.subtle" rounded="xs">
                   <Image
-                    alt=""
+                    alt={name}
                     h="full"
                     objectFit="cover"
                     rounded="xs"
@@ -2034,7 +2029,13 @@ export const WorkflowFieldSnapshot = ({
             </SimpleGrid>
           ) : (
             <Flex align="center" borderWidth="1px" h="32" justify="center" overflow="hidden" rounded="sm" w="full">
-              <Image alt="" maxH="full" maxW="full" objectFit="contain" src={galleryImageUrls.thumbnail(names[0]!)} />
+              <Image
+                alt={names[0]!}
+                maxH="full"
+                maxW="full"
+                objectFit="contain"
+                src={galleryImageUrls.thumbnail(names[0]!)}
+              />
             </Flex>
           )}
           <Text {...SNAPSHOT_VALUE_TEXT_PROPS}>{text}</Text>

@@ -16,6 +16,7 @@ import {
   getWorkflowContentBounds,
   getWorkflowExportOptions,
   WORKFLOW_EXPORT_TIMEOUT_MS,
+  WORKFLOW_EXPORT_IMAGE_TIMEOUT_MS,
 } from './workflowImageExport';
 
 type FakeElement = {
@@ -96,6 +97,106 @@ describe('workflow image export edge cases', () => {
     vi.clearAllMocks();
     vi.useRealTimers();
   });
+
+  it.each(['failed', 'hung'] as const)(
+    'replaces %s source images without changing the editor or retaining timers',
+    async (state) => {
+      vi.useFakeTimers();
+      const { flowElement, clone, stagingWrapper } = createExportDom();
+      const decode = vi.fn(() =>
+        state === 'failed' ? Promise.reject(new Error('Unavailable')) : new Promise<void>(() => {})
+      );
+      const sourceImage = { decode, src: 'source.png' };
+      const replacement = vi.fn();
+      const clonedImage = { src: 'source.png', alt: 'source.png', replaceWith: replacement };
+      const selector = '[data-workflow-export-field-value="true"] img';
+      flowElement.querySelectorAll = (query) => (query === selector ? [sourceImage as unknown as FakeElement] : []);
+      clone.querySelectorAll = (query) => (query === selector ? [clonedImage as unknown as FakeElement] : []);
+      const fallback = { textContent: '', style: {} };
+      vi.stubGlobal('document', {
+        body: flowElement.parentElement,
+        createElement: (tag: string) => (tag === 'span' ? fallback : stagingWrapper),
+      });
+      vi.mocked(toBlob).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+      const exportPromise = exportWorkflowAsPng({
+        flowElement: flowElement as unknown as HTMLElement,
+        bounds: { x: 0, y: 0, width: 100, height: 100 },
+        workflowName: 'Workflow',
+        fallbackWorkflowName: 'Unnamed Workflow',
+      });
+      try {
+        await vi.advanceTimersByTimeAsync(state === 'hung' ? WORKFLOW_EXPORT_IMAGE_TIMEOUT_MS - 1 : 0);
+        if (state === 'hung') {
+          expect(toBlob).not.toHaveBeenCalled();
+          await vi.advanceTimersByTimeAsync(1);
+        }
+        await exportPromise;
+        expect(replacement).toHaveBeenCalledWith(fallback);
+        expect(fallback.textContent).toBe('source.png');
+        expect(flowElement.querySelectorAll(selector)).toEqual([sourceImage]);
+        expect(downloadBlob).toHaveBeenCalledOnce();
+        expect(stagingWrapper.remove).toHaveBeenCalledOnce();
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it.each(['removed', 'replaced'] as const)(
+    'matches decoded images after a source is %s during the wait',
+    async (change) => {
+      vi.useFakeTimers();
+      const { flowElement, clone, stagingWrapper } = createExportDom();
+      let failFirst!: () => void;
+      const first = {
+        src: 'first.png',
+        decode: () =>
+          new Promise<void>((_, reject) => {
+            failFirst = () => reject(new Error('Unavailable'));
+          }),
+      };
+      const second = { src: 'second.png', naturalWidth: 800, naturalHeight: 400, decode: () => Promise.resolve() };
+      let images = [first, second];
+      const replaceWith = vi.fn();
+      const clonedImage = { src: 'second.png', alt: 'second.png', replaceWith };
+      const selector = '[data-workflow-export-field-value="true"] img';
+      flowElement.querySelectorAll = (query) => (query === selector ? (images as unknown as FakeElement[]) : []);
+      clone.querySelectorAll = (query) => (query === selector ? [clonedImage as unknown as FakeElement] : []);
+      const fallback = { textContent: '', style: {} };
+      vi.stubGlobal('document', {
+        body: flowElement.parentElement,
+        createElement: (tag: string) => (tag === 'span' ? fallback : stagingWrapper),
+      });
+      vi.mocked(toBlob).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+      const exportPromise = exportWorkflowAsPng({
+        flowElement: flowElement as unknown as HTMLElement,
+        bounds: { x: 0, y: 0, width: 100, height: 100 },
+        workflowName: 'Workflow',
+        fallbackWorkflowName: 'Unnamed Workflow',
+      });
+      try {
+        await vi.advanceTimersByTimeAsync(0);
+        images = [second];
+        if (change === 'replaced') {
+          second.src = 'new-source.png';
+          clonedImage.src = 'new-source.png';
+          clonedImage.alt = 'new-source.png';
+        }
+        failFirst();
+        await exportPromise;
+        if (change === 'removed') {
+          expect(replaceWith).not.toHaveBeenCalled();
+        } else {
+          expect(replaceWith).toHaveBeenCalledWith(fallback);
+          expect(fallback.textContent).toBe('new-source.png');
+        }
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
 
   it('allows one bounded retry when a previous rasterization never settles', async () => {
     vi.useFakeTimers();

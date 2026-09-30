@@ -737,7 +737,7 @@ describe('InvocationFlowNode output preview', () => {
               { updatedAt: 300 }
             );
           });
-          expect(host.querySelector('[data-workflow-export-field-value="true"]')?.textContent).toBe(name);
+          expect(host.querySelector('[data-workflow-export-field-value="true"]')?.textContent).toBe(initialName);
           await act(() => {
             queryClient.setQueryData(
               savedWorkflowDetailQueryKey(workflowId),
@@ -746,6 +746,22 @@ describe('InvocationFlowNode output preview', () => {
                 workflow_id: workflowId,
               },
               { updatedAt: 400 }
+            );
+          });
+          expect(host.querySelector('[data-workflow-export-field-value="true"]')?.textContent).toBe(
+            'Renamed child workflow'
+          );
+          await act(() => {
+            queryClient.setQueryData(
+              savedWorkflowPickerQueryOptions({ page: 0, query: 'Previous' }).queryKey,
+              {
+                pageParams: [0, 1],
+                pages: [
+                  { items: [{ name: initialName, workflow_id: workflowId }], page: 0, pages: 2, total: 2 },
+                  { items: [{ name: 'Other workflow', workflow_id: 'other' }], page: 1, pages: 2, total: 2 },
+                ],
+              },
+              { updatedAt: 500 }
             );
           });
           expect(host.querySelector('[data-workflow-export-field-value="true"]')?.textContent).toBe(
@@ -767,9 +783,14 @@ describe('InvocationFlowNode output preview', () => {
     }
   );
 
-  it.each(['SINGLE', 'COLLECTION'] as const)(
-    'exports scaled authored source images for %s fields',
-    async (cardinality) => {
+  it.each([
+    { cardinality: 'SINGLE', failed: false },
+    { cardinality: 'COLLECTION', failed: false },
+    { cardinality: 'SINGLE', failed: true },
+    { cardinality: 'COLLECTION', failed: true },
+  ] as const)(
+    'exports authored source images for $cardinality fields with failed=$failed',
+    async ({ cardinality, failed }) => {
       const source = outputImage(800, 400);
       const thumbnailSpy = vi.spyOn(galleryImageUrls, 'thumbnail').mockReturnValue(source);
       const value = { image_name: 'authored-source.png' };
@@ -807,16 +828,41 @@ describe('InvocationFlowNode output preview', () => {
         await render(adapter, 1, true, toFlowNodes(graph, [], { preview: imageTemplate }));
         const sourceImage = host.querySelector<HTMLImageElement>('[data-workflow-export-field-value="true"] img');
         expect(sourceImage).not.toBeNull();
-        await vi.waitFor(() => expect(sourceImage!.naturalWidth).toBe(800));
+        // Simulate a pending thumbnail's zero dimensions until decoding completes.
+        const naturalWidthSpy = vi.spyOn(sourceImage!, 'naturalWidth', 'get').mockReturnValue(0);
+        sourceImage!.style.width = '0px';
+        sourceImage!.style.height = '0px';
+        expect(sourceImage!.naturalWidth).toBe(0);
+        const decode = sourceImage!.decode.bind(sourceImage);
+        let releaseImage!: () => void;
+        const imageReady = new Promise<void>((resolve) => {
+          releaseImage = resolve;
+        });
+        const decodeSpy = vi.spyOn(sourceImage!, 'decode').mockImplementation(async () => {
+          await imageReady;
+          if (failed) {
+            throw new Error('Thumbnail unavailable');
+          }
+          naturalWidthSpy.mockRestore();
+          sourceImage!.style.removeProperty('width');
+          sourceImage!.style.removeProperty('height');
+          await decode();
+        });
         expect(getComputedStyle(sourceImage!).objectFit).toBe(cardinality === 'SINGLE' ? 'contain' : 'cover');
         expect(sourceImage!.getBoundingClientRect().width).toBeLessThan(800);
         expect(sourceImage!.getBoundingClientRect().height).toBeLessThanOrEqual(128);
-        await exportWorkflowAsPng({
+        const exportPromise = exportWorkflowAsPng({
           bounds: { x: 20, y: 20, width: 300, height: 260 },
           fallbackWorkflowName: 'Untitled Workflow',
           flowElement: host.querySelector<HTMLElement>('.react-flow')!,
           workflowName: 'Authored source image',
         });
+        await vi.waitFor(() => expect(decodeSpy).toHaveBeenCalledOnce());
+        expect(exportMocks.toBlob).not.toHaveBeenCalled();
+        releaseImage();
+        await exportPromise;
+        decodeSpy.mockRestore();
+        naturalWidthSpy.mockRestore();
         expect(exportedBlob?.type).toBe('image/png');
         const bitmap = await createImageBitmap(exportedBlob!);
         const canvas = document.createElement('canvas');
@@ -832,9 +878,19 @@ describe('InvocationFlowNode output preview', () => {
           }
         }
         bitmap.close();
-        expect(sourcePixels).toBeGreaterThan(1000);
-        expect(capturedClone?.querySelectorAll('img')).toHaveLength(1);
-        expect(capturedClone?.querySelector('img')?.src).toBe(source);
+        if (failed) {
+          expect(sourcePixels).toBe(0);
+          expect(capturedClone?.querySelectorAll('img')).toHaveLength(0);
+          expect(capturedClone?.querySelector('[data-workflow-export-field-value="true"] span')?.textContent).toBe(
+            'authored-source.png'
+          );
+          // The fallback belongs only to the clone; the editor image is preserved for later loads.
+          expect(host.querySelector('[data-workflow-export-field-value="true"] img')).toBe(sourceImage);
+        } else {
+          expect(sourcePixels).toBeGreaterThan(1000);
+          expect(capturedClone?.querySelectorAll('img')).toHaveLength(1);
+          expect(capturedClone?.querySelector('img')?.src).toBe(source);
+        }
         expect(capturedClone?.textContent).toContain('authored-source.png');
         expect(capturedClone?.textContent).not.toContain('Latest output');
         expect(capturedClone?.querySelector('button, input')).toBeNull();
