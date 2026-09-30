@@ -110,11 +110,11 @@ jobs:
               - 'uv.lock'
               - '.github/workflows/python-tests.yml'
               - 'invokeai/**'
-              - '!invokeai/frontend/web/**'
+              - '!invokeai/frontend/webv1/**'
               - '!invokeai/frontend/webv2/**'
               # Re-includes must follow the exclusions above.
               # test_imports.py walks every package, including the frontend ones.
-              - 'invokeai/frontend/web/**/*.py'
+              - 'invokeai/frontend/webv1/**/*.py'
               - 'invokeai/frontend/webv2/**/*.py'
               # test_workflow_graph_builder.py validates these editor fixtures against the backend.
               - 'invokeai/frontend/webv2/src/features/workflow/core/fixtures/**'

@@ -102,7 +102,7 @@ To add a new hotkey to the system, follow these steps:
 
 <Steps>
 1. **Add Translation Strings**
-   In `invokeai/frontend/web/public/locales/en.json`:
+   In `invokeai/frontend/webv1/public/locales/en.json`:
    ```json
    {
      "hotkeys": {
@@ -117,7 +117,7 @@ To add a new hotkey to the system, follow these steps:
    ```
 
 2. **Register the Hotkey**
-   In `invokeai/frontend/web/src/features/system/components/HotkeysModal/useHotkeyData.ts`:
+   In `invokeai/frontend/webv1/src/features/system/components/HotkeysModal/useHotkeyData.ts`:
    ```typescript
    // Inside the appropriate category builder function
    addHotkey('app', 'myAction', ['mod+k']); // Default binding

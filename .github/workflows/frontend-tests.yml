@@ -40,40 +40,6 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  frontend-tests:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10 # expected run time: <2 min
-    defaults:
-      run:
-        working-directory: invokeai/frontend/web
-    steps:
-      - uses: actions/checkout@v6
-
-      - name: check for changed frontend files
-        if: ${{ inputs.always_run != true }}
-        id: changed-files
-        # Pinned to the _hash_ for v45.0.9 to prevent supply-chain attacks.
-        # See:
-        # - CVE-2025-30066
-        # - https://www.stepsecurity.io/blog/harden-runner-detection-tj-actions-changed-files-action-is-compromised
-        # - https://github.com/tj-actions/changed-files/issues/2463
-        uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
-        with:
-          files_yaml: |
-            frontend:
-              - '.github/workflows/frontend-tests.yml'
-              - '.github/actions/install-frontend-deps/**'
-              - 'invokeai/frontend/web/**'
-
-      - name: install dependencies
-        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
-        uses: ./.github/actions/install-frontend-deps
-
-      - name: vitest
-        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm test:no-watch'
-        shell: bash
-
   frontend-webv2-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20 # Includes browser suites, performance sampling, project files, and accessibility.
@@ -91,6 +57,7 @@ jobs:
           files_yaml: |
             webv2:
               - '.github/workflows/frontend-tests.yml'
+              - '.nvmrc'
               - '.github/actions/install-frontend-deps/**'
               - 'invokeai/frontend/webv2/**'
 
