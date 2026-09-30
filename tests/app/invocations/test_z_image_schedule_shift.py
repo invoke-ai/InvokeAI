@@ -102,7 +102,6 @@ def drive_to_blend(px: int, steps: int, shift: float | None = None) -> tuple[flo
             "invokeai.app.invocations.z_image.z_image_denoise.TorchDevice.choose_bfloat16_safe_dtype",
             return_value=torch.float32,
         ),
-        patch("invokeai.app.invocations.z_image.z_image_denoise.ZImageConditioningInfo", object),
         patch(
             "invokeai.app.invocations.z_image.z_image_denoise.ZImageRegionalPromptingExtension.from_text_conditionings",
             return_value=regional_extension,
@@ -148,17 +147,24 @@ def test_the_fit_is_still_live_below_its_upper_point():
 
 
 @pytest.mark.parametrize("px", [1024, 1536, 2048, 3072, 4096])
-@pytest.mark.parametrize("steps", [8, 30])
-def test_the_pass_still_refines_the_input_at_every_frame_size(px: int, steps: int):
+def test_the_pass_still_refines_the_input_at_every_frame_size(px: int):
     """The defect the clamp exists for, measured through the node's own img2img blend.
 
-    An extrapolated shift pushed the entry sigma to 0.97 at 2048px and 1.0000 at 4096px, so the
-    blend kept almost nothing of the input. Both step counts are covered because the shift is a
-    claim about the whole schedule: 8 is the node default and the Turbo recommendation, 30 is what
-    a canvas pass sends.
+    An extrapolated shift pushed the entry sigma to 0.88 at 1536px, 0.96 at 2048px and 1.0000 at
+    4096px, so the blend kept almost nothing of the input.
     """
-    _, entry_sigma = drive_to_blend(px, steps)
+    _, entry_sigma = drive_to_blend(px, steps=30)
     assert entry_sigma == pytest.approx(CLAMPED_ENTRY_SIGMA, abs=1e-3)
+
+
+def test_the_entry_sigma_does_not_depend_on_the_step_count():
+    """8 is the node default and the Turbo recommendation, 30 is what a canvas pass sends.
+
+    A cell of its own rather than a second axis on the frame-size parametrisation: index clipping
+    lands on t = 1 - denoising_start whenever `denoising_start * steps` is whole, so both counts
+    enter at the same sigma and the ten cells would read one number twice over.
+    """
+    assert drive_to_blend(2048, steps=8)[1] == pytest.approx(drive_to_blend(2048, steps=30)[1], abs=1e-6)
 
 
 def test_an_explicit_shift_overrides_the_clamp():

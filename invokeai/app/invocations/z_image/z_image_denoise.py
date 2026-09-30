@@ -268,9 +268,9 @@ class ZImageDenoiseInvocation(BaseInvocation):
         Extrapolated it runs away fast -- shift reaches 25 at 2048px, 810 at 3072px and 103_777 at
         4096px -- and `_get_sigmas` flattens with it. Because `denoising_start` is clipped by *index*
         here, the step count survives but the entry point does not: a canvas img2img pass at
-        strength 0.5 would start from sigma 0.97 at 2048px and 1.0000 at 4096px, i.e. throw the
-        input image away and generate a new one. Below one megapixel the clamp changes nothing, and
-        an explicit `shift` on the invocation still overrides it.
+        strength 0.5 would start from sigma 0.88 at 1536px, 0.96 at 2048px and 1.0000 at 4096px,
+        i.e. throw the input image away and generate a new one. Below one megapixel the clamp
+        changes nothing, and an explicit `shift` on the invocation still overrides it.
         """
         m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
         b = base_shift - m * base_image_seq_len
