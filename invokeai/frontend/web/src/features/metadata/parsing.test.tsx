@@ -1,6 +1,8 @@
 import type { AppStore } from 'app/store/store';
 import type * as paramsSliceModule from 'features/controlLayers/store/paramsSlice';
+import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
 import { ImageMetadataHandlers, parseMetadataDatum, recallIfStillValid } from 'features/metadata/parsing';
+import { assert } from 'tsafe';
 import type * as modelsApiModule from 'services/api/endpoints/models';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -1343,6 +1345,33 @@ describe('ImageMetadataHandlers - RefImages', () => {
 
     expect(data.isParsed).toBe(true);
     expect(data.isError).toBe(true);
+  });
+
+  // The style strength has no metadata key and no row of its own: it lives inside the reference
+  // image's config, and the strength slider reads it from there. So the single-row recall has to
+  // carry it, otherwise recalling one reference resets its strength to the schema default of 1.
+  it('carries the style strength through the single-row recall', async () => {
+    currentBase = 'krea-2';
+    const store = makeStore();
+
+    const parsed = await ImageMetadataHandlers.RefImages.parse({ ref_images: [krea2RefImage(0.35)] }, store);
+    const entry = parsed[0];
+    assert(entry !== undefined);
+    ImageMetadataHandlers.RefImages.recallOne(entry, store);
+
+    const dispatched = vi.mocked(store.dispatch).mock.calls.map(([action]) => action);
+    const recalled = dispatched.find(
+      (action): action is ReturnType<typeof refImagesRecalled> =>
+        typeof action === 'object' && action !== null && 'type' in action && action.type === refImagesRecalled.type
+    );
+    assert(recalled !== undefined, 'expected refImagesRecalled to be dispatched');
+
+    expect(recalled.payload.replace).toBe(false);
+    expect(recalled.payload.entities).toHaveLength(1);
+    expect(recalled.payload.entities[0]?.config).toMatchObject({
+      type: 'krea2_reference_image',
+      styleStrength: 0.35,
+    });
   });
 
   it('drops the row when the referenced image is gone', async () => {
