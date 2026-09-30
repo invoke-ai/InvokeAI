@@ -1,0 +1,58 @@
+---
+title: CogView4
+description: Generate images with the CogView4-6B text-to-image model from THUDM.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 2
+---
+
+CogView4 is THUDM's 6B-parameter diffusion-transformer text-to-image model. It uses a **GLM** language
+model as its text encoder and a 16-channel VAE. InvokeAI supports the base **CogView4-6B** checkpoint.
+CogView4 support is basic: plain generation and Canvas image editing work, but the adapters and
+controls that other families offer are not available.
+
+## Hardware
+
+The Diffusers download is about **31 GB**, including the GLM text encoder and VAE. See
+[System Requirements](/start-here/system-requirements/) for general guidance, and the
+[Low VRAM guide](/configuration/optimization/low-vram-mode/) if you run out of memory.
+
+## Installing
+
+Install **CogView4** from the Model Manager's starter models. Its source is `THUDM/CogView4-6B`. This
+family has no starter bundle.
+
+CogView4 installs in **Diffusers** format only, as a single folder that contains the transformer, GLM
+text encoder, tokenizer and VAE. No other models are needed, and the components cannot be replaced
+individually. Single-file and GGUF CogView4 models are not recognized.
+
+## Generation settings
+
+When you select CogView4, InvokeAI applies the defaults from the model's reference example:
+
+| Setting    | Default     |
+| ---------- | ----------- |
+| Steps      | 50          |
+| CFG Scale  | 3.5         |
+| Resolution | 1024 × 1024 |
+
+- **CFG Scale** applies true classifier-free guidance.
+- **Width and height** must be multiples of **32**.
+- **Negative prompts** are supported and always used.
+- **No scheduler choice.** CogView4 uses its own flow-matching sampler, so the Scheduler control is
+  hidden.
+- **Prompt weighting** (Compel syntax) does not apply to CogView4. See
+  [Prompt Syntax](/users-guide/image-generation/prompt-syntax/). The GLM encoder reads up to **1024
+  tokens**, so long, descriptive prompts are fine.
+
+## Canvas
+
+On the Canvas, CogView4 supports text-to-image, image-to-image, inpainting and outpainting. LoRAs,
+ControlNet, reference images, regional guidance and PiD decoding are **not** available for CogView4.
+
+## Workflow editor
+
+The CogView4 nodes are **Main Model - CogView4**, **Prompt - CogView4**, **Denoise - CogView4**,
+**Image to Latents - CogView4** and **Latents to Image - CogView4**. Each prompt needs its own **Prompt -
+CogView4** node. Connect them to the denoise node's positive and negative conditioning inputs. Both are
+required.

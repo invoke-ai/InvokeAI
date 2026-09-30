@@ -1,0 +1,171 @@
+---
+title: Stable Diffusion 1.5 / 2.x
+description: Generate images with Stable Diffusion 1.5 and legacy SD 2.x models, including inpainting models, ControlNet, T2I-Adapter, IP-Adapter reference images, LoRAs and embeddings.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 10
+---
+
+Stable Diffusion 1.x and 2.x are the original latent-diffusion UNet models. They are small and fast
+by current standards, run on modest hardware, and have the largest library of community fine-tunes,
+LoRAs, embeddings and ControlNets.
+
+- **SD 1.x** (in practice, **SD 1.5** and its fine-tunes) is trained at **512×512** and uses a single
+  CLIP text encoder. It is fully supported: text-to-image, image-to-image, inpainting and outpainting,
+  control layers, reference images, regional guidance and upscaling.
+- **SD 2.x** is treated as **legacy**. Models you install yourself load and generate, but InvokeAI
+  ships no SD 2.x starter models and some Canvas features are not available for it (see
+  [SD 2.x](#sd-2x)).
+
+InvokeAI identifies the family, the **variant** (normal or inpainting; SD 2.x also has a depth
+variant) and the **prediction type** (epsilon or v-prediction) automatically on install.
+
+## Hardware
+
+SD 1.5 is the lightest local image model InvokeAI supports: the
+[System Requirements](/start-here/system-requirements/) table lists **4 GB VRAM** and 8 GB RAM as the
+minimum at 512×512. On smaller cards, see [Low-VRAM mode](/configuration/optimization/low-vram-mode/).
+
+## Installing
+
+The easiest path is the **Stable Diffusion 1.5** bundle in the Model Manager's starter models. It
+installs:
+
+- **Dreamshaper 8** — a popular, versatile main model
+- **EasyNegative** — a textual-inversion embedding for the negative prompt
+- Three **IP-Adapters** for reference images — Standard, Precise and Face — plus their image encoder
+- A set of **ControlNets**: Hard Edge Detection (canny), Inpainting, Line Drawing (mlsd), Depth Map,
+  Lighting Detection (Normals), Segmentation Map, Lineart, Lineart Anime, Pose Detection (openpose),
+  Contour Detection (scribble), Soft Edge Detection (softedge), Remix (shuffle) and Tile
+- **SwinIR**, a 4× upscaler used by the Upscale tool
+
+Other SD 1.5 starter models can be installed individually:
+
+| Starter model | Notes |
+| --- | --- |
+| CyberRealistic v4.1 | Photorealistic; installs its companion **CyberRealistic Negative v3** embedding |
+| ReV Animated | Fantasy and anime styles |
+| Dreamshaper 8 (inpainting) | Inpainting version of Dreamshaper 8 |
+| Deliberate v5 | Versatile general-purpose model |
+| Deliberate v5 (inpainting) | Inpainting version of Deliberate v5 |
+| QRCode Monster v2 (SD1.5) | ControlNet for scannable, stylized QR codes |
+| T2I-Adapters: Hard Edge Detection (canny), Sketch, Depth Map | Lighter-weight alternatives to ControlNet |
+
+SD 1.x and 2.x main models are self-contained: the UNet, text encoder and VAE all come in one install.
+Both formats are supported:
+
+- **Diffusers** folders (for example a HuggingFace repo ID such as `Lykon/dreamshaper-8`).
+- **Single-file checkpoints** (`.safetensors` / `.ckpt`), the format most community fine-tunes are
+  published in.
+
+No HuggingFace token is needed for the starter models.
+
+If a model was identified incorrectly, open it in the Model Manager and correct its **Variant** or
+**Prediction Type**.
+
+## Generation settings
+
+Selecting an SD 1.5 model applies these defaults, which you can override globally or per model in the
+Model Manager's **Default Settings**:
+
+| Setting | SD 1.5 default |
+| --- | --- |
+| Width × Height | 512 × 512 |
+| Steps | 30 |
+| CFG Scale | 7 |
+| Scheduler | Euler Ancestral |
+
+- **Resolution** — dimensions must be multiples of 8. An image size equivalent to 512×512 in pixel
+  count is recommended. For larger output, use the Upscale tool, or try
+  [HiDiffusion](/users-guide/image-generation/hidiffusion/).
+- **Negative prompt** — fully supported.
+- **Schedulers** — the full standard list (DDIM, DPM++ 2M Karras, Euler, Euler Ancestral, UniPC, and
+  so on) is available.
+- **Prompt syntax** — SD prompts support [Compel weighting and prompt functions](/users-guide/image-generation/prompt-syntax/).
+
+The **Advanced** section of the Generate panel adds these SD-specific controls:
+
+- **CLIP Skip** — skips the last layers of the text encoder (up to 12 for SD 1.5). Some fine-tunes,
+  especially anime models, are designed to be used with it.
+- **CFG Rescale** — intended for models trained with zero-terminal SNR; a value around `0.7` is
+  suggested for those. Leave it at 0 for ordinary models.
+- **Seamless Tiling** — generates images that tile without visible seams, on the X axis, Y axis or both.
+- **VAE** and **VAE Precision** — override the model's bundled VAE, and choose fp16 (default) or fp32
+  for encoding and decoding.
+- **HiDiffusion** — improves structure at higher resolutions. See
+  [HiDiffusion](/users-guide/image-generation/hidiffusion/).
+
+## Inpainting models
+
+Models with an inpainting variant (such as **Dreamshaper 8 (inpainting)** and
+**Deliberate v5 (inpainting)**) are detected automatically. They are made for filling masked areas and
+extending images on the Canvas, and usually blend new content into the surrounding image better than a
+normal model does. The **Inpainting** ControlNet is an alternative that works with ordinary SD 1.5
+models.
+
+## LoRAs and embeddings
+
+- **LoRAs** for SD 1.x (and SD 2.x), including LyCORIS variants, are supported. Add them in the LoRA
+  section of the Generate panel. LoRAs made for a different model family are not applied.
+- **Textual-inversion embeddings** are supported in the positive and negative prompts. Type `<` in a
+  prompt box to pick from the compatible embeddings you have installed — for example, `EasyNegative`
+  in the negative prompt.
+
+## Control layers
+
+SD 1.5 supports **ControlNet** and **T2I-Adapter** models as control layers on the Canvas. A control
+layer guides composition from an image — edges, depth, pose, line art and so on. See
+[Layers and drops](/users-guide/canvas/layers-and-drops/) for creating a control layer from an image.
+
+## Reference images (IP-Adapter)
+
+SD 1.5 supports up to **five reference images**, using IP-Adapter models:
+
+- **Standard Reference** — references an image with looser precision.
+- **Precise Reference** — references an image more precisely.
+- **Face Reference** — a precise reference adapted for faces.
+
+Each reference image has a **Mode** — **Style**, **Composition** or **Both** — and a **Weight**. Under
+**Advanced**, you can set the range of steps the reference is active for and, in Style mode, choose a
+**Style variant** (Standard, Strong or Precise).
+
+The starter IP-Adapters carry their own image encoder. The **CLIP Vision** selector next to the model
+matters only for IP-Adapters installed from a single checkpoint file; if the chosen encoder is not
+installed, it is downloaded on first use.
+
+## Regional guidance
+
+SD 1.5 supports **regional guidance** on the Canvas: each region can have its own positive prompt, its
+own negative prompt, and its own IP-Adapter reference images.
+
+## Upscaling
+
+The **Upscale** tool supports SD 1.5 main models. It requires a **Tile** ControlNet for SD 1.5 (the
+starter **Tile** ControlNet is part of the bundle), and the bundle's **SwinIR** model can serve as the
+upscaler.
+
+## Workflows
+
+The workflow library includes **Text to Image - SD1.5** and **MultiDiffusion SD1.5**. In the workflow
+editor, SD 1.x and 2.x models are loaded with the **Main Model - SD1.5, SD2** node and prompted with
+**Prompt - SD1.5**. Other nodes that work with them include **Denoise - SD1.5, SDXL**,
+**Apply LoRA - SD1.5**, **ControlNet - SD1.5, SD2, SDXL**, **T2I-Adapter - SD1.5, SDXL**,
+**IP-Adapter - SD1.5, SDXL**, **Apply CLIP Skip - SD1.5, SDXL** and **Apply Seamless - SD1.5, SDXL**.
+
+## SD 2.x
+
+SD 2.x models (SD 2.0 and 2.1 and their fine-tunes) are supported for models you install yourself,
+from a Diffusers folder or a single-file checkpoint. There are no SD 2.x starter models.
+
+- **Defaults** — selecting an SD 2.x model applies 768×768, 30 steps, CFG 7 and Euler Ancestral. That
+  suits the 768px v-prediction checkpoints. For the 512px `-base` checkpoints, change the size to
+  512×512, or set it as the model's default in the Model Manager.
+- **Prediction type** — SD 2.x checkpoints may be epsilon or v-prediction. InvokeAI detects this on
+  install from the checkpoint or its scheduler config. If a model's output looks wrong, check its
+  **Prediction Type** in the Model Manager.
+- **CLIP Skip** goes up to 24, and **CFG Rescale**, **Seamless Tiling**, the negative prompt and
+  regional prompts work as for SD 1.5.
+- **Not available for SD 2.x on the Canvas**: control layers, reference images (IP-Adapter),
+  HiDiffusion and the Upscale tool. In the workflow editor, the **ControlNet - SD1.5, SD2, SDXL** node
+  does accept SD 2.x ControlNets.
+- **LoRAs and embeddings** made for SD 2.x are supported.

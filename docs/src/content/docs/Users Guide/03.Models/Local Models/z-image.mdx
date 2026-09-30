@@ -1,0 +1,138 @@
+---
+title: Z-Image
+description: Generate images with Z-Image Turbo and Z-Image Base, including the GGUF, NVFP4 and SDNQ builds, ControlNets and regional prompting.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 12
+---
+
+Z-Image is a 6B-parameter text-to-image family from Tongyi-MAI that understands both English and Chinese
+prompts. It encodes prompts with a **Qwen3 4B** text encoder and decodes with the same 16-channel VAE as
+FLUX.1. InvokeAI supports two variants:
+
+- **Z-Image Turbo** is distilled for fast, low-step generation with **CFG disabled** (CFG Scale `1.0`).
+  This is the checkpoint the starter models install.
+- **Z-Image Base** is the undistilled foundation model. It needs more steps, and supports CFG and negative
+  prompts.
+
+A Diffusers pipeline's variant is detected on install. Single-file, GGUF and SDNQ files are registered as
+**Turbo**. If you install a Base checkpoint in one of those formats, change its **Variant** to *Z-Image
+Base* in the Model Manager so the right defaults and schedulers apply.
+
+Z-Image works in the Generate tab, on the Canvas (text-to-image, image-to-image, inpainting and
+outpainting) and in the workflow editor.
+
+## Hardware
+
+See the [System Requirements](/start-here/system-requirements/) table. In short: a Q4_K GGUF or NVFP4
+transformer runs in about 8 GB of VRAM, while the Q8 and full-precision (BF16) builds want 16 GB or more.
+The full Diffusers pipeline is roughly a 33 GB download.
+
+For more headroom you can enable [FP8 Storage](/configuration/optimization/fp8-storage/) on a
+full-precision Z-Image model, use an [SDNQ](/configuration/optimization/sdnq-quantization/) build, or turn
+on [Low-VRAM mode](/configuration/optimization/low-vram-mode/).
+
+## Installing
+
+The easiest path is the **Z-Image Turbo** bundle in the Model Manager. It installs the Q4_K GGUF
+transformer, the quantized Qwen3 encoder, the FLUX VAE and both Z-Image ControlNets.
+
+Z-Image needs three components:
+
+| Component             | Diffusers / SDNQ pipeline | GGUF / single-file install           |
+| --------------------- | ------------------------- | ------------------------------------ |
+| Transformer           | bundled                   | the `.gguf` / `.safetensors` file    |
+| Text encoder (Qwen3 4B) | bundled                 | installed separately                 |
+| VAE (FLUX.1)          | bundled                   | installed separately (any FLUX VAE)  |
+
+The starter models:
+
+| Starter                            | Format                      | Size    | Also installs                                  |
+| ---------------------------------- | --------------------------- | ------- | ---------------------------------------------- |
+| Z-Image Turbo                      | Diffusers pipeline          | ~33 GB  | nothing, everything is bundled                 |
+| Z-Image Turbo (quantized)          | GGUF Q4_K                   | ~4 GB   | Qwen3 encoder (GGUF Q6_K, ~3.3 GB) + FLUX VAE  |
+| Z-Image Turbo (Q8)                 | GGUF Q8_0                   | ~6.6 GB | Qwen3 encoder (GGUF Q6_K) + FLUX VAE           |
+| Z-Image Turbo (NVFP4)              | Comfy-Org nvfp4 single file | ~4.5 GB | Qwen3 encoder (FP4 mixed, ~3.5 GB) + FLUX VAE  |
+| Z-Image Turbo (SDNQ uint4 + SVD)   | SDNQ Diffusers pipeline     | ~5 GB   | nothing, everything is bundled                 |
+
+A full-precision **Z-Image Qwen3 Text Encoder** (~8 GB) is also available as a separate starter.
+
+The NVFP4 build keeps its quantized layers packed in memory and decodes them on the fly, so it needs about
+a third of the full-precision transformer's memory.
+
+### Choosing components
+
+When the selected Z-Image model is not a self-contained pipeline, the **Components** section next to the
+model shows three slots:
+
+- **Component source**: a Diffusers (or SDNQ) Z-Image pipeline to borrow the encoder and VAE from.
+- **Qwen3 Encoder**: a standalone Qwen3 4B encoder.
+- **VAE**: Z-Image decodes with the FLUX VAE, so FLUX-base VAEs are listed here.
+
+You need either a component source or both a Qwen3 encoder and a VAE before you can generate.
+
+## Generation settings
+
+Selecting a Z-Image model applies these defaults:
+
+| Variant       | Steps | CFG Scale | Scheduler | Size      |
+| ------------- | ----- | --------- | --------- | --------- |
+| Z-Image Turbo | 9     | 1.0       | Euler     | 1024×1024 |
+| Z-Image Base  | 50    | 4.0       | Euler     | 1024×1024 |
+
+- **CFG Scale**: `1.0` turns CFG off, which is what Turbo is trained for. Values below `1.0` are not
+  accepted.
+- **Negative prompt**: only used when CFG Scale is above `1.0`. With Turbo at `1.0` it has no effect.
+- **Schedulers**: *Euler* (the default and recommended), *Heun (2nd order)* (better quality, about twice as
+  slow) and *LCM*. LCM works with Turbo only and is not offered for Z-Image Base.
+- **Resolution**: width and height must be multiples of 16.
+- **Prompt weighting**: Compel-style [prompt syntax](/users-guide/image-generation/prompt-syntax/) does not
+  apply to Z-Image. Write prompts in plain language.
+
+In the workflow editor, **Denoise - Z-Image** also has a **Shift** input that overrides the timestep
+shift. Leave it blank to have it calculated from the image size, which is the recommended setting.
+
+## ControlNet
+
+Two Z-Image ControlNets are available as starters (both are part of the bundle):
+
+- **Z-Image ControlNet Union** handles Canny, HED, Depth, Pose and MLSD control images.
+- **Z-Image ControlNet Tile** is useful for upscaling and adding detail.
+
+On the Canvas, add a **Control Layer** while a Z-Image model is selected. The layer uses a Z-Image
+ControlNet with a default weight of `0.75`. The weight ranges from `0` to `2`, and `0.65` to `0.80` is the
+recommended range. **Only one** Z-Image control layer can be used per generation.
+
+In the workflow editor, the same thing is the **Z-Image ControlNet** node feeding the **Control** input of
+**Denoise - Z-Image**. That node also needs the **VAE** input connected, which it uses to encode the
+control image.
+
+## Regional prompting
+
+Z-Image supports **Regional Guidance** layers on the Canvas with **positive** prompts. Regional negative
+prompts, auto-negative and regional reference images are not supported for Z-Image.
+
+In the workflow editor, **Prompt - Z-Image** takes an optional mask, and **Denoise - Z-Image** accepts
+either one conditioning or a collection of them.
+
+## LoRA
+
+Z-Image LoRAs are supported in Kohya, PEFT/Diffusers and LyCORIS formats. They are applied to both the
+transformer and the Qwen3 encoder. In the workflow editor, use **Apply LoRA - Z-Image** or **Apply LoRA
+Collection - Z-Image**.
+
+## Seed Variance Enhancer
+
+Z-Image Turbo tends to produce similar images across different seeds. The **Seed Variance Enhancer -
+Z-Image** node, available in the workflow editor only, adds reproducible, seed-based noise to the prompt
+conditioning to increase variety:
+
+- **Strength**: `0` is off, `0.1` (the default) is subtle, `0.5` is strong.
+- **Randomize Percent**: the share of embedding values that receive noise (default `50`).
+
+Connect it between **Prompt - Z-Image** and the denoise node's positive conditioning.
+
+## PiD decoding
+
+Z-Image has no PiD decoder of its own and uses the **FLUX** PiD decoders, since it shares FLUX.1's VAE. See
+[PiD Decode](/users-guide/image-generation/pid-decode/).

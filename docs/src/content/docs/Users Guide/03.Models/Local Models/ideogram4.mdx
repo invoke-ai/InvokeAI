@@ -1,0 +1,77 @@
+---
+title: Ideogram 4
+description: Generate images with the Ideogram 4 text-to-image models.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 6
+---
+## Ideogram 4
+
+Ideogram 4 is an open-weight text-to-image model with a distinctive **structured JSON prompt**: instead of a single sentence, the model is trained to read an overall scene description plus a list of regions, each with a bounding box and its own text. Invoke assembles this JSON for you.
+
+### Installing Ideogram 4
+
+The weights are gated on HuggingFace under a **non-commercial license**. Open the model page, accept the terms, and make sure your HuggingFace token is [set up in the config file] before installing. Two bundled builds are available:
+
+- [`ideogram-ai/ideogram-4-nf4`](https://huggingface.co/ideogram-ai/ideogram-4-nf4) — nf4 quantized, **CUDA only**, fits in 24 GB VRAM. Recommended for NVIDIA GPUs.
+- [`ideogram-ai/ideogram-4-fp8`](https://huggingface.co/ideogram-ai/ideogram-4-fp8) — fp8 quantized, runs on **any device**, with higher memory use.
+
+Paste either repo ID into the Model Manager's HuggingFace / URL field to install. Each folder carries everything Ideogram 4 needs.
+
+#### Single files
+
+Comfy-Org's [`Comfy-Org/Ideogram-4`](https://huggingface.co/Comfy-Org/Ideogram-4) repackage is ungated (the same non-commercial license still applies) and ships the parts separately. Ideogram 4 runs **two** transformers — a conditional branch and an unconditional one, both active at every step — so a single-file install is four models, and each starter installs all four together:
+
+- `diffusion_models/ideogram4_<build>.safetensors` — the conditional branch, selected as the model
+- `diffusion_models/ideogram4_unconditional_<build>.safetensors` — the unconditional branch
+- `text_encoders/qwen3vl_8b_fp8_scaled.safetensors` — the Qwen3-VL **8B** encoder (not the 4B one Krea-2 uses)
+- `vae/flux2-vae.safetensors` — the 32-channel VAE, shared with FLUX.2, which is why it installs under the FLUX.2 base
+
+Pick the unconditional branch, the encoder and the VAE in the **Components** section next to the model — and pick the unconditional branch of the *same* build as the model. The `nvfp4` repackage in that repo is **not** supported yet and is refused at install.
+
+Which branch a file holds is read from the file itself, and from the filename for a build that does not record it, so keep these names as published.
+
+Two builds of the transformers are supported, and they behave differently in memory:
+
+| | download, per branch | resident, per branch |
+|---|---|---|
+| **Ideogram 4 (single file, int8)** — `int8_convrot` | 8.9 GB | **8.9 GB**, on every device |
+| **Ideogram 4 (single file, fp8)** — `fp8_scaled` | 8.6 GB | **8.7 GB** with `fp8_compute` *or* FP8 Storage; 17.3 GB with neither |
+
+Both branches are resident at once, so double those figures for the pair.
+
+:::note[Which to pick]
+**On an NVIDIA Ada card (RTX 40-series) or newer, with `fp8_compute` enabled**, take the fp8 build: the two are a wash on memory, and fp8 is the faster one because its weights stay quantized *and* run on the fp8 tensor cores. Measured at 1024px on a 4090, 12 steps: **35.6 s** for the fp8 pair against **45.7 s** for the int8 pair.
+
+**Without the fp8 matmul, the fp8 build still works — through FP8 Storage.** That setting keeps the file's own fp8 weights and per-tensor scales instead of expanding them, and installation switches it on for these files by itself. Measured on a 4090 with `fp8_compute` off, 1024px: **40.6 s**, 22.9 GB peak, 8.7 GB resident per branch — against **45.7 s** for the int8 pair. With *neither* the matmul nor Storage the weights are expanded to bf16 on load, 17.3 GB per branch, and a 24 GB card runs out of memory during the first step.
+
+**Use int8 where FP8 Storage is not available.** It requires a CUDA device; on anything else the fp8 build falls back to the expanded path, while int8 keeps its stored codes and dequantizes them per forward on any device with no setting to turn on.
+
+On a 24 GB NVIDIA card without the fp8 matmul (RTX 30-series), the int8 pair plus the 8B encoder still adds up to more than the card holds, so the bundled [nf4 build](#installing-ideogram-4) remains the smaller option there.
+:::
+
+### Prompting Ideogram 4
+
+When an Ideogram 4 model is selected, Invoke builds the structured JSON prompt automatically:
+
+- The **positive prompt** becomes the overall scene description.
+- Each enabled **Regional Guidance** layer on the Canvas contributes one element: its drawn box becomes the region's bounding box and its prompt becomes that region's description. Draw a box where you want something and describe it there.
+- To drive the model directly, paste a **raw JSON** object into the prompt box — anything starting with `{` is passed through unchanged.
+
+The exact JSON that was encoded is stored in the image metadata as **Structured Caption**, and can be recalled straight back into the prompt box from the metadata viewer.
+
+:::note[No negative prompt]
+Ideogram 4 does not use a negative prompt — it has a dedicated unconditional branch instead, so the negative prompt box has no effect.
+:::
+
+### Generation settings
+
+- **Sampler Preset** — the primary quality/speed control. `Quality (48 steps)`, `Default (20 steps)`, and `Turbo (12 steps)` each bundle a step count, a guidance schedule, and the schedule shift.
+- **Advanced** overrides (all optional, leave on *Auto* to use the preset's values): **Steps**, **Guidance Scale**, **Schedule Shift (mu)**, and a **Color Palette** that biases the generated colors.
+
+:::caution[Built-in safety filter]
+Ideogram 4 ships with a **content safety filter baked into the released model weights**. When it triggers, the model outputs a placeholder image reading *"Image blocked by safety filter"* instead of your image. This is the model's own filter — it is **not** Invoke's NSFW checker (it fires even with the NSFW checker off) and cannot be disabled from Invoke.
+
+The filter is known to **false-positive on completely benign prompts**, and the quantized builds can trigger it more readily. Invoke always sends the model a structured JSON prompt, which tends to trip the filter less than plain text; if you hit it, rephrasing or adjusting the prompt usually clears it.
+:::
+

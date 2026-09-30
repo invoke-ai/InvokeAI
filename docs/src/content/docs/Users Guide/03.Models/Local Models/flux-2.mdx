@@ -1,0 +1,158 @@
+---
+title: FLUX.2
+description: Generate and edit images with FLUX.2 Klein (4B and 9B, distilled and Base) and FLUX.2 [dev], including multi-reference image editing.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 5
+---
+
+FLUX.2 is Black Forest Labs' second-generation rectified-flow transformer family. It uses a 32-channel VAE
+and a large language model as its text encoder. InvokeAI supports these variants and detects them on
+install:
+
+| Variant | Text encoder | Notes |
+| --- | --- | --- |
+| **Klein 4B** | Qwen3 4B | Distilled for **4 steps** |
+| **Klein 9B** | Qwen3 8B | Distilled for **4 steps** |
+| **Klein 4B Base** / **Klein 9B Base** | Qwen3 4B / Qwen3 8B | Undistilled foundation models; **28 steps** |
+| **FLUX.2 [dev]** | Mistral Small 3.1 | 32B guidance-distilled transformer; **28 steps**; non-commercial license |
+
+Every variant can take reference images for image editing (see [Reference images](#reference-images)).
+
+:::note[Klein vs. Klein Base]
+A Klein model and its Base model have identical architectures, so InvokeAI tells them apart by the file or
+repository name: a name containing "base" (and not "distilled") is identified as Base. If a model was
+identified wrongly, change its **Variant** in the model's edit form in the Model Manager. It matters:
+Base models need 28 steps, distilled ones 4.
+:::
+
+## Hardware
+
+See the [System Requirements](/start-here/system-requirements/) table:
+
+- **Klein 4B** — 12 GB VRAM and 16 GB RAM at 1024×1024; the FP8 build works with 8 GB+. The GGUF Q4 build
+  runs on 6–8 GB.
+- **Klein 9B** — 12 GB VRAM and 32 GB RAM. The int8 build is 9.5 GB on any supported GPU. The FP8 build stays
+  that small only on an RTX 40-series (or newer) card with `fp8_compute` enabled; otherwise it expands to
+  about 18 GB. The Qwen3 8B encoder is about 15 GB and streams on a 12 GB card.
+- **FLUX.2 [dev]** — the full Diffusers pipeline is about 80 GB. The NF4 Diffusers build runs on about 18 GB
+  of VRAM with offloading, and the GGUF Q3_K_M transformer fits about 12 GB with offloading.
+
+See also [FP8 Storage](/configuration/optimization/fp8-storage/) and [SDNQ
+quantization](/configuration/optimization/sdnq-quantization/).
+
+## Installing
+
+The **FLUX.2 Klein** bundle in the Model Manager is the quickest start. It installs *FLUX.2 Klein 4B (GGUF
+Q4)* together with the FLUX.2 VAE and the Qwen3 4B encoder.
+
+A FLUX.2 model needs three components:
+
+| Component | Diffusers install | Single-file / GGUF / FP8 / int8 install |
+| --- | --- | --- |
+| Transformer | bundled | the checkpoint itself |
+| VAE (FLUX.2) | bundled | installed separately |
+| Text encoder | bundled | Klein 4B: Qwen3 4B · Klein 9B: Qwen3 8B · [dev]: Mistral |
+
+Starter models that are not Diffusers pipelines install the VAE and the matching encoder as dependencies.
+Pick them in the **Components** section next to the model. If you have a FLUX.2 Diffusers model of the
+matching variant installed, InvokeAI uses its encoder and VAE automatically, so you don't need standalone
+ones.
+
+### Klein starter models
+
+| Starter model | Format | Size |
+| --- | --- | --- |
+| FLUX.2 Klein 4B (Diffusers) / 9B (Diffusers) | Diffusers pipeline | ~16 GB / ~35 GB |
+| FLUX.2 Klein 4B | bf16 single file | ~8 GB |
+| FLUX.2 Klein 4B (FP8) / 9B (FP8) | FP8 single file | ~4 GB / ~9.5 GB |
+| FLUX.2 Klein 9B (int8) | int8 single file (community repack) | ~9.5 GB, same size in memory on every supported GPU |
+| FLUX.2 Klein 4B (GGUF Q4 / Q8) | GGUF | ~2.6 GB / ~4.3 GB |
+| FLUX.2 Klein 9B (GGUF Q4 / Q8) | GGUF | ~5.8 GB / ~10 GB |
+| FLUX.2 Klein 4B (SDNQ dynamic 4-bit) / 9B (SDNQ dynamic 4-bit + SVD) | SDNQ Diffusers pipeline | ~5 GB / ~13 GB, self-contained |
+
+Standalone Qwen3 encoders are available as starter models too: *FLUX.2 Klein Qwen3 4B Encoder* (~8 GB) and
+its *FP4 mixed* build (~3.6 GB download), and *FLUX.2 Klein Qwen3 8B Encoder* (~16 GB) with *FP4 mixed*
+(~6.3 GB download) and *int8* (~9.4 GB) builds. A 4B encoder only works with Klein 4B models, an 8B encoder
+only with Klein 9B.
+
+When you install an FP8 checkpoint, FP8 Storage is switched on for it automatically, which keeps the file's
+fp8 weights instead of expanding them.
+
+### FLUX.2 [dev] starter models
+
+| Starter model | Format | Size |
+| --- | --- | --- |
+| FLUX.2 [dev] (Diffusers) | Diffusers pipeline | ~80 GB |
+| FLUX.2 [dev] (Diffusers, NF4) | NF4-quantized transformer and text encoder | ~18 GB VRAM with offload |
+| FLUX.2 [dev] Transformer (GGUF Q3_K_M / Q4_K_M / Q5_K_M / Q6_K / Q8_0) | GGUF | ~15.9 / 20 / 24 / 27.9 / 35.5 GB |
+
+The GGUF transformers need a separate Mistral encoder. Q3_K_M and Q4_K_M install the GGUF Q4 encoder, the
+larger quants the GGUF Q8 encoder. Other encoder starters are the Comfy-Org builds — *FP8* (~18 GB, best
+quality for its size), *BF16* (~35.6 GB) and *FP4 mixed* (~12.3 GB download) — and a GGUF *IQ4_XS* build
+(~11.1 GB).
+
+:::caution[License and access]
+FLUX.2 [dev] is released under a non-commercial license. Some Black Forest Labs repositories are gated on
+HuggingFace: if a download asks for an access token, accept the license on the model's HuggingFace page and
+add your HuggingFace token under **API Keys** in the Model Manager.
+:::
+
+## Generation settings
+
+Selecting a FLUX.2 model applies these defaults:
+
+| Variant | Steps | Guidance | Scheduler | Size |
+| --- | --- | --- | --- | --- |
+| Klein 4B / 9B | 4 | — | Euler | 1024×1024 |
+| Klein 4B Base / 9B Base | 28 | — | Euler | 1024×1024 |
+| [dev] | 28 | 3.5 | Euler | 1024×1024 |
+
+- **Guidance** — the slider next to Steps sets FLUX.2 [dev]'s distilled guidance (0–20). It has no effect on
+  Klein models.
+- **Scheduler** — Euler, Heun (2nd order; better quality at about twice the time per step) or LCM (for few
+  steps).
+- **Size** — width and height must be multiples of 16.
+- **Negative prompt** — not available in the Generate tab or on the Canvas.
+
+Text-to-image, image-to-image, inpainting and outpainting all work on the Canvas. FLUX.2 has no ControlNet
+or IP-Adapter support.
+
+## Reference images
+
+Every FLUX.2 model can edit or combine images from up to **five** reference images. Add them on the
+Generate tab or the Canvas and describe the result you want in the prompt. No extra model is needed.
+
+In the workflow editor, wrap each image in a **Kontext Conditioning - FLUX** node and connect it (or a
+collection of them) to the **Reference Images** input of **FLUX2 Denoise**.
+
+## Regional guidance
+
+Regional guidance layers with a prompt are supported on the Canvas. Regional reference images are not.
+Regional prompts are **ignored when reference images are attached**; InvokeAI logs a warning when that
+happens.
+
+## LoRA
+
+FLUX.2 LoRAs are labelled with the variant they were trained for, and the Generate tab only offers LoRAs
+that match the selected model's variant. LoRAs patch the transformer and, where they include text-encoder
+layers, the Qwen3 or Mistral encoder. In workflows use **Apply LoRA - Flux2 Klein** or **Apply LoRA -
+FLUX.2 [dev]** (and their *Collection* versions).
+
+## PiD super-resolution decode
+
+FLUX.2 Klein latents can be decoded with a PiD decoder for a 4× super-resolved image. Install *PiD Decoder
+FLUX.2 (2K)* or *PiD Decoder FLUX.2 (2K to 4K)*; see [PiD Super-Resolution
+Decode](/users-guide/image-generation/pid-decode/).
+
+## Workflow nodes
+
+| Node | Purpose |
+| --- | --- |
+| **Main Model - Flux2 Klein** / **Main Model - FLUX.2 [dev]** | Loads the transformer, encoder and VAE |
+| **Prompt - Flux2 Klein** / **Prompt - FLUX.2 [dev]** | Encodes the prompt |
+| **FLUX2 Denoise** | Runs the diffusion; takes the VAE and optional reference images |
+| **Latents to Image - FLUX2** / **Image to Latents - FLUX2** | VAE decode / encode |
+
+**FLUX2 Denoise** also has a **CFG Scale** and a negative conditioning input, which the Generate tab leaves
+off (CFG 1.0).

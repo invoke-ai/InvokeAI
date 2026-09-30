@@ -3,46 +3,296 @@ title: Managing media generation models
 description: Introduction to the Model Manager
 ---
 
-## Models and the Model Manager
+Models are the "secret sauce" that drive image and video
+generation. This page provides a brief introduction to these models
+and describes how you can manage them using InvokeAI.
 
-## Checkpoint and Diffusers Models
+## Types of Models
 
-The model checkpoint files (`*.ckpt`) are the Stable Diffusion "secret sauce". They are the product of training the AI on millions of captioned images gathered from multiple sources.
+There are literally thousands of models available, each
+specialized for a different task. These include:
 
-Originally there was only a single Stable Diffusion weights file, which many people named `model.ckpt`.
+* **Text-to-Image** -- Given a text prompt, generate a
+    still image.
+* **Image-to-Image** -- Given a starting image and a text
+    prompt, generate a new image.
+* **Image Editing** -- Use a text prompt to modify an image or combine
+    several images according to instructions.
+* **Text-to-Video, Image-to-Video, Video-to-Video** -- As their names
+    imply, these generate videos starting from a text prompt, an image, or
+    another video. These modes can be combined in multiple ways.
+* **Concept** -- These are small add-on models that modify a larger image or video
+    generation model to achieve special effects, such as adding a
+    particular style, theme or character. The most common of these are LoRA models.
+* **ControlNet** -- Another family of models that provides spatial
+    guidance to an image generation model while it works, helping to
+    precisely control where elements of the image appear. A typical
+    example is a pose model that transfers the pose of a stick figure
+    onto a photorealistic subject.
 
-Today, there are thousands of models, fine tuned to excel at specific styles, genres, or themes.
+In addition to models directly involved in image and video
+manipulation, InvokeAI supports several support models:
 
-:::tip[Model Formats]
-  We also have two more popular model formats, both created by [HuggingFace](https://huggingface.co/):
+* **Image Segmenters** -- These are models that can identify
+  and isolate individual objects in an image, which is often the first
+  step in precisely editing an image.
+* **Vision Models** -- These are models that can describe what it
+  "sees" in an image. These can be used to classify, cluster and tag
+  images, as well as to convert an image into a text prompt that can
+  be repurposed.
+* **Large Language Models** -- These are models that generate text
+  from text. InvokeAI uses them for prompt enhancement, a process that
+  takes a simple prompt and tweaks it to achieve better results.
 
-  - `safetensors`: Single file, like `.ckpt` files. Prevents malware from lurking in a model.
-  - `diffusers`: Splits the model components into separate files, allowing very fast loading.
+## Local vs External Models
 
-  InvokeAI supports all three formats.
+A model can be installed locally, in which case it executes on your
+own hardware (CPU and graphics card), or it can be hosted
+externally. In the latter case InvokeAI will send your request out to
+the hosted image or video generation service and return the result. To
+use an external model you will typically need to subscribe to the
+hosting service.
+
+Locally-hosted models, also known as "open-weights" models, produce
+excellent quality images and videos with decent performance. They cost
+nothing to run beyond the initial hardware investment and the
+electricity it uses.  However, some of the more advanced models may
+strain or exceed local hardware resources; some are 50-100 GB in
+size. In this case using an externally-hosted model may be your best
+choice.
+
+:::note[Model Licensing]
+     Note that some models carry license terms that limit their use in
+     commercial applications or on public servers. It's your responsibility
+     to adhere to the license terms.
 :::
 
-## Starter Models
+---
 
-When you first start InvokeAI, you'll see a popup prompting you to install some starter models from the Model Manager. Click the `Starter Models` tab to see the list.
+## Model Manager
 
-You'll find a collection of popular and high-quality models available for easy download.
+The InvokeAI Model Manager is the central location for managing both
+local and external models. For those just getting started with
+InvokeAI, it provides a series of recommended starter models that are
+organized into a series of bundles.
 
-Some models carry license terms that limit their use in commercial applications or on public servers. It's your responsibility to adhere to the license terms.
+To access the model manager, go to the InvokeAI icon at the upper
+left of the screen, pull down its menu, and select "Model Manager." It
+has two sections: a list of installed models on the left (initially
+empty), and a panel on the right that allows you to search and install
+bundles, individual starter models, and other locally-installable and
+external models.
 
-## Other Models
+If it isn't selected already, click **"+ Add Models"** to display the
+list of starter models and bundles.
 
-There are a few ways to install other models:
+### Local Bundles
 
-- **URL or Local Path**: Provide the path to a model on your computer, or a direct link to the model. Some sites require you to use an API token to download models, which you can [set up in the config file]. You can also paste a HuggingFace Repo ID here directly — it is detected and routed to the HuggingFace installer automatically.
-- **HuggingFace**: Paste a HF Repo ID to install it. If there are multiple models in the repo, you'll get a list to choose from. Repo IDs look like this: `XpucT/Deliberate`. There is a copy button on each repo to copy the ID.
-- **Scan Folder**: Scan a local folder for models. You can install all of the detected models in one click.
+We suggest that you start by installing a bundle. You will see a
+series of chips across the top of the panel, each one corresponding to
+a different family (or "base") of generation model. Clicking on the
+chip will show you all the starter models in that group. To install
+all the recommended models for that family, click "Install bundle."
+You may also cherry-pick individual models within the bundle.
 
-### Diffusers models in HF repo subfolders
+Some models are quite large and may take a while to download. During
+download and installation, a status bar will appear at the bottom of
+the right panel. Click on this bar in order to see the progress of
+individual models.
 
-HuggingFace repos can be structured in any way. Some model authors include multiple models within the same folder.
+### External Models
 
-In this situation, you may need to provide some additional information to identify the model you want, by adding `:subfolder_name` to the repo ID.
+To add an externally-hosted model, select the **"API Keys"** section of
+the Model Manager's right panel. This will display a list of model
+providers. Where prompted, enter the API key for access to the
+provider using your subscription. See your provider's account page for
+information on how to generate these keys. Once a valid API key has
+been provided, the list of models hosted by that service will appear
+as selections in the Image Generation panel.
+
+:::note[Gated Downloads]
+   The API Keys section is also used to provide keys for services that
+   require authentication to download certain models, such as those
+   covered by restrictive licenses. If you try to install a model
+   hosted by HuggingFace or Civitai and you get a permission denied
+   error, you will need to enter an API key for your account on the
+   service. You may also need to accept the license terms for the
+   model in question on the host's download page.
+:::
+
+## Installing Models by Hand
+
+There is a search box at the top of the **"+ Add Models"** section
+that has multiple uses. You can:
+
+* Type a search term to find starter models that you can install
+  immediately.
+* Paste in the download URL of a model you wish to install from
+  Civitai, HuggingFace, or another download site. 
+* Paste in the HuggingFace repository ID of a model you wish to install.
+* If you've already downloaded the model and it is living on the
+  InvokeAI backend filesystem, type in or cut and paste the path to the
+  folder containing the model you wish to install.
+
+If you type in a URL or HuggingFace repository ID, a **Pull** button
+will appear. Pressing it will initiate the download and install. If
+you type in a file path, the button will change to **Scan**. Pressing
+it will scan the indicated folder and list the installable
+models. Click the model(s) you wish to install.
+
+## Editing a Model
+
+Once a model is installed, it will appear in the left-hand panel. The
+panel has controls that let you search and sort the models in various
+ways, including by model type and architecture.
+
+Most models have default parameters that you can customize, for
+example step count, image dimensions and CFG. When you click on a
+model, an edit panel appears to the right where you can edit the
+model's default parameters, change its name, add descriptive notes,
+and even choose a preview image for the model. For models that take
+prompt trigger terms, such as some LoRAs, you can add the terms so
+that they appear as shortcuts in the Image generation prompt box.
+
+## Deleting a Model
+
+Right click on the model in the left panel and choose **"Delete
+model"**. It will be removed from the list of models InvokeAI knows
+about. If the model was downloaded and installed by the Model Manager,
+its weights will be deleted from your file system. If, on the other
+hand, you downloaded the model by hand and then imported it into
+InvokeAI, the weights will be left alone.
+
+---
+
+## Model Zoology
+
+There are a bewildering number of model families, types and
+formats. This section provides a brief overview of the models that
+InvokeAI supports.
+
+### Checkpoints vs Diffusers Formats
+
+Model weights are distributed in two main layouts, and InvokeAI
+installs both:
+
+* **Diffusers** -- A folder, usually a HuggingFace repository, laid
+  out the way the HuggingFace `diffusers` library expects. Each
+  component of the model (the denoiser, the VAE, the text encoders,
+  the tokenizers and the scheduler settings) lives in its own
+  subfolder with its own configuration file. A Diffusers install is
+  self-contained: everything the model needs comes with it. Install
+  one by pasting its repository ID, such as
+  `stabilityai/stable-diffusion-xl-base-1.0`, into the Model Manager.
+* **Checkpoint** (single file) -- One file, usually `.safetensors`
+  (older models may use `.ckpt` or `.pt`), holding the weights of one
+  or more components. This is the usual format on Civitai. Single-file
+  checkpoints for Stable Diffusion 1.x and SDXL generally include the
+  VAE and text encoders. Checkpoints for most newer architectures
+  contain only the transformer, so you also have to install the VAE
+  and text encoder that go with them, either separately or as part of
+  the family's starter bundle.
+
+Newer models are often distributed in **quantized** forms, which
+store the weights at reduced precision to save disk space and
+VRAM. InvokeAI recognizes several of these, including **GGUF** files
+(named for their quantization level, such as `Q4_K_M` or `Q8_0`),
+**fp8**, **int8** and **nf4** builds. Like other single-file
+checkpoints, a quantized file usually carries only the transformer
+and needs separately installed companions. Lower precision trades a
+little image quality for a large saving in memory; each model family's
+page lists the builds it supports.
+
+A single-file Stable Diffusion 1.x, 2.x or SDXL model can be converted
+to Diffusers format with the **Convert to diffusers** action in the
+model's detail view. Conversion replaces the single file with an
+equivalent Diffusers folder. Converting is optional: InvokeAI runs
+the single-file checkpoint directly.
+
+### Submodels
+
+What we call "a model" is really a pipeline of several cooperating
+networks, called submodels or components. The prompt is split into
+tokens and turned into numbers by the text encoder. The denoiser then
+starts from random noise and, over a series of steps, gradually shapes
+it into an image guided by those numbers. It works in a compressed
+"latent" space rather than on pixels, so at the end the VAE decodes
+the result into the image you see.
+
+A Diffusers install carries all of these components together. With
+single-file and quantized installs you often pick some of them
+yourself. They appear as separate models in the Model Manager, and
+generation panels show slots for them (for example **VAE**, **Text
+encoder** or **Model components**) when the selected model needs
+them. Several families share components: FLUX.2 and Ideogram 4 use
+the same VAE, for example, so one download can serve both.
+
+| Component | What it does |
+|---|---|
+| **Denoiser** (UNet or transformer) | The core of the model and by far the largest part. At each step it predicts how to remove noise from the latent image, steered by the encoded prompt. Older models (SD 1.x, SDXL) use a convolutional **UNet**; newer ones use a **diffusion transformer** (DiT). Some models use two: the Wan 2.2 A14B models hand off from a high-noise expert to a low-noise expert partway through, and Ideogram 4 runs a conditional and an unconditional transformer side by side. |
+| **VAE** (variational autoencoder) | Translates between pixels and latents. The encoder half compresses an input image (for image-to-image, inpainting or a video's first frame) into latents; the decoder half turns the finished latents back into pixels. A different VAE can change color and fine detail. |
+| **Tokenizer** | Splits the prompt into tokens, the word pieces the text encoder understands. It is a small vocabulary file rather than a neural network, and it always comes with its text encoder. |
+| **Text encoder** | Turns the tokens into embeddings that tell the denoiser what to draw. Older models use CLIP; newer ones use large language models such as T5, Qwen3, Mistral or Gemma, which understand long, detailed prompts much better. These can be as large as the denoiser, and several families let you run them from a separately installed, quantized file. SDXL and FLUX.1 combine two encoders. |
+| **Image encoder** | Turns a reference image into embeddings the denoiser can use, the way a text encoder does for text. Used by IP-Adapters and FLUX Redux (CLIP Vision or SigLIP) to carry the style or content of a reference image. Vision-language text encoders such as Qwen-VL read reference images directly, which is how image-editing models like Qwen Image Edit see the image they edit. |
+| **Scheduler** | The algorithm that decides how much noise to remove at each step. It is configuration rather than a network; you can pick a different scheduler for many models in the generation settings. |
+| **Audio VAE** | Video-with-audio models only (LTX-2, MiniMax H3). The audio counterpart of the VAE: it encodes and decodes the latent form of the soundtrack that is denoised alongside the video. |
+| **Vocoder** | LTX-2 only. Converts the decoded audio spectrogram into a playable waveform. MiniMax H3's audio VAE produces a waveform directly and needs no vocoder. |
+| **Connectors** | LTX-2 only. A small network that adapts the Gemma text encoder's output, taken from every layer, into the form the LTX-2 transformer expects. |
+| **Latent upsampler** | LTX-2 only. Enlarges the latent video between the two passes of two-stage generation, so the second pass can refine at higher resolution. |
+
+### Model Families
+
+Every main model belongs to a family, also called its **base** or
+architecture. The family determines which components, LoRAs,
+ControlNets and other add-ons work with the model: a LoRA trained for
+SDXL cannot be used with FLUX.1, for example. InvokeAI detects the
+family when you install a model, shows it as a colored badge in the
+Model Manager, and only offers add-ons that match the selected main
+model.
+
+Families differ widely in size, speed and specialty. Older families
+such as SD 1.5 and SDXL run on modest hardware and have huge
+libraries of community fine-tunes, LoRAs and ControlNets. Newer
+families follow long prompts more faithfully and render text better,
+but need more VRAM. Many newer families also come in distilled
+"Turbo" or "Lightning" variants that trade some flexibility for much
+faster generation.
+
+| Family | Generates | Highlights | Details |
+|---|---|---|---|
+| **Stable Diffusion 1.x / 2.x** | Images | The original open model family. Small and fast, with the largest library of fine-tunes, LoRAs, ControlNets and IP-Adapters. Best at 512×512. | [SD 1.5 / 2.x](/users-guide/models/local-models/stable-diffusion-1-2/) |
+| **SDXL** | Images | Higher-resolution successor to SD 1.5 (1024×1024) with a similarly rich ecosystem of add-ons. An optional refiner model, used in the workflow editor, polishes fine detail. | [SDXL](/users-guide/models/local-models/sdxl/) |
+| **Stable Diffusion 3.5** | Images | Medium and Large transformer models from Stability AI, with three text encoders. | [SD 3.5](/users-guide/models/local-models/sd-3/) |
+| **FLUX.1** | Images | Dev, Schnell, Kontext (image editing) and Krea variants, plus Fill (inpainting, workflow editor only) and Redux, with ControlNets and IP-Adapters. | [FLUX.1](/users-guide/models/local-models/flux-1/) |
+| **FLUX.2** | Images | Klein 4B and 9B, and the much larger [dev]. Generates and edits images from reference images. | [FLUX.2](/users-guide/models/local-models/flux-2/) |
+| **CogView4** | Images | THUDM's 6B text-to-image model with a GLM text encoder. Basic support, without LoRAs, ControlNets or reference images. | [CogView4](/users-guide/models/local-models/cogview4/) |
+| **Z-Image** | Images | 6B model in a fast, few-step Turbo variant and a Base variant. Understands English and Chinese prompts, with ControlNets. | [Z-Image](/users-guide/models/local-models/z-image/) |
+| **ERNIE-Image** | Images | Baidu's 8B text-to-image model, in standard and distilled Turbo variants. | [ERNIE-Image](/users-guide/models/local-models/ernie-image/) |
+| **Qwen Image** | Images | Text-to-image (2512) and instruction-based image editing (Edit 2511), with fast Lightning variants. | [Qwen Image](/users-guide/models/local-models/qwen-image/) |
+| **Krea-2** | Images | 12B model in fast Turbo and undistilled Raw variants, with training-free style reference. | [Krea-2](/users-guide/models/local-models/krea-2/) |
+| **Ideogram 4** | Images | Structured prompts that place described elements in regions of the image. Non-commercial license. | [Ideogram 4](/users-guide/models/local-models/ideogram4/) |
+| **Anima** | Images | Compact 2B anime-focused model, with ControlNet-LLLite adapters for inpainting and sketch guidance. | [Anima](/users-guide/models/local-models/anima/) |
+| **Wan 2.2** | Video, images | Text-to-video and image-to-video, including first/last-frame interpolation. Can also generate single images. | [Wan 2.2](/users-guide/video-generation/wan-22/) |
+| **LTX-2** | Video with audio | Video with a synchronized soundtrack, audio-to-video and video-to-audio, keyframes and extension. | [LTX-2](/users-guide/video-generation/ltx-2/) |
+| **MiniMax H3** | Video with audio | Video with a stereo soundtrack, from first/last frames or from up to 12 reference images and videos. | [MiniMax H3](/users-guide/video-generation/minimax-h3/) |
+
+The video families are described in the [Video
+Generation](/users-guide/video-generation/introduction/) section, and
+are also listed under Local Models in the sidebar.
+
+---
+
+## Advanced Topics
+
+This section covers several model installation issues that you may
+encounter along the way.
+
+### HuggingFace repos that contain multiple models
+
+HuggingFace repos can be structured in any way. Some model authors
+include multiple models within the same folder. In this situation, you
+may need to provide some additional information to identify the model
+you want, by adding `:subfolder_name` to the repo ID.
 
 :::note[Example]
   Say you have a repo ID `monster-labs/control_v1p_sd15_qrcode_monster`, and the model you want is inside the `v2` subfolder.
@@ -50,94 +300,30 @@ In this situation, you may need to provide some additional information to identi
   Add `:v2` to the repo ID and use that when installing the model: `monster-labs/control_v1p_sd15_qrcode_monster:v2`
 :::
 
-[set up in the config file]: ../../configuration/invokeai-yaml
-
-## Ideogram 4
-
-Ideogram 4 is an open-weight text-to-image model with a distinctive **structured JSON prompt**: instead of a single sentence, the model is trained to read an overall scene description plus a list of regions, each with a bounding box and its own text. Invoke assembles this JSON for you.
-
-### Installing Ideogram 4
-
-The weights are gated on HuggingFace under a **non-commercial license**. Open the model page, accept the terms, and make sure your HuggingFace token is [set up in the config file] before installing. Two bundled builds are available:
-
-- [`ideogram-ai/ideogram-4-nf4`](https://huggingface.co/ideogram-ai/ideogram-4-nf4) — nf4 quantized, **CUDA only**, fits in 24 GB VRAM. Recommended for NVIDIA GPUs.
-- [`ideogram-ai/ideogram-4-fp8`](https://huggingface.co/ideogram-ai/ideogram-4-fp8) — fp8 quantized, runs on **any device**, with higher memory use.
-
-Paste either repo ID into the Model Manager's HuggingFace / URL field to install. Each folder carries everything Ideogram 4 needs.
-
-#### Single files
-
-Comfy-Org's [`Comfy-Org/Ideogram-4`](https://huggingface.co/Comfy-Org/Ideogram-4) repackage is ungated (the same non-commercial license still applies) and ships the parts separately. Ideogram 4 runs **two** transformers — a conditional branch and an unconditional one, both active at every step — so a single-file install is four models, and each starter installs all four together:
-
-- `diffusion_models/ideogram4_<build>.safetensors` — the conditional branch, selected as the model
-- `diffusion_models/ideogram4_unconditional_<build>.safetensors` — the unconditional branch
-- `text_encoders/qwen3vl_8b_fp8_scaled.safetensors` — the Qwen3-VL **8B** encoder (not the 4B one Krea-2 uses)
-- `vae/flux2-vae.safetensors` — the 32-channel VAE, shared with FLUX.2, which is why it installs under the FLUX.2 base
-
-Pick the unconditional branch, the encoder and the VAE in the **Components** section next to the model — and pick the unconditional branch of the *same* build as the model. The `nvfp4` repackage in that repo is **not** supported yet and is refused at install.
-
-Which branch a file holds is read from the file itself, and from the filename for a build that does not record it, so keep these names as published.
-
-Two builds of the transformers are supported, and they behave differently in memory:
-
-| | download, per branch | resident, per branch |
-|---|---|---|
-| **Ideogram 4 (single file, int8)** — `int8_convrot` | 8.9 GB | **8.9 GB**, on every device |
-| **Ideogram 4 (single file, fp8)** — `fp8_scaled` | 8.6 GB | **8.7 GB** with `fp8_compute` *or* FP8 Storage; 17.3 GB with neither |
-
-Both branches are resident at once, so double those figures for the pair.
-
-:::note[Which to pick]
-**On an NVIDIA Ada card (RTX 40-series) or newer, with `fp8_compute` enabled**, take the fp8 build: the two are a wash on memory, and fp8 is the faster one because its weights stay quantized *and* run on the fp8 tensor cores. Measured at 1024px on a 4090, 12 steps: **35.6 s** for the fp8 pair against **45.7 s** for the int8 pair.
-
-**Without the fp8 matmul, the fp8 build still works — through FP8 Storage.** That setting keeps the file's own fp8 weights and per-tensor scales instead of expanding them, and installation switches it on for these files by itself. Measured on a 4090 with `fp8_compute` off, 1024px: **40.6 s**, 22.9 GB peak, 8.7 GB resident per branch — against **45.7 s** for the int8 pair. With *neither* the matmul nor Storage the weights are expanded to bf16 on load, 17.3 GB per branch, and a 24 GB card runs out of memory during the first step.
-
-**Use int8 where FP8 Storage is not available.** It requires a CUDA device; on anything else the fp8 build falls back to the expanded path, while int8 keeps its stored codes and dequantizes them per forward on any device with no setting to turn on.
-
-On a 24 GB NVIDIA card without the fp8 matmul (RTX 30-series), the int8 pair plus the 8B encoder still adds up to more than the card holds, so the bundled [nf4 build](#installing-ideogram-4) remains the smaller option there.
-:::
-
-### Prompting Ideogram 4
-
-When an Ideogram 4 model is selected, Invoke builds the structured JSON prompt automatically:
-
-- The **positive prompt** becomes the overall scene description.
-- Each enabled **Regional Guidance** layer on the Canvas contributes one element: its drawn box becomes the region's bounding box and its prompt becomes that region's description. Draw a box where you want something and describe it there.
-- To drive the model directly, paste a **raw JSON** object into the prompt box — anything starting with `{` is passed through unchanged.
-
-The exact JSON that was encoded is stored in the image metadata as **Structured Caption**, and can be recalled straight back into the prompt box from the metadata viewer.
-
-:::note[No negative prompt]
-Ideogram 4 does not use a negative prompt — it has a dedicated unconditional branch instead, so the negative prompt box has no effect.
-:::
-
-### Generation settings
-
-- **Sampler Preset** — the primary quality/speed control. `Quality (48 steps)`, `Default (20 steps)`, and `Turbo (12 steps)` each bundle a step count, a guidance schedule, and the schedule shift.
-- **Advanced** overrides (all optional, leave on *Auto* to use the preset's values): **Steps**, **Guidance Scale**, **Schedule Shift (mu)**, and a **Color Palette** that biases the generated colors.
-
-:::caution[Built-in safety filter]
-Ideogram 4 ships with a **content safety filter baked into the released model weights**. When it triggers, the model outputs a placeholder image reading *"Image blocked by safety filter"* instead of your image. This is the model's own filter — it is **not** Invoke's NSFW checker (it fires even with the NSFW checker off) and cannot be disabled from Invoke.
-
-The filter is known to **false-positive on completely benign prompts**, and the quantized builds can trigger it more readily. Invoke always sends the model a structured JSON prompt, which tends to trip the filter less than plain text; if you hit it, rephrasing or adjusting the prompt usually clears it.
-:::
 
 ## Editing model metadata
 
-Every model has an editable **Source URL** field alongside its name and description. Use it to record where a model came from — for example a Civitai or HuggingFace page — independent of how it was originally installed. The URL is editable from the model's **Edit** view and appears as a clickable link in the model header once set. Models without a URL simply hide the field.
+Every model has an editable **Source URL** field alongside its name
+and description. Use it to record where a model came from — for
+example a Civitai or HuggingFace page — independent of how it was
+originally installed. The URL is editable from the model's **Edit**
+view and appears as a clickable link in the model header once
+set. Models without a URL simply hide the field.
 
-This is purely metadata: the URL has no effect on loading and is not used to refresh or reinstall the model. It is mainly useful for going back to the model's documentation, license, or example prompts later.
+This is purely metadata: the URL has no effect on loading and is not
+used to refresh or reinstall the model. It is mainly useful for going
+back to the model's documentation, license, or example prompts later.
 
 ## Bulk actions in the Model Manager
 
 The Model Manager supports multi-selection for batch operations.
 
 - **Select multiple models** by clicking with **Ctrl** (Windows / Linux) or **Cmd** (macOS) held, or by using the checkboxes on each row. A sticky header at the top shows the current selection count and is always visible while you scroll.
-- Open the **Actions** dropdown for the selection. The available actions are:
-  - **Delete Models** — removes every selected model in a single confirmation step. Partial failures (e.g. permission issues) are reported per-model in the result toast.
-  - **Reidentify Models** — re-probes every selected model, updating fields that depend on the file contents (type, base, format, variant, etc.). This is the bulk version of the per-model reidentify action.
+- Select the bulk action you wish to execute. These actions appear as buttons at the top of the list when one or more models are selected.
+  - **Delete** — removes every selected model in a single confirmation step. Partial failures (e.g. permission issues) are reported per-model in the result toast.
+  - **Re-identify** — re-probes every selected model, updating fields that depend on the file contents (type, base, format, variant, etc.). This is the bulk version of the per-model reidentify action.
 
-:::caution[Reidentify resets custom settings]
+:::caution[Re-identify resets custom settings]
 Reidentifying a model re-derives its configuration from the file on disk. Any custom settings you've adjusted on those models — default settings, descriptions, trigger phrases — may be overwritten. The confirmation modal warns you about this before running.
 :::
 
@@ -145,32 +331,16 @@ Both actions handle partial failures: if some models succeed and others fail, th
 
 ## Finding orphaned models
 
-If a model file is deleted or moved outside the Model Manager, its database entry sticks around. To find these orphaned entries:
+If a model file is deleted or moved outside the Model Manager, its
+database entry sticks around. To find these orphaned entries:
 
 1. Open the Model Manager.
-2. Open the **type filter** dropdown and pick **Missing Files**.
-3. The list now shows only models whose files are no longer present on disk. Each one also displays a **Missing Files** badge in its row.
+2. Click the "..." menu at the top right of the installed model list, and pick **"Clean up orphaned models..."**
+3. If there are orphaned models, a dialogue box appears that lists them and offers to remove their database entries.
 
-Orphaned models are automatically excluded from selection dropdowns (main model, LoRA, VAE, etc.), so you cannot accidentally pick one for generation. Use the [bulk delete action](#bulk-actions-in-the-model-manager) to clean them out in one step.
-
-## Synchronizing orphaned model directories
-
-The **Missing Files** filter finds database records whose files are gone. InvokeAI also has a separate sync workflow for the opposite situation: model directories that still exist on disk but are not referenced in the database.
-
-This can happen after a failed import, a manual database edit, or deleting a model record while leaving files behind. The sync workflow scans the models directory for top-level folders containing model files with common model extensions, including `.safetensors`, `.ckpt`, `.pt`, `.pth`, `.bin`, `.onnx`, and `.gguf`.
-
-To review these directories:
-
-1. In multi-user mode, sign in as an administrator. In single-user mode, the Model Manager controls are available by default.
-2. Open the Model Manager.
-3. Click **Sync Models** to scan for orphaned model directories.
-4. Review each reported relative directory path, contained model files, and total size before deleting anything.
-
-:::caution[Deletion removes directories]
-Deleting an orphaned model directory removes the entire reported directory from disk. The server deletes it directly with recursive directory deletion, so make sure the directory contains only files you intend to remove.
-:::
-
-Only administrators can use this workflow in multi-user mode. The underlying API is `/api/v2/models/sync/orphaned`; API results also include the absolute path for each reported directory.
+Orphaned models are automatically excluded from selection dropdowns
+(main model, LoRA, VAE, etc.), so you cannot accidentally pick one for
+generation.
 
 ## Exporting and Importing Model Settings
 
