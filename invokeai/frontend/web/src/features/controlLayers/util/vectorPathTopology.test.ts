@@ -231,7 +231,7 @@ describe('vector path topology', () => {
     expect(result?.activePointIndex).toBe(1);
   });
 
-  it('connects distant endpoints through a new intermediate point', () => {
+  it('connects distant endpoints directly without adding a point', () => {
     const source = buildPath('source', [
       [0, 0],
       [10, 0],
@@ -246,11 +246,10 @@ describe('vector path topology', () => {
     expect(result?.path.points.map((point) => point.anchor)).toEqual([
       { x: 0, y: 0 },
       { x: 10, y: 0 },
-      { x: 20, y: 0 },
       { x: 30, y: 0 },
       { x: 40, y: 0 },
     ]);
-    expect(result?.activePointIndex).toBe(3);
+    expect(result?.activePointIndex).toBe(2);
   });
 
   it('reverses paths as needed before joining their selected endpoints', () => {
@@ -268,13 +267,13 @@ describe('vector path topology', () => {
     expect(result?.path.points.map((point) => point.anchor)).toEqual([
       { x: 10, y: 0 },
       { x: 0, y: 0 },
-      { x: 20, y: 0 },
       { x: 40, y: 0 },
       { x: 30, y: 0 },
     ]);
+    expect(result?.activePointIndex).toBe(2);
   });
 
-  it('closes distant endpoints of one path through an intermediate point', () => {
+  it('closes distant endpoints of one path without adding a point', () => {
     const path = buildPath('path', [
       [0, 0],
       [20, 0],
@@ -284,7 +283,7 @@ describe('vector path topology', () => {
     const result = joinVectorPathEndpoints(path, 0, path, 2, false);
 
     expect(result?.path.isClosed).toBe(true);
-    expect(result?.path.points.at(-1)?.anchor).toEqual({ x: 10, y: 10 });
+    expect(result?.path.points).toEqual(path.points);
     expect(result?.activePointIndex).toBe(2);
   });
 

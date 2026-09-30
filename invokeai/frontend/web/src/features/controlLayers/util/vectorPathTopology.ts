@@ -257,15 +257,6 @@ export const joinVectorPathEndpoints = (
 
     firstPoint.inHandle = null;
     lastPoint.outHandle = null;
-    sourcePath.points.push({
-      anchor: {
-        x: (sourcePoint.anchor.x + targetPoint.anchor.x) / 2,
-        y: (sourcePoint.anchor.y + targetPoint.anchor.y) / 2,
-      },
-      inHandle: null,
-      outHandle: null,
-      type: 'corner',
-    });
     sourcePath.isClosed = true;
     return { path: sourcePath, activePointIndex: targetPointIndex };
   }
@@ -304,21 +295,9 @@ export const joinVectorPathEndpoints = (
   return {
     path: {
       ...sourcePath,
-      points: [
-        ...sourcePoints,
-        {
-          anchor: {
-            x: (sourceEndPoint.anchor.x + targetStartPoint.anchor.x) / 2,
-            y: (sourceEndPoint.anchor.y + targetStartPoint.anchor.y) / 2,
-          },
-          inHandle: null,
-          outHandle: null,
-          type: 'corner',
-        },
-        ...targetPoints,
-      ],
+      points: [...sourcePoints, ...targetPoints],
       isClosed: false,
     },
-    activePointIndex: sourcePoints.length + 1,
+    activePointIndex: sourcePoints.length,
   };
 };

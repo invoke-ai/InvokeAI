@@ -59,7 +59,7 @@ anchors. Handles are shown for all selected anchors.
 **Split Points** opens a closed path at a selected anchor or divides a path at selected internal anchors.
 
 **Join Points** requires exactly two selected endpoints from open paths. Nearby endpoints are welded at the last selected
-point. Distant endpoints are joined through a new intermediate Corner point. Joining the two endpoints of the same path
+point. Distant endpoints are connected directly by a straight segment without adding a point. Joining the two endpoints of the same path
 closes it.
 
 ### Finish the edit session
@@ -69,20 +69,23 @@ closes it.
 - **Reset** restores the initial geometry without leaving Edit mode.
 - Edit-session Undo and Redo operate on in-progress vector changes.
 
-Choosing a tool that cannot continue the edit session opens a confirmation dialog. Apply or discard the session, or
-press <kbd>Esc</kbd> to return to editing.
+Choosing another layer or a tool that cannot continue the edit session opens a three-button confirmation dialog.
+**Apply** keeps the edits and continues the switch; **Discard** restores the initial geometry and continues the switch.
+**Cancel** or <kbd>Esc</kbd> returns to editing without switching.
 
 ## Path and Layer Menus
 
 The vector layer menu contains whole-layer operations, including **Edit**, **Transform**, **Trace All Paths**,
 **Fill Closed Paths**, **Create Inpaint Mask**, and vector-to-vector **Merge Down**.
 
-While Edit mode is active, right-clicking the canvas opens the active path menu regardless of pointer location. It does
-not change the active path. The menu supports:
+While Edit mode is active, right-clicking a path outline or anchor on the canvas shows an **Active Path** group above the
+whole-layer actions. Right-clicking empty canvas space or a layer header shows only the regular layer menu. Path actions
+always target the active path; right-clicking another path does not change the active path. The group supports:
 
 - Transform, trace, or fill the active path.
 - Create an inpaint mask from a closed active path.
-- Extract the active path into a new vector layer.
+- Extract a copy of the active path into a new vector layer above its source, without leaving Edit mode or changing the
+  selected layer, active path, or point selection. The original path stays in its source layer.
 - Copy or delete the active path.
 
 Path transforms and materialization use the current in-progress edit-session geometry and keep Edit mode active.

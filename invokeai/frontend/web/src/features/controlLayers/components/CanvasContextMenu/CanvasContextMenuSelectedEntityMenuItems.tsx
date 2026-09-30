@@ -18,14 +18,11 @@ import { useEntityTypeString } from 'features/controlLayers/hooks/useEntityTypeS
 import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/selectors';
 import type { PropsWithChildren } from 'react';
 import { memo } from 'react';
-import { useTranslation } from 'react-i18next';
 import type { Equals } from 'tsafe';
 import { assert } from 'tsafe';
 
 const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
   const entityIdentifier = useEntityIdentifierContext();
-  const canvasManager = useCanvasManager();
-  const editSession = useStore(canvasManager.tool.tools.path.$editSession);
 
   if (entityIdentifier.type === 'raster_layer') {
     return <RasterLayerMenuItems />;
@@ -37,12 +34,6 @@ const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
     return <InpaintMaskMenuItems />;
   }
   if (entityIdentifier.type === 'vector_layer') {
-    if (
-      editSession?.entityIdentifier.id === entityIdentifier.id &&
-      editSession.entityIdentifier.type === entityIdentifier.type
-    ) {
-      return <VectorPathMenuItems />;
-    }
     return <VectorLayerMenuItems />;
   }
   if (entityIdentifier.type === 'regional_guidance') {
@@ -58,41 +49,36 @@ const CanvasContextMenuSelectedEntityMenuItemsContent = memo(() => {
 CanvasContextMenuSelectedEntityMenuItemsContent.displayName = 'CanvasContextMenuSelectedEntityMenuItemsContent';
 
 const CanvasContextMenuSelectedEntityMenuGroup = memo((props: PropsWithChildren) => {
-  const { t } = useTranslation();
   const entityIdentifier = useEntityIdentifierContext();
-  const canvasManager = useCanvasManager();
-  const editSession = useStore(canvasManager.tool.tools.path.$editSession);
   const entityTypeTitle = useEntityTypeString(entityIdentifier.type);
-  const isEditingPath =
-    entityIdentifier.type === 'vector_layer' &&
-    editSession?.entityIdentifier.id === entityIdentifier.id &&
-    editSession.entityIdentifier.type === entityIdentifier.type;
-  const title = isEditingPath ? t('controlLayers.vectorEdit.pathTitle') : entityTypeTitle;
 
-  return <MenuGroup title={title}>{props.children}</MenuGroup>;
+  return <MenuGroup title={entityTypeTitle}>{props.children}</MenuGroup>;
 });
 
 CanvasContextMenuSelectedEntityMenuGroup.displayName = 'CanvasContextMenuSelectedEntityMenuGroup';
 
-export const CanvasContextMenuSelectedEntityMenuItems = memo(() => {
-  const canvasManager = useCanvasManager();
-  const editSession = useStore(canvasManager.tool.tools.path.$editSession);
-  const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
-  const entityIdentifier = editSession?.entityIdentifier ?? selectedEntityIdentifier;
+export const CanvasContextMenuSelectedEntityMenuItems = memo(
+  ({ showPathActions = false }: { showPathActions?: boolean }) => {
+    const canvasManager = useCanvasManager();
+    const editSession = useStore(canvasManager.tool.tools.path.$editSession);
+    const selectedEntityIdentifier = useAppSelector(selectSelectedEntityIdentifier);
+    const entityIdentifier = editSession?.entityIdentifier ?? selectedEntityIdentifier;
 
-  if (!entityIdentifier) {
-    return null;
+    if (!entityIdentifier) {
+      return null;
+    }
+
+    return (
+      <EntityIdentifierContext.Provider value={entityIdentifier}>
+        <CanvasEntityStateGate entityIdentifier={entityIdentifier}>
+          {showPathActions && entityIdentifier.type === 'vector_layer' && <VectorPathMenuItems />}
+          <CanvasContextMenuSelectedEntityMenuGroup>
+            <CanvasContextMenuSelectedEntityMenuItemsContent />
+          </CanvasContextMenuSelectedEntityMenuGroup>
+        </CanvasEntityStateGate>
+      </EntityIdentifierContext.Provider>
+    );
   }
-
-  return (
-    <EntityIdentifierContext.Provider value={entityIdentifier}>
-      <CanvasEntityStateGate entityIdentifier={entityIdentifier}>
-        <CanvasContextMenuSelectedEntityMenuGroup>
-          <CanvasContextMenuSelectedEntityMenuItemsContent />
-        </CanvasContextMenuSelectedEntityMenuGroup>
-      </CanvasEntityStateGate>
-    </EntityIdentifierContext.Provider>
-  );
-});
+);
 
 CanvasContextMenuSelectedEntityMenuItems.displayName = 'CanvasContextMenuSelectedEntityMenuItems';

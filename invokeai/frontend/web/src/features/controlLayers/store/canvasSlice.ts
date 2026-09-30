@@ -566,9 +566,11 @@ const slice = createSlice({
     vectorPathExtracted: {
       reducer: (
         state,
-        action: PayloadAction<EntityIdentifierPayload<{ pathId: string; newLayerId: string }, 'vector_layer'>>
+        action: PayloadAction<
+          EntityIdentifierPayload<{ pathId: string; newLayerId: string; newPathId: string }, 'vector_layer'>
+        >
       ) => {
-        const { entityIdentifier, pathId, newLayerId } = action.payload;
+        const { entityIdentifier, pathId, newLayerId, newPathId } = action.payload;
         const sourceLayerIndex = state.vectorLayers.entities.findIndex((entity) => entity.id === entityIdentifier.id);
         const sourceLayer = state.vectorLayers.entities[sourceLayerIndex];
         if (!sourceLayer) {
@@ -581,19 +583,19 @@ const slice = createSlice({
           return;
         }
 
-        sourceLayer.paths.splice(pathIndex, 1);
         const extractedLayer = getVectorLayerState(newLayerId, {
           opacity: sourceLayer.opacity,
           position: { ...sourceLayer.position },
-          paths: [deepClone(path)],
+          paths: [{ ...deepClone(path), id: newPathId }],
         });
         state.vectorLayers.entities.splice(sourceLayerIndex + 1, 0, extractedLayer);
-        state.selectedEntityIdentifier = { type: 'vector_layer', id: newLayerId };
       },
       prepare: (
         payload: EntityIdentifierPayload<{ pathId: string }, 'vector_layer'>
-      ): { payload: EntityIdentifierPayload<{ pathId: string; newLayerId: string }, 'vector_layer'> } => ({
-        payload: { ...payload, newLayerId: getPrefixedId('vector_layer') },
+      ): {
+        payload: EntityIdentifierPayload<{ pathId: string; newLayerId: string; newPathId: string }, 'vector_layer'>;
+      } => ({
+        payload: { ...payload, newLayerId: getPrefixedId('vector_layer'), newPathId: getPrefixedId('bezier_path') },
       }),
     },
     vectorLayerPathsReplaced: (

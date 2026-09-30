@@ -1,7 +1,11 @@
 import {
+  AlertDialog,
+  AlertDialogBody,
+  AlertDialogContent,
+  AlertDialogFooter,
+  AlertDialogHeader,
   Button,
   ButtonGroup,
-  ConfirmationAlertDialog,
   Flex,
   FormControl,
   FormLabel,
@@ -20,7 +24,7 @@ import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
 import type { BezierPointType } from 'features/controlLayers/util/bezierPath';
 import { canJoinVectorPathEndpoints, canSplitVectorPathAtPoints } from 'features/controlLayers/util/vectorPathTopology';
 import { useHotkeyData } from 'features/system/components/HotkeysModal/useHotkeyData';
-import { Fragment, memo, useCallback, useState } from 'react';
+import { Fragment, memo, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const BEZIER_POINT_TYPES = ['corner', 'smooth', 'symmetric'] as const satisfies readonly BezierPointType[];
@@ -33,6 +37,7 @@ export const VectorLayerEditFooter = memo(() => {
   const { t } = useTranslation();
   const canvasManager = useCanvasManager();
   const hotkeysData = useHotkeyData();
+  const cancelExitRef = useRef<HTMLButtonElement>(null);
   const [smoothTarget, setSmoothTarget] = useState<'path' | 'selected'>('path');
   const editSession = useStore(canvasManager.tool.tools.path.$editSession);
   const isExitConfirmationOpen = useStore(canvasManager.tool.tools.path.$isExitConfirmationOpen);
@@ -145,10 +150,10 @@ export const VectorLayerEditFooter = memo(() => {
     canvasManager.tool.tools.path.joinSelectedEndpoints();
   }, [canvasManager.tool.tools.path]);
   const onApplyToolChange = useCallback(() => {
-    canvasManager.tool.tools.path.acceptEditSession(false);
+    canvasManager.tool.tools.path.confirmEditExit('apply');
   }, [canvasManager.tool.tools.path]);
   const onDiscardToolChange = useCallback(() => {
-    canvasManager.tool.tools.path.discardEditSession(false);
+    canvasManager.tool.tools.path.confirmEditExit('discard');
   }, [canvasManager.tool.tools.path]);
   const onCancelToolChange = useCallback(() => {
     canvasManager.tool.tools.path.cancelToolChange();
@@ -177,18 +182,28 @@ export const VectorLayerEditFooter = memo(() => {
 
   return (
     <Fragment>
-      <ConfirmationAlertDialog
+      <AlertDialog
         isOpen={isExitConfirmationOpen}
         onClose={onCancelToolChange}
-        title={t('controlLayers.vectorEdit.toolChangeTitle')}
-        acceptCallback={onApplyToolChange}
-        acceptButtonText={t('common.apply')}
-        cancelCallback={onDiscardToolChange}
-        cancelButtonText={t('controlLayers.vectorEdit.discardChanges')}
-        useInert={false}
+        leastDestructiveRef={cancelExitRef}
+        isCentered
       >
-        <Text>{t('controlLayers.vectorEdit.toolChangePrompt')}</Text>
-      </ConfirmationAlertDialog>
+        <AlertDialogContent>
+          <AlertDialogHeader>{t('controlLayers.vectorEdit.toolChangeTitle')}</AlertDialogHeader>
+          <AlertDialogBody>{t('controlLayers.vectorEdit.toolChangePrompt')}</AlertDialogBody>
+          <AlertDialogFooter gap={3}>
+            <Button ref={cancelExitRef} onClick={onCancelToolChange}>
+              {t('common.cancel')}
+            </Button>
+            <Button colorScheme="error" onClick={onDiscardToolChange}>
+              {t('controlLayers.vectorEdit.discardChanges')}
+            </Button>
+            <Button colorScheme="invokeBlue" onClick={onApplyToolChange}>
+              {t('common.apply')}
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
       <Flex bg="base.800" borderRadius="base" p={4} minW={420} flexDir="column" gap={4} shadow="dark-lg">
         <Flex alignItems="center" justifyContent="space-between" gap={4}>
           <Heading size="md" color="base.300" userSelect="none">

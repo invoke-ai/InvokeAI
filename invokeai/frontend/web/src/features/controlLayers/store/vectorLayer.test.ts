@@ -400,8 +400,9 @@ describe('vector layer integration', () => {
     expect(result.vectorLayers.entities[0]?.paths[1]?.points[0]?.anchor).toEqual({ x: 30, y: 40 });
   });
 
-  it('extracts one path into a selected vector layer above its source', () => {
+  it('extracts a copy above its unchanged source without changing the selected layer', () => {
     const state = getInitialCanvasState();
+    state.selectedEntityIdentifier = { id: 'vector-layer-a', type: 'vector_layer' };
     state.vectorLayers.entities.push(
       getVectorLayerState('vector-layer-a', {
         opacity: 0.4,
@@ -432,14 +433,76 @@ describe('vector layer integration', () => {
     );
 
     expect(result.vectorLayers.entities).toHaveLength(2);
-    expect(result.vectorLayers.entities[0]?.paths.map((path) => path.id)).toEqual(['bezier-path-b']);
+    expect(result.vectorLayers.entities[0]).toBe(state.vectorLayers.entities[0]);
     expect(result.vectorLayers.entities[1]).toMatchObject({
       id: 'vector_layer-1',
       opacity: 0.4,
       position: { x: 10, y: 20 },
-      paths: [{ id: 'bezier-path-a', name: 'Path A' }],
+      paths: [{ id: 'bezier_path-2', name: 'Path A' }],
     });
-    expect(result.selectedEntityIdentifier).toEqual({ id: 'vector_layer-1', type: 'vector_layer' });
+    const sourcePath = state.vectorLayers.entities[0]?.paths[0];
+    const copiedPath = result.vectorLayers.entities[1]?.paths[0];
+    expect(copiedPath).toEqual({ ...sourcePath, id: 'bezier_path-2' });
+    expect(copiedPath?.points).not.toBe(sourcePath?.points);
+    expect(copiedPath?.points[0]?.anchor).not.toBe(sourcePath?.points[0]?.anchor);
+    expect(result.selectedEntityIdentifier).toBe(state.selectedEntityIdentifier);
+  });
+
+  it('keeps the only source path and allows editing the extracted copy independently', () => {
+    const state = getInitialCanvasState();
+    state.vectorLayers.entities.push(
+      getVectorLayerState('source', {
+        paths: [
+          {
+            id: 'original',
+            name: null,
+            isClosed: true,
+            points: [
+              { anchor: { x: 0, y: 0 }, inHandle: null, outHandle: { x: 5, y: 0 }, type: 'smooth' },
+              { anchor: { x: 10, y: 10 }, inHandle: { x: 5, y: 10 }, outHandle: null, type: 'corner' },
+            ],
+          },
+        ],
+      })
+    );
+    const extracted = reducer(
+      state,
+      vectorPathExtracted({
+        entityIdentifier: { id: 'source', type: 'vector_layer' },
+        pathId: 'original',
+      })
+    );
+    const transformed = reducer(
+      extracted,
+      vectorPathTransformed({
+        entityIdentifier: { id: 'vector_layer-1', type: 'vector_layer' },
+        pathId: 'bezier_path-2',
+        matrix: [1, 0, 0, 1, 20, 30],
+      })
+    );
+    expect(transformed.vectorLayers.entities[0]).toBe(state.vectorLayers.entities[0]);
+    expect(transformed.vectorLayers.entities[0]?.paths).toHaveLength(1);
+    expect(transformed.vectorLayers.entities[1]?.paths[0]).toMatchObject({
+      id: 'bezier_path-2',
+      isClosed: true,
+      points: [
+        { anchor: { x: 20, y: 30 }, outHandle: { x: 25, y: 30 }, type: 'smooth' },
+        { anchor: { x: 30, y: 40 }, inHandle: { x: 25, y: 40 }, type: 'corner' },
+      ],
+    });
+  });
+
+  it.each(['missing-layer', 'source'])('does not extract a missing path from %s', (layerId) => {
+    const state = getInitialCanvasState();
+    state.vectorLayers.entities.push(getVectorLayerState('source'));
+    const result = reducer(
+      state,
+      vectorPathExtracted({
+        entityIdentifier: { id: layerId, type: 'vector_layer' },
+        pathId: 'missing-path',
+      })
+    );
+    expect(result).toBe(state);
   });
 
   it('duplicates a vector layer and rekeys its paths', () => {
