@@ -69,7 +69,7 @@ reference settings:
 - **Negative prompts** are supported and always used.
 - **No scheduler choice.** SD3 always uses its own flow-matching sampler, so the Scheduler control is
   hidden.
-- **Prompt weighting** (Compel syntax) does not apply to SD3. See [Prompt Syntax](/users-guide/image-generation/prompt-syntax/).
+- **Prompt weighting** (Compel syntax) does not apply to SD3. See [Prompt Syntax](/users-guide/image-generation/prompting-guide/#attention-weighting).
 
 ## Canvas
 
@@ -81,7 +81,7 @@ reference images and regional guidance are **not** available for SD3. LoRAs are 
 SD3 works with **PiD** decoding. PiD replaces the VAE decode with a 4× super-resolving pixel diffusion
 pass. Two decoders are available as starter models: **PiD Decoder SD3 (2K)** and **PiD Decoder SD3
 (2K to 4K)**. Each is about 5 GB and installs the shared Gemma-2 caption encoder as a dependency. See
-[PiD Super-Resolution Decode](/users-guide/image-generation/pid-decode/).
+[PiD Super-Resolution Decode](/users-guide/image-generation/advanced-topics/pid-decode/).
 
 ## Workflow editor
 

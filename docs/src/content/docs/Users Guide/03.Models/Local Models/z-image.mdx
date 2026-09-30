@@ -86,7 +86,7 @@ Selecting a Z-Image model applies these defaults:
 - **Schedulers**: *Euler* (the default and recommended), *Heun (2nd order)* (better quality, about twice as
   slow) and *LCM*. LCM works with Turbo only and is not offered for Z-Image Base.
 - **Resolution**: width and height must be multiples of 16.
-- **Prompt weighting**: Compel-style [prompt syntax](/users-guide/image-generation/prompt-syntax/) does not
+- **Prompt weighting**: Compel-style [prompt syntax](/users-guide/image-generation/prompting-guide/#attention-weighting) does not
   apply to Z-Image. Write prompts in plain language.
 
 In the workflow editor, **Denoise - Z-Image** also has a **Shift** input that overrides the timestep
@@ -135,4 +135,4 @@ Connect it between **Prompt - Z-Image** and the denoise node's positive conditio
 ## PiD decoding
 
 Z-Image has no PiD decoder of its own and uses the **FLUX** PiD decoders, since it shares FLUX.1's VAE. See
-[PiD Decode](/users-guide/image-generation/pid-decode/).
+[PiD Decode](/users-guide/image-generation/advanced-topics/pid-decode/).

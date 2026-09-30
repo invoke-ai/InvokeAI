@@ -180,7 +180,7 @@ This setting processes parts of the PiD pixel pathway in chunks and uses float32
 
 It is disabled by default because it is **not output-preserving**. The combined optimized path is not guaranteed to be bit-exact: chunking can change GPU kernel and reduction choices, while the float32 sampler differs from the default float64 path. The few-step sampler amplifies the difference into a slightly different image. The delta is small — around 43 dB PSNR, visually indistinguishable in side-by-side comparisons — but it is real, so the same seed and workflow will not reproduce an unoptimized decode exactly. Decoding speed is roughly unchanged: chunking costs about 4%, which the cheaper sampler math largely offsets.
 
-When the setting is active, each decode logs the resolution, the patch-token count and whether chunking actually engaged — worth checking, since the option is server-wide and never recorded in image metadata. See [PiD Super-Resolution Decode](/users-guide/image-generation/pid-decode/) for supported models and usage.
+When the setting is active, each decode logs the resolution, the patch-token count and whether chunking actually engaged — worth checking, since the option is server-wide and never recorded in image metadata. See [PiD Super-Resolution Decode](/users-guide/image-generation/advanced-topics/pid-decode/) for supported models and usage.
 
 ### Disabling Nvidia sysmem fallback (Windows only)
 

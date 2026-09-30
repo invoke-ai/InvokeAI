@@ -1,27 +1,20 @@
 ---
 title: Prompting Guide
-lastUpdated: 2026-03-30
+description: Write prompts that work, then go further with prompt templates, trigger phrases, dynamic prompts, wildcards and attention weighting.
+lastUpdated: 2026-09-30
 sidebar:
   order: 2
 ---
 
-import { Card, CardGrid, Steps, LinkCard } from '@astrojs/starlight/components';
+import { Card, CardGrid, Steps } from '@astrojs/starlight/components';
 
-<CardGrid>
-  <LinkCard
-    title="Prompting Syntax"
-    href="../prompt-syntax"
-    description="Learn how to weight prompt terms, blend concepts, and use prompt conjunctions for more control."
-  />
+The prompt is your main way of telling a model what to create. This guide starts with writing good prompts, which is all most images need. It then covers the tools that save typing and add variety: prompt templates, dynamic prompts and wildcards. It ends with advanced syntax for fine control.
 
-  <LinkCard
-    title="Dynamic Prompting"
-    href="../dynamic-prompting"
-    description="Learn how to create many prompt variations from a single template."
-  />
-</CardGrid>
+For the tools that write or rewrite a prompt for you, **Expand prompt** and **Image to prompt**, and for inserting trigger phrases, see [Prompt Tools](/users-guide/image-generation/prompt-tools/).
 
-Prompting in InvokeAI works best when you describe the image clearly, then refine only the parts that matter. This page focuses on practical prompt-writing habits.
+## Writing a prompt
+
+Prompting works best when you describe the image clearly, then refine only the parts that matter. Most good prompts cover a few of these:
 
 <CardGrid>
   <Card title="Subject" icon="seti:image">
@@ -34,7 +27,7 @@ Prompting in InvokeAI works best when you describe the image clearly, then refin
     Describe the camera angle, framing, lighting, environment, color palette, or mood that will shape the image.
   </Card>
   <Card title="Detail and Finish" icon="star">
-    Add a few high-value quality cues such as fabric texture, shallow depth of field, natural skin texture, or painterly brushwork.
+    Add a few high-value details such as fabric texture, shallow depth of field, natural skin texture, or painterly brushwork.
   </Card>
 </CardGrid>
 
@@ -44,45 +37,30 @@ A simple pattern that works well is:
 
 Not every prompt needs every category. Start simple, then add detail only when the model needs more direction.
 
-## Positive and negative prompts
+### Positive and negative prompts
 
-<CardGrid>
-  <Card title="Positive Prompt" icon="seti:default">
-    Use the positive prompt to describe what you want the model to create. Put the most important idea early and keep the wording concrete.
-  </Card>
-  <Card title="Negative Prompt" icon="document">
-    Use the negative prompt to remove recurring problems or unwanted traits. Keep it short and targeted instead of pasting a giant list into every generation.
-  </Card>
-</CardGrid>
+The **positive prompt** describes what you want the model to create. Put the most important idea early and keep the wording concrete.
 
-Good negative prompts usually name specific failure modes: `blurry`, `distorted hands`, `low detail`, `extra limbs`.
+The **negative prompt** lists what you do not want. Use it to remove recurring problems or unwanted traits, and keep it short and targeted rather than pasting a giant list into every generation. Good negative prompts name specific failure modes: `blurry`, `distorted hands`, `low detail`, `extra limbs`.
+
+Not every model uses a negative prompt. See [Negative prompt](/users-guide/image-generation/introduction/#negative-prompt) in the Generate panel guide for which models do.
 
 :::tip[Negative prompts are strong]
   A negative term can suppress nearby concepts too. If you negate something broad like `green` or `moss`, you may also weaken grass, foliage, or other related ideas.
 :::
 
-## A practical prompting workflow
+### A practical workflow
 
 <Steps>
-  1. Start with the core image
+  1. **Start with the core image.** Write the clearest version of the image you want before adding stylistic extras.
 
-      Write the clearest version of the image you want before adding stylistic extras.
+  2. **Add style and composition.** Once the subject is right, add medium, lens, lighting, mood, background, or framing details.
 
-  2. Add style and composition
+  3. **Test with a fixed seed.** When you are learning what a prompt change does, set the seed mode to **Fixed** so you can compare results directly.
 
-      Once the subject is right, add medium, lens, lighting, mood, background, or framing details.
+  4. **Change one thing at a time.** If you add five new terms at once, you will not know which one helped.
 
-  3. Test with a fixed seed
-
-      When you are learning what a prompt change does, keep the seed stable so you can compare results directly.
-
-  4. Change one thing at a time
-
-      If you add five new terms at once, you will not know which one helped.
-
-  5. Escalate only when needed
-
-      If the result is close but one element is too weak or too strong, move to [Prompting Syntax](../prompt-syntax) for weighting. If you want lots of variations, use [Dynamic Prompting](../dynamic-prompting).
+  5. **Escalate only when needed.** If the result is close but one element is too weak or too strong, use [attention weighting](#attention-weighting). If you want lots of variations, use [dynamic prompts](#dynamic-prompts).
 </Steps>
 
 Here is the same idea refined in stages:
@@ -95,25 +73,17 @@ portrait of a woman, studio photograph, soft key light
 portrait of a woman, studio photograph, soft key light, 85mm lens, shallow depth of field, natural skin texture
 ```
 
-## Write for the model you are using
+### Write for the model you are using
 
 The same prompt can behave very differently across models.
 
-- Photo-oriented models respond well to camera, lens, lighting, and texture language.
-- Illustration models often respond better to medium, art direction, and shape language.
-- Specialty models may expect specific trigger words, subjects, or styles from their own model card.
+- Newer models with large language-model text encoders, such as FLUX, Qwen Image, Z-Image and Krea-2, understand full sentences and long, detailed descriptions. Describe the scene as you would to a person, including how things relate to each other and any text that should appear in the image.
+- Older models such as SD 1.5 and SDXL use CLIP text encoders trained on short captions, and respond best to short, comma-separated phrases.
+- Photo-oriented models respond well to camera, lens, lighting and texture language. Illustration models often respond better to medium, art direction and shape language.
+- Specialty models and concepts may expect specific [trigger phrases](/users-guide/image-generation/prompt-tools/#prompt-triggers) from their model card.
 - If a prompt works beautifully on one model and poorly on another, that does not always mean the prompt is bad. The model may just speak a different visual language.
 
-## When advanced syntax helps
-
-Reach for advanced syntax when a normal comma-separated prompt is almost right, but you need more control.
-
-- Use [Prompting Syntax](../prompt-syntax) when one term needs more or less influence.
-- Use `.blend()` when you want to mix concepts or styles deliberately.
-- Use `.and()` when you want separate prompt clauses encoded individually.
-- Use [Dynamic Prompting](../dynamic-prompting) when you want many prompt variations from one template.
-
-## Common mistakes
+### Common mistakes
 
 - Packing too many unrelated ideas into one prompt.
 - Using long generic quality-word lists before you know the base prompt works.
@@ -121,60 +91,351 @@ Reach for advanced syntax when a normal comma-separated prompt is almost right, 
 - Expecting identical behavior across models, schedulers, and workflows.
 - Changing prompt, model, seed, and settings all at once while troubleshooting.
 
-## Example prompts
+### Example prompts
 
-### Photographic portrait
-
-**Positive prompt**
+**Photographic portrait**
 
 ```text
 editorial portrait of a woman in a charcoal coat, studio photograph, soft key light, subtle rim light, 85mm lens, shallow depth of field, natural skin texture
 ```
 
-**Negative prompt**
+Negative: `blurry, low detail, waxy skin, extra fingers`
 
-```text
-blurry, low detail, waxy skin, extra fingers
-```
-
-### Environment concept art
-
-**Positive prompt**
+**Environment concept art**
 
 ```text
 ancient stone temple built into a cliffside, fantasy concept art, misty sunrise, towering scale, moss-covered stairs, cinematic atmosphere
 ```
 
-**Negative prompt**
+Negative: `flat lighting, low contrast, muddy details`
 
-```text
-flat lighting, low contrast, muddy details
-```
-
-### Product-style render
-
-**Positive prompt**
+**Product-style render**
 
 ```text
 sleek ceramic teapot on a matte stone surface, product photography, clean studio lighting, soft shadow, high detail, minimal background
 ```
 
-**Negative prompt**
+Negative: `cluttered background, distortion, duplicate objects`
 
-```text
-cluttered background, distortion, duplicate objects
-```
-
-### Stylized illustration
-
-**Positive prompt**
+**Stylized illustration**
 
 ```text
 fox courier crossing a rainy city street, storybook illustration, bold shapes, glowing shop signs, reflective pavement, warm and cool color contrast
 ```
 
-**Negative prompt**
+Negative: `photorealistic, dull colors, low detail`
+
+## Prompt templates
+
+A prompt template is a reusable piece of prompt text, such as a photographic or artistic style, that wraps whatever you type. Apply **Photography (General)** once, and every prompt you write is sent as a photograph without you retyping the style words. Templates are available in the **Generate** panel.
+
+### Applying a template
+
+Click **Templates** in the positive prompt's toolbar. The popover lists the templates available to you in three groups:
+
+* **Your templates** — templates you have created. Only these can be edited or deleted.
+* **Shared templates** — templates other users have shared (multi-user installations only).
+* **Built-in templates** — the templates that ship with InvokeAI.
+
+Each row shows the template's preview image, its name and its prompt text. Type in **Search templates** to filter by name or prompt text, and click a template to apply it.
+
+While a template is applied, the toolbar button shows its name and a tag with the name appears under the positive prompt. To stop using the template, click the tag's close button (**Stop using this template**).
+
+Applying a template never changes the text in your prompt box. The template is combined with your prompt when you press **Invoke**, so you can switch templates, or remove one, without losing what you wrote.
+
+### How the template and your prompt combine
+
+A template's text usually contains the placeholder `{prompt}`, which marks where your own prompt goes. With the template
 
 ```text
-photorealistic, dull colors, low detail
+{prompt}. photography. f/2.8 macro photo, bokeh, photorealism
 ```
+
+the prompt `a red fox in the snow` is sent as
+
+```text
+a red fox in the snow. photography. f/2.8 macro photo, bokeh, photorealism
+```
+
+* Only the first `{prompt}` is replaced. Any further copies stay in the text as written.
+* A template without `{prompt}` is added to the end of your prompt, after a space.
+* Templates can carry negative text too. It is combined with your negative prompt by the same rules, for models that use a negative prompt.
+
+While a template is applied, an eye button in the prompt toolbar (**Show the merged prompt**) shows the prompt exactly as it will be sent, with the template's words distinguished from yours. The prompt boxes are read-only in this view. Click the text, or the button again (**Back to editing your prompt**), to return to editing.
+
+### Built-in templates
+
+InvokeAI ships with 18 templates covering common styles:
+
+* **Photography** — General, Studio Lighting, Landscape, Portrait, and Black and White
+* **Concept Art** — Fantasy, Sci-Fi, Character and Painterly
+* **Architectural Visualization**, **Environment Art**, **Interior Design (Visualization)**, **Product Rendering** and **Vehicles**
+* **Sketch**, **Line Art**, **Anime** and **Illustration**
+
+Built-in templates can be applied but not edited. To adapt one, create your own template from its text.
+
+### Creating and editing templates
+
+Click **New template** at the top of the popover. The editor has four fields:
+
+* **Name** — up to 128 characters. Templates you create are saved to your account.
+* **Prompt** — the template's positive text. The **`{prompt}`** button next to the field inserts the placeholder.
+* **Negative** — optional negative text, which may also contain `{prompt}`.
+* **Preview image** — an optional thumbnail for the list. Pick an image from the gallery, upload a file or drag one in.
+
+Click **Save** to store the template. To change or remove one of your templates later, use the pencil and trash buttons on its row. Deleting a template cannot be undone. If you delete, or someone else deletes, a template you are currently using, it keeps shaping your prompt until you stop using it.
+
+To reuse the prompt of an image you like, right-click it in the Gallery or Preview and choose **Use as Prompt Template**. The New template editor opens with the image's positive and negative prompts filled in. Replace the part that describes the subject with `{prompt}`, name the template and save it.
+
+### Importing and exporting templates
+
+The popover's **Import** and **Export** buttons move templates in and out as files. In a multi-user installation they are available to administrators only.
+
+* **Import** reads a `.csv` or `.json` file. A CSV file needs the columns `name`, `prompt` and `negative_prompt`; a JSON file is a list of objects with the same keys. Every template needs a name. Imported templates become your own templates.
+* **Export** downloads every user-created template as `prompt_templates.csv`, with the same three columns. Built-in templates are not included.
+
+Preview images are not part of either file.
+
+On a multi-user installation, templates you create are private to your account. Templates that other users have shared appear under **Shared templates**, where you can apply them but not change them.
+
+### Templates and image metadata
+
+An image's metadata records the prompt that was actually used, with the template already combined into it. It does not record which template was applied. When you recall the prompts from an image, you get that combined text, and any template you currently have applied is removed so that the style is not applied twice.
+
+## Dynamic prompts
+
+Dynamic prompts expand a single prompt into many variations. Write the parts you want to vary as a list of alternatives, and one press of **Invoke** generates an image for each variation. They are useful for brainstorming, exploring styles and subjects, and testing a model without rewriting the same prompt by hand.
+
+Dynamic prompts work in the **Generate** panel and on the Canvas. Only the positive prompt is expanded; the negative prompt is used as written for every variation.
+
+### Basic syntax
+
+Put alternatives inside braces and separate them with `|`:
+
+```text
+a {red|green|blue} balloon
+```
+
+This expands into three prompts: `a red balloon`, `a green balloon` and `a blue balloon`. Several groups in one prompt multiply:
+
+```text
+a {red|green} {balloon|kite}
+```
+
+gives `a red balloon`, `a red kite`, `a green balloon` and `a green kite`. Groups can also be nested: `a {cat|{small|large} dog}` gives `a cat`, `a small dog` and `a large dog`. More syntax is described under [Advanced dynamic prompt syntax](#advanced-dynamic-prompt-syntax).
+
+### Previewing and generating
+
+Click **Dynamic** in the prompt toolbar to open the Dynamic Prompts popover. When the prompt contains dynamic syntax, the button shows how many prompts it expands into.
+
+The **Preview** tab lists the expanded prompts, numbered and highlighted, and shows the total as *prompts × iterations → generations*. The Invoke button's tooltip shows the same count. Only the first 200 prompts are listed; the rest are summarized as *and N more*.
+
+Click a prompt in the list (**Use this prompt**) to replace your prompt with that one variation, for example to refine it on its own. If a template is applied, it is folded into the chosen prompt and the template itself is removed, since its words are now part of your prompt.
+
+If the prompt cannot be expanded, for example because a brace is not closed or a wildcard has no values, the Preview tab shows the error and Invoke is blocked until you fix it.
+
+<Steps>
+
+1. **Write the prompt** with the parts you want to vary in braces.
+
+2. **Open Dynamic** and check the Preview list. Make sure the combinations make sense before you generate a large batch.
+
+3. **Set the mode and the number of prompts** (see below).
+
+4. **Press Invoke.** Each expanded prompt is generated once per iteration, so 6 prompts with **Iterations** set to 2 give 12 images.
+
+</Steps>
+
+### All combinations or a random sample
+
+The **Mode** menu in the Preview tab sets how prompts are chosen:
+
+<CardGrid>
+  <Card title="All combinations" icon="list-format">
+    Lists every combination in order, up to **Max prompts**. This is the default, and the best choice when you want to compare every option.
+  </Card>
+  <Card title="Random sample" icon="random">
+    Draws **Number of prompts** variations at random, honoring any weights. The same prompt can be drawn more than once. Click **Shuffle the sample** to draw a new sample.
+  </Card>
+</CardGrid>
+
+The number of prompts can be set from 1 to 10,000 and is 100 by default. Combinations grow quickly, so this limit keeps an innocent-looking prompt from queuing thousands of images: `a {red|green|blue} balloon in {morning mist|golden hour|rain}` already has nine combinations.
+
+:::tip[Start small]
+  Preview a handful of variations first. Once they look useful, raise the limit or the number of iterations for a larger batch.
+:::
+
+### Seeds
+
+By default, every variation within one iteration shares the same seed. Because only the prompt changes between the images, this makes it easy to see what each option does.
+
+Turn on **New seed for every image** to give each image its own seed instead, for the widest variety. When the panel's **Seed mode** is **Fixed**, every image uses the same seed and this switch is unavailable.
+
+### Dynamic prompts and other features
+
+* **Prompt templates.** Expansion runs on your prompt after the [template](#prompt-templates) has been applied, so a template can contain dynamic syntax too.
+* **Image metadata.** Each image records the expanded prompt that produced it and its own seed. The original dynamic prompt and the dynamic prompt settings are not recorded.
+* **Workflows.** The workflow editor has a **Dynamic Prompt** node, and batch generators for random and combinatorial expansion.
+
+## Wildcards
+
+A wildcard is a named list of values that you can use in any prompt. Write the name between double underscores, and it behaves like a [dynamic prompt](#dynamic-prompts) group of all its values:
+
+```text
+a __colors__ balloon
+```
+
+With a `colors` wildcard containing `red`, `green` and `blue`, this is the same as `a {red|green|blue} balloon`. Wildcards save retyping long lists and keep them consistent between prompts.
+
+Values can contain dynamic syntax, including other wildcards. Names can be nested with `/`, such as `animals/dogs`, and `__animals/*__` combines every wildcard under `animals`.
+
+### Managing wildcards
+
+Wildcards are managed on the **Wildcards** tab of the **Dynamic** popover.
+
+* **New wildcard** opens the editor. Give the wildcard a **Name** (letters, numbers, underscores and hyphens, up to 128 characters) and its **Values**, one per line. Blank lines are ignored, and `#` starts a comment.
+* Click a wildcard to insert it at the cursor (**Insert into the prompt**). You can also type `__` in the prompt, or use the **+** [prompt trigger](/users-guide/image-generation/prompt-tools/#prompt-triggers) menu.
+* Use the pencil and trash buttons on a wildcard to edit or delete it.
+* **Search wildcards** finds wildcards by name or value.
+
+Wildcards belong to your account. On a multi-user installation, each user has their own set.
+
+### Importing and exporting wildcards
+
+**Import** reads wildcards from files you already have, such as collections downloaded for other tools:
+
+* **From files…** imports one or more files. A `.txt` file (or a file without an extension) becomes one wildcard named after the file, with one value per line.
+* **From a folder…** imports every wildcard file in a folder. Subfolders become part of the name, so `animals/dogs.txt` becomes `animals/dogs`.
+* A `.yaml`, `.yml` or `.json` file can hold many wildcards. Nested keys become the name, joined with `/`, and each list becomes a wildcard's values.
+
+If some wildcards already exist in your library, or cannot be imported, the **Import wildcards** dialog lists them. For each existing name you can **Skip** it, **Replace** it, or **Keep both**, which imports the new one under a numbered name.
+
+**Export** downloads all your wildcards as `wildcards.yaml` (**As YAML**) or `wildcards.json` (**As JSON**), in the same nested format.
+
+## Attention weighting
+
+Attention weighting makes parts of the prompt count for more or less than the rest. It uses Compel syntax, which applies to **SD 1.5 and SDXL**. Newer model families, including FLUX, Z-Image, CogView4 and Qwen Image, do not use it, and the symbols are passed to the model as ordinary text.
+
+:::note[Compatibility note]
+  If a weighted prompt seems to be ignored, check which model you are using. The syntax in this section only affects SD 1.5 and SDXL.
+:::
+
+| Syntax | Effect |
+|---|---|
+| `trees+` / `fog-` | Increase or decrease a single word |
+| `(golden hour light)+` | Weight a phrase |
+| `(cinematic lighting)1.25` | Use an exact numeric weight |
+| `(portrait with (blue eyes)1.3)1.1` | Nest weights |
+| `("portrait photo", "oil painting").blend(0.7, 0.3)` | Blend prompts |
+| `("red silk dress", "studio portrait", "soft rim light").and()` | Encode clauses separately |
+| `colored pencil \(medium\)` | Use literal parentheses |
+
+### Weighting with `+` and `-`
+
+Append `+` to increase influence, or `-` to reduce it.
+
+```text
+freckles+
+background crowd-
+(soft rim light)++
+```
+
+- Single words can be weighted directly. Wrap phrases of several words in parentheses.
+- Each additional `+` or `-` compounds, in steps of roughly 10%.
+- One or two steps is usually enough. Extreme weighting can overpower the rest of the prompt.
+
+### Numeric weights
+
+Use numeric weights when you want precise control instead of repeated plus or minus markers.
+
+```text
+(cinematic lighting)1.25
+(background crowd)0.8
+```
+
+`1` is neutral, values above `1` increase emphasis, and values between `0` and `1` reduce it. Wrap the weighted phrase in parentheses.
+
+Groups can be nested, and the weights combine. In `(portrait with (blue eyes)1.3)1.1`, the outer group strengthens the whole phrase, and `blue eyes` gets even more emphasis.
+
+### Adjusting weights with the keyboard
+
+In a prompt field, select text and press **Ctrl+Up** or **Ctrl+Down** to raise or lower its attention. With no selection, the shortcut targets the word at the cursor. Selecting a group's parentheses or weight targets its contents.
+
+- A selection inside a group changes only the selected words. A selection crossing a group boundary changes the selected words on both sides.
+- Symbolic weights move one `+` or `-` step. Numeric weights change by `0.1` of effective attention, including inherited group weights.
+- The numeric attention preference controls new weights; existing group weights keep their style.
+- Adjacent content with matching weights merges, and the adjusted content stays selected for the next keypress.
+- Inside prompt functions, the shortcut adjusts prompt arguments and preserves function parameters. Use **Ctrl+Z** to undo a weight change.
+
+### Blending with `.blend()`
+
+Use `.blend()` to mix the meaning of two or more prompts.
+
+```text
+("portrait photo, 85mm lens", "oil painting, visible brushstrokes").blend(0.7, 0.3)
+```
+
+Provide one weight for each prompt. Keeping the weights near a total of `1` makes the result easier to reason about, and quoting each prompt is safest, especially when they contain commas.
+
+### Combining clauses with `.and()`
+
+Use `.and()` when you want separate prompt clauses encoded individually instead of as one long comma-separated sentence.
+
+```text
+("red silk dress", "studio portrait", "soft rim light").and()
+```
+
+This can behave differently from `red silk dress, studio portrait, soft rim light`. If a normal prompt keeps collapsing ideas together, `.and()` is worth testing.
+
+### Literal parentheses
+
+Unescaped parentheses are treated as weighting syntax. To include actual parentheses in the text, escape them with backslashes:
+
+```text
+colored pencil \(medium\)
+A bear \(with razor-sharp teeth\) in a forest
+```
+
+## Advanced dynamic prompt syntax
+
+These additions to the [dynamic prompt](#dynamic-prompts) syntax give finer control over how variations are built.
+
+### Choosing more than one option
+
+Put a number and `$$` at the start of a group to pick several different options from it. They are joined with a comma:
+
+```text
+portrait, {2$$rim light|fog|rain}
+```
+
+gives prompts such as `portrait, rim light,fog` and `portrait, fog,rain`. To join them differently, put the separator between two `$$`:
+
+```text
+portrait, {2$$ and $$rim light|fog|rain}
+```
+
+gives prompts such as `portrait, rim light and fog`. A range picks a varying number of options: `{1-3$$rim light|fog|rain}` picks one, two or three.
+
+### Weighting options
+
+In **Random sample** mode, you can make some options more likely than others by putting a weight and `::` in front of them:
+
+```text
+a {0.7::red|0.2::green|0.1::blue} balloon
+```
+
+makes red balloons most common. Weights are ignored in All combinations mode, where every option appears once.
+
+### Variables
+
+A variable gives a group a name, so you can define it once and use it in several places. `${name={...}}` defines it and `${name}` uses it:
+
+```text
+${color={red|blue}} a ${color} hat with a ${color} scarf
+```
+
+Each use varies on its own, like a group written out in full, so this gives all four combinations from `a red hat with a red scarf` to `a blue hat with a blue scarf`. Variables are most useful for long lists you would otherwise repeat; for lists you use in many prompts, a [wildcard](#wildcards) is more convenient.
+
+### Comments
+
+Everything after a `#` is treated as a comment and left out of the prompt. Avoid `#` in ordinary prompts, since the rest of the prompt after it is dropped.

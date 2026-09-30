@@ -1,7 +1,196 @@
 ---
 title: Generating and modifying still images
-lastUpdated: 2029-09-29
+description: A guided tour of the Generate panel — choosing a model, writing a prompt, setting size and render parameters, and using concepts, reference images and the prompt tools.
+lastUpdated: 2026-09-30
 sidebar:
   order: 0
 ---
 
+import { Steps } from '@astrojs/starlight/components';
+import { Image } from 'astro:assets';
+import generatePanel from '../assets/generate-panel-overview.png';
+
+The **Generate** panel is where you create still images from a text prompt. This page walks through it from top to bottom: choosing a model, writing a prompt and generating a first image, then refining the result with size, render settings, concepts and reference images, and finally the tools that help you write prompts.
+
+The Generate panel sits in the left rail of the **Compose** layout (**Alt+1**), where finished images appear in the Preview in the center of the screen. It is also in the **Edit** layout (**Alt+2**), next to the Canvas. Press **1** to bring it to the front, or **Alt+A** to jump straight to its prompt. See [The Workbench](/users-guide/workbench/introduction/) for how layouts and panels work.
+
+The panel is divided into sections: the model picker and prompts at the top, followed by **Size**, **Guidance**, **Render**, **Components** and **Advanced**. Which sections and fields you see depends on the selected model, and each section header shows a summary of its settings, so you can keep sections you rarely change collapsed.
+
+<Image
+  src={generatePanel}
+  alt="The Generate panel with an SDXL model selected, a prompt and negative prompt entered, one concept added, and the Size, Guidance and Render sections open."
+  width={400}
+/>
+
+## Selecting a model
+
+The **Model** picker at the top of the panel lists the image generation models you have installed, grouped by model family. Type in **Search models…** to find one by name, family or description, or use the family chips to narrow the list. If the list is empty, install a model first; see [Managing media generation models](/users-guide/models/introduction/).
+
+When you switch models, the panel keeps your prompt and settings and adjusts only what the new model cannot use: it snaps the size to the new model's grid, and turns off or removes concepts, reference images and options the model does not support. If anything would be lost, a **Switch model?** dialog lists it before you confirm. Switching does not load the new model's recommended settings; use [Reset all to model defaults](#resetting-to-defaults) for that.
+
+### Model components
+
+Many newer models are installed as a single file that holds only the main network, and need companion models, such as a text encoder and a VAE, to generate. For these models the panel shows a **Components** section with a slot for each companion model. A Diffusers install of the same model carries its own components and leaves the slots on **Model default**. [Submodels](/users-guide/models/introduction/#submodels) explains what each component does, and each model family's page under [Local Models](/users-guide/models/introduction/#model-families) lists the ones it needs.
+
+If a required component is missing, **Invoke** is disabled and its tooltip names the slot to fill, for example *"Generate needs a VAE for FLUX models."* Pick an installed model in the slot, or install the family's starter bundle from the Model Manager, which includes everything the family needs.
+
+## Your first image
+
+<Steps>
+
+1. **Write a prompt.** Type a description of the image into the **Prompt** box, for example *a lighthouse on a rocky coast at sunset, dramatic clouds, oil painting*. Describe the subject, the setting, the lighting and the style you want. The [Prompting Guide](/users-guide/image-generation/prompting-guide/) has advice on writing prompts that work.
+
+2. **Choose how many images.** The **Iterations** field in the top bar, next to **Invoke**, sets how many images one press of Invoke produces. [Seed](#seed) explains how their seeds are chosen.
+
+3. **Press Invoke** in the top bar, or press **Ctrl+Enter** (**Cmd+Enter** on macOS). The job joins the queue, and the top bar shows its progress. The first run with a model takes longer while the model loads.
+
+4. **See the result.** The finished image appears in the Preview and is saved to the Gallery. To stop a run, click the cancel button in the queue area of the top bar, or press **Shift+X**.
+
+</Steps>
+
+Hover over **Invoke** to see what will be queued, for example *1 prompt × 4 iterations → 4 generations*. When Invoke is disabled, the same tooltip lists what is stopping it.
+
+## Routing images to the Gallery or the Canvas
+
+Every press of **Invoke** has a *route*: a **source**, the panel whose settings are used, and a **destination**, where the results go. Images can go to one of two destinations:
+
+* **Gallery** — the image is saved to the Gallery, on the board selected there, and shown in the Preview.
+* **Canvas** — the image lands in the Canvas's staging area, where you can compare the results and accept one onto the canvas as a new layer.
+
+Each layout preset starts with the route that suits its purpose. The **Compose** preset routes the Generate panel to the **Gallery**. The **Edit** preset routes to the **Canvas**, using the Canvas's layers and bounding box as the source, so results come back to the canvas for further editing. Switching presets switches to the new preset's route, unless the routing is locked.
+
+The routing control next to **Invoke** in the top bar shows the current source and destination as a pair of icons. Click it to change either one:
+
+* **Source** lists the panels in the current layout that can run a generation, such as Generate, Canvas, Upscale and Video.
+* **Destination** chooses **Gallery** or **Canvas**.
+* **Lock routing** keeps the route fixed. A small dot on the control shows that it is locked.
+
+The route also follows your work. When you change a setting in a different panel, that panel becomes the source, and the destination changes to match: the Canvas sends results to the Canvas, and the other panels send them to the Gallery. For example, editing the prompt in the Generate panel while you are in the Edit layout sends the next results to the Gallery. Lock the routing if you want results to keep going to one place while you work in several panels. To send a single run to the other destination without changing the route, press **Alt+Ctrl+Enter** (**Alt+Cmd+Enter** on macOS).
+
+The route is saved with the project, so each project remembers where its results go. See [Projects](/users-guide/projects/introduction/#what-a-project-keeps) for everything a project keeps.
+
+## Setting the image size
+
+The **Size** section sets the width and height of the image.
+
+* **Width** and **Height** can be set by dragging, by typing a value, or by dragging the corner of the small size preview. Sizes run from 64 to 4096 pixels and snap to a multiple the model requires, usually 8, 16 or 32.
+* **Aspect ratio** offers common shapes: 21:9, 16:9, 3:2, 4:3, 1:1, 3:4, 2:3, 9:16 and 9:21, or **Free**. Choosing a ratio locks it, so changing the width changes the height to match. The lock button between the two fields locks or unlocks the current ratio.
+* **Swap width and height** turns a landscape image into a portrait one and back.
+* Each model has an optimal image area, typically about one megapixel for newer models and less for SD 1.5. The line under the fields shows the image's size in megapixels, marks the recommended size, and estimates the run time from your recent runs. **Set optimal size** resizes the image to the model's optimal area at the current aspect ratio.
+
+Models produce their best results near their optimal size. Much larger images can show repeated subjects or distorted anatomy. To make a large image, generate at the optimal size and then upscale.
+
+## Render settings
+
+The **Render** section controls how the image is generated. Each slider has a mark at the model's recommended value. To reset a single field, double-click it or right-click it and choose **Reset to model default**.
+
+### Steps
+
+**Steps** is the number of denoising passes the model makes. More steps add detail and refine the image, up to a point where further steps change little and only take longer. Distilled "Turbo" and "Lightning" models are designed for a handful of steps (often 4 to 9), while standard models usually need 25 to 50. The model default is a good place to start.
+
+### CFG and Guidance
+
+**CFG** (classifier-free guidance) sets how strictly the model follows your prompt. Higher values follow the prompt more literally but can look harsh or oversaturated; lower values are looser and more natural. Typical values are 3 to 7 for most models, and 1 for distilled models, which are trained to work without CFG. Some models, including FLUX, show **Guidance** instead: a value built into the model that plays the same role, typically around 3.5. The model's page under Local Models gives recommended values.
+
+### Scheduler
+
+The **Scheduler** is the algorithm that decides how much noise to remove at each step. Schedulers differ in speed, in how many steps they need, and in the character of the result. Euler, the DPM++ family and UniPC are good general-purpose choices; LCM is only for LCM and similar distilled models. The list of schedulers depends on the model, and some models use a fixed schedule and do not show this field. **Use model default scheduler** switches back to the model's own choice.
+
+### Seed
+
+The **Seed** sets the starting noise for the image. The same model, prompt, seed and settings reproduce the same image, which lets you change one setting at a time and compare the results.
+
+* **New seed** picks a random seed.
+* **Seed mode** sets how seeds are chosen: **Random** picks a fresh starting seed each time you press Invoke, **Fixed** reuses the seed in the field, and **Increment** and **Decrement** use successive seeds, counting up or down by one. A line under the field shows the seeds the next batch will use.
+* **Recent seeds** shows thumbnails of recent images. Click one to reuse its seed; the mode switches to Fixed.
+
+### Negative prompt
+
+A negative prompt lists what you do *not* want in the image, such as *blurry, watermark, extra fingers*. Models that support one show a **+ Negative prompt…** button under the prompt; click it to open the box, and click **Turn off negative prompt** to hide it again without losing the text.
+
+Not every model uses a negative prompt. SD 1.5, SDXL, SD 3.5 and CogView4 always use it. Several newer models, including Z-Image, Qwen Image and Krea-2, use it only when CFG is above 1, and the box says so. FLUX.1, FLUX.2 and Ideogram 4 do not use a negative prompt, and the box is not shown for them.
+
+### Advanced settings
+
+The **Advanced** section appears for models with extra options, and its header counts the settings you have changed. Depending on the model it can include:
+
+* **VAE** and **VAE precision** — for SD 1.5 and SDXL, choose a different VAE or decode at FP32 precision. Other families set their VAE in the Components section.
+* **CLIP skip** and **CFG rescale** — SD 1.5 and SD 2.x only.
+* **HiDiffusion** — improves structure at large sizes for SD 1.5 and SDXL; see [HiDiffusion](/users-guide/image-generation/advanced-topics/hidiffusion/).
+* **Color compensation** — SDXL only.
+* **PiD Decode** — decodes the image at up to four times its size; see [PiD Super-Resolution Decode](/users-guide/image-generation/advanced-topics/pid-decode/).
+* **Seamless tiling** — makes the image tile along the X axis, the Y axis, or both.
+
+### Resetting to defaults
+
+Each model has recommended settings, which you can change in the Model Manager. **Reset all to model defaults**, the ↺ button in the Generate panel's title bar, applies them: size, steps, CFG or guidance, scheduler and VAE settings. Your prompts are left alone. The button is disabled when your settings already match the defaults.
+
+To return to the settings of an earlier image instead, right-click it in the Gallery or Preview and open **Recall Metadata**. **Recall All** restores its model, prompts, seed, size and render settings; **Remix Image** does the same but keeps a new seed; and **Use Prompt**, **Use Seed** and **Use Size** recall one thing at a time.
+
+To keep a combination of settings for later, use **Presets** in the panel's title bar to save the current settings under a name and apply them again.
+
+## Adding concepts
+
+Concepts, also called LoRAs, are small add-on models that teach the main model a style, a character, an object or a look. They are added in the **Guidance** section.
+
+<Steps>
+
+1. Click **Add concept** and choose a LoRA. The list only shows LoRAs made for the selected model's family.
+
+2. Adjust its **Weight**, which sets how strongly it acts. The default is the LoRA's own recommended weight, or 0.75. Values between 0.5 and 1 are typical; higher values can overpower the image, and negative values push the image away from the concept.
+
+3. Add any trigger words the LoRA needs to your prompt. They are shown under the LoRA's name, and the **+** button in the prompt toolbar inserts them for you (see [Prompt Triggers](/users-guide/image-generation/prompt-tools/#prompt-triggers)).
+
+</Steps>
+
+You can add as many concepts as you like and combine them. Use the switch on each row to turn a concept off without removing it, and the trash button to remove it. If you change to a model from a different family, its concepts are marked **Incompatible** or removed.
+
+## Adding reference images
+
+A reference image guides the new image by example rather than by words: its style, its composition, a person or an object in it. Reference images are added at the top of the **Guidance** section, and only appear for models that support them.
+
+To add one, click **Add reference image** and pick images from the Gallery or upload new ones, or drag images from the Gallery onto the section. You can also right-click any image and choose **Use as Reference Image**. Most models accept up to five. The order of the references matters to some models; use the arrow buttons on each card to reorder them.
+
+Hovering over a reference's thumbnail offers **Crop**, to use only part of the image, and **Use size**, to set the generation's size to match the reference. The switch on each card turns a reference off without removing it.
+
+What a reference does, and what options it has, depends on the model family:
+
+| Model family | How references work | Options |
+|---|---|---|
+| **SD 1.5, SDXL** | An IP-Adapter model carries the reference's look into the image. | **Mode**: **Style**, **Composition** or **Both**. **Weight**. Under **Advanced**: the IP-Adapter model, a **Style variant** and the **Active steps** range. |
+| **FLUX.1** | An IP-Adapter, or a **FLUX Redux** model, which transfers the reference's content. | IP-Adapter options as above, or **Image influence** (Lowest to Highest) for Redux. |
+| **FLUX.1 Kontext** | Kontext edits or recombines the reference images according to your prompt. | None beyond the model. |
+| **FLUX.2, Qwen Image Edit** | The model reads the references directly and uses them as your prompt instructs, for example *put the jacket from the first image on the person in the second*. | None. |
+
+Reference images require an extra model for SD 1.5, SDXL and FLUX.1 (an IP-Adapter or FLUX Redux model). These are available as starter models in the Model Manager, and an installed IP-Adapter is selected automatically.
+
+## Prompt tools
+
+The toolbar above the prompt box holds tools that help you write prompts. From left to right: **Templates**, **Dynamic**, **Add prompt trigger**, **Expand prompt**, **Image to prompt** and **Prompt history**.
+
+### Prompt enhancement
+
+**Expand prompt** turns a short prompt into a detailed description using a local language model. Write a few words, open the tool, pick a Text LLM and a **System prompt** (the instructions that tell the language model how to rewrite), and click **Expand**. The expanded text replaces your prompt, and you can edit it before pressing Invoke. Several system prompts ship with InvokeAI, some tuned for particular model families, and you can write your own.
+
+You need a Text LLM model installed; if there is none, the tool offers to open the Model Manager. See [Prompt Tools](/users-guide/image-generation/prompt-tools/#expand-prompt) for suitable models and for managing system prompts.
+
+### Image to prompt
+
+**Image to prompt** writes a prompt that describes an existing image, using a vision-language model (LLaVA OneVision). Select an image in the Gallery or Preview, or drag one onto the prompt box, then open the tool, choose the model and click **Generate Prompt**. The description replaces your prompt. This is useful for recreating an image you like in another model, or for starting from a close description and editing it. See [Prompt Tools](/users-guide/image-generation/prompt-tools/#image-to-prompt).
+
+### Prompt history
+
+Every prompt you submit with Invoke is kept in the project's **Prompt history**, along with its negative prompt, up to the last 100. Open it from the clock button to search your earlier prompts, click **Use prompt** to bring one back, or delete entries you no longer need. **Clear** empties the history at once, without asking.
+
+To step through the history without opening it, press **Alt+Up** and **Alt+Down** while the prompt box has focus. Stepping past the newest entry brings back what you were typing. The history belongs to the project and is shared by the Generate, Video and Upscale panels.
+
+## More prompting features
+
+These features change what the prompt says or how the model reads it. Prompt triggers are described on the [Prompt Tools](/users-guide/image-generation/prompt-tools/) page, and the others in the [Prompting Guide](/users-guide/image-generation/prompting-guide/).
+
+| Feature | What it does |
+|---|---|
+| **[Prompt templates](/users-guide/image-generation/prompting-guide/#prompt-templates)** | Wrap your prompt in a reusable style, such as a photographic or concept-art look, without retyping it. Includes 18 built-in templates, and you can create, import and export your own. |
+| **[Dynamic prompts](/users-guide/image-generation/prompting-guide/#dynamic-prompts)** | Write alternatives such as `a {red\|green\|blue} car` to generate one image per combination, or a random sample of them. Wildcards let you reuse named lists of values. |
+| **[Attention weighting](/users-guide/image-generation/prompting-guide/#attention-weighting)** | Make parts of the prompt count for more or less, for example `(red car)++` or `(red car)1.3`, and blend or combine prompts. Select text and press **Ctrl+Up** or **Ctrl+Down** to adjust its weight. Applies to SD 1.5 and SDXL. |
+| **[Prompt triggers](/users-guide/image-generation/prompt-tools/#prompt-triggers)** | Insert the trigger phrases of your model and concepts, compatible embeddings and wildcards from a searchable menu. |
