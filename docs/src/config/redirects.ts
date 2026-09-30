@@ -77,7 +77,7 @@ const redirects: RedirectsConfig = {
   '/features/hidiffusion': '/users-guide/image-generation/hidiffusion',
   '/features/hotkeys': '/users-guide/workbench/hotkeys',
   '/features/image-storage-maintenance': '/users-guide/gallery/image-storage-maintenance',
-  '/features/intermediates': '/users-guide/projects/intermediates',
+  '/features/intermediates': '/users-guide/image-generation/intermediates',
   '/features/krea-2': '/users-guide/models/local-models/krea-2',
   '/features/multi-user-mode/admin-guide': '/configuration/multi-user-mode/admin-guide',
   '/features/multi-user-mode/api-guide': '/configuration/multi-user-mode/api-guide',
