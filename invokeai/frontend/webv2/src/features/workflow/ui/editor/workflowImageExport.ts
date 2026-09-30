@@ -188,7 +188,9 @@ export const getWorkflowContentBounds = (
       ...(includeInputFieldLabels
         ? flowElement.querySelectorAll<HTMLElement>('[data-node-input-field-title="true"]')
         : []),
-      ...flowElement.querySelectorAll<HTMLElement>('[data-workflow-export-content="true"]'),
+      ...flowElement.querySelectorAll<HTMLElement>('[data-workflow-export-field-content="true"]'),
+      ...flowElement.querySelectorAll<HTMLElement>('[data-workflow-export-static-node-content="true"]'),
+      ...flowElement.querySelectorAll<HTMLElement>('[data-workflow-export-output-title="true"]'),
     ]);
     contentElements.forEach((element) => {
       const elementRect = element.getBoundingClientRect();

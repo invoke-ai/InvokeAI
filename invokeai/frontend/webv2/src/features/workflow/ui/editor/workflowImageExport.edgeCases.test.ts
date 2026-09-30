@@ -201,8 +201,8 @@ describe('workflow image export edge cases', () => {
     ).toMatchObject({ x: 0, y: 0, width: 690, height: 100 });
   });
 
-  it('includes inline export descriptions in content bounds', () => {
-    const description = {
+  it('includes overflowing output titles in content bounds', () => {
+    const outputTitle = {
       getBoundingClientRect: () => ({ left: 650, top: 250, width: 100, height: 50 }),
       scrollWidth: 100,
       scrollHeight: 50,
@@ -212,7 +212,7 @@ describe('workflow image export edge cases', () => {
       getBoundingClientRect: () => ({ left: 100, top: 200 }),
       querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
       querySelectorAll: (selector: string) =>
-        selector === '[data-workflow-export-content="true"]' ? [description] : [],
+        selector === '[data-workflow-export-output-title="true"]' ? [outputTitle] : [],
     };
 
     expect(
@@ -226,8 +226,64 @@ describe('workflow image export edge cases', () => {
     ).toMatchObject({ x: 0, y: 0, width: 650, height: 100 });
   });
 
-  it('measures export content in logical coordinates when the workflow is zoomed out', () => {
-    const description = {
+  it('includes full static field rows when measuring expanded snapshot content', () => {
+    const fieldContent = {
+      getBoundingClientRect: () => ({ left: 350, top: 120, width: 200, height: 420 }),
+      scrollWidth: 200,
+      scrollHeight: 420,
+    };
+    const viewport = { getBoundingClientRect: () => ({ left: 100, top: 100, width: 1000, height: 1000 }) };
+    const flowElement = {
+      getBoundingClientRect: () => ({ left: 100, top: 100 }),
+      querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
+      querySelectorAll: (selector: string) =>
+        selector === '[data-workflow-export-field-content="true"]' ? [fieldContent] : [],
+    };
+
+    vi.stubGlobal('getComputedStyle', () => ({ direction: 'ltr', transform: 'none' }));
+    try {
+      expect(
+        getWorkflowContentBounds(
+          flowElement as unknown as HTMLElement,
+          { x: 0, y: 0, width: 300, height: 200 },
+          { includeInputFieldLabels: false }
+        )
+      ).toMatchObject({ x: 0, y: 0, width: 450, height: 440 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('includes expanded static node content in snapshot bounds', () => {
+    const staticNodeContent = {
+      getBoundingClientRect: () => ({ left: 350, top: 120, width: 200, height: 420 }),
+      scrollWidth: 200,
+      scrollHeight: 420,
+    };
+    const viewport = { getBoundingClientRect: () => ({ left: 100, top: 100, width: 1000, height: 1000 }) };
+    const flowElement = {
+      getBoundingClientRect: () => ({ left: 100, top: 100 }),
+      querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
+      querySelectorAll: (selector: string) =>
+        selector === '[data-workflow-export-static-node-content="true"]' ? [staticNodeContent] : [],
+    };
+
+    vi.stubGlobal('getComputedStyle', () => ({ direction: 'ltr', transform: 'none' }));
+    try {
+      expect(
+        getWorkflowContentBounds(
+          flowElement as unknown as HTMLElement,
+          { x: 0, y: 0, width: 300, height: 200 },
+          { includeInputFieldLabels: false }
+        )
+      ).toMatchObject({ x: 0, y: 0, width: 450, height: 440 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('measures output titles in logical coordinates when the workflow is zoomed out', () => {
+    const outputTitle = {
       getBoundingClientRect: () => ({ left: 50, top: 50, width: 100, height: 25 }),
       scrollWidth: 200,
       scrollHeight: 50,
@@ -237,7 +293,7 @@ describe('workflow image export edge cases', () => {
       getBoundingClientRect: () => ({ left: 0, top: 0 }),
       querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
       querySelectorAll: (selector: string) =>
-        selector === '[data-workflow-export-content="true"]' ? [description] : [],
+        selector === '[data-workflow-export-output-title="true"]' ? [outputTitle] : [],
     };
 
     vi.stubGlobal('getComputedStyle', (element: unknown) => ({

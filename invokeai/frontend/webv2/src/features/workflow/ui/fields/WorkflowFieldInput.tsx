@@ -1854,3 +1854,91 @@ export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
       return CONNECTION_ONLY_FALLBACK;
   }
 };
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const stringifySnapshotValue = (value: unknown): string | null => {
+  try {
+    return JSON.stringify(value) ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const formatSnapshotObject = (value: Record<string, unknown>): string | null => {
+  const lora = value.lora;
+  if (isRecord(lora) && typeof lora.name === 'string') {
+    return typeof value.weight === 'number' ? `${lora.name} (${value.weight})` : lora.name;
+  }
+
+  for (const key of [
+    'name',
+    'image_name',
+    'video_name',
+    'latents_name',
+    'tensor_name',
+    'key',
+    'style_preset_id',
+    'system_prompt_id',
+    'workflow_id',
+    'board_id',
+    'id',
+  ]) {
+    const entry = value[key];
+    if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean') {
+      return String(entry);
+    }
+  }
+
+  if (['r', 'g', 'b', 'a'].every((channel) => typeof value[channel] === 'number')) {
+    return `rgba(${value.r}, ${value.g}, ${value.b}, ${value.a})`;
+  }
+
+  return stringifySnapshotValue(value);
+};
+
+const formatSnapshotValue = (value: unknown, template: FieldInputTemplate): string | null => {
+  if (isWorkflowGeneratorFieldTypeName(template.type.name) && isRecord(value)) {
+    const { values: _resolvedValues, ...settings } = value;
+    return stringifySnapshotValue(settings);
+  }
+
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    if (template.type.name === 'EnumField') {
+      return template.uiChoiceLabels?.[String(value)] ?? String(value);
+    }
+
+    return value === '' ? null : String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return (
+      value
+        .map((entry) => (isRecord(entry) ? formatSnapshotObject(entry) : String(entry)))
+        .filter(Boolean)
+        .join(', ') || '[]'
+    );
+  }
+
+  return isRecord(value) ? formatSnapshotObject(value) : null;
+};
+
+/** Renders authored values without mounting editors or resolving runtime diagnostics. */
+export const WorkflowFieldSnapshot = ({ template, value }: { template: FieldInputTemplate; value: unknown }) => {
+  const text = formatSnapshotValue(value, template);
+
+  return text ? (
+    <Text
+      color="fg.muted"
+      data-workflow-export-field-value="true"
+      fontSize="2xs"
+      lineHeight="short"
+      mt="0.5"
+      overflowWrap="anywhere"
+      whiteSpace="pre-wrap"
+    >
+      {text}
+    </Text>
+  ) : null;
+};
