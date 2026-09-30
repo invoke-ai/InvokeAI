@@ -346,6 +346,82 @@ describe('InvocationFlowNode output preview', () => {
     });
   });
 
+  it('bounds snapshots by rendered nodes instead of live editor result height', async () => {
+    const execution = createExecutionPort();
+    execution.set(completed(outputImage(400, 800)));
+    const adapter = createAdapter(execution.port);
+    let capturedHeight: number | undefined;
+    exportMocks.toBlob.mockImplementation((_clone: HTMLElement, options: { height: number }) => {
+      capturedHeight = options.height;
+      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
+    });
+
+    await render(adapter);
+    const liveRect = host.querySelector<HTMLElement>('.react-flow__node')!.getBoundingClientRect();
+    const liveBounds = { x: 20, y: 20, width: liveRect.width, height: liveRect.height };
+    await render(adapter, 1, true);
+    const snapshotRect = host.querySelector<HTMLElement>('.react-flow__node')!.getBoundingClientRect();
+    expect(snapshotRect.height).toBeLessThan(liveRect.height);
+
+    await exportWorkflowAsPng({
+      bounds: liveBounds,
+      fallbackWorkflowName: 'Untitled Workflow',
+      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
+      workflowName: 'Pristine bounds',
+    });
+
+    expect(capturedHeight).toBe(Math.ceil(snapshotRect.height + 200));
+  });
+
+  it.each([
+    { kind: 'plain', uiComponent: null, value: 'Authored text' },
+    { kind: 'multiline', uiComponent: 'textarea', value: 'First line\nSecond line' },
+    { kind: 'long', uiComponent: 'textarea', value: 'UnbrokenText'.repeat(50) },
+    { kind: 'empty', uiComponent: null, value: '' },
+  ] as const)('preserves static text field entry boxes for $kind fields', async ({ uiComponent, value }) => {
+    const textTemplate: InvocationTemplate = {
+      ...template,
+      inputs: {
+        a: {
+          ...template.inputs.a!,
+          input: 'direct',
+          type: { batch: false, cardinality: 'SINGLE', name: 'StringField' },
+          uiComponent,
+        },
+      },
+    };
+    const textNode: WorkflowInvocationNode = {
+      ...documentNode,
+      data: { ...documentNode.data, inputs: { a: { label: '', name: 'a', value } } },
+    };
+    const graph = { ...projectGraph, nodes: [textNode] };
+    const nodes = toFlowNodes(graph, [], { preview: textTemplate });
+    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
+    let capturedText: string | null | undefined;
+    let capturedBorderWidth: string | undefined;
+    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+      const entryBox = clone.querySelector<HTMLElement>('[data-workflow-export-field-value="true"]');
+      capturedText = entryBox?.textContent;
+      capturedBorderWidth = entryBox ? getComputedStyle(entryBox).borderTopWidth : undefined;
+      expect(entryBox).not.toBeNull();
+      expect(entryBox!.scrollWidth).toBeLessThanOrEqual(entryBox!.clientWidth);
+      expect(clone.querySelector('input, textarea, button')).toBeNull();
+      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
+    });
+
+    await render(adapter, 1, true, nodes);
+    await exportWorkflowAsPng({
+      bounds: { x: 20, y: 20, width: 300, height: 260 },
+      fallbackWorkflowName: 'Untitled Workflow',
+      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
+      workflowName: 'Text entry boxes',
+    });
+
+    expect(capturedText).toBe(value);
+    expect(capturedBorderWidth).toBe('1px');
+    expect(adapter.commands.editGraph).not.toHaveBeenCalled();
+  });
+
   it('renders authored notes as static text in snapshot exports', async () => {
     const noteBody = Array.from({ length: 60 }, (_, index) => `Snapshot note line ${index + 1}`).join('\n');
     const authoredNote = {

@@ -6,8 +6,6 @@ const WORKFLOW_GRID_SIZE = 25;
 
 export const EXPORT_PADDING = 100;
 export const EXPORT_SCALE = 2;
-export const EXPORT_MAX_CANVAS_DIMENSION = 16_384;
-export const EXPORT_MAX_CANVAS_PIXELS = 16_777_216;
 export const WORKFLOW_EXPORT_TIMEOUT_MS = 30_000;
 const WORKFLOW_EXPORT_IMAGE_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 // html-to-image has no abort signal; bound captures that remain active after their caller times out.
@@ -146,10 +144,39 @@ export const getWorkflowContentBounds = (
   nodeBounds: Rect,
   { includeInputFieldLabels = true }: WorkflowContentBoundsOptions = {}
 ): Rect => {
-  let minX = nodeBounds.x;
-  let minY = nodeBounds.y;
-  let maxX = nodeBounds.x + nodeBounds.width;
-  let maxY = nodeBounds.y + nodeBounds.height;
+  const flowRect = flowElement.getBoundingClientRect();
+  const viewport = flowElement.querySelector<HTMLElement>('.react-flow__viewport');
+  const viewportRect = viewport?.getBoundingClientRect() ?? flowRect;
+  const transform = viewport ? (getComputedStyle(viewport).transform ?? 'none') : 'none';
+  const matrix = transform
+    .match(/^matrix\(([^)]+)\)$/)?.[1]
+    ?.split(',')
+    .map(Number);
+  const zoom = matrix?.[0] && Number.isFinite(matrix[0]) && matrix[0] > 0 ? matrix[0] : 1;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  // The editor's measured nodes may be taller because of execution previews or textarea resize state.
+  flowElement.querySelectorAll<HTMLElement>('.react-flow__node').forEach((node) => {
+    const rect = node.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+    const x = (rect.left - viewportRect.left) / zoom;
+    const y = (rect.top - viewportRect.top) / zoom;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + rect.width / zoom);
+    maxY = Math.max(maxY, y + rect.height / zoom);
+  });
+  if (minX === Infinity) {
+    minX = nodeBounds.x;
+    minY = nodeBounds.y;
+    maxX = nodeBounds.x + nodeBounds.width;
+    maxY = nodeBounds.y + nodeBounds.height;
+  }
 
   flowElement.querySelectorAll<SVGGraphicsElement>('.react-flow__edge-path').forEach((path) => {
     let pathBounds: DOMRect;
@@ -174,16 +201,6 @@ export const getWorkflowContentBounds = (
   });
 
   {
-    const flowRect = flowElement.getBoundingClientRect();
-    const viewport = flowElement.querySelector<HTMLElement>('.react-flow__viewport');
-    const viewportRect = viewport?.getBoundingClientRect() ?? flowRect;
-    const transform = viewport ? (getComputedStyle(viewport).transform ?? 'none') : 'none';
-    const matrix = transform
-      .match(/^matrix\(([^)]+)\)$/)?.[1]
-      ?.split(',')
-      .map(Number);
-    const zoom = matrix?.[0] && Number.isFinite(matrix[0]) && matrix[0] > 0 ? matrix[0] : 1;
-
     const contentElements = new Set<HTMLElement>([
       ...(includeInputFieldLabels
         ? flowElement.querySelectorAll<HTMLElement>('[data-node-input-field-title="true"]')
@@ -219,14 +236,8 @@ export const getWorkflowImageDimensions = (bounds: Rect): WorkflowImageDimension
   const width = Math.max(1, Math.ceil(paddedBounds.width));
   const height = Math.max(1, Math.ceil(paddedBounds.height));
 
-  const scale = Math.min(
-    EXPORT_SCALE,
-    EXPORT_MAX_CANVAS_DIMENSION / width,
-    EXPORT_MAX_CANVAS_DIMENSION / height,
-    Math.sqrt(EXPORT_MAX_CANVAS_PIXELS / (width * height))
-  );
-  const canvasWidth = Math.max(1, Math.floor(width * scale));
-  const canvasHeight = Math.max(1, Math.floor(height * scale));
+  const canvasWidth = width * EXPORT_SCALE;
+  const canvasHeight = height * EXPORT_SCALE;
 
   return { width, height, canvasWidth, canvasHeight };
 };
@@ -247,6 +258,7 @@ export const getWorkflowExportOptions = (dimensions: WorkflowImageDimensions, ba
   canvasHeight: dimensions.canvasHeight,
   backgroundColor,
   pixelRatio: 1,
+  skipAutoScale: true,
   includeStyleProperties: [...EXPORT_STYLE_PROPERTIES],
   imagePlaceholder: WORKFLOW_EXPORT_IMAGE_PLACEHOLDER,
   onImageErrorHandler: () => WORKFLOW_EXPORT_IMAGE_PLACEHOLDER,

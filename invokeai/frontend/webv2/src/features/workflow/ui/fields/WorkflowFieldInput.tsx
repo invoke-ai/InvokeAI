@@ -1941,6 +1941,29 @@ export const WorkflowFieldSnapshot = ({
     text = seedMode === 'random' || !text ? modeLabel : `${text} (${modeLabel})`;
   }
 
+  if (template.type.name === 'StringField') {
+    return (
+      <Box
+        borderColor="border"
+        borderRadius="control"
+        borderWidth="1px"
+        data-workflow-export-field-value="true"
+        fontFamily={template.uiComponent === 'textarea' ? 'mono' : undefined}
+        minH="7"
+        minW="0"
+        mt="0.5"
+        overflowWrap="anywhere"
+        px="2"
+        py="1"
+        textStyle="xs"
+        w="full"
+        whiteSpace="pre-wrap"
+      >
+        {text}
+      </Box>
+    );
+  }
+
   return text ? (
     <Text
       color="fg.muted"
