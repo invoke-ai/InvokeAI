@@ -50696,7 +50696,7 @@ export type components = {
             vae?: components["schemas"]["VAEField"] | null;
             /**
              * Shift
-             * @description Override the timestep shift (mu) for the sigma schedule. Leave blank to auto-calculate based on image dimensions (recommended). Lower values (~0.5) produce less noise shifting, higher values (~1.15) produce more.
+             * @description Override the timestep shift for the sigma schedule. Leave blank to auto-calculate based on image dimensions (recommended). This is the shift itself, not the mu it is derived from: the auto-calculated value runs from about 1.6 on small frames to 3.16 at one megapixel and above. Lower values keep more of the input image, higher values less.
              * @default null
              */
             shift?: number | null;
@@ -50834,7 +50834,7 @@ export type components = {
             vae?: components["schemas"]["VAEField"] | null;
             /**
              * Shift
-             * @description Override the timestep shift (mu) for the sigma schedule. Leave blank to auto-calculate based on image dimensions (recommended). Lower values (~0.5) produce less noise shifting, higher values (~1.15) produce more.
+             * @description Override the timestep shift for the sigma schedule. Leave blank to auto-calculate based on image dimensions (recommended). This is the shift itself, not the mu it is derived from: the auto-calculated value runs from about 1.6 on small frames to 3.16 at one megapixel and above. Lower values keep more of the input image, higher values less.
              * @default null
              */
             shift?: number | null;
