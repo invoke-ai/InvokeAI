@@ -79,9 +79,12 @@ jobs:
             src:
               - 'pyproject.toml'
               - '.github/workflows/openapi-checks.yml'
+              - '.nvmrc'
+              - '.github/actions/install-frontend-deps/**'
               - 'scripts/generate_openapi_schema.py'
               - 'invokeai/**'
-              # The schema is generated from Python and compared against legacy web's artifacts.
+              # Shared contracts are generated from Python; neither UI package owns these artifacts.
+              - '!invokeai/frontend/webv1/**'
               - '!invokeai/frontend/webv2/**'
 
       - name: setup uv
@@ -107,21 +110,23 @@ jobs:
       - name: install frontend dependencies
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
         uses: ./.github/actions/install-frontend-deps
+        with:
+          working-directory: invokeai/frontend/api
 
       - name: copy schema
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        run: cp invokeai/frontend/web/openapi.json invokeai/frontend/web/openapi_orig.json
+        run: cp invokeai/frontend/api/openapi.json invokeai/frontend/api/openapi_orig.json
         shell: bash
 
       - name: generate schema
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
-        run: cd invokeai/frontend/web && uv run ../../../scripts/generate_openapi_schema.py > openapi.json && pnpm prettier --write openapi.json
+        run: cd invokeai/frontend/api && uv run ../../../scripts/generate_openapi_schema.py > openapi.json && pnpm format:openapi
         shell: bash
 
       - name: compare files
         if: ${{ steps.changed-files.outputs.src_any_changed == 'true' || inputs.always_run == true }}
         run: |
-          if ! diff invokeai/frontend/web/openapi.json invokeai/frontend/web/openapi_orig.json; then
+          if ! diff invokeai/frontend/api/openapi.json invokeai/frontend/api/openapi_orig.json; then
             echo "Files are different!";
             exit 1;
           fi

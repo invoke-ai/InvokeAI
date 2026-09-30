@@ -1,7 +1,3 @@
-# Copyright (c) 2023 - The InvokeAI Team
-# Primary Author: David Lovell (github @f412design, discord @techjedi)
-# co-author, minor tweaks - Lincoln Stein
-
 # pylint: disable=line-too-long
 # pylint: disable=broad-exception-caught
 """Script to import images into the new database system for 3.0.0"""

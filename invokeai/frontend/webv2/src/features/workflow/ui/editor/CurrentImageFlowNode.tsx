@@ -14,6 +14,8 @@ import { memo } from 'react';
 
 import type { CurrentImageFlowNode as CurrentImageFlowNodeType } from './flowAdapters';
 
+import { useIsWorkflowImageExport } from './InvocationFlowNode';
+
 const getLatestImage = (values: Record<string, unknown>): GeneratedImageContract | null => {
   const recentImages = Array.isArray(values.recentImages) ? (values.recentImages as GeneratedImageContract[]) : [];
 
@@ -23,15 +25,22 @@ const getLatestImage = (values: Record<string, unknown>): GeneratedImageContract
 const CurrentImageFlowNodeComponent = ({ data, selected }: NodeProps<CurrentImageFlowNodeType>) => {
   const galleryValues = useWorkflowProjectSelector((project) => project.galleryValues);
   const progressImage = useProgressImage();
+  const isWorkflowImageExport = useIsWorkflowImageExport();
   const node = data.documentNode;
   const latestImage = getLatestImage(galleryValues);
 
   return (
-    <Box overflow="hidden" w="20rem" {...getWorkflowNodeShellProps({ selected })}>
+    <Box
+      data-is-selected={selected}
+      data-workflow-node-shell="true"
+      overflow="hidden"
+      w="20rem"
+      {...getWorkflowNodeShellProps({ selected })}
+    >
       <Flex {...getWorkflowNodeHeaderProps()}>
         <Text fontWeight="700">{node.data.label || 'Current Image'}</Text>
         {progressImage ? (
-          <Text color="brand.solid" fontSize="2xs" ms="auto">
+          <Text color="brand.solid" data-node-status-indicator="true" fontSize="2xs" ms="auto">
             generating…
           </Text>
         ) : null}
@@ -46,7 +55,7 @@ const CurrentImageFlowNodeComponent = ({ data, selected }: NodeProps<CurrentImag
         })}
         fit="contain"
         h="18rem"
-        liveImage={progressImageToStreamingSource(progressImage)}
+        liveImage={isWorkflowImageExport ? null : progressImageToStreamingSource(progressImage)}
         w="full"
       >
         <Flex align="center" color="fg.subtle" fontSize="2xs" h="full" justify="center" px="4" textAlign="center">

@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
-
 """This module defines core text-to-image model metadata fields.
 
 Metadata comprises any descriptive information that is not essential

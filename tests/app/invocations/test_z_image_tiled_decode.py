@@ -6,18 +6,26 @@ import pytest
 import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
+from invokeai.app.invocations.vae.z_image_image_to_latents import ZImageImageToLatentsInvocation
 from invokeai.app.invocations.vae.z_image_latents_to_image import ZImageLatentsToImageInvocation
-from invokeai.backend.flux.modules.autoencoder import DEFAULT_TILE_SAMPLE_MIN_SIZE, MIN_TILE_SAMPLE_SIZE
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder as FluxAutoEncoder
+from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_tiling_scope import DEFAULT_TILE_SAMPLE_MIN_SIZE, MIN_TILE_SAMPLE_SIZE
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
 
 
 def _mock_flux_vae(element_size_bytes: int = 2) -> MagicMock:
-    vae = MagicMock(spec=FluxAutoEncoder)
+    """A stand-in for the estimator cells only: they read nothing but the parameter element size.
+
+    The node-wiring cells below use a real `AutoencoderKL`, because they are about tiling state a
+    mock cannot have -- `tile_overlap_factor` is set in `__init__`, so a spec'd mock lacks it.
+    """
+    vae = MagicMock(spec=AutoencoderKL)
     dtype = torch.float16 if element_size_bytes == 2 else torch.float32
     # A fresh iterator per call: the decode path reads `parameters()` after the estimator already
     # has, and a single stored iterator would be exhausted by then.
     vae.parameters.side_effect = lambda: iter([torch.zeros(1, dtype=dtype)])
+    # The tiled *encode* residual prices the assembled moments, so it reads the latent width.
+    vae.config.latent_channels = 16
     return vae
 
 
@@ -173,10 +181,93 @@ class TestFluxWorkingMemoryEstimate:
         )
 
 
-def _build_decode_mocks(latents: torch.Tensor, decoded: torch.Tensor, force_tiled_decode: bool = False):
-    """Wire ZImageLatentsToImageInvocation.invoke to run end-to-end on CPU against a mocked FLUX VAE."""
-    vae = _mock_flux_vae()
-    vae.decode.return_value = decoded
+class TestTheEncodeEstimate:
+    """Nothing exercised this estimator with `operation="encode"` before the FLUX.1 VAE could tile
+    an encode at all -- its docstring said as much: "a `tile_size` with `operation="encode"` would
+    price a tiled encode that cannot happen, and no call site passes one".
+
+    The tile-bounded term is shared with the decode. What tiling does *not* bound is not: a decode
+    assembles an image several times over and then converts it to bytes, while an encode consumes
+    its input once and accumulates latents at 1/64 the area. Inheriting the decode residual would
+    over-reserve by a wide margin on exactly the resolutions this feature exists for.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _fused_non_rocm_build(self, monkeypatch):
+        monkeypatch.setattr("invokeai.backend.util.vae_working_memory.sdpa_score_matrix_bytes", lambda *a, **k: 0)
+        monkeypatch.setattr(torch.version, "hip", None, raising=False)
+
+    def test_the_untiled_estimate_is_unchanged(self):
+        """Four call sites pass no tile and depend on this number staying what it was."""
+        image = torch.zeros(1, 3, 1024, 1024)
+        assert estimate_vae_working_memory_flux("encode", image, _mock_flux_vae()) == 1024 * 1024 * 2 * 1100
+
+    def test_a_tiled_estimate_is_flat_in_the_image_size_where_the_untiled_one_is_not(self):
+        vae = _mock_flux_vae()
+        estimates = [
+            estimate_vae_working_memory_flux("encode", torch.zeros(1, 3, edge, edge), vae, tile_size=512)
+            for edge in (1024, 2048, 3072)
+        ]
+        # Not exactly equal: the input image and the assembled latent are not bounded by tiling.
+        # But they are a rounding error beside the tile term, which is what "flat" has to mean.
+        assert max(estimates) < min(estimates) * 1.2
+        untiled = [
+            estimate_vae_working_memory_flux("encode", torch.zeros(1, 3, edge, edge), vae) for edge in (1024, 3072)
+        ]
+        assert untiled[1] == untiled[0] * 9
+
+    def test_the_tiled_estimate_is_one_tile_plus_the_input_and_every_live_copy_of_the_moments(self):
+        """The moments are not one copy. `AutoencoderKL._tiled_encode` keeps every encoded tile in
+        `rows` while it builds `result_rows` from them, then concatenates `enc` on top of both; the
+        tiles overlap, so they alone are `1/(1-0.25)**2` of the output area."""
+        vae = _mock_flux_vae()
+        edge, tile = 2048, 512
+        live_moment_copies = 1.0 / (1.0 - 0.25) ** 2 + 2.0
+        expected = tile * tile * 2 * 1100 * 1.25
+        expected += edge * edge * 3 * 2
+        expected += (edge // 8) * (edge // 8) * 2 * 16 * 2 * live_moment_copies
+        assert estimate_vae_working_memory_flux("encode", torch.zeros(1, 3, edge, edge), vae, tile_size=tile) == int(
+            expected
+        )
+
+    def test_it_does_not_inherit_the_decode_residual(self):
+        """The decode adds four element-size copies of the assembled image plus a byte buffer, for
+        the node's `clamp/*127.5/.byte()` tail. An encode has no such tail, and the cost of assuming
+        it does is a reservation the cache has to evict models to honour."""
+        vae = _mock_flux_vae()
+        image = torch.zeros(1, 3, 2048, 2048)
+        latents = torch.zeros(1, 16, 2048 // 8, 2048 // 8)
+
+        encode = estimate_vae_working_memory_flux("encode", image, vae, tile_size=512)
+        decode = estimate_vae_working_memory_flux("decode", latents, vae, tile_size=512)
+
+        # Same tile, same output area, so the whole difference is the residual term.
+        assert decode - encode > 2048 * 2048 * 3 * 2, "the encode is paying for the decode's image copies"
+
+    def test_a_tile_larger_than_the_image_is_priced_as_the_untiled_encode(self):
+        """`scoped_vae_tiling` hands the VAE a tile it will not use below its own threshold, and an
+        oversized tile would otherwise reserve for a pass that never runs."""
+        vae = _mock_flux_vae()
+        image = torch.zeros(1, 3, 512, 512)
+        assert estimate_vae_working_memory_flux(
+            "encode", image, vae, tile_size=1024
+        ) == estimate_vae_working_memory_flux("encode", image, vae)
+
+
+def _build_decode_mocks(vae, latents: torch.Tensor, decoded: torch.Tensor, force_tiled_decode: bool = False):
+    """Wire ZImageLatentsToImageInvocation.invoke to run end-to-end on CPU against a real tiny VAE.
+
+    `decode` is replaced so the test controls the result and can raise, and so the tiling state at
+    the moment of the call is recorded -- that is the thing under test, and the scope has restored
+    it by the time `invoke` returns.
+    """
+    tiling_state: list[dict] = []
+
+    def record_and_return(latents_arg, return_dict=True):
+        tiling_state.append({"use_tiling": vae.use_tiling, "tile_sample_min_size": vae.tile_sample_min_size})
+        return (decoded,) if return_dict is False else MagicMock(sample=decoded)
+
+    vae.decode = MagicMock(side_effect=record_and_return)
 
     vae_info = MagicMock()
     vae_info.model = vae
@@ -196,48 +287,63 @@ def _build_decode_mocks(latents: torch.Tensor, decoded: torch.Tensor, force_tile
     image_dto.width = decoded.shape[-1]
     image_dto.height = decoded.shape[-2]
     context.images.save.return_value = image_dto
-    return vae, vae_info, context
+    return vae_info, context, tiling_state
 
 
 def _build_invocation(tiled: bool = False, tile_size: int = 0) -> ZImageLatentsToImageInvocation:
+    # `seamless_axes=[]` rather than a MagicMock: the node patches seamless for every VAE it accepts
+    # now that there is only one class, and `SeamlessExt` would iterate a MagicMock.
     return ZImageLatentsToImageInvocation.model_construct(
         latents=MagicMock(latents_name="test_latents"),
-        vae=MagicMock(vae=MagicMock()),
+        vae=MagicMock(vae=MagicMock(), seamless_axes=[]),
         tiled=tiled,
         tile_size=tile_size,
     )
 
 
 class TestTilingIsWired:
-    def test_the_default_decodes_untiled(self):
-        vae, _, context = _build_decode_mocks(torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
+    def test_the_default_decodes_untiled(self, flux_shaped_vae):
+        vae = flux_shaped_vae()
+        _, context, state = _build_decode_mocks(vae, torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
         _build_invocation().invoke(context)
-        vae.disable_tiling.assert_called_once()
-        vae.enable_tiling.assert_not_called()
+        assert state[0]["use_tiling"] is False
 
-    def test_the_node_field_reaches_the_tiled_path(self):
-        vae, _, context = _build_decode_mocks(torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
+    def test_the_node_field_reaches_the_tiled_path(self, flux_shaped_vae):
+        vae = flux_shaped_vae()
+        _, context, state = _build_decode_mocks(vae, torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
         _build_invocation(tiled=True).invoke(context)
-        vae.enable_tiling.assert_called_once_with(tile_sample_min_size=DEFAULT_TILE_SAMPLE_MIN_SIZE)
-        vae.disable_tiling.assert_not_called()
+        assert state[0]["use_tiling"] is True
+        assert state[0]["tile_sample_min_size"] == DEFAULT_TILE_SAMPLE_MIN_SIZE
 
-    def test_force_tiled_decode_reaches_the_tiled_path(self):
+    def test_force_tiled_decode_reaches_the_tiled_path(self, flux_shaped_vae):
         """The config switch a small-VRAM user actually has; the node field is not the only way in."""
-        vae, _, context = _build_decode_mocks(
-            torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512), force_tiled_decode=True
+        vae = flux_shaped_vae()
+        _, context, state = _build_decode_mocks(
+            vae, torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512), force_tiled_decode=True
         )
         _build_invocation().invoke(context)
-        vae.enable_tiling.assert_called_once_with(tile_sample_min_size=DEFAULT_TILE_SAMPLE_MIN_SIZE)
+        assert state[0]["use_tiling"] is True
+        assert state[0]["tile_sample_min_size"] == DEFAULT_TILE_SAMPLE_MIN_SIZE
 
-    def test_a_requested_tile_size_is_passed_through(self):
-        vae, _, context = _build_decode_mocks(torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
+    def test_a_requested_tile_size_is_passed_through(self, flux_shaped_vae):
+        vae = flux_shaped_vae()
+        _, context, state = _build_decode_mocks(vae, torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
         _build_invocation(tiled=True, tile_size=384).invoke(context)
-        vae.enable_tiling.assert_called_once_with(tile_sample_min_size=384)
+        assert state[0]["tile_sample_min_size"] == 384
+
+    def test_the_tiling_state_is_restored_afterwards(self, flux_shaped_vae):
+        """The VAE is shared with the encode node and with FLUX.1; a tiled decode must not leak."""
+        vae = flux_shaped_vae()
+        _, context, _ = _build_decode_mocks(vae, torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
+        before = (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size)
+        _build_invocation(tiled=True, tile_size=384).invoke(context)
+        assert (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size) == before
 
     @pytest.mark.parametrize("tiled,expected_tile_size", [(False, None), (True, 0)])
-    def test_the_estimate_is_tile_bounded_only_when_tiling(self, tiled, expected_tile_size):
+    def test_the_estimate_is_tile_bounded_only_when_tiling(self, flux_shaped_vae, tiled, expected_tile_size):
         path = "invokeai.app.invocations.vae.z_image_latents_to_image.estimate_vae_working_memory_flux"
-        _, _, context = _build_decode_mocks(torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
+        vae = flux_shaped_vae()
+        _, context, _ = _build_decode_mocks(vae, torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
         with patch(path, return_value=1024) as estimate:
             _build_invocation(tiled=tiled).invoke(context)
         assert estimate.call_args.kwargs["tile_size"] == expected_tile_size
@@ -253,37 +359,105 @@ class TestOomFallback:
             RuntimeError("Native API failed. Native API returns: UR_RESULT_ERROR_OUT_OF_DEVICE_MEMORY"),
         ],
     )
-    def test_an_untiled_oom_retries_once_tiled(self, oom_error):
+    def test_an_untiled_oom_retries_once_tiled(self, flux_shaped_vae, oom_error):
+        vae = flux_shaped_vae()
         decoded = torch.zeros(1, 3, 512, 512)
-        vae, _, context = _build_decode_mocks(torch.zeros(1, 16, 64, 64), decoded)
-        vae.decode.side_effect = [oom_error, decoded]
+        _, context, state = _build_decode_mocks(vae, torch.zeros(1, 16, 64, 64), decoded)
+        calls = {"n": 0}
+        record = vae.decode.side_effect
+
+        def fail_then_succeed(latents_arg, return_dict=True):
+            calls["n"] += 1
+            result = record(latents_arg, return_dict=return_dict)
+            if calls["n"] == 1:
+                raise oom_error
+            return result
+
+        vae.decode = MagicMock(side_effect=fail_then_succeed)
 
         result = _build_invocation().invoke(context)
 
         assert vae.decode.call_count == 2
-        vae.enable_tiling.assert_called_once_with(tile_sample_min_size=DEFAULT_TILE_SAMPLE_MIN_SIZE)
+        assert [call["use_tiling"] for call in state] == [False, True]
         assert result.width == 512
         # The user gets a different image than they asked for, so both channels have to carry it: the
         # progress line while it happens, and a log line a bug report can still be read off afterwards.
         context.util.signal_progress.assert_any_call("VAE decode ran out of memory, retrying tiled")
         assert "not identical to an untiled decode" in context.logger.warning.call_args[0][0]
 
-    def test_a_non_oom_error_propagates_without_a_retry(self):
-        vae, _, context = _build_decode_mocks(torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
-        vae.decode.side_effect = RuntimeError("Input type (float) and weight type (half) should be the same")
+    def test_a_non_oom_error_propagates_without_a_retry(self, flux_shaped_vae):
+        vae = flux_shaped_vae()
+        _, context, state = _build_decode_mocks(vae, torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
+        vae.decode = MagicMock(side_effect=RuntimeError("Input type (float) and weight type (half) should be the same"))
 
         with pytest.raises(RuntimeError, match="weight type"):
             _build_invocation().invoke(context)
 
         assert vae.decode.call_count == 1
-        vae.enable_tiling.assert_not_called()
+        assert state == []
 
-    def test_an_oom_while_already_tiled_reraises(self):
-        vae, _, context = _build_decode_mocks(torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
-        vae.decode.side_effect = torch.cuda.OutOfMemoryError("CUDA out of memory")
+    def test_an_oom_while_already_tiled_reraises(self, flux_shaped_vae):
+        vae = flux_shaped_vae()
+        _, context, state = _build_decode_mocks(vae, torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
+        record = vae.decode.side_effect
+
+        def record_then_fail(latents_arg, return_dict=True):
+            record(latents_arg, return_dict=return_dict)
+            raise torch.cuda.OutOfMemoryError("CUDA out of memory")
+
+        vae.decode = MagicMock(side_effect=record_then_fail)
 
         with pytest.raises(torch.cuda.OutOfMemoryError):
             _build_invocation(tiled=True).invoke(context)
 
+        # One attempt, and it was already the tiled one -- retrying it tiled again would only burn
+        # the time a second full decode costs before failing the same way.
         assert vae.decode.call_count == 1
-        vae.enable_tiling.assert_called_once()
+        assert [call["use_tiling"] for call in state] == [True]
+
+
+class TestTheEncodeNodeTiling:
+    """The encode node called a bare `vae.disable_tiling()` and offered no way to ask for tiling.
+
+    That line predates the node having any tiling fields; it was there to give the shared cached VAE
+    a deterministic state, which the scope now does in both directions.
+    """
+
+    @staticmethod
+    def _encode(vae, tiled: bool = False, tile_size: int = 0):
+        seen: list[dict] = []
+        real_encode = vae.encode
+
+        def record(x, return_dict=True):
+            seen.append({"use_tiling": vae.use_tiling, "tile_sample_min_size": vae.tile_sample_min_size})
+            return real_encode(x, return_dict=return_dict)
+
+        vae.encode = record
+
+        vae_info = MagicMock()
+        vae_info.model = vae
+        cm = MagicMock()
+        cm.__enter__ = MagicMock(return_value=(None, vae))
+        cm.__exit__ = MagicMock(return_value=None)
+        vae_info.model_on_device.return_value = cm
+
+        with patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cpu")):
+            ZImageImageToLatentsInvocation.vae_encode(
+                vae_info=vae_info, image_tensor=torch.zeros(1, 3, 512, 512), tiled=tiled, tile_size=tile_size
+            )
+        return seen
+
+    def test_the_default_encodes_untiled(self, flux_shaped_vae):
+        vae = flux_shaped_vae()
+        assert self._encode(vae)[0]["use_tiling"] is False
+
+    def test_the_field_reaches_the_tiled_path_and_the_state_is_restored(self, flux_shaped_vae):
+        vae = flux_shaped_vae()
+        before = (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size)
+
+        seen = self._encode(vae, tiled=True, tile_size=384)
+
+        assert seen[0]["use_tiling"] is True
+        assert seen[0]["tile_sample_min_size"] == 384
+        # Shared with the decode node and with every FLUX.1 node, most of which never touch the flag.
+        assert (vae.use_tiling, vae.tile_sample_min_size, vae.tile_latent_min_size) == before

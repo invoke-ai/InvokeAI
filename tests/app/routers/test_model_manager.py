@@ -588,6 +588,41 @@ def test_reidentify_is_refused_while_the_same_model_is_being_converted(conversio
         deps.invoker.services.model_manager.store.replace_model.assert_not_called()
 
 
+def test_reidentify_keeps_a_backbone_only_the_install_source_names(
+    monkeypatch: Any, mm2_record_store: Any, mm2_app_config: Any
+) -> None:
+    """A 16-channel VAE is FLUX.1's or SD3's by its name alone. Copied into the models folder it keeps a
+    generic file name in a folder named for its key, and only the Hugging Face source still says SD3."""
+    from types import SimpleNamespace
+
+    import torch
+    from safetensors.torch import save_file
+
+    from invokeai.app.api.routers.model_manager import _reidentify_model
+    from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
+    from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelSourceType
+
+    path = mm2_app_config.models_path / "7c1f9d2e" / "diffusion_pytorch_model.safetensors"
+    path.parent.mkdir(parents=True)
+    save_file(
+        {"encoder.conv_in.weight": torch.zeros(8, 3, 3, 3), "decoder.conv_in.weight": torch.zeros(8, 16, 3, 3)}, path
+    )
+    source = {
+        "source": "stabilityai/stable-diffusion-3.5-large::vae/diffusion_pytorch_model.safetensors",
+        "source_type": ModelSourceType.HFRepoID,
+    }
+    installed = ModelConfigFactory.from_model_on_disk(path, source, allow_unknown=False).config
+    assert installed is not None and installed.base is BaseModelType.StableDiffusion3
+    mm2_record_store.add_model(installed)
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(store=mm2_record_store), configuration=mm2_app_config)
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(DummyInvoker(services))
+    )
+
+    assert _reidentify_model(installed.key).base is BaseModelType.StableDiffusion3
+
+
 @pytest.mark.anyio
 async def test_update_model_record_is_refused_while_the_same_model_is_being_converted(
     conversion_in_flight,

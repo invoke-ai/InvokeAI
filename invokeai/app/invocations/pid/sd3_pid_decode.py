@@ -34,12 +34,8 @@ from invokeai.backend.pid.decode import (
     encode_caption_for_pid,
     estimate_pid_decode_working_memory,
 )
+from invokeai.backend.sd3.vae import SD3_VAE_SCALING_FACTOR, SD3_VAE_SHIFT_FACTOR
 from invokeai.backend.util.devices import TorchDevice
-
-# SD3 medium VAE constants (see diffusers `stabilityai/stable-diffusion-3-medium` VAE config
-# and PiD's pipeline_registry.py confirmation).
-_SD3_VAE_SCALING_FACTOR: float = 1.5305
-_SD3_VAE_SHIFT_FACTOR: float = 0.0609
 
 
 @invocation(
@@ -141,7 +137,7 @@ class SD3PiDDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
             device = TorchDevice.choose_torch_device()
             dtype = next(iter(pid_net.parameters())).dtype
 
-            denorm_latent = latents.to(device=device, dtype=dtype) / _SD3_VAE_SCALING_FACTOR + _SD3_VAE_SHIFT_FACTOR
+            denorm_latent = latents.to(device=device, dtype=dtype) / SD3_VAE_SCALING_FACTOR + SD3_VAE_SHIFT_FACTOR
             caption_embs = caption_embs.to(device=device, dtype=dtype)
 
             context.util.signal_progress("Running PiD decoder")

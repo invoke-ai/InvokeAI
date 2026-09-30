@@ -8,9 +8,9 @@ from diffusers.models.autoencoders.autoencoder_kl_wan import AutoencoderKLWan
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder, resolve_tile_size
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.vae_tiling_scope import resolve_tile_size
 
 # The diffusers AutoencoderKL (SD1/SDXL, SD3, CogView4) and the FLUX.1 AutoEncoder run the same
 # mid-block self-attention as the FLUX.2 VAE: one head over the 512-channel width, on the
@@ -119,12 +119,14 @@ def estimate_vae_working_memory_cogview4(
 
 # What a tiled decode does *not* bound: the assembled image, several times over, per output pixel.
 #
-# `AutoEncoder._tiled_decode` moves each tile to the host and merges there, so it lands one stacked
-# copy back on the device. Diffusers' `AutoencoderKL.tiled_decode` -- the other class this estimator
-# serves, through the Z-Image node -- assembles entirely on the device: every decoded tile stays
-# live in `rows` while the cropped rows and then the concatenated result are built. On top of
-# either, a decode node runs `clamp(-1, 1)`, `+ 1.0` and `* 127.5` over the result and then
-# `.byte()` it: more element-size RGB buffers plus the 8-bit one.
+# `AutoencoderKL.tiled_decode` assembles entirely on the device: every decoded tile stays live in
+# `rows` while the cropped rows and then the concatenated result are built. On top of that, a decode
+# node runs `clamp(-1, 1)`, `+ 1.0` and `* 127.5` over the result and then `.byte()` it: more
+# element-size RGB buffers plus the 8-bit one.
+#
+# The measurement below was taken when this estimator also served InvokeAI's own port of the BFL
+# autoencoder, which merged on the *host* and therefore had a far smaller slope. That class is gone;
+# the constant is kept at the value that covers the diffusers slope, which is the one that remains.
 #
 # Measured on this repo's fixtures (RTX 4090, fp32), device peak over baseline against one full
 # image, at 1024px and 2048px:
@@ -141,11 +143,15 @@ def estimate_vae_working_memory_cogview4(
 _FLUX_VAE_TILED_IMAGE_COPIES = 4
 _IMAGE_CHANNELS = 3
 
+# An encoder emits mean and logvar before `DiagonalGaussianDistribution` splits them, so the tensor
+# a tiled encode assembles is twice the latent width.
+_VAE_MOMENT_CHANNELS_PER_LATENT = 2
+
 
 def estimate_vae_working_memory_flux(
     operation: Literal["encode", "decode"],
     image_tensor: torch.Tensor,
-    vae: AutoEncoder,
+    vae: AutoencoderKL,
     tile_size: int | None = None,
 ) -> int:
     """Estimate the working memory required by the invocation in bytes.
@@ -156,8 +162,9 @@ def estimate_vae_working_memory_flux(
     tiling does *not* bound are added on top. `tile_size <= 0` is the nodes' "use the default"
     sentinel; see `resolve_tile_size`.
 
-    Only `decode` tiles: `AutoEncoder.encode` never consults `use_tiling`. So a `tile_size` with
-    `operation="encode"` would price a tiled encode that cannot happen, and no call site passes one.
+    Both operations tile. The tile-bounded term is the same for either; what tiling does *not*
+    bound differs, so the residual is chosen by `operation` -- see `_FLUX_VAE_TILED_IMAGE_COPIES`
+    for the decode side.
     """
 
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
@@ -187,7 +194,35 @@ def estimate_vae_working_memory_flux(
         tile_w = min(tile, out_w)
         # A 25% margin for tile overlap and the number of tiles, mirroring the SD1/SDXL estimator.
         working_memory = tile_h * tile_w * element_size * scaling_constant * 1.25
-        working_memory += out_h * out_w * _IMAGE_CHANNELS * (_FLUX_VAE_TILED_IMAGE_COPIES * element_size + 1)
+        if operation == "decode":
+            working_memory += out_h * out_w * _IMAGE_CHANNELS * (_FLUX_VAE_TILED_IMAGE_COPIES * element_size + 1)
+        else:
+            # A tiled encode leaves two things un-bounded: the full-resolution image it slices tiles
+            # from, and the moments it assembles.
+            #
+            # The moments are *not* one copy. `AutoencoderKL._tiled_encode` appends every encoded
+            # tile to `rows`, then builds `result_rows` from them -- blending against `rows[i-1][j]`,
+            # so `rows` stays live throughout -- and finally concatenates `enc` on top of both. The
+            # tiles overlap, so their total area is `1 / (1 - overlap_factor)**2` times the output;
+            # `result_rows` and `enc` are one output each. Hence the factor below, which is 3.78 at
+            # the 0.25 every `AutoencoderKL` ships.
+            #
+            # Read from the VAE rather than hard-coded: an overlap factor of 0.5 would make the
+            # tiles alone four times the output, and a fixed 3.78 would then under-reserve. An
+            # estimate consumed as `free >= estimate` has to err upwards.
+            config = getattr(vae, "config", None)
+            latent_channels = getattr(config, "latent_channels", 16)
+            overlap_factor = getattr(vae, "tile_overlap_factor", 0.25)
+            live_moment_copies = 1.0 / (1.0 - overlap_factor) ** 2 + 2.0
+            moments = (
+                (out_h // LATENT_SCALE_FACTOR)
+                * (out_w // LATENT_SCALE_FACTOR)
+                * _VAE_MOMENT_CHANNELS_PER_LATENT
+                * latent_channels
+                * element_size
+            )
+            working_memory += out_h * out_w * _IMAGE_CHANNELS * element_size
+            working_memory += moments * live_moment_copies
         score_h, score_w = tile_h, tile_w
     else:
         working_memory = out_h * out_w * element_size * scaling_constant
@@ -370,6 +405,20 @@ def estimate_vae_working_memory_anima(
         w = tile_size
         # Add 25% to account for tile overlap.
         working_memory = h * w * element_size * scaling_constant * 1.25
+        if operation == "encode":
+            # ...plus what tiling does not bound on the encode: the full-resolution frame the tiles
+            # are sliced from, and the moments assembled out of them. Without these the estimate is
+            # flat while the measurement grows about 4 bytes per pixel -- measured on a 4090 at 1.07x
+            # headroom at 1024px falling to 0.69x at 4096px, i.e. an under-reservation, and this node
+            # has no tiled retry to fall back on the way its decode sibling does.
+            #
+            # The decode has the same kind of un-bounded assembly and does not price it either. That
+            # is pre-existing -- `anima_l2i` has tiled since it was written -- and is left alone here
+            # rather than changed in a diff about the encode.
+            frame_h, frame_w = image_tensor.shape[-2], image_tensor.shape[-1]
+            latent_area = (frame_h // LATENT_SCALE_FACTOR) * (frame_w // LATENT_SCALE_FACTOR)
+            working_memory += frame_h * frame_w * _IMAGE_CHANNELS * element_size
+            working_memory += latent_area * _VAE_MOMENT_CHANNELS_PER_LATENT * vae.config.z_dim * element_size
     else:
         latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
         h = latent_scale_factor_for_operation * image_tensor.shape[-2]

@@ -10,13 +10,13 @@ preset; Comfy-Org repackages both generations as single safetensors files. See
 (non-commercial / research).
 """
 
-import re
 from collections.abc import Mapping
 from pathlib import Path
 from typing import Any, Literal, Self
 
 from pydantic import Field
 
+from invokeai.backend.model_manager.configs.backbone_names import backbone_from_components, name_components
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
     InvalidMatchError,
@@ -28,7 +28,6 @@ from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
-    ModelSourceType,
     ModelType,
     PiDDecoderVariantType,
 )
@@ -192,70 +191,6 @@ def _raise_if_pid_net_contract_unmet(shapes: _Shapes, contract: Mapping[str, tup
             f"PiD checkpoint has {len(mismatched)} weights whose shape PidNet cannot accept "
             f"(e.g. {k}: {got}, expected {want}); loading it would fail with a size mismatch"
         )
-
-
-def _name_components(mod: ModelOnDisk, override_fields: dict[str, Any]) -> tuple[str, ...]:
-    """The name evidence for backbone and variant, most specific first.
-
-    NVIDIA distributes PiD checkpoints as
-    ``PiD_res2k_sr4x_official_<backbone>_distill_4step/model_ema_bf16.pth``, so the backbone and the
-    preset usually live in the *directory* name rather than the weights filename. A direct
-    single-file install stores the checkpoint as ``<uuid>/model_ema_bf16.pth`` and drops that
-    directory, which is why the install source is consulted at all: for an HF or URL install it still
-    carries NVIDIA's name.
-
-    These used to be concatenated into one string and substring-matched, which let a fixed backbone
-    precedence decide cases the name had already answered — `/flux/model_sd3.pth` matched `flux`
-    first and was registered as FLUX although the file itself says sd3. Matching component by
-    component and taking the first that names exactly one backbone lets the more specific name win.
-
-    A local install contributes no source: the model manager sets `source` to the file's own path
-    when there is no remote one (`ModelConfigFactory.build_common_fields`), so trusting it would mean
-    matching against arbitrary ancestor directories of wherever the user keeps their models. Nothing
-    is lost by dropping it — `install_path` identifies a local file *before* it moves it, so the
-    filename and parent directory are still the originals.
-    """
-    components = [mod.path.name, mod.path.parent.name]
-    if override_fields.get("source_type") != ModelSourceType.Path:
-        components.append(str(override_fields.get("source") or ""))
-    return tuple(c for c in components if c)
-
-
-# Ordered so that a more specific spelling is consumed before a more general one that it contains:
-# `flux2` before `flux`. That is precedence between two spellings of one answer, not between two
-# answers — see `_backbone_named_in`.
-_BACKBONE_NAME_PATTERNS: tuple[tuple[BaseModelType, re.Pattern[str]], ...] = (
-    (BaseModelType.Flux2, re.compile(r"(?<![a-z0-9])flux[_\-.]?2(?![a-z0-9])")),
-    (BaseModelType.StableDiffusionXL, re.compile(r"(?<![a-z0-9])sdxl(?![a-z0-9])")),
-    (BaseModelType.QwenImage, re.compile(r"(?<![a-z0-9])qwen[_\-.]?image(?![a-z0-9])")),
-    (BaseModelType.StableDiffusion3, re.compile(r"(?<![a-z0-9])sd[_\-.]?3(?![a-z0-9])")),
-    (BaseModelType.Flux, re.compile(r"(?<![a-z0-9])flux(?![a-z0-9])")),
-)
-
-
-def _backbone_named_in(text: str) -> BaseModelType | None:
-    """The single backbone *text* names, or None if it names none — or more than one.
-
-    Two different backbones in one string is not a precedence question, it is a text that decides
-    nothing; resolving it by a fixed order is how a directory named `flux` came to outrank a file
-    named `model_sd3`. Abstaining leaves the decision to the explicit `base` override, or to the
-    FLUX.1 default for the 16-channel family.
-    """
-    remaining, found = text.lower(), set()
-    for base, pattern in _BACKBONE_NAME_PATTERNS:
-        if pattern.search(remaining):
-            found.add(base)
-            # Consumed so the general spelling cannot match the specific one's leftovers.
-            remaining = pattern.sub(" ", remaining)
-    return next(iter(found)) if len(found) == 1 else None
-
-
-def _backbone_from_components(components: tuple[str, ...]) -> BaseModelType | None:
-    """The backbone named by the most specific component that names exactly one."""
-    for component in components:
-        if (named := _backbone_named_in(component)) is not None:
-            return named
-    return None
 
 
 # Backbones for which NVIDIA ships exactly one preset — for these the variant is known even when the
@@ -436,14 +371,14 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         # check proved it is a conv. The backbone therefore always comes from the weights — the name
         # can only break the FLUX.1 / SD3 / Qwen-Image tie, never pick a backbone on its own.
         latent_channels = shapes[_LATENT_PROJ_KEY][1]  # type: ignore[index]
-        components = _name_components(mod, override_fields)
+        components = name_components(mod, override_fields)
         if version is PiDVersion.V1_5:
             _raise_if_named_undistilled(components, mod.path.parent.name)
 
         cls._validate_base(
             latent_channels=latent_channels,
             version=version,
-            named_base=_backbone_from_components(components),
+            named_base=backbone_from_components(components),
             had_base_override=override_fields.get("base") is not None,
         )
 

@@ -1,4 +1,3 @@
-# Copyright (c) 2024 Lincoln D. Stein and the InvokeAI Team
 """Implementation of model loader service."""
 
 from pathlib import Path

@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Lincoln Stein and the InvokeAI Team
 """
 Utility routine used for autodetection of optimal slice size
 for attention mechanism.

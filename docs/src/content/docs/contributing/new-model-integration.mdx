@@ -23,7 +23,7 @@ The examples use a hypothetical architecture, `NewModel`, with the base value `n
 :::
 
 :::caution[Frontend scope]
-Frontend work targets **webv2** (`invokeai/frontend/webv2`) only. The legacy UI in `invokeai/frontend/web` gets no graph builders or UI for new architectures. It still owns the generated OpenAPI artifacts, which CI checks; see [Tests and CI gates](#13-tests-and-ci-gates).
+Frontend work targets **webv2** (`invokeai/frontend/webv2`) only. The legacy UI in `invokeai/frontend/webv1` gets no graph builders or UI for new architectures. Shared generated OpenAPI artifacts live in `invokeai/frontend/api`, which CI checks; see [Tests and CI gates](#13-tests-and-ci-gates).
 :::
 
 :::tip[Start with the scaffolder]
@@ -300,7 +300,9 @@ Configs identify a model on disk. Every non-abstract subclass of `Config_Base` r
 
 3. **VAE config (only for a new VAE)** (`configs/vae.py`)
 
-   `VAE_Checkpoint_Config_Base` detects only SD and FLUX.1 VAEs. Newer architectures subclass `Checkpoint_Config_Base, Config_Base` directly, as `VAE_Checkpoint_Flux2_Config` does:
+   `VAE_Checkpoint_Config_Base` and `VAE_Diffusers_Config_Base` detect the plain `AutoencoderKL` VAEs: SD 1, SD 2 (single files only) and SDXL at 4 latent channels, FLUX.1 and SD3 at 16. Within one latent width the weights cannot tell these bases apart, so `_VAE_FAMILIES` groups them, and an explicit `base` override chooses within a family but never across one. For 16 channels, a folder's `config.json` decides by `scaling_factor`/`shift_factor`, and a config that matches neither is not filed at all. A 16-channel single file goes to the backbone named in its file name, folder or install source (`configs/backbone_names.py`), else to FLUX.1. At 4 channels the older heuristics still apply: the file name for a single file, the SDXL config values or name for a folder. A new architecture that reuses one of these networks with its own constants (CogView 4 would) belongs in that table and in the diffusers constants check, not in a new detector.
+
+   Newer architectures with their own network subclass `Checkpoint_Config_Base, Config_Base` directly, as `VAE_Checkpoint_Flux2_Config` does:
 
    ```python title="invokeai/backend/model_manager/configs/vae.py"
    class VAE_Checkpoint_NewModel_Config(Checkpoint_Config_Base, Config_Base):
@@ -864,10 +866,12 @@ Beyond those tables, test what can silently go wrong:
 
 Use real lightweight modules with small configs rather than mocks.
 
-**CI gates for generated artifacts.** New or changed invocations change the OpenAPI schema. As long as `invokeai/frontend/web` exists, CI (`openapi-checks.yml`, `typegen-checks.yml`) requires its generated `openapi.json` and `src/services/api/schema.ts` to be current. Regenerate both from `invokeai/frontend/web` in the repository's Python environment. This is a generated-file gate, not legacy UI work:
+**CI gates for generated artifacts.** New or changed invocations change the OpenAPI schema. CI (`openapi-checks.yml`, `typegen-checks.yml`) requires the shared package's `invokeai/frontend/api/openapi.json` and `invokeai/frontend/api/schema.ts` to be current. Regenerate both from `invokeai/frontend/api` in the repository's Python environment after installing that package's locked dependencies:
 
 ```sh
-python ../../../scripts/generate_openapi_schema.py > openapi.json && pnpm exec prettier --write openapi.json
+pnpm install --frozen-lockfile
+set -o pipefail
+python ../../../scripts/generate_openapi_schema.py > openapi.json && pnpm format:openapi
 python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 ```
 

@@ -1,7 +1,7 @@
 """Loaders that handle no quantization side channel refuse one rather than dropping it.
 
-Nine call sites across six loader classes read a state dict and hand it to a model without ever
-looking for a `weight_scale`. At the seven that load non-strictly a quantized checkpoint does not
+Ten call sites across six loader classes read a state dict and hand it to a model without ever
+looking for a `weight_scale`. At the eight that load non-strictly a quantized checkpoint does not
 fail -- it *loads*, with the scale dropped as an unexpected key. Most cast every tensor to the
 compute dtype, turning the fp8 codes into ordinary floats off by `1/weight_scale`; the Z-Image
 ControlNet assigns them with no cast at all and reports the orphan only at DEBUG.
@@ -18,7 +18,7 @@ Each cell is paired with a dense one. Two of these loaders have no other test in
 without that half nothing would notice `is_scale_metadata_key` being widened until it started
 refusing ordinary checkpoints -- and it has been widened before, twice.
 
-Two of the nine are not in the table below: Ideogram 4's text encoder and VAE read a diffusers
+Two of the ten are not in the table below: Ideogram 4's text encoder and VAE read a diffusers
 *folder* rather than a single file, and the encoder is the one seam here that does support a
 quantized layout -- Ideogram's own weight-only fp8, behind a private flag in `config.json`. Both are
 covered in `test_ideogram4_diffusers_loader.py`, which owns that loader.
@@ -35,6 +35,7 @@ from invokeai.backend.model_manager.configs.main import Main_Checkpoint_ErnieIma
 from invokeai.backend.model_manager.configs.vae import (
     VAE_Checkpoint_Flux2_Config,
     VAE_Checkpoint_QwenImage_Config,
+    VAE_Checkpoint_SD3_Config,
     VAE_Checkpoint_Wan_Config,
 )
 from invokeai.backend.model_manager.load.model_loaders import anima, ernie_image, flux, vae
@@ -99,6 +100,14 @@ SITES = [
         lambda path: VAE_Checkpoint_QwenImage_Config.model_construct(path=str(path), name="qwen-vae"),
         True,
         id="qwen_image_vae",
+    ),
+    pytest.param(
+        VAELoader,
+        vae,
+        "_load_sd3_vae",
+        lambda path: VAE_Checkpoint_SD3_Config.model_construct(path=str(path), name="sd3-vae"),
+        True,
+        id="sd3_vae",
     ),
     pytest.param(
         # Reached by the Anima VAE registration and by the community qwen-image redistribution of

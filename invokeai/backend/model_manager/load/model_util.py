@@ -1,4 +1,3 @@
-# Copyright (c) 2024 The InvokeAI Development Team
 """Various utility functions needed by the loader and caching system."""
 
 import json
