@@ -91,7 +91,12 @@ import {
 } from 'features/controlLayers/store/paramsSlice';
 import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
 import type { CanvasMetadata, LoRA, RefImageState } from 'features/controlLayers/store/types';
-import { zCanvasMetadata, zCanvasReferenceImageState_OLD, zRefImageState } from 'features/controlLayers/store/types';
+import {
+  isKrea2ReferenceImageConfig,
+  zCanvasMetadata,
+  zCanvasReferenceImageState_OLD,
+  zRefImageState,
+} from 'features/controlLayers/store/types';
 import type { BaseModelType, ModelIdentifierField, ModelType } from 'features/nodes/types/common';
 import { zModelIdentifierField } from 'features/nodes/types/common';
 import { zModelIdentifier } from 'features/nodes/types/v2/common';
@@ -2206,6 +2211,27 @@ const CanvasLayers: SingleMetadataHandler<CanvasMetadata> = {
 //#endregion CanvasLayers
 
 //#region RefImages
+/**
+ * The value text the metadata viewer shows for one reference image row.
+ *
+ * Only the adapter-based references -- IP Adapter, FLUX Redux, FLUX Kontext -- have a model to name.
+ * The rest are supported natively by their base, so there is no model: FLUX.2, Qwen-Image, Wan and
+ * Krea-2. Those used to fall through to a bare "No model", which reads like a setting that failed to
+ * record rather than how those bases work, so they now describe the reference instead -- by its own
+ * tuning knob where it has one, and otherwise by saying no adapter model is involved.
+ *
+ * Pure and exported so the text for every reference type can be pinned without rendering the viewer.
+ */
+export const getRefImageMetadataValue = (config: RefImageState['config'], t: (key: string) => string): string => {
+  if ('model' in config) {
+    // Non-null for anything that reached a graph: the builders drop model-less references first.
+    return config.model?.name ?? t('metadata.refImageNoModel');
+  }
+  if (isKrea2ReferenceImageConfig(config)) {
+    return `${t('controlLayers.krea2StyleStrength')} ${config.styleStrength}`;
+  }
+  return t('metadata.refImageBuiltIn');
+};
 const RefImages: CollectionMetadataHandler<RefImageState[]> = {
   [CollectionMetadataKey]: true,
   type: 'RefImages',
@@ -2257,11 +2283,8 @@ const RefImages: CollectionMetadataHandler<RefImageState[]> = {
   i18nKey: 'controlLayers.referenceImage',
   LabelComponent: MetadataLabel,
   ValueComponent: ({ value }: CollectionMetadataValueProps<RefImageState[]>) => {
-    // FLUX.2 reference images don't have a model field (built-in support)
-    if ('model' in value.config && value.config.model) {
-      return <MetadataPrimitiveValue value={value.config.model.name} />;
-    }
-    return <MetadataPrimitiveValue value="No model" />;
+    const { t } = useTranslation();
+    return <MetadataPrimitiveValue value={getRefImageMetadataValue(value.config, t)} />;
   },
 };
 //#endregion RefImages

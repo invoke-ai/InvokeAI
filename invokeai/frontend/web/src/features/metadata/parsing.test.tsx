@@ -1,9 +1,15 @@
 import type { AppStore } from 'app/store/store';
 import type * as paramsSliceModule from 'features/controlLayers/store/paramsSlice';
 import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
-import { ImageMetadataHandlers, parseMetadataDatum, recallIfStillValid } from 'features/metadata/parsing';
-import { assert } from 'tsafe';
+import type { RefImageState } from 'features/controlLayers/store/types';
+import {
+  getRefImageMetadataValue,
+  ImageMetadataHandlers,
+  parseMetadataDatum,
+  recallIfStillValid,
+} from 'features/metadata/parsing';
 import type * as modelsApiModule from 'services/api/endpoints/models';
+import { assert } from 'tsafe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -1385,5 +1391,80 @@ describe('ImageMetadataHandlers - RefImages', () => {
     const data = await parseMetadataDatum({ ref_images: [krea2RefImage()] }, ImageMetadataHandlers.RefImages, store);
 
     expect(data.isError).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The metadata viewer's reference-image row text.
+//
+// Every reference type has to say something meaningful. The bases with built-in reference support have
+// no model to name and used to render a bare "No model", which reads like a missing setting.
+// ---------------------------------------------------------------------------
+describe('getRefImageMetadataValue', () => {
+  // Keys, not English, so the assertions survive copy changes.
+  const tKey = (key: string) => key;
+  const image = { original: { image: { image_name: 'ref.png', width: 512, height: 512 } } };
+
+  it.each([['flux2_reference_image'], ['qwen_image_reference_image'], ['wan_reference_image']] as const)(
+    'describes %s as built-in rather than as a missing model',
+    (type) => {
+      const value = getRefImageMetadataValue({ type, image } as RefImageState['config'], tKey);
+
+      expect(value).toBe('metadata.refImageBuiltIn');
+    }
+  );
+
+  it('shows the style strength for a Krea-2 reference', () => {
+    const value = getRefImageMetadataValue(
+      { type: 'krea2_reference_image', image, styleStrength: 0.6 } as RefImageState['config'],
+      tKey
+    );
+
+    expect(value).toBe('controlLayers.krea2StyleStrength 0.6');
+  });
+
+  it.each([['ip_adapter'], ['flux_redux'], ['flux_kontext_reference_image']] as const)(
+    'names the model for %s',
+    (type) => {
+      const config = {
+        type,
+        image,
+        model: { key: 'k', hash: 'h', name: 'Some Adapter', base: 'flux', type: 'ip_adapter' },
+      };
+
+      const value = getRefImageMetadataValue(config as unknown as RefImageState['config'], tKey);
+
+      expect(value).toBe('Some Adapter');
+    }
+  );
+
+  // Unreachable from a generated image -- the graph builders drop model-less adapter references -- but
+  // the viewer also renders live panel state, where the model may not be picked yet.
+  it('falls back for an adapter reference with no model picked', () => {
+    const value = getRefImageMetadataValue(
+      { type: 'flux_redux', image, model: null, imageInfluence: 'highest' } as RefImageState['config'],
+      tKey
+    );
+
+    expect(value).toBe('metadata.refImageNoModel');
+  });
+
+  // A new reference type that forgets to describe itself lands on the built-in text, never on a crash
+  // or an empty row.
+  it('does not return an empty string for any type in the union', () => {
+    const types = [
+      'ip_adapter',
+      'flux_redux',
+      'flux_kontext_reference_image',
+      'flux2_reference_image',
+      'qwen_image_reference_image',
+      'wan_reference_image',
+      'krea2_reference_image',
+    ] as const;
+
+    for (const type of types) {
+      const value = getRefImageMetadataValue({ type, image, styleStrength: 1 } as RefImageState['config'], tKey);
+      expect(value, type).not.toBe('');
+    }
   });
 });
