@@ -51,7 +51,7 @@ for frontend in webv2 webv1; do
     echo "Installing $frontend dependencies..."
     pnpm install --frozen-lockfile
     if [[ ! -z ${CI} ]]; then
-        # CI runs each package's completion gates before building distributions.
+        # CI validates webv2 separately; distribution builds only bundle the legacy fallback.
         pnpm exec vite build
     else
         pnpm build

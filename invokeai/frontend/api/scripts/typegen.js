@@ -5,7 +5,7 @@ import openapiTS, { astToString } from 'openapi-typescript';
 import ts from 'typescript';
 
 const OPENAPI_URL = 'http://127.0.0.1:9090/openapi.json';
-const OUTPUT_FILE = 'src/services/api/schema.ts';
+const OUTPUT_FILE = 'schema.ts';
 
 async function generateTypes(schema) {
   process.stdout.write(`Generating types ${OUTPUT_FILE}...`);

@@ -239,7 +239,6 @@ export default [
       '**/index.html',
       '**/.yarn/',
       '**/*.scss',
-      'src/services/api/schema.ts',
       '.prettierrc.js',
       '.storybook',
     ],

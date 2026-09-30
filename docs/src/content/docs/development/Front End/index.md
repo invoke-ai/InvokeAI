@@ -23,17 +23,18 @@ Run these in `invokeai/frontend/webv2`:
 - `test:browser`: run Chromium interaction tests
 - `check:release`: run the complete release gates, including performance, project-file, and accessibility journeys
 
-The legacy package has its own scripts and lockfile. See each package's `AGENTS.md` for its commands and ownership rules.
+The legacy package has its own scripts and lockfile. Frontend CI runs webv2's checks and release gate; legacy lint and tests remain available locally. See each package's `AGENTS.md` for its commands and ownership rules.
 
 ## Type generation
 
-The legacy `web` package owns generation, including shared backend contracts consumed by webv2. We use [openapi-typescript] to generate types from the app's OpenAPI schema. The generated types are committed to the repo in [schema.ts].
+The shared `invokeai/frontend/api` package owns OpenAPI/type generation for backend contracts. CI checks these artifacts independently of either UI package. We use [openapi-typescript] to generate types from the app's OpenAPI schema. The generated types are committed to the repo in [schema.ts].
 
 If you make backend changes, it's important to regenerate the frontend types:
 
 ```sh
 set -o pipefail
-cd invokeai/frontend/webv1 && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
+pnpm -C invokeai/frontend/api install --frozen-lockfile
+cd invokeai/frontend/api && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 ```
 
 On macOS and Linux, you can run `make frontend-typegen` as a shortcut for the above snippet.
@@ -121,7 +122,7 @@ Colocate unit tests and Chromium browser tests with the owning code. Use real br
 [i18next]: https://github.com/i18next/react-i18next
 [Weblate]: https://hosted.weblate.org/engage/invokeai/
 [openapi-typescript]: https://github.com/openapi-ts/openapi-typescript
-[schema.ts]: https://github.com/invoke-ai/InvokeAI/blob/main/invokeai/frontend/web/src/services/api/schema.ts
+[schema.ts]: https://github.com/invoke-ai/InvokeAI-7/blob/main/invokeai/frontend/api/schema.ts
 [conventional commits]: https://www.conventionalcommits.org/en/v1.0.0/
 [Workflows - Design and Implementation]: ./workflows/
 [State Management]: ./state-management/

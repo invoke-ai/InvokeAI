@@ -54,18 +54,18 @@ describe('architecture workflow', () => {
     expect(action.inputs['working-directory'].default).toBe('invokeai/frontend/webv2');
     for (const [path, source] of Object.entries(sources).filter(([path]) => path.includes('/workflows/'))) {
       const jobs = parse(source).jobs;
-      for (const [id, job] of Object.entries(jobs) as [
-        string,
-        {
-          defaults?: { run?: { 'working-directory'?: string } };
-          steps: { uses?: string; with?: { 'working-directory'?: string } }[];
-        },
-      ][]) {
+      for (const job of Object.values(jobs) as {
+        defaults?: { run?: { 'working-directory'?: string } };
+        steps: { uses?: string; with?: { 'working-directory'?: string } }[];
+      }[]) {
         const install = job.steps.find((step) => step.uses === './.github/actions/install-frontend-deps');
         if (!install) {
           continue;
         }
-        const expected = id.startsWith('frontend-webv2-') ? 'invokeai/frontend/webv2' : 'invokeai/frontend/webv1';
+        const expected =
+          path.endsWith('/frontend-checks.yml') || path.endsWith('/frontend-tests.yml')
+            ? 'invokeai/frontend/webv2'
+            : 'invokeai/frontend/api';
         expect(install.with?.['working-directory'] ?? action.inputs['working-directory'].default, path).toBe(expected);
         if (job.defaults?.run) {
           expect(job.defaults.run['working-directory'], path).toBe(expected);

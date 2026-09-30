@@ -20,6 +20,7 @@ help:
 	@echo "frontend-test            Run the frontend test suite once"
 	@echo "frontend-dev             Run the frontend in developer mode on localhost:5173"
 	@echo "frontend-legacy-dev      Run the legacy frontend development server"
+	@echo "frontend-api-install     Install shared API generation dependencies"
 	@echo "frontend-openapi         Generate the OpenAPI schema"
 	@echo "frontend-typegen         Generate types for the frontend from the OpenAPI schema"
 	@echo "frontend-lint            Run frontend checks and fixable lint/format steps"
@@ -89,14 +90,18 @@ frontendv2-dev: frontend-dev
 frontend-legacy-dev:
 	cd invokeai/frontend/webv1 && pnpm run dev
 
+# Install the shared contract generation tools
+frontend-api-install:
+	pnpm -C invokeai/frontend/api install --frozen-lockfile
+
 # Generate the OpenAPI Schema for the app
 frontend-openapi:
-	cd invokeai/frontend/webv1 && \
+	cd invokeai/frontend/api && \
 	python ../../../scripts/generate_openapi_schema.py > openapi.json && \
-	pnpm prettier --write openapi.json
+	pnpm format:openapi
 
 frontend-typegen:
-	set -o pipefail; cd invokeai/frontend/webv1 && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
+	set -o pipefail; cd invokeai/frontend/api && python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 
 frontend-lint:
 	pnpm -C invokeai/frontend/webv2 lint

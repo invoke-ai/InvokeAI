@@ -32,11 +32,11 @@ describe('IMAGE_BATCH_CHUNK_SIZE', () => {
   it('matches the bound the server actually publishes', () => {
     // The client-side chunk size exists only to satisfy the server-side cap, and the two are
     // declared in different languages. openapi.json is the committed contract between them
-    // (typegen-checks keeps it in sync with the routers), so drift on either side fails here
+    // (openapi-checks keeps it in sync with the routers), so drift on either side fails here
     // rather than at runtime as a batch of 422s.
     type ArraySchema = { maxItems?: number; anyOf?: ArraySchema[] };
     const openapi = JSON.parse(
-      readFileSync(fileURLToPath(new URL('../../../../openapi.json', import.meta.url)), 'utf8')
+      readFileSync(fileURLToPath(new URL('../../../../../api/openapi.json', import.meta.url)), 'utf8')
     ) as {
       components: { schemas: Record<string, { properties?: { image_names?: ArraySchema } }> };
     };
