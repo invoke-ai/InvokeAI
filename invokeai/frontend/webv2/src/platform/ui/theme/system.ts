@@ -274,6 +274,14 @@ const config = defineConfig({
     'body[data-gallery-drag], body[data-gallery-drag] *': {
       cursor: 'grabbing !important',
     },
+    // A pointer drag (resize, window move) owns the cursor and selection until it ends; iframes would swallow moves.
+    ':root[data-pointer-drag], :root[data-pointer-drag] *': {
+      cursor: 'var(--wb-pointer-drag-cursor) !important',
+      userSelect: 'none !important',
+    },
+    ':root[data-pointer-drag] iframe': {
+      pointerEvents: 'none',
+    },
     ':root': {
       '--wb-motion-duration-fast': '0.12s',
       '--wb-motion-duration-medium': '0.15s',

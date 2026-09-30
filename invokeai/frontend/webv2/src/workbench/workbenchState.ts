@@ -529,14 +529,6 @@ export const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: nu
 export const getPanelCollapseThreshold = (region: WidgetRegion): number =>
   getPanelSizeBounds(region).min - PANEL_COLLAPSE_OVERSHOOT_PX;
 
-/** Reopens halfway back from the collapse threshold to prevent boundary flicker. */
-export const shouldSnapPanelShut = (region: WidgetRegion, rawSizePx: number, isSnapped: boolean): boolean =>
-  shouldSnapPanelShutAt(getPanelCollapseThreshold(region), rawSizePx, isSnapped);
-
-/** Measure overshoot from the rendered width when the viewport squeezes a panel below its minimum. */
-export const shouldSnapPanelShutAt = (thresholdPx: number, rawSizePx: number, isSnapped: boolean): boolean =>
-  rawSizePx <= thresholdPx + (isSnapped ? PANEL_COLLAPSE_OVERSHOOT_PX / 2 : 0);
-
 /** The collapse threshold for a panel currently rendered at `visibleSizePx`. */
 export const getVisiblePanelCollapseThreshold = (region: WidgetRegion, visibleSizePx: number): number =>
   Math.min(getPanelCollapseThreshold(region), visibleSizePx - PANEL_COLLAPSE_OVERSHOOT_PX);
@@ -4724,9 +4716,12 @@ export const __workbenchReducerInternal = (
           galleryPage: 0,
           selectedBoardId: action.boardId,
           selectedImageNames: [],
-          // Only actual board changes clear similarity ranking and semantic text. Preserve selection pages: they
-          // may still describe the pre-search board listing.
-          ...(values.selectedBoardId !== action.boardId ? { semanticImageQuery: null, semanticSearchText: null } : {}),
+          // A semantic search ranks within the board, so it follows the switch; a map cluster is a fixed member
+          // list and ends with an actual board change.
+          ...(values.selectedBoardId !== action.boardId &&
+          (values.semanticImageQuery as { kind?: unknown } | null | undefined)?.kind === 'cluster'
+            ? { semanticImageQuery: null, semanticSearchText: null }
+            : {}),
         }),
         action.projectId
       );
@@ -4823,7 +4818,7 @@ export const __workbenchReducerInternal = (
       return updateGalleryValues(
         state,
         (values) => {
-          // Apply delayed commits only when they still match the current field, mode, and board.
+          // Apply delayed commits only when they still match the current field and mode; a board switch keeps both.
           if (values.semanticSearchText !== action.text) {
             return values;
           }

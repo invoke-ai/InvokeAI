@@ -191,6 +191,58 @@ describe('Combobox', () => {
     expect(document.querySelectorAll('[role="option"]')).toHaveLength(options.length);
   });
 
+  it('scrolls long lists in the themed viewport, following the keyboard highlight and reporting the end', async () => {
+    const longOptions = Array.from({ length: 40 }, (_, index) => ({
+      label: `Scheduler ${index + 1}`,
+      value: `scheduler_${index + 1}`,
+    }));
+    const onListScrollToBottom = vi.fn();
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await interact(() => {
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <Combobox
+              aria-label="Scheduler"
+              options={longOptions}
+              value="scheduler_1"
+              onListScrollToBottom={onListScrollToBottom}
+              onValueChange={() => undefined}
+            />
+          </ChakraProvider>
+        </I18nextProvider>
+      );
+    });
+    const input = host.querySelector<HTMLInputElement>('input[role="combobox"]')!;
+
+    await interact(() => input.click());
+    const content = document.querySelector<HTMLElement>('[data-scope="combobox"][data-part="content"]')!;
+    const viewport = content.querySelector<HTMLElement>('[data-scope="scroll-area"][data-part="viewport"]')!;
+    expect(viewport.scrollHeight).toBeGreaterThan(viewport.clientHeight);
+    expect(content.scrollHeight).toBe(content.clientHeight);
+
+    for (let step = 0; step < 20; step += 1) {
+      await interact(() => {
+        input.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' }));
+      });
+    }
+    const highlighted = content.querySelector<HTMLElement>('[role="option"][data-highlighted]')!;
+    const highlightedRect = highlighted.getBoundingClientRect();
+    const viewportRect = viewport.getBoundingClientRect();
+    expect(highlighted.textContent).toContain('Scheduler 21');
+    expect(highlightedRect.top).toBeGreaterThanOrEqual(viewportRect.top);
+    expect(highlightedRect.bottom).toBeLessThanOrEqual(viewportRect.bottom);
+    expect(onListScrollToBottom).not.toHaveBeenCalled();
+
+    await interact(() => {
+      viewport.scrollTop = viewport.scrollHeight;
+      viewport.dispatchEvent(new Event('scroll'));
+    });
+    expect(onListScrollToBottom).toHaveBeenCalled();
+  });
+
   it('honors the disabled state', async () => {
     const { input } = await renderCombobox(true);
 

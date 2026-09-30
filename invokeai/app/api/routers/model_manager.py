@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein
 """FastAPI route for model configuration records."""
 
 import asyncio
@@ -483,7 +482,11 @@ def _reidentify_model(key: str) -> AnyModelConfig:
     else:
         model_path = models_path / config.path
     mod = ModelOnDisk(model_path)
-    result = ModelConfigFactory.from_model_on_disk(mod)
+    # The install source is evidence identification reads: for a model whose weights cannot name its
+    # backbone (a 16-channel VAE, a PiD decoder), the HF repo or URL may. A file copied into the models
+    # folder has also lost the folder it came from, so without the source a re-probe refiles it under
+    # the default.
+    result = ModelConfigFactory.from_model_on_disk(mod, {"source": config.source, "source_type": config.source_type})
     if result.config is None:
         raise InvalidModelException("Unable to identify model format")
 

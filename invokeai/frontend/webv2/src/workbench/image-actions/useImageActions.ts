@@ -1,6 +1,7 @@
 import type { GalleryItemActionContext, GalleryItemActions } from '@features/gallery/react';
 import type { VaeModelConfig } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
+import type { VideoConditioningRole } from '@features/video';
 import type { WorkbenchSnapshot } from '@workbench/workbenchStore';
 
 import {
@@ -61,9 +62,11 @@ import { recordCanvasImportError } from './canvasImportError';
 import { executeImageRecall, executeLoadImageWorkflow, getCurrentGenerateValues } from './executeImageRecall';
 import {
   appendReferenceVideo,
-  canAppendReferenceVideo,
   executeVideoRecall,
+  getVideoPlacementRoom,
+  placeConditioningClip,
   placeInitialVideo,
+  type VideoPlacementRoom,
 } from './executeVideoRecall';
 import {
   captureGalleryWidgetKeyValues,
@@ -96,6 +99,8 @@ export interface ImageActions extends GalleryItemActions {
   canUseAsReferenceImage: boolean;
   /** Whether the video widget's current model takes reference videos and has room for another. */
   canUseAsReferenceVideo: boolean;
+  /** Whether the video widget's current model takes a conditioning clip in each role. */
+  canUseAsConditioningClip: Record<VideoConditioningRole, boolean>;
   copyImage: (image: GalleryImage) => Promise<void>;
   /** Opens a new project whose canvas holds these images as raster layers. */
   createCanvasFromImages: (images: readonly GalleryImage[]) => Promise<void>;
@@ -126,19 +131,22 @@ export interface ImageActions extends GalleryItemActions {
   setImagesStarred: (imageNames: string[], starred: boolean) => Promise<void>;
   useAsReferenceImage: (image: GalleryImage) => void;
   useAsReferenceVideo: (item: GalleryVideoItem) => void;
+  /** Sets a gallery video as the Video panel's conditioning clip in `role`, clearing the media it excludes. */
+  useAsConditioningClip: (item: GalleryVideoItem, role: VideoConditioningRole) => void;
 }
 
 const EMPTY_WIDGET_VALUES: Record<string, unknown> = {};
 
 /**
- * Selected as a boolean so Video panel edits re-render action consumers only when the answer flips. The cache skips
- * re-normalizing video values that have not changed since the last store update.
+ * Selected as booleans so Video panel edits re-render action consumers only when an answer flips (the workbench
+ * selector compares shallowly). The cache skips re-normalizing video values that have not changed since the last
+ * store update.
  */
-const createCanUseAsReferenceVideoSelector = (models: readonly ModelConfig[], projectId: string | undefined) => {
+const createVideoPlacementRoomSelector = (models: readonly ModelConfig[], projectId: string | undefined) => {
   let lastValues: Record<string, unknown> | null = null;
-  let lastResult = false;
+  let lastResult: VideoPlacementRoom = { conditioningAudio: false, conditioningVideo: false, referenceVideo: false };
 
-  return (snapshot: WorkbenchSnapshot): boolean => {
+  return (snapshot: WorkbenchSnapshot): VideoPlacementRoom => {
     const project = projectId
       ? snapshot.projects.find((candidate) => candidate.id === projectId)
       : snapshot.activeProject;
@@ -146,7 +154,7 @@ const createCanUseAsReferenceVideoSelector = (models: readonly ModelConfig[], pr
 
     if (videoValues !== lastValues) {
       lastValues = videoValues;
-      lastResult = canAppendReferenceVideo({ models, videoValues });
+      lastResult = getVideoPlacementRoom({ models, videoValues });
     }
 
     return lastResult;
@@ -212,11 +220,17 @@ export const useImageActions = ({
     }, [generateValues, supportedModels])
   );
 
-  const selectCanUseAsReferenceVideo = useMemo(
-    () => createCanUseAsReferenceVideoSelector(models, projectId),
+  const selectVideoPlacementRoom = useMemo(
+    () => createVideoPlacementRoomSelector(models, projectId),
     [models, projectId]
   );
-  const canUseAsReferenceVideo = useWorkbenchSelector(selectCanUseAsReferenceVideo, Object.is);
+  const videoPlacementRoom = useWorkbenchSelector(selectVideoPlacementRoom);
+  const canUseAsReferenceVideo = videoPlacementRoom.referenceVideo;
+  const { conditioningAudio, conditioningVideo } = videoPlacementRoom;
+  const canUseAsConditioningClip = useMemo(
+    () => ({ audio: conditioningAudio, video: conditioningVideo }),
+    [conditioningAudio, conditioningVideo]
+  );
 
   useMountEffect(() => {
     void ensureModelsLoaded();
@@ -1046,6 +1060,7 @@ export const useImageActions = ({
           imageNames.map((name) => ({ kind: 'image', name })),
           starred
         ),
+      canUseAsConditioningClip,
       canUseAsReferenceImage,
       canUseAsReferenceVideo,
       sendToInitialVideo: (item) => {
@@ -1091,6 +1106,33 @@ export const useImageActions = ({
         commands.widgets.patchValues('video', placement.patch, projectId);
         openWorkbenchWidget('video', { preferredRegions: ['left'] });
       },
+      useAsConditioningClip: (item, role) => {
+        const placement = placeConditioningClip({ models, role, video: item, videoValues: getLatestVideoValues() });
+
+        // The menu offers this only when the model takes the clip; the panel's model can still change first.
+        if (placement.status !== 'placed') {
+          notifications.add({
+            kind: 'info',
+            message: t(
+              placement.status === 'no-picture'
+                ? 'widgets.video.placement.conditioningClipNoPicture'
+                : 'widgets.video.placement.conditioningClipUnsupported'
+            ),
+            title: t('widgets.video.placement.conditioningClipNotSet'),
+          });
+          return;
+        }
+
+        commands.widgets.patchValues('video', placement.patch, projectId);
+        openWorkbenchWidget('video', { preferredRegions: ['left'] });
+        if (placement.displaced) {
+          notifications.add({
+            kind: 'info',
+            message: t('widgets.video.placement.conditioningClipDisplaced'),
+            title: t('widgets.video.placement.conditioningClipSet'),
+          });
+        }
+      },
       useAsReferenceImage: (image) => {
         const result = appendReferenceImage({ generateValues: getLatestGenerateValues(), image, models });
 
@@ -1104,6 +1146,7 @@ export const useImageActions = ({
     };
   }, [
     boards,
+    canUseAsConditioningClip,
     canUseAsReferenceImage,
     canUseAsReferenceVideo,
     confirmImageDeletion,

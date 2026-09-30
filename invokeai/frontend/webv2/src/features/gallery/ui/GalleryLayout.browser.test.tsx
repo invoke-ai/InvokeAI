@@ -324,7 +324,7 @@ describe('gallery layout shells', () => {
 
   it('bounds stacked pointer and keyboard resizing by the measured maximum', async () => {
     host!.style.height = '480px';
-    setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, boardPanelHeightPx: 600 } }));
+    setGallery(createGallery({ settings: { ...DEFAULT_GALLERY_SETTINGS, boardPanelHeightPx: 150 } }));
     await renderLayout(GalleryStackedLayout);
 
     const separator = host?.querySelector<HTMLElement>('[role="separator"]');
@@ -336,11 +336,17 @@ describe('gallery layout shells', () => {
     expect(contextBase.actions.updateSettings).toHaveBeenLastCalledWith({ boardPanelHeightPx: measuredMaximum });
 
     contextBase.actions.updateSettings.mockClear();
-    await act(() => {
-      separator?.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientY: 0 }));
-      window.dispatchEvent(new PointerEvent('pointermove', { bubbles: true, clientY: 5_000 }));
-      window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientY: 5_000 }));
-    });
+    const pointer = (type: string, clientY: number, buttons: number) =>
+      new PointerEvent(type, { bubbles: true, buttons, clientY, pointerId: 1 });
+    await act(() => separator?.dispatchEvent(pointer('pointerdown', 0, 1)));
+    await act(() => window.dispatchEvent(pointer('pointermove', 5_000, 1)));
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        })
+    );
+    await act(() => window.dispatchEvent(pointer('pointerup', 5_000, 0)));
 
     expect(contextBase.actions.updateSettings).toHaveBeenLastCalledWith({ boardPanelHeightPx: measuredMaximum });
   });

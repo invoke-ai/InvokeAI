@@ -47,7 +47,8 @@ export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphSta
 
   if (rootChildren.length === 0) {
     return (
-      <Stack gap="2" px="1" py="1">
+      // Same inset and color as the Edit tab's empty state and as this view once it has fields.
+      <Stack gap="2" p="3">
         <Text color="fg.muted" fontSize="2xs">
           No fields are exposed yet. Pin fields in the Workflow editor, or switch to Edit mode to build this form — it
           maps the project graph to simple controls, like the legacy Linear UI.

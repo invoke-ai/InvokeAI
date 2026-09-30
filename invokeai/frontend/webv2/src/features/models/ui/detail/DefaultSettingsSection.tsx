@@ -244,7 +244,7 @@ export const DefaultSettingsSection = ({
           const isEnabled = value !== null && value !== undefined;
 
           return (
-            <Panel key={field.key} gap="2" p="2.5" tone="control">
+            <Panel key={field.key} gap="2" p="2.5" tone="surface">
               <HStack justify="space-between">
                 <Text fontSize="2xs" fontWeight="600" textTransform="uppercase">
                   {t(field.labelKey)}

@@ -3,20 +3,7 @@ import type { IntermediatesRow } from '@features/intermediates/core/types';
 import type { IntermediatesSummaryParams } from '@features/intermediates/data/keys';
 import type { TFunction } from 'i18next';
 
-import {
-  Box,
-  Center,
-  Checkbox,
-  HStack,
-  Icon,
-  Input,
-  InputGroup,
-  Separator,
-  Spinner,
-  Stack,
-  Text,
-  VisuallyHidden,
-} from '@chakra-ui/react';
+import { Box, HStack, Icon, Input, InputGroup, Spinner, Stack, Text, VisuallyHidden } from '@chakra-ui/react';
 import { isRowSelected, resolveScope } from '@features/intermediates/core/selection';
 import { isOperationSettled } from '@features/intermediates/core/types';
 import { consumeIntermediatesFocus, peekIntermediatesFocus } from '@features/intermediates/data/focus';
@@ -28,8 +15,9 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { ApiError, getApiErrorMessage } from '@platform/transport/http';
 import { Button, IconButton } from '@platform/ui/Button';
 import { EmptyState } from '@platform/ui/EmptyState';
+import { ListPager } from '@platform/ui/list/ListPager';
+import { ListSelectionBar } from '@platform/ui/list/ListSelectionBar';
 import { RemovableTag } from '@platform/ui/RemovableTag';
-import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { BrushCleaningIcon, RefreshCwIcon, SearchIcon, Trash2Icon } from 'lucide-react';
@@ -320,27 +308,14 @@ export const IntermediatesManager = ({
         </Box>
       ) : null}
       <Stack flex="1" gap="0" minH="0" mt="-3">
-        {/* Keep the bar mounted so a selection never shifts the rows beneath it. */}
-        <HStack borderBottomWidth="1px" borderColor="border.subtle" flexShrink={0} gap="2" minH="8" py="1.5">
-          <Checkbox.Root
-            aria-label={t('intermediates.list.selectAll')}
-            checked={
-              selection.selectionState === 'all' ? true : selection.selectionState === 'some' ? 'indeterminate' : false
-            }
-            colorPalette="accent"
-            disabled={rows.length === 0 || isListBusy}
-            size="xs"
-            onCheckedChange={selection.toggleAll}
-            pl="2"
-          >
-            <Checkbox.HiddenInput />
-            <Checkbox.Control />
-            <Checkbox.Label color="fg.muted" fontSize="2xs" fontWeight="600">
-              {t('intermediates.list.selectAll')}
-            </Checkbox.Label>
-          </Checkbox.Root>
-          <Text color="fg.muted" flex="1" fontSize="2xs" id={deleteReasonId} minW="0" textAlign="end" truncate>
-            {isOperationActive && selection.hasSelection
+        <ListSelectionBar
+          checked={
+            selection.selectionState === 'all' ? true : selection.selectionState === 'some' ? 'indeterminate' : false
+          }
+          isDisabled={rows.length === 0 || isListBusy}
+          label={t('intermediates.list.selectAll')}
+          summary={
+            isOperationActive && selection.hasSelection
               ? t('intermediates.list.deleteWaiting')
               : selection.hasSelection
                 ? t('intermediates.selection.estimate', {
@@ -355,14 +330,16 @@ export const IntermediatesManager = ({
                       size: formatSummarySize(totals.reclaimableBytes, totals.unknownSizeCount, t),
                       videos: t('intermediates.counts.videos', { count: totals.safeVideos }),
                     })
-                  : ''}
-          </Text>
+                  : ''
+          }
+          summaryId={deleteReasonId}
+          onCheckedChange={selection.toggleAll}
+        >
           {query.data?.measuring ? (
             <Tooltip content={t('intermediates.stats.measuringNote')}>
               <Spinner aria-label={t('intermediates.stats.measuringNote')} color="fg.muted" size="xs" />
             </Tooltip>
           ) : null}
-          <Separator borderColor="border.subtle" h="4" orientation="vertical" />
           {/* `aria-disabled` keeps it focusable, so the reason it waits is announced on focus. */}
           <Button
             aria-describedby={isOperationActive && selection.hasSelection ? deleteReasonId : undefined}
@@ -388,25 +365,9 @@ export const IntermediatesManager = ({
             <Icon as={Trash2Icon} boxSize="3" />
             {t('intermediates.list.delete')}
           </Button>
-        </HStack>
-        {query.isPending ? (
-          <Center flex="1" minH="32">
-            <Spinner color="fg.subtle" size="sm" />
-          </Center>
-        ) : query.isError ? (
-          <Center flex="1" px="4">
-            <EmptyState
-              danger
-              description={getApiErrorMessage(query.error, t('intermediates.errors.couldNotLoad'))}
-              title={t('intermediates.errors.couldNotLoad')}
-            >
-              <Button size="xs" variant="outline" onClick={() => void query.refetch()}>
-                {t('common.retry')}
-              </Button>
-            </EmptyState>
-          </Center>
-        ) : rows.length === 0 ? (
-          <Center flex="1" px="4">
+        </ListSelectionBar>
+        <IntermediatesList
+          emptyState={
             <EmptyState
               description={
                 hasSearch ? t('intermediates.empty.noMatchesDescription') : t('intermediates.empty.description')
@@ -420,45 +381,36 @@ export const IntermediatesManager = ({
                 </Button>
               ) : null}
             </EmptyState>
-          </Center>
-        ) : (
-          <Scrollable flex="1" h="full" label={t('intermediates.title')} minH="0">
-            <Box py="1">
-              <IntermediatesList
-                isBusy={isListBusy}
-                isSelected={(row) => isRowSelected(selection.effectiveSelection, row)}
-                rows={rows}
-                showOwner={canClearOthersIntermediates && ownerId === null}
-                onToggleRow={selection.toggleRow}
-              />
-            </Box>
-          </Scrollable>
-        )}
+          }
+          errorState={
+            <EmptyState
+              danger
+              description={
+                query.isError ? getApiErrorMessage(query.error, t('intermediates.errors.couldNotLoad')) : null
+              }
+              title={t('intermediates.errors.couldNotLoad')}
+            >
+              <Button size="xs" variant="outline" onClick={() => void query.refetch()}>
+                {t('common.retry')}
+              </Button>
+            </EmptyState>
+          }
+          isBusy={isListBusy}
+          isSelected={(row) => isRowSelected(selection.effectiveSelection, row)}
+          rows={rows}
+          showOwner={canClearOthersIntermediates && ownerId === null}
+          status={query.isPending ? 'loading' : query.isError ? 'error' : 'ready'}
+          onToggleRow={selection.toggleRow}
+        />
         {showPagination ? (
-          <HStack borderColor="border.subtle" borderTopWidth="1px" flexShrink={0} justify="center" minH="8">
-            {/* `aria-disabled`, not `disabled`: a disabled button drops the keyboard focus it holds. */}
-            <Button
-              aria-disabled={!hasPreviousPage || isListBusy}
-              size="2xs"
-              variant="ghost"
-              onClick={() => goToPage(offset - INTERMEDIATES_PAGE_SIZE)}
-            >
-              {t('common.previousPage')}
-            </Button>
-            <Text aria-live="polite" color="fg.muted" fontSize="2xs">
-              {t('common.pageNumber', {
-                page: Math.floor((query.data?.offset ?? offset) / INTERMEDIATES_PAGE_SIZE) + 1,
-              })}
-            </Text>
-            <Button
-              aria-disabled={!hasNextPage || isListBusy}
-              size="2xs"
-              variant="ghost"
-              onClick={() => goToPage(offset + INTERMEDIATES_PAGE_SIZE)}
-            >
-              {t('common.nextPage')}
-            </Button>
-          </HStack>
+          <ListPager
+            hasNext={hasNextPage}
+            hasPrevious={hasPreviousPage}
+            isBusy={isListBusy}
+            page={Math.floor((query.data?.offset ?? offset) / INTERMEDIATES_PAGE_SIZE) + 1}
+            onNext={() => goToPage(offset + INTERMEDIATES_PAGE_SIZE)}
+            onPrevious={() => goToPage(offset - INTERMEDIATES_PAGE_SIZE)}
+          />
         ) : null}
       </Stack>
       <ClearDialog

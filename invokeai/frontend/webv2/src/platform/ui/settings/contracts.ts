@@ -32,6 +32,8 @@ export interface SettingFieldProps {
   field: SettingDefinition;
   surface: 'quick' | 'dialog';
   target?: SettingsTarget;
+  /** Shows another setting on the surface hosting this one (the dialog or the Launchpad page). */
+  onReveal?: (sectionId: string, entryId: string) => void;
 }
 
 export interface SettingsContribution {

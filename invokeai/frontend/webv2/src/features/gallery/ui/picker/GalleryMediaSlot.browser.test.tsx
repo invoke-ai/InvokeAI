@@ -6,7 +6,7 @@ import type { GalleryUiAdapter } from '@features/gallery/react';
 import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, PointerSensor, useDraggable, useSensor, useSensors } from '@dnd-kit/core';
 import { GalleryUiProvider } from '@features/gallery/react';
-import { getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/ui/galleryDnd';
+import { GalleryDragScope, getGalleryItemDragData, getGalleryItemDragId } from '@features/gallery/ui/galleryDnd';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { widgetCollisionDetection } from '@workbench/widgetDnd';
@@ -140,27 +140,30 @@ const renderSlot = async (props: Partial<Parameters<typeof GalleryMediaSlot>[0]>
         <QueryClientProvider client={queryClient!}>
           <GalleryUiProvider adapter={adapter}>
             <DndContext collisionDetection={widgetCollisionDetection} sensors={sensors}>
-              <DraggableThumb
-                data={getGalleryItemDragData([IMAGE_REF])}
-                id={getGalleryItemDragId(IMAGE_REF, 'preview-frame')}
-                left={10}
-                testId="image-thumb"
-              />
-              <DraggableThumb
-                data={getGalleryItemDragData([VIDEO_REF])}
-                id={getGalleryItemDragId(VIDEO_REF, 'preview-frame')}
-                left={60}
-                testId="video-thumb"
-              />
-              <DraggableThumb
-                data={getGalleryItemDragData([IMAGE_REF, { kind: 'image', name: 'second.png' }])}
-                id="multi-image-drag"
-                left={110}
-                testId="multi-thumb"
-              />
-              <div data-testid="slot" style={{ left: 200, position: 'fixed', top: 200, width: 320 }}>
-                <GalleryMediaSlot accept={['image']} dropId="test-slot" value={null} onChange={onChange} {...props} />
-              </div>
+              {/* As in the workbench shell, gallery drags are scoped to the drag context that carries them. */}
+              <GalleryDragScope value>
+                <DraggableThumb
+                  data={getGalleryItemDragData([IMAGE_REF])}
+                  id={getGalleryItemDragId(IMAGE_REF, 'preview-frame')}
+                  left={10}
+                  testId="image-thumb"
+                />
+                <DraggableThumb
+                  data={getGalleryItemDragData([VIDEO_REF])}
+                  id={getGalleryItemDragId(VIDEO_REF, 'preview-frame')}
+                  left={60}
+                  testId="video-thumb"
+                />
+                <DraggableThumb
+                  data={getGalleryItemDragData([IMAGE_REF, { kind: 'image', name: 'second.png' }])}
+                  id="multi-image-drag"
+                  left={110}
+                  testId="multi-thumb"
+                />
+                <div data-testid="slot" style={{ left: 200, position: 'fixed', top: 200, width: 320 }}>
+                  <GalleryMediaSlot accept={['image']} dropId="test-slot" value={null} onChange={onChange} {...props} />
+                </div>
+              </GalleryDragScope>
             </DndContext>
           </GalleryUiProvider>
         </QueryClientProvider>
@@ -384,5 +387,63 @@ describe('GalleryMediaSlot', () => {
     await dragOntoSlot('image-thumb');
 
     expect(mocks.getGalleryItemByRef).not.toHaveBeenCalled();
+  });
+
+  it('renders outside any drag context, as in widget dialog hosts and on the Launchpad', async () => {
+    await interact(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient!}>
+            <GalleryUiProvider adapter={adapter}>
+              <GalleryMediaSlot accept={['image']} dropId="outside-slot" value={null} onChange={onChange} />
+            </GalleryUiProvider>
+          </QueryClientProvider>
+        </ChakraProvider>
+      )
+    );
+
+    expect(trigger()).not.toBeNull();
+    expect(alertText()).toBeNull();
+    // Nothing can be dragged in here, so neither face may promise a drop.
+    expect(host?.textContent).not.toContain('widgets.gallery.picker.dropHint');
+  });
+
+  it('lays out a square tile with the icon above its label and its actions overlaid, outside the drag scope', async () => {
+    const renderTile = (value: GalleryMediaSlotValue | null) =>
+      interact(() =>
+        root?.render(
+          <ChakraProvider value={system}>
+            <QueryClientProvider client={queryClient!}>
+              <GalleryUiProvider adapter={adapter}>
+                <div style={{ width: 112 }}>
+                  <GalleryMediaSlot
+                    accept={['image']}
+                    dropId="tile-slot"
+                    layout="tile"
+                    value={value}
+                    onChange={onChange}
+                  />
+                </div>
+              </GalleryUiProvider>
+            </QueryClientProvider>
+          </ChakraProvider>
+        )
+      );
+
+    await renderTile(null);
+    const face = trigger()!;
+    expect(face.getBoundingClientRect().height).toBe(face.getBoundingClientRect().width);
+    expect(face.textContent).toBe('widgets.gallery.picker.chooseImage');
+    const [icon, label] = [face.querySelector('svg')!, [...face.querySelectorAll('p')].at(-1)!];
+    expect(icon.getBoundingClientRect().bottom).toBeLessThanOrEqual(label.getBoundingClientRect().top);
+
+    await renderTile({ kind: 'image', name: 'cover.png' });
+    const remove = host?.querySelector<HTMLButtonElement>('button[aria-label="widgets.gallery.picker.removeImage"]');
+    expect(remove).not.toBeNull();
+    // Beside the face, never inside it.
+    expect(trigger()?.contains(remove!)).toBe(false);
+    await interact(() => remove!.click());
+    expect(onChange).toHaveBeenCalledWith(null);
+    expect(document.activeElement).toBe(trigger());
   });
 });

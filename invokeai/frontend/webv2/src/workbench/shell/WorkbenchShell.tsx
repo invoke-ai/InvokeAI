@@ -12,7 +12,7 @@ import {
 } from '@dnd-kit/core';
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
-import { GalleryDragCursor } from '@features/gallery/utility';
+import { GalleryDragCursor, GalleryDragScope } from '@features/gallery/utility';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { FocusRegionProvider } from '@workbench/focusRegions';
@@ -125,6 +125,8 @@ export const WorkbenchShell = () => {
   );
   const canShowLeftPanel = leftRailItems.some((item) => item.id === leftRegion.activeInstanceId);
   const canShowRightPanel = rightRailItems.some((item) => item.id === rightRegion.activeInstanceId);
+  const isLeftPanelShown = panels.isLeftOpen && !leftRegion.isCollapsed && canShowLeftPanel;
+  const isRightPanelShown = panels.isRightOpen && !rightRegion.isCollapsed && canShowRightPanel;
   const leftDropState = useMemo(
     () => getRegionDropState(placementProject, activeDrag, 'left', getWidgetById),
     [activeDrag, placementProject]
@@ -289,63 +291,63 @@ export const WorkbenchShell = () => {
         onDragEnd={handleDragEnd}
         onDragStart={handleDragStart}
       >
-        <Flex direction="column" h="100vh" w="100vw">
-          <WorkbenchNotificationToaster />
-          <DocumentTitleProgress />
-          <TopBar />
-          <ProjectConflictBanner />
-          <QueueRecoveryBanner />
+        <GalleryDragScope value>
+          <Flex direction="column" h="100vh" w="100vw">
+            <WorkbenchNotificationToaster />
+            <DocumentTitleProgress />
+            <TopBar />
+            <ProjectConflictBanner />
+            <QueueRecoveryBanner />
 
-          <Flex aria-labelledby="workbench-project-heading" as="main" flex="1" minH="0" overflow="hidden">
-            <VisuallyHidden as="h1" id="workbench-project-heading">
-              {projectName}
-            </VisuallyHidden>
-            {/* Use a named content region: the project switcher is no longer a tablist. */}
-            <Flex
-              aria-labelledby="workbench-project-heading"
-              flex="1"
-              id={PROJECT_CONTENT_PANEL_ID}
-              minH="0"
-              overflow="hidden"
-              role="region"
-            >
-              <WidgetBar
-                groups={leftRailGroups}
-                menuItems={leftMenuItems}
-                side="left"
-                onSelect={handleSelect}
-                onToggle={handleToggleLeft}
-              />
-              {panels.isLeftOpen && !leftRegion.isCollapsed && canShowLeftPanel ? (
-                <LeftPanel instanceId={leftRegion.activeInstanceId} />
-              ) : null}
-              <CenterArea />
-              {panels.isRightOpen && !rightRegion.isCollapsed && canShowRightPanel ? (
-                <RightPanel instanceId={rightRegion.activeInstanceId} />
-              ) : null}
-              <WidgetBar
-                groups={rightRailGroups}
-                menuItems={rightMenuItems}
-                side="right"
-                onSelect={handleSelect}
-                onToggle={handleToggleRight}
-              />
+            <Flex aria-labelledby="workbench-project-heading" as="main" flex="1" minH="0" overflow="hidden">
+              <VisuallyHidden as="h1" id="workbench-project-heading">
+                {projectName}
+              </VisuallyHidden>
+              {/* Use a named content region: the project switcher is no longer a tablist. */}
+              <Flex
+                aria-labelledby="workbench-project-heading"
+                flex="1"
+                id={PROJECT_CONTENT_PANEL_ID}
+                minH="0"
+                overflow="hidden"
+                role="region"
+              >
+                <WidgetBar
+                  edgeRegion={isLeftPanelShown ? 'left' : 'center'}
+                  groups={leftRailGroups}
+                  menuItems={leftMenuItems}
+                  side="left"
+                  onSelect={handleSelect}
+                  onToggle={handleToggleLeft}
+                />
+                {isLeftPanelShown ? <LeftPanel instanceId={leftRegion.activeInstanceId} /> : null}
+                <CenterArea />
+                {isRightPanelShown ? <RightPanel instanceId={rightRegion.activeInstanceId} /> : null}
+                <WidgetBar
+                  edgeRegion={isRightPanelShown ? 'right' : 'center'}
+                  groups={rightRailGroups}
+                  menuItems={rightMenuItems}
+                  side="right"
+                  onSelect={handleSelect}
+                  onToggle={handleToggleRight}
+                />
+              </Flex>
             </Flex>
-          </Flex>
 
-          <BottomPanel />
-          <StatusBar dropState={bottomDropState} />
-        </Flex>
-        <FloatingWidgetLayer />
-        <GalleryDragCursor />
-        <PasteMediaRuntime />
-        {/*
-         * Allow pointer events through the full-size drag overlay so another finger can reach Preview pinch
-         * handlers.
-         */}
-        <DragOverlay style={DRAG_OVERLAY_STYLE}>
-          {activeDrag ? <WidgetDragPreview activeDrag={activeDrag} /> : null}
-        </DragOverlay>
+            <BottomPanel />
+            <StatusBar dropState={bottomDropState} />
+          </Flex>
+          <FloatingWidgetLayer />
+          <GalleryDragCursor />
+          <PasteMediaRuntime />
+          {/*
+           * Allow pointer events through the full-size drag overlay so another finger can reach Preview pinch
+           * handlers.
+           */}
+          <DragOverlay style={DRAG_OVERLAY_STYLE}>
+            {activeDrag ? <WidgetDragPreview activeDrag={activeDrag} /> : null}
+          </DragOverlay>
+        </GalleryDragScope>
       </DndContext>
     </FocusRegionProvider>
   );

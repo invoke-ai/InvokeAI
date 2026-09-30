@@ -1,7 +1,8 @@
 import type { GalleryBoard, GalleryView } from '@features/gallery/core/types';
 
-import { Text } from '@chakra-ui/react';
+import { Icon, Text } from '@chakra-ui/react';
 import { SegmentTabs } from '@platform/ui';
+import { ImagesIcon, ImageUpIcon, type LucideIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -9,19 +10,22 @@ import { getGalleryCountForView } from './galleryBoardLabels';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const GALLERY_VIEW_TABS = [
-  { labelKey: 'common.media', value: 'images' },
-  { labelKey: 'common.assets', value: 'assets' },
-] satisfies { labelKey: string; value: GalleryView }[];
+  { icon: ImagesIcon, labelKey: 'common.media', value: 'images' },
+  { icon: ImageUpIcon, labelKey: 'common.assets', value: 'assets' },
+] satisfies { icon: LucideIcon; labelKey: string; value: GalleryView }[];
 
 /** Wire the caller's grid to segmentTabsPanelId(idBase); tab counts distinguish Media and Assets before switching. */
 export const GalleryViewSegmentTabs = ({
   activeView,
   board,
+  iconLabels = false,
   idBase,
   onSelect,
 }: {
   activeView: GalleryView;
   board: GalleryBoard | undefined;
+  /** Icons in place of the view names, for headers too narrow to spare the words; the names become tooltips. */
+  iconLabels?: boolean;
   idBase: string;
   onSelect: (view: GalleryView) => void;
 }) => {
@@ -40,14 +44,16 @@ export const GalleryViewSegmentTabs = ({
 
   const tabs = useMemo(
     () =>
-      GALLERY_VIEW_TABS.map(({ labelKey, value }) => {
+      GALLERY_VIEW_TABS.map(({ icon, labelKey, value }) => {
         const count = board ? getGalleryCountForView(board, value) : null;
+        const name = t(labelKey);
 
         return {
+          ariaLabel: iconLabels ? (count === null ? name : `${name} ${count}`) : undefined,
           id: value,
           label: (
-            <Text as="span" display="flex" gap="1.5">
-              {t(labelKey)}
+            <Text alignItems="center" as="span" display="flex" gap="1.5">
+              {iconLabels ? <Icon as={icon} aria-hidden boxSize="3.5" /> : name}
               {count === null ? null : (
                 <Text as="span" color="currentColor" fontVariantNumeric="tabular-nums" opacity="0.8">
                   {count}
@@ -57,7 +63,7 @@ export const GalleryViewSegmentTabs = ({
           ),
         };
       }),
-    [board, t]
+    [board, iconLabels, t]
   );
 
   return (

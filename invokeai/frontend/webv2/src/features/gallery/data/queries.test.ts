@@ -1,4 +1,5 @@
 import type { GalleryItem, GalleryItemsPage } from '@features/gallery/core/items';
+import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { InfiniteQueryObserver, QueryClient, type InfiniteData } from '@tanstack/react-query';
@@ -414,8 +415,8 @@ describe('canonicalizeGalleryItemsFilter under a semantic query', () => {
   const reference = { fileId: 'external-1-abc', kind: 'file', label: 'shot.png' } as const;
 
   it('ignores the controls a ranked result set does not answer to', () => {
-    // Semantic results depend only on the reference; unrelated filters must not repeat blob uploads or remote
-    // downloads.
+    // Semantic results depend only on the reference and its board; unrelated filters must not repeat blob uploads
+    // or remote downloads.
     const base = canonicalizeGalleryItemsFilter({
       boardId: 'board-a',
       galleryView: 'images',
@@ -424,7 +425,6 @@ describe('canonicalizeGalleryItemsFilter under a semantic query', () => {
     });
 
     for (const variant of [
-      { boardId: 'board-b' },
       { galleryView: 'assets' as const },
       { orderDir: 'ASC' as const },
       { starred: true },
@@ -440,6 +440,15 @@ describe('canonicalizeGalleryItemsFilter under a semantic query', () => {
         })
       ).toEqual(base);
     }
+  });
+
+  it('keys a search by the board it ranks within, but a map cluster by its members alone', () => {
+    const inBoard = (boardId: string, semanticQuery: GallerySemanticReference) =>
+      canonicalizeGalleryItemsFilter({ boardId, galleryView: 'images', searchTerm: '', semanticQuery });
+    const cluster = { clusterId: 'cluster-1', kind: 'cluster', label: 'Cats' } as const;
+
+    expect(inBoard('board-b', reference)).not.toEqual(inBoard('board-a', reference));
+    expect(inBoard('board-b', cluster)).toEqual(inBoard('board-a', cluster));
   });
 
   it('still distinguishes one reference from another', () => {

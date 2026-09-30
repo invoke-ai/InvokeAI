@@ -29,6 +29,8 @@ export interface GalleryPickerPopoverProps {
   accept: GalleryPickerAccept;
   /** The trigger element; must accept a ref and a click handler. */
   children: ReactElement;
+  /** Shared with a Tooltip wrapping an icon-only trigger (see `useTooltipTriggerIds`). */
+  ids?: { trigger: string };
   /** The dialog's accessible name, e.g. "Choose image". */
   label: string;
   selection?: GalleryPickerSelection;
@@ -39,6 +41,7 @@ export interface GalleryPickerPopoverProps {
 export const GalleryPickerPopover = ({
   accept,
   children,
+  ids,
   label,
   selection = SINGLE_SELECTION,
   onPick,
@@ -53,6 +56,7 @@ export const GalleryPickerPopover = ({
 
   return (
     <Popover.Root
+      ids={ids}
       initialFocusEl={getInitialFocusEl}
       lazyMount
       open={isOpen}
@@ -69,7 +73,7 @@ export const GalleryPickerPopover = ({
             flexDirection="column"
             maxH="min(26rem, var(--available-height))"
             p="0"
-            w="clamp(18rem, var(--reference-width), 28rem)"
+            w="clamp(20rem, var(--reference-width), 28rem)"
           >
             <Suspense fallback={PICKER_FALLBACK}>
               <GalleryPickerView

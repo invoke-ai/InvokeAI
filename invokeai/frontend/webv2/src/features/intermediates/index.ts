@@ -1,1 +1,1 @@
-export { requestIntermediatesFocus } from './data/focus';
+export { INTERMEDIATES_SETTING_ID, requestIntermediatesFocus } from './data/focus';

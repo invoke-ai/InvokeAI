@@ -453,6 +453,7 @@ const buildSDGraph = (
           hidiffusion_window_attn: settings.hiDiffusionWindowAttentionEnabled,
         }
       : {}),
+    ...(shouldUsePidDecode(settings, model.base) ? getPidMetadata(settings) : {}),
     scheduler,
   });
   addReferenceImageMetadata(graph, output, settings);
@@ -893,7 +894,9 @@ const buildErnieImageGraph = (
 
   addEdge(graph, seed, 'value', denoise, 'seed');
   addEdge(graph, denoise, 'latents', output, 'latents');
-  addMetadata(graph, output, settings, model, 'ernie_image_txt2img', projectSettings);
+  addMetadata(graph, output, settings, model, 'ernie_image_txt2img', projectSettings, {
+    mistral_encoder: mistralEncoderModel ?? undefined,
+  });
 
   return graph;
 };

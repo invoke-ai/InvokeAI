@@ -11,6 +11,7 @@ import { userEvent } from 'vitest/browser';
 import type { PaletteEntry, PaletteSearchProvider } from './entries';
 
 import { CommandPaletteDialog } from './CommandPaletteDialog';
+import { PaletteSearchUnavailableError } from './entries';
 import { closeCommandPalette, openCommandPalette, useIsCommandPaletteOpen } from './paletteStore';
 
 let host: HTMLDivElement | null = null;
@@ -612,7 +613,22 @@ describe('CommandPaletteDialog interaction', () => {
 
     await act(() => userEvent.keyboard('{Enter}'));
     await waitFor(() => expect(document.body.textContent).toContain("Couldn't search entities"));
+    expect(document.body.textContent).not.toContain('offline');
     expect([...document.querySelectorAll('button')].some((button) => button.textContent === 'Retry')).toBe(true);
+  });
+
+  it('explains why a scope cannot search when the provider says', async () => {
+    const provider: PaletteSearchProvider = {
+      contextKey: 'context',
+      label: 'Entities',
+      providerKey: 'entities',
+      search: vi.fn(() => Promise.reject(new PaletteSearchUnavailableError('Entities need an index.'))),
+    };
+    await renderPalette({ entries: [], providers: [provider] });
+
+    await act(() => userEvent.keyboard('{Enter}'));
+    await waitFor(() => expect(document.body.textContent).toContain('Entities need an index.'));
+    expect(document.body.textContent).toContain("Couldn't search entities");
   });
 
   it('records a used search-scope command as a persistent recent', async () => {

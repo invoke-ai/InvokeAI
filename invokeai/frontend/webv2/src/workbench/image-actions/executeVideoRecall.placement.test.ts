@@ -4,7 +4,12 @@ import type { VideoReferenceItem } from '@features/video';
 import { createDefaultVideoWidgetValues, createVideoReferenceEntry } from '@features/video';
 import { describe, expect, it } from 'vitest';
 
-import { appendReferenceVideo, canAppendReferenceVideo, placeInitialVideo } from './executeVideoRecall';
+import {
+  appendReferenceVideo,
+  getVideoPlacementRoom,
+  placeConditioningClip,
+  placeInitialVideo,
+} from './executeVideoRecall';
 
 const model = (fields: Record<string, unknown>) =>
   ({
@@ -27,6 +32,7 @@ const REF2VA = model({
   name: 'H3 Ref2VA',
   variant: 'ref2va',
 });
+const LTX2 = model({ base: 'ltx-2', format: 'checkpoint', key: 'ltx2', name: 'LTX-2.5 dev', variant: 'ltx2_dev' });
 
 const clip = { durationSeconds: 5, fps: 16, height: 480, name: 'clip.mp4', width: 832 };
 const videoReference = (name: string): Extract<VideoReferenceItem, { kind: 'video' }> =>
@@ -117,7 +123,7 @@ describe('appendReferenceVideo', () => {
     };
     const videoValues = panel(REF2VA, { references: [videoReference('a.mp4'), videoReference('b.mp4'), image, image] });
 
-    expect(canAppendReferenceVideo({ models: [REF2VA], videoValues })).toBe(true);
+    expect(getVideoPlacementRoom({ models: [REF2VA], videoValues }).referenceVideo).toBe(true);
     expect(appendReferenceVideo({ models: [REF2VA], video: clip, videoValues }).status).toBe('appended');
   });
 
@@ -140,7 +146,7 @@ describe('appendReferenceVideo', () => {
     const videoValues = panel(REF2VA, { references: ['a.mp4', 'b.mp4', 'c.mp4'].map(videoReference) });
 
     expect(appendReferenceVideo({ models: [REF2VA], video: clip, videoValues })).toEqual({ status: 'full' });
-    expect(canAppendReferenceVideo({ models: [REF2VA], videoValues })).toBe(false);
+    expect(getVideoPlacementRoom({ models: [REF2VA], videoValues }).referenceVideo).toBe(false);
   });
 
   it('declines, rather than switching models, when the panel model takes no reference videos', () => {
@@ -149,7 +155,86 @@ describe('appendReferenceVideo', () => {
     expect(appendReferenceVideo({ models: [WAN_I2V, REF2VA], video: clip, videoValues })).toEqual({
       status: 'unsupported',
     });
-    expect(canAppendReferenceVideo({ models: [WAN_I2V, REF2VA], videoValues })).toBe(false);
-    expect(canAppendReferenceVideo({ models: [REF2VA], videoValues: panel(REF2VA) })).toBe(true);
+    expect(getVideoPlacementRoom({ models: [WAN_I2V, REF2VA], videoValues }).referenceVideo).toBe(false);
+    expect(getVideoPlacementRoom({ models: [REF2VA], videoValues: panel(REF2VA) }).referenceVideo).toBe(true);
+  });
+});
+
+describe('placeConditioningClip', () => {
+  it('sets the clip in the requested role and clears every other conditioning slot', () => {
+    const placement = placeConditioningClip({
+      models: [LTX2],
+      role: 'audio',
+      video: clip,
+      videoValues: panel(LTX2, {
+        firstFrameImage: { height: 480, image_name: 'first.png', width: 832 },
+        sourceVideo: { ...videoReference('source.mp4').clip },
+      }),
+    });
+
+    expect(placement).toEqual({
+      displaced: true,
+      patch: {
+        conditioningClip: expect.objectContaining({
+          clip: expect.objectContaining({ video_name: 'clip.mp4' }),
+          role: 'audio',
+        }),
+        firstFrameImage: null,
+        lastFrameImage: null,
+        references: [],
+        sourceVideo: null,
+      },
+      status: 'placed',
+    });
+  });
+
+  it('replacing a clip on an otherwise empty panel displaces nothing', () => {
+    const first = placeConditioningClip({ models: [LTX2], role: 'video', video: clip, videoValues: panel(LTX2) });
+    const held = first.status === 'placed' ? first.patch : {};
+
+    expect(
+      placeConditioningClip({
+        models: [LTX2],
+        role: 'audio',
+        video: { ...clip, name: 'other.mp4' },
+        videoValues: panel(LTX2, held),
+      })
+    ).toMatchObject({ displaced: false, status: 'placed' });
+  });
+
+  it('the requested role overrides the one the gallery record would default to', () => {
+    // A plain clip defaults to lending its picture; the caller asked for its soundtrack.
+    const placement = placeConditioningClip({ models: [LTX2], role: 'audio', video: clip, videoValues: panel(LTX2) });
+
+    expect(placement.status === 'placed' && placement.patch.conditioningClip?.role).toBe('audio');
+  });
+
+  it('refuses the picture of a wrapped audio upload, but takes its soundtrack', () => {
+    const song = { ...clip, mediaOrigin: 'audio_upload', name: 'song.mp4' };
+
+    expect(placeConditioningClip({ models: [LTX2], role: 'video', video: song, videoValues: panel(LTX2) })).toEqual({
+      status: 'no-picture',
+    });
+    expect(placeConditioningClip({ models: [LTX2], role: 'audio', video: song, videoValues: panel(LTX2) }).status).toBe(
+      'placed'
+    );
+  });
+
+  it('declines, rather than switching models, when the panel model takes no conditioning clip', () => {
+    const videoValues = panel(REF2VA, { references: [videoReference('dance.mp4')] });
+
+    expect(placeConditioningClip({ models: [REF2VA, LTX2], role: 'audio', video: clip, videoValues })).toEqual({
+      status: 'unsupported',
+    });
+    expect(getVideoPlacementRoom({ models: [REF2VA, LTX2], videoValues })).toEqual({
+      conditioningAudio: false,
+      conditioningVideo: false,
+      referenceVideo: true,
+    });
+    expect(getVideoPlacementRoom({ models: [LTX2], videoValues: panel(LTX2) })).toEqual({
+      conditioningAudio: true,
+      conditioningVideo: true,
+      referenceVideo: false,
+    });
   });
 });

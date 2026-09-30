@@ -68,6 +68,7 @@ const REF2VA = model({
   name: 'H3 Ref2VA',
   variant: 'ref2va',
 });
+const LTX2 = model({ base: 'ltx-2', format: 'checkpoint', key: 'ltx2', name: 'LTX-2.5 dev', variant: 'ltx2_dev' });
 
 const t = ((key: string) => key) as unknown as TFunction;
 
@@ -86,7 +87,10 @@ const parametersEvent = (parameters: Record<string, unknown>, extra: Record<stri
   ...extra,
 });
 
-const placementEvent = (action: 'initial_video' | 'reference_video', video: Record<string, unknown> = {}) => ({
+const placementEvent = (
+  action: 'conditioning_video' | 'initial_video' | 'reference_video',
+  video: Record<string, unknown> = {}
+) => ({
   action,
   queue_id: 'default',
   user_id: 'owner',
@@ -155,7 +159,7 @@ describe('createVideoRecallRuntime', () => {
     modelsApi.getModelsSnapshot.mockReset();
     modelsApi.getModelsSnapshot.mockReturnValue({
       error: null,
-      models: [WAN_I2V, WAN_T2V, REF2VA],
+      models: [WAN_I2V, WAN_T2V, REF2VA, LTX2],
       status: 'loaded',
     } as ModelsSnapshot);
     galleryApi.galleryItems.resolve.mockReset();
@@ -297,6 +301,11 @@ describe('createVideoRecallRuntime', () => {
     ['a placement without the video it places', { ...placementEvent('initial_video'), video: null }],
     ['a placement whose video has no size', { ...placementEvent('initial_video'), video: { video_name: 'clip.mp4' } }],
     ['an unknown action', { ...placementEvent('initial_video'), action: 'delete_video' }],
+    ['a conditioning video without its role', placementEvent('conditioning_video')],
+    [
+      'a conditioning video with an unknown role',
+      { ...placementEvent('conditioning_video'), conditioning_role: 'both' },
+    ],
   ])('ignores %s', async (_label, payload) => {
     const { videoShown, runtime, socket, store, videoValues } = setup();
     const before = videoValues();
@@ -473,6 +482,80 @@ describe('createVideoRecallRuntime', () => {
       expect(lastNotice()).toEqual(
         expect.objectContaining({ kind: 'info', message: 'widgets.video.placement.initialVideoUnused' })
       );
+
+      runtime.dispose();
+    });
+
+    it('sets a conditioning clip in the sent role, clearing the frames it displaces, and says so', async () => {
+      const { lastNotice, projectId, runtime, socket, store, videoShown, videoValues } = setup(LTX2);
+      store.commands.widgets.patchValues('video', { firstFrameImage: heldFrame }, projectId);
+
+      socket.emit({ ...placementEvent('conditioning_video'), conditioning_role: 'audio' });
+      await flush();
+
+      expect(videoValues()).toMatchObject({
+        conditioningClip: { clip: { video_name: 'clip.mp4' }, fpsKnown: true, role: 'audio' },
+        firstFrameImage: null,
+      });
+      expect(lastNotice()).toEqual(
+        expect.objectContaining({
+          kind: 'info',
+          message: 'widgets.video.placement.conditioningClipDisplaced',
+          title: 'widgets.video.placement.conditioningClipSet',
+        })
+      );
+      expect(videoShown()).toBe(true);
+
+      runtime.dispose();
+    });
+
+    it('sets a conditioning clip on an otherwise empty panel with a plain success notice', async () => {
+      const { lastNotice, runtime, socket, videoValues } = setup(LTX2);
+
+      socket.emit({ ...placementEvent('conditioning_video'), conditioning_role: 'video' });
+      await flush();
+
+      expect(videoValues()).toMatchObject({ conditioningClip: { role: 'video' } });
+      expect(lastNotice()).toMatchObject({ kind: 'success', title: 'widgets.video.placement.conditioningClipSet' });
+      expect(lastNotice()?.message).toBeUndefined();
+
+      runtime.dispose();
+    });
+
+    it('declines the picture of a wrapped audio upload, leaving the panel alone', async () => {
+      const { lastNotice, runtime, socket, videoValues } = setup(LTX2);
+      const before = videoValues();
+
+      socket.emit({
+        ...placementEvent('conditioning_video', { media_origin: 'audio_upload' }),
+        conditioning_role: 'video',
+      });
+      await flush();
+
+      expect(videoValues()).toBe(before);
+      expect(lastNotice()).toEqual(
+        expect.objectContaining({ kind: 'info', message: 'widgets.video.placement.conditioningClipNoPicture' })
+      );
+
+      runtime.dispose();
+    });
+
+    it('declines a conditioning clip the panel model cannot take, leaving its media alone', async () => {
+      const { lastNotice, runtime, socket, videoShown, videoValues } = setup(WAN_I2V);
+      const before = videoValues();
+
+      socket.emit({ ...placementEvent('conditioning_video'), conditioning_role: 'video' });
+      await flush();
+
+      expect(videoValues()).toBe(before);
+      expect(lastNotice()).toEqual(
+        expect.objectContaining({
+          kind: 'info',
+          message: 'widgets.video.placement.conditioningClipUnsupported',
+          title: 'widgets.video.placement.conditioningClipNotSet',
+        })
+      );
+      expect(videoShown()).toBe(false);
 
       runtime.dispose();
     });

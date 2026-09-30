@@ -90,11 +90,18 @@ export const toTinykeysBinding = (hotkey: string): string => {
   return parts.map((part) => TINY_MODIFIER_ALIASES[part] ?? TINY_KEY_ALIASES[part] ?? part).join('+');
 };
 
+/** The `mod` key's platform name; a bare modifier normalizes to nothing, so use this rather than formatting 'mod'. */
+export const MOD_KEY_LABEL = IS_MAC_OS ? 'cmd' : 'ctrl';
+
 export const formatHotkeyForPlatform = (hotkey: string): string[] =>
   normalizeHotkeyString(hotkey)
     .split('+')
     .filter(Boolean)
-    .map((part) => (IS_MAC_OS ? part.replace('mod', 'cmd').replace('alt', 'option') : part.replace('mod', 'ctrl')));
+    .map((part) => {
+      const named = part.replace('mod', MOD_KEY_LABEL);
+
+      return IS_MAC_OS ? named.replace('alt', 'option') : named;
+    });
 
 /** Inputs that take no typed text: a switch or checkbox owning focus has no native undo/shortcut to protect. */
 const NON_TEXT_INPUT_TYPES = new Set([

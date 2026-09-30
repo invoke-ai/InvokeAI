@@ -25,6 +25,8 @@ const COARSE_STEP_MULTIPLIER = 10;
 const MARK_EPSILON_RATIO = 1e-6;
 /** Clearance between a stop and the label or value text before the stop hides. */
 const TEXT_CLEARANCE_PX = 6;
+// A panel-coloured halo keeps text legible where the fill passes behind it.
+const SCRUBBER_TEXT_SHADOW = '0 1px 2px {colors.bg.panel}, 0 0 4px {colors.bg.panel}';
 /** A touch must travel this far horizontally before it scrubs; until then the panel may pan. */
 const TOUCH_INTENT_PX = 8;
 
@@ -144,6 +146,7 @@ const ROOT_CSS = {
     ps: '3',
     position: 'relative',
     textOverflow: 'ellipsis',
+    textShadow: SCRUBBER_TEXT_SHADOW,
     whiteSpace: 'nowrap',
   },
   '& [data-part="value"]': {
@@ -164,6 +167,7 @@ const ROOT_CSS = {
     position: 'relative',
     ps: '2',
     textAlign: 'end',
+    textShadow: SCRUBBER_TEXT_SHADOW,
     whiteSpace: 'nowrap',
   },
   '& input[data-part="value"]': { flex: 1, userSelect: 'text', w: 'full' },

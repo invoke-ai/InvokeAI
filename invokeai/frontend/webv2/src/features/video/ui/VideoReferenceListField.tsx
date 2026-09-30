@@ -728,6 +728,7 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
           {...(isInert ? DROP_ZONE_DISABLED_PROPS : {})}
           {...(isLoading ? DROP_ZONE_BUSY_PROPS : {})}
           isDisabled={isInert}
+          isInvalid={errorMessage !== null}
           isOver={isOver && acceptsActiveDrag}
           _focusVisible={DROP_ZONE_FOCUS_PROPS}
           position="relative"
@@ -760,7 +761,7 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
         </DropZone>
       </Field>
       {errorMessage ? (
-        <Text color="fg.error" fontSize="xs">
+        <Text aria-live="polite" color="fg.error" fontSize="xs" role="alert">
           {errorMessage}
         </Text>
       ) : null}

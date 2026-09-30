@@ -35,7 +35,6 @@ import {
   LTX2_NUM_FRAMES_DEFAULT,
   LTX2_NUM_FRAMES_MAX,
   LTX2_NUM_FRAMES_MIN,
-  LTX2_NUM_FRAMES_SLIDER_MAX,
   LTX2_EXTEND_CONTEXT_FRAMES,
   ltx2MaxExtendContextFrames,
   ltx2NewFramesForExtend,
@@ -95,11 +94,6 @@ export interface VideoTargetResolutionOption {
  */
 export interface VideoFramesGridPolicy extends VideoFramesGrid {
   kind: 'grid';
-  /**
-   * Where the slider stops, when that is below `max`. The field still accepts
-   * anything up to `max`: the cap is a recommendation about cost, not a limit.
-   */
-  sliderMax?: number;
 }
 
 export interface VideoFramesChoicesPolicy extends VideoFramesChoices {
@@ -354,7 +348,6 @@ const LTX2_FRAMES: VideoFramesGridPolicy = {
   kind: 'grid',
   max: LTX2_NUM_FRAMES_MAX,
   min: LTX2_NUM_FRAMES_MIN,
-  sliderMax: LTX2_NUM_FRAMES_SLIDER_MAX,
   step: LTX2_NUM_FRAMES_STEP,
 };
 

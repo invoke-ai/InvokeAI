@@ -1,5 +1,3 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-
 """Scheduler implementations used by the graph execution-state façade."""
 
 from collections import deque

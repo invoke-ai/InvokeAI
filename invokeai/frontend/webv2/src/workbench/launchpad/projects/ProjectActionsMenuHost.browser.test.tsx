@@ -22,7 +22,10 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+const navigate = vi.hoisted(() => vi.fn());
+
 vi.mock('@tanstack/react-router', () => ({
+  useNavigate: () => navigate,
   Link: ({ children, ...props }: { children?: unknown } & Record<string, unknown>) => (
     <a href="/app" {...props}>
       {children as never}
@@ -140,6 +143,34 @@ describe('ProjectActionsMenuHost', () => {
       expect(document.querySelector('[role="dialog"][data-state="open"]')).not.toBeNull();
       expect(document.querySelector<HTMLInputElement>('input[name="renameValue"]')?.value).toBe('Project one');
     });
+  });
+
+  it('opens the Preferences intermediates section focused on the project', async () => {
+    const { peekIntermediatesFocus } = await import('@features/intermediates/data/focus');
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <ProjectActionsMenuProvider>
+            <Card id="one" />
+          </ProjectActionsMenuProvider>
+        </ChakraProvider>
+      )
+    );
+    await act(() => userEvent.click(dotsButton('one')));
+    const item = document.querySelector<HTMLElement>('[role="menuitem"][data-value="intermediates"]')!;
+    await act(() => userEvent.click(item));
+
+    expect(peekIntermediatesFocus()).toEqual({ projectId: 'one' });
+    // Revealing the manager's entry puts focus in it on the page.
+    expect(navigate).toHaveBeenCalledWith({
+      params: { section: 'intermediates' },
+      search: { setting: 'intermediatesManager' },
+      to: '/preferences/$section',
+    });
+    await vi.waitFor(() => expect(openMenus()).toHaveLength(0));
   });
 
   it('moves the one menu across cards instead of racing sibling layers', async () => {

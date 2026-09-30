@@ -14,7 +14,12 @@ import { useTranslation } from 'react-i18next';
 
 import type { DynamicPromptsFieldConfig } from './DynamicPromptsPanel';
 
-import { PositivePromptActions, PromptTriggerPopover, type PromptTemplateState } from './PositivePromptActions';
+import {
+  PositivePromptActions,
+  PromptTriggerPopover,
+  type PromptTemplateState,
+  type SavedPromptModels,
+} from './PositivePromptActions';
 import { PROMPT_ATTENTION_TARGET_PROPS } from './promptAttentionHotkeys';
 import { insertPromptText, registerPositivePromptElement } from './promptFocus';
 import { promptHistoryNavigation } from './promptHistoryNavigation';
@@ -49,6 +54,8 @@ interface PositivePromptFieldProps {
   onApplyPromptTemplate?: (template: PromptTemplateSnapshot | null) => void;
   onResizeEnd: (heightPx: number) => void;
   onUsePrompt: (prompt: PromptHistoryItem) => void;
+  /** Where Expand and Image to Prompt save their model picks; absent keeps them for the session. */
+  savedPromptModels?: SavedPromptModels;
 }
 
 /** The positive prompt is the only field whose `__name__` references resolve. */
@@ -69,6 +76,7 @@ export const PositivePromptField = ({
   onUsePrompt,
   projectId,
   promptTemplate = null,
+  savedPromptModels,
   selectedModel,
   showSyntaxHighlighting,
   value,
@@ -205,6 +213,7 @@ export const PositivePromptField = ({
         effectivePositivePrompt={effectivePositivePrompt}
         template={templateState}
         projectId={projectId}
+        savedPromptModels={savedPromptModels}
         selectedModel={selectedModel}
         onOpenPromptTriggerPicker={triggerPicker.open}
         onPositivePromptChangeImmediate={commitPromptChangeImmediately}
@@ -223,6 +232,7 @@ export const PositivePromptField = ({
       insertTextAtCaret,
       loras,
       projectId,
+      savedPromptModels,
       selectedModel,
       showSyntaxHighlighting,
       templateState,
