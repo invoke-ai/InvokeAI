@@ -52,6 +52,27 @@ In this situation, you may need to provide some additional information to identi
 
 [set up in the config file]: ../../configuration/invokeai-yaml
 
+## Quantized model formats
+
+Many models are also published in smaller, quantized builds. InvokeAI recognizes the format from the file's contents, so you install them like any other model:
+
+- **GGUF** (`.gguf`, llama.cpp quantization such as Q4_K or Q8_0): weights stay packed in memory and are unpacked layer by layer during generation. Supported for the FLUX.1, FLUX.2, Z-Image, Krea-2, Qwen-Image and Wan transformers, and for the T5, Qwen3, Qwen3-VL, Mistral and Gemma 2 text encoders.
+- **NF4** (bitsandbytes): 4-bit, CUDA only.
+- **SDNQ**: see [SDNQ Quantization](/configuration/optimization/sdnq-quantization/).
+- **int8** (`int8_convrot`, from ComfyUI repackages): the weights stay int8 in memory on every device, including Apple Silicon, and need no setting to turn on. Supported for FLUX.1, FLUX.2 Klein, Z-Image, Krea-2, Ideogram 4, MiniMax H3, LTX-2 and the PiD decoders, and for the Qwen3 8B, Qwen3-VL and LTX-2 Gemma encoders.
+- **nvfp4** (4-bit, from Comfy-Org): the weights stay packed in memory and are unpacked per layer, so no special GPU is needed. Supported for the Z-Image, Krea-2, Qwen-Image and LTX-2 transformers and for the Qwen3, Qwen2.5-VL and FLUX.2 Mistral encoders; the Ideogram 4 nvfp4 files are refused at install.
+- **fp8** (plain or `fp8_scaled`): InvokeAI keeps the weights in fp8 when [FP8 Storage](/configuration/optimization/fp8-storage/) is on, which installation does for you, or when `fp8_compute` is enabled.
+- **MXFP8** (fp8 with one scale per block of 32 weights): loaded by unpacking to BF16. Turn FP8 Storage off for these; see the [FP8 Storage caution](/configuration/optimization/fp8-storage/).
+
+## How models are identified
+
+InvokeAI identifies a model from the file itself, and falls back to its name only where the contents are the same:
+
+- **Standalone 16-channel VAEs.** FLUX.1 and SD3 use the same VAE network with different settings. A diffusers `vae/` folder is identified by its `config.json`, so FLUX.1-dev's folder is filed as FLUX.1 and SD3.5's as SD3. A single file such as `sd3_vae.safetensors` is identified by its name, folder or download source; if none of them names a model family, it is filed as FLUX.1. If a VAE lands under the wrong base, change **Base** in the model's **Edit** view. A `vae/` folder installed before this detection existed can be fixed with **Reidentify**.
+- **FLUX.2 Klein 9B vs. Klein 9B Base.** The two are identical in structure, so the file or repo name decides, and they ship different default step counts (4 against 28). Names that say "distilled" are read as Klein 9B even when they also contain "base". If you installed `Winnougan/Klein9b-Distilled-Base-INT8-Convrot` by repo ID before this was fixed, it was filed as Klein 9B Base; remove and reinstall it.
+
+Text encoders for Qwen-Image, Z-Image, Krea-2 and Ideogram 4 bring their tokenizer and configuration with InvokeAI, so single-file and GGUF encoders load without network access.
+
 ## Ideogram 4
 
 Ideogram 4 is an open-weight text-to-image model with a distinctive **structured JSON prompt**: instead of a single sentence, the model is trained to read an overall scene description plus a list of regions, each with a bounding box and its own text. Invoke assembles this JSON for you.
@@ -71,7 +92,7 @@ Comfy-Org's [`Comfy-Org/Ideogram-4`](https://huggingface.co/Comfy-Org/Ideogram-4
 
 - `diffusion_models/ideogram4_<build>.safetensors` — the conditional branch, selected as the model
 - `diffusion_models/ideogram4_unconditional_<build>.safetensors` — the unconditional branch
-- `text_encoders/qwen3vl_8b_fp8_scaled.safetensors` — the Qwen3-VL **8B** encoder (not the 4B one Krea-2 uses)
+- `text_encoders/qwen3vl_8b_fp8_scaled.safetensors` — the Qwen3-VL **8B** encoder (not the 4B one Krea-2 uses). A llama.cpp GGUF of the 8B encoder works as well; see [Qwen3-VL GGUF encoders](/users-guide/models/local-models/krea-2/#qwen3-vl-gguf-encoders).
 - `vae/flux2-vae.safetensors` — the 32-channel VAE, shared with FLUX.2, which is why it installs under the FLUX.2 base
 
 Pick the unconditional branch, the encoder and the VAE in the **Components** section next to the model — and pick the unconditional branch of the *same* build as the model. The `nvfp4` repackage in that repo is **not** supported yet and is refused at install.
@@ -92,10 +113,18 @@ Both branches are resident at once, so double those figures for the pair.
 
 **Without the fp8 matmul, the fp8 build still works — through FP8 Storage.** That setting keeps the file's own fp8 weights and per-tensor scales instead of expanding them, and installation switches it on for these files by itself. Measured on a 4090 with `fp8_compute` off, 1024px: **40.6 s**, 22.9 GB peak, 8.7 GB resident per branch — against **45.7 s** for the int8 pair. With *neither* the matmul nor Storage the weights are expanded to bf16 on load, 17.3 GB per branch, and a 24 GB card runs out of memory during the first step.
 
-**Use int8 where FP8 Storage is not available.** It requires a CUDA device; on anything else the fp8 build falls back to the expanded path, while int8 keeps its stored codes and dequantizes them per forward on any device with no setting to turn on.
+**Use int8 where FP8 Storage is not available.** It requires a CUDA or Intel XPU device; on anything else the fp8 build falls back to the expanded path, while int8 keeps its stored codes and dequantizes them per forward on any device with no setting to turn on.
 
 On a 24 GB NVIDIA card without the fp8 matmul (RTX 30-series), the int8 pair plus the 8B encoder still adds up to more than the card holds, so the bundled [nf4 build](#installing-ideogram-4) remains the smaller option there.
 :::
+
+### Memory use during generation
+
+Ideogram 4 keeps both transformer branches loaded for the whole generation. With the single-file builds on a CUDA or ROCm GPU (with partial loading on, the default), InvokeAI checks whether the pair fits next to the working memory a generation needs. If it does not, it keeps only part of the second branch on the GPU and streams the rest in each step. On a 24 GB card with the fp8 pair this keeps about 2.4 GB free instead of 1.2 GB. The bundled nf4 and fp8 folders are not affected. Three things follow:
+
+- A streamed layer computes on a slightly different path, so images at the same seed can differ from those generated with both branches fully on the GPU.
+- If generations still run out of memory, raise `device_working_mem_gb` in `invokeai.yaml` (for example to `8`).
+- If you set `max_cache_vram_gb`, InvokeAI does not limit the second branch this way, because the cache already plans from that limit.
 
 ### Prompting Ideogram 4
 
@@ -121,6 +150,15 @@ Ideogram 4 ships with a **content safety filter baked into the released model we
 
 The filter is known to **false-positive on completely benign prompts**, and the quantized builds can trigger it more readily. Invoke always sends the model a structured JSON prompt, which tends to trip the filter less than plain text; if you hit it, rephrasing or adjusting the prompt usually clears it.
 :::
+
+## ERNIE-Image
+
+ERNIE-Image is Baidu's 8B text-to-image model, available as **ERNIE-Image** (50 steps, CFG 4.0) and the distilled **ERNIE-Image Turbo** (8 steps, CFG off). Both are in the starter models in two forms:
+
+- **Diffusers pipelines** (`baidu/ERNIE-Image`, `baidu/ERNIE-Image-Turbo`) — everything in one folder, including the prompt enhancer.
+- **Single files** from Comfy-Org (~16 GB each) — the transformer alone. The starter installs it together with the **ERNIE-Image Ministral Encoder** (Ministral 3B, ~7.7 GB) and the FLUX.2 VAE. Select the encoder and the VAE in the **Components** section next to the model. The single files have no prompt enhancer.
+
+The Ministral 3B encoder is not the Mistral Small 3 encoder FLUX.2 uses, and the two cannot replace each other. The prompt enhancer from the diffusers folder has the same shape as the encoder but is refused as one, with a message naming the file to install instead.
 
 ## Editing model metadata
 

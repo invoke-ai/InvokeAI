@@ -1,0 +1,46 @@
+---
+title: Upscaling
+lastUpdated: 2026-09-30
+sidebar:
+  order: 7
+---
+
+The **Upscale** panel enlarges an image and adds detail in two passes. First a Spandrel upscaling model (such as a Real-ESRGAN variant) enlarges the image. Then a main model runs a short image-to-image pass over the result to invent detail that fits your prompt.
+
+Open it from the left rail. It is available in the Compose, Edit and Video layouts.
+
+## Setting up an upscale
+
+The panel is split into sections, top to bottom:
+
+- **Source & treatment**
+  - **Source image**: pick an image from the gallery, drag one in, or upload one.
+  - **Spandrel model**: the first-pass upscaler. Choose one suited to your image: photography, illustration or linework.
+  - **Scale**: the output size is the source size multiplied by this value. The panel shows the resulting input and output size and warns when the output is large enough to need much more time and VRAM.
+  - **Treatment preset**, or **Creativity** and **Structure** directly. Higher Creativity invents more detail and gives the prompt more influence. Higher Structure keeps the source composition more strictly; it is only shown for models that use a Tile ControlNet.
+- **Detail guidance**: the prompt. It is the project prompt shared with Generate. For upscaling, describe the medium, texture and style rather than new content.
+- **Generation**: the **Main model** for the detail pass (**SD1.5**, **SDXL** or **FLUX.1**), steps, CFG scale, scheduler, seed, and LoRAs that match the main model.
+- **Advanced**: the components the main model needs (see below), tile size and tile overlap, VAE and VAE precision, and CLIP skip for SD1.5.
+
+## What each model family needs
+
+| | SD1.5 / SDXL | FLUX.1 |
+|---|---|---|
+| Tile ControlNet | Required: a Tile or Union ControlNet for the same family, under **Advanced** | Not used; the Structure slider is hidden |
+| Negative prompt | Available | Not used; FLUX.1 ignores it, so it is hidden and not recorded |
+| Other components | Taken from the main model | Every FLUX.1 model except an SDNQ pipeline needs a **T5 Encoder**, **CLIP Embed** and **VAE**, all under **Advanced**. SDNQ pipelines bring their own. FLUX Fill models cannot be used |
+| Detail pass | Tile by tile | One pass over the whole image |
+
+The panel says what is missing before you can queue, for example "Select a compatible Tile or Union ControlNet." or "This model needs a T5 encoder selected."
+
+:::note[FLUX.1 output size]
+FLUX.1 needs sizes that are a multiple of 16. When the enlarged image is not, the panel shrinks it slightly to the nearest fitting size before the detail pass — for example 2040 px becomes 2032 px.
+:::
+
+## Memory
+
+For SD1.5 and SDXL the detail pass works in tiles, so the output can be much larger than what the model generates in one go. Larger tiles can improve continuity but need more VRAM; more tile overlap reduces seams but costs time and memory.
+
+For FLUX.1 the detail pass runs over the whole image at once, so its memory use grows with the output size. There, **Tile size** only sets the tiles for the VAE encode and decode, and **Tile overlap** has no effect.
+
+For all model families, encoding and decoding the enlarged image with the VAE runs in tiles. See [Low-VRAM mode](/configuration/optimization/low-vram-mode/) if you still run out of memory.

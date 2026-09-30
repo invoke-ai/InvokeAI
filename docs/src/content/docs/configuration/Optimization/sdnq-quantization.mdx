@@ -103,7 +103,10 @@ If you need higher quality and have the VRAM, the static `Disty0/FLUX.2-klein-9B
 | **SDNQ uint4 + SVD** | ~50 % | ~50 %          | ✅ sidecar    | Full diffusers pipeline                   |
 | **GGUF Q4_K_M**   | ~30 % | ~30 %             | ✅ sidecar    | Single-file transformer + separate encoders/VAE |
 | **BnB NF4**       | ~50 % | ~50 %             | ✅ sidecar    | Single-file transformer + separate encoders/VAE |
-| **FP8 storage**   | ~50 % | ~50 %             | ✅ direct     | Any full-precision model (toggle in Model Manager) |
+| **int8** (`int8_convrot`) | ~50 % | ~50 %     | ✅ sidecar    | Single-file transformer or encoder, stays int8 on every device |
+| **nvfp4**         | ~35 % | ~35 %             | ✅ sidecar    | Single-file transformer or encoder, stays packed on every GPU |
+| **fp8 / fp8_scaled** checkpoint | ~50 % | ~50 % | ✅ sidecar | Single file; stays fp8 with FP8 Storage (on after install) or `fp8_compute` |
+| **FP8 storage**   | ~50 % | ~50 %             | ✅ sidecar    | Full-precision models whose loader supports it ([details](/configuration/optimization/fp8-storage/#where-the-toggle-is-shown)) |
 
 The headline differences:
 
@@ -111,7 +114,7 @@ The headline differences:
 - **SDNQ has the cleanest dynamic-precision story**: GGUF picks one bit-width per file; SDNQ dynamic-mixed exports tune precision per layer.
 - **GGUF is more memory-efficient** at the same nominal bit-width because it uses smaller groups. SDNQ trades that for the SVD correction option.
 
-For low VRAM (~6–8 GB), GGUF Q4 is still the best fit. For 12–16 GB cards that can host a FLUX-class model, SDNQ is the simplest "install one thing, get a working pipeline" option.
+For low VRAM (~6–8 GB), GGUF Q4 is still the best fit for most models; for Z-Image, the NVFP4 and int8 builds fit there too. For 12–16 GB cards that can host a FLUX-class model, SDNQ is the simplest "install one thing, get a working pipeline" option.
 
 ## Using a pipeline without standalone components
 

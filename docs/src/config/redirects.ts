@@ -34,7 +34,9 @@ const redirects: RedirectsConfig = {
   '/contributing/INVOCATIONS': '/development/architecture/invocations',
   '/contributing/LOCAL_DEVELOPMENT': '/development/setup/dev-environment',
   '/contributing/MODEL_MANAGER': '/development/architecture/model-manager',
-  '/contributing/NEW_MODEL_INTEGRATION': '/development/guides/models',
+  '/contributing/NEW_MODEL_INTEGRATION': '/contributing/new-model-integration',
+  // Superseded by the contributor guide, which tracks the current architecture.
+  '/development/guides/models': '/contributing/new-model-integration',
   '/contributing/PR-MERGE-POLICY': '/development/process/pr-merge-policy',
   '/contributing/TESTS': '/development/guides/tests',
   '/contributing/contribution_guides/development': '/development',
