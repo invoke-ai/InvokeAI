@@ -27,4 +27,5 @@
 /invokeai/frontend/install @lstein
 /invokeai/frontend/merge @lstein @blessedcoolant
 /invokeai/frontend/training @lstein @blessedcoolant
-/invokeai/frontend/web  @blessedcoolant  @lstein @dunkeroni @Pfannkuchensack @jpphoto
+/invokeai/frontend/webv1  @blessedcoolant  @lstein @dunkeroni @Pfannkuchensack @jpphoto
+/invokeai/frontend/webv2  @blessedcoolant  @lstein @dunkeroni @Pfannkuchensack @jpphoto

@@ -1,6 +1,6 @@
 ---
 title: Release Process
-lastUpdated: 2025-12-26
+lastUpdated: 2026-09-29
 ---
 
 The Invoke application is published as a python package on [PyPI]. This includes both a source distribution and built distribution (a wheel).
@@ -61,13 +61,14 @@ Next, these jobs run and must pass. They are the same jobs that are run for ever
 
 - **`python-tests`**: runs `pytest` on matrix of platforms
 - **`python-checks`**: runs `ruff` (format and lint)
-- **`frontend-tests`**: runs `vitest`
-- **`frontend-checks`**: runs `prettier` (format), `eslint` (lint), `dpdm` (circular refs), `tsc` (static type check) and `knip` (unused imports)
-- **`typegen-checks`**: ensures the frontend and backend types are synced
+- **`frontend-tests`**: runs webv2's `check:release`, including unit/browser tests, performance, project-file, and accessibility gates
+- **`frontend-checks`**: runs webv2 formatting, Oxc lint, TypeScript, architecture checks, and its production build
+
+PRs also run **`openapi-checks`** and **`typegen-checks`** against the shared `invokeai/frontend/api` package to detect backend contract drift. Legacy webv1 lint/tests remain local commands.
 
 #### `build-wheel` Job
 
-This sets up both python and frontend dependencies and builds the python package. Internally, this runs `./scripts/build_wheel.sh` and uploads `dist.zip`, which contains the wheel and unarchived build.
+This sets up both python and frontend dependencies and builds the python package. Internally, this runs `./scripts/build_wheel.sh`, bundles both webv2 and the legacy webv1 fallback, and uploads `dist.zip`, which contains the wheel and unarchived build. Distribution CI builds the legacy bundle without running its local lint/test completion command.
 
 You don't need to download or test these artifacts.
 

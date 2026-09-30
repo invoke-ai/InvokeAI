@@ -40,8 +40,10 @@ def _recording_transformer(seen: list[torch.dtype], dtype: torch.dtype) -> Ideog
 
 def test_the_loop_hands_the_model_conditioning_in_its_own_dtype() -> None:
     seen: list[torch.dtype] = []
-    conditional = _recording_transformer(seen, torch.bfloat16)
-    unconditional = _recording_transformer(seen, torch.bfloat16)
+    # Distinguish the model from the float32 encoder without CPU bf16 matmul, which can
+    # raise an illegal instruction on Windows runners. This tests allocation, not low-precision arithmetic.
+    conditional = _recording_transformer(seen, torch.float64)
+    unconditional = _recording_transformer(seen, torch.float64)
 
     run_ideogram4_denoise(
         conditional_transformer=conditional,
@@ -56,7 +58,7 @@ def test_the_loop_hands_the_model_conditioning_in_its_own_dtype() -> None:
     )
 
     # Both branches, and float32 nowhere: the encoder's dtype must not reach the buffers.
-    assert seen == [torch.bfloat16, torch.bfloat16]
+    assert seen == [torch.float64, torch.float64]
 
 
 def test_a_quantized_build_is_read_from_its_compute_dtype_not_its_weights() -> None:

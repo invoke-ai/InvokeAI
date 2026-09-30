@@ -75,14 +75,14 @@ import SystemRequirementsLink from '@components/SystemRequirmentsLink.astro'
 
   7. Install the frontend dev toolchain, paying attention to versions:
 
-        - [`nodejs`](https://nodejs.org/) (tested on LTS, v22)
+        - [`nodejs`](https://nodejs.org/) (use the version in `.nvmrc`)
         - [`pnpm`](https://pnpm.io/installation) (tested on v10)
 
   8. Do a production build of the frontend:
 
         ```sh
-        cd <PATH_TO_INVOKEAI_REPO>/invokeai/frontend/web
-        pnpm i
+        cd <PATH_TO_INVOKEAI_REPO>/invokeai/frontend/webv2
+        pnpm install --frozen-lockfile
         pnpm build
         ```
 
@@ -105,12 +105,14 @@ See the [Tests](../tests) documentation for information about running and writin
 
 ## Frontend Development
 
+The default frontend is `webv2`. To use legacy `web`, build it with `make frontend-legacy-build` and launch `invokeai-web --web-legacy`.
+
 You'll need to run `pnpm build` every time you pull in new changes to the frontend.
 
 Another option is to skip the build and instead run the UI in dev mode:
 
 ```sh
-cd invokeai/frontend/web
+cd invokeai/frontend/webv2
 pnpm dev
 ```
 
