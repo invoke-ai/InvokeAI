@@ -18,7 +18,7 @@ import {
 } from '@chakra-ui/react';
 import { getWorkflowFieldSeedMode, isSeedInputField } from '@features/workflow/graph';
 import { FieldDescriptionPopover } from '@features/workflow/ui/fields/FieldDescriptionPopover';
-import { WorkflowFieldInput } from '@features/workflow/ui/fields/WorkflowFieldInput';
+import { WorkflowFieldInput, WorkflowFieldSnapshot } from '@features/workflow/ui/fields/WorkflowFieldInput';
 import {
   getWorkflowNodeBodyProps,
   getWorkflowNodeHandleStyle,
@@ -28,6 +28,7 @@ import {
   WORKFLOW_NODE_SURFACE_TOKEN,
   WorkflowNodeInfoIcon,
   WorkflowNodeOutcomeIcon,
+  useIsWorkflowImageExport,
   type WorkflowNodeOutcome,
 } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
@@ -54,16 +55,7 @@ import { Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, RotateCcwIcon, TriangleAlertIcon } from 'lucide-react';
-import {
-  createContext,
-  memo,
-  useContext,
-  useId,
-  useState,
-  type ChangeEvent,
-  type KeyboardEvent,
-  type ReactNode,
-} from 'react';
+import { memo, useId, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InvocationFlowNode as InvocationFlowNodeType, InvocationNodeTemplateView } from './flowAdapters';
@@ -75,18 +67,6 @@ const NODE_WIDTH = '18rem';
 const ROW_PADDING_X = 12;
 /** Below this viewport zoom, field content renders as skeleton bars (ComfyUI-style) for performance/readability. */
 const CONTENT_VISIBILITY_ZOOM = 0.4;
-
-const WorkflowImageExportContext = createContext(false);
-
-export const WorkflowImageExportProvider = ({
-  children,
-  isExporting,
-}: {
-  children: ReactNode;
-  isExporting: boolean;
-}) => <WorkflowImageExportContext value={isExporting}>{children}</WorkflowImageExportContext>;
-
-export const useIsWorkflowImageExport = () => useContext(WorkflowImageExportContext);
 
 /** True while the viewport is zoomed out far enough that field content is unreadable noise. */
 const useIsZoomedOut = (): boolean => {
@@ -235,9 +215,29 @@ const NodeProgressStrip = ({ execution }: { execution: NodeExecutionState | null
   );
 };
 
-const NodeTitle = ({ node, title }: { node: WorkflowInvocationNode; title: string }) => {
+const NodeTitle = ({
+  isWorkflowImageExport,
+  node,
+  title,
+}: {
+  isWorkflowImageExport: boolean;
+  node: WorkflowInvocationNode;
+  title: string;
+}) => {
   const { editGraph } = useProjectGraphCommands();
   const [draftLabel, setDraftLabel] = useState<string | null>(null);
+
+  if (isWorkflowImageExport) {
+    return (
+      <MiddleTruncate
+        data-workflow-export-node-title="true"
+        data-workflow-export-static-node-content="true"
+        fontWeight="700"
+        minW="0"
+        text={title}
+      />
+    );
+  }
 
   if (draftLabel !== null) {
     return (
@@ -391,11 +391,9 @@ const NodeUpdateIcon = ({
 };
 
 const NodeInfoTooltipContent = ({
-  isFailed = false,
   node,
   template,
 }: {
-  isFailed?: boolean;
   node: WorkflowInvocationNode;
   template: InvocationNodeTemplateView['template'];
 }) => {
@@ -413,7 +411,6 @@ const NodeInfoTooltipContent = ({
       {updateStatusText ? <Text color="fg.warning">{updateStatusText}</Text> : null}
       <Text color="fg.subtle">{t('nodes.nodeClassification', { classification: template.classification })}</Text>
       <Text color="fg.subtle">{t('nodes.nodeCategory', { category: template.category })}</Text>
-      {isFailed ? <Text color="fg.error">{t('nodes.executionFailed')}</Text> : null}
       {template.description ? <Text fontStyle="italic">{template.description}</Text> : null}
       {node.data.notes ? <Text>{node.data.notes}</Text> : null}
     </Stack>
@@ -594,8 +591,26 @@ const InputFieldRow = ({
     value: instance?.value,
   });
   const isInvalid = invalidReason !== null;
+  const showInvalid = isInvalid && !isWorkflowImageExport;
   const handleTooltip = getHandleTypeTooltip(template.type, t('nodes.any'), t);
-  const canReset = showsControl && !isWorkflowFieldValueDefault(template, instance?.value);
+  const canReset = !isWorkflowImageExport && showsControl && !isWorkflowFieldValueDefault(template, instance?.value);
+  const fieldTitle = (
+    <Text
+      color={showInvalid ? 'fg.error' : isConnected ? 'fg.muted' : 'fg'}
+      data-node-input-field-title="true"
+      fontSize="2xs"
+      lineHeight="shorter"
+      minW="0"
+      truncate
+    >
+      {label}
+      {template.required ? (
+        <Text as="span" color="fg.error">
+          {' *'}
+        </Text>
+      ) : null}
+    </Text>
+  );
 
   if (isSkeleton) {
     return (
@@ -619,8 +634,13 @@ const InputFieldRow = ({
   }
 
   return (
-    <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY} w="full">
-      <Field.Root gap="0" invalid={isInvalid} minW="0" w="full">
+    <Box
+      data-workflow-export-field-content={isWorkflowImageExport ? 'true' : undefined}
+      px={WORKFLOW_NODE_DENSITY.rowPaddingX}
+      py={WORKFLOW_NODE_DENSITY.rowPaddingY}
+      w="full"
+    >
+      <Field.Root gap="0" invalid={isInvalid && !isWorkflowImageExport} minW="0" w="full">
         {/* The handle lives inside the label row so it stays centered on the
             label even when the value control below grows the row. */}
         <HStack gap="1.5" h="5" justify="space-between" minW="0" position="relative" w="full">
@@ -634,34 +654,24 @@ const InputFieldRow = ({
               />
             </Tooltip>
           ) : null}
-          <Tooltip
-            positioning={{ placement: 'top-start' }}
-            content={
-              <InputFieldTooltip
-                description={description}
-                isConnected={isConnected}
-                isExposed={isExposed}
-                label={label}
-                template={template}
-              />
-            }
-          >
-            <Text
-              color={isInvalid ? 'fg.error' : isConnected ? 'fg.muted' : 'fg'}
-              data-node-input-field-title="true"
-              fontSize="2xs"
-              lineHeight="shorter"
-              minW="0"
-              truncate
+          {isWorkflowImageExport ? (
+            fieldTitle
+          ) : (
+            <Tooltip
+              positioning={{ placement: 'top-start' }}
+              content={
+                <InputFieldTooltip
+                  description={description}
+                  isConnected={isConnected}
+                  isExposed={isExposed}
+                  label={label}
+                  template={template}
+                />
+              }
             >
-              {label}
-              {template.required ? (
-                <Text as="span" color="fg.error">
-                  {' *'}
-                </Text>
-              ) : null}
-            </Text>
-          </Tooltip>
+              {fieldTitle}
+            </Tooltip>
+          )}
           <HStack flexShrink={0} gap="0" ml="auto">
             {canReset ? (
               <Tooltip content="Reset to default value">
@@ -685,13 +695,15 @@ const InputFieldRow = ({
                 </IconButton>
               </Tooltip>
             ) : null}
-            <FieldDescriptionPopover
-              description={instance?.description}
-              fieldName={template.name}
-              nodeId={node.id}
-              templateDescription={template.description}
-            />
-            {isExposableField(template) ? (
+            {!isWorkflowImageExport ? (
+              <FieldDescriptionPopover
+                description={instance?.description}
+                fieldName={template.name}
+                nodeId={node.id}
+                templateDescription={template.description}
+              />
+            ) : null}
+            {!isWorkflowImageExport && isExposableField(template) ? (
               <IconButton
                 aria-label={isExposed ? `Remove ${label} from Linear UI` : `Expose ${label} in Linear UI`}
                 className="nodrag"
@@ -706,43 +718,37 @@ const InputFieldRow = ({
             ) : null}
           </HStack>
         </HStack>
-        {isWorkflowImageExport ? (
-          <Stack data-workflow-export-content="true" gap="0.5" mt="0.5" overflowWrap="anywhere" w="full">
-            <InputFieldTooltip
-              description={description}
-              isConnected={isConnected}
-              isExposed={isExposed}
-              label={label}
-              template={template}
-            />
-            {template.input !== 'direct' ? (
-              <Text data-workflow-export-connector-tooltip="true" fontSize="2xs">
-                {handleTooltip}
-              </Text>
-            ) : null}
-          </Stack>
-        ) : null}
         {showsControl ? (
-          <Box mt="0.5" w="full">
-            <WorkflowFieldInput
-              id={`${isWorkflowImageExport ? 'export-' : ''}${node.id}-${template.name}-value`}
-              invalid={isInvalid}
-              nodeId={node.id}
+          isWorkflowImageExport ? (
+            <WorkflowFieldSnapshot
               seedMode={getWorkflowFieldSeedMode(instance)}
               template={template}
               value={instance?.value}
-              onChange={(value) =>
-                editGraph({ fieldName: template.name, nodeId: node.id, type: 'setFieldValue', value })
-              }
-              onSeedModeChange={(seedMode) =>
-                editGraph({ fieldName: template.name, nodeId: node.id, seedMode, type: 'setFieldSeedMode' })
-              }
             />
-          </Box>
-        ) : isConnected && isSeedInputField(template) ? (
+          ) : (
+            <Box mt="0.5" w="full">
+              <WorkflowFieldInput
+                id={`${node.id}-${template.name}-value`}
+                invalid={isInvalid}
+                nodeId={node.id}
+                seedMode={getWorkflowFieldSeedMode(instance)}
+                template={template}
+                value={instance?.value}
+                onChange={(value) =>
+                  editGraph({ fieldName: template.name, nodeId: node.id, type: 'setFieldValue', value })
+                }
+                onSeedModeChange={(seedMode) =>
+                  editGraph({ fieldName: template.name, nodeId: node.id, seedMode, type: 'setFieldSeedMode' })
+                }
+              />
+            </Box>
+          )
+        ) : !isWorkflowImageExport && isConnected && isSeedInputField(template) ? (
           <ProvidedByConnectionNote />
         ) : null}
-        {invalidReason ? <Field.ErrorText fontSize="2xs">{invalidReason}</Field.ErrorText> : null}
+        {invalidReason && !isWorkflowImageExport ? (
+          <Field.ErrorText fontSize="2xs">{invalidReason}</Field.ErrorText>
+        ) : null}
       </Field.Root>
     </Box>
   );
@@ -760,7 +766,8 @@ const OutputFieldRow = ({
   const isWorkflowImageExport = useIsWorkflowImageExport();
   const { t } = useTranslation();
   const handleTooltip = getHandleTypeTooltip(template.type, t('nodes.any'), t);
-  const value = latestResult === undefined ? null : formatOutputFieldValue(latestResult, template.name);
+  const value =
+    !isWorkflowImageExport && latestResult !== undefined ? formatOutputFieldValue(latestResult, template.name) : null;
 
   return (
     <Box px={WORKFLOW_NODE_DENSITY.rowPaddingX} py={WORKFLOW_NODE_DENSITY.rowPaddingY}>
@@ -787,7 +794,6 @@ const OutputFieldRow = ({
           <Box flexShrink={0} maxW="full" textAlign="end">
             <Text
               color="fg.muted"
-              data-workflow-export-content="true"
               data-workflow-export-output-title="true"
               fontSize="2xs"
               lineHeight="shorter"
@@ -832,19 +838,6 @@ const OutputFieldRow = ({
           </HStack>
         )}
       </Flex>
-      {isWorkflowImageExport ? (
-        <Stack data-workflow-export-content="true" gap="0.5" maxW="full" px={WORKFLOW_NODE_DENSITY.rowPaddingX}>
-          <Text data-workflow-export-connector-tooltip="true" fontSize="2xs" overflowWrap="anywhere">
-            {handleTooltip}
-          </Text>
-          <OutputFieldTooltip includeTitle={false} template={template} />
-          {value ? (
-            <Text color="fg.subtle" fontSize="2xs" maxW="full" overflowWrap="anywhere" whiteSpace="pre-wrap">
-              {value.full}
-            </Text>
-          ) : null}
-        </Stack>
-      ) : null}
     </Box>
   );
 };
@@ -987,14 +980,26 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
 
   if (!templateView) {
     return (
-      <NodeShell isMissing selected={selected ?? false}>
-        <HStack gap="1.5" p="3">
-          <Icon as={TriangleAlertIcon} boxSize="3.5" color="red.solid" />
-          <Stack gap="0">
-            <Text fontWeight="700">{node.data.label || node.data.type}</Text>
-            <Text color="fg.subtle" fontSize="2xs">
-              Unknown node type "{node.data.type}". It cannot run on this backend.
-            </Text>
+      <NodeShell isMissing={!isWorkflowImageExport} selected={selected ?? false}>
+        <HStack gap="1.5" minW={isWorkflowImageExport ? '0' : undefined} p="3">
+          {!isWorkflowImageExport ? <Icon as={TriangleAlertIcon} boxSize="3.5" color="red.solid" /> : null}
+          <Stack flex={isWorkflowImageExport ? '1' : undefined} gap="0" minW={isWorkflowImageExport ? '0' : undefined}>
+            {isWorkflowImageExport ? (
+              <MiddleTruncate
+                data-workflow-export-node-title="true"
+                data-workflow-export-static-node-content="true"
+                fontWeight="700"
+                minW="0"
+                text={node.data.label || node.data.type}
+              />
+            ) : (
+              <Text fontWeight="700">{node.data.label || node.data.type}</Text>
+            )}
+            {!isWorkflowImageExport ? (
+              <Text color="fg.subtle" fontSize="2xs">
+                Unknown node type "{node.data.type}". It cannot run on this backend.
+              </Text>
+            ) : null}
           </Stack>
         </HStack>
       </NodeShell>
@@ -1013,48 +1018,53 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
   const isRunning = execution?.status === 'running';
   const isMissingRequiredInput = hasMissingRequiredInputs(node, inputTemplates, connectedFieldNames);
   const isCompact = data.isCompact && !selected && !isWorkflowImageExport;
-  const withFooter = !isZoomedOut && templateView.isExecutable && templateView.hasImageOutput;
-  const resultExecution = isWorkflowImageExport && execution?.status !== 'completed' ? null : execution;
+  const withFooter = !isWorkflowImageExport && !isZoomedOut && templateView.isExecutable && templateView.hasImageOutput;
+  const resultExecution = isWorkflowImageExport ? null : execution;
   const withOutputPreview = Boolean(resultExecution?.outputImageUrl);
   const latestResult = resultExecution?.latestOutput;
 
   return (
     <NodeShell
-      hasMissingRequiredInput={isMissingRequiredInput}
-      isOutdated={isOutdated}
-      isRunning={isRunning}
-      outcome={getExecutionOutcome(execution)}
+      hasMissingRequiredInput={!isWorkflowImageExport && isMissingRequiredInput}
+      isOutdated={!isWorkflowImageExport && isOutdated}
+      isRunning={!isWorkflowImageExport && isRunning}
+      outcome={isWorkflowImageExport ? null : getExecutionOutcome(execution)}
       selected={selected ?? false}
     >
       {/* The collapse chevron carries its own hit padding, so the header pulls its start padding in. */}
-      <Flex {...getWorkflowNodeHeaderProps({ roundedBottom: !isOpen })} gap="1" ps="1">
-        <IconButton
-          aria-label={isOpen ? 'Collapse node' : 'Expand node'}
-          className="nodrag"
-          size="2xs"
-          variant="ghost"
-          onClick={() => editGraph({ isOpen: !isOpen, nodeId: node.id, type: 'setNodeIsOpen' })}
-        >
-          <Icon as={isOpen ? ChevronDownIcon : ChevronRightIcon} boxSize="3.5" />
-        </IconButton>
+      <Flex
+        {...getWorkflowNodeHeaderProps({ roundedBottom: !isOpen })}
+        gap="1"
+        ps={isWorkflowImageExport ? WORKFLOW_NODE_DENSITY.headerPaddingStart : '1'}
+      >
+        {!isWorkflowImageExport ? (
+          <IconButton
+            aria-label={isOpen ? 'Collapse node' : 'Expand node'}
+            className="nodrag"
+            size="2xs"
+            variant="ghost"
+            onClick={() => editGraph({ isOpen: !isOpen, nodeId: node.id, type: 'setNodeIsOpen' })}
+          >
+            <Icon as={isOpen ? ChevronDownIcon : ChevronRightIcon} boxSize="3.5" />
+          </IconButton>
+        ) : null}
         {isZoomedOut ? (
           <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={node.data.label || template.title} />
         ) : (
           <>
-            <NodeTitle node={node} title={node.data.label || template.title} />
+            <NodeTitle
+              isWorkflowImageExport={isWorkflowImageExport}
+              node={node}
+              title={node.data.label || template.title}
+            />
             <BatchGroupSuffix node={node} />
             <Box flex="1" />
-            <NodeOutcomeIcon execution={execution} node={node} />
-            {isOutdated ? <NodeUpdateIcon node={node} template={template} /> : null}
-            <NodeInfoIcon node={node} template={template} />
+            {!isWorkflowImageExport ? <NodeOutcomeIcon execution={execution} node={node} /> : null}
+            {!isWorkflowImageExport && isOutdated ? <NodeUpdateIcon node={node} template={template} /> : null}
+            {!isWorkflowImageExport ? <NodeInfoIcon node={node} template={template} /> : null}
           </>
         )}
       </Flex>
-      {isWorkflowImageExport ? (
-        <Box data-workflow-export-content="true" maxW="full" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
-          <NodeInfoTooltipContent isFailed={execution?.status === 'failed'} node={node} template={template} />
-        </Box>
-      ) : null}
       <NodeProgressStrip execution={execution} />
       {isOpen && isCompact ? (
         <>
@@ -1085,11 +1095,11 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
               template={inputTemplate}
             />
           ))}
-          {shouldShowCallSavedWorkflowLoadingHint(node) ? (
+          {!isWorkflowImageExport && shouldShowCallSavedWorkflowLoadingHint(node) ? (
             <Text color="fg.subtle" fontSize="2xs" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
               {t('nodes.savedWorkflowDetailLoading')}
             </Text>
-          ) : shouldShowCallSavedWorkflowNoExposedFieldsHint(node) ? (
+          ) : !isWorkflowImageExport && shouldShowCallSavedWorkflowNoExposedFieldsHint(node) ? (
             <Text color="fg.subtle" fontSize="2xs" px={WORKFLOW_NODE_DENSITY.rowPaddingX} py="1">
               {t('nodes.savedWorkflowNoExposedFields')}
             </Text>
