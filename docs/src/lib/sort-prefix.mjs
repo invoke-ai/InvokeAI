@@ -25,7 +25,8 @@ export const stripSortPrefix = (segment) => segment.replace(sortPrefixRegEx, '')
  * @returns {string}
  */
 export const generateDocsId = ({ entry, data }) => {
-  if (typeof data.slug === 'string') return data.slug;
+  // Truthiness, as in Astro's default: an empty slug falls back to the path.
+  if (data.slug) return String(data.slug);
   return entry
     .replace(/\.[^./]+$/, '')
     .split('/')

@@ -16,6 +16,6 @@ export function remarkSortPrefixSlug({ docsDir }) {
 
     file.data.astro ??= {};
     const frontmatter = (file.data.astro.frontmatter ??= {});
-    if (typeof frontmatter.slug !== 'string') frontmatter.slug = generateDocsId({ entry, data: frontmatter });
+    if (!frontmatter.slug) frontmatter.slug = generateDocsId({ entry, data: frontmatter });
   };
 }
