@@ -3,6 +3,7 @@ import type { NodeProps } from '@xyflow/react';
 import { Box, Input, Text, Textarea } from '@chakra-ui/react';
 import { getWorkflowNodeChromeProps, useIsWorkflowImageExport } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { memo, useCallback, type ChangeEvent } from 'react';
 
 import type { NotesFlowNode as NotesFlowNodeType } from './flowAdapters';
@@ -20,9 +21,13 @@ const NotesSnapshotNode = ({ data }: NodeProps<NotesFlowNodeType>) => {
       w="16rem"
       {...getWorkflowNodeChromeProps({ selected: false })}
     >
-      <Text fontSize="2xs" fontWeight="700" mb="1.5">
-        {node.data.label}
-      </Text>
+      <MiddleTruncate
+        data-workflow-export-node-title="true"
+        fontSize="2xs"
+        fontWeight="700"
+        mb="1.5"
+        text={node.data.label}
+      />
       {node.data.notes ? (
         <Text fontSize="2xs" overflowWrap="anywhere" whiteSpace="pre-wrap">
           {node.data.notes}

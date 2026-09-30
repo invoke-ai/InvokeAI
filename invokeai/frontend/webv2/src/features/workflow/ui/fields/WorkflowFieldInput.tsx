@@ -1,5 +1,6 @@
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/react';
 import type { FieldInputTemplate } from '@features/workflow/contracts';
+import type { WorkflowLibraryPage, WorkflowRecordDTO } from '@features/workflow/data/api';
 import type { LoraFieldCollectionEntry } from '@features/workflow/utility';
 import type { SeedInputPatch } from '@platform/ui/SeedInput';
 
@@ -48,7 +49,9 @@ import {
 } from '@features/workflow/data/savedWorkflowFieldUtils';
 import {
   getWorkflowPagesItems,
+  savedWorkflowDetailQueryKey,
   savedWorkflowDetailQueryOptions,
+  savedWorkflowPickerQueryKeyPrefix,
   savedWorkflowPickerQueryOptions,
 } from '@features/workflow/data/savedWorkflowQueries';
 import { isSeedInputField } from '@features/workflow/graph';
@@ -99,7 +102,7 @@ import {
 } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { SeedInput } from '@platform/ui/SeedInput';
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { FilmIcon, ImageIcon, ImagePlusIcon, PlusIcon, RotateCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
 import {
   lazy,
@@ -111,6 +114,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ChangeEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -1924,6 +1928,64 @@ const formatSnapshotValue = (value: unknown, template: FieldInputTemplate): stri
   return isRecord(value) ? formatSnapshotObject(value) : null;
 };
 
+const SNAPSHOT_VALUE_TEXT_PROPS = {
+  color: 'fg.muted',
+  fontSize: '2xs',
+  lineHeight: 'short',
+  mt: '0.5',
+  overflowWrap: 'anywhere',
+  whiteSpace: 'pre-wrap',
+} as const;
+
+/** Use the freshest cached name without fetching or notifying the child-signature synchronizer. */
+const SavedWorkflowSnapshot = ({ workflowId }: { workflowId: string }) => {
+  const queryClient = useQueryClient();
+  const getName = useCallback(() => {
+    const detailKey = savedWorkflowDetailQueryKey(workflowId);
+    const record = queryClient.getQueryData<WorkflowRecordDTO>(detailKey);
+    let name = record?.name || workflowId;
+    let updatedAt = record?.name ? (queryClient.getQueryState(detailKey)?.dataUpdatedAt ?? 0) : -1;
+    for (const [key, pages] of queryClient.getQueriesData<InfiniteData<WorkflowLibraryPage>>({
+      queryKey: savedWorkflowPickerQueryKeyPrefix,
+    })) {
+      const pickerUpdatedAt = queryClient.getQueryState(key)?.dataUpdatedAt ?? 0;
+      if (pickerUpdatedAt < updatedAt) {
+        continue;
+      }
+      for (const page of pages?.pages ?? []) {
+        const workflow = page.items.find((item) => item.workflow_id === workflowId);
+        if (workflow?.name) {
+          name = workflow.name;
+          updatedAt = pickerUpdatedAt;
+          break;
+        }
+      }
+    }
+    return name;
+  }, [queryClient, workflowId]);
+  const subscribe = useCallback(
+    (onChange: () => void) =>
+      queryClient.getQueryCache().subscribe(({ query }) => {
+        const key = query.queryKey;
+        if (
+          key[0] === 'workflow' &&
+          key[1] === 'call-saved' &&
+          (key[2] === 'picker' || (key[2] === 'detail' && key[3] === workflowId))
+        ) {
+          onChange();
+        }
+      }),
+    [queryClient, workflowId]
+  );
+  const name = useSyncExternalStore(subscribe, getName, getName);
+
+  return (
+    <Text {...SNAPSHOT_VALUE_TEXT_PROPS} data-workflow-export-field-value="true">
+      {name}
+    </Text>
+  );
+};
+
 /** Renders authored values without mounting editors or resolving runtime diagnostics. */
 export const WorkflowFieldSnapshot = ({
   seedMode = 'fixed',
@@ -1939,6 +2001,46 @@ export const WorkflowFieldSnapshot = ({
   if (isSeedInputField(template) && seedMode !== 'fixed') {
     const modeLabel = t(`common.seedMode.${seedMode}`);
     text = seedMode === 'random' || !text ? modeLabel : `${text} (${modeLabel})`;
+  }
+
+  if (template.type.name === 'SavedWorkflowField' && typeof value === 'string' && value) {
+    return <SavedWorkflowSnapshot workflowId={value} />;
+  }
+
+  if (template.type.name === 'ImageField') {
+    const names =
+      template.type.cardinality === 'COLLECTION'
+        ? getImageCollectionNames(value).filter(Boolean)
+        : isRecord(value) && typeof value.image_name === 'string' && value.image_name
+          ? [value.image_name]
+          : [];
+    if (names.length > 0) {
+      return (
+        <Box data-workflow-export-field-value="true" mt="0.5" w="full">
+          {template.type.cardinality === 'COLLECTION' ? (
+            <SimpleGrid borderWidth="1px" columns={3} gap="1" p="1" rounded="sm">
+              {names.map((name) => (
+                <Box key={name} aspectRatio="1" bg="bg.subtle" rounded="xs">
+                  <Image
+                    alt=""
+                    h="full"
+                    objectFit="cover"
+                    rounded="xs"
+                    src={galleryImageUrls.thumbnail(name)}
+                    w="full"
+                  />
+                </Box>
+              ))}
+            </SimpleGrid>
+          ) : (
+            <Flex align="center" borderWidth="1px" h="32" justify="center" overflow="hidden" rounded="sm" w="full">
+              <Image alt="" maxH="full" maxW="full" objectFit="contain" src={galleryImageUrls.thumbnail(names[0]!)} />
+            </Flex>
+          )}
+          <Text {...SNAPSHOT_VALUE_TEXT_PROPS}>{text}</Text>
+        </Box>
+      );
+    }
   }
 
   if (template.type.name === 'StringField') {
@@ -1965,15 +2067,7 @@ export const WorkflowFieldSnapshot = ({
   }
 
   return text ? (
-    <Text
-      color="fg.muted"
-      data-workflow-export-field-value="true"
-      fontSize="2xs"
-      lineHeight="short"
-      mt="0.5"
-      overflowWrap="anywhere"
-      whiteSpace="pre-wrap"
-    >
+    <Text {...SNAPSHOT_VALUE_TEXT_PROPS} data-workflow-export-field-value="true">
       {text}
     </Text>
   ) : null;

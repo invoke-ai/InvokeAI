@@ -9,6 +9,7 @@ import {
   useIsWorkflowImageExport,
 } from '@features/workflow/ui/nodeChrome';
 import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import {
   imageUrlToStreamingSource,
@@ -78,17 +79,14 @@ const CurrentImageSnapshotNode = ({ data, selected }: NodeProps<CurrentImageFlow
       {...getWorkflowNodeShellProps({ selected })}
     >
       <Flex {...getWorkflowNodeHeaderProps()}>
-        <Text
+        <MiddleTruncate
           data-workflow-export-node-title="true"
           data-workflow-export-static-node-content="true"
           flex="1"
           fontWeight="700"
           minW="0"
-          overflowWrap="anywhere"
-          whiteSpace="pre-wrap"
-        >
-          {node.data.label || 'Current Image'}
-        </Text>
+          text={node.data.label || 'Current Image'}
+        />
       </Flex>
     </Box>
   );

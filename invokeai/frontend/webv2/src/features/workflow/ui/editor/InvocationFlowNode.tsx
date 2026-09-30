@@ -229,17 +229,13 @@ const NodeTitle = ({
 
   if (isWorkflowImageExport) {
     return (
-      <Text
+      <MiddleTruncate
         data-workflow-export-node-title="true"
         data-workflow-export-static-node-content="true"
-        flex="1"
         fontWeight="700"
         minW="0"
-        overflowWrap="anywhere"
-        whiteSpace="pre-wrap"
-      >
-        {title}
-      </Text>
+        text={title}
+      />
     );
   }
 
@@ -988,16 +984,17 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
         <HStack gap="1.5" minW={isWorkflowImageExport ? '0' : undefined} p="3">
           {!isWorkflowImageExport ? <Icon as={TriangleAlertIcon} boxSize="3.5" color="red.solid" /> : null}
           <Stack flex={isWorkflowImageExport ? '1' : undefined} gap="0" minW={isWorkflowImageExport ? '0' : undefined}>
-            <Text
-              data-workflow-export-node-title={isWorkflowImageExport ? 'true' : undefined}
-              data-workflow-export-static-node-content={isWorkflowImageExport ? 'true' : undefined}
-              fontWeight="700"
-              minW={isWorkflowImageExport ? '0' : undefined}
-              overflowWrap={isWorkflowImageExport ? 'anywhere' : undefined}
-              whiteSpace={isWorkflowImageExport ? 'pre-wrap' : undefined}
-            >
-              {node.data.label || node.data.type}
-            </Text>
+            {isWorkflowImageExport ? (
+              <MiddleTruncate
+                data-workflow-export-node-title="true"
+                data-workflow-export-static-node-content="true"
+                fontWeight="700"
+                minW="0"
+                text={node.data.label || node.data.type}
+              />
+            ) : (
+              <Text fontWeight="700">{node.data.label || node.data.type}</Text>
+            )}
             {!isWorkflowImageExport ? (
               <Text color="fg.subtle" fontSize="2xs">
                 Unknown node type "{node.data.type}". It cannot run on this backend.
