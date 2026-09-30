@@ -1,0 +1,233 @@
+---
+title: Automating with Workflows
+description: Why and when to use workflows, how nodes and connections work, a tour of the workflow editor, and a walkthrough that generates a subject with SDXL, composites it onto a background, and builds a simple form for it.
+lastUpdated: 2026-09-30
+---
+
+import { Image } from 'astro:assets';
+import { Steps } from '@astrojs/starlight/components';
+import EditorTour from './assets/workflow-editor-tour.svg';
+import nodePicker from './assets/workflow-node-picker.webp';
+import compositorNodes from './assets/workflow-compositor-nodes.webp';
+import formView from './assets/workflow-form-view.webp';
+import formEdit from './assets/workflow-form-edit.webp';
+
+The Generate panel, the Canvas and the Video panel each cover a common job well. **Workflows** are for everything else. A workflow is a recipe of processing steps that you assemble yourself: generate an image, then upscale it, cut out its subject, place it on a background, run it through a second model, repeat it for a list of prompts, and so on. Once built, a workflow runs with one press of **Invoke** and can be reused, adjusted and shared.
+
+Use a workflow when you want to:
+
+* **Chain steps together** that would otherwise take several trips through different panels, such as generating an image and then compositing it onto another.
+* **Use features the panels do not expose**, including community-contributed nodes.
+* **Repeat a process** exactly, on new prompts or images, without redoing it by hand.
+* **Share a process** with others as a single file.
+
+## Nodes and connections
+
+A workflow is made of **nodes** connected into a graph. Each node performs one operation, such as loading a model, encoding a prompt, denoising, decoding an image, or resizing it. Everything InvokeAI does is built from nodes, including what the Generate panel does behind the scenes.
+
+A node has:
+
+* **Outputs**, listed at the top of the node, with connection points on its right edge.
+* **Inputs**, listed below the outputs, with connection points on its left edge. Most inputs also have a control for entering a value directly, such as a text box, number or model picker.
+
+You build a workflow by dragging from an output of one node to an input of another. The connection passes the output's value along, and the input's own control is replaced by *Provided by connection*. Connection points and lines are colored by the kind of value they carry, such as images, latents, conditioning, numbers or text, and only compatible points can be connected. An input marked with a red **\*** is required: the workflow cannot run until it has a value or a connection.
+
+When you press **Invoke**, InvokeAI works out the order to run the nodes from their connections, runs them, and saves the images from the nodes you chose to the Gallery.
+
+:::tip[New to diffusion?]
+Workflows expose the individual steps of image generation. The [Diffusion overview](/users-guide/image-generation/advanced-topics/diffusion/) explains what those steps do, which makes it much easier to build workflows of your own.
+:::
+
+## A tour of the workflow editor
+
+Workflows are built and run in the **Automate** layout (**Alt+4**). The editor fills the center, the workflow's form is on the left, and the Gallery and Queue are on the right.
+
+<EditorTour
+  role="group"
+  aria-label="The Automate layout: the Workflow form panel on the left, the workflow editor with a graph of nodes in the center, and the Gallery on the right. Numbered callouts mark the parts described below."
+  style="width: 100%; height: auto;"
+/>
+
+Hover over a numbered circle, or tap it on a touchscreen, for a short description.
+
+| | Part | What it does |
+|---|---|---|
+| 1 | **Workflow panel** | The workflow's **form**: its most important settings as simple controls, like a Generate panel for this workflow. |
+| 2 | **View** / **Edit** | **View** uses the form. **Edit** lets you design the form, edit the workflow's details (name, description, author, tags, notes), and inspect the selected node. |
+| 3 | **Editor toolbar** | Tools for panning, box and lasso selection, and erasing nodes or connections; **Zoom in**, **Zoom out** and **Fit view**; **Download workflow as PNG**; and **Node opacity**. |
+| 4 | **Workflow name** | The active workflow. Click it to open the **Workflows** library. |
+| 5 | **Workflow actions** | **Add node** (**+**), **Save to library…**, the save status, settings, and the **⋯** menu with **Workflow details…**, **Rename workflow…**, **Import workflow JSON…**, **Export workflow JSON**, **New workflow** and more. |
+| 6 | **The graph** | The workflow's nodes and connections. Drag nodes by their title bar; scroll to zoom; drag empty space to pan. |
+| 7 | **Minimap** | An overview of the whole graph for finding your way around large workflows. |
+| 8 | **Gallery and Queue** | Where results appear, with the Queue, Preview and Image Map on the right-hand rail. |
+| 9 | **Automate** | The layout preset for workflows. |
+| 10 | **Invoke** | Runs the active workflow. The routing control beside it shows the source (**Workflow**) and the destination (**Gallery**). |
+
+### Adding and connecting nodes
+
+To add a node, press **Shift+A** or **Space** in the editor, or click **+** (**Add node**) in the editor's header. Type to search: every word you type must appear in the node's name, type, tags or category. Nodes are grouped by category, each with a short description and the node pack it comes from; nodes still in development are marked with a hammer icon (*Beta*). Click a node to add it near the middle of the view.
+
+<Image src={nodePicker} alt="The node picker searching for &quot;compositor&quot;, showing the Image Compositor node in the Image category." width={420} />
+
+A quicker way to add a node that is already connected: drag from a connection point and release it over empty space. The picker opens showing only the nodes that can connect to that point, and the new node is wired up for you.
+
+To connect two nodes, drag from an output on the right of one node to an input on the left of another. Only compatible connection points accept the connection. An input takes one connection, but an output can feed as many inputs as you like. To reconnect, drag the end of a connection to another point; to disconnect, drag it away and release it over empty space, or select the connection and press **Delete**.
+
+Right-click a node to **Copy**, **Paste**, **Duplicate**, **Collapse** or **Delete** it, and double-click its title to rename it. The chevron in a node's title bar collapses it to keep a large graph tidy.
+
+The picker's **Utility** group has three special nodes:
+
+* **Notes** — a sticky note for explaining a workflow to others, or to yourself later.
+* **Current Image** — shows the image being generated and the latest result, for keeping an eye on long workflows.
+* **Connector** — a small dot for rerouting connections (see below).
+
+#### Connectors
+
+Connectors tidy up the wiring of a large graph. They pass a value straight through and are removed before the workflow runs, so they cannot change what it does. To add one, right-click empty space in the editor and choose **Add connector**, then connect to and from it. You can wire a connector's output first and its input later; it only accepts a source whose type matches what it feeds. Deleting a connector joins its incoming connection directly to everything it fed.
+
+A node's border shows its state: red when a required input is missing or the node failed, highlighted with a progress strip while it runs, and green when it has finished. After a run, **Latest output** on an image node shows its result.
+
+### Where results go
+
+Only nodes whose **Save to Gallery** box is checked, at the bottom of nodes that produce images, send their images to the Gallery. The images of other nodes are intermediate results that are used and then discarded. New nodes start with **Save to Gallery** turned off, so check it on the node that makes your final image.
+
+Beside it, **Use Cache** lets InvokeAI reuse a node's previous result when its inputs have not changed, which speeds up repeated runs. On a multi-user installation, only administrators see this option.
+
+### Your workflows
+
+Each project keeps its own workflows, and one of them is **active**: the one shown in the editor and run by Invoke. Changes are saved with the project automatically. Click the workflow's name to open the **Workflows** library:
+
+* **This project** — the project's workflows. Open one to make it active, or start a **New workflow**.
+* **Browse** — the workflows that ship with InvokeAI, such as *Text to Image - SDXL*, *Flux Text to Image* and the video workflows. Opening one adds a copy to your project.
+* **Yours** — workflows you have saved to your library with **Save to library…**, for use in other projects.
+
+Opening a library workflow adds an independent copy to the project; the library's version is untouched. If the project already has a copy, you can switch to it (**Open project copy**) or **Add another copy**.
+
+Changes to a project's workflows never change the library by themselves. **Save to library…**, in the editor's header, saves the workflow as a new library template with the name you give it, including its form and its current settings as defaults. For a workflow opened from one of your own templates, **Update library template** replaces that template instead. If the template has changed since you opened it, you can save as a new template instead, or review the current one and replace it deliberately. Replacing a template also affects workflows that use it through the **Call Saved Workflow** node.
+
+Add comma-separated tags, such as `portrait, SDXL, upscaling`, in the workflow's **Details**; they become filters in the library. Each workflow also keeps its own undo history while the project is open.
+
+:::note[Changed from v6]
+In InvokeAI 6, editing a workflow opened from the library saved every change straight back to the library. Workflows now belong to their project and autosave there; the library changes only when you choose **Save to library…** or **Update library template**.
+:::
+
+To share a workflow, use **Export workflow JSON** from the **⋯** menu; others can load it with **Import workflow JSON…**. An image made by a workflow also carries the workflow in its metadata: right-click the image and choose **Load Workflow**. **Download workflow as PNG** in the editor toolbar saves a picture of the whole graph, at up to twice screen resolution, for documentation or sharing.
+
+## Walkthrough: put a generated subject on a background
+
+The Generate panel can make a picture of a fox, but it cannot then cut the fox out and place it on a photo of your choice. This walkthrough builds a workflow that does both: it generates a subject with SDXL on a plain white background, then uses the **Image Compositor** node to remove the white and composite the subject onto a background image. Finally, it gives the workflow a simple form.
+
+You need an SDXL model and an SDXL VAE, such as the *sdxl-vae-fp16-fix* starter model, installed from the Model Manager, and a background image in the Gallery.
+
+### 1. Start from the SDXL text-to-image workflow
+
+<Steps>
+
+1. Press **Alt+4** for the Automate layout.
+
+2. Click the workflow's name at the top of the editor to open the **Workflows** library, go to **Browse**, and open **Text to Image - SDXL**. A copy is added to your project and becomes the active workflow.
+
+3. In the **Main Model - SDXL** node, choose your SDXL model in **Model**, and in the **VAE Model** node choose an SDXL VAE.
+
+4. In the **Positive Prompt** node, describe the subject on a plain background, for example *a red fox sitting, full body, on a plain white background*. A plain, evenly lit background is what lets the Compositor cut the subject out cleanly.
+
+</Steps>
+
+This workflow already contains the SDXL text-to-image chain: the model loader, positive and negative prompts, random seed and noise, **Denoise - SD1.5, SDXL**, and **Latents to Image - SD1.5, SDXL**, which turns the result into an image.
+
+### 2. Add the Image Compositor
+
+<Steps>
+
+1. Press **Space** and type *compositor*, then click **Image Compositor** to add it. Drag it to the right of **Latents to Image**.
+
+2. Connect the **Image** output of **Latents to Image** to the **Image Subject** input of **Image Compositor**.
+
+3. In **Image Background**, click **Choose image** and pick a background from the Gallery, drag one onto it from the Gallery, or **Upload** a file.
+
+4. Check **Save to Gallery** at the bottom of **Image Compositor**, so the finished composite is saved. Uncheck it on **Latents to Image**, unless you also want to keep the plain subject.
+
+</Steps>
+
+<Image src={compositorNodes} alt="The Latents to Image node connected to the Image Compositor node, which has a mountain landscape as its Image Background. Save to Gallery is unchecked on Latents to Image and checked on Image Compositor." width={560} />
+
+### 3. Run it
+
+Press **Invoke**. The nodes light up in turn as they run, and the composited image appears in the Gallery. Press Invoke again for a new variation: the workflow's **Random Seed** node picks a new seed each time.
+
+If the result is not quite right, adjust the **Image Compositor**'s settings and run it again:
+
+* **Threshold** (default 50) sets how different from the corner color a pixel must be to count as part of the subject. Raise it if a white halo remains around the subject; lower it if parts of the subject disappear.
+* **Chroma Key** removes a specific color everywhere instead of flood-filling from the corners. Enter a color such as `white` or `#00ff00`. This also removes background showing through gaps in the subject.
+* **Fill Y** (on by default) scales the subject to the height of the background; **Fill X** scales it to the width. Keep at least one of them on unless the two images are exactly the same size. With both on, the subject is stretched to the background's shape.
+* **X Offset** and **Y Offset** move the subject, in pixels. Positive values move it right and **up**. A subject moved past an edge reappears on the opposite side.
+
+### 4. Build a form for the workflow
+
+A workflow with a dozen nodes is not the most convenient thing to use day to day. The **form** in the Workflow panel on the left gathers the settings you actually change into one simple panel, like the Generate panel.
+
+To add a setting to the form, click the **pin** icon at the right end of its row in the node (**Expose in Linear UI form**). Only settings with their own control can be pinned; connected inputs cannot.
+
+<Steps>
+
+1. The SDXL workflow already puts its **Positive Prompt**, **Negative Prompt**, **Model**, VAE and board settings in the form.
+
+2. In **Image Compositor**, pin **Image Background**, **Threshold**, **X Offset** and **Y Offset**. The pins turn blue, and the settings appear at the end of the form.
+
+3. In the Workflow panel, click **Edit**, then **Form**. Each setting is a card:
+   * Drag a card's title bar to reorder it.
+   * Type in **Field label** to give it a clearer name, such as *Background* for Image Background.
+   * Click **✕** (**Remove from form**) to take out settings you do not need, such as the VAE and board.
+   * **Add form element** adds a **Heading**, **Text**, a **Divider**, or a row or column container to group settings.
+
+4. Click **View** to use the form.
+
+</Steps>
+
+<Image src={formEdit} alt="The Workflow panel in Edit mode, with the Form tab listing the pinned settings as cards and the Node Inspector below." width={380} />
+
+In **View**, the form works like any generation panel: change the prompt or the background and press **Invoke**. The form is part of the workflow, so it is saved with it, exported with it, and shown to anyone who opens your workflow.
+
+<Image src={formView} alt="The finished form in View mode: Positive Prompt, Negative Prompt, Model, the Image Background with a mountain landscape, Threshold, X Offset and Y Offset." width={380} />
+
+### 5. Save and share it
+
+Use **Details** in the Workflow panel's Edit mode to give the workflow a name and description, then click **Save to library…** in the editor's header to keep it in your library for other projects. To share it, choose **Export workflow JSON** from the **⋯** menu.
+
+## Common node patterns
+
+A few groups of nodes appear in almost every image workflow. Knowing what they do makes it easier to read the bundled workflows and to build your own.
+
+* **Model, prompts and denoising.** A model loader, such as **Main Model - SDXL**, provides the model's parts: the UNet or transformer that denoises, the text encoders (CLIP) and the VAE. Prompt nodes turn text into *conditioning* using the text encoders. The denoise node needs both positive and negative conditioning, even if the negative prompt is empty.
+* **Noise and seeds.** Text-to-image starts from random noise, made by **Create Latent Noise** from a **Seed**, **Width** and **Height**. Its **Noise Type** must match the model family: **SD** for SD 1.5 and SDXL, or the matching family for FLUX, FLUX.2, SD3, CogView4, Z-Image or Anima. Type a seed for repeatable results, or connect a **Random Integer** node to the seed for a new one on every run.
+* **Images and latents.** Models work on compressed *latents*, not pixels. **Image to Latents** encodes an image with a VAE, for image-to-image; **Latents to Image** decodes the result back into pixels.
+* **Scaling.** **Scale Image** and **Resize Image** resize pixels, **Scale Latents** and **Resize Latents** resize latents, and **Image-to-Image** runs an upscaling model. Latents are already compressed, so enlarging the image and then refining it often gives more detail than enlarging the latents.
+* **Control and LoRAs.** A **ControlNet** node turns a control image, usually prepared by a processing node such as **Canny Edge Detection** or **Depth Anything Depth Estimation**, into a control input for the denoise node. **Apply LoRA** nodes (one per model family, such as **Apply LoRA - SDXL**) add a LoRA to the model's UNet and text encoders.
+* **Iteration and batches.** **Iterate** runs the rest of the graph once for each item in a collection, and **Collect** gathers several values into a collection. For example, **Random Range** makes a list of seeds and **Iterate** feeds them one at a time to the noise node, generating one image per seed. For more complex repetition, see [Loop Nodes](/users-guide/workflows/loop-nodes/).
+
+## Adding community nodes
+
+The community has written many more nodes, from image effects to prompt tools. The easiest way to install a node pack is the [Custom Node Manager](/users-guide/workflows/custom-node-manager/): paste the pack's Git URL and it is downloaded and loaded without restarting. To install one by hand, clone or download it into the `nodes` folder of your InvokeAI root, then click **Reload** in the Custom Node Manager or restart InvokeAI. `git clone` is the better choice, because `git pull` then updates the pack. The [Community Nodes](/users-guide/workflows/community-nodes/) page lists available packs.
+
+## Keyboard shortcuts
+
+These work while the workflow editor has focus. On macOS, use **Cmd** in place of **Ctrl**.
+
+| Shortcut | Action |
+|---|---|
+| **Shift+A** or **Space** | Add a node |
+| **Ctrl+C** / **Ctrl+V** | Copy / paste nodes, with the connections between them |
+| **Ctrl+D** | Duplicate the selected nodes |
+| **Ctrl+A** | Select all nodes |
+| **Delete** / **Backspace** | Delete the selected nodes |
+| **Ctrl+Z** / **Ctrl+Shift+Z**, **Ctrl+Y** | Undo / redo |
+| **Shift**-drag | Box-select nodes |
+| Hold **Ctrl** while dragging | Snap to the grid |
+| **Ctrl+Enter** | Invoke |
+
+## Learn more
+
+* [Loop Nodes](/users-guide/workflows/loop-nodes/) — repeat steps over lists of prompts, images or values.
+* [Face Tools Nodes](/users-guide/workflows/face-tools/) — find, mask and edit faces in a workflow.
+* [Community Nodes](/users-guide/workflows/community-nodes/) and the [Custom Node Manager](/users-guide/workflows/custom-node-manager/) — add nodes written by the community.
+* [Migrating from ComfyUI](/users-guide/workflows/comfyui-migration/) — how familiar ComfyUI nodes map to InvokeAI's.
