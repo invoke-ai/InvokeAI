@@ -675,6 +675,59 @@ describe('InvocationFlowNode output preview', () => {
     expect(capturedClone?.querySelector('button')).toBeNull();
   });
 
+  it.each([
+    ['fixed', '42'],
+    ['random', 'Random'],
+    ['increment', '42 (Increment)'],
+    ['decrement', '42 (Decrement)'],
+    [undefined, '42'],
+  ] as const)('preserves authored seed mode %s in snapshot exports', async (seedMode, expected) => {
+    const seedTemplate: InvocationTemplate = {
+      ...template,
+      inputs: {
+        seed: { ...template.inputs.a!, input: 'direct', maximum: 4_294_967_295, name: 'seed', title: 'Seed' },
+      },
+    };
+    const seedNode: WorkflowInvocationNode = {
+      ...documentNode,
+      data: { ...documentNode.data, inputs: { seed: { label: '', name: 'seed', seedMode, value: 42 } } },
+    };
+    const ordinaryNode: WorkflowInvocationNode = {
+      ...documentNode,
+      id: 'ordinary-integer',
+      position: { x: 420, y: 20 },
+      data: { ...documentNode.data, type: 'ordinary', inputs: { a: { label: '', name: 'a', seedMode, value: 42 } } },
+    };
+    const graph = { ...projectGraph, nodes: [seedNode, ordinaryNode] };
+    const nodes = toFlowNodes(graph, [], {
+      preview: seedTemplate,
+      ordinary: { ...template, type: 'ordinary', inputs: { a: { ...template.inputs.a!, input: 'direct' } } },
+    });
+    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
+    let capturedClone: HTMLElement | undefined;
+    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+      capturedClone = clone;
+      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
+    });
+
+    await render(adapter, 1, true, nodes);
+    await exportWorkflowAsPng({
+      bounds: { x: 20, y: 20, width: 720, height: 260 },
+      fallbackWorkflowName: 'Untitled Workflow',
+      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
+      workflowName: 'Seed modes',
+    });
+
+    expect(
+      capturedClone?.querySelector(`[data-id="${NODE_ID}"] [data-workflow-export-field-value="true"]`)?.textContent
+    ).toBe(expected);
+    expect(
+      capturedClone?.querySelector('[data-id="ordinary-integer"] [data-workflow-export-field-value="true"]')
+        ?.textContent
+    ).toBe('42');
+    expect(capturedClone?.querySelector('input, button, [role="menu"]')).toBeNull();
+  });
+
   it('omits legacy generator results while preserving generator settings in snapshot exports', async () => {
     const generatorTemplate: InvocationTemplate = {
       ...template,

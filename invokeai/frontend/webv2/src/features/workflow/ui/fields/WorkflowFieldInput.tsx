@@ -1925,8 +1925,21 @@ const formatSnapshotValue = (value: unknown, template: FieldInputTemplate): stri
 };
 
 /** Renders authored values without mounting editors or resolving runtime diagnostics. */
-export const WorkflowFieldSnapshot = ({ template, value }: { template: FieldInputTemplate; value: unknown }) => {
-  const text = formatSnapshotValue(value, template);
+export const WorkflowFieldSnapshot = ({
+  seedMode = 'fixed',
+  template,
+  value,
+}: {
+  seedMode?: SeedMode;
+  template: FieldInputTemplate;
+  value: unknown;
+}) => {
+  const { t } = useTranslation();
+  let text = formatSnapshotValue(value, template);
+  if (isSeedInputField(template) && seedMode !== 'fixed') {
+    const modeLabel = t(`common.seedMode.${seedMode}`);
+    text = seedMode === 'random' || !text ? modeLabel : `${text} (${modeLabel})`;
+  }
 
   return text ? (
     <Text

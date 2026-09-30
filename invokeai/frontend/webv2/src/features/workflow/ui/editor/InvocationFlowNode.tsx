@@ -724,7 +724,11 @@ const InputFieldRow = ({
         </HStack>
         {showsControl ? (
           isWorkflowImageExport ? (
-            <WorkflowFieldSnapshot template={template} value={instance?.value} />
+            <WorkflowFieldSnapshot
+              seedMode={getWorkflowFieldSeedMode(instance)}
+              template={template}
+              value={instance?.value}
+            />
           ) : (
             <Box mt="0.5" w="full">
               <WorkflowFieldInput
