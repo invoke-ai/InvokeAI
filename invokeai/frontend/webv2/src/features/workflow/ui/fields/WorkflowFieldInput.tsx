@@ -1892,7 +1892,7 @@ const formatSnapshotObject = (value: Record<string, unknown>): string | null => 
   }
 
   if (['r', 'g', 'b', 'a'].every((channel) => typeof value[channel] === 'number')) {
-    return `rgba(${value.r}, ${value.g}, ${value.b}, ${value.a})`;
+    return fromColorFieldValue(value);
   }
 
   return stringifySnapshotValue(value);

@@ -676,6 +676,55 @@ describe('InvocationFlowNode output preview', () => {
   });
 
   it.each([
+    [0, '#ff000000'],
+    [128, '#ff000080'],
+    [255, '#ff0000ff'],
+  ] as const)('preserves color alpha %s in snapshot exports', async (alpha, expected) => {
+    const colorTemplate: InvocationTemplate = {
+      ...template,
+      inputs: {
+        a: {
+          ...template.inputs.a!,
+          input: 'direct',
+          title: 'Color',
+          type: { batch: false, cardinality: 'SINGLE', name: 'ColorField' },
+        },
+      },
+    };
+    const colorNode: WorkflowInvocationNode = {
+      ...documentNode,
+      data: {
+        ...documentNode.data,
+        inputs: { a: { label: '', name: 'a', value: { r: 255, g: 0, b: 0, a: alpha } } },
+      },
+    };
+    const graph = { ...projectGraph, nodes: [colorNode] };
+    const nodes = toFlowNodes(graph, [], { preview: colorTemplate });
+    const adapter = createAdapter(createExecutionPort().port, projectSnapshotFor(graph));
+    let capturedClone: HTMLElement | undefined;
+    exportMocks.toBlob.mockImplementation((clone: HTMLElement) => {
+      capturedClone = clone;
+      return Promise.resolve(new Blob(['png'], { type: 'image/png' }));
+    });
+
+    await render(adapter, 1, true, nodes);
+    await exportWorkflowAsPng({
+      bounds: { x: 20, y: 20, width: 300, height: 260 },
+      fallbackWorkflowName: 'Untitled Workflow',
+      flowElement: host.querySelector<HTMLElement>('.react-flow')!,
+      workflowName: 'Color alpha',
+    });
+
+    const text = capturedClone?.querySelector('[data-workflow-export-field-value="true"]')?.textContent;
+    const canvas = document.createElement('canvas');
+    const context = canvas.getContext('2d')!;
+    context.fillStyle = text!;
+    context.fillRect(0, 0, 1, 1);
+    expect(context.getImageData(0, 0, 1, 1).data[3]).toBe(alpha);
+    expect(text).toBe(expected);
+  });
+
+  it.each([
     ['fixed', '42'],
     ['random', 'Random'],
     ['increment', '42 (Increment)'],
