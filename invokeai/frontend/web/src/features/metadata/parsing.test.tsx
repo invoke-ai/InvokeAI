@@ -1290,3 +1290,71 @@ describe('parseMetadataDatum', () => {
     expect(data.error).toBeInstanceOf(Error);
   });
 });
+
+// ---------------------------------------------------------------------------
+// RefImages
+//
+// The viewer renders a row per parsed entry and hides the row entirely when the parse fails, so
+// "does the reference image show up in the metadata" is exactly "does this handler's parse succeed on
+// what the graph builder wrote". These drive the real handler with the metadata shape each builder
+// emits.
+// ---------------------------------------------------------------------------
+describe('ImageMetadataHandlers - RefImages', () => {
+  const krea2RefImage = (styleStrength = 0.6) => ({
+    id: 'reference_image:1',
+    isEnabled: true,
+    config: {
+      type: 'krea2_reference_image',
+      styleStrength,
+      image: { original: { image: { image_name: 'style.png', width: 512, height: 512 } } },
+    },
+  });
+
+  it('parses a Krea-2 style reference from the ref_images slot', async () => {
+    currentBase = 'krea-2';
+
+    const parsed = await ImageMetadataHandlers.RefImages.parse({ ref_images: [krea2RefImage()] }, makeStore());
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.config.type).toBe('krea2_reference_image');
+    // The strength rides along in the config; there is no separate metadata key for it.
+    expect(parsed[0]?.config).toMatchObject({ styleStrength: 0.6 });
+  });
+
+  it('surfaces the row via parseMetadataDatum, which is what the viewer uses', async () => {
+    currentBase = 'krea-2';
+
+    const data = await parseMetadataDatum(
+      { ref_images: [krea2RefImage()] },
+      ImageMetadataHandlers.RefImages,
+      makeStore()
+    );
+
+    expect(data.isParsed).toBe(true);
+    expect(data.isSuccess).toBe(true);
+  });
+
+  // Before the reference was written to metadata, a Krea-2 image carried only a `krea2_style_strength`
+  // scalar. Nothing reads that key, so the row never appeared -- this pins the regression.
+  it('finds nothing when only a style-strength scalar was recorded', async () => {
+    currentBase = 'krea-2';
+
+    const data = await parseMetadataDatum({ krea2_style_strength: 0.6 }, ImageMetadataHandlers.RefImages, makeStore());
+
+    expect(data.isParsed).toBe(true);
+    expect(data.isError).toBe(true);
+  });
+
+  it('drops the row when the referenced image is gone', async () => {
+    currentBase = 'krea-2';
+    const store = makeStore();
+    // The image lookup is the one fetch the parse makes; a miss must fail the whole parse.
+    store.dispatch = vi.fn(() => ({
+      unwrap: () => Promise.reject(new Error('404')),
+    })) as unknown as typeof store.dispatch;
+
+    const data = await parseMetadataDatum({ ref_images: [krea2RefImage()] }, ImageMetadataHandlers.RefImages, store);
+
+    expect(data.isError).toBe(true);
+  });
+});
