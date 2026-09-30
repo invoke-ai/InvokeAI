@@ -296,7 +296,12 @@ export const buildKrea2Graph = async (arg: GraphBuilderArg): Promise<GraphBuilde
     });
     g.addEdge(modelLoader, 'vae', styleReference, 'vae');
     g.addEdge(styleReference, 'style_reference', denoise, 'style_reference');
-    g.upsertMetadata({ krea2_style_strength: styleStrength });
+    // Record the reference so it can be recalled from the generated image. `ref_images` is the single
+    // slot the RefImages metadata handler reads, and 'merge' is what every other base uses to append
+    // to it. The whole entity goes in, not just the config: that is the shape `zRefImageState`
+    // validates on the way back in. `config.styleStrength` travels with it, so there is no separate
+    // scalar -- a `krea2_style_strength` key would duplicate it and nothing reads it.
+    g.upsertMetadata({ ref_images: [styleRefEntity] }, 'merge');
   }
 
   if (state.system.shouldUseNSFWChecker) {
