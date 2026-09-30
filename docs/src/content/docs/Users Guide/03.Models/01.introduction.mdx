@@ -12,37 +12,23 @@ and describes how you can manage them using InvokeAI.
 There are literally thousands of models available, each
 specialized for a different task. These include:
 
-* **Text-to-Image** -- Given a text prompt, generate a
-    still image.
-* **Image-to-Image** -- Given a starting image and a text
-    prompt, generate a new image.
-* **Image Editing** -- Use a text prompt to modify an image or combine
-    several images according to instructions.
-* **Text-to-Video, Image-to-Video, Video-to-Video** -- As their names
-    imply, these generate videos starting from a text prompt, an image, or
-    another video. These modes can be combined in multiple ways.
-* **Concept** -- These are small add-on models that modify a larger image or video
-    generation model to achieve special effects, such as adding a
-    particular style, theme or character. The most common of these are LoRA models.
-* **ControlNet** -- Another family of models that provides spatial
-    guidance to an image generation model while it works, helping to
-    precisely control where elements of the image appear. A typical
-    example is a pose model that transfers the pose of a stick figure
-    onto a photorealistic subject.
+| Type | Description |
+|---|---|
+| **Text-to-Image** | Given a text prompt, generate a still image. |
+| **Image-to-Image** | Given a starting image and a text prompt, generate a new image. |
+| **Image Editing** | Use a text prompt to modify an image or combine several images according to instructions. |
+| **Text-to-Video, Image-to-Video, Video-to-Video** | As their names imply, these generate videos starting from a text prompt, an image, or another video. These modes can be combined in multiple ways. |
+| **Concept** | These are small add-on models that modify a larger image or video generation model to achieve special effects, such as adding a particular style, theme or character. The most common of these are LoRA models. |
+| **ControlNet** | Another family of models that provides spatial guidance to an image generation model while it works, helping to precisely control where elements of the image appear. A typical example is a pose model that transfers the pose of a stick figure onto a photorealistic subject. |
 
 In addition to models directly involved in image and video
 manipulation, InvokeAI supports several support models:
 
-* **Image Segmenters** -- These are models that can identify
-  and isolate individual objects in an image, which is often the first
-  step in precisely editing an image.
-* **Vision Models** -- These are models that can describe what it
-  "sees" in an image. These can be used to classify, cluster and tag
-  images, as well as to convert an image into a text prompt that can
-  be repurposed.
-* **Large Language Models** -- These are models that generate text
-  from text. InvokeAI uses them for prompt enhancement, a process that
-  takes a simple prompt and tweaks it to achieve better results.
+| Type | Description |
+|---|---|
+| **Image Segmenters** | These are models that can identify and isolate individual objects in an image, which is often the first step in precisely editing an image. |
+| **Vision Models** | These are models that can describe what it "sees" in an image. These can be used to classify, cluster and tag images, as well as to convert an image into a text prompt that can be repurposed. |
+| **Large Language Models** | These are models that generate text from text. InvokeAI uses them for prompt enhancement, a process that takes a simple prompt and tweaks it to achieve better results. |
 
 ## Local vs External Models
 
