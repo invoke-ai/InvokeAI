@@ -389,9 +389,7 @@ class TestTilingIsWired:
 
     def test_requested_tiling_skips_the_untiled_estimate(self, flux_shaped_vae):
         module = "invokeai.app.invocations.vae.z_image_latents_to_image"
-        _, context, _ = _build_decode_mocks(
-            flux_shaped_vae(), torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512)
-        )
+        _, context, _ = _build_decode_mocks(flux_shaped_vae(), torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512))
         with (
             patch(f"{module}.estimate_vae_working_memory_flux", return_value=2 * 2**30) as estimate,
             patch(f"{module}.should_pretile_vae_decode") as pretile,
