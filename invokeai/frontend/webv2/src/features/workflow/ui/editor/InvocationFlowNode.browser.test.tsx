@@ -25,6 +25,7 @@ import {
   createProjectGraph,
   projectGraphReducer,
 } from '@features/workflow/utility';
+import { downloadBlob } from '@platform/browser/downloadBlob';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { applyNodeChanges, ReactFlow, type NodeChange } from '@xyflow/react';
@@ -784,13 +785,14 @@ describe('InvocationFlowNode output preview', () => {
   );
 
   it.each([
-    { cardinality: 'SINGLE', failed: false },
-    { cardinality: 'COLLECTION', failed: false },
-    { cardinality: 'SINGLE', failed: true },
-    { cardinality: 'COLLECTION', failed: true },
+    { cardinality: 'SINGLE', failed: false, teardown: false },
+    { cardinality: 'COLLECTION', failed: false, teardown: false },
+    { cardinality: 'SINGLE', failed: true, teardown: false },
+    { cardinality: 'COLLECTION', failed: true, teardown: false },
+    { cardinality: 'SINGLE', failed: false, teardown: true },
   ] as const)(
-    'exports authored source images for $cardinality fields with failed=$failed',
-    async ({ cardinality, failed }) => {
+    'exports authored source images for $cardinality fields with failed=$failed and teardown=$teardown',
+    async ({ cardinality, failed, teardown }) => {
       const source = outputImage(800, 400);
       const thumbnailSpy = vi.spyOn(galleryImageUrls, 'thumbnail').mockReturnValue(source);
       const value = { image_name: 'authored-source.png' };
@@ -851,18 +853,40 @@ describe('InvocationFlowNode output preview', () => {
         expect(getComputedStyle(sourceImage!).objectFit).toBe(cardinality === 'SINGLE' ? 'contain' : 'cover');
         expect(sourceImage!.getBoundingClientRect().width).toBeLessThan(800);
         expect(sourceImage!.getBoundingClientRect().height).toBeLessThanOrEqual(128);
+        const flowElement = host.querySelector<HTMLElement>('.react-flow')!;
         const exportPromise = exportWorkflowAsPng({
           bounds: { x: 20, y: 20, width: 300, height: 260 },
           fallbackWorkflowName: 'Untitled Workflow',
-          flowElement: host.querySelector<HTMLElement>('.react-flow')!,
+          flowElement,
           workflowName: 'Authored source image',
         });
+        const outcome = exportPromise.then(
+          () => null,
+          (error: Error) => error
+        );
         await vi.waitFor(() => expect(decodeSpy).toHaveBeenCalledOnce());
         expect(exportMocks.toBlob).not.toHaveBeenCalled();
+        if (teardown) {
+          await act(() => root.unmount());
+          root = createRoot(host);
+          const nextGraph = { ...projectGraph, id: 'next-workflow' };
+          const nextAdapter = createAdapter(createExecutionPort().port, projectSnapshotFor(nextGraph));
+          await render(nextAdapter);
+          expect(flowElement.isConnected).toBe(false);
+          expect(host.querySelector('.react-flow')?.isConnected).toBe(true);
+        }
         releaseImage();
-        await exportPromise;
+        const error = await outcome;
         decodeSpy.mockRestore();
         naturalWidthSpy.mockRestore();
+        if (teardown) {
+          expect(error).toBeInstanceOf(Error);
+          expect(error?.message).toContain('canceled');
+          expect(exportMocks.toBlob).not.toHaveBeenCalled();
+          expect(downloadBlob).not.toHaveBeenCalled();
+          return;
+        }
+        expect(error).toBeNull();
         expect(exportedBlob?.type).toBe('image/png');
         const bitmap = await createImageBitmap(exportedBlob!);
         const canvas = document.createElement('canvas');

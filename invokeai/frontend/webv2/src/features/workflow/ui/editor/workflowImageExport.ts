@@ -585,6 +585,9 @@ export const exportWorkflowAsPng = async ({
   }
 
   const decoded = await decodeSourceImages(flowElement);
+  if (!flowElement.isConnected) {
+    throw new Error('Workflow image export canceled because the editor was unmounted');
+  }
   const contentBounds = getWorkflowContentBounds(flowElement, bounds, { includeInputFieldLabels: false });
   const dimensions = getWorkflowImageDimensions(contentBounds);
   const clone = flowElement.cloneNode(true) as HTMLElement;
@@ -617,6 +620,9 @@ export const exportWorkflowAsPng = async ({
     );
     if (!blob) {
       throw new Error('Workflow image export returned an empty Blob');
+    }
+    if (!flowElement.isConnected) {
+      throw new Error('Workflow image export canceled because the editor was unmounted');
     }
     downloadPng(blob, workflowName, fallbackWorkflowName);
   } finally {

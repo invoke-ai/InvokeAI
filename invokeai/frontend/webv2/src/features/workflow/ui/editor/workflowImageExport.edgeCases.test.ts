@@ -25,6 +25,7 @@ type FakeElement = {
   children: FakeElement[];
   cloneNode: () => FakeElement;
   id?: string;
+  isConnected: boolean;
   matches: () => boolean;
   parentElement: FakeElement | null;
   getBoundingClientRect: () => { left: number; top: number; width: number; height: number };
@@ -43,6 +44,7 @@ const createFakeElement = (overrides: Partial<FakeElement> = {}): FakeElement =>
     attributes: [],
     children: [],
     cloneNode: () => element,
+    isConnected: true,
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 1000 }),
     matches: () => false,
     parentElement: null,
@@ -197,6 +199,29 @@ describe('workflow image export edge cases', () => {
       }
     }
   );
+
+  it('cancels download if the editor unmounts during rasterization and removes staging', async () => {
+    const { flowElement, stagingWrapper } = createExportDom();
+    let finish!: (blob: Blob) => void;
+    vi.mocked(toBlob).mockReturnValue(
+      new Promise<Blob>((resolve) => {
+        finish = resolve;
+      })
+    );
+    const exportPromise = exportWorkflowAsPng({
+      flowElement: flowElement as unknown as HTMLElement,
+      bounds: { x: 0, y: 0, width: 100, height: 100 },
+      workflowName: 'Workflow',
+      fallbackWorkflowName: 'Unnamed Workflow',
+    });
+    const rejection = expect(exportPromise).rejects.toThrow('canceled');
+    await vi.waitFor(() => expect(toBlob).toHaveBeenCalledOnce());
+    flowElement.isConnected = false;
+    finish(new Blob(['png'], { type: 'image/png' }));
+    await rejection;
+    expect(downloadBlob).not.toHaveBeenCalled();
+    expect(stagingWrapper.remove).toHaveBeenCalledOnce();
+  });
 
   it('allows one bounded retry when a previous rasterization never settles', async () => {
     vi.useFakeTimers();
