@@ -1,0 +1,328 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -10 1200 770" width="1200" height="770" font-family="Inter, 'Helvetica Neue', Arial, sans-serif">
+  <style>
+    .wbl-callout { cursor: help; outline: none; }
+    .wbl-callout text { font-size: 15px; font-weight: 800; fill: #14161a; text-anchor: middle; pointer-events: none; }
+    .wbl-callout circle { transition: r 120ms ease-out; }
+    .wbl-callout:hover circle, .wbl-callout:focus circle { r: 17px; stroke: #ffffff; }
+    .wbl-tip { opacity: 0; pointer-events: none; transition: opacity 120ms ease-out; }
+    .wbl-tip rect { fill: #0e1013; stroke: #e4fd1d; stroke-width: 2; }
+    .wbl-tip text { fill: #d7dbe0; font-size: 20px; }
+    .wbl-tip .wbl-tip-title { fill: #ffffff; font-size: 23px; font-weight: 700; }
+    #wbl-c1:hover ~ #wbl-t1, #wbl-c1:focus-visible ~ #wbl-t1, #wbl-c1:focus ~ #wbl-t1,
+    #wbl-c2:hover ~ #wbl-t2, #wbl-c2:focus-visible ~ #wbl-t2, #wbl-c2:focus ~ #wbl-t2,
+    #wbl-c3:hover ~ #wbl-t3, #wbl-c3:focus-visible ~ #wbl-t3, #wbl-c3:focus ~ #wbl-t3,
+    #wbl-c4:hover ~ #wbl-t4, #wbl-c4:focus-visible ~ #wbl-t4, #wbl-c4:focus ~ #wbl-t4,
+    #wbl-c5:hover ~ #wbl-t5, #wbl-c5:focus-visible ~ #wbl-t5, #wbl-c5:focus ~ #wbl-t5,
+    #wbl-c6a:hover ~ #wbl-t6a, #wbl-c6a:focus-visible ~ #wbl-t6a, #wbl-c6a:focus ~ #wbl-t6a,
+    #wbl-c6b:hover ~ #wbl-t6b, #wbl-c6b:focus-visible ~ #wbl-t6b, #wbl-c6b:focus ~ #wbl-t6b,
+    #wbl-c7:hover ~ #wbl-t7, #wbl-c7:focus-visible ~ #wbl-t7, #wbl-c7:focus ~ #wbl-t7,
+    #wbl-c8a:hover ~ #wbl-t8a, #wbl-c8a:focus-visible ~ #wbl-t8a, #wbl-c8a:focus ~ #wbl-t8a,
+    #wbl-c8b:hover ~ #wbl-t8b, #wbl-c8b:focus-visible ~ #wbl-t8b, #wbl-c8b:focus ~ #wbl-t8b,
+    #wbl-c9:hover ~ #wbl-t9, #wbl-c9:focus-visible ~ #wbl-t9, #wbl-c9:focus ~ #wbl-t9,
+    #wbl-c10:hover ~ #wbl-t10, #wbl-c10:focus-visible ~ #wbl-t10, #wbl-c10:focus ~ #wbl-t10,
+    #wbl-c11:hover ~ #wbl-t11, #wbl-c11:focus-visible ~ #wbl-t11, #wbl-c11:focus ~ #wbl-t11,
+    #wbl-c12:hover ~ #wbl-t12, #wbl-c12:focus-visible ~ #wbl-t12, #wbl-c12:focus ~ #wbl-t12,
+    #wbl-c13:hover ~ #wbl-t13, #wbl-c13:focus-visible ~ #wbl-t13, #wbl-c13:focus ~ #wbl-t13,
+    #wbl-c14:hover ~ #wbl-t14, #wbl-c14:focus-visible ~ #wbl-t14, #wbl-c14:focus ~ #wbl-t14 { opacity: 1; }
+  </style>
+  <defs>
+    <pattern id="wbl-dots" width="16" height="16" patternUnits="userSpaceOnUse">
+      <circle cx="2" cy="2" r="1" fill="#2c3139"/>
+    </pattern>
+      </defs>
+
+  <!-- Window -->
+  <rect x="20" y="20" width="1160" height="720" rx="12" fill="#1c1f23" stroke="#3a3f47" stroke-width="2"/>
+
+  <!-- Top bar -->
+  <path d="M20 32a12 12 0 0 1 12-12h1136a12 12 0 0 1 12 12v42H20z" fill="#25282d"/>
+  <line x1="20" y1="74" x2="1180" y2="74" stroke="#3a3f47" stroke-width="2"/>
+  <!-- App menu -->
+  <rect x="38" y="35" width="24" height="24" rx="5" fill="#e4fd1d"/>
+  <path d="M44 42h12M44 47h12M44 52h8" stroke="#1c1f23" stroke-width="2.5" stroke-linecap="round"/>
+  <path d="M68 45l4 4 4-4" fill="none" stroke="#9aa1ab" stroke-width="2" stroke-linecap="round"/>
+  <!-- Project switcher -->
+  <text x="94" y="52" fill="#e8eaed" font-size="15" font-weight="600">My Project</text>
+  <path d="M184 44l4-4 4 4M184 52l4 4 4-4" fill="none" stroke="#9aa1ab" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- Preset tabs -->
+  <rect x="412" y="31" width="136" height="32" rx="7" fill="#353a42"/>
+  <text x="426" y="52" fill="#e4fd1d" font-size="14" font-weight="700">T</text>
+  <text x="444" y="52" fill="#e8eaed" font-size="14" font-weight="600">Compose</text>
+  <circle cx="518" cy="47" r="3.5" fill="#6cc4f0"/>
+  <path d="M530 45l4 4 4-4" fill="none" stroke="#9aa1ab" stroke-width="1.8" stroke-linecap="round"/>
+  <text x="564" y="52" fill="#b5bbc4" font-size="14">Edit</text>
+  <text x="614" y="52" fill="#b5bbc4" font-size="14">Video</text>
+  <text x="672" y="52" fill="#b5bbc4" font-size="14">Automate</text>
+  <path d="M758 47h14M765 40v14" stroke="#e8eaed" stroke-width="2.2" stroke-linecap="round"/>
+  <!-- Invoke cluster -->
+  <rect x="908" y="31" width="40" height="32" rx="6" fill="#1c1f23" stroke="#454b55"/>
+  <text x="923" y="52" fill="#e8eaed" font-size="14">1</text>
+  <rect x="948" y="31" width="104" height="32" fill="#b8cc1a"/>
+  <path d="M962 40l10 7-10 7z" fill="none" stroke="#1c1f23" stroke-width="2" stroke-linejoin="round"/>
+  <text x="980" y="52" fill="#1c1f23" font-size="14" font-weight="700">Invoke</text>
+  <rect x="1052" y="31" width="36" height="32" rx="6" fill="#1c1f23" stroke="#454b55"/>
+  <path d="M1062 42h16l-4-4M1078 52h-16l4 4" fill="none" stroke="#b5bbc4" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- Queue -->
+  <rect x="1100" y="31" width="64" height="32" rx="6" fill="#1c1f23" stroke="#454b55"/>
+  <path d="M1110 41h10M1110 47h10M1110 53h10" stroke="#b5bbc4" stroke-width="1.8" stroke-linecap="round"/>
+  <text x="1128" y="52" fill="#e8eaed" font-size="14">0</text>
+  <path d="M1146 45l4 4 4-4" fill="none" stroke="#9aa1ab" stroke-width="1.8" stroke-linecap="round"/>
+
+  <!-- Left rail -->
+  <rect x="20" y="75" width="52" height="615" fill="#1f2226"/>
+  <line x1="72" y1="75" x2="72" y2="690" stroke="#3a3f47" stroke-width="2"/>
+  <rect x="28" y="86" width="36" height="36" rx="7" fill="#353a42"/>
+  <path d="M36 97h20M36 104h20M36 111h20" stroke="#e4fd1d" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="42" cy="97" r="2.5" fill="#353a42" stroke="#e4fd1d" stroke-width="2"/>
+  <circle cx="51" cy="111" r="2.5" fill="#353a42" stroke="#e4fd1d" stroke-width="2"/>
+  <rect x="36" y="134" width="20" height="18" rx="3" fill="none" stroke="#9aa1ab" stroke-width="2"/>
+  <path d="M40 148l5-6 4 4 3-3 4 5" fill="none" stroke="#9aa1ab" stroke-width="1.6"/>
+  <circle cx="36" cy="182" r="2.2" fill="#9aa1ab"/><circle cx="46" cy="182" r="2.2" fill="#9aa1ab"/><circle cx="56" cy="182" r="2.2" fill="#9aa1ab"/>
+
+  <!-- Left panel -->
+  <rect x="73" y="75" width="297" height="615" fill="#1c1f23"/>
+  <line x1="73" y1="113" x2="370" y2="113" stroke="#30353c" stroke-width="2"/>
+  <text x="88" y="100" fill="#e8eaed" font-size="14" font-weight="600">Generate</text>
+  <circle cx="318" cy="95" r="2" fill="#9aa1ab"/><circle cx="326" cy="95" r="2" fill="#9aa1ab"/><circle cx="334" cy="95" r="2" fill="#9aa1ab"/>
+  <text x="88" y="140" fill="#9aa1ab" font-size="12">Model</text>
+  <rect x="88" y="148" width="266" height="30" rx="6" fill="#25282d" stroke="#3a3f47"/>
+  <text x="88" y="202" fill="#9aa1ab" font-size="12">Prompt</text>
+  <rect x="88" y="210" width="266" height="90" rx="6" fill="#25282d" stroke="#3a3f47"/>
+  <rect x="88" y="316" width="266" height="34" rx="6" fill="#25282d"/>
+  <rect x="88" y="358" width="266" height="34" rx="6" fill="#25282d"/>
+  <rect x="88" y="400" width="266" height="34" rx="6" fill="#25282d"/>
+  <text x="221" y="560" fill="#5d6570" font-size="22" font-weight="700" text-anchor="middle" letter-spacing="2">LEFT PANEL</text>
+
+  <!-- Left resize handle -->
+  <line x1="370" y1="75" x2="370" y2="690" stroke="#3a3f47" stroke-width="2"/>
+  <rect x="365" y="364" width="10" height="36" rx="5" fill="#1c1f23" stroke="#6b737e" stroke-width="2"/>
+
+  <!-- Center -->
+  <rect x="371" y="75" width="458" height="615" fill="#14161a"/>
+  <rect x="371" y="75" width="458" height="615" fill="url(#wbl-dots)"/>
+  <rect x="385" y="88" width="122" height="34" rx="8" fill="#25282d" stroke="#454b55"/>
+  <circle cx="404" cy="105" r="6" fill="none" stroke="#e8eaed" stroke-width="2"/>
+  <circle cx="404" cy="105" r="2" fill="#e8eaed"/>
+  <text x="418" y="110" fill="#e8eaed" font-size="14" font-weight="600">Preview</text>
+  <path d="M484 102l4 4 4-4" fill="none" stroke="#9aa1ab" stroke-width="1.8" stroke-linecap="round"/>
+  <rect x="746" y="88" width="70" height="34" rx="8" fill="#25282d" stroke="#454b55"/>
+  <rect x="756" y="96" width="18" height="18" rx="4" fill="#6cc4f0"/>
+  <rect x="784" y="96" width="18" height="18" rx="4" fill="none" stroke="#9aa1ab" stroke-width="2"/>
+  <rect x="460" y="170" width="280" height="230" rx="8" fill="#23272d" stroke="#3a3f47"/>
+  <path d="M470 380l70-80 50 50 40-35 100 65z" fill="#2f353d"/>
+  <circle cx="690" cy="220" r="18" fill="#2f353d"/>
+  <text x="600" y="470" fill="#5d6570" font-size="22" font-weight="700" text-anchor="middle" letter-spacing="2">CENTER PANEL</text>
+
+  <!-- Floating window -->
+  <g>
+    <rect x="596" y="508" width="222" height="164" rx="9" fill="#1c1f23" stroke="#6cc4f0" stroke-width="2"/>
+    <path d="M596 517a9 9 0 0 1 9-9h204a9 9 0 0 1 9 9v21H596z" fill="#2a2e34"/>
+    <text x="610" y="528" fill="#e8eaed" font-size="12.5" font-weight="600">Image Map</text>
+    <path d="M760 523h10" stroke="#b5bbc4" stroke-width="1.8" stroke-linecap="round"/>
+    <rect x="778" y="517" width="11" height="11" rx="2" fill="none" stroke="#b5bbc4" stroke-width="1.6"/>
+    <path d="M797 528l8-8M799 520h6v6" fill="none" stroke="#b5bbc4" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="640" cy="580" r="5" fill="#e4a53d"/><circle cx="652" cy="592" r="4" fill="#e4a53d"/><circle cx="662" cy="575" r="4" fill="#e4a53d"/>
+    <circle cx="720" cy="610" r="5" fill="#6cc4f0"/><circle cx="734" cy="600" r="4" fill="#6cc4f0"/><circle cx="728" cy="624" r="4" fill="#6cc4f0"/>
+    <circle cx="770" cy="570" r="4" fill="#9b7de8"/><circle cx="782" cy="582" r="5" fill="#9b7de8"/>
+    <circle cx="660" cy="640" r="4" fill="#5fc47a"/><circle cx="674" cy="648" r="4" fill="#5fc47a"/>
+  </g>
+
+  <!-- Right resize handle -->
+  <line x1="830" y1="75" x2="830" y2="690" stroke="#3a3f47" stroke-width="2"/>
+  <rect x="825" y="364" width="10" height="36" rx="5" fill="#1c1f23" stroke="#6b737e" stroke-width="2"/>
+
+  <!-- Right panel -->
+  <rect x="831" y="75" width="297" height="615" fill="#1c1f23"/>
+  <line x1="831" y1="113" x2="1128" y2="113" stroke="#30353c" stroke-width="2"/>
+  <text x="846" y="100" fill="#e8eaed" font-size="14" font-weight="600">Gallery</text>
+  <circle cx="1102" cy="95" r="6" fill="none" stroke="#9aa1ab" stroke-width="2"/>
+  <rect x="846" y="128" width="266" height="28" rx="6" fill="#25282d" stroke="#3a3f47"/>
+  <g fill="#2f353d">
+    <rect x="846" y="170" width="84" height="84" rx="5"/><rect x="937" y="170" width="84" height="84" rx="5"/><rect x="1028" y="170" width="84" height="84" rx="5"/>
+    <rect x="846" y="261" width="84" height="84" rx="5"/><rect x="937" y="261" width="84" height="84" rx="5"/><rect x="1028" y="261" width="84" height="84" rx="5"/>
+    <rect x="846" y="352" width="84" height="84" rx="5"/><rect x="937" y="352" width="84" height="84" rx="5"/><rect x="1028" y="352" width="84" height="84" rx="5"/>
+  </g>
+  <text x="979" y="560" fill="#5d6570" font-size="22" font-weight="700" text-anchor="middle" letter-spacing="2">RIGHT PANEL</text>
+
+  <!-- Right rail -->
+  <line x1="1128" y1="75" x2="1128" y2="690" stroke="#3a3f47" stroke-width="2"/>
+  <rect x="1129" y="75" width="51" height="615" fill="#1f2226"/>
+  <rect x="1136" y="86" width="36" height="36" rx="7" fill="#353a42"/>
+  <rect x="1144" y="95" width="20" height="18" rx="3" fill="none" stroke="#e4fd1d" stroke-width="2"/>
+  <path d="M1148 109l5-6 4 4 3-3 4 5" fill="none" stroke="#e4fd1d" stroke-width="1.6"/>
+  <rect x="1144" y="134" width="20" height="18" rx="2" fill="none" stroke="#6cc4f0" stroke-width="2" stroke-dasharray="3 2"/>
+  <path d="M1144 182h20M1144 189h20M1144 196h20" stroke="#9aa1ab" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="1144" cy="224" r="2.2" fill="#9aa1ab"/><circle cx="1154" cy="224" r="2.2" fill="#9aa1ab"/><circle cx="1164" cy="224" r="2.2" fill="#9aa1ab"/>
+
+  <!-- Status bar -->
+  <line x1="20" y1="690" x2="1180" y2="690" stroke="#3a3f47" stroke-width="2"/>
+  <path d="M20 690h1160v38a12 12 0 0 1-12 12H32a12 12 0 0 1-12-12z" fill="#25282d"/>
+  <circle cx="40" cy="715" r="4" fill="#5fc47a"/>
+  <text x="50" y="719" fill="#b5bbc4" font-size="12">Server Status</text>
+  <text x="150" y="719" fill="#b5bbc4" font-size="12">Queue idle</text>
+  <text x="230" y="719" fill="#b5bbc4" font-size="12">Gallery</text>
+  <text x="292" y="719" fill="#b5bbc4" font-size="12">Autosave: Saved</text>
+  <circle cx="404" cy="715" r="2" fill="#9aa1ab"/><circle cx="411" cy="715" r="2" fill="#9aa1ab"/><circle cx="418" cy="715" r="2" fill="#9aa1ab"/>
+  <text x="1164" y="719" fill="#b5bbc4" font-size="12" text-anchor="end">Notifications</text>
+
+  <!-- Callouts, then their tooltips: a tooltip follows its callout so a sibling selector can show it,
+       and every tooltip comes after every callout so it paints above them. -->
+  <g>
+    <g class="wbl-callout" id="wbl-c1" tabindex="0" role="img" aria-label="1. App menu: Projects, Model Manager, Fonts, Queue, Settings and help">
+      <circle cx="50" cy="12" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="50" y="17">1</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c2" tabindex="0" role="img" aria-label="2. Project switcher: Switch, rename, export or close projects Ctrl+P / ⌘P">
+      <circle cx="140" cy="12" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="140" y="17">2</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c3" tabindex="0" role="img" aria-label="3. Layout preset tabs: Click to switch layouts. A dot means unsaved changes; the arrow opens the preset menu">
+      <circle cx="590" cy="12" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="590" y="17">3</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c4" tabindex="0" role="img" aria-label="4. Save as new preset: Save the current arrangement as a preset">
+      <circle cx="765" cy="12" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="765" y="17">4</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c5" tabindex="0" role="img" aria-label="5. Invoke controls: Iterations, the Invoke button, and routing: where settings come from and results go">
+      <circle cx="1000" cy="12" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="1000" y="17">5</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c6a" tabindex="0" role="img" aria-label="6. Left rail: One icon per panel. Click to show a panel; click the active icon to collapse it">
+      <circle cx="46" cy="260" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="46" y="265">6</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c6b" tabindex="0" role="img" aria-label="6. Right rail: One icon per panel. Click to show a panel; click the active icon to collapse it">
+      <circle cx="1154" cy="260" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="1154" y="265">6</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c7" tabindex="0" role="img" aria-label="7. Rail menu (…): Add panels to this rail or remove them">
+      <circle cx="46" cy="206" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="46" y="211">7</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c8a" tabindex="0" role="img" aria-label="8. Left panel: Shows the selected left-rail panel">
+      <circle cx="221" cy="600" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="221" y="605">8</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c8b" tabindex="0" role="img" aria-label="8. Right panel: Shows the selected right-rail panel">
+      <circle cx="979" cy="600" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="979" y="605">8</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c9" tabindex="0" role="img" aria-label="9. Resize handle: Drag to resize the panel; drag past its minimum to collapse it">
+      <circle cx="370" cy="340" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="370" y="345">9</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c10" tabindex="0" role="img" aria-label="10. Center panel: The main work area: Preview, Canvas, Gallery, Workflow editor or Image Map">
+      <circle cx="600" cy="440" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="600" y="445">10</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c11" tabindex="0" role="img" aria-label="11. Center view menu: Switch the center view, add another, or close the current one. Z swaps in Preview">
+      <circle cx="522" cy="92" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="522" y="97">11</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c12" tabindex="0" role="img" aria-label="12. Floating window: Preview and Image Map can float. Drag to move; Dock to panel returns it to its rail">
+      <circle cx="580" cy="515" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="580" y="520">12</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c13" tabindex="0" role="img" aria-label="13. Floating panel’s rail slot: Marks where a floating panel came from. Click to dock it again">
+      <circle cx="1118" cy="143" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="1118" y="148">13</text>
+    </g>
+    <g class="wbl-callout" id="wbl-c14" tabindex="0" role="img" aria-label="14. Status bar: Server, queue, gallery, autosave and notifications. Some chips open a bottom panel">
+      <circle cx="460" cy="715" r="14" fill="#e4fd1d" stroke="#14161a" stroke-width="3"/>
+      <text x="460" y="720">14</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t1" aria-hidden="true">
+      <rect x="4" y="34" width="458" height="108" rx="9"/>
+      <text x="20" y="68" class="wbl-tip-title">App menu</text>
+      <text x="20" y="96">Projects, Model Manager, Fonts, Queue,</text>
+      <text x="20" y="124">Settings and help</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t2" aria-hidden="true">
+      <rect x="4" y="34" width="480" height="108" rx="9"/>
+      <text x="20" y="68" class="wbl-tip-title">Project switcher</text>
+      <text x="20" y="96">Switch, rename, export or close projects</text>
+      <text x="20" y="124">Ctrl+P / ⌘P</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t3" aria-hidden="true">
+      <rect x="328" y="34" width="525" height="108" rx="9"/>
+      <text x="344" y="68" class="wbl-tip-title">Layout preset tabs</text>
+      <text x="344" y="96">Click to switch layouts. A dot means unsaved</text>
+      <text x="344" y="124">changes; the arrow opens the preset menu</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t4" aria-hidden="true">
+      <rect x="525" y="34" width="480" height="80" rx="9"/>
+      <text x="541" y="68" class="wbl-tip-title">Save as new preset</text>
+      <text x="541" y="96">Save the current arrangement as a preset</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t5" aria-hidden="true">
+      <rect x="682" y="34" width="514" height="108" rx="9"/>
+      <text x="698" y="68" class="wbl-tip-title">Invoke controls</text>
+      <text x="698" y="96">Iterations, the Invoke button, and routing:</text>
+      <text x="698" y="124">where settings come from and results go</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t6a" aria-hidden="true">
+      <rect x="4" y="282" width="502" height="108" rx="9"/>
+      <text x="20" y="316" class="wbl-tip-title">Left rail</text>
+      <text x="20" y="344">One icon per panel. Click to show a panel;</text>
+      <text x="20" y="372">click the active icon to collapse it</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t6b" aria-hidden="true">
+      <rect x="694" y="282" width="502" height="108" rx="9"/>
+      <text x="710" y="316" class="wbl-tip-title">Right rail</text>
+      <text x="710" y="344">One icon per panel. Click to show a panel;</text>
+      <text x="710" y="372">click the active icon to collapse it</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t7" aria-hidden="true">
+      <rect x="4" y="228" width="458" height="80" rx="9"/>
+      <text x="20" y="262" class="wbl-tip-title">Rail menu (…)</text>
+      <text x="20" y="290">Add panels to this rail or remove them</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t8a" aria-hidden="true">
+      <rect x="15" y="622" width="413" height="80" rx="9"/>
+      <text x="31" y="656" class="wbl-tip-title">Left panel</text>
+      <text x="31" y="684">Shows the selected left-rail panel</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t8b" aria-hidden="true">
+      <rect x="767" y="622" width="424" height="80" rx="9"/>
+      <text x="783" y="656" class="wbl-tip-title">Right panel</text>
+      <text x="783" y="684">Shows the selected right-rail panel</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t9" aria-hidden="true">
+      <rect x="152" y="362" width="435" height="108" rx="9"/>
+      <text x="168" y="396" class="wbl-tip-title">Resize handle</text>
+      <text x="168" y="424">Drag to resize the panel;</text>
+      <text x="168" y="452">drag past its minimum to collapse it</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t10" aria-hidden="true">
+      <rect x="377" y="462" width="446" height="108" rx="9"/>
+      <text x="393" y="496" class="wbl-tip-title">Center panel</text>
+      <text x="393" y="524">The main work area: Preview, Canvas,</text>
+      <text x="393" y="552">Gallery, Workflow editor or Image Map</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t11" aria-hidden="true">
+      <rect x="260" y="114" width="525" height="108" rx="9"/>
+      <text x="276" y="148" class="wbl-tip-title">Center view menu</text>
+      <text x="276" y="176">Switch the center view, add another,</text>
+      <text x="276" y="204">or close the current one. Z swaps in Preview</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t12" aria-hidden="true">
+      <rect x="306" y="537" width="547" height="108" rx="9"/>
+      <text x="322" y="571" class="wbl-tip-title">Floating window</text>
+      <text x="322" y="599">Preview and Image Map can float. Drag to move;</text>
+      <text x="322" y="627">Dock to panel returns it to its rail</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t13" aria-hidden="true">
+      <rect x="727" y="165" width="469" height="108" rx="9"/>
+      <text x="743" y="199" class="wbl-tip-title">Floating panel’s rail slot</text>
+      <text x="743" y="227">Marks where a floating panel came from.</text>
+      <text x="743" y="255">Click to dock it again</text>
+    </g>
+    <g class="wbl-tip" id="wbl-t14" aria-hidden="true">
+      <rect x="192" y="585" width="536" height="108" rx="9"/>
+      <text x="208" y="619" class="wbl-tip-title">Status bar</text>
+      <text x="208" y="647">Server, queue, gallery, autosave and</text>
+      <text x="208" y="675">notifications. Some chips open a bottom panel</text>
+    </g>
+  </g>
+</svg>
