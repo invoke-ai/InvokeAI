@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, cloneElement, startTransition, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server, userEvent } from 'vitest/browser';
 
 import { WorkflowFieldInput, type WorkflowFieldInputProps } from './WorkflowFieldInput';
@@ -2090,6 +2090,11 @@ describe('WorkflowFieldInput record pickers', () => {
 });
 
 describe('WorkflowFieldInput generators', () => {
+  // The generator editor is a lazy chunk; load it up front so the first test is not timing a cold transform.
+  beforeAll(async () => {
+    await import('./GeneratorFieldInput');
+  });
+
   const FLOAT_GENERATOR = fullTemplate('FloatField', {
     default: { count: 10, start: 0, step: 0.1, type: 'float_generator_arithmetic_sequence' },
     input: 'direct',
