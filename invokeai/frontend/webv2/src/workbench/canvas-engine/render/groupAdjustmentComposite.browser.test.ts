@@ -5,6 +5,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
 import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { identity } from '@workbench/canvas-engine/math/mat2d';
+import { createAdjustedSurfaceCache } from '@workbench/canvas-engine/render/adjustedSurfaceCache';
 import { createColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import { compositeDocument } from '@workbench/canvas-engine/render/compositor';
 import { createGroupSurfaceCache } from '@workbench/canvas-engine/render/groupSurfaceCache';
@@ -516,5 +517,124 @@ describe('group-scoped previews and partial refresh', () => {
     expect(after.groupSurfaceRefreshes).toBe(before.groupSurfaceRefreshes + 1);
     const fresh = groupedScene(options);
     expect(pixels).toEqual(allPixels(fresh.composite(floatAt(lifted(fresh.scene), 8))));
+  });
+});
+
+describe('layer adjustments in export', () => {
+  /** A 16px gradient layer, scaled 3x and offset, with a non-linear stack. */
+  const adjustedScene = () => {
+    const scene = sceneFor({});
+    scene.caches.growToRect('graded', { height: 16, width: 16, x: 0, y: 0 });
+    const ctx = scene.caches.get('graded')!.surface.ctx;
+    for (let x = 0; x < 16; x += 1) {
+      ctx.fillStyle = `rgb(${x * 16}, ${255 - x * 16}, 128)`;
+      ctx.fillRect(x, 0, 1, 16);
+    }
+    scene.caches.publishPixels('graded');
+    const layer = raster('graded', {
+      adjustments: gammaStack('ga'),
+      transform: { rotation: 0, scaleX: 3, scaleY: 3, x: 5, y: 7 },
+    });
+    return { document: docWith([layer]), layer, scene };
+  };
+
+  it('matches the display pixel for pixel by adjusting layer-local pixels before resampling', async () => {
+    const { document, layer, scene } = adjustedScene();
+    const adjusted = createAdjustedSurfaceCache(scene.backend);
+    const screen = scene.backend.createSurface(WIDTH, HEIGHT);
+    compositeDocument(screen, document, scene.caches, identity(), {
+      adjustedSurface: (_layer, entry) => adjusted.get(layer.id, entry, layer.adjustments),
+      backend: scene.backend,
+    });
+    const exported = await renderRasterComposite(planBaseRasterComposite(document, BBOX), scene);
+
+    const display = screen.ctx.getImageData(0, 0, WIDTH, HEIGHT).data;
+    const exportedPixels = exported.ctx.getImageData(0, 0, WIDTH, HEIGHT).data;
+    let worst = 0;
+    for (let i = 0; i < display.length; i += 1) {
+      worst = Math.max(worst, Math.abs(display[i]! - exportedPixels[i]!));
+    }
+    expect(worst).toBeLessThanOrEqual(1);
+  });
+
+  it('allocates only the layer-local region the bbox can sample, not a bbox-sized intermediate', async () => {
+    const { document, scene } = adjustedScene();
+    const sizes: [number, number][] = [];
+    const backend = {
+      ...scene.backend,
+      createSurface: (width: number, height: number) => {
+        sizes.push([width, height]);
+        return scene.backend.createSurface(width, height);
+      },
+    };
+    const corner: Rect = { height: 8, width: 8, x: 5, y: 7 };
+    await renderRasterComposite(planBaseRasterComposite(document, corner), { ...scene, backend });
+
+    // The output surface plus a local copy covering about 8/3 source pixels (+1px resampling margin) a side.
+    expect(sizes).toEqual([
+      [8, 8],
+      [4, 4],
+    ]);
+  });
+
+  it('adjusts a downscaled layer after resampling, so the work never exceeds the output', async () => {
+    const { scene } = adjustedScene();
+    const shrunk = docWith([
+      raster('graded', {
+        adjustments: gammaStack('ga'),
+        transform: { rotation: 0, scaleX: 0.25, scaleY: 0.25, x: 0, y: 0 },
+      }),
+    ]);
+    const sizes: [number, number][] = [];
+    const backend = {
+      ...scene.backend,
+      createSurface: (width: number, height: number) => {
+        sizes.push([width, height]);
+        return scene.backend.createSurface(width, height);
+      },
+    };
+    await renderRasterComposite(planBaseRasterComposite(shrunk, { height: 2, width: 2, x: 0, y: 0 }), {
+      ...scene,
+      backend,
+    });
+
+    expect(sizes).toEqual([
+      [2, 2],
+      [2, 2],
+    ]);
+  });
+
+  it("draws the display's adjusted copy instead of adjusting again", async () => {
+    const { document, layer, scene } = adjustedScene();
+    const adjusted = createAdjustedSurfaceCache(scene.backend);
+    const display = adjusted.get(layer.id, scene.caches.get(layer.id)!, layer.adjustments)!;
+    const sizes: [number, number][] = [];
+    const backend = {
+      ...scene.backend,
+      createSurface: (width: number, height: number) => {
+        sizes.push([width, height]);
+        return scene.backend.createSurface(width, height);
+      },
+    };
+    const shared: RasterSurface[] = [];
+    const exported = await renderRasterComposite(planBaseRasterComposite(document, BBOX), {
+      ...scene,
+      adjustedSurface: (_layerId, surface) => {
+        shared.push(surface);
+        return display;
+      },
+      backend,
+    });
+
+    expect(shared).toEqual([scene.caches.get(layer.id)!.surface]);
+    expect(sizes).toEqual([[WIDTH, HEIGHT]]);
+    const screen = scene.backend.createSurface(WIDTH, HEIGHT);
+    compositeDocument(screen, document, scene.caches, identity(), {
+      adjustedSurface: () => display,
+      backend: scene.backend,
+    });
+    expect([...exported.ctx.getImageData(0, 0, WIDTH, HEIGHT).data]).toEqual([
+      ...screen.ctx.getImageData(0, 0, WIDTH, HEIGHT).data,
+    ]);
   });
 });
