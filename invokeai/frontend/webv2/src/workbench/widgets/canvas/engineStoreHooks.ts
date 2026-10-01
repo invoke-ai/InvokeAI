@@ -52,6 +52,22 @@ export const useLayerThumbnailVersion = (
   return useSyncExternalStore(subscribe, getSnapshot);
 };
 
+/**
+ * A primitive read of live engine state (document model, cached pixels), taken on every render and whenever a layer
+ * publishes pixels. The React Compiler memoizes a plain render-time engine call on its arguments, so it would keep a
+ * stale answer after a paint; route such reads through here.
+ */
+export const useCanvasEngineRead = <T extends boolean | number | string | null>(
+  engine: CanvasCoreStoreCapability | null,
+  read: () => T
+): T => {
+  const subscribe = useCallback(
+    (listener: () => void) => engine?.interaction.subscribe('layerPixelEpoch', listener) ?? (() => undefined),
+    [engine]
+  );
+  return useSyncExternalStore(subscribe, read, read);
+};
+
 /** Subscribes to one layer's thumbnail request state; an absent key is idle. */
 export const useLayerThumbnailStatus = (
   engine: CanvasCoreStoreCapability | null,

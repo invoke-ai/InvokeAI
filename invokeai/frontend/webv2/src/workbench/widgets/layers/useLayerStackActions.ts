@@ -4,6 +4,7 @@ import type { LucideIcon } from 'lucide-react';
 
 import { toaster } from '@platform/ui';
 import { canMergeVisibleRasters, compileDocumentNodes, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectName } from '@workbench/WorkbenchContext';
 import { EyeIcon, EyeOffIcon, FileDownIcon, LayersIcon, PlusIcon } from 'lucide-react';
@@ -55,11 +56,14 @@ export const useLayerStackActions = (
       nodes: own,
     };
   }, [axis, stack, stacks]);
-  const canMerge =
-    !editingLocked &&
-    !!engine &&
-    stack === 'raster' &&
-    canMergeVisibleRasters(engine.document.model()?.compileLeaves() ?? [], engine.exports.hasExportableLayerContent);
+  const canMerge = useCanvasEngineRead(
+    engine,
+    () =>
+      !editingLocked &&
+      !!engine &&
+      stack === 'raster' &&
+      canMergeVisibleRasters(engine.document.model()?.compileLeaves() ?? [], engine.exports.hasExportableLayerContent)
+  );
   const canExport = !!engine && exportable;
 
   return useMemo(() => {

@@ -37,11 +37,7 @@ import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
-import {
-  useCanvasDocumentEditingLocked,
-  useCanvasLayerPixelEpoch,
-  useLayerThumbnailVersion,
-} from '@workbench/widgets/canvas/engineStoreHooks';
+import { useCanvasDocumentEditingLocked, useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
 import { reportLayerOperation, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
@@ -242,11 +238,11 @@ const LayerMenu = ({
   const documentEditingLocked = useCanvasDocumentEditingLocked(engine);
   const { selectedIds } = useLayerPanelState(projectId, document.selectedLayerId);
   const interactionLocked = isCanvasInteractionLocked(canvas, queueItems) || documentEditingLocked;
-  // Re-render when live, not-yet-persisted paint/mask pixels change.
-  useLayerThumbnailVersion(engine, layer.id);
-  const hasSupportedContent = engine
-    ? engine.exports.hasExportableLayerContent(layer.id)
-    : hasPureExportableLayerContent(layer, document);
+  const hasLiveContent = useCanvasEngineRead(
+    engine,
+    () => engine?.exports.hasExportableLayerContent(layer.id) ?? false
+  );
+  const hasSupportedContent = engine ? hasLiveContent : hasPureExportableLayerContent(layer, document);
   const [internalDialogKind, setInternalDialogKind] = useState<LayerMenuDialogKind | null>(null);
   const dialogKind = controlledDialogKind !== undefined ? controlledDialogKind : internalDialogKind;
   const setDialogKind = useCallback(
@@ -280,20 +276,23 @@ const LayerMenu = ({
     [commitPrepared, layer, selectedIds]
   );
 
-  const canGroup = canGroupSelection(engine?.document.model() ?? null, actionTargets({ layer, selectedIds }));
-  // Un-memoized on purpose, like `canGroup`: it reads live raster content
-  // (`hasExportableLayerContent`), which the content epoch re-renders for.
-  useCanvasLayerPixelEpoch(engine);
-  const mergeModel = engine?.document.model() ?? null;
-  const mergeTargets = actionTargets({ layer, selectedIds });
-  const canMerge =
-    !!engine &&
-    !!mergeModel &&
-    mergeTargets.length > 1 &&
-    canMergeSelectedRasters(mergeModel.document, mergeModel.compileLeaves(), new Set(mergeTargets), (layerId) =>
-      engine.exports.hasExportableLayerContent(layerId)
+  const targets = actionTargets({ layer, selectedIds });
+  const canGroup = useCanvasEngineRead(engine, () => canGroupSelection(engine?.document.model() ?? null, targets));
+  const canMerge = useCanvasEngineRead(engine, () => {
+    const model = engine?.document.model() ?? null;
+    return (
+      !!engine &&
+      !!model &&
+      targets.length > 1 &&
+      canMergeSelectedRasters(model.document, model.compileLeaves(), new Set(targets), (layerId) =>
+        engine.exports.hasExportableLayerContent(layerId)
+      )
     );
-  const canDeleteSelection = !!mergeModel && mergeModel.refusalFor({ ids: mergeTargets, type: 'remove' }) === null;
+  });
+  const canDeleteSelection = useCanvasEngineRead(
+    engine,
+    () => engine?.document.model()?.refusalFor({ ids: targets, type: 'remove' }) === null
+  );
   const hiddenByAncestor =
     (lookupDocumentNodeState(document, layer.id)?.documentHidden ?? false) && !isNodeHidden(layer);
   const actionState = useMemo<LayerContextActionState>(
