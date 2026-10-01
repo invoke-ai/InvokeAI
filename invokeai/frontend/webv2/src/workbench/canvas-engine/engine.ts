@@ -1747,6 +1747,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const requestColorSample = (): Promise<string | null> => {
     // A second request supersedes the first; the earlier caller gets a cancel.
     settleColorSample(null, false);
+    // End any held temporary tool first, so the request records the tool the user was really on.
+    pipeline.endForToolSwitch();
 
     return new Promise<string | null>((resolve) => {
       pendingColorSample = { previousToolId: interactionController.getActiveToolId(), resolve, sampledHex: null };

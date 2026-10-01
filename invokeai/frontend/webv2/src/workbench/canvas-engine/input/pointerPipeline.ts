@@ -174,7 +174,8 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
   // A cancelled gesture's pointer keeps reporting pressed moves; they reach a tool only as hover until release.
   let cancelledPointerId: number | null = null;
   // The control focus last landed on by pointer; keyboard navigation (`:focus-visible` on arrival) clears it.
-  let pointerFocused: EventTarget | null = null;
+  // Held weakly: a focused row may be removed (virtualized) without another focusin.
+  let pointerFocused: WeakRef<EventTarget> | null = null;
 
   /**
    * Reads the input element's viewport offset. Hoisted out of
@@ -228,7 +229,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     }
     return (
       event.target !== null &&
-      event.target === pointerFocused &&
+      event.target === pointerFocused?.deref() &&
       !(event.target as KeyTarget)?.closest?.(OVERLAY_SELECTOR)
     );
   };
@@ -404,7 +405,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     },
     isGestureActive: () => gestureActive,
     onFocusIn: (event) => {
-      pointerFocused = arrivedByPointer(event.target) ? event.target : null;
+      pointerFocused = event.target && arrivedByPointer(event.target) ? new WeakRef(event.target) : null;
     },
     onKeyUp: (event) => {
       if (event.code === 'Space' && tempHold === 'space') {

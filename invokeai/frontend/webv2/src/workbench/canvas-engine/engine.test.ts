@@ -18397,6 +18397,29 @@ describe('Select Object canvas engine integration', () => {
     h.engine.lifecycle.dispose();
   });
 
+  it('arms the eyedropper over a Space hold and returns to the tool the user was really on', async () => {
+    const h = await createSamHarness();
+    h.overlay.fire('pointerenter', {});
+    const initial = h.engine.stores.activeTool.get();
+    h.fireKey('keydown', 'Space', ' ');
+    expect(h.engine.stores.activeTool.get()).toBe('view');
+
+    let settled: string | null | undefined;
+    void h.engine.tools.requestColorSample().then((hex) => {
+      settled = hex;
+    });
+    h.fireKey('keyup', 'Space', ' ');
+    expect(h.engine.stores.activeTool.get()).toBe('colorPicker');
+    await flushMicrotasks();
+    expect(settled).toBeUndefined();
+
+    h.engine.tools.handleEscapePriority({ gestureWasActive: false });
+    await flushMicrotasks();
+    expect(settled).toBeNull();
+    expect(h.engine.stores.activeTool.get()).toBe(initial);
+    h.engine.lifecycle.dispose();
+  });
+
   it('does not restore sessionless sam when Escape closes the session during a Space hold', async () => {
     const h = await createSamHarness();
     getCanvasOperations(h.engine).startSelectObject('source');
