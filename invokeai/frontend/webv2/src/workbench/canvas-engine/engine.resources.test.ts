@@ -1,4 +1,5 @@
 import type { BitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
+import type { GroupSurfaceContent } from '@workbench/canvas-engine/render/groupCompositeScopes';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 
 import {
@@ -7,7 +8,6 @@ import {
   layerContract,
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/documentModel';
-import { NO_GROUP_CONTENT } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -15,6 +15,8 @@ import type * as RasterControllerModule from './controllers/rasterController';
 import type { RasterController } from './controllers/rasterController';
 
 import { createCanvasEngine } from './engine';
+
+const NO_GROUP_CONTENT: GroupSurfaceContent = { excludeIds: new Set(), float: null, previews: null };
 
 const owners = vi.hoisted(() => ({ raster: null as RasterController | null }));
 

@@ -20,7 +20,7 @@ import {
   planScreenComposition,
 } from '@workbench/canvas-engine/document-model/screenComposition';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
-import { intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
+import { expand, intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 
 import type { DerivedSurfaceCache } from './derivedSurfaceCache';
 import type { GroupCompositeScope, GroupSurfaceContent } from './groupCompositeScopes';
@@ -654,7 +654,8 @@ export const compositeDocument = (
 
   // Draw staged preview in document space with a dashed outline distinguishing pending pixels.
   const staged = isIsolated(opts) ? null : opts.stagedPreview;
-  if (staged && reaches(staged.rect, view, repaint)) {
+  // Half the outline lands outside the rect, so a repaint beside it must still redraw that half.
+  if (staged && reaches(staged.rect, view, expand(repaint, STAGED_PREVIEW_OUTLINE_WIDTH))) {
     ctx.save();
     setTransformFromMat(ctx, view);
     ctx.globalAlpha = staged.opacity ?? 1;

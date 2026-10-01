@@ -2515,6 +2515,23 @@ describe('createCanvasEngine', () => {
     }
   });
 
+  it('draws overlay chrome under the device-pixel base transform', () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    const { engine } = createEngine();
+    const screen = createFakeCanvas();
+    const overlay = createFakeCanvas();
+    engine.surface.attach(screen.element, overlay.element);
+    engine.surface.resize(100, 80, 2);
+    overlay.surface.callLog.length = 0;
+    raf.flush();
+
+    const transforms = overlay.surface.callLog.filter((entry) => entry.op === 'setTransform');
+    expect(transforms.map((entry) => entry.args)).toContainEqual([2, 0, 0, 2, 0, 0]);
+    engine.lifecycle.dispose();
+  });
+
   it('dispose removes both store subscriptions', () => {
     const { engine, unsubscribe } = createEngine();
     expect(unsubscribe).not.toHaveBeenCalled();

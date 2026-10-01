@@ -858,7 +858,7 @@ describe('compositeDocument — damage', () => {
   };
 
   it('performs no clears and no draws when every damaged region is offscreen', () => {
-    const { backend, caches, doc, ops, target } = scene();
+    const { backend, caches, doc, target } = scene();
     const diagnostics = createCanvasDiagnostics(true);
 
     compositeDocument(target, doc, caches, VIEW, {
@@ -869,7 +869,6 @@ describe('compositeDocument — damage', () => {
     compositeDocument(target, doc, caches, VIEW, { backend, damage: { kind: 'none' }, diagnostics });
 
     expect(target.callLog).toEqual([]);
-    expect(ops('clearRect')).toEqual([]);
     expect(diagnostics.snapshot().compositeFrames).toBe(0);
   });
 

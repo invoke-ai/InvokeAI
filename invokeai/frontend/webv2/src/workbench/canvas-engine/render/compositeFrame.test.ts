@@ -264,6 +264,37 @@ describe('compositor options', () => {
 });
 
 describe('the surface budget', () => {
+  const workingSet = () => harness.enforce.mock.calls.at(-1)![0] as Set<string>;
+
+  it('keeps a filter-previewed layer resident while only its preview is on screen', () => {
+    const offscreen = documentOf([layer('a', { transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 500, y: 0 } })]);
+    draw(offscreen);
+    expect(workingSet().has('a')).toBe(false);
+
+    harness.previews.publishFilter('a', harness.previews.beginGuardedFilter('a'), {
+      guard: { layerId: 'a' },
+      rect: { height: 8, width: 8, x: -500, y: 0 },
+      surface: surface(8, 8),
+    } as never);
+    draw(offscreen);
+    expect(workingSet().has('a')).toBe(true);
+  });
+
+  it('re-derives a document-sized layer when the document grows around it', () => {
+    harness.entries.clear();
+    const gradient = layer('g', {
+      source: { angle: 0, kind: 'linear', stops: [], type: 'gradient' },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: -100, y: 0 },
+    });
+    const frame = createCompositeFrame(harness.deps);
+    frame.draw(surface(), documentOf([gradient]), VIEW, null, null);
+    expect(workingSet().has('g')).toBe(false);
+
+    const grown = { ...documentOf([gradient]), width: 200 } as CanvasDocumentContractV3;
+    frame.draw(surface(), grown, VIEW, null, null);
+    expect(workingSet().has('g')).toBe(true);
+  });
+
   it('hands the raster owner the layers this frame demanded and the usage captured before drawing', () => {
     draw();
     const [workingSet, usage] = harness.enforce.mock.calls.at(-1) as [Set<string>, typeof FRAME_USAGE];

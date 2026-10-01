@@ -1,15 +1,16 @@
 import type { CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
-import type { GroupCompositeScope } from '@workbench/canvas-engine/render/groupCompositeScopes';
+import type { GroupCompositeScope, GroupSurfaceContent } from '@workbench/canvas-engine/render/groupCompositeScopes';
 
 import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import { createBitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
 import { identity } from '@workbench/canvas-engine/math/mat2d';
-import { NO_GROUP_CONTENT } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
 import { RasterController } from './rasterController';
+
+const NO_GROUP_CONTENT: GroupSurfaceContent = { excludeIds: new Set(), float: null, previews: null };
 
 const RECT = { height: 10, width: 10, x: 0, y: 0 };
 const SURFACE_BYTES = 400;

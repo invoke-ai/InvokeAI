@@ -5,17 +5,21 @@ import { PreviewStateController } from '@workbench/canvas-engine/controllers/pre
 import { RasterController } from '@workbench/canvas-engine/controllers/rasterController';
 import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import {
+  createLargeTreeDocument,
   documentFrom,
   groupContract,
   layerContract,
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { updateNodeValues } from '@workbench/canvas-engine/document/documentIndex';
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
 import { identity } from '@workbench/canvas-engine/math/mat2d';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { createViewport } from '@workbench/canvas-engine/viewport';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import { createCompositeFrame } from './compositeFrame';
+import * as compositor from './compositor';
+import * as frameDemand from './frameDemand';
 
 const SURFACE_BYTES = 10 * 10 * 4;
 
@@ -103,5 +107,50 @@ describe('composite frame working set under steady overage', () => {
       groupSurfaceRebuilds: 0,
       groupSurfaceRefreshes: 5,
     });
+  });
+});
+
+describe('frame description over 2,000 nodes', () => {
+  it('prepares once per document and re-derives bounds only for the edited leaf', () => {
+    const backend = createTestStubRasterBackend();
+    const raster = new RasterController({ backend, diagnostics: createCanvasDiagnostics(true) });
+    const viewport = createViewport();
+    viewport.setViewportSize(100, 100, 1);
+    const frame = createCompositeFrame({
+      backend,
+      derivedSurfaceCache: raster.derived,
+      diagnostics: createCanvasDiagnostics(true),
+      getAdjustedSurface: () => null,
+      getCheckerboardTile: () => backend.createSurface(1, 1),
+      getGroupSurface: () => null,
+      getMaskPatternTile: () => null,
+      layerCache: raster.layers,
+      previews: new PreviewStateController(),
+      raster,
+      rasterizeLayer: () => undefined,
+      stores: createEngineStores(),
+      transformOverrides: new Map(),
+      viewport,
+    });
+    const screen = backend.createSurface(100, 100);
+    const prepare = vi.spyOn(compositor, 'prepareComposite');
+    const bounds = vi.spyOn(frameDemand, 'committedLeafBounds');
+    const document = createLargeTreeDocument(2_000);
+
+    frame.draw(screen, document, identity(), null, null);
+    const leafCount = bounds.mock.calls.length;
+    expect(leafCount).toBeGreaterThan(1_000);
+    frame.draw(screen, document, identity(), null, null, { kind: 'none' });
+    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(bounds).toHaveBeenCalledTimes(leafCount);
+
+    const edited = {
+      ...document,
+      stacks: updateNodeValues(document.stacks, new Map([['l7', (node) => ({ ...node, opacity: 0.5 })]])),
+    };
+    frame.draw(screen, edited, identity(), null, null);
+    expect(prepare).toHaveBeenCalledTimes(2);
+    expect(bounds.mock.calls.slice(leafCount).map(([leaf]) => leaf.id)).toEqual(['l7']);
+    raster.dispose();
   });
 });

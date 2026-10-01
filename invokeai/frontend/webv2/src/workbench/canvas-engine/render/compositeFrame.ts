@@ -65,6 +65,9 @@ interface LeafBoundsMemo {
   readonly matrix: Mat2d;
   readonly live: Rect | undefined;
   readonly bounds: Rect | null;
+  // Legacy gradients without an extent are document-sized.
+  readonly documentWidth: number;
+  readonly documentHeight: number;
 }
 
 const sameOptionalRect = (a: Rect | undefined, b: Rect | undefined): boolean =>
@@ -118,7 +121,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
   };
 
   // The frame description is reused until the document, isolation or override contents change; each leaf's
-  // bounds until its contract, placement or live cache extent does.
+  // bounds until its contract, placement, live cache extent or the document size does.
   let preparation: CompositePreparation | null = null;
   // A bounded or empty repaint reads only part of the working set; the usage window stays open from the last full
   // repaint so artifacts it skipped are not evicted as unused.
@@ -148,10 +151,17 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
       const live = layerCache.peek(leaf.id)?.rect;
       const previous = boundsMemo.get(leaf.id);
       const memo =
-        previous && previous.layer === leaf.layer && previous.matrix === matrix && sameOptionalRect(previous.live, live)
+        previous &&
+        previous.layer === leaf.layer &&
+        previous.matrix === matrix &&
+        previous.documentWidth === doc.width &&
+        previous.documentHeight === doc.height &&
+        sameOptionalRect(previous.live, live)
           ? previous
           : {
               bounds: committedLeafBounds(leaf, matrix, doc, live),
+              documentHeight: doc.height,
+              documentWidth: doc.width,
               layer: leaf.layer,
               live: live && { ...live },
               matrix,
@@ -182,11 +192,17 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
       const overrides = !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null;
       const frame = describeFrame(doc, isolatedGuard?.layerId ?? null, overrides);
+      // Snapshot filter previews only when active, avoiding an empty map allocation every frame.
+      const layerPreviews = !isolatedGuard && previews.filterCount() > 0 ? previews.filterSnapshot() : null;
       const activeFrameLayerIds = calculateActiveFrameLayerIds({
         document: doc,
         preparation: frame,
         viewport: visibleDocumentRect(screen),
       });
+      // A previewed layer draws through its cache entry even when only the preview is on screen.
+      for (const layerId of layerPreviews?.keys() ?? []) {
+        activeFrameLayerIds.add(layerId);
+      }
       ensureLayerCaches(doc, frame, activeFrameLayerIds);
       const frameDamage = isolatedGuard ? FULL_DAMAGE : (damage ?? FULL_DAMAGE);
       const usage = raster.beginFrame();
@@ -207,8 +223,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         floatingSelection: isolatedGuard ? null : (floatFrame?.composite ?? null),
         imageSmoothing: shouldSmoothAtZoom(viewport.getZoom()),
         isolationLayerId: isolatedGuard?.layerId ?? null,
-        // Snapshot filter previews only when active, avoiding an empty map allocation every frame.
-        layerPreviews: !isolatedGuard && previews.filterCount() > 0 ? previews.filterSnapshot() : null,
+        layerPreviews,
         maskPatternTile: deps.getMaskPatternTile,
         preparation: frame,
         // Screen frames are display-time: the region tint may draw.

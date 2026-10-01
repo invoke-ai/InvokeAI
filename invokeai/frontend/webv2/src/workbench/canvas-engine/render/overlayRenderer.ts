@@ -465,7 +465,7 @@ const drawSamGeometry = (ctx: Ctx, state: OverlayState): void => {
  * Even-odd viewport/bbox fill shades outside the generation frame; globalAlpha controls opacity independently of
  * theme color.
  */
-const drawBboxOverlayShade = (ctx: Ctx, state: OverlayState): void => {
+const drawBboxOverlayShade = (ctx: Ctx, target: RasterSurface, state: OverlayState): void => {
   if (!state.bboxOverlay) {
     return;
   }
@@ -474,7 +474,8 @@ const drawBboxOverlayShade = (ctx: Ctx, state: OverlayState): void => {
   ctx.globalAlpha = BBOX_OVERLAY_ALPHA;
   ctx.fillStyle = state.bboxOverlayColor ?? BBOX_OVERLAY_FILL;
   ctx.beginPath();
-  ctx.rect(0, 0, state.viewportSize.width, state.viewportSize.height);
+  // The backing store rounds its device size, so cover it whole rather than the CSS viewport.
+  ctx.rect(0, 0, target.width / state.dpr, target.height / state.dpr);
   ctx.rect(bboxScreen.x, bboxScreen.y, bboxScreen.width, bboxScreen.height);
   ctx.fill('evenodd');
   ctx.restore();
@@ -533,7 +534,7 @@ export const renderOverlay = (target: RasterSurface, state: OverlayState): void 
   ctx.setTransform(base.a, base.b, base.c, base.d, base.e, base.f);
 
   // Shade outside bbox first, then draw overlay chrome above it. The unbounded plane has no document outline.
-  drawBboxOverlayShade(ctx, state);
+  drawBboxOverlayShade(ctx, target, state);
 
   // Grid next (behind the bbox), spanning the whole viewport.
   if (state.showGrid) {

@@ -7,7 +7,7 @@ import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-mod
 import { identity } from '@workbench/canvas-engine/math/mat2d';
 import { createColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import { compositeDocument } from '@workbench/canvas-engine/render/compositor';
-import { createGroupSurfaceCache, NO_GROUP_CONTENT } from '@workbench/canvas-engine/render/groupSurfaceCache';
+import { createGroupSurfaceCache } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { planBaseRasterComposite, renderRasterComposite } from '@workbench/canvas-engine/render/rasterComposite';
@@ -347,7 +347,7 @@ describe('group adjustment composite', () => {
     compositeDocument(screen, docAt(1), scene.caches, identity(), {
       backend: scene.backend,
       groupSurface: (scope, members, matrices) =>
-        groupSurfaces.get(scope, members, matrices, { ...NO_GROUP_CONTENT, excludeIds: new Set(['red']) }),
+        groupSurfaces.get(scope, members, matrices, { excludeIds: new Set(['red']), float: null, previews: null }),
     });
     composite(1);
     expect(draws()).toEqual({ allocations: 2, rebuilds: 2 });
@@ -365,15 +365,39 @@ describe('group adjustment composite', () => {
 });
 
 describe('group-scoped previews and partial refresh', () => {
-  const groupedScene = () => {
-    const scene = sceneFor({ member: '#00ff00', under: '#0000ff' });
+  interface GroupedSceneOptions {
+    /** Member cache extent in source pixels; the transform maps it into the document. */
+    memberRect?: Rect;
+    member?: Partial<CanvasRasterLayerContractV2>;
+    group?: Parameters<typeof groupContract>[2];
+    nested?: boolean;
+  }
+
+  const groupedScene = ({
+    group = { opacity: 0.5 },
+    member = {},
+    memberRect = BBOX,
+    nested = false,
+  }: GroupedSceneOptions = {}) => {
+    const scene = sceneFor({ under: '#0000ff' });
+    scene.caches.growToRect('member', memberRect);
+    const memberSurface = scene.caches.get('member')!.surface;
+    memberSurface.ctx.fillStyle = '#00ff00';
+    memberSurface.ctx.fillRect(0, 0, memberRect.width, memberRect.height);
+    scene.caches.publishPixels('member');
+    const diagnostics = createCanvasDiagnostics(true);
     const groupSurfaces = createGroupSurfaceCache({
       createSurface: (w, h) => scene.backend.createSurface(w, h),
       damageSince: (id, version) => scene.caches.damageSince(id, version),
+      diagnostics,
       getAdjustedSurface: () => null,
       getCacheEntry: (id) => scene.caches.get(id),
     });
-    const document = docWith([groupContract('g', [raster('member')], { opacity: 0.5 }), raster('under')]);
+    const memberNode = raster('member', member);
+    const document = docWith([
+      groupContract('g', [nested ? groupContract('inner', [memberNode], { opacity: 0.8 }) : memberNode], group),
+      raster('under'),
+    ]);
     const composite = (options: Partial<Parameters<typeof compositeDocument>[4]> = {}) => {
       const screen = scene.backend.createSurface(WIDTH, HEIGHT);
       compositeDocument(screen, document, scene.caches, identity(), {
@@ -383,8 +407,18 @@ describe('group-scoped previews and partial refresh', () => {
       });
       return screen;
     };
-    return { composite, groupSurfaces, scene };
+    /** Paints a magenta dot into the member cache and publishes only that damage. */
+    const paintDot = (bounded: boolean) => {
+      const entry = scene.caches.get('member')!;
+      const dot = { height: 1, width: 1, x: 3, y: 4 };
+      entry.surface.ctx.fillStyle = '#ff00ff';
+      entry.surface.ctx.fillRect(dot.x, dot.y, dot.width, dot.height);
+      scene.caches.publishPixels('member', bounded ? dot : undefined);
+    };
+    return { composite, diagnostics, groupSurfaces, paintDot, scene };
   };
+
+  const allPixels = (surface: RasterSurface): number[] => [...surface.ctx.getImageData(0, 0, WIDTH, HEIGHT).data];
 
   it('draws a member filter preview inside its group, under the group opacity', () => {
     const { composite, scene } = groupedScene();
@@ -428,21 +462,50 @@ describe('group-scoped previews and partial refresh', () => {
     expect(Math.abs(b! - 255)).toBeLessThanOrEqual(2);
   });
 
-  it('refreshes a damaged member region to the same pixels as a full rebuild', () => {
-    const { composite, scene } = groupedScene();
-    composite();
-    const entry = scene.caches.get('member')!;
-    entry.surface.ctx.fillStyle = '#ff00ff';
-    entry.surface.ctx.fillRect(10, 12, 7, 5);
-    scene.caches.publishPixels('member', { height: 5, width: 7, x: 10, y: 12 });
+  it.each<[string, GroupedSceneOptions]>([
+    ['an untransformed member', {}],
+    [
+      'a member scaled 8x',
+      {
+        member: { transform: { rotation: 0, scaleX: 8, scaleY: 8, x: 0, y: 0 } },
+        memberRect: { height: 8, width: 8, x: 0, y: 0 },
+      },
+    ],
+    ['an inverted group', { group: { adjustments: invertStack('ga'), opacity: 0.5 } }],
+    ['a group with levels', { group: { adjustments: gammaStack('ga') } }],
+    ['a member inside a nested group', { nested: true }],
+  ])('refreshes a damaged region of %s to the same pixels as a full rebuild', (_, options) => {
+    const refreshed = groupedScene(options);
+    refreshed.composite();
+    refreshed.paintDot(true);
+    const pixels = allPixels(refreshed.composite());
+    expect(refreshed.diagnostics.snapshot().groupSurfaceRefreshes).toBeGreaterThan(0);
 
-    const refreshed = composite().ctx.getImageData(0, 0, WIDTH, HEIGHT).data;
-    const rebuilt = groupedScene();
-    const fresh = rebuilt.scene.caches.get('member')!;
-    fresh.surface.ctx.fillStyle = '#ff00ff';
-    fresh.surface.ctx.fillRect(10, 12, 7, 5);
-    rebuilt.scene.caches.publishPixels('member');
+    const rebuilt = groupedScene(options);
+    rebuilt.paintDot(false);
+    expect(pixels).toEqual(allPixels(rebuilt.composite()));
+  });
 
-    expect([...refreshed]).toEqual([...rebuilt.composite().ctx.getImageData(0, 0, WIDTH, HEIGHT).data]);
+  it('moves a floating selection inside a group by refreshing only the old and new landing', () => {
+    const lifted = (scene: ReturnType<typeof groupedScene>['scene']) => {
+      const surface = scene.backend.createSurface(8, 8);
+      surface.ctx.fillStyle = '#ffffff';
+      surface.ctx.fillRect(0, 0, 8, 8);
+      return surface;
+    };
+    const floatAt = (surface: RasterSurface, x: number) => ({
+      floatingSelection: { layerId: 'member', matrix: identity(), rect: { height: 8, width: 8, x, y: 20 }, surface },
+    });
+    const dragged = groupedScene();
+    const surface = lifted(dragged.scene);
+    dragged.composite(floatAt(surface, 10));
+    const before = dragged.diagnostics.snapshot();
+    const pixels = allPixels(dragged.composite(floatAt(surface, 30)));
+    const after = dragged.diagnostics.snapshot();
+
+    expect(after.groupSurfaceRebuilds).toBe(before.groupSurfaceRebuilds);
+    expect(after.groupSurfaceRefreshes).toBe(before.groupSurfaceRefreshes + 1);
+    const fresh = groupedScene();
+    expect(pixels).toEqual(allPixels(fresh.composite(floatAt(lifted(fresh.scene), 30))));
   });
 });

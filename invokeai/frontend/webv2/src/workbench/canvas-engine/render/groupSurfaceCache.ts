@@ -13,7 +13,7 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
 
 import { multiply } from '@workbench/canvas-engine/math/mat2d';
-import { intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
+import { expand, intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import { adjustmentsKey, applyAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
 import { blendToComposite } from '@workbench/canvas-engine/render/compositor';
 
@@ -55,15 +55,15 @@ export interface GroupSurfaceCache {
   clear(): void;
 }
 
-export const NO_GROUP_CONTENT: GroupSurfaceContent = { excludeIds: new Set(), float: null, previews: null };
-
 const matKey = (m: Mat2d): string => `${m.a},${m.b},${m.c},${m.d},${m.e},${m.f}`;
 const rectKey = (r: Rect): string => `${r.x},${r.y},${r.width},${r.height}`;
 const sameRect = (a: Rect, b: Rect): boolean =>
   a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height;
 
-/** Destination pixels a changed source pixel can reach through interpolation. */
-const RESAMPLE_MARGIN = 2;
+// A changed source pixel reaches one source pixel further through bilinear sampling, whatever the member's scale,
+// plus one destination pixel of edge antialiasing.
+const SOURCE_FILTER_RADIUS = 1;
+const ANTIALIAS_MARGIN = 1;
 
 // The frame composites with live session matrices while the overview composites
 // the settled contract, so one group legitimately holds two keys at once; two
@@ -76,7 +76,23 @@ interface GroupSlot {
   readonly surface: RasterSurface;
   /** Cache version of every member pixel source the surface currently shows. */
   versions: ReadonlyMap<string, number>;
+  /** Placement of the floating selection the surface shows, so a drag refreshes in place. */
+  float: DrawnFloat | null;
   lastUsed: number;
+}
+
+interface DrawnFloat {
+  readonly placement: string;
+  /** Document-space bounds the float covers. */
+  readonly landing: Rect;
+}
+
+interface DrawnEntry {
+  readonly leaf: SemanticLeaf;
+  readonly matrix: Mat2d;
+  readonly entry: LayerCacheEntry | null;
+  readonly bounds: Rect | null;
+  readonly float: DrawnFloat | null;
 }
 
 const surfaceBytes = (surface: RasterSurface): number => surface.width * surface.height * 4;
@@ -120,7 +136,7 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
       .map(childScopeKey)
       .join(',')})`;
 
-  /** Everything a surface depends on except member pixels, which are tracked by version and damage. */
+  /** Everything a surface depends on except member pixels and float placement, which are tracked as damage. */
   const shapeKeyOf = (
     scope: GroupCompositeScope,
     members: readonly SemanticLeaf[],
@@ -140,7 +156,7 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
       const preview = content.previews?.get(leaf.id);
       const float = content.float?.layerId === leaf.id ? content.float : null;
       const previewKey = preview ? `:p${objectId(preview.surface)}@${rectKey(preview.rect)}` : '';
-      const floatKey = float ? `:f${objectId(float.surface)}@${rectKey(float.rect)}*${matKey(float.matrix)}` : '';
+      const floatKey = float ? `:f${objectId(float.surface)}` : '';
       const appearance = `${layer.opacity}:${layer.blendMode}:${matKey(memberMatrices[i - baseIndex]!)}:${own}`;
       memberKeys.push(`${leaf.id}:${appearance}${previewKey}${floatKey}`);
     }
@@ -154,8 +170,8 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
     memberMatrices: readonly Mat2d[],
     content: GroupSurfaceContent,
     baseIndex: number
-  ): { leaf: SemanticLeaf; matrix: Mat2d; entry: LayerCacheEntry | null; bounds: Rect | null }[] => {
-    const drawn: { leaf: SemanticLeaf; matrix: Mat2d; entry: LayerCacheEntry | null; bounds: Rect | null }[] = [];
+  ): DrawnEntry[] => {
+    const drawn: DrawnEntry[] = [];
     for (let i = scope.start; i < scope.end; i += 1) {
       const leaf = members[i - baseIndex]!;
       if (content.excludeIds.has(leaf.id) || leaf.layer.type !== 'raster') {
@@ -167,11 +183,13 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
       const pixels = preview ? preview.rect : entry && !isEmpty(entry.rect) ? entry.rect : null;
       let bounds = pixels ? transformBounds(matrix, pixels) : null;
       const float = content.float?.layerId === leaf.id ? content.float : null;
+      let drawnFloat: DrawnFloat | null = null;
       if (float && !isEmpty(float.rect)) {
         const landing = transformBounds(multiply(matrix, float.matrix), float.rect);
         bounds = bounds ? union(bounds, landing) : landing;
+        drawnFloat = { landing, placement: `${rectKey(float.rect)}*${matKey(float.matrix)}` };
       }
-      drawn.push({ bounds, entry: preview ? null : entry, leaf, matrix });
+      drawn.push({ bounds, entry: preview ? null : entry, float: drawnFloat, leaf, matrix });
     }
     return drawn;
   };
@@ -263,11 +281,19 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
   };
 
   /** Document-space region the members changed since the slot was drawn; null when only a full redraw is safe. */
-  const damagedRegion = (slot: GroupSlot, drawn: ReturnType<typeof drawnEntries>): { region: Rect | null } | null => {
+  const damagedRegion = (slot: GroupSlot, drawn: readonly DrawnEntry[]): { region: Rect | null } | null => {
     if (drawn.filter((item) => item.entry).length !== slot.versions.size) {
       return null;
     }
     let region: Rect | null = null;
+    const float = drawn.find((item) => item.float)?.float ?? null;
+    if (float?.placement !== slot.float?.placement) {
+      for (const landing of [slot.float?.landing, float?.landing]) {
+        if (landing) {
+          region = region ? union(region, landing) : landing;
+        }
+      }
+    }
     for (const { entry, leaf, matrix } of drawn) {
       if (!entry) {
         continue;
@@ -283,18 +309,19 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
       if (!local) {
         return null;
       }
-      const changed = transformBounds(matrix, {
-        height: local.height,
-        width: local.width,
-        x: entry.rect.x + local.x,
-        y: entry.rect.y + local.y,
-      });
+      const changed = transformBounds(
+        matrix,
+        expand(
+          { height: local.height, width: local.width, x: entry.rect.x + local.x, y: entry.rect.y + local.y },
+          SOURCE_FILTER_RADIUS
+        )
+      );
       region = region ? union(region, changed) : changed;
     }
     return { region };
   };
 
-  const versionsOf = (drawn: ReturnType<typeof drawnEntries>): ReadonlyMap<string, number> =>
+  const versionsOf = (drawn: readonly DrawnEntry[]): ReadonlyMap<string, number> =>
     new Map(drawn.flatMap(({ entry, leaf }) => (entry ? [[leaf.id, entry.version] as const] : [])));
 
   function resolve(
@@ -332,12 +359,9 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
       const region = damage
         ? damage.region &&
           intersect(
-            roundOut({
-              height: damage.region.height + RESAMPLE_MARGIN * 2,
-              width: damage.region.width + RESAMPLE_MARGIN * 2,
-              x: damage.region.x - rect.x - RESAMPLE_MARGIN,
-              y: damage.region.y - rect.y - RESAMPLE_MARGIN,
-            }),
+            roundOut(
+              expand({ ...damage.region, x: damage.region.x - rect.x, y: damage.region.y - rect.y }, ANTIALIAS_MARGIN)
+            ),
             whole
           )
         : whole;
@@ -363,6 +387,7 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
         lastUsed: clock,
         rect,
         shapeKey,
+        float: null,
         surface: deps.createSurface(rect.width, rect.height),
         versions: new Map(),
       };
@@ -373,6 +398,7 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
       cache.set(scope.id, slots);
     }
     slot.versions = versionsOf(drawn);
+    slot.float = drawn.find((item) => item.float)?.float ?? null;
     slot.lastUsed = clock;
     const index = slots.indexOf(slot);
     if (index > 0) {
