@@ -7,6 +7,8 @@ import type {
 import type { ChangeEvent } from 'react';
 
 import { Box, Flex, HStack, Image, Stack, Text, Textarea } from '@chakra-ui/react';
+import { FindInGalleryThumbnailButton } from '@features/gallery/mediaSlot';
+import { galleryImageUrls } from '@features/gallery/utility';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { workflowSelectionStore } from '@features/workflow/ui/editor/selectionStore';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
@@ -14,6 +16,7 @@ import {
   useWorkflowHostCommands,
   useWorkflowNodeExecutionState,
   useWorkflowProjectSelector,
+  useWorkflowUi,
 } from '@features/workflow/ui/WorkflowUiContext';
 import {
   formatOutputFieldValue,
@@ -138,6 +141,27 @@ const DetailsTab = ({ node, template }: { node: WorkflowInvocationNode; template
   );
 };
 
+const OutputImage = ({ imageName }: { imageName: string }) => {
+  const { t } = useTranslation();
+  const { findInGallery } = useWorkflowUi();
+  const onFind = useCallback(() => findInGallery({ kind: 'image', name: imageName }), [findInGallery, imageName]);
+
+  return (
+    <Box className="group" position="relative">
+      <Image
+        alt={t('widgets.workflow.outputImage')}
+        bg="bg.muted"
+        h="10rem"
+        objectFit="contain"
+        rounded="sm"
+        src={galleryImageUrls.thumbnail(imageName)}
+        w="full"
+      />
+      <FindInGalleryThumbnailButton name={imageName} onFind={onFind} />
+    </Box>
+  );
+};
+
 const OutputsTab = ({ nodeId, template }: { nodeId: string; template: InvocationTemplate | undefined }) => {
   const { t } = useTranslation();
   const execution = useWorkflowNodeExecutionState(nodeId);
@@ -178,16 +202,8 @@ const OutputsTab = ({ nodeId, template }: { nodeId: string; template: Invocation
             : t(`widgets.workflow.runStatus.${execution.status}`)
         }
       />
-      {execution.status === 'completed' && execution.outputImageUrl ? (
-        <Image
-          alt={t('widgets.workflow.outputImage')}
-          bg="bg.muted"
-          h="10rem"
-          objectFit="contain"
-          rounded="sm"
-          src={execution.outputImageUrl}
-          w="full"
-        />
+      {execution.status === 'completed' && execution.outputImageName ? (
+        <OutputImage imageName={execution.outputImageName} />
       ) : null}
       {hasResult ? (
         <>

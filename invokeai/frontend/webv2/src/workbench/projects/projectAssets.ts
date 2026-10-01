@@ -25,8 +25,15 @@ export const GALLERY_SELECTION_KEYS: ReadonlySet<string> = new Set([
   'selectedImageNames',
 ]);
 
-/** Strip gallery board IDs while preserving authored workflow board inputs. */
-export const GALLERY_INSTALLATION_KEYS: ReadonlySet<string> = new Set(['projectBoardId', 'selectedBoardId']);
+/**
+ * Strip gallery board IDs while preserving authored workflow board inputs. A dropped auto-add board falls back to
+ * following the selected board.
+ */
+export const GALLERY_INSTALLATION_KEYS: ReadonlySet<string> = new Set([
+  'autoAddBoardId',
+  'projectBoardId',
+  'selectedBoardId',
+]);
 
 /** Clear pagination/window anchors when transferred board IDs change. */
 export const GALLERY_POSITION_KEYS: ReadonlySet<string> = new Set(['galleryPage']);

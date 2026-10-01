@@ -58,6 +58,12 @@ export interface WorkflowCommands {
   redo(target?: WorkflowTarget): void;
   removeWorkflow(workflowId: string): void;
   renameWorkflow(workflowId: string, name: string): void;
+  /** Replaces a copy's document (keeping its id and name) as one undo step, and activates it. */
+  replaceWorkflow(
+    target: WorkflowTarget,
+    document: ProjectGraphState,
+    options: { label: string; source: ProjectWorkflowSource }
+  ): void;
   selectWorkflow(workflowId: string): void;
   /** Records a publication target; ignored once that project or workflow no longer exists. */
   setWorkflowSource(target: WorkflowTarget, source: ProjectWorkflowSource | undefined): void;
@@ -73,7 +79,8 @@ export interface WorkflowNodeExecutionState {
   status: 'running' | 'completed' | 'failed';
   progress: number | null;
   progressMessage: string | null;
-  outputImageUrl: string | null;
+  /** The node's most recent image output, when it produced one. */
+  outputImageName: string | null;
   /** The most recent invocation result of the current run. */
   latestOutput: unknown;
   error: string | null;

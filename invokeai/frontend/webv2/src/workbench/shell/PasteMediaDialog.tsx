@@ -6,7 +6,7 @@ import {
   classifyGalleryUpload,
   galleryImageItemToGalleryImage,
   getGalleryBoardLabel,
-  getGalleryDestinationBoardId,
+  getGalleryAutoAddBoardId,
   getGallerySelectedBoardId,
   getGallerySettings,
   getGalleryView,
@@ -115,9 +115,9 @@ export const PasteMediaDialog = ({ request }: { request: PasteMediaRequest }) =>
         orderDir: gallerySettings.boardOrderDir,
       })
     ).data ?? EMPTY_BOARDS;
-  // Uploads land where generation results do: the picked board, else the
-  // project board — never a date bucket, which cannot hold items.
-  const destinationBoardId = getGalleryDestinationBoardId(galleryValues) ?? 'none';
+  // Uploads land where generation results do: the auto-add board — never a
+  // date bucket, which cannot hold items.
+  const destinationBoardId = getGalleryAutoAddBoardId(galleryValues) ?? 'none';
   const selectedBoardId = getGallerySelectedBoardId(galleryValues, boards);
   const galleryView = getGalleryView(galleryValues);
   const getCurrentGalleryLocation = useCallback(

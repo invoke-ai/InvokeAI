@@ -57,7 +57,7 @@ const projectState = (id = 'project-1', projectGraph: ProjectGraphState = create
 const NODE_STATE = {
   error: null,
   latestOutput: null,
-  outputImageUrl: null,
+  outputImageName: null,
   progress: 0.5,
   progressMessage: null,
   status: 'running' as const,

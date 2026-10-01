@@ -50,13 +50,14 @@ vi.mock('@workbench/layoutPresetActivation', async (importOriginal) => {
 
 vi.mock('./useTopbarShortcut', () => ({ useTopbarShortcut: () => null }));
 
+import { LayoutPresetAdminDialogs } from './LayoutPresetAdminDialogs';
 import { LayoutPresetStrip } from './LayoutPresetStrip';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const renderStrip = async () => {
+const renderStrip = async ({ withAdminDialogs = false } = {}) => {
   host = document.createElement('div');
   host.style.width = '900px';
   document.body.append(host);
@@ -66,6 +67,7 @@ const renderStrip = async () => {
     root?.render(
       <ChakraProvider value={system}>
         <LayoutPresetStrip />
+        {withAdminDialogs ? <LayoutPresetAdminDialogs /> : null}
       </ChakraProvider>
     );
     await new Promise<void>((resolve) => {
@@ -96,6 +98,18 @@ const pressDown = (target: EventTarget, clientX: number, clientY: number): void 
     new PointerEvent('pointerdown', { bubbles: true, button: 0, cancelable: true, clientX, clientY })
   );
   mouse('mousedown', target, clientX, clientY);
+};
+
+const settle = (ms = 200): Promise<void> =>
+  new Promise((resolve) => {
+    globalThis.setTimeout(resolve, ms);
+  });
+
+const openPresetMenuItem = async (presetId: string, item: string) => {
+  await act(() => userEvent.click(presetTab(presetId)!, { button: 'right' }));
+  await act(() => settle());
+  await act(() => userEvent.click(document.querySelector<HTMLElement>(`[role="menuitem"][data-value="${item}"]`)!));
+  await act(() => settle());
 };
 
 const nextFrame = (): Promise<void> =>
@@ -150,6 +164,46 @@ describe('LayoutPresetStrip', () => {
     await act(() => userEvent.click(presetTab('edit')!));
 
     expect(store.getSnapshot().activeProject.layout.presetId).toBe('edit');
+  });
+
+  // The menu's layer must be gone before an admin dialog mounts, or zag dismisses the dialog as nested above it.
+  it('keeps the edit and delete dialogs opened from a preset menu', async () => {
+    await renderStrip({ withAdminDialogs: true });
+
+    await openPresetMenuItem('custom-1', 'edit-preset');
+
+    const editDialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    expect(editDialog?.textContent).toMatch(/^topbar\.presets\.edit/);
+    expect(document.querySelector('[role="menu"]')).toBeNull();
+
+    const name = editDialog!.querySelector<HTMLInputElement>('input[name="layout-preset-name"]')!;
+    await act(() => userEvent.clear(name));
+    await act(() => userEvent.type(name, 'Renamed'));
+    await act(() =>
+      userEvent.click(
+        Array.from(editDialog!.querySelectorAll('button')).find(
+          (button) => button.textContent === 'topbar.presets.save'
+        )!
+      )
+    );
+    await act(() => settle());
+
+    expect(presetTab('custom-1')).toHaveAttribute('aria-label', 'Renamed');
+
+    await openPresetMenuItem('custom-1', 'delete-preset');
+
+    const deleteDialog = document.querySelector<HTMLElement>('[role="alertdialog"], [role="dialog"]');
+    expect(deleteDialog?.textContent).toMatch(/topbar\.presets\.deleteQuestion/);
+    await act(() =>
+      userEvent.click(
+        Array.from(deleteDialog!.querySelectorAll('button')).find(
+          (button) => button.textContent === 'topbar.presets.delete'
+        )!
+      )
+    );
+    await act(() => settle());
+
+    expect(presetTabIds()).not.toContain('custom-1');
   });
 
   // Desktop tabs activate on press, including the press that begins reordering.

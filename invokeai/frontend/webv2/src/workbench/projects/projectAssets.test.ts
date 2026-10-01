@@ -339,7 +339,14 @@ describe('stripInstallationState', () => {
     const stripped = stripInstallationState({
       widgetInstances: {
         'gallery-1': {
-          state: { values: { galleryView: 'images', projectBoardId: 'board-1', selectedBoardId: 'board-2' } },
+          state: {
+            values: {
+              autoAddBoardId: 'board-3',
+              galleryView: 'images',
+              projectBoardId: 'board-1',
+              selectedBoardId: 'board-2',
+            },
+          },
           typeId: 'gallery',
         },
       },
@@ -348,6 +355,7 @@ describe('stripInstallationState', () => {
 
     expect(JSON.stringify(stripped)).not.toContain('board-1');
     expect(JSON.stringify(stripped)).not.toContain('board-2');
+    expect(JSON.stringify(stripped)).not.toContain('board-3');
     // Everything else the widget holds survives.
     expect(JSON.stringify(stripped)).toContain('galleryView');
   });
