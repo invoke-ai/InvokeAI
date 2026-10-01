@@ -15,6 +15,7 @@ import {
   recordProjectWorkflowRun,
   redoProjectWorkflow,
   removeProjectWorkflow,
+  replaceProjectWorkflowDocument,
   selectProjectWorkflow,
   setProjectWorkflowSource,
   stripProjectWorkflowSources,
@@ -268,6 +269,61 @@ describe('per-workflow edit history', () => {
     expect(project.workflowHistories.a?.future).toHaveLength(15);
     expect(project.workflowHistories.b?.past).toHaveLength(25);
     expect(getActiveProjectGraph(redoProjectWorkflow(project, 'a')).nodes.map((node) => node.id)).toEqual(['a-0']);
+  });
+});
+
+describe('replacing a copy with its library version', () => {
+  it('keeps the copy’s id and name, moves its source, and undoes to the previous graph in one step', () => {
+    const copy = { ...createProjectGraph('copy'), name: 'My tweaks' };
+    let project: ProjectWorkflowSession = {
+      workflowHistories: {},
+      workflows: {
+        activeWorkflowId: 'copy',
+        entries: [{ document: copy, source: { libraryWorkflowId: 'lib', revision: 1 } }],
+      },
+    };
+
+    project = addNode(project, 'copy', 'mine');
+
+    const authored = getActiveProjectGraph(project);
+    const library = { ...createProjectGraph('parsed-elsewhere'), name: 'Library name' };
+    const libraryWithNode = applyProjectWorkflowAction(session(library), library.id, {
+      node: { ...buildInvocationNode(template, { x: 10, y: 10 }), id: 'theirs' },
+      type: 'addNode',
+    }).project;
+
+    project = replaceProjectWorkflowDocument(project, 'copy', getActiveProjectGraph(libraryWithNode), {
+      label: 'Replace',
+      source: { libraryWorkflowId: 'lib', revision: 4 },
+    });
+
+    const replaced = project.workflows.entries[0]!;
+
+    expect(replaced.document).toMatchObject({ id: 'copy', name: 'My tweaks' });
+    expect(replaced.document.nodes.map((node) => node.id)).toEqual(['theirs']);
+    expect(replaced.source).toEqual({ libraryWorkflowId: 'lib', revision: 4 });
+
+    project = undoProjectWorkflow(project, 'copy');
+
+    // The graph and the revision it is based on travel together, so a later update still meets the conflict check.
+    expect(getActiveProjectGraph(project)).toBe(authored);
+    expect(project.workflows.entries[0]!.source).toEqual({ libraryWorkflowId: 'lib', revision: 1 });
+
+    project = redoProjectWorkflow(project, 'copy');
+
+    expect(getActiveProjectGraph(project).nodes.map((node) => node.id)).toEqual(['theirs']);
+    expect(project.workflows.entries[0]!.source).toEqual({ libraryWorkflowId: 'lib', revision: 4 });
+  });
+
+  it('leaves the project alone when the copy is gone', () => {
+    const project = session(createProjectGraph('a'));
+
+    expect(
+      replaceProjectWorkflowDocument(project, 'missing', createProjectGraph('b'), {
+        label: 'Replace',
+        source: { libraryWorkflowId: 'lib', revision: 1 },
+      })
+    ).toBe(project);
   });
 });
 

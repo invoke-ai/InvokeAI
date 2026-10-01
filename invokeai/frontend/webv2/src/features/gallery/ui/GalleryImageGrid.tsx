@@ -637,7 +637,7 @@ export const GalleryImageGrid = () => {
           </Flex>
         ) : null}
         <ScrollArea.Root h="full" minH="0" size="xs" variant="hover" w="full">
-          <ScrollArea.Viewport ref={viewportRef} h="full" outline="none" w="full">
+          <ScrollArea.Viewport ref={viewportRef} data-dnd-auto-scroll="false" h="full" outline="none" w="full">
             <ScrollArea.Content display="flex" flexDirection="column" minH="full">
               {pinnedHeight > 0 ? (
                 <Box

@@ -532,6 +532,14 @@ const LayerMenu = ({
   const openRename = useCallback(() => setDialogKind('rename'), [setDialogKind]);
   const closeDialog = useCallback(() => setDialogKind(null), [setDialogKind]);
   const openRunWorkflow = useCallback(() => setDialogKind('run-workflow'), [setDialogKind]);
+  // Operations present their controls in the Properties pane, so starting one must bring that pane into view.
+  const revealProperties = useCallback(
+    (layerId: string) => {
+      widgets.open({ region: 'right', widgetId: 'layers' });
+      requestLayerProperties(layerId);
+    },
+    [widgets]
+  );
   const startSelectObject = useCallback(
     (layerId: string) => {
       if (!engine) {
@@ -541,8 +549,9 @@ const LayerMenu = ({
       if (result !== 'started') {
         throw makeStatusError(result);
       }
+      revealProperties(layerId);
     },
-    [engine, makeStatusError]
+    [engine, makeStatusError, revealProperties]
   );
   const startFilter = useCallback(
     (layerId: string) => {
@@ -553,8 +562,9 @@ const LayerMenu = ({
       if (result !== 'started') {
         throw makeStatusError(result);
       }
+      revealProperties(layerId);
     },
-    [engine, makeStatusError]
+    [engine, makeStatusError, revealProperties]
   );
   const submitRename = useCallback(
     (name: string) => {
@@ -637,10 +647,9 @@ const LayerMenu = ({
   }, [engine, layer.id, makeStatusError]);
 
   const handleOpenProperties = useCallback(() => {
-    widgets.open({ region: 'right', widgetId: 'layers' });
+    revealProperties(layer.id);
     focusOpenedWidget('right', 'layers');
-    requestLayerProperties(layer.id);
-  }, [layer.id, widgets]);
+  }, [layer.id, revealProperties]);
 
   const handleBooleanRaster = useCallback(
     async (operation: BooleanRasterOperation) => {

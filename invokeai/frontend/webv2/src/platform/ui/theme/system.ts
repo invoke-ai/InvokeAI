@@ -18,6 +18,7 @@ import {
   skeletonRecipe,
   sliderSlotRecipe,
   tabsSlotRecipe,
+  toastSlotRecipe,
   textareaRecipe,
   tooltipSlotRecipe,
 } from './recipes';
@@ -371,6 +372,7 @@ const config = defineConfig({
       select: selectSlotRecipe,
       slider: sliderSlotRecipe,
       tabs: tabsSlotRecipe,
+      toast: toastSlotRecipe,
       tooltip: tooltipSlotRecipe,
     },
   },

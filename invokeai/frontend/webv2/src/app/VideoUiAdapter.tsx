@@ -1,7 +1,7 @@
 import type { VideoUiAdapter } from '@features/video';
 import type { ReactNode } from 'react';
 
-import { getGalleryDestinationBoardId, toGalleryItemKey } from '@features/gallery/contracts';
+import { getGalleryAutoAddBoardId, toGalleryItemKey } from '@features/gallery/contracts';
 import { invalidateGallery } from '@features/gallery/queries';
 import { VideoUiProvider } from '@features/video';
 import { useQueryClient } from '@tanstack/react-query';
@@ -34,9 +34,9 @@ export const VideoUiAdapterProvider = ({ children }: { children: ReactNode }) =>
   const showPromptSyntaxHighlighting = useWorkbenchPreferenceSelector(
     (preferences) => preferences.showPromptSyntaxHighlighting
   );
-  // Use the queue's galleryBoardId destination for panel uploads too.
+  // Panel uploads land where new results do: the auto-add board.
   const uploadBoardId = useActiveProjectSelector(
-    (activeProject) => getGalleryDestinationBoardId(getProjectWidgetValues(activeProject, 'gallery')) ?? 'none'
+    (activeProject) => getGalleryAutoAddBoardId(getProjectWidgetValues(activeProject, 'gallery')) ?? 'none'
   );
   // Read the current board through a ref so board selection does not recreate project actions.
   const uploadBoardIdRef = useRef(uploadBoardId);

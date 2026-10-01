@@ -1469,6 +1469,7 @@
       "any": "Direct value or connection"
     },
     "pinnedToLinearUi": "Pinned to Linear UI.",
+    "renameFieldHint": "Double-click the name to rename it.",
     "batch": "batch",
     "any": "Any",
     "anyInput": "Any input",
@@ -1533,8 +1534,6 @@
     "executionCompleted": "Completed",
     "executionFailed": "Failed",
     "childWorkflowError": "Child workflow error: {{error}}",
-    "latestOutput": "Latest output",
-    "latestOutputImage": "Latest output of this node",
     "forLoopBodyBoundary": "For loop body",
     "imageCollectionCount_one": "{{count}} image",
     "imageCollectionCount_other": "{{count}} images",
@@ -1849,6 +1848,10 @@
         "label": "Keep highlighted connections behind nodes",
         "description": "Connections to a selected node normally rise above other nodes. Keep them beneath so they never cover node controls."
       },
+      "workflowGroupNodesByCategory": {
+        "label": "Group node search by category",
+        "description": "Show add-node results under their categories. When off, results are one list ordered by how closely they match."
+      },
       "workflowShowMinimap": {
         "label": "Show minimap",
         "description": "Show an overview in the corner of the workflow editor."
@@ -2109,6 +2112,11 @@
           "clickPoint": "Remove that point.",
           "drag": "Draw or adjust the search box."
         }
+      },
+      "title": {
+        "group": "Group: {{name}}",
+        "layer": "Layer: {{name}}",
+        "operation": "Operation: {{name}}"
       },
       "target": {
         "defaults": "Defaults",
@@ -3791,6 +3799,10 @@
       "alwaysShowDimensions": "Always show dimensions",
       "archiveBoard": "Archive Board",
       "archivedBoards": "Archived boards",
+      "autoAddBadge": "Auto",
+      "autoAddBadgeTooltip": "New generations, canvas saves and pasted uploads land here, as do workflow nodes whose board is Auto.",
+      "autoAddToBoard": "Auto-add to this board",
+      "stopAutoAdd": "Stop auto-adding here",
       "assetCount_one": "{{count}} upload",
       "assetCount_other": "{{count}} uploads",
       "boardActionsForBoard": "Board actions for {{name}}",
@@ -3808,6 +3820,8 @@
       "boardRenamed": "Renamed board to \"{{name}}\"",
       "boardUnarchived": "Unarchived board \"{{name}}\"",
       "boardVisibility": "Board visibility",
+      "destination": "Destination",
+      "followSelectedBoard": "Send new results to the selected board",
       "commands": {
         "clearSelection": "Clear gallery selection",
         "deleteSelection": "Delete gallery selection",
@@ -4278,12 +4292,9 @@
   },
   "workflowLibrary": {
     "activeWorkflow": "Active",
-    "addAnotherCopy": "Add another copy",
-    "addAnotherCopyHint": "A second, independent copy in this project",
     "allTag": "All",
     "applying": "Applying workflow…",
     "browse": "Browse",
-    "chooseProjectCopy": "Open which copy?",
     "conflictStaleBody": "The library template behind \"{{name}}\" has changed since this copy was loaded or last saved.",
     "conflictTitle": "Template has changed",
     "conflictUnknownBody": "It is not known whether the library template behind \"{{name}}\" still matches this copy.",
@@ -4313,6 +4324,7 @@
     "loadFailedBody": "Could not load \"{{name}}\".",
     "loadWarning": "Workflow load warning",
     "loadedLabel": "Loaded \"{{name}}\" from library",
+    "replacedLabel": "Replaced with \"{{name}}\" from library",
     "loading": "Loading workflows…",
     "loadingMore": "Loading more…",
     "moreActions": "More actions",
@@ -4322,11 +4334,22 @@
     "nodeCount_one": "{{count}} node",
     "nodeCount_other": "{{count}} nodes",
     "notRunYet": "Not run yet",
+    "copyChoice": {
+      "addCopy": "Add new copy",
+      "body_one": "This project already has a copy of this workflow. Open it, add another copy, or replace the copy with the library version.",
+      "body_other": "This project already has {{count}} copies of this workflow. Open one, add another copy, or replace one with the library version.",
+      "copy": "Copy",
+      "open": "Open copy",
+      "openCopyLabel": "{{name}} (open now)",
+      "replace": "Replace copy",
+      "replaceHint": "Replacing keeps the copy's name and swaps in the library's graph; undo restores the previous one.",
+      "title": "“{{name}}” is already in this project"
+    },
     "open": "Open",
+    "openExistingCopiesHint": "This project already has a copy; choose to open it, add another, or replace it",
     "openHint": "Adds a copy to this project",
+    "openWithEllipsis": "Open…",
     "openProjectChanged": "The project changed while \"{{name}}\" was loading; nothing was added.",
-    "openProjectCopy": "Open project copy",
-    "openProjectCopyHint": "Switches to the copy this project already has",
     "openProjectWorkflowHint": "Makes it the active workflow",
     "previewGraph": "Preview graph",
     "projectWorkflowCount_one": "{{count}} workflow in this project",

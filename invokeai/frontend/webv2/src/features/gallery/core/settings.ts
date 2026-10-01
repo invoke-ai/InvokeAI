@@ -16,8 +16,16 @@ export const GALLERY_MIN_GRID_HEIGHT_PX = 128;
 export const GALLERY_BOARD_PANEL_MIN_WIDTH_PX = 180;
 export const GALLERY_BOARD_PANEL_MAX_WIDTH_PX = 420;
 
+/** The auto-add choice that sends results to whichever board the gallery has selected. */
+export const GALLERY_AUTO_ADD_FOLLOW = 'follow';
+
 /** User-tunable gallery settings, persisted in the widget's `values` record. */
 export interface GallerySettings {
+  /**
+   * Where results without a board of their own go: `follow` (the selected board), `none` (Uncategorized), or a
+   * board id. Workflow nodes set to Auto use it too.
+   */
+  autoAddBoardId: string;
   boardOrderBy: GalleryBoardOrderBy;
   boardOrderDir: GalleryOrderDir;
   /** Board panel disclosure controlled by the region-independent widget header. */
@@ -41,6 +49,7 @@ export interface GallerySettings {
 }
 
 export const DEFAULT_GALLERY_SETTINGS: GallerySettings = {
+  autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW,
   boardOrderBy: 'created_at',
   boardOrderDir: 'DESC',
   boardPanelCollapsed: false,
@@ -87,6 +96,10 @@ export const getGallerySettings = (values: Record<string, unknown>): GallerySett
     values.paginationMode === 'paginated' ? 'paginated' : DEFAULT_GALLERY_SETTINGS.paginationMode;
 
   return {
+    autoAddBoardId:
+      typeof values.autoAddBoardId === 'string' && values.autoAddBoardId !== ''
+        ? values.autoAddBoardId
+        : DEFAULT_GALLERY_SETTINGS.autoAddBoardId,
     boardOrderBy: isBoardOrderBy(values.boardOrderBy) ? values.boardOrderBy : DEFAULT_GALLERY_SETTINGS.boardOrderBy,
     boardOrderDir: isOrderDir(values.boardOrderDir) ? values.boardOrderDir : DEFAULT_GALLERY_SETTINGS.boardOrderDir,
     boardPanelCollapsed:
