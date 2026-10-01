@@ -30,8 +30,6 @@ export type WorkflowPublicationIntent =
 export interface WorkflowUiSnapshot {
   addNodeConnection: AddNodeConnectionFilter | null;
   addNodePosition: XYPosition | null;
-  /** Nodes whose latest-output preview is folded away. Session-lived, like the previews themselves. */
-  collapsedPreviewNodeIds: ReadonlySet<string>;
   isAddNodeOpen: boolean;
   isLibraryOpen: boolean;
   /** Which view the library dialog shows; remembered for the session. */
@@ -63,7 +61,6 @@ let nextWorkflowLoadRequestId = 0;
 const INITIAL_WORKFLOW_UI_SNAPSHOT: WorkflowUiSnapshot = {
   addNodeConnection: null,
   addNodePosition: null,
-  collapsedPreviewNodeIds: new Set(),
   importRequestCount: 0,
   isAddNodeOpen: false,
   renameRequest: null,
@@ -143,18 +140,6 @@ export const clearPendingWorkflowLoad = (requestId: number): void => {
   if (workflowUiStore.getSnapshot().pendingWorkflowLoad?.requestId === requestId) {
     workflowUiStore.patchSnapshot({ pendingWorkflowLoad: null });
   }
-};
-
-export const setNodePreviewCollapsed = (nodeId: string, collapsed: boolean): void => {
-  const collapsedPreviewNodeIds = new Set(workflowUiStore.getSnapshot().collapsedPreviewNodeIds);
-
-  if (collapsed) {
-    collapsedPreviewNodeIds.add(nodeId);
-  } else {
-    collapsedPreviewNodeIds.delete(nodeId);
-  }
-
-  workflowUiStore.patchSnapshot({ collapsedPreviewNodeIds });
 };
 
 let nextRenameRequestId = 0;

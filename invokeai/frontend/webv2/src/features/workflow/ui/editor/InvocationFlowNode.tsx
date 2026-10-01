@@ -2,20 +2,7 @@
 import type { FieldInputTemplate, FieldOutputTemplate, WorkflowInvocationNode } from '@features/workflow/contracts';
 import type { WorkflowNodeExecutionState as NodeExecutionState } from '@features/workflow/ui/contracts';
 
-import {
-  Box,
-  chakra,
-  Checkbox,
-  Field,
-  Flex,
-  HStack,
-  Icon,
-  IconButton,
-  Image,
-  Input,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { Box, Checkbox, Field, Flex, HStack, Icon, IconButton, Input, Stack, Text } from '@chakra-ui/react';
 import { getWorkflowFieldSeedMode, isSeedInputField } from '@features/workflow/graph';
 import { FieldDescriptionPopover } from '@features/workflow/ui/fields/FieldDescriptionPopover';
 import { WorkflowFieldInput, WorkflowFieldSnapshot } from '@features/workflow/ui/fields/WorkflowFieldInput';
@@ -25,7 +12,6 @@ import {
   getWorkflowNodeHeaderProps,
   getWorkflowNodeShellProps,
   WORKFLOW_NODE_DENSITY,
-  WORKFLOW_NODE_SURFACE_TOKEN,
   WorkflowNodeInfoIcon,
   WorkflowNodeOutcomeIcon,
   useIsWorkflowImageExport,
@@ -33,7 +19,6 @@ import {
 } from '@features/workflow/ui/nodeChrome';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNodeExecutionState } from '@features/workflow/ui/WorkflowUiContext';
-import { setNodePreviewCollapsed, workflowUiStore } from '@features/workflow/ui/workflowUiStore';
 import {
   CALL_SAVED_WORKFLOW_DYNAMIC_FIELD_PREFIX,
   cloneWorkflowFieldDefault,
@@ -50,12 +35,11 @@ import {
   isExposableField,
   isWorkflowFieldValueDefault,
 } from '@features/workflow/utility';
-import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, RotateCcwIcon, TriangleAlertIcon } from 'lucide-react';
-import { memo, useId, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { memo, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InvocationFlowNode as InvocationFlowNodeType, InvocationNodeTemplateView } from './flowAdapters';
@@ -479,80 +463,6 @@ const NodeInfoIcon = ({
     label={`Show details for ${node.data.label || template.title}`}
   />
 );
-
-/** Fixed so a run's differently shaped outputs do not resize the node and shove its neighbours around. */
-const NODE_OUTPUT_PREVIEW_HEIGHT = '10rem';
-
-/**
- * The node's latest output image behind a disclosure. The fold is session-lived
- * (`workflowUiStore`), matching the preview itself, so it is not a graph edit.
- */
-const NodeOutputPreview = ({
-  imageUrl,
-  isSkeleton,
-  nodeId,
-  roundedBottom,
-}: {
-  imageUrl: string;
-  isSkeleton: boolean;
-  nodeId: string;
-  roundedBottom: boolean;
-}) => {
-  const { t } = useTranslation();
-  const contentId = useId();
-  const collapsed = useExternalStoreSelector(workflowUiStore.subscribe, workflowUiStore.getSnapshot, (snapshot) =>
-    snapshot.collapsedPreviewNodeIds.has(nodeId)
-  );
-
-  return (
-    <Box borderBottomRadius={roundedBottom ? 'lg' : 'none'} borderColor="border.subtle" borderTopWidth="1px">
-      <chakra.button
-        alignItems="center"
-        aria-controls={contentId}
-        aria-expanded={!collapsed}
-        className="nodrag"
-        display="flex"
-        focusVisibleRing="inside"
-        gap="1"
-        px={WORKFLOW_NODE_DENSITY.rowPaddingX}
-        py="1"
-        textAlign="start"
-        type="button"
-        w="full"
-        onClick={() => setNodePreviewCollapsed(nodeId, !collapsed)}
-      >
-        <Icon as={collapsed ? ChevronRightIcon : ChevronDownIcon} boxSize="3" color="fg.subtle" />
-        <Text
-          color="fg.subtle"
-          fontSize="2xs"
-          fontWeight="600"
-          letterSpacing="wide"
-          lineHeight="1"
-          textTransform="uppercase"
-        >
-          {t('nodes.latestOutput')}
-        </Text>
-      </chakra.button>
-      {/* The frame behind the image keeps a letterboxed output reading as a picture, not a gap. */}
-      <Box id={contentId} hidden={collapsed} pb="1.5" px={WORKFLOW_NODE_DENSITY.rowPaddingX}>
-        {collapsed ? null : isSkeleton ? (
-          <SkeletonBar h={NODE_OUTPUT_PREVIEW_HEIGHT} w="full" />
-        ) : (
-          <Image
-            alt={t('nodes.latestOutputImage')}
-            bg={WORKFLOW_NODE_SURFACE_TOKEN}
-            draggable={false}
-            h={NODE_OUTPUT_PREVIEW_HEIGHT}
-            objectFit="contain"
-            rounded="sm"
-            src={imageUrl}
-            w="full"
-          />
-        )}
-      </Box>
-    </Box>
-  );
-};
 
 const NodeFooter = ({ canUseCache, node }: { canUseCache: boolean; node: WorkflowInvocationNode }) => {
   const { editGraph } = useProjectGraphCommands();
@@ -1088,7 +998,6 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
   const isCompact = data.isCompact && !selected && !isWorkflowImageExport;
   const withFooter = !isWorkflowImageExport && !isZoomedOut && templateView.isExecutable && templateView.hasImageOutput;
   const resultExecution = isWorkflowImageExport ? null : execution;
-  const withOutputPreview = Boolean(resultExecution?.outputImageUrl);
   const latestResult = resultExecution?.latestOutput;
 
   return (
@@ -1140,7 +1049,7 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
           <HiddenHandles inputTemplates={inputTemplates} outputTemplates={outputTemplates} />
         </>
       ) : isOpen ? (
-        <Box {...getWorkflowNodeBodyProps({ roundedBottom: !withFooter && !withOutputPreview })}>
+        <Box {...getWorkflowNodeBodyProps({ roundedBottom: !withFooter })}>
           {outputRows.map((row) =>
             row.type === 'header' ? (
               <OutputScopeHeader key={`output-scope-${row.scope}`} scope={row.scope} />
@@ -1176,14 +1085,6 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
       ) : (
         <HiddenHandles inputTemplates={inputTemplates} outputTemplates={outputTemplates} />
       )}
-      {isOpen && resultExecution?.outputImageUrl ? (
-        <NodeOutputPreview
-          imageUrl={resultExecution.outputImageUrl}
-          isSkeleton={isZoomedOut}
-          nodeId={node.id}
-          roundedBottom={!withFooter}
-        />
-      ) : null}
       {isOpen && withFooter ? <NodeFooter canUseCache={data.canUseCache} node={node} /> : null}
     </NodeShell>
   );

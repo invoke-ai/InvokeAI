@@ -18,7 +18,6 @@ import {
 } from '@features/workflow/data/savedWorkflowQueries';
 import { WorkflowImageExportProvider } from '@features/workflow/ui/nodeChrome';
 import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
-import { setNodePreviewCollapsed } from '@features/workflow/ui/workflowUiStore';
 import {
   buildCurrentImageNode,
   buildNotesNode,
@@ -85,8 +84,6 @@ exportMocks.translate = (key, options) => i18n.t(key, options as never) as unkno
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 const NODE_ID = 'preview-node';
-/** The preview's fixed height (10rem) in CSS pixels, however the root font is sized. */
-const previewHeightPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) * 10;
 
 const template: InvocationTemplate = {
   category: 'test',
@@ -284,12 +281,11 @@ const createAdapter = (
     widgets: { open: vi.fn(), patchValues: vi.fn() },
   }) as unknown as WorkflowUiAdapter;
 
-describe('InvocationFlowNode output preview', () => {
+describe('InvocationFlowNode chrome and export', () => {
   let host: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
-    setNodePreviewCollapsed(NODE_ID, false);
     queryClient.clear();
     host = document.createElement('div');
     host.style.cssText = 'width: 480px; height: 520px;';
@@ -325,10 +321,6 @@ describe('InvocationFlowNode output preview', () => {
       )
     );
   const image = () => host.querySelector<HTMLImageElement>('.react-flow__node img');
-  const disclosure = () =>
-    [...host.querySelectorAll<HTMLButtonElement>('.react-flow__node button[aria-expanded]')].find(
-      (button) => button.textContent === 'Latest output'
-    )!;
   const nodeHeight = () => host.querySelector<HTMLElement>('.react-flow__node')!.getBoundingClientRect().height;
 
   it('keeps field-description editing available in the workflow editor', async () => {
@@ -1584,66 +1576,18 @@ describe('InvocationFlowNode output preview', () => {
     }
   });
 
-  it('keeps one preview height across differently shaped outputs and folds it away per node', async () => {
+  // Outputs are inspected in the side panel; a result growing the node would push it over the nodes below.
+  it('keeps its size and shows no image when a run completes with an image output', async () => {
     const execution = createExecutionPort();
     const adapter = createAdapter(execution.port);
 
     await render(adapter);
-    expect(image()).toBeNull();
-    expect(disclosure()).toBeUndefined();
+    const idleHeight = nodeHeight();
 
     await act(() => execution.set(completed(outputImage(400, 100))));
-    await vi.waitFor(() => expect(image()!.getBoundingClientRect().height).toBeCloseTo(previewHeightPx(), 0));
-    const heightWithWideOutput = nodeHeight();
-
-    await act(() => execution.set(completed(outputImage(100, 400))));
-    await vi.waitFor(() => expect(image()!.src).toBe(outputImage(100, 400)));
-    expect(image()!.getBoundingClientRect().height).toBeCloseTo(previewHeightPx(), 0);
-    expect(nodeHeight()).toBe(heightWithWideOutput);
-
-    await act(() => disclosure().click());
-    expect(disclosure().getAttribute('aria-expanded')).toBe('false');
-    expect(image()).toBeNull();
-    expect(nodeHeight()).toBeLessThan(heightWithWideOutput - 100);
-
-    // The fold outlives the node's mount: a remount (offscreen virtualization, a project switch back) keeps it.
-    await act(() => root.unmount());
-    root = createRoot(host);
-    await render(adapter);
-    expect(disclosure().getAttribute('aria-expanded')).toBe('false');
-    expect(image()).toBeNull();
-
-    await act(() => disclosure().click());
-    expect(disclosure().getAttribute('aria-expanded')).toBe('true');
-    await vi.waitFor(() => expect(image()!.getBoundingClientRect().height).toBeCloseTo(previewHeightPx(), 0));
-  });
-
-  it('stands in a same-height skeleton for the image when the viewport is zoomed out', async () => {
-    const execution = createExecutionPort();
-    const adapter = createAdapter(execution.port);
-    execution.set(completed(outputImage(400, 100)));
-
-    await render(adapter);
-    await vi.waitFor(() => expect(image()).not.toBeNull());
-    const node = () => host.querySelector<HTMLElement>('.react-flow__node')!;
-    const layoutHeight = node().offsetHeight;
-
-    await act(() => root.unmount());
-    root = createRoot(host);
-    await render(adapter, 0.3);
-
-    await vi.waitFor(() => expect(image()).toBeNull());
-    expect(node().offsetHeight).toBe(layoutHeight);
-  });
-
-  it('omits completed output previews from image exports when zoomed out', async () => {
-    const execution = createExecutionPort();
-    const adapter = createAdapter(execution.port);
-    execution.set(completed(outputImage(400, 100)));
-
-    await render(adapter, 0.3, true);
 
     expect(image()).toBeNull();
+    expect(nodeHeight()).toBe(idleHeight);
   });
 
   it('renders full fields for compact nodes during image export', async () => {

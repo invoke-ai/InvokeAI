@@ -1533,8 +1533,6 @@
     "executionCompleted": "Completed",
     "executionFailed": "Failed",
     "childWorkflowError": "Child workflow error: {{error}}",
-    "latestOutput": "Latest output",
-    "latestOutputImage": "Latest output of this node",
     "forLoopBodyBoundary": "For loop body",
     "imageCollectionCount_one": "{{count}} image",
     "imageCollectionCount_other": "{{count}} images",
