@@ -263,10 +263,14 @@ class MistralEncoder_Diffusers_Config(Config_Base):
         return cls(variant=variant, **override_fields)
 
 
+# Comfy-Org ``*_fp4_mixed`` files probe as checkpoints here, but the loader cannot dequantize them:
+# it scales the packed uint8 instead of unpacking the two nibbles a byte holds, which is where the
+# shape mismatch in issue #9565 comes from. Rejecting them at probe is a follow-up. Kept out of the
+# class docstring below because pydantic publishes that as the schema description.
 class MistralEncoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
     """Configuration for a single-file Mistral text encoder (safetensors).
 
-    Accepts both 30-layer cow (Comfy-Org bf16/fp8/fp4) and 40-layer Mistral Small 3
+    Accepts both 30-layer cow (Comfy-Org bf16/fp8) and 40-layer Mistral Small 3
     (BFL canonical / upstream Mistral 3.x single-files). The loader uses the
     detected variant to decide whether to keep or strip the final RMSNorm.
     """

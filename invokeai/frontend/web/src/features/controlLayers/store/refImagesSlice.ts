@@ -23,6 +23,7 @@ import {
   isFlux2ReferenceImageConfig,
   isFLUXReduxConfig,
   isIPAdapterConfig,
+  isKrea2ReferenceImageConfig,
   isQwenImageReferenceImageConfig,
   isWanReferenceImageConfig,
   zRefImagesState,
@@ -146,11 +147,13 @@ const slice = createSlice({
         return;
       }
 
-      // FLUX.2, Qwen Image Edit and Wan reference images don't have a model field - they use built-in support
+      // FLUX.2, Qwen Image Edit, Wan and Krea-2 reference images don't have a model field - they use
+      // built-in support
       if (
         isFlux2ReferenceImageConfig(entity.config) ||
         isQwenImageReferenceImageConfig(entity.config) ||
-        isWanReferenceImageConfig(entity.config)
+        isWanReferenceImageConfig(entity.config) ||
+        isKrea2ReferenceImageConfig(entity.config)
       ) {
         return;
       }
@@ -233,6 +236,17 @@ const slice = createSlice({
         return;
       }
       entity.config.weight = weight;
+    },
+    refImageKrea2StyleStrengthChanged: (state, action: PayloadActionWithId<{ styleStrength: number }>) => {
+      const { id, styleStrength } = action.payload;
+      const entity = selectRefImageEntity(state, id);
+      if (!entity) {
+        return;
+      }
+      if (!isKrea2ReferenceImageConfig(entity.config)) {
+        return;
+      }
+      entity.config.styleStrength = styleStrength;
     },
     refImageIPAdapterBeginEndStepPctChanged: (
       state,
@@ -331,6 +345,7 @@ export const {
   refImageIPAdapterWeightChanged,
   refImageIPAdapterBeginEndStepPctChanged,
   refImageFLUXReduxImageInfluenceChanged,
+  refImageKrea2StyleStrengthChanged,
   refImageIsEnabledToggled,
   refImagesRecalled,
   refImagesReordered,

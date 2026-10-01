@@ -43,6 +43,17 @@ vi.mock('features/controlLayers/store/paramsSlice', () => ({
   selectParamsSlice: vi.fn(() => params),
 }));
 
+let refImageEntities: unknown[] = [];
+vi.mock('features/controlLayers/store/refImagesSlice', async () => {
+  const actual = await vi.importActual('features/controlLayers/store/refImagesSlice');
+  return { ...actual, selectRefImagesSlice: vi.fn(() => ({ entities: refImageEntities })) };
+});
+
+vi.mock('features/controlLayers/store/validators', async () => {
+  const actual = await vi.importActual('features/controlLayers/store/validators');
+  return { ...actual, getGlobalReferenceImageWarnings: vi.fn(() => []) };
+});
+
 vi.mock('features/controlLayers/store/selectors', () => ({
   selectCanvasMetadata: vi.fn(() => ({})),
   selectCanvasSlice: vi.fn(() => ({
@@ -55,16 +66,33 @@ vi.mock('features/metadata/util/modelFetchingHelpers', () => ({
   fetchModelConfigWithTypeGuard: vi.fn(() => Promise.resolve(model)),
 }));
 
+// The real mode helpers are what assign the denoise dimensions - anything the builder reads off `denoise`
+// before they run is `undefined`. The mocks mirror that so ordering bugs are visible here (review 4977240290).
+let scaledSize = { width: 1024, height: 1024 };
+const applyScaledSize = (denoise: { width?: number; height?: number }) => {
+  denoise.width = scaledSize.width;
+  denoise.height = scaledSize.height;
+};
+
 vi.mock('features/nodes/util/graph/generation/addImageToImage', () => ({
-  addImageToImage: vi.fn(({ l2i }) => Promise.resolve(l2i)),
+  addImageToImage: vi.fn(({ denoise, l2i }) => {
+    applyScaledSize(denoise);
+    return Promise.resolve(l2i);
+  }),
 }));
 
 vi.mock('features/nodes/util/graph/generation/addInpaint', () => ({
-  addInpaint: vi.fn(({ l2i }) => Promise.resolve(l2i)),
+  addInpaint: vi.fn(({ denoise, l2i }) => {
+    applyScaledSize(denoise);
+    return Promise.resolve(l2i);
+  }),
 }));
 
 vi.mock('features/nodes/util/graph/generation/addOutpaint', () => ({
-  addOutpaint: vi.fn(({ l2i }) => Promise.resolve(l2i)),
+  addOutpaint: vi.fn(({ denoise, l2i }) => {
+    applyScaledSize(denoise);
+    return Promise.resolve(l2i);
+  }),
 }));
 
 vi.mock('features/nodes/util/graph/generation/addRegions', () => ({
@@ -84,7 +112,10 @@ vi.mock('features/nodes/util/graph/generation/addWatermarker', () => ({
 }));
 
 vi.mock('features/nodes/util/graph/generation/addTextToImage', () => ({
-  addTextToImage: vi.fn(({ l2i }) => l2i),
+  addTextToImage: vi.fn(({ denoise, l2i }) => {
+    applyScaledSize(denoise);
+    return l2i;
+  }),
 }));
 
 vi.mock('features/nodes/util/graph/graphBuilderUtils', () => ({
@@ -141,6 +172,8 @@ describe('buildKrea2Graph', () => {
   afterEach(() => {
     vi.clearAllMocks();
     nextId = 0;
+    refImageEntities = [];
+    scaledSize = { width: 1024, height: 1024 };
     params = { ...defaultParams };
     model = { ...baseModel };
   });
@@ -384,6 +417,151 @@ describe('buildKrea2Graph', () => {
       const { g } = await buildTxt2Img();
       const metadata = g.getMetadataNode() as unknown as Record<string, unknown>;
       expect(metadata.negative_prompt).toBeUndefined();
+    });
+  });
+  describe('style reference', () => {
+    const styleRefEntity = (overrides: Record<string, unknown> = {}) => ({
+      id: 'ref-1',
+      isEnabled: true,
+      config: {
+        type: 'krea2_reference_image',
+        styleStrength: 1,
+        image: { original: { image: { image_name: 'style.png' }, width: 512, height: 512 } },
+        ...overrides,
+      },
+    });
+
+    const styleReferenceNode = (g: BuiltGraph) =>
+      Object.values(g.getGraph().nodes).find((n) => n.type === 'krea2_style_reference');
+
+    it('adds no style reference node when there is no reference image', async () => {
+      const { g } = await buildTxt2Img();
+      expect(styleReferenceNode(g)).toBeUndefined();
+    });
+
+    it('wires the style reference between the VAE and denoise', async () => {
+      refImageEntities = [styleRefEntity()];
+      const { g } = await buildTxt2Img();
+
+      const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
+      expect(styleReference).toBeDefined();
+      expect(styleReference.image).toEqual({ image_name: 'style.png' });
+
+      const edges = g.getGraph().edges;
+      expect(edges.some((e) => e.destination.node_id === styleReference.id && e.destination.field === 'vae')).toBe(
+        true
+      );
+      expect(
+        edges.some((e) => e.source.node_id === styleReference.id && e.destination.field === 'style_reference')
+      ).toBe(true);
+    });
+
+    // The reference's image tokens are appended to the target's, so a size mismatch is a hard error in the
+    // denoise node. The generation-mode helper is what assigns the denoise dimensions, so the style node has
+    // to be built after it - reading them earlier yields `undefined`, which JSON drops, silently leaving the
+    // node on its 1024x1024 backend default (review 4977240290).
+    it.each([
+      ['1024x1024', { width: 1024, height: 1024 }],
+      ['768x1024', { width: 768, height: 1024 }],
+      ['1152x896', { width: 1152, height: 896 }],
+    ])('encodes the reference at the denoise resolution (%s, txt2img)', async (_label, size) => {
+      scaledSize = size;
+      refImageEntities = [styleRefEntity()];
+      const { g } = await buildTxt2Img();
+
+      const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
+      const denoise = Object.values(g.getGraph().nodes).find((n) => n.type === 'krea2_denoise') as unknown as Record<
+        string,
+        unknown
+      >;
+      expect(denoise.width).toBe(size.width);
+      expect(styleReference.width).toBe(size.width);
+      expect(styleReference.height).toBe(size.height);
+      expect(styleReference.width).toBe(denoise.width);
+      expect(styleReference.height).toBe(denoise.height);
+    });
+
+    it.each(['img2img', 'inpaint', 'outpaint'] as const)(
+      'encodes the reference at the denoise resolution (%s)',
+      async (generationMode) => {
+        scaledSize = { width: 768, height: 1024 };
+        refImageEntities = [styleRefEntity()];
+        const { g } = await buildCanvasMode(generationMode);
+
+        const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
+        expect(styleReference.width).toBe(768);
+        expect(styleReference.height).toBe(1024);
+      }
+    );
+
+    // 0 is documented as a full bypass. Emitting the node anyway costs a VAE encode, a capture pass per step
+    // and a retained K/V cache for no visible effect.
+    it('adds no style reference node when the strength is 0', async () => {
+      refImageEntities = [styleRefEntity({ styleStrength: 0 })];
+      const { g } = await buildTxt2Img();
+
+      expect(styleReferenceNode(g)).toBeUndefined();
+      expect((g.getMetadataNode() as unknown as Record<string, unknown>).krea2_style_strength).toBeUndefined();
+    });
+
+    it('falls through to the next reference when the first has a strength of 0', async () => {
+      refImageEntities = [
+        styleRefEntity({ styleStrength: 0 }),
+        { ...styleRefEntity({ styleStrength: 0.5 }), id: 'ref-2' },
+      ];
+      const { g } = await buildTxt2Img();
+
+      const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
+      expect(styleReference.style_strength).toBe(0.5);
+    });
+
+    it('prefers the cropped image when one exists', async () => {
+      refImageEntities = [
+        styleRefEntity({
+          image: {
+            original: { image: { image_name: 'style.png' }, width: 512, height: 512 },
+            crop: { image: { image_name: 'style-cropped.png' }, width: 256, height: 256 },
+          },
+        }),
+      ];
+      const { g } = await buildTxt2Img();
+
+      const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
+      expect(styleReference.image).toEqual({ image_name: 'style-cropped.png' });
+    });
+
+    it('carries the style strength onto the node and into metadata', async () => {
+      refImageEntities = [styleRefEntity({ styleStrength: 0.6 })];
+      const { g } = await buildTxt2Img();
+
+      const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
+      expect(styleReference.style_strength).toBe(0.6);
+      expect((g.getMetadataNode() as unknown as Record<string, unknown>).krea2_style_strength).toBe(0.6);
+    });
+
+    it('ignores disabled reference images and ones without an image', async () => {
+      refImageEntities = [{ ...styleRefEntity(), isEnabled: false }, styleRefEntity({ image: null })];
+      const { g } = await buildTxt2Img();
+      expect(styleReferenceNode(g)).toBeUndefined();
+    });
+
+    it('uses only the first valid reference image', async () => {
+      // The technique supports exactly one reference; the panel allows several.
+      refImageEntities = [
+        styleRefEntity({ styleStrength: 0.25 }),
+        { ...styleRefEntity({ styleStrength: 0.75 }), id: 'ref-2' },
+      ];
+      const { g } = await buildTxt2Img();
+
+      const styleReferenceNodes = Object.values(g.getGraph().nodes).filter((n) => n.type === 'krea2_style_reference');
+      expect(styleReferenceNodes).toHaveLength(1);
+      expect((styleReferenceNodes[0] as unknown as Record<string, unknown>).style_strength).toBe(0.25);
+    });
+
+    it('ignores reference images belonging to another base', async () => {
+      refImageEntities = [{ id: 'ref-1', isEnabled: true, config: { type: 'wan_reference_image', image: {} } }];
+      const { g } = await buildTxt2Img();
+      expect(styleReferenceNode(g)).toBeUndefined();
     });
   });
 });

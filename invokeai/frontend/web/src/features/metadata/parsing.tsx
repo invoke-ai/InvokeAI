@@ -160,6 +160,7 @@ import {
   isFlux1VAEModelConfig,
   isFlux2VAEModelConfig,
   isQwen3EncoderModelConfig,
+  isZImageQwen3EncoderModelConfig,
 } from 'services/api/types';
 import { assert } from 'tsafe';
 import z from 'zod';
@@ -1598,18 +1599,18 @@ const ZImageQwen3EncoderModel: SingleMetadataHandler<ModelIdentifierField> = {
     // Check provenance: `qwen3_encoder` is also written by Anima and FLUX.2 Klein, and this handler
     // clears `zImageQwen3SourceModel` on recall (review 4966712044).
     assertMetadataModelBase(metadata, 'z-image', 'ZImageQwen3EncoderModel');
-    // The picker's domain (`useQwen3EncoderModels`): the 4B/8B encoders, i.e. everything except Anima's
-    // 0.6B, whose 1024-wide embeddings Z-Image cannot consume. That split lives in `variant`, so the
-    // full config is needed - the identifier alone cannot tell the two apart.
+    // The picker's domain (`useZImageQwen3EncoderModels`): the 4B encoder only. Anima's 0.6B (1024 wide)
+    // and Klein 9B's 8B (4096 wide) produce embeddings Z-Image cannot consume (#9526). That split lives in
+    // `variant`, so the full config is needed - the identifier alone cannot tell them apart.
     const parsed = await parseModelIdentifierMatching({
       raw: getProperty(metadata, 'qwen3_encoder'),
       store,
       type: 'qwen3_encoder',
-      isCompatible: isQwen3EncoderModelConfig,
+      isCompatible: isZImageQwen3EncoderModelConfig,
       handlerType: 'ZImageQwen3EncoderModel',
     });
-    // Klein and Z-Image encoders both satisfy isQwen3EncoderModelConfig, so the variant cannot separate
-    // those two - the currently selected base does.
+    // Klein 4B and Z-Image share the 4B encoder, so the variant cannot separate those two - the currently
+    // selected base does.
     const base = selectBase(store.getState());
     assert(base === 'z-image', 'ZImageQwen3EncoderModel handler only works with Z-Image models');
     return Promise.resolve(parsed);
