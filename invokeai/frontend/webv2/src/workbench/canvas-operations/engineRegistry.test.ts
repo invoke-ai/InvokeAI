@@ -364,7 +364,7 @@ describe('createEngineRegistry', () => {
         if (!detached) {
           throw new Error(`Detached snapshot is missing ${layerId}`);
         }
-        return Promise.resolve(detached);
+        return Promise.resolve({ ...detached, release: () => undefined });
       },
       hashBlob: (blob: Blob) => blob.text(),
       uploadImage,

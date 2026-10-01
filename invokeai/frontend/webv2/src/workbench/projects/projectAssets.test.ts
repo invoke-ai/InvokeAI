@@ -141,6 +141,7 @@ it('announces engines registering and releasing their held media', () => {
   sources.subscribe(onChange);
   let notifyEngine = () => undefined as void;
   const release = sources.register('project-1', {
+    flushPendingPixels: () => Promise.resolve(),
     read: () => ({ images: ['undo.png'], videos: [] }),
     subscribe: (listener) => {
       notifyEngine = listener;
@@ -152,6 +153,20 @@ it('announces engines registering and releasing their held media', () => {
   release();
   expect(sources.read('project-1')).toBeUndefined();
   expect(onChange).toHaveBeenCalledTimes(3);
+});
+
+it("crosses a registered engine's paint barrier and treats an unregistered project as saved", async () => {
+  const sources = createCanvasHeldMediaSources();
+  const flushPendingPixels = vi.fn(() => Promise.reject(new Error('upload failed')));
+  sources.register('project-1', {
+    flushPendingPixels,
+    read: () => ({ images: [], videos: [] }),
+    subscribe: () => () => undefined,
+  });
+
+  await expect(sources.flushPendingPixels('project-1')).rejects.toThrow('upload failed');
+  await expect(sources.flushPendingPixels('project-2')).resolves.toBeUndefined();
+  expect(flushPendingPixels).toHaveBeenCalledOnce();
 });
 
 const projectDocument = (overrides: Record<string, unknown> = {}): Record<string, unknown> => ({

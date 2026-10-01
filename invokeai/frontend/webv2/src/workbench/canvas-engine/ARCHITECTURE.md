@@ -61,8 +61,8 @@ Controllers communicate through constructor-injected ports or public capabilitie
 
 Current extracted ownership includes:
 
-- `RasterController`: base layer caches, decoded bitmap leases, derived and adjusted surfaces, rasterization jobs, invalidation, and the unified raster-memory controller.
-- `RasterMemoryBudgetController`: base, derived, decoded, detached, and reserved byte accounting plus generation-scoped and operation-owned reservations and pins.
+- `RasterController`: base layer caches, decoded bitmap leases, derived, adjusted and group surfaces, rasterization jobs, invalidation, residency pins, working-set eviction, and the unified raster-memory controller.
+- `RasterMemoryBudgetController`: base, derived, group, decoded, detached, reserved and overage byte accounting plus generation-scoped reservations and operation-owned reservations and pins.
 - `RenderController`: render targets, scheduler construction, previews, and render lifecycle.
 - `HistoryController`: engine-owned history and inactive byte trimming.
 - `PersistenceController`: dirty-bitmap flush barriers and disposal.
@@ -101,28 +101,36 @@ Canvas invocation first crosses the paint-flush barrier, then captures the post-
 
 The render path computes this set before `ensureLayerCaches`. Only demanded layers are rasterized for the frame. Offscreen enabled layers are not eagerly allocated; they remain on-demand and LRU-evictable, then rasterize again when panning or a transform reveals them.
 
-Budget enforcement protects only:
+The frame's demanded layers form its working set. After drawing, `RasterController.enforceBudget` reclaims memory in a fixed order:
 
-- layers demanded by the active frame; and
-- layers explicitly pinned by an in-flight thumbnail, export, snapshot, or other background operation.
+1. derived and group artifacts the frame did not read (obsolete parameter variants, inactive groups);
+2. least-recently-used base caches that are outside the working set and unprotected.
 
-Derived surfaces are evicted first, followed by least-recently-used unprotected base caches. Export and thumbnail callers request and pin their own caches, preserving their behavior without treating all enabled layers as visible. Deterministic tests assert allocation counts and bytes for pan/reveal, rotated bounds, unflushed paint bounds, isolation, transient transforms, eviction, and re-rasterization.
+A layer is protected while an operation pins it (`RasterController.pin`, held by every read lease, snapshot capture, export and duplicate) or while it is held: its pixels are not yet persisted (`BitmapStore.hasPendingWork`) or an edit session (transform, text, float, pixel edit, operation lock) owns them. Whatever the working set and protected layers still need stays resident; the bytes above the budget are reported as overage and leave no room for background reservations. Export and thumbnail callers request and pin their own caches. Deterministic tests assert allocation counts and bytes for pan/reveal, rotated bounds, unflushed paint bounds, isolation, transient transforms, eviction, and re-rasterization.
 
 ## Raster resource ownership and memory policy
 
-The raster soft limit is 512 MiB. `RasterMemoryBudgetController` maintains one snapshot across all material allocation classes:
+`RasterController` is the single raster owner. It owns base layer caches, derived and adjusted surfaces, group composites, decoded bitmaps, detached snapshot accounting, reservations and pins. Each store keeps a running byte total, updated at every allocation, resize, transfer and release, and pushes it to `RasterMemoryBudgetController`; nothing resynchronizes totals by rescanning. Cache surfaces change only through `LayerCacheStore` (growth, trim, replacement, `publishRasterized`, `captureState`/`restoreState`), so the accounting cannot drift from the pixels.
+
+The raster soft limit is 512 MiB. The memory snapshot reports:
 
 - `baseBytes`: layer cache surfaces;
 - `derivedBytes`: derived and adjusted display surfaces;
+- `groupBytes`: group composites;
 - `decodedBytes`: leased `ImageBitmap` instances;
-- `detachedBytes`: caller-owned raster snapshot surfaces; and
-- `reservedBytes`: capacity promised to background work but not yet represented by another class.
+- `detachedBytes`: caller-owned raster snapshot surfaces and retained operation pixels;
+- `reservedBytes`: capacity promised to background work but not yet represented by another class;
+- `overageBytes`: the amount the protected working set holds above the limit.
 
-Active-frame base surfaces are allowed to exceed the soft limit so the visible frame can render; diagnostics report the overage. Background snapshots, thumbnails, raster exports, transformed/adjusted copies, and PSD exports must reserve sufficient available bytes before allocating and return typed `over-budget` outcomes when they cannot. Surface-cache enforcement subtracts decoded, detached, and reserved bytes before calculating the base/derived allowance.
+Background snapshots, thumbnails, raster exports, transformed/adjusted copies, and PSD exports reserve sufficient available bytes before allocating and return typed `over-budget` outcomes when they cannot.
 
-Reservations and cache pins are idempotent leases. Cancellable preparation work uses lifecycle-generation leases, which activation, cooldown, and disposal release if the normal `finally` path has not already done so. Once an asynchronous raster composite is in flight, it uses operation-owned reservations and pins instead: lifecycle changes may make its result stale, but cannot erase its accounting while a yielded allocation is still able to resume. The operation releases those leases in `finally`. Detached snapshot accounting is also caller-owned: it follows the snapshot and is released only by `CanvasRasterSnapshot.release()` or engine disposal.
+Asynchronous raster reads return a `RasterReadLease` (`rasterTransactions.ts`): the pixels, their layer-local extent, a freshness guard and an idempotent `release`. The lease pins its source layer from before rasterization until release, so neither eviction nor paint trimming can reshape pixels an operation is still reading; the guard still rejects pixels a later edit replaced. Extraction, merges, crops, copies, filters, snapshots and composite exports all read through leases and release them in `finally`.
 
-`DecodedBitmapPool` replaces permanent decoded-image caching. `acquire(imageName, decode, signal)` coalesces concurrent decodes for the same image and returns a short-lived `DecodedBitmapLease`. Each rasterizer releases its lease in `finally`. The bitmap closes after the final lease, a pending decode is aborted when all interested callers cancel, and disposal aborts pending work and closes every resolved bitmap. Pool byte changes feed `decodedBytes`, so decoded images participate in the same budget as surfaces.
+Reservations are idempotent leases. Cancellable preparation work uses lifecycle-generation reservations, which activation, cooldown, and disposal release if the normal `finally` path has not already done so. Once an asynchronous raster composite is in flight, it uses operation-owned reservations instead: lifecycle changes may make its result stale, but cannot erase its accounting while a yielded allocation is still able to resume. Pins are always operation-owned. Detached snapshot accounting follows the snapshot and is released only by `CanvasRasterSnapshot.release()` or engine disposal.
+
+Paint persistence protects dirty pixels until the latest generation of them is acknowledged: across encoding, upload failures, an open retry circuit and later strokes. A dirty paint layer whose cache is missing keeps its pending work and fails the flush barrier; the store never reports a save that uploaded nothing.
+
+`DecodedBitmapPool` replaces permanent decoded-image caching. `acquire(imageName, decode, signal)` refuses an already-aborted request before any work starts, coalesces concurrent decodes for the same image and returns a short-lived `DecodedBitmapLease`. Each rasterizer releases its lease in `finally`. The bitmap closes after the final lease, a pending decode is aborted when all interested callers cancel and its late bitmap is closed, the pool observes its own decode promise so an abandoned decode cannot surface an unhandled rejection, and disposal aborts pending work and closes every resolved bitmap. Pool byte changes feed `decodedBytes`.
 
 Staged results use a separate compressed-Blob cache rather than retaining a decoded surface for every candidate. Once a candidate's thumbnail settles, the UI asks the engine to prefetch its full-resolution bytes with at most two full-image requests in flight. Selecting a queued candidate promotes it immediately and preempts stale work, while completed/in-flight requests and concurrent decodes of the same image are coalesced. The per-engine cache is LRU-bounded to 24 entries and 64 MiB, retries a failed selected request once as foreground demand, and releases outstanding work on engine cooldown or disposal.
 
@@ -154,7 +162,9 @@ The capability returns `exported`, `nothing`, `too-large`, `not-ready`, `over-bu
 
 ## Lifecycle
 
-Lifecycle states are `active`, `cooling`, `cool`, and `disposed`. Losing the final registry reference immediately detaches input/render targets, cancels background PSD work and rasterization, releases the old generation's reservations and pins, and starts a dirty-pixel flush. Successful, still-current flushes release reconstructible raster caches and trim history. Failed flushes retain dirty pixels and remain retryable; the registry retains the engine and retries after another grace period, disposing it only after a `cooled` result. Reacquisition increments the lifecycle generation so late flush or grace-period work cannot clean up or dispose a live engine. Operation-owned composite leases survive these generation transitions until their owning operation settles.
+Lifecycle states are `active`, `cooling`, `cool`, and `disposed`. Losing the final registry reference immediately detaches input/render targets, cancels background PSD work and rasterization, releases the old generation's reservations and pins, and starts a dirty-pixel flush. Successful, still-current flushes release every reconstructible raster surface (base, derived and group) and trim history. Failed flushes retain dirty pixels and remain retryable; the registry retains the engine and retries after another grace period, disposing it only after a `cooled` result. Reacquisition increments the lifecycle generation so late flush or grace-period work cannot clean up or dispose a live engine. Operation-owned composite leases survive these generation transitions until their owning operation settles.
+
+Closing a project first crosses the engine's paint barrier; if unsaved pixels cannot be persisted the project stays open with its engine state intact. Disposal cancels outstanding work and releases every resource category: caches, decoded bitmaps, reservations, pins and outstanding snapshots.
 
 Caller-owned `CanvasRasterSnapshot` objects are not reconstructible lifecycle caches. They remain usable through cooldown and continue to count against detached bytes until released. Final engine disposal force-releases them.
 

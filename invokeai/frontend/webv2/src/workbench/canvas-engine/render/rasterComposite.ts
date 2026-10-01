@@ -53,7 +53,8 @@ export interface RenderRasterCompositeDeps {
   backend: {
     createSurface(width: number, height: number): RasterSurface;
   };
-  getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect }>;
+  /** Owned access to a layer's pixels, released once they are drawn. */
+  getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect; release(): void }>;
   readImageData?(surface: RasterSurface, rect: Rect): ImageData;
   writeImageData?(surface: RasterSurface, imageData: ImageData, x: number, y: number): void;
 }
@@ -231,6 +232,14 @@ export const renderRasterComposite = async (
 
   const drawRef = async (ctx: Ctx, ref: CompositeLayerRef): Promise<void> => {
     const layerSurface = await deps.getLayerSurface(ref.id);
+    try {
+      drawLayer(ctx, ref, layerSurface);
+    } finally {
+      layerSurface.release();
+    }
+  };
+
+  const drawLayer = (ctx: Ctx, ref: CompositeLayerRef, layerSurface: { surface: RasterSurface; rect: Rect }): void => {
     if (ref.adjustments) {
       // Bake adjustments into an isolated bbox surface before applying layer opacity/blend to generation output.
       const temp = deps.backend.createSurface(width, height);

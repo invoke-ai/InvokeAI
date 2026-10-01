@@ -52,7 +52,7 @@ const sceneFor = (fills: Record<string, string>) => {
     caches,
     getLayerSurface: (layerId: string) => {
       const entry = caches.get(layerId)!;
-      return Promise.resolve({ rect: entry.rect, surface: entry.surface });
+      return Promise.resolve({ rect: entry.rect, release: () => undefined, surface: entry.surface });
     },
   };
 };

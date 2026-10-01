@@ -81,7 +81,7 @@ interface HarnessOptions {
   getLayerSurface?: (
     surface: RasterSurface,
     offset: { x: number; y: number }
-  ) => { surface: RasterSurface; offset: { x: number; y: number } } | null;
+  ) => { surface: RasterSurface; offset: { x: number; y: number } } | 'empty' | null;
   hashBlob?: (blob: Blob) => Promise<string>;
   uploadImage?: (blob: Blob) => Promise<CanvasImageUploadResult>;
   maxUploadAttempts?: number;
@@ -174,6 +174,21 @@ afterEach(() => {
 });
 
 describe('createBitmapStore', () => {
+  it('keeps unpersisted pixels pending and fails the barrier when their cache is missing', async () => {
+    const onError = vi.fn();
+    const h = createHarness({ getLayerSurface: () => null, onError });
+
+    h.store.markLayerDirty(LAYER);
+
+    await expect(h.store.flushPendingUploads()).rejects.toThrow('Canvas pixel persistence failed');
+    expect(h.encodeSurface).not.toHaveBeenCalled();
+    expect(h.uploadImage).not.toHaveBeenCalled();
+    expect(h.dispatch).not.toHaveBeenCalled();
+    expect(h.store.hasPendingWork(LAYER)).toBe(true);
+    expect(onError).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
   it('reports whether a layer still has pixels that are not represented by its persisted ref', async () => {
     const h = createHarness();
 
@@ -1484,7 +1499,7 @@ describe('truthful extent: trimming and clearing', () => {
     offset: { x: 0, y: 0 },
     type: 'paint',
   };
-  const noSurface = (): null => null;
+  const noSurface = (): 'empty' => 'empty';
 
   it('clears the ref instead of uploading when the trim finds no visible pixels', async () => {
     const h = createHarness({ getLayerSurface: noSurface, trimLayerPixels: () => 'emptied' });
@@ -1534,7 +1549,7 @@ describe('truthful extent: trimming and clearing', () => {
   it('drops a stale self-echo entry when the document already holds no bitmap', async () => {
     let erased = false;
     const h = createHarness({
-      getLayerSurface: (surface, offset) => (erased ? null : { offset, surface }),
+      getLayerSurface: (surface, offset) => (erased ? 'empty' : { offset, surface }),
       trimLayerPixels: () => (erased ? 'emptied' : 'kept'),
     });
 
@@ -1556,7 +1571,7 @@ describe('truthful extent: trimming and clearing', () => {
   it('drops the self-echo entry, so a later undo re-dispatching the old name is not mistaken for an echo', async () => {
     let erased = false;
     const h = createHarness({
-      getLayerSurface: (surface, offset) => (erased ? null : { offset, surface }),
+      getLayerSurface: (surface, offset) => (erased ? 'empty' : { offset, surface }),
       trimLayerPixels: () => (erased ? 'emptied' : 'kept'),
     });
 
@@ -1603,7 +1618,7 @@ describe('truthful extent: trimming and clearing', () => {
         clearAttempts += 1;
         return clearAttempts === 2;
       },
-      getLayerSurface: (surface, offset) => (cacheEmpty ? null : { offset, surface }),
+      getLayerSurface: (surface, offset) => (cacheEmpty ? 'empty' : { offset, surface }),
       trimLayerPixels: () => {
         if (cacheEmpty) {
           return 'kept';
@@ -1629,7 +1644,7 @@ describe('truthful extent: trimming and clearing', () => {
     let trimmedOnce = false;
     const h = createHarness({
       clearBitmap: () => false,
-      getLayerSurface: (surface, offset) => (cacheEmpty ? null : { offset, surface }),
+      getLayerSurface: (surface, offset) => (cacheEmpty ? 'empty' : { offset, surface }),
       trimLayerPixels: () => {
         if (!trimmedOnce) {
           trimmedOnce = true;
@@ -1658,7 +1673,7 @@ describe('truthful extent: trimming and clearing', () => {
     let trimmedOnce = false;
     const h = createHarness({
       clearBitmap: () => false,
-      getLayerSurface: (surface, offset) => (cacheEmpty ? null : { offset, surface }),
+      getLayerSurface: (surface, offset) => (cacheEmpty ? 'empty' : { offset, surface }),
       trimLayerPixels: () => {
         if (!trimmedOnce) {
           trimmedOnce = true;
@@ -1690,7 +1705,7 @@ describe('truthful extent: trimming and clearing', () => {
     let restoreDuringTrim = false;
     const h = createHarness({
       clearBitmap: () => false,
-      getLayerSurface: (surface, offset) => (cacheEmpty ? null : { offset, surface }),
+      getLayerSurface: (surface, offset) => (cacheEmpty ? 'empty' : { offset, surface }),
       trimLayerPixels: () => {
         if (!primedPendingClear) {
           primedPendingClear = true;

@@ -5,12 +5,10 @@ import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d } from '@workbench/canvas-engine/types';
 
 import { PreviewStateController } from '@workbench/canvas-engine/controllers/previewStateController';
-import { RasterMemoryBudgetController } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
 import * as compositor from '@workbench/canvas-engine/render/compositor';
-import * as surfaceBudget from '@workbench/canvas-engine/render/surfaceBudget';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { FloatingSelectionFrame } from './floatingSelectionFrame';
@@ -53,12 +51,13 @@ interface Harness {
   overrides: Map<string, { x: number; y: number }>;
   entries: Map<string, LayerCacheEntry>;
   rasterizeLayer: ReturnType<typeof vi.fn>;
-  deleteDerivedSurfaces: ReturnType<typeof vi.fn>;
+  beginFrame: ReturnType<typeof vi.fn>;
+  enforce: ReturnType<typeof vi.fn>;
 }
 
 let harness: Harness;
 let composite: ReturnType<typeof vi.spyOn>;
-let enforce: ReturnType<typeof vi.spyOn>;
+const FRAME_USAGE = { derivedTick: 3, groupTick: 5 };
 
 const entryFor = (rect = { height: 8, width: 8, x: 0, y: 0 }, stale = false) =>
   ({ rect, stale, surface: surface(8, 8), version: 1 }) as unknown as LayerCacheEntry;
@@ -69,12 +68,12 @@ const makeHarness = (): Harness => {
   const overrides = new Map<string, { x: number; y: number }>();
   const entries = new Map<string, LayerCacheEntry>([['a', entryFor()]]);
   const rasterizeLayer = vi.fn();
-  const deleteDerivedSurfaces = vi.fn();
+  const beginFrame = vi.fn(() => FRAME_USAGE);
+  const enforce = vi.fn(() => ({ evictedBaseLayerIds: [] as string[], overageBytes: 0 }));
   return {
-    deleteDerivedSurfaces,
+    beginFrame,
     deps: {
       backend: {} as CreateCompositeFrameDeps['backend'],
-      deleteDerivedSurfaces,
       derivedSurfaceCache: { byteSize: () => 0 } as CreateCompositeFrameDeps['derivedSurfaceCache'],
       diagnostics: {} as CreateCompositeFrameDeps['diagnostics'],
       getAdjustedSurface: () => null,
@@ -87,11 +86,10 @@ const makeHarness = (): Harness => {
         getOrCreateRect: (id: string) => entries.get(id) ?? entryFor(),
         peek: (id: string) => entries.get(id),
       } as unknown as CreateCompositeFrameDeps['layerCache'],
-      memory: new RasterMemoryBudgetController({ budgetBytes: 1_000_000 }),
       previews,
+      raster: { beginFrame, enforceBudget: enforce },
       rasterizeLayer,
       stores,
-      syncMemoryBaselines: vi.fn(),
       transformOverrides: overrides,
       viewport: {
         getDpr: () => 1,
@@ -100,6 +98,7 @@ const makeHarness = (): Harness => {
         screenToDocument: ({ x, y }: { x: number; y: number }) => ({ x, y }),
       } as unknown as CreateCompositeFrameDeps['viewport'],
     },
+    enforce,
     entries,
     overrides,
     previews,
@@ -120,9 +119,6 @@ const lastCompositeOptions = () => composite.mock.calls.at(-1)?.[4] as Record<st
 beforeEach(() => {
   harness = makeHarness();
   composite = vi.spyOn(compositor, 'compositeDocument').mockImplementation(() => undefined);
-  enforce = vi.spyOn(surfaceBudget, 'enforceSurfaceBudget').mockReturnValue({
-    evictedBaseLayerIds: [],
-  } as unknown as ReturnType<typeof surfaceBudget.enforceSurfaceBudget>);
 });
 
 describe('cache preparation', () => {
@@ -268,46 +264,25 @@ describe('compositor options', () => {
 });
 
 describe('the surface budget', () => {
-  it('protects the layers this frame drew from eviction', () => {
+  it('hands the raster owner the layers this frame demanded and the usage captured before drawing', () => {
     draw();
-    const protectedIds = enforce.mock.calls.at(-1)?.[2] as Set<string>;
-    expect(protectedIds.has('a')).toBe(true);
+    const [workingSet, usage] = harness.enforce.mock.calls.at(-1) as [Set<string>, typeof FRAME_USAGE];
+    expect(workingSet.has('a')).toBe(true);
+    expect(usage).toBe(FRAME_USAGE);
+    expect(harness.beginFrame.mock.invocationCallOrder[0]).toBeLessThan(composite.mock.invocationCallOrder[0]!);
   });
 
-  it('protects layers pinned by in-flight background work', () => {
-    harness.deps.memory.pin('pinned-layer', 0);
-    draw();
-    const protectedIds = enforce.mock.calls.at(-1)?.[2] as Set<string>;
-    expect(protectedIds.has('pinned-layer')).toBe(true);
-  });
-
-  it('leaves the surface budget room for bytes already committed elsewhere', () => {
-    const reserved = harness.deps.memory.reserve(400_000, { generation: 0, purpose: 'psd-export' });
-    expect(reserved.status).toBe('ok');
-    draw();
-    const budget = enforce.mock.calls.at(-1)?.[3] as number;
-    expect(budget).toBe(600_000);
-  });
-
-  it('never asks for a negative budget', () => {
-    harness.deps.memory.trackDetached(5_000_000, 0);
-    draw();
-    expect(enforce.mock.calls.at(-1)?.[3]).toBe(0);
-  });
-
-  it('prunes every version-keyed dependent of an evicted layer', () => {
+  it('prunes the thumbnail state of an evicted layer', () => {
     harness.stores.thumbnailVersion.set('gone', 4);
     harness.stores.thumbnailStatus.set('gone', 'ready');
-    enforce.mockReturnValue({ evictedBaseLayerIds: ['gone'] } as unknown as ReturnType<
-      typeof surfaceBudget.enforceSurfaceBudget
-    >);
+    harness.enforce.mockReturnValue({ evictedBaseLayerIds: ['gone'], overageBytes: 0 });
     draw();
-    expect(harness.deleteDerivedSurfaces).toHaveBeenCalledWith('gone');
     expect(harness.stores.thumbnailVersion.get('gone')).toBeUndefined();
+    expect(harness.stores.thumbnailStatus.get('gone')).toBeUndefined();
   });
 
   it('enforces the budget after compositing, never before', () => {
     draw();
-    expect(composite.mock.invocationCallOrder[0]).toBeLessThan(enforce.mock.invocationCallOrder[0]!);
+    expect(composite.mock.invocationCallOrder[0]).toBeLessThan(harness.enforce.mock.invocationCallOrder[0]!);
   });
 });

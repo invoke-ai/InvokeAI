@@ -209,7 +209,7 @@ describe('compositor goldens', () => {
       backend,
       getLayerSurface: (layerId) => {
         const entry = caches.get(layerId)!;
-        return Promise.resolve({ rect: entry.rect, surface: entry.surface });
+        return Promise.resolve({ rect: entry.rect, release: () => undefined, surface: entry.surface });
       },
     });
     await expectGolden('generation-base', surface, { tolerance: EXACT });

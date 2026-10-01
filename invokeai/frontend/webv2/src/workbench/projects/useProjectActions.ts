@@ -11,6 +11,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { hasActiveQueueRuns } from '@workbench/queue-integration/activeQueueRuns';
 import { useNotify } from '@workbench/useNotify';
 import {
+  useWorkbenchCanvasHeldMedia,
   useWorkbenchCommands,
   useWorkbenchPersistenceAdapter,
   useWorkbenchPersistenceService,
@@ -37,6 +38,7 @@ export const useProjectActions = (): {
   const persistence = useWorkbenchPersistenceAdapter();
   const persistenceService = useWorkbenchPersistenceService();
   const commands = useWorkbenchCommands();
+  const canvasEngines = useWorkbenchCanvasHeldMedia();
   const navigate = useNavigate();
   const notify = useNotify();
   const { t } = useTranslation();
@@ -130,7 +132,16 @@ export const useProjectActions = (): {
         if (!current) {
           return;
         }
-        const outcome = await persistenceService.flushProjectToServer(current);
+        // Unsaved canvas pixels must reach the document before it is flushed; otherwise the engine keeps them open.
+        try {
+          await canvasEngines.flushPendingPixels(project.id);
+        } catch {
+          assertAccountScopeCurrent(owner);
+          notify.error(t('projects.closeBlocked'), t('projects.file.notSynced'));
+          return;
+        }
+        assertAccountScopeCurrent(owner);
+        const outcome = await persistenceService.flushProjectToServer(queries.getProject(project.id) ?? current);
         assertAccountScopeCurrent(owner);
         if (outcome.kind === 'schema-refused') {
           notify.error(t('projects.closeBlocked'), t('projects.file.updateClient'));

@@ -9,10 +9,10 @@ import type {
   CanvasLayerContract,
   CanvasLayerSourceContract,
 } from '@workbench/canvas-engine/contracts';
+import type { RasterReadLease } from '@workbench/canvas-engine/rasterTransactions';
 import type { CanvasTextSource } from '@workbench/canvas-engine/render/fontLoader';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
-import type { Rect } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLayer, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
@@ -21,13 +21,7 @@ import { isEmpty, roundOut, transformBounds } from '@workbench/canvas-engine/mat
 import { applyAdjustments, isIdentityAdjustments } from '@workbench/canvas-engine/render/adjustments';
 
 export type ExportLayerPixelsResult =
-  | {
-      status: 'ok';
-      surface: ReturnType<RasterBackend['createSurface']>;
-      rect: Rect;
-      guard: LayerExportGuard;
-      release(): void;
-    }
+  | ({ status: 'ok' } & RasterReadLease)
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' | 'aborted' };
 
 export interface RasterExportControllerOptions {
@@ -48,7 +42,8 @@ export interface RasterExportControllerOptions {
   ) =>
     | { status: 'ok'; lease: { release(): void } }
     | { status: 'over-budget'; requestedBytes: number; availableBytes: number };
-  readonly pin?: (layerId: string) => { release(): void };
+  /** Keeps a layer resident and untrimmed for the lifetime of a read lease. */
+  readonly pin: (layerId: string) => { release(): void };
   /** Resolves custom font bytes before an operation whose pixels leave the editor. */
   readonly waitForFont?: (source: CanvasTextSource, signal?: AbortSignal) => Promise<string>;
   /** Invalidates cached pixels rendered with a fallback family after output readiness recovers. */
@@ -83,7 +78,6 @@ export class RasterExportController {
       result.release();
       return { status: 'over-budget' };
     }
-    const pinLease = this.options.pin?.(result.guard.layerId);
     let released = false;
     const release = (): void => {
       if (released) {
@@ -91,7 +85,6 @@ export class RasterExportController {
       }
       released = true;
       result.release();
-      pinLease?.release();
       if (reservation?.status === 'ok') {
         reservation.lease.release();
       }
@@ -149,13 +142,7 @@ export class RasterExportController {
     const liveEntry = this.options.layers.get(layerId);
     if (liveEntry && !liveEntry.stale && !this.options.isRasterizing(layer) && !isEmpty(liveEntry.rect)) {
       return this.applyAdjustments(
-        {
-          guard: this.options.captureGuard(layer, liveEntry),
-          release: () => undefined,
-          rect: liveEntry.rect,
-          status: 'ok',
-          surface: liveEntry.surface,
-        },
+        this.lease(layer, liveEntry, this.options.pin(layerId)),
         options.applyAdjustments === true
       );
     }
@@ -167,47 +154,57 @@ export class RasterExportController {
     if (reservation?.status === 'over-budget') {
       return { status: 'over-budget' };
     }
-    const pinLease = this.options.pin?.(layerId);
+    // The pin outlives the rasterization: the lease keeps the published pixels resident until its release.
+    const pin = this.options.pin(layerId);
+    let leased = false;
     try {
       const rasterized = await this.options.getOrStartRasterization(layer, document, options.signal);
       if (rasterized !== 'published') {
         return { status: rasterized === 'aborted' ? 'aborted' : 'not-ready' };
       }
+      const currentDocument = this.options.getDocument();
+      const currentLayer = currentDocument ? lookupDocumentLayer(currentDocument, layerId) : null;
+      const entry = this.options.layers.get(layerId);
+      if (!currentLayer || !entry || entry.stale) {
+        return { status: 'not-ready' };
+      }
+      const currentSource = renderableSourceOf(currentLayer);
+      if (!currentSource) {
+        return { status: 'missing' };
+      }
+      if (!options.includeDisabled && !lookupDocumentLeaf(currentDocument!, layerId)?.contributionEnabled) {
+        return { status: 'disabled' };
+      }
+      if (!this.options.isSupportedSource(currentSource)) {
+        return { status: 'unsupported' };
+      }
+      if (isEmpty(entry.rect)) {
+        return { status: 'empty' };
+      }
+      leased = true;
+      return this.applyAdjustments(this.lease(currentLayer, entry, pin), options.applyAdjustments === true);
     } finally {
-      pinLease?.release();
+      if (!leased) {
+        pin.release();
+      }
       if (reservation?.status === 'ok') {
         reservation.lease.release();
       }
     }
-    const currentDocument = this.options.getDocument();
-    const currentLayer = currentDocument ? lookupDocumentLayer(currentDocument, layerId) : null;
-    const entry = this.options.layers.get(layerId);
-    if (!currentLayer || !entry || entry.stale) {
-      return { status: 'not-ready' };
-    }
-    const currentSource = renderableSourceOf(currentLayer);
-    if (!currentSource) {
-      return { status: 'missing' };
-    }
-    if (!options.includeDisabled && !lookupDocumentLeaf(currentDocument!, layerId)?.contributionEnabled) {
-      return { status: 'disabled' };
-    }
-    if (!this.options.isSupportedSource(currentSource)) {
-      return { status: 'unsupported' };
-    }
-    if (isEmpty(entry.rect)) {
-      return { status: 'empty' };
-    }
-    return this.applyAdjustments(
-      {
-        guard: this.options.captureGuard(currentLayer, entry),
-        release: () => undefined,
-        rect: entry.rect,
-        status: 'ok',
-        surface: entry.surface,
-      },
-      options.applyAdjustments === true
-    );
+  }
+
+  private lease(
+    layer: CanvasLayerContract,
+    entry: LayerCacheEntry,
+    pin: { release(): void }
+  ): Extract<ExportLayerPixelsResult, { status: 'ok' }> {
+    return {
+      guard: this.options.captureGuard(layer, entry),
+      rect: { ...entry.rect },
+      release: () => pin.release(),
+      status: 'ok',
+      surface: entry.surface,
+    };
   }
 
   private async reserveBaked(
@@ -237,14 +234,12 @@ export class RasterExportController {
       raw.release();
       return noReservedPixels({ status: 'over-budget' });
     }
-    const pinLease = this.options.pin?.(layerId);
     let released = false;
     const release = (): void => {
       if (released) {
         return;
       }
       released = true;
-      pinLease?.release();
       if (reservation?.status === 'ok') {
         reservation.lease.release();
       }

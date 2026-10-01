@@ -25,6 +25,8 @@ export interface GroupSurfaceResult {
 
 export interface GroupSurfaceDeps {
   createSurface(width: number, height: number): RasterSurface;
+  /** Receives the running byte total after every build and release. */
+  onBytesChange?(bytes: number): void;
   getCacheEntry(layerId: string): LayerCacheEntry | undefined;
   /** The member's own adjusted pixels (its personal stack), or null for raw. */
   getAdjustedSurface(layer: CanvasRasterLayerContractV2, entry: LayerCacheEntry): RasterSurface | null;
@@ -41,6 +43,10 @@ export interface GroupSurfaceCache {
   ): GroupSurfaceResult | null;
   /** Drops every cached group not named; call when document structure changes. */
   prune(liveGroupIds: ReadonlySet<string>): void;
+  /** The access clock; a slot read at or after a captured tick is in use by that frame. */
+  tick(): number;
+  /** Evicts slots least-recently-used first until within budget, keeping slots read after `sinceTick`. */
+  evict(budgetBytes: number, sinceTick: number): number;
   clear(): void;
 }
 
@@ -51,8 +57,34 @@ const matKey = (m: Mat2d): string => `${m.a},${m.b},${m.c},${m.d},${m.e},${m.f}`
 // slots stop those consumers evicting each other every tick.
 const SLOTS_PER_GROUP = 2;
 
+interface GroupSlot {
+  readonly key: string;
+  readonly result: GroupSurfaceResult;
+  lastUsed: number;
+}
+
+const slotBytes = (slot: GroupSlot): number => slot.result.surface.width * slot.result.surface.height * 4;
+
 export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCache => {
-  const cache = new Map<string, { key: string; result: GroupSurfaceResult }[]>();
+  const cache = new Map<string, GroupSlot[]>();
+  let clock = 0;
+  let totalBytes = 0;
+
+  const adjustBytes = (delta: number): void => {
+    if (delta === 0) {
+      return;
+    }
+    totalBytes += delta;
+    try {
+      deps.onBytesChange?.(totalBytes);
+    } catch {
+      // Accounting observers cannot veto an allocation that already happened.
+    }
+  };
+
+  const dropSlots = (slots: readonly GroupSlot[]): void => {
+    adjustBytes(-slots.reduce((bytes, slot) => bytes + slotBytes(slot), 0));
+  };
 
   // A scope's OWN opacity/blend are applied by the consumer when the surface
   // lands, so they stay out of its shape key (an opacity scrub reuses the
@@ -173,22 +205,44 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
   };
 
   return {
-    byteSize: () => {
-      let bytes = 0;
+    byteSize: () => totalBytes,
+    clear: () => {
       for (const slots of cache.values()) {
-        for (const { result } of slots) {
-          bytes += result.rect.width * result.rect.height * 4;
-        }
+        dropSlots(slots);
       }
-      return bytes;
+      cache.clear();
     },
-    clear: () => cache.clear(),
+    evict: (budgetBytes, sinceTick) => {
+      if (totalBytes <= budgetBytes) {
+        return 0;
+      }
+      const candidates = [...cache.entries()]
+        .flatMap(([groupId, slots]) => slots.map((slot) => ({ groupId, slot })))
+        .filter(({ slot }) => slot.lastUsed <= sinceTick)
+        .sort((a, b) => a.slot.lastUsed - b.slot.lastUsed);
+      let evicted = 0;
+      for (const { groupId, slot } of candidates) {
+        if (totalBytes <= budgetBytes) {
+          break;
+        }
+        const slots = cache.get(groupId)!;
+        slots.splice(slots.indexOf(slot), 1);
+        if (slots.length === 0) {
+          cache.delete(groupId);
+        }
+        dropSlots([slot]);
+        evicted += 1;
+      }
+      return evicted;
+    },
     get: (scope, members, memberMatrices, excludeIds) => {
       const key = buildKey(scope, members, memberMatrices, excludeIds);
       const slots = cache.get(scope.id) ?? [];
+      clock += 1;
       const hitIndex = slots.findIndex((slot) => slot.key === key);
       if (hitIndex >= 0) {
         const hit = slots[hitIndex]!;
+        hit.lastUsed = clock;
         if (hitIndex > 0) {
           slots.splice(hitIndex, 1);
           slots.unshift(hit);
@@ -197,8 +251,10 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
       }
       const result = build(scope, members, memberMatrices, excludeIds, scope.start);
       if (result) {
-        slots.unshift({ key, result });
-        slots.length = Math.min(slots.length, SLOTS_PER_GROUP);
+        const slot: GroupSlot = { key, lastUsed: clock, result };
+        adjustBytes(slotBytes(slot));
+        slots.unshift(slot);
+        dropSlots(slots.splice(SLOTS_PER_GROUP));
         cache.set(scope.id, slots);
       }
       // A null build (every member excluded or unrasterized) keeps existing
@@ -207,11 +263,13 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
       return result;
     },
     prune: (liveGroupIds) => {
-      for (const id of cache.keys()) {
+      for (const [id, slots] of cache) {
         if (!liveGroupIds.has(id)) {
+          dropSlots(slots);
           cache.delete(id);
         }
       }
     },
+    tick: () => clock,
   };
 };

@@ -142,6 +142,7 @@ export const createEngineRegistry = (
       const engine = createCanvasEngine({ projectId, ...deps });
       const releaseHeldMedia =
         heldMedia?.register(projectId, {
+          flushPendingPixels: () => engine.lifecycle.flushPendingUploads(),
           read: () => engine.history.getHeldAssetRefs(),
           subscribe: (listener) => engine.interaction.subscribe('historyEpoch', listener),
         }) ?? (() => undefined);

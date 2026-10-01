@@ -996,26 +996,6 @@ describe('createCanvasEngine', () => {
     engine.lifecycle.dispose();
   });
 
-  it('refuses a raster snapshot using the actual live surface bytes before cloning', async () => {
-    const { engine } = createEngine();
-    const live = await engine.exports.exportLayerPixels('a');
-    expect(live.status).toBe('ok');
-    if (live.status !== 'ok') {
-      throw new Error('layer cache was not rasterized');
-    }
-    // Model a live paint cache that has grown beyond its persisted source bounds.
-    // The stub resize records dimensions without allocating a real 276 MiB buffer.
-    // One live surface fits the 512 MiB limit; cloning a second one does not.
-    live.surface.resize(8_500, 8_500);
-    const documentSnapshot = engine.document.captureSnapshot();
-
-    await expect(engine.exports.captureRasterSnapshot(documentSnapshot!, ['a'])).resolves.toEqual({
-      status: 'over-budget',
-    });
-
-    engine.lifecycle.dispose();
-  });
-
   it('releases detached raster snapshot surfaces when the engine is disposed', async () => {
     const { engine } = createEngine();
     const documentSnapshot = engine.document.captureSnapshot();

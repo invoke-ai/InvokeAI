@@ -127,7 +127,10 @@ const makeHarness = (overrides: Partial<CreateLayerRasterizerDeps> = {}): Harnes
       layerCache: {
         get: vi.fn(() => entry),
         getOrCreateRect: vi.fn(() => entry),
-        publishPixels: vi.fn(() => ({ ...entry, version: entry.version + 1 })),
+        publishRasterized: vi.fn((_layerId: string, _rect: unknown, _pixels: unknown, family?: string) => {
+          entry.renderedFontFamily = family;
+          return { ...entry, version: entry.version + 1 };
+        }),
         version: vi.fn(() => entry.version),
       } as unknown as CreateLayerRasterizerDeps['layerCache'],
       rasterize: rasterize as unknown as CreateLayerRasterizerDeps['rasterize'],
@@ -217,8 +220,12 @@ describe('job reuse', () => {
 });
 
 describe('publishing', () => {
-  it('writes the pixels, publishes, and reports the layer ready', async () => {
+  it('publishes the rasterized pixels through the cache and reports the layer ready', async () => {
+    const rect = { height: 8, width: 8, x: 1, y: 2 };
+    const pixels = surface(8, 8);
+    harness.rasterize.mockResolvedValue({ rect, surface: pixels });
     await expect(start()).resolves.toBe('published');
+    expect(harness.deps.layerCache.publishRasterized).toHaveBeenCalledWith('layer-1', rect, pixels, undefined);
     expect(harness.spies.trackPublishedLayerImage).toHaveBeenCalled();
     expect(harness.spies.setVersion).toHaveBeenCalledWith('layer-1', 4);
     expect(harness.spies.setStatus).toHaveBeenCalledWith('layer-1', 'ready');
@@ -228,33 +235,6 @@ describe('publishing', () => {
   it('keeps the decoded bitmap it published', async () => {
     await start();
     expect(harness.spies.releaseBitmapIfUnreferenced).not.toHaveBeenCalled();
-  });
-
-  it('resizes the cache surface when the raster came back a different size', async () => {
-    harness.rasterize.mockResolvedValue({ rect: { height: 8, width: 8, x: 0, y: 0 }, surface: surface(8, 8) });
-    await start();
-    expect(harness.entry.surface.resize).toHaveBeenCalledWith(8, 8);
-  });
-
-  it('clears but does not draw an empty result', async () => {
-    harness.rasterize.mockResolvedValue({ rect: { height: 0, width: 0, x: 0, y: 0 }, surface: surface(0, 0) });
-    await expect(start()).resolves.toBe('published');
-    expect(harness.entry.surface.ctx.drawImage).not.toHaveBeenCalled();
-    expect(harness.entry.surface.ctx.clearRect).toHaveBeenCalled();
-  });
-
-  it('copies the result rect rather than aliasing it', async () => {
-    const rect = { height: 4, width: 4, x: 1, y: 2 };
-    harness.rasterize.mockResolvedValue({ rect, surface: surface() });
-    await start();
-    expect(harness.entry.rect).toEqual(rect);
-    expect(harness.entry.rect).not.toBe(rect);
-  });
-
-  it('reports stale when the cache refuses to publish', async () => {
-    (harness.deps.layerCache.publishPixels as ReturnType<typeof vi.fn>).mockReturnValue(undefined);
-    await expect(start()).resolves.toBe('stale');
-    expect(harness.spies.setStatus).not.toHaveBeenCalled();
   });
 });
 

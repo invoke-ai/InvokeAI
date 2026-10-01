@@ -49,10 +49,10 @@ export interface BitmapStoreTimers {
 /** Dependencies for {@link createBitmapStore}. */
 export interface BitmapStoreDeps {
   /**
-   * Atomically reads the content-sized cache surface and layer-local offset, or null when absent. Encoding and
-   * persisted placement must describe the same pixels.
+   * Atomically reads the content-sized cache surface and layer-local offset. Encoding and persisted placement must
+   * describe the same pixels. `'empty'` is a cache without visible extent; null means no cache exists at all.
    */
-  getLayerSurface(layerId: string): { surface: RasterSurface; offset: { x: number; y: number } } | null;
+  getLayerSurface(layerId: string): { surface: RasterSurface; offset: { x: number; y: number } } | 'empty' | null;
   /**
    * Reads the current source to prevent an old dirty mark from persisting surviving cache pixels over a layer
    * converted away from paint.
@@ -401,22 +401,19 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       return;
     }
     const placed = deps.getLayerSurface(layerId);
-    if (pendingClears.has(layerId) && !placed) {
+    if (placed === 'empty' || (placed === null && pendingClears.has(layerId))) {
       dirty.delete(layerId);
       clearTimer(layerId);
       clearLayerBitmap(layerId, requeueFailure);
       return;
     }
-    if (pendingClears.has(layerId)) {
-      // A failed clear may outlive the empty cache that requested it. A later
-      // rasterization can restore visible pixels without calling markLayerDirty,
-      // so the fresh surface verdict wins over the stale clear intent.
-      pendingClears.delete(layerId);
-    }
+    // A failed clear may outlive the empty cache that requested it. A later
+    // rasterization can restore visible pixels without calling markLayerDirty,
+    // so the fresh surface verdict wins over the stale clear intent.
+    pendingClears.delete(layerId);
     if (!placed) {
-      // Layer or its cache is gone (or empty); nothing to persist.
-      dirty.delete(layerId);
-      clearTimer(layerId);
+      // Unpersisted pixels without a cache cannot be saved; reporting success would upload nothing.
+      requeueFailure(new Error('Canvas pixels for this layer are no longer available.'));
       return;
     }
     // Capture surface and offset atomically for encoding. Growth during awaits marks dirty again, so a follow-up

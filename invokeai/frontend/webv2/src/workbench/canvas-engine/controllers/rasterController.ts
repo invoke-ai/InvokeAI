@@ -3,6 +3,7 @@ import type {
   CanvasImageRef,
   CanvasLayerContract,
   CanvasLayerSourceContract,
+  CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -30,25 +31,46 @@ import {
   createDerivedSurfaceCache,
   type DerivedSurfaceCache,
 } from '@workbench/canvas-engine/render/derivedSurfaceCache';
+import { createGroupSurfaceCache, type GroupSurfaceCache } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createLayerCacheStore, DEFAULT_CACHE_BUDGET_BYTES } from '@workbench/canvas-engine/render/layerCache';
 
-import { RasterMemoryBudgetController } from './rasterMemoryBudgetController';
+import { RasterMemoryBudgetController, type RasterMemoryLease } from './rasterMemoryBudgetController';
 
 export interface RasterControllerOptions {
   readonly backend: RasterBackend;
   readonly diagnostics: CanvasDiagnostics;
+  readonly budgetBytes?: number;
   readonly onVersionChange?: (layerId: string) => void;
   readonly getDocument?: () => CanvasDocumentContractV3 | null;
   readonly getLayerImageName?: (layer: CanvasLayerContract) => string | null;
   readonly imageResolver?: (imageName: string, signal?: AbortSignal) => Promise<Blob>;
+  /** Layers whose live pixels nothing else can reconstruct: unpersisted paint and open edit sessions. */
+  readonly isLayerHeld?: (layerId: string) => boolean;
+  /** A group member's display pixels; defaults to its adjusted surface. */
+  readonly getGroupMemberSurface?: (layer: CanvasRasterLayerContractV2, entry: LayerCacheEntry) => RasterSurface | null;
 }
 
+/** Access clocks captured before a frame draws; artifacts read after them are that frame's working set. */
+export interface RasterFrameUsage {
+  readonly derivedTick: number;
+  readonly groupTick: number;
+}
+
+export interface RasterBudgetResult {
+  readonly evictedBaseLayerIds: readonly string[];
+  readonly overageBytes: number;
+}
+
+/** Owns every raster allocation class, their accounting, residency pins, and working-set eviction. */
 export class RasterController {
   readonly layers: LayerCacheStore;
   readonly derived: DerivedSurfaceCache;
   readonly adjustments: AdjustedSurfaceCache;
+  readonly groups: GroupSurfaceCache;
   readonly memory: RasterMemoryBudgetController;
   readonly bitmaps: DecodedBitmapPool;
+  private readonly diagnostics: CanvasDiagnostics;
+  private readonly isLayerHeld: (layerId: string) => boolean;
   private readonly jobs = new Map<string, RasterizationJob>();
   private readonly activeJobs = new Set<RasterizationJob>();
   private readonly trackedImages = new Map<string, string>();
@@ -63,16 +85,82 @@ export class RasterController {
 
   constructor(options: RasterControllerOptions) {
     this.backend = options.backend;
-    this.memory = new RasterMemoryBudgetController({ budgetBytes: DEFAULT_CACHE_BUDGET_BYTES });
-    this.bitmaps = createDecodedBitmapPool({ onBytesChange: (bytes) => this.memory.setDecodedBytes(bytes) });
-    this.layers = createLayerCacheStore(options.backend, { onVersionChange: options.onVersionChange });
+    this.diagnostics = options.diagnostics;
+    this.isLayerHeld = options.isLayerHeld ?? (() => false);
+    const memory = new RasterMemoryBudgetController({ budgetBytes: options.budgetBytes ?? DEFAULT_CACHE_BUDGET_BYTES });
+    this.memory = memory;
+    this.bitmaps = createDecodedBitmapPool({ onBytesChange: (bytes) => memory.setCategoryBytes('decoded', bytes) });
+    this.layers = createLayerCacheStore(options.backend, {
+      onBytesChange: (bytes) => memory.setCategoryBytes('base', bytes),
+      onVersionChange: options.onVersionChange,
+    });
     this.getDocument = options.getDocument ?? (() => null);
     this.getLayerImageName = options.getLayerImageName ?? (() => null);
     this.imageResolver = options.imageResolver ?? null;
-    this.derived = createDerivedSurfaceCache(options.diagnostics);
+    this.derived = createDerivedSurfaceCache(options.diagnostics, (bytes) => memory.setCategoryBytes('derived', bytes));
     this.adjustments = createAdjustedSurfaceCache(options.backend, this.derived, (layerId, version) =>
       this.layers.damageSince(layerId, version)
     );
+    const getGroupMemberSurface =
+      options.getGroupMemberSurface ?? ((layer, entry) => this.getAdjustedSurface(layer, entry));
+    this.groups = createGroupSurfaceCache({
+      createSurface: (width, height) => options.backend.createSurface(width, height),
+      getAdjustedSurface: (layer, entry) => getGroupMemberSurface(layer, entry),
+      getCacheEntry: (layerId) => this.layers.get(layerId),
+      onBytesChange: (bytes) => memory.setCategoryBytes('group', bytes),
+    });
+  }
+
+  /** Keeps a layer's cache resident and untrimmed until the lease is released. */
+  pin(layerId: string): RasterMemoryLease {
+    return this.memory.pin(layerId);
+  }
+
+  /** Pinned or held layers survive eviction; their bytes become accounted overage instead. */
+  isProtected(layerId: string): boolean {
+    return this.memory.isPinned(layerId) || this.isLayerHeld(layerId);
+  }
+
+  beginFrame(): RasterFrameUsage {
+    return { derivedTick: this.derived.tick(), groupTick: this.groups.tick() };
+  }
+
+  /**
+   * Reclaims, in order, derived and group artifacts the frame did not use, then unprotected base caches outside
+   * the working set. Whatever the working set still needs stays resident as reported overage.
+   */
+  enforceBudget(workingSetLayerIds: ReadonlySet<string>, usage: RasterFrameUsage): RasterBudgetResult {
+    const excess = (): number => this.memory.snapshot().overageBytes;
+    if (excess() > 0) {
+      this.derived.evict(Math.max(0, this.derived.byteSize() - excess()), (_layerId, lastUsed) => {
+        return lastUsed > usage.derivedTick;
+      });
+    }
+    if (excess() > 0) {
+      this.groups.evict(Math.max(0, this.groups.byteSize() - excess()), usage.groupTick);
+    }
+    const evictedBaseLayerIds =
+      excess() > 0
+        ? this.layers.evict(
+            (layerId) => workingSetLayerIds.has(layerId) || this.isProtected(layerId),
+            Math.max(0, this.layers.byteSize() - excess())
+          )
+        : [];
+    for (const layerId of evictedBaseLayerIds) {
+      this.deleteDerivedSurfaces(layerId);
+    }
+    const overageBytes = excess();
+    if (overageBytes > 0) {
+      this.diagnostics.add('overBudgetVisibleBaseBytes', overageBytes);
+    }
+    return { evictedBaseLayerIds, overageBytes };
+  }
+
+  /** Drops every reconstructible surface; callers first prove nothing unpersisted remains. */
+  releaseReconstructible(): void {
+    this.layers.dispose();
+    this.derived.dispose();
+    this.groups.clear();
   }
 
   async decodeImage(
@@ -292,9 +380,8 @@ export class RasterController {
     this.clearTrackedImages();
     this.clearMirroredImages();
     this.clearThumbnailKeys();
-    this.layers.dispose();
+    this.releaseReconstructible();
     this.bitmaps.dispose();
-    this.adjustments.dispose();
     this.memory.dispose();
   }
 }

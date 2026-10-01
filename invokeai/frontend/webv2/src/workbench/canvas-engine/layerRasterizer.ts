@@ -13,7 +13,6 @@ import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { getSourceContentRect, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import { isSupportedExportSource } from '@workbench/canvas-engine/layerExportGuards';
-import { isEmpty } from '@workbench/canvas-engine/math/rect';
 
 /** How a rasterization ended: pixels landed, the world moved, it threw, or it was cancelled. */
 export type LayerRasterizationOutcome = 'published' | 'stale' | 'error' | 'aborted';
@@ -181,21 +180,7 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
           return 'stale';
         }
 
-        if (currentEntry.surface.width !== result.rect.width || currentEntry.surface.height !== result.rect.height) {
-          currentEntry.surface.resize(result.rect.width, result.rect.height);
-        }
-        const ctx = currentEntry.surface.ctx;
-        ctx.setTransform(1, 0, 0, 1, 0, 0);
-        ctx.clearRect(0, 0, result.rect.width, result.rect.height);
-        if (!isEmpty(result.rect)) {
-          ctx.drawImage(result.surface.canvas, 0, 0);
-        }
-        currentEntry.renderedFontFamily = renderedFontFamily;
-        currentEntry.rect = { ...result.rect };
-        const publishedEntry = layerCache.publishPixels(layer.id);
-        if (!publishedEntry) {
-          return 'stale';
-        }
+        const publishedEntry = layerCache.publishRasterized(layer.id, result.rect, result.surface, renderedFontFamily);
         deps.trackPublishedLayerImage(currentLayer);
         published = true;
         deps.thumbnails.setVersion(layer.id, publishedEntry.version);

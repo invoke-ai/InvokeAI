@@ -3,7 +3,7 @@ import type {
   PreviewStateController,
   SamPreviewState,
 } from '@workbench/canvas-engine/controllers/previewStateController';
-import type { RasterMemoryBudgetController } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
+import type { RasterController } from '@workbench/canvas-engine/controllers/rasterController';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type { DerivedSurfaceCache } from '@workbench/canvas-engine/render/derivedSurfaceCache';
@@ -21,7 +21,6 @@ import {
   type CompositeOptions,
 } from '@workbench/canvas-engine/render/compositor';
 import { calculateActiveFrameLayerIds } from '@workbench/canvas-engine/render/frameDemand';
-import { enforceSurfaceBudget } from '@workbench/canvas-engine/render/surfaceBudget';
 
 import type { FloatingSelectionFrame } from './floatingSelectionFrame';
 import type { LayerTransformOverrides } from './overlayFrame';
@@ -31,7 +30,7 @@ export interface CreateCompositeFrameDeps {
   readonly derivedSurfaceCache: DerivedSurfaceCache;
   readonly backend: RasterBackend;
   readonly diagnostics: CanvasDiagnostics;
-  readonly memory: RasterMemoryBudgetController;
+  readonly raster: Pick<RasterController, 'beginFrame' | 'enforceBudget'>;
   readonly previews: PreviewStateController;
   readonly stores: EngineStores;
   readonly viewport: Viewport;
@@ -42,8 +41,6 @@ export interface CreateCompositeFrameDeps {
   readonly getCheckerboardTile: () => RasterSurface;
   /** Starts (or joins) the rasterization of a layer whose cache is stale. */
   readonly rasterizeLayer: (layer: CanvasLayerContract, doc: CanvasDocumentContractV3) => void;
-  readonly syncMemoryBaselines: () => void;
-  readonly deleteDerivedSurfaces: (layerId: string) => void;
 }
 
 export interface CompositeFrame {
@@ -68,7 +65,7 @@ export interface CompositeFrame {
  * and transform overrides.
  */
 export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeFrame => {
-  const { derivedSurfaceCache, diagnostics, layerCache, memory, previews, stores, transformOverrides, viewport } = deps;
+  const { derivedSurfaceCache, diagnostics, layerCache, previews, raster, stores, transformOverrides, viewport } = deps;
 
   /**
    * Create missing caches and rasterize stale ones, but never resize existing entries here: unflushed paint may
@@ -105,25 +102,13 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
     };
   };
 
-  /** Evict after drawing, protecting displayed layers and background-work pins. */
-  const enforceBudget = (activeFrameLayerIds: ReadonlySet<string>): void => {
-    deps.syncMemoryBaselines();
-    const snapshot = memory.snapshot();
-    const surfaceBudgetBytes = Math.max(
-      0,
-      memory.budgetBytes - snapshot.decodedBytes - snapshot.detachedBytes - snapshot.reservedBytes
-    );
-    const { evictedBaseLayerIds } = enforceSurfaceBudget(
-      layerCache,
-      derivedSurfaceCache,
-      new Set([...activeFrameLayerIds, ...memory.pinnedLayerIds()]),
-      surfaceBudgetBytes,
-      diagnostics
-    );
-    deps.syncMemoryBaselines();
-    // Eviction must prune adjusted-surface and thumbnail dependents; recreated cache versions remain monotonic.
+  /** Evict after drawing; the frame's demanded layers and the artifacts it read form the working set. */
+  const enforceBudget = (
+    activeFrameLayerIds: ReadonlySet<string>,
+    usage: ReturnType<typeof raster.beginFrame>
+  ): void => {
+    const { evictedBaseLayerIds } = raster.enforceBudget(activeFrameLayerIds, usage);
     for (const id of evictedBaseLayerIds) {
-      deps.deleteDerivedSurfaces(id);
       stores.thumbnailVersion.delete(id);
       stores.thumbnailStatus.delete(id);
     }
@@ -151,6 +136,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         viewport: visibleDocumentRect(screen),
       });
       ensureLayerCaches(doc, activeFrameLayerIds);
+      const usage = raster.beginFrame();
 
       compositeDocument(screen, doc, layerCache, view, {
         damage: isolatedGuard ? null : damage,
@@ -192,7 +178,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         transformOverrides: !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null,
       });
 
-      enforceBudget(activeFrameLayerIds);
+      enforceBudget(activeFrameLayerIds, usage);
     },
   };
 };

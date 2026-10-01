@@ -31,6 +31,7 @@ import type {
 import type {
   CanvasCompositeExecutorDeps,
   CaptureRasterSnapshotResult,
+  RasterReadLease,
 } from '@workbench/canvas-engine/rasterTransactions';
 export type {
   BooleanRasterResult,
@@ -139,7 +140,6 @@ import {
   type CompositeOptions,
 } from '@workbench/canvas-engine/render/compositor';
 import { createFontLoader, domFontLoadApi } from '@workbench/canvas-engine/render/fontLoader';
-import { createGroupSurfaceCache } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { hasLayerDisplayEffect } from '@workbench/canvas-engine/render/layerDisplayEffect';
 import { createMaskPatternTile } from '@workbench/canvas-engine/render/maskFill';
 import { renderOverlay } from '@workbench/canvas-engine/render/overlayRenderer';
@@ -347,8 +347,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     backend,
     diagnostics,
     getDocument: () => mirror.getDocument(),
+    // Pixel transactions already bake adjustments into the live cache; drawing them through the group again would
+    // apply them twice.
+    getGroupMemberSurface: (layer, entry) => getAdjustedSurface(layer, entry),
     getLayerImageName: layerImageName,
     imageResolver,
+    isLayerHeld: (layerId) => isLayerHeldBySession(layerId) || bitmapStore.hasPendingWork(layerId),
     onVersionChange: (layerId) => editingController?.invalidateLayer(layerId),
   });
   const layerCache = rasterController.layers;
@@ -434,40 +438,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   let lifecycleState: 'active' | 'cooling' | 'cool' | 'disposed' = 'active';
   let lifecycleGeneration = 0;
   let cooldownPromise: Promise<'cooled' | 'dirty'> | null = null;
-  const trimPinCounts = new Map<string, number>();
-  const trimPinsByGeneration = new Map<number, Set<{ release(): void }>>();
-  const pinLayerForTrim = (layerId: string, generation: number): { release(): void } => {
-    trimPinCounts.set(layerId, (trimPinCounts.get(layerId) ?? 0) + 1);
-    let released = false;
-    const lease = {
-      release: (): void => {
-        if (released) {
-          return;
-        }
-        released = true;
-        const count = trimPinCounts.get(layerId) ?? 0;
-        if (count <= 1) {
-          trimPinCounts.delete(layerId);
-        } else {
-          trimPinCounts.set(layerId, count - 1);
-        }
-        const generationPins = trimPinsByGeneration.get(generation);
-        generationPins?.delete(lease);
-        if (generationPins?.size === 0) {
-          trimPinsByGeneration.delete(generation);
-        }
-      },
-    };
-    const generationPins = trimPinsByGeneration.get(generation) ?? new Set<{ release(): void }>();
-    generationPins.add(lease);
-    trimPinsByGeneration.set(generation, generationPins);
-    return lease;
-  };
-  const releaseTrimPinGeneration = (generation: number): void => {
-    for (const lease of trimPinsByGeneration.get(generation) ?? []) {
-      lease.release();
-    }
-  };
 
   // The brush/eraser cursor ring, drawn on the overlay (set by the active tool).
   let overlayCursor: OverlayCursor | null = null;
@@ -506,23 +476,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     return rasterController.getAdjustedSurface(layer, entry);
   };
 
-  // Use guarded adjusted surfaces inside groups too, preventing double application during pixel edits.
-  const groupSurfaces = createGroupSurfaceCache({
-    createSurface: (width, height) => backend.createSurface(width, height),
-    getAdjustedSurface: (layer, entry) => getAdjustedSurface(layer, entry),
-    getCacheEntry: (layerId) => layerCache.get(layerId),
-  });
+  const groupSurfaces = rasterController.groups;
   const getGroupSurface: NonNullable<CompositeOptions['groupSurface']> = (scope, members, matrices, excludeIds) =>
     groupSurfaces.get(scope, members, matrices, excludeIds);
-
-  /**
-   * Resync actual cache sizes before every allocation: rasterization and eviction change memory outside the
-   * budget's accounting.
-   */
-  const syncMemoryBaselines = (): void => {
-    rasterController.memory.setBaseBytes(layerCache.byteSize());
-    rasterController.memory.setDerivedBytes(derivedSurfaceCache.byteSize() + groupSurfaces.byteSize());
-  };
 
   // Completed-stroke subscribers (persistence P2.2, history P2.3).
   const strokeListeners = new Set<(event: StrokeCommittedEvent) => void>();
@@ -607,24 +563,20 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     return false;
   };
 
-  /**
-   * Defer trim while another operation owns or frames the pixels. Include every session that depends on cache
-   * bounds, especially transform frame/bake.
-   */
+  /** Sessions that own or frame a layer's live pixels, which nothing else can reconstruct while they are open. */
+  function isLayerHeldBySession(layerId: string): boolean {
+    return (
+      stores.documentEditingLayerId.get() === layerId ||
+      stores.transformSession.get()?.layerId === layerId ||
+      stores.textEditSession.get()?.layerId === layerId ||
+      floatingSelection.get()?.layerId === layerId ||
+      pixelEditController?.isOpenFor([layerId]) === true
+    );
+  }
+
+  /** Defer trim while a gesture, session, pinned read or rasterization depends on the cache bounds. */
   const isLayerBusyForTrim = (layerId: string): boolean => {
-    if (pipeline.isGestureActive()) {
-      return true;
-    }
-    if (stores.documentEditingLayerId.get() === layerId || (trimPinCounts.get(layerId) ?? 0) > 0) {
-      return true;
-    }
-    if (stores.transformSession.get()?.layerId === layerId || stores.textEditSession.get()?.layerId === layerId) {
-      return true;
-    }
-    if (floatingSelection.get()?.layerId === layerId) {
-      return true;
-    }
-    if (pixelEditController?.isOpenFor([layerId])) {
+    if (pipeline.isGestureActive() || isLayerHeldBySession(layerId) || rasterController.memory.isPinned(layerId)) {
       return true;
     }
     const layer = getDocumentLayer(mirror.getDocument(), layerId);
@@ -651,9 +603,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       getAuthoritativeLayerSource: getAuthoritativeLayerSourceById,
       getLayerSource: getLayerSourceById,
       getLayerSurface: (layerId) => {
-        const entry = layerCache.get(layerId);
-        if (!entry || entry.rect.width <= 0 || entry.rect.height <= 0) {
+        const entry = layerCache.peek(layerId);
+        if (!entry) {
           return null;
+        }
+        if (entry.rect.width <= 0 || entry.rect.height <= 0) {
+          return 'empty';
         }
         return { offset: { x: entry.rect.x, y: entry.rect.y }, surface: entry.surface };
       },
@@ -1224,11 +1179,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     isSupportedSource: isSupportedExportSource,
     layers: layerCache,
     invalidateLayerCache,
-    pin: (layerId) => rasterController.memory.pin(layerId, lifecycleGeneration),
-    reserve: (bytes) => {
-      syncMemoryBaselines();
-      return rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'raster-export' });
-    },
+    pin: (layerId) => rasterController.pin(layerId),
+    reserve: (bytes) =>
+      rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'raster-export' }),
     waitForFont: fontLoader.waitForReady,
   });
   const rasterizeLayerPixels = rasterExportController.rasterize.bind(rasterExportController);
@@ -1288,37 +1241,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const copyLayerToRaster = (layerId: string): Promise<string | null> => layerController.copy.copyToRaster(layerId);
 
   /**
-   * Returns rasterized layer pixels with local content bounds for generation. Missing, ineligible or unsupported
-   * layers throw so exports cannot silently omit selected contributors.
+   * Leases rasterized layer pixels for a composite export. Missing, ineligible or unsupported layers throw so
+   * exports cannot silently omit selected contributors.
    */
-  type LayerSurfaceForExportResult =
-    | { status: 'ok'; surface: RasterSurface; rect: Rect }
-    | { status: 'aborted' | 'not-ready' | 'over-budget' };
-  const getLayerSurfaceForExport = async (
-    layerId: string,
-    signal?: AbortSignal
-  ): Promise<LayerSurfaceForExportResult> => {
-    const result = await rasterizeLayerPixels(layerId, { signal });
-    if (result.status === 'ok') {
-      return { rect: result.rect, status: 'ok', surface: result.surface };
-    }
-    if (result.status === 'over-budget') {
-      return { status: 'over-budget' };
-    }
-    if (result.status === 'aborted') {
-      return { status: 'aborted' };
-    }
-    return { status: 'not-ready' };
-  };
-  const requireLayerSurfaceForExport = async (layerId: string): Promise<{ surface: RasterSurface; rect: Rect }> => {
-    const result = await getLayerSurfaceForExport(layerId);
+  const requireLayerSurfaceForExport = async (layerId: string): Promise<RasterReadLease> => {
+    const result = await rasterizeLayerPixels(layerId);
     if (result.status === 'ok') {
       return result;
     }
     if (result.status === 'over-budget') {
       throw new RasterCompositeOverBudgetError();
     }
-    throw new Error(`Cannot rasterize layer ${layerId} for generation: ${result.status}.`);
+    throw new Error(`Cannot rasterize layer ${layerId} for export: ${result.status}.`);
   };
 
   const releaseBitmapIfUnreferenced = (imageName: string): void =>
@@ -1385,7 +1319,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const compositeFrame = createCompositeFrame({
     backend,
-    deleteDerivedSurfaces,
     derivedSurfaceCache,
     diagnostics,
     getAdjustedSurface,
@@ -1393,11 +1326,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getCheckerboardTile,
     getMaskPatternTile,
     layerCache,
-    memory: rasterController.memory,
     previews: renderController.previews,
+    raster: rasterController,
     rasterizeLayer: (layer, doc) => void getOrStartLayerRasterization(layer, doc),
     stores,
-    syncMemoryBaselines,
     transformOverrides,
     viewport,
   });
@@ -1912,7 +1844,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       return;
     }
     rasterController.memory.releaseGeneration(lifecycleGeneration);
-    releaseTrimPinGeneration(lifecycleGeneration);
     lifecycleGeneration += 1;
     lifecycleState = 'active';
     editingController.activate();
@@ -1931,7 +1862,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
     psdExportController.cancel();
     rasterController.memory.releaseGeneration(lifecycleGeneration);
-    releaseTrimPinGeneration(lifecycleGeneration);
     lifecycleGeneration += 1;
     const generation = lifecycleGeneration;
     lifecycleState = 'cooling';
@@ -1945,8 +1875,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         if (disposed || lifecycleState !== 'cooling' || lifecycleGeneration !== generation) {
           return 'cooled';
         }
-        layerCache.dispose();
-        derivedSurfaceCache.dispose();
+        rasterController.releaseReconstructible();
         renderController.previews.clearFilters();
         checkerboardTile = null;
         maskPatternTiles.clear();
@@ -2172,22 +2101,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     };
   };
 
-  const reserveLayerOperation = (bytes: number) => {
-    syncMemoryBaselines();
-    const reservation = rasterController.memory.reserveOperation(bytes, { purpose: 'layer-operation' });
-    if (reservation.status === 'over-budget') {
-      return reservation;
-    }
-    return {
-      lease: {
-        release: () => {
-          syncMemoryBaselines();
-          reservation.lease.release();
-        },
-      },
-      status: 'ok' as const,
-    };
-  };
+  const reserveLayerOperation = (bytes: number) =>
+    rasterController.memory.reserveOperation(bytes, { purpose: 'layer-operation' });
 
   const layerNeedsPixelPersistence = (layer: CanvasLayerContract): boolean =>
     renderableSourceOf(layer)?.type === 'paint';
@@ -2213,7 +2128,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     preparePixels: prepareGeneratedPaintCache,
     prepareDuplicateRasterSource: prepareLayerRasterCache,
     pinDuplicateRasterSources: (layerIds) => {
-      const leases = layerIds.map((layerId) => rasterController.memory.pinOperation(layerId));
+      const leases = layerIds.map((layerId) => rasterController.pin(layerId));
       return {
         release: () => {
           for (const lease of leases) {
@@ -2226,7 +2141,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     reserve: reserveLayerOperation,
     scheduleDuplicateRasterization: scheduleLayerRasterization,
     sameContract: documentHasLayerContract,
-    trackDetached: (bytes) => rasterController.memory.trackDetached(bytes, lifecycleGeneration),
+    trackDetached: (bytes) => rasterController.memory.trackDetached(bytes),
   });
   const commitLayerCopy = layerMutationController.copy.bind(layerMutationController);
   const commitLayerConversion = layerMutationController.convert.bind(layerMutationController);
@@ -2307,24 +2222,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       isDisposed: () => disposed,
       isGuardCurrent: isLayerExportGuardCurrent,
       memory: rasterController.memory,
-      pinForTrim: pinLayerForTrim,
       rasterizeLayerPixels,
-      syncMemoryBaselines,
     });
 
   const psdExportController = new PsdExportController({
     backend,
     captureDocumentSnapshot,
     captureRasterSnapshot,
-    getAvailableBytes: () => {
-      syncMemoryBaselines();
-      return rasterController.memory.getAvailableBytes();
-    },
+    getAvailableBytes: () => rasterController.memory.getAvailableBytes(),
     isDocumentSnapshotCurrent,
-    reserve: (bytes) => {
-      syncMemoryBaselines();
-      return rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'psd-export' });
-    },
+    reserve: (bytes) =>
+      rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'psd-export' }),
   });
   const exportRasterLayersToPsd = (fileName: string): Promise<PsdExportResult> => psdExportController.export(fileName);
 
@@ -2444,7 +2352,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     disposed = true;
     releaseActiveSnapshots();
     rasterController.memory.releaseGeneration(lifecycleGeneration);
-    releaseTrimPinGeneration(lifecycleGeneration);
     lifecycleGeneration += 1;
     lifecycleState = 'disposed';
     const cleanup = createCleanupAccumulator();
@@ -2564,11 +2471,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const getViewport = (): Viewport => viewport;
   const getCompositeExecutorDeps = (): CanvasCompositeExecutorDeps => ({
     backend,
-    getLayerSurface: requireLayerSurfaceForExport,
-    reserve: (bytes) => {
-      syncMemoryBaselines();
-      return rasterController.memory.reserveOperation(bytes, { purpose: 'invocation-composite' });
-    },
+    reserve: (bytes) => rasterController.memory.reserveOperation(bytes, { purpose: 'invocation-composite' }),
     // Unreferenced generation inputs upload as reclaimable intermediates.
     uploadImage: (blob) => opts.uploadIntermediateImage(blob),
   });
@@ -2590,28 +2493,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         snapshot.documentGeneration === rasterController.getDocumentGeneration() &&
         snapshot.lifecycleGeneration === lifecycleGeneration,
       pin: (layerIds) => {
-        const leases = layerIds.map((layerId) => ({
-          memory: rasterController.memory.pinOperation(layerId),
-          trim: pinLayerForTrim(layerId, lifecycleGeneration),
-        }));
-        let released = false;
+        const leases = layerIds.map((layerId) => rasterController.pin(layerId));
         return {
           release: () => {
-            if (released) {
-              return;
-            }
-            released = true;
             for (const lease of leases) {
-              lease.memory.release();
-              lease.trim.release();
+              lease.release();
             }
           },
         };
       },
-      reserve: (bytes) => {
-        syncMemoryBaselines();
-        return rasterController.memory.reserveOperation(bytes, { purpose: 'background-snapshot' });
-      },
+      reserve: (bytes) => rasterController.memory.reserveOperation(bytes, { purpose: 'background-snapshot' }),
     });
   const surface: CanvasSurfaceCapability = { attach, detach, resize };
   const viewportCapability: CanvasViewportCapability = { fitToView, fitToViewOnFirstShow, getViewport, setBboxGrid };
@@ -2783,7 +2674,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       getMaskPattern: getMaskPatternTile,
       isDisposed: () => disposed,
       isSupportedSource: isSupportedExportSource,
-      pin: (layerId) => rasterController.memory.pin(layerId, lifecycleGeneration),
+      pin: (layerId) => rasterController.pin(layerId),
       projectId,
       rasterize: rasterizeLayerForThumbnail,
       reportError: (layerId, error) => {
@@ -2793,10 +2684,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
           // Diagnostics must not turn a handled thumbnail failure into a rejection.
         }
       },
-      reserve: (bytes) => {
-        syncMemoryBaselines();
-        return rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'thumbnail' });
-      },
+      reserve: (bytes) =>
+        rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'thumbnail' }),
       setStatus: (layerId, status) => {
         if (status) {
           stores.thumbnailStatus.set(layerId, status);
