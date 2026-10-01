@@ -1,6 +1,5 @@
 import { getLibraryWorkflowRecord, touchLibraryWorkflowOpenedAt } from '@features/workflow/data/api';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
-import { requestWorkflowFitView } from '@features/workflow/ui/editor/flowInstanceStore';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNotifications, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import { parseWorkflowJson } from '@features/workflow/utility';
@@ -80,7 +79,6 @@ export const PendingWorkflowLoader = () => {
             ? { source: { libraryWorkflowId: source.workflowId, revision: libraryRevision } }
             : {}),
         });
-        requestWorkflowFitView(document.nodes);
 
         if (source.kind === 'library') {
           void touchLibraryWorkflowOpenedAt(source.workflowId, owner.signal).catch(() => {

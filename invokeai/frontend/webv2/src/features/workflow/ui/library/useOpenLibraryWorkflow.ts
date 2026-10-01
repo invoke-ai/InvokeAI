@@ -3,7 +3,6 @@ import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { getLibraryWorkflowRecordCached, touchLibraryWorkflowOpenedAt } from '@features/workflow/queries';
-import { requestWorkflowFitView } from '@features/workflow/ui/editor/flowInstanceStore';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNotifications, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import { parseWorkflowJson } from '@features/workflow/utility';
@@ -139,7 +138,6 @@ export const useOpenLibraryWorkflow = (onOpened: () => void): OpenLibraryWorkflo
           reusePlaceholder: mode === 'resume-or-add',
           source: { libraryWorkflowId: record.workflow_id, revision: record.revision },
         });
-        requestWorkflowFitView(document.nodes);
 
         for (const warning of warnings) {
           notify.info(t('workflowLibrary.loadWarning'), warning);
