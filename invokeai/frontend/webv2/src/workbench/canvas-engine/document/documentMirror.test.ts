@@ -9,7 +9,11 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 
-import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import {
+  groupContract,
+  layerContract,
+  stacksFrom,
+} from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it, vi } from 'vitest';
@@ -600,6 +604,25 @@ describe('createDocumentMirror: value edits through the reducer', () => {
     expect(getForestDiffCount()).toBe(0);
   });
 
+  it('applies a batched config update as one value edit, composing repeated ids in order', () => {
+    const { apply, callbacks, mirror } = setup(makeDoc([rasterLayer('a'), rasterLayer('b'), rasterLayer('c')]));
+    const invert = [{ id: 'inv', isEnabled: true, type: 'invert' as const }];
+
+    apply({
+      type: 'updateCanvasLayerConfigs',
+      updates: [
+        { config: { adjustments: invert, layerType: 'raster' }, id: 'a' },
+        { config: { isTransparencyLocked: true, layerType: 'raster' }, id: 'c' },
+        { config: { isTransparencyLocked: true, layerType: 'raster' }, id: 'a' },
+      ],
+    });
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a', 'c'], [], false);
+    expect(callbacks.onLayersChanged).toHaveBeenCalledOnce();
+    expect(getForestDiffCount()).toBe(0);
+    const a = getDocumentLeaves(mirror.getDocument()!).find((leaf) => leaf.id === 'a') as CanvasRasterLayerContractV2;
+    expect(a).toMatchObject({ adjustments: invert, isTransparencyLocked: true });
+  });
+
   it('reports only the descendants whose inherited flags moved when a group flag flips', () => {
     const doc = makeDoc([
       groupContract('g', [rasterLayer('a'), groupContract('h', [rasterLayer('b')], { isEnabled: false })]),
@@ -610,6 +633,39 @@ describe('createDocumentMirror: value edits through the reducer', () => {
     apply({ type: 'setCanvasLayersEnabled', updates: [{ id: 'g', isEnabled: false }] });
     // b was already disabled through h, so only a changes.
     expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a'], [], false);
+    expect(getForestDiffCount()).toBe(0);
+  });
+
+  it('reports the descendants of a group whose lock or display visibility flips', () => {
+    const doc = makeDoc([
+      groupContract('g', [rasterLayer('a'), rasterLayer('b')]),
+      groupContract('m', [layerContract('mask', 'inpaint_mask')]),
+    ]);
+    const { apply, callbacks } = setup(doc);
+
+    apply({ id: 'g', patch: { isLocked: true }, type: 'updateCanvasLayer' });
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a', 'b'], [], false);
+    apply({ type: 'setCanvasLayersHidden', updates: [{ id: 'm', isHidden: true }] });
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['mask'], [], false);
+    expect(getForestDiffCount()).toBe(0);
+  });
+
+  it.each<[string, CanvasProjectMutation]>([
+    ['blend mode', { id: 'g', patch: { blendMode: 'multiply' }, type: 'updateCanvasLayer' }],
+    [
+      'adjustments',
+      {
+        config: { adjustments: [{ id: 'ga', isEnabled: true, type: 'invert' }], layerType: 'group' },
+        id: 'g',
+        type: 'updateCanvasLayerConfig',
+      },
+    ],
+  ])('recomposites a group whose %s changes without reporting a pixel change', (_, mutation) => {
+    const { apply, callbacks } = setup(makeDoc([groupContract('g', [rasterLayer('a')]), rasterLayer('c')]));
+
+    apply(mutation);
+    expect(callbacks.onLayersRecomposite).toHaveBeenLastCalledWith(['a']);
+    expect(callbacks.onLayersChanged).not.toHaveBeenCalled();
     expect(getForestDiffCount()).toBe(0);
   });
 

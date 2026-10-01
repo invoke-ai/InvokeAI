@@ -17,9 +17,8 @@ import { isLayerContributing } from '@workbench/canvas-engine/document/layerElig
 import { getSourceContentRect, isRenderableLayer, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import {
   compositeDocument,
-  prepareComposite,
+  reusePreparation,
   shouldSmoothAtZoom,
-  transformOverridesKey,
   type CompositeOptions,
   type CompositePreparation,
 } from '@workbench/canvas-engine/render/compositor';
@@ -133,18 +132,13 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
     isolationLayerId: string | null,
     overrides: CompositeOptions['transformOverrides']
   ): CompositePreparation => {
-    if (
-      preparation?.document !== doc ||
-      preparation.isolationLayerId !== isolationLayerId ||
-      preparation.overridesKey !== transformOverridesKey(overrides)
-    ) {
-      preparation = prepareComposite(doc, {
-        groupSurface: deps.getGroupSurface,
-        isolationLayerId,
-        transformOverrides: overrides,
-      });
-    }
-    const plan = preparation;
+    const plan = reusePreparation(preparation, doc, {
+      backend: deps.backend,
+      groupSurface: deps.getGroupSurface,
+      isolationLayerId,
+      transformOverrides: overrides,
+    });
+    preparation = plan;
     const nextMemo = new Map<string, LeafBoundsMemo>();
     const bounds = plan.leaves.map((leaf, index) => {
       const matrix = plan.matrices[index]!;

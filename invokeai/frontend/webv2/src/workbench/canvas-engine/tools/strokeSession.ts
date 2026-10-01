@@ -117,16 +117,6 @@ const padToChunk = (r: Rect, chunk: number): Rect => {
   return { height: bottom - y, width: right - x, x, y };
 };
 
-/** Runs `task` before the next animation frame; synchronous where no frames exist. */
-const scheduleAnimationFrame = (task: () => void): (() => void) => {
-  if (typeof requestAnimationFrame !== 'function') {
-    task();
-    return () => undefined;
-  }
-  const frame = requestAnimationFrame(() => task());
-  return () => cancelAnimationFrame(frame);
-};
-
 /** The 2D context flavour a {@link RasterSurface} exposes. */
 type SurfaceContext = RasterSurface['ctx'];
 
@@ -291,7 +281,6 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
   // Below the travel threshold, preserve the first aim point as a round dab rather than a short capsule.
   const tapCollapseLength = Math.max(2, localSize * 0.25);
   let travel = 0;
-  const scheduleFrame = ctx.scheduleFrame ?? scheduleAnimationFrame;
   let cancelScheduledFrame: (() => void) | null = null;
   let closed = false;
   // Before pixels cover `accumRect` in stable layer-local coordinates, unaffected by backing-store origin shifts.
@@ -559,7 +548,7 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
         return;
       }
       let ran = false;
-      const cancel = scheduleFrame(() => {
+      const cancel = ctx.scheduleFrame(() => {
         ran = true;
         renderFrame();
       });

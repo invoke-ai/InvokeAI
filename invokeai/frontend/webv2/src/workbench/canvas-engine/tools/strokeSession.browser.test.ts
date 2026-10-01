@@ -211,7 +211,7 @@ const sweep = (): PointerInput[] => {
 describe('incremental compositing produces the same coverage as recompositing everything', () => {
   // Band updates and incremental before-snapshots must preserve interior coverage. Boundary antialiasing may
   // differ by subpixels across batches; interior gaps or compounded opacity may not. Deliberately shrinking the
-  // band by 30px fails all four cases.
+  // band by 30px fails every case.
   const cases: {
     batchSize: number;
     batchesPerFrame?: number;

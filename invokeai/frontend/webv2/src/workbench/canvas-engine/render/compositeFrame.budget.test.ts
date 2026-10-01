@@ -133,15 +133,17 @@ describe('frame description over 2,000 nodes', () => {
       viewport,
     });
     const screen = backend.createSurface(100, 100);
-    const prepare = vi.spyOn(compositor, 'prepareComposite');
+    const composite = vi.spyOn(compositor, 'compositeDocument');
+    const description = () => composite.mock.calls.at(-1)![4].preparation;
     const bounds = vi.spyOn(frameDemand, 'committedLeafBounds');
     const document = createLargeTreeDocument(2_000);
 
     frame.draw(screen, document, identity(), null, null);
     const leafCount = bounds.mock.calls.length;
+    const first = description();
     expect(leafCount).toBeGreaterThan(1_000);
     frame.draw(screen, document, identity(), null, null, { kind: 'none' });
-    expect(prepare).toHaveBeenCalledTimes(1);
+    expect(description()?.leaves).toBe(first?.leaves);
     expect(bounds).toHaveBeenCalledTimes(leafCount);
 
     const edited = {
@@ -149,7 +151,7 @@ describe('frame description over 2,000 nodes', () => {
       stacks: updateNodeValues(document.stacks, new Map([['l7', (node) => ({ ...node, opacity: 0.5 })]])),
     };
     frame.draw(screen, edited, identity(), null, null);
-    expect(prepare).toHaveBeenCalledTimes(2);
+    expect(description()?.document).toBe(edited);
     expect(bounds.mock.calls.slice(leafCount).map(([leaf]) => leaf.id)).toEqual(['l7']);
     raster.dispose();
   });

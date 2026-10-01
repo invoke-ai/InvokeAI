@@ -70,6 +70,7 @@ const createHarness = (doc: CanvasDocumentContractV3) => {
   const layers = createLayerCacheStore(backend);
   let idCounter = 0;
   const ctx: ToolContext = {
+    scheduleFrame: () => () => undefined,
     backend,
     commitStructural: (label, forward, inverse) => {
       commits.push({ forward, inverse, label });

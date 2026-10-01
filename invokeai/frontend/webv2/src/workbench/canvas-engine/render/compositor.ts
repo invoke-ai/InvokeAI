@@ -232,6 +232,13 @@ const isPreparedFor = (
   preparation.grouped === (!!opts.groupSurface && !isIsolated(opts)) &&
   preparation.overridesKey === transformOverridesKey(opts.transformOverrides);
 
+/** Reuses `previous` while it still describes `doc` under these options, else prepares a new description. */
+export const reusePreparation = (
+  previous: CompositePreparation | null | undefined,
+  doc: CanvasDocumentContractV3,
+  opts: CompositeOptions
+): CompositePreparation => (isPreparedFor(previous, doc, opts) ? previous : prepareComposite(doc, opts));
+
 const setTransformFromMat = (ctx: Ctx, m: Mat2d): void => {
   ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
 };
@@ -517,7 +524,7 @@ export const compositeDocument = (
   view: Mat2d,
   opts: CompositeOptions
 ): void => {
-  const plan = isPreparedFor(opts.preparation, doc, opts) ? opts.preparation : prepareComposite(doc, opts);
+  const plan = reusePreparation(opts.preparation, doc, opts);
   const targetRect: Rect = { height: target.height, width: target.width, x: 0, y: 0 };
   const damage = resolveDamage(plan, view, target, opts.damage);
   if (damage.kind === 'none') {

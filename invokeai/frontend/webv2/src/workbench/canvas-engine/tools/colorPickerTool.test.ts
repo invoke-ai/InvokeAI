@@ -97,6 +97,7 @@ const createHarness = (doc: CanvasDocumentContractV3 | null): Harness => {
   const overlayCursors: unknown[] = [];
 
   const ctx: ToolContext = {
+    scheduleFrame: () => () => undefined,
     backend,
     commitStructural: vi.fn(),
     captureInsertionAnchor: createTestInsertionAnchorCapture('p'),

@@ -3,11 +3,18 @@ import type { StubRasterBackend, StubRasterSurface } from '@workbench/canvas-eng
 import type { ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput } from '@workbench/canvas-engine/types';
 
+import * as freehand from '@workbench/canvas-engine/freehand';
 import { fromTRS } from '@workbench/canvas-engine/math/mat2d';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { createStrokeSession } from '@workbench/canvas-engine/tools/strokeSession';
 import { describe, expect, it, vi } from 'vitest';
+
+/** Renders a scheduled stroke frame immediately; frame timing is covered by the engine tests. */
+const runFrameNow = (task: () => void): (() => void) => {
+  task();
+  return () => undefined;
+};
 
 const pointer = (x: number, y: number): PointerInput => ({
   buttons: 1,
@@ -55,6 +62,7 @@ const runStroke = (opts: { withMask: boolean }) => {
     invalidate: vi.fn(),
     layers,
     notifyLayerPainted,
+    scheduleFrame: runFrameNow,
   } as unknown as ToolContext;
 
   // Only the scratch is created after this point.
@@ -130,6 +138,7 @@ describe('strokeSession: bbox-clipped painting', () => {
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
     created.length = 0;
 
@@ -213,6 +222,7 @@ describe('strokeSession: content-sized cache growth', () => {
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted,
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
     const session = createStrokeSession({
       clipMask: null,
@@ -326,6 +336,7 @@ describe('strokeSession: cache version bump (live adjusted-surface invalidation)
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
     const session = createStrokeSession({
       clipMask: null,
@@ -379,6 +390,7 @@ describe('incremental "before" snapshot', () => {
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
     const session = createStrokeSession({
       color: '#ff0000',
@@ -461,6 +473,7 @@ describe('strokeSession: pressure-dependent opacity', () => {
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
 
     created.length = 0;
@@ -550,6 +563,7 @@ describe('layer transforms', () => {
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
     const session = createStrokeSession({
       color: '#ff0000',
@@ -599,6 +613,7 @@ describe('tap collapse', () => {
       invalidate: vi.fn(),
       layers,
       notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
     } as unknown as ToolContext;
     const session = createStrokeSession({
       clipMask: null,
@@ -733,5 +748,44 @@ describe('frame-coalesced rendering', () => {
 
     expect(presentFrame).toThrow(failure);
     expect(onRenderError).toHaveBeenCalledWith(failure);
+  });
+});
+
+describe('strokeSession: incremental decimation', () => {
+  it('never re-decimates the whole stroke while it renders frame by frame', () => {
+    const decimate = vi.spyOn(freehand, 'decimateSamples');
+    const backend = createTestStubRasterBackend();
+    const layers = createLayerCacheStore(backend);
+    layers.getOrCreate('L', 400, 100);
+    const ctx = {
+      backend,
+      createPath2D: () =>
+        ({ closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} }) as unknown as Path2D,
+      emitStrokeCommitted: vi.fn(),
+      invalidate: vi.fn(),
+      layers,
+      notifyLayerPainted: vi.fn(),
+      scheduleFrame: runFrameNow,
+    } as unknown as ToolContext;
+    const session = createStrokeSession({
+      clipMask: null,
+      color: '#ff0000',
+      composite: 'source-over',
+      ctx,
+      hardness: 1,
+      layerId: 'L',
+      opacity: 1,
+      pressureOpacity: false,
+      size: 8,
+      thinning: 0,
+      tool: 'brush',
+    });
+
+    for (let x = 0; x < 300; x += 1) {
+      session.addPoints([pointer(x, 50)]);
+    }
+    session.commit();
+    expect(decimate).not.toHaveBeenCalled();
+    decimate.mockRestore();
   });
 });

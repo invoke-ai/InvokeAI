@@ -74,11 +74,8 @@ export interface ToolContext {
   getSelectedLayerIds?(): readonly string[];
   /** Requests a re-render for the given flags. */
   invalidate(payload: InvalidatePayload): void;
-  /**
-   * Runs `task` once before the next composited frame so its invalidations render in that frame; returns a cancel.
-   * Absent, tools fall back to `requestAnimationFrame`, or run synchronously without one.
-   */
-  scheduleFrame?(task: () => void): () => void;
+  /** Runs `task` once before the next composited frame so its invalidations render in that frame; returns a cancel. */
+  scheduleFrame(task: () => void): () => void;
   /** Reducer bridge. Painting tools use it for the single gesture-start `addCanvasLayer`. */
   dispatch(action: CanvasProjectMutation): void;
   /** Where a layer the tool creates lands: above `aboveId` when it belongs to `stack`, else the stack top. */

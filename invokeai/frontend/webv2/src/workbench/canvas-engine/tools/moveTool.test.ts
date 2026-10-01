@@ -131,6 +131,7 @@ const createHarness = (doc: CanvasDocumentContractV3, options: HarnessOptions = 
     stores.bboxGrid.set(options.bboxGrid);
   }
   const ctx: ToolContext = {
+    scheduleFrame: () => () => undefined,
     backend: null as never,
     commitFloatingSelection: commitFloat,
     commitStructural: (label, forward, inverse) => {

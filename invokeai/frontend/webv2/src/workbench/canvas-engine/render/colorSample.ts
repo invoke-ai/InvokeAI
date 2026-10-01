@@ -9,7 +9,7 @@ import type { Mat2d, Vec2 } from '@workbench/canvas-engine/types';
 import type { LayerCacheStore } from './layerCache';
 import type { RasterBackend, RasterSurface } from './raster';
 
-import { compositeDocument, prepareComposite, type CompositeOptions, type CompositePreparation } from './compositor';
+import { compositeDocument, reusePreparation, type CompositeOptions, type CompositePreparation } from './compositor';
 
 /** An RGBA sample, channels in `[0, 255]`. */
 export interface RgbaSample {
@@ -71,9 +71,7 @@ export const createColorSampler = (backend: RasterBackend): ColorSampler => {
       }
 
       scratch ??= backend.createSurface(1, 1);
-      if (preparation?.document !== doc || preparation.grouped !== !!providers.groupSurface) {
-        preparation = prepareComposite(doc, providers);
-      }
+      preparation = reusePreparation(preparation, doc, { backend, ...providers });
       const view: Mat2d = { a: 1, b: 0, c: 0, d: 1, e: -px, f: -py };
       // Use canonical compositing for placement and display effects, omitting checkerboard/staged previews to
       // retain transparent empty space.

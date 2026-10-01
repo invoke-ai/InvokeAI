@@ -144,6 +144,10 @@ const createHarness = (
   let idCounter = 0;
 
   const ctx: ToolContext = {
+    scheduleFrame: (task) => {
+      task();
+      return () => undefined;
+    },
     backend,
     ...(beginPixelEdit ? { beginPixelEdit } : {}),
     captureInsertionAnchor: createTestInsertionAnchorCapture('p'),

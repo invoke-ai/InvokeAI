@@ -872,10 +872,13 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
         if (!applicable) {
           return document;
         }
-        return mutation.updates.reduce(
-          (current, update) => mapNode(current, update.id, (node) => patchLayerConfig(node, update.config)),
-          document
-        );
+        // One value edit for the batch; repeated ids apply their patches in order.
+        const patches = new Map<string, (node: CanvasNodeContract) => CanvasNodeContract>();
+        for (const { config, id } of mutation.updates) {
+          const earlier = patches.get(id);
+          patches.set(id, (node) => patchLayerConfig(earlier ? earlier(node) : node, config));
+        }
+        return mapNodes(document, patches);
       });
     case 'convertCanvasLayer': {
       if (mutation.layer.type !== mutation.targetType) {

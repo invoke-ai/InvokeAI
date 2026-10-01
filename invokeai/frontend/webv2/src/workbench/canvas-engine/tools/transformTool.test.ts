@@ -142,6 +142,7 @@ const createHarness = (doc: CanvasDocumentContractV3, zoom = 1, float?: Floating
   };
 
   const ctx: ToolContext = {
+    scheduleFrame: () => () => undefined,
     applyTransform: () => {
       state.applyCount += 1;
     },

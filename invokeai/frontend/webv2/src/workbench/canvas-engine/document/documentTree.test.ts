@@ -92,6 +92,20 @@ describe('document tree', () => {
     expect(valueEditBetween(before, removeNodes(moved, new Set(['r4'])))).toBeNull();
   });
 
+  it('stops folding once the folded edits would touch more than a quarter of a large forest', () => {
+    const before = stacksFrom(Array.from({ length: 400 }, (_, index) => layer(`l${index}`)));
+    const fade = (stacks: CanvasStackForests, ids: readonly string[], opacity: number) =>
+      updateNodeValues(stacks, new Map(ids.map((id) => [id, (node) => ({ ...node, opacity })])));
+    const first = Array.from({ length: 40 }, (_, index) => `l${index}`);
+    const once = fade(before, first, 0.5);
+
+    // 80 replaced nodes across two steps stay within a quarter of 400; 110 do not.
+    expect(valueEditBetween(before, fade(once, first, 0.4))?.size).toBe(40);
+    const wide = Array.from({ length: 70 }, (_, index) => `l${index + 100}`);
+    expect(valueEditBetween(before, fade(once, wide, 0.4))).toBeNull();
+    expect(valueEditBetween(once, fade(once, wide, 0.4))?.size).toBe(70);
+  });
+
   it('removes subtrees and shares the untouched forests', () => {
     const before = stacks();
     const after = removeNodes(before, new Set(['g2', 'r4']));

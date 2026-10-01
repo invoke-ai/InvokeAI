@@ -1,4 +1,5 @@
 import type { BitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { GroupSurfaceContent } from '@workbench/canvas-engine/render/groupCompositeScopes';
 import type { CanvasProjectMutationPort } from '@workbench/canvasProjectMutationPort';
 
@@ -9,6 +10,8 @@ import {
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/documentModel';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it, vi } from 'vitest';
 
 import type * as RasterControllerModule from './controllers/rasterController';
@@ -49,14 +52,30 @@ const fakeCanvas = (): HTMLCanvasElement => {
 };
 
 const createEngine = (bitmapStore?: BitmapStore) => {
-  const document = documentFrom([groupContract('group', [layerContract('layer')], { opacity: 0.5 })]);
-  const canvas = { document, documentRevision: 0, snapshots: [], version: 3 };
+  const document = documentFrom([
+    groupContract('group', [layerContract('layer')], { opacity: 0.5 }),
+    layerContract('other'),
+  ]);
+  let project = applyCanvasProjectMutation(createInitialWorkbenchState().projects[0]!, {
+    document,
+    type: 'replaceCanvasDocument',
+  });
+  const listeners = new Set<() => void>();
   const mutationPort = {
     commitEdit: () => undefined,
     dispatch: () => false,
-    getCanvasState: () => canvas,
-    subscribe: () => () => undefined,
+    getCanvasState: () => project.canvas,
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
   } as unknown as CanvasProjectMutationPort;
+  const apply = (mutation: CanvasProjectMutation): void => {
+    project = applyCanvasProjectMutation(project, mutation);
+    for (const listener of listeners) {
+      listener();
+    }
+  };
   const { engine } = createCanvasEngine({
     backend: createTestStubRasterBackend(),
     bitmapStore,
@@ -72,13 +91,14 @@ const createEngine = (bitmapStore?: BitmapStore) => {
   raster.layers.getOrCreateRect('layer', RECT);
   raster.layers.publishPixels('layer');
   const leaves = compileDocumentLeaves(document);
+  const start = leaves.findIndex((leaf) => leaf.id === 'layer');
   raster.groups.get(
-    { adjustments: [], blendMode: 'normal', children: [], end: 1, id: 'group', opacity: 0.5, start: 0 },
-    leaves,
-    leaves.map((leaf) => leaf.worldTransform),
+    { adjustments: [], blendMode: 'normal', children: [], end: start + 1, id: 'group', opacity: 0.5, start },
+    leaves.slice(start, start + 1),
+    [leaves[start]!.worldTransform],
     NO_GROUP_CONTENT
   );
-  return { engine, raster };
+  return { apply, engine, raster };
 };
 
 const offscreenDocument = () =>
@@ -202,5 +222,16 @@ describe('engine raster resource lifecycle', () => {
     });
     expect(raster.isProtected('layer')).toBe(false);
     expect(bitmap.close).toHaveBeenCalledOnce();
+  });
+});
+
+describe('engine group surfaces', () => {
+  it('releases a deleted group surface', () => {
+    const { apply, engine, raster } = createEngine();
+    expect(raster.memory.snapshot().groupBytes).toBeGreaterThan(0);
+
+    apply({ ids: ['group'], type: 'removeCanvasLayers' });
+    expect(raster.memory.snapshot().groupBytes).toBe(0);
+    engine.lifecycle.dispose();
   });
 });

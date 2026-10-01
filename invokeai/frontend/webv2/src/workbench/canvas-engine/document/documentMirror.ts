@@ -172,6 +172,10 @@ const diffValueEdit = (prev: CanvasDocumentIndex, next: CanvasDocumentIndex, edi
   const reflagged: string[] = [];
   const adjusted: string[] = [];
   for (const [id, { after, before }] of edit) {
+    // Folded steps can hand a node back unchanged.
+    if (before === after) {
+      continue;
+    }
     if (isGroupNode(after) && isGroupNode(before)) {
       if (groupFlagsChanged(before, after)) {
         reflagged.push(id);

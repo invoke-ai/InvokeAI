@@ -70,6 +70,7 @@ const createHarness = (doc: CanvasDocumentContractV3) => {
   const stores = createEngineStores();
   let idCounter = 0;
   const ctx: ToolContext = {
+    scheduleFrame: () => () => undefined,
     backend: null as never,
     commitStructural: (label, forward, inverse) => {
       commits.push({ forward, inverse, label });

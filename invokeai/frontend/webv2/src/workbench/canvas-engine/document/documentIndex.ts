@@ -387,13 +387,17 @@ const valueEdits = new WeakMap<CanvasStackForests, ValueEditRecord>();
 
 /** How many consecutive value edits a consumer that fell behind may still fold instead of diffing forests. */
 const MAX_FOLDED_VALUE_EDITS = 16;
+/** Folding up to this many replaced nodes always beats a forest diff, however small the document. */
+const MIN_FOLDED_ENTRIES = 64;
 
 /**
  * The value edits that lead from `previous` to `next`, folded oldest first, or null when any step between them
- * restructured the forests or was not recorded.
+ * restructured the forests or was not recorded, or when folding would touch more than a quarter of the nodes (a
+ * forest diff is then cheaper).
  */
 export const valueEditBetween = (previous: CanvasStackForests, next: CanvasStackForests): CanvasValueEdit | null => {
   const steps: CanvasValueEdit[] = [];
+  let entries = 0;
   let current = next;
   while (current !== previous) {
     const record = valueEdits.get(current);
@@ -402,6 +406,10 @@ export const valueEditBetween = (previous: CanvasStackForests, next: CanvasStack
       return null;
     }
     steps.push(record.changes);
+    entries += record.changes.size;
+    if (steps.length > 1 && entries > Math.max(MIN_FOLDED_ENTRIES, indexStacks(next).byId.size / 4)) {
+      return null;
+    }
     current = from;
   }
   if (steps.length <= 1) {

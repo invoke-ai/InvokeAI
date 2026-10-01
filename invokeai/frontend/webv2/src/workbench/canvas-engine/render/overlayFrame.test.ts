@@ -132,6 +132,20 @@ describe('the move outline', () => {
     expect(dragged).not.toEqual(committed);
   });
 
+  it('outlines the topmost of several dragged layers', () => {
+    harness.state.tool = 'move';
+    const doc = documentOf(['a', 'b', 'c']);
+    harness.overrides.set('c', { x: 100, y: 100 });
+    const onlyC = describeOverlay(doc)?.layerOutline;
+    harness.overrides.set('b', { x: 50, y: 50 });
+    const bAndC = describeOverlay(doc)?.layerOutline;
+    harness.overrides.delete('c');
+    const onlyB = describeOverlay(doc)?.layerOutline;
+
+    expect(bAndC).toEqual(onlyB);
+    expect(bAndC).not.toEqual(onlyC);
+  });
+
   it('is absent when the selected layer is gone', () => {
     harness.state.tool = 'move';
     expect(describeOverlay(documentOf([], { selectedLayerId: 'missing' }))?.layerOutline).toBeNull();
