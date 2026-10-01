@@ -15,7 +15,7 @@ import { describe, expect, it, vi } from 'vitest';
 
 import type { RasterCallLogEntry, StubRasterSurface } from './raster.testStub';
 
-import { compositeDocument, createCheckerboardTile, shouldSmoothAtZoom } from './compositor';
+import { compositeDocument, createCheckerboardTile, prepareComposite, shouldSmoothAtZoom } from './compositor';
 import { createDerivedSurfaceCache } from './derivedSurfaceCache';
 import { createLayerCacheStore } from './layerCache';
 import { createTestStubRasterBackend } from './raster.testStub';
@@ -805,5 +805,41 @@ describe('compositeDocument — hidden layers', () => {
     compositeDocument(target, makeDoc([hiddenMask('m')]), caches, VIEW, { backend, isolationLayerId: 'm' });
 
     expect(target.callLog.some((e) => e.op === 'drawImage')).toBe(true);
+  });
+});
+
+describe('compositeDocument — prepared plans', () => {
+  const scene = () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    const top = caches.getOrCreate('top', 10, 10);
+    const bottom = caches.getOrCreate('bottom', 10, 10);
+    const target = backend.createSurface(50, 50);
+    const drawn = (): unknown[] => target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
+    return { backend, bottom, caches, drawn, target, top };
+  };
+
+  it('draws from a plan prepared for the same document and isolation', () => {
+    const { backend, caches, drawn, target, top } = scene();
+    const doc = makeDoc([rasterLayer('top'), rasterLayer('bottom')]);
+    const isolatedTop = prepareComposite(doc, { isolationLayerId: 'top' });
+
+    compositeDocument(target, doc, caches, VIEW, { backend, isolationLayerId: 'top', preparation: isolatedTop });
+
+    expect(drawn()).toEqual([top.surface.canvas]);
+  });
+
+  it('ignores a plan prepared for another document or isolation', () => {
+    const { backend, bottom, caches, drawn, target, top } = scene();
+    const doc = makeDoc([rasterLayer('top'), rasterLayer('bottom')]);
+    const isolatedTop = prepareComposite(doc, { isolationLayerId: 'top' });
+
+    compositeDocument(target, doc, caches, VIEW, { backend, preparation: isolatedTop });
+    compositeDocument(target, { ...doc, stacks: stacksFrom([rasterLayer('bottom')]) }, caches, VIEW, {
+      backend,
+      preparation: prepareComposite(doc),
+    });
+
+    expect(drawn()).toEqual([bottom.surface.canvas, top.surface.canvas, bottom.surface.canvas]);
   });
 });

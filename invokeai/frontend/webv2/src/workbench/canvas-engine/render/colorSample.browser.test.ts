@@ -4,7 +4,7 @@ import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixt
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { describe, expect, it } from 'vitest';
 
-import { sampleDocumentColor } from './colorSample';
+import { createColorSampler } from './colorSample';
 import { compositeDocument } from './compositor';
 import { createLayerCacheStore } from './layerCache';
 
@@ -47,7 +47,7 @@ describe('color sampling with real browser rasterization', () => {
     compositeDocument(viewport, doc, caches, IDENTITY);
 
     expect([...viewport.ctx.getImageData(20, 0, 1, 1).data]).toEqual(EXPECTED_PIXEL);
-    expect(sampleDocumentColor(doc, caches, backend, { x: 20, y: 0 })).toEqual(EXPECTED_COLOR);
+    expect(createColorSampler(backend).sample(doc, caches, { x: 20, y: 0 })).toEqual(EXPECTED_COLOR);
   });
 
   it('matches a visible paint cache whose local content rectangle is offset', () => {
@@ -62,6 +62,6 @@ describe('color sampling with real browser rasterization', () => {
     compositeDocument(viewport, doc, caches, IDENTITY);
 
     expect([...viewport.ctx.getImageData(20, 0, 1, 1).data]).toEqual(EXPECTED_PIXEL);
-    expect(sampleDocumentColor(doc, caches, backend, { x: 20, y: 0 })).toEqual(EXPECTED_COLOR);
+    expect(createColorSampler(backend).sample(doc, caches, { x: 20, y: 0 })).toEqual(EXPECTED_COLOR);
   });
 });

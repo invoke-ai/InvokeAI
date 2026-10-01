@@ -4,7 +4,7 @@ import type { Rect } from '@workbench/canvas-engine/types';
 
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { identity } from '@workbench/canvas-engine/math/mat2d';
-import { sampleDocumentColor } from '@workbench/canvas-engine/render/colorSample';
+import { createColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import { compositeDocument } from '@workbench/canvas-engine/render/compositor';
 import { createGroupSurfaceCache } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -182,9 +182,10 @@ describe('group adjustment composite', () => {
       getCacheEntry: (id) => scene.caches.get(id),
     });
     const point = { x: WIDTH / 2, y: HEIGHT / 2 };
-    const raw = sampleDocumentColor(document, scene.caches, scene.backend, point);
+    const sampler = createColorSampler(scene.backend);
+    const raw = sampler.sample(document, scene.caches, point);
     expect(raw?.r).toBe(0x40);
-    const adjusted = sampleDocumentColor(document, scene.caches, scene.backend, point, {
+    const adjusted = sampler.sample(document, scene.caches, point, {
       groupSurface: (scope, members, matrices, exclude) => groupSurfaces.get(scope, members, matrices, exclude),
     });
     expect(adjusted?.r).toBe(255 - 0x40);

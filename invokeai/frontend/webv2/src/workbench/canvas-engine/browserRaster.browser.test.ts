@@ -9,7 +9,7 @@ import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixt
 import { executePsdExport, planPsdExport } from '@workbench/canvas-engine/export/psdExport';
 import { createHistory } from '@workbench/canvas-engine/history/history';
 import { createImagePatchEntry } from '@workbench/canvas-engine/history/imagePatch';
-import { sampleDocumentColor } from '@workbench/canvas-engine/render/colorSample';
+import { createColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import { compositeDocument } from '@workbench/canvas-engine/render/compositor';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createDomRasterBackend, type RasterSurface } from '@workbench/canvas-engine/render/raster';
@@ -64,7 +64,7 @@ describe('real browser raster acceptance', () => {
     caches.getOrCreate('empty', 0, 0);
 
     expect(() =>
-      sampleDocumentColor(documentWith([rasterLayer('empty')]), caches, backend, { x: 1, y: 1 })
+      createColorSampler(backend).sample(documentWith([rasterLayer('empty')]), caches, { x: 1, y: 1 })
     ).not.toThrow();
   });
 

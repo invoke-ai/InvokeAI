@@ -128,6 +128,8 @@ export interface CompositeOptions {
   floatingSelection?: { layerId: string; surface: RasterSurface; rect: Rect; matrix: Mat2d } | null;
   /** Optional deterministic render counters; omitted in the normal zero-overhead path. */
   diagnostics?: CanvasDiagnostics | null;
+  /** Reused draw plan from {@link prepareComposite}; ignored unless it was prepared for this document and isolation. */
+  preparation?: CompositePreparation | null;
   /**
    * An adjusted group's document-space composite (stack applied), `null` when
    * it has no drawable content; `excludeIds` members are left out for the
@@ -151,6 +153,42 @@ export const blendToComposite = (mode: CanvasBlendMode): GlobalCompositeOperatio
 
 const isIsolated = (opts: CompositeOptions): boolean =>
   opts.isolationLayerId !== null && opts.isolationLayerId !== undefined;
+
+/** The leaves and group scopes one document composites with; stable while the document and isolation are. */
+export interface CompositePreparation {
+  readonly document: CanvasDocumentContractV3;
+  readonly isolationLayerId: string | null;
+  readonly grouped: boolean;
+  readonly leaves: readonly SemanticLeaf[];
+  readonly scopes: readonly GroupCompositeScope[];
+}
+
+/** Plans the draw order and isolated group scopes for `doc`, for callers compositing it repeatedly. */
+export const prepareComposite = (
+  doc: CanvasDocumentContractV3,
+  opts: Pick<CompositeOptions, 'groupSurface' | 'isolationLayerId'> = {}
+): CompositePreparation => {
+  const isolationLayerId = opts.isolationLayerId ?? null;
+  // The plan lists the leaves to draw bottom first; the `stagedPreview` lands on top of every stack.
+  const { leaves } = planScreenComposition(compileDocumentLeaves(doc), {
+    isolationLayerId,
+    showOverlayStacks: ALL_OVERLAY_STACKS_SHOWN,
+  });
+  // Isolation mode inspects raw members, so scopes are bypassed while active.
+  const grouped = !!opts.groupSurface && isolationLayerId === null;
+  const scopes = grouped ? planGroupCompositeScopes(leaves, collectCompositedGroups(doc)) : [];
+  return { document: doc, grouped, isolationLayerId, leaves, scopes };
+};
+
+const isPreparedFor = (
+  preparation: CompositePreparation | null | undefined,
+  doc: CanvasDocumentContractV3,
+  opts: CompositeOptions
+): preparation is CompositePreparation =>
+  !!preparation &&
+  preparation.document === doc &&
+  preparation.isolationLayerId === (opts.isolationLayerId ?? null) &&
+  preparation.grouped === (!!opts.groupSurface && !isIsolated(opts));
 
 const setTransformFromMat = (ctx: Ctx, m: Mat2d): void => {
   ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
@@ -487,14 +525,8 @@ export const compositeDocument = (
     ctx.clip();
   }
 
-  // The plan lists the leaves to draw bottom first; the `stagedPreview` lands on top of every stack.
-  const plan = planScreenComposition(compileDocumentLeaves(doc), {
-    isolationLayerId: opts.isolationLayerId ?? null,
-    showOverlayStacks: ALL_OVERLAY_STACKS_SHOWN,
-  });
-  // Isolation mode inspects raw members, so scopes are bypassed while active.
-  const scopes =
-    opts.groupSurface && !isIsolated(opts) ? planGroupCompositeScopes(plan.leaves, collectCompositedGroups(doc)) : [];
+  const plan = isPreparedFor(opts.preparation, doc, opts) ? opts.preparation : prepareComposite(doc, opts);
+  const { scopes } = plan;
   let scopeIndex = 0;
 
   const drawLeafFlat = (leaf: SemanticLeaf): void => {

@@ -130,6 +130,8 @@ export interface LayerCacheStore {
   delete(layerId: string): void;
   /** The current `version` for a layer (0 if it has no cache yet). */
   version(layerId: string): number;
+  /** Advances whenever any cache's published pixels, bounds or identity change; equal values mean unchanged caches. */
+  revision(): number;
   /** Total bytes held across all cache surfaces (w*h*4 each). */
   byteSize(): number;
   /** Evicts unprotected entries least-recently-used first until within `budgetBytes`. Returns evicted ids. */
@@ -199,8 +201,10 @@ export const createLayerCacheStore = (
   // caches cannot mistake new pixels for old ones.
   const versionFloors = new Map<string, number>();
   let tick = 0;
+  let revision = 0;
 
   const notifyVersionChange = (layerId: string): void => {
+    revision += 1;
     try {
       options.onVersionChange?.(layerId);
     } catch {
@@ -582,6 +586,7 @@ export const createLayerCacheStore = (
     for (const entry of entries.values()) {
       rememberFloor(entry);
     }
+    revision += 1;
     entries.clear();
     damageTrails.clear();
     accountedBytes.clear();
@@ -609,6 +614,7 @@ export const createLayerCacheStore = (
     publishPixels,
     publishRasterized,
     restoreState,
+    revision: () => revision,
     shrinkToRect,
     version,
   };

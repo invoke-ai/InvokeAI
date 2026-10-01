@@ -6,7 +6,7 @@
 import type { PointerInput } from '@workbench/canvas-engine/types';
 
 import { rgbaToHex } from '@workbench/canvas-engine/color';
-import { sampleDocumentColor } from '@workbench/canvas-engine/render/colorSample';
+import { createColorSampler, type ColorSampler } from '@workbench/canvas-engine/render/colorSample';
 
 import type { Tool, ToolContext } from './tool';
 
@@ -23,12 +23,12 @@ const updateCursorRing = (ctx: ToolContext, input: PointerInput): void => {
 };
 
 /** Offers sampled color to the one-shot claim then workbench router; standalone fallback updates brush color. */
-const pickColorAt = (ctx: ToolContext, input: PointerInput): void => {
+const pickColorAt = (ctx: ToolContext, sampler: ColorSampler, input: PointerInput): void => {
   const doc = ctx.getDocument();
   if (!doc) {
     return;
   }
-  const sample = sampleDocumentColor(doc, ctx.layers, ctx.backend, input.documentPoint, ctx.sampleProviders);
+  const sample = sampler.sample(doc, ctx.layers, input.documentPoint, ctx.sampleProviders);
   if (!sample) {
     return;
   }
@@ -43,32 +43,40 @@ const pickColorAt = (ctx: ToolContext, input: PointerInput): void => {
 };
 
 /** Creates a fresh color-picker tool. */
-export const createColorPickerTool = (): Tool => ({
-  cursor: () => 'crosshair',
-  id: 'colorPicker',
-  onDeactivate: (ctx) => {
-    ctx.setOverlayCursor(null);
-    ctx.invalidate({ overlay: true });
-  },
-  onPointerCancel: (ctx) => {
-    ctx.discardColorSample?.();
-  },
-  onPointerDown: (ctx, input) => {
-    if ((input.buttons & PRIMARY_BUTTON) === 0) {
-      return;
-    }
-    ctx.discardColorSample?.();
-    updateCursorRing(ctx, input);
-    pickColorAt(ctx, input);
-  },
-  onPointerMove: (ctx, input) => {
-    updateCursorRing(ctx, input);
-    if (input.buttons & PRIMARY_BUTTON) {
-      pickColorAt(ctx, input);
-    }
-  },
-  onPointerUp: (ctx, input) => {
-    updateCursorRing(ctx, input);
-    ctx.commitColorSample?.();
-  },
-});
+export const createColorPickerTool = (): Tool => {
+  // One engine owns the tool and its backend, so the sampler can outlive a gesture.
+  let sampler: ColorSampler | null = null;
+  const pick = (ctx: ToolContext, input: PointerInput): void => {
+    sampler ??= createColorSampler(ctx.backend);
+    pickColorAt(ctx, sampler, input);
+  };
+  return {
+    cursor: () => 'crosshair',
+    id: 'colorPicker',
+    onDeactivate: (ctx) => {
+      ctx.setOverlayCursor(null);
+      ctx.invalidate({ overlay: true });
+    },
+    onPointerCancel: (ctx) => {
+      ctx.discardColorSample?.();
+    },
+    onPointerDown: (ctx, input) => {
+      if ((input.buttons & PRIMARY_BUTTON) === 0) {
+        return;
+      }
+      ctx.discardColorSample?.();
+      updateCursorRing(ctx, input);
+      pick(ctx, input);
+    },
+    onPointerMove: (ctx, input) => {
+      updateCursorRing(ctx, input);
+      if (input.buttons & PRIMARY_BUTTON) {
+        pick(ctx, input);
+      }
+    },
+    onPointerUp: (ctx, input) => {
+      updateCursorRing(ctx, input);
+      ctx.commitColorSample?.();
+    },
+  };
+};
