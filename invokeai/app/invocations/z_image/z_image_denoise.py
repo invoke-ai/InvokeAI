@@ -61,12 +61,19 @@ def _padded(tokens: int) -> int:
     return tokens + (-tokens) % SEQ_MULTI_OF
 
 
+# The two points the shift fit is built on. 4096 image tokens is a 1024x1024 frame -- one
+# megapixel, and where the reference pipeline's fit ends. Naming them keeps the fit and the clamp
+# in `_calculate_shift` from drifting apart.
+Z_IMAGE_MU_FIT_MIN_SEQ_LEN = 256
+Z_IMAGE_MU_FIT_MAX_SEQ_LEN = 4096
+
+
 @invocation(
     "z_image_denoise",
     title="Denoise - Z-Image",
     tags=["image", "z-image"],
     category="latents",
-    version="1.6.0",
+    version="1.6.1",
     classification=Classification.Prototype,
 )
 class ZImageDenoiseInvocation(BaseInvocation):
@@ -127,9 +134,11 @@ class ZImageDenoiseInvocation(BaseInvocation):
     shift: Optional[float] = InputField(
         default=None,
         ge=0.0,
-        description="Override the timestep shift (mu) for the sigma schedule. "
+        description="Override the timestep shift for the sigma schedule. "
         "Leave blank to auto-calculate based on image dimensions (recommended). "
-        "Lower values (~0.5) produce less noise shifting, higher values (~1.15) produce more.",
+        "This is the shift itself, not the mu it is derived from: the auto-calculated value runs "
+        "from about 1.6 on small frames to 3.16 at one megapixel and above. Lower values keep more "
+        "of the input image, higher values less.",
         title="Shift",
     )
     # Scheduler selection for the denoising process
@@ -245,8 +254,8 @@ class ZImageDenoiseInvocation(BaseInvocation):
     def _calculate_shift(
         self,
         image_seq_len: int,
-        base_image_seq_len: int = 256,
-        max_image_seq_len: int = 4096,
+        base_image_seq_len: int = Z_IMAGE_MU_FIT_MIN_SEQ_LEN,
+        max_image_seq_len: int = Z_IMAGE_MU_FIT_MAX_SEQ_LEN,
         base_shift: float = 0.5,
         max_shift: float = 1.15,
     ) -> float:
@@ -254,12 +263,18 @@ class ZImageDenoiseInvocation(BaseInvocation):
 
         Based on diffusers ZImagePipeline.calculate_shift method.
         Returns a linear shift value (exp(mu) from the original formula).
-        """
-        import math
 
+        The fit is a straight line through two points and is not evaluated past the second one.
+        Extrapolated it runs away fast -- shift reaches 25 at 2048px, 810 at 3072px and 103_777 at
+        4096px -- and `_get_sigmas` flattens with it. Because `denoising_start` is clipped by *index*
+        here, the step count survives but the entry point does not: a canvas img2img pass at
+        strength 0.5 would start from sigma 0.88 at 1536px, 0.96 at 2048px and 1.0000 at 4096px,
+        i.e. throw the input image away and generate a new one. Below one megapixel the clamp
+        changes nothing, and an explicit `shift` on the invocation still overrides it.
+        """
         m = (max_shift - base_shift) / (max_image_seq_len - base_image_seq_len)
         b = base_shift - m * base_image_seq_len
-        mu = image_seq_len * m + b
+        mu = min(image_seq_len, max_image_seq_len) * m + b
         # Convert from exponential mu to linear shift value
         return math.exp(mu)
 

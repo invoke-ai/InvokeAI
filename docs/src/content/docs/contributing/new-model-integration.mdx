@@ -287,7 +287,7 @@ Configs identify a model on disk. Every non-abstract subclass of `Config_Base` r
 
 2. **Detection helpers**
 
-   Detect the architecture from keys that only it has, and from shapes where keys are shared. Strip ComfyUI prefixes such as `model.diffusion_model.` first. Exclude LoRA suffixes, so that a LoRA for the architecture is not mistaken for a main model.
+   Detect the architecture from keys that only it has, and from shapes where keys are shared. Strip ComfyUI prefixes such as `model.diffusion_model.` from each key first, with `_strip_comfyui_key_prefix` in `configs/main.py`. It reads the shared `COMFYUI_KEY_PREFIXES`, so detection and the loaders agree on which prefixes exist. Exclude LoRA suffixes, so that a LoRA for the architecture is not mistaken for a main model.
 
    ```python title="invokeai/backend/model_manager/configs/main.py"
    def _has_new_model_keys(state_dict: dict[str | int, Any]) -> bool:
@@ -377,9 +377,13 @@ Loaders turn a config into an in-memory model. Every module in this folder is im
 2. **Single-file and GGUF main models**
 
    Subclass `ModelLoader`, build the transformer under `accelerate.init_empty_weights()`, convert the keys to the diffusers layout, and load with `assign=True`. `Krea2CheckpointModel` and `Krea2GGUFCheckpointModel` in `krea2.py` show the full pattern:
-   - reserving RAM before materializing
-   - quantized formats: ComfyUI `fp8_scaled`, `int8_convrot` and `nvfp4` (helpers in `invokeai/backend/quantization/`), and GGUF through `gguf_sd_loader`
+   - stripping the ComfyUI prefix with `CheckpointPrefix.detect(sd).strip(sd)` (`invokeai/backend/model_manager/checkpoint_prefix.py`) rather than a hand-written loop
+   - reserving RAM before materializing, exactly once: build the empty model first, take the fp8 and nvfp4 side channels out of the state dict, then reserve, and only then fold or widen anything. A fold before the reservation lands on a cache that was never asked for the room. For fp8, nvfp4 and dense files the reservation is `reserve_for_load` (`invokeai/backend/quantization/load_plan.py`).
+   - quantized formats: ComfyUI `fp8_scaled`, `int8_convrot` and `nvfp4` (helpers in `invokeai/backend/quantization/`), and GGUF through `gguf_sd_loader`. For int8, call `install_int8_convrot_layers` instead of its individual steps. It makes the reservation itself through its `reserve` argument, so do not also call `reserve_for_load`; the steps' order matters, and skipping the first one loads a mixed checkpoint's fp8 weights without their scale.
+   - a loader that handles no quantization side channel (a VAE, an adapter, a non-strict `load_state_dict`) calls `reject_quantized_side_channel` so a quantized file is refused rather than loaded wrongly
    - opting into FP8 storage with `_apply_fp8_layerwise_casting`
+
+   **Declare FP8 Storage support at registration.** The Model Manager only shows the FP8 Storage toggle where `fp8_storage_verdict(base, type, format)` (`invokeai/backend/model_manager/load/fp8_capability.py`) says it works. A loader that does not apply the cast says so where it registers, with a reason: `fp8_storage=Unimplemented("...")` for work not done yet, `NotApplicable("...")` for a deliberate decision. `tests/backend/model_manager/load/test_fp8_capability.py` walks the registry and fails for a loader that neither casts nor declares.
 
    Community single-file checkpoints often use key names that differ from diffusers, for example fused projections. Verify the conversion numerically against the diffusers module on a small config.
 
@@ -389,13 +393,14 @@ Loaders turn a config into an in-memory model. Every module in this folder is im
 
 4. **Text encoder loader (only for a new encoder type)**
 
-   Register with `base=BaseModelType.Any` and the encoder's `ModelType`, and serve both `SubModelType.TextEncoder` and `SubModelType.Tokenizer`. Vendor tokenizers and configs the loader needs, as `invokeai/backend/qwen2_5_vl/` does, so a single-file install loads without network access.
+   Register with `base=BaseModelType.Any` and the encoder's `ModelType`, and serve both `SubModelType.TextEncoder` and `SubModelType.Tokenizer`. Vendor tokenizers and configs the loader needs, as `invokeai/backend/qwen2_5_vl/` does, so a single-file install loads without network access. Add the vendored files to `[tool.setuptools.package-data]` in `pyproject.toml`, or a wheel install fails with `FileNotFoundError`.
 </Steps>
 
 :::tip[Checklist: Model loaders]{icon="approve-check"}
 - [ ] Loader per registered `(base, type, format)`
 - [ ] Key conversion for single-file and GGUF layouts, verified numerically against diffusers
 - [ ] Quantized formats via the existing `invokeai/backend/quantization/` helpers
+- [ ] FP8 Storage: the loader casts, or declares `Unimplemented` / `NotApplicable` at registration
 - [ ] VAE and encoder loaders (if new)
 :::
 

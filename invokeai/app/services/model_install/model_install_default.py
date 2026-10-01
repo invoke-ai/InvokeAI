@@ -337,6 +337,9 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _resume_remote_download(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.WAITING
+        # Sources whose partial file has vanished. _enqueue_remote_download replaces job.download_parts
+        # with fresh parts, so the flag must be carried onto them or the resume response loses it.
+        restarted_from_scratch: set[str] = set()
         if job.download_parts:
             for part in job.download_parts:
                 if part.complete or part.bytes <= 0:
@@ -348,6 +351,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     part.bytes = 0
                     part.resume_from_scratch = True
                     part.resume_message = "Partial file missing. Restarted download from the beginning."
+                    restarted_from_scratch.add(str(part.source))
             job.bytes = sum(p.bytes for p in job.download_parts)
         remote_files, metadata = self._remote_files_from_source(job.source)
         subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
@@ -360,6 +364,7 @@ class ModelInstallService(ModelInstallServiceBase):
             subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
             subfolders=subfolders if len(subfolders) > 1 else None,
             resume_metadata=job._resume_metadata,
+            restarted_from_scratch=restarted_from_scratch,
         )
 
     @property
@@ -1360,6 +1365,7 @@ class ModelInstallService(ModelInstallServiceBase):
         subfolders: Optional[List[Path]] = None,
         resume_metadata: Optional[dict] = None,
         clear_partials: bool = False,
+        restarted_from_scratch: Optional[set[str]] = None,
     ) -> ModelInstallJob:
         job.source_metadata = metadata
         job.local_path = destdir
@@ -1402,9 +1408,15 @@ class ModelInstallService(ModelInstallServiceBase):
                 part.final_url = meta.get("final_url") or part.final_url
                 if meta.get("download_path"):
                     part.download_path = Path(meta.get("download_path"))
+        if restarted_from_scratch:
+            for part in multifile_job.download_parts:
+                if str(part.source) in restarted_from_scratch:
+                    part.resume_from_scratch = True
+                    part.resume_message = "Partial file missing. Restarted download from the beginning."
         with self._lock:
             self._download_cache[multifile_job.id] = job
         job._multifile_job = multifile_job
+        job.download_parts = multifile_job.download_parts
 
         self._write_install_marker(job, status=InstallStatus.WAITING)
         files_string = "file" if len(remote_files) == 1 else "files"
