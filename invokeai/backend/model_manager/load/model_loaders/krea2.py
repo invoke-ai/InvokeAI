@@ -289,7 +289,7 @@ class Krea2DiffusersModel(GenericDiffusersLoader):
 
         # Krea-2 prefers bfloat16; use a safe dtype based on target device capabilities.
         target_device = TorchDevice.choose_torch_device()
-        dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        dtype = TorchDevice.choose_krea2_denoise_dtype(target_device)
 
         extra_kwargs: dict[str, Any] = {}
         if submodel_type is SubModelType.TextEncoder:
@@ -349,7 +349,7 @@ class Krea2CheckpointModel(ModelLoader):
         model_path = Path(config.path)
 
         target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        model_dtype = TorchDevice.choose_krea2_denoise_dtype(target_device)
 
         sd = load_file(model_path)
         sd = _strip_comfyui_prefix(sd)
@@ -412,7 +412,7 @@ class Krea2GGUFCheckpointModel(ModelLoader):
 
         model_path = Path(config.path)
         target_device = TorchDevice.choose_torch_device()
-        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        compute_dtype = TorchDevice.choose_krea2_denoise_dtype(target_device)
 
         # GGMLTensor wrappers (kept on CPU; dequantized on-the-fly by the cache during inference).
         sd = gguf_sd_loader(model_path, compute_dtype=compute_dtype)
@@ -464,7 +464,7 @@ class Qwen3VLEncoderLoader(ModelLoader):
                 return AutoTokenizer.from_pretrained(tokenizer_path, local_files_only=True, extra_special_tokens={})
             case SubModelType.TextEncoder:
                 target_device = TorchDevice.choose_torch_device()
-                model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+                model_dtype = TorchDevice.choose_krea2_denoise_dtype(target_device)
                 te_config = _normalize_qwen3vl_rope_config(
                     AutoConfig.from_pretrained(text_encoder_path, local_files_only=True)
                 )
@@ -569,7 +569,7 @@ class Qwen3VLEncoderCheckpointLoader(ModelLoader):
 
         model_path = Path(config.path)
         target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+        model_dtype = TorchDevice.choose_krea2_denoise_dtype(target_device)
 
         sd = load_file(str(model_path))
         # Detect an fp8 source (ComfyUI 'scaled fp8' weight_scale keys, or raw float8 weights) BEFORE
