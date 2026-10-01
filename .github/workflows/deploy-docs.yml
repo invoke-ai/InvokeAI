@@ -107,6 +107,10 @@ jobs:
         working-directory: docs
 
       # Checks
+      - name: test docs tooling
+        run: pnpm test
+        working-directory: docs
+
       - name: verify generated docs data
         run: pnpm run check-docs-data
         working-directory: docs
