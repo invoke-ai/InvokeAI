@@ -27,7 +27,7 @@ export const WorkbenchSplashScreen = ({ messageKey = 'splash.loadingWorkspace' }
           <VStack align="start" flex="1" minH="full" minW="80" textAlign="start" py="2">
             <Heading size="2xl">{t('app.nameWithVersion', { name: t('app.name'), version: APP_VERSION })}</Heading>
             <Text fontSize="md">{t('splash.tagline')}</Text>
-            <Text fontSize="xs">{t('splash.artworkBy', { artist: 'John Smith' })}</Text>
+            <Text fontSize="xs">{t('splash.artworkBy', { artist: 'Jonathan Pollack' })}</Text>
             <Flex alignItems="center" gap="2" mt="auto">
               <Spinner size="xs" />
               <Text fontSize="xs" flex="1">
