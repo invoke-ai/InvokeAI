@@ -18493,7 +18493,8 @@ describe('history entries and stepBy', () => {
 });
 
 describe('pixel undo onto a cache that is no longer trustworthy', () => {
-  it('rasterizes the layer from its source before writing the patch', async () => {
+  /** Records a brush stroke on `source`, then invalidates every cache so the next undo cannot trust it. */
+  const strokeThenInvalidate = async (source: CanvasLayerSourceContract, imageResolver: () => Promise<Blob>) => {
     const raf = createControllableRaf();
     vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
     vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
@@ -18507,15 +18508,20 @@ describe('pixel undo onto a cache that is no longer trustworthy', () => {
       }
     );
     const document = paintDoc();
-    const persisted = {
-      ...getDocumentLeaves(document)[0]!,
-      source: { bitmap: { height: 100, imageName: 'persisted', width: 100 }, type: 'paint' as const },
-    };
-    const { store } = createReactiveStore({ ...document, stacks: stacksFrom([persisted]) });
-    const imageResolver = vi.fn(() => Promise.resolve(new Blob()));
+    const layer = { ...getDocumentLeaves(document)[0]!, source } as CanvasLayerContract;
+    const { store } = createReactiveStore({ ...document, stacks: stacksFrom([layer]) });
+    const base = createTestStubRasterBackend();
+    const surfaces: { width: number; height: number }[] = [];
+    const bitmapStore = createSpyBitmapStore();
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
-      bitmapStore: createSpyBitmapStore(),
+      backend: {
+        ...base,
+        createSurface: (width: number, height: number) => {
+          surfaces.push({ height, width });
+          return base.createSurface(width, height);
+        },
+      },
+      bitmapStore,
       imageResolver,
       projectId: 'p1',
       store,
@@ -18530,13 +18536,48 @@ describe('pixel undo onto a cache that is no longer trustworthy', () => {
     overlay.fire('pointermove', pointerAt(40, 40));
     overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
     expect(engine.history.getEntries().past).toEqual(['Brush stroke']);
-
     await engine.diagnostics.clearCaches();
-    const fetchesBeforeUndo = imageResolver.mock.calls.length;
-    expect(await engine.history.undo()).toBe('applied');
+    bitmapStore.markLayerDirty.mockClear();
+    return { bitmapStore, engine, surfaces };
+  };
+  const persisted: CanvasLayerSourceContract = {
+    bitmap: { height: 100, imageName: 'persisted', width: 100 },
+    type: 'paint',
+  };
 
+  it('rasterizes the layer from its source before writing the patch', async () => {
+    const imageResolver = vi.fn(() => Promise.resolve(new Blob()));
+    const { engine } = await strokeThenInvalidate(persisted, imageResolver);
+    const fetchesBeforeUndo = imageResolver.mock.calls.length;
+
+    expect(await engine.history.undo()).toBe('applied');
     expect(imageResolver.mock.calls.length).toBeGreaterThan(fetchesBeforeUndo);
     expect(engine.history.getEntries()).toEqual({ future: ['Brush stroke'], past: [] });
+    engine.lifecycle.dispose();
+  });
+
+  it('keeps the step in place, unpersisted, when the pixels cannot be rasterized', async () => {
+    let fail = false;
+    const imageResolver = vi.fn(() => (fail ? Promise.reject(new Error('offline')) : Promise.resolve(new Blob())));
+    const { bitmapStore, engine } = await strokeThenInvalidate(persisted, imageResolver);
+    fail = true;
+
+    await expectReplayFailure(engine.history.undo(), /could not be restored/);
+    expect(engine.history.getEntries()).toEqual({ future: [], past: ['Brush stroke'] });
+    expect(bitmapStore.markLayerDirty).not.toHaveBeenCalled();
+    engine.lifecycle.dispose();
+  });
+
+  it('writes the patch into a fresh cache when the source now holds no pixels', async () => {
+    const { bitmapStore, engine, surfaces } = await strokeThenInvalidate({ bitmap: null, type: 'paint' }, () =>
+      Promise.resolve(new Blob())
+    );
+    const allocatedBeforeUndo = surfaces.length;
+
+    expect(await engine.history.undo()).toBe('applied');
+    // The stale cache is dropped rather than patched, so its old pixels never persist around the patch.
+    expect(surfaces.length).toBeGreaterThan(allocatedBeforeUndo);
+    expect(bitmapStore.markLayerDirty).toHaveBeenCalledWith('paint1');
     engine.lifecycle.dispose();
   });
 });

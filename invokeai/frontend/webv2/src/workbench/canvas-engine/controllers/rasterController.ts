@@ -230,7 +230,7 @@ export class RasterController {
       : null;
   }
 
-  /** The memoized adjusted copy of a layer's live cache, when `surface` is that cache and its pixels are unbaked. */
+  /** The adjusted copy of a layer's live cache (built and memoized on a miss), when `surface` is that cache and unbaked. */
   getAdjustedCacheSurface(
     layerId: string,
     surface: RasterSurface,

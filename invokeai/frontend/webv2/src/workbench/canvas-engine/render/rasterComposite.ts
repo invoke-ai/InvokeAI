@@ -55,7 +55,7 @@ export interface RenderRasterCompositeDeps {
   };
   /** Owned access to a layer's pixels, released once they are drawn. */
   getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect; release(): void }>;
-  /** The display's memoized, layer-local adjusted copy of `surface`, or null when the owner keeps none for it. */
+  /** The display's layer-local adjusted copy of `surface` (built and memoized on a miss), or null when `surface` is not a live cache. */
   adjustedSurface?(
     layerId: string,
     surface: RasterSurface,
