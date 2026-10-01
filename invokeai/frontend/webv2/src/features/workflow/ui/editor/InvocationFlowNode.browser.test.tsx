@@ -2036,6 +2036,39 @@ describe('InvocationFlowNode field entry', () => {
     expect(weight.value).toBe('7');
   });
 
+  it('renames a field from its name on double-click; Escape keeps the name and the template title clears it', async () => {
+    const { store } = await renderEntryNode();
+    const fieldLabel = () => {
+      const node = store.getSnapshot().nodes.find((candidate) => candidate.id === entryNode.id);
+      return node?.type === 'invocation' ? node.data.inputs.steps?.label : undefined;
+    };
+    const stepsTitle = () =>
+      Array.from(host.querySelectorAll<HTMLElement>('[data-node-input-field-title="true"]')).find((title) =>
+        title.textContent?.startsWith(fieldLabel() || 'Steps')
+      )!;
+    const rename = async (sequence: string) => {
+      await act(() => userEvent.dblClick(stepsTitle()));
+      const input = host.querySelector<HTMLInputElement>('input[aria-label="Field label"]')!;
+      expect(document.activeElement).toBe(input);
+      await keys(sequence);
+      await settle();
+    };
+
+    await rename('Iterations{Enter}');
+    expect(fieldLabel()).toBe('Iterations');
+    expect(stepsTitle().textContent).toBe('Iterations *');
+    expect(host.querySelector('input[aria-label="Field label"]')).toBeNull();
+    // Focus returns to the node, where editor shortcuts such as undo still apply.
+    expect(document.activeElement?.classList.contains('react-flow__node')).toBe(true);
+
+    await rename('Discarded{Escape}');
+    expect(fieldLabel()).toBe('Iterations');
+
+    await rename('Steps{Enter}');
+    expect(fieldLabel()).toBe('');
+    expect(stepsTitle().textContent).toBe('Steps *');
+  });
+
   it('keeps a fractional integer visible and flagged until it is corrected', async () => {
     const { field, store } = await renderEntryNode();
     const steps = field('Steps');

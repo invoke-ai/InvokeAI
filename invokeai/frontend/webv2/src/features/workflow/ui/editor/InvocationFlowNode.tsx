@@ -55,7 +55,7 @@ import { Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Handle, Position, useStore, type NodeProps } from '@xyflow/react';
 import { ChevronDownIcon, ChevronRightIcon, PinIcon, PinOffIcon, RotateCcwIcon, TriangleAlertIcon } from 'lucide-react';
-import { memo, useId, useState, type ChangeEvent, type KeyboardEvent } from 'react';
+import { memo, useId, useRef, useState, type ChangeEvent, type KeyboardEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { InvocationFlowNode as InvocationFlowNodeType, InvocationNodeTemplateView } from './flowAdapters';
@@ -215,6 +215,66 @@ const NodeProgressStrip = ({ execution }: { execution: NodeExecutionState | null
   );
 };
 
+/** The editor a label double-click opens: Enter or blur commits, Escape keeps the current name. */
+const InlineLabelInput = ({
+  ariaLabel,
+  fontSize,
+  initialValue,
+  onCommit,
+  onEnd,
+}: {
+  ariaLabel: string;
+  fontSize?: '2xs';
+  initialValue: string;
+  onCommit: (value: string) => void;
+  onEnd: () => void;
+}) => {
+  const [draft, setDraft] = useState(initialValue);
+  const isCancelled = useRef(false);
+
+  // Its own field: inside a value row it would otherwise take that control's id and invalid state.
+  return (
+    <Field.Root flex="1" minW="0">
+      <Input
+        autoFocus
+        aria-label={ariaLabel}
+        className="nodrag"
+        flex="1"
+        fontSize={fontSize}
+        minW="0"
+        size="2xs"
+        value={draft}
+        onBlur={() => {
+          if (!isCancelled.current && draft.trim() !== initialValue) {
+            onCommit(draft.trim());
+          }
+
+          onEnd();
+        }}
+        onChange={(event: ChangeEvent<HTMLInputElement>) => setDraft(event.currentTarget.value)}
+        onFocus={(event) => event.currentTarget.select()}
+        onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
+          if (event.key === 'Escape') {
+            isCancelled.current = true;
+          }
+
+          if (event.key === 'Enter' || event.key === 'Escape') {
+            event.stopPropagation();
+            // Hand focus back to the node so editor shortcuts (undo) keep working; the blur commits.
+            const node = event.currentTarget.closest<HTMLElement>('.react-flow__node');
+
+            if (node) {
+              node.focus({ preventScroll: true });
+            } else {
+              event.currentTarget.blur();
+            }
+          }
+        }}
+      />
+    </Field.Root>
+  );
+};
+
 const NodeTitle = ({
   isWorkflowImageExport,
   node,
@@ -225,7 +285,7 @@ const NodeTitle = ({
   title: string;
 }) => {
   const { editGraph } = useProjectGraphCommands();
-  const [draftLabel, setDraftLabel] = useState<string | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
 
   if (isWorkflowImageExport) {
     return (
@@ -239,24 +299,14 @@ const NodeTitle = ({
     );
   }
 
-  if (draftLabel !== null) {
+  if (isEditing) {
     return (
-      <Input
-        autoFocus
-        aria-label="Node label"
-        className="nodrag"
-        size="2xs"
-        value={draftLabel}
-        onBlur={() => {
-          editGraph({ label: draftLabel.trim(), nodeId: node.id, type: 'setNodeLabel' });
-          setDraftLabel(null);
-        }}
-        onChange={(event: ChangeEvent<HTMLInputElement>) => setDraftLabel(event.currentTarget.value)}
-        onKeyDown={(event: KeyboardEvent<HTMLInputElement>) => {
-          if (event.key === 'Enter' || event.key === 'Escape') {
-            event.currentTarget.blur();
-          }
-        }}
+      <InlineLabelInput
+        ariaLabel="Node label"
+        // Start from the displayed title, including the template fallback for unset labels.
+        initialValue={title}
+        onCommit={(label) => editGraph({ label, nodeId: node.id, type: 'setNodeLabel' })}
+        onEnd={() => setIsEditing(false)}
       />
     );
   }
@@ -267,8 +317,7 @@ const NodeTitle = ({
       minW="0"
       text={title}
       title="Double-click to rename"
-      // Start editing from the displayed title, including the template fallback for unset labels.
-      onDoubleClick={() => setDraftLabel(title)}
+      onDoubleClick={() => setIsEditing(true)}
     />
   );
 };
@@ -298,6 +347,7 @@ const InputFieldTooltip = ({
         {isExposed ? ` · ${t('nodes.pinnedToLinearUi')}` : null}
       </Text>
       {description ? <Text>{description}</Text> : null}
+      <Text color="fg.subtle">{t('nodes.renameFieldHint')}</Text>
     </Stack>
   );
 };
@@ -594,6 +644,7 @@ const InputFieldRow = ({
   const showInvalid = isInvalid && !isWorkflowImageExport;
   const handleTooltip = getHandleTypeTooltip(template.type, t('nodes.any'), t);
   const canReset = !isWorkflowImageExport && showsControl && !isWorkflowFieldValueDefault(template, instance?.value);
+  const [isEditingLabel, setIsEditingLabel] = useState(false);
   const fieldTitle = (
     <Text
       color={showInvalid ? 'fg.error' : isConnected ? 'fg.muted' : 'fg'}
@@ -602,6 +653,7 @@ const InputFieldRow = ({
       lineHeight="shorter"
       minW="0"
       truncate
+      onDoubleClick={isWorkflowImageExport ? undefined : () => setIsEditingLabel(true)}
     >
       {label}
       {template.required ? (
@@ -656,6 +708,22 @@ const InputFieldRow = ({
           ) : null}
           {isWorkflowImageExport ? (
             fieldTitle
+          ) : isEditingLabel ? (
+            <InlineLabelInput
+              ariaLabel="Field label"
+              fontSize="2xs"
+              initialValue={label}
+              // The template title is the unset label, so renaming back to it follows template changes again.
+              onCommit={(next) =>
+                editGraph({
+                  fieldName: template.name,
+                  label: next === template.title ? '' : next,
+                  nodeId: node.id,
+                  type: 'setFieldLabel',
+                })
+              }
+              onEnd={() => setIsEditingLabel(false)}
+            />
           ) : (
             <Tooltip
               positioning={{ placement: 'top-start' }}

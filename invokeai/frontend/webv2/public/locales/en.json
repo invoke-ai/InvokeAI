@@ -1468,6 +1468,7 @@
       "any": "Direct value or connection"
     },
     "pinnedToLinearUi": "Pinned to Linear UI.",
+    "renameFieldHint": "Double-click the name to rename it.",
     "batch": "batch",
     "any": "Any",
     "anyInput": "Any input",
