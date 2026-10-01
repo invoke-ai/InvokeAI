@@ -1,7 +1,8 @@
 import { Box, Flex, forwardRef, Grid, GridItem, IconButton, Spinner, Text } from '@invoke-ai/ui-library';
 import { createSelector } from '@reduxjs/toolkit';
 import { useAppSelector, useAppStore } from 'app/store/storeHooks';
-import { getFocusedRegion, useIsRegionFocused } from 'common/hooks/focus';
+import { getFocusedRegion } from 'common/hooks/focus';
+import { useGalleryStarImageHotkey } from 'features/gallery/hooks/useGalleryStarImageHotkey';
 import { getVideoPrefetchOptions, useRangeBasedImageFetching } from 'features/gallery/hooks/useRangeBasedImageFetching';
 import type { selectGalleryItemNamesQueryArgs } from 'features/gallery/store/gallerySelectors';
 import {
@@ -9,7 +10,6 @@ import {
   selectImageToCompare,
   selectLastSelectedItem,
   selectSelection,
-  selectSelectionCount,
 } from 'features/gallery/store/gallerySelectors';
 import { imageToCompareChanged, selectionChanged } from 'features/gallery/store/gallerySlice';
 import { isVideoName } from 'features/gallery/store/types';
@@ -29,8 +29,8 @@ import type {
   VirtuosoGridHandle,
 } from 'react-virtuoso';
 import { VirtuosoGrid } from 'react-virtuoso';
-import { imagesApi, useImageDTO, useStarImagesMutation, useUnstarImagesMutation } from 'services/api/endpoints/images';
-import { useStarVideosMutation, useUnstarVideosMutation, useVideoDTO, videosApi } from 'services/api/endpoints/videos';
+import { imagesApi } from 'services/api/endpoints/images';
+import { videosApi } from 'services/api/endpoints/videos';
 import { useDebounce } from 'use-debounce';
 
 import { getItemIndex } from './getItemIndex';
@@ -334,54 +334,6 @@ const useKeepSelectedImageInView = (
   }, [imageNames, rangeRef, rootRef, virtuosoRef, selection]);
 };
 
-const useStarImageHotkey = () => {
-  const lastSelectedItem = useAppSelector(selectLastSelectedItem);
-  const selectionCount = useAppSelector(selectSelectionCount);
-  const isGalleryFocused = useIsRegionFocused('gallery');
-  const isVideo = lastSelectedItem ? isVideoName(lastSelectedItem) : false;
-  const imageDTO = useImageDTO(isVideo ? null : lastSelectedItem);
-  const videoDTO = useVideoDTO(isVideo ? lastSelectedItem : null);
-  const [starImages] = useStarImagesMutation();
-  const [unstarImages] = useUnstarImagesMutation();
-  const [starVideos] = useStarVideosMutation();
-  const [unstarVideos] = useUnstarVideosMutation();
-
-  const dto = isVideo ? videoDTO : imageDTO;
-
-  const handleStarHotkey = useCallback(() => {
-    if (!isGalleryFocused) {
-      return;
-    }
-    if (isVideo) {
-      if (!videoDTO) {
-        return;
-      }
-      if (videoDTO.starred) {
-        unstarVideos({ video_names: [videoDTO.video_name] });
-      } else {
-        starVideos({ video_names: [videoDTO.video_name] });
-      }
-    } else {
-      if (!imageDTO) {
-        return;
-      }
-      if (imageDTO.starred) {
-        unstarImages({ image_names: [imageDTO.image_name] });
-      } else {
-        starImages({ image_names: [imageDTO.image_name] });
-      }
-    }
-  }, [isGalleryFocused, isVideo, imageDTO, videoDTO, starImages, unstarImages, starVideos, unstarVideos]);
-
-  useRegisteredHotkeys({
-    id: 'starImage',
-    category: 'gallery',
-    callback: handleStarHotkey,
-    options: { enabled: !!dto && selectionCount === 1 && isGalleryFocused },
-    dependencies: [dto, selectionCount, isGalleryFocused, handleStarHotkey],
-  });
-};
-
 type GalleryImageGridContentProps = {
   imageNames: string[];
   navigationImageNames?: string[];
@@ -404,7 +356,7 @@ export const GalleryImageGridContent = memo(
       enabled: !isLoading,
     });
 
-    useStarImageHotkey();
+    useGalleryStarImageHotkey();
     useKeepSelectedImageInView(imageNames, virtuosoRef, rootRef, rangeRef);
     useKeyboardNavigation(navigationImageNames ?? imageNames, virtuosoRef, rootRef);
     const scrollerRef = useScrollableGallery(rootRef);
