@@ -41,6 +41,8 @@ A node's border shows its state: red when a required input is missing or the nod
 
 Only nodes whose **Save to Gallery** box is checked, at the bottom of nodes that produce images, send their images to the Gallery. The images of other nodes are intermediate results that are used and then discarded. New nodes start with **Save to Gallery** turned off, so check it on the node that makes your final image.
 
+An image node's **Board** field chooses where its saved images go. **Auto**, the default, uses the Gallery's destination: the selected board, or the auto-add board if one is set (see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes)). **None** saves to Uncategorized, and you can also pick a specific board. Images from nodes that have no Board field go to Uncategorized.
+
 Beside it, **Use Cache** lets InvokeAI reuse a node's previous result when its inputs have not changed, which speeds up repeated runs. On a multi-user installation, only administrators see this option.
 
 ### Your workflows
@@ -51,7 +53,7 @@ Each project keeps its own workflows, and one of them is **active**: the one sho
 * **Browse** — the workflows that ship with InvokeAI, such as *Text to Image - SDXL*, *Flux Text to Image* and the video workflows. Opening one adds a copy to your project.
 * **Yours** — workflows you have saved to your library with **Save to library…**, for use in other projects.
 
-Opening a library workflow adds an independent copy to the project; the library's version is untouched. If the project already has a copy, you can switch to it (**Open project copy**) or **Add another copy**.
+Opening a library workflow adds an independent copy to the project; the library's version is untouched. If the project already has a copy, opening the template asks what to do: **Open copy** switches to the existing copy, **Add new copy** makes another one, and **Replace copy** replaces the copy's graph with the library version while keeping its name. A replace can be undone in one step.
 
 Changes to a project's workflows never change the library by themselves. **Save to library…**, in the editor's header, saves the workflow as a new library template with the name you give it, including its form and its current settings as defaults. For a workflow opened from one of your own templates, **Update library template** replaces that template instead. If the template has changed since you opened it, you can save as a new template instead, or review the current one and replace it deliberately. Replacing a template also affects workflows that use it through the **Call Saved Workflow** node.
 
