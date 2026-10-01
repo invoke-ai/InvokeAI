@@ -1,7 +1,15 @@
 import type { AppStore } from 'app/store/store';
 import type * as paramsSliceModule from 'features/controlLayers/store/paramsSlice';
-import { ImageMetadataHandlers, parseMetadataDatum, recallIfStillValid } from 'features/metadata/parsing';
+import { refImagesRecalled } from 'features/controlLayers/store/refImagesSlice';
+import type { RefImageState } from 'features/controlLayers/store/types';
+import {
+  getRefImageMetadataValue,
+  ImageMetadataHandlers,
+  parseMetadataDatum,
+  recallIfStillValid,
+} from 'features/metadata/parsing';
 import type * as modelsApiModule from 'services/api/endpoints/models';
+import { assert } from 'tsafe';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -1288,5 +1296,175 @@ describe('parseMetadataDatum', () => {
     expect(data.isParsed).toBe(true);
     expect(data.isError).toBe(true);
     expect(data.error).toBeInstanceOf(Error);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RefImages
+//
+// The viewer renders a row per parsed entry and hides the row entirely when the parse fails, so
+// "does the reference image show up in the metadata" is exactly "does this handler's parse succeed on
+// what the graph builder wrote". These drive the real handler with the metadata shape each builder
+// emits.
+// ---------------------------------------------------------------------------
+describe('ImageMetadataHandlers - RefImages', () => {
+  const krea2RefImage = (styleStrength = 0.6) => ({
+    id: 'reference_image:1',
+    isEnabled: true,
+    config: {
+      type: 'krea2_reference_image',
+      styleStrength,
+      image: { original: { image: { image_name: 'style.png', width: 512, height: 512 } } },
+    },
+  });
+
+  it('parses a Krea-2 style reference from the ref_images slot', async () => {
+    currentBase = 'krea-2';
+
+    const parsed = await ImageMetadataHandlers.RefImages.parse({ ref_images: [krea2RefImage()] }, makeStore());
+
+    expect(parsed).toHaveLength(1);
+    expect(parsed[0]?.config.type).toBe('krea2_reference_image');
+    // The strength rides along in the config; there is no separate metadata key for it.
+    expect(parsed[0]?.config).toMatchObject({ styleStrength: 0.6 });
+  });
+
+  it('surfaces the row via parseMetadataDatum, which is what the viewer uses', async () => {
+    currentBase = 'krea-2';
+
+    const data = await parseMetadataDatum(
+      { ref_images: [krea2RefImage()] },
+      ImageMetadataHandlers.RefImages,
+      makeStore()
+    );
+
+    expect(data.isParsed).toBe(true);
+    expect(data.isSuccess).toBe(true);
+  });
+
+  // Before the reference was written to metadata, a Krea-2 image carried only a `krea2_style_strength`
+  // scalar. Nothing reads that key, so the row never appeared -- this pins the regression.
+  it('finds nothing when only a style-strength scalar was recorded', async () => {
+    currentBase = 'krea-2';
+
+    const data = await parseMetadataDatum({ krea2_style_strength: 0.6 }, ImageMetadataHandlers.RefImages, makeStore());
+
+    expect(data.isParsed).toBe(true);
+    expect(data.isError).toBe(true);
+  });
+
+  // The style strength has no metadata key and no row of its own: it lives inside the reference
+  // image's config, and the strength slider reads it from there. So the single-row recall has to
+  // carry it, otherwise recalling one reference resets its strength to the schema default of 1.
+  it('carries the style strength through the single-row recall', async () => {
+    currentBase = 'krea-2';
+    const store = makeStore();
+
+    const parsed = await ImageMetadataHandlers.RefImages.parse({ ref_images: [krea2RefImage(0.35)] }, store);
+    const entry = parsed[0];
+    assert(entry !== undefined);
+    ImageMetadataHandlers.RefImages.recallOne(entry, store);
+
+    const dispatched = vi.mocked(store.dispatch).mock.calls.map(([action]) => action);
+    const recalled = dispatched.find(
+      (action): action is ReturnType<typeof refImagesRecalled> =>
+        typeof action === 'object' && action !== null && 'type' in action && action.type === refImagesRecalled.type
+    );
+    assert(recalled !== undefined, 'expected refImagesRecalled to be dispatched');
+
+    expect(recalled.payload.replace).toBe(false);
+    expect(recalled.payload.entities).toHaveLength(1);
+    expect(recalled.payload.entities[0]?.config).toMatchObject({
+      type: 'krea2_reference_image',
+      styleStrength: 0.35,
+    });
+  });
+
+  it('drops the row when the referenced image is gone', async () => {
+    currentBase = 'krea-2';
+    const store = makeStore();
+    // The image lookup is the one fetch the parse makes; a miss must fail the whole parse.
+    store.dispatch = vi.fn(() => ({
+      unwrap: () => Promise.reject(new Error('404')),
+    })) as unknown as typeof store.dispatch;
+
+    const data = await parseMetadataDatum({ ref_images: [krea2RefImage()] }, ImageMetadataHandlers.RefImages, store);
+
+    expect(data.isError).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// The metadata viewer's reference-image row text.
+//
+// Every reference type has to say something meaningful. The bases with built-in reference support have
+// no model to name and used to render a bare "No model", which reads like a missing setting.
+// ---------------------------------------------------------------------------
+describe('getRefImageMetadataValue', () => {
+  // Keys, not English, so the assertions survive copy changes.
+  const tKey = (key: string) => key;
+  const image = { original: { image: { image_name: 'ref.png', width: 512, height: 512 } } };
+
+  it.each([['flux2_reference_image'], ['qwen_image_reference_image'], ['wan_reference_image']] as const)(
+    'describes %s as built-in rather than as a missing model',
+    (type) => {
+      const value = getRefImageMetadataValue({ type, image } as RefImageState['config'], tKey);
+
+      expect(value).toBe('metadata.refImageBuiltIn');
+    }
+  );
+
+  it('shows the style strength for a Krea-2 reference', () => {
+    const value = getRefImageMetadataValue(
+      { type: 'krea2_reference_image', image, styleStrength: 0.6 } as RefImageState['config'],
+      tKey
+    );
+
+    expect(value).toBe('controlLayers.krea2StyleStrength 0.6');
+  });
+
+  it.each([['ip_adapter'], ['flux_redux'], ['flux_kontext_reference_image']] as const)(
+    'names the model for %s',
+    (type) => {
+      const config = {
+        type,
+        image,
+        model: { key: 'k', hash: 'h', name: 'Some Adapter', base: 'flux', type: 'ip_adapter' },
+      };
+
+      const value = getRefImageMetadataValue(config as unknown as RefImageState['config'], tKey);
+
+      expect(value).toBe('Some Adapter');
+    }
+  );
+
+  // Unreachable from a generated image -- the graph builders drop model-less adapter references -- but
+  // the viewer also renders live panel state, where the model may not be picked yet.
+  it('falls back for an adapter reference with no model picked', () => {
+    const value = getRefImageMetadataValue(
+      { type: 'flux_redux', image, model: null, imageInfluence: 'highest' } as RefImageState['config'],
+      tKey
+    );
+
+    expect(value).toBe('metadata.refImageNoModel');
+  });
+
+  // A new reference type that forgets to describe itself lands on the built-in text, never on a crash
+  // or an empty row.
+  it('does not return an empty string for any type in the union', () => {
+    const types = [
+      'ip_adapter',
+      'flux_redux',
+      'flux_kontext_reference_image',
+      'flux2_reference_image',
+      'qwen_image_reference_image',
+      'wan_reference_image',
+      'krea2_reference_image',
+    ] as const;
+
+    for (const type of types) {
+      const value = getRefImageMetadataValue({ type, image, styleStrength: 1 } as RefImageState['config'], tKey);
+      expect(value, type).not.toBe('');
+    }
   });
 });

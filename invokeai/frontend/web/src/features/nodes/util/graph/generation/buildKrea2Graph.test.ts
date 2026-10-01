@@ -138,6 +138,11 @@ vi.mock('services/api/types', async () => {
   };
 });
 
+import type { RefImageState } from 'features/controlLayers/store/types';
+import { isKrea2ReferenceImageConfig, zRefImageState } from 'features/controlLayers/store/types';
+import { assert } from 'tsafe';
+import { z } from 'zod';
+
 import { addImageToImage } from './addImageToImage';
 import { addInpaint } from './addInpaint';
 import { addOutpaint } from './addOutpaint';
@@ -426,13 +431,16 @@ describe('buildKrea2Graph', () => {
       config: {
         type: 'krea2_reference_image',
         styleStrength: 1,
-        image: { original: { image: { image_name: 'style.png' }, width: 512, height: 512 } },
+        image: { original: { image: { image_name: 'style.png', width: 512, height: 512 } } },
         ...overrides,
       },
     });
 
     const styleReferenceNode = (g: BuiltGraph) =>
       Object.values(g.getGraph().nodes).find((n) => n.type === 'krea2_style_reference');
+
+    const refImagesMetadata = (g: BuiltGraph) =>
+      (g.getMetadataNode() as unknown as { ref_images?: RefImageState[] }).ref_images;
 
     it('adds no style reference node when there is no reference image', async () => {
       const { g } = await buildTxt2Img();
@@ -501,7 +509,7 @@ describe('buildKrea2Graph', () => {
       const { g } = await buildTxt2Img();
 
       expect(styleReferenceNode(g)).toBeUndefined();
-      expect((g.getMetadataNode() as unknown as Record<string, unknown>).krea2_style_strength).toBeUndefined();
+      expect(refImagesMetadata(g)).toBeUndefined();
     });
 
     it('falls through to the next reference when the first has a strength of 0', async () => {
@@ -519,8 +527,12 @@ describe('buildKrea2Graph', () => {
       refImageEntities = [
         styleRefEntity({
           image: {
-            original: { image: { image_name: 'style.png' }, width: 512, height: 512 },
-            crop: { image: { image_name: 'style-cropped.png' }, width: 256, height: 256 },
+            original: { image: { image_name: 'style.png', width: 512, height: 512 } },
+            crop: {
+              image: { image_name: 'style-cropped.png', width: 256, height: 256 },
+              box: { x: 0, y: 0, width: 256, height: 256 },
+              ratio: 1,
+            },
           },
         }),
       ];
@@ -536,7 +548,7 @@ describe('buildKrea2Graph', () => {
 
       const styleReference = styleReferenceNode(g) as unknown as Record<string, unknown>;
       expect(styleReference.style_strength).toBe(0.6);
-      expect((g.getMetadataNode() as unknown as Record<string, unknown>).krea2_style_strength).toBe(0.6);
+      expect(refImagesMetadata(g)?.[0]?.config).toMatchObject({ styleStrength: 0.6 });
     });
 
     it('ignores disabled reference images and ones without an image', async () => {
@@ -562,6 +574,73 @@ describe('buildKrea2Graph', () => {
       refImageEntities = [{ id: 'ref-1', isEnabled: true, config: { type: 'wan_reference_image', image: {} } }];
       const { g } = await buildTxt2Img();
       expect(styleReferenceNode(g)).toBeUndefined();
+    });
+
+    // Without this, a Krea-2 image records no trace of the reference it was generated from, so the
+    // RefImages metadata handler finds nothing and the style reference cannot be recalled.
+    it('records the reference image in metadata', async () => {
+      refImageEntities = [styleRefEntity()];
+      const { g } = await buildTxt2Img();
+
+      const refImages = refImagesMetadata(g);
+      expect(refImages).toHaveLength(1);
+      expect(refImages?.[0]).toMatchObject({
+        id: 'ref-1',
+        isEnabled: true,
+        config: {
+          type: 'krea2_reference_image',
+          styleStrength: 1,
+          image: { original: { image: { image_name: 'style.png', width: 512, height: 512 } } },
+        },
+      });
+    });
+
+    // The recall handler validates with `zRefImageState` before dispatching, so metadata that does not
+    // satisfy that schema is silently discarded -- which looks exactly like writing nothing at all.
+    it('records it in the shape the recall handler accepts', async () => {
+      refImageEntities = [styleRefEntity({ styleStrength: 0.4 })];
+      const { g } = await buildTxt2Img();
+
+      const parsed = z.array(zRefImageState).parse(refImagesMetadata(g));
+
+      expect(parsed).toHaveLength(1);
+      const config = parsed[0]?.config;
+      assert(config !== undefined && isKrea2ReferenceImageConfig(config));
+      expect(config.styleStrength).toBe(0.4);
+      expect(config.image?.original.image.image_name).toBe('style.png');
+    });
+
+    it('records the cropped image when the reference is cropped', async () => {
+      refImageEntities = [
+        styleRefEntity({
+          image: {
+            original: { image: { image_name: 'style.png', width: 512, height: 512 } },
+            crop: {
+              image: { image_name: 'style-cropped.png', width: 256, height: 256 },
+              box: { x: 0, y: 0, width: 256, height: 256 },
+              ratio: 1,
+            },
+          },
+        }),
+      ];
+      const { g } = await buildTxt2Img();
+
+      // The node is fed the crop, so recall has to restore the crop too, not just the original.
+      expect(refImagesMetadata(g)?.[0]?.config).toMatchObject({
+        image: { crop: { image: { image_name: 'style-cropped.png' } } },
+      });
+    });
+
+    it('records only the reference that was actually used', async () => {
+      refImageEntities = [
+        styleRefEntity({ styleStrength: 0.25 }),
+        { ...styleRefEntity({ styleStrength: 0.75 }), id: 'ref-2' },
+      ];
+      const { g } = await buildTxt2Img();
+
+      const refImages = refImagesMetadata(g);
+      expect(refImages).toHaveLength(1);
+      expect(refImages?.[0]?.id).toBe('ref-1');
     });
   });
 });

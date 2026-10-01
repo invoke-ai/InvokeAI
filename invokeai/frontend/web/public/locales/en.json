@@ -1093,6 +1093,8 @@
         "positivePrompt": "Positive Prompt",
         "qwen3Encoder": "Qwen3 Encoder",
         "qwen3Source": "Qwen3 Source",
+        "refImageBuiltIn": "Built-in, no adapter model",
+        "refImageNoModel": "No model",
         "recallParameters": "Recall Parameters",
         "recallParameter": "Recall {{label}}",
         "scheduler": "Scheduler",
