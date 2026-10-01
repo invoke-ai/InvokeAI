@@ -7,7 +7,15 @@ import {
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { describe, expect, it } from 'vitest';
 
-import { getDocumentIndex, isSelfOrAncestor, outermostNodes } from './documentIndex';
+import {
+  getDocumentIndex,
+  getValueEditVisitCount,
+  isSelfOrAncestor,
+  outermostNodes,
+  resetDocumentIndexBuildCount,
+  updateNodeValues,
+  valueEditBetween,
+} from './documentIndex';
 import {
   cloneSubtree,
   collectSubtree,
@@ -15,7 +23,6 @@ import {
   insertNodes,
   removeNodes,
   subtreeDepth,
-  updateNodes,
 } from './documentTree';
 
 const layer = layerContract;
@@ -44,7 +51,11 @@ describe('document tree', () => {
 
   it('updates nodes in place while sharing every untouched node, and returns the same forests for a no-op', () => {
     const before = stacks();
-    const after = updateNodes(before, new Map([['r3', (node) => ({ ...node, name: 'renamed' })]]));
+    getDocumentIndex({ stacks: before });
+    resetDocumentIndexBuildCount();
+    const after = updateNodeValues(before, new Map([['r3', (node) => ({ ...node, name: 'renamed' })]]));
+    // r3 and its two ancestors; r1, r2, r4 and c1 are never visited.
+    expect(getValueEditVisitCount()).toBe(3);
 
     expect(after).not.toBe(before);
     expect(after.control).toBe(before.control);
@@ -53,8 +64,32 @@ describe('document tree', () => {
     expect(g1(after)).not.toBe(g1(before));
     expect(g1(after).children[0]).toBe(g1(before).children[0]);
     expect(collectSubtreeLeaves(g1(after))[1]?.name).toBe('renamed');
-    expect(updateNodes(before, new Map([['r3', (node) => node]]))).toBe(before);
-    expect(updateNodes(before, new Map([['ghost', (node) => ({ ...node, name: 'x' })]]))).toBe(before);
+    expect(updateNodeValues(before, new Map([['r3', (node) => node]]))).toBe(before);
+    expect(updateNodeValues(before, new Map([['ghost', (node) => ({ ...node, name: 'x' })]]))).toBe(before);
+  });
+
+  it('records the replaced nodes of each value edit and folds consecutive edits for a consumer that fell behind', () => {
+    const before = stacks();
+    const renamed = updateNodeValues(
+      before,
+      new Map([
+        ['g2', (node) => ({ ...node, isEnabled: false })],
+        ['r3', (node) => ({ ...node, name: 'renamed' })],
+      ])
+    );
+    const edit = valueEditBetween(before, renamed)!;
+    // Only the updated nodes are listed: g1 was rebuilt for a new child array, not edited.
+    expect([...edit.keys()]).toEqual(['r3', 'g2']);
+    expect(edit.get('r3')!.before).toBe(collectSubtreeLeaves(g1(before))[1]);
+    expect((edit.get('g2')!.after as CanvasGroupContract).children[0]).toBe(edit.get('r3')!.after);
+
+    const moved = updateNodeValues(renamed, new Map([['r3', (node) => ({ ...node, opacity: 0.5 })]]));
+    const folded = valueEditBetween(before, moved)!;
+    expect(folded.get('r3')!.before).toBe(edit.get('r3')!.before);
+    expect(folded.get('r3')!.after).toMatchObject({ name: 'renamed', opacity: 0.5 });
+    expect(folded.has('g2')).toBe(true);
+    // Structural edits are not value edits: nothing connects the forests across a removal.
+    expect(valueEditBetween(before, removeNodes(moved, new Set(['r4'])))).toBeNull();
   });
 
   it('removes subtrees and shares the untouched forests', () => {

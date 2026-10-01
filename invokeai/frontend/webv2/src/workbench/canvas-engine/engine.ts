@@ -1447,10 +1447,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     onLayersRecomposite: (ids) => {
       scheduler.invalidate({ layers: ids });
     },
-    onLayersChanged: (ids, sourceChangedIds) => {
+    onLayersChanged: (ids, sourceChangedIds, restructured) => {
       const cleanup = createCleanupAccumulator();
-      // A group deleted with its leaves reports here, not onLayerOrderChanged.
-      {
+      // A group deleted with its leaves reports here, not onLayerOrderChanged; value edits remove no group.
+      if (restructured) {
         const doc = mirror.getDocument();
         cleanup.run(() => groupSurfaces.prune(doc ? new Set(getDocumentIndex(doc).byId.keys()) : new Set()));
       }
@@ -1466,9 +1466,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         cleanup.run(cancelOpenPixelEdit);
       }
       const doc = mirror.getDocument();
-      for (const id of sourceChangedIds) {
-        cleanup.run(() => editingController.invalidateLayer(id));
-      }
+      // `sourceChangedIds` is a subset of `ids`, so each changed layer invalidates once.
       for (const id of ids) {
         cleanup.run(() => editingController.invalidateLayer(id));
       }
