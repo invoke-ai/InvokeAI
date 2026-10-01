@@ -1,5 +1,5 @@
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { WidgetCommandApi, WidgetHotkeyApi } from '@workbench/widgetContracts';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 
 import { useEffect, useEffectEvent } from 'react';
 import { useTranslation } from 'react-i18next';

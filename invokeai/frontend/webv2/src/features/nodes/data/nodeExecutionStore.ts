@@ -8,8 +8,6 @@ import { getFirstOutputImageName } from '@platform/core/outputImages';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore, createKeyedTransientStore } from '@platform/state/externalStore';
 
-import { browserNodesDataPort } from './transport';
-
 /**
  * Keep transient execution state outside the workbench reducer; subscribe per source node ID to isolate frequent
  * renders.
@@ -25,8 +23,8 @@ export interface NodeExecutionState {
   /** 0..1, or null while indeterminate. Only meaningful while running. */
   progress: number | null;
   progressMessage: string | null;
-  /** Thumbnail of the node's most recent image output, when it produced one. */
-  outputImageUrl: string | null;
+  /** The node's most recent image output, when it produced one. */
+  outputImageName: string | null;
   /** The node's most recent invocation result in the current run (a loop body runs many times). */
   latestOutput: unknown;
   error: string | null;
@@ -71,9 +69,7 @@ export const nodeExecutionStore = {
 
     stateByNodeId.set(event.invocation_source_id, {
       error: null,
-      outputImageUrl: imageName
-        ? browserNodesDataPort.buildUrl(`/api/v1/images/i/${encodeURIComponent(imageName)}/thumbnail`)
-        : null,
+      outputImageName: imageName ?? null,
       latestOutput: event.result,
       progress: null,
       progressMessage: null,
@@ -85,7 +81,7 @@ export const nodeExecutionStore = {
 
     stateByNodeId.set(event.invocation_source_id, {
       error: event.error_message,
-      outputImageUrl: previous?.outputImageUrl ?? null,
+      outputImageName: previous?.outputImageName ?? null,
       latestOutput: previous?.latestOutput ?? null,
       progress: null,
       progressMessage: null,
@@ -97,7 +93,7 @@ export const nodeExecutionStore = {
 
     stateByNodeId.set(nodeId, {
       error: null,
-      outputImageUrl: previous?.outputImageUrl ?? null,
+      outputImageName: previous?.outputImageName ?? null,
       latestOutput: previous?.latestOutput ?? null,
       progress: percentage,
       progressMessage: message,
@@ -136,7 +132,7 @@ export const nodeExecutionStore = {
 
     stateByNodeId.set(event.invocation_source_id, {
       error: null,
-      outputImageUrl: previous?.outputImageUrl ?? null,
+      outputImageName: previous?.outputImageName ?? null,
       latestOutput: previous?.latestOutput ?? null,
       progress: null,
       progressMessage: null,

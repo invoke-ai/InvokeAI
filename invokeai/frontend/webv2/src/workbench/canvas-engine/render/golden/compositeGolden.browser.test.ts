@@ -120,7 +120,11 @@ const scene = (layers: CanvasLayerContract[], paint: Record<string, { rect: Rect
   return { backend, caches };
 };
 
-const render = (layers: CanvasLayerContract[], paint: Parameters<typeof scene>[1], options: CompositeOptions = {}) => {
+const render = (
+  layers: CanvasLayerContract[],
+  paint: Parameters<typeof scene>[1],
+  options: Partial<CompositeOptions> = {}
+) => {
   const { backend, caches } = scene(layers, paint);
   const target = backend.createSurface(WIDTH, HEIGHT);
   compositeDocument(target, doc(layers), caches, identity(), {
@@ -209,7 +213,7 @@ describe('compositor goldens', () => {
       backend,
       getLayerSurface: (layerId) => {
         const entry = caches.get(layerId)!;
-        return Promise.resolve({ rect: entry.rect, surface: entry.surface });
+        return Promise.resolve({ rect: entry.rect, release: () => undefined, surface: entry.surface });
       },
     });
     await expectGolden('generation-base', surface, { tolerance: EXACT });

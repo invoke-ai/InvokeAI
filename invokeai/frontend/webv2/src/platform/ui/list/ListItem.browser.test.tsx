@@ -61,6 +61,8 @@ describe('ListItem', () => {
     await act(() => action.click());
     expect(onAction).toHaveBeenCalledTimes(1);
     expect(onPress).not.toHaveBeenCalled();
+    // Leave a real pointer over the row: the next test must not inherit a hover on its new controls.
+    await userEvent.hover(primary());
   });
 
   it('renders a static row without a press handler as plain content, not a button', async () => {
@@ -77,6 +79,10 @@ describe('ListItem', () => {
 
     await render(<ListItem title={longPrompt} titleTruncate="end" onIntent={onIntent} onPress={() => undefined} />);
 
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    expect(onIntent).not.toHaveBeenCalled();
     await act(() => primary().focus());
     expect(onIntent).toHaveBeenCalledTimes(1);
     await userEvent.hover(primary());

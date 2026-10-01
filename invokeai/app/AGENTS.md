@@ -6,7 +6,7 @@
 - Before changing flows, inspect `api/dependencies.py`, affected routers, service base/default/storage implementations, and tests. Preserve dependency/start/stop lifecycles; avoid parallel global services.
 - Server-authorize every account-owned resource, including queries, writes, events, exports, and recovery; UI guards are insufficient.
 - Trace frontend/saved-workflow consumers before changing Pydantic models, invocation fields/versions, HTTP DTOs, or socket-event names, defaults, validation, or errors.
-- API changes may require regenerating `frontend/web/openapi.json` and `frontend/web/src/services/api/schema.ts` under `invokeai/`, even for webv2. Follow legacy frontend generation guidance; never hand-edit output.
+- API changes may require regenerating `frontend/api/openapi.json` and `frontend/api/schema.ts` under `invokeai/`, even for webv2. Follow shared API package generation guidance; never hand-edit output.
 
 ## Persistence and lifecycle
 

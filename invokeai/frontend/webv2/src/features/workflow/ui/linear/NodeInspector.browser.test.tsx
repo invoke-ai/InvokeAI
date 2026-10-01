@@ -120,6 +120,8 @@ const createExecutionPort = () => {
   };
 };
 
+const findInGalleryMock = vi.fn();
+
 const createAdapter = (nodeExecution: WorkflowUiAdapter['nodeExecution']): WorkflowUiAdapter =>
   ({
     capabilities: { getSnapshot: () => ({ canUseCache: true }), subscribe: () => () => {} },
@@ -135,6 +137,7 @@ const createAdapter = (nodeExecution: WorkflowUiAdapter['nodeExecution']): Workf
       setWorkflowSource: vi.fn(),
       undo: vi.fn(),
     },
+    findInGallery: findInGalleryMock,
     getProjectGraph: () => projectGraph,
     nodeExecution,
     notifications: { error: vi.fn(), info: vi.fn(), success: vi.fn() },
@@ -186,7 +189,7 @@ describe('NodeInspector outputs tab', () => {
       execution.set({
         error: null,
         latestOutput: { height: 768, type: 'image_output', width: 1024 },
-        outputImageUrl: 'data:image/png;base64,',
+        outputImageName: 'result.png',
         progress: null,
         progressMessage: null,
         status: 'completed',
@@ -197,7 +200,9 @@ describe('NodeInspector outputs tab', () => {
     expect(host.textContent).toContain('Completed');
     expect(host.textContent).toContain('1024');
     expect(host.textContent).toContain('768');
-    expect(host.querySelector('img')?.getAttribute('src')).toBe('data:image/png;base64,');
+    expect(host.querySelector('img')?.getAttribute('src')).toContain('/images/i/result.png/thumbnail');
+    await act(() => host.querySelector<HTMLButtonElement>('button[aria-label*="InGallery"]')!.click());
+    expect(findInGalleryMock).toHaveBeenLastCalledWith({ kind: 'image', name: 'result.png' });
     expect(host.querySelector('[aria-label="Latest output"]')?.textContent).toContain('"type": "image_output"');
 
     // The store carries the previous run's result through a failure; the tab must not pass it off as this run's.
@@ -205,7 +210,7 @@ describe('NodeInspector outputs tab', () => {
       execution.set({
         error: 'Out of memory',
         latestOutput: { height: 768, type: 'image_output', width: 1024 },
-        outputImageUrl: 'data:image/png;base64,',
+        outputImageName: 'result.png',
         progress: null,
         progressMessage: null,
         status: 'failed',

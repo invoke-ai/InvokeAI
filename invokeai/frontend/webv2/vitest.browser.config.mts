@@ -6,6 +6,11 @@ import { defineConfig } from 'vitest/config';
 
 import viteConfig from './vite.config.mts';
 
+/** A previous test's pointer must not hover controls mounted by the next test. */
+const resetBrowserPointer: BrowserCommand<[]> = async ({ page }) => {
+  await page.mouse.move(-1, -1);
+};
+
 /** Drives Chromium's own IME over CDP: `compose` replaces the in-progress text, `commit` inserts the final text. */
 const imeCompose: BrowserCommand<[steps: readonly { kind: 'commit' | 'compose'; text: string }[]]> = async (
   { context, page },
@@ -52,7 +57,7 @@ export default mergeConfig(
     },
     test: {
       browser: {
-        commands: { imeCompose },
+        commands: { imeCompose, resetBrowserPointer },
         enabled: true,
         headless: true,
         instances: [{ browser: 'chromium' }],

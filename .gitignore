@@ -180,7 +180,7 @@ cython_debug/
 .DS_Store
 
 # Let the frontend manage its own gitignore
-!invokeai/frontend/web/*
+!invokeai/frontend/webv1/*
 
 # Scratch folder
 .scratch/

@@ -1,8 +1,8 @@
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { toaster } from '@platform/ui';
 import { publishLayerPanelSelection } from '@workbench/layerPanelState';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { reportLayerOperation, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -51,6 +51,14 @@ export const useLayerSelectionCommands = (
         return;
       }
       if (result?.status === 'busy') {
+        return;
+      }
+      if (result && result.status !== 'nothing') {
+        reportLayerOperation(
+          result.status,
+          (title, description) => toaster.create({ description, title, type: 'warning' }),
+          t
+        );
         return;
       }
     } catch {

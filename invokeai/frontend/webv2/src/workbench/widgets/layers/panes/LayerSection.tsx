@@ -1,9 +1,9 @@
 import type { CanvasDocumentContractV3, CanvasLayerContract, CanvasNodeContract } from '@workbench/canvas-engine/api';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { Stack, Switch, Text } from '@chakra-ui/react';
 import { getDocumentNode } from '@workbench/canvas-engine/api';
-import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
+import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { AdjustmentSettings } from '@workbench/widgets/layers/AdjustmentSettings';
 import { ControlLayerSettings } from '@workbench/widgets/layers/ControlLayerSettings';
@@ -37,7 +37,7 @@ type LayerSectionEngine = Pick<
 // Reference equality is exact: the document index hands back the same node
 // object until the node itself changes, and the section renders the whole
 // node, so a narrower comparison would serve stale views of it.
-const selectSelectedNode = (project: {
+export const selectSelectedNode = (project: {
   canvas: { document: Pick<CanvasDocumentContractV3, 'stacks' | 'selectedLayerId'> };
 }): CanvasNodeContract | null => getDocumentNode(project.canvas.document, project.canvas.document.selectedLayerId);
 

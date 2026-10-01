@@ -20,6 +20,9 @@ importers:
       astro:
         specifier: ^6.3.7
         version: 6.3.7(@types/node@24.12.3)(jiti@2.6.1)(rollup@4.60.4)(yaml@2.9.0)
+      github-slugger:
+        specifier: ^2.0.0
+        version: 2.0.0
       mermaid:
         specifier: ^11.15.0
         version: 11.15.0

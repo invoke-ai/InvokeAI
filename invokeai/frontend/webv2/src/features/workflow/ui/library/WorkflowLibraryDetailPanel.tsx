@@ -38,20 +38,9 @@ import {
   Tooltip,
   useTooltipTriggerIds,
 } from '@platform/ui';
-import {
-  CopyIcon,
-  CopyPlusIcon,
-  DownloadIcon,
-  EllipsisIcon,
-  GitForkIcon,
-  PencilIcon,
-  Trash2Icon,
-  WorkflowIcon,
-} from 'lucide-react';
+import { CopyIcon, DownloadIcon, EllipsisIcon, GitForkIcon, PencilIcon, Trash2Icon, WorkflowIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import type { OpenLibraryWorkflowMode } from './useOpenLibraryWorkflow';
 
 import { planLibraryWorkflowOpen } from './useOpenLibraryWorkflow';
 import {
@@ -84,37 +73,14 @@ export interface WorkflowLibraryDetailPanelProps {
   onDeleted: () => void;
   /** Carries the copy's id so the shell can select it once the list refreshes. */
   onDuplicated: (workflowId: string) => void;
-  onOpen: (item: WorkflowLibraryListItem, mode: OpenLibraryWorkflowMode) => void;
+  /** Adds the first copy, or asks what to do when the project already holds one. */
+  onOpen: (item: WorkflowLibraryListItem) => void;
   onPreview: (entry: WorkflowLibraryEntry) => void;
-  /** Activates a project copy the project already made from this template. */
-  onResume: (workflowId: string) => void;
-  /** The project's workflows, so the rail can offer the existing copies of this template. */
+  /** The project's workflows, so the rail can say when opening will ask about existing copies. */
   projectWorkflows: readonly ProjectWorkflowEntry[];
 }
 
 const toFileSlug = (name: string): string => name.trim().replaceAll(/\s+/g, '-').toLowerCase() || 'workflow';
-
-const CHOOSER_POSITIONING = { placement: 'top-start' } as const;
-
-const ProjectCopyItem = ({
-  copy,
-  onResume,
-}: {
-  copy: ProjectWorkflowEntry;
-  onResume: (workflowId: string) => void;
-}) => {
-  const { t } = useTranslation();
-  const handleSelect = useCallback(() => onResume(copy.document.id), [copy.document.id, onResume]);
-
-  return (
-    <MenuActionItem
-      icon={WorkflowIcon}
-      label={copy.document.name || t('workflowLibrary.untitled')}
-      value={`resume:${copy.document.id}`}
-      onSelect={handleSelect}
-    />
-  );
-};
 
 export const WorkflowLibraryDetailPanel = ({
   contextMenuPoint,
@@ -126,7 +92,6 @@ export const WorkflowLibraryDetailPanel = ({
   onDuplicated,
   onOpen,
   onPreview,
-  onResume,
   projectWorkflows,
 }: WorkflowLibraryDetailPanelProps) => {
   const { t } = useTranslation();
@@ -149,36 +114,15 @@ export const WorkflowLibraryDetailPanel = ({
   );
   const installableCount = resolved?.filter((requirement) => requirement.status === 'installable').length ?? 0;
 
-  const openPlan = useMemo(
-    () => (entry ? planLibraryWorkflowOpen(projectWorkflows, entry.item.workflow_id) : null),
+  const hasCopies = useMemo(
+    () => (entry ? planLibraryWorkflowOpen(projectWorkflows, entry.item.workflow_id).kind === 'choose' : false),
     [entry, projectWorkflows]
   );
-  const [isCopyChooserOpen, setIsCopyChooserOpen] = useState(false);
-
-  /** Open lands in the project: the first copy is added, an existing one resumed, several offered as a choice. */
   const handleOpen = useCallback(() => {
-    if (!entry || !openPlan) {
-      return;
-    }
-
-    if (openPlan.kind === 'choose') {
-      setIsCopyChooserOpen(true);
-      return;
-    }
-
-    if (openPlan.kind === 'resume') {
-      onResume(openPlan.workflowId);
-      return;
-    }
-
-    onOpen(entry.item, 'resume-or-add');
-  }, [entry, onOpen, onResume, openPlan]);
-  const handleAddCopy = useCallback(() => {
     if (entry) {
-      onOpen(entry.item, 'add-copy');
+      onOpen(entry.item);
     }
   }, [entry, onOpen]);
-  const handleCopyChooserOpenChange = useCallback((event: { open: boolean }) => setIsCopyChooserOpen(event.open), []);
 
   const handlePreview = useCallback(() => {
     if (entry && entry.enrichment.status === 'ready') {
@@ -400,9 +344,6 @@ export const WorkflowLibraryDetailPanel = ({
         : undefined,
     [contextMenuTriggerId, entry]
   );
-  // The chooser is anchored to the button that opened it, so closing returns focus there.
-  const openButtonId = entry ? `${getWorkflowLibraryCardId(entry.item.workflow_id)}-open` : undefined;
-  const chooserIds = useMemo(() => (openButtonId ? { trigger: openButtonId } : undefined), [openButtonId]);
   const moreActionsIds = useTooltipTriggerIds();
 
   const confirmDelete = useCallback(async () => {
@@ -433,28 +374,18 @@ export const WorkflowLibraryDetailPanel = ({
 
   const { item, tags } = entry;
   const name = item.name || t('workflowLibrary.untitled');
-  const hasCopies = openPlan !== null && openPlan.kind !== 'add';
-  const openLabel = hasCopies ? t('workflowLibrary.openProjectCopy') : t('workflowLibrary.open');
+  const openLabel = hasCopies ? t('workflowLibrary.openWithEllipsis') : t('workflowLibrary.open');
 
   // One item set behind both the rail's overflow button and a card's right-click.
   const actionItems = (
     <>
       <MenuActionItem
-        hint={hasCopies ? t('workflowLibrary.openProjectCopyHint') : t('workflowLibrary.openHint')}
+        hint={hasCopies ? t('workflowLibrary.openExistingCopiesHint') : t('workflowLibrary.openHint')}
         icon={WorkflowIcon}
         label={openLabel}
         value="open"
         onSelect={handleOpen}
       />
-      {hasCopies ? (
-        <MenuActionItem
-          hint={t('workflowLibrary.addAnotherCopyHint')}
-          icon={CopyPlusIcon}
-          label={t('workflowLibrary.addAnotherCopy')}
-          value="add-copy"
-          onSelect={handleAddCopy}
-        />
-      ) : null}
       <MenuActionItem
         hint={t('workflowLibrary.duplicateHint')}
         icon={CopyIcon}
@@ -566,7 +497,7 @@ export const WorkflowLibraryDetailPanel = ({
               {t('workflowLibrary.installModels', { count: installableCount })}
             </Button>
           ) : (
-            <Button flex="1" id={openButtonId} minW="0" size="sm" onClick={handleOpen}>
+            <Button flex="1" minW="0" size="sm" onClick={handleOpen}>
               {openLabel}
             </Button>
           )}
@@ -606,31 +537,6 @@ export const WorkflowLibraryDetailPanel = ({
           <Menu.Positioner>
             <MenuContent data-workflow-context-menu minW="16rem">
               {actionItems}
-            </MenuContent>
-          </Menu.Positioner>
-        </Portal>
-      </Menu.Root>
-
-      {/* Several copies exist: the chooser lists them by name; another copy is a separate action. */}
-      <Menu.Root
-        ids={chooserIds}
-        open={isCopyChooserOpen && openPlan?.kind === 'choose'}
-        positioning={CHOOSER_POSITIONING}
-        onOpenChange={handleCopyChooserOpenChange}
-      >
-        <Portal>
-          <Menu.Positioner>
-            <MenuContent data-workflow-copy-chooser minW="16rem">
-              <Menu.ItemGroup>
-                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
-                  {t('workflowLibrary.chooseProjectCopy')}
-                </Menu.ItemGroupLabel>
-                {openPlan?.kind === 'choose'
-                  ? openPlan.copies.map((copy) => (
-                      <ProjectCopyItem key={copy.document.id} copy={copy} onResume={onResume} />
-                    ))
-                  : null}
-              </Menu.ItemGroup>
             </MenuContent>
           </Menu.Positioner>
         </Portal>

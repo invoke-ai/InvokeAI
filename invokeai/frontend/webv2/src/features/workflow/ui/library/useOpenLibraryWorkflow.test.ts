@@ -9,12 +9,12 @@ const entry = (id: string, libraryWorkflowId?: string) => ({
 });
 
 describe('planLibraryWorkflowOpen', () => {
-  it('adds a copy when the project has none, resumes a single copy, and asks when there are several', () => {
+  it('adds the first copy and asks once the project holds any', () => {
     expect(planLibraryWorkflowOpen([entry('a'), entry('b', 'other')], 'lib')).toEqual({ kind: 'add' });
-    expect(planLibraryWorkflowOpen([entry('a', 'lib'), entry('b')], 'lib')).toEqual({
-      kind: 'resume',
-      workflowId: 'a',
-    });
+
+    const single = [entry('a', 'lib')];
+
+    expect(planLibraryWorkflowOpen([...single, entry('b')], 'lib')).toEqual({ copies: single, kind: 'choose' });
 
     const copies = [entry('a', 'lib'), entry('b', 'lib')];
 

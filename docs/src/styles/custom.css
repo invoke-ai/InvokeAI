@@ -111,6 +111,29 @@ body {
   background: var(--sl-color-bg);
 }
 
+/*
+ * On wide screens Starlight right-aligns the content column and splits the spare width between a gap
+ * after the navigation sidebar and the table of contents. Instead, keep the table of contents at its
+ * own width against the right edge and centre the content in the remaining space.
+ */
+@media (min-width: 72rem) {
+  [data-has-sidebar][data-has-toc] .main-pane {
+    --sl-content-margin-inline: auto;
+    flex: 1;
+    min-width: 0;
+  }
+
+  [data-has-sidebar][data-has-toc] .right-sidebar-container {
+    width: var(--sl-sidebar-width);
+    flex-shrink: 0;
+  }
+
+  /* The fixed panel would otherwise take the viewport width and run past the right edge. */
+  [data-has-sidebar][data-has-toc] .right-sidebar {
+    width: var(--sl-sidebar-width);
+  }
+}
+
 #starlight__sidebar .sidebar-content {
   a {
     transition:
@@ -128,6 +151,11 @@ body {
     span {
       font-weight: normal;
     }
+  }
+
+  /* Only top-level sections keep bold labels; nested directory labels match page links. */
+  ul ul .group-label .large {
+    font-weight: normal;
   }
 }
 

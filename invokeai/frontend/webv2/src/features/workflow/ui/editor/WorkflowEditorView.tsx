@@ -292,6 +292,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   );
   // XYFlow recreates its controller when React Activity reveals this view and reads this object on reconnect.
   const defaultViewport = useMemo(() => getWorkflowViewport(viewportKey) ?? { ...DEFAULT_VIEWPORT }, [viewportKey]);
+  // A workflow this editor has not shown yet (a load, a switch, a reload) opens fitted rather than at the origin.
+  const [fitOnMount] = useState(() =>
+    getWorkflowViewport(viewportKey) === null ? projectGraph.nodes.map(({ id, position }) => ({ id, position })) : null
+  );
   const perfSource = useMemo<WorkflowPerfSource>(
     () => ({
       area: 'editor',
@@ -1234,9 +1238,13 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       ) : null}
       {flowInstance ? (
         <WorkflowSelectionRequestRuntime
+          fitOnMount={fitOnMount}
           flowInstance={flowInstance}
+          isLargeGraph={isLargeGraph}
+          projectId={projectId}
           reduceMotion={reduceMotion}
           selectNodes={selectNodes}
+          workflowId={workflowId}
         />
       ) : null}
       {lassoOverlay}

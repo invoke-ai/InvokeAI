@@ -1,0 +1,146 @@
+---
+title: Qwen Image
+description: Generate and edit images with the Qwen Image 2512 text-to-image model and the Qwen Image Edit 2511 reference-image editing model, including GGUF installs and the Lightning LoRAs.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 8
+---
+
+Qwen Image is a diffusion-transformer image family from the Qwen team that encodes prompts with the
+**Qwen2.5-VL 7B** vision-language model and decodes with a 16-channel VAE. InvokeAI supports two
+variants:
+
+- **Qwen Image** (e.g. *Qwen Image 2512*) — text-to-image generation.
+- **Qwen Image Edit** (e.g. *Qwen Image Edit 2511*) — text-guided editing driven by one or more
+  **reference images**. Because its text encoder is a vision-language model, it reads the reference
+  images alongside your instruction ("replace the background with a beach", "put this jacket on the
+  person in image 2").
+
+The variant is detected automatically on install. Both variants can also run text-to-image,
+image-to-image, inpainting and outpainting on the Canvas; only the Edit variant accepts reference images.
+
+## License
+
+Qwen Image 2512, Qwen Image Edit 2511, the Lightning LoRAs and the Qwen2.5-VL text encoder are released under **Apache 2.0**, which allows commercial use. None of the downloads is gated.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
+## Hardware
+
+Qwen Image is a large model: the full Diffusers pipeline is a ~40 GB download. To run it on a
+consumer GPU, use a **GGUF** transformer together with the standalone VAE and fp8 text encoder:
+
+| Transformer build | Download |
+| ----------------- | -------- |
+| Q2_K              | ~7.5 GB  |
+| Q4_K_M            | ~13 GB   |
+| Q6_K              | ~17 GB   |
+| Q8_0              | ~22 GB   |
+
+The Qwen2.5-VL encoder is loaded in addition to the transformer (~7 GB for the fp8 build). If your GPU
+cannot hold both, enable [Low-VRAM mode](/configuration/optimization/low-vram-mode/). Single-file
+checkpoints that ship scaled fp8 weights can be kept in fp8 with
+[FP8 Storage](/configuration/optimization/fp8-storage/).
+
+## Installing
+
+The easiest path is the **Qwen Image** bundle in the Model Manager's Starter Models. It installs the
+standalone VAE and fp8 encoder, the Diffusers and the Q4_K_M / Q8_0 GGUF builds of both *Qwen Image
+2512* and *Qwen Image Edit 2511*, and the Lightning LoRAs for each. The other GGUF builds (Q2_K, Q6_K)
+are available as individual starter models.
+
+Qwen Image needs three components:
+
+| Component                 | Diffusers install       | GGUF / single-file install             |
+| ------------------------- | ----------------------- | -------------------------------------- |
+| Transformer               | bundled in the pipeline | the `.gguf` / `.safetensors` file      |
+| VAE (Qwen Image VAE)      | bundled                 | installed separately                   |
+| Text encoder (Qwen2.5-VL) | bundled                 | installed separately                   |
+
+- **Diffusers** (`Qwen/Qwen-Image-2512`, `Qwen/Qwen-Image-Edit-2511`): a single ~40 GB install that
+  includes everything.
+- **GGUF** (from `unsloth/Qwen-Image-2512-GGUF` and `unsloth/Qwen-Image-Edit-2511-GGUF`): the file
+  contains only the transformer. The GGUF starter models install the **Qwen Image VAE** (~250 MB) and
+  the **Qwen2.5-VL Encoder (fp8 scaled)** (~7 GB) as dependencies, so you never need the full pipeline.
+- **Single-file `.safetensors`** checkpoints (bf16/fp16, and ComfyUI-style fp8-scaled or nvfp4 builds)
+  can be installed by path or URL; like GGUF, they need a standalone VAE and encoder.
+
+Three Qwen2.5-VL encoder builds are available as starter models: **fp8 scaled** (~7 GB, the one the
+bundle installs), **NVFP4** (~5.7 GB download, about 6.7 GB once loaded), and **Diffusers** (~16 GB,
+full precision). The single-file encoders ship with their tokenizer and config inside InvokeAI.
+
+When a GGUF or single-file Qwen Image model is selected, pick the **Qwen VL Encoder** and **VAE** in the
+**Components** section next to the model. Alternatively, set **Component source** to an installed
+Diffusers Qwen Image model and InvokeAI takes the missing VAE and encoder from it. A Diffusers main
+model needs neither.
+
+:::note[Edit or Generate?]
+For single-file and GGUF installs, the Edit variant is recognized from a marker tensor in the file, or
+from the word "edit" in the filename for converters that don't write the marker. Keep the published
+filenames when installing a converted Edit checkpoint.
+:::
+
+## Generation settings
+
+Selecting a Qwen Image model applies these defaults:
+
+- **Steps:** 40
+- **CFG Scale:** 4
+- **Size:** 1024×1024; width and height snap to multiples of 16.
+
+There is no scheduler choice — Qwen Image always uses its own flow-matching schedule, so the
+**Scheduler** control is hidden.
+
+The **negative prompt** is used only when CFG Scale is above 1; at CFG 1 it is ignored.
+
+## Lightning LoRAs (4 and 8 steps)
+
+The *Qwen Image Lightning* and *Qwen Image Edit Lightning* starter LoRAs are distillation LoRAs that cut
+generation to **4** or **8** steps. Use the one that matches your model variant, and set:
+
+- **Steps:** 4 or 8, matching the LoRA
+- **CFG Scale:** 1
+
+The LoRAs are trained for a fixed schedule shift of `3`. In the workflow editor, set **Shift** on the
+**Denoise - Qwen Image** node to `3.0` when using them; leave it empty for the base model's default
+schedule. The Generate tab does not expose this setting.
+
+## Image editing with reference images
+
+With a **Qwen Image Edit** model selected, add up to **five** reference images,
+then describe the change you want in the prompt. The text-to-image variant does not accept reference
+images.
+
+- All reference images are given to the Qwen2.5-VL encoder together with your prompt, so you can refer
+  to them in the instruction.
+- The **first** reference image is also encoded by the VAE and supplied to the transformer as a
+  pixel-level reference.
+
+In the workflow editor, reference images go into the **Reference Images** input of **Prompt - Qwen
+Image**; connect an **Image to Latents - Qwen Image** node to the **Reference Latents** input of
+**Denoise - Qwen Image** to add the pixel-level reference.
+
+## LoRA
+
+Qwen Image LoRAs (diffusers PEFT, Kohya and LoKR formats) are supported and apply to the transformer.
+In the workflow editor use **Apply LoRA - Qwen Image** or **Apply LoRA Collection - Qwen Image**.
+
+## PiD super-resolution decode
+
+Qwen Image works with [PiD Decode](/users-guide/image-generation/advanced-topics/pid-decode/), which replaces the VAE
+decode with a 4× super-resolving pixel diffusion. The *PiD Decoder Qwen-Image (2K to 4K)* and *PiD 1.5
+Decoder Qwen-Image (2K to 4K)* decoders (including an int8 build of the latter) are starter models.
+
+## Workflow nodes
+
+| Node                                        | Purpose                                                             |
+| ------------------------------------------- | ------------------------------------------------------------------- |
+| **Main Model - Qwen Image**                 | Loads the transformer, VAE and Qwen VL encoder (or a component source) |
+| **Prompt - Qwen Image**                     | Encodes the prompt and any reference images                         |
+| **Denoise - Qwen Image**                    | Runs sampling; accepts reference latents, img2img latents and masks |
+| **Image to Latents - Qwen Image**           | VAE encode                                                          |
+| **Latents to Image - Qwen Image**           | VAE decode                                                          |
+| **Latents to Image - Qwen-Image + PiD (4x SR)** | PiD super-resolution decode                                     |
+
+The **Prompt - Qwen Image** node also has a **Quantization** option (`none`, `int8`, `nf4`) that
+quantizes the Qwen2.5-VL encoder on load to reduce its VRAM use.

@@ -380,7 +380,7 @@ The UI doesn't know about Python functions; it only knows how to build graphs of
 
    Write a TypeScript function that constructs the node graph for your model.
 
-   ```typescript title="invokeai/frontend/web/src/features/nodes/util/graph/generation/buildNewModelGraph.ts"
+   ```typescript title="invokeai/frontend/webv1/src/features/nodes/util/graph/generation/buildNewModelGraph.ts"
    export const buildNewModelGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderResult> => {
      const { state, manager } = arg;
      const { model } = state.params;
@@ -427,7 +427,7 @@ The UI doesn't know about Python functions; it only knows how to build graphs of
 
    Hook your graph builder into the main routing logic.
 
-   ```typescript title="invokeai/frontend/web/src/features/queue/hooks/useEnqueueCanvas.ts" ins={5-6}
+   ```typescript title="invokeai/frontend/webv1/src/features/queue/hooks/useEnqueueCanvas.ts" ins={5-6}
    switch (base) {
      case 'sdxl':
        return buildSDXLGraph(arg);
@@ -442,7 +442,7 @@ The UI doesn't know about Python functions; it only knows how to build graphs of
 
    Add your new nodes to the strict frontend type unions.
 
-   ```typescript title="invokeai/frontend/web/src/features/nodes/util/graph/types.ts" ins="| 'newmodel_vae_decode'"
+   ```typescript title="invokeai/frontend/webv1/src/features/nodes/util/graph/types.ts" ins="| 'newmodel_vae_decode'"
    export type ImageOutputNodes =
      | 'l2i' | 'flux_vae_decode' | 'sd3_l2i' | 'newmodel_vae_decode';
    ```
@@ -470,7 +470,7 @@ Finally, add any custom UI controls (like a specific scheduler dropdown) and man
 
    Update the parameters slice for your model-specific settings.
 
-   ```typescript title="invokeai/frontend/web/src/features/controlLayers/store/paramsSlice.ts"
+   ```typescript title="invokeai/frontend/webv1/src/features/controlLayers/store/paramsSlice.ts"
    interface ParamsState {
      // ...
      newmodelScheduler: 'euler' | 'heun';
@@ -486,9 +486,9 @@ Finally, add any custom UI controls (like a specific scheduler dropdown) and man
 
 2. **Parameter Recall**
 
-   Ensure users can extract parameters from previously generated images by updating `invokeai/frontend/web/src/features/metadata/parsing.tsx`.
+   Ensure users can extract parameters from previously generated images by updating `invokeai/frontend/webv1/src/features/metadata/parsing.tsx`.
 
-   ```typescript title="invokeai/frontend/web/src/features/metadata/parsing.tsx"
+   ```typescript title="invokeai/frontend/webv1/src/features/metadata/parsing.tsx"
    const recallNewmodelScheduler = (metadata: CoreMetadata) => {
      if (metadata.scheduler) {
        dispatch(setNewmodelScheduler(metadata.scheduler));
@@ -593,7 +593,7 @@ A complete minimal `txt2img` integration touches the following areas:
     - `[newmodel]`
       - sampling_utils.py
       - denoise.py
-  - frontend/web/src/features
+  - frontend/webv1/src/features
     - nodes/util/graph
       - generation/buildNewModelGraph.ts
       - types.ts

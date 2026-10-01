@@ -35,7 +35,7 @@ from invokeai.backend.model_manager.taxonomy import (
 
 # FLUX.2 Klein variant -> the Qwen3 encoder variant it was trained against, and the single place
 # that relationship is written down on the backend. Mirrors `KLEIN_TO_QWEN3_VARIANT_MAP` in
-# `invokeai/frontend/web/src/features/parameters/util/flux2Klein.ts` — keep the two in sync.
+# `invokeai/frontend/webv1/src/features/parameters/util/flux2Klein.ts` — keep the two in sync.
 # Variants sharing a Qwen3 entry (`klein_9b` and `klein_9b_base`) are valid encoder sources for
 # each other. [dev] is deliberately absent: it uses a Mistral encoder, so it can never satisfy a
 # Klein transformer, and `.get()` returning None is what makes the guards below fail closed.

@@ -23,11 +23,15 @@ import type { Tool, ToolContext } from './tool';
 
 import { layerMatrix } from './moveHitTest';
 import {
+  extendFreehandTrace,
+  finishFreehandTrace,
   MIN_POLYLINE_POINTS,
   movePolyline,
   polylinePreview,
   pressPolyline,
+  startFreehandTrace,
   startPolyline,
+  type FreehandTrace,
   type PolylineSession,
 } from './polylineSession';
 
@@ -39,13 +43,10 @@ const PRIMARY_BUTTON = 1;
 /** Screen-space distance (CSS px) the pointer must travel before a press becomes a drag. */
 export const SHAPE_DRAG_THRESHOLD_PX = 3;
 
-/** Minimum document-space gap between stored freehand points (input decimation). */
-const FREEHAND_MIN_POINT_DISTANCE = 2;
-
 type Session =
   | { kind: 'drag'; startDoc: Vec2; startScreen: Vec2; moved: boolean }
   | { kind: 'polyline'; session: PolylineSession }
-  | { kind: 'freehand'; points: Vec2[] };
+  | ({ kind: 'freehand' } & FreehandTrace);
 
 const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -170,40 +171,72 @@ export const createShapeTool = (): Tool => {
     if (!dirtyRect || dirtyRect.width < 1 || dirtyRect.height < 1) {
       return 'refused';
     }
-    const entry = ctx.layers.growToRect(layer.id, dirtyRect);
-    const surfaceCtx = entry.surface.ctx;
-    const sx = dirtyRect.x - entry.rect.x;
-    const sy = dirtyRect.y - entry.rect.y;
-    const beforeImageData = surfaceCtx.getImageData(sx, sy, dirtyRect.width, dirtyRect.height);
+    // Admitted before the first pixel changes: the before/after pair is the step's footprint.
+    const edit = ctx.beginStrokeEdit(dirtyRect.width * dirtyRect.height * 8);
+    if (!edit) {
+      return 'refused';
+    }
+    const original = ctx.layers.peek(layer.id);
+    const originalRect = original ? { ...original.rect } : null;
+    let beforeImageData: ImageData | null = null;
+    let sx = 0;
+    let sy = 0;
+    /** Puts the pre-shape pixels and cache extent back and ends the edit unrecorded. */
+    const restore = (): void => {
+      const entry = ctx.layers.peek(layer.id);
+      if (entry && beforeImageData) {
+        entry.surface.ctx.putImageData(beforeImageData, sx, sy);
+      }
+      if (originalRect) {
+        ctx.layers.shrinkToRect(layer.id, originalRect);
+      } else {
+        ctx.layers.delete(layer.id);
+      }
+      ctx.notifyLayerPainted(layer.id);
+      edit.cancel();
+    };
+    try {
+      const entry = ctx.layers.growToRect(layer.id, dirtyRect);
+      const surfaceCtx = entry.surface.ctx;
+      sx = dirtyRect.x - entry.rect.x;
+      sy = dirtyRect.y - entry.rect.y;
+      beforeImageData = surfaceCtx.getImageData(sx, sy, dirtyRect.width, dirtyRect.height);
 
-    // Draw into dirty-rect-local scratch so clipping and transparency lock apply in one composite; map through
-    // layer inverse then scratch offset.
-    const scratch = ctx.backend.createSurface(dirtyRect.width, dirtyRect.height);
-    const draw = scratch.ctx;
-    const { rect, source } = placed;
-    const toScratch = multiply(translate(identity(), { x: -dirtyRect.x, y: -dirtyRect.y }), toLocal);
-    draw.setTransform(toScratch.a, toScratch.b, toScratch.c, toScratch.d, toScratch.e, toScratch.f);
-    drawShapeSource(draw, source, rect.x, rect.y, rect.width, rect.height);
-    draw.globalCompositeOperation = 'destination-in';
-    if (clipMask) {
-      // The mask sits in document space, so it goes through the same mapping.
-      draw.drawImage(clipMask.surface.canvas, clipMask.rect.x, clipMask.rect.y);
+      // Draw into dirty-rect-local scratch so clipping and transparency lock apply in one composite; map through
+      // layer inverse then scratch offset.
+      const scratch = ctx.backend.createSurface(dirtyRect.width, dirtyRect.height);
+      const draw = scratch.ctx;
+      const { rect, source } = placed;
+      const toScratch = multiply(translate(identity(), { x: -dirtyRect.x, y: -dirtyRect.y }), toLocal);
+      draw.setTransform(toScratch.a, toScratch.b, toScratch.c, toScratch.d, toScratch.e, toScratch.f);
+      drawShapeSource(draw, source, rect.x, rect.y, rect.width, rect.height);
+      draw.globalCompositeOperation = 'destination-in';
+      if (clipMask) {
+        // The mask sits in document space, so it goes through the same mapping.
+        draw.drawImage(clipMask.surface.canvas, clipMask.rect.x, clipMask.rect.y);
+      }
+      if (clipRect && (toLocal.b !== 0 || toLocal.c !== 0)) {
+        // The dirty-rect clamp only bounds the AABB on a rotated/sheared layer;
+        // keep exactly the pixels inside the document-space rect.
+        draw.fillStyle = '#000';
+        draw.beginPath();
+        draw.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
+        draw.fill();
+      }
+      surfaceCtx.save();
+      surfaceCtx.setTransform(1, 0, 0, 1, 0, 0);
+      surfaceCtx.globalCompositeOperation = layer.isTransparencyLocked ? 'source-atop' : 'source-over';
+      surfaceCtx.drawImage(scratch.canvas, sx, sy);
+      surfaceCtx.restore();
+      const afterImageData = surfaceCtx.getImageData(sx, sy, dirtyRect.width, dirtyRect.height);
+      if (!edit.commit({ afterImageData, beforeImageData, dirtyRect, layerId: layer.id, tool: 'shape' })) {
+        restore();
+        return 'refused';
+      }
+    } catch (error) {
+      restore();
+      throw error;
     }
-    if (clipRect && (toLocal.b !== 0 || toLocal.c !== 0)) {
-      // The dirty-rect clamp only bounds the AABB on a rotated/sheared layer;
-      // keep exactly the pixels inside the document-space rect.
-      draw.fillStyle = '#000';
-      draw.beginPath();
-      draw.rect(clipRect.x, clipRect.y, clipRect.width, clipRect.height);
-      draw.fill();
-    }
-    surfaceCtx.save();
-    surfaceCtx.setTransform(1, 0, 0, 1, 0, 0);
-    surfaceCtx.globalCompositeOperation = layer.isTransparencyLocked ? 'source-atop' : 'source-over';
-    surfaceCtx.drawImage(scratch.canvas, sx, sy);
-    surfaceCtx.restore();
-    const afterImageData = surfaceCtx.getImageData(sx, sy, dirtyRect.width, dirtyRect.height);
-    ctx.emitStrokeCommitted({ afterImageData, beforeImageData, dirtyRect, layerId: layer.id, tool: 'shape' });
     return 'placed';
   };
 
@@ -305,7 +338,7 @@ export const createShapeTool = (): Tool => {
       }
       session =
         kind === 'freehand'
-          ? { kind: 'freehand', points: [{ x: input.documentPoint.x, y: input.documentPoint.y }] }
+          ? { ...startFreehandTrace(input), kind: 'freehand' }
           : { kind: 'drag', moved: false, startDoc: input.documentPoint, startScreen: input.screenPoint };
     },
     onPointerMove: (ctx, input, batch) => {
@@ -326,12 +359,7 @@ export const createShapeTool = (): Tool => {
         return;
       }
       if (session.kind === 'freehand') {
-        for (const sample of batch) {
-          const last = session.points[session.points.length - 1];
-          if (!last || distance(last, sample.documentPoint) >= FREEHAND_MIN_POINT_DISTANCE) {
-            session.points.push({ x: sample.documentPoint.x, y: sample.documentPoint.y });
-          }
-        }
+        extendFreehandTrace(session, batch);
         ctx.stores.lassoPreview.set({ kind: 'freehand', points: session.points.slice() });
         ctx.invalidate({ overlay: true });
         return;
@@ -355,7 +383,7 @@ export const createShapeTool = (): Tool => {
         return;
       }
       if (session.kind === 'freehand') {
-        commit(ctx, polygonShapeFrom([...session.points, input.documentPoint], styleFromOptions(ctx)));
+        commit(ctx, polygonShapeFrom(finishFreehandTrace(session, input), styleFromOptions(ctx)));
         return;
       }
       if (!session.moved) {
