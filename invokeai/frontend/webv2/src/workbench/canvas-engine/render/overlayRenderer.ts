@@ -258,7 +258,7 @@ const strokeOutlined = (ctx: Ctx, light: string, lightWidth: number): void => {
 
 /**
  * Draws the picker's loupe: the pixels around the pointer magnified without smoothing inside a ring, the sampled
- * center pixel boxed under the crosshair cursor, and its RGB values below.
+ * center pixel boxed as the target (the picker hides the system cursor), and its RGB values below.
  */
 const drawColorLoupe = (ctx: Ctx, state: OverlayState): void => {
   const loupe = state.colorLoupe;

@@ -48,7 +48,8 @@ export const createColorPickerTool = (): Tool => {
     pickColorAt(ctx, sampler, input);
   };
   return {
-    cursor: () => 'crosshair',
+    // The loupe's boxed center pixel is the target; a system cursor would cover it.
+    cursor: () => 'none',
     id: 'colorPicker',
     // A pointer already over the canvas (an Alt hold, a pick request) gets the loupe without moving.
     onActivate: (ctx) => updateLoupe(ctx),

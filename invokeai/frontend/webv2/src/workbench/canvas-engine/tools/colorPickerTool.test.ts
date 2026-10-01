@@ -248,9 +248,9 @@ describe('color picker tool', () => {
     expect(h.loupes.at(-1)).toBe(false);
   });
 
-  it('reports a crosshair cursor', () => {
+  it("hides the system cursor so the loupe's boxed center pixel is the target", () => {
     const tool = createColorPickerTool();
-    expect(tool.cursor?.({} as ToolContext)).toBe('crosshair');
+    expect(tool.cursor?.({} as ToolContext)).toBe('none');
   });
 
   describe('one-shot color sample requests', () => {
