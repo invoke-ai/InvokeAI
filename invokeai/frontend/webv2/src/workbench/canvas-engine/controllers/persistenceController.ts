@@ -1,4 +1,4 @@
-import type { BitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
+import type { BitmapStore, FlushPendingUploadsOptions } from '@workbench/canvas-engine/document/bitmapStore';
 
 export class PersistenceController {
   readonly store: BitmapStore;
@@ -8,8 +8,8 @@ export class PersistenceController {
     this.store = store;
   }
 
-  flush(): Promise<void> {
-    return this.store.flushPendingUploads();
+  flush(options?: FlushPendingUploadsOptions): Promise<void> {
+    return this.store.flushPendingUploads(options);
   }
 
   dispose(): void {

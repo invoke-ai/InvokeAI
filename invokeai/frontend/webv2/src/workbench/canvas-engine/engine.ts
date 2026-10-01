@@ -2558,7 +2558,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     activate,
     beginCooldown,
     dispose,
-    flushPendingUploads: () => persistenceController.flush(),
+    flushPendingUploads: (options) => persistenceController.flush(options),
     getLifecycleState: () => lifecycleState,
   };
   const layerController = new LayerController({

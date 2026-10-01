@@ -142,7 +142,8 @@ export const createEngineRegistry = (
       const engine = createCanvasEngine({ projectId, ...deps });
       const releaseLiveEngine =
         liveEngines?.register(projectId, {
-          flushPendingPixels: () => engine.lifecycle.flushPendingUploads(),
+          // Document pushes cannot wait on an edit the user may never finish.
+          flushPendingPixels: () => engine.lifecycle.flushPendingUploads({ waitForHeldPixels: false }),
           heldAssets: () => engine.history.getHeldAssetRefs(),
           subscribe: (listener) => engine.interaction.subscribe('historyEpoch', listener),
         }) ?? (() => undefined);

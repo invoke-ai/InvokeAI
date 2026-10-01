@@ -10,6 +10,8 @@ import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from '
 import { createContext, use, useEffect, useSyncExternalStore, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import type { ProjectPushOutcome } from './projects/projectFlush';
+
 import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
 import { WorkbenchUnavailableScreen } from './components/WorkbenchUnavailableScreen';
 import { createExtensionRegistry, type ExtensionRegistry } from './extensions/extensionRegistry';
@@ -118,17 +120,17 @@ export const WorkbenchProvider = ({
         }
       },
       deleteProject: (projectId) => persistence.deleteProjectOnServer(projectId),
-      flushProject: async (projectId) => {
-        // Unsaved canvas pixels reach the document before it is pushed; a failure rejects the flush.
-        await liveCanvasEngines.flushPendingPixels(projectId);
+      flushPixels: (projectId) => liveCanvasEngines.flushPendingPixels(projectId),
+      flushProject: (projectId) => {
         const project = store.getSnapshot().projects.find((candidate) => candidate.id === projectId);
 
         // Unopened projects have no local edits; their ids reflect server acknowledgements.
         return project
           ? persistence.flushProjectToServer(project)
-          : { documentJson: '', kind: 'acknowledged' as const };
+          : Promise.resolve<ProjectPushOutcome>({ documentJson: '', kind: 'acknowledged' });
       },
       getOpenProjectIds: () => store.getSnapshot().projects.map((project) => project.id),
+      getProject: (projectId) => store.getSnapshot().projects.find((candidate) => candidate.id === projectId),
       markProjectDeleted: (projectId) => {
         persistence.markProjectDeleted(projectId);
       },

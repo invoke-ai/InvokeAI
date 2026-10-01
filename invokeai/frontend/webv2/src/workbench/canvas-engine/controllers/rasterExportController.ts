@@ -180,8 +180,9 @@ export class RasterExportController {
       if (isEmpty(entry.rect)) {
         return { status: 'empty' };
       }
+      const lease = this.lease(currentLayer, entry, pin);
       leased = true;
-      return this.applyAdjustments(this.lease(currentLayer, entry, pin), options.applyAdjustments === true);
+      return this.applyAdjustments(lease, options.applyAdjustments === true);
     } finally {
       if (!leased) {
         pin.release();

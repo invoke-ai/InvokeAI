@@ -404,7 +404,11 @@ export interface CanvasLifecycleCapability {
   beginCooldown(): Promise<'cooled' | 'dirty'>;
   dispose(): void;
   getLifecycleState(): CanvasLifecycleState;
-  flushPendingUploads(): Promise<void>;
+  /**
+   * Persists unsaved pixels. With `waitForHeldPixels: false` it rejects instead of waiting while an open edit
+   * holds dirty pixels.
+   */
+  flushPendingUploads(options?: { readonly waitForHeldPixels?: boolean }): Promise<void>;
 }
 
 export type CanvasEditCapability = CanvasEditGate;

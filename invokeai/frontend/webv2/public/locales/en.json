@@ -450,7 +450,7 @@
     "allSavedAlreadyOpen": "All saved projects are already open.",
     "activeRunsMustFinish": "Wait for active queue runs to finish first.",
     "closeProjectLabel": "Close {{name}}",
-    "canvasPixelsNotSaved": "Unsaved canvas changes could not be uploaded, so the project stays open with them. {{reason}}",
+    "canvasPixelsNotSaved": "The project stays open because its canvas changes are not saved yet. {{reason}}",
     "closeBlocked": "Project not closed",
     "couldNotOpen": "Could not open project",
     "couldNotOpenDescription": "\"{{name}}\" could not be loaded from the server.",

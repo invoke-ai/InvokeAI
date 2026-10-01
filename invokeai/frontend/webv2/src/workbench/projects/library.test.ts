@@ -98,6 +98,12 @@ const openProject = (projectId: string, calls: string[] = []) => {
 
       return Promise.resolve<ProjectPushOutcome>({ documentJson: '{}', kind: 'acknowledged' });
     }),
+    current: vi.fn(() => undefined),
+    flushPixels: vi.fn(() => {
+      calls.push('flushPixels');
+
+      return Promise.resolve();
+    }),
     markDeleted: vi.fn(() => {
       calls.push('markDeleted');
     }),
@@ -352,7 +358,7 @@ describe('library mutations', () => {
 
     await library.readAcknowledgedProject('source', account.accountLifecycle.capture());
 
-    expect(calls).toEqual(['flush', 'get']);
+    expect(calls).toEqual(['flushPixels', 'flush', 'get']);
   });
 
   /** An unacknowledged flush must abort duplication rather than copy stale server bytes. */
@@ -370,7 +376,7 @@ describe('library mutations', () => {
       reason: 'unsynced',
     });
 
-    expect(calls).toEqual(['flush']);
+    expect(calls).toEqual(['flushPixels', 'flush']);
     expect(api.getProject).not.toHaveBeenCalled();
   });
 

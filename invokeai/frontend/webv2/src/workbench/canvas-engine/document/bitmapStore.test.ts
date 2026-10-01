@@ -717,6 +717,37 @@ describe('createBitmapStore', () => {
     h.store.dispose();
   });
 
+  it('fails fast instead of waiting when the caller cannot wait on an open edit', async () => {
+    const h = createHarness();
+    h.store.markLayerDirty(LAYER);
+    const release = h.store.suspendLayer(LAYER);
+
+    await expect(h.store.flushPendingUploads({ waitForHeldPixels: false })).rejects.toMatchObject({
+      layerIds: [LAYER],
+      reason: 'held',
+    });
+    expect(h.store.hasPendingWork(LAYER)).toBe(true);
+
+    release();
+    await h.store.flushPendingUploads({ waitForHeldPixels: false });
+    expect(h.dispatch).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
+  it('fails fast on pixels a session defers instead of polling', async () => {
+    let busy = true;
+    const h = createHarness({ trimLayerPixels: () => (busy ? 'deferred' : 'kept') });
+    h.store.markLayerDirty(LAYER);
+
+    await expect(h.store.flushPendingUploads({ waitForHeldPixels: false })).rejects.toMatchObject({ reason: 'held' });
+    expect(h.uploadImage).not.toHaveBeenCalled();
+
+    busy = false;
+    await h.store.flushPendingUploads({ waitForHeldPixels: false });
+    expect(h.uploadImage).toHaveBeenCalledOnce();
+    h.store.dispose();
+  });
+
   it.each(['reset', 'dispose'] as const)('%s settles barriers waiting on suspended dirty work', async (ending) => {
     const h = createHarness();
     h.store.markLayerDirty(LAYER);
