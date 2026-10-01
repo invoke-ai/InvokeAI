@@ -431,6 +431,8 @@ export interface EngineStores {
   thumbnailStatus: KeyedThumbnailStatusStore;
   /** Monotonic aggregate version for consumers whose eligibility depends on live layer content. */
   layerPixelEpoch: ScalarStore<number>;
+  /** Monotonic version of the mirrored document, for consumers that read the engine's model during render. */
+  documentEpoch: ScalarStore<number>;
   /** Brush tool options (size / color / opacity / pressure). */
   brushOptions: ScalarStore<BrushOptions>;
   /** One-way foreground/background mirror for gesture-start reads; the engine never writes it. */
@@ -684,6 +686,7 @@ export const createEngineStores = (initialTool: ToolId = 'view'): EngineStores =
   marqueeOptions: createScalarStore<MarqueeToolOptions>({ ...DEFAULT_MARQUEE_OPTIONS }, marqueeOptionsEqual),
   marqueePreview: createScalarStore<{ rect: Rect; kind: 'rect' | 'ellipse' } | null>(null, rectShapePreviewEqual),
   layerPixelEpoch: createScalarStore<number>(0),
+  documentEpoch: createScalarStore<number>(0),
   ruleOfThirds: createScalarStore<boolean>(false),
   samInteraction: createScalarStore(null),
   shapeOptions: createScalarStore<ShapeToolOptions>({ ...DEFAULT_SHAPE_OPTIONS }, shapeOptionsEqual),

@@ -18694,3 +18694,34 @@ describe('floating selection lifecycle', () => {
     engine.lifecycle.dispose();
   });
 });
+
+describe('document epoch', () => {
+  it('advances on each document change, once the engine model already reflects it', () => {
+    const { setDocument, store } = createReactiveStore(paintDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const seen: (number | undefined)[] = [];
+    engine.interaction.subscribe('documentEpoch', () =>
+      seen.push(
+        engine.document
+          .model()
+          ?.compileLeaves()
+          .find((leaf) => leaf.id === 'paint1')?.layer.opacity
+      )
+    );
+    const before = engine.interaction.get('documentEpoch');
+    const dimmed = paintDoc();
+    const [layer] = getDocumentLeaves(dimmed);
+
+    setDocument({ ...dimmed, stacks: stacksFrom([{ ...layer!, opacity: 0.25 }]) });
+
+    expect(engine.interaction.get('documentEpoch')).toBe(before + 1);
+    expect(seen).toEqual([0.25]);
+    engine.lifecycle.dispose();
+  });
+});

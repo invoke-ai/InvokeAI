@@ -18,27 +18,27 @@ await i18n.use(initReactI18next).init({
   resources: { en: { translation: { 'widgets.layers.control.filter': 'Filter' } } },
 });
 
-/** An engine whose layer gains pixels later and announces them through the pixel epoch, as a fill does. */
-const createPaintingEngine = () => {
-  let painted = false;
-  const listeners = new Set<() => void>();
+/** An engine whose layer gains content later, announced through one of its interaction signals. */
+const createChangingEngine = () => {
+  let hasContent = false;
+  const listeners = new Map<string, Set<() => void>>();
   const engine = {
-    exports: { hasExportableLayerContent: () => painted },
+    exports: { hasExportableLayerContent: () => hasContent },
     interaction: {
       subscribe: (key: string, listener: () => void) => {
-        if (key === 'layerPixelEpoch') {
-          listeners.add(listener);
-        }
-        return () => listeners.delete(listener);
+        const set = listeners.get(key) ?? new Set();
+        set.add(listener);
+        listeners.set(key, set);
+        return () => set.delete(listener);
       },
     },
     projectId: 'project',
   } as unknown as LayerFilterOperationEngine;
-  const paint = (): void => {
-    painted = true;
-    listeners.forEach((listener) => listener());
+  const gainContent = (signal: 'layerPixelEpoch' | 'documentEpoch'): void => {
+    hasContent = true;
+    listeners.get(signal)?.forEach((listener) => listener());
   };
-  return { engine, paint };
+  return { engine, gainContent };
 };
 
 const noop = (): void => {};
@@ -53,8 +53,11 @@ afterEach(() => {
   container = null;
 });
 
-it('enables Filter as soon as the layer publishes pixels, without reselecting it', async () => {
-  const { engine, paint } = createPaintingEngine();
+it.each([
+  ['publishes pixels (a fill)', 'layerPixelEpoch'],
+  ['gains content through a document change', 'documentEpoch'],
+] as const)('enables Filter as soon as the layer %s, without reselecting it', async (_, signal) => {
+  const { engine, gainContent } = createChangingEngine();
   const layer = createEmptyPaintLayer('Raster', 'raster');
   container = document.createElement('div');
   document.body.append(container);
@@ -70,7 +73,7 @@ it('enables Filter as soon as the layer publishes pixels, without reselecting it
   );
   await expect.element(page.getByRole('button', { name: 'Filter' })).toBeDisabled();
 
-  act(() => paint());
+  act(() => gainContent(signal));
 
   await expect.element(page.getByRole('button', { name: 'Filter' })).toBeEnabled();
 });

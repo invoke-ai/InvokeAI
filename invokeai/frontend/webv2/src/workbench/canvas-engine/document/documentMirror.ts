@@ -49,6 +49,8 @@ export interface DocumentMirrorCallbacks {
    * session cleanup.
    */
   onSelectionChanged?(selectedLayerId: string | null): void;
+  /** Any change to the mirrored document, after the callbacks above have reacted to it (even when one threw). */
+  onDocumentChanged?(): void;
 }
 
 /** The imperative mirror handle. */
@@ -255,39 +257,42 @@ export const createDocumentMirror = (
       const prevSelectedLayerId = prevDoc?.selectedLayerId ?? null;
       lastDoc = doc;
       lastRevision = revision;
-
-      if (!prevDoc || !doc) {
-        callbacks.onDocumentReplaced();
-      } else if (
-        revision !== prevRevision ||
-        prevDoc.width !== doc.width ||
-        prevDoc.height !== doc.height ||
-        prevDoc.background !== doc.background
-      ) {
-        callbacks.onDocumentReplaced();
-      } else {
-        if (prevDoc.stacks !== doc.stacks) {
-          const edit = valueEditBetween(prevDoc.stacks, doc.stacks);
-          const prevIndex = getDocumentIndex(prevDoc);
-          const nextIndex = getDocumentIndex(doc);
-          const diff = edit ? diffValueEdit(prevIndex, nextIndex, edit) : diffForests(prevIndex, nextIndex);
-          if (diff.changed.length > 0) {
-            callbacks.onLayersChanged(diff.changed, diff.sourceChanged, diff.restructured);
-          } else if (diff.restructured) {
-            callbacks.onLayerOrderChanged();
+      try {
+        if (!prevDoc || !doc) {
+          callbacks.onDocumentReplaced();
+        } else if (
+          revision !== prevRevision ||
+          prevDoc.width !== doc.width ||
+          prevDoc.height !== doc.height ||
+          prevDoc.background !== doc.background
+        ) {
+          callbacks.onDocumentReplaced();
+        } else {
+          if (prevDoc.stacks !== doc.stacks) {
+            const edit = valueEditBetween(prevDoc.stacks, doc.stacks);
+            const prevIndex = getDocumentIndex(prevDoc);
+            const nextIndex = getDocumentIndex(doc);
+            const diff = edit ? diffValueEdit(prevIndex, nextIndex, edit) : diffForests(prevIndex, nextIndex);
+            if (diff.changed.length > 0) {
+              callbacks.onLayersChanged(diff.changed, diff.sourceChanged, diff.restructured);
+            } else if (diff.restructured) {
+              callbacks.onLayerOrderChanged();
+            }
+            if (diff.recompositeOnly.length > 0) {
+              callbacks.onLayersRecomposite?.(diff.recompositeOnly);
+            }
           }
-          if (diff.recompositeOnly.length > 0) {
-            callbacks.onLayersRecomposite?.(diff.recompositeOnly);
+          if (!bboxEqual(prevDoc.bbox, doc.bbox)) {
+            callbacks.onBboxChanged();
           }
         }
-        if (!bboxEqual(prevDoc.bbox, doc.bbox)) {
-          callbacks.onBboxChanged();
-        }
-      }
 
-      const selectedLayerId = doc?.selectedLayerId ?? null;
-      if (selectedLayerId !== prevSelectedLayerId) {
-        callbacks.onSelectionChanged?.(selectedLayerId);
+        const selectedLayerId = doc?.selectedLayerId ?? null;
+        if (selectedLayerId !== prevSelectedLayerId) {
+          callbacks.onSelectionChanged?.(selectedLayerId);
+        }
+      } finally {
+        callbacks.onDocumentChanged?.();
       }
     }
 

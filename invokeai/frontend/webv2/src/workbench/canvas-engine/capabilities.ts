@@ -129,6 +129,8 @@ export interface CanvasInteractionState {
   marqueeOptions: MarqueeToolOptions;
   /** Monotonic signal: some layer published new cache pixels (thumbnails, overview). */
   layerPixelEpoch: number;
+  /** Monotonic signal: the mirrored document changed (an edit, sync or swap), after the engine reacted to it. */
+  documentEpoch: number;
   ruleOfThirds: boolean;
   shapeOptions: ShapeToolOptions;
   showBbox: boolean;

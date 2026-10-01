@@ -375,6 +375,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     lassoOptions: stores.lassoOptions,
     marqueeOptions: stores.marqueeOptions,
     layerPixelEpoch: stores.layerPixelEpoch,
+    documentEpoch: stores.documentEpoch,
     ruleOfThirds: stores.ruleOfThirds,
     shapeOptions: stores.shapeOptions,
     showBbox: stores.showBbox,
@@ -1399,6 +1400,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   // ---- Document mirror ----------------------------------------------------
 
   const mirror: DocumentMirror = createDocumentMirror(mutationPort, {
+    onDocumentChanged: () => stores.documentEpoch.set(stores.documentEpoch.get() + 1),
     // Bbox changes need only overlay redraw unless a bbox-relative staged preview must move in the composite.
     // Explicitly placed candidates stay fixed.
     onBboxChanged: () => {

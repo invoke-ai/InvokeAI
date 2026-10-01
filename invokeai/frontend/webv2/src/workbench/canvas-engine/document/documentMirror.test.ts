@@ -696,3 +696,46 @@ describe('createDocumentMirror: value edits through the reducer', () => {
     expect(getForestDiffCount()).toBe(1);
   });
 });
+
+describe('createDocumentMirror: change signal', () => {
+  it('signals each document change once, after the other callbacks reacted, and never for staging alone', () => {
+    const doc = makeDoc([rasterLayer('a')]);
+    const canvas = makeCanvas(doc);
+    const store = createFakeStore([{ canvas, id: 'p1' }]);
+    const order: string[] = [];
+    const callbacks = {
+      ...spyCallbacks(),
+      onDocumentChanged: vi.fn(() => order.push('document')),
+      onLayersChanged: vi.fn(() => order.push('layers')),
+    };
+    createDocumentMirror(store, 'p1', callbacks);
+
+    store.setState({
+      projects: [{ canvas: { ...canvas, document: makeDoc([rasterLayer('a', { opacity: 0.5 })]) }, id: 'p1' }],
+    });
+    store.setState({
+      projects: [{ canvas: { ...store.getState().projects[0]!.canvas, stagingArea: makeStaging() }, id: 'p1' }],
+    });
+
+    expect(order).toEqual(['layers', 'document']);
+  });
+
+  it('still signals the change when a reaction throws', () => {
+    const doc = makeDoc([rasterLayer('a')]);
+    const canvas = makeCanvas(doc);
+    const store = createFakeStore([{ canvas, id: 'p1' }]);
+    const callbacks = {
+      ...spyCallbacks(),
+      onDocumentChanged: vi.fn(),
+      onLayersChanged: vi.fn(() => {
+        throw new Error('reaction failed');
+      }),
+    };
+    createDocumentMirror(store, 'p1', callbacks);
+
+    expect(() =>
+      store.setState({ projects: [{ canvas: { ...canvas, document: makeDoc([rasterLayer('b')]) }, id: 'p1' }] })
+    ).toThrow('reaction failed');
+    expect(callbacks.onDocumentChanged).toHaveBeenCalledOnce();
+  });
+});
