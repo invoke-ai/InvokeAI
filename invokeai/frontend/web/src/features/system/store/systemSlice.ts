@@ -12,8 +12,9 @@ import { assert } from 'tsafe';
 import { type Language, type SystemState, zSystemState } from './types';
 
 const getInitialState = (): SystemState => ({
-  _version: 3,
+  _version: 4,
   shouldConfirmOnDelete: true,
+  shouldProtectStarredMedia: false,
   shouldAntialiasProgressImage: false,
   shouldConfirmOnNewSession: true,
   language: 'en',
@@ -36,6 +37,9 @@ const slice = createSlice({
   reducers: {
     setShouldConfirmOnDelete: (state, action: PayloadAction<boolean>) => {
       state.shouldConfirmOnDelete = action.payload;
+    },
+    setShouldProtectStarredMedia: (state, action: PayloadAction<boolean>) => {
+      state.shouldProtectStarredMedia = action.payload;
     },
     logIsEnabledChanged: (state, action: PayloadAction<SystemState['logIsEnabled']>) => {
       state.logIsEnabled = action.payload;
@@ -88,6 +92,7 @@ const slice = createSlice({
 
 export const {
   setShouldConfirmOnDelete,
+  setShouldProtectStarredMedia,
   logIsEnabledChanged,
   logLevelChanged,
   logNamespaceToggled,
@@ -122,6 +127,14 @@ export const systemSliceConfig: SliceConfig<typeof slice> = {
         state.shouldUseMiddleClickToOpenInNewTab = false;
         state._version = 3;
       }
+      if (state._version === 3) {
+        state.shouldProtectStarredMedia = false;
+        state._version = 4;
+      }
+      if (state._version === 4 && !('shouldProtectStarredMedia' in state)) {
+        const legacyValue = (state as Record<string, unknown>).shouldProtectStarredImages;
+        state.shouldProtectStarredMedia = typeof legacyValue === 'boolean' ? legacyValue : false;
+      }
       return zSystemState.parse(state);
     },
   },
@@ -136,6 +149,7 @@ export const selectSystemLogNamespaces = createSystemSelector((system) =>
 );
 export const selectSystemLogIsEnabled = createSystemSelector((system) => system.logIsEnabled);
 export const selectSystemShouldConfirmOnDelete = createSystemSelector((system) => system.shouldConfirmOnDelete);
+export const selectSystemShouldProtectStarredMedia = createSystemSelector((system) => system.shouldProtectStarredMedia);
 export const selectSystemShouldUseNSFWChecker = createSystemSelector((system) => system.shouldUseNSFWChecker);
 export const selectSystemShouldUseWatermarker = createSystemSelector((system) => system.shouldUseWatermarker);
 export const selectSystemShouldAntialiasProgressImage = createSystemSelector(

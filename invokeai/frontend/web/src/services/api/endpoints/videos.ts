@@ -102,11 +102,13 @@ export const videosApi = api.injectEndpoints({
 
     deleteVideo: build.mutation<
       paths['/api/v1/videos/i/{video_name}']['delete']['responses']['200']['content']['application/json'],
-      paths['/api/v1/videos/i/{video_name}']['delete']['parameters']['path']
+      paths['/api/v1/videos/i/{video_name}']['delete']['parameters']['path'] &
+        NonNullable<paths['/api/v1/videos/i/{video_name}']['delete']['parameters']['query']>
     >({
-      query: ({ video_name }) => ({
+      query: ({ video_name, delete_starred }) => ({
         url: buildVideosUrl(`i/${video_name}`),
         method: 'DELETE',
+        params: { delete_starred },
       }),
       invalidatesTags: (result) => {
         if (!result) {
@@ -149,11 +151,12 @@ export const videosApi = api.injectEndpoints({
      * board action fires both so the polymorphic uncategorized bucket is fully cleared. */
     deleteUncategorizedVideos: build.mutation<
       paths['/api/v1/videos/uncategorized']['delete']['responses']['200']['content']['application/json'],
-      void
+      NonNullable<paths['/api/v1/videos/uncategorized']['delete']['parameters']['query']> | void
     >({
-      query: () => ({
+      query: (params) => ({
         url: buildVideosUrl('uncategorized'),
         method: 'DELETE',
+        params: params ?? undefined,
       }),
       invalidatesTags: (result) => {
         if (!result) {

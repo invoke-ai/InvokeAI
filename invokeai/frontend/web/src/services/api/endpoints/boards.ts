@@ -152,5 +152,4 @@ export const {
   useGetBoardVideosTotalQuery,
   useCreateBoardMutation,
   useUpdateBoardMutation,
-  useListAllImageNamesForBoardQuery,
 } = boardsApi;

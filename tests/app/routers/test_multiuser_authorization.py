@@ -1285,7 +1285,7 @@ class TestImageMutationAuth:
         monkeypatch.setattr(
             mock_invoker.services.images,
             "delete",
-            MagicMock(side_effect=[None, OSError("file busy")]),
+            MagicMock(side_effect=[True, OSError("file busy")]),
         )
 
         response = client.delete("/api/v1/images/uncategorized", headers=_auth(user1_token))

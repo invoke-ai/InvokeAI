@@ -129,13 +129,15 @@ class VideoServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete(self, video_name: str) -> None:
-        """Deletes a video."""
+    def delete(self, video_name: str, delete_starred: bool = True) -> bool:
+        """Deletes a video, returning ``False`` when a starred video is protected."""
         pass
 
     @abstractmethod
-    def delete_videos_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
-        """Deletes all videos on a board; returns ``(deleted_names, failed_names)``.
+    def delete_videos_on_board(
+        self, board_id: str, user_id: Optional[str] = None, delete_starred: bool = True
+    ) -> tuple[list[str], list[str], list[str]]:
+        """Deletes videos on a board; returns ``(deleted_names, failed_names, starred_skipped_names)``.
 
         When ``user_id`` is provided, only videos owned by that user are deleted (other users'
         contributions to a public/shared board are preserved). Pass ``None`` for the admin
@@ -146,6 +148,9 @@ class VideoServiceABC(ABC):
         are the authoritative ``deleted_videos``/``failed_videos`` for the caller's response —
         callers must not reconstruct failures by diffing their own board listing, which races
         with concurrent moves/deletes.
+
+        When ``delete_starred`` is ``False``, starred videos are preserved and reported in
+        ``starred_skipped_names``.
         """
         pass
 

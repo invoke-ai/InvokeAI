@@ -372,7 +372,7 @@ class ImageService(ImageServiceABC):
             self.__invoker.services.logger.error("Problem getting paginated image DTOs")
             raise e
 
-    def delete(self, image_name: str):
+    def delete(self, image_name: str, delete_starred: bool = True) -> bool:
         # Record first, files second, with a durable journal spanning the two. Deleting the record
         # first means a database failure leaves the image completely intact, and the only state
         # that can outlive this call is a file nothing references — which the journal lets startup
@@ -383,6 +383,8 @@ class ImageService(ImageServiceABC):
         with self._image_mutation_lock():
             try:
                 record = self.__invoker.services.image_records.get(image_name)
+                if not delete_starred and record.starred:
+                    return False
                 token = self.__invoker.services.image_files.begin_delete([(image_name, record.image_subfolder)])
                 try:
                     self.__invoker.services.image_records.delete(image_name)
@@ -402,6 +404,7 @@ class ImageService(ImageServiceABC):
                     # behind and startup recovery purges the leftover files.
                     self.__invoker.services.logger.error(f"Failed to purge deleted image files: {cleanup_error}")
                 self._on_deleted(image_name)
+                return True
             except ImageRecordNotFoundException:
                 # Already deleted by another request; nothing here failed, so nothing to log.
                 raise
@@ -415,7 +418,9 @@ class ImageService(ImageServiceABC):
                 self.__invoker.services.logger.error("Problem deleting image record and file")
                 raise e
 
-    def delete_images_on_board(self, board_id: str, user_id: Optional[str] = None) -> tuple[list[str], list[str]]:
+    def delete_images_on_board(
+        self, board_id: str, user_id: Optional[str] = None, delete_starred: bool = True
+    ) -> tuple[list[str], list[str], list[str]]:
         # The mutation lock spans the per-image record reads through the purges and rollbacks so a
         # subfolder move cannot relocate files between a record read and its stage or commit.
         with self._image_mutation_lock():
@@ -430,10 +435,14 @@ class ImageService(ImageServiceABC):
                 )
                 deleted_image_names: list[str] = []
                 failed_image_names: list[str] = []
+                starred_skipped_image_names: list[str] = []
                 staged_deletes: list[tuple[str, object]] = []
                 for image_name in image_names:
                     try:
                         record = self.__invoker.services.image_records.get(image_name)
+                        if not delete_starred and record.starred:
+                            starred_skipped_image_names.append(image_name)
+                            continue
                         token = self.__invoker.services.image_files.stage_delete(
                             image_name, image_subfolder=record.image_subfolder
                         )
@@ -462,7 +471,7 @@ class ImageService(ImageServiceABC):
                         self.__invoker.services.logger.error(f"Failed to purge staged image files: {cleanup_error}")
                 for image_name in deleted_image_names:
                     self._on_deleted(image_name)
-                return deleted_image_names, failed_image_names
+                return deleted_image_names, failed_image_names, starred_skipped_image_names
             except ImageRecordDeleteException:
                 self.__invoker.services.logger.error("Failed to delete image records")
                 raise
