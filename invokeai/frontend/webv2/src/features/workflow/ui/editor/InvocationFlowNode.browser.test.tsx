@@ -188,10 +188,10 @@ const outputImage = (width: number, height: number): string => {
   return canvas.toDataURL();
 };
 
-const completed = (outputImageUrl: string): WorkflowNodeExecutionState => ({
+const completed = (outputImageName: string): WorkflowNodeExecutionState => ({
   error: null,
   latestOutput: null,
-  outputImageUrl,
+  outputImageName,
   progress: null,
   progressMessage: null,
   status: 'completed',
@@ -546,7 +546,7 @@ describe('InvocationFlowNode chrome and export', () => {
       execution.set({
         error: null,
         latestOutput: { value: longOutput },
-        outputImageUrl: 'data:image/png;base64,cHJldmlldw==',
+        outputImageName: 'data:image/png;base64,cHJldmlldw==',
         progress: null,
         progressMessage: null,
         status: 'completed',
@@ -931,7 +931,7 @@ describe('InvocationFlowNode chrome and export', () => {
       execution.set({
         error: null,
         latestOutput: null,
-        outputImageUrl: null,
+        outputImageName: null,
         progress: 0.5,
         progressMessage: null,
         status: 'running',
@@ -1304,7 +1304,7 @@ describe('InvocationFlowNode chrome and export', () => {
     execution.set({
       error: 'Child node failed',
       latestOutput: null,
-      outputImageUrl: null,
+      outputImageName: null,
       progress: null,
       progressMessage: null,
       status: 'failed',
@@ -1493,7 +1493,7 @@ describe('InvocationFlowNode chrome and export', () => {
     const completed = {
       error: null,
       latestOutput: { value: 'previous result' },
-      outputImageUrl: 'data:image/png;base64,cHJldmlvdXM=',
+      outputImageName: 'data:image/png;base64,cHJldmlvdXM=',
       progress: null,
       progressMessage: null,
       status: 'completed' as const,
@@ -1631,7 +1631,7 @@ describe('InvocationFlowNode failure outcome', () => {
     execution.set({
       error: 'Child node failed',
       latestOutput: null,
-      outputImageUrl: null,
+      outputImageName: null,
       progress: null,
       progressMessage: null,
       status: 'failed',

@@ -21,6 +21,7 @@ import { shallowEqual } from '@platform/state/selectors';
 import { focusOpenedWidget } from '@workbench/focusRegions';
 import { resolveAndSubmitGraphPreviewInvocation } from '@workbench/graphPreviewInvocation';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys';
+import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import {
   createInvocationRouteInputSelector,
   formatRoute,
@@ -246,6 +247,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
     []
   );
 
+  const findInGallery = useFindGalleryItem();
   const adapter = useMemo<WorkflowUiAdapter>(
     () => ({
       capabilities,
@@ -264,6 +266,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
           commands.workflows.setSource(target.projectId, target.workflowId, source),
         undo: commands.workflows.undo,
       },
+      findInGallery,
       getProjectGraph: () => getActiveProjectWorkflow(queries.getSnapshot().activeProject).document,
       nodeExecution: {
         get: nodeExecutionStore.get,
@@ -297,7 +300,18 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         patchValues: (widgetId, values) => commands.widgets.patchValues(widgetId, values),
       },
     }),
-    [capabilities, commands, notify.error, notify.info, notify.success, persistence, preferences, project, queries]
+    [
+      capabilities,
+      commands,
+      findInGallery,
+      notify.error,
+      notify.info,
+      notify.success,
+      persistence,
+      preferences,
+      project,
+      queries,
+    ]
   );
 
   return (

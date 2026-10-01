@@ -30,6 +30,7 @@ import {
   type GalleryItem,
 } from '@features/gallery';
 import { getSelectedGalleryImageFromValues, toGalleryItemKey } from '@features/gallery/contracts';
+import { FindInGalleryThumbnailButton } from '@features/gallery/mediaSlot';
 import { GalleryPickerPopover, type GalleryPickerSelection } from '@features/gallery/picker';
 import { invalidateGallery } from '@features/gallery/queries';
 import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
@@ -691,7 +692,9 @@ const ImageCollectionTile = ({
   name: string;
   onRemove: (index: number) => void;
 }) => {
+  const { findInGallery } = useWorkflowUi();
   const onRemoveClick = useCallback(() => onRemove(index), [index, onRemove]);
+  const onFind = useCallback(() => findInGallery({ kind: 'image', name }), [findInGallery, name]);
 
   return (
     <Box aspectRatio="1" bg="bg.subtle" className="group" position="relative" rounded="xs">
@@ -720,6 +723,7 @@ const ImageCollectionTile = ({
       >
         <Icon as={XIcon} boxSize="3" />
       </IconButton>
+      <FindInGalleryThumbnailButton bottom="0.5" insetInlineEnd="0.5" name={name} onFind={onFind} />
     </Box>
   );
 };
@@ -926,6 +930,7 @@ const ImageCollectionInput = ({
 
 const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputProps & { kind: WorkflowMediaKind }) => {
   const { t } = useTranslation();
+  const { findInGallery } = useWorkflowUi();
   const config = MEDIA_FIELD_CONFIG[kind];
   const mediaName =
     typeof (value as Record<string, unknown> | null | undefined)?.[config.nameKey] === 'string'
@@ -950,6 +955,11 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
     [config.nameKey, onChange]
   );
   const onClearClick = useCallback(() => onChange(undefined), [onChange]);
+  const onFind = useCallback(() => {
+    if (mediaName) {
+      findInGallery({ kind, name: mediaName });
+    }
+  }, [findInGallery, kind, mediaName]);
 
   // Replace failed stale thumbnails with media icons; retry when the value changes.
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
@@ -982,7 +992,7 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
     <Box position="relative" w="full" {...invalidAriaProps}>
       <MediaDropMonitor dropId={dropId} kind={kind} onDrop={onMediaDrop} />
       {/* The whole preview area is the drop target, like the legacy editor's widget. */}
-      <Box ref={setNodeRef} className="nodrag" h="32" position="relative" rounded="sm" w="full">
+      <Box ref={setNodeRef} className="nodrag group" h="32" position="relative" rounded="sm" w="full">
         <GalleryPickerPopover accept={pickerAccept} label={pickerLabel} onPick={onPick}>
           <chakra.button
             aria-label={pickerLabel}
@@ -1057,6 +1067,10 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
           >
             {badge}
           </Badge>
+        ) : null}
+        {mediaName ? (
+          // Top corner: the size badge holds the bottom one.
+          <FindInGalleryThumbnailButton bottom="auto" name={mediaName} top="1" onFind={onFind} />
         ) : null}
         <DropTargetOverlay isActive={acceptsActiveDrag} isOver={isOver} label={`Drop ${config.noun}`} />
       </Box>

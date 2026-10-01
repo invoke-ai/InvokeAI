@@ -73,7 +73,8 @@ export interface WorkflowNodeExecutionState {
   status: 'running' | 'completed' | 'failed';
   progress: number | null;
   progressMessage: string | null;
-  outputImageUrl: string | null;
+  /** The node's most recent image output, when it produced one. */
+  outputImageName: string | null;
   /** The most recent invocation result of the current run. */
   latestOutput: unknown;
   error: string | null;
