@@ -1,0 +1,162 @@
+---
+title: FLUX.1
+description: Generate and edit images with FLUX.1 dev, schnell, Krea dev and Kontext, plus FLUX Fill, Redux, IP-Adapter, ControlNets and Control LoRAs.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 4
+---
+
+FLUX.1 is Black Forest Labs' family of rectified-flow transformer text-to-image models. It uses two
+text encoders (T5-XXL and CLIP-L) and a 16-channel VAE. InvokeAI detects three variants on install:
+
+- **FLUX.1 dev** — guidance-distilled. Uses a **Guidance** value rather than classifier-free guidance.
+  **FLUX.1 Krea dev** and **FLUX.1 Kontext dev** are dev-architecture models and are handled the same way.
+- **FLUX.1 schnell** — timestep-distilled for **4 steps**. It ignores guidance.
+- **FLUX.1 Fill dev** — an inpainting/outpainting model (shown as *FLUX Dev - Fill*). It cannot do
+  text-to-image.
+
+The family is supported by a set of add-on models: ControlNets, Control LoRAs, an IP-Adapter, FLUX Redux
+and PiD super-resolution decoders.
+
+## License
+
+| Model | License | Commercial use |
+|---|---|---|
+| FLUX.1 schnell | Apache 2.0 | Allowed |
+| FLUX.1 dev, Kontext dev, Krea dev, Fill and Redux | FLUX.1 [dev] Non-Commercial License | The weights may not be used commercially. Images you generate may be, except to train a competing model. |
+| T5 and CLIP text encoders | Apache 2.0 / MIT | Allowed |
+
+The starter models download from ungated copies where possible. The FLUX Fill, Redux and Kontext models, and the control LoRAs, come from Black Forest Labs' own gated repositories: accept the license on each model's HuggingFace page and add your HuggingFace token under **API Keys** in the Model Manager.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
+## Hardware
+
+See the [System Requirements](/start-here/system-requirements/) table. FLUX.1 needs about **10 GB of
+VRAM** and **32 GB of system RAM** at 1024×1024. Download totals with dependencies are roughly **12 GB**
+for the NF4 and GGUF Q4 builds, **18 GB** for the int8 build and **33 GB** for bfloat16. The int8
+transformer occupies about 11.5 GB on any supported GPU, so it streams on a 10 GB card.
+
+To fit a full-precision checkpoint in less memory, see [FP8 Storage](/configuration/optimization/fp8-storage/)
+and [Low-VRAM mode](/configuration/optimization/low-vram-mode/).
+
+## Installing
+
+The simplest path is the **FLUX.1 dev** bundle in the Model Manager. It installs:
+
+- FLUX.1 schnell (quantized) and FLUX.1 dev (quantized)
+- FLUX.1 Kontext dev (quantized) and FLUX.1 Krea dev (quantized)
+- FLUX Fill and FLUX Redux
+- the FLUX VAE, the int8 T5 encoder and the CLIP-L encoder
+- the InstantX Union ControlNet, the Canny and Depth Control LoRAs, and the XLabs IP-Adapter
+
+Individual starter models for the main model:
+
+| Starter model | Format | Notes |
+| --- | --- | --- |
+| FLUX.1 dev / FLUX.1 schnell | bfloat16 single file | ~33 GB with dependencies (bf16 T5) |
+| FLUX.1 dev (quantized) / schnell (quantized) | bitsandbytes NF4 | ~12 GB with dependencies (int8 T5) |
+| FLUX.1 dev (int8) | int8 single file (community repack) | ~18 GB with dependencies; half the memory of bf16 on every supported GPU |
+| FLUX.1 schnell (SDNQ uint4 + SVD) | [SDNQ](/configuration/optimization/sdnq-quantization/) Diffusers pipeline | ~15 GB, self-contained |
+| FLUX.1 Kontext dev (quantized) | GGUF Q4_K_M | ~12 GB with dependencies |
+| FLUX.1 Krea dev / Krea dev (quantized) | single file / GGUF Q4_K_M | ~29 GB / ~12 GB with dependencies |
+| FLUX Fill | single file | Inpainting model |
+
+Except for the self-contained SDNQ pipeline, a FLUX.1 main model is only the transformer, and needs three
+components. Installing a starter model installs them as dependencies:
+
+| Component | Starter options |
+| --- | --- |
+| VAE | `FLUX.1-schnell_ae` (works with every FLUX.1 variant) |
+| T5 encoder | bfloat16 (~9.5 GB), bitsandbytes int8 (~5 GB), GGUF Q6_K (~3.9 GB, near-lossless), GGUF Q3_K_S (~2.1 GB, lower quality) |
+| CLIP embed | `clip-vit-large-patch14` (~250 MB) |
+
+Select them in the **Components** section next to the model. The SDNQ pipeline carries its own encoders
+and VAE, so its component pickers stay empty.
+
+Some Black Forest Labs repositories are gated on HuggingFace. If a download asks for an access token,
+accept the license on the model's HuggingFace page and add your HuggingFace token under **API Keys** in
+the Model Manager.
+
+## Generation settings
+
+Selecting a FLUX.1 model applies these defaults:
+
+| Variant | Steps | Guidance | Scheduler | Size |
+| --- | --- | --- | --- | --- |
+| dev (incl. Krea, Kontext) | 28 | 3.5 | Euler | 1024×1024 |
+| schnell | 4 | — (ignored) | Euler | 1024×1024 |
+| Fill | 50 | 30 | Euler | 1024×1024 |
+
+- **Guidance** — the slider next to Steps sets FLUX's distilled guidance, not CFG. Higher values follow the
+  prompt more closely and give less varied images.
+- **Scheduler** — Euler, Heun (2nd order; better quality at about twice the time per step) or LCM (for few
+  steps).
+- **Size** — width and height must be multiples of 16.
+- **Negative prompt** — FLUX.1 has no negative prompt in the Generate tab or on the Canvas.
+
+Text-to-image, image-to-image, inpainting and outpainting all work with dev and schnell models on the
+Canvas. Regional guidance is supported, and a regional layer can
+also carry a FLUX Redux reference image.
+
+## Reference images
+
+A FLUX.1 model accepts up to **five** reference images. Three kinds are available:
+
+- **FLUX Redux** — image variation from a reference. Pick a FLUX Redux model on the reference image card
+  and set **Image influence** from *Lowest* to *Highest* (default). Redux needs the SigLIP image encoder,
+  which installs with it.
+- **IP-Adapter** — the *Standard Reference (XLabs FLUX IP-Adapter v2)* starter model references an image
+  more loosely. It uses the CLIP ViT-L image encoder, installed as a dependency.
+- **Kontext** — when the selected model is FLUX.1 Kontext dev, reference images are passed to Kontext for
+  instruction-style editing: describe the change you want in the prompt.
+
+:::note[Kontext is recognized by name]
+The Generate tab treats a FLUX.1 model as Kontext only if its name contains "kontext". If you rename a
+Kontext model in the Model Manager, keep that word in the name.
+:::
+
+## ControlNets and Control LoRAs
+
+On the Canvas, a control layer can use either kind of FLUX.1 structural control:
+
+- **ControlNet** — the *FLUX.1-dev-Controlnet-Union* starter model (InstantX) covers canny, tile, depth,
+  blur, pose, gray and low-quality inputs. XLabs FLUX ControlNets are also recognized.
+- **Control LoRA** — *Hard Edge Detection (Canny)* and *Depth Map* are Black Forest Labs' official Control
+  LoRAs. A Control LoRA cannot be combined with a FLUX Fill model.
+
+## FLUX Fill
+
+FLUX Fill regenerates a masked region of an image. The Generate tab and Canvas refuse a Fill model (they
+report that it does not support text-to-image), so use it in the workflow editor: connect a
+**FLUX Fill Conditioning** node (image plus inpainting mask) to the **Fill Conditioning** input of
+**FLUX Denoise**, and connect the VAE to its `controlnet_vae` input. A guidance of about 30 is
+recommended.
+
+## LoRA
+
+FLUX.1 LoRAs can be applied from the Generate tab or with the **Apply LoRA - FLUX** and **Apply LoRA
+Collection - FLUX** nodes. They patch the transformer and, where the LoRA includes text-encoder layers, the
+CLIP and T5 encoders.
+
+## PiD super-resolution decode
+
+FLUX.1 latents can be decoded with a PiD decoder, which produces a 4× super-resolved image. Install *PiD
+Decoder FLUX (2K)* or *PiD Decoder FLUX (2K to 4K)*; see [PiD Super-Resolution
+Decode](/users-guide/image-generation/advanced-topics/pid-decode/).
+
+## Workflow nodes
+
+| Node | Purpose |
+| --- | --- |
+| **Main Model - FLUX** | Loads the transformer, T5, CLIP and VAE |
+| **Prompt - FLUX** | Encodes the prompt |
+| **FLUX Denoise** | Runs the diffusion; has inputs for ControlNet, Control LoRA, IP-Adapter, Redux, Kontext and Fill conditioning |
+| **Latents to Image - FLUX** / **Image to Latents - FLUX** | VAE decode / encode |
+| **Kontext Conditioning - FLUX** | Wraps a reference image for Kontext |
+| **FLUX Kontext Image Prep** | Resizes the first image to a preferred Kontext resolution and joins up to ten images side by side |
+| **FLUX Redux**, **FLUX IP-Adapter**, **FLUX ControlNet**, **Control LoRA - FLUX**, **FLUX Fill Conditioning** | Conditioning for the features above |
+
+In workflows, **FLUX Denoise** also exposes **CFG Scale** with a negative conditioning input (CFG is off at
+the default of 1.0), and a **DyPE** preset for resolutions above the model's native size: *Auto
+(>1536px)*, *Area (auto)*, *4K Optimized* or *Manual*.
