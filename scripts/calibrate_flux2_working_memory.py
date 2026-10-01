@@ -68,7 +68,7 @@ from invokeai.backend.model_manager.configs.flux2_variant import flux2_hidden_si
 from invokeai.backend.model_manager.taxonomy import Flux2VariantType
 from invokeai.backend.util.attention import SDPA_MATH_BYTES_PER_SCORE_ELEMENT, sdpa_score_matrix_bytes
 from invokeai.backend.util.vae_working_memory import (
-    _flux2_vae_scaling_constant,
+    _flux_vae_scaling_constant,
     estimate_vae_working_memory_flux2,
 )
 
@@ -457,8 +457,8 @@ def report_sdpa(shapes: list[tuple[int, int, int]], dtype_name: str) -> list[dic
 
 
 def report_vae(pxs: list[int], dtype_name: str, vae_path: str | None) -> list[dict]:
-    decode_k = _flux2_vae_scaling_constant("decode", torch.device("cuda"))
-    encode_k = _flux2_vae_scaling_constant("encode", torch.device("cuda"))
+    decode_k = _flux_vae_scaling_constant("decode", torch.device("cuda"))
+    encode_k = _flux_vae_scaling_constant("encode", torch.device("cuda"))
     print(f"\n=== 3. VAE linear constants (this build selects {decode_k} decode / {encode_k} encode) ===")
     print("`implied_k` is the measured peak over pixel area, directly comparable to those literals;")
     print("fit on the rows whose `math` column matches what this build really does (section 1).")
@@ -495,7 +495,7 @@ def report_vae(pxs: list[int], dtype_name: str, vae_path: str | None) -> list[di
     _flag_non_monotonic(rows)
     for operation in ("decode", "encode"):
         # Compare against the column this build actually selects, not against a hard-coded number.
-        shipped = _flux2_vae_scaling_constant(operation, torch.device("cuda"))
+        shipped = _flux_vae_scaling_constant(operation, torch.device("cuda"))
         for force_math in (False, True):
             ks = [
                 r["implied_linear_constant"]

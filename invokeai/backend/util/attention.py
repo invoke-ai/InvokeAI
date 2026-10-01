@@ -7,7 +7,7 @@ import os
 import threading
 import warnings
 from functools import lru_cache, wraps
-from typing import Any
+from typing import Any, Callable
 
 import psutil
 import torch
@@ -99,8 +99,9 @@ _WARNING_FILTER_LOCK = threading.Lock()
 #
 # The guard keys on the torch build, not the card: only gfx1100 was measured, and a wrong image is
 # the worse failure, so every ROCm device takes the math kernel for wide heads until a build is
-# known to be fixed. The cost is a materialized score matrix for those calls (~4.3 GiB for a 1024px
-# VAE decode, ~21 GiB at 1536px; the working-memory estimators price it). A user on a build where
+# known to be fixed. The cost is the math kernel for those calls: slower, and a materialized score
+# matrix (~4.3 GiB for a 1024px VAE decode, ~21 GiB at 1536px), which the guard computes in chunks of
+# `SDPA_MATH_CHUNK_BYTES` and the working-memory estimators price accordingly. A user on a build where
 # the fused kernels are correct can raise the threshold, or switch the guard off with a large value:
 #     INVOKE_ROCM_FUSED_SDPA_MAX_HEAD_DIM=100000
 _ROCM_FUSED_SDPA_MAX_HEAD_DIM_DEFAULT = 256
@@ -124,7 +125,19 @@ def _read_rocm_fused_sdpa_max_head_dim() -> int:
 ROCM_FUSED_SDPA_MAX_HEAD_DIM = _read_rocm_fused_sdpa_max_head_dim()
 
 _IS_ROCM = torch.version.hip is not None
-_ROCM_SDPA_GUARD_SENTINEL = "_invokeai_rocm_head_dim_guard"
+_ROCM_SDPA_GUARD_SENTINEL = "_invokeai_rocm_sdpa_guard"
+
+# Largest score matrix one math-kernel SDPA call may materialize on ROCm; larger calls run in chunks of at most this
+# (`_chunked_sdpa`). Where no fused kernel exists -- ROCm on Windows has none, measured on an RX 9060 XT with torch
+# 2.12+rocm7.14 -- an unchunked call costs heads x seq^2 x ~12-17 bytes: 8 GiB for Z-Image at 1024px, 12.9 GiB for
+# Krea-2, 40 GiB for Z-Image at 1536px, against a 16 GB card. Measured per call at 1 GiB, against unchunked: Z-Image
+# shape +8 % time, FLUX VAE mid-block (one 512-wide head, 1024px) +12 %; both within one bf16 ulp of the unchunked
+# result. Read at call time, so tests can lower it.
+SDPA_MATH_CHUNK_BYTES = 1 << 30
+
+
+def _rocm_cuda(device_type: str) -> bool:
+    return _IS_ROCM and device_type == "cuda"
 
 
 def rocm_sdpa_uses_math_kernel(device_type: str, head_dim: int) -> bool:
@@ -133,7 +146,19 @@ def rocm_sdpa_uses_math_kernel(device_type: str, head_dim: int) -> bool:
     The single rule shared by the guard itself and by the working-memory estimators, so a reserved
     score matrix always corresponds to a kernel that really runs.
     """
-    return _IS_ROCM and device_type == "cuda" and head_dim > ROCM_FUSED_SDPA_MAX_HEAD_DIM
+    return _rocm_cuda(device_type) and head_dim > ROCM_FUSED_SDPA_MAX_HEAD_DIM
+
+
+def rocm_sdpa_chunks_math(device_type: str) -> bool:
+    """True when math-kernel attention on this device runs in chunks of at most `SDPA_MATH_CHUNK_BYTES`.
+
+    That is a ROCm device with the guard installed on the live binding -- not a guard that failed to install, and not
+    a process that never installed it (scripts and tests that skip `apply_monkeypatches`), where the whole score
+    matrix is still built and must be budgeted in full.
+    """
+    return _rocm_cuda(device_type) and getattr(
+        torch.nn.functional.scaled_dot_product_attention, _ROCM_SDPA_GUARD_SENTINEL, False
+    )
 
 
 def _math_sdpa(
@@ -156,9 +181,111 @@ def _math_sdpa(
     )[0]
 
 
-def install_rocm_sdpa_head_dim_guard() -> None:
-    """Rebind ``torch.nn.functional.scaled_dot_product_attention`` so that, on ROCm, a call whose
-    head_dim exceeds ``ROCM_FUSED_SDPA_MAX_HEAD_DIM`` runs the math kernel instead of a fused one.
+def _math_score_bytes(query: torch.Tensor, key: torch.Tensor) -> int:
+    """Upper bound on the score matrix a math-kernel call over these (4-D) inputs materializes."""
+    batch, heads, query_len, _ = query.shape
+    return batch * heads * query_len * key.shape[-2] * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+
+
+def _chunkable_kv(query: torch.Tensor, key: torch.Tensor, value: torch.Tensor) -> bool:
+    """Whether `_chunked_sdpa` slices K/V correctly: 4-D and of the query's batch. Other broadcasts that math SDPA
+    accepts (3-D K/V, a wider K/V batch) stay whole."""
+    batch = query.shape[0]
+    return key.dim() == value.dim() == 4 and key.shape[0] == value.shape[0] == batch
+
+
+def _materializes(
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attn_mask: torch.Tensor | None,
+    scale: float | None,
+    enable_gqa: bool,
+) -> bool:
+    """Whether torch would run this exact call on the math kernel, under whatever backend policy is active now.
+
+    `_fused_sdp_choice` is the dispatcher query `F.scaled_dot_product_attention` itself runs, so an `sdpa_policy`
+    window or diffusers' pinned `sdpa_kernel` is honoured. Anything but a clear fused answer counts as math: when no
+    backend is eligible at all the probe raises, and the chunks then raise the same error the whole call would have.
+    """
+    try:
+        choice = torch.ops.aten._fused_sdp_choice(
+            query, key, value, attn_mask, 0.0, False, scale=scale, enable_gqa=enable_gqa
+        )
+    except Exception:
+        return True
+    return int(choice) not in _FUSED_SDP_CHOICES
+
+
+def _chunked_sdpa(
+    call: Callable[[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor | None], torch.Tensor],
+    query: torch.Tensor,
+    key: torch.Tensor,
+    value: torch.Tensor,
+    attn_mask: torch.Tensor | None,
+    enable_gqa: bool,
+) -> torch.Tensor:
+    """Run a 4-D `(batch, heads, seq, dim)` attention as calls whose score matrices stay within `SDPA_MATH_CHUNK_BYTES`.
+
+    Softmax normalizes each query row over all keys, so splitting heads or query rows is exact in exact arithmetic,
+    and both orders agree to within one bf16 ulp in practice. Head groups come first: every call keeps its full
+    `query x key` shape, which is bitwise the unchunked result wherever the kernel's arithmetic does not depend on
+    the batch it runs over (it does on CPU; a rocBLAS batched GEMM re-tiles when 30 head-batches become groups of 2,
+    measured at 0.0005 on a bf16 Z-Image shape). Query rows are split only when a single head (or GQA group) alone
+    exceeds the budget -- the one-head VAE mid-block -- or when K/V are broadcast across heads rather than grouped. A
+    mask is sliced along the axis being split wherever it is not broadcast there. The output is allocated from the
+    first chunk's result, which carries the dtype autocast chose.
+    """
+    budget = SDPA_MATH_CHUNK_BYTES
+    batch, heads, query_len, _ = query.shape
+    key_len, kv_heads = key.shape[-2], key.shape[-3]
+    per_head = batch * query_len * key_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+
+    if kv_heads == heads:
+        ratio: int | None = 1
+    elif enable_gqa and kv_heads > 0 and heads % kv_heads == 0:
+        ratio = heads // kv_heads
+    else:
+        ratio = None
+    group = 0 if ratio is None else (budget // per_head) // ratio * ratio
+
+    out: torch.Tensor | None = None
+    if group > 0:
+        mask_per_head = attn_mask is not None and attn_mask.dim() >= 3 and attn_mask.shape[-3] == heads
+        assert ratio is not None
+        for start in range(0, heads, group):
+            end = min(start + group, heads)
+            mask = attn_mask[..., start:end, :, :] if mask_per_head else attn_mask
+            kv = slice(start // ratio, end // ratio)
+            part = call(query[:, start:end], key[:, kv], value[:, kv], mask)
+            if out is None:
+                out = part.new_empty((*query.shape[:-1], part.shape[-1]))
+            out[:, start:end] = part
+    else:
+        rows = max(1, budget // (batch * heads * key_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT))
+        mask_per_row = attn_mask is not None and attn_mask.dim() >= 2 and attn_mask.shape[-2] == query_len
+        for start in range(0, query_len, rows):
+            end = min(start + rows, query_len)
+            mask = attn_mask[..., start:end, :] if mask_per_row else attn_mask
+            part = call(query[:, :, start:end], key, value, mask)
+            if out is None:
+                out = part.new_empty((*query.shape[:-1], part.shape[-1]))
+            out[:, :, start:end] = part
+    assert out is not None
+    return out
+
+
+def install_rocm_sdpa_guard() -> None:
+    """Rebind ``torch.nn.functional.scaled_dot_product_attention`` on ROCm so that attention runs on a kernel that is
+    both correct and bounded in memory.
+
+    Two rules, both only for ROCm devices:
+
+    * A call whose head_dim exceeds ``ROCM_FUSED_SDPA_MAX_HEAD_DIM`` runs the math kernel instead of a fused one, which
+      returns wrong output there.
+    * A call that runs on the math kernel -- routed by the first rule, or chosen by torch because no fused kernel takes
+      it (all of them, on ROCm under Windows) -- and would materialize more than ``SDPA_MATH_CHUNK_BYTES`` of scores
+      runs in chunks (`_chunked_sdpa`). Causal and dropout calls, and anything but 4-D inputs, are left whole.
 
     The math kernel is invoked as the aten op directly rather than through ``sdpa_kernel(MATH)``:
     that context manager writes torch's process-global backend flags, so on a multi-GPU install it
@@ -167,10 +294,11 @@ def install_rocm_sdpa_head_dim_guard() -> None:
 
     Callers that resolve the function through the module at call time inherit the guard -- that is
     diffusers' `AttnProcessor2_0` and its attention dispatcher, and every autoencoder in this repo.
-    Two differences from the fused path for the routed calls only: torch's argument validation is
+    Two differences from the fused path for the wide-head calls only: torch's argument validation is
     skipped (an invalid mask dtype is not rejected up front), and the aten op is not on autocast's
     cast list, so fp32 inputs under ``torch.autocast`` compute in fp32 instead of the autocast
-    dtype. No current wide-head caller runs under autocast.
+    dtype. No current wide-head caller runs under autocast. Chunks of narrower heads go through the
+    original function, keeping its semantics.
 
     Idempotent; a no-op on non-ROCm builds. If the aten op is missing or rejects the call shape
     this wrapper relies on, the guard is not installed and the log says so, rather than failing
@@ -187,8 +315,9 @@ def install_rocm_sdpa_head_dim_guard() -> None:
         _math_sdpa(probe, probe, probe, torch.ones((2, 2), dtype=torch.bool), 0.0, False, None, False)
     except Exception as e:
         logger.warning(
-            f"ROCm head-dim SDPA guard NOT installed: the math attention op rejected the call shape ({e!r}). "
-            f"Attention with head_dim > {ROCM_FUSED_SDPA_MAX_HEAD_DIM} may return wrong output on this build."
+            f"ROCm SDPA guard NOT installed: the math attention op rejected the call shape ({e!r}). "
+            f"Attention with head_dim > {ROCM_FUSED_SDPA_MAX_HEAD_DIM} may return wrong output on this build, and "
+            "math-kernel attention builds its whole score matrix."
         )
         return
     original = functional.scaled_dot_product_attention
@@ -206,24 +335,56 @@ def install_rocm_sdpa_head_dim_guard() -> None:
         enable_gqa: bool = False,
         **kwargs: Any,
     ) -> torch.Tensor:
-        if not rocm_sdpa_uses_math_kernel(query.device.type, query.shape[-1]):
-            return original(
-                query, key, value, attn_mask, dropout_p, is_causal, *args, scale=scale, enable_gqa=enable_gqa, **kwargs
-            )
-        if args or kwargs:
+        wide_head = rocm_sdpa_uses_math_kernel(query.device.type, query.shape[-1])
+        if wide_head and (args or kwargs):
             # A torch that grew new SDPA arguments would need the math call updated to match;
             # refuse rather than silently drop them.
             raise TypeError(
-                f"scaled_dot_product_attention received arguments the ROCm head-dim guard does not forward: "
+                f"scaled_dot_product_attention received arguments the ROCm SDPA guard does not forward: "
                 f"{args!r}, {sorted(kwargs)!r}"
             )
-        return _math_sdpa(query, key, value, attn_mask, dropout_p, is_causal, scale, enable_gqa)
+        chunk = (
+            _rocm_cuda(query.device.type)
+            and query.dim() == 4
+            and not query.is_nested
+            and not is_causal
+            and dropout_p == 0.0
+            and not args
+            and not kwargs
+            and _math_score_bytes(query, key) > SDPA_MATH_CHUNK_BYTES
+            and _chunkable_kv(query, key, value)
+            and (wide_head or _materializes(query, key, value, attn_mask, scale, enable_gqa))
+        )
+        if wide_head:
+            if not chunk:
+                return _math_sdpa(query, key, value, attn_mask, dropout_p, is_causal, scale, enable_gqa)
+            return _chunked_sdpa(
+                lambda q, k, v, m: _math_sdpa(q, k, v, m, 0.0, False, scale, enable_gqa),
+                query,
+                key,
+                value,
+                attn_mask,
+                enable_gqa,
+            )
+        if chunk:
+            return _chunked_sdpa(
+                lambda q, k, v, m: original(q, k, v, m, 0.0, False, scale=scale, enable_gqa=enable_gqa),
+                query,
+                key,
+                value,
+                attn_mask,
+                enable_gqa,
+            )
+        return original(
+            query, key, value, attn_mask, dropout_p, is_causal, *args, scale=scale, enable_gqa=enable_gqa, **kwargs
+        )
 
     setattr(guarded_scaled_dot_product_attention, _ROCM_SDPA_GUARD_SENTINEL, True)
     functional.scaled_dot_product_attention = guarded_scaled_dot_product_attention
     logger.info(
         f"ROCm: attention with head_dim > {ROCM_FUSED_SDPA_MAX_HEAD_DIM} runs on the math SDPA kernel "
-        f"(the fused kernels return wrong output there; {_ROCM_FUSED_SDPA_MAX_HEAD_DIM_ENV} overrides the threshold)."
+        f"(the fused kernels return wrong output there; {_ROCM_FUSED_SDPA_MAX_HEAD_DIM_ENV} overrides the threshold), "
+        f"and math-kernel attention runs in chunks of at most {SDPA_MATH_CHUNK_BYTES / 2**30:g} GiB of scores."
     )
 
 
@@ -359,27 +520,37 @@ def sdpa_score_matrix_bytes(
     `F.scaled_dot_product_attention` directly through `AttnProcessor2_0`). It consults the
     process-wide default backend, which is the one that applies here: estimates are priced before
     the model is loaded and outside any `attention_backend()` scope.
+
+    Where the ROCm guard computes math attention in chunks (`rocm_sdpa_chunks_math`), one chunk is
+    what is alive at a time, so the term is capped at ``SDPA_MATH_CHUNK_BYTES``. That cap assumes the
+    call is one the guard will chunk: a plain 4-D, non-causal, dropout-free call with K/V of the
+    query's batch, which is what every caller here prices. A causal or dropout call, or one with
+    broadcast K/V, runs whole and would need the full figure.
     """
     if seq_len <= 0 or num_heads <= 0:
         return 0
 
     score_matrix_bytes = num_heads * seq_len * seq_len * SDPA_MATH_BYTES_PER_SCORE_ELEMENT
+    chunked = rocm_sdpa_chunks_math(device.type)
+    if chunked:
+        score_matrix_bytes = min(score_matrix_bytes, SDPA_MATH_CHUNK_BYTES)
+    suffix = ", in chunks" if chunked else ""
 
     if via_diffusers_dispatch:
         dispatch = _diffusers_attention_dispatch()
         if dispatch == _DISPATCH_FUSED:
             return 0
         if dispatch == _DISPATCH_MATH:
-            return _log_and_return(score_matrix_bytes, device, head_dim, "the diffusers backend")
+            return _log_and_return(score_matrix_bytes, device, head_dim, f"the diffusers backend{suffix}")
         # _DISPATCH_TORCH: diffusers forwards to `F.scaled_dot_product_attention`, so torch decides.
 
     if rocm_sdpa_uses_math_kernel(device.type, head_dim):
-        # `install_rocm_sdpa_head_dim_guard` sends these calls to the math kernel regardless of
-        # what torch's dispatch would pick, so the probe would answer for a kernel that never runs.
-        return _log_and_return(score_matrix_bytes, device, head_dim, "the ROCm head-dim guard")
+        # `install_rocm_sdpa_guard` sends these calls to the math kernel regardless of what
+        # torch's dispatch would pick, so the probe would answer for a kernel that never runs.
+        return _log_and_return(score_matrix_bytes, device, head_dim, f"the ROCm SDPA guard{suffix}")
     if not _torch_sdpa_materializes_score_matrix(device.type, device.index, dtype, head_dim, has_attn_mask):
         return 0
-    return _log_and_return(score_matrix_bytes, device, head_dim, "this torch build")
+    return _log_and_return(score_matrix_bytes, device, head_dim, f"this torch build{suffix}")
 
 
 @lru_cache(maxsize=None)

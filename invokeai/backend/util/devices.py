@@ -9,6 +9,7 @@ from deprecated import deprecated
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.util.level_zero import xpu_device_is_integrated, xpu_memory_info
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.wddm import video_memory_budget
 
 # legacy APIs
 TorchPrecisionNames = Literal["float32", "float16", "bfloat16"]
@@ -333,8 +334,8 @@ class TorchDevice:
         return device
 
     @classmethod
-    def empty_cache(cls) -> None:
-        """Clear the GPU device cache — unless another generation device is mid-session.
+    def empty_cache(cls) -> bool:
+        """Clear the GPU device cache — unless another generation device is mid-session. Says whether it ran.
 
         ``torch.cuda.empty_cache()`` is process-global: it takes EVERY device's
         caching-allocator mutex and cudaFree/hipFrees their cached blocks, and a free on a
@@ -366,7 +367,7 @@ class TorchDevice:
             InvokeAILogger.get_logger(cls.__name__).debug(
                 "Deferring empty_cache: another generation device is mid-session."
             )
-            return
+            return False
         # Clear before running: a skip that races in after this point re-sets the flag, so a
         # request is never lost, only (harmlessly) repeated.
         cls._empty_cache_deferred.clear()
@@ -376,6 +377,7 @@ class TorchDevice:
             torch.cuda.empty_cache()
         if _xpu_is_available():
             torch.xpu.empty_cache()
+        return True
 
     @classmethod
     def flush_deferred_empty_cache(cls) -> None:
@@ -457,6 +459,21 @@ class TorchDevice:
             )
 
         return (max(total_bytes - reserved_bytes, 0), total_bytes)
+
+    @classmethod
+    def cuda_mem_get_info(cls, device: torch.device) -> tuple[int, int]:
+        """Return ``(free, total)`` VRAM in bytes for a CUDA or ROCm device.
+
+        ``torch.cuda.mem_get_info``, except that on a ROCm build under Windows the free figure is capped by what the
+        Windows video-memory budget still allows this process (`wddm.video_memory_budget`). There, torch's figure is
+        the device total minus this process's own live allocations: it ignores other processes, and Windows pages
+        allocations into shared system memory well before it is exhausted instead of failing them.
+        """
+        free, total = torch.cuda.mem_get_info(device)
+        budget = video_memory_budget(device)
+        if budget is not None:
+            free = min(free, max(budget - (total - free), 0))
+        return free, total
 
     @classmethod
     def _to_dtype(cls, precision_name: TorchPrecisionNames) -> torch.dtype:

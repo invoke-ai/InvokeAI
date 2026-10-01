@@ -58,7 +58,10 @@ def run_app() -> None:
     import uvicorn
 
     from invokeai.app.services.config.config_default import get_config
-    from invokeai.app.util.torch_cuda_allocator import configure_torch_cuda_allocator
+    from invokeai.app.util.torch_cuda_allocator import (
+        apply_rocm_windows_allocator_default,
+        configure_torch_cuda_allocator,
+    )
     from invokeai.backend.util.logging import InvokeAILogger
 
     # Load config.
@@ -70,6 +73,8 @@ def run_app() -> None:
     # NOTE: It is important that this happens before torch is imported.
     if app_config.pytorch_cuda_alloc_conf:
         configure_torch_cuda_allocator(app_config.pytorch_cuda_alloc_conf, logger)
+    else:
+        apply_rocm_windows_allocator_default(logger)
 
     # This import must happen after configure_torch_cuda_allocator() is called, because the module imports torch.
     from invokeai.app.invocations.baseinvocation import InvocationRegistry

@@ -60,6 +60,7 @@ from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import Rec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Krea2ConditioningInfo
 from invokeai.backend.util import sdpa_scope
+from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 
@@ -553,18 +554,29 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         # headroom. Without this hint the cache reserves only the small default working memory and places
         # the model before LoRA patches are applied, so a model+LoRA combination that just fits the base
         # forward OOMs once the LoRA's extra activations are added.
+        regional_attention_mask_bytes = self._regional_attention_mask_bytes(
+            pos_extension, neg_extension, inference_dtype
+        )
         estimated_working_memory = self._estimate_working_memory(
             image_seq_len=image_seq_len,
             positive_text_seq_len=pos_prompt_embeds.shape[1],
             negative_text_seq_len=neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else None,
             do_cfg=do_cfg,
             num_loras=len(self.transformer.loras),
-            regional_attention_mask_bytes=self._regional_attention_mask_bytes(
-                pos_extension, neg_extension, inference_dtype
-            ),
+            regional_attention_mask_bytes=regional_attention_mask_bytes,
             style_reference_kv_bytes=(
                 style_extension.kv_cache_bytes(inference_dtype) if style_extension is not None else 0
             ),
+        )
+        # The activation estimate assumes a fused kernel. Where the build has none for this attention -- ROCm on
+        # Windows, MPS -- the score matrix is built as well (chunked on ROCm, see `install_rocm_sdpa_guard`).
+        estimated_working_memory += self._attention_score_bytes(
+            transformer_info.model,
+            seq_len=image_seq_len
+            + max(pos_prompt_embeds.shape[1], neg_prompt_embeds.shape[1] if neg_prompt_embeds is not None else 0),
+            has_attn_mask=regional_attention_mask_bytes > 0,
+            device=device,
+            dtype=inference_dtype,
         )
         # An int8_tensorwise build stores its linears quantized and materializes the dequantized,
         # derotated weight per forward call. That transient is alive alongside the activations above,
@@ -800,6 +812,32 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
         peak_attention_bias_bytes = max(extension.attention_mask_numel for extension in extensions)
         peak_attention_bias_bytes *= attention_dtype_bytes
         return final_mask_bytes + peak_build_scratch_bytes + peak_attention_bias_bytes
+
+    @staticmethod
+    def _attention_score_bytes(
+        transformer: object, seq_len: int, has_attn_mask: bool, device: torch.device, dtype: torch.dtype
+    ) -> int:
+        """The score matrix the main blocks' joint attention materializes, where it does (0 on a fused kernel).
+
+        One call is alive at a time: the blocks run in sequence, and so do the conditional and unconditional passes.
+        The K/V heads are expanded to the query heads before the call on any build without a fused grouped-query
+        kernel (`backend/krea2/attention.py`), so the query head count is the one that counts. Heads come from the
+        loaded model's config. The probe answers for torch's default policy, so forcing the math kernel through the
+        `INVOKE_KREA2_SDPA_BACKEND` debugging switch is not priced.
+        """
+        config = getattr(transformer, "config", None)
+        num_heads = getattr(config, "num_attention_heads", None)
+        head_dim = getattr(config, "attention_head_dim", None)
+        if not isinstance(num_heads, int) or not isinstance(head_dim, int):
+            return 0
+        return sdpa_score_matrix_bytes(
+            device=device,
+            dtype=dtype,
+            num_heads=num_heads,
+            head_dim=head_dim,
+            seq_len=seq_len,
+            has_attn_mask=has_attn_mask,
+        )
 
     def _estimate_working_memory(
         self,

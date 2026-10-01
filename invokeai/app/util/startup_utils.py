@@ -162,10 +162,11 @@ def apply_monkeypatches() -> None:
     install_peer_aware_empty_cache()
 
     # ROCm's fused SDPA kernels return wrong output for heads wider than 256 (the VAE mid-block
-    # attention), turning decodes into noise or black images. Route those calls to the math kernel.
-    from invokeai.backend.util.attention import install_rocm_sdpa_head_dim_guard
+    # attention), turning decodes into noise or black images. Route those calls to the math kernel,
+    # and compute math-kernel attention -- the only kernel ROCm on Windows has -- in bounded chunks.
+    from invokeai.backend.util.attention import install_rocm_sdpa_guard
 
-    install_rocm_sdpa_head_dim_guard()
+    install_rocm_sdpa_guard()
 
 
 def register_mime_types() -> None:

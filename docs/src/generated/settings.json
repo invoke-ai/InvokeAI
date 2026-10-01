@@ -584,7 +584,7 @@
     {
       "category": "CACHE",
       "default": null,
-      "description": "Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.",
+      "description": "Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally. Unset on a ROCm build of PyTorch on Windows, \"expandable_segments:True\" is used.",
       "env_var": "INVOKEAI_PYTORCH_CUDA_ALLOC_CONF",
       "literal_values": [],
       "name": "pytorch_cuda_alloc_conf",
@@ -721,6 +721,17 @@
       "env_var": "INVOKEAI_FORCE_TILED_DECODE",
       "literal_values": [],
       "name": "force_tiled_decode",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": true,
+      "description": "Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, Z-Image, Qwen-Image, Krea-2 and Wan decodes). Turn off to decode untiled unless tiling is requested; the FLUX.1 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.",
+      "env_var": "INVOKEAI_AUTO_TILED_DECODE",
+      "literal_values": [],
+      "name": "auto_tiled_decode",
       "required": false,
       "type": "<class 'bool'>",
       "validation": {}
