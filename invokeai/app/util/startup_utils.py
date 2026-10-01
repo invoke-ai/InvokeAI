@@ -1,6 +1,9 @@
+import ctypes
 import logging
 import mimetypes
+import re
 import socket
+import sys
 from pathlib import Path
 
 import torch
@@ -31,6 +34,55 @@ def check_cudnn(logger: logging.Logger) -> None:
                 "Encountered a cuDNN version issue. This may result in degraded performance. This issue is usually "
                 "caused by an incompatible cuDNN version installed in your python environment, or on the host "
                 f"system. Full error message:\n{e}"
+            )
+
+
+def nvidia_driver_cuda_version() -> int | None:
+    """The CUDA version the installed NVIDIA driver supports (12040 for 12.4), or None when there is no driver."""
+    try:
+        driver = ctypes.CDLL("nvcuda.dll" if sys.platform == "win32" else "libcuda.so.1")
+    except OSError:
+        return None
+    version = ctypes.c_int()
+    try:
+        if driver.cuDriverGetVersion(ctypes.byref(version)) != 0:
+            return None
+    except AttributeError:  # a stub library without the driver API
+        return None
+    return version.value
+
+
+def check_cuda_build_compatibility(logger: logging.Logger) -> None:
+    """Name the two ways a CUDA build of torch fails on an NVIDIA machine that torch itself only warns about.
+
+    A driver too old for the build's CUDA version leaves torch without CUDA, so Invoke silently runs on the CPU and
+    generation looks hung. A GPU older than the build's lowest architecture passes `is_available()` and then fails
+    at the first kernel launch.
+    """
+    if torch.version.cuda is None or torch.version.hip is not None:
+        return
+    if not torch.cuda.is_available():
+        driver = nvidia_driver_cuda_version()
+        major, minor = (int(part) for part in torch.version.cuda.split(".")[:2])
+        if driver is not None and driver < major * 1000 + minor * 10:
+            logger.error(
+                f"PyTorch here is built for CUDA {torch.version.cuda}, but the NVIDIA driver only supports CUDA "
+                f"{driver // 1000}.{driver % 1000 // 10}, so Invoke is running on the CPU. Update the NVIDIA driver "
+                "(R580 or newer for CUDA 13)."
+            )
+        return
+    # Custom builds may list suffixed targets (sm_90a, sm_100f); a diagnostic must not stop the server over them.
+    architectures = [int(m.group(1)) for arch in torch.cuda.get_arch_list() if (m := re.match(r"sm_(\d+)", arch))]
+    if not architectures:
+        return
+    lowest = min(architectures)
+    for index in range(torch.cuda.device_count()):
+        major, minor = torch.cuda.get_device_capability(index)
+        if major * 10 + minor < lowest:
+            logger.error(
+                f"{torch.cuda.get_device_name(index)} has compute capability {major}.{minor}, but this PyTorch build "
+                f"supports {lowest // 10}.{lowest % 10} and newer, so generation on it will fail. See the system "
+                "requirements for the options on older GPUs."
             )
 
 

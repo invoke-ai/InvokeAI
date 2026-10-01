@@ -87,6 +87,7 @@ def run_app() -> None:
     # Import from startup_utils here to avoid importing torch before configure_torch_cuda_allocator() is called.
     from invokeai.app.util.startup_utils import (
         apply_monkeypatches,
+        check_cuda_build_compatibility,
         check_cudnn,
         enable_dev_reload,
         find_open_port,
@@ -105,6 +106,7 @@ def run_app() -> None:
     apply_monkeypatches()
     register_mime_types()
     check_cudnn(logger)
+    check_cuda_build_compatibility(logger)
     # Fail here rather than inside a generation: the value is read per generation, so a typo would
     # otherwise surface as a failed queue item minutes after the server came up.
     resolve_krea2_sdpa_backends()

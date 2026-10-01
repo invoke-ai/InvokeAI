@@ -17,7 +17,7 @@ FP8 Storage is meant for **full precision** checkpoints (FP16 / BF16 / FP32). It
 ## Requirements
 
 - **A CUDA or Intel XPU device.** Before first use InvokeAI runs a small FP8 test on the device. If the device, driver or PyTorch build cannot store and upcast `float8_e4m3fn` (some older AMD ROCm GPUs, for example), the test fails, InvokeAI logs a warning and loads the model without FP8. CPU and MPS are never used for FP8 Storage.
-- **CUDA 12.x and recent PyTorch.** The `float8_e4m3fn` dtype was added in PyTorch 2.1 — InvokeAI's bundled versions satisfy this.
+- **Recent PyTorch.** The `float8_e4m3fn` dtype was added in PyTorch 2.1 — InvokeAI's bundled versions satisfy this.
 
 There is no hardware requirement for FP8 *compute* — InvokeAI casts back to FP16/BF16 for math. This means FP8 Storage works on GPUs that do not natively support FP8 matmul (e.g. RTX 30-series), at a small per-step throughput cost.
 

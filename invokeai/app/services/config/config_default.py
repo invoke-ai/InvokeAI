@@ -28,6 +28,7 @@ DB_FILE = Path("invokeai.db")
 LEGACY_INIT_FILE = Path("invokeai.init")
 PRECISION = Literal["auto", "float16", "bfloat16", "float32"]
 ATTENTION_TYPE = Literal["auto", "normal", "xformers", "sliced", "torch-sdp"]
+NOISE_DTYPE = Literal["float32", "float16"]
 ATTENTION_SLICE_SIZE = Literal["auto", "balanced", "max", 1, 2, 3, 4, 5, 6, 7, 8]
 LOG_FORMAT = Literal["plain", "color", "syslog", "legacy"]
 LOG_LEVEL = Literal["debug", "info", "warning", "error", "critical"]
@@ -120,6 +121,7 @@ class InvokeAIAppConfig(BaseSettings):
         device: Preferred execution device. `auto` will choose the device depending on the hardware platform and the installed torch capabilities.<br>Valid values: `auto`, `cpu`, `cuda`, `mps`, `xpu`, `cuda:N`, `xpu:N` (where N is a device number)
         precision: Floating point precision. `float16` will consume half the memory of `float32` but produce slightly lower-quality images. The `auto` setting will guess the proper precision based on your video card and operating system.<br>Valid values: `auto`, `float16`, `bfloat16`, `float32`
         sequential_guidance: Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.
+        noise_dtype: The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.<br>Valid values: `float32`, `float16`
         wan_memory_optimization: Enable experimental Wan memory optimizations at the cost of slower generation.
         pid_memory_optimization: Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.
         attention_type: Attention type.<br>Valid values: `auto`, `normal`, `xformers`, `sliced`, `torch-sdp`
@@ -245,6 +247,7 @@ class InvokeAIAppConfig(BaseSettings):
 
     # GENERATION
     sequential_guidance:           bool = Field(default=False,              description="Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.")
+    noise_dtype:            NOISE_DTYPE = Field(default="float32",          description="The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.")
     wan_memory_optimization:       bool = Field(default=False,              description="Enable experimental Wan memory optimizations at the cost of slower generation.")
     pid_memory_optimization:       bool = Field(default=False,              description="Enable experimental PiD decode memory optimizations. Roughly halves the peak activation memory of a PiD decode; in exchange the decoded image changes slightly, because neither the chunked pixel pathway nor the float32 sampler intermediates are bit-exact with the default path.")
     attention_type:      ATTENTION_TYPE = Field(default="auto",             description="Attention type.")

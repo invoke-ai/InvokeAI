@@ -654,6 +654,20 @@
     },
     {
       "category": "GENERATION",
+      "default": "float32",
+      "description": "The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.",
+      "env_var": "INVOKEAI_NOISE_DTYPE",
+      "literal_values": [
+        "float32",
+        "float16"
+      ],
+      "name": "noise_dtype",
+      "required": false,
+      "type": "typing.Literal['float32', 'float16']",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
       "default": false,
       "description": "Enable experimental Wan memory optimizations at the cost of slower generation.",
       "env_var": "INVOKEAI_WAN_MEMORY_OPTIMIZATION",
