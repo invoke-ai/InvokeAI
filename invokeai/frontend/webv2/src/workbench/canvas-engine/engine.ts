@@ -1710,7 +1710,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         listener({ from, temporary: switchOptions?.temporary === true, to });
       }
     },
-    cancelGesture: () => pipeline.cancelGestureForToolSwitch(),
+    cancelGesture: () => pipeline.endForToolSwitch(),
     getTool: (toolId) => tools.get(toolId),
     getToolContext: () => toolContext,
     invalidateOverlay: () => scheduler.invalidate({ overlay: true }),
@@ -1792,6 +1792,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getActiveTool: activeTool,
     getActiveToolId: () => interactionController.getActiveToolId(),
     getInputElement: () => renderController.getInputElement(),
+    getKeyboardRoot: () => renderController.getKeyboardRoot(),
     getToolContext: () => toolContext,
     handleEscape: handleEscapePriority,
     hasTool: (id) => tools.has(id),
@@ -1861,8 +1862,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
   };
 
-  const attach = (screenCanvas: HTMLCanvasElement, overlayCanvas: HTMLCanvasElement): void =>
-    renderController.attach(screenCanvas, overlayCanvas);
+  const attach = (
+    screenCanvas: HTMLCanvasElement,
+    overlayCanvas: HTMLCanvasElement,
+    keyboardRoot?: HTMLElement
+  ): void => renderController.attach(screenCanvas, overlayCanvas, keyboardRoot);
   const detach = (): void => renderController.detach();
 
   const activate = (): void => {

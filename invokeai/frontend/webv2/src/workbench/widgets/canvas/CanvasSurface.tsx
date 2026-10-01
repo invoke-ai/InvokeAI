@@ -38,7 +38,7 @@ export const CanvasSurface = ({ engine }: { engine: CanvasSurfaceEngine }) => {
       return;
     }
 
-    engine.surface.attach(screen, overlay);
+    engine.surface.attach(screen, overlay, container);
 
     // A handle drag defers the resize and full recomposition to its release; pixel CSS sizes make the interim
     // canvas crop or reveal rather than stretch.

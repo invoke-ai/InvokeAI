@@ -65,7 +65,7 @@ const makeKeyEvent = (init: {
     target: init.target ?? null,
   }) as unknown as KeyboardEvent;
 
-/** A key target inside the canvas surface; the harness surface claims it through `contains`. */
+/** A key target inside the canvas surface; the harness keyboard root claims it through `contains`. */
 const SURFACE_TARGET = { tagName: 'DIV' };
 /** A focused toolbar button outside the surface; its `closest` resolves the interactive selector. */
 const BUTTON_TARGET = { closest: () => ({}), tagName: 'BUTTON' };
@@ -107,7 +107,6 @@ const createHarness = (
   const releases: number[] = [];
   const element = {
     getBoundingClientRect: () => ({ left: 0, top: 0 }) as DOMRect,
-    parentElement: { contains: (node: unknown) => node === SURFACE_TARGET },
     releasePointerCapture: (id: number) => releases.push(id),
     setPointerCapture: (id: number) => captures.push(id),
   } as unknown as HTMLElement;
@@ -122,6 +121,7 @@ const createHarness = (
     getActiveTool: () => tool,
     getActiveToolId: () => activeToolId,
     getInputElement: () => element,
+    getKeyboardRoot: () => ({ contains: (node) => node === (SURFACE_TARGET as unknown) }),
     getToolContext: () => ctx,
     handleEscape: opts.handleEscape,
     hasTool: (id) => registered.has(id),
@@ -568,51 +568,46 @@ describe('pointer pipeline: canvas keyboard ownership', () => {
     expect(h.setTool).toHaveBeenLastCalledWith('view', { temporary: true });
     expect(owned.preventDefault).toHaveBeenCalledOnce();
   });
-
-  it('restores a held tool on a release observed after focus moved, without consuming the key', () => {
-    const h = createHarness();
-    h.pipeline.onPointerEnter();
-    h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', target: SURFACE_TARGET }));
-    h.pipeline.onPointerLeave();
-
-    const release = makeKeyEvent({ code: 'Space', key: ' ', target: BUTTON_TARGET });
-    h.pipeline.onKeyUp(release);
-    expect(h.setTool).toHaveBeenLastCalledWith('brush', { temporary: true });
-    expect(release.preventDefault).not.toHaveBeenCalled();
-  });
 });
 
 describe('pointer pipeline: cancellation ownership', () => {
-  it('a tool-switch cancel drops the rest of the pressed drag until the pointer is released', () => {
+  it('a tool-switch cancel turns the rest of the pressed drag into hover until the pointer is released', () => {
     const h = createHarness();
     h.pipeline.onPointerDown(makePointerEvent({ pointerId: 4 }));
-    h.pipeline.cancelGestureForToolSwitch();
+    h.pipeline.endForToolSwitch();
     expect(h.tool.cancels).toBe(1);
     expect(h.releases).toEqual([4]);
 
     h.pipeline.onPointerMove(makePointerEvent({ clientX: 5, pointerId: 4 }));
     h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, pointerId: 4 }));
-    expect(h.tool.moves).toHaveLength(0);
+    expect(h.tool.moves.map(({ batch, input }) => [input.buttons, ...batch.map((sample) => sample.buttons)])).toEqual([
+      [0, 0],
+    ]);
     expect(h.tool.ups).toHaveLength(0);
 
     // The released pointer hovers normally again.
     h.pipeline.onPointerMove(makePointerEvent({ buttons: 0, clientX: 6, pointerId: 4 }));
-    expect(h.tool.moves).toHaveLength(1);
+    expect(h.tool.moves).toHaveLength(2);
   });
 
-  it('a tool-switch cancel drops, rather than restores, a hold released mid-gesture', () => {
+  it.each([
+    ['released mid-gesture', true],
+    ['still held', false],
+  ])('a tool switch first restores the held tool when its key is %s', (_, released) => {
     const h = createHarness();
     h.pipeline.onPointerEnter();
     h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', target: SURFACE_TARGET }));
     h.pipeline.onPointerDown(makePointerEvent({ pointerId: 2 }));
-    h.pipeline.onKeyUp(makeKeyEvent({ code: 'Space' }));
+    if (released) {
+      h.pipeline.onKeyUp(makeKeyEvent({ code: 'Space' }));
+    }
     h.setTool.mockClear();
 
-    h.pipeline.cancelGestureForToolSwitch();
+    h.pipeline.endForToolSwitch();
     expect(h.tool.cancels).toBe(1);
-    expect(h.setTool).not.toHaveBeenCalled();
+    expect(h.setTool.mock.calls).toEqual([['brush', { temporary: true }]]);
     h.pipeline.onKeyUp(makeKeyEvent({ code: 'Space' }));
-    expect(h.setTool).not.toHaveBeenCalled();
+    expect(h.setTool).toHaveBeenCalledOnce();
   });
 
   it('reset cancels through the held temporary tool before restoring the prior tool', () => {

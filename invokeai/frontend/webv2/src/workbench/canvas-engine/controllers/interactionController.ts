@@ -48,6 +48,10 @@ export class InteractionController {
     }
     if (!switchOptions?.temporary) {
       this.options.cancelGesture?.();
+      // Ending a held temporary tool may already have restored the requested tool.
+      if (toolId === this.activeToolId) {
+        return;
+      }
     }
     const previous = this.activeToolId;
     this.options.beforeSwitch?.(previous, toolId, switchOptions);

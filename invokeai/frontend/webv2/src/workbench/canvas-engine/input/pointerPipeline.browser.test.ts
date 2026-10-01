@@ -34,7 +34,7 @@ const createInputHarness = () => {
 
   const events: string[] = [];
   const tools = Object.fromEntries(
-    (['brush', 'view', 'transform'] as const).map((id): [ToolId, Tool] => [
+    (['brush', 'view', 'transform', 'bbox', 'eraser'] as const).map((id): [ToolId, Tool] => [
       id,
       {
         id,
@@ -48,7 +48,7 @@ const createInputHarness = () => {
   ) as Record<string, Tool>;
   const ctx = {} as ToolContext;
   const interaction = new InteractionController({
-    cancelGesture: () => pipeline.cancelGestureForToolSwitch(),
+    cancelGesture: () => pipeline.endForToolSwitch(),
     getTool: (id) => tools[id],
     getToolContext: () => ctx,
     initialToolId: 'brush',
@@ -62,7 +62,9 @@ const createInputHarness = () => {
     getActiveTool: () => interaction.getActiveTool(),
     getActiveToolId: () => interaction.getActiveToolId(),
     getInputElement: () => canvas,
+    getKeyboardRoot: () => surface,
     getToolContext: () => ctx,
+    handleEscape: () => events.push('escape'),
     hasTool: (id) => id in tools,
     setTool: (id, options) => interaction.setTool(id, options),
     updateCursor: () => undefined,
@@ -75,11 +77,13 @@ const createInputHarness = () => {
   };
   globalThis.addEventListener('keydown', pipeline.onKeyDown);
   globalThis.addEventListener('keyup', pipeline.onKeyUp);
+  globalThis.addEventListener('focusin', pipeline.onFocusIn);
   globalThis.addEventListener('keydown', observe);
   globalThis.addEventListener('keyup', observe);
   cleanups.push(() => {
     globalThis.removeEventListener('keydown', pipeline.onKeyDown);
     globalThis.removeEventListener('keyup', pipeline.onKeyUp);
+    globalThis.removeEventListener('focusin', pipeline.onFocusIn);
     globalThis.removeEventListener('keydown', observe);
     globalThis.removeEventListener('keyup', observe);
     pipeline.reset();
@@ -92,19 +96,63 @@ const createInputHarness = () => {
 };
 
 describe('pointer pipeline in Chromium: keyboard ownership', () => {
-  it('leaves Enter and Space to a focused toolbar control', async () => {
+  it('leaves Enter, Space, C and Escape to a control reached by keyboard', async () => {
     const h = createInputHarness();
     h.interaction.setTool('transform');
     h.pipeline.onPointerEnter();
-    h.button.focus();
+    h.surface.focus();
+    await userEvent.tab();
+    expect(document.activeElement).toBe(h.button);
 
     await userEvent.keyboard('{Enter}');
     await userEvent.keyboard('{Control>}{Enter}{/Control}');
     await userEvent.keyboard(' ');
+    await userEvent.keyboard('c');
+    await userEvent.keyboard('{Escape}');
     expect(h.clicks()).toBe(2);
     expect(h.events).toEqual([]);
     expect(h.interaction.getActiveToolId()).toBe('transform');
     expect(h.observed.filter((event) => event.defaultPrevented)).toEqual([]);
+  });
+
+  it('pans with Space over the canvas after a control was clicked, without activating that control', async () => {
+    const h = createInputHarness();
+    await userEvent.click(h.button);
+    expect(h.clicks()).toBe(1);
+    h.pipeline.onPointerEnter();
+
+    await userEvent.keyboard('{Space>}');
+    expect(h.interaction.getActiveToolId()).toBe('view');
+    await userEvent.keyboard('{/Space}');
+    expect(h.interaction.getActiveToolId()).toBe('brush');
+    expect(h.clicks()).toBe(1);
+
+    // Enter still belongs to the clicked control.
+    h.interaction.setTool('transform');
+    await userEvent.keyboard('{Enter}');
+    expect(h.clicks()).toBe(2);
+    expect(h.events).not.toContain('transform:apply');
+  });
+
+  it('leaves hold keys and Escape to an open menu', async () => {
+    const h = createInputHarness();
+    const menu = document.createElement('div');
+    menu.setAttribute('role', 'menu');
+    const item = document.createElement('div');
+    item.setAttribute('role', 'menuitem');
+    item.tabIndex = -1;
+    item.textContent = 'Menu item';
+    menu.append(item);
+    document.body.append(menu);
+    cleanups.push(() => menu.remove());
+    await userEvent.click(item);
+    h.pipeline.onPointerEnter();
+
+    await userEvent.keyboard(' ');
+    await userEvent.keyboard('c');
+    await userEvent.keyboard('{Escape}');
+    expect(h.interaction.getActiveToolId()).toBe('brush');
+    expect(h.events).toEqual([]);
   });
 
   it('applies on Enter only when the focused surface owns an unmodified, unprevented key', async () => {
@@ -140,27 +188,17 @@ describe('pointer pipeline in Chromium: keyboard ownership', () => {
   });
 });
 
-describe('pointer pipeline in Chromium: gesture ownership across tool switches', () => {
-  it('cancels a drag through the outgoing tool on a genuine switch and never routes its tail to the new tool', () => {
+describe('pointer pipeline in Chromium: tool switches during a hold', () => {
+  it('keeps a tool chosen while Space is still held when Space is released', async () => {
     const h = createInputHarness();
-    h.pipeline.onPointerDown(h.pointer('pointerdown', 1));
-    h.interaction.setTool('transform');
-
-    expect(h.pipeline.isGestureActive()).toBe(false);
-    h.pipeline.onPointerMove(h.pointer('pointermove', 1));
-    h.pipeline.onPointerUp(h.pointer('pointerup', 0));
-    expect(h.events).toEqual(['brush:down', 'brush:cancel']);
-  });
-
-  it('reset cancels the temporary tool that owns the gesture, then restores the held tool', () => {
-    const h = createInputHarness();
+    h.interaction.setTool('eraser');
     h.pipeline.onPointerEnter();
     h.surface.focus();
-    h.surface.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, code: 'Space', key: ' ' }));
-    h.pipeline.onPointerDown(h.pointer('pointerdown', 1));
 
-    h.pipeline.reset();
-    expect(h.events).toEqual(['view:down', 'view:cancel']);
+    await userEvent.keyboard('{Space>}');
+    expect(h.interaction.getActiveToolId()).toBe('view');
+    h.interaction.setTool('brush');
+    await userEvent.keyboard('{/Space}');
     expect(h.interaction.getActiveToolId()).toBe('brush');
   });
 });

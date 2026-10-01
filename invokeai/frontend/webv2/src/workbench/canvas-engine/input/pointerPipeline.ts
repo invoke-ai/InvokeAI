@@ -2,8 +2,10 @@
  * Normalizes DOM events into tool input with capture, coalesced samples and default mouse pressure 0.5. Middle
  * mouse pans independently. Space, Alt and held C temporarily select view, picker and bbox; release restores the
  * tool, while quick C selects bbox persistently. Temporary switches preserve sessions and are blocked mid-gesture.
- * Escape/pointercancel cancel; extra buttons are ignored mid-gesture. Enter and Space act only while the canvas
- * surface owns the keyboard; key releases are always observed and never consumed. DOM access is injected.
+ * Escape/pointercancel cancel; extra buttons are ignored mid-gesture. Enter acts only while the keyboard root owns
+ * focus. Hold keys and the Escape ladder also act after a control was merely clicked, but never over an editable
+ * field, a keyboard-navigated control or an open overlay. Key releases are always observed and never consumed. DOM
+ * access is injected.
  */
 
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
@@ -24,6 +26,8 @@ export interface PointerPipelineDeps {
   viewport: Viewport;
   /** The element that owns pointer capture and defines the coordinate rect. */
   getInputElement(): (HTMLElement & Partial<Pick<HTMLElement, 'setPointerCapture' | 'releasePointerCapture'>>) | null;
+  /** The focusable element whose focus gives the canvas its session keys. */
+  getKeyboardRoot(): Pick<HTMLElement, 'contains'> | null;
   getActiveTool(): Tool | undefined;
   getActiveToolId(): ToolId;
   getToolContext(): ToolContext;
@@ -56,6 +60,8 @@ export interface PointerPipeline {
   onPointerLeave(): void;
   onKeyDown(event: KeyboardEvent): void;
   onKeyUp(event: KeyboardEvent): void;
+  /** Window focus moves; records whether focus arrived by pointer, which decides hold-key ownership. */
+  onFocusIn(event: FocusEvent): void;
   /** Primary gesture state blocks undo/redo from injecting pixels during live strokes. */
   isGestureActive(): boolean;
   /**
@@ -64,10 +70,10 @@ export interface PointerPipeline {
    */
   cancelActiveGesture(): void;
   /**
-   * Cancels through the outgoing tool before a genuine tool switch. A hold whose key was released mid-gesture is
-   * dropped instead of restored, so the requested tool wins.
+   * Before a genuine tool switch, cancels through the outgoing tool and ends any held temporary tool, so the switch
+   * leaves the tool the user was really on and a later key release restores nothing.
    */
-  cancelGestureForToolSwitch(): void;
+  endForToolSwitch(): void;
   /** Replaces a matching tool id that a currently-held temporary tool would restore on release. */
   replaceTemporaryRestoreTool(current: ToolId, replacement: ToolId): void;
   /** Clears hover/gesture/temp-tool state, cancelling any in-flight gesture (called on detach/blur). */
@@ -123,7 +129,20 @@ const INTERACTIVE_SELECTOR = [
   ].map((role) => `[role="${role}"]`),
 ].join(', ');
 
-type KeyTarget = { tagName?: unknown; closest?: (selector: string) => unknown } | null;
+/** Open layers whose focused content keeps its own keys. */
+const OVERLAY_SELECTOR = '[role="dialog"], [role="alertdialog"], [role="menu"], [role="listbox"]';
+
+type KeyTarget = {
+  tagName?: unknown;
+  closest?: (selector: string) => unknown;
+  matches?: (selector: string) => boolean;
+} | null;
+
+// Chromium turns `:focus-visible` on for the focused element at any keydown, so how focus arrived is read on arrival.
+const arrivedByPointer = (target: EventTarget | null): boolean => {
+  const el = target as KeyTarget;
+  return typeof el?.matches === 'function' && !el.matches(':focus-visible');
+};
 
 const isInteractiveTarget = (target: EventTarget | null): boolean => {
   const el = target as KeyTarget;
@@ -152,8 +171,10 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
   let restoreTempAfterGesture = false;
   let bboxQuickTap = false;
   let bboxTapTimer: ReturnType<typeof setTimeout> | null = null;
-  // A cancelled gesture's pointer keeps reporting pressed moves; none may reach a tool until it is released.
+  // A cancelled gesture's pointer keeps reporting pressed moves; they reach a tool only as hover until release.
   let cancelledPointerId: number | null = null;
+  // The control focus last landed on by pointer; keyboard navigation (`:focus-visible` on arrival) clears it.
+  let pointerFocused: EventTarget | null = null;
 
   /**
    * Reads the input element's viewport offset. Hoisted out of
@@ -186,22 +207,37 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     return [buildPointerInput(event, origin)];
   };
 
-  /** Session keys belong to the canvas only when focus is on its surface (or nowhere) and no control claims them. */
+  /** Enter belongs to the canvas only when focus is on its keyboard root (or nowhere) and no control claims it. */
   const ownsKeyboard = (event: KeyboardEvent): boolean => {
     if (event.defaultPrevented || isInteractiveTarget(event.target)) {
       return false;
     }
-    const input = deps.getInputElement();
-    const surface = (input?.parentElement ?? input) as { contains?: (node: unknown) => boolean } | null;
-    return isDocumentRootTarget(event.target) || surface?.contains?.(event.target) === true;
+    return isDocumentRootTarget(event.target) || deps.getKeyboardRoot()?.contains(event.target as Node) === true;
+  };
+
+  /**
+   * Hold keys and Escape also reach the canvas after a pointer click left focus on a control (a tool button, a layer
+   * row), but not over an editable field, a control reached by keyboard or an open overlay.
+   */
+  const ownsCanvasKey = (event: KeyboardEvent): boolean => {
+    if (event.defaultPrevented || isEditableTarget(event.target)) {
+      return false;
+    }
+    if (ownsKeyboard(event)) {
+      return true;
+    }
+    return (
+      event.target !== null &&
+      event.target === pointerFocused &&
+      !(event.target as KeyTarget)?.closest?.(OVERLAY_SELECTOR)
+    );
   };
 
   const releaseCapture = (pointerId: number): void => {
     deps.getInputElement()?.releasePointerCapture?.(pointerId);
   };
 
-  /** `restoreTemporary: false` lets a genuine tool switch win over a hold whose key was released mid-gesture. */
-  const cancelGesture = (restoreTemporary = true): void => {
+  const cancelGesture = (): void => {
     if (!gestureActive) {
       return;
     }
@@ -214,11 +250,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     deps.getActiveTool()?.onPointerCancel?.(deps.getToolContext());
     deps.updateCursor();
     if (restoreTempAfterGesture && tempHold) {
-      if (restoreTemporary) {
-        endTempTool();
-      } else {
-        clearTempHold();
-      }
+      endTempTool();
     }
   };
 
@@ -311,14 +343,8 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       return;
     }
     if (bboxQuickTap) {
-      if (tempSwitched) {
-        deps.setTool(priorToolId, { temporary: true });
-      }
+      endTempTool();
       deps.setTool(BBOX_TEMP_TOOL);
-      tempHold = null;
-      tempSwitched = false;
-      restoreTempAfterGesture = false;
-      bboxQuickTap = false;
       return;
     }
     endTempTool();
@@ -328,8 +354,11 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     cancelActiveGesture: () => {
       cancelGesture();
     },
-    cancelGestureForToolSwitch: () => {
-      cancelGesture(false);
+    endForToolSwitch: () => {
+      cancelGesture();
+      if (tempHold) {
+        endTempTool();
+      }
     },
     onKeyDown: (event) => {
       if (event.key === 'Escape') {
@@ -337,7 +366,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         // Escape may cancel a session but must preserve committed selection.
         const gestureWasActive = gestureActive;
         cancelGesture();
-        if (!isEditableTarget(event.target)) {
+        if (ownsCanvasKey(event)) {
           deps.handleEscape?.({ gestureWasActive });
         }
         return;
@@ -354,7 +383,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         return;
       }
       if (event.code === 'Space' && !event.repeat) {
-        if (event.ctrlKey || event.metaKey || event.altKey || !ownsKeyboard(event)) {
+        if (event.ctrlKey || event.metaKey || event.altKey || !ownsCanvasKey(event)) {
           return;
         }
         beginTempTool('space', SPACE_TEMP_TOOL);
@@ -364,16 +393,19 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         return;
       }
       if (isAltKey(event) && !event.repeat) {
-        if (!deps.getActiveTool()?.usesAltKey) {
+        if (!deps.getActiveTool()?.usesAltKey && ownsCanvasKey(event)) {
           beginTempTool('alt', ALT_TEMP_TOOL);
         }
         return;
       }
-      if (isBboxKey(event) && !event.repeat) {
+      if (isBboxKey(event) && !event.repeat && ownsCanvasKey(event)) {
         beginBboxTempTool();
       }
     },
     isGestureActive: () => gestureActive,
+    onFocusIn: (event) => {
+      pointerFocused = arrivedByPointer(event.target) ? event.target : null;
+    },
     onKeyUp: (event) => {
       if (event.code === 'Space' && tempHold === 'space') {
         releaseTempTool();
@@ -447,13 +479,13 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         middleLast = screenPoint;
         return;
       }
-      if (cancelledPointerId === event.pointerId) {
-        if (event.buttons !== 0) {
-          return;
-        }
+      // A cancelled gesture's pointer stays pressed until release; its moves reach the tool only as hover, so the
+      // cursor keeps tracking but nothing resumes the gesture.
+      const cancelledPress = cancelledPointerId === event.pointerId && event.buttons !== 0;
+      if (cancelledPointerId === event.pointerId && !cancelledPress) {
         cancelledPointerId = null;
       }
-      const batch = buildBatch(event);
+      const batch = cancelledPress ? buildBatch(event).map((input) => ({ ...input, buttons: 0 })) : buildBatch(event);
       const last = batch[batch.length - 1];
       if (!last) {
         return;

@@ -11,6 +11,7 @@ import { createEmptyCanvasState } from '@workbench/canvasMigration';
 import { act, StrictMode, useRef } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { CanvasSurface } from './CanvasSurface';
 
@@ -295,5 +296,46 @@ describe('CanvasSurface during a resize drag', () => {
     await act(() =>
       window.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, buttons: 0, clientX: 0, pointerId: 1 }))
     );
+  });
+});
+
+describe('CanvasSurface keyboard ownership', () => {
+  it('owns hold keys once the canvas is clicked, and leaves them to a tree row reached by keyboard', async () => {
+    const registry = createTrackedRegistry(20);
+    const { engine } = acquireTrackedEngine(registry, 'project-a', createEngineDeps(createEmptyCanvasState(64, 64)));
+    const host = document.createElement('div');
+    document.body.append(host);
+    const { root } = createTrackedRoot(host);
+    await act(async () => {
+      root.render(
+        <>
+          <StrictCanvasHarness engine={engine} />
+          <div role="tree">
+            <div aria-selected="false" role="treeitem" tabIndex={0}>
+              Layer
+            </div>
+          </div>
+        </>
+      );
+      await nextFrame();
+    });
+    const overlay = host.querySelectorAll('canvas')[1]!;
+    const row = host.querySelector<HTMLElement>('[role="treeitem"]')!;
+    const tool = () => engine.interaction.get('activeTool');
+    const initial = tool();
+
+    await userEvent.click(overlay);
+    expect(document.activeElement).toBe(overlay.parentElement);
+    await userEvent.keyboard('{Space>}');
+    expect(tool()).toBe('view');
+    await userEvent.keyboard('{/Space}');
+    expect(tool()).toBe(initial);
+
+    await userEvent.tab();
+    expect(document.activeElement).toBe(row);
+    await userEvent.hover(overlay);
+    await userEvent.keyboard('{Space>}');
+    expect(tool()).toBe(initial);
+    await userEvent.keyboard('{/Space}');
   });
 });

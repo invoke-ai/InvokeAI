@@ -160,7 +160,8 @@ export interface CanvasCoreStoreCapability {
 }
 
 export interface CanvasSurfaceCapability {
-  attach(screenCanvas: HTMLCanvasElement, overlayCanvas: HTMLCanvasElement): void;
+  /** `keyboardRoot` is the focusable element whose focus gives the canvas its session keys; defaults to the overlay. */
+  attach(screenCanvas: HTMLCanvasElement, overlayCanvas: HTMLCanvasElement, keyboardRoot?: HTMLElement): void;
   detach(): void;
   resize(cssWidth: number, cssHeight: number, dpr: number): void;
 }
