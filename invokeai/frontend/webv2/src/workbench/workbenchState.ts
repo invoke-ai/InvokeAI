@@ -55,11 +55,12 @@ import {
   getPersistedSelectedGalleryItemKeys,
   stripInfiniteWindowAnchor,
   stripUnresolvableGallerySearch,
+  GALLERY_AUTO_ADD_FOLLOW,
   gallerySemanticReferenceKey,
   getGallerySettings,
   parseGallerySemanticReference,
   toGallerySemanticTextReference,
-  getGalleryDestinationBoardId,
+  getGalleryAutoAddBoardId,
   getSelectedGalleryItemFromValues,
   legacyGeneratedImageToGalleryItem,
   normalizeGalleryImage,
@@ -2443,6 +2444,7 @@ const compileInvocationSnapshot = (
     }
 
     const plan = planWorkflowSubmission(workflowDocument, templatesSnapshot.templates, {
+      autoBoardId: getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}),
       batchCount: sanitizeBatchCount(widgetStates.workflow?.values.batchCount),
       generators: workflowGenerators,
     });
@@ -2808,8 +2810,9 @@ const reconcileDeletedGalleryBoard = (
   const withBoardReferencesCleared = updateAllProjectGalleryValues(withSurvivorsMoved, (values) => {
     const selectedBoardWasDeleted = values.selectedBoardId === boardId;
     const projectBoardWasDeleted = values.projectBoardId === boardId;
+    const autoAddBoardWasDeleted = values.autoAddBoardId === boardId;
 
-    if (!selectedBoardWasDeleted && !projectBoardWasDeleted) {
+    if (!selectedBoardWasDeleted && !projectBoardWasDeleted && !autoAddBoardWasDeleted) {
       return values;
     }
 
@@ -2819,6 +2822,7 @@ const reconcileDeletedGalleryBoard = (
         ? { galleryPage: 0, selectedBoardId: 'none', semanticImageQuery: null, semanticSearchText: null }
         : {}),
       ...(projectBoardWasDeleted ? { projectBoardId: null } : {}),
+      ...(autoAddBoardWasDeleted ? { autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW } : {}),
     };
   });
   let didChangeQueue = false;
@@ -3272,7 +3276,9 @@ const enqueueCompiledSnapshot = (
             seedStep: seedPlan?.step ?? 0,
           }
         : { error: `${route.sourceId} queue item is missing source submission metadata.`, kind: 'invalid' };
-  const galleryBoardId = getGalleryDestinationBoardId(widgetStates.gallery?.values ?? {});
+  // A workflow compiles every node's board in (Auto included), so its board-less results stay Uncategorized.
+  const galleryBoardId =
+    route.sourceId === 'workflow' ? null : getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {});
   const generatePresentationSettings = normalizeGenerateSettings(widgetStates.generate?.values);
   const videoPresentationDimensions =
     route.sourceId === 'video' && videoSettings?.model ? getVideoDimensions(videoSettings.model, videoSettings) : null;

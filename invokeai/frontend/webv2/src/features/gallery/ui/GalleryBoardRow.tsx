@@ -24,6 +24,7 @@ import { getBoardCounts } from './galleryStateView';
 
 export const GalleryBoardRow = ({
   board,
+  isAutoAddTarget = false,
   isMenuOpen,
   isSelected,
   loadedItemBoardIds,
@@ -31,6 +32,8 @@ export const GalleryBoardRow = ({
   onSelectBoard,
 }: {
   board: GalleryBoard;
+  /** Results without a board of their own land here (the gallery is not following its selection). */
+  isAutoAddTarget?: boolean;
   /** Its own menu is showing, so the trigger must not fade out from under it. */
   isMenuOpen?: boolean;
   isSelected: boolean;
@@ -156,6 +159,13 @@ export const GalleryBoardRow = ({
         onContextMenu={onOpenMenu ? handleContextMenu : undefined}
         onSelect={handleSelect}
       >
+        {isAutoAddTarget ? (
+          <Tooltip content={t('widgets.gallery.autoAddBadgeTooltip')}>
+            <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} size="xs" variant="subtle">
+              {t('widgets.gallery.autoAddBadge')}
+            </Badge>
+          </Tooltip>
+        ) : null}
         {board.projectId !== null ? (
           <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} size="xs" variant="subtle">
             {t('common.project')}
