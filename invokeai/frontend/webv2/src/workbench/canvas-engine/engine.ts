@@ -1643,8 +1643,21 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
   });
 
-  const unsubscribeBrushOptions = stores.brushOptions.subscribe(refreshBrushCursorRadius);
-  const unsubscribeEraserOptions = stores.eraserOptions.subscribe(refreshBrushCursorRadius);
+  // Only a diameter change moves the ring; other option edits (color, opacity) leave the overlay untouched.
+  const subscribeSizeChange = (store: ScalarStore<{ size: number }>, toolId: ToolId): (() => void) => {
+    let size = store.get().size;
+    return store.subscribe(() => {
+      const next = store.get().size;
+      if (next !== size) {
+        size = next;
+        if (interactionController.getActiveToolId() === toolId) {
+          refreshBrushCursorRadius();
+        }
+      }
+    });
+  };
+  const unsubscribeBrushOptions = subscribeSizeChange(stores.brushOptions, 'brush');
+  const unsubscribeEraserOptions = subscribeSizeChange(stores.eraserOptions, 'eraser');
   const unsubscribeCheckerboard = stores.checkerboard.subscribe(() => scheduler.invalidate({ all: true }));
   const unsubscribeCheckerColors = stores.checkerColors.subscribe(() => {
     checkerboardTile = null;
@@ -1685,6 +1698,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         listener({ from, temporary: switchOptions?.temporary === true, to });
       }
     },
+    cancelGesture: () => pipeline.cancelGestureForToolSwitch(),
     getTool: (toolId) => tools.get(toolId),
     getToolContext: () => toolContext,
     invalidateOverlay: () => scheduler.invalidate({ overlay: true }),

@@ -2,7 +2,8 @@
  * Normalizes DOM events into tool input with capture, coalesced samples and default mouse pressure 0.5. Middle
  * mouse pans independently. Space, Alt and held C temporarily select view, picker and bbox; release restores the
  * tool, while quick C selects bbox persistently. Temporary switches preserve sessions and are blocked mid-gesture.
- * Escape/pointercancel cancel; extra buttons are ignored mid-gesture. DOM access is injected.
+ * Escape/pointercancel cancel; extra buttons are ignored mid-gesture. Enter and Space act only while the canvas
+ * surface owns the keyboard; key releases are always observed and never consumed. DOM access is injected.
  */
 
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
@@ -62,6 +63,11 @@ export interface PointerPipeline {
    * commit stale drag state; idle calls do nothing.
    */
   cancelActiveGesture(): void;
+  /**
+   * Cancels through the outgoing tool before a genuine tool switch. A hold whose key was released mid-gesture is
+   * dropped instead of restored, so the requested tool wins.
+   */
+  cancelGestureForToolSwitch(): void;
   /** Replaces a matching tool id that a currently-held temporary tool would restore on release. */
   replaceTemporaryRestoreTool(current: ToolId, replacement: ToolId): void;
   /** Clears hover/gesture/temp-tool state, cancelling any in-flight gesture (called on detach/blur). */
@@ -88,6 +94,48 @@ const isEditableTarget = (target: EventTarget | null): boolean => {
   return tagName === 'INPUT' || tagName === 'TEXTAREA' || el.isContentEditable === true;
 };
 
+/** Controls whose own keyboard activation must win over canvas session keys. */
+const INTERACTIVE_SELECTOR = [
+  'a[href]',
+  'button',
+  'input',
+  'select',
+  'summary',
+  'textarea',
+  '[contenteditable]:not([contenteditable="false"])',
+  ...[
+    'button',
+    'checkbox',
+    'combobox',
+    'gridcell',
+    'link',
+    'menuitem',
+    'menuitemcheckbox',
+    'menuitemradio',
+    'option',
+    'radio',
+    'slider',
+    'spinbutton',
+    'switch',
+    'tab',
+    'textbox',
+    'treeitem',
+  ].map((role) => `[role="${role}"]`),
+].join(', ');
+
+type KeyTarget = { tagName?: unknown; closest?: (selector: string) => unknown } | null;
+
+const isInteractiveTarget = (target: EventTarget | null): boolean => {
+  const el = target as KeyTarget;
+  return isEditableTarget(target) || (typeof el?.closest === 'function' && el.closest(INTERACTIVE_SELECTOR) !== null);
+};
+
+/** A document root target means no control holds focus, so the canvas may take the key. */
+const isDocumentRootTarget = (target: EventTarget | null): boolean => {
+  const tagName = (target as KeyTarget)?.tagName;
+  return !target || tagName === 'BODY' || tagName === 'HTML';
+};
+
 /** Creates a pointer pipeline bound to the engine's injected deps. */
 export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipeline => {
   let hovered = false;
@@ -104,6 +152,8 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
   let restoreTempAfterGesture = false;
   let bboxQuickTap = false;
   let bboxTapTimer: ReturnType<typeof setTimeout> | null = null;
+  // A cancelled gesture's pointer keeps reporting pressed moves; none may reach a tool until it is released.
+  let cancelledPointerId: number | null = null;
 
   /**
    * Reads the input element's viewport offset. Hoisted out of
@@ -136,23 +186,39 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     return [buildPointerInput(event, origin)];
   };
 
+  /** Session keys belong to the canvas only when focus is on its surface (or nowhere) and no control claims them. */
+  const ownsKeyboard = (event: KeyboardEvent): boolean => {
+    if (event.defaultPrevented || isInteractiveTarget(event.target)) {
+      return false;
+    }
+    const input = deps.getInputElement();
+    const surface = (input?.parentElement ?? input) as { contains?: (node: unknown) => boolean } | null;
+    return isDocumentRootTarget(event.target) || surface?.contains?.(event.target) === true;
+  };
+
   const releaseCapture = (pointerId: number): void => {
     deps.getInputElement()?.releasePointerCapture?.(pointerId);
   };
 
-  const cancelGesture = (): void => {
+  /** `restoreTemporary: false` lets a genuine tool switch win over a hold whose key was released mid-gesture. */
+  const cancelGesture = (restoreTemporary = true): void => {
     if (!gestureActive) {
       return;
     }
     gestureActive = false;
     if (activePointerId !== null) {
       releaseCapture(activePointerId);
+      cancelledPointerId = activePointerId;
       activePointerId = null;
     }
     deps.getActiveTool()?.onPointerCancel?.(deps.getToolContext());
     deps.updateCursor();
     if (restoreTempAfterGesture && tempHold) {
-      endTempTool();
+      if (restoreTemporary) {
+        endTempTool();
+      } else {
+        clearTempHold();
+      }
     }
   };
 
@@ -207,15 +273,20 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     }
   };
 
-  function endTempTool(): void {
+  function clearTempHold(): void {
     clearBboxTapTimer();
-    if (tempSwitched) {
-      deps.setTool(priorToolId, { temporary: true });
-    }
     tempHold = null;
     tempSwitched = false;
     restoreTempAfterGesture = false;
     bboxQuickTap = false;
+  }
+
+  function endTempTool(): void {
+    const restore = tempSwitched;
+    clearTempHold();
+    if (restore) {
+      deps.setTool(priorToolId, { temporary: true });
+    }
   }
 
   const releaseTempTool = (): void => {
@@ -257,6 +328,9 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     cancelActiveGesture: () => {
       cancelGesture();
     },
+    cancelGestureForToolSwitch: () => {
+      cancelGesture(false);
+    },
     onKeyDown: (event) => {
       if (event.key === 'Escape') {
         // Cancel the gesture before the engine Escape ladder. Editable fields keep Escape; gesture-consuming
@@ -274,10 +348,15 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       }
       if (event.key === 'Enter') {
         // Enter applies a session-bearing tool's edit (transform). No-op otherwise.
-        deps.getActiveTool()?.onKeyCommand?.(deps.getToolContext(), 'apply');
+        if (!event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey && ownsKeyboard(event)) {
+          deps.getActiveTool()?.onKeyCommand?.(deps.getToolContext(), 'apply');
+        }
         return;
       }
       if (event.code === 'Space' && !event.repeat) {
+        if (event.ctrlKey || event.metaKey || event.altKey || !ownsKeyboard(event)) {
+          return;
+        }
         beginTempTool('space', SPACE_TEMP_TOOL);
         if (tempHold === 'space') {
           event.preventDefault();
@@ -336,6 +415,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       if (event.button !== 0) {
         return;
       }
+      cancelledPointerId = null;
       // Commit and consume modal text presses before gesture activation; prevent default focus/selection after
       // closing the session.
       if (deps.maybeCommitModalSession?.()) {
@@ -367,6 +447,12 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         middleLast = screenPoint;
         return;
       }
+      if (cancelledPointerId === event.pointerId) {
+        if (event.buttons !== 0) {
+          return;
+        }
+        cancelledPointerId = null;
+      }
       const batch = buildBatch(event);
       const last = batch[batch.length - 1];
       if (!last) {
@@ -380,6 +466,9 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         return;
       }
       releaseCapture(event.pointerId);
+      if (cancelledPointerId === event.pointerId) {
+        cancelledPointerId = null;
+      }
       if (middlePanning) {
         middlePanning = false;
         middleLast = null;
@@ -403,17 +492,16 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       }
     },
     reset: () => {
-      clearBboxTapTimer();
+      // Cancel through the tool that owns the gesture before a held temporary tool is restored.
+      cancelGesture();
       if (tempHold) {
         endTempTool();
       }
-      // Cancel an in-flight gesture through the same path Esc uses, so the active
-      // tool's `onPointerCancel` runs and clears its transient state (rather than
-      // silently dropping `gestureActive` and stranding stale tool state).
-      cancelGesture();
+      clearBboxTapTimer();
       hovered = false;
       gestureActive = false;
       activePointerId = null;
+      cancelledPointerId = null;
       middlePanning = false;
       middleLast = null;
     },

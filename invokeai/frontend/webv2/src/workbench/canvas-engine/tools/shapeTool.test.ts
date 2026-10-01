@@ -291,6 +291,38 @@ describe('shape tool: polygon and freehand kinds', () => {
     }
   });
 
+  it('decimates a freehand trace by on-screen travel and keeps the release point', () => {
+    const h = createHarness(makeDoc());
+    h.stores.shapeOptions.set({ ...h.stores.shapeOptions.get(), kind: 'freehand' });
+    const tool = createShapeTool();
+    const zoomedOut = (x: number, y: number): PointerInput => ({
+      ...pointer(x, y),
+      screenPoint: { x: x / 10, y: y / 10 },
+    });
+
+    down(tool, h.ctx, zoomedOut(0, 0));
+    // 10 document units are 1 CSS px at 0.1× zoom: decimated away.
+    move(tool, h.ctx, zoomedOut(10, 0));
+    move(tool, h.ctx, zoomedOut(30, 0));
+    move(tool, h.ctx, zoomedOut(30, 30));
+    expect(h.stores.lassoPreview.get()).toMatchObject({
+      points: [
+        { x: 0, y: 0 },
+        { x: 30, y: 0 },
+        { x: 30, y: 30 },
+      ],
+    });
+    up(tool, h.ctx, zoomedOut(5, 30));
+
+    const forward = h.commits[0]?.forward;
+    if (forward?.type === 'addCanvasLayer' && forward.layer.type === 'raster') {
+      expect((forward.layer.source as { points?: unknown[] }).points).toHaveLength(4);
+      expect(forward.layer.source).toMatchObject({ height: 30, width: 30 });
+    } else {
+      throw new Error('expected a polygon layer');
+    }
+  });
+
   it('commits nothing for a flat polygon', () => {
     // The third point survives the 1px dedupe; only the sub-pixel bounds reject it.
     expect(

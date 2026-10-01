@@ -23,11 +23,15 @@ import type { Tool, ToolContext } from './tool';
 
 import { layerMatrix } from './moveHitTest';
 import {
+  extendFreehandTrace,
+  finishFreehandTrace,
   MIN_POLYLINE_POINTS,
   movePolyline,
   polylinePreview,
   pressPolyline,
+  startFreehandTrace,
   startPolyline,
+  type FreehandTrace,
   type PolylineSession,
 } from './polylineSession';
 
@@ -39,13 +43,10 @@ const PRIMARY_BUTTON = 1;
 /** Screen-space distance (CSS px) the pointer must travel before a press becomes a drag. */
 export const SHAPE_DRAG_THRESHOLD_PX = 3;
 
-/** Minimum document-space gap between stored freehand points (input decimation). */
-const FREEHAND_MIN_POINT_DISTANCE = 2;
-
 type Session =
   | { kind: 'drag'; startDoc: Vec2; startScreen: Vec2; moved: boolean }
   | { kind: 'polyline'; session: PolylineSession }
-  | { kind: 'freehand'; points: Vec2[] };
+  | ({ kind: 'freehand' } & FreehandTrace);
 
 const distance = (a: Vec2, b: Vec2): number => Math.hypot(a.x - b.x, a.y - b.y);
 
@@ -305,7 +306,7 @@ export const createShapeTool = (): Tool => {
       }
       session =
         kind === 'freehand'
-          ? { kind: 'freehand', points: [{ x: input.documentPoint.x, y: input.documentPoint.y }] }
+          ? { ...startFreehandTrace(input), kind: 'freehand' }
           : { kind: 'drag', moved: false, startDoc: input.documentPoint, startScreen: input.screenPoint };
     },
     onPointerMove: (ctx, input, batch) => {
@@ -326,12 +327,7 @@ export const createShapeTool = (): Tool => {
         return;
       }
       if (session.kind === 'freehand') {
-        for (const sample of batch) {
-          const last = session.points[session.points.length - 1];
-          if (!last || distance(last, sample.documentPoint) >= FREEHAND_MIN_POINT_DISTANCE) {
-            session.points.push({ x: sample.documentPoint.x, y: sample.documentPoint.y });
-          }
-        }
+        extendFreehandTrace(session, batch);
         ctx.stores.lassoPreview.set({ kind: 'freehand', points: session.points.slice() });
         ctx.invalidate({ overlay: true });
         return;
@@ -355,7 +351,7 @@ export const createShapeTool = (): Tool => {
         return;
       }
       if (session.kind === 'freehand') {
-        commit(ctx, polygonShapeFrom([...session.points, input.documentPoint], styleFromOptions(ctx)));
+        commit(ctx, polygonShapeFrom(finishFreehandTrace(session, input), styleFromOptions(ctx)));
         return;
       }
       if (!session.moved) {

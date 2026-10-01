@@ -14385,6 +14385,12 @@ describe('brush cursor ring: live size updates', () => {
     // The options-bar slider path (a direct store write) likewise invalidates.
     engine.stores.brushOptions.set({ ...engine.stores.brushOptions.get(), size: 123 });
     expect(raf.pendingCount()).toBeGreaterThan(0);
+    raf.flush();
+
+    // Non-size option edits and the inactive eraser's size leave the overlay alone.
+    engine.stores.brushOptions.set({ ...engine.stores.brushOptions.get(), color: '#123456', opacity: 0.4 });
+    engine.stores.eraserOptions.set({ ...engine.stores.eraserOptions.get(), size: 77 });
+    expect(raf.pendingCount()).toBe(0);
 
     engine.lifecycle.dispose();
   });
@@ -14502,6 +14508,55 @@ describe('doc-replace mid-gesture: cancels the active tool gesture', () => {
       (call) => (call[0] as EngineTestAction).type === 'updateCanvasLayer'
     ).length;
     expect(updatesAfter).toBe(updatesBefore);
+    expect(engine.stores.canUndo.get()).toBe(false);
+
+    engine.lifecycle.dispose();
+  });
+});
+
+describe('genuine tool switch mid-gesture', () => {
+  it('cancels the stroke through the outgoing brush and routes none of the drag tail to the new tool', () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+
+    const { store } = createReactiveStore(paintDoc());
+    const dispatch = store.dispatch as Mock;
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const strokes: StrokeCommittedEvent[] = [];
+    engine.tools.onStrokeCommitted((event) => strokes.push(event));
+    const overlay = createInputCanvas();
+    const screen = createInputCanvas();
+    engine.surface.attach(screen.element, overlay.element);
+    engine.tools.setTool('brush');
+
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(40, 40));
+    engine.tools.setTool('move');
+
+    // The gesture ended with the brush: context menus and undo are no longer blocked by it.
+    expect(engine.tools.canTargetLayerFromContextMenu()).toBe(true);
+    const dispatchesAfterSwitch = dispatch.mock.calls.length;
+    overlay.fire('pointermove', pointerAt(80, 60));
+    overlay.fire('pointerup', pointerAt(80, 60, { buttons: 0 }));
+
+    expect(dispatch.mock.calls.length).toBe(dispatchesAfterSwitch);
+    expect(strokes).toEqual([]);
     expect(engine.stores.canUndo.get()).toBe(false);
 
     engine.lifecycle.dispose();
