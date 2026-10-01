@@ -177,6 +177,13 @@ you want, by adding `:subfolder_name` to the repo ID.
   Add `:v2` to the repo ID and use that when installing the model: `monster-labs/control_v1p_sd15_qrcode_monster:v2`
 :::
 
+### How models are identified
+
+InvokeAI identifies a model from the file itself, and falls back to its name only where the contents are the same:
+
+- **Standalone 16-channel VAEs.** FLUX.1 and SD3 use the same VAE network with different settings. A diffusers `vae/` folder is identified by its `config.json`, so FLUX.1-dev's folder is filed as FLUX.1 and SD3.5's as SD3. A single file such as `sd3_vae.safetensors` is identified by its name, folder or download source; if none of them names a model family, it is filed as FLUX.1. If a VAE lands under the wrong base, change **Base** in the model's **Edit** view. A `vae/` folder installed before this detection existed can be fixed with **Re-identify model**.
+- **FLUX.2 Klein 9B vs. Klein 9B Base.** The two are identical in structure, so the file or repo name decides, and they ship different default step counts (4 against 28). Names that say "distilled" are read as Klein 9B even when they also contain "base". If you installed `Winnougan/Klein9b-Distilled-Base-INT8-Convrot` by repo ID before this was fixed, it was filed as Klein 9B Base; remove and reinstall it.
+
 ## Editing model metadata
 
 Every model has an editable **Source URL** field alongside its name

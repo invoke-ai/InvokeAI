@@ -17,7 +17,7 @@ This is a summary, not legal advice. Read the full license on the model's Huggin
 
 ### Installing Ideogram 4
 
-The weights are gated on HuggingFace under a **non-commercial license**. Open the model page, accept the terms, and make sure your HuggingFace token is [set up in the config file] before installing. Two bundled builds are available:
+The weights are gated on HuggingFace under a **non-commercial license**. Open the model page, accept the terms, and make sure your HuggingFace token is [set up in the config file](/configuration/invokeai-yaml/) before installing. Two bundled builds are available:
 
 - [`ideogram-ai/ideogram-4-nf4`](https://huggingface.co/ideogram-ai/ideogram-4-nf4) — nf4 quantized, **CUDA only**, fits in 24 GB VRAM. Recommended for NVIDIA GPUs.
 - [`ideogram-ai/ideogram-4-fp8`](https://huggingface.co/ideogram-ai/ideogram-4-fp8) — fp8 quantized, runs on **any device**, with higher memory use.
@@ -30,7 +30,7 @@ Comfy-Org's [`Comfy-Org/Ideogram-4`](https://huggingface.co/Comfy-Org/Ideogram-4
 
 - `diffusion_models/ideogram4_<build>.safetensors` — the conditional branch, selected as the model
 - `diffusion_models/ideogram4_unconditional_<build>.safetensors` — the unconditional branch
-- `text_encoders/qwen3vl_8b_fp8_scaled.safetensors` — the Qwen3-VL **8B** encoder (not the 4B one Krea-2 uses)
+- `text_encoders/qwen3vl_8b_fp8_scaled.safetensors` — the Qwen3-VL **8B** encoder (not the 4B one Krea-2 uses). A llama.cpp GGUF of the 8B encoder works as well; see [Qwen3-VL GGUF encoders](/users-guide/models/local-models/krea-2/#qwen3-vl-gguf-encoders).
 - `vae/flux2-vae.safetensors` — the 32-channel VAE, shared with FLUX.2, which is why it installs under the FLUX.2 base
 
 Pick the unconditional branch, the encoder and the VAE in the **Components** section next to the model — and pick the unconditional branch of the *same* build as the model. The `nvfp4` repackage in that repo is **not** supported yet and is refused at install.
@@ -51,10 +51,18 @@ Both branches are resident at once, so double those figures for the pair.
 
 **Without the fp8 matmul, the fp8 build still works — through FP8 Storage.** That setting keeps the file's own fp8 weights and per-tensor scales instead of expanding them, and installation switches it on for these files by itself. Measured on a 4090 with `fp8_compute` off, 1024px: **40.6 s**, 22.9 GB peak, 8.7 GB resident per branch — against **45.7 s** for the int8 pair. With *neither* the matmul nor Storage the weights are expanded to bf16 on load, 17.3 GB per branch, and a 24 GB card runs out of memory during the first step.
 
-**Use int8 where FP8 Storage is not available.** It requires a CUDA device; on anything else the fp8 build falls back to the expanded path, while int8 keeps its stored codes and dequantizes them per forward on any device with no setting to turn on.
+**Use int8 where FP8 Storage is not available.** It requires a CUDA or Intel XPU device; on anything else the fp8 build falls back to the expanded path, while int8 keeps its stored codes and dequantizes them per forward on any device with no setting to turn on.
 
 On a 24 GB NVIDIA card without the fp8 matmul (RTX 30-series), the int8 pair plus the 8B encoder still adds up to more than the card holds, so the bundled [nf4 build](#installing-ideogram-4) remains the smaller option there.
 :::
+
+### Memory use during generation
+
+Ideogram 4 keeps both transformer branches loaded for the whole generation. With the single-file builds on a CUDA or ROCm GPU (with partial loading on, the default), InvokeAI checks whether the pair fits next to the working memory a generation needs. If it does not, it keeps only part of the second branch on the GPU and streams the rest in each step. On a 24 GB card with the fp8 pair this keeps about 2.4 GB free instead of 1.2 GB. The bundled nf4 and fp8 folders are not affected. Three things follow:
+
+- A streamed layer computes on a slightly different path, so images at the same seed can differ from those generated with both branches fully on the GPU.
+- If generations still run out of memory, raise `device_working_mem_gb` in `invokeai.yaml` (for example to `8`).
+- If you set `max_cache_vram_gb`, InvokeAI does not limit the second branch this way, because the cache already plans from that limit.
 
 ### Prompting Ideogram 4
 

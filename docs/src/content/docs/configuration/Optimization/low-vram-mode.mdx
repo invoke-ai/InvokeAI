@@ -164,6 +164,16 @@ Invoke has the option of keeping a RAM copy of all model weights, even when they
 keep_ram_copy_of_weights: false
 ```
 
+### Tiled VAE decode and encode
+
+Without tiling, the memory a VAE needs grows with the square of the image size. For FLUX.1, an untiled 3072² encode peaks at about 18.8 GiB on an RTX 4090, and a tiled one at 0.8 GiB, while tiled memory stays roughly flat as the image grows. Tiling costs some speed on smaller images.
+
+- **Always tile:** set `force_tiled_decode: true` in `invokeai.yaml`. It covers the VAE decode and encode for SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image, the Anima encode, and the Krea-2 style reference. Other model families (for example SD3, FLUX.2, Wan and LTX-2) ignore it.
+- **Per node:** the SD, FLUX.1, Z-Image and Qwen-Image **Latents to Image** and **Image to Latents** nodes, and **Image to Latents - Anima**, have **Tiled** and **Tile Size** fields for workflows. The [Upscale panel](/users-guide/image-generation/upscale/) turns tiling on by itself.
+- **Automatic retry:** if a FLUX.1, Z-Image or Anima decode, or a FLUX.1 encode, runs out of memory, InvokeAI retries it once with tiling and logs that it did.
+
+A tiled decode is not pixel-identical to a single-pass one. The VAE looks at the whole image at once, so the difference is spread over the image rather than limited to the tile seams; it is small, but the same seed will not reproduce an untiled result exactly.
+
 ### PiD decode optimization
 
 PiD decodes directly into high-resolution pixels, so its activation and sampler memory can exceed the working memory needed by a normal VAE decode. Partial model loading reduces memory used by PiD's weights, but does not reduce these full-resolution intermediates.
