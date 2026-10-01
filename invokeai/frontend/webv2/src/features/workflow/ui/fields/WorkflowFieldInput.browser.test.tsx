@@ -1675,6 +1675,16 @@ describe('WorkflowFieldInput text and number entry', () => {
       await keys('{ArrowUp}');
       expect(integer.input.value).toBe('4');
       expect(integer.onCommit).toHaveBeenLastCalledWith(4);
+
+      // A float without a declared step moves by tenths, and a typed value off that step stays valid.
+      const float = await renderStateful(FLOAT, 0.5);
+
+      await keys('{ArrowUp}');
+      expect(float.input.value).toBe('0.6');
+      expect(float.onCommit).toHaveBeenLastCalledWith(0.6);
+      await keys('{Control>}a{/Control}0.15');
+      expect(float.onCommit).toHaveBeenLastCalledWith(0.15);
+      expect(isInvalid(float.input)).toBe(false);
     });
 
     it('pastes a number at the caret and over a selection', async () => {
