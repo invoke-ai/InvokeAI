@@ -58,6 +58,12 @@ export interface WorkflowCommands {
   redo(target?: WorkflowTarget): void;
   removeWorkflow(workflowId: string): void;
   renameWorkflow(workflowId: string, name: string): void;
+  /** Replaces a copy's document (keeping its id and name) as one undo step, and activates it. */
+  replaceWorkflow(
+    target: WorkflowTarget,
+    document: ProjectGraphState,
+    options: { label: string; source: ProjectWorkflowSource }
+  ): void;
   selectWorkflow(workflowId: string): void;
   /** Records a publication target; ignored once that project or workflow no longer exists. */
   setWorkflowSource(target: WorkflowTarget, source: ProjectWorkflowSource | undefined): void;

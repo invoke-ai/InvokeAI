@@ -261,6 +261,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         renameWorkflow: (workflowId, name) => {
           commands.workflows.rename(workflowId, name);
         },
+        replaceWorkflow: (target, document, options) => commands.workflows.replaceDocument(target, document, options),
         selectWorkflow: (workflowId) => commands.workflows.select(workflowId),
         setWorkflowSource: (target, source) =>
           commands.workflows.setSource(target.projectId, target.workflowId, source),

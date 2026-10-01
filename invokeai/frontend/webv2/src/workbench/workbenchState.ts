@@ -112,6 +112,7 @@ import {
   recordProjectWorkflowRun,
   redoProjectWorkflow,
   removeProjectWorkflow,
+  replaceProjectWorkflowDocument,
   selectProjectWorkflow,
   setProjectWorkflowDocument,
   setProjectWorkflowSource,
@@ -341,6 +342,14 @@ type WorkbenchReducerAction =
   | { type: 'duplicateProjectWorkflow'; workflowId: string; copyId: string; copyName: string; projectId?: string }
   | { type: 'removeProjectWorkflow'; workflowId: string; projectId?: string }
   | { type: 'setProjectWorkflowSource'; projectId: string; workflowId: string; source?: ProjectWorkflowSource }
+  | {
+      type: 'replaceProjectWorkflowDocument';
+      projectId: string;
+      workflowId: string;
+      document: ProjectGraphState;
+      label: string;
+      source: ProjectWorkflowSource;
+    }
   | { type: 'undoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'redoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean; models?: readonly ModelConfig[] }
@@ -4320,6 +4329,20 @@ export const __workbenchReducerInternal = (
     case 'removeProjectWorkflow': {
       return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) =>
         removeProjectWorkflow(project, action.workflowId)
+      );
+    }
+    case 'replaceProjectWorkflowDocument': {
+      return updateProjectById(state, action.projectId, (project) =>
+        selectProjectWorkflow(
+          replaceProjectWorkflowDocument(
+            project,
+            action.workflowId,
+            action.document,
+            { label: action.label, source: action.source },
+            now()
+          ),
+          action.workflowId
+        )
       );
     }
     case 'setProjectWorkflowSource': {
