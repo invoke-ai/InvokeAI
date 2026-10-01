@@ -40,6 +40,22 @@ and needs separately installed companions. Lower precision trades a
 little image quality for a large saving in memory; each model family's
 page lists the builds it supports.
 
+### Quantized formats
+
+InvokeAI recognizes the format from the file's contents, so you install them like any other model:
+
+- **GGUF** (`.gguf`, llama.cpp quantization such as Q4_K or Q8_0): weights stay packed in memory and are unpacked layer by layer during generation. Supported for the FLUX.1, FLUX.2, Z-Image, Krea-2, Qwen-Image and Wan transformers, and for the T5, Qwen3, Qwen3-VL, Mistral and Gemma 2 text encoders.
+- **NF4** (bitsandbytes): 4-bit, CUDA only.
+- **SDNQ**: see [SDNQ Quantization](/configuration/optimization/sdnq-quantization/).
+- **int8** (`int8_convrot`, from ComfyUI repackages): the weights stay int8 in memory on every device, including Apple Silicon, and need no setting to turn on. Supported for FLUX.1, FLUX.2 Klein, Z-Image, Krea-2, Ideogram 4, MiniMax H3, LTX-2 and the PiD decoders, and for the Qwen3 8B, Qwen3-VL and LTX-2 Gemma encoders.
+- **nvfp4** (4-bit, in ComfyUI's checkpoint format, such as Comfy-Org's builds; other nvfp4 exports such as AWQ are refused): the weights stay packed in memory and are unpacked per layer, so no special GPU is needed. Supported for the Z-Image, Krea-2, Qwen-Image and LTX-2 transformers and for the Qwen3, Qwen2.5-VL and FLUX.2 Mistral encoders; the Ideogram 4 nvfp4 files are refused at install.
+- **fp8** (plain or `fp8_scaled`): InvokeAI keeps the weights in fp8 when [FP8 Storage](/configuration/optimization/fp8-storage/) is on, which installation does for you, or when `fp8_compute` is enabled.
+- **MXFP8** (fp8 with one scale per block of 32 weights): loaded by unpacking to BF16. Turn FP8 Storage off for these; see the [FP8 Storage caution](/configuration/optimization/fp8-storage/).
+
+Text encoders for Qwen-Image, Z-Image, Krea-2 and Ideogram 4 bring their tokenizer and configuration with InvokeAI, so single-file and GGUF encoders load without network access.
+
+### Converting to Diffusers
+
 A single-file Stable Diffusion 1.x, 2.x or SDXL model can be converted
 to Diffusers format with the **Convert to diffusers** action in the
 model's detail view. Conversion replaces the single file with an
