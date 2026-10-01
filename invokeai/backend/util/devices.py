@@ -431,3 +431,18 @@ class TorchDevice:
         if config.precision == "auto":
             return cls.choose_bfloat16_safe_dtype(device)
         return NAME_TO_PRECISION[config.precision]
+
+    @classmethod
+    def choose_krea2_gguf_dtype(cls, device: Optional[torch.device] = None) -> torch.dtype:
+        """Choose the compute dtype for Krea-2 GGUF weights.
+
+        Krea-2 GGUF dequantization in BF16 is unreliable on MPS, so use FP32 there. On other devices,
+        explicit precision settings are honored and ``auto`` retains the BF16-safe default used by Krea-2.
+        """
+        device = device or cls.choose_torch_device()
+        if device.type == "mps":
+            return torch.float32
+        config = get_config()
+        if config.precision == "auto":
+            return cls.choose_bfloat16_safe_dtype(device)
+        return NAME_TO_PRECISION[config.precision]
