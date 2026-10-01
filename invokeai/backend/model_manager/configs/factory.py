@@ -73,6 +73,7 @@ from invokeai.backend.model_manager.configs.lora import (
     LoRA_OMI_SDXL_Config,
     LoraModelDefaultSettings,
 )
+from invokeai.backend.model_manager.configs.ltx2_duration_head import LTX2DurationHead_Checkpoint_Config
 from invokeai.backend.model_manager.configs.main import (
     Main_BnBNF4_FLUX_Config,
     Main_Checkpoint_Anima_Config,
@@ -177,10 +178,13 @@ from invokeai.backend.model_manager.configs.vae import (
     VAE_Checkpoint_QwenImage_Config,
     VAE_Checkpoint_SD1_Config,
     VAE_Checkpoint_SD2_Config,
+    VAE_Checkpoint_SD3_Config,
     VAE_Checkpoint_SDXL_Config,
     VAE_Checkpoint_Wan_Config,
     VAE_Diffusers_Flux2_Config,
+    VAE_Diffusers_FLUX_Config,
     VAE_Diffusers_SD1_Config,
+    VAE_Diffusers_SD3_Config,
     VAE_Diffusers_SDXL_Config,
     VAE_Diffusers_Wan_Config,
 )
@@ -440,17 +444,19 @@ AnyModelConfig = Annotated[
         Annotated[VAE_Checkpoint_SD2_Config, VAE_Checkpoint_SD2_Config.get_tag()],
         Annotated[VAE_Checkpoint_SDXL_Config, VAE_Checkpoint_SDXL_Config.get_tag()],
         Annotated[VAE_Checkpoint_FLUX_Config, VAE_Checkpoint_FLUX_Config.get_tag()],
+        Annotated[VAE_Checkpoint_SD3_Config, VAE_Checkpoint_SD3_Config.get_tag()],
         Annotated[VAE_Checkpoint_Flux2_Config, VAE_Checkpoint_Flux2_Config.get_tag()],
-        # IMPORTANT: VAE_Checkpoint_Wan_Config must be checked BEFORE QwenImage —
-        # both share the AutoencoderKLWan architecture and the Wan config relies
-        # on a filename heuristic to claim 16-channel files; ordering here lets
-        # Wan win when the filename suggests it.
+        # Wan and Qwen-Image share the 16-channel AutoencoderKLWan layout. The order here decides
+        # nothing (see "Configs must exclude each other" in new-model-integration.mdx): both configs
+        # defer on `_filename_suggests_wan`, which is what hands a file named for Wan to Wan.
         Annotated[VAE_Checkpoint_Wan_Config, VAE_Checkpoint_Wan_Config.get_tag()],
         Annotated[VAE_Checkpoint_QwenImage_Config, VAE_Checkpoint_QwenImage_Config.get_tag()],
         Annotated[VAE_Checkpoint_Anima_Config, VAE_Checkpoint_Anima_Config.get_tag()],
         # VAE - diffusers format
         Annotated[VAE_Diffusers_SD1_Config, VAE_Diffusers_SD1_Config.get_tag()],
         Annotated[VAE_Diffusers_SDXL_Config, VAE_Diffusers_SDXL_Config.get_tag()],
+        Annotated[VAE_Diffusers_FLUX_Config, VAE_Diffusers_FLUX_Config.get_tag()],
+        Annotated[VAE_Diffusers_SD3_Config, VAE_Diffusers_SD3_Config.get_tag()],
         Annotated[VAE_Diffusers_Flux2_Config, VAE_Diffusers_Flux2_Config.get_tag()],
         Annotated[VAE_Diffusers_Wan_Config, VAE_Diffusers_Wan_Config.get_tag()],
         # PiD Decoder - checkpoint format
@@ -577,6 +583,7 @@ AnyModelConfig = Annotated[
         Annotated[CLIPVision_Diffusers_Config, CLIPVision_Diffusers_Config.get_tag()],
         Annotated[SigLIP_Diffusers_Config, SigLIP_Diffusers_Config.get_tag()],
         Annotated[FLUXRedux_Checkpoint_Config, FLUXRedux_Checkpoint_Config.get_tag()],
+        Annotated[LTX2DurationHead_Checkpoint_Config, LTX2DurationHead_Checkpoint_Config.get_tag()],
         Annotated[LlavaOnevision_Diffusers_Config, LlavaOnevision_Diffusers_Config.get_tag()],
         Annotated[TextLLM_Diffusers_Config, TextLLM_Diffusers_Config.get_tag()],
         Annotated[ExternalApiModelConfig, ExternalApiModelConfig.get_tag()],

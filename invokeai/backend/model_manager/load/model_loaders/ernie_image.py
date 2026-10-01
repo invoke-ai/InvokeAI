@@ -1,4 +1,3 @@
-# Copyright (c) 2026, Lincoln D. Stein and the InvokeAI Development Team
 """Loaders for Baidu ERNIE-Image: diffusers pipelines and single-file transformers."""
 
 from pathlib import Path

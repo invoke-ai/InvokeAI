@@ -1,8 +1,10 @@
 import type { GenerationModelCatalogItem, PromptHistoryItem } from '@features/generation/contracts';
 import type { RebalancePreset } from '@features/generation/core/conditioningRebalance';
 import type { GenerateSettings } from '@features/generation/core/types';
+import type { ReadableExternalStore } from '@platform/state/projectedExternalStore';
 import type { ComponentType, ReactNode } from 'react';
 
+import { type EqualityFn, shallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { createContext, use } from 'react';
 
 export interface GenerationModelSelectProps {
@@ -75,9 +77,10 @@ export interface GenerationUiAdapter {
     info(title: string, message?: string): void;
     reportError(error: { area: string; message: string; namespace: 'generation'; projectId?: string }): void;
   };
+  /** The active project's stored Generate values; a store so edits do not re-render every adapter consumer. */
+  generateValues: ReadableExternalStore<Record<string, unknown>>;
   project: {
     activeProjectId: string;
-    generateValues: Record<string, unknown>;
     invocationSourceId: string;
     showPromptSyntaxHighlighting: boolean;
   };
@@ -133,6 +136,21 @@ export const useGenerationUi = (): GenerationUiAdapter => {
 
   return adapter;
 };
+
+const selectAllValues = (values: Record<string, unknown>) => values;
+
+export function useGenerateValues(): Record<string, unknown>;
+export function useGenerateValues<Selected>(
+  selector: (values: Record<string, unknown>) => Selected,
+  isEqual?: EqualityFn<Selected>
+): Selected;
+export function useGenerateValues<Selected>(
+  selector: (values: Record<string, unknown>) => Selected = selectAllValues as never,
+  isEqual: EqualityFn<Selected> = shallowEqual
+): Selected {
+  const { generateValues } = useGenerationUi();
+  return useExternalStoreSelector(generateValues.subscribe, generateValues.getSnapshot, selector, isEqual);
+}
 
 export const GenerationModelSelect = (props: GenerationModelSelectProps) => {
   const { ModelSelect } = useGenerationUi().models;

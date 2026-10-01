@@ -1,8 +1,10 @@
 import type * as transportModule from '@platform/transport/http';
 
+import { galleryKeys } from '@features/gallery/queries';
+import { queryClient } from '@platform/query/client';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest';
 
 const transport = vi.hoisted(() => ({
   apiFetch: vi.fn(),
@@ -47,6 +49,19 @@ describe('createProjectSettled', () => {
       project_id: 'project-1',
     });
     expect(transport.apiFetchJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('marks board lists fetched before the create stale, since they predate its board', async () => {
+    const owner = captureAccountScope();
+    const boardsKey = [...galleryKeys.boardsForAccount(owner), {}];
+    queryClient.setQueryData(boardsKey, []);
+    transport.apiFetchJson.mockResolvedValueOnce({ board_id: 'board-for-project-1', project_id: 'project-1' });
+
+    onTestFinished(() => queryClient.removeQueries({ queryKey: boardsKey }));
+
+    await createProjectSettled(request, owner);
+
+    await vi.waitFor(() => expect(queryClient.getQueryState(boardsKey)?.isInvalidated).toBe(true));
   });
 
   /** Settle with a retry write: GET 404 can race the initial create transaction. */

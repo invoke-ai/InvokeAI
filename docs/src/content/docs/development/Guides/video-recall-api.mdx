@@ -16,8 +16,11 @@ browser, a script, another application — drive a user's open **Video** panel:
   outcome as the gallery's *Extend in Video* action.
 - **Use as Ref Video** — append a video to the reference list of models that take
   reference videos (today, MiniMax H3 Ref2VA).
+- **Use as Conditioning Clip** — set a video as the conditioning clip of models that
+  generate one half of a clip from the other (today, LTX-2): its soundtrack, to
+  generate a picture for it, or its picture, to generate a soundtrack for it.
 
-Send Video and Use as Ref Video take either the name of a video already in the
+Send Video, Use as Ref Video and Use as Conditioning Clip take either the name of a video already in the
 gallery or a video file, which is uploaded into the gallery first.
 
 ## How it works
@@ -42,6 +45,8 @@ gallery or a video file, which is uploaded into the gallery first.
 | `POST /api/v1/recall/video/{queue_id}/initial-video/upload` | multipart `file` | Upload, then send |
 | `POST /api/v1/recall/video/{queue_id}/reference-video?video_name=…` | none | Use a gallery video as a reference |
 | `POST /api/v1/recall/video/{queue_id}/reference-video/upload` | multipart `file` | Upload, then use as a reference |
+| `POST /api/v1/recall/video/{queue_id}/conditioning-video?video_name=…&role=…` | none | Use a gallery video as the conditioning clip |
+| `POST /api/v1/recall/video/{queue_id}/conditioning-video/upload?role=…` | multipart `file` | Upload, then use as the conditioning clip |
 
 `queue_id` is the frontend's queue, normally `default`.
 
@@ -76,7 +81,13 @@ the response's `overridden` maps it to the field that won — for example
 precedence: a `source_video` that is missing from the gallery overrides nothing.
 Send only the fields you mean to set; the Swagger page offers minimal examples.
 
-### Send Video and Use as Ref Video
+### Send Video, Use as Ref Video and Use as Conditioning Clip
+
+The conditioning-clip routes require a `role` query parameter naming which stream of
+the video is the condition: `audio` keeps its soundtrack and generates a picture for
+it (LTX-2 audio-to-video); `video` keeps its picture and generates a soundtrack for it
+(video-to-audio). A missing or unknown `role` is rejected with `422` before any upload
+is read.
 
 The name-only routes take `video_name` as a query parameter; the video must be in
 the gallery and readable by the caller.
@@ -93,8 +104,9 @@ answer `429` with a `Retry-After` header.
 
 Whether the video is usable depends on the model selected in the panel, which is
 never switched on the caller's behalf: an initial video needs a model that can
-extend a clip, and a reference video needs a model that takes reference videos,
-with room for another.
+extend a clip, a reference video needs a model that takes reference videos,
+with room for another, and a conditioning clip needs a model that generates in the
+requested role.
 
 ## Frontend behavior
 
@@ -132,9 +144,19 @@ in a text field; the notification still reports the change.
   gives a new video: soundtrack-only conditioning for an uploaded audio file,
   otherwise video and audio from a short sample of the clip. It is declined when
   the panel's model takes no reference videos or all its video slots are taken.
+- **Use as Conditioning Clip** sets the panel's *Conditioning Clip* in the requested
+  role; the whole clip is used. A conditioning clip excludes every other medium, so
+  where the panel's own field waits for you to clear them, this action clears the
+  first and last frames, the initial video and the references itself, and the
+  notification says so when there were any. It replaces a conditioning clip the
+  panel already holds. It is declined, leaving the panel alone, when the panel's
+  model cannot generate in that role, and in the `video` role for an uploaded audio
+  file, whose picture is only a placeholder. Other settings are not changed to fit
+  the clip: a two-stage resolution, or a clip whose length falls outside the
+  model's frame range, still has to be fixed before the panel can generate.
 
-The gallery's context menu offers the same *Extend in Video* and *Use as Reference
-Video* actions for any video in the gallery.
+The gallery's context menu offers the same *Extend in Video*, *Use as Reference
+Video* and *Use as Conditioning Clip* actions for any video in the gallery.
 
 ## Request schema
 
@@ -227,6 +249,10 @@ curl -X POST "http://localhost:9090/api/v1/recall/video/default/initial-video?vi
 # Upload a clip onto a board and use it as a Ref2VA reference
 curl -X POST "http://localhost:9090/api/v1/recall/video/default/reference-video/upload?board_id=<board-id>" \
   -F "file=@dance.mp4"
+
+# Generate an LTX-2 picture for a song's soundtrack
+curl -X POST "http://localhost:9090/api/v1/recall/video/default/conditioning-video/upload?role=audio" \
+  -F "file=@song.mp3"
 ```
 
 In multi-user mode, add `-H "Authorization: Bearer <token>"`.
@@ -266,7 +292,7 @@ exactly what the frontend receives. `skipped` lists fields whose model or medium
 could not be used; `overridden` maps media fields that lost to a higher-precedence
 medium in the same request to the field that won.
 
-Send Video / Use as Ref Video:
+Send Video / Use as Ref Video / Use as Conditioning Clip:
 
 ```json
 { "status": "success", "queue_id": "default", "action": "reference_video", "video": { "video_name": "…", "…": "…" }, "uploaded": true }
@@ -281,11 +307,11 @@ Send Video / Use as Ref Video:
 | `401` | Multi-user mode without a valid token |
 | `400` | The upload ended before its body was complete |
 | `403` | The caller may not read a referenced image or video, or may not add media to `board_id` |
-| `404` | `video_name` (Send Video / Use as Ref Video) is not in the gallery, or `board_id` does not exist |
+| `404` | `video_name` (Send Video / Use as Ref Video / Use as Conditioning Clip) is not in the gallery, or `board_id` does not exist |
 | `409` | Image storage maintenance is running (Recall / Remix) |
 | `413` | The upload exceeds the video upload size limit |
 | `415` | The upload is not a supported video or audio file, or could not be converted |
-| `422` | Malformed JSON or multipart body, an unknown field, a value out of bounds, or `metadata` that is not a JSON object |
+| `422` | Malformed JSON or multipart body, an unknown field, a value out of bounds, a missing or unknown `role` (Use as Conditioning Clip), or `metadata` that is not a JSON object |
 | `429` | Too many concurrent video uploads |
 | `500` | The uploaded video could not be stored |
 
@@ -297,11 +323,12 @@ Send Video / Use as Ref Video:
 |---|---|---|
 | `queue_id` | string | From the request path |
 | `user_id` | string | The caller |
-| `action` | `"parameters"` \| `"initial_video"` \| `"reference_video"` | What to do |
+| `action` | `"parameters"` \| `"initial_video"` \| `"reference_video"` \| `"conditioning_video"` | What to do |
 | `mode` | `"recall"` \| `"remix"` \| null | `parameters` only |
 | `strict` | boolean | `parameters` only |
 | `parameters` | object \| null | `parameters` only: the resolved fields, with models as `{key, hash, name, base, type}` |
 | `video` | object \| null | Placements only: `{video_name, width, height, duration, fps, media_origin}` |
+| `conditioning_role` | `"audio"` \| `"video"` \| null | `conditioning_video` only: which stream of `video` is the condition |
 
 ## Implementation
 

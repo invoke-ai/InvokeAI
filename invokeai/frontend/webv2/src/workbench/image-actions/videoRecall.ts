@@ -579,6 +579,11 @@ export const buildVideoRecallSettings = ({
     if (snapped !== values.numFrames) {
       values = { ...values, numFrames: snapped };
     }
+    // Under auto duration the Frames value is only a ceiling the duration head chooses beneath, so a
+    // recalled length would not be the length that runs. Recall reproduces the clip it came from.
+    if (values.autoDuration) {
+      values = { ...values, autoDuration: false };
+    }
     fields.push('frames');
   }
 

@@ -19,6 +19,7 @@ import { HsvWheelPicker } from '@platform/ui/HsvWheelPicker';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getDocumentLayer } from '@workbench/canvas-engine/api';
+import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { armMaskTintTarget, clearMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
 import {
   useActiveColorCommands,
@@ -27,7 +28,6 @@ import {
 } from '@workbench/widgets/canvas/color-system/useActiveColors';
 import { useMaskTintEditor, type MaskTintEditor } from '@workbench/widgets/canvas/color-system/useMaskTintEditor';
 import { FormNumberField } from '@workbench/widgets/canvas/tool-presentation/FormControls';
-import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { ArrowLeftRightIcon, CircleIcon, PipetteIcon, RotateCcwIcon, SquareIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';

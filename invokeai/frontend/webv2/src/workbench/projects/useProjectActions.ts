@@ -11,6 +11,7 @@ import { useNavigate } from '@tanstack/react-router';
 import { hasActiveQueueRuns } from '@workbench/queue-integration/activeQueueRuns';
 import { useNotify } from '@workbench/useNotify';
 import {
+  useWorkbenchLiveCanvasEngines,
   useWorkbenchCommands,
   useWorkbenchPersistenceAdapter,
   useWorkbenchPersistenceService,
@@ -37,6 +38,7 @@ export const useProjectActions = (): {
   const persistence = useWorkbenchPersistenceAdapter();
   const persistenceService = useWorkbenchPersistenceService();
   const commands = useWorkbenchCommands();
+  const canvasEngines = useWorkbenchLiveCanvasEngines();
   const navigate = useNavigate();
   const notify = useNotify();
   const { t } = useTranslation();
@@ -124,13 +126,32 @@ export const useProjectActions = (): {
       return;
     }
 
+    /** Crosses the canvas paint barrier; false (with a notice) when unsaved pixels cannot be persisted. */
+    const persistCanvasPixels = async (): Promise<boolean> => {
+      try {
+        await canvasEngines.flushPendingPixels(project.id);
+        return true;
+      } catch (error) {
+        assertAccountScopeCurrent(owner);
+        notify.error(
+          t('projects.closeBlocked'),
+          t('projects.canvasPixelsNotSaved', { reason: getApiErrorMessage(error, t('projects.file.notSynced')) })
+        );
+        return false;
+      }
+    };
+
     void (async () => {
       for (let attempt = 0; attempt < CLOSE_FLUSH_ATTEMPTS; attempt += 1) {
         const current = queries.getProject(project.id);
         if (!current) {
           return;
         }
-        const outcome = await persistenceService.flushProjectToServer(current);
+        if (!(await persistCanvasPixels())) {
+          return;
+        }
+        assertAccountScopeCurrent(owner);
+        const outcome = await persistenceService.flushProjectToServer(queries.getProject(project.id) ?? current);
         assertAccountScopeCurrent(owner);
         if (outcome.kind === 'schema-refused') {
           notify.error(t('projects.closeBlocked'), t('projects.file.updateClient'));
@@ -139,6 +160,10 @@ export const useProjectActions = (): {
 
         if (outcome.kind === 'unsynced' || outcome.kind === 'conflicted') {
           notify.error(t('projects.closeBlocked'), t('projects.file.notSynced'));
+          return;
+        }
+        // Pixels painted while the document was pushed change it again, so the comparison below retries.
+        if (!(await persistCanvasPixels())) {
           return;
         }
         if (

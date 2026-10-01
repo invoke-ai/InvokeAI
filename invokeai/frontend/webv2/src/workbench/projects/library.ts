@@ -263,11 +263,13 @@ export const renameLibraryProject = async (projectId: string, name: string): Pro
   upsertProjectSummary({ id: updated.project_id, name: updated.name, revision: updated.revision }, owner);
 };
 
-/** Export/copy requires an acknowledged flush before reading server bytes. */
+/** Export/copy requires the paint barrier and an acknowledged flush before reading server bytes. */
 export const readAcknowledgedProject = async (projectId: string, owner: AccountScope): Promise<ProjectRecordDTO> => {
   const openProject = getOpenProject(projectId);
 
   if (openProject) {
+    // Written bytes must include canvas pixels that only the live engine holds.
+    await openProject.flushPixels();
     assertProjectFlushed(await openProject.flush());
   }
 

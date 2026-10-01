@@ -8,6 +8,7 @@ import { system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { ModelLibraryList } from './ModelLibraryList';
 
@@ -103,6 +104,49 @@ describe('ModelLibraryList filter transitions', () => {
   });
 });
 
+describe('ModelLibraryList keyboard context menu', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  beforeEach(() => {
+    accountLifecycle.activate('library-menu-test-a', ':user:library-menu-test-a');
+    setModelsSnapshotForTests({ models: library, status: 'loaded' });
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    accountLifecycle.invalidate();
+  });
+
+  it('opens the row menu from the keyboard and returns focus to the row when it closes', async () => {
+    await act(() => root.render(<Harness filters={DEFAULT_LIBRARY_FILTERS} />));
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    const row = host.querySelector<HTMLElement>('[data-list-row="main-1"]')!;
+    const primary = row.querySelector<HTMLButtonElement>('[data-list-primary]')!;
+
+    await act(() => primary.focus());
+    // Keyboard-invoked context menus arrive as a contextmenu event with no pointer position.
+    await act(() => {
+      row.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 0, clientY: 0 }));
+    });
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull());
+    await vi.waitFor(() =>
+      expect(document.querySelector('[role="menu"]')!.contains(document.activeElement)).toBe(true)
+    );
+
+    await userEvent.keyboard('{Escape}');
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).toBeNull());
+    expect(document.activeElement).toBe(primary);
+  });
+});
+
 describe('ModelLibraryList pinned group header', () => {
   let host: HTMLDivElement;
   let root: Root;
@@ -141,13 +185,14 @@ describe('ModelLibraryList pinned group header', () => {
     });
   };
 
-  const pinnedHeaderText = () => host.querySelector<HTMLElement>('[data-pinned-group-header]')?.textContent ?? '';
+  const pinnedHeaderText = () => host.querySelector<HTMLElement>('[data-list-pinned-header]')?.textContent ?? '';
 
   it('swaps the pinned header when a group scrolls under it, not an overscan later', async () => {
     await act(() => root.render(<Harness filters={DEFAULT_LIBRARY_FILTERS} />));
     await settleFrame();
 
-    const viewport = host.querySelector<HTMLElement>('[aria-label="models.library"]');
+    expect(host.querySelector('[role="list"][aria-label="models.library"]')).not.toBeNull();
+    const viewport = host.querySelector<HTMLElement>('[data-list-viewport]');
 
     expect(viewport).not.toBeNull();
     expect(pinnedHeaderText()).toContain('Main Models');
@@ -162,9 +207,9 @@ describe('ModelLibraryList pinned group header', () => {
       });
     };
 
-    // Rows: main header (30px) + 20 main rows (56px each) put the LoRAs header
-    // at 1150px; one row past it, the first visible row is a lora.
-    await scrollTo(1206);
+    // Rows: main header (32px) + 20 main rows (56px each) put the LoRAs header
+    // at 1152px; one row past it, the first visible row is a lora.
+    await scrollTo(1208);
     expect(pinnedHeaderText()).toContain('LoRAs');
 
     await scrollTo(0);

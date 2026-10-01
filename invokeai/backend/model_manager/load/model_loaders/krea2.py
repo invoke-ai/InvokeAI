@@ -1,4 +1,3 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Class for Krea-2 model loading in InvokeAI."""
 
 from abc import abstractmethod

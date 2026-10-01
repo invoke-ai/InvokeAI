@@ -1,5 +1,6 @@
 import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery';
 import type { GalleryItemContextMenuTarget } from '@features/gallery/react';
+import type { VideoConditioningRole } from '@features/video';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
 import { HStack, Icon, Menu, Portal, ScrollArea, Text } from '@chakra-ui/react';
@@ -11,13 +12,16 @@ import {
 } from '@features/gallery';
 import { MenuContent, MenuIconItem } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ClapperboardIcon,
   AsteriskIcon,
+  AudioLinesIcon,
   ChevronRightIcon,
   CopyIcon,
+  CrosshairIcon,
   DownloadIcon,
   ExternalLinkIcon,
   EyeIcon,
@@ -26,6 +30,7 @@ import {
   FilmIcon,
   FolderIcon,
   ImageIcon,
+  ImagePlayIcon,
   ImagesIcon,
   LayersIcon,
   QuoteIcon,
@@ -375,6 +380,16 @@ const SingleItemMenuItems = ({
       actions.useAsReferenceVideo(item);
     }
   }, [actions, item]);
+  const makeConditioningClipHandler = useCallback(
+    (role: VideoConditioningRole) => () => {
+      if (item.kind === 'video') {
+        actions.useAsConditioningClip(item, role);
+      }
+    },
+    [actions, item]
+  );
+  const handleUseSoundtrack = useMemo(() => makeConditioningClipHandler('audio'), [makeConditioningClipHandler]);
+  const handleUsePicture = useMemo(() => makeConditioningClipHandler('video'), [makeConditioningClipHandler]);
 
   return (
     <>
@@ -446,6 +461,23 @@ const SingleItemMenuItems = ({
             value="use-as-reference-video"
             onClick={handleUseAsReferenceVideo}
           />
+          <ContextSubMenu icon={AudioLinesIcon} label="Use as Conditioning Clip">
+            <ContextMenuItem
+              disabled={!actions.canUseAsConditioningClip.audio}
+              icon={AudioLinesIcon}
+              label={t('widgets.video.conditioningRoleAudio')}
+              value="use-as-conditioning-audio"
+              onClick={handleUseSoundtrack}
+            />
+            {/* A wrapped audio upload's picture is a placeholder, so it has nothing to lend. */}
+            <ContextMenuItem
+              disabled={!actions.canUseAsConditioningClip.video || item.mediaOrigin === 'audio_upload'}
+              icon={ImagePlayIcon}
+              label={t('widgets.video.conditioningRoleVideo')}
+              value="use-as-conditioning-video"
+              onClick={handleUsePicture}
+            />
+          </ContextSubMenu>
         </>
       ) : null}
       {item.kind === 'video' && previewVideoActions && previewVideoActions.itemKey === toGalleryItemKey(item) ? (
@@ -466,6 +498,7 @@ const SingleItemMenuItems = ({
           <Menu.Separator borderColor="border.subtle" />
         </>
       ) : null}
+      <FindInGalleryMenuItem itemRef={itemRef} />
       <ChangeBoardSubMenu boards={boards} currentBoardId={item.boardId} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem
@@ -700,6 +733,7 @@ const SingleImageMenuItems = ({
     [actions, image.imageName]
   );
   const handleDelete = useCallback(() => onRequestDeletion([image.imageName]), [image.imageName, onRequestDeletion]);
+  const imageItemRef = useMemo<GalleryItemRef>(() => ({ kind: 'image', name: image.imageName }), [image.imageName]);
   const handleRecallAll = useRecallImageDataHandler(actions, image, 'all');
   const handleRecallRemix = useRecallImageDataHandler(actions, image, 'remix');
   const handleRecallPrompts = useRecallImageDataHandler(actions, image, 'prompts');
@@ -823,6 +857,7 @@ const SingleImageMenuItems = ({
       />
       <Menu.Separator borderColor="border.subtle" />
       <NewFromImageSubMenu actions={actions} images={images} isBulk={false} />
+      <FindInGalleryMenuItem itemRef={imageItemRef} />
       <ChangeBoardSubMenu boards={boards} currentBoardId={image.boardId} onMove={handleMove} />
       <Menu.Separator borderColor="border.subtle" />
       <ContextMenuItem isDanger icon={Trash2Icon} label="Delete Image" value="delete-image" onClick={handleDelete} />
@@ -1004,6 +1039,21 @@ const GalleryCanvasImportDestinationMenuItem = ({
   );
 
   return <ContextMenuItem icon={LayersIcon} label={t(item.label)} value={item.value} onClick={handleClick} />;
+};
+
+const FindInGalleryMenuItem = ({ itemRef }: { itemRef: GalleryItemRef }) => {
+  const { t } = useTranslation();
+  const findGalleryItem = useFindGalleryItem();
+  const handleClick = useCallback(() => findGalleryItem(itemRef), [findGalleryItem, itemRef]);
+
+  return (
+    <ContextMenuItem
+      icon={CrosshairIcon}
+      label={t('widgets.gallery.findInGallery')}
+      value="find-in-gallery"
+      onClick={handleClick}
+    />
+  );
 };
 
 const ChangeBoardSubMenu = ({

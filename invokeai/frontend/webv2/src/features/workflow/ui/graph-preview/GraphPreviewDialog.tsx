@@ -2,18 +2,20 @@ import type { GraphPreviewSourceState, WorkflowInvocationSourceId } from '@featu
 import type { ReactFlowInstance } from '@xyflow/react';
 import type { ReactNode } from 'react';
 
-import { Box, Dialog, Icon, Portal, Stack, Text } from '@chakra-ui/react';
+import { Box, Center, Dialog, Icon, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { localizeForLoopValidationReason } from '@features/workflow/core/forLoops';
 import { useWorkflowGraphPreview } from '@features/workflow/ui/WorkflowUiContext';
 import { Button, JsonPreview, SegmentTabs, segmentTabsPanelId, segmentTabsTabId, toaster } from '@platform/ui';
 import { CheckIcon, ChevronUpIcon, CopyIcon, TriangleAlertIcon } from 'lucide-react';
-import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { lazy, Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GraphPreviewFlow } from './GraphPreviewFlow';
-import { GraphPreviewList } from './GraphPreviewList';
 import { GraphPreviewOpenAsMenu } from './GraphPreviewOpenAsMenu';
 import { GraphPreviewSidePanel } from './GraphPreviewSidePanel';
+
+// Loaded through this module so the snapshot shares the dialog's chunk; a second entry splits the flow out of it.
+export { GraphPreviewSnapshot } from './GraphPreviewSnapshot';
 
 interface GraphPreviewDialogProps {
   graphId: string;
@@ -39,6 +41,21 @@ const modeItems = [
 
 const COPY_RESET_DELAY_MS = 1500;
 const SELECT_AND_REVEAL_FIT_VIEW_OPTIONS = { duration: 150, maxZoom: 1 } as const;
+
+// List mode brings the virtualized list; load it when chosen so the workflow route's startup does not carry it.
+const GraphPreviewList = lazy(() =>
+  import('./GraphPreviewList').then((module) => ({ default: module.GraphPreviewList }))
+);
+const ListFallback = () => {
+  const { t } = useTranslation();
+
+  return (
+    <Center aria-label={t('common.loading')} h="full" role="status">
+      <Spinner color="fg.subtle" size="sm" />
+    </Center>
+  );
+};
+const LIST_FALLBACK = <ListFallback />;
 
 const PreviewPane = ({ children }: { children: ReactNode }) => (
   <Box flex="1" h="full" minH="0" minW="0" w="full" rounded="md" borderWidth={1} overflow="hidden">
@@ -228,7 +245,12 @@ export const GraphPreviewDialog = ({
                     ) : mode === 'json' ? (
                       <JsonPreview h="full" label={jsonLabel} maxH="100%" value={graph} />
                     ) : mode === 'list' ? (
-                      <GraphPreviewList graph={graph} onSelect={selectAndReveal} />
+                      // The inset keeps the first row off the pane's rounded border.
+                      <Box display="flex" flexDirection="column" h="full" pt="2">
+                        <Suspense fallback={LIST_FALLBACK}>
+                          <GraphPreviewList graph={graph} selectedNodeId={selectedNodeId} onSelect={selectAndReveal} />
+                        </Suspense>
+                      </Box>
                     ) : (
                       <GraphPreviewFlow
                         graph={graph}

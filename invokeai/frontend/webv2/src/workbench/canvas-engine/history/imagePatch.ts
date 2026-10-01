@@ -12,9 +12,10 @@ import { NO_HELD_ASSET_REFS } from './history';
 
 /**
  * Engine-owned pixel write at the layer-local rect, including invalidation/versioning and dirty persistence
- * marking.
+ * marking. It first makes the layer's cache trustworthy (rasterizing an evicted or stale one) and rejects, leaving
+ * the cache unchanged, when it cannot.
  */
-export type ImagePatchApply = (layerId: string, rect: Rect, pixels: ImageData) => void;
+export type ImagePatchApply = (layerId: string, rect: Rect, pixels: ImageData) => Promise<void>;
 
 /** Options for {@link createImagePatchEntry}. */
 export interface CreateImagePatchEntryOptions {

@@ -219,7 +219,7 @@ def test_context_parallelism_is_unreachable_so_chunking_cannot_interact_with_it(
 
     invokeai_root = Path(invokeai.__file__).parent
     vendored = invokeai_root / "backend" / "pid" / "_src"
-    # Scan the Python trees only: `invokeai/frontend/web` carries node_modules, which is huge and
+    # Scan the Python trees only: `invokeai/frontend/webv1` carries node_modules, which is huge and
     # contains symlinks that break a naive walk.
     callers = [
         path

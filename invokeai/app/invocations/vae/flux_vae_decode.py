@@ -15,11 +15,10 @@ from invokeai.app.invocations.fields import (
 from invokeai.app.invocations.model import VAEField
 from invokeai.app.invocations.primitives import ImageOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.oom import is_oom_error
-from invokeai.backend.util.vae_tiling_scope import scoped_vae_tiling
+from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE, scoped_vae_tiling
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
 
 
@@ -28,7 +27,7 @@ from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory
     title="Latents to Image - FLUX",
     tags=["latents", "image", "vae", "l2i", "flux"],
     category="latents",
-    version="1.0.2",
+    version="1.1.0",
 )
 class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
     """Generates an image from latents."""
@@ -41,49 +40,53 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         description=FieldDescriptions.vae,
         input=Input.Connection,
     )
+    tiled: bool = InputField(default=False, description=FieldDescriptions.tiled)
+    # 0 is the "use the model's default" sentinel shared with the SD and Qwen-Image nodes: the
+    # workflow UI cannot represent None in a number field.
+    tile_size: int = InputField(
+        default=0,
+        multiple_of=8,
+        description=f"{FieldDescriptions.vae_tile_size} Values between 1 and "
+        f"{MIN_TILE_SAMPLE_SIZE} are raised to {MIN_TILE_SAMPLE_SIZE}.",
+    )
 
     def _vae_decode(self, context: InvocationContext, vae_info: LoadedModel, latents: torch.Tensor) -> Image.Image:
-        assert isinstance(vae_info.model, (AutoEncoder, AutoencoderKL))
+        # Deliberately still a class check, and deliberately not `is_flux_family_vae`.
+        #
+        # This node has accepted any `AutoencoderKL` since before the FLUX.1 VAE became one, so the
+        # hazard that a foreign 16-channel VAE (SD 3.5's is the same 244 tensors with the same
+        # shapes, differing only in `scaling_factor`/`shift_factor`) decodes here and is normalised
+        # by the wrong constant is pre-existing, not introduced by that swap. Narrowing it would also
+        # refuse a VAE whose config carries no `shift_factor`, which `test_flux_vae_decode.py`
+        # exercises on purpose. The encode node *is* guarded, because it used to reject every
+        # `AutoencoderKL` and the swap is what widened it.
+        assert isinstance(vae_info.model, AutoencoderKL)
+        use_tiling = self.tiled or context.config.get().force_tiled_decode
+        tile_size = self.tile_size if use_tiling else None
 
-        # This node has no tiling fields, so the config switch is the only way a user can ask for a
-        # tiled decode here -- the same one the Z-Image, SD and Qwen-Image decode nodes honour. 0 is
-        # the "use the VAE's default tile" sentinel shared by the estimator and `scoped_vae_tiling`.
-        use_tiling = context.config.get().force_tiled_decode
-        tile_size = 0 if use_tiling else None
-
-        # Only estimate working memory for BFL AutoEncoder (diffusers VAE handles this internally)
-        if isinstance(vae_info.model, AutoEncoder):
-            estimated_working_memory = estimate_vae_working_memory_flux(
-                operation="decode", image_tensor=latents, vae=vae_info.model, tile_size=tile_size
-            )
-        else:
-            estimated_working_memory = 0
+        estimated_working_memory = estimate_vae_working_memory_flux(
+            operation="decode", image_tensor=latents, vae=vae_info.model, tile_size=tile_size
+        )
 
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
-            assert isinstance(vae, (AutoEncoder, AutoencoderKL))
+            assert isinstance(vae, AutoencoderKL)
             vae_dtype = next(iter(vae.parameters())).dtype
             # Use the VAE's intended compute device (CUDA/MPS, or CPU if configured cpu_only). Do NOT infer it from
             # current param residency: partial loading may have temporarily offloaded all weights to RAM, which would
             # wrongly place the latents (and thus the whole decode) on the CPU (see #9373).
             latents = latents.to(device=vae_info.compute_device, dtype=vae_dtype)
 
-            if not isinstance(vae, AutoEncoder):
-                # Diffusers AutoencoderKL returns DecoderOutput with .sample attribute
-                # Scale latents for diffusers VAE (FLUX uses shift_factor and scale_factor).
-                # `shift_factor` is optional on AutoencoderKL: the FLUX VAE sets one, but a plain
-                # SD-style config leaves it None, and `tensor + None` raises TypeError. Absent means
-                # no shift — same handling as the Z-Image and PiD decode paths.
-                scaling_factor = vae.config.scaling_factor
-                shift_factor = getattr(vae.config, "shift_factor", None)
+            # `AutoencoderKL` leaves the scaling to the caller. `shift_factor` is optional on the
+            # class: the FLUX VAE sets one, but a plain SD-style config leaves it None, and
+            # `tensor + None` raises TypeError. Absent means no shift.
+            scaling_factor = vae.config.scaling_factor
+            shift_factor = getattr(vae.config, "shift_factor", None)
 
-                latents = latents / scaling_factor
-                if shift_factor is not None:
-                    latents = latents + shift_factor
+            latents = latents / scaling_factor
+            if shift_factor is not None:
+                latents = latents + shift_factor
 
             def decode() -> torch.Tensor:
-                if isinstance(vae, AutoEncoder):
-                    # BFL AutoEncoder returns tensor directly
-                    return vae.decode(latents)
                 return vae.decode(latents, return_dict=False)[0]
 
             # The tiling state is set explicitly for this decode rather than inherited from whatever

@@ -1,8 +1,5 @@
-import type { CanvasLayerPreviewMutation } from '@workbench/canvas-engine/capabilities';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
-import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
-import { createTestEditConcurrency } from '@workbench/canvas-engine/editConcurrency.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
 import { LayerController } from './layerController';
@@ -11,15 +8,10 @@ import { StructuralLayerController } from './structuralLayerController';
 describe('LayerController', () => {
   const mask = {
     applyImagePatch: vi.fn(),
-    canEdit: () => true,
+    ctx: {} as never,
     deleteDerived: vi.fn(),
     discardPersisted: vi.fn(),
-    dispatch: vi.fn(),
-    endBurst: vi.fn(),
-    getDocument: () => null,
-    history: {} as never,
     isCacheReady: () => false,
-    isGestureActive: () => false,
     layers: {} as never,
     markDirty: vi.fn(),
     notifyPainted: vi.fn(),
@@ -41,129 +33,62 @@ describe('LayerController', () => {
   };
   const structural = new StructuralLayerController({
     ctx: {
+      applyStep: vi.fn(),
+      begin: () => ({ status: 'not-ready' }),
       canEdit: () => true,
-      capturePermit: () => ({ epoch: 0 }),
-      projectId: 'p',
       dispatch: vi.fn(() => true),
-      dispatchPrepared: vi.fn(),
       getDocument: () => null,
       getEditRevision: () => 0,
       getReducerDocument: () => null,
-      history: { push: vi.fn() } as never,
+      historyTop: () => null,
       isGestureActive: () => false,
+      projectId: 'p',
     },
   });
-  const rasterize = {
-    backend: {} as never,
-    canEdit: () => true,
-    dispatch: vi.fn(),
-    endBurst: vi.fn(),
-    getDocument: () => null,
-    history: {} as never,
-    isGestureActive: () => false,
-    layers: {} as never,
-    markDirty: vi.fn(),
-    notifyPainted: vi.fn(),
-    rasterizeDeps: vi.fn(),
-  };
+  // The layer operations are exercised by their own tests; here they only need to construct.
+  const rasterize = { backend: {} as never, ctx: {} as never, rasterizeDeps: vi.fn() };
   const merge = {
     backend: {} as never,
-    canEdit: () => true,
     ctx: {} as never,
     exportBaked: vi.fn(),
     hasExportableContent: () => false,
     isCacheReady: () => true,
     layers: {} as never,
-    markDirty: vi.fn(),
     needsPixelPersistence: () => false,
-    notifyPainted: vi.fn(),
     publishSelectedLayerIds: vi.fn(),
-    reserve: vi.fn(),
   };
   const booleanMerge = {
     backend: {} as never,
-    concurrency: createTestEditConcurrency({ capturePermit: () => null }),
-    createLayerId: () => 'result',
-    captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
-    dispatchPrepared: vi.fn(),
-    endBurst: vi.fn(),
+    ctx: {} as never,
     exportBaked: vi.fn(),
-    getDocument: () => null,
-    getReducerDocument: () => null,
-    history: {} as never,
-    installPrepared: vi.fn(),
     isCacheReady: () => true,
     isGuardCurrent: () => true,
-    preparePixels: vi.fn(),
   };
   const extractMaskedArea = {
     backend: {} as never,
-    concurrency: createTestEditConcurrency({ capturePermit: () => null }),
-    createLayerId: () => 'result',
-    captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
+    ctx: {} as never,
     derived: {} as never,
     diagnostics: {} as never,
-    dispatchPrepared: vi.fn(),
-    endBurst: vi.fn(),
     exportBaked: vi.fn(),
     getAdjustedSurface: vi.fn(),
-    getDocument: () => null,
     getMaskPattern: () => null,
-    getReducerDocument: () => null,
     hasExportableContent: () => false,
-    history: {} as never,
-    installPrepared: vi.fn(),
     isCacheReady: () => true,
     isGuardCurrent: () => true,
     layers: {} as never,
-    preparePixels: vi.fn(),
     rasterize: vi.fn(),
   };
   const crop = {
     backend: {} as never,
     captureCache: vi.fn(),
-    concurrency: createTestEditConcurrency({ capturePermit: () => null }),
+    ctx: {} as never,
     discardPersisted: vi.fn(),
-    dispatchPrepared: vi.fn(),
-    endBurst: vi.fn(),
     exportBaked: vi.fn(),
-    getDocument: () => null,
-    getReducerDocument: () => null,
-    history: {} as never,
-    installPrepared: vi.fn(),
     isGuardCurrent: () => true,
     isSupportedSource: () => true,
-    preparePixels: vi.fn(),
   };
-  const copy = {
-    concurrency: createTestEditConcurrency({ capturePermit: () => null }),
-    createLayerId: () => 'copy',
-    captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
-    dispatchPrepared: vi.fn(),
-    endBurst: vi.fn(),
-    exportBaked: vi.fn(),
-    getDocument: () => null,
-    getReducerDocument: () => null,
-    history: {} as never,
-    installPrepared: vi.fn(),
-    isGuardCurrent: () => true,
-    preparePixels: vi.fn(),
-  };
-  const newRasterLayer = {
-    backend: {} as never,
-    concurrency: createTestEditConcurrency({ capturePermit: () => null }),
-    createLayerId: () => 'new',
-    captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
-    dispatchPrepared: vi.fn(),
-    endBurst: vi.fn(),
-    getDocument: () => null,
-    getReducerDocument: () => null,
-    history: {} as never,
-    installPrepared: vi.fn(),
-    layers: {} as never,
-    preparePixels: vi.fn(),
-    selection: {} as never,
-  };
+  const copy = { backend: {} as never, ctx: {} as never, exportBaked: vi.fn(), isGuardCurrent: () => true };
+  const newRasterLayer = { backend: {} as never, ctx: {} as never, layers: {} as never, selection: {} as never };
   it('exposes only declared layer and preview ports', async () => {
     const forward: CanvasProjectMutation = { id: 'layer', type: 'setCanvasSelectedLayer' };
     const inverse: CanvasProjectMutation = { id: null, type: 'setCanvasSelectedLayer' };
@@ -183,7 +108,9 @@ describe('LayerController', () => {
     const controller = new LayerController(deps);
 
     expect(
-      controller.layers.applyStructuralPreview({ id: 'layer', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' })
+      controller.layers
+        .beginStructuralPreview()
+        ?.apply({ id: 'layer', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' })
     ).toBe(true);
     controller.layers.commitStructural('edit', forward, inverse);
     expect(controller.previews.drawLayerThumbnail('layer', {} as HTMLCanvasElement, 96)).toBe(false);
@@ -208,7 +135,7 @@ describe('LayerController', () => {
     controller.dispose();
     controller.dispose();
 
-    expect(controller.layers.applyStructuralPreview({} as CanvasLayerPreviewMutation)).toBe(false);
+    expect(controller.layers.beginStructuralPreview()).toBeNull();
     controller.layers.commitStructural('late', {} as CanvasProjectMutation, {} as CanvasProjectMutation);
     expect(controller.previews.drawLayerThumbnail('layer', {} as HTMLCanvasElement, 96)).toBe(false);
   });

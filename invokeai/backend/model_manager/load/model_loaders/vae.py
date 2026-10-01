@@ -1,4 +1,3 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Class for VAE model loading in InvokeAI."""
 
 from pathlib import Path
@@ -13,7 +12,9 @@ from invokeai.backend.model_manager.configs.vae import (
     VAE_Checkpoint_Anima_Config,
     VAE_Checkpoint_Config_Base,
     VAE_Checkpoint_QwenImage_Config,
+    VAE_Checkpoint_SD3_Config,
     VAE_Checkpoint_Wan_Config,
+    VAE_Diffusers_FLUX_Config,
     VAE_Diffusers_Wan_Config,
 )
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
@@ -28,6 +29,7 @@ from invokeai.backend.model_manager.taxonomy import (
 from invokeai.backend.quantization.fp8_scaled import reject_quantized_side_channel
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.loaders import raise_on_incomplete_sdnq_load, sdnq_sd_loader
+from invokeai.backend.sd3.vae import get_sd3_vae_diffusers_config
 from invokeai.backend.util.state_dict_loading import load_state_dict_ignoring_extras
 
 
@@ -42,6 +44,12 @@ def _is_sdnq_vae_folder(path: Path) -> bool:
 
 _QWEN_IMAGE_LAYOUT_MARKER = "decoder.conv_in.weight"
 """Present only in the diffusers export of the Qwen-Image VAE."""
+
+_LDM_LAYOUT_MARKER = "encoder.down.0.block.0.norm1.weight"
+"""Present in the original LDM layout of a 2-D `AutoencoderKL` (and in BFL's, which is the same)."""
+
+_DIFFUSERS_LAYOUT_MARKER = "encoder.down_blocks.0.resnets.0.norm1.weight"
+"""The same tensor in the diffusers layout."""
 
 _WAN_LAYOUT_MARKER = "decoder.middle.0.residual.0.gamma"
 """Present only in the original Wan-family layout.
@@ -246,6 +254,8 @@ class VAELoader(GenericDiffusersLoader):
             return self._load_wan_vae_diffusers(config)
         elif isinstance(config, VAE_Checkpoint_QwenImage_Config):
             return self._load_qwen_image_vae(config)
+        elif isinstance(config, VAE_Checkpoint_SD3_Config):
+            return self._load_sd3_vae(config)
         elif isinstance(config, VAE_Checkpoint_Config_Base):
             return AutoencoderKL.from_single_file(
                 config.path,
@@ -258,7 +268,49 @@ class VAELoader(GenericDiffusersLoader):
         if model_path.is_dir() and _is_sdnq_vae_folder(model_path):
             return self._load_sdnq_vae(model_path)
 
+        if isinstance(config, VAE_Diffusers_FLUX_Config):
+            # In the dtype every other FLUX.1 VAE path uses: the generic loader below would take float16,
+            # which `precision: auto` picks on CUDA and MPS and which this autoencoder is broken in.
+            return AutoencoderKL.from_pretrained(
+                model_path, torch_dtype=self._torch_dtype_avoiding_float16(), local_files_only=True
+            )
+
+        # The FLUX, Z-Image and SD3 model loaders ask for a standalone VAE as `SubModelType.VAE`, the
+        # way they ask a main model for its VAE. A standalone VAE folder *is* that submodel; the
+        # generic loader would read the request as one for a submodel the folder does not have.
+        if submodel_type is SubModelType.VAE:
+            submodel_type = None
         return super()._load_model(config, submodel_type)
+
+    def _load_sd3_vae(self, config: VAE_Checkpoint_SD3_Config) -> AnyModel:
+        """Load a single-file SD3 VAE into an `AutoencoderKL` built with SD3's constants.
+
+        `AutoencoderKL.from_single_file` cannot: with no config beside the weights, diffusers infers
+        the model from the keys, finds no pipeline around a bare VAE and builds SD 1.5's 4-channel one.
+
+        Both layouts are accepted, where `FluxVAELoader` refuses the diffusers one. For FLUX.1 the base
+        may be nothing more than the default every unnamed 16-channel file gets; for SD3 it never is,
+        because identification files a VAE under SD3 only when its name or an explicit override says
+        so. The LDM layout is the one a VAE extracted from an SD3 single-file checkpoint comes in.
+        """
+        from diffusers.loaders.single_file_utils import convert_ldm_vae_checkpoint
+
+        name = Path(config.path).name
+        sd = _read_checkpoint(config.path)
+        reject_quantized_side_channel(sd, f"SD3 VAE checkpoint {name}")
+
+        with accelerate.init_empty_weights():
+            model = AutoencoderKL(**get_sd3_vae_diffusers_config())
+
+        if _LDM_LAYOUT_MARKER in sd:
+            sd = convert_ldm_vae_checkpoint(sd, model.config)
+        elif _DIFFUSERS_LAYOUT_MARKER not in sd:
+            raise ValueError(f"{name} is in neither the diffusers nor the LDM layout of the SD3 autoencoder.")
+
+        sd = {k: v.to(self._torch_dtype) if v.is_floating_point() else v for k, v in sd.items()}
+        load_state_dict_ignoring_extras(model, sd, source="SD3 VAE checkpoint", assign=True)
+        model.eval()
+        return model
 
     def _load_wan_vae(self, config: VAE_Checkpoint_Wan_Config) -> AnyModel:
         """Load a Wan 2.2 VAE from a single-file checkpoint.

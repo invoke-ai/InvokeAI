@@ -1,6 +1,6 @@
 /**
  * Shared click-to-place polyline with cursor band. Close on double-click, Enter or first-vertex screen-radius hit;
- * preview that hit with a ring.
+ * preview that hit with a ring. Freehand traces share the same CSS-pixel input decimation.
  */
 
 import type { LassoPreview } from '@workbench/canvas-engine/engineStores';
@@ -85,3 +85,35 @@ export const polylinePreview = (session: PolylineSession): LassoPreview => ({
   kind: 'polygon',
   points: session.points.slice(),
 });
+
+/** Minimum on-screen gap (CSS px) between stored freehand points, independent of zoom. */
+export const FREEHAND_MIN_POINT_SPACING_PX = 2;
+
+/** A dragged freehand outline: document-space points, decimated by on-screen travel. */
+export interface FreehandTrace {
+  points: Vec2[];
+  lastScreen: Vec2;
+}
+
+export const startFreehandTrace = (input: PointerInput): FreehandTrace => ({
+  lastScreen: input.screenPoint,
+  points: [{ x: input.documentPoint.x, y: input.documentPoint.y }],
+});
+
+export const extendFreehandTrace = (trace: FreehandTrace, samples: readonly PointerInput[]): void => {
+  for (const sample of samples) {
+    if (distance(trace.lastScreen, sample.screenPoint) >= FREEHAND_MIN_POINT_SPACING_PX) {
+      trace.points.push({ x: sample.documentPoint.x, y: sample.documentPoint.y });
+      trace.lastScreen = sample.screenPoint;
+    }
+  }
+};
+
+/** The completed outline, always ending on the release point. */
+export const finishFreehandTrace = (trace: FreehandTrace, input: PointerInput): Vec2[] => {
+  const last = trace.points[trace.points.length - 1];
+  const final = input.documentPoint;
+  return last && last.x === final.x && last.y === final.y
+    ? trace.points.slice()
+    : [...trace.points, { x: final.x, y: final.y }];
+};

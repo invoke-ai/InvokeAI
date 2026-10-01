@@ -1,4 +1,3 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Z-Image ControlNet Extension for spatial conditioning.
 
 This module provides an extension-based approach to Z-Image ControlNet,

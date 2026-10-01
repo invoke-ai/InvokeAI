@@ -2,8 +2,8 @@ import type { ProjectGraphState, WorkflowEdge as WorkflowDocumentEdge, XYPositio
 import type { WorkflowPerfSource, WorkflowRuntimeApi } from '@features/workflow/ui/contracts';
 
 import { Box, Flex, HStack, Spinner, Stack, Text } from '@chakra-ui/react';
-import '@xyflow/react/dist/style.css';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
+import '@xyflow/react/dist/style.css';
 import { FlowMiniMap, flowThemeCss, getFlowColorMode } from '@features/workflow/ui/graph-preview';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import {
@@ -58,6 +58,9 @@ import {
   startTransition,
   type MouseEvent as ReactMouseEvent,
 } from 'react';
+import { flushSync } from 'react-dom';
+
+import type { WorkflowImageExportView } from './WorkflowImageExportView';
 
 import { buildDuplicateElements, buildPasteElements, copyNodesToClipboard, useHasClipboardNodes } from './clipboard';
 import { ConnectorFlowNode } from './ConnectorFlowNode';
@@ -239,6 +242,13 @@ export const getInitialRenderFlowModel = (model: WorkflowFlowModel, viewport: Vi
   return { edges, nodes };
 };
 
+export const getRenderedFlowModel = (
+  model: WorkflowFlowModel | null,
+  viewport: Viewport,
+  { isFullGraphMounted, isLargeGraph }: { isFullGraphMounted: boolean; isLargeGraph: boolean }
+): WorkflowFlowModel | null =>
+  model && isLargeGraph && !isFullGraphMounted ? getInitialRenderFlowModel(model, viewport) : model;
+
 const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const projectGraph = useWorkflowProjectSelector((project) => project.projectGraph);
   const projectId = useWorkflowProjectSelector((project) => project.id);
@@ -282,6 +292,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   );
   // XYFlow recreates its controller when React Activity reveals this view and reads this object on reconnect.
   const defaultViewport = useMemo(() => getWorkflowViewport(viewportKey) ?? { ...DEFAULT_VIEWPORT }, [viewportKey]);
+  // A workflow this editor has not shown yet (a load, a switch, a reload) opens fitted rather than at the origin.
+  const [fitOnMount] = useState(() =>
+    getWorkflowViewport(viewportKey) === null ? projectGraph.nodes.map(({ id, position }) => ({ id, position })) : null
+  );
   const perfSource = useMemo<WorkflowPerfSource>(
     () => ({
       area: 'editor',
@@ -311,6 +325,18 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const shouldDeferInitialBuild = isLargeGraph && flowModel === null;
   const [flowInstance, setFlowInstance] = useState<WorkflowFlowInstance | null>(null);
   const [isFullGraphMounted, setIsFullGraphMounted] = useState(!isLargeGraph);
+  const [ExportView, setExportView] = useState<typeof WorkflowImageExportView | null>(null);
+  const exportRef = useRef<HTMLDivElement>(null);
+  const onExportPrepare = useCallback(async () => {
+    const { WorkflowImageExportView } = await import('./WorkflowImageExportView');
+    flushSync(() => setExportView(() => WorkflowImageExportView));
+    const element = exportRef.current?.querySelector<HTMLElement>('.react-flow');
+    if (!element) {
+      throw new Error('Workflow export view did not mount');
+    }
+    return element;
+  }, []);
+  const onExportComplete = useCallback(() => setExportView(null), []);
   const [tool, setTool] = useState<EditorTool>('pan');
   const [nodeOpacity, setNodeOpacity] = useState(1);
   const [isMinimapReady, setIsMinimapReady] = useState(!isLargeGraph);
@@ -397,10 +423,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   });
   const pointerToolHandlers = tool === 'lasso' ? lassoHandlers : tool === 'eraser' ? eraserHandlers : {};
   const renderedFlowModel = useMemo(
-    () =>
-      flowModel && isLargeGraph && !isFullGraphMounted
-        ? getInitialRenderFlowModel(flowModel, defaultViewport)
-        : flowModel,
+    () => getRenderedFlowModel(flowModel, defaultViewport, { isFullGraphMounted, isLargeGraph }),
     [defaultViewport, flowModel, isFullGraphMounted, isLargeGraph]
   );
   const renderedFlowNodes = renderedFlowModel?.nodes ?? EMPTY_FLOW_NODES;
@@ -1191,17 +1214,37 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
           nodeOpacity={nodeOpacity}
           tool={tool}
           updatableNodeCount={updatableNodeCount}
+          onExportPrepare={onExportPrepare}
+          onExportComplete={onExportComplete}
           onNodeOpacityChange={setNodeOpacity}
           onToolChange={setTool}
           onUpdateNodes={onUpdateNodes}
         />
         {workflowShowMinimap && (!isLargeGraph || isMinimapReady) ? <FlowMiniMap /> : null}
       </ReactFlow>
+      {ExportView ? (
+        <ExportView
+          containerRef={exportRef}
+          colorMode={getFlowColorMode(themeId)}
+          defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
+          edges={flowEdges}
+          edgeTypes={edgeTypes}
+          nodes={flowNodes}
+          nodeTypes={nodeTypes}
+          style={flowStyle}
+        >
+          <LoopBodyBoundaryOverlay edges={projectGraph.edges} nodes={projectGraph.nodes} />
+        </ExportView>
+      ) : null}
       {flowInstance ? (
         <WorkflowSelectionRequestRuntime
+          fitOnMount={fitOnMount}
           flowInstance={flowInstance}
+          isLargeGraph={isLargeGraph}
+          projectId={projectId}
           reduceMotion={reduceMotion}
           selectNodes={selectNodes}
+          workflowId={workflowId}
         />
       ) : null}
       {lassoOverlay}

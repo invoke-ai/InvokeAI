@@ -1,5 +1,5 @@
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { WidgetCommandContribution, WidgetHotkeyContribution } from '@workbench/widgetContracts';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 
 import { act, createElement, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';

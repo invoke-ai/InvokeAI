@@ -822,7 +822,7 @@ export const LAYER_CONTEXT_ACTION_DEFINITIONS: readonly LayerContextActionDefini
     supportedLayerTypes: ALL_LAYER_TYPES,
   },
   {
-    defaultLabel: 'Save layer to assets',
+    defaultLabel: 'Save layer to uploads',
     handler: ({ effects }) => effects.saveToAssets(),
     icon: SaveIcon,
     id: 'save-to-assets',

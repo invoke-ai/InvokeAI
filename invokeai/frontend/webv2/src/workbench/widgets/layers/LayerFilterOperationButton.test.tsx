@@ -22,13 +22,12 @@ interface CapturedTooltipProps {
   disabled?: boolean;
 }
 
-const { captured, notifyError, thumbnailSubscription } = vi.hoisted(() => ({
+const { captured, notifyError } = vi.hoisted(() => ({
   captured: {
     button: null as CapturedButtonProps | null,
     tooltip: null as CapturedTooltipProps | null,
   },
   notifyError: vi.fn(),
-  thumbnailSubscription: vi.fn(),
 }));
 
 vi.mock('@platform/ui', async (importOriginal) => {
@@ -49,9 +48,6 @@ vi.mock('@platform/ui', async (importOriginal) => {
 vi.mock('@workbench/useNotify', () => ({
   useNotify: () => ({ error: notifyError, info: vi.fn(), success: vi.fn() }),
 }));
-vi.mock('@workbench/widgets/canvas/engineStoreHooks', () => ({
-  useLayerThumbnailVersion: thumbnailSubscription,
-}));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
@@ -66,6 +62,7 @@ const createEngine = (
   const startFilterOperation = vi.fn(launch);
   const engine = {
     exports: { hasExportableLayerContent },
+    interaction: { subscribe: () => () => undefined },
     operations: { startFilterOperation },
   } as unknown as LayerFilterOperationEngine;
 
@@ -103,7 +100,6 @@ beforeEach(() => {
   captured.button = null;
   captured.tooltip = null;
   notifyError.mockClear();
-  thumbnailSubscription.mockClear();
 });
 
 describe('LayerFilterOperationButton eligibility', () => {
@@ -143,7 +139,7 @@ describe('LayerFilterOperationButton eligibility', () => {
   it.each([
     ['raster', createEmptyPaintLayer('Raster', 'raster')],
     ['control', createControlLayer('Control', 'control')],
-  ] as const)('enables a filterable %s layer and subscribes to its thumbnail', (_type, layer) => {
+  ] as const)('enables a filterable %s layer', (_type, layer) => {
     const { engine } = createEngine(true);
     const { button, tooltip } = renderButton(engine, layer);
 
@@ -151,8 +147,6 @@ describe('LayerFilterOperationButton eligibility', () => {
     expect(button.disabled).toBe(false);
     expect(tooltip.disabled).toBe(true);
     expect(tooltip.content).toBe('');
-    expect(thumbnailSubscription).toHaveBeenCalledOnce();
-    expect(thumbnailSubscription).toHaveBeenCalledWith(engine, layer.id);
   });
 });
 

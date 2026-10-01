@@ -38,15 +38,16 @@ export interface MiddleTruncateProps extends Omit<TextProps, 'children'> {
 }
 
 /**
- * For identifiers whose suffix matters. Keep white-space: pre so flex boundaries retain spaces; preserve full DOM
- * text for copy and accessibility.
+ * For identifiers whose suffix matters. Keep white-space: pre across the head/tail boundary so the space there
+ * survives; a head with no tail collapses newlines like any single-line label. Preserve full DOM text for copy and
+ * accessibility.
  */
 export const MiddleTruncate = ({ tailGraphemes = DEFAULT_TAIL_GRAPHEMES, text, ...textProps }: MiddleTruncateProps) => {
   const { head, tail } = useMemo(() => splitTextForMiddleTruncation(text, tailGraphemes), [tailGraphemes, text]);
 
   return (
     <Text display="flex" minW="0" overflow="hidden" title={text} whiteSpace="nowrap" {...textProps}>
-      <chakra.span flex="0 1 auto" overflow="hidden" textOverflow="ellipsis" whiteSpace="pre">
+      <chakra.span flex="0 1 auto" overflow="hidden" textOverflow="ellipsis" whiteSpace={tail ? 'pre' : 'nowrap'}>
         {head}
       </chakra.span>
       {tail ? (

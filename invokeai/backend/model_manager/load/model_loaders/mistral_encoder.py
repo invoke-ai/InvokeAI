@@ -1,4 +1,3 @@
-# Copyright (c) 2026, The InvokeAI Development Team
 """Model loaders for the Mistral text encoder used by FLUX.2 [dev].
 
 FLUX.2 [dev] uses BFL's 30-layer "cow-mistral3-small" distillation as its sole

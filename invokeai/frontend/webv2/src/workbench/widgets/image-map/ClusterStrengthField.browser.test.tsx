@@ -212,9 +212,8 @@ describe('ClusterStrengthField', () => {
     await settle();
     settings.patch.mockClear();
 
-    // Cleared by key, not by setValue: the empty box and the "." are one keystroke sequence here.
-    await userEvent.clear(spinner());
-    await userEvent.type(spinner(), '.');
+    // One keyboard sequence: clear() waits long enough to commit the intentionally empty box before type() runs.
+    await userEvent.type(spinner(), '{selectall}{Backspace}.', { skipClick: true });
     // The box reads as empty here, which is the whole trap.
     expect(spinner().value).toBe('');
     expect(spinner().validity.badInput).toBe(true);

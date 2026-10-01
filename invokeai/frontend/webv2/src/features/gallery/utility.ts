@@ -1,4 +1,5 @@
 export {
+  GalleryDragScope,
   getGalleryBoardDropData,
   getGalleryBoardDropId,
   getGalleryItemDragData,

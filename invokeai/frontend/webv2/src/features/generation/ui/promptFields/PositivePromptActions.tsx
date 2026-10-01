@@ -4,6 +4,7 @@ import type {
   ExpandPromptSuggestion,
   GenerateLora,
   GenerateModelConfig,
+  GenerateSettings,
   ImageWithDims,
 } from '@features/generation/core/types';
 import type { DynamicPromptsFieldConfig } from '@features/generation/ui/promptFields/DynamicPromptsPanel';
@@ -67,6 +68,58 @@ const OpenModelManagerButton = ({ modelType }: { modelType?: string }) => {
   );
 };
 
+type SavedPromptModelKeys = Pick<GenerateSettings, 'expandPromptModelKey' | 'imageToPromptModelKey'>;
+
+/** A surface that keeps the Expand and Image to Prompt model picks; without one they last for the session. */
+export interface SavedPromptModels extends SavedPromptModelKeys {
+  onChange: (patch: Partial<SavedPromptModelKeys>) => void;
+}
+
+/** The picker lists these single-base model types by name, so the first listed is the first by name. */
+const getFirstModelByName = (models: readonly ModelConfig[]): ModelConfig | null =>
+  models.reduce<ModelConfig | null>(
+    (first, model) =>
+      first === null || model.name.localeCompare(first.name, undefined, { sensitivity: 'base' }) < 0 ? model : first,
+    null
+  );
+
+/**
+ * The picked model when it is still installed, else the suggested one, else the first listed. A pick is saved
+ * to the surface when it keeps one, and only when it differs from what is saved.
+ */
+const usePromptModelPick = ({
+  candidates,
+  onSave,
+  savedKey,
+  suggestedKey = null,
+}: {
+  candidates: readonly ModelConfig[];
+  onSave?: (key: string) => void;
+  savedKey?: string | null;
+  suggestedKey?: string | null;
+}) => {
+  const [sessionKey, setSessionKey] = useState<string | null>(null);
+  const pickedKey = onSave ? (savedKey ?? null) : sessionKey;
+  const findModel = (key: string | null) => (key ? (candidates.find((model) => model.key === key) ?? null) : null);
+  const model = findModel(pickedKey) ?? findModel(suggestedKey) ?? getFirstModelByName(candidates);
+  const pick = useCallback(
+    (next: ModelConfig | null) => {
+      if (!next) {
+        return;
+      }
+
+      if (!onSave) {
+        setSessionKey(next.key);
+      } else if (next.key !== savedKey) {
+        onSave(next.key);
+      }
+    },
+    [onSave, savedKey]
+  );
+
+  return { model, pick };
+};
+
 export interface PromptTemplateState {
   /** The applied template, or null when none is. */
   active: PromptTemplateSnapshot | null;
@@ -98,6 +151,7 @@ interface PositivePromptActionsProps {
   projectId: string;
   onOpenPromptTriggerPicker: (anchorElement: HTMLElement) => void;
   onPositivePromptChangeImmediate: (prompt: string) => void;
+  savedPromptModels?: SavedPromptModels;
   template: PromptTemplateState;
   onInsertText: (text: string) => void;
   showSyntaxHighlighting: boolean;
@@ -116,6 +170,7 @@ export const PositivePromptActions = ({
   onUsePrompt,
   positivePrompt,
   projectId,
+  savedPromptModels,
   showSyntaxHighlighting,
   template,
 }: PositivePromptActionsProps) => {
@@ -142,6 +197,7 @@ export const PositivePromptActions = ({
         isDisabled={template.isViewMode}
         positivePrompt={positivePrompt}
         projectId={projectId}
+        savedPromptModels={savedPromptModels}
         suggestion={expandPromptSuggestion ?? null}
         onPositivePromptChange={onPositivePromptChangeImmediate}
       />
@@ -149,6 +205,7 @@ export const PositivePromptActions = ({
         droppedImage={droppedImage}
         isDisabled={template.isViewMode}
         projectId={projectId}
+        savedPromptModels={savedPromptModels}
         onPositivePromptChange={onPositivePromptChangeImmediate}
       />
       <PositivePromptHistoryButton onUsePrompt={onUsePrompt} />
@@ -376,11 +433,13 @@ const ExpandPromptButton = ({
   onPositivePromptChange,
   positivePrompt,
   projectId,
+  savedPromptModels,
   suggestion,
 }: {
   isDisabled: boolean;
   positivePrompt: string;
   projectId: string;
+  savedPromptModels: SavedPromptModels | undefined;
   suggestion: ExpandPromptSuggestion | null;
   onPositivePromptChange: (prompt: string) => void;
 }) => {
@@ -395,7 +454,6 @@ const ExpandPromptButton = ({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
-  const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
   const [selectedSystemPromptId, setSelectedSystemPromptId] = useState<string | null>(null);
   // Keyed by image so unticking one frame does not carry over to the next one.
   const [excludedImageName, setExcludedImageName] = useState<string | null>(null);
@@ -403,9 +461,17 @@ const ExpandPromptButton = ({
   const suggestedModelKey = suggestion?.modelSource
     ? (textLlmModels.find((model) => model.source === suggestion.modelSource)?.key ?? null)
     : null;
-  // An explicit choice wins; otherwise the widget's suggested enhancer, when it is installed.
-  const effectiveModelKey = selectedModelKey ?? suggestedModelKey;
-  const selectedModel = effectiveModelKey ? textLlmModels.find((model) => model.key === effectiveModelKey) : null;
+  const onSaveModelKey = savedPromptModels?.onChange;
+  const saveModelKey = useMemo(
+    () => (onSaveModelKey ? (key: string) => onSaveModelKey({ expandPromptModelKey: key }) : undefined),
+    [onSaveModelKey]
+  );
+  const { model: selectedModel, pick: handleModelChange } = usePromptModelPick({
+    candidates: textLlmModels,
+    onSave: saveModelKey,
+    savedKey: savedPromptModels?.expandPromptModelKey,
+    suggestedKey: suggestedModelKey,
+  });
   const suggestedImage = suggestion?.image ?? null;
   const canReadImages = selectedModel?.supports_images === true;
   const isImageIncluded = suggestedImage !== null && excludedImageName !== suggestedImage.image_name;
@@ -483,7 +549,6 @@ const ExpandPromptButton = ({
     [suggestedImageName]
   );
   const handleOpenChange = useCallback((event: { open: boolean }) => setIsOpen(event.open), []);
-  const handleModelChange = useCallback((model: ModelConfig | null) => setSelectedModelKey(model?.key ?? null), []);
   const handleRunExpandPrompt = useCallback(() => void runExpandPrompt(), [runExpandPrompt]);
 
   return (
@@ -529,7 +594,7 @@ const ExpandPromptButton = ({
                       modelTypes={TEXT_LLM_MODEL_TYPES}
                       placeholder={t('widgets.generate.selectTextLlm')}
                       size="xs"
-                      value={effectiveModelKey}
+                      value={selectedModel?.key ?? null}
                       onChange={handleModelChange}
                     />
                     {suggestion?.modelSource && !suggestedModelKey ? (
@@ -626,10 +691,12 @@ const ImageToPromptButton = ({
   isDisabled,
   onPositivePromptChange,
   projectId,
+  savedPromptModels,
 }: {
   droppedImage: DroppedPromptImage;
   isDisabled: boolean;
   projectId: string;
+  savedPromptModels: SavedPromptModels | undefined;
   onPositivePromptChange: (prompt: string) => void;
 }) => {
   const { t } = useTranslation();
@@ -644,9 +711,17 @@ const ImageToPromptButton = ({
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [taskId, setTaskId] = useState<string | null>(null);
-  const [selectedModelKey, setSelectedModelKey] = useState<string | null>(null);
   const llavaModels = models.filter((model) => model.type === 'llava_onevision');
-  const selectedModel = selectedModelKey ? llavaModels.find((model) => model.key === selectedModelKey) : null;
+  const onSaveModelKey = savedPromptModels?.onChange;
+  const saveModelKey = useMemo(
+    () => (onSaveModelKey ? (key: string) => onSaveModelKey({ imageToPromptModelKey: key }) : undefined),
+    [onSaveModelKey]
+  );
+  const { model: selectedModel, pick: handleModelChange } = usePromptModelPick({
+    candidates: llavaModels,
+    onSave: saveModelKey,
+    savedKey: savedPromptModels?.imageToPromptModelKey,
+  });
   // Dropped images take precedence over gallery selection.
   const image = droppedImage.image ?? selectedImage;
   const droppedImageName = droppedImage.image?.imageName ?? null;
@@ -710,7 +785,6 @@ const ImageToPromptButton = ({
 
   const popoverIds = useMemo(() => ({ trigger: triggerId }), [triggerId]);
   const handleOpenChange = useCallback((event: { open: boolean }) => (event.open ? setIsOpen(true) : close()), [close]);
-  const handleModelChange = useCallback((model: ModelConfig | null) => setSelectedModelKey(model?.key ?? null), []);
   const handleRunImageToPrompt = useCallback(() => void runImageToPrompt(), [runImageToPrompt]);
 
   return (
@@ -755,7 +829,7 @@ const ImageToPromptButton = ({
                       modelTypes={LLAVA_MODEL_TYPES}
                       placeholder={t('widgets.generate.selectVisionModel')}
                       size="xs"
-                      value={selectedModelKey}
+                      value={selectedModel?.key ?? null}
                       onChange={handleModelChange}
                     />
                     {image ? (

@@ -1,5 +1,6 @@
 import type { ModelConfig, ModelTaxonomyType } from '@features/models/react';
 import type { FieldInputTemplate } from '@features/workflow/contracts';
+import type { WorkflowLibraryPage, WorkflowRecordDTO } from '@features/workflow/data/api';
 import type { LoraFieldCollectionEntry } from '@features/workflow/utility';
 import type { SeedInputPatch } from '@platform/ui/SeedInput';
 
@@ -29,6 +30,7 @@ import {
   type GalleryItem,
 } from '@features/gallery';
 import { getSelectedGalleryImageFromValues, toGalleryItemKey } from '@features/gallery/contracts';
+import { FindInGalleryThumbnailButton } from '@features/gallery/mediaSlot';
 import { GalleryPickerPopover, type GalleryPickerSelection } from '@features/gallery/picker';
 import { invalidateGallery } from '@features/gallery/queries';
 import { galleryImageUrls, galleryVideoUrls } from '@features/gallery/utility';
@@ -48,7 +50,9 @@ import {
 } from '@features/workflow/data/savedWorkflowFieldUtils';
 import {
   getWorkflowPagesItems,
+  savedWorkflowDetailQueryKey,
   savedWorkflowDetailQueryOptions,
+  savedWorkflowPickerQueryKeyPrefix,
   savedWorkflowPickerQueryOptions,
 } from '@features/workflow/data/savedWorkflowQueries';
 import { isSeedInputField } from '@features/workflow/graph';
@@ -99,7 +103,7 @@ import {
 } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { SeedInput } from '@platform/ui/SeedInput';
-import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useQuery, useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { FilmIcon, ImageIcon, ImagePlusIcon, PlusIcon, RotateCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
 import {
   lazy,
@@ -111,6 +115,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ChangeEvent,
 } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -156,8 +161,12 @@ export interface WorkflowFieldInputProps {
   onSeedModeChange?: (seedMode: SeedMode) => void;
 }
 
-// The media well's hover, matching DropZone's pointer-hover accent preview.
-const MEDIA_INPUT_HOVER_PROPS = { borderColor: 'accent.solid' };
+// The media well's hover matches DropZone's accent preview; an invalid well keeps its error border and tints instead.
+const MEDIA_WELL_PROPS = { _hover: { borderColor: 'accent.solid' } };
+const MEDIA_WELL_INVALID_PROPS = {
+  borderColor: 'border.error',
+  _hover: { bg: 'bg.error/60', borderColor: 'border.error' },
+};
 
 /** A row of a list names itself by position; a scalar field is named by its title. */
 type ScalarInputProps = WorkflowFieldInputProps & { ariaLabel?: string };
@@ -683,7 +692,9 @@ const ImageCollectionTile = ({
   name: string;
   onRemove: (index: number) => void;
 }) => {
+  const { findInGallery } = useWorkflowUi();
   const onRemoveClick = useCallback(() => onRemove(index), [index, onRemove]);
+  const onFind = useCallback(() => findInGallery({ kind: 'image', name }), [findInGallery, name]);
 
   return (
     <Box aspectRatio="1" bg="bg.subtle" className="group" position="relative" rounded="xs">
@@ -712,6 +723,7 @@ const ImageCollectionTile = ({
       >
         <Icon as={XIcon} boxSize="3" />
       </IconButton>
+      <FindInGalleryThumbnailButton bottom="0.5" insetInlineEnd="0.5" name={name} onFind={onFind} />
     </Box>
   );
 };
@@ -828,16 +840,10 @@ const ImageCollectionInput = ({
   return (
     <Box position="relative" w="full" {...invalidAriaProps}>
       <ImageCollectionDropMonitor dropId={dropId} onDrop={appendNames} />
-      <Box
-        ref={setNodeRef}
-        boxShadow={invalid ? '0 0 0 1px {colors.red.solid}' : undefined}
-        className="nodrag"
-        position="relative"
-        rounded="sm"
-        w="full"
-      >
+      <Box ref={setNodeRef} className="nodrag" position="relative" rounded="sm" w="full">
         {names.length > 0 ? (
           <SimpleGrid
+            borderColor={invalid ? 'border.error' : undefined}
             borderWidth="1px"
             className="nowheel"
             columns={3}
@@ -872,9 +878,9 @@ const ImageCollectionInput = ({
                 h="full"
                 justifyContent="center"
                 rounded="sm"
-                transition="border-color var(--wb-motion-duration-fast) ease"
+                transition="border-color var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease"
                 w="full"
-                _hover={MEDIA_INPUT_HOVER_PROPS}
+                {...(invalid ? MEDIA_WELL_INVALID_PROPS : MEDIA_WELL_PROPS)}
               >
                 <Text as="span" color="fg" fontSize="xs" fontWeight="600">
                   {pickerLabel}
@@ -924,6 +930,7 @@ const ImageCollectionInput = ({
 
 const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputProps & { kind: WorkflowMediaKind }) => {
   const { t } = useTranslation();
+  const { findInGallery } = useWorkflowUi();
   const config = MEDIA_FIELD_CONFIG[kind];
   const mediaName =
     typeof (value as Record<string, unknown> | null | undefined)?.[config.nameKey] === 'string'
@@ -948,6 +955,11 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
     [config.nameKey, onChange]
   );
   const onClearClick = useCallback(() => onChange(undefined), [onChange]);
+  const onFind = useCallback(() => {
+    if (mediaName) {
+      findInGallery({ kind, name: mediaName });
+    }
+  }, [findInGallery, kind, mediaName]);
 
   // Replace failed stale thumbnails with media icons; retry when the value changes.
   const [failedThumbnail, setFailedThumbnail] = useState<string | null>(null);
@@ -980,15 +992,7 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
     <Box position="relative" w="full" {...invalidAriaProps}>
       <MediaDropMonitor dropId={dropId} kind={kind} onDrop={onMediaDrop} />
       {/* The whole preview area is the drop target, like the legacy editor's widget. */}
-      <Box
-        ref={setNodeRef}
-        boxShadow={invalid ? '0 0 0 1px {colors.red.solid}' : undefined}
-        className="nodrag"
-        h="32"
-        position="relative"
-        rounded="sm"
-        w="full"
-      >
+      <Box ref={setNodeRef} className="nodrag group" h="32" position="relative" rounded="sm" w="full">
         <GalleryPickerPopover accept={pickerAccept} label={pickerLabel} onPick={onPick}>
           <chakra.button
             aria-label={pickerLabel}
@@ -1007,9 +1011,9 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
                 justifyContent="center"
                 overflow="hidden"
                 rounded="sm"
-                transition="border-color var(--wb-motion-duration-fast) ease"
+                transition="border-color var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease"
                 w="full"
-                _hover={MEDIA_INPUT_HOVER_PROPS}
+                {...(invalid ? MEDIA_WELL_INVALID_PROPS : MEDIA_WELL_PROPS)}
               >
                 {failedThumbnail !== mediaName ? (
                   <Image
@@ -1037,9 +1041,9 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
                 h="full"
                 justifyContent="center"
                 rounded="sm"
-                transition="border-color var(--wb-motion-duration-fast) ease"
+                transition="border-color var(--wb-motion-duration-fast) ease, background var(--wb-motion-duration-fast) ease"
                 w="full"
-                _hover={MEDIA_INPUT_HOVER_PROPS}
+                {...(invalid ? MEDIA_WELL_INVALID_PROPS : MEDIA_WELL_PROPS)}
               >
                 <Text as="span" color="fg" fontSize="xs" fontWeight="600">
                   {pickerLabel}
@@ -1063,6 +1067,10 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
           >
             {badge}
           </Badge>
+        ) : null}
+        {mediaName ? (
+          // Top corner: the size badge holds the bottom one.
+          <FindInGalleryThumbnailButton bottom="auto" name={mediaName} top="1" onFind={onFind} />
         ) : null}
         <DropTargetOverlay isActive={acceptsActiveDrag} isOver={isOver} label={`Drop ${config.noun}`} />
       </Box>
@@ -1863,4 +1871,219 @@ export const WorkflowFieldInput = (props: WorkflowFieldInputProps) => {
     default:
       return CONNECTION_ONLY_FALLBACK;
   }
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const stringifySnapshotValue = (value: unknown): string | null => {
+  try {
+    return JSON.stringify(value) ?? null;
+  } catch {
+    return null;
+  }
+};
+
+const formatSnapshotObject = (value: Record<string, unknown>): string | null => {
+  const lora = value.lora;
+  if (isRecord(lora) && typeof lora.name === 'string') {
+    return typeof value.weight === 'number' ? `${lora.name} (${value.weight})` : lora.name;
+  }
+
+  for (const key of [
+    'name',
+    'image_name',
+    'video_name',
+    'latents_name',
+    'tensor_name',
+    'key',
+    'style_preset_id',
+    'system_prompt_id',
+    'workflow_id',
+    'board_id',
+    'id',
+  ]) {
+    const entry = value[key];
+    if (typeof entry === 'string' || typeof entry === 'number' || typeof entry === 'boolean') {
+      return String(entry);
+    }
+  }
+
+  if (['r', 'g', 'b', 'a'].every((channel) => typeof value[channel] === 'number')) {
+    return fromColorFieldValue(value);
+  }
+
+  return stringifySnapshotValue(value);
+};
+
+const formatSnapshotValue = (value: unknown, template: FieldInputTemplate): string | null => {
+  if (isWorkflowGeneratorFieldTypeName(template.type.name) && isRecord(value)) {
+    const { values: _resolvedValues, ...settings } = value;
+    return stringifySnapshotValue(settings);
+  }
+
+  if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
+    if (template.type.name === 'EnumField') {
+      return template.uiChoiceLabels?.[String(value)] ?? String(value);
+    }
+
+    return value === '' ? null : String(value);
+  }
+
+  if (Array.isArray(value)) {
+    return (
+      value
+        .map((entry) => (isRecord(entry) ? formatSnapshotObject(entry) : String(entry)))
+        .filter(Boolean)
+        .join(', ') || '[]'
+    );
+  }
+
+  return isRecord(value) ? formatSnapshotObject(value) : null;
+};
+
+const SNAPSHOT_VALUE_TEXT_PROPS = {
+  color: 'fg.muted',
+  fontSize: '2xs',
+  lineHeight: 'short',
+  mt: '0.5',
+  overflowWrap: 'anywhere',
+  whiteSpace: 'pre-wrap',
+} as const;
+
+/** Prefer detail metadata: appending picker pages does not refresh earlier records. */
+const SavedWorkflowSnapshot = ({ workflowId }: { workflowId: string }) => {
+  const queryClient = useQueryClient();
+  const getName = useCallback(() => {
+    const detailKey = savedWorkflowDetailQueryKey(workflowId);
+    const record = queryClient.getQueryData<WorkflowRecordDTO>(detailKey);
+    if (record?.name) {
+      return record.name;
+    }
+    for (const [, pages] of queryClient.getQueriesData<InfiniteData<WorkflowLibraryPage>>({
+      queryKey: savedWorkflowPickerQueryKeyPrefix,
+    })) {
+      for (const page of pages?.pages ?? []) {
+        const workflow = page.items.find((item) => item.workflow_id === workflowId);
+        if (workflow?.name) {
+          return workflow.name;
+        }
+      }
+    }
+    return workflowId;
+  }, [queryClient, workflowId]);
+  const subscribe = useCallback(
+    (onChange: () => void) =>
+      queryClient.getQueryCache().subscribe(({ query }) => {
+        const key = query.queryKey;
+        if (
+          key[0] === 'workflow' &&
+          key[1] === 'call-saved' &&
+          (key[2] === 'picker' || (key[2] === 'detail' && key[3] === workflowId))
+        ) {
+          onChange();
+        }
+      }),
+    [queryClient, workflowId]
+  );
+  const name = useSyncExternalStore(subscribe, getName, getName);
+
+  return (
+    <Text {...SNAPSHOT_VALUE_TEXT_PROPS} data-workflow-export-field-value="true">
+      {name}
+    </Text>
+  );
+};
+
+/** Renders authored values without mounting editors or resolving runtime diagnostics. */
+export const WorkflowFieldSnapshot = ({
+  seedMode = 'fixed',
+  template,
+  value,
+}: {
+  seedMode?: SeedMode;
+  template: FieldInputTemplate;
+  value: unknown;
+}) => {
+  const { t } = useTranslation();
+  let text = formatSnapshotValue(value, template);
+  if (isSeedInputField(template) && seedMode !== 'fixed') {
+    const modeLabel = t(`common.seedMode.${seedMode}`);
+    text = seedMode === 'random' || !text ? modeLabel : `${text} (${modeLabel})`;
+  }
+
+  if (template.type.name === 'SavedWorkflowField' && typeof value === 'string' && value) {
+    return <SavedWorkflowSnapshot workflowId={value} />;
+  }
+
+  if (template.type.name === 'ImageField') {
+    const names =
+      template.type.cardinality === 'COLLECTION'
+        ? getImageCollectionNames(value).filter(Boolean)
+        : isRecord(value) && typeof value.image_name === 'string' && value.image_name
+          ? [value.image_name]
+          : [];
+    if (names.length > 0) {
+      return (
+        <Box data-workflow-export-field-value="true" mt="0.5" w="full">
+          {template.type.cardinality === 'COLLECTION' ? (
+            <SimpleGrid borderWidth="1px" columns={3} gap="1" p="1" rounded="sm">
+              {names.map((name) => (
+                <Box key={name} aspectRatio="1" bg="bg.subtle" rounded="xs">
+                  <Image
+                    alt={name}
+                    h="full"
+                    objectFit="cover"
+                    rounded="xs"
+                    src={galleryImageUrls.thumbnail(name)}
+                    w="full"
+                  />
+                </Box>
+              ))}
+            </SimpleGrid>
+          ) : (
+            <Flex align="center" borderWidth="1px" h="32" justify="center" overflow="hidden" rounded="sm" w="full">
+              <Image
+                alt={names[0]!}
+                maxH="full"
+                maxW="full"
+                objectFit="contain"
+                src={galleryImageUrls.thumbnail(names[0]!)}
+              />
+            </Flex>
+          )}
+          <Text {...SNAPSHOT_VALUE_TEXT_PROPS}>{text}</Text>
+        </Box>
+      );
+    }
+  }
+
+  if (template.type.name === 'StringField') {
+    return (
+      <Box
+        borderColor="border"
+        borderRadius="control"
+        borderWidth="1px"
+        data-workflow-export-field-value="true"
+        fontFamily={template.uiComponent === 'textarea' ? 'mono' : undefined}
+        minH="7"
+        minW="0"
+        mt="0.5"
+        overflowWrap="anywhere"
+        px="2"
+        py="1"
+        textStyle="xs"
+        w="full"
+        whiteSpace="pre-wrap"
+      >
+        {text}
+      </Box>
+    );
+  }
+
+  return text ? (
+    <Text {...SNAPSHOT_VALUE_TEXT_PROPS} data-workflow-export-field-value="true">
+      {text}
+    </Text>
+  ) : null;
 };

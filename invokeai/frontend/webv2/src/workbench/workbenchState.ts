@@ -55,11 +55,12 @@ import {
   getPersistedSelectedGalleryItemKeys,
   stripInfiniteWindowAnchor,
   stripUnresolvableGallerySearch,
+  GALLERY_AUTO_ADD_FOLLOW,
   gallerySemanticReferenceKey,
   getGallerySettings,
   parseGallerySemanticReference,
   toGallerySemanticTextReference,
-  getGalleryDestinationBoardId,
+  getGalleryAutoAddBoardId,
   getSelectedGalleryItemFromValues,
   legacyGeneratedImageToGalleryItem,
   normalizeGalleryImage,
@@ -111,6 +112,7 @@ import {
   recordProjectWorkflowRun,
   redoProjectWorkflow,
   removeProjectWorkflow,
+  replaceProjectWorkflowDocument,
   selectProjectWorkflow,
   setProjectWorkflowDocument,
   setProjectWorkflowSource,
@@ -340,6 +342,14 @@ type WorkbenchReducerAction =
   | { type: 'duplicateProjectWorkflow'; workflowId: string; copyId: string; copyName: string; projectId?: string }
   | { type: 'removeProjectWorkflow'; workflowId: string; projectId?: string }
   | { type: 'setProjectWorkflowSource'; projectId: string; workflowId: string; source?: ProjectWorkflowSource }
+  | {
+      type: 'replaceProjectWorkflowDocument';
+      projectId: string;
+      workflowId: string;
+      document: ProjectGraphState;
+      label: string;
+      source: ProjectWorkflowSource;
+    }
   | { type: 'undoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'redoWorkflowChange'; projectId?: string; workflowId?: string }
   | { type: 'submitInvocationSnapshot'; backendSupportsCancellation: boolean; models?: readonly ModelConfig[] }
@@ -528,14 +538,6 @@ export const getPanelSizeBounds = (region: WidgetRegion): { max: number; min: nu
 /** The size at or below which a resize drag snaps the region shut. */
 export const getPanelCollapseThreshold = (region: WidgetRegion): number =>
   getPanelSizeBounds(region).min - PANEL_COLLAPSE_OVERSHOOT_PX;
-
-/** Reopens halfway back from the collapse threshold to prevent boundary flicker. */
-export const shouldSnapPanelShut = (region: WidgetRegion, rawSizePx: number, isSnapped: boolean): boolean =>
-  shouldSnapPanelShutAt(getPanelCollapseThreshold(region), rawSizePx, isSnapped);
-
-/** Measure overshoot from the rendered width when the viewport squeezes a panel below its minimum. */
-export const shouldSnapPanelShutAt = (thresholdPx: number, rawSizePx: number, isSnapped: boolean): boolean =>
-  rawSizePx <= thresholdPx + (isSnapped ? PANEL_COLLAPSE_OVERSHOOT_PX / 2 : 0);
 
 /** The collapse threshold for a panel currently rendered at `visibleSizePx`. */
 export const getVisiblePanelCollapseThreshold = (region: WidgetRegion, visibleSizePx: number): number =>
@@ -2451,6 +2453,7 @@ const compileInvocationSnapshot = (
     }
 
     const plan = planWorkflowSubmission(workflowDocument, templatesSnapshot.templates, {
+      autoBoardId: getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {}),
       batchCount: sanitizeBatchCount(widgetStates.workflow?.values.batchCount),
       generators: workflowGenerators,
     });
@@ -2816,8 +2819,9 @@ const reconcileDeletedGalleryBoard = (
   const withBoardReferencesCleared = updateAllProjectGalleryValues(withSurvivorsMoved, (values) => {
     const selectedBoardWasDeleted = values.selectedBoardId === boardId;
     const projectBoardWasDeleted = values.projectBoardId === boardId;
+    const autoAddBoardWasDeleted = values.autoAddBoardId === boardId;
 
-    if (!selectedBoardWasDeleted && !projectBoardWasDeleted) {
+    if (!selectedBoardWasDeleted && !projectBoardWasDeleted && !autoAddBoardWasDeleted) {
       return values;
     }
 
@@ -2827,6 +2831,7 @@ const reconcileDeletedGalleryBoard = (
         ? { galleryPage: 0, selectedBoardId: 'none', semanticImageQuery: null, semanticSearchText: null }
         : {}),
       ...(projectBoardWasDeleted ? { projectBoardId: null } : {}),
+      ...(autoAddBoardWasDeleted ? { autoAddBoardId: GALLERY_AUTO_ADD_FOLLOW } : {}),
     };
   });
   let didChangeQueue = false;
@@ -3280,7 +3285,9 @@ const enqueueCompiledSnapshot = (
             seedStep: seedPlan?.step ?? 0,
           }
         : { error: `${route.sourceId} queue item is missing source submission metadata.`, kind: 'invalid' };
-  const galleryBoardId = getGalleryDestinationBoardId(widgetStates.gallery?.values ?? {});
+  // A workflow compiles every node's board in (Auto included), so its board-less results stay Uncategorized.
+  const galleryBoardId =
+    route.sourceId === 'workflow' ? null : getGalleryAutoAddBoardId(widgetStates.gallery?.values ?? {});
   const generatePresentationSettings = normalizeGenerateSettings(widgetStates.generate?.values);
   const videoPresentationDimensions =
     route.sourceId === 'video' && videoSettings?.model ? getVideoDimensions(videoSettings.model, videoSettings) : null;
@@ -4324,6 +4331,20 @@ export const __workbenchReducerInternal = (
         removeProjectWorkflow(project, action.workflowId)
       );
     }
+    case 'replaceProjectWorkflowDocument': {
+      return updateProjectById(state, action.projectId, (project) =>
+        selectProjectWorkflow(
+          replaceProjectWorkflowDocument(
+            project,
+            action.workflowId,
+            action.document,
+            { label: action.label, source: action.source },
+            now()
+          ),
+          action.workflowId
+        )
+      );
+    }
     case 'setProjectWorkflowSource': {
       return updateProjectById(state, action.projectId, (project) =>
         setProjectWorkflowSource(project, action.workflowId, action.source)
@@ -4724,9 +4745,12 @@ export const __workbenchReducerInternal = (
           galleryPage: 0,
           selectedBoardId: action.boardId,
           selectedImageNames: [],
-          // Only actual board changes clear similarity ranking and semantic text. Preserve selection pages: they
-          // may still describe the pre-search board listing.
-          ...(values.selectedBoardId !== action.boardId ? { semanticImageQuery: null, semanticSearchText: null } : {}),
+          // A semantic search ranks within the board, so it follows the switch; a map cluster is a fixed member
+          // list and ends with an actual board change.
+          ...(values.selectedBoardId !== action.boardId &&
+          (values.semanticImageQuery as { kind?: unknown } | null | undefined)?.kind === 'cluster'
+            ? { semanticImageQuery: null, semanticSearchText: null }
+            : {}),
         }),
         action.projectId
       );
@@ -4823,7 +4847,7 @@ export const __workbenchReducerInternal = (
       return updateGalleryValues(
         state,
         (values) => {
-          // Apply delayed commits only when they still match the current field, mode, and board.
+          // Apply delayed commits only when they still match the current field and mode; a board switch keeps both.
           if (values.semanticSearchText !== action.text) {
             return values;
           }

@@ -1,5 +1,6 @@
 import type { AccountScope } from '@platform/state/accountLifecycle';
 
+import { queryClient } from '@platform/query/client';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ApiError, apiFetch, apiFetchJson, sleep } from '@platform/transport/http';
 import {
@@ -308,10 +309,7 @@ export class ProjectCreateAbsentError extends Error {
  * commit. A 201 succeeds; after 409, GET distinguishes an existing project from a board conflict. Other
  * deterministic rejections prove absence. Transport failure remains unknown and must never authorize deletion.
  */
-export const createProjectSettled = async (
-  request: ProjectCreateRequest,
-  owner: AccountScope
-): Promise<ProjectRecordDTO> => {
+const settleProjectCreate = async (request: ProjectCreateRequest, owner: AccountScope): Promise<ProjectRecordDTO> => {
   const projectId = request.project_id;
   const body = serializeCreateProjectRequest(request);
   const writeBudget = createProjectWriteRetryBudget();
@@ -368,6 +366,21 @@ export const createProjectSettled = async (
       return classify(retryError);
     }
   }
+};
+
+export const createProjectSettled = async (
+  request: ProjectCreateRequest,
+  owner: AccountScope
+): Promise<ProjectRecordDTO> => {
+  const record = await settleProjectCreate(request, owner);
+
+  // The server mints the project's board with it, so board lists fetched before now are missing it. Loaded lazily
+  // to keep the gallery data layer off the launchpad's startup graph.
+  void import('@features/gallery/queries').then(({ galleryKeys }) =>
+    queryClient.invalidateQueries({ queryKey: galleryKeys.boardsForAccount(owner) })
+  );
+
+  return record;
 };
 
 /** A response arrived and refused the create outright, so nothing was written. */

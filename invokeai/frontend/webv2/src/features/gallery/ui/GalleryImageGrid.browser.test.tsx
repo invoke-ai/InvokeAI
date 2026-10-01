@@ -28,6 +28,7 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { getContrastRatio } from '@platform/ui/theme/contrastRatio.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { workbenchAutoScroll } from '@workbench/widgetDnd';
 import { PreviewFilmstrip } from '@workbench/widgets/preview/PreviewFilmstrip';
 import { PreviewFrame } from '@workbench/widgets/preview/PreviewFrame';
 import { createInstance } from 'i18next';
@@ -453,7 +454,7 @@ const Harness = ({
         <QueryClientProvider client={queryClient!}>
           <GalleryUiProvider adapter={createAdapter(progressSessions, liveFollowEnabled, pinnedSessionId)}>
             <GalleryWidgetContext value={contextValue}>
-              <DndContext sensors={sensors}>
+              <DndContext autoScroll={workbenchAutoScroll} sensors={sensors}>
                 <DragMonitor />
                 <Box bg={background} data-testid="gallery-surface" h="full">
                   <GalleryImageGrid />
@@ -566,6 +567,34 @@ afterEach(async () => {
 });
 
 describe('GalleryImageGrid mixed item cells', () => {
+  it('keeps the gallery scroll position when an image is dragged upward out of a long grid', async () => {
+    const items = Array.from({ length: 60 }, (_, index) => createItem('image', `image-${index}.png`));
+    await renderGallery(createGallery({ items, settings: DENSE_SETTINGS }));
+
+    const viewport = host!.querySelector<HTMLElement>('[data-part="viewport"]')!;
+    await interact(() => {
+      viewport.scrollTop = viewport.scrollHeight;
+    }, 50);
+    const initialScrollTop = viewport.scrollTop;
+    expect(initialScrollTop).toBeGreaterThan(viewport.clientHeight);
+
+    const tile = getButton('Select image-59.png for preview');
+    const rect = tile.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    await interact(() => pointer('pointerdown', tile, x, y));
+    await interact(() => pointer('pointermove', document, x, y - 20), 50);
+    expect(onDragStart).toHaveBeenCalledOnce();
+
+    const edgeY = viewport.getBoundingClientRect().top + 2;
+    await interact(() => pointer('pointermove', document, x, edgeY), 250);
+    expect(viewport.scrollTop).toBe(initialScrollTop);
+
+    await interact(() => pointer('pointermove', document, x, edgeY - 20), 100);
+    await interact(() => pointer('pointerup', document, x, edgeY - 20));
+    expect(viewport.scrollTop).toBe(initialScrollTop);
+  });
+
   const starred = createItem('image', 'starred.png', { starred: true });
   const sectionOrder = () =>
     Array.from(host?.querySelectorAll('[data-gallery-section]') ?? []).map((row) =>
@@ -863,6 +892,32 @@ describe('GalleryImageGrid mixed item cells', () => {
     expect(actionMocks.selectItem).toHaveBeenCalledWith(video);
     expect(onDragStart).not.toHaveBeenCalled();
   });
+
+  it.each([
+    { chord: '{Control>}{Enter}{/Control}', modifier: 'ctrlKey' },
+    { chord: '{Meta>}{Enter}{/Meta}', modifier: 'metaKey' },
+  ])(
+    'lets $modifier+Enter reach app hotkeys from a focused tile without activating it or starting a drag',
+    async ({ chord, modifier }) => {
+      const image = createItem('image', 'chord.png');
+      const reachedWindow = vi.fn();
+      window.addEventListener('keydown', reachedWindow);
+
+      try {
+        await renderGallery(createGallery({ items: [image] }));
+        const imageButton = getButton('Select chord.png for preview');
+
+        await interact(() => imageButton.focus());
+        await act(() => userEvent.keyboard(chord));
+
+        expect(reachedWindow).toHaveBeenCalledWith(expect.objectContaining({ key: 'Enter', [modifier]: true }));
+        expect(actionMocks.selectItem).not.toHaveBeenCalled();
+        expect(onDragStart).not.toHaveBeenCalled();
+      } finally {
+        window.removeEventListener('keydown', reachedWindow);
+      }
+    }
+  );
 
   it('preserves the ordered full selection when an unloaded video is dragged from a loaded image', async () => {
     await renderGallery(
@@ -1565,7 +1620,7 @@ describe('shared gallery progress section', () => {
     expect(followProgressSession).toHaveBeenCalledWith('run:1', { revealPreview: true });
     expect(host?.querySelectorAll('[role="listitem"]')).toHaveLength(currentGallery.items.length);
   });
-  it('steps the arrow keys between the followed tile, the strip and the listing as one sequence', async () => {
+  it('steps the arrow keys between the strip, the followed tile and the listing as one sequence', async () => {
     const starred = createItem('image', 'starred.png', { starred: true });
     const regular = createItem('image', 'regular.png');
     currentProgressSessions = [session, { ...session, id: 'run:2', itemIndex: 2, backendItemId: 11 }];
@@ -1577,56 +1632,58 @@ describe('shared gallery progress section', () => {
       createGallery({ items: [regular], selectedItemKey: 'image:regular.png', selectedItemKeys: ['image:regular.png'] })
     );
 
-    // Down from the second tile lands on the strip's only cell; right steps off the tiles into it too.
-    registeredCommands.get('gallery.galleryNavDown')?.();
+    // Up from the second tile lands on the strip above; right steps off the tiles into the listing.
+    registeredCommands.get('gallery.galleryNavUp')?.();
     expect(actionMocks.selectItem).toHaveBeenLastCalledWith(starred);
     registeredCommands.get('gallery.galleryNavRight')?.();
-    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(starred);
+    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(regular);
     registeredCommands.get('gallery.galleryNavLeft')?.();
     expect(followProgressSession).toHaveBeenLastCalledWith('run:1', { revealPreview: false });
 
-    // From the strip, up and left follow a tile again; down and right reach the listing.
+    // From the strip, down and right follow a tile; up and left have nowhere to go.
     currentLiveFollowEnabled = false;
     currentPinnedSessionId = null;
     await renderGallery(
       createGallery({ items: [regular], selectedItemKey: 'image:starred.png', selectedItemKeys: ['image:starred.png'] })
     );
-    registeredCommands.get('gallery.galleryNavUp')?.();
-    expect(followProgressSession).toHaveBeenLastCalledWith('run:1', { revealPreview: false });
-    registeredCommands.get('gallery.galleryNavLeft')?.();
-    expect(followProgressSession).toHaveBeenLastCalledWith('run:2', { revealPreview: false });
     registeredCommands.get('gallery.galleryNavDown')?.();
-    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(regular);
+    expect(followProgressSession).toHaveBeenLastCalledWith('run:1', { revealPreview: false });
     registeredCommands.get('gallery.galleryNavRight')?.();
-    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(regular);
+    expect(followProgressSession).toHaveBeenLastCalledWith('run:1', { revealPreview: false });
+    registeredCommands.get('gallery.galleryNavUp')?.();
+    registeredCommands.get('gallery.galleryNavLeft')?.();
     expect(followProgressSession).toHaveBeenCalledTimes(3);
+    expect(actionMocks.selectItem).toHaveBeenCalledTimes(2);
   });
   it('skips waiting tiles, which cannot be followed, and steps past a collapsed section', async () => {
     const starred = createItem('image', 'starred.png', { starred: true });
+    const regular = createItem('image', 'regular.png');
     currentProgressSessions = [
       session,
       { ...session, id: 'run:2', itemIndex: 2, backendItemId: null, state: 'queued' },
     ];
     currentLiveFollowEnabled = true;
     setStrip([starred]);
-    await renderGallery(createGallery({ selectedItemKey: null, selectedItemKeys: [] }));
+    await renderGallery(createGallery({ items: [regular], selectedItemKey: null, selectedItemKeys: [] }));
 
     registeredCommands.get('gallery.galleryNavRight')?.();
-    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(starred);
+    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(regular);
     expect(followProgressSession).not.toHaveBeenCalled();
 
-    // A collapsed in-progress section shows no tiles, so the strip is the top of the sequence.
+    // A collapsed in-progress section shows no tiles, so the strip sits directly above the listing.
     currentLiveFollowEnabled = false;
     await renderGallery(
       createGallery({
+        items: [regular],
         selectedItemKey: 'image:starred.png',
         selectedItemKeys: ['image:starred.png'],
         settings: { ...getGallerySettings({}), progressSectionCollapsed: true },
       })
     );
-    registeredCommands.get('gallery.galleryNavLeft')?.();
+    registeredCommands.get('gallery.galleryNavDown')?.();
+    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(regular);
     expect(followProgressSession).not.toHaveBeenCalled();
-    expect(actionMocks.selectItem).toHaveBeenCalledTimes(1);
+    expect(actionMocks.selectItem).toHaveBeenCalledTimes(2);
   });
   it('steps out of a starred selection the strip does not show instead of resetting', async () => {
     const shown = Array.from({ length: 12 }, (_, index) =>

@@ -40,7 +40,6 @@ import {
   clampPanelSize,
   createDraftProject,
   getPanelCollapseThreshold,
-  shouldSnapPanelShut,
   normalizeWorkbenchAccount,
   normalizeWorkbenchProject,
 } from './workbenchState';
@@ -229,6 +228,8 @@ const createGenerateValues = (overrides: Partial<GenerateWidgetValues> = {}): Ge
   negativePromptHeightPx: 56,
   positivePrompt: 'first prompt',
   positivePromptHeightPx: 96,
+  expandPromptModelKey: null,
+  imageToPromptModelKey: null,
   promptTemplate: null,
   promptTemplateViewMode: false,
   mistralEncoderModel: null,
@@ -819,21 +820,6 @@ describe('workbench panel resize bounds', () => {
     expect(clampPanelSize('left', 900)).toBe(720);
     expect(clampPanelSize('left', 700)).toBe(700);
     expect(clampPanelSize('left', 100)).toBe(350);
-  });
-
-  it('snaps shut past the overshoot and reopens with hysteresis', () => {
-    expect(shouldSnapPanelShut('left', 350, false)).toBe(false);
-    expect(shouldSnapPanelShut('left', 271, false)).toBe(false);
-    expect(shouldSnapPanelShut('left', 270, false)).toBe(true);
-    // Once shut, dragging back only reopens past the halfway band.
-    expect(shouldSnapPanelShut('left', 290, true)).toBe(true);
-    expect(shouldSnapPanelShut('left', 311, true)).toBe(false);
-  });
-
-  it('measures the overshoot against whichever floor the region has', () => {
-    expect(shouldSnapPanelShut('bottom', 96, false)).toBe(false);
-    expect(shouldSnapPanelShut('bottom', 17, false)).toBe(false);
-    expect(shouldSnapPanelShut('bottom', 16, false)).toBe(true);
   });
 
   it('exposes the collapse threshold as a size below the floor', () => {
@@ -3420,6 +3406,65 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       return node?.type === 'invocation' ? node.data.inputs.seed?.value : undefined;
     };
 
+    it('compiles Auto boards to the auto-add board, leaves None unboarded, and keeps results off the selection', () => {
+      const boardTemplate = {
+        ...seedTemplate,
+        inputs: {
+          board: {
+            ...(seedTemplate.inputs.seed as NonNullable<(typeof seedTemplate.inputs)['seed']>),
+            maximum: null,
+            minimum: null,
+            name: 'board',
+            title: 'Board',
+            type: { batch: false, cardinality: 'SINGLE' as const, name: 'BoardField' },
+          },
+        },
+        outputType: 'image_output',
+        title: 'Save Image',
+        type: 'save_image',
+      };
+      const boardNode = (id: string, board: unknown) => ({
+        data: {
+          inputs: { board: { label: '', name: 'board', value: board } },
+          isIntermediate: false,
+          isOpen: true,
+          label: '',
+          nodePack: 'invokeai',
+          notes: '',
+          type: 'save_image',
+          useCache: true,
+          version: '1.0.0',
+        },
+        id,
+        position: { x: 0, y: 0 },
+        type: 'invocation' as const,
+      });
+      let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' });
+
+      workflowTemplatesMock.snapshot = { error: null, status: 'loaded', templates: { save_image: boardTemplate } };
+      state = workbenchReducer(state, { boardId: 'selected-board', type: 'selectGalleryBoard' });
+      state = workbenchReducer(state, { settings: { autoAddBoardId: 'auto-board' }, type: 'updateGallerySettings' });
+
+      for (const [id, board] of [
+        ['auto-node', 'auto'],
+        ['none-node', 'none'],
+      ] as const) {
+        state = workbenchReducer(state, {
+          action: { node: boardNode(id, board), type: 'addNode' },
+          type: 'applyWorkflowAction',
+        });
+      }
+
+      state = submitWorkflow(state);
+
+      const graph = (readSubmission(state) as { graph: { nodes: Record<string, Record<string, unknown>> } }).graph;
+
+      expect(graph.nodes['auto-node']).toMatchObject({ board: { board_id: 'auto-board' } });
+      expect(graph.nodes['none-node']).not.toHaveProperty('board');
+      // Boards are settled in the graph, so nothing is re-filed onto the selected board afterwards.
+      expect(getActiveProject(state).queue.items[0]?.snapshot.galleryBoardId).toBeNull();
+    });
+
     it('carries batch-node groups on the submission and sizes the placeholders for every session', () => {
       const floatField = {
         ...(seedTemplate.inputs.seed as NonNullable<(typeof seedTemplate.inputs)['seed']>),
@@ -5066,13 +5111,13 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
   });
 
-  it('exits a similarity search when the view moves to another board', () => {
+  it('carries a similarity search to another board, which it then ranks within, from the first page', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, { boardId: 'board-a', type: 'selectGalleryBoard' });
     state = workbenchReducer(state, {
       type: 'patchWidgetValues',
-      values: { galleryPage: 4, semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      values: { galleryPage: 4, semanticImageQuery: { kind: 'text', query: 'sunset' }, semanticSearchText: 'sunset' },
       widgetId: 'gallery',
     });
 
@@ -5080,7 +5125,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     const values = getProjectWidgetValues(getActiveProject(state), 'gallery');
 
-    expect(values.semanticImageQuery).toBeNull();
+    expect(values.semanticImageQuery).toEqual({ kind: 'text', query: 'sunset' });
+    expect(values.semanticSearchText).toBe('sunset');
     expect(values.selectedBoardId).toBe('board-b');
     expect(values.galleryPage).toBe(0);
   });
@@ -5104,8 +5150,9 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
   });
 
-  it('leaves the page stamped on the selection alone when a search is dismissed by a board move', () => {
-    // This selection predates search; its board page remains valid and must not be reset with ranking pages.
+  it('leaves the page stamped on the selection alone when a map cluster is dismissed by a board move', () => {
+    // This selection predates the cluster; its board page remains valid and must not be reset with ranking pages.
+    // The cluster id is deliberately unregistered: a stale cluster ends with the board all the same.
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, { boardId: 'board-a', type: 'selectGalleryBoard' });
@@ -5116,7 +5163,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     });
     state = workbenchReducer(state, {
       type: 'patchWidgetValues',
-      values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
+      values: { semanticImageQuery: { clusterId: 'cluster-gone', kind: 'cluster', label: 'Cats' } },
       widgetId: 'gallery',
     });
 
@@ -5160,6 +5207,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, { boardId: 'doomed-board', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { settings: { autoAddBoardId: 'doomed-board' }, type: 'updateGallerySettings' });
     state = workbenchReducer(state, {
       type: 'patchWidgetValues',
       values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
@@ -5183,6 +5231,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     expect(values.selectedBoardId).toBe('none');
     expect(values.semanticImageQuery).toBeNull();
+    // A deleted auto-add board hands results back to the selection.
+    expect(values.autoAddBoardId).toBe('follow');
   });
 
   it('stores selected backend board id for gallery submissions', () => {
@@ -5196,6 +5246,18 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const queueItem = getActiveProject(state).queue.items[0];
 
     expect(queueItem.snapshot.galleryBoardId).toBe('backend-board-id');
+  });
+
+  it('sends gallery submissions to a fixed auto-add board rather than the selected one', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { boardId: 'selected-board', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { settings: { autoAddBoardId: 'auto-board' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = primeGenerate(state);
+    state = submitGenerate(state);
+
+    expect(getActiveProject(state).queue.items[0]?.snapshot.galleryBoardId).toBe('auto-board');
   });
 
   it('sends gallery submissions to the project board until a board is picked', () => {
@@ -5442,26 +5504,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       expect(galleryValues(state).searchTerm).toBe('');
     });
 
-    it('leaves semantic mode with the ranking on a board move or a tab switch, not on a re-click', () => {
+    it('leaves semantic mode on a tab switch, not on a re-click of the current tab', () => {
       let state = createInitialWorkbenchState();
-
-      state = workbenchReducer(state, { boardId: 'board-a', type: 'selectGalleryBoard' });
-      state = workbenchReducer(state, { searchTerm: 'sunset', type: 'setGallerySearchTerm' });
-      state = workbenchReducer(state, { enabled: true, type: 'setGallerySemanticSearchMode' });
-      state = workbenchReducer(state, { boardId: 'board-a', type: 'selectGalleryBoard' });
-
-      expect(galleryValues(state)).toMatchObject({
-        semanticImageQuery: { kind: 'text', query: 'sunset' },
-        semanticSearchText: 'sunset',
-      });
-
-      state = workbenchReducer(state, { boardId: 'board-b', type: 'selectGalleryBoard' });
-
-      expect(galleryValues(state)).toMatchObject({
-        searchTerm: '',
-        semanticImageQuery: null,
-        semanticSearchText: null,
-      });
 
       state = workbenchReducer(state, { enabled: true, type: 'setGallerySemanticSearchMode' });
       state = workbenchReducer(state, { text: 'beach', type: 'setGallerySemanticSearchText' });

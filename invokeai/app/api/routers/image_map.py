@@ -2,7 +2,8 @@ import asyncio
 import threading
 import time
 from collections import OrderedDict
-from typing import Literal, Optional
+from datetime import date
+from typing import AbstractSet, Literal, Optional
 
 import numpy as np
 from fastapi import File, HTTPException, Query, UploadFile, status
@@ -12,7 +13,11 @@ from pydantic import BaseModel, Field
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.routers._access import assert_image_read_access, assert_video_read_access
+from invokeai.app.api.routers._access import (
+    assert_board_read_access,
+    assert_image_read_access,
+    assert_video_read_access,
+)
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
 from invokeai.app.services.image_index.cluster_labels import (
     MAX_CUSTOM_VOCAB_TERM_LENGTH,
@@ -294,6 +299,41 @@ def _served_kinds(include_videos: bool) -> tuple[MediaKind, ...]:
     return ("image", "video") if include_videos else ("image",)
 
 
+SearchBoardQuery = Query(
+    default=None,
+    description="Restrict results to this board's items; 'none' selects items on no board. Omit to rank every "
+    "accessible item.",
+)
+SearchCreatedDateQuery = Query(
+    default=None,
+    description="Restrict results to items created on this ISO date, as the date-based virtual boards list them.",
+)
+
+
+def _search_scope(
+    board_id: Optional[str], created_date: Optional[date], current_user: CurrentUserOrDefault
+) -> Optional[AbstractSet[str]]:
+    """The item names a scoped search may return, or None when the search covers everything accessible.
+
+    Membership comes from the gallery's own listing, intersected later with the indexed items, so
+    items on archived boards (never indexed for search) cannot match. Image and video names never
+    collide, so a flat name set is enough.
+    """
+    if board_id is None and created_date is None:
+        return None
+    if board_id is not None and board_id != "none":
+        assert_board_read_access(board_id, current_user)
+    names = ApiDependencies.invoker.services.gallery.get_item_names(
+        starred_first=False,
+        is_intermediate=False,
+        board_id=board_id,
+        user_id=current_user.user_id,
+        is_admin=current_user.is_admin,
+        created_date=created_date.isoformat() if created_date is not None else None,
+    )
+    return frozenset(names.item_names)
+
+
 def _search_reference(image_name: Optional[str], video_name: Optional[str]) -> Optional[IndexedItem]:
     """The reference item for a similarity search, or None when none was given.
 
@@ -527,6 +567,8 @@ async def search_image_map(
     video_name: Optional[str] = Query(default=None, description="Reference video for similarity search"),
     limit: int = Query(default=100, ge=1, le=500, description="Maximum number of results"),
     include_videos: bool = IncludeVideosQuery,
+    board_id: Optional[str] = SearchBoardQuery,
+    created_date: Optional[date] = SearchCreatedDateQuery,
 ) -> ImageMapSearchResponse:
     """Ranks the user's accessible images and videos by semantic similarity.
 
@@ -554,6 +596,10 @@ async def search_image_map(
 
     user_id, is_admin = _scope(current_user)
     scope_user = None if is_admin else user_id
+    # Resolved before embedding so an unreadable or empty scope costs no encoder pass.
+    within = await asyncio.to_thread(_search_scope, board_id, created_date, current_user)
+    if within is not None and not within:
+        return ImageMapSearchResponse(results=[])
 
     if q is not None:
         try:
@@ -614,7 +660,12 @@ async def search_image_map(
                 )
 
     results = await asyncio.to_thread(
-        services.image_index.search_similar, scope_user, query_embedding, limit, _served_kinds(include_videos)
+        services.image_index.search_similar,
+        scope_user,
+        query_embedding,
+        limit,
+        _served_kinds(include_videos),
+        within,
     )
     return ImageMapSearchResponse(
         results=[ImageMapSearchResult(image_name=item.name, kind=item.kind, score=score) for item, score in results]
@@ -746,6 +797,8 @@ async def search_image_map_by_image(
     image_url: Optional[str] = Query(default=None, max_length=2000, description="URL of a reference image"),
     limit: int = Query(default=100, ge=1, le=500, description="Maximum number of results"),
     include_videos: bool = IncludeVideosQuery,
+    board_id: Optional[str] = SearchBoardQuery,
+    created_date: Optional[date] = SearchCreatedDateQuery,
 ) -> ImageMapSearchResponse:
     """Ranks the user's accessible images by similarity to an arbitrary reference image.
 
@@ -768,6 +821,9 @@ async def search_image_map_by_image(
 
     user_id, is_admin = _scope(current_user)
     scope_user = None if is_admin else user_id
+    within = await asyncio.to_thread(_search_scope, board_id, created_date, current_user)
+    if within is not None and not within:
+        return ImageMapSearchResponse(results=[])
 
     if image is not None:
         data = await image.read(MAX_SEARCH_IMAGE_BYTES + 1)
@@ -806,7 +862,12 @@ async def search_image_map_by_image(
         )
 
     results = await asyncio.to_thread(
-        services.image_index.search_similar, scope_user, query_embedding, limit, _served_kinds(include_videos)
+        services.image_index.search_similar,
+        scope_user,
+        query_embedding,
+        limit,
+        _served_kinds(include_videos),
+        within,
     )
     return ImageMapSearchResponse(
         results=[ImageMapSearchResult(image_name=item.name, kind=item.kind, score=score) for item, score in results]

@@ -18,10 +18,14 @@ import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { Field } from '@platform/ui/Field';
-import { lazy, Suspense, useCallback, useMemo, useRef, useState } from 'react';
+import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { buildLibraryGraphPreviewSource } from './libraryPreviewSource';
+import {
+  buildLibraryGraphPreviewSource,
+  DeferredGraphPreviewDialog,
+  preloadGraphPreview,
+} from './libraryPreviewSource';
 import { isUpdatableSource } from './projectWorkflowEntries';
 import { formatRelativeTime } from './relativeTime';
 import {
@@ -31,13 +35,6 @@ import {
   useWorkflowPublication,
   type WorkflowPublicationFailure,
 } from './useWorkflowPublication';
-
-/** Load graph preview only on request to keep xyflow outside the publication dialogs' chunk. */
-const LazyGraphPreviewDialog = lazy(() =>
-  import('@features/workflow/ui/graph-preview/GraphPreviewDialog').then((module) => ({
-    default: module.GraphPreviewDialog,
-  }))
-);
 
 type FailedResult = WorkflowPublicationFailure;
 
@@ -489,7 +486,7 @@ export const WorkflowPublicationHost = () => {
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
-            <Dialog.Content data-workflow-review-dialog>
+            <Dialog.Content ref={preloadGraphPreview} data-workflow-review-dialog>
               <Dialog.Header>
                 <Dialog.Title>{t('workflowLibrary.reviewTitle')}</Dialog.Title>
               </Dialog.Header>
@@ -529,7 +526,7 @@ export const WorkflowPublicationHost = () => {
 
       {activeStage.kind === 'review' && activeStage.record && reviewPreviewSource ? (
         <Suspense fallback={null}>
-          <LazyGraphPreviewDialog
+          <DeferredGraphPreviewDialog
             graphId={activeStage.record.workflow_id}
             hideInvoke
             isOpen={activeStage.isPreviewOpen}

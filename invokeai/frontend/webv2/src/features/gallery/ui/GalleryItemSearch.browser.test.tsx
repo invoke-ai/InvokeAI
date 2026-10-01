@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
+import type { GalleryBoard } from '@features/gallery/core/types';
 import type { ImageIndexAvailability } from '@features/gallery/data/backend';
 import type { GalleryUiAdapter } from '@features/gallery/react';
 
@@ -90,8 +91,12 @@ const actions = {
   setSemanticSearchText: vi.fn(),
 };
 
+const archivedBoards = [{ archived: true, id: 'old-board' }];
+
 interface HarnessGallery {
+  boards: Array<Pick<GalleryBoard, 'archived' | 'id'>>;
   searchTerm: string;
+  selectedBoardId: string;
   semanticImageQuery: GallerySemanticReference | null;
   semanticSearchText: string | null;
 }
@@ -99,7 +104,9 @@ interface HarnessGallery {
 /** Write text intents back into controlled values to model the workbench while recording calls. */
 const Harness = ({ initial }: { initial: Partial<HarnessGallery> }) => {
   const [gallery, setGallery] = useState<HarnessGallery>({
+    boards: [],
     searchTerm: '',
+    selectedBoardId: 'none',
     semanticImageQuery: null,
     semanticSearchText: null,
     ...initial,
@@ -335,6 +342,38 @@ describe('GalleryItemSearch semantic mode', () => {
     await act(() => vi.advanceTimersByTime(SEMANTIC_SEARCH_COMMIT_DEBOUNCE_MS));
 
     expect(actions.commitSemanticSearch.mock.calls).toEqual([['sun']]);
+  });
+
+  it('explains why a semantic search in an archived board finds nothing', async () => {
+    await renderSearch({ boards: archivedBoards, selectedBoardId: 'old-board', semanticSearchText: 'sun' });
+
+    expect(host?.querySelector('[role="status"]')?.textContent).toBe('widgets.gallery.semanticSearchArchivedBoard');
+  });
+
+  it('explains why an image similarity search in an archived board finds nothing', async () => {
+    await renderSearch({
+      boards: archivedBoards,
+      selectedBoardId: 'old-board',
+      semanticImageQuery: { imageName: 'ref.png', kind: 'image' },
+    });
+
+    expect(host?.querySelector('[role="status"]')?.textContent).toBe('widgets.gallery.semanticSearchArchivedBoard');
+  });
+
+  it('leaves a cluster in an archived board unexplained, since it lists its members', async () => {
+    await renderSearch({
+      boards: archivedBoards,
+      selectedBoardId: 'old-board',
+      semanticImageQuery: { clusterId: 'c1', kind: 'cluster', label: 'Boats' },
+    });
+
+    expect(host?.querySelector('[role="status"]')).toBeNull();
+  });
+
+  it('leaves a metadata search in an archived board unexplained, since it still matches', async () => {
+    await renderSearch({ boards: archivedBoards, searchTerm: 'sun', selectedBoardId: 'old-board' });
+
+    expect(host?.querySelector('[role="status"]')).toBeNull();
   });
 
   it('shows no hint on a ready index', async () => {

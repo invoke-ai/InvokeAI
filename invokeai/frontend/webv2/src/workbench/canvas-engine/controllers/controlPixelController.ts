@@ -1,8 +1,12 @@
 /** Transactional pixel editing for controls and destructively edited raster images. */
 
-import type { CanvasControlLayerContract, CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
+import type { CanvasEditRefusal } from '@workbench/canvas-engine/capabilities';
+import type {
+  CanvasControlLayerContract,
+  CanvasDocumentContractV3,
+  CanvasLayerContract,
+} from '@workbench/canvas-engine/contracts';
 import type { BitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
-import type { History } from '@workbench/canvas-engine/history/history';
 import type { ImagePatchApply } from '@workbench/canvas-engine/history/imagePatch';
 import type { LayerPixelSnapshot, LayerPixelSnapshotApply } from '@workbench/canvas-engine/history/layerSnapshot';
 import type {
@@ -15,6 +19,7 @@ import type { PixelEditTransaction, PixelEditPatch, StrokeCommittedEvent } from 
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { Rect } from '@workbench/canvas-engine/types';
 
+import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { getSourceContentRect } from '@workbench/canvas-engine/document/sources';
@@ -24,24 +29,25 @@ import {
   decidePixelEdit,
   type PixelEditableLayer,
 } from '@workbench/canvas-engine/editing/controlPixelEdit';
+import { HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 import { createImagePatchEntry } from '@workbench/canvas-engine/history/imagePatch';
 import { createLayerSnapshotEntry } from '@workbench/canvas-engine/history/layerSnapshot';
 import { isEmpty } from '@workbench/canvas-engine/math/rect';
 import { strokeCommitLabel } from '@workbench/canvas-engine/strokeCommit';
 
+import type { CanvasMutationContext, EditStep, EditTransaction } from './mutationContext';
+
 export interface PixelEditControllerOptions {
+  readonly ctx: Pick<CanvasMutationContext, 'applyStep' | 'begin'>;
   readonly applyImagePatch: ImagePatchApply;
   readonly backend: RasterBackend;
   readonly bitmapStore: Pick<BitmapStore, 'discardLayer' | 'markLayerDirty' | 'suspendLayer'>;
   readonly canEdit: () => boolean;
   readonly deleteDerived: (layerId: string) => void;
-  readonly dispatchReplacement: (layer: PixelEditableLayer) => void;
-  readonly endBurst: () => void;
   readonly getActiveProjectId: () => string | null;
   readonly getAdjustedSurface: (layer: PixelEditableLayer, entry: LayerCacheEntry) => RasterSurface | null;
   readonly getDocument: () => CanvasDocumentContractV3 | null;
   readonly getTransformSession: () => unknown;
-  readonly history: History;
   readonly installPrepared: (prepared: PreparedLayerCacheReplacement, persist?: boolean) => void;
   readonly invalidate: (layerId: string, overlay?: boolean) => void;
   readonly isCacheReady: (layer: PixelEditableLayer, document: CanvasDocumentContractV3) => boolean;
@@ -55,6 +61,7 @@ export interface PixelEditControllerOptions {
   ) => PreparedLayerCacheReplacement;
   readonly projectId: string;
   readonly publishStroke: (event: StrokeCommittedEvent) => void;
+  readonly reportRefusal: (refusal: CanvasEditRefusal) => void;
   readonly setTransformOverride: (layerId: string, transform: LayerTransform | null) => void;
 }
 
@@ -70,9 +77,21 @@ const isImageDataEqual = (left: ImageData, right: ImageData): boolean => {
   return true;
 };
 
-/** Owns the exclusive direct/materialized pixel transaction for control layers and raster images. */
+/** Conversion reducers clone contracts, so the replacement postcondition compares by value. */
+const hasLayerContract = (document: CanvasDocumentContractV3 | null, expected: CanvasLayerContract): boolean => {
+  const current = getDocumentLayer(document, expected.id);
+  return current !== undefined && areJsonValuesStructurallyEqual(current, expected);
+};
+
+/**
+ * Owns the exclusive direct/materialized pixel transaction for control layers and raster images. Each is admitted
+ * before the first pixel changes. A commit that records nothing leaves the edit open: callers restore the pixels
+ * they touched, then cancel, which releases the transaction and, for a materialized edit, reinstates the unbaked
+ * cache last.
+ */
 export class PixelEditController {
-  private open: { cancel: () => void; layerId: string } | null = null;
+  // `publishing` while the edit records its own step: the document change it makes is not an external one.
+  private open: { cancel: () => void; layerId: string; publishing: boolean } | null = null;
 
   constructor(private readonly options: PixelEditControllerOptions) {}
 
@@ -81,25 +100,27 @@ export class PixelEditController {
   }
 
   isOpenFor(layerIds: readonly string[]): boolean {
-    return this.open !== null && layerIds.includes(this.open.layerId);
+    return this.open !== null && !this.open.publishing && layerIds.includes(this.open.layerId);
   }
 
+  /** Replays a whole-layer snapshot; throws, leaving the layer unchanged, when the document refuses it. */
   private applySnapshot: LayerPixelSnapshotApply = (snapshot) => {
-    const pixels = this.options.backend.createSurface(snapshot.rect.width, snapshot.rect.height);
+    const o = this.options;
+    const pixels = o.backend.createSurface(snapshot.rect.width, snapshot.rect.height);
     if (snapshot.pixels) {
       pixels.ctx.putImageData(snapshot.pixels, 0, 0);
     }
-    const prepared = this.options.preparePixels(snapshot.layer.id, snapshot.rect, pixels);
-    this.options.dispatchReplacement(snapshot.layer);
-    try {
-      this.options.bitmapStore.discardLayer(snapshot.layer.id);
-    } catch {
-      // Persistence bookkeeping is ancillary after reducer acceptance.
-    }
-    this.options.installPrepared(prepared, snapshot.layer.source.type === 'paint');
+    const prepared = o.preparePixels(snapshot.layer.id, snapshot.rect, pixels);
+    o.ctx.applyStep({
+      accepted: (document) => hasLayerContract(document, snapshot.layer),
+      install: () => o.installPrepared(prepared, snapshot.layer.source.type === 'paint'),
+      mutation: { layer: snapshot.layer, layerId: snapshot.layer.id, type: 'replaceCanvasLayer' },
+      notify: () => o.bitmapStore.discardLayer(snapshot.layer.id),
+    });
   };
 
-  begin(layerId: string): PixelEditTransaction | null {
+  /** `gesture` admits an edit the gesture in progress starts (a stroke's first press). */
+  begin(layerId: string, options: { gesture?: boolean } = {}): PixelEditTransaction | null {
     const o = this.options;
     const document = o.getDocument();
     const layer = getDocumentLayer(document, layerId);
@@ -124,190 +145,196 @@ export class PixelEditController {
       isCacheReady: o.isCacheReady(layer, document),
       layer,
     });
-    if (decision.status === 'rejected') {
+    if (decision.status === 'rejected' || (decision.status === 'direct' && layer.type !== 'control')) {
       return null;
     }
-    if (decision.status === 'direct') {
-      if (layer.type !== 'control') {
-        return null;
-      }
-      return this.beginDirect(layerId, layer);
+    const entry = o.layers.get(layerId);
+    const beforeBytes = entry && !isEmpty(entry.rect) ? entry.rect.width * entry.rect.height * 4 : 0;
+    // A materialized edit records the whole layer before and after.
+    const historyBytes =
+      decision.status === 'direct' ? HISTORY_ENTRY_OVERHEAD_BYTES : beforeBytes * 2 + HISTORY_ENTRY_OVERHEAD_BYTES;
+    const txn = o.ctx.begin({ gesture: options.gesture, historyBytes });
+    if (!('publish' in txn)) {
+      o.reportRefusal(txn.status);
+      return null;
     }
-    return this.beginMaterialized(layerId, layer, contentRect);
+    // The unbaked surface stays alive outside the cache's accounting until the edit ends.
+    if (decision.status !== 'direct' && !txn.reserveRaster(beforeBytes)) {
+      txn.end();
+      o.reportRefusal('over-budget');
+      return null;
+    }
+    const opened =
+      decision.status === 'direct'
+        ? this.beginDirect(txn, layerId, layer as CanvasControlLayerContract)
+        : this.beginMaterialized(txn, layerId, layer, contentRect);
+    if (!opened) {
+      txn.end();
+    }
+    return opened;
   }
 
-  private beginDirect(layerId: string, layer: CanvasControlLayerContract): PixelEditTransaction | null {
+  /** The shared lifecycle: exclusive ownership, persistence suspension and refusal reporting. */
+  private openTransaction(
+    txn: EditTransaction,
+    layerId: string,
+    rollback: () => void
+  ): {
+    readonly owns: () => boolean;
+    readonly close: (restore: boolean) => void;
+    readonly grow: (bytes: number) => boolean;
+    readonly refused: () => void;
+    readonly publish: <T>(run: () => T) => T;
+  } {
     const o = this.options;
-    const originalEntry = o.layers.get(layerId);
-    let originalPixels: ImageData | null = null;
-    if (originalEntry && !isEmpty(originalEntry.rect)) {
-      try {
-        originalPixels = originalEntry.surface.ctx.getImageData(
-          0,
-          0,
-          originalEntry.rect.width,
-          originalEntry.rect.height
-        );
-      } catch {
-        return null;
-      }
-    }
-    const original = originalEntry
-      ? {
-          hasPublishedPixels: originalEntry.hasPublishedPixels,
-          lastUsed: originalEntry.lastUsed,
-          pixels: originalPixels,
-          rect: { ...originalEntry.rect },
-          stale: originalEntry.stale,
-          surface: originalEntry.surface,
-          version: originalEntry.version,
-        }
-      : null;
     const releasePersistence = o.bitmapStore.suspendLayer(layerId);
     let closed = false;
-    let owner: { cancel: () => void; layerId: string };
-    const close = (): boolean => {
-      if (closed || this.open !== owner) {
-        return false;
+    let refusalReported = false;
+    const owner = {
+      cancel: () => close(true),
+      layerId,
+      publishing: false,
+    };
+    const owns = (): boolean => !closed && this.open === owner;
+    const close = (restore: boolean): void => {
+      if (!owns()) {
+        return;
       }
       closed = true;
       this.open = null;
-      return true;
-    };
-    const restore = (): void => {
       try {
-        if (!original) {
-          o.layers.delete(layerId);
-        } else {
-          original.surface.resize(original.rect.width, original.rect.height);
-          if (original.pixels) {
-            original.surface.ctx.putImageData(original.pixels, 0, 0);
-          }
-          const current = o.layers.get(layerId) ?? o.layers.getOrCreateRect(layerId, original.rect);
-          Object.assign(current, {
-            hasPublishedPixels: original.hasPublishedPixels,
-            lastUsed: original.lastUsed,
-            rect: { ...original.rect },
-            stale: original.stale,
-            surface: original.surface,
-            version: original.version,
-          });
+        if (restore) {
+          rollback();
         }
       } finally {
-        o.deleteDerived(layerId);
-        o.invalidate(layerId);
-      }
-    };
-    const restoreAndRelease = (): void => {
-      try {
-        restore();
-      } finally {
-        releasePersistence();
-      }
-    };
-    const cancel = (): void => {
-      if (close()) {
-        restoreAndRelease();
-      }
-    };
-    const commitPatch = (label: string, patch: PixelEditPatch): boolean => {
-      if (closed || this.open !== owner) {
-        return false;
-      }
-      if (isImageDataEqual(patch.before, patch.after)) {
-        cancel();
-        return false;
-      }
-      const document = o.getDocument();
-      if (
-        o.getActiveProjectId() !== o.projectId ||
-        !o.canEdit() ||
-        !o.isOperationIdle() ||
-        document?.selectedLayerId !== layerId ||
-        getDocumentLayer(document, layerId) !== layer
-      ) {
-        cancel();
-        return false;
-      }
-      close();
-      let entry = null;
-      try {
-        if (!o.history.isApplying()) {
-          entry = createImagePatchEntry({
-            after: patch.after,
-            apply: o.applyImagePatch,
-            before: patch.before,
-            label,
-            layerId,
-            rect: patch.rect,
-          });
-        }
-      } catch (error) {
-        restoreAndRelease();
-        throw error;
-      }
-      try {
-        // Once the pixels are accepted, persistence and history are the
-        // authoritative consequences. Publish UI/render notifications only
-        // afterwards: a faulty observer must not make a visible edit ephemeral.
-        if (entry) {
-          o.history.push(entry);
-        }
-        o.bitmapStore.markLayerDirty(layerId);
-        o.endBurst();
         try {
-          o.notifyPainted(layerId);
-        } catch {
-          // Accepted pixels are already dirty in the live cache; later invalidation reconciles UI observers.
+          releasePersistence();
+        } finally {
+          txn.end();
         }
-      } finally {
-        releasePersistence();
       }
-      return true;
     };
-    const transaction: PixelEditTransaction = {
-      cancel,
-      commitPatch: (label, patch) => void commitPatch(label, patch),
-      commitStroke: (event) => {
-        if (event.layerId !== layerId) {
-          cancel();
-          return;
+    const refused = (): void => {
+      if (!refusalReported) {
+        refusalReported = true;
+        o.reportRefusal('over-budget');
+      }
+    };
+    this.open = owner;
+    return {
+      close,
+      grow: (bytes) => {
+        if (txn.growHistory(bytes)) {
+          return true;
         }
-        if (
-          commitPatch(strokeCommitLabel(event.tool), {
-            after: event.afterImageData,
-            before: event.beforeImageData,
-            rect: event.dirtyRect,
-          })
-        ) {
-          o.publishStroke(event);
+        refused();
+        return false;
+      },
+      owns,
+      publish: (run) => {
+        owner.publishing = true;
+        try {
+          return run();
+        } finally {
+          owner.publishing = false;
         }
       },
+      refused,
+    };
+  }
+
+  private isStillTarget(layerId: string, layer: PixelEditableLayer): boolean {
+    const o = this.options;
+    const document = o.getDocument();
+    return (
+      o.getActiveProjectId() === o.projectId &&
+      o.canEdit() &&
+      o.isOperationIdle() &&
+      document?.selectedLayerId === layerId &&
+      getDocumentLayer(document, layerId) === layer
+    );
+  }
+
+  private beginDirect(txn: EditTransaction, layerId: string, layer: CanvasControlLayerContract): PixelEditTransaction {
+    const o = this.options;
+    const original = o.layers.captureState(layerId);
+    const lifecycle = this.openTransaction(txn, layerId, () => {
+      // The caller already put back the pixels and extent it touched; reinstate the exact entry, version included,
+      // so guards captured before the edit stay current. An extent it could not restore falls back to rasterizing.
+      const surface = original?.surface;
+      if (!original || (surface!.width === original.rect.width && surface!.height === original.rect.height)) {
+        o.layers.restoreState(layerId, original);
+      } else {
+        o.layers.invalidate(layerId);
+      }
+      o.deleteDerived(layerId);
+      o.invalidate(layerId);
+    });
+    const commitPatch = (label: string, patch: PixelEditPatch, event?: StrokeCommittedEvent): boolean => {
+      if (!lifecycle.owns()) {
+        return false;
+      }
+      if (isImageDataEqual(patch.before, patch.after) || !this.isStillTarget(layerId, layer)) {
+        return false;
+      }
+      const entry = createImagePatchEntry({
+        after: patch.after,
+        apply: o.applyImagePatch,
+        before: patch.before,
+        label,
+        layerId,
+        rect: patch.rect,
+      });
+      const result = lifecycle.publish(() =>
+        txn.publish(
+          label,
+          {
+            notify: () => {
+              o.bitmapStore.markLayerDirty(layerId);
+              o.notifyPainted(layerId);
+              if (event) {
+                o.publishStroke(event);
+              }
+            },
+          },
+          entry,
+          { origin: 'system' }
+        )
+      );
+      if (result.status === 'over-budget') {
+        lifecycle.refused();
+      }
+      if (result.status === 'committed') {
+        lifecycle.close(false);
+      }
+      return result.status === 'committed';
+    };
+    return {
+      cancel: () => lifecycle.close(true),
+      commit: (event) =>
+        event.layerId === layerId
+          ? commitPatch(
+              strokeCommitLabel(event.tool),
+              { after: event.afterImageData, before: event.beforeImageData, rect: event.dirtyRect },
+              event
+            )
+          : false,
+      commitPatch: (label, patch) => commitPatch(label, patch),
+      grow: lifecycle.grow,
       layerId,
     };
-    owner = { cancel, layerId };
-    this.open = owner;
-    return transaction;
   }
 
   private beginMaterialized(
+    txn: EditTransaction,
     layerId: string,
     layer: PixelEditableLayer,
     contentRect: Rect
   ): PixelEditTransaction | null {
     const o = this.options;
     const originalEntry = o.layers.get(layerId);
-    const original = originalEntry
-      ? {
-          hasPublishedPixels: originalEntry.hasPublishedPixels,
-          lastUsed: originalEntry.lastUsed,
-          rect: { ...originalEntry.rect },
-          stale: originalEntry.stale,
-          surface: originalEntry.surface,
-          version: originalEntry.version,
-        }
-      : null;
-    const beforeRect = original?.rect ?? { ...contentRect };
+    const original = o.layers.captureState(layerId);
+    const beforeRect = original ? { ...original.rect } : { ...contentRect };
     let beforePixels: ImageData | null = null;
     if (!isEmpty(beforeRect)) {
       if (!originalEntry) {
@@ -340,128 +367,77 @@ export class PixelEditController {
       return null;
     }
     const before: LayerPixelSnapshot = { layer: structuredClone(layer), pixels: beforePixels, rect: beforeRect };
-    const restore = (): void => {
+    const lifecycle = this.openTransaction(txn, layerId, () => {
       try {
-        if (original) {
-          const current = o.layers.get(layerId);
-          if (current) {
-            Object.assign(current, { ...original, rect: { ...original.rect } });
-          }
-        } else {
-          o.layers.delete(layerId);
-        }
+        o.layers.restoreState(layerId, original);
       } finally {
         o.deleteDerived(layerId);
         o.setTransformOverride(layerId, null);
         o.invalidate(layerId, true);
       }
-    };
-    const releasePersistence = o.bitmapStore.suspendLayer(layerId);
-    const restoreAndRelease = (): void => {
-      try {
-        restore();
-      } finally {
-        releasePersistence();
-      }
-    };
+    });
     try {
-      const preview = originalEntry ?? o.layers.getOrCreateRect(layerId, prepared.rect);
-      Object.assign(preview, {
-        surface: prepared.surface,
-        rect: { ...prepared.rect },
-        hasPublishedPixels: true,
-        stale: false,
-      });
-      preview.version += 1;
+      o.layers.installReplacement(prepared);
       o.deleteDerived(layerId);
       o.setTransformOverride(layerId, { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
       o.invalidate(layerId, true);
     } catch {
-      restoreAndRelease();
+      lifecycle.close(true);
       return null;
     }
-    let closed = false;
-    let owner: { cancel: () => void; layerId: string };
-    const close = (): boolean => {
-      if (closed || this.open !== owner) {
+    const commit = (label: string, event?: StrokeCommittedEvent): boolean => {
+      if (!lifecycle.owns()) {
         return false;
       }
-      closed = true;
-      this.open = null;
-      return true;
-    };
-    const cancel = (): void => {
-      if (close()) {
-        restoreAndRelease();
-      }
-    };
-    const commit = (label: string, event?: StrokeCommittedEvent): void => {
-      if (!close()) {
-        return;
-      }
-      const document = o.getDocument();
       const edited = o.layers.get(layerId);
-      if (
-        o.getActiveProjectId() !== o.projectId ||
-        !o.canEdit() ||
-        !o.isOperationIdle() ||
-        document?.selectedLayerId !== layerId ||
-        getDocumentLayer(document, layerId) !== layer ||
-        !edited ||
-        (event && event.layerId !== layerId)
-      ) {
-        restoreAndRelease();
-        return;
+      if (!this.isStillTarget(layerId, layer) || !edited || (event && event.layerId !== layerId)) {
+        return false;
       }
-      let entry = null;
-      try {
-        const pixels = isEmpty(edited.rect)
-          ? null
-          : edited.surface.ctx.getImageData(0, 0, edited.rect.width, edited.rect.height);
-        const materialized = buildMaterializedPixelLayer(layer, edited.rect);
-        const after: LayerPixelSnapshot = { layer: materialized, pixels, rect: { ...edited.rect } };
-        if (!o.history.isApplying()) {
-          entry = createLayerSnapshotEntry({ after, apply: this.applySnapshot, before, label });
-        }
-        o.dispatchReplacement(materialized);
-      } catch (error) {
-        restoreAndRelease();
-        throw error;
-      }
-      try {
-        // The replacement has passed reducer and mirror postconditions. From
-        // here on it must never be treated as rollback-safe, even if cleanup or
-        // an observer fails.
-        if (entry) {
-          o.history.push(entry);
-        }
-        o.bitmapStore.markLayerDirty(layerId);
-        o.setTransformOverride(layerId, null);
-        o.endBurst();
-        try {
+      // A preparation failure throws with the edit still open; the caller restores its pixels and cancels.
+      const pixels = isEmpty(edited.rect)
+        ? null
+        : edited.surface.ctx.getImageData(0, 0, edited.rect.width, edited.rect.height);
+      const materialized = buildMaterializedPixelLayer(layer, edited.rect);
+      const after: LayerPixelSnapshot = { layer: materialized, pixels, rect: { ...edited.rect } };
+      const entry = createLayerSnapshotEntry({ after, apply: this.applySnapshot, before, label });
+
+      const step: EditStep = {
+        accepted: (document) => hasLayerContract(document, materialized),
+        mutation: { layer: materialized, layerId, type: 'replaceCanvasLayer' },
+        notify: () => {
+          o.bitmapStore.markLayerDirty(layerId);
+          o.setTransformOverride(layerId, null);
           o.notifyPainted(layerId);
-        } catch {
-          // See the direct path: persistence is already authoritative.
-        }
-      } finally {
-        releasePersistence();
+          if (event) {
+            o.publishStroke(event);
+          }
+        },
+        rollback: {
+          mutation: { layer, layerId, type: 'replaceCanvasLayer' },
+          restored: (document) => hasLayerContract(document, layer),
+        },
+      };
+      const result = lifecycle.publish(() => txn.publish(label, step, entry));
+      if (result.status === 'over-budget') {
+        lifecycle.refused();
       }
-      if (event) {
-        o.publishStroke(event);
+      if (result.status === 'committed') {
+        lifecycle.close(false);
       }
+      return result.status === 'committed';
     };
-    const transaction: PixelEditTransaction = {
-      cancel,
-      commitPatch: (label, patch) => (isImageDataEqual(patch.before, patch.after) ? cancel() : commit(label)),
-      commitStroke: (event) =>
+    return {
+      cancel: () => lifecycle.close(true),
+      commit: (event) =>
         isImageDataEqual(event.beforeImageData, event.afterImageData)
-          ? cancel()
+          ? false
           : commit(strokeCommitLabel(event.tool), event),
+      commitPatch: (label, patch) => (isImageDataEqual(patch.before, patch.after) ? false : commit(label)),
+      // The entry is two whole-layer snapshots, admitted at begin; the stroke's own footprint is never retained.
+      // A cache the stroke grew past that admission grows it at publication instead.
+      grow: () => lifecycle.owns(),
       layerId,
     };
-    owner = { cancel, layerId };
-    this.open = owner;
-    return transaction;
   }
 
   dispose(): void {

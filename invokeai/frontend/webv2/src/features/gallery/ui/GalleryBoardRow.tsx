@@ -14,11 +14,17 @@ import { useTranslation } from 'react-i18next';
 
 import { BoardCover } from './GalleryBoardCover';
 import { GalleryBoardRowShell } from './GalleryBoardRowShell';
-import { getGalleryBoardDropData, getGalleryBoardDropId, isGalleryItemDragData } from './galleryDnd';
+import {
+  acceptsGalleryItemMoves,
+  getGalleryBoardDropData,
+  getGalleryBoardDropId,
+  isGalleryItemDragData,
+} from './galleryDnd';
 import { getBoardCounts } from './galleryStateView';
 
 export const GalleryBoardRow = ({
   board,
+  isAutoAddTarget = false,
   isMenuOpen,
   isSelected,
   loadedItemBoardIds,
@@ -26,6 +32,8 @@ export const GalleryBoardRow = ({
   onSelectBoard,
 }: {
   board: GalleryBoard;
+  /** Results without a board of their own land here (the gallery is not following its selection). */
+  isAutoAddTarget?: boolean;
   /** Its own menu is showing, so the trigger must not fade out from under it. */
   isMenuOpen?: boolean;
   isSelected: boolean;
@@ -40,7 +48,7 @@ export const GalleryBoardRow = ({
   const boardLabel = getGalleryBoardLabel(board, t);
 
   const canDropItems =
-    board.kind === 'board' &&
+    acceptsGalleryItemMoves(board.kind) &&
     isGalleryItemDragData(dragData) &&
     dragData.items.some((ref) => loadedItemBoardIds.get(toGalleryItemKey(ref)) !== board.id);
 
@@ -151,6 +159,13 @@ export const GalleryBoardRow = ({
         onContextMenu={onOpenMenu ? handleContextMenu : undefined}
         onSelect={handleSelect}
       >
+        {isAutoAddTarget ? (
+          <Tooltip content={t('widgets.gallery.autoAddBadgeTooltip')}>
+            <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} size="xs" variant="subtle">
+              {t('widgets.gallery.autoAddBadge')}
+            </Badge>
+          </Tooltip>
+        ) : null}
         {board.projectId !== null ? (
           <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} size="xs" variant="subtle">
             {t('common.project')}

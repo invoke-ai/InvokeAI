@@ -33,7 +33,7 @@ Earlier releases wrote every edit of a workflow opened from the library straight
   - **Browse** lists curated bundled templates, filterable by a fixed set of category tags.
   - **Yours** lists templates you have saved; each can be renamed, duplicated, downloaded or deleted from its card menu, opened from the **⋯** button beside the title or with a right-click. The tag filter here is **dynamic** — it shows every unique tag found across your own templates, with a count per tag.
 
-  Opening a template adds an independent copy to your project; the template itself is untouched. If the project already has a copy, **Open project copy** switches to it, and **Add another copy** makes a second one.
+  Opening a template adds an independent copy to your project; the template itself is untouched. If the project already has a copy, opening the template asks what to do: **Open copy** switches to it, **Add new copy** makes another, and **Replace copy** swaps the copy's graph for the library version while keeping its name. A replace is a single undo step.
 
   Editing or running a project workflow never changes the library. To publish, use **Save to library…** in the editor header: it creates a new template with the name you enter, using the workflow's current graph, form and input values as the template's defaults. A copy opened from one of your own templates can also **Update library template** explicitly; that replaces the template's content while the template and the project workflow each keep their own name. Because a template may have changed since you opened it, an update is checked against the revision you last saw; if the template moved on, you can save as new instead, or review the current template and replace it deliberately. Replacing a template affects workflows that call it through **Call Saved Workflow**.
 
@@ -58,6 +58,8 @@ Earlier releases wrote every edit of a workflow opened from the library straight
 </Card>
 <Card title="Workflow Image Export" icon="download">
   Click the camera button in the workflow editor controls to download a PNG of the complete workflow, rendered at up to 2x resolution. The image includes connectors, the background grid, and the selected Invoke color scheme, with nodes shown deselected and the MiniMap omitted.
+
+  Closing the originating workflow editor while the PNG is being prepared cancels the export.
 </Card>
 
 ### Managing Nodes

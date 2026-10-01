@@ -13,15 +13,19 @@ import { useTranslation } from 'react-i18next';
 
 import type { GalleryProgressLayout } from './galleryGridLayout';
 
+import { SELECTED_TILE_CSS } from './GalleryTileFrame';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 export const GalleryProgressSection = ({
   layout,
   getScrollElement,
+  offsetTopPx,
 }: {
   layout: GalleryProgressLayout;
   getScrollElement(): HTMLDivElement | null;
+  /** Height of the pinned content above this section in the shared scroll viewport. */
+  offsetTopPx: number;
 }) => {
   const { t } = useTranslation();
   const { progressSessions, pinnedProgressSessionId, liveFollowEnabled, followProgressSession } = useGalleryUi();
@@ -99,6 +103,7 @@ export const GalleryProgressSection = ({
             layout={layout}
             fit={gallery.settings.thumbnailFit}
             getScrollElement={getScrollElement}
+            offsetTopPx={offsetTopPx}
             pinnedSessionId={pinnedProgressSessionId}
             liveFollowEnabled={liveFollowEnabled}
             onFollow={followProgressSession}
@@ -115,6 +120,7 @@ const GalleryProgressGrid = ({
   layout,
   fit,
   getScrollElement,
+  offsetTopPx,
   pinnedSessionId,
   liveFollowEnabled,
   onFollow,
@@ -124,6 +130,7 @@ const GalleryProgressGrid = ({
   layout: GalleryProgressLayout;
   fit: GalleryThumbnailFit;
   getScrollElement(): HTMLDivElement | null;
+  offsetTopPx: number;
   pinnedSessionId: string | null;
   liveFollowEnabled: boolean;
   onFollow(id: string, options: { revealPreview: boolean }): void;
@@ -131,11 +138,12 @@ const GalleryProgressGrid = ({
 }) => {
   const { columns, tileSize, headerHeight, paddingBottom, rowCount, rowHeight } = layout;
   const estimateSize = useCallback(() => rowHeight, [rowHeight]);
+  const scrollMargin = offsetTopPx + headerHeight;
   const virtualizer = useVirtualizer({
     count: rowCount,
     getScrollElement,
     estimateSize,
-    scrollMargin: headerHeight,
+    scrollMargin,
     overscan: 2,
   });
   const measure = useEffectEvent(() => virtualizer.measure());
@@ -150,7 +158,7 @@ const GalleryProgressGrid = ({
             <Box
               key={session.id}
               position="absolute"
-              top={`${row.start - headerHeight}px`}
+              top={`${row.start - scrollMargin}px`}
               left={`${column * rowHeight}px`}
             >
               <GalleryProgressTile
@@ -224,17 +232,20 @@ const GalleryProgressTile = ({
     [restoreFocus]
   );
 
+  const isShownSelected = selected && session.state !== 'queued';
+
   return (
     <chakra.button
       ref={buttonRef}
       type="button"
       focusVisibleRing="inside"
       aria-label={`${label} · ${status}`}
-      aria-pressed={selected && session.state !== 'queued'}
+      aria-pressed={isShownSelected}
       aria-disabled={session.state !== 'running'}
       tabIndex={session.state === 'running' ? 0 : -1}
-      borderColor={selected && session.state !== 'queued' ? 'accent.solid' : 'border.subtle'}
-      borderWidth="1px"
+      borderColor={isShownSelected ? 'accent.solid' : 'border.subtle'}
+      borderWidth="2px"
+      css={isShownSelected ? SELECTED_TILE_CSS : undefined}
       flexShrink={0}
       minW="0"
       overflow="hidden"

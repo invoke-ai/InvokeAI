@@ -1,11 +1,11 @@
 import type { CanvasControlLayerContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/api';
 import type { CanvasOperationCapability } from '@workbench/canvas-operations/api';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { Box } from '@chakra-ui/react';
 import { Button, Tooltip } from '@platform/ui';
 import { useNotify } from '@workbench/useNotify';
-import { useLayerThumbnailVersion } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -33,11 +33,14 @@ export const LayerFilterOperationButton = ({
 }: LayerFilterOperationButtonProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
-  useLayerThumbnailVersion(engine, layer.id);
+  const hasExportableContent = useCanvasEngineRead(
+    engine,
+    () => engine?.exports.hasExportableLayerContent(layer.id) ?? false
+  );
 
   const disabledReason = getLayerFilterLaunchDisabledReason({
     hasEngine: engine !== null,
-    hasExportableContent: engine?.exports.hasExportableLayerContent(layer.id) ?? false,
+    hasExportableContent,
     isEnabled: layer.isEnabled,
     isLocked: layer.isLocked,
   });

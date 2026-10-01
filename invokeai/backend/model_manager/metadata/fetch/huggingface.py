@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
-
 """
 This module fetches model metadata objects from the HuggingFace model repository,
 using either a `repo_id` or the model page URL.

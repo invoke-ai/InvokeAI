@@ -88,12 +88,13 @@ describe('damage-clipped compositing matches a full repaint', () => {
     backend: ReturnType<typeof createDomRasterBackend>,
     view: Mat2d,
     steps: (() => LayerDamage)[],
-    checkerboard: boolean
+    checkerboard: boolean,
+    extra: Partial<Parameters<typeof compositeDocument>[4]> = {}
   ) => {
     const full = backend.createSurface(SCREEN_W, SCREEN_H);
     const clipped = backend.createSurface(SCREEN_W, SCREEN_H);
     const tile = checkerboard ? createCheckerboardTile(backend, { a: '#2a2a2a', b: '#363636' }) : null;
-    const opts = { checkerboardTile: tile, imageSmoothing: false };
+    const opts = { backend, checkerboardTile: tile, imageSmoothing: false, ...extra };
 
     // Seed both with an identical full composite.
     compositeDocument(full, doc, caches, view, opts);
@@ -102,7 +103,10 @@ describe('damage-clipped compositing matches a full repaint', () => {
     for (const step of steps) {
       const damage = step();
       compositeDocument(full, doc, caches, view, opts);
-      compositeDocument(clipped, doc, caches, view, { ...opts, damage: [damage] });
+      compositeDocument(clipped, doc, caches, view, {
+        ...opts,
+        damage: { kind: 'regions', regions: [damage] } as const,
+      });
     }
     return { clipped: pixelsOf(clipped), full: pixelsOf(full) };
   };
@@ -200,6 +204,22 @@ describe('damage-clipped compositing matches a full repaint', () => {
     const doc = { stacks: stacksFrom(layers) } as unknown as CanvasDocumentContractV3;
     const steps = [() => repaint(caches, 'a', { height: 50, width: 50, x: 70, y: 70 }, '#ef4444')];
     const { clipped, full } = run(doc, caches, backend, IDENTITY_VIEW, steps, false);
+    expect(countDifferences(full, clipped)).toEqual({ differing: 0, worst: 0 });
+  });
+
+  it('redraws the staged outline half that lies outside its rect beside the damage', () => {
+    const layers = [rasterLayer('a')];
+    const rects = { a: { height: 200, width: 300, x: 40, y: 30 } };
+    const { backend, caches } = scene(layers, rects, { a: '#a855f7' });
+    const doc = { stacks: stacksFrom(layers) } as unknown as CanvasDocumentContractV3;
+    const staged = backend.createSurface(50, 50);
+    staged.ctx.fillStyle = '#22c55e';
+    staged.ctx.fillRect(0, 0, 50, 50);
+    // The padded damage ends exactly at the staged rect's left edge, inside the outline's outer half.
+    const steps = [() => repaint(caches, 'a', { height: 10, width: 4, x: 195, y: 110 }, '#ef4444')];
+    const { clipped, full } = run(doc, caches, backend, IDENTITY_VIEW, steps, true, {
+      stagedPreview: { rect: { height: 50, width: 50, x: 200, y: 100 }, surface: staged },
+    });
     expect(countDifferences(full, clipped)).toEqual({ differing: 0, worst: 0 });
   });
 });

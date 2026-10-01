@@ -88,6 +88,57 @@ const INITIAL_SNAPSHOT: WorkflowLibraryBrowseSnapshot = {
 
 const store = createExternalStore<WorkflowLibraryBrowseSnapshot>(INITIAL_SNAPSHOT);
 
+// #region View cache
+
+/**
+ * Views already browsed (Browse, Yours, a tag or search), kept so switching back shows them at once with their
+ * enrichment instead of refetching and re-reading every row. A view older than `VIEW_FRESH_MS` is revalidated in the
+ * background and merged in place; library mutations drop the other views.
+ */
+interface CachedBrowseView {
+  entries: readonly WorkflowLibraryEntry[];
+  fetchedAt: number;
+  page: number;
+  pages: number;
+  tagCounts: readonly WorkflowTagCount[];
+  total: number;
+}
+
+const VIEW_CACHE_LIMIT = 8;
+const VIEW_FRESH_MS = 30_000;
+const viewCache = new Map<string, CachedBrowseView>();
+/** When the current view's pages last arrived from the server. */
+let currentViewFetchedAt = 0;
+
+const getFilterKey = ({ category, search, tag }: WorkflowLibraryBrowseFilter): string =>
+  JSON.stringify([category, search, tag]);
+
+const rememberCurrentView = (): void => {
+  const { entries, filter, page, pages, status, tagCounts, total } = store.getSnapshot();
+
+  // An unfetched view is one a library change has outdated; leaving before its refresh lands must not keep it.
+  if (status !== 'loaded' || currentViewFetchedAt === 0) {
+    return;
+  }
+
+  const key = getFilterKey(filter);
+
+  viewCache.delete(key);
+  viewCache.set(key, { entries, fetchedAt: currentViewFetchedAt, page, pages, tagCounts, total });
+
+  // Maps iterate in insertion order, so the first key is the least recently left view.
+  while (viewCache.size > VIEW_CACHE_LIMIT) {
+    const oldest = viewCache.keys().next().value;
+
+    if (oldest === undefined) {
+      break;
+    }
+    viewCache.delete(oldest);
+  }
+};
+
+// #endregion
+
 const initialLoadFlight = createTrailingSingleFlight();
 const refreshFlight = createTrailingSingleFlight();
 
@@ -130,6 +181,10 @@ const retryFailedEnrichment = (entries: readonly WorkflowLibraryEntry[]): readon
 const publishPage = (result: WorkflowLibraryPage, mode: 'append' | 'replace'): void => {
   const previous = store.getSnapshot().entries;
   const merged = mergeEntries(previous, result.items);
+
+  if (mode === 'replace') {
+    currentViewFetchedAt = Date.now();
+  }
 
   store.patchSnapshot({
     entries: mode === 'append' ? [...previous, ...merged] : merged,
@@ -363,7 +418,10 @@ const probeUserTotal = async (owner: AccountScope): Promise<void> => {
   }
 };
 
-/** Applies a filter patch, resets the accumulated pages, and refetches page 0. */
+/**
+ * Applies a filter patch. A view browsed before comes back from the cache at once (revalidated in the background once
+ * stale); a new one resets the accumulated pages and fetches page 0.
+ */
 export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBrowseFilter>): void => {
   const snapshot = store.getSnapshot();
   const filter = { ...snapshot.filter, ...patch };
@@ -375,9 +433,33 @@ export const setWorkflowLibraryBrowseFilter = (patch: Partial<WorkflowLibraryBro
   const owner = captureAccountScope();
   const isCategoryChanged = filter.category !== snapshot.filter.category;
 
+  rememberCurrentView();
+
   // Everything already in flight was requested for the previous filter.
   filterGeneration += 1;
   hasTemplateLoadFailed = false;
+
+  const cached = viewCache.get(getFilterKey(filter));
+
+  if (cached) {
+    currentViewFetchedAt = cached.fetchedAt;
+    store.patchSnapshot({
+      entries: cached.entries,
+      error: null,
+      filter,
+      page: cached.page,
+      pages: cached.pages,
+      status: 'loaded',
+      tagCounts: cached.tagCounts,
+      total: cached.total,
+    });
+    pumpEnrichment();
+
+    if (Date.now() - cached.fetchedAt > VIEW_FRESH_MS) {
+      void refreshWorkflowLibraryBrowse();
+    }
+    return;
+  }
 
   store.patchSnapshot({
     entries: EMPTY_ENTRIES,
@@ -452,6 +534,7 @@ export const refreshWorkflowLibraryBrowse = (): Promise<void> =>
       if (last && isFilterCurrent(generation, owner)) {
         const items = results.flatMap((result) => result.items);
 
+        currentViewFetchedAt = Date.now();
         store.patchSnapshot({
           entries: mergeEntries(retryFailedEnrichment(store.getSnapshot().entries), items),
           error: null,
@@ -487,6 +570,10 @@ export const useWorkflowLibraryBrowseSelector = store.useSelector;
 let isRefreshScheduled = false;
 
 onWorkflowLibraryCacheInvalidated(() => {
+  // A mutation can change any view; the current one refreshes below, the others fetch afresh when revisited.
+  viewCache.clear();
+  currentViewFetchedAt = 0;
+
   if (isRefreshScheduled || store.getSnapshot().status === 'idle') {
     return;
   }
@@ -510,6 +597,8 @@ registerAccountOwnedResource({
     templatesFlight = null;
     hasTemplateLoadFailed = false;
     isRefreshScheduled = false;
+    viewCache.clear();
+    currentViewFetchedAt = 0;
     initialLoadFlight.reset();
     refreshFlight.reset();
     store.setSnapshot(INITIAL_SNAPSHOT);

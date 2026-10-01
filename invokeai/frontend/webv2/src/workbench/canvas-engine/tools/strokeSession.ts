@@ -1,6 +1,7 @@
 /**
  * Per-gesture brush/eraser sessions accumulate samples and draw one scratch silhouette, compositing at stroke
- * opacity without overlap darkening. Brush uses source-over or transparency-locked source-atop; erase uses
+ * opacity without overlap darkening. Samples append immediately; the accumulated stroke renders at most once per
+ * frame and commit renders the final stroke synchronously. Brush uses source-over or transparency-locked source-atop; erase uses
  * destination-out and is refused under transparency lock.
  *
  * Each preview restores affected pristine pixels before compositing the accumulated stroke. Extend
@@ -14,12 +15,19 @@ import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d, PlacedSurface, PointerInput, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { strokeToPath, type StrokeSamplePoint } from '@workbench/canvas-engine/freehand';
+import {
+  createSampleDecimator,
+  polygonToPath,
+  sampleSpacing,
+  strokeOutlineFromSamples,
+  strokeToPath,
+  type StrokeSamplePoint,
+} from '@workbench/canvas-engine/freehand';
 import { applyToPoint, getScale, identity, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { expand, intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import { getPressureBands } from '@workbench/canvas-engine/pressureBands';
 
-import type { StrokeCommittedEvent, ToolContext } from './tool';
+import type { StrokeCommittedEvent, StrokeEdit, ToolContext } from './tool';
 
 /** Everything a stroke session needs, resolved by the owning tool on pointer-down. */
 export interface StrokeSessionConfig {
@@ -64,15 +72,24 @@ export interface StrokeSessionConfig {
    * local. Absence uses identity.
    */
   layerTransform?: Mat2d | null;
+  /** The admitted edit; its undo footprint grows before the stroke's before/after pixels do. */
+  edit: Pick<StrokeEdit, 'grow'>;
+  /** Called when a scheduled frame render throws, before the error propagates; the owner aborts the stroke. */
+  onRenderError?: (error: unknown) => void;
+  /** Called once when a frame's growth is refused; the session has already restored the layer. */
+  onRefused?: () => void;
 }
 
 /** The imperative handle a tool drives across a gesture. */
 export interface StrokeSession {
-  /** Appends coalesced samples and repaints the accumulated stroke. */
+  /** Appends coalesced samples and schedules one repaint of the accumulated stroke for the next frame. */
   addPoints(inputs: readonly PointerInput[]): void;
-  /** Finalizes the stroke and returns the completed edit for its owner to publish. */
-  commit(): StrokeCommittedEvent | null;
-  /** Restores the pre-stroke pixels and drops the session without an event. */
+  /**
+   * Renders the final stroke and hands it to `publish`. Returns whether it was published; when nothing was painted,
+   * growth was refused, or `publish` declined, the layer is restored first.
+   */
+  commit(publish: (event: StrokeCommittedEvent) => boolean): boolean;
+  /** Restores the pre-stroke pixels and extent and drops the session without an event. */
   cancel(): void;
 }
 
@@ -265,14 +282,23 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
   // The feathered copy of the silhouette; allocated only when hardness < 1.
   let soft: RasterSurface | null = null;
 
+  // Raw samples feed only the pressure bands; the outline reads the incrementally decimated samples.
   const points: StrokeSamplePoint[] = [];
+  const decimator = createSampleDecimator(sampleSpacing(localSize));
   // Below the travel threshold, preserve the first aim point as a round dab rather than a short capsule.
   const tapCollapseLength = Math.max(2, localSize * 0.25);
+  let travel = 0;
+  let cancelScheduledFrame: (() => void) | null = null;
+  let closed = false;
   // Before pixels cover `accumRect` in stable layer-local coordinates, unaffected by backing-store origin shifts.
   let beforeImageData: ImageData | null = null;
   let accumRect: Rect | null = null;
   let previousPolygon: Vec2[] | null = null;
   const chunk = growthChunk(localSize);
+  const original = layers.peek(layerId);
+  const originalRect = original ? { ...original.rect } : null;
+  // Bytes of before/after pixels the admitted edit already covers.
+  let admittedFootprint = 0;
 
   /** Ensures the scratch surface is at least `w`×`h`. */
   const ensureStroke = (w: number, h: number): RasterSurface => {
@@ -293,21 +319,17 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     return soft;
   };
 
-  const paint = (last: boolean): void => {
+  /** Renders the accumulated stroke; false when the undo footprint could not grow to cover it. */
+  const paint = (last: boolean): boolean => {
     if (points.length === 0) {
-      return;
+      return true;
     }
-    let effective: readonly StrokeSamplePoint[] = points;
-    if (points.length > 1) {
-      let travel = 0;
-      for (let i = 1; i < points.length && travel < tapCollapseLength; i++) {
-        travel += Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.y - points[i - 1]!.y);
-      }
-      if (travel < tapCollapseLength) {
-        effective = [points[0]!];
-      }
-    }
-    const { bounds, path, polygon } = strokeToPath(effective, { last, size: localSize, thinning }, ctx.createPath2D);
+    const isTap = travel < tapCollapseLength;
+    const effective: readonly StrokeSamplePoint[] = isTap ? [points[0]!] : points;
+    const { bounds, path, polygon } = polygonToPath(
+      strokeOutlineFromSamples(isTap ? effective : decimator.samples(last), { last, size: localSize, thinning }),
+      ctx.createPath2D
+    );
     let dirty: Rect | null = roundOut(featherBleed > 0 ? expand(bounds, featherBleed) : bounds);
     // Limit dirty/growth bounds to selection coverage and skip empty intersections.
     if (clipMaskLocalRect) {
@@ -317,7 +339,7 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
       dirty = intersect(dirty, clipRectLocal);
     }
     if (!dirty || isEmpty(dirty)) {
-      return;
+      return true;
     }
     // Outward chunk-padding amortizes growth; dirty regions and history use the same padded extent. Clamp padding
     // to selection bounds, and trim visible content during persistence.
@@ -336,7 +358,15 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
       }
     }
     if (isEmpty(region)) {
-      return;
+      return true;
+    }
+    // Before and after pixels each cover the region; admit them before either is captured.
+    const footprint = region.width * region.height * 8;
+    if (footprint > admittedFootprint) {
+      if (!config.edit.grow(footprint - admittedFootprint)) {
+        return false;
+      }
+      admittedFootprint = footprint;
     }
 
     // Grow preserving pixels at chunk crossings while retaining surface-object identity.
@@ -497,35 +527,106 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     // Report layer-local damage; compositor transforms it to screen space, avoiding full-layer resampling as zoom
     // increases.
     ctx.invalidate({ damage: { layerId, rect: changed }, layers: [layerId] });
+    return true;
+  };
+
+  let settled = false;
+  /** Puts the pre-stroke pixels back and returns the cache to its pre-stroke extent, once. */
+  const restore = (): void => {
+    const entry = layers.peek(layerId);
+    if (settled || !entry || !accumRect || !beforeImageData) {
+      return;
+    }
+    settled = true;
+    entry.surface.ctx.putImageData(beforeImageData, accumRect.x - entry.rect.x, accumRect.y - entry.rect.y);
+    if (originalRect) {
+      layers.shrinkToRect(layerId, originalRect);
+    } else {
+      layers.delete(layerId);
+    }
+    // The whole restored rect is damage, so adjusted caches discard the live stroke preview.
+    const restored = layers.peek(layerId);
+    if (restored && !isEmpty(restored.rect)) {
+      const visible = intersect(accumRect, restored.rect);
+      layers.publishPixels(
+        layerId,
+        visible ? { ...visible, x: visible.x - restored.rect.x, y: visible.y - restored.rect.y } : null
+      );
+    }
+    ctx.invalidate({ layers: [layerId] });
+  };
+
+  const append = (sample: StrokeSamplePoint): void => {
+    const previous = points[points.length - 1];
+    if (previous && travel < tapCollapseLength) {
+      travel += Math.hypot(sample.x - previous.x, sample.y - previous.y);
+    }
+    points.push(sample);
+    decimator.push(sample);
+  };
+
+  const unschedule = (): void => {
+    cancelScheduledFrame?.();
+    cancelScheduledFrame = null;
+  };
+
+  const renderFrame = (): void => {
+    cancelScheduledFrame = null;
+    if (closed) {
+      return;
+    }
+    let painted: boolean;
+    try {
+      painted = paint(false);
+    } catch (error) {
+      config.onRenderError?.(error);
+      throw error;
+    }
+    if (!painted) {
+      closed = true;
+      restore();
+      config.onRefused?.();
+    }
   };
 
   return {
     addPoints: (inputs) => {
-      for (const input of inputs) {
-        points.push(toSample(input));
+      if (closed) {
+        return;
       }
-      paint(false);
+      for (const input of inputs) {
+        append(toSample(input));
+      }
+      if (cancelScheduledFrame) {
+        return;
+      }
+      let ran = false;
+      const cancel = ctx.scheduleFrame(() => {
+        ran = true;
+        renderFrame();
+      });
+      if (!ran) {
+        cancelScheduledFrame = cancel;
+      }
     },
     cancel: () => {
-      const entry = layers.get(layerId);
-      if (entry && accumRect && beforeImageData) {
-        entry.surface.ctx.putImageData(beforeImageData, accumRect.x - entry.rect.x, accumRect.y - entry.rect.y);
-        // Cancellation reports the whole restored accumulated rect so adjusted caches discard the live stroke
-        // preview.
-        layers.publishPixels(layerId, {
-          height: accumRect.height,
-          width: accumRect.width,
-          x: accumRect.x - entry.rect.x,
-          y: accumRect.y - entry.rect.y,
-        });
-        ctx.invalidate({ layers: [layerId] });
-      }
+      closed = true;
+      unschedule();
+      restore();
     },
-    commit: () => {
-      paint(true);
+    commit: (publish) => {
+      if (closed) {
+        return false;
+      }
+      closed = true;
+      unschedule();
+      if (!paint(true)) {
+        restore();
+        return false;
+      }
       const entry = layers.get(layerId);
       if (!entry || !accumRect || !beforeImageData) {
-        return null;
+        return false;
       }
       const afterImageData = entry.surface.ctx.getImageData(
         accumRect.x - entry.rect.x,
@@ -533,14 +634,20 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
         accumRect.width,
         accumRect.height
       );
-      return {
+      const published = publish({
         afterImageData,
         beforeImageData,
         dirtyRect: accumRect,
         layerId,
         tool,
         ...(createdLayer ? { createdLayer } : {}),
-      };
+      });
+      if (published) {
+        settled = true;
+      } else {
+        restore();
+      }
+      return published;
     },
   };
 };

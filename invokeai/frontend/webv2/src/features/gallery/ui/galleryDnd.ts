@@ -3,6 +3,7 @@ import type { GalleryBoardKind } from '@features/gallery/core/types';
 
 import { useDndContext, useDroppable, type UseDroppableArguments } from '@dnd-kit/core';
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { createContext } from 'react';
 
 export interface GalleryItemDragData {
   kind: 'gallery-item';
@@ -41,7 +42,17 @@ export const getGalleryItemDragId = (
   scope?: string
 ): GalleryItemDragId => `${source}${scope ? `#${scope}` : ''}:${toGalleryItemKey(item)}`;
 
+/**
+ * True inside the drag context that gallery items are dragged in (the workbench shell). dnd-kit cannot say whether a
+ * DndContext is mounted, and surfaces outside it (widget dialog hosts, the Launchpad) still render gallery drop targets.
+ */
+export const GalleryDragScope = createContext(false);
+
 export const getGalleryBoardDropId = (boardId: string): string => `gallery-board:${boardId}`;
+
+/** Real boards and Uncategorized hold items; date boards are views and accept no moves. */
+export const acceptsGalleryItemMoves = (boardKind: GalleryBoardKind): boolean =>
+  boardKind === 'board' || boardKind === 'uncategorized';
 
 /** Droppable id for the search field: dropping a gallery image there searches by similarity. */
 export const GALLERY_SEMANTIC_SEARCH_DROP_ID = 'gallery-semantic-search-drop';
@@ -131,7 +142,11 @@ export const resolveGalleryBoardDrop = (
   overData: unknown,
   loadedItems: readonly GalleryItem[]
 ): GalleryBoardDropResolution | null => {
-  if (!isGalleryItemDragData(activeData) || !isGalleryBoardDropData(overData) || overData.boardKind !== 'board') {
+  if (
+    !isGalleryItemDragData(activeData) ||
+    !isGalleryBoardDropData(overData) ||
+    !acceptsGalleryItemMoves(overData.boardKind)
+  ) {
     return null;
   }
 

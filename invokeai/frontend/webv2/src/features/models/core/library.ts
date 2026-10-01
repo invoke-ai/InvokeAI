@@ -220,12 +220,3 @@ export const collectBasesForDisplay = (models: Pick<ModelConfig, 'base'>[]): str
 /** Distinct types present in a model list, in canonical order. */
 export const collectTypes = (models: Pick<ModelConfig, 'type'>[]): ModelTaxonomyType[] =>
   [...new Set(models.map((model) => model.type))].sort((a, b) => getModelCategoryRank(a) - getModelCategoryRank(b));
-
-/** Rows for a virtualized flat list: group headers interleaved with models. */
-export type LibraryRow = { kind: 'header'; group: ModelGroup } | { kind: 'model'; model: ModelConfig };
-
-export const flattenGroupsToRows = (groups: ModelGroup[]): LibraryRow[] =>
-  groups.flatMap<LibraryRow>((group) => [
-    { group, kind: 'header' },
-    ...group.models.map<LibraryRow>((model) => ({ kind: 'model', model })),
-  ]);

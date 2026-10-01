@@ -18,6 +18,7 @@ import type {
 } from '@features/workflow/ui/WorkflowUiContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { GalleryHostProvider, type GalleryHost } from '@features/gallery/picker';
 import { WorkflowGraphPreviewProvider, WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import {
   openWorkflowLibraryAtProjectWorkflow,
@@ -34,7 +35,15 @@ import { userEvent } from 'vitest/browser';
 // Warm the mocked lazy module to avoid first-compile timing variability in preview wiring tests.
 import '@features/workflow/ui/graph-preview/GraphPreviewDialog';
 
+import { LibraryCopyChoiceHost } from './LibraryCopyChoiceDialog';
 import { WorkflowLibraryDialog } from './WorkflowLibraryDialog';
+
+/** In the app the workbench derives this from its Gallery adapter; the library's thumbnail slot reads it. */
+const GALLERY_HOST: GalleryHost = {
+  galleryValues: {},
+  notifications: { add: vi.fn(), reportError: vi.fn() },
+  projectName: '',
+};
 
 // Provide the fixture node's reactive template snapshot so preview compilation can run without backend schema
 // loading.
@@ -137,7 +146,7 @@ vi.mock('@features/workflow/data/libraryBrowseStore', async () => {
 
 // Test opener invocation and busy-state wiring here; load sequencing has separate coverage.
 const loader = vi.hoisted(() => ({
-  open: vi.fn((_item: unknown, _mode: 'resume-or-add' | 'add-copy') => Promise.resolve()),
+  open: vi.fn((_item: unknown, _mode: 'first-copy' | 'add-copy') => Promise.resolve()),
   phase: { current: 'idle' as 'applying' | 'fetching' | 'idle' },
   resume: vi.fn((_workflowId: string) => {}),
 }));
@@ -174,7 +183,6 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.activeWorkflow': 'Active',
   'workflowLibrary.addAnotherCopy': 'Add another copy',
   'workflowLibrary.addAnotherCopyHint': 'A second, independent copy in this project',
-  'workflowLibrary.addWorkflow': 'Add workflow',
   'workflowLibrary.chooseProjectCopy': 'Open which copy?',
   'workflowLibrary.allTag': 'All',
   'workflowLibrary.applying': 'Applying workflow…',
@@ -197,8 +205,7 @@ const TRANSLATIONS: Record<string, string> = {
   'workflowLibrary.notRunYet': 'Not run yet',
   'workflowLibrary.open': 'Open',
   'workflowLibrary.openHint': 'Adds a copy to this project',
-  'workflowLibrary.openProjectCopy': 'Open project copy',
-  'workflowLibrary.openProjectCopyHint': 'Switches to the copy this project already has',
+  'workflowLibrary.openWithEllipsis': 'Open…',
   'workflowLibrary.previewGraph': 'Preview graph',
   'workflowLibrary.projectWorkflowCount_one': '{{count}} workflow in this project',
   'workflowLibrary.projectWorkflowCount_other': '{{count}} workflows in this project',
@@ -420,9 +427,12 @@ describe('WorkflowLibraryDialog', () => {
         <StrictMode>
           <ChakraProvider value={system}>
             <WorkflowUiProvider adapter={UI_ADAPTER}>
-              <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-                <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={onOpenChange} />
-              </WorkflowGraphPreviewProvider>
+              <GalleryHostProvider host={GALLERY_HOST}>
+                <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                  <WorkflowLibraryDialog isOpen={isOpen} onOpenChange={onOpenChange} />
+                  <LibraryCopyChoiceHost />
+                </WorkflowGraphPreviewProvider>
+              </GalleryHostProvider>
             </WorkflowUiProvider>
           </ChakraProvider>
         </StrictMode>
@@ -692,7 +702,7 @@ describe('WorkflowLibraryDialog', () => {
     });
 
     expect(loader.open).toHaveBeenCalledTimes(1);
-    expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'resume-or-add');
+    expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
   });
 
   it('dedupes entries that share a workflow id', async () => {
@@ -842,7 +852,31 @@ describe('WorkflowLibraryDialog', () => {
     await vi.waitFor(() => expect(open()).not.toBeNull());
     await act(() => open()?.click());
 
-    expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'resume-or-add');
+    expect(loader.open).toHaveBeenCalledWith(LANDSCAPE.item, 'first-copy');
+  });
+
+  // The question mounts while the menu that asked it is still closing; the menu's teardown must not dismiss it.
+  it('keeps the copy question a card menu raised for a template the project already holds', async () => {
+    await openWith(LOADED_SNAPSHOT);
+
+    await act(() =>
+      card('wf-portrait')?.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 120, clientY: 80 })
+      )
+    );
+
+    const open = () => document.querySelector<HTMLElement>('[data-workflow-context-menu] [data-menu-item="open"]');
+
+    await vi.waitFor(() => expect(open()).not.toBeNull());
+    await act(async () => {
+      open()?.click();
+      await settleFrame();
+      await settleFrame();
+    });
+
+    await vi.waitFor(() => expect(document.querySelector('[data-workflow-context-menu]')).toBeNull());
+    expect(document.querySelector('[data-library-copy-choice]')).not.toBeNull();
+    expect(loader.open).not.toHaveBeenCalled();
   });
 
   it('closes the card context menu on Escape and hands focus back to the card', async () => {
@@ -873,17 +907,17 @@ describe('WorkflowLibraryDialog', () => {
   it('opens the selected workflow from the rail, the keyboard-reachable path', async () => {
     await openWith(LOADED_SNAPSHOT);
 
-    // Portrait needs nothing installed, but the project already holds a copy of it: Open resumes that copy.
-    await clickText('Open project copy');
+    // Portrait needs nothing installed, but the project already holds a copy of it: Open asks what to do.
+    await clickText('Open…');
 
-    expect(loader.resume).toHaveBeenCalledWith('wf-user');
+    expect(workflowUiStore.getSnapshot().libraryCopyChoice?.item.workflow_id).toBe(PORTRAIT.item.workflow_id);
     expect(loader.open).not.toHaveBeenCalled();
 
     // Upscale has no copy yet (and nothing to install first), so Open adds one.
     await act(() => card('wf-upscale')?.click());
     await clickText('Open');
 
-    expect(loader.open).toHaveBeenCalledWith(UPSCALE.item, 'resume-or-add');
+    expect(loader.open).toHaveBeenCalledWith(UPSCALE.item, 'first-copy');
   });
 
   it('badges the cards with the models their workflows still need', async () => {
@@ -916,6 +950,17 @@ describe('WorkflowLibraryDialog', () => {
     expect(preview?.getAttribute('data-source-label')).toBe('Preview Fixture');
     // The document's one `integer` node made it through compilation.
     expect(preview?.textContent).toContain('integer');
+  });
+
+  it('commits the first preview in the click that opens it once the library has loaded the dialog', async () => {
+    await openWith(withSnapshot({ entries: [PORTRAIT, PREVIEW_FIXTURE] }));
+    await act(() => card('wf-preview-fixture')?.click());
+    await vi.dynamicImportSettled();
+
+    // A Suspense reveal here lets StrictMode replay the open dialog's effects after its focus trap started.
+    act(() => (buttonWithText('Preview graph') as HTMLButtonElement).click());
+
+    expect(document.querySelector('[data-preview-dialog]')?.getAttribute('data-preview-open')).toBe('true');
   });
 
   it('disables the Preview action for an entry whose enrichment is not ready', async () => {
@@ -1067,9 +1112,11 @@ describe('WorkflowLibraryDialog — This project', () => {
         <StrictMode>
           <ChakraProvider value={system}>
             <WorkflowUiProvider adapter={UI_ADAPTER}>
-              <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
-                <WorkflowLibraryDialog isOpen onOpenChange={onOpenChange} />
-              </WorkflowGraphPreviewProvider>
+              <GalleryHostProvider host={GALLERY_HOST}>
+                <WorkflowGraphPreviewProvider adapter={GRAPH_PREVIEW}>
+                  <WorkflowLibraryDialog isOpen onOpenChange={onOpenChange} />
+                </WorkflowGraphPreviewProvider>
+              </GalleryHostProvider>
             </WorkflowUiProvider>
           </ChakraProvider>
         </StrictMode>
@@ -1179,17 +1226,6 @@ describe('WorkflowLibraryDialog — This project', () => {
 
     expect(COMMANDS.createWorkflow).toHaveBeenCalledTimes(1);
     expect(onOpenChange).not.toHaveBeenCalled();
-  });
-
-  it('moves to the bundled templates when asked to add a workflow', async () => {
-    await renderDialog();
-
-    await clickText('Add workflow');
-
-    expect(workflowUiStore.getSnapshot().libraryTab).toBe('default');
-    expect(browse.setWorkflowLibraryBrowseFilter).toHaveBeenCalledWith({ category: 'default', tag: null });
-    expect(document.querySelector('[data-library-tab="default"]')).not.toBeNull();
-    expect(browse.ensureWorkflowLibraryBrowseLoaded).toHaveBeenCalled();
   });
 
   it('opens a workflow from a double-click or the rail, then closes', async () => {

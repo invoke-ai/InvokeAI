@@ -1,5 +1,5 @@
 /* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
-import { Box, Checkbox, Flex, HStack, Icon, Separator, Text } from '@chakra-ui/react';
+import { Icon } from '@chakra-ui/react';
 import { collectBases, collectTypes, filterModels } from '@features/models/core/library';
 import { bulkDeleteModels, bulkReidentifyModels } from '@features/models/data/api';
 import { refreshModels, removeModelsFromStore, useModelsSelector } from '@features/models/data/modelsStore';
@@ -18,11 +18,11 @@ import { useNotify } from '@features/models/ui/useModelsNotify';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, IconButton, ConfirmDialog } from '@platform/ui';
+import { ListSelectionBar } from '@platform/ui/list/ListSelectionBar';
+import { ManagerColumn } from '@platform/ui/ManagerLayout';
 import { RefreshCcwIcon, Trash2Icon, XIcon } from 'lucide-react';
 import { useCallback, useDeferredValue, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { HEADER_MIN_HEIGHT, LIBRARY_WIDTH } from './layoutConstants';
 
 const EMPTY_KEYS: string[] = [];
 
@@ -158,19 +158,7 @@ export const LibraryColumn = () => {
   };
 
   return (
-    <Flex direction="column" flexShrink={0} h="full" minH="0" position="relative" w={LIBRARY_WIDTH} borderEndWidth={1}>
-      <HStack align="center" borderBottomWidth={1} flexShrink={0} gap="2" minH={HEADER_MIN_HEIGHT} px="3">
-        <Text fontSize="sm" fontWeight="700">
-          {t('models.title')}
-        </Text>
-        <Text color="fg.muted" fontSize="xs">
-          {models.length}
-        </Text>
-        <Box ms="auto">
-          <MaintenanceMenu />
-        </Box>
-      </HStack>
-
+    <ManagerColumn actions={<MaintenanceMenu />} count={models.length} title={t('models.title')}>
       <ModelFilterBar
         availableBases={availableBases}
         availableTypes={availableTypes}
@@ -179,30 +167,16 @@ export const LibraryColumn = () => {
         onChange={(nextFilters) => updateModelsUi({ filters: nextFilters })}
       />
 
-      {/* Keep controls mounted below search to prevent selection-induced layout shifts or obscured model rows. */}
-      <HStack borderBottomWidth={1} flexShrink={0} gap="2" minH="8" px="3" py="1.5">
-        <Checkbox.Root
-          aria-label={t('models.selectAll')}
-          // No visible matches means indeterminate, not all selected; clicking clears the hidden selection.
-          checked={hasSelection ? (hasUnselectedFiltered || filteredKeys.length === 0 ? 'indeterminate' : true) : false}
-          colorPalette="accent"
-          disabled={!canSelectAll}
-          size="xs"
-          onCheckedChange={handleToggleSelectAll}
-        >
-          <Checkbox.HiddenInput />
-          <Checkbox.Control />
-          <Checkbox.Label color="fg.muted" fontSize="2xs" fontWeight="600">
-            {t('models.selectAll')}
-          </Checkbox.Label>
-        </Checkbox.Root>
-        <Box flex="1" />
+      <ListSelectionBar
+        // No visible matches means indeterminate, not all selected; clicking clears the hidden selection.
+        checked={hasSelection ? (hasUnselectedFiltered || filteredKeys.length === 0 ? 'indeterminate' : true) : false}
+        isDisabled={!canSelectAll}
+        label={t('models.selectAll')}
+        summary={hasSelection ? t('models.selectedCount', { count: selectedKeys.size }) : undefined}
+        onCheckedChange={handleToggleSelectAll}
+      >
         {hasSelection ? (
           <>
-            <Text color="fg.muted" fontSize="2xs" fontWeight="600">
-              {t('models.selectedCount', { count: selectedKeys.size })}
-            </Text>
-            <Separator borderColor="border.subtle" h="4" orientation="vertical" />
             <Button size="2xs" variant="ghost" onClick={() => setIsBulkReidentifyOpen(true)}>
               <Icon as={RefreshCcwIcon} boxSize="3" />
               {t('models.reidentifySelected')}
@@ -221,7 +195,7 @@ export const LibraryColumn = () => {
             </IconButton>
           </>
         ) : null}
-      </HStack>
+      </ListSelectionBar>
 
       <ModelLibraryList
         activeModelKey={activeModelKey}
@@ -249,6 +223,6 @@ export const LibraryColumn = () => {
         onClose={() => setIsBulkReidentifyOpen(false)}
         onConfirm={handleBulkReidentify}
       />
-    </Flex>
+    </ManagerColumn>
   );
 };

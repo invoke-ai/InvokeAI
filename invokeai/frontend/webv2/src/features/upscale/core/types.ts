@@ -1,5 +1,6 @@
 import type {
   CompiledGenerateGraph,
+  ComponentModelConfig,
   GenerateLora,
   ImageWithDims,
   MainModelConfig,
@@ -36,6 +37,9 @@ export interface UpscaleWidgetValues {
   clipSkip: number;
   vae: VaeModelConfig | null;
   vaePrecision: VaePrecision;
+  /** Only used by architectures whose `needsExplicitComponents` is set; null elsewhere. */
+  t5EncoderModel: ComponentModelConfig | null;
+  clipEmbedModel: ComponentModelConfig | null;
 
   tileControlnetModel: TileControlNetModelConfig | null;
   tileSize: number;

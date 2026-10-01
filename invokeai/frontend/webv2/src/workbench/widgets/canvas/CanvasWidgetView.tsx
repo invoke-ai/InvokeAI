@@ -7,6 +7,7 @@ import { useQueueItemProgressImage } from '@features/queue/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { preloadCanvasInvocation } from '@workbench/activeInvocationSubmission';
 import { getCanvasImportNotice } from '@workbench/canvas-operations/api';
+import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { getCanvasStagingSlots } from '@workbench/canvasStagingView';
 import { recordCanvasImportError } from '@workbench/image-actions/canvasImportError';
 import { readLayerPanelState } from '@workbench/layerPanelState';
@@ -14,7 +15,6 @@ import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useNotify } from '@workbench/useNotify';
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
-import { clearLayerPropertiesRequest } from '@workbench/widgets/layers/layerPropertiesRequestStore';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectId,
@@ -34,6 +34,7 @@ import {
   type CanvasContextMenuTarget,
 } from './canvasContextMenu';
 import { CanvasCreateFromBboxSubmenu } from './CanvasCreateFromBboxSubmenu';
+import { CanvasEditRefusalNotices } from './CanvasEditRefusalNotices';
 import { CanvasGlobalContextMenu } from './CanvasGlobalContextMenu';
 import { executeCanvasHotkeyCommand } from './canvasHotkeyCommands';
 import { resolveCanvasImageDrop } from './canvasImageDnd';
@@ -57,10 +58,9 @@ import { StagingBar } from './StagingBar';
 import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
 import { ToolStrip } from './ToolStrip';
-import { useCanvasEngine } from './useCanvasEngine';
 import { useCanvasGallerySave } from './useCanvasGallerySave';
 import { useCreateFromBbox } from './useCreateFromBbox';
-import { reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
+import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
 
 const MissingFontsDialog = lazy(() =>
   import('./MissingFontsDialog').then((module) => ({ default: module.MissingFontsDialog }))
@@ -85,12 +85,6 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const fontReferences = useMemo(() => engine?.fonts.collectReferences(document) ?? [], [document, engine]);
   const operation = useCanvasOperation(engine);
   const operationKind = operation?.status === 'active' ? operation.identity.kind : null;
-  // An operation's panel supersedes any pending layer-properties request.
-  useEffect(() => {
-    if (operationKind) {
-      clearLayerPropertiesRequest();
-    }
-  }, [operationKind]);
   const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
   const { createFromBbox, isCreating } = useCreateFromBbox(engine);
 
@@ -267,7 +261,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       }
       const result = mountedEngine.selection.pasteImage(pixels);
       if (result.status !== 'created') {
-        notifications.add({ kind: 'error', title: t('widgets.canvas.clipboard.pasteFailed') });
+        reportLayerOperation(result.status, notify.error, t);
       }
     })();
   });
@@ -282,15 +276,20 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   /* eslint-disable react/preserve-manual-memoization -- imperative engine payload is mutable by design */
   const commitSelectedStagedImage = useCallback(
     (continueStaging: boolean) => {
-      if (selectedSlot?.kind === 'candidate') {
-        engine?.layers.commitStagedImage({
-          candidate: selectedSlot.candidate,
-          continueStaging,
-          selectedImageIndex: stagingArea.selectedImageIndex,
-        });
+      if (selectedSlot?.kind !== 'candidate' || !engine) {
+        return;
+      }
+      const result = engine.layers.commitStagedImage({
+        candidate: selectedSlot.candidate,
+        continueStaging,
+        selectedImageIndex: stagingArea.selectedImageIndex,
+      });
+      if (result.status !== 'committed' && result.status !== 'busy') {
+        // A candidate that left staging is as stale as one that changed under the accept.
+        reportLayerOperation(result.status === 'missing' ? 'stale' : result.status, notify.error, t);
       }
     },
-    [engine, selectedSlot, stagingArea.selectedImageIndex]
+    [engine, notify, selectedSlot, stagingArea.selectedImageIndex, t]
   );
   /* eslint-enable react/preserve-manual-memoization */
   const acceptStagedImage = useCallback(() => commitSelectedStagedImage(false), [commitSelectedStagedImage]);
@@ -375,6 +374,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       notifyLayerDuplicateFailed: () =>
         notifications.add({ kind: 'error', title: t('widgets.layers.actions.copyFailed') }),
       pasteFromClipboard,
+      reportLayerOperation: (refusal) => reportLayerOperation(refusal, notify.error, t),
       reportPreparedCommit: (outcome) => reportPreparedCommit(outcome, notify.error, t),
       reportStructuralCommit: (result) => reportStructuralCommit(result, notify.error, t),
       resetActiveColors: colorCommands.resetPair,
@@ -488,6 +488,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       w="full"
     >
       <CanvasColorFeed engine={engine} />
+      {engine ? <CanvasEditRefusalNotices key={projectId} engine={engine} /> : null}
       {engine && fontReferences.length > 0 ? (
         <Suspense fallback={null}>
           <MissingFontsDialog key={projectId} engine={engine} groups={fontReferences} />

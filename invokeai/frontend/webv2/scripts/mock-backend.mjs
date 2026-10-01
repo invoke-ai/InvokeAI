@@ -133,6 +133,9 @@ const createState = (profile) => {
     videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
     workflows: new Map(fixture.workflows.map((workflow) => [workflow.workflow_id, clone(workflow)])),
     nextWorkflowNumber: fixture.workflows.length + 1,
+    /** Custom workflow thumbnails by workflow id; the version stands in for the server's cache-busting query. */
+    workflowThumbnails: new Map(),
+    nextWorkflowThumbnailVersion: 1,
     /** Every workflow-library request since the last reset, so journeys can prove which writes happened. */
     workflowRequests: [],
   };
@@ -206,6 +209,51 @@ const readBody = (request) =>
     request.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
     request.on('error', reject);
   });
+
+const readRawBody = (request) =>
+  new Promise((resolve, reject) => {
+    const chunks = [];
+
+    request.on('data', (chunk) => chunks.push(chunk));
+    request.on('end', () => resolve(Buffer.concat(chunks)));
+    request.on('error', reject);
+  });
+
+/** The bytes and declared type of one named part of a multipart/form-data body, or null. */
+const readMultipartFile = async (request, fieldName) => {
+  const boundary = /boundary=(?:"([^"]+)"|([^;]+))/.exec(request.headers['content-type'] ?? '');
+
+  if (!boundary) {
+    return null;
+  }
+
+  const body = await readRawBody(request);
+  const delimiter = Buffer.from(`--${boundary[1] ?? boundary[2]}`);
+  let start = body.indexOf(delimiter);
+
+  while (start !== -1) {
+    const next = body.indexOf(delimiter, start + delimiter.length);
+    const headerEnd = body.indexOf('\r\n\r\n', start);
+
+    if (next === -1 || headerEnd === -1 || headerEnd > next) {
+      return null;
+    }
+
+    const headers = body.subarray(start + delimiter.length, headerEnd).toString('utf8');
+
+    if (new RegExp(`;\\s*name="${fieldName.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`).test(headers)) {
+      return {
+        contentType: /content-type:\s*([^\r\n]+)/i.exec(headers)?.[1]?.trim() ?? '',
+        // The part's data ends at the CRLF that precedes the next delimiter.
+        data: body.subarray(headerEnd + 4, next - 2),
+      };
+    }
+
+    start = next;
+  }
+
+  return null;
+};
 
 const readJsonBody = async (request, fallback = {}) => {
   const body = await readBody(request);
@@ -1924,7 +1972,16 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, { requests: state.workflowRequests });
       }
 
-      const workflowRecord = (workflow) => ({ ...workflow, thumbnail_url: workflow.thumbnail_url ?? null });
+      const workflowRecord = (workflow) => {
+        const thumbnail = state.workflowThumbnails.get(workflow.workflow_id);
+
+        return {
+          ...workflow,
+          thumbnail_url: thumbnail
+            ? `/api/v1/workflows/i/${encodeURIComponent(workflow.workflow_id)}/thumbnail?v=${String(thumbnail.version)}`
+            : (workflow.thumbnail_url ?? null),
+        };
+      };
       const workflowListItem = ({ workflow: _workflow, ...item }) => workflowRecord(item);
       const workflowTags = (workflow) =>
         String(workflow.tags ?? '')
@@ -1960,7 +2017,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
         return json(200, counts);
       }
 
-      const workflowMatch = /^\/api\/v1\/workflows\/i\/([^/]+)(\/opened_at)?$/.exec(path);
+      const workflowMatch = /^\/api\/v1\/workflows\/i\/([^/]+)(\/opened_at|\/thumbnail)?$/.exec(path);
       if (workflowMatch) {
         const workflowId = decodeURIComponent(workflowMatch[1]);
         const suffix = workflowMatch[2] ?? '';
@@ -1975,6 +2032,45 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
           return json(200, null);
         }
 
+        if (suffix === '/thumbnail') {
+          const thumbnail = state.workflowThumbnails.get(workflowId);
+
+          if (method === 'GET') {
+            return thumbnail
+              ? writeBinary(response, 200, thumbnail.data, { 'content-type': thumbnail.contentType })
+              : json(404, { detail: 'Workflow thumbnail not found' });
+          }
+          if (workflow.category === 'default') {
+            return json(403, { detail: 'Bundled workflows cannot be modified' });
+          }
+          if (method === 'PUT') {
+            const file = await readMultipartFile(request, 'image');
+
+            if (!file?.contentType.startsWith('image') || file.data.length === 0) {
+              return json(415, { detail: 'Not an image' });
+            }
+
+            state.workflowThumbnails.set(workflowId, {
+              contentType: file.contentType,
+              data: file.data,
+              version: state.nextWorkflowThumbnailVersion++,
+            });
+            return json(200, null);
+          }
+          if (method === 'DELETE') {
+            // Fixture workflows can carry a seeded thumbnail URL without stored bytes; removing clears either.
+            const removedUpload = state.workflowThumbnails.delete(workflowId);
+            const removedFixture = Boolean(workflow.thumbnail_url);
+
+            workflow.thumbnail_url = null;
+            return removedUpload || removedFixture
+              ? json(200, null)
+              : json(404, { detail: 'Workflow thumbnail not found' });
+          }
+
+          return json(405, { detail: `No mock for ${method} ${path}` });
+        }
+
         if (method === 'GET') {
           return json(200, workflowRecord(workflow));
         }
@@ -1984,6 +2080,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
             return json(403, { detail: 'Bundled workflows cannot be deleted' });
           }
           state.workflows.delete(workflowId);
+          state.workflowThumbnails.delete(workflowId);
           return json(200, null);
         }
 
