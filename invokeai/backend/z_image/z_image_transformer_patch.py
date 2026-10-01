@@ -155,9 +155,16 @@ def create_regional_forward(
             # token is valid, -inf where it is padding) so non-matching items behave normally.
             neg_inf = torch.finfo(unified.dtype).min
             zero = torch.zeros((), dtype=unified.dtype, device=device)
+            # diffusers returns ``None`` when every item has the same length (always the case for
+            # bsz == 1), meaning no token is padding.
+            valid_mask = (
+                unified_mask.bool()
+                if unified_mask is not None
+                else torch.ones((bsz, unified_seqlen), dtype=torch.bool, device=device)
+            )
             float_mask = (
                 torch.where(
-                    unified_mask.bool().unsqueeze(1).unsqueeze(1),  # (bsz, 1, 1, S)
+                    valid_mask.unsqueeze(1).unsqueeze(1),  # (bsz, 1, 1, S)
                     zero,
                     torch.full((), neg_inf, dtype=unified.dtype, device=device),
                 )
