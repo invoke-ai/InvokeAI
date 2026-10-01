@@ -1,8 +1,8 @@
 import { getLibraryWorkflowRecord, touchLibraryWorkflowOpenedAt } from '@features/workflow/data/api';
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
-import { requestWorkflowFitView } from '@features/workflow/ui/editor/flowInstanceStore';
 import { useProjectGraphCommands } from '@features/workflow/ui/useProjectGraphCommands';
 import { useWorkflowNotifications, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
+import { requestLibraryCopyChoice } from '@features/workflow/ui/workflowUiStore';
 import { parseWorkflowJson } from '@features/workflow/utility';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import {
@@ -18,12 +18,12 @@ import { startWorkflowUiPendingLoadRuntime } from './pendingLibraryWorkflowLoadR
 
 /**
  * Apply external library or embedded-workflow requests through the same collection commands as the library
- * dialog: a template resumes its existing copy or becomes a new one, an embedded document becomes a new workflow.
- * Without a chooser to hand to the user, a template with several copies resumes the first.
+ * dialog: a template becomes the project's first copy, or the copy-choice host asks what to do once it has one;
+ * an embedded document becomes a new workflow.
  */
 export const PendingWorkflowLoader = () => {
   const { t } = useTranslation();
-  const { addWorkflow, selectWorkflow } = useProjectGraphCommands();
+  const { addWorkflow } = useProjectGraphCommands();
   const { project } = useWorkflowUi();
   const notify = useWorkflowNotifications();
   useMountEffect(() => {
@@ -39,8 +39,12 @@ export const PendingWorkflowLoader = () => {
         if (source.kind === 'library') {
           const plan = planLibraryWorkflowOpen(project.getSnapshot().workflows, source.workflowId);
 
-          if (plan.kind !== 'add') {
-            selectWorkflow(plan.kind === 'resume' ? plan.workflowId : plan.copies[0]!.document.id);
+          if (plan.kind === 'choose') {
+            requestLibraryCopyChoice(projectId, {
+              // Without the template's name, the copy's own stands in for it.
+              name: source.name ?? plan.copies[0]!.document.name,
+              workflow_id: source.workflowId,
+            });
             return;
           }
         }
@@ -80,7 +84,6 @@ export const PendingWorkflowLoader = () => {
             ? { source: { libraryWorkflowId: source.workflowId, revision: libraryRevision } }
             : {}),
         });
-        requestWorkflowFitView(document.nodes);
 
         if (source.kind === 'library') {
           void touchLibraryWorkflowOpenedAt(source.workflowId, owner.signal).catch(() => {

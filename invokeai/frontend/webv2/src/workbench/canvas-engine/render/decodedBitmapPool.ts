@@ -89,6 +89,8 @@ export const createDecodedBitmapPool = (
     if (disposed) {
       throw new Error('DecodedBitmapPool is disposed.');
     }
+    // A cancelled caller must not start (or join) work it can never own.
+    signal?.throwIfAborted();
     let entry = entries.get(key);
     if (!entry) {
       const created: PoolEntry = {
@@ -99,13 +101,11 @@ export const createDecodedBitmapPool = (
         promise: Promise.resolve(null as never),
       };
       created.promise = decode(created.controller.signal).then((bitmap) => {
-        if (disposed) {
+        if (disposed || entries.get(key) !== created || created.leases === 0) {
           bitmap.close();
-          throw new Error('DecodedBitmapPool was disposed during decode.');
-        }
-        if (entries.get(key) !== created || created.leases === 0) {
-          bitmap.close();
-          throw created.controller.signal.reason ?? new Error('DecodedBitmapPool discarded an unowned decode.');
+          throw disposed
+            ? new Error('DecodedBitmapPool was disposed during decode.')
+            : (created.controller.signal.reason ?? new Error('DecodedBitmapPool discarded an unowned decode.'));
         }
         created.bitmap = bitmap;
         created.bytes = bitmapBytes(bitmap);
@@ -113,6 +113,9 @@ export const createDecodedBitmapPool = (
         reportBytes();
         return bitmap;
       });
+      // Every waiter observes this promise through its own chain; the pool's copy
+      // must not surface an unhandled rejection after all waiters have gone.
+      created.promise.catch(() => undefined);
       entry = created;
       entries.set(key, entry);
     }

@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   getBoardCounts,
+  getGalleryAutoAddBoardId,
   getGalleryDestinationBoardId,
   getGallerySelectedBoardId,
   getGallerySelectedImageQuery,
@@ -144,6 +145,7 @@ describe('gallery state view', () => {
     );
 
     expect(gallery.settings).toEqual({
+      autoAddBoardId: 'follow',
       boardOrderBy: 'board_name',
       boardOrderDir: 'DESC',
       boardPanelCollapsed: false,
@@ -351,5 +353,17 @@ describe('getGalleryDestinationBoardId', () => {
       'project'
     );
     expect(getGalleryDestinationBoardId({})).toBeNull();
+  });
+});
+
+describe('getGalleryAutoAddBoardId', () => {
+  it('follows the gallery destination until a board is fixed', () => {
+    expect(getGalleryAutoAddBoardId({ projectBoardId: 'project', selectedBoardId: 'picked' })).toBe('picked');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'follow', projectBoardId: 'project' })).toBe('project');
+  });
+
+  it('uses a fixed board, including Uncategorized, whatever the selection', () => {
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'fixed', selectedBoardId: 'picked' })).toBe('fixed');
+    expect(getGalleryAutoAddBoardId({ autoAddBoardId: 'none', selectedBoardId: 'picked' })).toBe('none');
   });
 });

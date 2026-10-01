@@ -1,3 +1,5 @@
+import type { Project } from '@workbench/projectContracts';
+
 import type { ProjectPushOutcome } from './projectFlush';
 
 import { type OpenProjectHandle, registerOpenProject, unregisterOpenProject } from './syncStore';
@@ -10,6 +12,9 @@ export interface OpenProjectBrokerDeps {
   deleteProject: (projectId: string) => Promise<void>;
   /** Push this project's live document and report whether the server took it. */
   flushProject: (projectId: string) => Promise<ProjectPushOutcome>;
+  /** Persist the project's unsaved canvas pixels into its document. */
+  flushPixels: (projectId: string) => Promise<void>;
+  getProject: (projectId: string) => Project | undefined;
   getOpenProjectIds: () => string[];
   /** Stop the autosave recreating a project that is being deleted. */
   markProjectDeleted: (projectId: string) => void;
@@ -30,6 +35,8 @@ export const createOpenProjectBroker = (deps: OpenProjectBrokerDeps): OpenProjec
     close: () => deps.closeProject(projectId),
     deleteOnServer: () => deps.deleteProject(projectId),
     flush: () => deps.flushProject(projectId),
+    current: () => deps.getProject(projectId),
+    flushPixels: () => deps.flushPixels(projectId),
     markDeleted: () => deps.markProjectDeleted(projectId),
     // Rename through the reducer's revision chain; an unacknowledged flush remains recoverable.
     rename: async (name: string) => {

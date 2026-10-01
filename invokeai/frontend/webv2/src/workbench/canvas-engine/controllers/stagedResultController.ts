@@ -5,34 +5,32 @@ import type {
   CanvasStagingCandidateContract,
   CanvasStateContractV3,
 } from '@workbench/canvas-engine/contracts';
-import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
-import type { LayerStackKind } from '@workbench/canvas-engine/document/layerStacks';
-import type { CanvasEditConcurrency } from '@workbench/canvas-engine/editConcurrency';
-import type { History } from '@workbench/canvas-engine/history/history';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { ProjectEvent } from '@workbench/projectContracts';
 
 import { getDocumentLayer, getDocumentLeaves, hasDocumentNode } from '@workbench/canvas-engine/document/documentIndex';
 import { insertNodesAtAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import { haveSameStructure } from '@workbench/canvas-engine/document/layerStacks';
-import { collectHistoryMediaRefs } from '@workbench/canvas-engine/history/history';
+import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 import { getCanvasStagingCandidateFingerprint } from '@workbench/canvasStagingView';
 
+import type { CanvasMutationContext, EditStep } from './mutationContext';
+
+import { guardedResultRefusal, layerEditRefusal } from './editSteps';
+
 export interface StagedResultControllerOptions {
-  readonly concurrency: CanvasEditConcurrency;
-  readonly captureInsertionAnchor: (stack: LayerStackKind, aboveId: string | null) => CanvasNodeInsertionAnchor;
+  readonly ctx: Pick<
+    CanvasMutationContext,
+    | 'applyStep'
+    | 'begin'
+    | 'capturePermit'
+    | 'captureInsertionAnchor'
+    | 'createLayerId'
+    | 'isGestureActive'
+    | 'isPermitCurrent'
+  >;
   readonly createEventId: () => string;
-  readonly createLayerId: () => string;
-  readonly dispatchPrepared: (
-    mutation: CanvasProjectMutation,
-    reducerAccepted: () => boolean,
-    mirrorAccepted: () => boolean,
-    origin?: 'system' | 'user'
-  ) => void;
-  readonly endBurst: () => void;
   readonly getCanvasState: () => CanvasStateContractV3 | null;
-  readonly getDocument: () => CanvasDocumentContractV3 | null;
-  readonly history: History;
   readonly now: () => string;
 }
 
@@ -75,8 +73,8 @@ export class StagedResultController {
     if (this.disposed) {
       return { status: 'missing' };
     }
-    const permit = o.concurrency.capturePermit(owner);
-    if (!permit || o.concurrency.isGestureActive()) {
+    const permit = o.ctx.capturePermit(owner);
+    if (!permit || o.ctx.isGestureActive()) {
       return { status: 'busy' };
     }
     const canvas = o.getCanvasState();
@@ -91,13 +89,17 @@ export class StagedResultController {
     ) {
       return { status: 'missing' };
     }
-    if (!o.concurrency.isPermitCurrent(permit) || o.concurrency.isGestureActive()) {
+    if (!o.ctx.isPermitCurrent(permit) || o.ctx.isGestureActive()) {
       return { status: 'busy' };
     }
 
     const continueStaging = options.continueStaging === true;
     const layer = {
-      ...createLayer(o.createLayerId(), `Layer ${getDocumentLeaves(canvas.document).length + 1}`, options.candidate),
+      ...createLayer(
+        o.ctx.createLayerId(),
+        `Layer ${getDocumentLeaves(canvas.document).length + 1}`,
+        options.candidate
+      ),
       isEnabled: !continueStaging,
     };
     const event: ProjectEvent = {
@@ -110,7 +112,7 @@ export class StagedResultController {
     };
     const previousSelectedLayerId = canvas.document.selectedLayerId;
     const previousStacks = canvas.document.stacks;
-    const anchor = o.captureInsertionAnchor('raster', null);
+    const anchor = o.ctx.captureInsertionAnchor('raster', null);
     const acceptedStacks = insertNodesAtAnchor(previousStacks, anchor, [layer]);
     const previousStagingArea = canvas.stagingArea;
     const acceptedSelectedLayerId = continueStaging ? previousSelectedLayerId : layer.id;
@@ -131,100 +133,84 @@ export class StagedResultController {
           next.stagingArea.pendingImageIds.length === 0 &&
           next.stagingArea.selectedImageIndex === 0 &&
           !next.stagingArea.isVisible);
-    const isMirrored = (): boolean =>
-      o.getDocument()?.selectedLayerId === acceptedSelectedLayerId &&
-      getDocumentLayer(o.getDocument(), layer.id) === layer;
-
-    try {
-      o.endBurst();
-      o.dispatchPrepared(
-        {
-          anchor,
-          candidateFingerprint,
-          continueStaging,
-          event,
-          layer,
-          selectedImageIndex: options.selectedImageIndex,
-          type: 'commitStagedImage',
-        },
-        () => isCommitted(o.getCanvasState()),
-        isMirrored
-      );
-    } catch {
-      if (isCommitted(o.getCanvasState())) {
-        o.dispatchPrepared(
-          {
-            continueStaging,
-            event,
-            layer,
-            selectedLayerId: previousSelectedLayerId,
-            stagingArea: previousStagingArea,
-            type: 'rollbackStagedImageCommit',
-          },
-          () =>
-            hasPreviousLayerStack(o.getCanvasState()?.document ?? null) &&
-            o.getCanvasState()?.stagingArea === previousStagingArea,
-          () => hasPreviousLayerStack(o.getDocument()),
-          'system'
-        );
-      }
-      return { status: 'stale' };
-    }
-
-    const applyLayerStack = (
-      mutation: Extract<CanvasProjectMutation, { type: 'applyCanvasLayerStackMutation' }>,
-      reducerAccepted: () => boolean,
-      mirrorAccepted: () => boolean,
-      rollback: Extract<CanvasProjectMutation, { type: 'applyCanvasLayerStackMutation' }>,
-      reducerRolledBack: () => boolean,
-      mirrorRolledBack: () => boolean
-    ): void => {
-      try {
-        o.dispatchPrepared(mutation, reducerAccepted, mirrorAccepted);
-      } catch (error) {
-        if (reducerAccepted()) {
-          o.dispatchPrepared(rollback, reducerRolledBack, mirrorRolledBack, 'system');
-        }
-        throw error;
-      }
-    };
-    const addAcceptedLayer: Extract<CanvasProjectMutation, { type: 'applyCanvasLayerStackMutation' }> = {
+    type StackMutation = Extract<CanvasProjectMutation, { type: 'applyCanvasLayerStackMutation' }>;
+    const addAcceptedLayer: StackMutation = {
       add: [{ anchor, nodes: [layer] }],
       enabledUpdates: [],
       selectedLayerId: acceptedSelectedLayerId,
       type: 'applyCanvasLayerStackMutation',
     };
-    const removeAcceptedLayer: Extract<CanvasProjectMutation, { type: 'applyCanvasLayerStackMutation' }> = {
+    const removeAcceptedLayer: StackMutation = {
       enabledUpdates: [],
       removeIds: [layer.id],
       selectedLayerId: previousSelectedLayerId,
       type: 'applyCanvasLayerStackMutation',
     };
-    o.history.push({
-      bytes: 256,
-      heldAssetRefs: collectHistoryMediaRefs(layer),
-      label: continueStaging ? 'Save staged image as disabled layer' : 'Accept staged image',
-      redo: () =>
-        applyLayerStack(
-          addAcceptedLayer,
-          () => hasAcceptedLayerStack(o.getCanvasState()?.document ?? null),
-          () => hasAcceptedLayerStack(o.getDocument()),
-          removeAcceptedLayer,
-          () => hasPreviousLayerStack(o.getCanvasState()?.document ?? null),
-          () => hasPreviousLayerStack(o.getDocument())
-        ),
-      replayFailureAtomic: true,
-      undo: () =>
-        applyLayerStack(
-          removeAcceptedLayer,
-          () => hasPreviousLayerStack(o.getCanvasState()?.document ?? null),
-          () => hasPreviousLayerStack(o.getDocument()),
-          addAcceptedLayer,
-          () => hasAcceptedLayerStack(o.getCanvasState()?.document ?? null),
-          () => hasAcceptedLayerStack(o.getDocument())
-        ),
-    });
-    return { layerId: layer.id, status: 'committed' };
+    const added: EditStep = {
+      accepted: hasAcceptedLayerStack,
+      mutation: addAcceptedLayer,
+      rollback: { mutation: removeAcceptedLayer, restored: hasPreviousLayerStack },
+    };
+    const removed: EditStep = {
+      accepted: hasPreviousLayerStack,
+      mutation: removeAcceptedLayer,
+      rollback: { mutation: addAcceptedLayer, restored: hasAcceptedLayerStack },
+    };
+
+    // A failed read cannot prove that the commit (or its rollback) landed.
+    const readCanvas = (): CanvasStateContractV3 | null => {
+      try {
+        return o.getCanvasState();
+      } catch {
+        return null;
+      }
+    };
+    const txn = o.ctx.begin({ historyBytes: HISTORY_ENTRY_OVERHEAD_BYTES, owner });
+    if (!('publish' in txn)) {
+      return { status: layerEditRefusal(txn.status) };
+    }
+    try {
+      const result = txn.publish(
+        continueStaging ? 'Save staged image as disabled layer' : 'Accept staged image',
+        {
+          accepted: () => isCommitted(readCanvas()),
+          mutation: {
+            anchor,
+            candidateFingerprint,
+            continueStaging,
+            event,
+            layer,
+            selectedImageIndex: options.selectedImageIndex,
+            type: 'commitStagedImage',
+          },
+          rollback: {
+            mutation: {
+              continueStaging,
+              event,
+              layer,
+              selectedLayerId: previousSelectedLayerId,
+              stagingArea: previousStagingArea,
+              type: 'rollbackStagedImageCommit',
+            },
+            restored: () => {
+              const restored = readCanvas();
+              return hasPreviousLayerStack(restored?.document ?? null) && restored?.stagingArea === previousStagingArea;
+            },
+          },
+        },
+        {
+          bytes: HISTORY_ENTRY_OVERHEAD_BYTES,
+          heldAssetRefs: collectHistoryMediaRefs(layer),
+          redo: () => o.ctx.applyStep(added),
+          undo: () => o.ctx.applyStep(removed),
+        }
+      );
+      return result.status === 'committed'
+        ? { layerId: layer.id, status: 'committed' }
+        : { status: guardedResultRefusal(result) };
+    } finally {
+      txn.end();
+    }
   }
 
   dispose(): void {

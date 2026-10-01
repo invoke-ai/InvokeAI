@@ -361,26 +361,25 @@ describe('inpaint mask painting', () => {
 });
 
 describe('mask invert', () => {
-  it('inverts a mask as an undoable op and returns true', () => {
+  it('inverts a mask as one undoable step', async () => {
     const { engine } = setupEngine(maskDoc());
     expect(engine.stores.canUndo.get()).toBe(false);
-    expect(engine.layers.invertMask('mask1')).toBe(true);
-    // One undoable image patch was recorded.
+    expect(engine.layers.invertMask('mask1')).toEqual({ status: 'committed' });
     expect(engine.stores.canUndo.get()).toBe(true);
-    // Round trips: undo then redo restore without throwing.
-    engine.history.undo();
+    expect(await engine.history.undo()).toBe('applied');
     expect(engine.stores.canRedo.get()).toBe(true);
-    engine.history.redo();
+    expect(await engine.history.redo()).toBe('applied');
     expect(engine.stores.canUndo.get()).toBe(true);
     engine.lifecycle.dispose();
   });
 
-  it('returns false for a missing layer, a non-mask layer, or a locked mask', () => {
+  it('reports a missing layer and a locked mask distinctly without recording history', () => {
     const lockedDoc = maskDoc();
     getDocumentLeaves(lockedDoc)[0]!.isLocked = true;
     const { engine } = setupEngine(lockedDoc);
-    expect(engine.layers.invertMask('nope')).toBe(false);
-    expect(engine.layers.invertMask('mask1')).toBe(false); // locked
+    expect(engine.layers.invertMask('nope')).toEqual({ status: 'missing' });
+    expect(engine.layers.invertMask('mask1')).toEqual({ status: 'locked' });
+    expect(engine.stores.canUndo.get()).toBe(false);
     engine.lifecycle.dispose();
   });
 
@@ -428,7 +427,7 @@ describe('mask invert', () => {
     overlay.fire('pointermove', pointerAt(180, 180));
     overlay.fire('pointerup', pointerAt(180, 180, 0));
 
-    expect(engine.layers.invertMask('mask1')).toBe(true);
+    expect(engine.layers.invertMask('mask1')).toEqual({ status: 'committed' });
 
     // Growth replaces backing surfaces. Inspect the last surface receiving `putImageData`, which owns the final
     // invert extent.
@@ -498,23 +497,23 @@ describe('mask invert', () => {
 });
 
 describe('mask clear', () => {
-  it('clears a live unflushed inpaint mask and restores it through undo', () => {
+  it('clears a live unflushed inpaint mask and restores it through undo', async () => {
     const { engine, overlay } = setupEngine(maskDoc());
     engine.tools.setTool('brush');
     overlay.fire('pointerdown', pointerAt(20, 20));
     overlay.fire('pointermove', pointerAt(50, 50));
     overlay.fire('pointerup', pointerAt(50, 50, 0));
 
-    expect(engine.layers.clearMask('mask1')).toBe(true);
-    expect(engine.layers.clearMask('mask1')).toBe(false);
+    expect(engine.layers.clearMask('mask1')).toEqual({ status: 'committed' });
+    expect(engine.layers.clearMask('mask1')).toEqual({ status: 'nothing' });
     expect(engine.stores.canUndo.get()).toBe(true);
 
-    engine.history.undo();
+    expect(await engine.history.undo()).toBe('applied');
     expect(engine.stores.canRedo.get()).toBe(true);
-    engine.history.redo();
-    expect(engine.layers.clearMask('mask1')).toBe(false);
-    engine.history.undo();
-    expect(engine.layers.clearMask('mask1')).toBe(true);
+    expect(await engine.history.redo()).toBe('applied');
+    expect(engine.layers.clearMask('mask1')).toEqual({ status: 'nothing' });
+    expect(await engine.history.undo()).toBe('applied');
+    expect(engine.layers.clearMask('mask1')).toEqual({ status: 'committed' });
     engine.lifecycle.dispose();
   });
 
@@ -541,11 +540,11 @@ describe('mask clear', () => {
     overlay.fire('pointermove', pointerAt(50, 50));
     overlay.fire('pointerup', pointerAt(50, 50, 0));
 
-    expect(engine.layers.clearMask('mask1')).toBe(true);
+    expect(engine.layers.clearMask('mask1')).toEqual({ status: 'committed' });
     engine.lifecycle.dispose();
   });
 
-  it('clears a cold hidden persisted mask and restores its bitmap reference on undo', () => {
+  it('clears a cold hidden persisted mask and restores its bitmap reference on undo', async () => {
     const doc = maskDoc();
     const mask = getDocumentLeaves(doc)[0]!;
     if (mask.type !== 'inpaint_mask') {
@@ -559,14 +558,14 @@ describe('mask clear', () => {
     };
     const { dispatch, engine } = setupEngine(doc);
 
-    expect(engine.layers.clearMask('mask1')).toBe(true);
+    expect(engine.layers.clearMask('mask1')).toEqual({ status: 'committed' });
     expect(dispatch.mock.calls.at(-1)?.[0]).toMatchObject({
       config: { mask: { bitmap: null } },
       id: 'mask1',
       type: 'updateCanvasLayerConfig',
     });
 
-    engine.history.undo();
+    expect(await engine.history.undo()).toBe('applied');
     expect(dispatch.mock.calls.at(-1)?.[0]).toMatchObject({
       config: {
         mask: { bitmap: { imageName: 'persisted-mask' }, offset: { x: 7, y: 9 } },
@@ -577,13 +576,13 @@ describe('mask clear', () => {
     engine.lifecycle.dispose();
   });
 
-  it('refuses missing, non-mask, locked, and empty layers', () => {
+  it('reports missing, non-mask, locked, and empty layers distinctly', () => {
     const locked = maskDoc();
     (locked.stacks.inpaint_mask[0] as CanvasLayerContract).isLocked = true;
     const { engine } = setupEngine(locked);
 
-    expect(engine.layers.clearMask('missing')).toBe(false);
-    expect(engine.layers.clearMask('mask1')).toBe(false);
+    expect(engine.layers.clearMask('missing')).toEqual({ status: 'missing' });
+    expect(engine.layers.clearMask('mask1')).toEqual({ status: 'locked' });
     engine.lifecycle.dispose();
 
     const raster = maskDoc();
@@ -600,11 +599,11 @@ describe('mask clear', () => {
       type: 'raster',
     };
     const { engine: rasterEngine } = setupEngine(raster);
-    expect(rasterEngine.layers.clearMask('mask1')).toBe(false);
+    expect(rasterEngine.layers.clearMask('mask1')).toEqual({ status: 'unsupported' });
     rasterEngine.lifecycle.dispose();
 
     const { engine: emptyEngine } = setupEngine(maskDoc());
-    expect(emptyEngine.layers.clearMask('mask1')).toBe(false);
+    expect(emptyEngine.layers.clearMask('mask1')).toEqual({ status: 'nothing' });
     emptyEngine.lifecycle.dispose();
   });
 });

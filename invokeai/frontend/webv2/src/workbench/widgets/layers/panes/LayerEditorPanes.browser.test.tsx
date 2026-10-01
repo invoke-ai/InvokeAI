@@ -88,7 +88,7 @@ vi.mock('@workbench/WorkbenchContext', async () => {
 vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
   useCanvasProjectMutationDispatch: () => () => true,
 }));
-vi.mock('@workbench/widgets/canvas/useCanvasEngine', () => ({ useCanvasEngine: () => harness.engine }));
+vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => harness.engine }));
 
 import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { clearMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';

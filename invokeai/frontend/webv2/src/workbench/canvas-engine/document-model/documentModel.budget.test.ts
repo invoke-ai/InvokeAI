@@ -6,11 +6,17 @@ import {
   getDocumentIndexDerivationCount,
   getDocumentIndexMaterializationCount,
   getDocumentIndexVisitCount,
+  getValueEditVisitCount,
   resetDocumentIndexBuildCount,
 } from '@workbench/canvas-engine/document/documentIndex';
+import {
+  createDocumentMirror,
+  getForestDiffCount,
+  resetForestDiffCount,
+} from '@workbench/canvas-engine/document/documentMirror';
 import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { DocumentCommand, PreparedDocumentEdit } from './documentCommands';
 
@@ -32,11 +38,14 @@ const context = { editRevision: 0, projectId: 'budget' };
 const resetCounters = (): void => {
   resetDocumentModelDiagnostics();
   resetDocumentIndexBuildCount();
+  resetForestDiffCount();
 };
 
 const counters = () => ({
   ...getDocumentModelDiagnostics(),
   entriesVisited: getDocumentIndexVisitCount(),
+  forestDiffs: getForestDiffCount(),
+  forestNodesVisited: getValueEditVisitCount(),
   indexBuilds: getDocumentIndexBuildCount(),
   indexDerivations: getDocumentIndexDerivationCount(),
   nodesMaterialized: getDocumentIndexMaterializationCount(),
@@ -300,7 +309,12 @@ describe('value edits at the 10,000-node limit', () => {
       patch: { transform: { x: 40 } },
       type: 'updateCanvasLayer',
     }).canvas.document;
-    expect(counters()).toMatchObject({ entriesVisited: depth + 1, indexBuilds: 0, indexDerivations: 1 });
+    expect(counters()).toMatchObject({
+      entriesVisited: depth + 1,
+      forestNodesVisited: depth + 1,
+      indexBuilds: 0,
+      indexDerivations: 1,
+    });
     expect(lookupDocumentLeaf(next, 'l5')?.layer.transform.x).toBe(40);
     expect(lookupDocumentNodeState(next, 'l5')?.node).toBe(getDocumentIndex(next).byId.get('l5')!.node);
     expect(lookupDocumentNodeState(next, 'l6')).toBe(lookupDocumentNodeState(before, 'l6'));
@@ -324,7 +338,12 @@ describe('value edits at the 10,000-node limit', () => {
       type: 'setCanvasLayersEnabled',
       updates: [{ id: 'g0', isEnabled: false }],
     }).canvas.document;
-    expect(counters()).toMatchObject({ entriesVisited: subtree + 1, indexBuilds: 0, indexDerivations: 1 });
+    expect(counters()).toMatchObject({
+      entriesVisited: subtree + 1,
+      forestNodesVisited: 1,
+      indexBuilds: 0,
+      indexDerivations: 1,
+    });
     expect(getDocumentIndex(next).leaves).toBe(getDocumentIndex(before).leaves);
     compileDocumentNodes(next);
     expect(counters()).toMatchObject({ nodesCompiled: subtree + 1, nodesMaterialized: 0 });
@@ -361,6 +380,47 @@ describe('value edits at the 10,000-node limit', () => {
     expect(counters()).toMatchObject({ indexBuilds: 0, nodesMaterialized: 0 });
     expect(getDocumentIndex(project.canvas.document).byId.get('l19')!.node).toMatchObject({ opacity: 0.5 });
     expect(getDocumentIndex(project.canvas.document).byId.size).toBe(LIMIT_COUNT);
+  });
+});
+
+describe('reducer → mirror value edits at the 10,000-node limit', () => {
+  beforeEach(resetCounters);
+
+  it.for([
+    ['flat', createLargeFlatDocument],
+    ['tree', createLargeTreeDocument],
+  ] as const)('touches only the edited path end to end on a %s document', ([, create], { annotate }) => {
+    let project = applyCanvasProjectMutation(createInitialWorkbenchState().projects[0]!, {
+      document: create(10_000),
+      type: 'replaceCanvasDocument',
+    });
+    const onLayersChanged = vi.fn();
+    const mirror = createDocumentMirror(
+      { getCanvasState: () => project.canvas, subscribe: () => () => undefined },
+      {
+        onBboxChanged: () => undefined,
+        onDocumentReplaced: () => undefined,
+        onLayerOrderChanged: () => undefined,
+        onLayersChanged,
+        onStagingChanged: () => undefined,
+      }
+    );
+    const depth = getDocumentIndex(project.canvas.document).byId.get('l0')!.path.length;
+    resetCounters();
+
+    timed(annotate, 'reducer + mirror', () => {
+      project = applyCanvasProjectMutation(project, { id: 'l0', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' });
+      mirror.refresh();
+    });
+    expect(onLayersChanged).toHaveBeenCalledWith(['l0'], [], false);
+    expect(counters()).toMatchObject({
+      forestDiffs: 0,
+      forestNodesVisited: depth + 1,
+      indexBuilds: 0,
+      indexDerivations: 1,
+      nodesMaterialized: 0,
+    });
+    mirror.dispose();
   });
 });
 

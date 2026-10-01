@@ -12,8 +12,6 @@ import type {
   CanvasMaskFillContract,
   CanvasRasterLayerContractV2,
   CanvasRegionalGuidanceLayerContract,
-  CanvasLayerPreviewMutation,
-  CanvasStructuralEngine,
   RegionalGuidanceReferenceImage,
   Rect,
 } from '@workbench/canvas-engine/api';
@@ -578,9 +576,3 @@ export const convertRasterControlLayer = (
 /** Whether the layers panel may offer merge-down for `layerId`; merging is pixel work, so it needs an engine. */
 export const canMergeLayerDown = (document: CanvasDocumentContractV3, layerId: string, hasEngine: boolean): boolean =>
   hasEngine && mergeDownEligibility(document, layerId).status === 'eligible';
-
-/** Applies a guarded live edit without recording history until the interaction ends. */
-export const applyStructuralPreview = (
-  engine: CanvasStructuralEngine | null,
-  action: CanvasLayerPreviewMutation
-): boolean => engine?.layers.applyStructuralPreview(action) ?? false;

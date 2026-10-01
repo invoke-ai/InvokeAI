@@ -3406,6 +3406,65 @@ describe('workbenchReducer Phase 5 generation flow', () => {
       return node?.type === 'invocation' ? node.data.inputs.seed?.value : undefined;
     };
 
+    it('compiles Auto boards to the auto-add board, leaves None unboarded, and keeps results off the selection', () => {
+      const boardTemplate = {
+        ...seedTemplate,
+        inputs: {
+          board: {
+            ...(seedTemplate.inputs.seed as NonNullable<(typeof seedTemplate.inputs)['seed']>),
+            maximum: null,
+            minimum: null,
+            name: 'board',
+            title: 'Board',
+            type: { batch: false, cardinality: 'SINGLE' as const, name: 'BoardField' },
+          },
+        },
+        outputType: 'image_output',
+        title: 'Save Image',
+        type: 'save_image',
+      };
+      const boardNode = (id: string, board: unknown) => ({
+        data: {
+          inputs: { board: { label: '', name: 'board', value: board } },
+          isIntermediate: false,
+          isOpen: true,
+          label: '',
+          nodePack: 'invokeai',
+          notes: '',
+          type: 'save_image',
+          useCache: true,
+          version: '1.0.0',
+        },
+        id,
+        position: { x: 0, y: 0 },
+        type: 'invocation' as const,
+      });
+      let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' });
+
+      workflowTemplatesMock.snapshot = { error: null, status: 'loaded', templates: { save_image: boardTemplate } };
+      state = workbenchReducer(state, { boardId: 'selected-board', type: 'selectGalleryBoard' });
+      state = workbenchReducer(state, { settings: { autoAddBoardId: 'auto-board' }, type: 'updateGallerySettings' });
+
+      for (const [id, board] of [
+        ['auto-node', 'auto'],
+        ['none-node', 'none'],
+      ] as const) {
+        state = workbenchReducer(state, {
+          action: { node: boardNode(id, board), type: 'addNode' },
+          type: 'applyWorkflowAction',
+        });
+      }
+
+      state = submitWorkflow(state);
+
+      const graph = (readSubmission(state) as { graph: { nodes: Record<string, Record<string, unknown>> } }).graph;
+
+      expect(graph.nodes['auto-node']).toMatchObject({ board: { board_id: 'auto-board' } });
+      expect(graph.nodes['none-node']).not.toHaveProperty('board');
+      // Boards are settled in the graph, so nothing is re-filed onto the selected board afterwards.
+      expect(getActiveProject(state).queue.items[0]?.snapshot.galleryBoardId).toBeNull();
+    });
+
     it('carries batch-node groups on the submission and sizes the placeholders for every session', () => {
       const floatField = {
         ...(seedTemplate.inputs.seed as NonNullable<(typeof seedTemplate.inputs)['seed']>),
@@ -5148,6 +5207,7 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     let state = createInitialWorkbenchState();
 
     state = workbenchReducer(state, { boardId: 'doomed-board', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { settings: { autoAddBoardId: 'doomed-board' }, type: 'updateGallerySettings' });
     state = workbenchReducer(state, {
       type: 'patchWidgetValues',
       values: { semanticImageQuery: { kind: 'text', query: 'sunset' } },
@@ -5171,6 +5231,8 @@ describe('workbenchReducer Phase 5 generation flow', () => {
 
     expect(values.selectedBoardId).toBe('none');
     expect(values.semanticImageQuery).toBeNull();
+    // A deleted auto-add board hands results back to the selection.
+    expect(values.autoAddBoardId).toBe('follow');
   });
 
   it('stores selected backend board id for gallery submissions', () => {
@@ -5184,6 +5246,18 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     const queueItem = getActiveProject(state).queue.items[0];
 
     expect(queueItem.snapshot.galleryBoardId).toBe('backend-board-id');
+  });
+
+  it('sends gallery submissions to a fixed auto-add board rather than the selected one', () => {
+    let state = createInitialWorkbenchState();
+
+    state = workbenchReducer(state, { boardId: 'selected-board', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { settings: { autoAddBoardId: 'auto-board' }, type: 'updateGallerySettings' });
+    state = workbenchReducer(state, { destination: 'gallery', type: 'setInvocationDestination' });
+    state = primeGenerate(state);
+    state = submitGenerate(state);
+
+    expect(getActiveProject(state).queue.items[0]?.snapshot.galleryBoardId).toBe('auto-board');
   });
 
   it('sends gallery submissions to the project board until a board is picked', () => {

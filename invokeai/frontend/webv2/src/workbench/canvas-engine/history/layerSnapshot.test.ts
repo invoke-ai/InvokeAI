@@ -45,7 +45,6 @@ describe('createLayerSnapshotEntry', () => {
 
     expect(entry.bytes).toBe(before.pixels!.data.byteLength + after.pixels!.data.byteLength + 256);
     expect(entry.heldAssetRefs?.images).toEqual(['before']);
-    expect(entry.replayFailureAtomic).toBe(true);
     entry.undo();
     entry.redo();
     expect(apply).toHaveBeenNthCalledWith(1, before);

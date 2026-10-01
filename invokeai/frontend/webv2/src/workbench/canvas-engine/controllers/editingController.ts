@@ -20,7 +20,7 @@ import { TransformEditingController, type TransformEditingControllerOptions } fr
 export interface EditingControllerOptions {
   readonly selection: SelectionStateDeps;
   /** Records selection changes; the float folds its own mask move into its entry instead. */
-  readonly history: History;
+  readonly history: Pick<History, 'admit' | 'isReplaying'>;
   readonly getDocument: () => CanvasDocumentContractV3 | null;
   readonly createSelectionState?: (deps: SelectionStateDeps) => SelectionState;
   readonly createEditGate?: () => CanvasEditGateController;
@@ -110,6 +110,12 @@ export class EditingController {
 
   cooldown(): void {
     if (!this.disposed) {
+      // Leaving the canvas banks a float like a tool switch, so the flush that follows persists it.
+      try {
+        this.floatingSelection.commit();
+      } catch {
+        // A float that cannot land has been put back; cooldown proceeds regardless.
+      }
       this.editGate.cooldown();
     }
   }

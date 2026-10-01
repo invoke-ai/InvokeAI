@@ -1,3 +1,5 @@
+import type { Project } from '@workbench/projectContracts';
+
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
@@ -53,6 +55,10 @@ export interface OpenProjectHandle {
   deleteOnServer: () => Promise<void>;
   /** Flush returns an acknowledgement outcome; callers reading server bytes must assert success. */
   flush: () => Promise<ProjectPushOutcome>;
+  /** Persists unsaved canvas pixels into the document; rejects when they cannot be saved. */
+  flushPixels: () => Promise<void>;
+  /** The live project as the editor holds it now. */
+  current: () => Project | undefined;
   /** Stop the autosave from recreating this project while it is being deleted. */
   markDeleted: () => void;
   /** Unmark failed deletes so autosave can resume. */

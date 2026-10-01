@@ -5,7 +5,7 @@ import type {
   LayerStackKind,
   LayerStackMoveKind,
 } from '@workbench/canvas-engine/api';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { LucideIcon } from 'lucide-react';
 import type { ComponentProps } from 'react';
 
@@ -14,7 +14,7 @@ import { MenuActionItem, MenuContent, RenameDialog } from '@platform/ui';
 import { collectSubtree, getDocumentIndex, isOverlayStack } from '@workbench/canvas-engine/api';
 import { publishLayerPanelSelection, useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { reportLayerOperation, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
   ArrowDownIcon,
@@ -157,6 +157,10 @@ export const LayerGroupContextMenu = ({
         return;
       }
       if (result.status === 'busy') {
+        return;
+      }
+      if (result.status !== 'nothing') {
+        reportLayerOperation(result.status, notify.error, t);
         return;
       }
     } catch {

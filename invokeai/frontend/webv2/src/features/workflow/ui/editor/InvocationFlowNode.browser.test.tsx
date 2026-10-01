@@ -18,7 +18,6 @@ import {
 } from '@features/workflow/data/savedWorkflowQueries';
 import { WorkflowImageExportProvider } from '@features/workflow/ui/nodeChrome';
 import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
-import { setNodePreviewCollapsed } from '@features/workflow/ui/workflowUiStore';
 import {
   buildCurrentImageNode,
   buildNotesNode,
@@ -85,8 +84,6 @@ exportMocks.translate = (key, options) => i18n.t(key, options as never) as unkno
 const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
 
 const NODE_ID = 'preview-node';
-/** The preview's fixed height (10rem) in CSS pixels, however the root font is sized. */
-const previewHeightPx = () => parseFloat(getComputedStyle(document.documentElement).fontSize) * 10;
 
 const template: InvocationTemplate = {
   category: 'test',
@@ -191,10 +188,10 @@ const outputImage = (width: number, height: number): string => {
   return canvas.toDataURL();
 };
 
-const completed = (outputImageUrl: string): WorkflowNodeExecutionState => ({
+const completed = (outputImageName: string): WorkflowNodeExecutionState => ({
   error: null,
   latestOutput: null,
-  outputImageUrl,
+  outputImageName,
   progress: null,
   progressMessage: null,
   status: 'completed',
@@ -284,12 +281,11 @@ const createAdapter = (
     widgets: { open: vi.fn(), patchValues: vi.fn() },
   }) as unknown as WorkflowUiAdapter;
 
-describe('InvocationFlowNode output preview', () => {
+describe('InvocationFlowNode chrome and export', () => {
   let host: HTMLDivElement;
   let root: Root;
 
   beforeEach(() => {
-    setNodePreviewCollapsed(NODE_ID, false);
     queryClient.clear();
     host = document.createElement('div');
     host.style.cssText = 'width: 480px; height: 520px;';
@@ -325,10 +321,6 @@ describe('InvocationFlowNode output preview', () => {
       )
     );
   const image = () => host.querySelector<HTMLImageElement>('.react-flow__node img');
-  const disclosure = () =>
-    [...host.querySelectorAll<HTMLButtonElement>('.react-flow__node button[aria-expanded]')].find(
-      (button) => button.textContent === 'Latest output'
-    )!;
   const nodeHeight = () => host.querySelector<HTMLElement>('.react-flow__node')!.getBoundingClientRect().height;
 
   it('keeps field-description editing available in the workflow editor', async () => {
@@ -554,7 +546,7 @@ describe('InvocationFlowNode output preview', () => {
       execution.set({
         error: null,
         latestOutput: { value: longOutput },
-        outputImageUrl: 'data:image/png;base64,cHJldmlldw==',
+        outputImageName: 'data:image/png;base64,cHJldmlldw==',
         progress: null,
         progressMessage: null,
         status: 'completed',
@@ -939,7 +931,7 @@ describe('InvocationFlowNode output preview', () => {
       execution.set({
         error: null,
         latestOutput: null,
-        outputImageUrl: null,
+        outputImageName: null,
         progress: 0.5,
         progressMessage: null,
         status: 'running',
@@ -1312,7 +1304,7 @@ describe('InvocationFlowNode output preview', () => {
     execution.set({
       error: 'Child node failed',
       latestOutput: null,
-      outputImageUrl: null,
+      outputImageName: null,
       progress: null,
       progressMessage: null,
       status: 'failed',
@@ -1501,7 +1493,7 @@ describe('InvocationFlowNode output preview', () => {
     const completed = {
       error: null,
       latestOutput: { value: 'previous result' },
-      outputImageUrl: 'data:image/png;base64,cHJldmlvdXM=',
+      outputImageName: 'data:image/png;base64,cHJldmlvdXM=',
       progress: null,
       progressMessage: null,
       status: 'completed' as const,
@@ -1584,66 +1576,18 @@ describe('InvocationFlowNode output preview', () => {
     }
   });
 
-  it('keeps one preview height across differently shaped outputs and folds it away per node', async () => {
+  // Outputs are inspected in the side panel; a result growing the node would push it over the nodes below.
+  it('keeps its size and shows no image when a run completes with an image output', async () => {
     const execution = createExecutionPort();
     const adapter = createAdapter(execution.port);
 
     await render(adapter);
-    expect(image()).toBeNull();
-    expect(disclosure()).toBeUndefined();
+    const idleHeight = nodeHeight();
 
     await act(() => execution.set(completed(outputImage(400, 100))));
-    await vi.waitFor(() => expect(image()!.getBoundingClientRect().height).toBeCloseTo(previewHeightPx(), 0));
-    const heightWithWideOutput = nodeHeight();
-
-    await act(() => execution.set(completed(outputImage(100, 400))));
-    await vi.waitFor(() => expect(image()!.src).toBe(outputImage(100, 400)));
-    expect(image()!.getBoundingClientRect().height).toBeCloseTo(previewHeightPx(), 0);
-    expect(nodeHeight()).toBe(heightWithWideOutput);
-
-    await act(() => disclosure().click());
-    expect(disclosure().getAttribute('aria-expanded')).toBe('false');
-    expect(image()).toBeNull();
-    expect(nodeHeight()).toBeLessThan(heightWithWideOutput - 100);
-
-    // The fold outlives the node's mount: a remount (offscreen virtualization, a project switch back) keeps it.
-    await act(() => root.unmount());
-    root = createRoot(host);
-    await render(adapter);
-    expect(disclosure().getAttribute('aria-expanded')).toBe('false');
-    expect(image()).toBeNull();
-
-    await act(() => disclosure().click());
-    expect(disclosure().getAttribute('aria-expanded')).toBe('true');
-    await vi.waitFor(() => expect(image()!.getBoundingClientRect().height).toBeCloseTo(previewHeightPx(), 0));
-  });
-
-  it('stands in a same-height skeleton for the image when the viewport is zoomed out', async () => {
-    const execution = createExecutionPort();
-    const adapter = createAdapter(execution.port);
-    execution.set(completed(outputImage(400, 100)));
-
-    await render(adapter);
-    await vi.waitFor(() => expect(image()).not.toBeNull());
-    const node = () => host.querySelector<HTMLElement>('.react-flow__node')!;
-    const layoutHeight = node().offsetHeight;
-
-    await act(() => root.unmount());
-    root = createRoot(host);
-    await render(adapter, 0.3);
-
-    await vi.waitFor(() => expect(image()).toBeNull());
-    expect(node().offsetHeight).toBe(layoutHeight);
-  });
-
-  it('omits completed output previews from image exports when zoomed out', async () => {
-    const execution = createExecutionPort();
-    const adapter = createAdapter(execution.port);
-    execution.set(completed(outputImage(400, 100)));
-
-    await render(adapter, 0.3, true);
 
     expect(image()).toBeNull();
+    expect(nodeHeight()).toBe(idleHeight);
   });
 
   it('renders full fields for compact nodes during image export', async () => {
@@ -1687,7 +1631,7 @@ describe('InvocationFlowNode failure outcome', () => {
     execution.set({
       error: 'Child node failed',
       latestOutput: null,
-      outputImageUrl: null,
+      outputImageName: null,
       progress: null,
       progressMessage: null,
       status: 'failed',
@@ -2034,6 +1978,39 @@ describe('InvocationFlowNode field entry', () => {
     await act(() => weight.blur());
     await settle();
     expect(weight.value).toBe('7');
+  });
+
+  it('renames a field from its name on double-click; Escape keeps the name and the template title clears it', async () => {
+    const { store } = await renderEntryNode();
+    const fieldLabel = () => {
+      const node = store.getSnapshot().nodes.find((candidate) => candidate.id === entryNode.id);
+      return node?.type === 'invocation' ? node.data.inputs.steps?.label : undefined;
+    };
+    const stepsTitle = () =>
+      Array.from(host.querySelectorAll<HTMLElement>('[data-node-input-field-title="true"]')).find((title) =>
+        title.textContent?.startsWith(fieldLabel() || 'Steps')
+      )!;
+    const rename = async (sequence: string) => {
+      await act(() => userEvent.dblClick(stepsTitle()));
+      const input = host.querySelector<HTMLInputElement>('input[aria-label="Field label"]')!;
+      expect(document.activeElement).toBe(input);
+      await keys(sequence);
+      await settle();
+    };
+
+    await rename('Iterations{Enter}');
+    expect(fieldLabel()).toBe('Iterations');
+    expect(stepsTitle().textContent).toBe('Iterations *');
+    expect(host.querySelector('input[aria-label="Field label"]')).toBeNull();
+    // Focus returns to the node, where editor shortcuts such as undo still apply.
+    expect(document.activeElement?.classList.contains('react-flow__node')).toBe(true);
+
+    await rename('Discarded{Escape}');
+    expect(fieldLabel()).toBe('Iterations');
+
+    await rename('Steps{Enter}');
+    expect(fieldLabel()).toBe('');
+    expect(stepsTitle().textContent).toBe('Steps *');
   });
 
   it('keeps a fractional integer visible and flagged until it is corrected', async () => {

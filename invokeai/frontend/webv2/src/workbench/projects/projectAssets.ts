@@ -25,8 +25,15 @@ export const GALLERY_SELECTION_KEYS: ReadonlySet<string> = new Set([
   'selectedImageNames',
 ]);
 
-/** Strip gallery board IDs while preserving authored workflow board inputs. */
-export const GALLERY_INSTALLATION_KEYS: ReadonlySet<string> = new Set(['projectBoardId', 'selectedBoardId']);
+/**
+ * Strip gallery board IDs while preserving authored workflow board inputs. A dropped auto-add board falls back to
+ * following the selected board.
+ */
+export const GALLERY_INSTALLATION_KEYS: ReadonlySet<string> = new Set([
+  'autoAddBoardId',
+  'projectBoardId',
+  'selectedBoardId',
+]);
 
 /** Clear pagination/window anchors when transferred board IDs change. */
 export const GALLERY_POSITION_KEYS: ReadonlySet<string> = new Set(['galleryPage']);
@@ -47,25 +54,30 @@ export interface CanvasHeldAssetRefs {
   readonly videos: readonly string[];
 }
 
-/** What a live Canvas engine's undo state retains, and when that changes. */
-export interface CanvasHeldMediaSource {
-  read(): CanvasHeldAssetRefs;
+/** What a live Canvas engine holds beyond the document: media its undo state retains, and unsaved pixels. */
+export interface LiveCanvasEngine {
+  heldAssets(): CanvasHeldAssetRefs;
   subscribe(listener: () => void): () => void;
+  /** Persists the engine's unsaved pixels into the document; rejects when they cannot be saved. */
+  flushPendingPixels(): Promise<void>;
 }
 
 /** One mounted Workbench's live Canvas engines, each registered for as long as its undo state survives. */
-export interface CanvasHeldMediaSources {
-  read(projectId: string): CanvasHeldAssetRefs | undefined;
-  register(projectId: string, source: CanvasHeldMediaSource): () => void;
+export interface LiveCanvasEngines {
+  heldAssets(projectId: string): CanvasHeldAssetRefs | undefined;
+  register(projectId: string, source: LiveCanvasEngine): () => void;
   subscribe(listener: () => void): () => void;
+  /** Crosses the project's paint barrier; a project without a live engine has nothing unsaved. */
+  flushPendingPixels(projectId: string): Promise<void>;
 }
 
-export const createCanvasHeldMediaSources = (): CanvasHeldMediaSources => {
-  const sources = new Map<string, CanvasHeldMediaSource>();
+export const createLiveCanvasEngines = (): LiveCanvasEngines => {
+  const sources = new Map<string, LiveCanvasEngine>();
   const listeners = new Set<() => void>();
   const notify = (): void => listeners.forEach((listener) => listener());
   return {
-    read: (projectId) => sources.get(projectId)?.read(),
+    flushPendingPixels: (projectId) => sources.get(projectId)?.flushPendingPixels() ?? Promise.resolve(),
+    heldAssets: (projectId) => sources.get(projectId)?.heldAssets(),
     register: (projectId, source) => {
       sources.set(projectId, source);
       const unsubscribe = source.subscribe(notify);

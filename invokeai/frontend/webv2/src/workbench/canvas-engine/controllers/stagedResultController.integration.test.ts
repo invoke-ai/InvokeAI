@@ -81,7 +81,7 @@ describe('staged result project-port integration', () => {
     engine.lifecycle.dispose();
   });
 
-  it('banks a disabled layer without changing the staged session or current layer selection', () => {
+  it('banks a disabled layer without changing the staged session or current layer selection', async () => {
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
     const currentLayerId = store.getState().projects[0]!.canvas.document.selectedLayerId;
@@ -110,11 +110,11 @@ describe('staged result project-port integration', () => {
     expect(projectAfterSave.canvas.stagingArea.pendingImages).toEqual([candidate]);
     expect(projectAfterSave.canvas.stagingArea.isVisible).toBe(true);
 
-    engine.history.undo();
+    await engine.history.undo();
     expect(getDocumentLeaves(store.getState().projects[0]!.canvas.document)).not.toContain(savedLayer);
     expect(store.getState().projects[0]!.canvas.stagingArea).toBe(stagedBefore);
 
-    engine.history.redo();
+    await engine.history.redo();
     expect(store.getState().projects[0]!.canvas.document.stacks.raster[0]).toBe(savedLayer);
     expect(store.getState().projects[0]!.canvas.document.selectedLayerId).toBe(currentLayerId);
     expect(store.getState().projects[0]!.canvas.stagingArea).toBe(stagedBefore);
@@ -149,7 +149,7 @@ describe('staged result project-port integration', () => {
     }
   );
 
-  it('compensates a reducer-accepted undo when mirror acceptance fails and keeps history retryable', () => {
+  it('reconciles the mirror when state reads fail transiently during an undo', async () => {
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
     store.commands.canvas.appendStagingCandidate({ candidate, projectId });
@@ -166,15 +166,16 @@ describe('staged result project-port integration', () => {
     const accepted = structuredClone(store.getState().projects.find((project) => project.id === projectId)!);
     rejectingPort.arm('applyCanvasLayerStackMutation');
 
-    expect(() => engine.history.undo()).toThrow('document mirror read failed');
-    expect(store.getState().projects.find((project) => project.id === projectId)).toEqual(accepted);
-    expect(engine.document.getDocument()).toEqual(accepted.canvas.document);
-    expect(engine.stores.canUndo.get()).toBe(true);
-    expect(engine.stores.canRedo.get()).toBe(false);
+    expect(await engine.history.undo()).toBe('applied');
+    const undone = store.getState().projects.find((project) => project.id === projectId)!;
+    expect(undone.canvas.document).not.toEqual(accepted.canvas.document);
+    expect(engine.document.getDocument()).toBe(undone.canvas.document);
+    expect(engine.stores.canUndo.get()).toBe(false);
+    expect(engine.stores.canRedo.get()).toBe(true);
     engine.lifecycle.dispose();
   });
 
-  it('compensates a reducer-accepted redo when mirror acceptance fails and keeps history retryable', () => {
+  it('reconciles the mirror when state reads fail transiently during a redo', async () => {
     const store = createWorkbenchStore();
     const projectId = store.getState().activeProjectId;
     store.commands.canvas.appendStagingCandidate({ candidate, projectId });
@@ -188,15 +189,16 @@ describe('staged result project-port integration', () => {
       reportError: () => undefined,
     });
     expect(engine.layers.commitStagedImage(selection).status).toBe('committed');
-    engine.history.undo();
+    await engine.history.undo();
     const undone = structuredClone(store.getState().projects.find((project) => project.id === projectId)!);
     rejectingPort.arm('applyCanvasLayerStackMutation');
 
-    expect(() => engine.history.redo()).toThrow('document mirror read failed');
-    expect(store.getState().projects.find((project) => project.id === projectId)).toEqual(undone);
-    expect(engine.document.getDocument()).toEqual(undone.canvas.document);
-    expect(engine.stores.canUndo.get()).toBe(false);
-    expect(engine.stores.canRedo.get()).toBe(true);
+    expect(await engine.history.redo()).toBe('applied');
+    const redone = store.getState().projects.find((project) => project.id === projectId)!;
+    expect(redone.canvas.document).not.toEqual(undone.canvas.document);
+    expect(engine.document.getDocument()).toBe(redone.canvas.document);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    expect(engine.stores.canRedo.get()).toBe(false);
     engine.lifecycle.dispose();
   });
 });

@@ -93,7 +93,18 @@ const Harness = ({ entryId, owner = 'raster' }: { entryId: string; owner?: 'rast
           ),
       },
       layers: {
-        applyStructuralPreview: apply,
+        beginStructuralPreview: () => ({
+          apply,
+          cancel: (restore?: CanvasProjectMutation) => {
+            if (restore) {
+              apply(restore);
+            }
+          },
+          commit: (_label: string, edit: PreparedDocumentEdit) => {
+            commits.push(edit);
+            return { status: apply(edit.forward) ? ('committed' as const) : ('dispatch-rejected' as const) };
+          },
+        }),
         commitPrepared: (_label: string, edit: PreparedDocumentEdit) => {
           commits.push(edit);
           return { status: apply(edit.forward) ? ('committed' as const) : ('dispatch-rejected' as const) };

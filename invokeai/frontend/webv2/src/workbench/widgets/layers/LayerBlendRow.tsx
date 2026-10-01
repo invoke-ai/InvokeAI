@@ -1,13 +1,13 @@
 import type { NumberInput as ChakraNumberInput, SelectValueChangeDetails } from '@chakra-ui/react';
 import type { CanvasBlendMode, CanvasDocumentContractV3, CanvasNodeContract } from '@workbench/canvas-engine/api';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { createListCollection, Flex, HStack, NumberInput } from '@chakra-ui/react';
 import { Select } from '@platform/ui';
 import { getDocumentIndex, isGroupNode } from '@workbench/canvas-engine/api';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
-import { applyStructuralPreview, CANVAS_BLEND_MODES } from '@workbench/widgets/layers/layerOps';
+import { usePreparedCommit, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
+import { CANVAS_BLEND_MODES } from '@workbench/widgets/layers/layerOps';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -119,7 +119,7 @@ const OpacityRow = ({
   engine: LayerBlendRowEngine | null;
   layer: CanvasNodeContract | null;
 }) => {
-  const commitPrepared = usePreparedCommit(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const { t } = useTranslation();
   // Capture original opacity once and track latest writes outside render closures so same-event commits record
   // current values.
@@ -156,7 +156,7 @@ const OpacityRow = ({
       }
       const next = clamp01(valueAsNumber / 100);
       if (
-        !applyStructuralPreview(engine, {
+        !previewStructural({
           id: layer.id,
           patch: { opacity: next },
           type: 'updateCanvasLayer',
@@ -170,7 +170,7 @@ const OpacityRow = ({
         pendingRef.current.latest = next;
       }
     },
-    [commitPending, engine, layer]
+    [commitPending, previewStructural, layer]
   );
 
   // Commit on spinner release, arrow/page-key release, Enter, or typed-value blur.

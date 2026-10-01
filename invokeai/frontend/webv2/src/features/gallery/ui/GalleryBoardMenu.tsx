@@ -1,9 +1,18 @@
 import type { GalleryBoard } from '@features/gallery/core/types';
 
 import { Dialog, HStack, Icon, Input, Menu, Portal, Stack, Text } from '@chakra-ui/react';
+import { GALLERY_AUTO_ADD_FOLLOW } from '@features/gallery/core/settings';
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
-import { ArchiveIcon, DownloadIcon, FileDownIcon, PencilIcon, Trash2Icon, type LucideIcon } from 'lucide-react';
+import {
+  ArchiveIcon,
+  DownloadIcon,
+  FileDownIcon,
+  PencilIcon,
+  SquareArrowDownIcon,
+  Trash2Icon,
+  type LucideIcon,
+} from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -134,6 +143,11 @@ export const GalleryBoardMenu = ({
                     <Menu.Separator />
                   </>
                 )}
+                {board.id === gallery.settings.autoAddBoardId ? (
+                  <BoardAutoAddMenuItem boardId={GALLERY_AUTO_ADD_FOLLOW} label={t('widgets.gallery.stopAutoAdd')} />
+                ) : board.kind !== 'date' && !board.archived ? (
+                  <BoardAutoAddMenuItem boardId={board.id} label={t('widgets.gallery.autoAddToBoard')} />
+                ) : null}
                 <BoardDownloadMenuItem board={board} />
                 {isManagedBoard && (
                   <>
@@ -245,6 +259,14 @@ const BoardExportProjectMenuItem = ({ board }: { board: GalleryBoard }) => {
       onClick={handleClick}
     />
   );
+};
+
+/** Sets the auto-add board; `follow` hands results back to the selected board. */
+const BoardAutoAddMenuItem = ({ boardId, label }: { boardId: string; label: string }) => {
+  const { actions } = useGalleryWidget();
+  const handleClick = useCallback(() => actions.updateSettings({ autoAddBoardId: boardId }), [actions, boardId]);
+
+  return <BoardMenuItem icon={SquareArrowDownIcon} label={label} value="auto-add-board" onClick={handleClick} />;
 };
 
 const BoardDownloadMenuItem = ({ board }: { board: GalleryBoard }) => {

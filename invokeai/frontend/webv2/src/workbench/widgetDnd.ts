@@ -8,9 +8,16 @@ import {
   type Collision,
   type CollisionDetection,
   type ClientRect,
+  type DndContextProps,
 } from '@dnd-kit/core';
 import { arrayMove } from '@dnd-kit/sortable';
 import { isWidgetRegion as isKnownWidgetRegion } from '@workbench/layoutContracts';
+
+/** Preserve board-list edge scrolling while non-sortable surfaces opt out. */
+export const workbenchAutoScroll = {
+  acceleration: 5,
+  canScroll: (element) => element.getAttribute('data-dnd-auto-scroll') !== 'false',
+} satisfies NonNullable<DndContextProps['autoScroll']>;
 
 const clipsOverflow = (value: string): boolean => value !== 'visible';
 

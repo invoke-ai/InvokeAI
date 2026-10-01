@@ -26,6 +26,7 @@ export {
 export { getCreateFromBboxNotice, type CreateFromBboxNotice } from './createFromBboxNotice';
 export type {
   FilterOperationSessionState,
+  FilterSessionErrorCode,
   SamInput,
   SamModel,
   SamSessionError,

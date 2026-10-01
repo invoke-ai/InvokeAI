@@ -16,6 +16,7 @@ describe('RenderController', () => {
         ({
           onKeyDown: vi.fn(),
           onKeyUp: vi.fn(),
+          onFocusIn: vi.fn(),
           onPointerCancel: vi.fn(),
           onPointerDown: vi.fn(),
           onPointerEnter: vi.fn(),

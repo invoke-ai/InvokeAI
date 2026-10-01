@@ -114,23 +114,47 @@ export const decimateSamples = (
 };
 
 /**
- * Pure document-space stroke outline. Separate perfect-freehand stages keep the start gate small while using the
- * real diameter for outline width.
+ * Appends samples one at a time while keeping {@link decimateSamples}' output for the prefix seen so far, so a
+ * growing stroke never re-scans the samples it has already gated.
  */
-export const strokeOutlinePolygon = (points: readonly StrokeSamplePoint[], opts: FreehandOptions): Vec2[] => {
-  if (points.length === 0) {
+export interface SampleDecimator {
+  push(point: StrokeSamplePoint): void;
+  /** Exactly `decimateSamples(pushed, spacing, last)`; the returned array must not be mutated. */
+  samples(last: boolean): readonly StrokeSamplePoint[];
+}
+
+export const createSampleDecimator = (spacing: number): SampleDecimator => {
+  const minDistance = spacing * spacing;
+  const kept: StrokeSamplePoint[] = [];
+  let final: StrokeSamplePoint | null = null;
+  return {
+    push: (point) => {
+      final = point;
+      const anchor = kept[kept.length - 1];
+      if (!anchor || dist2(anchor, point) >= minDistance) {
+        kept.push(point);
+      }
+    },
+    samples: (last) => (last && final && kept[kept.length - 1] !== final ? [...kept, final] : kept),
+  };
+};
+
+/**
+ * Document-space outline of already-decimated samples. Separate perfect-freehand stages keep the start gate small
+ * while using the real diameter for outline width.
+ */
+export const strokeOutlineFromSamples = (samples: readonly StrokeSamplePoint[], opts: FreehandOptions): Vec2[] => {
+  const first = samples[0];
+  if (!first) {
     return [];
   }
   const last = opts.last ?? false;
-  const samples = decimateSamples(points, sampleSpacing(opts.size), last);
   // perfect-freehand gives a lone sample a pen-oriented fallback dot whose
   // diameter bottoms out around 2.5px. Repeating the tap makes it use the real
   // outline size, which matters now that brushes can be smaller than one pixel.
-  if (samples.length === 1) {
-    samples.push(samples[0]!);
-  }
+  const input = samples.length === 1 ? [first, first] : samples;
   const strokePoints = getStrokePoints(
-    samples.map((p) => [p.x, p.y, p.pressure]),
+    input.map((p) => [p.x, p.y, p.pressure]),
     {
       last,
       size: Math.min(opts.size, START_GATE_SIZE),
@@ -146,6 +170,10 @@ export const strokeOutlinePolygon = (points: readonly StrokeSamplePoint[], opts:
   });
   return outline.map(([x, y]) => ({ x, y }));
 };
+
+/** Pure document-space stroke outline of raw samples, decimated for `opts.size`. */
+export const strokeOutlinePolygon = (points: readonly StrokeSamplePoint[], opts: FreehandOptions): Vec2[] =>
+  strokeOutlineFromSamples(decimateSamples(points, sampleSpacing(opts.size), opts.last ?? false), opts);
 
 /** Serializes an outline polygon to an SVG path string (`M … L … Z`). */
 export const polygonToSvgPath = (polygon: readonly Vec2[]): string => {
@@ -217,6 +245,16 @@ export const polygonBounds = (polygon: readonly Vec2[]): Rect => {
   return { height: maxY - minY, width: maxX - minX, x: minX, y: minY };
 };
 
+/** Traces an outline polygon into a fresh path and reports its bounds. */
+export const polygonToPath = (
+  polygon: Vec2[],
+  createPath2D: CreatePath2D
+): { path: Path2D; polygon: Vec2[]; bounds: Rect } => {
+  const path = createPath2D();
+  traceSmoothPolygon(path, polygon);
+  return { bounds: polygonBounds(polygon), path, polygon };
+};
+
 /**
  * Builds the smooth stroke path through an injected Path2D factory and returns enclosing polygon bounds, avoiding
  * duplicate outline computation.
@@ -225,9 +263,4 @@ export const strokeToPath = (
   points: readonly StrokeSamplePoint[],
   opts: FreehandOptions,
   createPath2D: CreatePath2D
-): { path: Path2D; polygon: Vec2[]; bounds: Rect } => {
-  const polygon = strokeOutlinePolygon(points, opts);
-  const path = createPath2D();
-  traceSmoothPolygon(path, polygon);
-  return { bounds: polygonBounds(polygon), path, polygon };
-};
+): { path: Path2D; polygon: Vec2[]; bounds: Rect } => polygonToPath(strokeOutlinePolygon(points, opts), createPath2D);

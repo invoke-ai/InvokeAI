@@ -6,6 +6,9 @@ import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/ras
 import { describe, expect, it, vi } from 'vitest';
 
 import { RasterExportController } from './rasterExportController';
+import { RasterMemoryBudgetController } from './rasterMemoryBudgetController';
+
+const pin = () => ({ release: () => undefined });
 
 describe('RasterExportController budget', () => {
   it('returns over-budget before allocating a baked raster export', async () => {
@@ -44,6 +47,7 @@ describe('RasterExportController budget', () => {
       isRasterizing: () => false,
       isSupportedSource: () => true,
       layers,
+      pin,
       reserve,
     });
 
@@ -99,6 +103,7 @@ describe('RasterExportController budget', () => {
       isRasterizing: () => false,
       isSupportedSource: () => true,
       layers,
+      pin,
       reserve,
     });
 
@@ -151,6 +156,7 @@ describe('RasterExportController budget', () => {
       isRasterizing: () => false,
       isSupportedSource: () => true,
       layers,
+      pin,
       reserve,
     });
 
@@ -220,6 +226,7 @@ describe('RasterExportController budget', () => {
       isRasterizing: () => false,
       isSupportedSource: () => true,
       layers,
+      pin,
       waitForFont,
     });
 
@@ -299,6 +306,7 @@ describe('RasterExportController budget', () => {
       isRasterizing: () => false,
       isSupportedSource: () => true,
       layers,
+      pin,
       waitForFont,
     });
 
@@ -314,5 +322,187 @@ describe('RasterExportController budget', () => {
     await expect(controller.rasterize('text-layer')).resolves.toMatchObject({ status: 'ok' });
     expect(invalidateLayerCache).toHaveBeenCalledOnce();
     expect(getOrStartRasterization).toHaveBeenCalledOnce();
+  });
+
+  it('pins the source for the whole read lease, on cached and freshly rasterized paths', async () => {
+    const backend = createTestStubRasterBackend();
+    const layers = createLayerCacheStore(backend);
+    const memory = new RasterMemoryBudgetController();
+    const layer = {
+      blendMode: 'normal' as const,
+      id: 'layer',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Layer',
+      opacity: 1,
+      source: { image: { height: 10, imageName: 'layer.png', width: 10 }, type: 'image' as const },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster' as const,
+    };
+    const document: CanvasDocumentContractV3 = {
+      background: 'transparent',
+      bbox: { height: 10, width: 10, x: 0, y: 0 },
+      height: 10,
+      stacks: stacksFrom([layer]),
+      selectedLayerId: null,
+      version: 3,
+      width: 10,
+    };
+    let pinnedDuringRasterization = false;
+    const controller = new RasterExportController({
+      backend,
+      captureGuard: (captured, entry) => ({
+        cacheVersion: entry.version,
+        documentGeneration: 1,
+        layer: captured,
+        layerId: captured.id,
+        projectId: 'p',
+      }),
+      getDocument: () => document,
+      getOrStartRasterization: () => {
+        pinnedDuringRasterization = memory.isPinned('layer');
+        layers.getOrCreateRect('layer', { height: 10, width: 10, x: 0, y: 0 });
+        layers.publishPixels('layer');
+        return Promise.resolve('published');
+      },
+      isGuardCurrent: () => true,
+      isRasterizing: () => false,
+      isSupportedSource: () => true,
+      layers,
+      pin: (layerId) => memory.pin(layerId),
+    });
+
+    const rasterized = await controller.rasterize('layer');
+    expect(pinnedDuringRasterization).toBe(true);
+    expect(rasterized.status).toBe('ok');
+    expect(memory.isPinned('layer')).toBe(true);
+    if (rasterized.status === 'ok') {
+      rasterized.release();
+      rasterized.release();
+    }
+    expect(memory.isPinned('layer')).toBe(false);
+
+    const cached = await controller.rasterize('layer');
+    expect(memory.isPinned('layer')).toBe(true);
+    if (cached.status === 'ok') {
+      cached.release();
+    }
+    expect(memory.isPinned('layer')).toBe(false);
+  });
+
+  it.each([
+    ['aborted', 'aborted', { height: 10, width: 10, x: 0, y: 0 }],
+    ['stale', 'not-ready', { height: 10, width: 10, x: 0, y: 0 }],
+    ['published', 'empty', { height: 0, width: 0, x: 0, y: 0 }],
+  ] as const)('releases the pin when a %s rasterization reads as %s', async (outcome, status, publishedRect) => {
+    const backend = createTestStubRasterBackend();
+    const layers = createLayerCacheStore(backend);
+    const memory = new RasterMemoryBudgetController();
+    const layer = {
+      blendMode: 'normal' as const,
+      id: 'layer',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Layer',
+      opacity: 1,
+      source: { image: { height: 10, imageName: 'layer.png', width: 10 }, type: 'image' as const },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster' as const,
+    };
+    const document: CanvasDocumentContractV3 = {
+      background: 'transparent',
+      bbox: { height: 10, width: 10, x: 0, y: 0 },
+      height: 10,
+      stacks: stacksFrom([layer]),
+      selectedLayerId: null,
+      version: 3,
+      width: 10,
+    };
+    const controller = new RasterExportController({
+      backend,
+      captureGuard: (captured, entry) => ({
+        cacheVersion: entry.version,
+        documentGeneration: 1,
+        layer: captured,
+        layerId: captured.id,
+        projectId: 'p',
+      }),
+      getDocument: () => document,
+      getOrStartRasterization: () => {
+        layers.publishRasterized(
+          'layer',
+          publishedRect,
+          backend.createSurface(publishedRect.width, publishedRect.height)
+        );
+        return Promise.resolve(outcome);
+      },
+      isGuardCurrent: () => true,
+      isRasterizing: () => false,
+      isSupportedSource: () => true,
+      layers,
+      pin: (layerId) => memory.pin(layerId),
+    });
+
+    await expect(controller.rasterize('layer')).resolves.toEqual({ status });
+    expect(memory.isPinned('layer')).toBe(false);
+  });
+
+  it('releases the source pin once an adjusted copy is made, keeping its reservation until release', async () => {
+    const backend = createTestStubRasterBackend();
+    const layers = createLayerCacheStore(backend);
+    const memory = new RasterMemoryBudgetController();
+    const layer = {
+      adjustments: [
+        { brightness: 0.1, contrast: 0, id: 'adj-bc', isEnabled: true, type: 'brightness-contrast' as const },
+      ],
+      blendMode: 'normal' as const,
+      id: 'layer',
+      isEnabled: true,
+      isLocked: false,
+      name: 'Layer',
+      opacity: 1,
+      source: { image: { height: 10, imageName: 'layer.png', width: 10 }, type: 'image' as const },
+      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+      type: 'raster' as const,
+    };
+    const document: CanvasDocumentContractV3 = {
+      background: 'transparent',
+      bbox: { height: 10, width: 10, x: 0, y: 0 },
+      height: 10,
+      stacks: stacksFrom([layer]),
+      selectedLayerId: null,
+      version: 3,
+      width: 10,
+    };
+    layers.publishRasterized('layer', { height: 10, width: 10, x: 0, y: 0 }, backend.createSurface(10, 10));
+    const controller = new RasterExportController({
+      backend,
+      captureGuard: (captured, entry) => ({
+        cacheVersion: entry.version,
+        documentGeneration: 1,
+        layer: captured,
+        layerId: captured.id,
+        projectId: 'p',
+      }),
+      getDocument: () => document,
+      getOrStartRasterization: () => Promise.resolve('published'),
+      isGuardCurrent: () => true,
+      isRasterizing: () => false,
+      isSupportedSource: () => true,
+      layers,
+      pin: (layerId) => memory.pin(layerId),
+      reserve: (bytes) => memory.reserveOperation(bytes, { purpose: 'raster-export' }),
+    });
+
+    const adjusted = await controller.rasterize('layer', { applyAdjustments: true });
+
+    expect(adjusted.status).toBe('ok');
+    expect(memory.isPinned('layer')).toBe(false);
+    expect(memory.snapshot().reservedBytes).toBe(800);
+    if (adjusted.status === 'ok') {
+      expect(adjusted.surface).not.toBe(layers.peek('layer')?.surface);
+      adjusted.release();
+    }
+    expect(memory.snapshot().reservedBytes).toBe(0);
   });
 });
