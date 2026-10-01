@@ -1848,6 +1848,10 @@
         "label": "Keep highlighted connections behind nodes",
         "description": "Connections to a selected node normally rise above other nodes. Keep them beneath so they never cover node controls."
       },
+      "workflowGroupNodesByCategory": {
+        "label": "Group node search by category",
+        "description": "Show add-node results under their categories. When off, results are one list ordered by how closely they match."
+      },
       "workflowShowMinimap": {
         "label": "Show minimap",
         "description": "Show an overview in the corner of the workflow editor."

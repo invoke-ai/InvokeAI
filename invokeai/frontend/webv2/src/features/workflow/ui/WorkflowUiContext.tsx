@@ -19,6 +19,7 @@ export interface WorkflowPreferences {
   themeId: WorkbenchThemeId;
   workflowEdgeStyle: 'curved' | 'square';
   workflowEdgesBehindNodes: boolean;
+  workflowGroupNodesByCategory: boolean;
   workflowShowMinimap: boolean;
   workflowSnapToGrid: boolean;
   workflowValidateConnections: boolean;

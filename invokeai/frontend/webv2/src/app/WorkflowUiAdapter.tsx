@@ -49,6 +49,7 @@ const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
   themeId: preferences.themeId,
   workflowEdgeStyle: preferences.workflowEdgeStyle,
   workflowEdgesBehindNodes: preferences.workflowEdgesBehindNodes,
+  workflowGroupNodesByCategory: preferences.workflowGroupNodesByCategory,
   workflowShowMinimap: preferences.workflowShowMinimap,
   workflowSnapToGrid: preferences.workflowSnapToGrid,
   workflowValidateConnections: preferences.workflowValidateConnections,
