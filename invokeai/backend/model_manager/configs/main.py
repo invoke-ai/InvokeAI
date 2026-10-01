@@ -43,6 +43,7 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 from invokeai.backend.model_manager.configs.qwen3_encoder import _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
+    AnimaVariantType,
     BaseModelType,
     Flux2VariantType,
     FluxVariantType,
@@ -1284,6 +1285,22 @@ def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
             return True
 
     return False
+
+
+#: Where Anima-3.8B v1.1 bundles its semantic connector, relative to the transformer root. The
+#: bundle records it in its header as `anima_v2_connector_prefix` (`net.anima_v2_connector.`).
+ANIMA_V2_CONNECTOR_KEY_PREFIX = "anima_v2_connector."
+
+#: Anima's own wrapper namespaces, as `_has_anima_keys` accepts them.
+_ANIMA_KEY_PREFIXES = ("", "net.", "model.diffusion_model.")
+
+
+def _get_anima_variant(state_dict: dict[str | int, Any]) -> AnimaVariantType:
+    """An Anima checkpoint that bundles the semantic connector needs Qwen3.5 as well as Qwen3."""
+    connector_prefixes = tuple(f"{prefix}{ANIMA_V2_CONNECTOR_KEY_PREFIX}" for prefix in _ANIMA_KEY_PREFIXES)
+    if any(isinstance(key, str) and key.startswith(connector_prefixes) for key in state_dict):
+        return AnimaVariantType.Qwen35
+    return AnimaVariantType.Qwen3
 
 
 class Main_Diffusers_ZImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
@@ -2884,6 +2901,11 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
 
     base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    # Required, and therefore not part of the discriminator tag. A default would put it into the tag
+    # (`Config_Base.get_tag`), which a stored record's dict does not carry, and every Anima record
+    # would stop deserializing. Records written before the field existed get it from
+    # `migration_2026_10_01_add_anima_variant`.
+    variant: AnimaVariantType = Field(description="Which text encoders the model is conditioned on.")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -2892,14 +2914,37 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         raise_for_override_fields(cls, override_fields)
 
         cls._validate_looks_like_anima_model(mod)
+        cls._reject_unbundled_qwen35_dit(mod)
 
-        return cls(**override_fields)
+        variant = override_fields.pop("variant", None) or _get_anima_variant(mod.load_state_dict())
+        return cls(**override_fields, variant=variant)
 
     @classmethod
     def _validate_looks_like_anima_model(cls, mod: ModelOnDisk) -> None:
         has_anima_keys = _has_anima_keys(mod.load_state_dict())
         if not has_anima_keys:
             raise NotAMatchError("state dict does not look like an Anima model")
+
+    @classmethod
+    def _reject_unbundled_qwen35_dit(cls, mod: ModelOnDisk) -> None:
+        """Refuse the Anima-3.8B v1.0 DiT, which needs an adapter file this release does not load.
+
+        v1.0 trained 12 inserted blocks jointly with a separate Qwen3.5 cross-attention adapter; on its
+        own it loads cleanly as a 52-block Anima and generates with a conditioning signal its new
+        blocks were never trained without. v1.1 bundles a newer connector into the checkpoint and is
+        the release path, so the v1.0 file is refused here rather than installed as something it is
+        not. Its header names the joint training; a plain depth-expanded finetune carries no such key.
+        """
+        metadata = mod.metadata()
+        if "qwen35_joint_dit_blocks" not in metadata:
+            return
+        if _get_anima_variant(mod.load_state_dict()) is AnimaVariantType.Qwen35:
+            return
+        raise InvalidMatchError(
+            "This is the Anima-3.8B v1.0 transformer, which only works together with its separate "
+            "Qwen3.5 adapter file. Install the Anima-3.8B v1.1 checkpoint instead "
+            "(Anima-3.8B-v1.1.safetensors), which bundles its connector."
+        )
 
 
 class Main_SDNQ_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):

@@ -247,11 +247,12 @@
     },
     "anima": {
       "componentsFilled": {
-        "diffusers": [
+        "qwen3": [
           "qwen3EncoderModel",
           "vae"
         ],
-        "standalone-components": [
+        "qwen35": [
+          "qwen35EncoderModel",
           "qwen3EncoderModel",
           "vae"
         ]
@@ -284,7 +285,8 @@
           0
         ],
         "guidance_scale": [
-          4.5
+          4.5,
+          6
         ],
         "height": [
           1024
@@ -296,7 +298,8 @@
           "euler"
         ],
         "steps": [
-          35
+          35,
+          40
         ],
         "use_cache": [
           true
@@ -332,6 +335,7 @@
           true
         ],
         "model": [],
+        "qwen3_5_encoder_model": [],
         "qwen3_encoder_model": [],
         "use_cache": [
           true
@@ -339,6 +343,7 @@
         "vae_model": []
       },
       "outputs": [
+        "qwen3_5_encoder",
         "qwen3_encoder",
         "transformer",
         "vae"
@@ -347,6 +352,7 @@
     "anima_text_encoder": {
       "inputs": [
         "prompt",
+        "qwen3_5_encoder",
         "qwen3_encoder"
       ],
       "literalInputs": {
@@ -509,6 +515,7 @@
           3.5,
           4,
           4.5,
+          6,
           7
         ],
         "clip_embed_model": [],
@@ -583,6 +590,7 @@
         "model": [],
         "qwen_image_qwen_vl_encoder": [],
         "qwen_image_vae": [],
+        "qwen3_5_encoder": [],
         "qwen3_encoder": [],
         "qwen3_source": [],
         "qwen3_vl_encoder": [],

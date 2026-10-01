@@ -7,6 +7,10 @@ Encodes text using the dual-conditioning pipeline:
 Both outputs are stored together in AnimaConditioningInfo and used by
 the LLM Adapter inside the transformer during denoising.
 
+Anima-3.8B additionally reads Qwen3.5 4B hidden states (layers 7, 15, 23, 31) through the semantic
+connector bundled in its transformer. They are encoded here when a Qwen3.5 encoder is connected and
+stored beside the Qwen3 ones; the connector itself runs inside the denoising loop, per step.
+
 Key differences from Z-Image text encoder:
 - Anima uses Qwen3 0.6B (base model, NOT instruct) — no chat template
 - Anima additionally tokenizes with T5-XXL tokenizer to get token IDs
@@ -28,13 +32,15 @@ from invokeai.app.invocations.fields import (
     TensorField,
     UIComponent,
 )
-from invokeai.app.invocations.model import Qwen3EncoderField
+from invokeai.app.invocations.model import Qwen3EncoderField, Qwen35EncoderField
 from invokeai.app.invocations.primitives import AnimaConditioningOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.anima.semantic_connector import QWEN35_LAYER_INDICES
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_QWEN3_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
+from invokeai.backend.qwen3_5.qwen3_5_encoder import Qwen35Encoder
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     AnimaConditioningInfo,
     ConditioningFieldData,
@@ -52,13 +58,16 @@ T5_MAX_SEQ_LEN = 512
 # Qwen3 0.6B supports 32K context but the LLM Adapter doesn't need that much.
 QWEN3_MAX_SEQ_LEN = 8192
 
+# The reference encoder for Anima-3.8B's semantic connector truncates the Qwen3.5 prompt here.
+QWEN3_5_MAX_SEQ_LEN = 1024
+
 
 @invocation(
     "anima_text_encoder",
     title="Prompt - Anima",
     tags=["prompt", "conditioning", "anima"],
     category="conditioning",
-    version="1.4.0",
+    version="1.5.0",
     classification=Classification.Prototype,
     idle_gpu_offloadable=True,
 )
@@ -80,10 +89,17 @@ class AnimaTextEncoderInvocation(BaseInvocation):
         default=None,
         description="A mask defining the region that this conditioning prompt applies to.",
     )
+    qwen3_5_encoder: Qwen35EncoderField | None = InputField(
+        default=None,
+        title="Qwen3.5 Encoder",
+        description=f"{FieldDescriptions.qwen3_5_encoder}. Connect it for Anima-3.8B, which reads both encoders.",
+        input=Input.Connection,
+    )
 
     @torch.no_grad()
     def invoke(self, context: InvocationContext) -> AnimaConditioningOutput:
         qwen3_embeds, t5xxl_ids, t5xxl_weights = self._encode_prompt(context)
+        qwen35_states, qwen35_mask = self._encode_qwen3_5(context) if self.qwen3_5_encoder else (None, None)
 
         # Move to CPU for storage
         qwen3_embeds = qwen3_embeds.detach().to("cpu")
@@ -96,6 +112,8 @@ class AnimaTextEncoderInvocation(BaseInvocation):
                     qwen3_embeds=qwen3_embeds,
                     t5xxl_ids=t5xxl_ids,
                     t5xxl_weights=t5xxl_weights,
+                    qwen35_states=qwen35_states,
+                    qwen35_mask=qwen35_mask,
                 )
             ]
         )
@@ -218,6 +236,48 @@ class AnimaTextEncoderInvocation(BaseInvocation):
         t5xxl_ids = t5_tokens.input_ids[0]  # Shape: (seq_len,)
 
         return qwen3_embeds, t5xxl_ids, None
+
+    def _encode_qwen3_5(self, context: InvocationContext) -> tuple[torch.Tensor, torch.Tensor]:
+        """Encode the prompt with Qwen3.5 the way Anima-3.8B's reference encoder does.
+
+        Returns:
+            Tuple of (states, mask), on the CPU.
+            - states: Shape (num_layers, seq_len, 2560), one row per layer in `QWEN35_LAYER_INDICES`.
+            - mask: Shape (seq_len,), True for real tokens.
+        """
+        assert self.qwen3_5_encoder is not None
+        context.util.signal_progress("Running Qwen3.5 text encoder")
+        tokenizer_info = context.models.load(self.qwen3_5_encoder.tokenizer)
+        with tokenizer_info.model_on_device() as (_, tokenizer):
+            if not isinstance(tokenizer, PreTrainedTokenizerBase):
+                raise TypeError(f"Expected PreTrainedTokenizerBase for tokenizer, got {type(tokenizer).__name__}.")
+            # No template, no special tokens -- the prompt's tokens as they are.
+            token_ids = tokenizer.encode(self.prompt, add_special_tokens=False)
+            pad_token_id = tokenizer.pad_token_id
+        if len(token_ids) > QWEN3_5_MAX_SEQ_LEN:
+            logger.warning(f"Prompt was truncated to {QWEN3_5_MAX_SEQ_LEN} tokens for the Qwen3.5 encoder.")
+            token_ids = token_ids[:QWEN3_5_MAX_SEQ_LEN]
+        # An empty prompt becomes one padding token that nothing attends to, as in the reference, so the
+        # connector adds no Qwen3.5 signal for it. (The reference also masks every token from the first
+        # occurrence of id 151643 on -- the Qwen3 padding id, which in Qwen3.5's vocabulary is the
+        # ordinary token " 내용". That is not reproduced.)
+        is_empty = not token_ids
+        if is_empty:
+            if pad_token_id is None:
+                raise ValueError("The Qwen3.5 tokenizer has no padding token to encode an empty prompt with.")
+            token_ids = [pad_token_id]
+        mask = torch.full((len(token_ids),), not is_empty, dtype=torch.bool)
+
+        encoder_info = context.models.load(self.qwen3_5_encoder.text_encoder)
+        with encoder_info.model_on_device() as (_, encoder):
+            if not isinstance(encoder, Qwen35Encoder):
+                raise TypeError(f"Expected a Qwen3.5 encoder, got {type(encoder).__name__}.")
+            input_ids = torch.tensor([token_ids], device=encoder_info.compute_device)
+            # The connector was trained on what Anima-3.8B's encoder checkpoint computes, and that file
+            # ships its last tapped layer without the MLP.
+            states = encoder(input_ids, QWEN35_LAYER_INDICES, last_layer_attention_only=True)
+            stacked = torch.cat(states, dim=0).detach().to("cpu")
+        return stacked, mask
 
     def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
         """Iterate over LoRA models to apply to the Qwen3 text encoder."""

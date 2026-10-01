@@ -56,6 +56,62 @@
     }
   },
   {
+    "base": "anima",
+    "variant": "anima_qwen35",
+    "features": {
+      "negative_prompt": {
+        "visible": true,
+        "usage": "cfg-gated"
+      },
+      "dimension_grid": 8,
+      "guidance_label": "CFG",
+      "guidance_min": 1.0,
+      "guidance_max": null,
+      "scheduler_set": "anima",
+      "scheduler_applies_to_graph": true,
+      "control_kinds": [],
+      "max_reference_images": 0,
+      "reference_images_require_variant": null,
+      "supports_regional_guidance": true,
+      "regional_negative": false,
+      "clip_skip_max": null,
+      "supports_seamless": false,
+      "supports_cfg_rescale": false,
+      "sd_vae_override": false,
+      "color_compensation": false,
+      "vae_precision": false
+    },
+    "defaults": {
+      "vae": null,
+      "vae_precision": null,
+      "scheduler": "euler",
+      "steps": 40,
+      "cfg_scale": 6.0,
+      "cfg_rescale_multiplier": null,
+      "width": 1024,
+      "height": 1024,
+      "guidance": null,
+      "cpu_only": null,
+      "fp8_storage": null
+    },
+    "vae": {
+      "accepted": [
+        {
+          "base": "anima",
+          "latent_channels": null
+        },
+        {
+          "base": "qwen-image",
+          "latent_channels": null
+        },
+        {
+          "base": "wan",
+          "latent_channels": 16
+        }
+      ]
+    }
+  },
+  {
     "base": "cogview4",
     "variant": null,
     "features": {
