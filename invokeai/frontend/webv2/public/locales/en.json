@@ -2112,6 +2112,11 @@
           "drag": "Draw or adjust the search box."
         }
       },
+      "title": {
+        "group": "Group: {{name}}",
+        "layer": "Layer: {{name}}",
+        "operation": "Operation: {{name}}"
+      },
       "target": {
         "defaults": "Defaults",
         "editing": "Editing: {{name}}",
