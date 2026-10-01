@@ -37,9 +37,7 @@ def _is_shipped(path: Path, package_data: dict[str, list[str]]) -> bool:
 def test_every_vendored_backend_data_file_is_package_data() -> None:
     package_data = _package_data()
     vendored = [
-        p
-        for p in BACKEND.rglob("*")
-        if p.is_file() and p.name.endswith(DATA_SUFFIXES) and "__pycache__" not in p.parts
+        p for p in BACKEND.rglob("*") if p.is_file() and p.name.endswith(DATA_SUFFIXES) and "__pycache__" not in p.parts
     ]
     assert vendored, "found no vendored data files -- the scan is broken"
 
