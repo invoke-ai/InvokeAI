@@ -1,17 +1,21 @@
 import type {
+  CanvasLayerPreviewMutation,
   PreparedCommitOptions,
   StructuralCommitOptions,
   StructuralCommitResult,
+  StructuralPreviewSession,
 } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3 } from '@workbench/canvas-engine/contracts';
 import type { PreparedDocumentEdit } from '@workbench/canvas-engine/document-model/documentCommands';
+import type { HistoryEntryToken } from '@workbench/canvas-engine/history/history';
 import type { CanvasMutationOrigin, CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 
 import { createDocumentModel } from '@workbench/canvas-engine/document-model/documentModel';
 import { checkEditPostconditions } from '@workbench/canvas-engine/document-model/postconditions';
 import { createDocumentPatchEntry } from '@workbench/canvas-engine/history/documentPatch';
+import { HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 
-import type { CanvasMutationContext } from './mutationContext';
+import { EditStepError, type CanvasMutationContext, type EditStep } from './mutationContext';
 
 /** The edit revision a mutation's insertion was anchored at; a commit refuses an anchor captured earlier. */
 const anchorRevisionOf = (mutation: CanvasProjectMutation): number | undefined => {
@@ -27,21 +31,19 @@ const anchorRevisionOf = (mutation: CanvasProjectMutation): number | undefined =
 
 export type StructuralMutationContext = Pick<
   CanvasMutationContext,
+  | 'applyStep'
+  | 'begin'
   | 'canEdit'
-  | 'capturePermit'
   | 'dispatch'
-  | 'dispatchPrepared'
   | 'getDocument'
   | 'getEditRevision'
   | 'getReducerDocument'
-  | 'history'
+  | 'historyTop'
   | 'isGestureActive'
   | 'projectId'
 >;
 
 export type StructuralFailureReport =
-  | 'Structural edit could not be reverted'
-  | 'Structural edit could not be mirrored'
   | 'Structural history replay was refused'
   | 'Structural history replay could not be mirrored';
 
@@ -64,9 +66,10 @@ const defaultSchedulePreview = (flush: () => void): (() => void) => {
 };
 
 interface NudgeBurst {
-  expiresAt: number;
-  selectionKey: string;
-  origins: readonly { id: string; x: number; y: number }[];
+  readonly token: HistoryEntryToken;
+  readonly expiresAt: number;
+  readonly selectionKey: string;
+  readonly origins: readonly { id: string; x: number; y: number }[];
 }
 
 const NUDGE_COALESCE_MS = 500;
@@ -78,27 +81,21 @@ const positionMutation = (positions: readonly { id: string; x: number; y: number
 
 const unique = (ids: readonly string[]): string[] => [...new Set(ids)];
 
-/** Owns guarded, failure-atomic structural document edits and nudge coalescing. */
+type RecordedResult = StructuralCommitResult | { status: 'committed'; token: HistoryEntryToken };
+
+/** The public result; the history token stays internal. */
+const publicResult = (result: RecordedResult): StructuralCommitResult =>
+  result.status === 'committed' ? { status: 'committed' } : result;
+
+/** Owns guarded, failure-atomic structural document edits, nudge coalescing and live preview sessions. */
 export class StructuralLayerController {
   private burst: NudgeBurst | null = null;
   private disposed = false;
   private readonly now: () => number;
-  private pendingPreview: CanvasProjectMutation | null = null;
-  private cancelPreviewFlush: (() => void) | null = null;
+  private preview: { session: StructuralPreviewSession; flushPending(): void; drop(): void } | null = null;
 
   constructor(private readonly deps: StructuralLayerControllerOptions) {
     this.now = deps.now ?? Date.now;
-  }
-
-  /** A commit supersedes any preview still waiting for its frame. */
-  private discardPendingPreview(): void {
-    this.cancelPreviewFlush?.();
-    this.cancelPreviewFlush = null;
-    this.pendingPreview = null;
-  }
-
-  endBurst(): void {
-    this.burst = null;
   }
 
   canCommit(): boolean {
@@ -112,20 +109,14 @@ export class StructuralLayerController {
     inverse: CanvasProjectMutation,
     options: StructuralCommitOptions = {}
   ): StructuralCommitResult {
-    const refusal = this.refuse({
-      ...options,
-      expectedRevision: options.expectedRevision ?? anchorRevisionOf(forward) ?? anchorRevisionOf(inverse),
-    });
-    if (refusal) {
-      return refusal;
+    const stale = this.staleRevision(
+      options.expectedRevision ?? anchorRevisionOf(forward) ?? anchorRevisionOf(inverse)
+    );
+    if (stale) {
+      return stale;
     }
-    this.endBurst();
-    this.discardPendingPreview();
-    const applied = this.apply(label, forward, inverse, options.verify);
-    if (applied.status === 'committed') {
-      this.deps.ctx.history.push(this.entry(label, forward, inverse));
-    }
-    return applied;
+    this.endPreview();
+    return publicResult(this.publish(label, this.step(forward, inverse, options.verify), forward, inverse));
   }
 
   /** A prepared flat edit: refused as `stale` unless its revision and project still match, verified by its postconditions. */
@@ -134,64 +125,109 @@ export class StructuralLayerController {
     edit: PreparedDocumentEdit,
     options: PreparedCommitOptions = {}
   ): StructuralCommitResult {
-    const refusal = this.refuse({ expectedRevision: edit.expectedRevision });
-    if (refusal) {
-      return refusal;
+    const stale = this.staleRevision(edit.expectedRevision);
+    if (stale) {
+      return stale;
     }
     if (edit.projectId !== this.deps.ctx.projectId) {
       return { status: 'dispatch-rejected' };
     }
-    this.endBurst();
-    this.discardPendingPreview();
-    const applied = this.apply(
-      label,
-      edit.forward,
-      edit.inverse,
-      (document) => checkEditPostconditions(document, edit.postconditions),
-      options.origin
+    this.endPreview();
+    const step = this.step(edit.forward, edit.inverse, (document) =>
+      checkEditPostconditions(document, edit.postconditions)
     );
-    if (applied.status === 'committed' && edit.history === 'record') {
-      this.deps.ctx.history.push(this.entry(label, edit.forward, edit.inverse));
+    if (edit.history !== 'record') {
+      return this.applyUnrecorded(step);
     }
-    return applied;
+    return publicResult(this.publish(label, step, edit.forward, edit.inverse, options.origin));
   }
 
   /**
-   * Coalesce gesture previews to one dispatch per frame to limit project subscriptions. True means queued; a lock,
-   * gesture or disposal before flush discards it.
+   * Starts an owned preview: `apply` coalesces live dispatches to one per frame, and `commit` records the gesture
+   * as one step from its prepared baseline without dispatching again when the preview already reached it, restoring
+   * the baseline when it is refused. A newer session, any commit or disposal ends this one.
    */
-  preview(action: CanvasProjectMutation): boolean {
+  beginPreview(): StructuralPreviewSession | null {
     if (!this.canCommit()) {
-      return false;
+      return null;
     }
-    this.pendingPreview = action;
-    if (this.cancelPreviewFlush === null) {
-      const schedule = this.deps.schedulePreview ?? defaultSchedulePreview;
-      // The scheduler may flush synchronously (no rAF); the cancel handle must not outlive the flush.
-      let flushed = false;
-      const cancel = schedule(() => {
-        flushed = true;
-        this.cancelPreviewFlush = null;
-        const pending = this.pendingPreview;
-        this.pendingPreview = null;
-        if (pending && this.canCommit()) {
-          this.deps.ctx.dispatch(pending);
+    this.endPreview();
+    let pending: CanvasProjectMutation | null = null;
+    let cancelFlush: (() => void) | null = null;
+    const owns = (): boolean => this.preview?.session === session;
+    const flushPending = (): void => {
+      cancelFlush?.();
+      cancelFlush = null;
+      const next = pending;
+      pending = null;
+      if (next && this.canCommit()) {
+        this.deps.ctx.dispatch(next, 'system');
+      }
+    };
+    const drop = (): void => {
+      cancelFlush?.();
+      cancelFlush = null;
+      pending = null;
+    };
+    const session: StructuralPreviewSession = {
+      apply: (action: CanvasLayerPreviewMutation) => {
+        if (!owns() || !this.canCommit()) {
+          return false;
         }
-      });
-      this.cancelPreviewFlush = flushed ? null : cancel;
-    }
-    return true;
+        pending = action;
+        if (cancelFlush === null) {
+          let flushed = false;
+          const cancel = (this.deps.schedulePreview ?? defaultSchedulePreview)(() => {
+            flushed = true;
+            cancelFlush = null;
+            flushPending();
+          });
+          cancelFlush = flushed ? null : cancel;
+        }
+        return true;
+      },
+      cancel: (restore) => {
+        if (owns()) {
+          drop();
+          this.preview = null;
+          // Returning to the baseline undoes this session's own unrecorded previews, so a lock does not block it.
+          if (restore && !this.disposed) {
+            this.deps.ctx.dispatch(restore, 'system');
+          }
+        }
+      },
+      commit: (label, edit) => {
+        if (!owns()) {
+          return { status: 'busy' };
+        }
+        flushPending();
+        this.preview = null;
+        if (edit.projectId !== this.deps.ctx.projectId) {
+          return { status: 'dispatch-rejected' };
+        }
+        const verify = (document: CanvasDocumentContractV3 | null): boolean =>
+          document !== null && checkEditPostconditions(document, edit.postconditions);
+        // The preview already published the final values: record the step without another reducer allocation.
+        const step: EditStep = verify(this.deps.ctx.getReducerDocument())
+          ? {}
+          : this.step(edit.forward, edit.inverse, verify);
+        const result = publicResult(this.publish(label, step, edit.forward, edit.inverse));
+        // A refused gesture must not leave its unrecorded previews behind.
+        if (result.status !== 'committed' && !this.disposed) {
+          this.deps.ctx.dispatch(edit.inverse, 'system');
+        }
+        return result;
+      },
+    };
+    this.preview = { drop, flushPending, session };
+    return session;
   }
 
   nudge(dx: number, dy: number): StructuralCommitResult {
     const { ctx } = this.deps;
-    const refusal = this.refuse({});
-    if (refusal) {
-      return refusal;
-    }
     const document = ctx.getDocument();
-    if (!document?.selectedLayerId) {
-      return { status: 'dispatch-rejected' };
+    if (this.disposed || !document?.selectedLayerId) {
+      return { status: this.disposed ? 'not-ready' : 'dispatch-rejected' };
     }
     const ids = unique([document.selectedLayerId, ...(this.deps.getSelectedLayerIds?.(document) ?? [])]);
     const model = createDocumentModel(document, { editRevision: ctx.getEditRevision(), projectId: ctx.projectId });
@@ -203,136 +239,131 @@ export class StructuralLayerController {
     if (prepared.edit.touchedIds.some((id) => !leaves.find((leaf) => leaf.id === id)?.contributionEnabled)) {
       return { status: 'dispatch-rejected' };
     }
+    this.endPreview();
     const selectionKey = prepared.edit.touchedIds.join('\0');
     const now = this.now();
-    const coalesce = !!this.burst && this.burst.selectionKey === selectionKey && now < this.burst.expiresAt;
-    const origins =
-      coalesce && this.burst
-        ? this.burst.origins
-        : (prepared.edit.inverse as Extract<CanvasProjectMutation, { type: 'setCanvasLayerPositions' }>).updates;
-    const label = 'Nudge layer';
+    // Coalesce only into the step this burst recorded: any interleaved entry starts a fresh one.
+    const burst = this.burst;
+    const coalesce =
+      burst !== null &&
+      burst.token === ctx.historyTop() &&
+      burst.selectionKey === selectionKey &&
+      now < burst.expiresAt;
+    const origins = coalesce
+      ? burst.origins
+      : (prepared.edit.inverse as Extract<CanvasProjectMutation, { type: 'setCanvasLayerPositions' }>).updates;
     const forward = prepared.edit.forward;
     const inverse = positionMutation(origins);
-    const applied = this.apply(label, forward, inverse, (next) =>
-      checkEditPostconditions(next, prepared.edit.postconditions)
+    const result = this.publish(
+      'Nudge layer',
+      this.step(forward, inverse, (next) => checkEditPostconditions(next, prepared.edit.postconditions)),
+      forward,
+      inverse,
+      undefined,
+      coalesce ? burst.token : undefined
     );
-    if (applied.status !== 'committed') {
-      this.burst = null;
-      return applied;
-    }
-    const entry = this.entry(label, forward, inverse);
-    if (coalesce) {
-      ctx.history.amendLast(entry);
-    } else {
-      ctx.history.push(entry);
-    }
-    this.burst = { expiresAt: now + NUDGE_COALESCE_MS, origins, selectionKey };
-    return applied;
+    this.burst =
+      'token' in result ? { expiresAt: now + NUDGE_COALESCE_MS, origins, selectionKey, token: result.token } : null;
+    return publicResult(result);
   }
 
   dispose(): void {
     this.disposed = true;
-    this.endBurst();
-    this.discardPendingPreview();
+    this.burst = null;
+    this.endPreview();
   }
 
-  private refuse(options: StructuralCommitOptions): StructuralCommitResult | null {
+  private endPreview(): void {
+    this.preview?.drop();
+    this.preview = null;
+  }
+
+  private staleRevision(expectedRevision: number | undefined): StructuralCommitResult | null {
+    const actualRevision = this.deps.ctx.getEditRevision();
+    return expectedRevision !== undefined && expectedRevision !== actualRevision
+      ? { actualRevision, expectedRevision, status: 'stale' }
+      : null;
+  }
+
+  /** A step that dispatches `forward`, verifies it, and dispatches `inverse` back when verification fails. */
+  private step(
+    forward: CanvasProjectMutation,
+    inverse: CanvasProjectMutation,
+    verify?: (document: CanvasDocumentContractV3) => boolean
+  ): EditStep {
     const { ctx } = this.deps;
+    const before = ctx.getReducerDocument();
+    return {
+      accepted: (document) => document !== null && document !== before && (verify?.(document) ?? true),
+      mutation: forward,
+      rollback: { mutation: inverse, restored: () => true },
+    };
+  }
+
+  private publish(
+    label: string,
+    step: EditStep,
+    forward: CanvasProjectMutation,
+    inverse: CanvasProjectMutation,
+    origin?: CanvasMutationOrigin,
+    replacing?: HistoryEntryToken
+  ): RecordedResult {
     if (this.disposed) {
       return { status: 'not-ready' };
     }
-    if (!ctx.capturePermit()) {
-      return { status: 'busy' };
+    const txn = this.deps.ctx.begin({ historyBytes: HISTORY_ENTRY_OVERHEAD_BYTES });
+    if (!('publish' in txn)) {
+      return { status: txn.status };
+    }
+    try {
+      const entry = createDocumentPatchEntry({
+        dispatch: (action) => this.replay(label, action, action === forward ? inverse : forward),
+        forward,
+        inverse,
+        label,
+      });
+      const published = txn.publish(label, step, entry, { origin, replacing, routed: forward });
+      return published.status === 'committed' ? { status: 'committed', token: published.token } : published;
+    } finally {
+      txn.end();
+    }
+  }
+
+  private applyUnrecorded(step: EditStep): StructuralCommitResult {
+    const { ctx } = this.deps;
+    if (this.disposed || !ctx.canEdit()) {
+      return { status: this.disposed ? 'not-ready' : 'busy' };
     }
     if (ctx.isGestureActive()) {
       return { status: 'gesture-active' };
     }
-    if (!ctx.getReducerDocument()) {
-      return { status: 'not-ready' };
-    }
-    const actualRevision = ctx.getEditRevision();
-    if (options.expectedRevision !== undefined && options.expectedRevision !== actualRevision) {
-      return { actualRevision, expectedRevision: options.expectedRevision, status: 'stale' };
-    }
-    return null;
-  }
-
-  /** Dispatches `forward` once through the guarded context; a verified failure applies `inverse`. */
-  private apply(
-    label: string,
-    forward: CanvasProjectMutation,
-    inverse: CanvasProjectMutation,
-    verify: (document: CanvasDocumentContractV3) => boolean = () => true,
-    origin?: CanvasMutationOrigin
-  ): StructuralCommitResult {
-    const { ctx } = this.deps;
-    const before = ctx.getReducerDocument();
-    const isMirrored = (): boolean => ctx.getDocument() === ctx.getReducerDocument();
-    const isApplied = (): boolean => {
-      const document = ctx.getReducerDocument();
-      return document !== null && document !== before && verify(document);
-    };
     try {
-      ctx.dispatchPrepared(forward, isApplied, isMirrored, origin);
+      ctx.applyStep(step);
       return { status: 'committed' };
     } catch (error) {
-      const after = ctx.getReducerDocument();
-      if (after === before) {
-        return { status: 'dispatch-rejected' };
+      if (!(error instanceof EditStepError)) {
+        throw error;
       }
-      let recoveryError: unknown = error;
-      try {
-        ctx.dispatchPrepared(inverse, () => ctx.getReducerDocument() !== after, isMirrored, 'system');
-      } catch (inverseError) {
-        recoveryError = inverseError;
-      }
-      const recovered =
-        ctx.getReducerDocument() === after ? 'unreverted' : isMirrored() ? 'reverted' : 'reverted-unmirrored';
-      if (recovered === 'unreverted') {
-        this.deps.report?.('Structural edit could not be reverted', label, recoveryError);
-      } else if (recovered === 'reverted-unmirrored') {
-        this.deps.report?.('Structural edit could not be mirrored', label, recoveryError);
-      }
-      return { recovered, status: 'postcondition-failed' };
+      return error.outcome === 'rejected'
+        ? { status: 'dispatch-rejected' }
+        : { recovered: error.outcome, status: 'postcondition-failed' };
     }
-  }
-
-  private entry(label: string, forward: CanvasProjectMutation, inverse: CanvasProjectMutation) {
-    return createDocumentPatchEntry({
-      dispatch: (action) => this.replay(label, action, forward, inverse),
-      forward,
-      inverse,
-      label,
-      replayFailureAtomic: true,
-    });
   }
 
   /**
-   * A reducer that refuses a replay (its target changed since) is expected: the entry moves as a
-   * no-op and the refusal is reported. A mirror that cannot follow an accepted replay is not: the
-   * opposite action restores the reducer and the failure surfaces.
+   * A reducer that refuses a replay (its target changed since) is expected: the entry moves as a no-op and the
+   * refusal is reported. A mirror that cannot follow an accepted replay is not: the opposite action restores the
+   * reducer and the step stays where it was.
    */
-  private replay(
-    label: string,
-    action: CanvasProjectMutation,
-    forward: CanvasProjectMutation,
-    inverse: CanvasProjectMutation
-  ): void {
-    const { ctx } = this.deps;
-    const before = ctx.getReducerDocument();
+  private replay(label: string, action: CanvasProjectMutation, opposite: CanvasProjectMutation): void {
     try {
-      ctx.dispatchPrepared(
-        action,
-        () => ctx.getReducerDocument() !== before,
-        () => ctx.getDocument() === ctx.getReducerDocument()
-      );
+      this.deps.ctx.applyStep({ mutation: action, rollback: { mutation: opposite, restored: () => true } });
     } catch (error) {
-      if (ctx.getReducerDocument() === before) {
+      if (error instanceof EditStepError && error.outcome === 'rejected') {
         this.deps.report?.('Structural history replay was refused', label, error);
         return;
       }
       this.deps.report?.('Structural history replay could not be mirrored', label, error);
-      ctx.dispatch(action === forward ? inverse : forward, 'system');
       throw error;
     }
   }

@@ -48,6 +48,7 @@ export interface RenderControllerOptions extends RenderSchedulerDeps {
     onPointerLeave: (event: PointerEvent) => void;
     onKeyDown: (event: KeyboardEvent) => void;
     onKeyUp: (event: KeyboardEvent) => void;
+    onFocusIn: (event: FocusEvent) => void;
     onWheel: (event: WheelEvent) => void;
     reset(): void;
   };
@@ -68,6 +69,7 @@ export class RenderController {
   private screen: RasterSurface | null = null;
   private overlay: RasterSurface | null = null;
   private input: HTMLCanvasElement | null = null;
+  private keyboardRoot: HTMLElement | null = null;
   private disposed = false;
 
   constructor(private readonly options: RenderControllerOptions) {
@@ -86,7 +88,11 @@ export class RenderController {
     return this.input;
   }
 
-  attach(screenCanvas: HTMLCanvasElement, overlayCanvas: HTMLCanvasElement): void {
+  getKeyboardRoot(): HTMLElement | null {
+    return this.keyboardRoot;
+  }
+
+  attach(screenCanvas: HTMLCanvasElement, overlayCanvas: HTMLCanvasElement, keyboardRoot?: HTMLElement): void {
     if (this.disposed || this.options.isEngineDisposed()) {
       return;
     }
@@ -96,6 +102,7 @@ export class RenderController {
     this.screen = wrapCanvasSurface(screenCanvas);
     this.overlay = wrapCanvasSurface(overlayCanvas);
     this.input = overlayCanvas;
+    this.keyboardRoot = keyboardRoot ?? overlayCanvas;
     const handlers = this.options.getInputHandlers();
     this.input.addEventListener('pointerdown', handlers.onPointerDown);
     this.input.addEventListener('pointermove', handlers.onPointerMove);
@@ -107,6 +114,7 @@ export class RenderController {
     if (typeof globalThis.addEventListener === 'function') {
       globalThis.addEventListener('keydown', handlers.onKeyDown);
       globalThis.addEventListener('keyup', handlers.onKeyUp);
+      globalThis.addEventListener('focusin', handlers.onFocusIn);
       globalThis.addEventListener('pagehide', this.options.onPageHide);
       globalThis.addEventListener('blur', this.options.onWindowBlur);
     }
@@ -135,6 +143,7 @@ export class RenderController {
     if (typeof globalThis.removeEventListener === 'function') {
       globalThis.removeEventListener('keydown', handlers.onKeyDown);
       globalThis.removeEventListener('keyup', handlers.onKeyUp);
+      globalThis.removeEventListener('focusin', handlers.onFocusIn);
       globalThis.removeEventListener('pagehide', this.options.onPageHide);
       globalThis.removeEventListener('blur', this.options.onWindowBlur);
     }
@@ -148,6 +157,7 @@ export class RenderController {
     this.screen = null;
     this.overlay = null;
     this.input = null;
+    this.keyboardRoot = null;
     this.options.updateAnimation();
   }
 

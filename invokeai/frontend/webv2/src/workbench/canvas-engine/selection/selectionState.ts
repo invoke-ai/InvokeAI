@@ -242,19 +242,15 @@ export const createSelectionState = (deps: SelectionStateDeps): SelectionState =
       return;
     }
 
-    const copiedData = new Uint8ClampedArray(source.data);
-    const copied = createImageData(copiedData, source.width, source.height);
     // Prepare every fallible replacement artifact before publishing any state.
-    // If allocation, pixel upload, or Path2D construction fails, the exact prior
+    // If allocation, the blit, or Path2D construction fails, the exact prior
     // selection remains authoritative and the engine may safely report failure.
     const nextMask = backend.createSurface(rect.width, rect.height);
-    nextMask.ctx.putImageData(copied, 0, 0);
+    nextMask.ctx.drawImage(next.surface.canvas, 0, 0);
     // Trace the mask's true edge for the ants; a mask whose alpha never reaches
     // the solid threshold still selected something (hasAlpha above), so fall
     // back to tracing any non-zero coverage rather than showing no outline.
-    const alphaSource = { data: copiedData, height: source.height, width: source.width };
-    const outline =
-      traceMaskOutlinePath(alphaSource, rect) || traceMaskOutlinePath(alphaSource, rect, 1) || rectPathData(rect);
+    const outline = traceMaskOutlinePath(source, rect) || traceMaskOutlinePath(source, rect, 1) || rectPathData(rect);
     const nextPath = createPath2D(outline);
 
     mask = nextMask;

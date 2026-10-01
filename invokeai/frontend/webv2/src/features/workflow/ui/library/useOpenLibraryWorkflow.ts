@@ -1,5 +1,5 @@
 import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
-import type { WorkflowLibraryListItem } from '@features/workflow/queries';
+import type { LibraryOpenItem } from '@features/workflow/ui/workflowUiStore';
 
 import { updateLoadedWorkflowNodes } from '@features/workflow/data/templates';
 import { getLibraryWorkflowRecordCached, touchLibraryWorkflowOpenedAt } from '@features/workflow/queries';
@@ -19,23 +19,21 @@ import { useTranslation } from 'react-i18next';
 import { findProjectCopiesOf } from './projectWorkflowEntries';
 
 /**
- * Opening a template always lands in the project's own collection: as a new copy, or by resuming the copy the
- * project already made from it. Overlapping opens are dropped; a queued second load would add a second copy.
+ * Opening a template always lands in the project's own collection. The first copy is added directly; once the
+ * project holds one, the caller asks whether to open a copy, add another, or replace one with the library version.
+ * Overlapping loads are dropped; a queued second load would add a second copy.
  */
 
 export type WorkflowLoadPhase = 'applying' | 'fetching' | 'idle';
 
 export type OpenLibraryWorkflowMode =
-  /** Resume the one existing copy, or add the first; several copies need a choice the caller makes. */
-  | 'resume-or-add'
-  /** Always add a fresh, independent copy beside any existing ones. */
+  /** The project's first copy; it may take over the untouched blank a fresh project starts with. */
+  | 'first-copy'
+  /** Another, independent copy beside the existing ones. */
   | 'add-copy';
 
-/** What opening a template would do given the project's current copies. */
-export type LibraryWorkflowOpenPlan =
-  | { kind: 'add' }
-  | { kind: 'resume'; workflowId: string }
-  | { kind: 'choose'; copies: readonly ProjectWorkflowEntry[] };
+/** What opening a template involves given the project's current copies. */
+export type LibraryWorkflowOpenPlan = { kind: 'add' } | { kind: 'choose'; copies: readonly ProjectWorkflowEntry[] };
 
 export const planLibraryWorkflowOpen = (
   workflows: readonly ProjectWorkflowEntry[],
@@ -43,29 +41,25 @@ export const planLibraryWorkflowOpen = (
 ): LibraryWorkflowOpenPlan => {
   const copies = findProjectCopiesOf(workflows, libraryWorkflowId);
 
-  if (copies.length === 0) {
-    return { kind: 'add' };
-  }
-
-  if (copies.length === 1) {
-    return { kind: 'resume', workflowId: copies[0]!.document.id };
-  }
-
-  return { copies, kind: 'choose' };
+  return copies.length === 0 ? { kind: 'add' } : { copies, kind: 'choose' };
 };
 
 export interface OpenLibraryWorkflow {
-  /** Fetches the template and adds a copy, or resumes the existing one; resolves once the project has it. */
-  open: (item: Pick<WorkflowLibraryListItem, 'name' | 'workflow_id'>, mode: OpenLibraryWorkflowMode) => Promise<void>;
+  /** Fetches the template and adds a copy; resolves once the project has it. */
+  open: (item: LibraryOpenItem, mode: OpenLibraryWorkflowMode) => Promise<void>;
+  /** Fetches the template and puts it in place of an existing copy, as one undo step. */
+  replace: (item: LibraryOpenItem, workflowId: string) => Promise<void>;
   /** Activates a copy the project already owns. */
   resume: (workflowId: string) => void;
   /** Drives the caller's busy overlay; `applying` is the expensive half. */
   loadPhase: WorkflowLoadPhase;
 }
 
+type LibraryLoadTarget = { kind: 'add'; mode: OpenLibraryWorkflowMode } | { kind: 'replace'; workflowId: string };
+
 export const useOpenLibraryWorkflow = (onOpened: () => void): OpenLibraryWorkflow => {
   const { t } = useTranslation();
-  const { addWorkflow, selectWorkflow } = useProjectGraphCommands();
+  const { addWorkflow, replaceWorkflow, selectWorkflow } = useProjectGraphCommands();
   const { project } = useWorkflowUi();
   const notify = useWorkflowNotifications();
   const [loadPhase, setLoadPhase] = useState<WorkflowLoadPhase>('idle');
@@ -79,26 +73,12 @@ export const useOpenLibraryWorkflow = (onOpened: () => void): OpenLibraryWorkflo
     [onOpened, selectWorkflow]
   );
 
-  const open = useCallback(
-    async (item: Pick<WorkflowLibraryListItem, 'name' | 'workflow_id'>, mode: OpenLibraryWorkflowMode) => {
+  const load = useCallback(
+    async (item: LibraryOpenItem, target: LibraryLoadTarget) => {
       const owner = captureAccountScope();
 
       if (isInFlightRef.current) {
         return;
-      }
-
-      if (mode === 'resume-or-add') {
-        const plan = planLibraryWorkflowOpen(project.getSnapshot().workflows, item.workflow_id);
-
-        if (plan.kind === 'resume') {
-          resume(plan.workflowId);
-          return;
-        }
-
-        if (plan.kind === 'choose') {
-          // Several copies exist; the surface offering the open owns the choice.
-          return;
-        }
       }
 
       isInFlightRef.current = true;
@@ -133,13 +113,22 @@ export const useOpenLibraryWorkflow = (onOpened: () => void): OpenLibraryWorkflo
           return;
         }
 
-        addWorkflow(document, {
-          label: t('workflowLibrary.loadedLabel', { name: item.name }),
-          // The first copy may take over the blank a fresh project starts with; another copy never does.
-          reusePlaceholder: mode === 'resume-or-add',
-          source: { libraryWorkflowId: record.workflow_id, revision: record.revision },
-        });
-        requestWorkflowFitView(document.nodes);
+        const source = { libraryWorkflowId: record.workflow_id, revision: record.revision };
+
+        if (target.kind === 'replace') {
+          replaceWorkflow({ projectId, workflowId: target.workflowId }, document, {
+            label: t('workflowLibrary.replacedLabel', { name: item.name }),
+            source,
+          });
+          // The copy keeps its id, so its editor stays mounted and fits the new graph on request.
+          requestWorkflowFitView({ projectId, workflowId: target.workflowId }, document.nodes);
+        } else {
+          addWorkflow(document, {
+            label: t('workflowLibrary.loadedLabel', { name: item.name }),
+            reusePlaceholder: target.mode === 'first-copy',
+            source,
+          });
+        }
 
         for (const warning of warnings) {
           notify.info(t('workflowLibrary.loadWarning'), warning);
@@ -165,8 +154,16 @@ export const useOpenLibraryWorkflow = (onOpened: () => void): OpenLibraryWorkflo
         }
       }
     },
-    [addWorkflow, notify, onOpened, project, resume, t]
+    [addWorkflow, notify, onOpened, project, replaceWorkflow, t]
+  );
+  const open = useCallback(
+    (item: LibraryOpenItem, mode: OpenLibraryWorkflowMode) => load(item, { kind: 'add', mode }),
+    [load]
+  );
+  const replace = useCallback(
+    (item: LibraryOpenItem, workflowId: string) => load(item, { kind: 'replace', workflowId }),
+    [load]
   );
 
-  return { loadPhase, open, resume };
+  return { loadPhase, open, replace, resume };
 };

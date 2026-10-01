@@ -5,7 +5,9 @@ import { HStack } from '@chakra-ui/react';
 import { Button, IconButton } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { isLeafPixelEditEligible, lookupDocumentLeaf } from '@workbench/canvas-engine/api';
+import { useNotify } from '@workbench/useNotify';
 import { useCanvasHasSelection } from '@workbench/widgets/canvas/engineStoreHooks';
+import { reportLayerOperation } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { SquareIcon, SquareMinusIcon, SquarePlusIcon, SquaresIntersectIcon } from 'lucide-react';
 import { useCallback } from 'react';
@@ -113,6 +115,7 @@ const SelectionAction = ({
  */
 export const SelectionActions = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
+  const notify = useNotify();
   const hasSelection = useCanvasHasSelection(engine);
   const canPaintTarget = useActiveProjectSelector((project) => {
     const { document } = project.canvas;
@@ -123,7 +126,12 @@ export const SelectionActions = ({ engine }: ToolFormProps) => {
   const onErase = useCallback(() => engine.selection.eraseSelection(), [engine]);
   const onInvert = useCallback(() => engine.selection.invertSelection(), [engine]);
   const onDeselect = useCallback(() => engine.selection.deselect(), [engine]);
-  const onLiftToLayer = useCallback(() => engine.selection.liftSelectionToLayer(), [engine]);
+  const onLiftToLayer = useCallback(() => {
+    const result = engine.selection.liftSelectionToLayer();
+    if (result.status !== 'created' && result.status !== 'empty') {
+      reportLayerOperation(result.status, notify.error, t);
+    }
+  }, [engine, notify, t]);
   const needsSelection = hasSelection ? null : t('widgets.canvas.toolOptions.selectionNeedsSelection');
   const needsPaintTarget =
     needsSelection ?? (canPaintTarget ? null : t('widgets.canvas.toolOptions.selectionNeedsPaintLayer'));

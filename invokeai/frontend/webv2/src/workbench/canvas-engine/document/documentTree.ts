@@ -115,57 +115,6 @@ export const replaceChildren = (
   return roots === stacks[stack] ? stacks : { ...stacks, [stack]: [...roots] };
 };
 
-/**
- * Rewrites named nodes with structural sharing along changed paths. Returns the same forests if unchanged;
- * `changed` records replaced nodes by id.
- */
-export const updateNodesTracked = (
-  stacks: CanvasStackForests,
-  updates: ReadonlyMap<string, (node: CanvasNodeContract) => CanvasNodeContract>
-): { stacks: CanvasStackForests; changed: Map<string, CanvasNodeContract> } => {
-  const changed = new Map<string, CanvasNodeContract>();
-  if (updates.size === 0) {
-    return { changed, stacks };
-  }
-  const visit = (nodes: readonly CanvasNodeContract[]): readonly CanvasNodeContract[] => {
-    let rebuilt = false;
-    const next = nodes.map((node) => {
-      let current = node;
-      if (isGroupNode(current)) {
-        const children = visit(current.children);
-        if (children !== current.children) {
-          current = { ...current, children: [...children] };
-        }
-      }
-      const update = updates.get(current.id);
-      if (update) {
-        const updated = update(current);
-        if (updated !== current) {
-          changed.set(updated.id, updated);
-          current = updated;
-        }
-      }
-      rebuilt ||= current !== node;
-      return current;
-    });
-    return rebuilt ? next : nodes;
-  };
-  let result = stacks;
-  for (const stack of Object.keys(stacks) as CanvasLayerStackKind[]) {
-    const roots = visit(stacks[stack]);
-    if (roots !== stacks[stack]) {
-      result = result === stacks ? { ...stacks } : result;
-      result[stack] = [...roots];
-    }
-  }
-  return { changed, stacks: result };
-};
-
-export const updateNodes = (
-  stacks: CanvasStackForests,
-  updates: ReadonlyMap<string, (node: CanvasNodeContract) => CanvasNodeContract>
-): CanvasStackForests => updateNodesTracked(stacks, updates).stacks;
-
 /** Removes the subtrees rooted at `ids`, sharing every untouched node. */
 export const removeNodes = (stacks: CanvasStackForests, ids: ReadonlySet<string>): CanvasStackForests => {
   if (ids.size === 0) {

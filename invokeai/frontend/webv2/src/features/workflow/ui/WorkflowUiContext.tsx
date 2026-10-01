@@ -1,3 +1,4 @@
+import type { GalleryItemRef } from '@features/gallery/contracts';
 import type { ForLoopValidationReason } from '@features/workflow/core/forLoops';
 import type { ProjectGraphState, ProjectWorkflowEntry, ProjectWorkflowSource } from '@features/workflow/core/types';
 import type { WorkbenchThemeId } from '@theme/themes';
@@ -19,6 +20,7 @@ export interface WorkflowPreferences {
   themeId: WorkbenchThemeId;
   workflowEdgeStyle: 'curved' | 'square';
   workflowEdgesBehindNodes: boolean;
+  workflowGroupNodesByCategory: boolean;
   workflowShowMinimap: boolean;
   workflowSnapToGrid: boolean;
   workflowValidateConnections: boolean;
@@ -86,6 +88,8 @@ export interface WorkflowUiAdapter {
     measure(name: string, start: string, source: WorkflowPerfSource, end?: string): void;
     time<T>(name: string, source: WorkflowPerfSource, callback: () => T): T;
   };
+  /** Raises the gallery and selects the item, as the other media fields' find buttons do. */
+  findInGallery(ref: GalleryItemRef): void;
   /** Leaves the editor for the model manager's Add Models section, searching for `query`. */
   openAddModels(query: string): void;
   registerModalHotkeyLayer(id: string): () => void;

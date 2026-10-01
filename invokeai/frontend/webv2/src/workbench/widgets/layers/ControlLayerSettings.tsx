@@ -30,13 +30,14 @@ import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Button, Field, Select, Slider } from '@platform/ui';
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/api';
 import { getCanvasOperations, resolveDefaultFilterForModel } from '@workbench/canvas-operations/api';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
+import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { getCompatibleControlModels } from './controlModelOptions';
 import { LayerFilterOperationButton } from './LayerFilterOperationButton';
-import { applyStructuralPreview, CONTROL_ADAPTER_DEFAULTS, CONTROL_WEIGHT_BOUNDS } from './layerOps';
+import { CONTROL_ADAPTER_DEFAULTS, CONTROL_WEIGHT_BOUNDS } from './layerOps';
 import { runLayerFilterOperation } from './layerPropertiesOperation';
 import { useSelectedMainModel } from './useSelectedMainModel';
 
@@ -89,7 +90,7 @@ const contributingControlLayers = (
 
 export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
-  const commitPrepared = usePreparedCommit(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const models = useModelsSelector((snapshot) => snapshot.models);
   const mainModel = useSelectedMainModel();
   const base = mainModel?.base ?? null;
@@ -221,7 +222,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         return;
       }
       if (
-        !applyStructuralPreview(engine, {
+        !previewStructural({
           config: { adapter: { weight: next }, layerType: 'control' },
           id: layer.id,
           type: 'updateCanvasLayerConfig',
@@ -233,7 +234,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         weightBeforeRef.current = adapter.weight;
       }
     },
-    [adapter.weight, engine, layer.id]
+    [adapter.weight, previewStructural, layer.id]
   );
   const handleWeightChangeEnd = useCallback(
     ({ value }: SliderValueChangeDetails) => {
@@ -268,7 +269,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         return;
       }
       if (
-        !applyStructuralPreview(engine, {
+        !previewStructural({
           config: { adapter: { beginEndStepPct: [value[0]!, value[1]!] }, layerType: 'control' },
           id: layer.id,
           type: 'updateCanvasLayerConfig',
@@ -280,7 +281,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         rangeBeforeRef.current = adapter.beginEndStepPct;
       }
     },
-    [adapter.beginEndStepPct, engine, layer.id]
+    [adapter.beginEndStepPct, previewStructural, layer.id]
   );
   const handleRangeChangeEnd = useCallback(
     ({ value }: SliderValueChangeDetails) => {
@@ -334,18 +335,22 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
 
   const selectedModelName = modelOptions.find((model) => model.key === adapter.model)?.name;
   const adapterModel = models.find((model) => model.key === adapter.model) ?? null;
-  const hasContent = engine?.exports.hasExportableLayerContent(layer.id) ?? false;
-  const controlLoraIndex =
+  const hasContent = useCanvasEngineRead(engine, () => engine?.exports.hasExportableLayerContent(layer.id) ?? false);
+  const controlLoraIndex = useCanvasEngineRead(engine, () =>
     adapter.kind === 'control_lora' && engine
       ? contributingControlLayers(engine, 'control_lora').findIndex((candidate) => candidate.id === layer.id)
-      : 0;
-  const zImageControlIndex =
+      : 0
+  );
+  const zImageControlIndex = useCanvasEngineRead(engine, () =>
     adapter.kind === 'z_image_control' && engine
       ? contributingControlLayers(engine, 'z_image_control').findIndex((candidate) => candidate.id === layer.id)
-      : 0;
-  const contributing = engine
-    ? (lookupDocumentLeaf(engine.document.model()?.document, layer.id)?.contributionEnabled ?? false)
-    : layer.isEnabled;
+      : 0
+  );
+  const contributing = useCanvasEngineRead(engine, () =>
+    engine
+      ? (lookupDocumentLeaf(engine.document.model()?.document, layer.id)?.contributionEnabled ?? false)
+      : layer.isEnabled
+  );
   // Same reason as `kindOptions`: validation asks the capability table whether the kind is supported.
   const validationReason = useExternalStoreSelector(
     subscribeArchitectureCapabilities,

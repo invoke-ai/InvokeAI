@@ -8,7 +8,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, cloneElement, startTransition, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import { server, userEvent } from 'vitest/browser';
 
 import { WorkflowFieldInput, type WorkflowFieldInputProps } from './WorkflowFieldInput';
@@ -28,6 +28,7 @@ const resolveItemMock = vi.fn();
 const pickerState = vi.hoisted(() => ({ accept: null as readonly string[] | null }));
 const workflowApiMock = vi.hoisted(() => ({ apiFetch: vi.fn(), apiFetchJson: vi.fn() }));
 const workflowCommandsMock = vi.hoisted(() => ({ editGraph: vi.fn() }));
+const findInGalleryMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@platform/transport/http', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -118,7 +119,11 @@ const projectSnapshot = {
 
 vi.mock('@features/workflow/ui/WorkflowUiContext', () => ({
   useWorkflowProjectSelector: (selector: (project: typeof projectSnapshot) => unknown) => selector(projectSnapshot),
-  useWorkflowUi: () => ({ commands: workflowCommandsMock, project: { getSnapshot: () => projectSnapshot } }),
+  useWorkflowUi: () => ({
+    commands: workflowCommandsMock,
+    findInGallery: findInGalleryMock,
+    project: { getSnapshot: () => projectSnapshot },
+  }),
 }));
 
 const TEXTAREA_TEMPLATE = {
@@ -593,6 +598,12 @@ describe('WorkflowFieldInput media inputs', () => {
       { image_name: SELECTED_GALLERY_VIDEO.name },
     ]);
 
+    // Each tile reveals its own image in the gallery.
+    const findButtons = [...host.querySelectorAll<HTMLButtonElement>('button[aria-label*="InGallery"]')];
+    expect(findButtons).toHaveLength(2);
+    await act(() => findButtons[1]!.click());
+    expect(findInGalleryMock).toHaveBeenLastCalledWith({ kind: 'image', name: 'b.png' });
+
     await act(() => host.querySelector<HTMLButtonElement>('button[aria-label="Remove a.png"]')!.click());
     expect(onChange).toHaveBeenLastCalledWith([{ image_name: 'b.png' }]);
 
@@ -808,6 +819,19 @@ describe('WorkflowFieldInput media inputs', () => {
     expect(resolveItemMock).not.toHaveBeenCalled();
   });
 
+  it('reveals the chosen image in the gallery from the field', async () => {
+    const imageTemplate = {
+      name: 'image',
+      title: 'Image',
+      type: { name: 'ImageField' },
+    } as unknown as FieldInputTemplate;
+
+    await renderField(imageTemplate, { image_name: 'chosen.png' }, vi.fn());
+    await act(() => host.querySelector<HTMLButtonElement>('button[aria-label*="InGallery"]')!.click());
+
+    expect(findInGalleryMock).toHaveBeenLastCalledWith({ kind: 'image', name: 'chosen.png' });
+  });
+
   it('keeps the image field on the image upload path', async () => {
     uploadImageMock.mockResolvedValue({ imageName: 'uploaded.png' });
     const onChange = vi.fn();
@@ -820,6 +844,8 @@ describe('WorkflowFieldInput media inputs', () => {
     await renderField(imageTemplate, undefined, onChange);
 
     expect(host.querySelector<HTMLInputElement>('input[type="file"]')?.accept).toBe('image/*');
+    // Nothing to reveal until the field holds an image.
+    expect(host.querySelector('button[aria-label*="InGallery"]')).toBeNull();
     await act(() => findButton('Upload').click());
 
     const fileInput = host.querySelector<HTMLInputElement>('input[type="file"]')!;
@@ -1675,6 +1701,16 @@ describe('WorkflowFieldInput text and number entry', () => {
       await keys('{ArrowUp}');
       expect(integer.input.value).toBe('4');
       expect(integer.onCommit).toHaveBeenLastCalledWith(4);
+
+      // A float without a declared step moves by tenths, and a typed value off that step stays valid.
+      const float = await renderStateful(FLOAT, 0.5);
+
+      await keys('{ArrowUp}');
+      expect(float.input.value).toBe('0.6');
+      expect(float.onCommit).toHaveBeenLastCalledWith(0.6);
+      await keys('{Control>}a{/Control}0.15');
+      expect(float.onCommit).toHaveBeenLastCalledWith(0.15);
+      expect(isInvalid(float.input)).toBe(false);
     });
 
     it('pastes a number at the caret and over a selection', async () => {
@@ -2054,6 +2090,11 @@ describe('WorkflowFieldInput record pickers', () => {
 });
 
 describe('WorkflowFieldInput generators', () => {
+  // The generator editor is a lazy chunk; load it up front so the first test is not timing a cold transform.
+  beforeAll(async () => {
+    await import('./GeneratorFieldInput');
+  });
+
   const FLOAT_GENERATOR = fullTemplate('FloatField', {
     default: { count: 10, start: 0, step: 0.1, type: 'float_generator_arithmetic_sequence' },
     input: 'direct',

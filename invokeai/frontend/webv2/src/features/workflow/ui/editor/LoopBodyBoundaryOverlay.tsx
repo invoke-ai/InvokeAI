@@ -1,6 +1,7 @@
 import type { WorkflowEdge, WorkflowNode } from '@features/workflow/contracts';
 
 import { Box, Text } from '@chakra-ui/react';
+import { useIsWorkflowImageExport } from '@features/workflow/ui/nodeChrome';
 import { getForLoopBodyBoundaries, type LoopBodyBoundaryStatus } from '@features/workflow/utility';
 import { type ReactFlowState, useStore, ViewportPortal } from '@xyflow/react';
 import { memo, useCallback, useMemo } from 'react';
@@ -63,6 +64,7 @@ const areSameRects = (a: (BoundaryRect | null)[], b: (BoundaryRect | null)[]): b
   });
 
 export const LoopBodyBoundaryOverlay = ({ nodes, edges }: { nodes: WorkflowNode[]; edges: WorkflowEdge[] }) => {
+  const isWorkflowImageExport = useIsWorkflowImageExport();
   const { t } = useTranslation();
   const boundaries = useMemo(() => getForLoopBodyBoundaries(nodes, edges), [edges, nodes]);
   const selectBounds = useCallback(
@@ -80,10 +82,14 @@ export const LoopBodyBoundaryOverlay = ({ nodes, edges }: { nodes: WorkflowNode[
           return null;
         }
 
-        const colors = getStatusColor(boundary.status);
+        const colors = isWorkflowImageExport
+          ? { border: 'border.emphasized', text: 'fg.subtle' }
+          : getStatusColor(boundary.status);
         const bodyLabel = t('nodes.forLoopBodyBoundary');
         const statusLabel =
-          boundary.status === 'complete' ? '' : t(`nodes.forLoopBodyBoundaryStatus.${boundary.status}`);
+          isWorkflowImageExport || boundary.status === 'complete'
+            ? ''
+            : t(`nodes.forLoopBodyBoundaryStatus.${boundary.status}`);
         const label = statusLabel ? `${bodyLabel} - ${statusLabel}` : bodyLabel;
 
         return (
@@ -94,7 +100,7 @@ export const LoopBodyBoundaryOverlay = ({ nodes, edges }: { nodes: WorkflowNode[
             borderColor={colors.border}
             borderRadius="base"
             data-loop-body-boundary={boundary.forNodeId ?? boundary.returnNodeId}
-            data-loop-body-status={boundary.status}
+            data-loop-body-status={isWorkflowImageExport ? undefined : boundary.status}
             h={bounds.height + BOUNDARY_PADDING * 2}
             pointerEvents="none"
             position="absolute"

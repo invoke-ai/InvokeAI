@@ -1,9 +1,8 @@
 import type { CanvasLayerContract, CanvasMaskFillContract } from '@workbench/canvas-engine/api';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { getDocumentLayer } from '@workbench/canvas-engine/api';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
-import { applyStructuralPreview } from '@workbench/widgets/layers/layerOps';
+import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -48,7 +47,7 @@ const configFor = (layer: MaskLayer, fill: CanvasMaskFillContract) =>
  */
 export const useMaskTintEditor = (engine: MaskTintEngine | null): MaskTintEditor | null => {
   const { t } = useTranslation();
-  const commitPrepared = usePreparedCommit(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const armedLayerId = useMaskTintTargetLayerId();
   const layer = useActiveProjectSelector((project): MaskLayer | null => {
     if (!armedLayerId || project.canvas.document.selectedLayerId !== armedLayerId) {
@@ -105,7 +104,7 @@ export const useMaskTintEditor = (engine: MaskTintEngine | null): MaskTintEditor
         return;
       }
       if (
-        !applyStructuralPreview(engine, {
+        !previewStructural({
           config: configFor(layer, { ...layer.mask.fill, color: hex }),
           id: layer.id,
           type: 'updateCanvasLayerConfig',
@@ -119,7 +118,7 @@ export const useMaskTintEditor = (engine: MaskTintEngine | null): MaskTintEditor
         gestureRef.current.latestHex = hex;
       }
     },
-    [engine, layer]
+    [previewStructural, layer]
   );
   const commit = useCallback(
     (hex: string) => {

@@ -1,6 +1,19 @@
+import type { LayerExportGuard } from './capabilities';
 import type { CanvasStateContractV3 } from './contracts';
 import type { RasterSurface } from './render/raster';
 import type { Rect } from './types';
+
+/**
+ * Owned access to one layer's pixels. The source stays pinned (resident, untrimmed) until `release`, which is
+ * idempotent; `guard` tells whether the pixels still describe the live layer.
+ */
+export interface RasterReadLease {
+  readonly surface: RasterSurface;
+  /** Layer-local extent of `surface`. */
+  readonly rect: Rect;
+  readonly guard: LayerExportGuard;
+  release(): void;
+}
 
 export interface CanvasDetachedLayerSurface {
   readonly rect: Rect;
@@ -24,7 +37,6 @@ export interface CanvasCompositeExecutorDeps {
     createSurface(width: number, height: number): RasterSurface;
     encodeSurface(surface: RasterSurface, type?: string): Promise<Blob>;
   };
-  getLayerSurface(layerId: string): Promise<{ surface: RasterSurface; rect: Rect }>;
   reserve?(
     bytes: number
   ):

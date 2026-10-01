@@ -70,6 +70,7 @@ const createHarness = (doc: CanvasDocumentContractV3) => {
   const stores = createEngineStores();
   let idCounter = 0;
   const ctx: ToolContext = {
+    scheduleFrame: () => () => undefined,
     backend: null as never,
     commitStructural: (label, forward, inverse) => {
       commits.push({ forward, inverse, label });
@@ -79,7 +80,7 @@ const createHarness = (doc: CanvasDocumentContractV3) => {
     createLayerId: () => `grad-${++idCounter}`,
     createPath2D: (d) => ({ d }) as unknown as Path2D,
     dispatch: (action) => dispatched.push(action),
-    emitStrokeCommitted: vi.fn(),
+    beginStrokeEdit: () => null,
     getDocument: () => doc,
     invalidate: vi.fn(),
     layers: null as never,

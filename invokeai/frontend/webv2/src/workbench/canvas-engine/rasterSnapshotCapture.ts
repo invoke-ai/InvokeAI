@@ -30,13 +30,11 @@ const estimatedLayerBytes = (layer: CanvasLayerContract, document: CanvasDocumen
 };
 
 export interface CreateRasterSnapshotCaptureDeps {
-  readonly memory: RasterMemoryBudgetController;
-  /** Re-reads the live cache sizes into the budget before a reservation decision. */
-  readonly syncMemoryBaselines: () => void;
+  readonly memory: Pick<RasterMemoryBudgetController, 'pin' | 'reserve' | 'trackDetached'>;
   readonly createSurface: (width: number, height: number) => RasterSurface;
   readonly getCanvasState: () => CanvasStateContractV3 | null;
   readonly getDocumentGeneration: () => number;
-  readonly getContentEpoch: () => number;
+  readonly getDirectPixelEpoch: () => number;
   readonly getLifecycleGeneration: () => number;
   readonly isDisposed: () => boolean;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
@@ -44,8 +42,6 @@ export interface CreateRasterSnapshotCaptureDeps {
     layerId: string,
     options: { includeDisabled?: boolean; signal?: AbortSignal }
   ) => Promise<ExportLayerPixelsResult>;
-  /** Guards paint-cache trimming while snapshot capture reads live layer pixels. */
-  readonly pinForTrim?: (layerId: string, generation: number) => { release(): void };
 }
 
 export interface RasterSnapshotCapture {
@@ -71,12 +67,12 @@ export interface RasterSnapshotCapture {
  * revisions. Reserve estimated bytes upfront and top up larger actual surfaces before exceeding budget.
  */
 export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDeps): RasterSnapshotCapture => {
-  const { isGuardCurrent, memory, syncMemoryBaselines } = deps;
+  const { isGuardCurrent, memory } = deps;
 
   const activeSnapshots = new Set<CanvasRasterSnapshot>();
   const snapshotSources = new WeakMap<
     CanvasDocumentSnapshot,
-    { canvas: CanvasStateContractV3; contentEpoch: number; lifecycleGeneration: number }
+    { canvas: CanvasStateContractV3; directPixelEpoch: number; lifecycleGeneration: number }
   >();
 
   const isDocumentSnapshotCurrent = (snapshot: CanvasDocumentSnapshot): boolean => {
@@ -85,16 +81,14 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
       !deps.isDisposed() &&
       source !== undefined &&
       source.canvas === deps.getCanvasState() &&
-      source.contentEpoch === deps.getContentEpoch() &&
+      source.directPixelEpoch === deps.getDirectPixelEpoch() &&
       source.lifecycleGeneration === deps.getLifecycleGeneration() &&
       snapshot.documentGeneration === deps.getDocumentGeneration()
     );
   };
 
-  const reserveBytes = (bytes: number, generation: number): ReturnType<RasterMemoryBudgetController['reserve']> => {
-    syncMemoryBaselines();
-    return memory.reserve(bytes, { generation, purpose: 'background-snapshot' });
-  };
+  const reserveBytes = (bytes: number, generation: number): ReturnType<RasterMemoryBudgetController['reserve']> =>
+    memory.reserve(bytes, { generation, purpose: 'background-snapshot' });
 
   const captureRasterSnapshot = async (
     documentSnapshot: CanvasDocumentSnapshot,
@@ -129,8 +123,8 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
       return { status: 'over-budget' };
     }
     const reservationLeases: { release(): void }[] = [reservation.lease];
-    const pinLeases = uniqueLayerIds.map((layerId) => memory.pin(layerId, captureLifecycleGeneration));
-    const trimPinLeases = uniqueLayerIds.map((layerId) => deps.pinForTrim?.(layerId, captureLifecycleGeneration));
+    // Earlier layers stay resident while later ones rasterize, so the final guard check cannot fail spuriously.
+    const pinLeases = uniqueLayerIds.map((layerId) => memory.pin(layerId));
     const layerSurfaces = new Map<string, { rect: Rect; surface: RasterSurface }>();
     const emptyLayerIds = new Set<string>();
     const capturedGuards: LayerExportGuard[] = [];
@@ -203,7 +197,7 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
       for (const lease of reservationLeases) {
         lease.release();
       }
-      const detachedLease = memory.trackDetached(actualDetachedBytes, captureLifecycleGeneration);
+      const detachedLease = memory.trackDetached(actualDetachedBytes);
       let released = false;
       const snapshot: CanvasRasterSnapshot = {
         ...documentSnapshot,
@@ -229,9 +223,6 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
       for (const lease of pinLeases) {
         lease.release();
       }
-      for (const lease of trimPinLeases) {
-        lease?.release();
-      }
     }
   };
 
@@ -247,7 +238,7 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
       };
       snapshotSources.set(snapshot, {
         canvas,
-        contentEpoch: deps.getContentEpoch(),
+        directPixelEpoch: deps.getDirectPixelEpoch(),
         lifecycleGeneration: deps.getLifecycleGeneration(),
       });
       return snapshot;

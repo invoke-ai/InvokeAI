@@ -31,6 +31,9 @@ export interface FloatingSelection {
   transform: LayerTransform;
 }
 
+/** A lift took the pixels, was refused admission (and reported it), or found nothing it could lift. */
+export type FloatLiftResult = 'lifted' | 'refused' | 'unavailable';
+
 /** Inputs to {@link liftSelectedPixels}. */
 export interface LiftSelectedPixelsParams {
   backend: RasterBackend;
@@ -101,9 +104,19 @@ const projectIntoLocal = (
   return { rect: region, surface };
 };
 
+/** The layer-local region a lift takes: the selection's local extent clipped to the layer content, or null. */
+export const liftRegion = (cacheRect: Rect, layerMatrix: Mat2d, maskRect: Rect): Rect | null => {
+  const inverseLayerMatrix = invert(layerMatrix);
+  if (!inverseLayerMatrix || isEmpty(cacheRect) || isEmpty(maskRect)) {
+    return null;
+  }
+  const region = intersect(roundOut(transformBounds(inverseLayerMatrix, maskRect)), cacheRect);
+  return region && !isEmpty(region) ? region : null;
+};
+
 /**
- * Copies selected layer content and returns its exact local stencil, or null without overlap. Does not mutate
- * cache; callers cut with the same stencil.
+ * Copies selected layer content over {@link liftRegion} and returns its exact local stencil, or null without
+ * overlap. Does not mutate cache; callers cut with the same stencil.
  */
 export const liftSelectedPixels = ({
   backend,
@@ -111,14 +124,9 @@ export const liftSelectedPixels = ({
   layerMatrix,
   mask,
 }: LiftSelectedPixelsParams): LiftedPixels | null => {
+  const region = liftRegion(cache.rect, layerMatrix, mask.rect);
   const inverseLayerMatrix = invert(layerMatrix);
-  if (!inverseLayerMatrix || isEmpty(cache.rect) || isEmpty(mask.rect)) {
-    return null;
-  }
-  // The selection's extent in layer-local space, clipped to what the layer holds.
-  const maskLocalBounds = roundOut(transformBounds(inverseLayerMatrix, mask.rect));
-  const region = intersect(maskLocalBounds, cache.rect);
-  if (!region || isEmpty(region)) {
+  if (!region || !inverseLayerMatrix) {
     return null;
   }
 

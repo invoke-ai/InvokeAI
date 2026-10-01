@@ -15,14 +15,18 @@ import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities 
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Button, ColorPicker, Field, Select, Tooltip } from '@platform/ui';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
+import { useNotify } from '@workbench/useNotify';
 import { armMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
 import { type ColorSamplerEngine, useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
-import { type CanvasPreparedEngine, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import {
+  type CanvasPreparedEngine,
+  reportMaskEdit,
+  useStructuralPreview,
+} from '@workbench/widgets/canvas/useStructuralCommit';
 import { PaletteIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { applyStructuralPreview } from './layerOps';
 import { useSelectedModelBase } from './useSelectedModelBase';
 
 /** The regional-guidance fields patchable via `updateCanvasLayerConfig`. */
@@ -58,7 +62,7 @@ interface RegionalGuidanceSettingsProps {
  */
 export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSettingsProps) => {
   const { t } = useTranslation();
-  const commitPrepared = usePreparedCommit(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const sampleColor = useColorSampler(engine);
   const base = useSelectedModelBase();
   const showSyntaxHighlighting = useWorkbenchPreferenceSelector(
@@ -177,7 +181,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   const handleColorChange = useCallback(
     (hex: string) => {
       if (
-        !applyStructuralPreview(engine, {
+        !previewStructural({
           config: { layerType: 'regional_guidance', mask: { fill: { ...fill, color: hex } } },
           id: layer.id,
           type: 'updateCanvasLayerConfig',
@@ -189,7 +193,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
         fillBeforeRef.current = fill;
       }
     },
-    [engine, fill, layer.id]
+    [previewStructural, fill, layer.id]
   );
 
   const handleArmTint = useCallback(() => armMaskTintTarget(layer.id), [layer.id]);
@@ -212,9 +216,12 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
     [commitFill, fill]
   );
 
+  const notify = useNotify();
   const handleInvert = useCallback(() => {
-    engine?.layers.invertMask(layer.id);
-  }, [engine, layer.id]);
+    if (engine) {
+      reportMaskEdit(engine.layers.invertMask(layer.id), notify.error, t);
+    }
+  }, [engine, layer.id, notify, t]);
 
   const styleValue = useMemo(() => [fill.style], [fill.style]);
 

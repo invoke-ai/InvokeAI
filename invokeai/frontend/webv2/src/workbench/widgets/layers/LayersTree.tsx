@@ -1,8 +1,8 @@
 import type { CollisionDetection, DragEndEvent, DragMoveEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core';
 import type { CanvasDocumentContractV3, DocumentCommand, LayerStackKind } from '@workbench/canvas-engine/api';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { LayerPanelState, LayerSelectionModifiers } from '@workbench/layerPanelState';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { Dispatch, FocusEvent, KeyboardEvent, ReactNode } from 'react';
 
 import { Box, Text } from '@chakra-ui/react';
@@ -20,6 +20,7 @@ import {
   setLayerPanelFocus,
   toggleLayerStackCollapsed,
 } from '@workbench/layerPanelState';
+import { useCanvasOperation } from '@workbench/widgets/canvas/engineStoreHooks';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useEffectEvent, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { defaultRangeExtractor, useVirtualizer, type Range } from 'react-hook-tanstack-virtual';
@@ -175,6 +176,8 @@ export const LayersTree = ({
   const { t } = useTranslation();
   const commitPrepared = usePreparedCommit(engine);
   const propertiesRequest = useCurrentLayerPropertiesRequest();
+  const operation = useCanvasOperation(engine);
+  const operationLayerId = operation.status === 'active' ? operation.identity.layerId : null;
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [scrollTop, setScrollTop] = useState(0);
   const [surface, setSurface] = useState<LayerSurfaceRequest | null>(null);
@@ -687,13 +690,17 @@ export const LayersTree = ({
     }
   }, [primaryId, rowIndexByKey]);
 
-  // Reveal external Properties requests, scroll after render, and open once; discard requests for removed nodes.
+  // Reveal external Properties requests, scroll after render, and open once; discard requests for removed nodes
+  // and, while an operation runs, for any layer but its target: the operation's panel supersedes them.
   useLayoutEffect(() => {
     if (!propertiesRequest) {
       pendingProperties.current = null;
       return;
     }
-    if (!getDocumentNode(document, propertiesRequest.layerId)) {
+    if (
+      !getDocumentNode(document, propertiesRequest.layerId) ||
+      (operationLayerId !== null && operationLayerId !== propertiesRequest.layerId)
+    ) {
       clearLayerPropertiesRequest(propertiesRequest.token);
       pendingProperties.current = null;
       return;
@@ -712,7 +719,7 @@ export const LayersTree = ({
       pendingProperties.current = { ...pending, scrolled: true };
       virtualizerRef.current.scrollToIndex(index);
     }
-  }, [document, primaryId, projectId, propertiesRequest, rowIndexByKey]);
+  }, [document, operationLayerId, primaryId, projectId, propertiesRequest, rowIndexByKey]);
 
   useLayoutEffect(() => {
     const host = scrollRef.current;

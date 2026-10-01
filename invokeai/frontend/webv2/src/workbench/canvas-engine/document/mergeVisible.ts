@@ -6,12 +6,14 @@ import { isLayerEditable } from './layerEligibility';
 
 export type HasMergeVisibleContent = (layerId: string) => boolean;
 
+const isMergeVisibleRasterLeaf = (leaf: SemanticLeaf, hasContent: HasMergeVisibleContent): boolean =>
+  leaf.stack === 'raster' && leaf.contributionEnabled && hasContent(leaf.id);
+
 /** Contributing raster leaves with content, top first. */
 export const getMergeVisibleRasterLeaves = (
   leaves: readonly SemanticLeaf[],
   hasContent: HasMergeVisibleContent
-): SemanticLeaf[] =>
-  leaves.filter((leaf) => leaf.stack === 'raster' && leaf.contributionEnabled && hasContent(leaf.id));
+): SemanticLeaf[] => leaves.filter((leaf) => isMergeVisibleRasterLeaf(leaf, hasContent));
 
 /** Contributing raster layers with content, top first. */
 export const getMergeVisibleRasterLayers = (
@@ -19,9 +21,19 @@ export const getMergeVisibleRasterLayers = (
   hasContent: HasMergeVisibleContent
 ): CanvasLayerContract[] => getMergeVisibleRasterLeaves(leaves, hasContent).map((leaf) => leaf.layer);
 
-/** Whether the raster stack's merge-visible action has at least two contributors. */
-export const canMergeVisibleRasters = (leaves: readonly SemanticLeaf[], hasContent: HasMergeVisibleContent): boolean =>
-  getMergeVisibleRasterLayers(leaves, hasContent).length >= 2;
+/** Whether the raster stack's merge-visible action has at least two contributors; stops at the second. */
+export const canMergeVisibleRasters = (
+  leaves: readonly SemanticLeaf[],
+  hasContent: HasMergeVisibleContent
+): boolean => {
+  let found = 0;
+  for (const leaf of leaves) {
+    if (isMergeVisibleRasterLeaf(leaf, hasContent) && ++found === 2) {
+      return true;
+    }
+  }
+  return false;
+};
 
 /**
  * Destructive merge-selected may only collapse one uninterrupted run of raster siblings: leaves
