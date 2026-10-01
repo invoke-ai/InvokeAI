@@ -10,6 +10,7 @@ import EditorTour from './assets/workflow-editor-tour.svg';
 import compositorNodes from './assets/workflow-compositor-nodes.webp';
 import formView from './assets/workflow-form-view.webp';
 import formEdit from './assets/workflow-form-edit.webp';
+import compositorResult from './assets/workflow-compositor-result.webp';
 
 The Generate panel, the Canvas and the Video panel each cover a common job well. **Workflows** are for everything else. A workflow is a recipe of processing steps that you assemble yourself: generate an image, then upscale it, cut out its subject, place it on a background, run it through a second model, repeat it for a list of prompts, and so on. Once built, a workflow runs with one press of **Invoke** and can be reused, adjusted and shared.
 
@@ -113,10 +114,18 @@ This workflow already contains the SDXL text-to-image chain: the model loader, p
 
 Press **Invoke**. The nodes light up in turn as they run, and the composited image appears in the Gallery. Press Invoke again for a new variation: the workflow's **Random Seed** node picks a new seed each time.
 
-If the result is not quite right, adjust the **Image Compositor**'s settings and run it again:
+The default settings rarely give a clean cut-out on the first try. SDXL models usually add a soft shadow under the subject, even with *shadow* in the negative prompt. The Compositor's default flood fill, which spreads inward from the corners of the subject image, stops where the white turns to the shadow's light grey, so the shadow and sometimes a pale halo are pasted onto the background. To clean them up, set **Chroma Key** to `white` and raise **Threshold** to about 80, as in the example below, and run it again. Every near-white pixel then becomes transparent, including the faint shadow.
 
-* **Threshold** (default 50) sets how different from the corner color a pixel must be to count as part of the subject. Raise it if a white halo remains around the subject; lower it if parts of the subject disappear.
-* **Chroma Key** removes a specific color everywhere instead of flood-filling from the corners. Enter a color such as `white` or `#00ff00`. This also removes background showing through gaps in the subject.
+:::caution[Watch the light parts of the subject]
+A chroma key also removes near-white areas *inside* the subject, such as a fox's white chest or the highlights in its eyes. If holes appear, lower **Threshold** until they close, accepting a little shadow, or describe a subject without white parts.
+:::
+
+<Image src={compositorResult} alt="After a run: the Latents to Image node's latest output shows the fox on a plain white background, and the Current Image node shows the fox composited onto the mountain landscape. The Image Compositor uses Chroma Key white and Threshold 80." width={420} />
+
+In summary, the **Image Compositor**'s settings are:
+
+* **Threshold** (default 50) sets how different from the background color a pixel must be to count as part of the subject. Raise it if a white halo or shadow remains around the subject; lower it if parts of the subject disappear.
+* **Chroma Key** removes a specific color everywhere instead of flood-filling from the corners. Enter a color such as `white` or `#00ff00`. This also removes faint shadows and background showing through gaps in the subject. Leave it empty to use the flood fill.
 * **Fill Y** (on by default) scales the subject to the height of the background; **Fill X** scales it to the width. Keep at least one of them on unless the two images are exactly the same size. With both on, the subject is stretched to the background's shape.
 * **X Offset** and **Y Offset** move the subject, in pixels. Positive values move it right and **up**. A subject moved past an edge reappears on the opposite side.
 

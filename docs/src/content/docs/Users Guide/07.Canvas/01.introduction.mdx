@@ -12,6 +12,7 @@ import inpaint from '../assets/canvas-inpaint.webp';
 import outpaint from '../assets/canvas-outpaint.webp';
 import regional from '../assets/canvas-regional-guidance.webp';
 import controlLayer from '../assets/canvas-control-layer.webp';
+import inpaintResult from '../assets/canvas-inpaint-result.webp';
 
 The **Canvas** is where you build and refine an image in layers. You can paint, repaint part of an image (inpainting), extend it beyond its edges (outpainting), guide different regions with their own prompts, and steer the composition with control images, generating as many times as you like and keeping only the results you want.
 
@@ -88,6 +89,8 @@ Inpainting regenerates part of an image and leaves the rest untouched: remove an
 4. **Press Invoke**, then pick a result in the staging area and click **Accept to Layer**.
 
 </Steps>
+
+<Image src={inpaintResult} alt="Inpainting a plate of sushi: on the left, an inpaint mask over one piece; on the right, the result in the staging area, where that piece has become salmon-roe sushi, ready for Accept to Layer." />
 
 **Denoising strength** controls how much the masked area may change: lower values keep its colors and shapes, higher values replace it. Two optional modifiers, added from the mask's right-click menu, give finer control: **Add noise** adds noise inside the mask before generating, and **Add denoise limit** caps how strongly it can be repainted. The mask's **Invert mask** button, in its Properties, swaps the masked and unmasked areas.
 
