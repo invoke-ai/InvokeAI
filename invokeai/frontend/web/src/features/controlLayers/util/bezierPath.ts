@@ -703,6 +703,53 @@ export const evaluateBezierSegment = (
   };
 };
 
+export const getBezierPathBounds = (points: RenderableBezierPoint[], isClosed: boolean): Rect => {
+  if (points.length === 0) {
+    return { x: 0, y: 0, width: 0, height: 0 };
+  }
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+  const include = (point: Coordinate) => {
+    minX = Math.min(minX, point.x);
+    minY = Math.min(minY, point.y);
+    maxX = Math.max(maxX, point.x);
+    maxY = Math.max(maxY, point.y);
+  };
+  points.forEach((point) => include(point.anchor));
+  for (let i = 0; i < (isClosed ? points.length : points.length - 1); i++) {
+    const from = points[i]!;
+    const to = points[(i + 1) % points.length]!;
+    const p1 = from.outHandle ?? from.anchor;
+    const p2 = to.inHandle ?? to.anchor;
+    for (const axis of ['x', 'y'] as const) {
+      // Roots of the cubic's derivative, with the common factor of three removed.
+      const a = -from.anchor[axis] + 3 * p1[axis] - 3 * p2[axis] + to.anchor[axis];
+      const b = 2 * (from.anchor[axis] - 2 * p1[axis] + p2[axis]);
+      const c = p1[axis] - from.anchor[axis];
+      const roots: number[] = [];
+      if (Math.abs(a) < BEZIER_FIT_EPSILON) {
+        if (Math.abs(b) >= BEZIER_FIT_EPSILON) {
+          roots.push(-c / b);
+        }
+      } else {
+        const discriminant = b * b - 4 * a * c;
+        if (discriminant >= 0) {
+          const sqrt = Math.sqrt(discriminant);
+          roots.push((-b + sqrt) / (2 * a), (-b - sqrt) / (2 * a));
+        }
+      }
+      for (const t of roots) {
+        if (t > 0 && t < 1) {
+          include(evaluateBezierSegment(from, to, t));
+        }
+      }
+    }
+  }
+  return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
+};
+
 export const splitBezierSegmentAt = (
   from: CanvasBezierPointState,
   to: CanvasBezierPointState,

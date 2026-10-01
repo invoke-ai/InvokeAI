@@ -21,6 +21,7 @@ import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerP
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityTypeIsHidden } from 'features/controlLayers/hooks/useEntityTypeIsHidden';
 import { selectCanvasSlice } from 'features/controlLayers/store/selectors';
+import type { CanvasBezierPathState } from 'features/controlLayers/store/types';
 import type { BezierPointType } from 'features/controlLayers/util/bezierPath';
 import { canJoinVectorPathEndpoints, canSplitVectorPathAtPoints } from 'features/controlLayers/util/vectorPathTopology';
 import { useHotkeyData } from 'features/system/components/HotkeysModal/useHotkeyData';
@@ -28,6 +29,7 @@ import { Fragment, memo, useCallback, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const BEZIER_POINT_TYPES = ['corner', 'smooth', 'symmetric'] as const satisfies readonly BezierPointType[];
+const EMPTY_PATHS: CanvasBezierPathState[] = [];
 
 const isBezierPointType = (value: string): value is BezierPointType => {
   return BEZIER_POINT_TYPES.includes(value as BezierPointType);
@@ -111,10 +113,12 @@ export const VectorLayerEditFooter = memo(() => {
   });
   const editSessionPaths = useAppSelector((state) => {
     if (!editSession) {
-      return [];
+      return EMPTY_PATHS;
     }
     const canvas = selectCanvasSlice(state);
-    return canvas.vectorLayers.entities.find((entity) => entity.id === editSession.entityIdentifier.id)?.paths ?? [];
+    return (
+      canvas.vectorLayers.entities.find((entity) => entity.id === editSession.entityIdentifier.id)?.paths ?? EMPTY_PATHS
+    );
   });
 
   const onPointTypeChange = useCallback(

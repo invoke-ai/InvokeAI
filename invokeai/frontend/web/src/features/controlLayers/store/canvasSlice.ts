@@ -2322,6 +2322,9 @@ const canvasUndoableConfig: UndoableOptions<CanvasState, UnknownAction> = {
       return false;
     }
     // Throttle rapid actions of the same type
+    if (isAnyOf(vectorLayerPathsReplaced, vectorPathTransformed)(action) && action.payload.undoGroup) {
+      return true;
+    }
     filter = actionsThrottlingFilter(action);
     return filter;
   },

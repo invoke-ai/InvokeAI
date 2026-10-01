@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   canvasClearHistory,
+  canvasRedo,
   canvasSliceConfig,
   canvasUndo,
   vectorLayerAdded,
@@ -57,7 +58,7 @@ describe('vector layer edit history', () => {
         undoGroup,
       })
     );
-    vi.advanceTimersByTime(1001);
+    vi.advanceTimersByTime(16);
     history = reducer(
       history,
       vectorLayerPathsReplaced({
@@ -114,7 +115,7 @@ describe('vector layer edit history', () => {
           undoGroup,
         })
       );
-      vi.advanceTimersByTime(1001);
+      vi.advanceTimersByTime(16);
     }
 
     expect(history.present.vectorLayers.entities[0]?.paths[0]?.points[0]?.anchor).toEqual({ x: 6, y: 6 });
@@ -156,11 +157,55 @@ describe('vector layer edit history', () => {
       undoGroup: 'path-edit-session-a',
     };
     history = reducer(history, vectorPathTransformed(payload));
-    vi.advanceTimersByTime(1001);
+    vi.advanceTimersByTime(16);
     history = reducer(history, vectorPathTransformed(payload));
 
     expect(history.present.vectorLayers.entities[0]?.paths[0]?.points[0]?.anchor).toEqual({ x: 10, y: 10 });
     history = reducer(history, canvasUndo());
     expect(history.present.vectorLayers.entities[0]?.paths).toEqual([originalPath]);
+    history = reducer(history, canvasRedo());
+    expect(history.present.vectorLayers.entities[0]?.paths[0]?.points[0]?.anchor).toEqual({ x: 10, y: 10 });
   });
+
+  it.each(['redo', 'subsequent action', 'discard'] as const)(
+    'preserves the final rapid edit across %s',
+    (operation) => {
+      vi.useFakeTimers();
+      vi.stubGlobal('window', { setTimeout });
+      const reducer = undoable(canvasSliceConfig.slice.reducer, canvasSliceConfig.undoableConfig?.reduxUndoOptions);
+      let history = reducer(undefined, { type: '@@INIT' });
+      history = reducer(history, vectorLayerAdded({ isSelected: true }));
+      const entityIdentifier = { type: 'vector_layer' as const, id: history.present.vectorLayers.entities[0]!.id };
+      const path = (x: number) => ({
+        id: 'path',
+        name: null,
+        isClosed: false,
+        points: [
+          { anchor: { x, y: 0 }, inHandle: null, outHandle: null, type: 'corner' as const },
+          { anchor: { x: 100, y: 0 }, inHandle: null, outHandle: null, type: 'corner' as const },
+        ],
+      });
+      history = reducer(history, vectorPathAdded({ entityIdentifier, path: path(0) }));
+      history = reducer(history, canvasClearHistory());
+      for (const x of [1, 2, 3, 4, 5]) {
+        history = reducer(history, vectorLayerPathsReplaced({ entityIdentifier, paths: [path(x)], undoGroup: 'edit' }));
+        vi.advanceTimersByTime(16);
+      }
+      if (operation === 'redo') {
+        history = reducer(reducer(history, canvasUndo()), canvasRedo());
+      } else {
+        if (operation === 'discard') {
+          history = reducer(
+            history,
+            vectorLayerPathsReplaced({ entityIdentifier, paths: [path(0)], undoGroup: 'edit' })
+          );
+        }
+        history = reducer(history, vectorPathAdded({ entityIdentifier, path: { ...path(50), id: 'second' } }));
+        history = reducer(history, canvasUndo());
+      }
+      expect(history.present.vectorLayers.entities[0]?.paths[0]?.points[0]?.anchor.x).toBe(
+        operation === 'discard' ? 0 : 5
+      );
+    }
+  );
 });

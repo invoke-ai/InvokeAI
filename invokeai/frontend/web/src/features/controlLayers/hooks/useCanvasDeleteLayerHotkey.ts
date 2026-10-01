@@ -8,6 +8,20 @@ import { selectSelectedEntityIdentifier } from 'features/controlLayers/store/sel
 import { useRegisteredHotkeys } from 'features/system/components/HotkeysModal/useHotkeyData';
 import { useCallback } from 'react';
 
+export const getCanvasDeleteTarget = (
+  focusedRegion: ReturnType<typeof getFocusedRegion>,
+  isBusy: boolean,
+  isEditing: boolean
+): 'path' | 'layer' | null => {
+  if (isBusy || (focusedRegion !== 'canvas' && focusedRegion !== 'layers')) {
+    return null;
+  }
+  if (isEditing) {
+    return 'path';
+  }
+  return focusedRegion === 'layers' ? 'layer' : null;
+};
+
 export function useCanvasDeleteLayerHotkey() {
   useAssertSingleton(useCanvasDeleteLayerHotkey.name);
   const dispatch = useAppDispatch();
@@ -16,17 +30,14 @@ export function useCanvasDeleteLayerHotkey() {
   const isBusy = useCanvasIsBusy();
 
   const deleteSelected = useCallback(() => {
-    if (isBusy) {
-      return;
-    }
-
     const pathTool = canvasManager.tool.tools.path;
-    if (pathTool.hasActiveEditSession()) {
+    const target = getCanvasDeleteTarget(getFocusedRegion(), isBusy, pathTool.hasActiveEditSession());
+    if (target === 'path') {
       pathTool.deleteSelectedPointsOrActivePath();
       return;
     }
 
-    if (selectedEntityIdentifier === null || getFocusedRegion() !== 'layers') {
+    if (target !== 'layer' || selectedEntityIdentifier === null) {
       return;
     }
 

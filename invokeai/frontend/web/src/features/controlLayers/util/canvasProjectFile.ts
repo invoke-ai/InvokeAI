@@ -11,6 +11,7 @@ import type {
   ImageWithDims,
   RefImageState,
 } from 'features/controlLayers/store/types';
+import { zCanvasVectorLayerState } from 'features/controlLayers/store/types';
 import { getImageDTOSafe } from 'services/api/endpoints/images';
 import { z } from 'zod';
 
@@ -49,7 +50,7 @@ export type CanvasProjectState = {
 const zCanvasProjectState = z.object({
   rasterLayers: z.array(z.any()),
   controlLayers: z.array(z.any()),
-  vectorLayers: z.array(z.any()).default([]),
+  vectorLayers: z.array(zCanvasVectorLayerState).default([]),
   inpaintMasks: z.array(z.any()),
   regionalGuidance: z.array(z.any()),
   bbox: z.any(),

@@ -126,7 +126,7 @@ const DropDownToolWidthPickerComponent = memo(
     );
 
     return (
-      <Popover>
+      <Popover autoFocus={false}>
         <FormControl w="min-content" gap={2} overflow="hidden">
           <PopoverAnchor>
             <NumberInput

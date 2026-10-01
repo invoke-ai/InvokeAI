@@ -1,3 +1,4 @@
+import { objectEquals } from '@observ33r/object-equals';
 import { deepClone } from 'common/util/deepClone';
 import type { CanvasManager } from 'features/controlLayers/konva/CanvasManager';
 import { CanvasModuleBase } from 'features/controlLayers/konva/CanvasModuleBase';
@@ -1112,11 +1113,14 @@ export class CanvasPathToolModule extends CanvasModuleBase {
     }
 
     this.pendingEditExitAction = null;
-    this.manager.stateApi.replaceVectorPaths({
-      entityIdentifier: session.entityIdentifier,
-      paths: deepClone(session.snapshotPaths),
-      undoGroup: session.id,
-    });
+    const adapter = this.manager.getAdapter(session.entityIdentifier);
+    if (adapter?.state.type === 'vector_layer' && !objectEquals(adapter.state.paths, session.snapshotPaths)) {
+      this.manager.stateApi.replaceVectorPaths({
+        entityIdentifier: session.entityIdentifier,
+        paths: deepClone(session.snapshotPaths),
+        undoGroup: session.id,
+      });
+    }
     this.$isExitConfirmationOpen.set(false);
     this.$editSession.set(null);
     if (restoreTool) {
@@ -2031,6 +2035,9 @@ export class CanvasPathToolModule extends CanvasModuleBase {
       return null;
     }
 
+    if (t <= 1e-6 || t >= 1 - 1e-6) {
+      return null;
+    }
     const split = splitBezierSegmentAt(from, to, t);
     from.outHandle = split.fromOutHandle;
     to.inHandle = split.toInHandle;

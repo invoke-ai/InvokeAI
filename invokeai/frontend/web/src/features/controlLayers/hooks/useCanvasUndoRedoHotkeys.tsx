@@ -18,9 +18,9 @@ export const useCanvasUndoRedoHotkeys = () => {
   const editSession = useStore(pathTool.$editSession);
 
   const mayUndoCanvas = useAppSelector(selectCanvasMayUndo);
-  const mayUndo = editSession ? pathTool.canUndoEditSession() : mayUndoCanvas;
+  const mayUndo = editSession && pathTool.getCanMutateEditSession() ? pathTool.canUndoEditSession() : mayUndoCanvas;
   const handleUndo = useCallback(() => {
-    if (pathTool.hasActiveEditSession()) {
+    if (pathTool.getCanMutateEditSession()) {
       pathTool.undoEditSession();
       return;
     }
@@ -35,9 +35,9 @@ export const useCanvasUndoRedoHotkeys = () => {
   });
 
   const mayRedoCanvas = useAppSelector(selectCanvasMayRedo);
-  const mayRedo = editSession ? pathTool.canRedoEditSession() : mayRedoCanvas;
+  const mayRedo = editSession && pathTool.getCanMutateEditSession() ? pathTool.canRedoEditSession() : mayRedoCanvas;
   const handleRedo = useCallback(() => {
-    if (pathTool.hasActiveEditSession()) {
+    if (pathTool.getCanMutateEditSession()) {
       pathTool.redoEditSession();
       return;
     }

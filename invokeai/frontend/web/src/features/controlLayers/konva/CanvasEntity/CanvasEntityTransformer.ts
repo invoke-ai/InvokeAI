@@ -877,6 +877,9 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
       // Path edits can schedule many bbox updates. Drop the pending coalesced update because this transform computes its
       // own bbox directly from the active path.
       this.requestRectCalculation.cancel();
+    } else {
+      // Start the pending calculation before joining its mutex queue; otherwise Transform can use stale bounds.
+      this.requestRectCalculation.flush();
     }
     // This will be released when the transformation is stopped
     await this.transformMutex.acquire();

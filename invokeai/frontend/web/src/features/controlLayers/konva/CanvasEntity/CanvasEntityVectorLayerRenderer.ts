@@ -1,7 +1,8 @@
 import { debounce } from 'es-toolkit/compat';
 import { CanvasEntityObjectRenderer } from 'features/controlLayers/konva/CanvasEntity/CanvasEntityObjectRenderer';
+import { CanvasVectorPath } from 'features/controlLayers/konva/CanvasEntity/CanvasVectorPath';
 import { areStageAttrsGonnaExplode } from 'features/controlLayers/konva/util';
-import { buildBezierPathData } from 'features/controlLayers/util/bezierPath';
+import { buildBezierPathData, getBezierPathBounds } from 'features/controlLayers/util/bezierPath';
 import Konva from 'konva';
 
 const VECTOR_PATH_STROKE = 'rgba(90, 175, 255, 1)';
@@ -52,9 +53,10 @@ export class CanvasEntityVectorLayerRenderer extends CanvasEntityObjectRenderer 
       }
 
       this.konva.objectGroup.add(
-        new Konva.Path({
+        new CanvasVectorPath({
           name: `${this.type}:vector_path:${path.id}`,
           data,
+          vectorBounds: getBezierPathBounds(path.points, path.isClosed),
           stroke: VECTOR_PATH_STROKE,
           strokeWidth,
           fillEnabled: false,

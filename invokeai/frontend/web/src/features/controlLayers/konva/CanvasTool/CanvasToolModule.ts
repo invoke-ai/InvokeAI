@@ -436,6 +436,7 @@ export class CanvasToolModule extends CanvasModuleBase {
     this.konva.stage.on('pointerdown', this.onStagePointerDown);
     this.konva.stage.on('pointerup', this.onStagePointerUp);
     this.konva.stage.on('pointermove', this.onStagePointerMove);
+    this.konva.stage.on('dblclick', this.onStageDoubleClick);
 
     // The Konva stage doesn't appear to handle pointerleave events, so we need to listen to the container instead
     this.manager.stage.container.addEventListener('pointerleave', this.onStagePointerLeave);
@@ -446,6 +447,8 @@ export class CanvasToolModule extends CanvasModuleBase {
     window.addEventListener('keyup', this.onKeyUp);
     window.addEventListener('pointermove', this.onWindowPointerMove);
     window.addEventListener('pointerup', this.onWindowPointerUp);
+    window.addEventListener('pointercancel', this.onPathPointerInterrupted);
+    window.addEventListener('lostpointercapture', this.onPathPointerInterrupted);
     window.addEventListener('blur', this.onWindowBlur);
 
     return () => {
@@ -453,6 +456,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       this.konva.stage.off('pointerdown', this.onStagePointerDown);
       this.konva.stage.off('pointerup', this.onStagePointerUp);
       this.konva.stage.off('pointermove', this.onStagePointerMove);
+      this.konva.stage.off('dblclick', this.onStageDoubleClick);
 
       this.manager.stage.container.removeEventListener('pointerleave', this.onStagePointerLeave);
 
@@ -462,6 +466,8 @@ export class CanvasToolModule extends CanvasModuleBase {
       window.removeEventListener('keyup', this.onKeyUp);
       window.removeEventListener('pointermove', this.onWindowPointerMove);
       window.removeEventListener('pointerup', this.onWindowPointerUp);
+      window.removeEventListener('pointercancel', this.onPathPointerInterrupted);
+      window.removeEventListener('lostpointercapture', this.onPathPointerInterrupted);
       window.removeEventListener('blur', this.onWindowBlur);
     };
   };
@@ -645,6 +651,12 @@ export class CanvasToolModule extends CanvasModuleBase {
       }
     } finally {
       this.render();
+    }
+  };
+
+  onStageDoubleClick = (e: KonvaEventObject<MouseEvent>) => {
+    if (e.target === this.konva.stage && this.$tool.get() === 'rect' && this.getCanDraw()) {
+      void this.tools.rect.onStageDoubleClick();
     }
   };
 
@@ -862,15 +874,20 @@ export class CanvasToolModule extends CanvasModuleBase {
    * focus returns.
    */
   onWindowBlur = () => {
+    this.onPathPointerInterrupted();
     this.tools.bbox.stopInteraction();
     this.clearTemporaryToolHotkeys();
     this.manager.stateApi.$spaceKey.set(false);
     this.tools.rect.stopDragTranslation();
   };
 
+  onPathPointerInterrupted = () => {
+    this.tools.path.onWindowPointerUp();
+  };
+
   onKeyDown = (e: KeyboardEvent) => {
     const isSpaceKey = e.key === KEY_SPACE || e.code === CODE_SPACE;
-    if (e.defaultPrevented) {
+    if (e.defaultPrevented && (e.key === KEY_ESCAPE || e.key === 'Enter')) {
       return;
     }
     if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) {
@@ -886,7 +903,7 @@ export class CanvasToolModule extends CanvasModuleBase {
       return;
     }
     // The Transform overlay owns Enter/Escape while a transform transaction is active.
-    if (this.manager.stateApi.$transformingAdapter.get()) {
+    if (this.manager.stateApi.$transformingAdapter.get() && (e.key === KEY_ESCAPE || e.key === 'Enter')) {
       return;
     }
 

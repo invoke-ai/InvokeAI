@@ -17,9 +17,9 @@ export const CanvasToolbarUndoButton = memo(() => {
   const pathTool = canvasManager.tool.tools.path;
   const editSession = useStore(pathTool.$editSession);
   const mayUndoCanvas = useAppSelector(selectCanvasMayUndo);
-  const mayUndo = editSession ? pathTool.canUndoEditSession() : mayUndoCanvas;
+  const mayUndo = editSession && pathTool.getCanMutateEditSession() ? pathTool.canUndoEditSession() : mayUndoCanvas;
   const onClick = useCallback(() => {
-    if (pathTool.hasActiveEditSession()) {
+    if (pathTool.getCanMutateEditSession()) {
       pathTool.undoEditSession();
       return;
     }

@@ -17,9 +17,9 @@ export const CanvasToolbarRedoButton = memo(() => {
   const pathTool = canvasManager.tool.tools.path;
   const editSession = useStore(pathTool.$editSession);
   const mayRedoCanvas = useAppSelector(selectCanvasMayRedo);
-  const mayRedo = editSession ? pathTool.canRedoEditSession() : mayRedoCanvas;
+  const mayRedo = editSession && pathTool.getCanMutateEditSession() ? pathTool.canRedoEditSession() : mayRedoCanvas;
   const onClick = useCallback(() => {
-    if (pathTool.hasActiveEditSession()) {
+    if (pathTool.getCanMutateEditSession()) {
       pathTool.redoEditSession();
       return;
     }

@@ -285,7 +285,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     const point = this.getEntityRelativePoint(cursorPos.relative, selectedEntity.state.position);
 
     if (shapeType === 'polygon') {
-      await this.onPolygonPointerDown(point, selectedEntity.entityIdentifier, e.evt.shiftKey, e.evt.detail >= 2);
+      await this.onPolygonPointerDown(point, selectedEntity.entityIdentifier, e.evt.shiftKey);
       return;
     }
 
@@ -519,8 +519,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
   private onPolygonPointerDown = async (
     point: Coordinate,
     entityIdentifier: CanvasEntityIdentifier,
-    shouldSnap: boolean,
-    shouldCommitOpen: boolean
+    shouldSnap: boolean
   ) => {
     if (
       this.activeEntityIdentifier &&
@@ -553,16 +552,26 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (entityIdentifier.type === 'vector_layer' && shouldCommitOpen && this.polygonPoints.length >= 2) {
-      await this.commitPolygon(false);
-      return;
-    }
-
     const polygonPoint = this.getPolygonPoint(point, shouldSnap);
     this.polygonPoints = [...this.polygonPoints, polygonPoint];
     this.polygonPointer = polygonPoint;
     await this.updatePolygonBuffer();
     this.render();
+  };
+
+  onStageDoubleClick = async () => {
+    if (!this.hasOpenVectorPolygonSession()) {
+      return;
+    }
+    // Both pointerdowns have already run. Remove the second click's coincident/nearby endpoint.
+    const last = this.polygonPoints.at(-1);
+    const previous = this.polygonPoints.at(-2);
+    if (last && previous && Math.hypot(last.x - previous.x, last.y - previous.y) <= this.manager.stage.unscale(5)) {
+      this.polygonPoints.pop();
+    }
+    if (this.polygonPoints.length >= 2) {
+      await this.commitOpenPolygon();
+    }
   };
 
   commitOpenPolygon = async () => {

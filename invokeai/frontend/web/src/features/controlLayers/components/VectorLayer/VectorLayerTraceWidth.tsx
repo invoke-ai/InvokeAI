@@ -46,7 +46,8 @@ export const VectorLayerTraceWidth = memo(() => {
     dispatch(settingsTraceTaperEndsToggled());
   }, [dispatch]);
   const commitTaper = useCallback(() => {
-    const nextTaper = Number.isFinite(localTaper) ? localTaper : traceTaper;
+    const nextTaper = Math.round(Math.min(500, Math.max(1, Number.isFinite(localTaper) ? localTaper : traceTaper)));
+    setLocalTaper(nextTaper);
     dispatch(settingsTraceTaperChanged(nextTaper));
   }, [dispatch, localTaper, traceTaper]);
   const onTaperChange = useCallback((_valueAsString: string, valueAsNumber: number) => {
@@ -86,7 +87,7 @@ export const VectorLayerTraceWidth = memo(() => {
         </FormLabel>
         <Checkbox isChecked={traceTaperEnds} onChange={onTaperEndsChange} />
       </FormControl>
-      <Popover>
+      <Popover autoFocus={false}>
         <FormControl w="min-content" flexShrink={0} gap={2} isDisabled={!traceTaperEnds} overflow="hidden">
           <FormLabel m={0} mt={1} whiteSpace="nowrap">
             {t('controlLayers.vectorEdit.taper')}

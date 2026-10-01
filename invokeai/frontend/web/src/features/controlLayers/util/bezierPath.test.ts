@@ -4,6 +4,7 @@ import {
   evaluateBezierSegment,
   findNearestBezierPathSegment,
   fitPolylineToBezierPoints,
+  getBezierPathBounds,
   getBezierPathHitSamplesPerSegment,
   getBezierPointPullHandleType,
   ovalToBezierPoints,
@@ -16,6 +17,26 @@ import {
 } from './bezierPath';
 
 describe('bezierPath utilities', () => {
+  it('includes exact curve endpoints and extrema in bounds', () => {
+    expect(
+      getBezierPathBounds(
+        [
+          { anchor: { x: 0, y: 0 }, inHandle: null, outHandle: { x: 0, y: 300 } },
+          { anchor: { x: 1000, y: 0 }, inHandle: { x: 300, y: 300 }, outHandle: null },
+        ],
+        false
+      )
+    ).toEqual({ x: 0, y: 0, width: 1000, height: 225 });
+  });
+  it('includes the closing segment and handles degenerate bounds', () => {
+    const points = [
+      { anchor: { x: 0, y: 0 }, inHandle: { x: -100, y: 0 }, outHandle: null },
+      { anchor: { x: 0, y: 10 }, inHandle: null, outHandle: { x: -100, y: 10 } },
+    ];
+    expect(getBezierPathBounds(points, false)).toEqual({ x: 0, y: 0, width: 0, height: 10 });
+    expect(getBezierPathBounds(points, true)).toEqual({ x: -75, y: 0, width: 75, height: 10 });
+    expect(getBezierPathBounds([], false)).toEqual({ x: 0, y: 0, width: 0, height: 0 });
+  });
   it('does not fit a path without two distinct samples', () => {
     expect(fitPolylineToBezierPoints([{ x: 4, y: 8 }], 1)).toEqual([]);
     expect(
