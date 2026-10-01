@@ -26,7 +26,7 @@ const zeroSnapshot = (): MutableCanvasDiagnosticsSnapshot => ({
   layersCulled: 0,
   layersDrawn: 0,
   overlayFrames: 0,
-  overBudgetVisibleBaseBytes: 0,
+  rasterOverageBytes: 0,
   surfaceCreations: 0,
   surfaceResizes: 0,
 });

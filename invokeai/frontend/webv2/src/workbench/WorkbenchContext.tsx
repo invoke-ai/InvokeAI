@@ -10,8 +10,6 @@ import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from '
 import { createContext, use, useEffect, useSyncExternalStore, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { ProjectPushOutcome } from './projects/projectFlush';
-
 import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
 import { WorkbenchUnavailableScreen } from './components/WorkbenchUnavailableScreen';
 import { createExtensionRegistry, type ExtensionRegistry } from './extensions/extensionRegistry';
@@ -19,9 +17,9 @@ import { clearLayerPanelStates } from './layerPanelState';
 import { createWorkbenchPersistenceRuntime } from './persistenceRuntime';
 import { createOpenProjectBroker } from './projects/openProjectBroker';
 import {
-  createCanvasHeldMediaSources,
+  createLiveCanvasEngines,
   createOpenProjectsHeldMediaReader,
-  type CanvasHeldMediaSources,
+  type LiveCanvasEngines,
 } from './projects/projectAssets';
 import { describeRefusedProjects } from './projects/projectLoadRefusal';
 import {
@@ -45,7 +43,7 @@ type WorkbenchSelector<T> = (snapshot: WorkbenchSnapshot) => T;
 const WorkbenchStoreContext = createContext<WorkbenchInternalStore | null>(null);
 const WorkbenchPersistenceContext = createContext<SyncedWorkbenchPersistence | null>(null);
 const WorkbenchExtensionsContext = createContext<ExtensionRegistry | null>(null);
-const WorkbenchCanvasHeldMediaContext = createContext<CanvasHeldMediaSources | null>(null);
+const WorkbenchLiveCanvasEnginesContext = createContext<LiveCanvasEngines | null>(null);
 const subscribeToNothing = (): (() => void) => () => {};
 const getNullSnapshot = (): null => null;
 
@@ -64,7 +62,7 @@ export const WorkbenchProvider = ({
   const { t } = useTranslation();
   const [persistence] = useState(() => createSyncedWorkbenchPersistence(owner));
   const [extensions] = useState(createExtensionRegistry);
-  const [canvasHeldMedia] = useState(createCanvasHeldMediaSources);
+  const [liveCanvasEngines] = useState(createLiveCanvasEngines);
   const [loadUnavailable, setLoadUnavailable] = useState<{ message: string; retry(): void } | null>(null);
   const hasHydrated = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot).hasHydrated;
 
@@ -120,13 +118,15 @@ export const WorkbenchProvider = ({
         }
       },
       deleteProject: (projectId) => persistence.deleteProjectOnServer(projectId),
-      flushProject: (projectId) => {
+      flushProject: async (projectId) => {
+        // Unsaved canvas pixels reach the document before it is pushed; a failure rejects the flush.
+        await liveCanvasEngines.flushPendingPixels(projectId);
         const project = store.getSnapshot().projects.find((candidate) => candidate.id === projectId);
 
         // Unopened projects have no local edits; their ids reflect server acknowledgements.
         return project
           ? persistence.flushProjectToServer(project)
-          : Promise.resolve<ProjectPushOutcome>({ documentJson: '', kind: 'acknowledged' });
+          : { documentJson: '', kind: 'acknowledged' as const };
       },
       getOpenProjectIds: () => store.getSnapshot().projects.map((project) => project.id),
       markProjectDeleted: (projectId) => {
@@ -144,7 +144,7 @@ export const WorkbenchProvider = ({
     persistenceRuntime.start();
     const releaseIntermediateHold = startIntermediatesHoldLease({
       owner,
-      read: createOpenProjectsHeldMediaReader(() => store.getSnapshot().projects, canvasHeldMedia.read),
+      read: createOpenProjectsHeldMediaReader(() => store.getSnapshot().projects, liveCanvasEngines.heldAssets),
       subscribe: (onChange) => {
         let projects = store.getSnapshot().projects;
         const unsubscribeProjects = store.subscribe(() => {
@@ -154,7 +154,7 @@ export const WorkbenchProvider = ({
             onChange();
           }
         });
-        const unsubscribeCanvas = canvasHeldMedia.subscribe(onChange);
+        const unsubscribeCanvas = liveCanvasEngines.subscribe(onChange);
         return () => {
           unsubscribeProjects();
           unsubscribeCanvas();
@@ -173,7 +173,7 @@ export const WorkbenchProvider = ({
 
   return (
     <WorkbenchPersistenceContext value={persistence}>
-      <WorkbenchCanvasHeldMediaContext value={canvasHeldMedia}>
+      <WorkbenchLiveCanvasEnginesContext value={liveCanvasEngines}>
         <WorkbenchExtensionsContext value={extensions}>
           <WorkbenchStoreContext value={store}>
             {loadUnavailable ? (
@@ -189,7 +189,7 @@ export const WorkbenchProvider = ({
             )}
           </WorkbenchStoreContext>
         </WorkbenchExtensionsContext>
-      </WorkbenchCanvasHeldMediaContext>
+      </WorkbenchLiveCanvasEnginesContext>
     </WorkbenchPersistenceContext>
   );
 };
@@ -316,12 +316,12 @@ export const useOptionalWorkbenchPersistenceService = (): SyncedWorkbenchPersist
   use(WorkbenchPersistenceContext);
 
 /** Where live Canvas engines register the undo state the hold lease must keep. */
-export const useWorkbenchCanvasHeldMedia = (): CanvasHeldMediaSources => {
-  const heldMedia = use(WorkbenchCanvasHeldMediaContext);
-  if (!heldMedia) {
-    throw new Error('useWorkbenchCanvasHeldMedia must be used within a WorkbenchProvider.');
+export const useWorkbenchLiveCanvasEngines = (): LiveCanvasEngines => {
+  const liveEngines = use(WorkbenchLiveCanvasEnginesContext);
+  if (!liveEngines) {
+    throw new Error('useWorkbenchLiveCanvasEngines must be used within a WorkbenchProvider.');
   }
-  return heldMedia;
+  return liveEngines;
 };
 
 export const useWorkbenchExtensions = (): ExtensionRegistry => {

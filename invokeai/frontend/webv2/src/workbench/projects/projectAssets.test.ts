@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   collectHeldAssetRefs,
   collectLiveAssetRefs,
-  createCanvasHeldMediaSources,
+  createLiveCanvasEngines,
   createOpenProjectsHeldMediaReader,
   remapAssetRefs,
   selectCoverImageName,
@@ -136,31 +136,31 @@ it('rescans only the workflow an edit touched, sharing the documents its history
 });
 
 it('announces engines registering and releasing their held media', () => {
-  const sources = createCanvasHeldMediaSources();
+  const sources = createLiveCanvasEngines();
   const onChange = vi.fn();
   sources.subscribe(onChange);
   let notifyEngine = () => undefined as void;
   const release = sources.register('project-1', {
     flushPendingPixels: () => Promise.resolve(),
-    read: () => ({ images: ['undo.png'], videos: [] }),
+    heldAssets: () => ({ images: ['undo.png'], videos: [] }),
     subscribe: (listener) => {
       notifyEngine = listener;
       return () => undefined;
     },
   });
-  expect(sources.read('project-1')).toEqual({ images: ['undo.png'], videos: [] });
+  expect(sources.heldAssets('project-1')).toEqual({ images: ['undo.png'], videos: [] });
   notifyEngine();
   release();
-  expect(sources.read('project-1')).toBeUndefined();
+  expect(sources.heldAssets('project-1')).toBeUndefined();
   expect(onChange).toHaveBeenCalledTimes(3);
 });
 
 it("crosses a registered engine's paint barrier and treats an unregistered project as saved", async () => {
-  const sources = createCanvasHeldMediaSources();
+  const sources = createLiveCanvasEngines();
   const flushPendingPixels = vi.fn(() => Promise.reject(new Error('upload failed')));
   sources.register('project-1', {
     flushPendingPixels,
-    read: () => ({ images: [], videos: [] }),
+    heldAssets: () => ({ images: [], videos: [] }),
     subscribe: () => () => undefined,
   });
 

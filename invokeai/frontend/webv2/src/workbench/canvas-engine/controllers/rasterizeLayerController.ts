@@ -61,13 +61,8 @@ export class RasterizeLayerController {
         return;
       }
       const contentRect = getSourceContentRect(liveLayer, liveDocument);
-      const entry = this.deps.layers.getOrCreateRect(layerId, contentRect);
-      entry.rect = contentRect;
-      entry.stale = true;
-      void rasterizeSource(liveSource, this.deps.rasterizeDeps(liveDocument), entry.surface).then((result) => {
-        entry.rect = result.rect;
-      });
-      entry.stale = false;
+      const scratch = this.deps.backend.createSurface(contentRect.width, contentRect.height);
+      void rasterizeSource(liveSource, this.deps.rasterizeDeps(liveDocument), scratch);
       const matrix = bakeMatrix(liveLayer.transform);
       const bakedRect = roundOut(transformBounds(matrix, contentRect));
       const baked = this.deps.backend.createSurface(bakedRect.width, bakedRect.height);
@@ -75,7 +70,7 @@ export class RasterizeLayerController {
       baked.ctx.clearRect(0, 0, bakedRect.width, bakedRect.height);
       baked.ctx.imageSmoothingEnabled = true;
       baked.ctx.setTransform(matrix.a, matrix.b, matrix.c, matrix.d, matrix.e - bakedRect.x, matrix.f - bakedRect.y);
-      baked.ctx.drawImage(entry.surface.canvas, contentRect.x, contentRect.y);
+      baked.ctx.drawImage(scratch.canvas, contentRect.x, contentRect.y);
       baked.ctx.setTransform(1, 0, 0, 1, 0, 0);
       const paintLayer: CanvasLayerContract = {
         ...liveLayer,

@@ -84,7 +84,6 @@ export class RasterExportController {
         return;
       }
       released = true;
-      result.release();
       if (reservation?.status === 'ok') {
         reservation.lease.release();
       }
@@ -102,6 +101,9 @@ export class RasterExportController {
     } catch (error) {
       release();
       throw error;
+    } finally {
+      // The owned copy no longer reads the live cache; only its guard still describes it.
+      result.release();
     }
   }
 
@@ -141,10 +143,7 @@ export class RasterExportController {
     }
     const liveEntry = this.options.layers.get(layerId);
     if (liveEntry && !liveEntry.stale && !this.options.isRasterizing(layer) && !isEmpty(liveEntry.rect)) {
-      return this.applyAdjustments(
-        this.lease(layer, liveEntry, this.options.pin(layerId)),
-        options.applyAdjustments === true
-      );
+      return this.applyAdjustments(this.lease(layer, liveEntry), options.applyAdjustments === true);
     }
     const contentRect = getSourceContentRect(layer, document);
     if (isEmpty(contentRect)) {
@@ -193,18 +192,15 @@ export class RasterExportController {
     }
   }
 
+  /** A lease on the live cache; the pin is taken last so nothing can fail while it is unowned. */
   private lease(
     layer: CanvasLayerContract,
     entry: LayerCacheEntry,
-    pin: { release(): void }
+    pin?: { release(): void }
   ): Extract<ExportLayerPixelsResult, { status: 'ok' }> {
-    return {
-      guard: this.options.captureGuard(layer, entry),
-      rect: { ...entry.rect },
-      release: () => pin.release(),
-      status: 'ok',
-      surface: entry.surface,
-    };
+    const guard = this.options.captureGuard(layer, entry);
+    const held = pin ?? this.options.pin(layer.id);
+    return { guard, rect: { ...entry.rect }, release: () => held.release(), status: 'ok', surface: entry.surface };
   }
 
   private async reserveBaked(
@@ -243,7 +239,6 @@ export class RasterExportController {
       if (reservation?.status === 'ok') {
         reservation.lease.release();
       }
-      raw.release();
     };
     try {
       const surface = this.options.backend.createSurface(rect.width, rect.height);
@@ -261,6 +256,8 @@ export class RasterExportController {
     } catch (error) {
       release();
       throw error;
+    } finally {
+      raw.release();
     }
   }
 

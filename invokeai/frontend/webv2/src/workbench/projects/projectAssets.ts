@@ -48,29 +48,29 @@ export interface CanvasHeldAssetRefs {
 }
 
 /** What a live Canvas engine holds beyond the document: media its undo state retains, and unsaved pixels. */
-export interface CanvasHeldMediaSource {
-  read(): CanvasHeldAssetRefs;
+export interface LiveCanvasEngine {
+  heldAssets(): CanvasHeldAssetRefs;
   subscribe(listener: () => void): () => void;
   /** Persists the engine's unsaved pixels into the document; rejects when they cannot be saved. */
   flushPendingPixels(): Promise<void>;
 }
 
 /** One mounted Workbench's live Canvas engines, each registered for as long as its undo state survives. */
-export interface CanvasHeldMediaSources {
-  read(projectId: string): CanvasHeldAssetRefs | undefined;
-  register(projectId: string, source: CanvasHeldMediaSource): () => void;
+export interface LiveCanvasEngines {
+  heldAssets(projectId: string): CanvasHeldAssetRefs | undefined;
+  register(projectId: string, source: LiveCanvasEngine): () => void;
   subscribe(listener: () => void): () => void;
   /** Crosses the project's paint barrier; a project without a live engine has nothing unsaved. */
   flushPendingPixels(projectId: string): Promise<void>;
 }
 
-export const createCanvasHeldMediaSources = (): CanvasHeldMediaSources => {
-  const sources = new Map<string, CanvasHeldMediaSource>();
+export const createLiveCanvasEngines = (): LiveCanvasEngines => {
+  const sources = new Map<string, LiveCanvasEngine>();
   const listeners = new Set<() => void>();
   const notify = (): void => listeners.forEach((listener) => listener());
   return {
     flushPendingPixels: (projectId) => sources.get(projectId)?.flushPendingPixels() ?? Promise.resolve(),
-    read: (projectId) => sources.get(projectId)?.read(),
+    heldAssets: (projectId) => sources.get(projectId)?.heldAssets(),
     register: (projectId, source) => {
       sources.set(projectId, source);
       const unsubscribe = source.subscribe(notify);

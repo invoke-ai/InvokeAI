@@ -3,7 +3,6 @@ import type {
   CanvasImageRef,
   CanvasLayerContract,
   CanvasLayerSourceContract,
-  CanvasRasterLayerContractV2,
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -34,7 +33,7 @@ import {
 import { createGroupSurfaceCache, type GroupSurfaceCache } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createLayerCacheStore, DEFAULT_CACHE_BUDGET_BYTES } from '@workbench/canvas-engine/render/layerCache';
 
-import { RasterMemoryBudgetController, type RasterMemoryLease } from './rasterMemoryBudgetController';
+import { RasterMemoryBudgetController } from './rasterMemoryBudgetController';
 
 export interface RasterControllerOptions {
   readonly backend: RasterBackend;
@@ -46,8 +45,8 @@ export interface RasterControllerOptions {
   readonly imageResolver?: (imageName: string, signal?: AbortSignal) => Promise<Blob>;
   /** Layers whose live pixels nothing else can reconstruct: unpersisted paint and open edit sessions. */
   readonly isLayerHeld?: (layerId: string) => boolean;
-  /** A group member's display pixels; defaults to its adjusted surface. */
-  readonly getGroupMemberSurface?: (layer: CanvasRasterLayerContractV2, entry: LayerCacheEntry) => RasterSurface | null;
+  /** Layers whose live cache already includes their adjustments (an open pixel transaction), drawn raw. */
+  readonly isAdjustmentBaked?: (layerId: string) => boolean;
 }
 
 /** Access clocks captured before a frame draws; artifacts read after them are that frame's working set. */
@@ -71,6 +70,7 @@ export class RasterController {
   readonly bitmaps: DecodedBitmapPool;
   private readonly diagnostics: CanvasDiagnostics;
   private readonly isLayerHeld: (layerId: string) => boolean;
+  private readonly isAdjustmentBaked: (layerId: string) => boolean;
   private readonly jobs = new Map<string, RasterizationJob>();
   private readonly activeJobs = new Set<RasterizationJob>();
   private readonly trackedImages = new Map<string, string>();
@@ -87,6 +87,7 @@ export class RasterController {
     this.backend = options.backend;
     this.diagnostics = options.diagnostics;
     this.isLayerHeld = options.isLayerHeld ?? (() => false);
+    this.isAdjustmentBaked = options.isAdjustmentBaked ?? (() => false);
     const memory = new RasterMemoryBudgetController({ budgetBytes: options.budgetBytes ?? DEFAULT_CACHE_BUDGET_BYTES });
     this.memory = memory;
     this.bitmaps = createDecodedBitmapPool({ onBytesChange: (bytes) => memory.setCategoryBytes('decoded', bytes) });
@@ -101,19 +102,12 @@ export class RasterController {
     this.adjustments = createAdjustedSurfaceCache(options.backend, this.derived, (layerId, version) =>
       this.layers.damageSince(layerId, version)
     );
-    const getGroupMemberSurface =
-      options.getGroupMemberSurface ?? ((layer, entry) => this.getAdjustedSurface(layer, entry));
     this.groups = createGroupSurfaceCache({
       createSurface: (width, height) => options.backend.createSurface(width, height),
-      getAdjustedSurface: (layer, entry) => getGroupMemberSurface(layer, entry),
+      getAdjustedSurface: (layer, entry) => this.getAdjustedSurface(layer, entry),
       getCacheEntry: (layerId) => this.layers.get(layerId),
       onBytesChange: (bytes) => memory.setCategoryBytes('group', bytes),
     });
-  }
-
-  /** Keeps a layer's cache resident and untrimmed until the lease is released. */
-  pin(layerId: string): RasterMemoryLease {
-    return this.memory.pin(layerId);
   }
 
   /** Pinned or held layers survive eviction; their bytes become accounted overage instead. */
@@ -131,11 +125,13 @@ export class RasterController {
    */
   enforceBudget(workingSetLayerIds: ReadonlySet<string>, usage: RasterFrameUsage): RasterBudgetResult {
     const excess = (): number => this.memory.snapshot().overageBytes;
-    if (excess() > 0) {
-      this.derived.evict(Math.max(0, this.derived.byteSize() - excess()), (_layerId, lastUsed) => {
-        return lastUsed > usage.derivedTick;
-      });
+    if (excess() === 0) {
+      return { evictedBaseLayerIds: [], overageBytes: 0 };
     }
+    this.derived.evict(
+      Math.max(0, this.derived.byteSize() - excess()),
+      (_layerId, lastUsed) => lastUsed > usage.derivedTick
+    );
     if (excess() > 0) {
       this.groups.evict(Math.max(0, this.groups.byteSize() - excess()), usage.groupTick);
     }
@@ -151,16 +147,18 @@ export class RasterController {
     }
     const overageBytes = excess();
     if (overageBytes > 0) {
-      this.diagnostics.add('overBudgetVisibleBaseBytes', overageBytes);
+      this.diagnostics.add('rasterOverageBytes', overageBytes);
     }
     return { evictedBaseLayerIds, overageBytes };
   }
 
-  /** Drops every reconstructible surface; callers first prove nothing unpersisted remains. */
+  /** Drops every derived and group surface and each base cache nothing pins or holds. */
   releaseReconstructible(): void {
-    this.layers.dispose();
     this.derived.dispose();
     this.groups.clear();
+    for (const layerId of this.layers.evict((candidate) => this.isProtected(candidate), 0)) {
+      this.deleteDerivedSurfaces(layerId);
+    }
   }
 
   async decodeImage(
@@ -229,7 +227,9 @@ export class RasterController {
   }
 
   getAdjustedSurface(layer: CanvasLayerContract, entry: LayerCacheEntry): RasterSurface | null {
-    return layer.type === 'raster' ? this.adjustments.get(layer.id, entry, layer.adjustments) : null;
+    return layer.type === 'raster' && !this.isAdjustmentBaked(layer.id)
+      ? this.adjustments.get(layer.id, entry, layer.adjustments)
+      : null;
   }
 
   deleteDerivedSurfaces(layerId: string): void {
@@ -380,7 +380,9 @@ export class RasterController {
     this.clearTrackedImages();
     this.clearMirroredImages();
     this.clearThumbnailKeys();
-    this.releaseReconstructible();
+    this.layers.dispose();
+    this.derived.dispose();
+    this.groups.clear();
     this.bitmaps.dispose();
     this.memory.dispose();
   }

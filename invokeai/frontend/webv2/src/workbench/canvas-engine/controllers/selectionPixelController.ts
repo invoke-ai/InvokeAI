@@ -1,7 +1,7 @@
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { History } from '@workbench/canvas-engine/history/history';
 import type { ImagePatchApply } from '@workbench/canvas-engine/history/imagePatch';
-import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
+import type { LayerCacheEntryState, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
 import type { PixelEditTransaction } from '@workbench/canvas-engine/tools/tool';
@@ -121,18 +121,7 @@ export class SelectionPixelController {
     let editSurface: RasterSurface | null = null;
     let commitStarted = false;
     let rollbackStarted = false;
-    let growthSnapshot:
-      | {
-          hasPublishedPixels: boolean;
-          lastUsed: number;
-          pixels: ImageData | null;
-          rect: Rect;
-          stale: boolean;
-          surface: RasterSurface;
-          version: number;
-        }
-      | null
-      | undefined;
+    let growthSnapshot: { pixels: ImageData | null; state: LayerCacheEntryState } | null | undefined;
     const rollback = (): void => {
       if (target.kind !== 'control' || rollbackStarted) {
         return;
@@ -140,23 +129,15 @@ export class SelectionPixelController {
       rollbackStarted = true;
       try {
         if (growthSnapshot !== undefined) {
-          if (growthSnapshot === null) {
-            this.deps.layers.delete(layerId);
-          } else {
-            const current = this.deps.layers.get(layerId);
-            if (current) {
-              growthSnapshot.surface.resize(growthSnapshot.rect.width, growthSnapshot.rect.height);
-              if (growthSnapshot.pixels) {
-                growthSnapshot.surface.ctx.putImageData(growthSnapshot.pixels, 0, 0);
-              }
-              current.hasPublishedPixels = growthSnapshot.hasPublishedPixels;
-              current.lastUsed = growthSnapshot.lastUsed;
-              current.rect = { ...growthSnapshot.rect };
-              current.stale = growthSnapshot.stale;
-              current.surface = growthSnapshot.surface;
-              current.version = growthSnapshot.version;
+          if (growthSnapshot) {
+            const { pixels, state } = growthSnapshot;
+            state.surface.resize(state.rect.width, state.rect.height);
+            if (pixels) {
+              state.surface.ctx.putImageData(pixels, 0, 0);
             }
           }
+          // An exact rollback; the store re-accounts the reinstated surface.
+          this.deps.layers.restoreState(layerId, growthSnapshot?.state ?? null);
           this.deps.deleteDerived(layerId);
           this.deps.invalidateLayer(layerId);
         } else if (before && editOrigin && editRect && editSurface) {
@@ -179,19 +160,16 @@ export class SelectionPixelController {
           selectionRect.x + selectionRect.width > existing.rect.x + existing.rect.width ||
           selectionRect.y + selectionRect.height > existing.rect.y + existing.rect.height;
         if (needsGrowth) {
-          growthSnapshot = existing
-            ? {
-                hasPublishedPixels: existing.hasPublishedPixels,
-                lastUsed: existing.lastUsed,
-                pixels: isEmpty(existing.rect)
-                  ? null
-                  : existing.surface.ctx.getImageData(0, 0, existing.rect.width, existing.rect.height),
-                rect: { ...existing.rect },
-                stale: existing.stale,
-                surface: existing.surface,
-                version: existing.version,
-              }
-            : null;
+          const state = this.deps.layers.captureState(layerId);
+          growthSnapshot =
+            existing && state
+              ? {
+                  pixels: isEmpty(existing.rect)
+                    ? null
+                    : existing.surface.ctx.getImageData(0, 0, existing.rect.width, existing.rect.height),
+                  state,
+                }
+              : null;
         }
       }
       let rect: Rect | null;

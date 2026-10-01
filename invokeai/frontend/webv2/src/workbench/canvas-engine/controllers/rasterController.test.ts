@@ -117,7 +117,7 @@ describe('RasterController', () => {
     publish(controller, 'dirty');
     publish(controller, 'pinned');
     publish(controller, 'hidden');
-    const pin = controller.pin('pinned');
+    const pin = controller.memory.pin('pinned');
 
     const result = controller.enforceBudget(new Set(), controller.beginFrame());
 
@@ -126,6 +126,43 @@ describe('RasterController', () => {
     expect(controller.layers.peek('pinned')).toBeDefined();
     pin.release();
     expect(controller.enforceBudget(new Set(), controller.beginFrame()).evictedBaseLayerIds).toEqual(['pinned']);
+  });
+
+  it('keeps a drawn group composite across frames instead of rebuilding it under pressure', () => {
+    const backend = createTestStubRasterBackend();
+    const createSurface = vi.fn((width: number, height: number) => backend.createSurface(width, height));
+    const controller = new RasterController({
+      backend: { ...backend, createSurface },
+      budgetBytes: SURFACE_BYTES,
+      diagnostics: createCanvasDiagnostics(true),
+    });
+    publish(controller, 'member');
+    const members = [
+      { id: 'member', layer: { ...adjustedLayer('member'), adjustments: [] } } as unknown as SemanticLeaf,
+    ];
+    const builds = (): number => createSurface.mock.calls.filter(([width]) => width === 10).length;
+    const before = builds();
+
+    for (let frame = 0; frame < 5; frame += 1) {
+      const usage = controller.beginFrame();
+      controller.groups.get(groupScope, members, [identity()], new Set());
+      expect(controller.enforceBudget(new Set(['member']), usage).overageBytes).toBe(SURFACE_BYTES);
+    }
+
+    expect(builds() - before).toBe(1);
+  });
+
+  it('counts reserved and detached bytes when deciding what to reclaim', () => {
+    const controller = createController(SURFACE_BYTES * 2);
+    publish(controller, 'hidden');
+    const reservation = controller.memory.reserveOperation(1, { purpose: 'thumbnail' });
+    const detached = controller.memory.trackDetached(SURFACE_BYTES);
+
+    expect(controller.enforceBudget(new Set(), controller.beginFrame()).evictedBaseLayerIds).toEqual(['hidden']);
+    detached.release();
+    if (reservation.status === 'ok') {
+      reservation.lease.release();
+    }
   });
 
   it('evicts inactive group composites and releases them with the reconstructible caches', () => {

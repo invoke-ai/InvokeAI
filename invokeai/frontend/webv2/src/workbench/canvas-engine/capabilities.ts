@@ -475,7 +475,7 @@ export interface CanvasDiagnosticsSnapshot {
   readonly layersDrawn: number;
   readonly compositeFrames: number;
   readonly overlayFrames: number;
-  readonly overBudgetVisibleBaseBytes: number;
+  readonly rasterOverageBytes: number;
 }
 
 export interface CanvasEngineToolCapability extends CanvasToolCapability {

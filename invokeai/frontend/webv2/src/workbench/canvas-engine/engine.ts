@@ -347,11 +347,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     backend,
     diagnostics,
     getDocument: () => mirror.getDocument(),
-    // Pixel transactions already bake adjustments into the live cache; drawing them through the group again would
-    // apply them twice.
-    getGroupMemberSurface: (layer, entry) => getAdjustedSurface(layer, entry),
     getLayerImageName: layerImageName,
     imageResolver,
+    // A raster-image pixel transaction replaces the live cache with pixels that already include adjustments while
+    // the contract keeps them until commit; applying them again would double them and snap back on pointer-up.
+    isAdjustmentBaked: (layerId) => pixelEditController?.isOpenFor([layerId]) === true,
     isLayerHeld: (layerId) => isLayerHeldBySession(layerId) || bitmapStore.hasPendingWork(layerId),
     onVersionChange: (layerId) => editingController?.invalidateLayer(layerId),
   });
@@ -465,16 +465,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   // Adjusted raster surfaces rebuild on cache-version or adjustment changes, not each frame.
   const derivedSurfaceCache = rasterController.derived;
   const deleteDerivedSurfaces = (layerId: string): void => rasterController.deleteDerivedSurfaces(layerId);
-  const getAdjustedSurface = (layer: CanvasLayerContract, entry: LayerCacheEntry): RasterSurface | null => {
-    if (layer.type === 'raster' && pixelEditController?.isOpenFor([layer.id])) {
-      // A raster-image pixel transaction replaces the live cache with pixels
-      // that already include adjustments while leaving the reducer contract
-      // untouched until commit. Drawing that preview through the contract's
-      // adjustments would apply them twice and snap back on pointer-up.
-      return null;
-    }
-    return rasterController.getAdjustedSurface(layer, entry);
-  };
+  const getAdjustedSurface = (layer: CanvasLayerContract, entry: LayerCacheEntry): RasterSurface | null =>
+    rasterController.getAdjustedSurface(layer, entry);
 
   const groupSurfaces = rasterController.groups;
   const getGroupSurface: NonNullable<CompositeOptions['groupSurface']> = (scope, members, matrices, excludeIds) =>
@@ -574,9 +566,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     );
   }
 
-  /** Defer trim while a gesture, session, pinned read or rasterization depends on the cache bounds. */
+  /** Defer trim while a gesture, session or rasterization depends on the cache bounds. */
   const isLayerBusyForTrim = (layerId: string): boolean => {
-    if (pipeline.isGestureActive() || isLayerHeldBySession(layerId) || rasterController.memory.isPinned(layerId)) {
+    if (pipeline.isGestureActive() || isLayerHeldBySession(layerId)) {
       return true;
     }
     const layer = getDocumentLayer(mirror.getDocument(), layerId);
@@ -591,7 +583,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       dispatchBitmap: (layerId, bitmap, offset) => dispatchLayerBitmap(layerId, bitmap, offset),
       encodeSurface: (surface) => backend.encodeSurface(surface),
       trimLayerPixels: (layerId) => {
-        const result = trimPaintCacheToAlpha({ isLayerBusy: isLayerBusyForTrim, layers: layerCache }, layerId);
+        const result = trimPaintCacheToAlpha(
+          {
+            isLayerBusy: isLayerBusyForTrim,
+            isLayerPinned: (candidate) => rasterController.memory.isPinned(candidate),
+            layers: layerCache,
+          },
+          layerId
+        );
         if (result === 'emptied' || result === 'trimmed') {
           // Derived surfaces are keyed on the old extent; both calls are synchronous,
           // so they land before the clear dispatch and no frame sees a mismatch.
@@ -1187,7 +1186,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     isSupportedSource: isSupportedExportSource,
     layers: layerCache,
     invalidateLayerCache,
-    pin: (layerId) => rasterController.pin(layerId),
+    pin: (layerId) => rasterController.memory.pin(layerId),
     reserve: (bytes) =>
       rasterController.memory.reserve(bytes, { generation: lifecycleGeneration, purpose: 'raster-export' }),
     waitForFont: fontLoader.waitForReady,
@@ -2148,7 +2147,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     preparePixels: prepareGeneratedPaintCache,
     prepareDuplicateRasterSource: prepareLayerRasterCache,
     pinDuplicateRasterSources: (layerIds) => {
-      const leases = layerIds.map((layerId) => rasterController.pin(layerId));
+      const leases = layerIds.map((layerId) => rasterController.memory.pin(layerId));
       return {
         release: () => {
           for (const lease of leases) {
@@ -2513,7 +2512,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         snapshot.documentGeneration === rasterController.getDocumentGeneration() &&
         snapshot.lifecycleGeneration === lifecycleGeneration,
       pin: (layerIds) => {
-        const leases = layerIds.map((layerId) => rasterController.pin(layerId));
+        const leases = layerIds.map((layerId) => rasterController.memory.pin(layerId));
         return {
           release: () => {
             for (const lease of leases) {
@@ -2694,7 +2693,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       getMaskPattern: getMaskPatternTile,
       isDisposed: () => disposed,
       isSupportedSource: isSupportedExportSource,
-      pin: (layerId) => rasterController.pin(layerId),
+      pin: (layerId) => rasterController.memory.pin(layerId),
       projectId,
       rasterize: rasterizeLayerForThumbnail,
       reportError: (layerId, error) => {

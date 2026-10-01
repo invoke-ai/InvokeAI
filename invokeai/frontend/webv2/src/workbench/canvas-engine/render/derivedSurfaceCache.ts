@@ -58,11 +58,7 @@ export const createDerivedSurfaceCache = (
       return;
     }
     totalBytes += delta;
-    try {
-      onBytesChange?.(totalBytes);
-    } catch {
-      // Accounting observers cannot veto an allocation that already happened.
-    }
+    onBytesChange?.(totalBytes);
   };
 
   const remove = (key: string, entry: CacheEntry): void => {

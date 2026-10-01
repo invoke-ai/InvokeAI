@@ -30,7 +30,7 @@ vi.mock('./library', () => ({
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => harness.navigate }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: harness.notifyError }) }));
 vi.mock('@workbench/WorkbenchContext', () => ({
-  useWorkbenchCanvasHeldMedia: () => ({ flushPendingPixels: harness.flushCanvasPixels }),
+  useWorkbenchLiveCanvasEngines: () => ({ flushPendingPixels: harness.flushCanvasPixels }),
   useWorkbenchCommands: () => ({ projects: { close: harness.close } }),
   useWorkbenchPersistenceAdapter: () => ({ getState: () => ({ projects: [harness.project] }) }),
   useWorkbenchPersistenceService: () => ({
@@ -118,7 +118,7 @@ describe('useProjectActions', () => {
     await act(() => userEvent.click(document.querySelector('button')!));
     await vi.waitFor(() => expect(harness.notifyError).toHaveBeenCalledOnce());
 
-    expect(harness.notifyError).toHaveBeenCalledWith('projects.closeBlocked', 'projects.file.notSynced');
+    expect(harness.notifyError).toHaveBeenCalledWith('projects.closeBlocked', 'projects.canvasPixelsNotSaved');
     expect(harness.flush).not.toHaveBeenCalled();
     expect(harness.close).not.toHaveBeenCalled();
   });
@@ -134,6 +134,10 @@ describe('useProjectActions', () => {
     await vi.waitFor(() => expect(harness.close).toHaveBeenCalledOnce());
 
     expect(harness.flushCanvasPixels.mock.invocationCallOrder[0]).toBeLessThan(
+      harness.flush.mock.invocationCallOrder[0]!
+    );
+    // Pixels painted while the document was being pushed are persisted before the tab closes.
+    expect(harness.flushCanvasPixels.mock.invocationCallOrder[1]).toBeGreaterThan(
       harness.flush.mock.invocationCallOrder[0]!
     );
   });

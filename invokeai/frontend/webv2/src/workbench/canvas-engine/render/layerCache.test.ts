@@ -213,6 +213,8 @@ describe('createLayerCacheStore', () => {
     expect(store.byteSize()).toBe(64);
     store.restoreState('a', before);
     expect(store.byteSize()).toBe(400);
+    // An exact rollback: guards captured before the replacement describe the reinstated entry again.
+    expect(store.peek('a')).toMatchObject({ rect: before!.rect, surface: before!.surface, version: before!.version });
     store.publishRasterized('b', { height: 2, width: 3, x: 0, y: 0 }, backend.createSurface(3, 2));
     store.delete('a');
 

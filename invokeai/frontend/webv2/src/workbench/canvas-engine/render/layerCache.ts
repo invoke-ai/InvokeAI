@@ -112,7 +112,10 @@ export interface LayerCacheStore {
   publishRasterized(layerId: string, rect: Rect, pixels: RasterSurface, renderedFontFamily?: string): LayerCacheEntry;
   /** The entry's current state, or null when absent; the surface is shared, not copied. */
   captureState(layerId: string): LayerCacheEntryState | null;
-  /** Reinstates a captured state (null deletes the entry), keeping byte accounting exact. */
+  /**
+   * Reinstates a captured state exactly (null deletes the entry), version included, so guards captured before a
+   * rolled-back transaction stay current. The caller discards artifacts derived from versions issued since.
+   */
   restoreState(layerId: string, state: LayerCacheEntryState | null): void;
   /**
    * Publish direct writes as current, bump version and notify. Optional surface-local damage enables partial
@@ -151,13 +154,7 @@ export const createLayerCacheStore = (
   const accountedBytes = new Map<string, number>();
   let totalBytes = 0;
 
-  const reportBytes = (): void => {
-    try {
-      options.onBytesChange?.(totalBytes);
-    } catch {
-      // Accounting observers cannot veto an allocation that already happened.
-    }
-  };
+  const reportBytes = (): void => options.onBytesChange?.(totalBytes);
 
   /** Brings the running total in line with the entry's current surface. */
   const account = (entry: LayerCacheEntry): void => {
@@ -496,17 +493,15 @@ export const createLayerCacheStore = (
       del(layerId);
       return;
     }
-    const entry = entries.get(layerId);
-    if (entry) {
-      Object.assign(entry, { ...state, rect: { ...state.rect } });
-      touch(entry);
-      damageTrails.delete(layerId);
-      account(entry);
-      notifyVersionChange(layerId);
-      return;
-    }
-    const restored: LayerCacheEntry = { ...state, lastUsed: 0, layerId, rect: { ...state.rect } };
+    const restored: LayerCacheEntry = entries.get(layerId) ?? {
+      ...state,
+      lastUsed: 0,
+      layerId,
+      rect: { ...state.rect },
+    };
+    Object.assign(restored, { ...state, rect: { ...state.rect } });
     touch(restored);
+    damageTrails.delete(layerId);
     entries.set(layerId, restored);
     account(restored);
     notifyVersionChange(layerId);

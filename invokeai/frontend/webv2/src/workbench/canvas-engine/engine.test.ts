@@ -5532,8 +5532,11 @@ describe('mergeLayerDown', () => {
     expect(dispatch.mock.calls.some((call) => (call[0] as EngineTestAction).type === 'mergeCanvasLayersDown')).toBe(
       true
     );
-    // No pixels require allocation; zero-sized union canvases would throw.
-    expect(surfaces.length).toBe(surfacesBeforeMerge);
+    // Only the merged layer's empty cache is allocated; zero-sized union canvases would throw.
+    expect(surfaces.length).toBe(surfacesBeforeMerge + 1);
+    expect(surfaces.at(-1)).toMatchObject({ height: 0, width: 0 });
+    // The merged layer is empty, not lost: the paint barrier succeeds.
+    await expect(engine.lifecycle.flushPendingUploads()).resolves.toBeUndefined();
 
     engine.lifecycle.dispose();
   });
@@ -7927,11 +7930,12 @@ describe('rasterizeLayer (parametric → paint)', () => {
       }
     }
 
-    const baked = surfaces[before];
+    const baked = surfaces
+      .slice(before)
+      .find(
+        (surface) => surface.width === 60 && surface.height === 40 && surface.callLog.some((e) => e.op === 'drawImage')
+      );
     expect(baked).toBeDefined();
-    expect(baked?.width).toBe(60);
-    expect(baked?.height).toBe(40);
-    expect(baked?.callLog.some((e) => e.op === 'drawImage')).toBe(true);
 
     engine.lifecycle.dispose();
   });

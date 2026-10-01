@@ -205,11 +205,15 @@ describe('image-layer erasing with real browser pixels', () => {
       getLayerSource: () => currentSource,
       getLayerSurface: (layerId) => {
         const entry = layers.get(layerId);
-        return entry && entry.rect.width > 0 && entry.rect.height > 0
+        if (!entry) {
+          return null;
+        }
+        return entry.rect.width > 0 && entry.rect.height > 0
           ? { offset: { x: entry.rect.x, y: entry.rect.y }, surface: entry.surface }
-          : null;
+          : 'empty';
       },
-      trimLayerPixels: (layerId) => trimPaintCacheToAlpha({ isLayerBusy: () => false, layers }, layerId),
+      trimLayerPixels: (layerId) =>
+        trimPaintCacheToAlpha({ isLayerBusy: () => false, isLayerPinned: () => false, layers }, layerId),
       uploadImage,
     });
 

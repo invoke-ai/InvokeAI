@@ -92,7 +92,9 @@ export class MergeLayerController {
         type: 'mergeCanvasLayersDown',
         upperLayerId,
       });
+      // An empty live cache, not a missing one: the paint barrier treats a dirty layer without a cache as lost.
       this.deps.layers.delete(below.id);
+      this.deps.layers.getOrCreateRect(below.id, { height: 0, width: 0, x: 0, y: 0 }).stale = false;
       this.deps.notifyPainted(below.id);
       this.deps.markDirty(below.id);
       return true;

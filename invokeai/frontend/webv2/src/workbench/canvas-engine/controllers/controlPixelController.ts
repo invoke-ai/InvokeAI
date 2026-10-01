@@ -152,17 +152,7 @@ export class PixelEditController {
         return null;
       }
     }
-    const original = originalEntry
-      ? {
-          hasPublishedPixels: originalEntry.hasPublishedPixels,
-          lastUsed: originalEntry.lastUsed,
-          pixels: originalPixels,
-          rect: { ...originalEntry.rect },
-          stale: originalEntry.stale,
-          surface: originalEntry.surface,
-          version: originalEntry.version,
-        }
-      : null;
+    const original = o.layers.captureState(layerId);
     const releasePersistence = o.bitmapStore.suspendLayer(layerId);
     let closed = false;
     let owner: { cancel: () => void; layerId: string };
@@ -176,23 +166,14 @@ export class PixelEditController {
     };
     const restore = (): void => {
       try {
-        if (!original) {
-          o.layers.delete(layerId);
-        } else {
+        if (original) {
           original.surface.resize(original.rect.width, original.rect.height);
-          if (original.pixels) {
-            original.surface.ctx.putImageData(original.pixels, 0, 0);
+          if (originalPixels) {
+            original.surface.ctx.putImageData(originalPixels, 0, 0);
           }
-          const current = o.layers.get(layerId) ?? o.layers.getOrCreateRect(layerId, original.rect);
-          Object.assign(current, {
-            hasPublishedPixels: original.hasPublishedPixels,
-            lastUsed: original.lastUsed,
-            rect: { ...original.rect },
-            stale: original.stale,
-            surface: original.surface,
-            version: original.version,
-          });
         }
+        // An exact rollback; the store re-accounts the reinstated surface.
+        o.layers.restoreState(layerId, original);
       } finally {
         o.deleteDerived(layerId);
         o.invalidate(layerId);
@@ -297,17 +278,8 @@ export class PixelEditController {
   ): PixelEditTransaction | null {
     const o = this.options;
     const originalEntry = o.layers.get(layerId);
-    const original = originalEntry
-      ? {
-          hasPublishedPixels: originalEntry.hasPublishedPixels,
-          lastUsed: originalEntry.lastUsed,
-          rect: { ...originalEntry.rect },
-          stale: originalEntry.stale,
-          surface: originalEntry.surface,
-          version: originalEntry.version,
-        }
-      : null;
-    const beforeRect = original?.rect ?? { ...contentRect };
+    const original = o.layers.captureState(layerId);
+    const beforeRect = original ? { ...original.rect } : { ...contentRect };
     let beforePixels: ImageData | null = null;
     if (!isEmpty(beforeRect)) {
       if (!originalEntry) {
@@ -342,14 +314,7 @@ export class PixelEditController {
     const before: LayerPixelSnapshot = { layer: structuredClone(layer), pixels: beforePixels, rect: beforeRect };
     const restore = (): void => {
       try {
-        if (original) {
-          const current = o.layers.get(layerId);
-          if (current) {
-            Object.assign(current, { ...original, rect: { ...original.rect } });
-          }
-        } else {
-          o.layers.delete(layerId);
-        }
+        o.layers.restoreState(layerId, original);
       } finally {
         o.deleteDerived(layerId);
         o.setTransformOverride(layerId, null);
@@ -365,14 +330,7 @@ export class PixelEditController {
       }
     };
     try {
-      const preview = originalEntry ?? o.layers.getOrCreateRect(layerId, prepared.rect);
-      Object.assign(preview, {
-        surface: prepared.surface,
-        rect: { ...prepared.rect },
-        hasPublishedPixels: true,
-        stale: false,
-      });
-      preview.version += 1;
+      o.layers.installReplacement(prepared);
       o.deleteDerived(layerId);
       o.setTransformOverride(layerId, { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 });
       o.invalidate(layerId, true);

@@ -75,11 +75,7 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
       return;
     }
     totalBytes += delta;
-    try {
-      deps.onBytesChange?.(totalBytes);
-    } catch {
-      // Accounting observers cannot veto an allocation that already happened.
-    }
+    deps.onBytesChange?.(totalBytes);
   };
 
   const dropSlots = (slots: readonly GroupSlot[]): void => {
