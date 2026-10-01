@@ -13,7 +13,7 @@ import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbenc
 
 import type { CanvasMutationContext } from './mutationContext';
 
-import { addLayerStep, publishRefusal, removeLayerStep } from './layerResultSteps';
+import { addLayerStep, guardedResultRefusal, layerEditRefusal, removeLayerStep } from './editSteps';
 
 export type {
   CommitMaskImageResult,
@@ -100,7 +100,7 @@ export class MaskResultController {
     const anchor = o.ctx.captureInsertionAnchor(layer.type, liveLayer.id);
     const txn = o.ctx.begin({ historyBytes: HISTORY_ENTRY_OVERHEAD_BYTES, owner });
     if (!('publish' in txn)) {
-      return Promise.resolve({ status: txn.status === 'gesture-active' ? 'busy' : txn.status });
+      return Promise.resolve({ status: layerEditRefusal(txn.status) });
     }
     try {
       const added = () =>
@@ -116,7 +116,7 @@ export class MaskResultController {
         }
       );
       return Promise.resolve(
-        result.status === 'committed' ? { layerId, status: 'committed' } : { status: publishRefusal(result) }
+        result.status === 'committed' ? { layerId, status: 'committed' } : { status: guardedResultRefusal(result) }
       );
     } finally {
       txn.end();

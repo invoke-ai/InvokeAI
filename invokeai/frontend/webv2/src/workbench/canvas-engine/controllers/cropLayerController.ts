@@ -16,11 +16,13 @@ import type { CanvasMutationContext, EditStep } from './mutationContext';
 
 import {
   layerEditRefusal,
-  layerEditStatus,
+  layerOperationStatus,
   rgbaBytes,
   withReplayReservation,
   type LayerEditRefusal,
-} from './newRasterLayerController';
+  replaceLayerStep,
+  type LayerPixels,
+} from './editSteps';
 
 export type CropLayerResult =
   | { status: 'cropped' }
@@ -30,11 +32,6 @@ export type CropLayerResult =
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
-
-interface PixelSnapshot {
-  pixels: RasterSurface;
-  rect: Rect;
-}
 
 export interface CropLayerControllerOptions {
   readonly ctx: Pick<
@@ -57,7 +54,7 @@ export interface CropLayerControllerOptions {
     layer: CanvasLayerContract,
     document: CanvasDocumentContractV3,
     admit?: (rect: Rect) => boolean
-  ) => PixelSnapshot | null | 'not-ready' | 'over-budget';
+  ) => LayerPixels | null | 'not-ready' | 'over-budget';
   readonly discardPersisted: (layerId: string) => void;
 }
 
@@ -150,30 +147,19 @@ export class CropLayerController {
           } else {
             after = { ...before, mask: { ...before.mask, bitmap: null, offset: paint.offset }, transform: identity };
           }
-          const afterPixels: PixelSnapshot = { pixels: cropped, rect: cropRect };
+          const afterPixels: LayerPixels = { pixels: cropped, rect: cropRect };
           /** Replaces the layer's contract and cache together; a failed replacement restores the current contract. */
-          const replaceStep = (contract: CanvasLayerContract, snapshot: PixelSnapshot): EditStep => {
-            const previous = getDocumentLayer(ctx.getReducerDocument(), layerId);
-            const prepared = ctx.preparePixels(layerId, snapshot.rect, snapshot.pixels);
-            return {
-              accepted: (candidate) => getDocumentLayer(candidate, layerId) === contract,
-              install: () => {
+          const replaceStep = (contract: CanvasLayerContract, snapshot: LayerPixels): EditStep =>
+            replaceLayerStep(ctx, contract, ctx.preparePixels(layerId, snapshot.rect, snapshot.pixels), {
+              beforeInstall: () => {
                 try {
                   this.deps.discardPersisted(layerId);
                 } catch {
                   // The installed pixels are marked dirty and persist on their own.
                 }
-                ctx.installPrepared(prepared);
               },
-              mutation: { layer: contract, layerId, type: 'replaceCanvasLayer' },
-              rollback: previous
-                ? {
-                    mutation: { layer: previous, layerId, type: 'replaceCanvasLayer' },
-                    restored: (candidate) => getDocumentLayer(candidate, layerId) === previous,
-                  }
-                : undefined,
-            };
-          };
+              restore: getDocumentLayer(ctx.getReducerDocument(), layerId) ?? undefined,
+            });
           const result = txn.publish('Crop layer to bbox', replaceStep(after, afterPixels), {
             bytes: rgbaBytes(beforePixels.rect) + rgbaBytes(cropRect) + HISTORY_ENTRY_OVERHEAD_BYTES,
             heldAssetRefs: collectHistoryMediaRefs(before, after),
@@ -184,7 +170,7 @@ export class CropLayerController {
                 ctx.applyStep(replaceStep(before, beforePixels))
               ),
           });
-          const status = layerEditStatus(result);
+          const status = layerOperationStatus(result);
           return status === 'committed' ? { status: 'cropped' } : status === 'failed' ? failedCrop : { status };
         } finally {
           txn.end();

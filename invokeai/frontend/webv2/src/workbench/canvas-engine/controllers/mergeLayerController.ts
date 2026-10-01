@@ -33,13 +33,15 @@ import type { CanvasMutationContext, EditStep } from './mutationContext';
 import {
   addedLayerHistoryBytes,
   layerEditRefusal,
-  layerEditStatus,
+  layerOperationStatus,
   paintLayerAt,
   publishAddedRasterLayer,
   rgbaBytes,
   withReplayReservation,
   type LayerEditRefusal,
-} from './newRasterLayerController';
+  replaceLayerStep,
+  type LayerPixels,
+} from './editSteps';
 
 export type MergeVisibleResult = 'merged' | LayerEditRefusal | 'nothing' | 'failed';
 
@@ -62,12 +64,6 @@ export interface MergeLayerControllerOptions {
   readonly exportBaked: (layerId: string) => Promise<ExportResult>;
   readonly needsPixelPersistence: (layer: CanvasLayerContract) => boolean;
   readonly publishSelectedLayerIds: (primaryId: string | null, selectedIds: readonly string[]) => void;
-}
-
-/** A layer's cache pixels copied out for undo. */
-interface PixelSnapshot {
-  readonly rect: Rect;
-  readonly pixels: RasterSurface;
 }
 
 const EMPTY_RECT: Rect = { height: 0, width: 0, x: 0, y: 0 };
@@ -140,7 +136,7 @@ export class MergeLayerController {
       if (!txn.reserveRaster(snapshotBytes + rgbaBytes(mergedRect) * 2)) {
         return 'over-budget';
       }
-      const snapshot = (rect: Rect, layerId: string): PixelSnapshot => {
+      const snapshot = (rect: Rect, layerId: string): LayerPixels => {
         const pixels = this.deps.backend.createSurface(rect.width, rect.height);
         if (!isEmpty(rect)) {
           pixels.ctx.drawImage(this.deps.layers.get(layerId)!.surface.canvas, 0, 0);
@@ -165,7 +161,7 @@ export class MergeLayerController {
         context.globalAlpha = 1;
         context.globalCompositeOperation = 'source-over';
       }
-      const mergedPixels: PixelSnapshot = { pixels: merged, rect: mergedRect };
+      const mergedPixels: LayerPixels = { pixels: merged, rect: mergedRect };
       const source = { bitmap: null, offset: { x: mergedRect.x, y: mergedRect.y }, type: 'paint' } as const;
       const mergeMutation: CanvasProjectMutation = { source, type: 'mergeCanvasLayersDown', upperLayerId: upper.id };
       const upperAnchor = ctx.captureRestoreAnchor(upper.id)!;
@@ -183,21 +179,11 @@ export class MergeLayerController {
           mutation: mergeMutation,
         };
       };
-      const replaceBelowStep = (contract: CanvasLayerContract, pixels: PixelSnapshot): EditStep => {
-        const previous = getDocumentLayer(ctx.getReducerDocument(), below.id);
-        const prepared = ctx.preparePixels(below.id, pixels.rect, pixels.pixels);
-        return {
-          accepted: (candidate) => getDocumentLayer(candidate, below.id) === contract,
-          install: () => ctx.installPrepared(prepared, persist(contract)),
-          mutation: { layer: contract, layerId: below.id, type: 'replaceCanvasLayer' },
-          rollback: previous
-            ? {
-                mutation: { layer: previous, layerId: below.id, type: 'replaceCanvasLayer' },
-                restored: (candidate) => getDocumentLayer(candidate, below.id) === previous,
-              }
-            : undefined,
-        };
-      };
+      const replaceBelowStep = (contract: CanvasLayerContract, pixels: LayerPixels): EditStep =>
+        replaceLayerStep(ctx, contract, ctx.preparePixels(below.id, pixels.rect, pixels.pixels), {
+          persist: persist(contract),
+          restore: getDocumentLayer(ctx.getReducerDocument(), below.id) ?? undefined,
+        });
       const reinsertUpperStep = (): EditStep => {
         const prepared = ctx.preparePixels(upper.id, upperRect, upperPixels.pixels);
         return {
@@ -229,7 +215,7 @@ export class MergeLayerController {
             throw error;
           }
         });
-      const status = layerEditStatus(
+      const status = layerOperationStatus(
         txn.publish('Merge down', mergeStep(), {
           bytes: snapshotBytes + rgbaBytes(mergedRect) + HISTORY_ENTRY_OVERHEAD_BYTES,
           heldAssetRefs: collectHistoryMediaRefs(upper, below),
@@ -379,7 +365,7 @@ export class MergeLayerController {
         context.globalAlpha = 1;
         context.globalCompositeOperation = 'source-over';
 
-        const status = layerEditStatus(
+        const status = layerOperationStatus(
           publishAddedRasterLayer(ctx, txn, {
             anchor: ctx.captureInsertionAnchor('raster', null),
             heldAssetRefs: collectHistoryMediaRefs(contributors),
@@ -561,7 +547,7 @@ export class MergeLayerController {
             rollback: { mutation: merge, restored: hasMerged },
           };
         };
-        const status = layerEditStatus(
+        const status = layerOperationStatus(
           txn.publish('Merge selected layers', mergeStep(), {
             bytes: rawBytes + mergedBytes + contributors.length * HISTORY_ENTRY_OVERHEAD_BYTES,
             heldAssetRefs: collectHistoryMediaRefs(rawSnapshots.map(({ layer }) => layer)),

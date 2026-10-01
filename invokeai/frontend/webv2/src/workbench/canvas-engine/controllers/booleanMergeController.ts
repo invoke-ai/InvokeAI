@@ -12,13 +12,13 @@ import type { CanvasMutationContext } from './mutationContext';
 import {
   addedLayerHistoryBytes,
   layerEditRefusal,
-  layerEditStatus,
+  layerOperationStatus,
   paintLayerAt,
   publishAddedRasterLayer,
   rgbaBytes,
-  type AddedLayerContext,
+  type LayerStepContext,
   type LayerEditRefusal,
-} from './newRasterLayerController';
+} from './editSteps';
 
 export type BooleanRasterOperation = 'intersect' | 'cutout' | 'cutaway' | 'exclude';
 export type BooleanRasterResult = 'merged' | 'missing' | 'unsupported' | 'empty' | 'failed' | LayerEditRefusal;
@@ -28,7 +28,7 @@ type ExportResult =
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
 
 export interface BooleanMergeControllerOptions {
-  readonly ctx: AddedLayerContext &
+  readonly ctx: LayerStepContext &
     Pick<
       CanvasMutationContext,
       'begin' | 'capturePermit' | 'captureInsertionAnchor' | 'createLayerId' | 'getDocument' | 'isPermitCurrent'
@@ -157,7 +157,7 @@ export class BooleanMergeController {
           upperPixels.rect.y - resultRect.y
         );
         const layer = paintLayerAt(ctx.createLayerId(), `${upper.name} ${operation}`, resultRect);
-        const status = layerEditStatus(
+        const status = layerOperationStatus(
           publishAddedRasterLayer(ctx, txn, {
             anchor: ctx.captureInsertionAnchor('raster', upper.id),
             enabled: {

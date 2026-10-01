@@ -51,13 +51,10 @@ const STRUCTURAL_MUTATION_TYPES = [
 ];
 /** Explicitly allowlist structural-mutation owners to prevent bypassing the prepared-edit seam. */
 const STRUCTURAL_MUTATION_OWNER_PATHS = new Set([
-  'workbench/canvasProjectMutations.ts',
   'workbench/canvas-engine/controllers/controlPixelController.ts',
-  'workbench/canvas-engine/controllers/cropLayerController.ts',
-  'workbench/canvas-engine/controllers/layerResultSteps.ts',
+  'workbench/canvas-engine/controllers/editSteps.ts',
   'workbench/canvas-engine/controllers/layerMutationController.ts',
   'workbench/canvas-engine/controllers/mergeLayerController.ts',
-  'workbench/canvas-engine/controllers/newRasterLayerController.ts',
   'workbench/canvas-engine/controllers/rasterizeLayerController.ts',
   'workbench/canvas-engine/controllers/stagedResultController.ts',
   'workbench/canvas-engine/controllers/structuralLayerController.ts',
@@ -72,6 +69,7 @@ const STRUCTURAL_MUTATION_OWNER_PATHS = new Set([
   'workbench/canvas-engine/tools/paintTool.ts',
   'workbench/canvas-engine/tools/shapeTool.ts',
   'workbench/canvas-operations/importGalleryImages.ts',
+  'workbench/canvasProjectMutations.ts',
 ]);
 const structuralLiteral = new RegExp(`type: '(?:${STRUCTURAL_MUTATION_TYPES.join('|')})'`, 'g');
 

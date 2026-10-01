@@ -1,164 +1,33 @@
-import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasCommandRefusal } from '@workbench/canvas-engine/document/commandRefusal';
-import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
-import type { CanvasTransactionOutcome, SubsetOf } from '@workbench/canvas-engine/editConcurrency';
-import type { HeldAssetRefs } from '@workbench/canvas-engine/history/history';
-import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
+import type { SubsetOf } from '@workbench/canvas-engine/editConcurrency';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { getDocumentLayer, isNodeAbsent } from '@workbench/canvas-engine/document/documentIndex';
-import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
+import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { isEmpty, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
 import { liftSelectedPixels } from '@workbench/canvas-engine/selection/floatingSelection';
 import { layerMatrix } from '@workbench/canvas-engine/tools/moveHitTest';
 
-import type {
-  CanvasMutationContext,
-  EditPublishResult,
-  EditRefusal,
-  EditStep,
-  EditTransaction,
-} from './mutationContext';
+import type { CanvasMutationContext } from './mutationContext';
 
-/** A refused admission as its caller reports it; a gesture in progress reads as contention. */
-export type LayerEditRefusal = SubsetOf<CanvasTransactionOutcome, 'busy' | 'not-ready' | 'over-budget'>;
-
-/** How a layer operation's publication ended; a reducer refusal or failed postcondition applied nothing. */
-export type LayerEditStatus = 'committed' | LayerEditRefusal | 'failed';
-
-export const layerEditRefusal = (status: EditRefusal): LayerEditRefusal =>
-  status === 'gesture-active' ? 'busy' : status;
-
-export const layerEditStatus = (result: EditPublishResult): LayerEditStatus => {
-  switch (result.status) {
-    case 'committed':
-      return 'committed';
-    case 'dispatch-rejected':
-    case 'postcondition-failed':
-      return 'failed';
-    default:
-      return layerEditRefusal(result.status);
-  }
-};
-
-export const rgbaBytes = (rect: Rect): number => Math.max(0, rect.width) * Math.max(0, rect.height) * 4;
-
-export type ReplayContext = Pick<CanvasMutationContext, 'reserveRaster'>;
-
-/** Runs a replay's preparation under a raster reservation; a replay that does not fit throws and stays in place. */
-export const withReplayReservation = <T>(ctx: ReplayContext, bytes: number, run: () => T): T => {
-  const lease = ctx.reserveRaster(bytes);
-  if (!lease) {
-    throw new Error('Not enough raster memory to replay this step.');
-  }
-  try {
-    return run();
-  } finally {
-    lease.release();
-  }
-};
-
-type EnabledUpdates = readonly { readonly id: string; readonly isEnabled: boolean }[];
-
-/** A new paint layer whose pixels the undo entry owns, inserted and selected in one step. */
-export interface AddedRasterLayerEdit {
-  readonly label: string;
-  /** A raster paint layer whose source offset places `pixels` at `rect`. */
-  readonly layer: CanvasLayerContract;
-  readonly rect: Rect;
-  readonly pixels: RasterSurface;
-  readonly anchor: CanvasNodeInsertionAnchor;
-  /** The selection undo restores. */
-  readonly selectedLayerId: string | null;
-  /** Enabled flags the edit sets on other layers, and the values undo restores. */
-  readonly enabled?: { readonly before: EnabledUpdates; readonly after: EnabledUpdates };
-  readonly heldAssetRefs?: HeldAssetRefs;
-}
-
-export type AddedLayerContext = Pick<CanvasMutationContext, 'applyStep' | 'installPrepared' | 'preparePixels'> &
-  ReplayContext;
-
-/** Bytes an {@link AddedRasterLayerEdit} entry retains. */
-export const addedLayerHistoryBytes = (rect: Rect): number => rgbaBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES;
-
-/**
- * Inserts the layer with its prepared pixels as one undo step. The cache replacement is reserved and prepared
- * before the document changes; replays prepare again under their own reservation.
- */
-export const publishAddedRasterLayer = (
-  ctx: AddedLayerContext,
-  txn: EditTransaction,
-  edit: AddedRasterLayerEdit
-): EditPublishResult => {
-  const { anchor, layer, pixels, rect, selectedLayerId } = edit;
-  const after = edit.enabled?.after ?? [];
-  const before = edit.enabled?.before ?? [];
-  const forward: CanvasProjectMutation = {
-    add: [{ anchor, nodes: [layer] }],
-    enabledUpdates: after,
-    selectedLayerId: layer.id,
-    type: 'applyCanvasLayerStackMutation',
-  };
-  const inverse: CanvasProjectMutation = {
-    enabledUpdates: before,
-    removeIds: [layer.id],
-    selectedLayerId,
-    type: 'applyCanvasLayerStackMutation',
-  };
-  const hasEnabled = (document: CanvasDocumentContractV3 | null, updates: EnabledUpdates): boolean =>
-    updates.every((update) => getDocumentLayer(document, update.id)?.isEnabled === update.isEnabled);
-  const added = (document: CanvasDocumentContractV3 | null): boolean =>
-    document?.selectedLayerId === layer.id &&
-    getDocumentLayer(document, layer.id) === layer &&
-    hasEnabled(document, after);
-  const removed = (document: CanvasDocumentContractV3 | null): boolean =>
-    document !== null &&
-    document.selectedLayerId === selectedLayerId &&
-    isNodeAbsent(document, layer.id) &&
-    hasEnabled(document, before);
-  const addStep = (): EditStep => {
-    const prepared = ctx.preparePixels(layer.id, rect, pixels);
-    return {
-      accepted: added,
-      install: () => ctx.installPrepared(prepared),
-      mutation: forward,
-      rollback: { mutation: inverse, restored: removed },
-    };
-  };
-  if (!txn.reserveRaster(rgbaBytes(rect))) {
-    return { status: 'over-budget' };
-  }
-  return txn.publish(edit.label, addStep(), {
-    bytes: addedLayerHistoryBytes(rect),
-    heldAssetRefs: edit.heldAssetRefs ?? collectHistoryMediaRefs(layer),
-    redo: () => withReplayReservation(ctx, rgbaBytes(rect), () => ctx.applyStep(addStep())),
-    undo: () =>
-      ctx.applyStep({ accepted: removed, mutation: inverse, rollback: { mutation: forward, restored: added } }),
-  });
-};
-
-/** A raster paint layer placing pixels at `rect` with an identity transform. */
-export const paintLayerAt = (id: string, name: string, rect: Rect): CanvasLayerContract => ({
-  blendMode: 'normal',
-  id,
-  isEnabled: true,
-  isLocked: false,
-  name,
-  opacity: 1,
-  source: { bitmap: null, offset: { x: rect.x, y: rect.y }, type: 'paint' },
-  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-  type: 'raster',
-});
+import {
+  addedLayerHistoryBytes,
+  layerEditRefusal,
+  layerOperationStatus,
+  paintLayerAt,
+  publishAddedRasterLayer,
+  type LayerEditRefusal,
+  type LayerStepContext,
+} from './editSteps';
 
 export type NewRasterLayerResult =
   | { status: 'created'; layerId: string }
   | { status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing'> | 'empty' | 'failed' };
 
 export interface NewRasterLayerControllerOptions {
-  readonly ctx: AddedLayerContext &
+  readonly ctx: LayerStepContext &
     Pick<CanvasMutationContext, 'begin' | 'captureInsertionAnchor' | 'createLayerId' | 'getDocument'>;
   readonly backend: RasterBackend;
   readonly layers: LayerCacheStore;
@@ -193,7 +62,7 @@ export class NewRasterLayerController {
     }
     try {
       const layer = paintLayerAt(ctx.createLayerId(), name, rect);
-      const status = layerEditStatus(
+      const status = layerOperationStatus(
         publishAddedRasterLayer(ctx, txn, {
           anchor: ctx.captureInsertionAnchor('raster', document.selectedLayerId),
           label,

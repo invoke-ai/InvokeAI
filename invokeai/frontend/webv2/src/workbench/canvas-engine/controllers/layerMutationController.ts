@@ -3,7 +3,6 @@ import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/c
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
-import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
@@ -22,9 +21,15 @@ import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbenc
 
 import type { CanvasMutationContext, EditStep } from './mutationContext';
 
-import { pixelBytes, publishRefusal } from './layerResultSteps';
+import {
+  guardedResultRefusal,
+  layerEditRefusal,
+  type LayerPixels,
+  rgbaBytes,
+  withReplayReservation,
+} from './editSteps';
 
-export type CapturedLayerCache = { pixels: RasterSurface; rect: Rect } | null | 'not-ready' | 'over-budget';
+export type CapturedLayerCache = LayerPixels | null | 'not-ready' | 'over-budget';
 
 export type DuplicateLayerRasterPlan =
   | {
@@ -183,7 +188,7 @@ export class LayerMutationController {
     const historyBytes = retainedBytes + sources.length * HISTORY_ENTRY_OVERHEAD_BYTES;
     const txn = ctx.begin({ historyBytes });
     if (!('publish' in txn)) {
-      return { status: txn.status === 'gesture-active' ? 'busy' : txn.status };
+      return { status: layerEditRefusal(txn.status) };
     }
     try {
       // Immutable durable sources rebuild caches on redo, needing one insertion copy. Unpersisted paint/mask
@@ -297,11 +302,7 @@ export class LayerMutationController {
           (total, plan) => total + (plan.type === 'capture' ? plan.replayReserveBytes : 0),
           0
         );
-        const replayReservation = ctx.reserveRaster(replayBytes);
-        if (!replayReservation) {
-          throw new Error('Not enough raster memory to restore duplicated layers');
-        }
-        try {
+        withReplayReservation(ctx, replayBytes, () => {
           const prepared = replayPlans.flatMap((plan, index) => {
             if (plan.type !== 'capture') {
               return [];
@@ -314,9 +315,7 @@ export class LayerMutationController {
             return [{ duplicate, replacement: ctx.preparePixels(duplicate.id, retained.rect, retained.pixels) }];
           });
           ctx.applyStep(added(prepared));
-        } finally {
-          replayReservation.release();
-        }
+        });
         o.scheduleDuplicateRasterization(
           replayPlans.flatMap((plan, index) =>
             plan.type === 'reference' && plans[index]?.type === 'capture' ? [duplicates[index]!.id] : []
@@ -340,7 +339,7 @@ export class LayerMutationController {
         }
       );
       if (result.status !== 'committed') {
-        return { status: publishRefusal(result) };
+        return { status: guardedResultRefusal(result) };
       }
       if (retainedBytes > 0) {
         detachedLease = o.trackDetached(retainedBytes);
@@ -371,7 +370,7 @@ export class LayerMutationController {
       const captured = o.captureCache(
         source,
         document,
-        (rect) => txn.growHistory(pixelBytes(rect)) && txn.reserveRaster(pixelBytes(rect))
+        (rect) => txn.growHistory(rgbaBytes(rect)) && txn.reserveRaster(rgbaBytes(rect))
       );
       if (captured === 'not-ready' || captured === 'over-budget') {
         return false;
@@ -400,7 +399,7 @@ export class LayerMutationController {
       const prepare = (): PreparedLayerCacheReplacement | null =>
         captured ? ctx.preparePixels(layer.id, captured.rect, captured.pixels) : null;
       const result = txn.publish(label, added(prepare()), {
-        bytes: (captured ? pixelBytes(captured.rect) : 0) + HISTORY_ENTRY_OVERHEAD_BYTES,
+        bytes: (captured ? rgbaBytes(captured.rect) : 0) + HISTORY_ENTRY_OVERHEAD_BYTES,
         heldAssetRefs: collectHistoryMediaRefs(layer),
         redo: () => replayPrepared(ctx, captured, () => ctx.applyStep(added(prepare()))),
         undo: () => ctx.applyStep(stackStep(removeCopy, hasNoCopy, addCopy, hasCopy)),
@@ -435,7 +434,7 @@ export class LayerMutationController {
       const captured = o.captureCache(
         current,
         document,
-        (rect) => txn.growHistory(pixelBytes(rect)) && txn.reserveRaster(pixelBytes(rect))
+        (rect) => txn.growHistory(rgbaBytes(rect)) && txn.reserveRaster(rgbaBytes(rect))
       );
       if (captured === 'not-ready' || captured === 'over-budget') {
         return false;
@@ -469,7 +468,7 @@ export class LayerMutationController {
         };
       };
       const result = txn.publish(label, converted(after, current), {
-        bytes: (captured ? pixelBytes(captured.rect) : 0) + HISTORY_ENTRY_OVERHEAD_BYTES,
+        bytes: (captured ? rgbaBytes(captured.rect) : 0) + HISTORY_ENTRY_OVERHEAD_BYTES,
         heldAssetRefs: collectHistoryMediaRefs(before, after),
         redo: () => replayPrepared(ctx, captured, () => ctx.applyStep(converted(after, before))),
         undo: () => replayPrepared(ctx, captured, () => ctx.applyStep(converted(before, after, restoreAnchor))),
@@ -489,14 +488,5 @@ const replayPrepared = (
   captured: CapturedLayerCache,
   replay: () => void
 ): void => {
-  const bytes = captured && typeof captured !== 'string' ? pixelBytes(captured.rect) : 0;
-  const reservation = bytes > 0 ? ctx.reserveRaster(bytes) : null;
-  if (bytes > 0 && !reservation) {
-    throw new Error('Not enough raster memory to restore this step.');
-  }
-  try {
-    replay();
-  } finally {
-    reservation?.release();
-  }
+  withReplayReservation(ctx, captured && typeof captured !== 'string' ? rgbaBytes(captured.rect) : 0, replay);
 };

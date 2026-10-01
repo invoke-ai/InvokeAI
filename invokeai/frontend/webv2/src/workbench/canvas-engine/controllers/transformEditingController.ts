@@ -18,6 +18,8 @@ import { bakeMatrix } from '@workbench/canvas-engine/transform/transformMath';
 
 import type { CanvasMutationContext, EditStep } from './mutationContext';
 
+import { rgbaBytes, withReplayReservation } from './editSteps';
+
 export interface TransformEditingControllerOptions {
   readonly session: { get(): TransformSession | null; set(value: TransformSession | null): void };
   readonly backend: RasterBackend;
@@ -205,15 +207,7 @@ export class TransformEditingController {
 
   /** Replays a bake step, reserving the whole-layer pixels it installs; throws, leaving it in place, when they do not fit. */
   private replay(step: EditStep, rect: Rect): void {
-    const reservation = this.deps.ctx.reserveRaster(rect.width * rect.height * 4);
-    if (!reservation) {
-      throw new Error('Not enough raster memory to restore the transformed layer.');
-    }
-    try {
-      this.deps.ctx.applyStep(step);
-    } finally {
-      reservation.release();
-    }
+    withReplayReservation(this.deps.ctx, rgbaBytes(rect), () => this.deps.ctx.applyStep(step));
   }
 
   private settle(status: StructuralCommitResult['status']): void {

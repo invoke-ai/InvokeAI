@@ -17,11 +17,11 @@ import type { CanvasMutationContext, EditStep } from './mutationContext';
 
 import {
   layerEditRefusal,
-  layerEditStatus,
+  layerOperationStatus,
   rgbaBytes,
   withReplayReservation,
   type LayerEditRefusal,
-} from './newRasterLayerController';
+} from './editSteps';
 
 export type RasterizeLayerResult =
   | 'rasterized'
@@ -98,7 +98,7 @@ export class RasterizeLayerController {
         source: { bitmap: null, offset: { x: bakedRect.x, y: bakedRect.y }, type: 'paint' },
         transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
       };
-      const status = layerEditStatus(
+      const status = layerOperationStatus(
         txn.publish('Rasterize layer', this.convertStep(layerId, paint, parametric, bakedRect, baked), {
           bytes: rgbaBytes(bakedRect) + HISTORY_ENTRY_OVERHEAD_BYTES,
           heldAssetRefs: collectHistoryMediaRefs(parametric),

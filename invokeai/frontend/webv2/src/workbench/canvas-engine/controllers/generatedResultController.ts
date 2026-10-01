@@ -13,12 +13,13 @@ import type { CanvasMutationContext } from './mutationContext';
 
 import {
   addLayerStep,
-  pixelBytes,
-  publishRefusal,
+  guardedResultRefusal,
+  layerEditRefusal,
   removeLayerStep,
   replaceLayerStep,
   replayWithPixels,
-} from './layerResultSteps';
+  rgbaBytes,
+} from './editSteps';
 
 export interface GeneratedResultControllerOptions {
   readonly captureCache: LayerMutationControllerOptions['captureCache'];
@@ -108,16 +109,16 @@ export class GeneratedResultController {
       const source = { bitmap: image, offset: origin, type: 'paint' } as const;
       const identityTransform: LayerTransform = { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 };
       const afterPixels = { pixels: decoded.surface, rect };
-      const txn = o.ctx.begin({ historyBytes: pixelBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES, owner });
+      const txn = o.ctx.begin({ historyBytes: rgbaBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES, owner });
       if (!('publish' in txn)) {
-        return { status: txn.status === 'gesture-active' ? 'busy' : txn.status };
+        return { status: layerEditRefusal(txn.status) };
       }
       try {
-        if (!txn.reserveRaster(pixelBytes(rect))) {
+        if (!txn.reserveRaster(rgbaBytes(rect))) {
           return { status: 'over-budget' };
         }
         if (options.target === 'replace') {
-          const beforePixels = o.captureCache(liveLayer, document, (rect) => txn.growHistory(pixelBytes(rect)));
+          const beforePixels = o.captureCache(liveLayer, document, (rect) => txn.growHistory(rgbaBytes(rect)));
           if (beforePixels === 'not-ready' || beforePixels === 'over-budget') {
             return { status: beforePixels };
           }
@@ -146,7 +147,7 @@ export class GeneratedResultController {
             options.historyLabel ?? 'Replace layer with workflow result',
             replaceLayerStep(o.ctx, after, prepared, { notify: publishAfter, persist: false, restore: liveLayer }),
             {
-              bytes: pixelBytes(beforePixels.rect) + pixelBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES,
+              bytes: rgbaBytes(beforePixels.rect) + rgbaBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES,
               heldAssetRefs: collectHistoryMediaRefs(before, after),
               redo: () =>
                 replayWithPixels(o.ctx, liveLayer.id, afterPixels, (prepared) =>
@@ -164,7 +165,7 @@ export class GeneratedResultController {
           );
           return result.status === 'committed'
             ? { layerId: liveLayer.id, status: 'committed' }
-            : { status: publishRefusal(result) };
+            : { status: guardedResultRefusal(result) };
         }
         const layerId = o.ctx.createLayerId();
         const selectedLayerId = document.selectedLayerId;
@@ -209,13 +210,15 @@ export class GeneratedResultController {
             : 'Copy workflow result to raster layer',
           added(prepared),
           {
-            bytes: pixelBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES,
+            bytes: rgbaBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES,
             heldAssetRefs: collectHistoryMediaRefs(copy),
             redo: () => replayWithPixels(o.ctx, layerId, afterPixels, added),
             undo: () => o.ctx.applyStep(removeLayerStep(layerId, selectedLayerId)),
           }
         );
-        return result.status === 'committed' ? { layerId, status: 'committed' } : { status: publishRefusal(result) };
+        return result.status === 'committed'
+          ? { layerId, status: 'committed' }
+          : { status: guardedResultRefusal(result) };
       } finally {
         txn.end();
       }

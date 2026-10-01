@@ -16,7 +16,7 @@ import { bakeMatrix } from '@workbench/canvas-engine/transform/transformMath';
 
 import type { CanvasMutationContext, EditStep } from './mutationContext';
 
-import { pixelBytes, publishRefusal } from './layerResultSteps';
+import { guardedResultRefusal, layerEditRefusal, rgbaBytes, withReplayReservation } from './editSteps';
 
 export interface MaskLayerControllerOptions {
   readonly ctx: Pick<CanvasMutationContext, 'applyStep' | 'begin' | 'getDocument' | 'reserveRaster'>;
@@ -61,9 +61,9 @@ export class MaskLayerController {
     if (!originalBitmap && !rect) {
       return { status: 'nothing' };
     }
-    const txn = ctx.begin({ historyBytes: (rect ? pixelBytes(rect) : 0) + HISTORY_ENTRY_OVERHEAD_BYTES });
+    const txn = ctx.begin({ historyBytes: (rect ? rgbaBytes(rect) : 0) + HISTORY_ENTRY_OVERHEAD_BYTES });
     if (!('publish' in txn)) {
-      return { status: txn.status === 'gesture-active' ? 'busy' : txn.status };
+      return { status: layerEditRefusal(txn.status) };
     }
     try {
       const before = rect && entry ? entry.surface.ctx.getImageData(0, 0, rect.width, rect.height) : null;
@@ -78,24 +78,18 @@ export class MaskLayerController {
         heldAssetRefs: collectHistoryMediaRefs(originalBitmap),
         redo: () => ctx.applyStep(cleared),
         undo: () => {
-          const reservation = rect ? ctx.reserveRaster(pixelBytes(rect)) : null;
-          if (rect && !reservation) {
-            throw new Error('Not enough raster memory to restore the mask.');
-          }
-          try {
+          withReplayReservation(ctx, rect ? rgbaBytes(rect) : 0, () =>
             ctx.applyStep(
               this.maskStep(layer, originalBitmap, originalOffset, null, { x: 0, y: 0 }, () => {
                 if (before && rect) {
                   this.deps.restoreCache(layerId, rect, before);
                 }
               })
-            );
-          } finally {
-            reservation?.release();
-          }
+            )
+          );
         },
       });
-      return result.status === 'committed' ? { status: 'committed' } : { status: publishRefusal(result) };
+      return result.status === 'committed' ? { status: 'committed' } : { status: guardedResultRefusal(result) };
     } finally {
       txn.end();
     }
@@ -131,12 +125,12 @@ export class MaskLayerController {
     if (isEmpty(domain)) {
       return { status: 'nothing' };
     }
-    const txn = ctx.begin({ historyBytes: pixelBytes(domain) * 2 + HISTORY_ENTRY_OVERHEAD_BYTES });
+    const txn = ctx.begin({ historyBytes: rgbaBytes(domain) * 2 + HISTORY_ENTRY_OVERHEAD_BYTES });
     if (!('publish' in txn)) {
-      return { status: txn.status === 'gesture-active' ? 'busy' : txn.status };
+      return { status: layerEditRefusal(txn.status) };
     }
     try {
-      if (!txn.reserveRaster(pixelBytes(domain))) {
+      if (!txn.reserveRaster(rgbaBytes(domain))) {
         return { status: 'over-budget' };
       }
       const originalRect = this.deps.layers.peek(layerId)?.rect;
@@ -176,7 +170,7 @@ export class MaskLayerController {
       } else {
         this.deps.layers.delete(layerId);
       }
-      return { status: publishRefusal(result) };
+      return { status: guardedResultRefusal(result) };
     } finally {
       txn.end();
     }

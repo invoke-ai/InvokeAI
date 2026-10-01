@@ -11,13 +11,13 @@ import type { CanvasMutationContext } from './mutationContext';
 import {
   addedLayerHistoryBytes,
   layerEditRefusal,
-  layerEditStatus,
+  layerOperationStatus,
   paintLayerAt,
   publishAddedRasterLayer,
   rgbaBytes,
-  type AddedLayerContext,
+  type LayerStepContext,
   type LayerEditRefusal,
-} from './newRasterLayerController';
+} from './editSteps';
 
 type ExportResult =
   | { status: 'ok'; surface: RasterSurface; rect: Rect; guard: LayerExportGuard; release(): void }
@@ -28,7 +28,7 @@ export type CopyLayerToRasterResult =
   | { status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing' | 'unsupported'> | 'empty' | 'failed' };
 
 export interface CopyLayerControllerOptions {
-  readonly ctx: AddedLayerContext &
+  readonly ctx: LayerStepContext &
     Pick<
       CanvasMutationContext,
       'begin' | 'capturePermit' | 'captureInsertionAnchor' | 'createLayerId' | 'getDocument' | 'isPermitCurrent'
@@ -82,7 +82,7 @@ export class CopyLayerController {
         const pixels = this.deps.backend.createSurface(baked.rect.width, baked.rect.height);
         pixels.ctx.drawImage(baked.surface.canvas, 0, 0);
         const layer = paintLayerAt(ctx.createLayerId(), `${sourceLayer.name} copy`, baked.rect);
-        const status = layerEditStatus(
+        const status = layerOperationStatus(
           publishAddedRasterLayer(ctx, txn, {
             anchor: ctx.captureInsertionAnchor('raster', layerId),
             label: 'Copy layer to raster',

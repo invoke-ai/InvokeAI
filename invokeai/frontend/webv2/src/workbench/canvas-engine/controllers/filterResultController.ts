@@ -18,12 +18,13 @@ import type { CanvasMutationContext } from './mutationContext';
 
 import {
   addLayerStep,
-  pixelBytes,
-  publishRefusal,
+  guardedResultRefusal,
+  layerEditRefusal,
   removeLayerStep,
   replaceLayerStep,
   replayWithPixels,
-} from './layerResultSteps';
+  rgbaBytes,
+} from './editSteps';
 
 export type {
   CommitRasterFilterOptions,
@@ -123,16 +124,16 @@ export class FilterResultController {
       const rect = { ...options.rect };
       const paintSource = { bitmap: image, offset: { x: rect.x, y: rect.y }, type: 'paint' } as const;
       const afterPixels = { pixels, rect };
-      const txn = o.ctx.begin({ historyBytes: pixelBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES, owner });
+      const txn = o.ctx.begin({ historyBytes: rgbaBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES, owner });
       if (!('publish' in txn)) {
-        return { status: txn.status === 'gesture-active' ? 'busy' : txn.status };
+        return { status: layerEditRefusal(txn.status) };
       }
       try {
-        if (!txn.reserveRaster(pixelBytes(rect))) {
+        if (!txn.reserveRaster(rgbaBytes(rect))) {
           return { status: 'over-budget' };
         }
         if (options.mode === 'replace') {
-          const beforePixels = o.captureCache(liveLayer, document, (rect) => txn.growHistory(pixelBytes(rect)));
+          const beforePixels = o.captureCache(liveLayer, document, (rect) => txn.growHistory(rgbaBytes(rect)));
           if (beforePixels === 'not-ready' || beforePixels === 'over-budget') {
             return { status: beforePixels };
           }
@@ -157,7 +158,7 @@ export class FilterResultController {
             'Replace layer with filter result',
             replaceLayerStep(o.ctx, after, prepared, { notify: discard, persist: false, restore: liveLayer }),
             {
-              bytes: pixelBytes(beforePixels.rect) + pixelBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES,
+              bytes: rgbaBytes(beforePixels.rect) + rgbaBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES,
               heldAssetRefs: collectHistoryMediaRefs(before, after),
               redo: () =>
                 replayWithPixels(o.ctx, liveLayer.id, afterPixels, (prepared) =>
@@ -174,7 +175,7 @@ export class FilterResultController {
           );
           return result.status === 'committed'
             ? { layerId: liveLayer.id, status: 'committed' }
-            : { status: publishRefusal(result) };
+            : { status: guardedResultRefusal(result) };
         }
         const selectedLayerId = document.selectedLayerId;
         const layerId = o.ctx.createLayerId();
@@ -231,12 +232,14 @@ export class FilterResultController {
           return interrupted;
         }
         const result = txn.publish('Copy layer filter result', added(prepared), {
-          bytes: pixelBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES,
+          bytes: rgbaBytes(rect) + HISTORY_ENTRY_OVERHEAD_BYTES,
           heldAssetRefs: collectHistoryMediaRefs(copy),
           redo: () => replayWithPixels(o.ctx, layerId, afterPixels, added),
           undo: () => o.ctx.applyStep(removeLayerStep(layerId, selectedLayerId)),
         });
-        return result.status === 'committed' ? { layerId, status: 'committed' } : { status: publishRefusal(result) };
+        return result.status === 'committed'
+          ? { layerId, status: 'committed' }
+          : { status: guardedResultRefusal(result) };
       } finally {
         txn.end();
       }

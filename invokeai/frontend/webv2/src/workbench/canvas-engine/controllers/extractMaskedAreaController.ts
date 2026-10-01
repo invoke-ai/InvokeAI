@@ -25,13 +25,13 @@ import type { CanvasMutationContext } from './mutationContext';
 import {
   addedLayerHistoryBytes,
   layerEditRefusal,
-  layerEditStatus,
+  layerOperationStatus,
   paintLayerAt,
   publishAddedRasterLayer,
   rgbaBytes,
-  type AddedLayerContext,
+  type LayerStepContext,
   type LayerEditRefusal,
-} from './newRasterLayerController';
+} from './editSteps';
 
 export type ExtractMaskedAreaResult =
   | { status: 'extracted'; layerId: string }
@@ -42,7 +42,7 @@ type ExportResult =
   | { status: 'missing' | 'disabled' | 'unsupported' | 'empty' | 'not-ready' | 'over-budget' };
 
 export interface ExtractMaskedAreaControllerOptions {
-  readonly ctx: AddedLayerContext &
+  readonly ctx: LayerStepContext &
     Pick<
       CanvasMutationContext,
       'begin' | 'capturePermit' | 'captureInsertionAnchor' | 'createLayerId' | 'getDocument' | 'isPermitCurrent'
@@ -218,7 +218,7 @@ export class ExtractMaskedAreaController {
         pixels.ctx.globalCompositeOperation = 'destination-in';
         pixels.ctx.drawImage(maskPixels.surface.canvas, 0, 0);
         const layer = paintLayerAt(ctx.createLayerId(), `${mask.name} extraction`, rect);
-        const status = layerEditStatus(
+        const status = layerOperationStatus(
           publishAddedRasterLayer(ctx, txn, {
             anchor: ctx.captureInsertionAnchor('raster', null),
             label: 'Extract masked area',

@@ -11,6 +11,7 @@ import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixt
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { describe, expect, it } from 'vitest';
 
+import { REPLAY_RASTER_REFUSAL } from './editSteps';
 import { createLayerOperationHarness } from './layerOperationHarness.testing';
 import { NewRasterLayerController } from './newRasterLayerController';
 
@@ -152,9 +153,10 @@ describe('NewRasterLayerController: insert', () => {
     h.state.rasterBytes = 0;
 
     const result = await h.history.redo();
-    expect(result.status).toBe('failed');
+    expect(result).toMatchObject({ error: new Error(REPLAY_RASTER_REFUSAL), status: 'failed' });
     expect(leafIds(h.document())).toEqual(['a']);
     expect(h.history.canRedo()).toBe(true);
+    expect(h.reservedBytes()).toBe(0);
   });
 
   it('reports a reducer refusal as failed and records nothing', () => {
@@ -164,6 +166,23 @@ describe('NewRasterLayerController: insert', () => {
     expect(h.insert()).toEqual({ status: 'failed' });
     expect(h.installed).toEqual([]);
     expect(h.history.canUndo()).toBe(false);
+    expect(h.reservedBytes()).toBe(0);
+  });
+
+  it('rolls back an insertion whose postconditions fail and reports it as failed', () => {
+    const h = createHarness();
+    const before = leafIds(h.document());
+    h.state.interleave = (mutation) =>
+      mutation.type === 'applyCanvasLayerStackMutation' && mutation.add
+        ? { id: 'a', type: 'setCanvasSelectedLayer' }
+        : null;
+
+    expect(h.insert()).toEqual({ status: 'failed' });
+    expect(leafIds(h.document())).toEqual(before);
+    expect(h.document().selectedLayerId).toBe('a');
+    expect(h.installed).toEqual([]);
+    expect(h.history.canUndo()).toBe(false);
+    expect(h.reservedBytes()).toBe(0);
   });
 
   it('refuses an empty rect', () => {

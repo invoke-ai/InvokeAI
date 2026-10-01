@@ -16,7 +16,7 @@ import { getCanvasStagingCandidateFingerprint } from '@workbench/canvasStagingVi
 
 import type { CanvasMutationContext, EditStep } from './mutationContext';
 
-import { publishRefusal } from './layerResultSteps';
+import { guardedResultRefusal, layerEditRefusal } from './editSteps';
 
 export interface StagedResultControllerOptions {
   readonly ctx: Pick<
@@ -167,7 +167,7 @@ export class StagedResultController {
     };
     const txn = o.ctx.begin({ historyBytes: HISTORY_ENTRY_OVERHEAD_BYTES, owner });
     if (!('publish' in txn)) {
-      return { status: txn.status === 'gesture-active' ? 'busy' : txn.status };
+      return { status: layerEditRefusal(txn.status) };
     }
     try {
       const result = txn.publish(
@@ -207,7 +207,7 @@ export class StagedResultController {
       );
       return result.status === 'committed'
         ? { layerId: layer.id, status: 'committed' }
-        : { status: publishRefusal(result) };
+        : { status: guardedResultRefusal(result) };
     } finally {
       txn.end();
     }

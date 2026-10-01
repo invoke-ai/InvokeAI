@@ -18,7 +18,8 @@ export interface LayerOperationHarnessOptions {
 
 /**
  * Layer operations over the real reducer, mutation context, history and layer caches. The mirror is the reducer
- * document; `rasterBytes` and `refuse` let a test starve memory or make the reducer reject a mutation.
+ * document; `rasterBytes`, `refuse` and `interleave` let a test starve memory, make the reducer reject a mutation, or
+ * break an accepted mutation's postconditions.
  */
 export const createLayerOperationHarness = (
   document: CanvasDocumentContractV3,
@@ -38,6 +39,8 @@ export const createLayerOperationHarness = (
     gestureActive: options.gestureActive ?? false,
     rasterBytes: Number.POSITIVE_INFINITY,
     refuse: (_mutation: CanvasProjectMutation): boolean => false,
+    /** A mutation applied right after an accepted one, as an interleaved edit would, to fail its postconditions. */
+    interleave: (_mutation: CanvasProjectMutation): CanvasProjectMutation | null => null,
   };
   let reserved = 0;
   let nextId = 0;
@@ -48,6 +51,10 @@ export const createLayerOperationHarness = (
       dispatched.push(action);
       if (!state.refuse(action)) {
         project = applyCanvasProjectMutation(project, action);
+        const interleaved = state.interleave(action);
+        if (interleaved) {
+          project = applyCanvasProjectMutation(project, interleaved);
+        }
         for (const listener of listeners) {
           listener();
         }
