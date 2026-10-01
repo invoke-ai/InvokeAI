@@ -3,7 +3,9 @@
  * tests; default browser functions resolve lazily.
  */
 
-import type { LayerDamage, RenderFlags } from '@workbench/canvas-engine/types';
+import type { FrameDamage, LayerDamage, RenderFlags } from '@workbench/canvas-engine/types';
+
+import { FULL_DAMAGE, NO_DAMAGE } from '@workbench/canvas-engine/types';
 
 /** The partial invalidation payload accepted by {@link RenderScheduler.invalidate}. */
 export interface InvalidatePayload {
@@ -53,11 +55,18 @@ export interface RenderScheduler {
 
 const createEmptyFlags = (): RenderFlags => ({
   all: false,
-  damage: [],
+  damage: NO_DAMAGE,
   layers: new Set<string>(),
   overlay: false,
   view: false,
 });
+
+const addDamage = (pending: FrameDamage, damage: LayerDamage | null): FrameDamage => {
+  if (!damage || pending.kind === 'full') {
+    return FULL_DAMAGE;
+  }
+  return { kind: 'regions', regions: pending.kind === 'regions' ? [...pending.regions, damage] : [damage] };
+};
 
 const hasPending = (flags: RenderFlags): boolean => flags.all || flags.view || flags.overlay || flags.layers.size > 0;
 
@@ -132,12 +141,12 @@ export const createRenderScheduler = (deps: RenderSchedulerDeps): RenderSchedule
     // performance for correctness.
     if (payload.all) {
       pending.all = true;
-      pending.damage = null;
+      pending.damage = FULL_DAMAGE;
     }
     if (payload.view) {
       // The whole viewport moves under a pan/zoom; no layer-local rect survives it.
       pending.view = true;
-      pending.damage = null;
+      pending.damage = FULL_DAMAGE;
     }
     if (payload.overlay) {
       // The overlay is its own canvas, redrawn whole every frame — it neither
@@ -152,11 +161,7 @@ export const createRenderScheduler = (deps: RenderSchedulerDeps): RenderSchedule
         payload.damage && payload.layers.length === 1 && payload.layers[0] === payload.damage.layerId
           ? payload.damage
           : null;
-      if (!damage) {
-        pending.damage = null;
-      } else if (pending.damage) {
-        pending.damage.push(damage);
-      }
+      pending.damage = addDamage(pending.damage, damage);
     }
     schedule();
   };

@@ -112,7 +112,7 @@ describe('real browser raster acceptance', () => {
       ]),
       caches,
       IDENTITY,
-      { clipRect: { height: 8, width: 4, x: 0, y: 0 } }
+      { backend, clipRect: { height: 8, width: 4, x: 0, y: 0 } }
     );
 
     expectPixel(target, 1, 1, [255, 0, 0, 255]);

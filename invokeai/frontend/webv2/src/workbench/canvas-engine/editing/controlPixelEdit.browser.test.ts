@@ -119,6 +119,7 @@ const setup = (
   const composite = (): RasterSurface => {
     const target = backend.createSurface(document.width, document.height);
     compositeDocument(target, document, layers, IDENTITY, {
+      backend,
       adjustedSurface: (candidate, candidateEntry) =>
         controller.isOpenFor([candidate.id])
           ? null

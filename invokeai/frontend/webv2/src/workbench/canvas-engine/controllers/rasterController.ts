@@ -104,6 +104,8 @@ export class RasterController {
     );
     this.groups = createGroupSurfaceCache({
       createSurface: (width, height) => options.backend.createSurface(width, height),
+      damageSince: (layerId, version) => this.layers.damageSince(layerId, version),
+      diagnostics: options.diagnostics,
       getAdjustedSurface: (layer, entry) => this.getAdjustedSurface(layer, entry),
       getCacheEntry: (layerId) => this.layers.get(layerId),
       onBytesChange: (bytes) => memory.setCategoryBytes('group', bytes),

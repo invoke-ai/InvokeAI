@@ -476,6 +476,12 @@ export interface CanvasDiagnosticsSnapshot {
   readonly compositeFrames: number;
   readonly overlayFrames: number;
   readonly rasterOverageBytes: number;
+  /** Group composite backing stores allocated or resized. */
+  readonly groupSurfaceAllocations: number;
+  /** Whole-surface group redraws (new content, geometry, or unknown member damage). */
+  readonly groupSurfaceRebuilds: number;
+  /** Group redraws limited to the region members damaged. */
+  readonly groupSurfaceRefreshes: number;
 }
 
 export interface CanvasEngineToolCapability extends CanvasToolCapability {

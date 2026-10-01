@@ -7,6 +7,7 @@ import {
   layerContract,
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { compileDocumentLeaves } from '@workbench/canvas-engine/document-model/documentModel';
+import { NO_GROUP_CONTENT } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -73,7 +74,7 @@ const createEngine = (bitmapStore?: BitmapStore) => {
     { adjustments: [], blendMode: 'normal', children: [], end: 1, id: 'group', opacity: 0.5, start: 0 },
     leaves,
     leaves.map((leaf) => leaf.worldTransform),
-    new Set()
+    NO_GROUP_CONTENT
   );
   return { engine, raster };
 };

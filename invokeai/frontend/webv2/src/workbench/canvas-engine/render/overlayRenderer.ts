@@ -1,12 +1,13 @@
 /**
- * Interaction overlays render in screen space through `view`, keeping strokes and handles constant-sized at any
- * zoom. The unbounded plane has no document outline; all drawing uses {@link RasterSurface} contexts.
+ * Interaction overlays render in CSS pixels through `view` under a device-pixel-ratio base transform, keeping
+ * strokes and handles constant in CSS pixels at any zoom and DPR, where pointer hit testing measures them. The
+ * unbounded plane has no document outline; all drawing uses {@link RasterSurface} contexts.
  */
 
 import type { ParametricShapeKind } from '@workbench/canvas-engine/contracts';
 import type { Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { applyToPoint, getScale, invert } from '@workbench/canvas-engine/math/mat2d';
+import { applyToPoint, getScale, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { transformBounds } from '@workbench/canvas-engine/math/rect';
 import { buildParametricShapePath } from '@workbench/canvas-engine/render/rasterizers/shapeRasterizer';
 import { drawMarchingAnts, type MarchingAntsRender } from '@workbench/canvas-engine/selection/marchingAnts';
@@ -56,8 +57,12 @@ export interface RectShapePreview {
 
 /** Everything the overlay needs to draw a frame. */
 export interface OverlayState {
-  /** Document→screen transform. */
+  /** Document→CSS-pixel transform. */
   view: Mat2d;
+  /** Backing-store pixels per CSS pixel. */
+  dpr: number;
+  /** The viewport in CSS pixels. */
+  viewportSize: { readonly width: number; readonly height: number };
   /** Generation bounding box in document space. */
   bbox: Rect;
   /** Whether to draw the eight bbox resize handles (bbox tool active). */
@@ -137,7 +142,7 @@ const strokeRectScreen = (ctx: Ctx, screenRect: Rect): void => {
  * Project viewport bounds into document space and snap outward to grid cells for seamless pan/zoom. Skip overly
  * dense grids; never clip to document bounds.
  */
-const drawGrid = (ctx: Ctx, state: OverlayState, target: RasterSurface): void => {
+const drawGrid = (ctx: Ctx, state: OverlayState): void => {
   const gridSize = state.gridSize ?? 0;
   if (gridSize <= 0) {
     return;
@@ -155,9 +160,9 @@ const drawGrid = (ctx: Ctx, state: OverlayState, target: RasterSurface): void =>
   // Document-space bounds of the viewport's four screen corners.
   const corners = [
     applyToPoint(inv, { x: 0, y: 0 }),
-    applyToPoint(inv, { x: target.width, y: 0 }),
-    applyToPoint(inv, { x: 0, y: target.height }),
-    applyToPoint(inv, { x: target.width, y: target.height }),
+    applyToPoint(inv, { x: state.viewportSize.width, y: 0 }),
+    applyToPoint(inv, { x: 0, y: state.viewportSize.height }),
+    applyToPoint(inv, { x: state.viewportSize.width, y: state.viewportSize.height }),
   ];
   const xs = corners.map((p) => p.x);
   const ys = corners.map((p) => p.y);
@@ -401,19 +406,19 @@ const SAM_EXCLUDE_COLOR = '#ef4444';
 const SAM_POINT_RADIUS_PX = 5;
 const SAM_HANDLE_DRAW_PX = 8;
 
-const drawSamPreview = (ctx: Ctx, state: OverlayState): void => {
+const drawSamPreview = (ctx: Ctx, state: OverlayState, base: Mat2d): void => {
   const preview = state.samPreview;
   if (!preview) {
     return;
   }
-  const { view } = state;
+  const placed = multiply(base, state.view);
   ctx.save();
-  ctx.setTransform(view.a, view.b, view.c, view.d, view.e, view.f);
+  ctx.setTransform(placed.a, placed.b, placed.c, placed.d, placed.e, placed.f);
   ctx.globalAlpha = preview.opacity;
   ctx.drawImage(preview.surface.canvas, preview.rect.x, preview.rect.y, preview.rect.width, preview.rect.height);
   ctx.restore();
   if (preview.outline) {
-    drawMarchingAnts(ctx, state.view, { matrix: null, paths: [preview.outline], phase: preview.phase });
+    drawMarchingAnts(ctx, state.view, { matrix: null, paths: [preview.outline], phase: preview.phase }, base);
   }
 };
 
@@ -460,7 +465,7 @@ const drawSamGeometry = (ctx: Ctx, state: OverlayState): void => {
  * Even-odd viewport/bbox fill shades outside the generation frame; globalAlpha controls opacity independently of
  * theme color.
  */
-const drawBboxOverlayShade = (ctx: Ctx, state: OverlayState, target: RasterSurface): void => {
+const drawBboxOverlayShade = (ctx: Ctx, state: OverlayState): void => {
   if (!state.bboxOverlay) {
     return;
   }
@@ -469,7 +474,7 @@ const drawBboxOverlayShade = (ctx: Ctx, state: OverlayState, target: RasterSurfa
   ctx.globalAlpha = BBOX_OVERLAY_ALPHA;
   ctx.fillStyle = state.bboxOverlayColor ?? BBOX_OVERLAY_FILL;
   ctx.beginPath();
-  ctx.rect(0, 0, target.width, target.height);
+  ctx.rect(0, 0, state.viewportSize.width, state.viewportSize.height);
   ctx.rect(bboxScreen.x, bboxScreen.y, bboxScreen.width, bboxScreen.height);
   ctx.fill('evenodd');
   ctx.restore();
@@ -517,20 +522,22 @@ const drawBboxHandles = (ctx: Ctx, state: OverlayState): void => {
   ctx.restore();
 };
 
-/** Clears and redraws the entire overlay for the given `state`. */
+/** Clears the backing store, then redraws the overlay in CSS pixels under the state's device-pixel ratio. */
 export const renderOverlay = (target: RasterSurface, state: OverlayState): void => {
   const ctx = target.ctx;
+  const base: Mat2d = { a: state.dpr, b: 0, c: 0, d: state.dpr, e: 0, f: 0 };
 
   ctx.save();
   ctx.setTransform(1, 0, 0, 1, 0, 0);
   ctx.clearRect(0, 0, target.width, target.height);
+  ctx.setTransform(base.a, base.b, base.c, base.d, base.e, base.f);
 
   // Shade outside bbox first, then draw overlay chrome above it. The unbounded plane has no document outline.
-  drawBboxOverlayShade(ctx, state, target);
+  drawBboxOverlayShade(ctx, state);
 
   // Grid next (behind the bbox), spanning the whole viewport.
   if (state.showGrid) {
-    drawGrid(ctx, state, target);
+    drawGrid(ctx, state);
   }
 
   // Rule-of-thirds guides sit inside the bbox, behind its frame.
@@ -544,13 +551,13 @@ export const renderOverlay = (target: RasterSurface, state: OverlayState): void 
     ctx.setLineDash([]);
   }
 
-  drawSamPreview(ctx, state);
+  drawSamPreview(ctx, state, base);
   drawSamGeometry(ctx, state);
   drawLayerOutline(ctx, state);
   drawBboxHandles(ctx, state);
   drawTransformFrame(ctx, state);
   if (state.marchingAnts) {
-    drawMarchingAnts(ctx, state.view, state.marchingAnts);
+    drawMarchingAnts(ctx, state.view, state.marchingAnts, base);
   }
   drawLassoPreview(ctx, state);
   drawRectShapePreview(ctx, state, state.marqueePreview);

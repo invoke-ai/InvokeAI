@@ -5,22 +5,26 @@ import type {
 } from '@workbench/canvas-engine/controllers/previewStateController';
 import type { RasterController } from '@workbench/canvas-engine/controllers/rasterController';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
+import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type { DerivedSurfaceCache } from '@workbench/canvas-engine/render/derivedSurfaceCache';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
-import type { LayerDamage, Mat2d, Rect } from '@workbench/canvas-engine/types';
+import type { FrameDamage, Mat2d, Rect } from '@workbench/canvas-engine/types';
 import type { Viewport } from '@workbench/canvas-engine/viewport';
 
-import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { isLayerContributing } from '@workbench/canvas-engine/document/layerEligibility';
 import { getSourceContentRect, isRenderableLayer, renderableSourceOf } from '@workbench/canvas-engine/document/sources';
 import {
   compositeDocument,
+  prepareComposite,
   shouldSmoothAtZoom,
+  transformOverridesKey,
   type CompositeOptions,
+  type CompositePreparation,
 } from '@workbench/canvas-engine/render/compositor';
-import { calculateActiveFrameLayerIds } from '@workbench/canvas-engine/render/frameDemand';
+import { calculateActiveFrameLayerIds, committedLeafBounds } from '@workbench/canvas-engine/render/frameDemand';
+import { FULL_DAMAGE } from '@workbench/canvas-engine/types';
 
 import type { FloatingSelectionFrame } from './floatingSelectionFrame';
 import type { LayerTransformOverrides } from './overlayFrame';
@@ -51,13 +55,20 @@ export interface CompositeFrame {
     view: Mat2d,
     floatFrame: FloatingSelectionFrame | null,
     samPreview: SamPreviewState | null,
-    /**
-     * Layer-local repaint regions; null means full repaint. Partial damage is valid only when every invalidation
-     * named its region.
-     */
-    damage?: LayerDamage[] | null
+    /** What must be repainted; absent repaints everything. */
+    damage?: FrameDamage
   ): void;
 }
+
+interface LeafBoundsMemo {
+  readonly layer: SemanticLeaf['layer'];
+  readonly matrix: Mat2d;
+  readonly live: Rect | undefined;
+  readonly bounds: Rect | null;
+}
+
+const sameOptionalRect = (a: Rect | undefined, b: Rect | undefined): boolean =>
+  a === b || (!!a && !!b && a.x === b.x && a.y === b.y && a.width === b.width && a.height === b.height);
 
 /**
  * Composite only for pixel/order/view changes. Rasterize demanded visible layers and protect them during post-draw
@@ -71,9 +82,13 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
    * Create missing caches and rasterize stale ones, but never resize existing entries here: unflushed paint may
    * exceed persisted bounds. Rasterization owns bounds changes.
    */
-  const ensureLayerCaches = (doc: CanvasDocumentContractV3, activeFrameLayerIds: ReadonlySet<string>): void => {
-    for (const layer of getDocumentLeaves(doc)) {
-      if (!isLayerContributing(layer) || !renderableSourceOf(layer) || !activeFrameLayerIds.has(layer.id)) {
+  const ensureLayerCaches = (
+    doc: CanvasDocumentContractV3,
+    frame: CompositePreparation,
+    activeFrameLayerIds: ReadonlySet<string>
+  ): void => {
+    for (const { layer } of frame.leaves) {
+      if (!activeFrameLayerIds.has(layer.id) || !isLayerContributing(layer) || !renderableSourceOf(layer)) {
         continue;
       }
       if (!isRenderableLayer(layer)) {
@@ -102,6 +117,52 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
     };
   };
 
+  // The frame description is reused until the document, isolation or override contents change; each leaf's
+  // bounds until its contract, placement or live cache extent does.
+  let preparation: CompositePreparation | null = null;
+  // A bounded or empty repaint reads only part of the working set; the usage window stays open from the last full
+  // repaint so artifacts it skipped are not evicted as unused.
+  let fullFrameUsage: ReturnType<typeof raster.beginFrame> | null = null;
+  let boundsMemo = new Map<string, LeafBoundsMemo>();
+
+  const describeFrame = (
+    doc: CanvasDocumentContractV3,
+    isolationLayerId: string | null,
+    overrides: CompositeOptions['transformOverrides']
+  ): CompositePreparation => {
+    if (
+      preparation?.document !== doc ||
+      preparation.isolationLayerId !== isolationLayerId ||
+      preparation.overridesKey !== transformOverridesKey(overrides)
+    ) {
+      preparation = prepareComposite(doc, {
+        groupSurface: deps.getGroupSurface,
+        isolationLayerId,
+        transformOverrides: overrides,
+      });
+    }
+    const plan = preparation;
+    const nextMemo = new Map<string, LeafBoundsMemo>();
+    const bounds = plan.leaves.map((leaf, index) => {
+      const matrix = plan.matrices[index]!;
+      const live = layerCache.peek(leaf.id)?.rect;
+      const previous = boundsMemo.get(leaf.id);
+      const memo =
+        previous && previous.layer === leaf.layer && previous.matrix === matrix && sameOptionalRect(previous.live, live)
+          ? previous
+          : {
+              bounds: committedLeafBounds(leaf, matrix, doc, live),
+              layer: leaf.layer,
+              live: live && { ...live },
+              matrix,
+            };
+      nextMemo.set(leaf.id, memo);
+      return memo.bounds;
+    });
+    boundsMemo = nextMemo;
+    return { ...plan, bounds };
+  };
+
   /** Evict after drawing; the frame's demanded layers and the artifacts it read form the working set. */
   const enforceBudget = (
     activeFrameLayerIds: ReadonlySet<string>,
@@ -119,27 +180,22 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
       const stagedPreview = previews.getStaged();
       const stagedPlacement = stagedPreview?.placement;
       const isolatedGuard = samPreview?.isolated ? samPreview.guard : null;
-      const isolatedIds = isolatedGuard ? new Set([isolatedGuard.layerId]) : null;
-
-      const liveCacheRects = new Map<string, Rect>();
-      for (const layer of getDocumentLeaves(doc)) {
-        const rect = layerCache.peek(layer.id)?.rect;
-        if (rect) {
-          liveCacheRects.set(layer.id, rect);
-        }
-      }
+      const overrides = !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null;
+      const frame = describeFrame(doc, isolatedGuard?.layerId ?? null, overrides);
       const activeFrameLayerIds = calculateActiveFrameLayerIds({
         document: doc,
-        isolationLayerIds: isolatedIds ?? undefined,
-        liveCacheRects,
-        transformOverrides: !isolatedGuard ? transformOverrides : undefined,
+        preparation: frame,
         viewport: visibleDocumentRect(screen),
       });
-      ensureLayerCaches(doc, activeFrameLayerIds);
+      ensureLayerCaches(doc, frame, activeFrameLayerIds);
+      const frameDamage = isolatedGuard ? FULL_DAMAGE : (damage ?? FULL_DAMAGE);
       const usage = raster.beginFrame();
+      if (frameDamage.kind === 'full' || !fullFrameUsage) {
+        fullFrameUsage = usage;
+      }
 
       compositeDocument(screen, doc, layerCache, view, {
-        damage: isolatedGuard ? null : damage,
+        damage: frameDamage,
         adjustedSurface: deps.getAdjustedSurface,
         groupSurface: deps.getGroupSurface,
         backend: deps.backend,
@@ -154,6 +210,7 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
         // Snapshot filter previews only when active, avoiding an empty map allocation every frame.
         layerPreviews: !isolatedGuard && previews.filterCount() > 0 ? previews.filterSnapshot() : null,
         maskPatternTile: deps.getMaskPatternTile,
+        preparation: frame,
         // Screen frames are display-time: the region tint may draw.
         regionOverlays: true,
         // Candidate-specific placement wins for final images. Progress frames
@@ -175,10 +232,10 @@ export const createCompositeFrame = (deps: CreateCompositeFrameDeps): CompositeF
             : null,
         // Skip the edited text layer because its portal renders live content.
         skipLayerId: stores.textEditSession.get()?.layerId ?? null,
-        transformOverrides: !isolatedGuard && transformOverrides.size > 0 ? transformOverrides : null,
+        transformOverrides: overrides,
       });
 
-      enforceBudget(activeFrameLayerIds, usage);
+      enforceBudget(activeFrameLayerIds, fullFrameUsage);
     },
   };
 };

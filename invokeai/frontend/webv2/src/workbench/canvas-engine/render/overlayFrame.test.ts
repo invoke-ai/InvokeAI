@@ -12,6 +12,7 @@ import type { FloatingSelectionFrame } from './floatingSelectionFrame';
 import { createOverlayFrame, type CreateOverlayFrameDeps } from './overlayFrame';
 
 const VIEW = [1, 0, 0, 1, 0, 0] as unknown as Mat2d;
+const SCREEN = { dpr: 1, view: VIEW, viewportSize: { height: 64, width: 64 } };
 
 const layer = (id: string, overrides: Record<string, unknown> = {}) => ({
   id,
@@ -78,7 +79,7 @@ const describeOverlay = (
   doc = documentOf(),
   floatFrame: FloatingSelectionFrame | null = null,
   sam: Parameters<ReturnType<typeof createOverlayFrame>['describe']>[3] = null
-) => createOverlayFrame(harness.deps).describe(doc, VIEW, floatFrame, sam);
+) => createOverlayFrame(harness.deps).describe(doc, SCREEN, floatFrame, sam);
 
 beforeEach(() => {
   harness = makeHarness();
@@ -231,7 +232,7 @@ describe('SAM', () => {
       data: { id: 'mask' },
       rect: { height: 4, width: 4, x: 1, y: 1 },
     } as unknown as SamPreviewState;
-    expect(createOverlayFrame(harness.deps).describe(documentOf(), VIEW, null, sam).samPreview).toEqual({
+    expect(createOverlayFrame(harness.deps).describe(documentOf(), SCREEN, null, sam).samPreview).toEqual({
       opacity: 0.45,
       outline: null,
       phase: 0,

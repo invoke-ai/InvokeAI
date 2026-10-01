@@ -5,6 +5,7 @@ import type { GroupCompositeScope } from '@workbench/canvas-engine/render/groupC
 import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import { createBitmapStore } from '@workbench/canvas-engine/document/bitmapStore';
 import { identity } from '@workbench/canvas-engine/math/mat2d';
+import { NO_GROUP_CONTENT } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -56,7 +57,7 @@ describe('RasterController', () => {
       groupScope,
       [{ id: 'a', layer: adjustedLayer('a') } as unknown as SemanticLeaf],
       [identity()],
-      new Set()
+      NO_GROUP_CONTENT
     );
 
     expect(controller.memory.snapshot()).toMatchObject({
@@ -145,7 +146,7 @@ describe('RasterController', () => {
 
     for (let frame = 0; frame < 5; frame += 1) {
       const usage = controller.beginFrame();
-      controller.groups.get(groupScope, members, [identity()], new Set());
+      controller.groups.get(groupScope, members, [identity()], NO_GROUP_CONTENT);
       expect(controller.enforceBudget(new Set(['member']), usage).overageBytes).toBe(SURFACE_BYTES);
     }
 
@@ -169,12 +170,12 @@ describe('RasterController', () => {
     const controller = createController(SURFACE_BYTES);
     publish(controller, 'member');
     const members = [{ id: 'member', layer: adjustedLayer('member') } as unknown as SemanticLeaf];
-    controller.groups.get(groupScope, members, [identity()], new Set());
+    controller.groups.get(groupScope, members, [identity()], NO_GROUP_CONTENT);
 
     controller.enforceBudget(new Set(['member']), controller.beginFrame());
     expect(controller.memory.snapshot().groupBytes).toBe(0);
 
-    controller.groups.get(groupScope, members, [identity()], new Set());
+    controller.groups.get(groupScope, members, [identity()], NO_GROUP_CONTENT);
     controller.releaseReconstructible();
     expect(controller.memory.snapshot()).toMatchObject({ baseBytes: 0, derivedBytes: 0, groupBytes: 0 });
   });

@@ -164,7 +164,8 @@ import { createSamTool } from '@workbench/canvas-engine/tools/samTool';
 import { createShapeTool } from '@workbench/canvas-engine/tools/shapeTool';
 import { createTextTool } from '@workbench/canvas-engine/tools/textTool';
 import { createTransformTool } from '@workbench/canvas-engine/tools/transformTool';
-import { createViewport, MAX_DPR, type Viewport } from '@workbench/canvas-engine/viewport';
+import { FULL_DAMAGE } from '@workbench/canvas-engine/types';
+import { createViewport, type Viewport } from '@workbench/canvas-engine/viewport';
 
 import type { ImagePatchApply } from './history/imagePatch';
 import type { CanvasProjectMutation } from './mutationContracts';
@@ -469,8 +470,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     rasterController.getAdjustedSurface(layer, entry);
 
   const groupSurfaces = rasterController.groups;
-  const getGroupSurface: NonNullable<CompositeOptions['groupSurface']> = (scope, members, matrices, excludeIds) =>
-    groupSurfaces.get(scope, members, matrices, excludeIds);
+  const getGroupSurface: NonNullable<CompositeOptions['groupSurface']> = (scope, members, matrices, content) =>
+    groupSurfaces.get(scope, members, matrices, content);
 
   // Completed-stroke subscribers (persistence P2.2, history P2.3).
   const strokeListeners = new Set<(event: StrokeCommittedEvent) => void>();
@@ -1288,7 +1289,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       return;
     }
     const doc = mirror.getDocument();
-    const view = viewport.viewMatrix(viewport.getDpr());
+    const dpr = viewport.getDpr();
+    const view = viewport.viewMatrix(dpr);
 
     if (!doc) {
       clearSurface(screen);
@@ -1305,8 +1307,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       compositeFrame.draw(screen, doc, view, floatRender, samPreview, flags.damage);
     }
 
-    // Redraw the screen-space overlay on every frame to match the composite's view transform.
-    renderOverlay(overlay, overlayFrame.describe(doc, view, floatRender, samPreview));
+    // Redraw the overlay every frame in CSS pixels, scaled by the same device-pixel ratio as the composite.
+    const cssSize = viewport.getViewportSize();
+    const viewportSize = cssSize.width > 0 ? cssSize : { height: overlay.height / dpr, width: overlay.width / dpr };
+    renderOverlay(
+      overlay,
+      overlayFrame.describe(doc, { dpr, view: viewport.viewMatrix(1), viewportSize }, floatRender, samPreview)
+    );
   };
 
   const renderController = new RenderController({
@@ -1920,13 +1927,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     suppressViewportInvalidate = true;
     viewport.setViewportSize(cssWidth, cssHeight, dpr);
     suppressViewportInvalidate = false;
-    const backingDpr = Math.min(dpr, MAX_DPR);
+    // The viewport owns the clamped ratio so the backing size and every view matrix agree.
+    const backingDpr = viewport.getDpr();
     const backingWidth = Math.round(cssWidth * backingDpr);
     const backingHeight = Math.round(cssHeight * backingDpr);
     renderController.resize(backingWidth, backingHeight);
     // Resize clears canvas pixels; force full recomposition in the same task to prevent a blank browser frame.
     // Detached rendering is a no-op.
-    render({ all: true, damage: null, layers: new Set<string>(), overlay: true, view: true });
+    render({ all: true, damage: FULL_DAMAGE, layers: new Set<string>(), overlay: true, view: true });
   };
 
   let hasEverFitToView = false;

@@ -44,7 +44,7 @@ describe('color sampling with real browser rasterization', () => {
     caches.publishPixels('far-layer');
     const doc = documentWith(layer(20));
     const viewport = backend.createSurface(24, 8);
-    compositeDocument(viewport, doc, caches, IDENTITY);
+    compositeDocument(viewport, doc, caches, IDENTITY, { backend });
 
     expect([...viewport.ctx.getImageData(20, 0, 1, 1).data]).toEqual(EXPECTED_PIXEL);
     expect(createColorSampler(backend).sample(doc, caches, { x: 20, y: 0 })).toEqual(EXPECTED_COLOR);
@@ -59,7 +59,7 @@ describe('color sampling with real browser rasterization', () => {
     caches.publishPixels('far-layer');
     const doc = documentWith(layer(0), 32);
     const viewport = backend.createSurface(32, 8);
-    compositeDocument(viewport, doc, caches, IDENTITY);
+    compositeDocument(viewport, doc, caches, IDENTITY, { backend });
 
     expect([...viewport.ctx.getImageData(20, 0, 1, 1).data]).toEqual(EXPECTED_PIXEL);
     expect(createColorSampler(backend).sample(doc, caches, { x: 20, y: 0 })).toEqual(EXPECTED_COLOR);

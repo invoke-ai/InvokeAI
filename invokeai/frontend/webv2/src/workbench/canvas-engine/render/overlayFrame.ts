@@ -8,7 +8,7 @@ import type {
 } from '@workbench/canvas-engine/render/overlayRenderer';
 import type { FloatingSelection } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
-import type { Mat2d, ToolId, Vec2 } from '@workbench/canvas-engine/types';
+import type { ToolId, Vec2 } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLayer, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentIndex, type CanvasNodeEntry } from '@workbench/canvas-engine/document/documentIndex';
@@ -51,11 +51,14 @@ export interface OverlayFrame {
   /** Everything the overlay renderer draws this frame, gathered from live state. */
   describe(
     doc: CanvasDocumentContractV3,
-    view: Mat2d,
+    screen: OverlayScreen,
     floatFrame: FloatingSelectionFrame | null,
     samPreview: SamPreviewState | null
   ): OverlayState;
 }
+
+/** The overlay's screen: document→CSS transform, CSS viewport size and device-pixel ratio. */
+export type OverlayScreen = Pick<OverlayState, 'dpr' | 'view' | 'viewportSize'>;
 
 /**
  * Pure projection of engine state into overlay descriptors. Live previews replace committed geometry; stale frames
@@ -131,7 +134,7 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
   };
 
   return {
-    describe: (doc, view, floatFrame, samPreview) => {
+    describe: (doc, screen, floatFrame, samPreview) => {
       const activeTool = getActiveToolId();
       const bboxPreview = stores.bboxPreview.get();
       const samSession = stores.samInteraction.get();
@@ -169,7 +172,7 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
         showBbox: stores.showBbox.get() || activeTool === 'bbox',
         showGrid: stores.showGrid.get(),
         transformFrame: transformFrame(doc),
-        view,
+        ...screen,
       };
     },
   };

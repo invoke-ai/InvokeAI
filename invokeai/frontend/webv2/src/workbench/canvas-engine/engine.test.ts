@@ -2500,6 +2500,21 @@ describe('createCanvasEngine', () => {
     engine.lifecycle.dispose();
   });
 
+  it('sizes the backing stores by the same sub-one or fractional ratio the view matrix uses', () => {
+    for (const dpr of [0.5, 1.5]) {
+      const { engine } = createEngine();
+      const screen = createFakeCanvas();
+      const overlay = createFakeCanvas();
+      engine.surface.attach(screen.element, overlay.element);
+      engine.surface.resize(100, 80, dpr);
+
+      expect(engine.viewport.getViewport().getDpr()).toBe(dpr);
+      expect([screen.element.width, screen.element.height]).toEqual([100 * dpr, 80 * dpr]);
+      expect([overlay.element.width, overlay.element.height]).toEqual([100 * dpr, 80 * dpr]);
+      engine.lifecycle.dispose();
+    }
+  });
+
   it('dispose removes both store subscriptions', () => {
     const { engine, unsubscribe } = createEngine();
     expect(unsubscribe).not.toHaveBeenCalled();
@@ -8690,7 +8705,10 @@ describe('setStagedPreview', () => {
     const { store } = createReactiveStore(emptyDoc({ height: 100, width: 100, x: 5, y: 7 }));
     const resolver = vi.fn(() => Promise.resolve(new Blob()));
     const engine = createCanvasEngine({
-      backend: createTestStubRasterBackend(),
+      backend: {
+        ...createTestStubRasterBackend(),
+        createImageBitmap: () => Promise.resolve({ close: vi.fn(), height: 17, width: 23 } as unknown as ImageBitmap),
+      },
       imageResolver: resolver,
       projectId: 'p1',
       store,
@@ -8703,7 +8721,7 @@ describe('setStagedPreview', () => {
     raf.flush();
 
     expect(resolver).toHaveBeenCalledWith('staged-candidate', expect.any(AbortSignal));
-    // The decoded (stub, 0-sized) surface is drawn at the current bbox origin.
+    // The decoded surface is drawn at the current bbox origin.
     expect(stagedDraws(screen.surface).at(-1)!.slice(1, 3)).toEqual([5, 7]);
 
     engine.lifecycle.dispose();

@@ -93,7 +93,7 @@ describe('damage-clipped compositing matches a full repaint', () => {
     const full = backend.createSurface(SCREEN_W, SCREEN_H);
     const clipped = backend.createSurface(SCREEN_W, SCREEN_H);
     const tile = checkerboard ? createCheckerboardTile(backend, { a: '#2a2a2a', b: '#363636' }) : null;
-    const opts = { checkerboardTile: tile, imageSmoothing: false };
+    const opts = { backend, checkerboardTile: tile, imageSmoothing: false };
 
     // Seed both with an identical full composite.
     compositeDocument(full, doc, caches, view, opts);
@@ -102,7 +102,10 @@ describe('damage-clipped compositing matches a full repaint', () => {
     for (const step of steps) {
       const damage = step();
       compositeDocument(full, doc, caches, view, opts);
-      compositeDocument(clipped, doc, caches, view, { ...opts, damage: [damage] });
+      compositeDocument(clipped, doc, caches, view, {
+        ...opts,
+        damage: { kind: 'regions', regions: [damage] } as const,
+      });
     }
     return { clipped: pixelsOf(clipped), full: pixelsOf(full) };
   };

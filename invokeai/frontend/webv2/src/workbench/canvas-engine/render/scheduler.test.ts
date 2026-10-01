@@ -314,7 +314,7 @@ describe('damage coalescing', () => {
     scheduler.invalidate({ damage: damage('a', 0), layers: ['a'] });
     scheduler.invalidate({ damage: damage('a', 40), layers: ['a'] });
     raf.flush();
-    expect(flagsOf(render).damage).toEqual([damage('a', 0), damage('a', 40)]);
+    expect(flagsOf(render).damage).toEqual({ kind: 'regions', regions: [damage('a', 0), damage('a', 40)] });
   });
 
   it('keeps overlay-only invalidations from widening the frame', () => {
@@ -324,7 +324,7 @@ describe('damage coalescing', () => {
     scheduler.invalidate({ damage: damage('a', 0), layers: ['a'] });
     scheduler.invalidate({ overlay: true });
     raf.flush();
-    expect(flagsOf(render).damage).toEqual([damage('a', 0)]);
+    expect(flagsOf(render).damage).toEqual({ kind: 'regions', regions: [damage('a', 0)] });
   });
 
   it.each([
@@ -336,7 +336,7 @@ describe('damage coalescing', () => {
     scheduler.invalidate({ damage: damage('a', 0), layers: ['a'] });
     scheduler.invalidate(payload);
     raf.flush();
-    expect(flagsOf(render).damage).toBeNull();
+    expect(flagsOf(render).damage).toEqual({ kind: 'full' });
   });
 
   it('stays widened once something in the frame could not name its damage', () => {
@@ -344,7 +344,14 @@ describe('damage coalescing', () => {
     scheduler.invalidate({ view: true });
     scheduler.invalidate({ damage: damage('a', 0), layers: ['a'] });
     raf.flush();
-    expect(flagsOf(render).damage).toBeNull();
+    expect(flagsOf(render).damage).toEqual({ kind: 'full' });
+  });
+
+  it('reports no composite damage for an overlay-only frame', () => {
+    const { raf, render, scheduler } = setup();
+    scheduler.invalidate({ overlay: true });
+    raf.flush();
+    expect(flagsOf(render).damage).toEqual({ kind: 'none' });
   });
 
   it('ignores damage that does not name the single invalidated layer', () => {
@@ -353,25 +360,25 @@ describe('damage coalescing', () => {
     const { raf, render, scheduler } = setup();
     scheduler.invalidate({ damage: damage('a', 0), layers: ['a', 'b'] });
     raf.flush();
-    expect(flagsOf(render).damage).toBeNull();
+    expect(flagsOf(render).damage).toEqual({ kind: 'full' });
   });
 
   it('ignores damage naming a different layer than the one invalidated', () => {
     const { raf, render, scheduler } = setup();
     scheduler.invalidate({ damage: damage('b', 0), layers: ['a'] });
     raf.flush();
-    expect(flagsOf(render).damage).toBeNull();
+    expect(flagsOf(render).damage).toEqual({ kind: 'full' });
   });
 
   it('starts each frame with a fresh damage set', () => {
     const { raf, render, scheduler } = setup();
     scheduler.invalidate({ all: true });
     raf.flush();
-    expect(flagsOf(render).damage).toBeNull();
+    expect(flagsOf(render).damage).toEqual({ kind: 'full' });
 
     render.mockClear();
     scheduler.invalidate({ damage: damage('a', 0), layers: ['a'] });
     raf.flush();
-    expect(flagsOf(render).damage).toEqual([damage('a', 0)]);
+    expect(flagsOf(render).damage).toEqual({ kind: 'regions', regions: [damage('a', 0)] });
   });
 });

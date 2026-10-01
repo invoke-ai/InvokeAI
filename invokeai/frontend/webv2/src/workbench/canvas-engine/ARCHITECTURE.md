@@ -97,11 +97,13 @@ Canvas invocation first crosses the paint-flush barrier, then captures the post-
 
 ## Frame demand before allocation
 
-`calculateActiveFrameLayerIds` is a pure pre-allocation pass. For each enabled renderable layer it combines persisted source bounds with any larger live cache rect, applies the committed or transient transform (including rotation), respects isolation, and intersects the result with the document-space viewport. An explicitly isolated operation target is the one exception to normal document visibility: it remains demanded and drawable when disabled or display-hidden because the user is acting on that named layer directly.
+Each frame is described once by a `CompositePreparation` (`render/compositor.ts`): the leaves drawn bottom first, each leaf's effective matrix with transient transform overrides applied, the isolated group scopes, and each leaf's document-space bounds (persisted source bounds joined with any larger live cache rect, through that matrix). `compositeFrame` reuses the description until the document identity, isolation or override contents change, and each leaf's bounds until its contract, matrix or live cache extent does. Frame demand, compositing and color sampling all read the same description, so placement is never recomputed per consumer.
+
+`calculateActiveFrameLayerIds` is the pure pre-allocation pass over that description: it intersects each drawable leaf's bounds with the document-space viewport. An explicitly isolated operation target is the one exception to normal document visibility: it remains demanded and drawable when disabled or display-hidden because the user is acting on that named layer directly.
 
 The render path computes this set before `ensureLayerCaches`. Only demanded layers are rasterized for the frame. Offscreen enabled layers are not eagerly allocated; they remain on-demand and LRU-evictable, then rasterize again when panning or a transform reveals them.
 
-The frame's demanded layers form its working set. After drawing, `RasterController.enforceBudget` reclaims memory in a fixed order:
+The frame's demanded layers form its working set. After drawing, `RasterController.enforceBudget` reclaims memory in a fixed order (a bounded or empty repaint reads only part of the working set, so its usage window stays open from the last full repaint):
 
 1. derived and group artifacts the frame did not read (obsolete parameter variants, inactive groups);
 2. least-recently-used base caches that are outside the working set and unprotected.
@@ -133,6 +135,16 @@ Paint persistence protects dirty pixels until the latest generation of them is a
 `DecodedBitmapPool` replaces permanent decoded-image caching. `acquire(imageName, decode, signal)` refuses an already-aborted request before any work starts, coalesces concurrent decodes for the same image and returns a short-lived `DecodedBitmapLease`. Each rasterizer releases its lease in `finally`. The bitmap closes after the final lease, a pending decode is aborted when all interested callers cancel and its late bitmap is closed, the pool observes its own decode promise so an abandoned decode cannot surface an unhandled rejection, and disposal aborts pending work and closes every resolved bitmap. Pool byte changes feed `decodedBytes`.
 
 Staged results use a separate compressed-Blob cache rather than retaining a decoded surface for every candidate. Once a candidate's thumbnail settles, the UI asks the engine to prefetch its full-resolution bytes with at most two full-image requests in flight. Selecting a queued candidate promotes it immediately and preempts stale work, while completed/in-flight requests and concurrent decodes of the same image are coalesced. The per-engine cache is LRU-bounded to 24 entries and 64 MiB, retries a failed selected request once as foreground demand, and releases outstanding work on engine cooldown or disposal.
+
+## Composition, damage and overlays
+
+Damage is explicit: `FrameDamage` is a full repaint, no visible repaint, or layer-local regions. The scheduler widens to full on any invalidation without a region, a viewport change or a forced repaint. The compositor resolves regions through the frame's matrices into one padded screen rect: regions entirely off the target clear and draw nothing, and a bounded repaint clips to the rect and culls every leaf, group scope and staged preview whose screen bounds miss it. Unknown layers or non-finite geometry repaint everything.
+
+Compositing always renders through the canonical `RasterBackend`; there is no approximate backend-free path. Filter previews and the floating selection of a grouped member compose inside the group's isolated surface, under the group's opacity, blend and adjustments, exactly as the member's committed pixels would; display, sampling and export share one set of composition semantics.
+
+A group surface is keyed by everything except its members' pixels (scope shape, member appearance and matrices, in-scope previews and float). While that key and the bounds hold, the cache refreshes in place: it unions the damage each member's cache recorded since the version it last drew, clears that region (padded for resampling) and redraws every contributor there, then applies the group's per-pixel adjustments to the region alone. Unknown member damage, a changed member set or new bounds redraw the whole surface, reallocating only when its size changed; a new key reuses the least-recently-used of a group's two slots once both are taken.
+
+The overlay renders in CSS pixels. It receives the document→CSS view, the CSS viewport size and the device-pixel ratio, clears the backing store in device pixels, then draws every handle, nub, dash and cursor under a DPR base transform (nested image and path transforms compose with it), so chrome keeps its CSS size at any ratio and matches the CSS-pixel hit tests. The viewport owns the ratio (capped at `MAX_DPR`, sub-one ratios kept) and both the backing-store size and the composite view matrix derive from it.
 
 ## Derived surfaces and invalidation
 

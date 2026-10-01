@@ -84,7 +84,6 @@ const SEAM_ONLY_SYMBOLS = ['repairSelectedLayerId', 'moveNodesWithinSiblings', '
 /** Production planners that consume the document model; dropping the import would reopen an ad-hoc path. */
 const MODEL_CONSUMERS = [
   'workbench/canvas-engine/render/compositor.ts',
-  'workbench/canvas-engine/render/frameDemand.ts',
   'workbench/canvas-engine/render/overlayFrame.ts',
   'workbench/canvas-engine/render/floatingSelectionFrame.ts',
   'workbench/canvas-engine/render/rasterComposite.ts',

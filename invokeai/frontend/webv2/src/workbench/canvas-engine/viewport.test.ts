@@ -97,6 +97,16 @@ describe('createViewport', () => {
     expect(vp.getState().pan).toEqual({ x: 15, y: 1 });
   });
 
+  it('keeps sub-one and fractional ratios and reads an invalid ratio as one', () => {
+    const vp = createViewport();
+    vp.setViewportSize(800, 600, 0.75);
+    expect(vp.getDpr()).toBe(0.75);
+    vp.setViewportSize(800, 600, 1.25);
+    expect(vp.getDpr()).toBe(1.25);
+    vp.setViewportSize(800, 600, 0);
+    expect(vp.getDpr()).toBe(1);
+  });
+
   it('setViewportSize clamps dpr to the max and notifies on change', () => {
     const vp = createViewport();
     const listener = vi.fn();

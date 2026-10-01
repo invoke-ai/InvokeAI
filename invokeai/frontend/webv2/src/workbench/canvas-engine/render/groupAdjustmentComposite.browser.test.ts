@@ -2,11 +2,12 @@ import type { CanvasAdjustmentsContract, CanvasRasterLayerContractV2 } from '@wo
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
+import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { identity } from '@workbench/canvas-engine/math/mat2d';
 import { createColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import { compositeDocument } from '@workbench/canvas-engine/render/compositor';
-import { createGroupSurfaceCache } from '@workbench/canvas-engine/render/groupSurfaceCache';
+import { createGroupSurfaceCache, NO_GROUP_CONTENT } from '@workbench/canvas-engine/render/groupSurfaceCache';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
 import { planBaseRasterComposite, renderRasterComposite } from '@workbench/canvas-engine/render/rasterComposite';
@@ -118,13 +119,14 @@ describe('group adjustment composite', () => {
     const groupSurfaces = createGroupSurfaceCache({
       createSurface: (w, h) => scene.backend.createSurface(w, h),
       getAdjustedSurface: () => null,
+      damageSince: (id, version) => scene.caches.damageSince(id, version),
       getCacheEntry: (id) => scene.caches.get(id),
     });
 
     const screen = scene.backend.createSurface(WIDTH, HEIGHT);
     compositeDocument(screen, document, scene.caches, identity(), {
       backend: scene.backend,
-      groupSurface: (scope, members, matrices, exclude) => groupSurfaces.get(scope, members, matrices, exclude),
+      groupSurface: (scope, members, matrices, content) => groupSurfaces.get(scope, members, matrices, content),
     });
     const exported = await renderRasterComposite(planBaseRasterComposite(document, BBOX), scene);
 
@@ -137,7 +139,7 @@ describe('group adjustment composite', () => {
     const again = scene.backend.createSurface(WIDTH, HEIGHT);
     compositeDocument(again, document, scene.caches, identity(), {
       backend: scene.backend,
-      groupSurface: (scope, members, matrices, exclude) => groupSurfaces.get(scope, members, matrices, exclude),
+      groupSurface: (scope, members, matrices, content) => groupSurfaces.get(scope, members, matrices, content),
     });
     expect(centerPixel(again)).toEqual(screenPx);
   });
@@ -163,12 +165,13 @@ describe('group adjustment composite', () => {
     const groupSurfaces = createGroupSurfaceCache({
       createSurface: (w, h) => scene.backend.createSurface(w, h),
       getAdjustedSurface: () => null,
+      damageSince: (id, version) => scene.caches.damageSince(id, version),
       getCacheEntry: (id) => scene.caches.get(id),
     });
     const screen = scene.backend.createSurface(WIDTH, HEIGHT);
     compositeDocument(screen, document, scene.caches, identity(), {
       backend: scene.backend,
-      groupSurface: (scope, members, matrices, exclude) => groupSurfaces.get(scope, members, matrices, exclude),
+      groupSurface: (scope, members, matrices, content) => groupSurfaces.get(scope, members, matrices, content),
     });
     expect(Math.abs(centerPixel(screen)[0]! - 221)).toBeLessThanOrEqual(3);
   });
@@ -179,6 +182,7 @@ describe('group adjustment composite', () => {
     const groupSurfaces = createGroupSurfaceCache({
       createSurface: (w, h) => scene.backend.createSurface(w, h),
       getAdjustedSurface: () => null,
+      damageSince: (id, version) => scene.caches.damageSince(id, version),
       getCacheEntry: (id) => scene.caches.get(id),
     });
     const point = { x: WIDTH / 2, y: HEIGHT / 2 };
@@ -186,7 +190,7 @@ describe('group adjustment composite', () => {
     const raw = sampler.sample(document, scene.caches, point);
     expect(raw?.r).toBe(0x40);
     const adjusted = sampler.sample(document, scene.caches, point, {
-      groupSurface: (scope, members, matrices, exclude) => groupSurfaces.get(scope, members, matrices, exclude),
+      groupSurface: (scope, members, matrices, content) => groupSurfaces.get(scope, members, matrices, content),
     });
     expect(adjusted?.r).toBe(255 - 0x40);
   });
@@ -209,12 +213,13 @@ describe('group adjustment composite', () => {
     const groupSurfaces = createGroupSurfaceCache({
       createSurface: (w, h) => scene.backend.createSurface(w, h),
       getAdjustedSurface: () => null,
+      damageSince: (id, version) => scene.caches.damageSince(id, version),
       getCacheEntry: (id) => scene.caches.get(id),
     });
     const screen = scene.backend.createSurface(WIDTH, HEIGHT);
     compositeDocument(screen, document, scene.caches, identity(), {
       backend: scene.backend,
-      groupSurface: (scope, members, matrices, exclude) => groupSurfaces.get(scope, members, matrices, exclude),
+      groupSurface: (scope, members, matrices, content) => groupSurfaces.get(scope, members, matrices, content),
     });
     const screenPx = centerPixel(screen);
     const exportPx = centerPixel(exported);
@@ -244,12 +249,13 @@ describe('group adjustment composite', () => {
     const groupSurfaces = createGroupSurfaceCache({
       createSurface: (w, h) => nestedScene.backend.createSurface(w, h),
       getAdjustedSurface: () => null,
+      damageSince: (id, version) => nestedScene.caches.damageSince(id, version),
       getCacheEntry: (id) => nestedScene.caches.get(id),
     });
     const screen = nestedScene.backend.createSurface(WIDTH, HEIGHT);
     compositeDocument(screen, nested, nestedScene.caches, identity(), {
       backend: nestedScene.backend,
-      groupSurface: (scope, members, matrices, exclude) => groupSurfaces.get(scope, members, matrices, exclude),
+      groupSurface: (scope, members, matrices, content) => groupSurfaces.get(scope, members, matrices, content),
     });
     const screenPx = centerPixel(screen);
     const exportPx = centerPixel(nestedExport);
@@ -267,6 +273,7 @@ describe('group adjustment composite', () => {
         return scene.backend.createSurface(w, h);
       },
       getAdjustedSurface: () => null,
+      damageSince: (id, version) => scene.caches.damageSince(id, version),
       getCacheEntry: (id) => scene.caches.get(id),
     });
     const compositeAt = (opacity: number) => {
@@ -274,7 +281,7 @@ describe('group adjustment composite', () => {
       const screen = scene.backend.createSurface(WIDTH, HEIGHT);
       compositeDocument(screen, document, scene.caches, identity(), {
         backend: scene.backend,
-        groupSurface: (scope, members, matrices, exclude) => groupSurfaces.get(scope, members, matrices, exclude),
+        groupSurface: (scope, members, matrices, content) => groupSurfaces.get(scope, members, matrices, content),
       });
       return centerPixel(screen);
     };
@@ -287,15 +294,15 @@ describe('group adjustment composite', () => {
     expect(Math.abs(at90[3]! - 230)).toBeLessThanOrEqual(2);
   });
 
-  it('holds two keys per group so alternating consumers (frame vs overview) stop rebuilding', () => {
-    // Frame/session and settled Overview matrices alternate two keys; two slots retain them, while a third evicts.
+  it('holds two keys per group so alternating consumers (frame vs overview) stop redrawing', () => {
+    // Frame/session and settled Overview matrices alternate two keys; two slots retain them, while a third
+    // repaints the least-recently-used slot in place instead of allocating.
     const scene = sceneFor({ red: '#ff0000' });
-    let builds = 0;
+    const diagnostics = createCanvasDiagnostics(true);
     const groupSurfaces = createGroupSurfaceCache({
-      createSurface: (w, h) => {
-        builds += 1;
-        return scene.backend.createSurface(w, h);
-      },
+      createSurface: (w, h) => scene.backend.createSurface(w, h),
+      damageSince: (id, version) => scene.caches.damageSince(id, version),
+      diagnostics,
       getAdjustedSurface: () => null,
       getCacheEntry: (id) => scene.caches.get(id),
     });
@@ -309,38 +316,41 @@ describe('group adjustment composite', () => {
       const screen = scene.backend.createSurface(WIDTH, HEIGHT);
       compositeDocument(screen, docAt(x), scene.caches, identity(), {
         backend: scene.backend,
-        groupSurface: (scope, members, matrices, exclude) => groupSurfaces.get(scope, members, matrices, exclude),
+        groupSurface: (scope, members, matrices, content) => groupSurfaces.get(scope, members, matrices, content),
       });
       return screen;
+    };
+    const draws = () => {
+      const { groupSurfaceAllocations, groupSurfaceRebuilds } = diagnostics.snapshot();
+      return { allocations: groupSurfaceAllocations, rebuilds: groupSurfaceRebuilds };
     };
 
     const first = centerPixel(composite(0));
     composite(1);
-    expect(builds).toBe(2);
+    expect(draws()).toEqual({ allocations: 2, rebuilds: 0 });
     composite(0);
     composite(1);
     composite(0);
-    expect(builds).toBe(2);
+    expect(draws()).toEqual({ allocations: 2, rebuilds: 0 });
     expect(centerPixel(composite(0))).toEqual(first);
 
     composite(2);
-    expect(builds).toBe(3);
-    // x:2 evicted the least-recently-used slot (x:1); x:0 is still warm.
+    expect(draws()).toEqual({ allocations: 2, rebuilds: 1 });
+    // x:2 took over the least-recently-used slot (x:1); x:0 is still warm.
     composite(0);
-    expect(builds).toBe(3);
+    expect(draws()).toEqual({ allocations: 2, rebuilds: 1 });
     composite(1);
-    expect(builds).toBe(4);
+    expect(draws()).toEqual({ allocations: 2, rebuilds: 2 });
 
-    // A null build (all members excluded, e.g. under a filter preview) must not
-    // evict the warm slots the other consumer still needs.
+    // A null build (every member excluded) must not evict the warm slots the other consumer still needs.
     const screen = scene.backend.createSurface(WIDTH, HEIGHT);
     compositeDocument(screen, docAt(1), scene.caches, identity(), {
       backend: scene.backend,
-      groupSurface: (scope, members, matrices) => groupSurfaces.get(scope, members, matrices, new Set(['red'])),
+      groupSurface: (scope, members, matrices) =>
+        groupSurfaces.get(scope, members, matrices, { ...NO_GROUP_CONTENT, excludeIds: new Set(['red']) }),
     });
-    const buildsAfterNull = builds;
     composite(1);
-    expect(builds).toBe(buildsAfterNull);
+    expect(draws()).toEqual({ allocations: 2, rebuilds: 2 });
   });
 
   it('keeps identity and pass-through groups on the flat path and keys the plan by group stacks', () => {
@@ -351,5 +361,88 @@ describe('group adjustment composite', () => {
     const inverted = docWith([groupContract('g', [raster('white')], { adjustments: invertStack('ia') })]);
     expect(planBaseRasterComposite(adjusted, BBOX).key).not.toBe(planBaseRasterComposite(flat, BBOX).key);
     expect(planBaseRasterComposite(adjusted, BBOX).key).not.toBe(planBaseRasterComposite(inverted, BBOX).key);
+  });
+});
+
+describe('group-scoped previews and partial refresh', () => {
+  const groupedScene = () => {
+    const scene = sceneFor({ member: '#00ff00', under: '#0000ff' });
+    const groupSurfaces = createGroupSurfaceCache({
+      createSurface: (w, h) => scene.backend.createSurface(w, h),
+      damageSince: (id, version) => scene.caches.damageSince(id, version),
+      getAdjustedSurface: () => null,
+      getCacheEntry: (id) => scene.caches.get(id),
+    });
+    const document = docWith([groupContract('g', [raster('member')], { opacity: 0.5 }), raster('under')]);
+    const composite = (options: Partial<Parameters<typeof compositeDocument>[4]> = {}) => {
+      const screen = scene.backend.createSurface(WIDTH, HEIGHT);
+      compositeDocument(screen, document, scene.caches, identity(), {
+        backend: scene.backend,
+        groupSurface: (scope, members, matrices, content) => groupSurfaces.get(scope, members, matrices, content),
+        ...options,
+      });
+      return screen;
+    };
+    return { composite, groupSurfaces, scene };
+  };
+
+  it('draws a member filter preview inside its group, under the group opacity', () => {
+    const { composite, scene } = groupedScene();
+    const committed = centerPixel(composite());
+    const previewSurface = scene.backend.createSurface(WIDTH, HEIGHT);
+    previewSurface.ctx.fillStyle = '#ff0000';
+    previewSurface.ctx.fillRect(0, 0, WIDTH, HEIGHT);
+
+    const previewed = centerPixel(
+      composite({ layerPreviews: new Map([['member', { rect: BBOX, surface: previewSurface }]]) })
+    );
+
+    // Green and red at the group's 50% over blue: the preview replaces the member, never the group's opacity.
+    expect(committed[1]).toBeGreaterThan(120);
+    expect(committed[1]).toBeLessThan(135);
+    expect(previewed[0]).toBeGreaterThan(120);
+    expect(previewed[0]).toBeLessThan(135);
+    expect(previewed[2]).toBeGreaterThan(120);
+    expect(previewed[3]).toBe(255);
+  });
+
+  it('draws a floating selection inside its group, under the group opacity', () => {
+    const { composite, scene } = groupedScene();
+    const lifted = scene.backend.createSurface(8, 8);
+    lifted.ctx.fillStyle = '#ffffff';
+    lifted.ctx.fillRect(0, 0, 8, 8);
+
+    const screen = composite({
+      floatingSelection: {
+        layerId: 'member',
+        matrix: identity(),
+        rect: { height: 8, width: 8, x: WIDTH / 2 - 4, y: HEIGHT / 2 - 4 },
+        surface: lifted,
+      },
+    });
+
+    // White at 50% over blue, not opaque white drawn above the group.
+    const [r, g, b] = centerPixel(screen);
+    expect(Math.abs(r! - 128)).toBeLessThanOrEqual(2);
+    expect(Math.abs(g! - 128)).toBeLessThanOrEqual(2);
+    expect(Math.abs(b! - 255)).toBeLessThanOrEqual(2);
+  });
+
+  it('refreshes a damaged member region to the same pixels as a full rebuild', () => {
+    const { composite, scene } = groupedScene();
+    composite();
+    const entry = scene.caches.get('member')!;
+    entry.surface.ctx.fillStyle = '#ff00ff';
+    entry.surface.ctx.fillRect(10, 12, 7, 5);
+    scene.caches.publishPixels('member', { height: 5, width: 7, x: 10, y: 12 });
+
+    const refreshed = composite().ctx.getImageData(0, 0, WIDTH, HEIGHT).data;
+    const rebuilt = groupedScene();
+    const fresh = rebuilt.scene.caches.get('member')!;
+    fresh.surface.ctx.fillStyle = '#ff00ff';
+    fresh.surface.ctx.fillRect(10, 12, 7, 5);
+    rebuilt.scene.caches.publishPixels('member');
+
+    expect([...refreshed]).toEqual([...rebuilt.composite().ctx.getImageData(0, 0, WIDTH, HEIGHT).data]);
   });
 });
