@@ -69,11 +69,19 @@ export const popoverSlotRecipe = defineSlotRecipe({
   },
 });
 
-/** Chakra dims descriptions to 80%, which drops them below AA on the solid status fills. */
+/**
+ * Keep white status text at AA: Chakra dims descriptions to 80%, and its green/orange 600 fills are too light
+ * for white at any opacity, so success and warning use the 700 step.
+ */
 export const toastSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.toast,
   base: {
     ...chakraSlotRecipes.toast.base,
+    root: {
+      ...chakraSlotRecipes.toast.base?.root,
+      '&[data-type=success]': { ...chakraSlotRecipes.toast.base?.root?.['&[data-type=success]'], bg: 'green.700' },
+      '&[data-type=warning]': { ...chakraSlotRecipes.toast.base?.root?.['&[data-type=warning]'], bg: 'orange.700' },
+    },
     description: { ...chakraSlotRecipes.toast.base?.description, opacity: 1 },
   },
 });
