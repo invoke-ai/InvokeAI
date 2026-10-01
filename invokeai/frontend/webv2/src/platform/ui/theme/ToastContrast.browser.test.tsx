@@ -20,8 +20,7 @@ afterEach(async () => {
 });
 
 describe('toast contrast', () => {
-  // Success and warning fills (green/orange 600) stay below AA even for full-strength white text.
-  it.each(['error', 'info'] as const)('renders a %s description at AA contrast', async (type) => {
+  it.each(['error', 'info', 'success', 'warning'] as const)('renders a %s description at AA contrast', async (type) => {
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
