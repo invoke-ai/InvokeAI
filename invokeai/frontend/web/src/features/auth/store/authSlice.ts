@@ -39,7 +39,7 @@ const decodeTokenPayload = (token: string | null): Record<string, unknown> | nul
   }
 };
 
-const getTokenUserId = (token: string | null): string | null => {
+export const getTokenUserId = (token: string | null): string | null => {
   const payload = decodeTokenPayload(token);
   return typeof payload?.user_id === 'string' ? payload.user_id : null;
 };

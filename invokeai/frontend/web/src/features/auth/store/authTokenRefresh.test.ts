@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   beginAuthTransition,
+  beginPasswordChange,
   captureAuthGeneration,
   createMediaAuthLock,
   markTokenRefreshAccepted,
@@ -9,6 +10,7 @@ import {
   shouldAcceptRefreshedToken,
   shouldEndSessionForUnauthorized,
   shouldThrottleRefreshedToken,
+  waitForPasswordChange,
 } from './authTokenRefresh';
 
 const tokenFor = (userId: string, nonce: number, epoch: number) =>
@@ -236,5 +238,81 @@ describe('ending a session over a 401', () => {
     expect(shouldEndSessionForUnauthorized(null)).toBe(false);
     localStorage.setItem('auth_token', '');
     expect(shouldEndSessionForUnauthorized('')).toBe(false);
+  });
+
+  it('waits for a password change published through shared storage, then rechecks the live token', async () => {
+    vi.useFakeTimers();
+    try {
+      const oldToken = tokenFor('user', 1, 0);
+      const replacement = tokenFor('user', 2, 1);
+      localStorage.setItem('auth_token', oldToken);
+      const finishInOtherTab = beginPasswordChange(oldToken, captureAuthGeneration());
+      const pending = waitForPasswordChange(oldToken, captureAuthGeneration());
+      let settled = false;
+      void pending.then(() => {
+        settled = true;
+      });
+
+      await vi.advanceTimersByTimeAsync(100);
+      expect(settled).toBe(false);
+      localStorage.setItem('auth_token', replacement);
+      finishInOtherTab();
+      await vi.advanceTimersByTimeAsync(100);
+
+      await pending;
+      expect(shouldEndSessionForUnauthorized(oldToken)).toBe(false);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('stops waiting for an abandoned transition when its marker expires', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(100_000);
+      const oldToken = tokenFor('user', 1, 0);
+      localStorage.setItem('auth_token', oldToken);
+      const finish = beginPasswordChange(oldToken, captureAuthGeneration());
+      const pending = waitForPasswordChange(oldToken, captureAuthGeneration());
+
+      vi.setSystemTime(130_001);
+      await vi.advanceTimersByTimeAsync(100);
+      await pending;
+      expect(shouldEndSessionForUnauthorized(oldToken)).toBe(true);
+      finish();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('does not wait for a transition belonging to a different login', async () => {
+    const otherToken = tokenFor('other-user', 1, 0);
+    const currentToken = tokenFor('user', 1, 0);
+    const finishOther = beginPasswordChange(otherToken, captureAuthGeneration());
+    localStorage.setItem('auth_token', currentToken);
+
+    await waitForPasswordChange(currentToken, captureAuthGeneration());
+    expect(shouldEndSessionForUnauthorized(currentToken)).toBe(true);
+    finishOther();
+  });
+
+  it('stops waiting on explicit logout and rejects a late password-change token', async () => {
+    vi.useFakeTimers();
+    try {
+      const oldToken = tokenFor('user', 1, 0);
+      localStorage.setItem('auth_token', oldToken);
+      const generation = captureAuthGeneration();
+      const finish = beginPasswordChange(oldToken, generation);
+      const pending = waitForPasswordChange(oldToken, generation);
+
+      beginAuthTransition();
+      localStorage.removeItem('auth_token');
+      await vi.advanceTimersByTimeAsync(100);
+      await pending;
+      expect(shouldAcceptRefreshedToken(oldToken, generation, tokenFor('user', 2, 1))).toBe(false);
+      finish();
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
