@@ -7,14 +7,21 @@ import type {
   CanvasStateContractV3,
   CanvasNodeContract,
 } from '@workbench/canvas-engine/contracts';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 
-import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import {
+  groupContract,
+  layerContract,
+  stacksFrom,
+} from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { DocumentMirrorCallbacks } from './documentMirror';
 
 import { getDocumentLeaves } from './documentIndex';
-import { createDocumentMirror } from './documentMirror';
+import { createDocumentMirror, getForestDiffCount, resetForestDiffCount } from './documentMirror';
 
 const rasterLayer = (id: string, overrides: Partial<CanvasRasterLayerContractV2> = {}): CanvasLayerContract => ({
   blendMode: 'normal',
@@ -189,7 +196,7 @@ describe('createDocumentMirror', () => {
     mirror.refresh();
 
     expect(mirror.getDocument()).toBe(updated);
-    expect(callbacks.onLayersChanged).toHaveBeenCalledWith(['a'], []);
+    expect(callbacks.onLayersChanged).toHaveBeenCalledWith(['a'], [], false);
   });
 
   it('reports exactly the edited layer id when one layer changes by reference', () => {
@@ -206,7 +213,7 @@ describe('createDocumentMirror', () => {
     store.setState({ projects: [{ canvas: { ...canvas, document: nextDoc }, id: 'p1' }] });
 
     expect(callbacks.onLayersChanged).toHaveBeenCalledTimes(1);
-    expect(callbacks.onLayersChanged).toHaveBeenCalledWith(['a'], []);
+    expect(callbacks.onLayersChanged).toHaveBeenCalledWith(['a'], [], false);
     expect(callbacks.onDocumentReplaced).not.toHaveBeenCalled();
     expect(callbacks.onBboxChanged).not.toHaveBeenCalled();
   });
@@ -222,7 +229,7 @@ describe('createDocumentMirror', () => {
     // Opacity changes preserve source identity; rerasterization would erase unflushed paint.
     const opacityEdit: CanvasDocumentContractV3 = { ...doc, stacks: stacksFrom([{ ...a, opacity: 0.5 }]) };
     store.setState({ projects: [{ canvas: { ...canvas, document: opacityEdit }, id: 'p1' }] });
-    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a'], []);
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a'], [], false);
 
     // Genuine source swap (new `source` object): reported as source-changed.
     const swapped = getDocumentLeaves(store.getState().projects[0]!.canvas.document)[0] as CanvasRasterLayerContractV2;
@@ -233,7 +240,7 @@ describe('createDocumentMirror', () => {
       ]),
     };
     store.setState({ projects: [{ canvas: { ...canvas, document: sourceSwap }, id: 'p1' }] });
-    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a'], ['a']);
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a'], ['a'], false);
   });
 
   it('for a mask: a fill-only change is NOT source-changed, a bitmap swap IS (protects unflushed strokes)', () => {
@@ -261,7 +268,7 @@ describe('createDocumentMirror', () => {
       stacks: stacksFrom([{ ...mask, mask: { bitmap: null, fill: { color: '#00ff00', style: 'grid' as const } } }]),
     };
     store.setState({ projects: [{ canvas: { ...canvas, document: fillEdit }, id: 'p1' }] });
-    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['m'], []);
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['m'], [], false);
 
     // A bitmap swap (persistence round-trip / undo): reported as source-changed.
     const current = getDocumentLeaves(
@@ -274,7 +281,7 @@ describe('createDocumentMirror', () => {
       ]),
     };
     store.setState({ projects: [{ canvas: { ...canvas, document: bitmapSwap }, id: 'p1' }] });
-    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['m'], ['m']);
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['m'], ['m'], false);
   });
 
   it('reports added and removed layer ids', () => {
@@ -290,11 +297,11 @@ describe('createDocumentMirror', () => {
     store.setState({
       projects: [{ canvas: { ...canvas, document: { ...doc, stacks: stacksFrom([b, a]) } }, id: 'p1' }],
     });
-    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['b'], ['b']);
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['b'], ['b'], true);
 
     // A removal is a change but not a source change (the id has no incoming source).
     store.setState({ projects: [{ canvas: { ...canvas, document: { ...doc, stacks: stacksFrom([b]) } }, id: 'p1' }] });
-    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a'], []);
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a'], [], true);
   });
 
   it('fires onLayerOrderChanged exactly once on a pure reorder, with no layer ids reported', () => {
@@ -378,7 +385,7 @@ describe('createDocumentMirror', () => {
     store.setState({ projects: [{ canvas: { ...canvas, document: nextDoc }, id: 'p1' }] });
 
     expect(callbacks.onDocumentReplaced).not.toHaveBeenCalled();
-    expect(callbacks.onLayersChanged).toHaveBeenCalledWith(['a'], []);
+    expect(callbacks.onLayersChanged).toHaveBeenCalledWith(['a'], [], false);
   });
 
   it('fires onBboxChanged when only the bbox moves', () => {
@@ -485,7 +492,7 @@ describe('createDocumentMirror: groups', () => {
     const { callbacks, set } = setup(doc);
 
     set({ ...doc, stacks: stacksFrom([groupContract('g', [a, groupContract('h', [b])], { isEnabled: false }), c]) });
-    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a', 'b'], []);
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a', 'b'], [], false);
     expect(callbacks.onLayerOrderChanged).not.toHaveBeenCalled();
   });
 
@@ -556,7 +563,7 @@ describe('createDocumentMirror: groups', () => {
     const { callbacks, set } = setup(doc);
 
     set({ ...doc, stacks: stacksFrom([groupContract('g', [a, b], { isEnabled: false })]) });
-    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['b'], []);
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['b'], [], true);
   });
 
   it('reports the leaves of a removed group as removed, never the group id', () => {
@@ -566,6 +573,169 @@ describe('createDocumentMirror: groups', () => {
     const { callbacks, set } = setup(doc);
 
     set({ ...doc, stacks: stacksFrom([b]) });
-    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a'], []);
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a'], [], true);
+  });
+});
+
+describe('createDocumentMirror: value edits through the reducer', () => {
+  const setup = (doc: CanvasDocumentContractV3) => {
+    let project = applyCanvasProjectMutation(createInitialWorkbenchState().projects[0]!, {
+      document: doc,
+      type: 'replaceCanvasDocument',
+    });
+    const store = createFakeStore([project]);
+    const callbacks = spyCallbacks();
+    const mirror = createDocumentMirror(store, project.id, callbacks);
+    resetForestDiffCount();
+    const apply = (mutation: CanvasProjectMutation, notify = true): void => {
+      project = applyCanvasProjectMutation(project, mutation);
+      (notify ? store.setState : store.replaceStateSilently)({ projects: [project] });
+    };
+    return { apply, callbacks, mirror };
+  };
+
+  it('reports leaf property and source edits from the recorded changes without diffing the forests', () => {
+    const { apply, callbacks } = setup(makeDoc([rasterLayer('a'), rasterLayer('b')]));
+
+    apply({ id: 'b', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' });
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['b'], [], false);
+    apply({ id: 'a', source: { bitmap: null, type: 'paint' }, type: 'updateCanvasLayerSource' });
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a'], ['a'], false);
+    expect(getForestDiffCount()).toBe(0);
+  });
+
+  it('applies a batched config update as one value edit, composing repeated ids in order', () => {
+    const { apply, callbacks, mirror } = setup(makeDoc([rasterLayer('a'), rasterLayer('b'), rasterLayer('c')]));
+    const invert = [{ id: 'inv', isEnabled: true, type: 'invert' as const }];
+
+    apply({
+      type: 'updateCanvasLayerConfigs',
+      updates: [
+        { config: { adjustments: invert, layerType: 'raster' }, id: 'a' },
+        { config: { isTransparencyLocked: true, layerType: 'raster' }, id: 'c' },
+        { config: { isTransparencyLocked: true, layerType: 'raster' }, id: 'a' },
+      ],
+    });
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a', 'c'], [], false);
+    expect(callbacks.onLayersChanged).toHaveBeenCalledOnce();
+    expect(getForestDiffCount()).toBe(0);
+    const a = getDocumentLeaves(mirror.getDocument()!).find((leaf) => leaf.id === 'a') as CanvasRasterLayerContractV2;
+    expect(a).toMatchObject({ adjustments: invert, isTransparencyLocked: true });
+  });
+
+  it('reports only the descendants whose inherited flags moved when a group flag flips', () => {
+    const doc = makeDoc([
+      groupContract('g', [rasterLayer('a'), groupContract('h', [rasterLayer('b')], { isEnabled: false })]),
+      rasterLayer('c'),
+    ]);
+    const { apply, callbacks } = setup(doc);
+
+    apply({ type: 'setCanvasLayersEnabled', updates: [{ id: 'g', isEnabled: false }] });
+    // b was already disabled through h, so only a changes.
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a'], [], false);
+    expect(getForestDiffCount()).toBe(0);
+  });
+
+  it('reports the descendants of a group whose lock or display visibility flips', () => {
+    const doc = makeDoc([
+      groupContract('g', [rasterLayer('a'), rasterLayer('b')]),
+      groupContract('m', [layerContract('mask', 'inpaint_mask')]),
+    ]);
+    const { apply, callbacks } = setup(doc);
+
+    apply({ id: 'g', patch: { isLocked: true }, type: 'updateCanvasLayer' });
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a', 'b'], [], false);
+    apply({ type: 'setCanvasLayersHidden', updates: [{ id: 'm', isHidden: true }] });
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['mask'], [], false);
+    expect(getForestDiffCount()).toBe(0);
+  });
+
+  it.each<[string, CanvasProjectMutation]>([
+    ['blend mode', { id: 'g', patch: { blendMode: 'multiply' }, type: 'updateCanvasLayer' }],
+    [
+      'adjustments',
+      {
+        config: { adjustments: [{ id: 'ga', isEnabled: true, type: 'invert' }], layerType: 'group' },
+        id: 'g',
+        type: 'updateCanvasLayerConfig',
+      },
+    ],
+  ])('recomposites a group whose %s changes without reporting a pixel change', (_, mutation) => {
+    const { apply, callbacks } = setup(makeDoc([groupContract('g', [rasterLayer('a')]), rasterLayer('c')]));
+
+    apply(mutation);
+    expect(callbacks.onLayersRecomposite).toHaveBeenLastCalledWith(['a']);
+    expect(callbacks.onLayersChanged).not.toHaveBeenCalled();
+    expect(getForestDiffCount()).toBe(0);
+  });
+
+  it('fans group appearance edits out on the recomposite channel and stays silent on a rename', () => {
+    const { apply, callbacks } = setup(
+      makeDoc([groupContract('g', [rasterLayer('a'), rasterLayer('b')]), rasterLayer('c')])
+    );
+
+    apply({ id: 'g', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' });
+    expect(callbacks.onLayersRecomposite).toHaveBeenLastCalledWith(['a', 'b']);
+    apply({ id: 'g', patch: { name: 'Folder' }, type: 'updateCanvasLayer' });
+    expect(callbacks.onLayersChanged).not.toHaveBeenCalled();
+    expect(callbacks.onLayersRecomposite).toHaveBeenCalledTimes(1);
+    expect(getForestDiffCount()).toBe(0);
+  });
+
+  it('folds value edits a missed notification skipped, and diffs forests only across a structural edit', () => {
+    const { apply, callbacks, mirror } = setup(makeDoc([rasterLayer('a'), rasterLayer('b'), rasterLayer('c')]));
+
+    apply({ id: 'a', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' }, false);
+    apply({ id: 'c', source: { bitmap: null, type: 'paint' }, type: 'updateCanvasLayerSource' }, false);
+    mirror.refresh();
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['a', 'c'], ['c'], false);
+    expect(getForestDiffCount()).toBe(0);
+
+    apply({ ids: ['b'], type: 'removeCanvasLayers' });
+    expect(callbacks.onLayersChanged).toHaveBeenLastCalledWith(['b'], [], true);
+    expect(getForestDiffCount()).toBe(1);
+  });
+});
+
+describe('createDocumentMirror: change signal', () => {
+  it('signals each document change once, after the other callbacks reacted, and never for staging alone', () => {
+    const doc = makeDoc([rasterLayer('a')]);
+    const canvas = makeCanvas(doc);
+    const store = createFakeStore([{ canvas, id: 'p1' }]);
+    const order: string[] = [];
+    const callbacks = {
+      ...spyCallbacks(),
+      onDocumentChanged: vi.fn(() => order.push('document')),
+      onLayersChanged: vi.fn(() => order.push('layers')),
+    };
+    createDocumentMirror(store, 'p1', callbacks);
+
+    store.setState({
+      projects: [{ canvas: { ...canvas, document: makeDoc([rasterLayer('a', { opacity: 0.5 })]) }, id: 'p1' }],
+    });
+    store.setState({
+      projects: [{ canvas: { ...store.getState().projects[0]!.canvas, stagingArea: makeStaging() }, id: 'p1' }],
+    });
+
+    expect(order).toEqual(['layers', 'document']);
+  });
+
+  it('still signals the change when a reaction throws', () => {
+    const doc = makeDoc([rasterLayer('a')]);
+    const canvas = makeCanvas(doc);
+    const store = createFakeStore([{ canvas, id: 'p1' }]);
+    const callbacks = {
+      ...spyCallbacks(),
+      onDocumentChanged: vi.fn(),
+      onLayersChanged: vi.fn(() => {
+        throw new Error('reaction failed');
+      }),
+    };
+    createDocumentMirror(store, 'p1', callbacks);
+
+    expect(() =>
+      store.setState({ projects: [{ canvas: { ...canvas, document: makeDoc([rasterLayer('b')]) }, id: 'p1' }] })
+    ).toThrow('reaction failed');
+    expect(callbacks.onDocumentChanged).toHaveBeenCalledOnce();
   });
 });

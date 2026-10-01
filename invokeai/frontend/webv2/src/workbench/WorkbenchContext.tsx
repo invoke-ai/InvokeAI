@@ -19,9 +19,9 @@ import { clearLayerPanelStates } from './layerPanelState';
 import { createWorkbenchPersistenceRuntime } from './persistenceRuntime';
 import { createOpenProjectBroker } from './projects/openProjectBroker';
 import {
-  createCanvasHeldMediaSources,
+  createLiveCanvasEngines,
   createOpenProjectsHeldMediaReader,
-  type CanvasHeldMediaSources,
+  type LiveCanvasEngines,
 } from './projects/projectAssets';
 import { describeRefusedProjects } from './projects/projectLoadRefusal';
 import {
@@ -45,7 +45,7 @@ type WorkbenchSelector<T> = (snapshot: WorkbenchSnapshot) => T;
 const WorkbenchStoreContext = createContext<WorkbenchInternalStore | null>(null);
 const WorkbenchPersistenceContext = createContext<SyncedWorkbenchPersistence | null>(null);
 const WorkbenchExtensionsContext = createContext<ExtensionRegistry | null>(null);
-const WorkbenchCanvasHeldMediaContext = createContext<CanvasHeldMediaSources | null>(null);
+const WorkbenchLiveCanvasEnginesContext = createContext<LiveCanvasEngines | null>(null);
 const subscribeToNothing = (): (() => void) => () => {};
 const getNullSnapshot = (): null => null;
 
@@ -64,7 +64,7 @@ export const WorkbenchProvider = ({
   const { t } = useTranslation();
   const [persistence] = useState(() => createSyncedWorkbenchPersistence(owner));
   const [extensions] = useState(createExtensionRegistry);
-  const [canvasHeldMedia] = useState(createCanvasHeldMediaSources);
+  const [liveCanvasEngines] = useState(createLiveCanvasEngines);
   const [loadUnavailable, setLoadUnavailable] = useState<{ message: string; retry(): void } | null>(null);
   const hasHydrated = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot).hasHydrated;
 
@@ -120,6 +120,7 @@ export const WorkbenchProvider = ({
         }
       },
       deleteProject: (projectId) => persistence.deleteProjectOnServer(projectId),
+      flushPixels: (projectId) => liveCanvasEngines.flushPendingPixels(projectId),
       flushProject: (projectId) => {
         const project = store.getSnapshot().projects.find((candidate) => candidate.id === projectId);
 
@@ -129,6 +130,7 @@ export const WorkbenchProvider = ({
           : Promise.resolve<ProjectPushOutcome>({ documentJson: '', kind: 'acknowledged' });
       },
       getOpenProjectIds: () => store.getSnapshot().projects.map((project) => project.id),
+      getProject: (projectId) => store.getSnapshot().projects.find((candidate) => candidate.id === projectId),
       markProjectDeleted: (projectId) => {
         persistence.markProjectDeleted(projectId);
       },
@@ -144,7 +146,7 @@ export const WorkbenchProvider = ({
     persistenceRuntime.start();
     const releaseIntermediateHold = startIntermediatesHoldLease({
       owner,
-      read: createOpenProjectsHeldMediaReader(() => store.getSnapshot().projects, canvasHeldMedia.read),
+      read: createOpenProjectsHeldMediaReader(() => store.getSnapshot().projects, liveCanvasEngines.heldAssets),
       subscribe: (onChange) => {
         let projects = store.getSnapshot().projects;
         const unsubscribeProjects = store.subscribe(() => {
@@ -154,7 +156,7 @@ export const WorkbenchProvider = ({
             onChange();
           }
         });
-        const unsubscribeCanvas = canvasHeldMedia.subscribe(onChange);
+        const unsubscribeCanvas = liveCanvasEngines.subscribe(onChange);
         return () => {
           unsubscribeProjects();
           unsubscribeCanvas();
@@ -173,7 +175,7 @@ export const WorkbenchProvider = ({
 
   return (
     <WorkbenchPersistenceContext value={persistence}>
-      <WorkbenchCanvasHeldMediaContext value={canvasHeldMedia}>
+      <WorkbenchLiveCanvasEnginesContext value={liveCanvasEngines}>
         <WorkbenchExtensionsContext value={extensions}>
           <WorkbenchStoreContext value={store}>
             {loadUnavailable ? (
@@ -189,7 +191,7 @@ export const WorkbenchProvider = ({
             )}
           </WorkbenchStoreContext>
         </WorkbenchExtensionsContext>
-      </WorkbenchCanvasHeldMediaContext>
+      </WorkbenchLiveCanvasEnginesContext>
     </WorkbenchPersistenceContext>
   );
 };
@@ -316,12 +318,12 @@ export const useOptionalWorkbenchPersistenceService = (): SyncedWorkbenchPersist
   use(WorkbenchPersistenceContext);
 
 /** Where live Canvas engines register the undo state the hold lease must keep. */
-export const useWorkbenchCanvasHeldMedia = (): CanvasHeldMediaSources => {
-  const heldMedia = use(WorkbenchCanvasHeldMediaContext);
-  if (!heldMedia) {
-    throw new Error('useWorkbenchCanvasHeldMedia must be used within a WorkbenchProvider.');
+export const useWorkbenchLiveCanvasEngines = (): LiveCanvasEngines => {
+  const liveEngines = use(WorkbenchLiveCanvasEnginesContext);
+  if (!liveEngines) {
+    throw new Error('useWorkbenchLiveCanvasEngines must be used within a WorkbenchProvider.');
   }
-  return heldMedia;
+  return liveEngines;
 };
 
 export const useWorkbenchExtensions = (): ExtensionRegistry => {

@@ -169,17 +169,22 @@ export const exportLibraryProject = async (
 
 /** Export an open project from its live in-memory document. */
 export const exportOpenProject = async (
-  project: Project,
+  requested: Project,
   options: ProjectFileOptions = {}
 ): Promise<ProjectExportOutcome> => {
   const owner = options.owner ?? captureAccountScope();
+  const open = getOpenProject(requested.id);
+  // The file is written from the live document, which holds the canvas pixels only after this barrier.
+  await open?.flushPixels();
+  assertAccountScopeCurrent(owner);
+  const project = open?.current() ?? requested;
   const { serializeProjectDocument } = await import('./projectDocument');
   const document = serializeProjectDocument(project);
 
   assertAccountScopeCurrent(owner);
 
   // Use the acknowledged server compatibility floor; offline fallback uses live canvas requirements.
-  const record = getOpenProject(project.id) ? await readAcknowledgedProject(project.id, owner) : null;
+  const record = open ? await readAcknowledgedProject(project.id, owner) : null;
   const minimumCanvasSchemaVersion = Math.max(
     getProjectCanvasSchemaRequirement(document),
     record?.minimum_canvas_schema_version ?? 1

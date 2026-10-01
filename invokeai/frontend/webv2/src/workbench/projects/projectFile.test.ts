@@ -174,6 +174,43 @@ describe('exportOpenProject', () => {
     expect(downloads.downloadBlob.mock.calls[0]![1]).toBe('My project.invk');
   });
 
+  it("writes an open project's document after its canvas pixels reach it", async () => {
+    const { registerOpenProject, unregisterOpenProject } = await import('./syncStore');
+    const requested = { ...createDraftProject([]), name: 'Before barrier' };
+    const order: string[] = [];
+    api.getProject.mockResolvedValue({
+      data: persistence.serializeProjectDocument(requested),
+      name: requested.name,
+      project_id: requested.id,
+      revision: 1,
+    });
+    registerOpenProject(requested.id, {
+      close: vi.fn(),
+      current: vi.fn(() => {
+        order.push('current');
+        return { ...requested, name: 'After barrier' };
+      }),
+      deleteOnServer: vi.fn(),
+      flush: vi.fn(() => Promise.resolve<ProjectPushOutcome>({ documentJson: '{}', kind: 'acknowledged' })),
+      flushPixels: vi.fn(() => {
+        order.push('flushPixels');
+        return Promise.resolve();
+      }),
+      markDeleted: vi.fn(),
+      rename: vi.fn(),
+      unmarkDeleted: vi.fn(),
+    });
+
+    try {
+      await projectFile.exportOpenProject(requested);
+    } finally {
+      unregisterOpenProject(requested.id);
+    }
+
+    expect(order.slice(0, 2)).toEqual(['flushPixels', 'current']);
+    expect(downloads.downloadBlob.mock.calls[0]![1]).toBe('After barrier.invk');
+  });
+
   /** Include a positive transport probe so negative server-call assertions cannot pass vacuously. */
   it('reaches the server through the mocked transport', async () => {
     api.getProject.mockResolvedValue({
@@ -291,6 +328,11 @@ describe('exportLibraryProject', () => {
       close: vi.fn(),
       deleteOnServer: vi.fn(),
       flush,
+      current: vi.fn(() => undefined),
+      flushPixels: vi.fn(() => {
+        order.push('flushPixels');
+        return Promise.resolve();
+      }),
       markDeleted: vi.fn(),
       rename: vi.fn(),
       unmarkDeleted: vi.fn(),
@@ -303,7 +345,7 @@ describe('exportLibraryProject', () => {
     }
 
     expect(flush).toHaveBeenCalledTimes(1);
-    expect(order).toEqual(['flush', 'get']);
+    expect(order).toEqual(['flushPixels', 'flush', 'get']);
   });
 
   /** Require an acknowledged flush before reading/exporting server bytes. */
@@ -314,6 +356,8 @@ describe('exportLibraryProject', () => {
       close: vi.fn(),
       deleteOnServer: vi.fn(),
       flush: vi.fn(() => Promise.resolve<ProjectPushOutcome>({ documentJson: '{}', kind: 'unsynced' })),
+      current: vi.fn(() => undefined),
+      flushPixels: vi.fn(() => Promise.resolve()),
       markDeleted: vi.fn(),
       rename: vi.fn(),
       unmarkDeleted: vi.fn(),

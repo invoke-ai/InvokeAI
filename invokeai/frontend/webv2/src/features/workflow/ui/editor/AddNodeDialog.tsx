@@ -4,7 +4,7 @@ import type { AddNodeConnectionFilter } from '@features/workflow/ui/workflowUiSt
 
 import { Badge, Box, Dialog, HStack, Icon, Input, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
-import { useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
+import { useWorkflowPreferencesSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import {
   getCompatibleInputTemplate,
   getCompatibleOutputTemplate,
@@ -27,8 +27,8 @@ import {
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
 
 /**
- * Searching expands all node groups without capping results; idle groups collapse and UI-only nodes lead in
- * Utility.
+ * Searching expands all node groups without capping results and ranks the closest names first; idle groups collapse
+ * and UI-only nodes lead in Utility. With grouping off, results are one ranked list.
  */
 
 const UTILITY_CATEGORY = 'Utility';
@@ -44,11 +44,52 @@ const toCategoryLabel = (value: string): string =>
     .replace(/\b\w/g, (char) => char.toUpperCase())
     .trim();
 
-const matchesSearch = (template: InvocationTemplate, terms: string[]): boolean => {
-  const haystack = `${template.title} ${template.type} ${template.tags.join(' ')} ${template.category}`.toLowerCase();
+interface SearchQuery {
+  terms: string[];
+  /** The whole query, lowercased with single spaces. */
+  text: string;
+}
 
-  return terms.every((term) => haystack.includes(term));
+const parseSearchQuery = (searchTerm: string): SearchQuery => {
+  const terms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
+
+  return { terms, text: terms.join(' ') };
 };
+
+/**
+ * Where a match lists, lower first: the exact name or type, a name prefix, every term in the name, then a match
+ * anywhere else (type, tags, category). Null when a term matches nothing.
+ */
+const getSearchRank = (query: SearchQuery, name: string, otherText: string, type?: string): number | null => {
+  if (query.terms.length === 0) {
+    return 0;
+  }
+
+  const lowerName = name.toLowerCase();
+  const haystack = `${lowerName} ${otherText.toLowerCase()}`;
+
+  if (!query.terms.every((term) => haystack.includes(term))) {
+    return null;
+  }
+
+  if (lowerName === query.text || type === query.text) {
+    return 0;
+  }
+
+  if (lowerName.startsWith(query.text)) {
+    return 1;
+  }
+
+  return query.terms.every((term) => lowerName.includes(term)) ? 2 : 3;
+};
+
+const getTemplateSearchRank = (template: InvocationTemplate, query: SearchQuery): number | null =>
+  getSearchRank(
+    query,
+    template.title,
+    `${template.type} ${template.tags.join(' ')} ${template.category}`,
+    template.type
+  );
 
 const isCompatibleConnectionTemplate = (
   template: InvocationTemplate,
@@ -114,11 +155,32 @@ const getConnectionFilterName = (connectionFilter: AddNodeConnectionFilter): str
 interface NodeRow {
   description: string;
   isBeta: boolean;
+  isUtility: boolean;
   key: string;
   nodePack: string;
   onAdd: () => void;
+  /** From `getSearchRank`; 0 while not searching. */
+  rank: number;
   title: string;
 }
+
+const FOR_RETURN_KEY = 'template:for_return';
+
+const compareRows = (a: NodeRow, b: NodeRow, shouldPromoteForReturn: boolean): number => {
+  if (shouldPromoteForReturn && (a.key === FOR_RETURN_KEY) !== (b.key === FOR_RETURN_KEY)) {
+    return a.key === FOR_RETURN_KEY ? -1 : 1;
+  }
+
+  if (a.rank !== b.rank) {
+    return a.rank - b.rank;
+  }
+
+  if (a.isUtility !== b.isUtility) {
+    return a.isUtility ? -1 : 1;
+  }
+
+  return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
+};
 
 interface CategoryGroup {
   label: string;
@@ -127,31 +189,33 @@ interface CategoryGroup {
 
 type ResultRow =
   | { group: CategoryGroup; id: string; isExpanded: boolean; kind: 'category' }
-  | { groupLabel: string; id: string; kind: 'node'; row: NodeRow };
+  | { id: string; kind: 'node'; level: 1 | 2; row: NodeRow };
 
 const getResultRowId = (index: number): string => `${RESULT_LIST_ID}-${index}`;
 
 const NodeResultRow = ({
   id,
   isActive,
+  level,
   onActive,
   row,
 }: {
   id: string;
   isActive: boolean;
+  level: 1 | 2;
   onActive: () => void;
   row: NodeRow;
 }) => (
   <Box
     id={id}
     as="button"
-    aria-level={2}
+    aria-level={level}
     aria-selected={isActive}
     bg={isActive ? 'bg.emphasized' : undefined}
     role="treeitem"
     tabIndex={-1}
     _hover={ROW_HOVER_PROPS}
-    ps="5"
+    ps={level === 1 ? '1.5' : '5'}
     pe="1.5"
     py="1.5"
     rounded="md"
@@ -312,6 +376,7 @@ const AddNodeDialogContent = ({
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set());
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
+  const groupByCategory = useWorkflowPreferencesSelector((preferences) => preferences.workflowGroupNodesByCategory);
 
   useMountEffect(() => registerModalHotkeyLayer('workflow-add-node'));
   const isSearching = searchTerm.trim().length > 0;
@@ -328,7 +393,7 @@ const AddNodeDialogContent = ({
   );
 
   const groups = useMemo<CategoryGroup[]>(() => {
-    const terms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const query = parseSearchQuery(searchTerm);
     const projectGraph = getProjectGraph();
     const shouldPromoteForReturn = isForIterationOutputConnection(
       connectionFilter,
@@ -374,16 +439,22 @@ const AddNodeDialogContent = ({
               title: 'Current Image',
             },
           ]),
-    ].filter((row) => terms.every((term) => row.title.toLowerCase().includes(term)));
+    ].flatMap((row) => {
+      const rank = getSearchRank(query, row.title, '');
+
+      return rank === null ? [] : [{ ...row, isUtility: true, rank }];
+    });
 
     const byCategory = new Map<string, NodeRow[]>();
 
     for (const template of Object.values(templates)) {
-      if (
-        template.classification === 'internal' ||
-        (terms.length > 0 && !matchesSearch(template, terms)) ||
-        !isCompatibleConnectionTemplate(template, connectionFilter)
-      ) {
+      if (template.classification === 'internal' || !isCompatibleConnectionTemplate(template, connectionFilter)) {
+        continue;
+      }
+
+      const rank = getTemplateSearchRank(template, query);
+
+      if (rank === null) {
         continue;
       }
 
@@ -391,56 +462,57 @@ const AddNodeDialogContent = ({
       const row: NodeRow = {
         description: template.description,
         isBeta: template.classification === 'beta',
+        isUtility: false,
         key: `template:${template.type}`,
         nodePack: template.nodePack,
         onAdd: () => {
           onAddNode(template);
           close(true);
         },
+        rank,
         title: template.title,
       };
 
       byCategory.set(label, [...(byCategory.get(label) ?? []), row]);
     }
 
-    const categoryGroups = [...byCategory.entries()]
-      .map(([label, rows]) => ({
-        label,
-        rows: rows.sort((a, b) => {
-          if (shouldPromoteForReturn) {
-            if (a.key === 'template:for_return' && b.key !== 'template:for_return') {
-              return -1;
-            }
-            if (a.key !== 'template:for_return' && b.key === 'template:for_return') {
-              return 1;
-            }
-          }
+    const groupsByLabel = [...byCategory.entries()].map(([label, rows]) => ({
+      label,
+      rows: rows.sort((a, b) => compareRows(a, b, shouldPromoteForReturn)),
+    }));
+    const allGroups =
+      utilityRows.length > 0 ? [{ label: UTILITY_CATEGORY, rows: utilityRows }, ...groupsByLabel] : groupsByLabel;
 
-          return a.title.localeCompare(b.title, undefined, { sensitivity: 'base' });
-        }),
-      }))
-      .sort((a, b) => {
-        if (shouldPromoteForReturn) {
-          const aHasForReturn = a.rows.some((row) => row.key === 'template:for_return');
-          const bHasForReturn = b.rows.some((row) => row.key === 'template:for_return');
-          if (aHasForReturn && !bHasForReturn) {
-            return -1;
-          }
-          if (!aHasForReturn && bHasForReturn) {
-            return 1;
-          }
-        }
+    if (!groupByCategory) {
+      const rows = allGroups.flatMap((group) => group.rows).sort((a, b) => compareRows(a, b, shouldPromoteForReturn));
 
-        return a.label.localeCompare(b.label);
-      });
+      return rows.length > 0 ? [{ label: '', rows }] : [];
+    }
 
-    return utilityRows.length > 0
-      ? [{ label: UTILITY_CATEGORY, rows: utilityRows }, ...categoryGroups]
-      : categoryGroups;
+    // Rows are sorted, so each group lists by its best row; Utility leads among equals.
+    return allGroups.sort((a, b) => {
+      const bestA = a.rows[0]!;
+      const bestB = b.rows[0]!;
+
+      if (shouldPromoteForReturn && (bestA.key === FOR_RETURN_KEY) !== (bestB.key === FOR_RETURN_KEY)) {
+        return bestA.key === FOR_RETURN_KEY ? -1 : 1;
+      }
+
+      if (bestA.rank !== bestB.rank) {
+        return bestA.rank - bestB.rank;
+      }
+
+      if ((a.label === UTILITY_CATEGORY) !== (b.label === UTILITY_CATEGORY)) {
+        return a.label === UTILITY_CATEGORY ? -1 : 1;
+      }
+
+      return a.label.localeCompare(b.label);
+    });
   }, [
     close,
     connectionFilter,
     getProjectGraph,
+    groupByCategory,
     onAddConnector,
     onAddCurrentImage,
     onAddNode,
@@ -455,21 +527,36 @@ const AddNodeDialogContent = ({
   const resultRows = useMemo<ResultRow[]>(() => {
     const rows: ResultRow[] = [];
 
+    if (!groupByCategory) {
+      return (groups[0]?.rows ?? []).map((row) => ({ id: row.key, kind: 'node', level: 1, row }));
+    }
+
     for (const group of groups) {
       const isExpanded = isSearching || expandedCategories.has(group.label);
       rows.push({ group, id: `category:${group.label}`, isExpanded, kind: 'category' });
 
       if (isExpanded) {
         for (const row of group.rows) {
-          rows.push({ groupLabel: group.label, id: row.key, kind: 'node', row });
+          rows.push({ id: row.key, kind: 'node', level: 2, row });
         }
       }
     }
 
     return rows;
-  }, [expandedCategories, groups, isSearching]);
+  }, [expandedCategories, groupByCategory, groups, isSearching]);
+  // While searching, Enter adds the best match rather than toggling the category header above it.
+  const defaultActiveIndex = isSearching
+    ? Math.max(
+        0,
+        resultRows.findIndex((row) => row.kind === 'node')
+      )
+    : 0;
   const effectiveActiveIndex =
-    resultRows.length === 0 ? null : activeIndex === null ? 0 : Math.min(activeIndex, resultRows.length - 1);
+    resultRows.length === 0
+      ? null
+      : activeIndex === null
+        ? defaultActiveIndex
+        : Math.min(activeIndex, resultRows.length - 1);
   const estimateVirtualRowSize = useCallback(
     (index: number) => (resultRows[index]?.kind === 'category' ? CATEGORY_ROW_HEIGHT_PX : NODE_ROW_HEIGHT_PX),
     [resultRows]
@@ -519,7 +606,7 @@ const AddNodeDialogContent = ({
         const nextIndex =
           prev === null
             ? direction > 0
-              ? 0
+              ? Math.min(defaultActiveIndex + 1, resultRows.length - 1)
               : resultRows.length - 1
             : (prev + direction + resultRows.length) % resultRows.length;
 
@@ -527,7 +614,7 @@ const AddNodeDialogContent = ({
         return nextIndex;
       });
     },
-    [resultRows.length, virtualizer]
+    [defaultActiveIndex, resultRows.length, virtualizer]
   );
 
   const activateResultRow = useCallback(
@@ -567,10 +654,10 @@ const AddNodeDialogContent = ({
     },
     [activateResultRow, effectiveActiveIndex, moveActiveIndex, resultRows]
   );
-  const onSearchChange = useCallback(
-    (event: ChangeEvent<HTMLInputElement>) => setSearchTerm(event.currentTarget.value),
-    []
-  );
+  const onSearchChange = useCallback((event: ChangeEvent<HTMLInputElement>) => {
+    setSearchTerm(event.currentTarget.value);
+    setActiveIndex(null);
+  }, []);
 
   let body: ReactNode;
 
@@ -635,16 +722,18 @@ const AddNodeDialogContent = ({
                   onChange={onSearchChange}
                   onKeyDown={onSearchKeyDown}
                 />
-                <Tooltip content={isAllExpanded ? 'Collapse All' : 'Expand All'}>
-                  <IconButton
-                    aria-label={isAllExpanded ? 'Collapse all categories' : 'Expand all categories'}
-                    size="sm"
-                    variant="ghost"
-                    onClick={toggleAllCategories}
-                  >
-                    <Icon as={isAllExpanded ? ChevronsUpDownIcon : ChevronsDownUpIcon} />
-                  </IconButton>
-                </Tooltip>
+                {groupByCategory ? (
+                  <Tooltip content={isAllExpanded ? 'Collapse All' : 'Expand All'}>
+                    <IconButton
+                      aria-label={isAllExpanded ? 'Collapse all categories' : 'Expand all categories'}
+                      size="sm"
+                      variant="ghost"
+                      onClick={toggleAllCategories}
+                    >
+                      <Icon as={isAllExpanded ? ChevronsUpDownIcon : ChevronsDownUpIcon} />
+                    </IconButton>
+                  </Tooltip>
+                ) : null}
               </HStack>
               <ScrollArea.Root flex="1" minH="0" size="xs" variant="hover" w="full">
                 <ScrollArea.Viewport ref={setScrollElement} h="full" w="full">
@@ -711,7 +800,7 @@ const VirtualResultRow = ({
           onToggle={onToggleCategory}
         />
       ) : (
-        <NodeResultRow id={id} isActive={isActive} onActive={onActive} row={row.row} />
+        <NodeResultRow id={id} isActive={isActive} level={row.level} onActive={onActive} row={row.row} />
       )}
     </Box>
   );

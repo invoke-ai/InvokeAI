@@ -14,7 +14,11 @@ import {
   isOverlayStack,
 } from '@workbench/canvas-engine/api';
 import { publishLayerPanelSelection } from '@workbench/layerPanelState';
-import { commitPreparedEdit, type PreparedCommitOutcome } from '@workbench/widgets/canvas/useStructuralCommit';
+import {
+  commitPreparedEdit,
+  type LayerOperationRefusal,
+  type PreparedCommitOutcome,
+} from '@workbench/widgets/canvas/useStructuralCommit';
 import {
   canGroupSelection,
   canUngroupSelection,
@@ -63,6 +67,7 @@ export interface CanvasHotkeyContext {
   readonly notifyLayerDuplicateFailed: () => void;
   readonly reportStructuralCommit: (result: StructuralCommitResult) => void;
   readonly reportPreparedCommit: (outcome: PreparedCommitOutcome) => void;
+  readonly reportLayerOperation: (refusal: LayerOperationRefusal) => void;
   readonly t: (key: string) => string;
 }
 
@@ -176,7 +181,10 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     }
   } else if (commandId === 'canvas.resetSelected') {
     if (engine && selectedLayer) {
-      engine.layers.clearMask(selectedLayer.id);
+      const result = engine.layers.clearMask(selectedLayer.id);
+      if (result.status !== 'committed' && result.status !== 'nothing' && result.status !== 'busy') {
+        ctx.reportLayerOperation(result.status);
+      }
     }
   } else if (commandId === 'canvas.undo') {
     // Use engine pixel/structural history only; empty canvas history never falls back to project undo.
@@ -252,7 +260,10 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
     // With a live pixel selection, mod+J is "layer via copy" — it lifts just
     // the selected pixels. With none, it duplicates the whole layer.
     if (engine?.interaction.get('hasSelection')) {
-      engine.selection.liftSelectionToLayer();
+      const result = engine.selection.liftSelectionToLayer();
+      if (result.status !== 'created' && result.status !== 'empty') {
+        ctx.reportLayerOperation(result.status);
+      }
     } else if (engine && selected) {
       void engine.layers
         .duplicateLayers(ctx.selectedLayerIds)
@@ -268,7 +279,11 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
           if (result.status === 'busy') {
             return;
           }
-          ctx.notifyLayerDuplicateFailed();
+          if (result.status === 'nothing') {
+            ctx.notifyLayerDuplicateFailed();
+            return;
+          }
+          ctx.reportLayerOperation(result.status);
         })
         .catch(() => {
           // The engine keeps rejected transactions atomic; route both rejection
@@ -289,7 +304,10 @@ export const executeCanvasHotkeyCommand = (commandId: string, ctx: CanvasHotkeyC
   } else if (commandId === 'canvas.mergeDown') {
     // Share canMergeLayerDown with the layer menu so shortcuts respect identical eligibility.
     if (engine && selectedLayer && canMergeLayerDown(document, selectedLayer.id, true)) {
-      engine.layers.mergeLayerDown(selectedLayer.id);
+      const result = engine.layers.mergeLayerDown(selectedLayer.id);
+      if (result !== 'merged') {
+        ctx.reportLayerOperation(result);
+      }
     }
   }
 };

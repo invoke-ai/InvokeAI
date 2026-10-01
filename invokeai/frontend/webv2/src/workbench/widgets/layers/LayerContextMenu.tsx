@@ -10,8 +10,8 @@ import type {
   LayerStackMoveKind,
   RegionalGuidanceReferenceImage,
 } from '@workbench/canvas-engine/api';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { LucideIcon } from 'lucide-react';
 import type { ComponentProps, Dispatch, ReactNode } from 'react';
 
@@ -37,12 +37,8 @@ import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
-import {
-  useCanvasDocumentEditingLocked,
-  useCanvasRasterContentEpoch,
-  useLayerThumbnailVersion,
-} from '@workbench/widgets/canvas/engineStoreHooks';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { useCanvasDocumentEditingLocked, useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
+import { reportLayerOperation, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import {
   ArrowRightLeftIcon,
@@ -147,6 +143,7 @@ type LayerActionErrorStatus =
   | 'busy'
   | 'disabled'
   | 'empty'
+  | 'failed'
   | 'locked'
   | 'missing'
   | 'not-ready'
@@ -158,10 +155,11 @@ const LAYER_ACTION_ERROR_KEYS: Record<LayerActionErrorStatus, string> = {
   busy: 'widgets.layers.actions.busy',
   disabled: 'widgets.layers.actions.disabled',
   empty: 'widgets.layers.actions.empty',
+  failed: 'widgets.layers.actions.operationFailed',
   locked: 'widgets.layers.actions.locked',
   missing: 'widgets.layers.actions.missing',
   'not-ready': 'widgets.layers.actions.notReady',
-  'over-budget': 'widgets.layers.actions.notReady',
+  'over-budget': 'widgets.layers.actions.overBudget',
   unsupported: 'widgets.layers.actions.unsupported',
 };
 
@@ -240,11 +238,11 @@ const LayerMenu = ({
   const documentEditingLocked = useCanvasDocumentEditingLocked(engine);
   const { selectedIds } = useLayerPanelState(projectId, document.selectedLayerId);
   const interactionLocked = isCanvasInteractionLocked(canvas, queueItems) || documentEditingLocked;
-  // Re-render when live, not-yet-persisted paint/mask pixels change.
-  useLayerThumbnailVersion(engine, layer.id);
-  const hasSupportedContent = engine
-    ? engine.exports.hasExportableLayerContent(layer.id)
-    : hasPureExportableLayerContent(layer, document);
+  const hasLiveContent = useCanvasEngineRead(
+    engine,
+    () => engine?.exports.hasExportableLayerContent(layer.id) ?? false
+  );
+  const hasSupportedContent = engine ? hasLiveContent : hasPureExportableLayerContent(layer, document);
   const [internalDialogKind, setInternalDialogKind] = useState<LayerMenuDialogKind | null>(null);
   const dialogKind = controlledDialogKind !== undefined ? controlledDialogKind : internalDialogKind;
   const setDialogKind = useCallback(
@@ -278,20 +276,23 @@ const LayerMenu = ({
     [commitPrepared, layer, selectedIds]
   );
 
-  const canGroup = canGroupSelection(engine?.document.model() ?? null, actionTargets({ layer, selectedIds }));
-  // Un-memoized on purpose, like `canGroup`: it reads live raster content
-  // (`hasExportableLayerContent`), which the content epoch re-renders for.
-  useCanvasRasterContentEpoch(engine);
-  const mergeModel = engine?.document.model() ?? null;
-  const mergeTargets = actionTargets({ layer, selectedIds });
-  const canMerge =
-    !!engine &&
-    !!mergeModel &&
-    mergeTargets.length > 1 &&
-    canMergeSelectedRasters(mergeModel.document, mergeModel.compileLeaves(), new Set(mergeTargets), (layerId) =>
-      engine.exports.hasExportableLayerContent(layerId)
+  const targets = actionTargets({ layer, selectedIds });
+  const canGroup = useCanvasEngineRead(engine, () => canGroupSelection(engine?.document.model() ?? null, targets));
+  const canMerge = useCanvasEngineRead(engine, () => {
+    const model = engine?.document.model() ?? null;
+    return (
+      !!engine &&
+      !!model &&
+      targets.length > 1 &&
+      canMergeSelectedRasters(model.document, model.compileLeaves(), new Set(targets), (layerId) =>
+        engine.exports.hasExportableLayerContent(layerId)
+      )
     );
-  const canDeleteSelection = !!mergeModel && mergeModel.refusalFor({ ids: mergeTargets, type: 'remove' }) === null;
+  });
+  const canDeleteSelection = useCanvasEngineRead(
+    engine,
+    () => engine?.document.model()?.refusalFor({ ids: targets, type: 'remove' }) === null
+  );
   const hiddenByAncestor =
     (lookupDocumentNodeState(document, layer.id)?.documentHidden ?? false) && !isNodeHidden(layer);
   const actionState = useMemo<LayerContextActionState>(
@@ -359,6 +360,10 @@ const LayerMenu = ({
         if (result.status === 'busy') {
           return;
         }
+        if (result.status !== 'nothing') {
+          reportLayerOperation(result.status, notify.error, t);
+          return;
+        }
       } catch {
         // Report rejected transactions in the menu; the document remains unchanged.
       }
@@ -392,19 +397,31 @@ const LayerMenu = ({
         notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.groupActions.mergeNotReady'));
       } else if (result === 'over-budget') {
         notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.groupActions.mergeOverBudget'));
+      } else if (result === 'failed') {
+        notify.error(t('widgets.layers.actions.actionFailed'), t('widgets.layers.actions.operationFailed'));
       }
     });
   }, [engine, layer, notify, selectedIds, t]);
 
   const handleMerge = useCallback(() => {
-    // Pixel work: engine-only, and not recorded on the undo history.
-    engine?.layers.mergeLayerDown(layer.id);
-  }, [engine, layer.id]);
+    if (!engine) {
+      throw makeStatusError('not-ready');
+    }
+    const result = engine.layers.mergeLayerDown(layer.id);
+    if (result !== 'merged') {
+      throw makeStatusError(result);
+    }
+  }, [engine, layer.id, makeStatusError]);
 
   const handleRasterize = useCallback(() => {
-    // Rasterization records one undoable entry restoring the original parametric source.
-    engine?.layers.rasterizeLayer(layer.id);
-  }, [engine, layer.id]);
+    if (!engine) {
+      throw makeStatusError('not-ready');
+    }
+    const result = engine.layers.rasterizeLayer(layer.id);
+    if (result !== 'rasterized') {
+      throw makeStatusError(result);
+    }
+  }, [engine, layer.id, makeStatusError]);
 
   const addCopy = useCallback(
     (copied: CanvasLayerContract | null, label: string) => {
@@ -515,6 +532,14 @@ const LayerMenu = ({
   const openRename = useCallback(() => setDialogKind('rename'), [setDialogKind]);
   const closeDialog = useCallback(() => setDialogKind(null), [setDialogKind]);
   const openRunWorkflow = useCallback(() => setDialogKind('run-workflow'), [setDialogKind]);
+  // Operations present their controls in the Properties pane, so starting one must bring that pane into view.
+  const revealProperties = useCallback(
+    (layerId: string) => {
+      widgets.open({ region: 'right', widgetId: 'layers' });
+      requestLayerProperties(layerId);
+    },
+    [widgets]
+  );
   const startSelectObject = useCallback(
     (layerId: string) => {
       if (!engine) {
@@ -524,8 +549,9 @@ const LayerMenu = ({
       if (result !== 'started') {
         throw makeStatusError(result);
       }
+      revealProperties(layerId);
     },
-    [engine, makeStatusError]
+    [engine, makeStatusError, revealProperties]
   );
   const startFilter = useCallback(
     (layerId: string) => {
@@ -536,8 +562,9 @@ const LayerMenu = ({
       if (result !== 'started') {
         throw makeStatusError(result);
       }
+      revealProperties(layerId);
     },
-    [engine, makeStatusError]
+    [engine, makeStatusError, revealProperties]
   );
   const submitRename = useCallback(
     (name: string) => {
@@ -620,10 +647,9 @@ const LayerMenu = ({
   }, [engine, layer.id, makeStatusError]);
 
   const handleOpenProperties = useCallback(() => {
-    widgets.open({ region: 'right', widgetId: 'layers' });
+    revealProperties(layer.id);
     focusOpenedWidget('right', 'layers');
-    requestLayerProperties(layer.id);
-  }, [layer.id, widgets]);
+  }, [layer.id, revealProperties]);
 
   const handleBooleanRaster = useCallback(
     async (operation: BooleanRasterOperation) => {
@@ -646,10 +672,11 @@ const LayerMenu = ({
     if (!engine) {
       throw makeStatusError('not-ready');
     }
-    if ((await engine.layers.copyLayerToRaster(layer.id)) === null) {
-      throw new Error(t('widgets.layers.actions.copyFailed'));
+    const result = await engine.layers.copyLayerToRaster(layer.id);
+    if (result.status !== 'copied') {
+      throw makeStatusError(result.status);
     }
-  }, [addCopy, engine, getActionLabel, layer, makeStatusError, t]);
+  }, [addCopy, engine, getActionLabel, layer, makeStatusError]);
 
   const handleCopyToControl = useCallback(() => {
     if (layer.type === 'raster') {

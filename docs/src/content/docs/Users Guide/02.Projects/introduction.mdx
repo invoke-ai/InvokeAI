@@ -5,6 +5,8 @@ lastUpdated: 2026-09-29
 sidebar:
   order: 0
 ---
+import { Image } from 'astro:assets';
+import projectSwitcher from '../assets/project-switcher.webp';
 
 A **project** is a self-contained workspace. Everything you arrange while working on one idea stays together in it: the canvas and its layers, the workflows you have open, the panel layout, your prompt history, and a gallery board that collects the project's images and videos. Open the project again later, on the same computer or another one, and it comes back exactly as you left it.
 
@@ -25,7 +27,7 @@ Invoke saves projects automatically on the server, so there is no Save button to
 | Canvas layers and settings | Installed models |
 | Open workflows, and which one is active | Your workflow library |
 | Panel layout and floating widgets | Saved layout presets |
-| Prompt history | Preferences, theme and hotkeys |
+| Prompt history, and the Invoke routing (source and destination) | Preferences, theme and hotkeys |
 | Widget settings, such as gallery filters | Boards other than the project's own |
 | Project settings: **Use CPU noise**, **Antialias progress images** and the Preview's progress image toggle | Generate recipes |
 | The project's board and the images and videos on it | |
@@ -60,6 +62,8 @@ The name of the active project appears in the top bar. Click it, or press <kbd>C
 - **Recent**: up to five other projects you edited lately.
 - **New project** and **Open project**, which lists every saved project that is not already open.
 
+<Image src={projectSwitcher} alt="The project switcher open from the top bar, showing project details and commands, the open project, recent projects, New project and Open project." width={420} />
+
 The switcher also carries commands for the active project: **Rename…**, **Details**, **Export**, **Close** and **Delete project…**. **Details** opens the **Project** widget, which shows the project's name, when it was last saved and whether it is in sync with the server.
 
 The shortcut works even while you are typing in a prompt box. You can rebind it in the hotkey settings, where it is called **Open project switcher**.
@@ -72,7 +76,7 @@ The shortcut works even while you are typing in a prompt box. You can rebind it 
 
 Every project owns a private board, created with the project and named after it. In the gallery it appears near the top, after **Uncategorized**, and always shows the current project name.
 
-New results go to whichever board is selected in the gallery, so you can send a batch somewhere else when you want to. When a project is first created, imported or duplicated, its own board is selected. If you choose a date view instead of a specific board, results still go to the project board. After that, the project remembers your choice of destination.
+New results go to whichever board is selected in the gallery, so you can send a batch somewhere else when you want to. To send them to one board while you browse others, choose **Auto-add to this board** from that board's menu; see [Choosing where new media goes](/users-guide/gallery/introduction/#choosing-where-new-media-goes). When a project is first created, imported or duplicated, its own board is selected. If you choose a date view instead of a specific board, results still go to the project board. After that, the project remembers your choice of destination.
 
 The destination is fixed when you press **Invoke**. Switching to a different project or board while a job runs does not redirect its results.
 
@@ -125,7 +129,7 @@ Right-click a project, or use its **Actions** button, for **Open**, **Pin**, **R
 
 If you only want to tidy the switcher, **Close** the project instead of deleting it.
 
-Generation also leaves temporary files behind in each project. **Delete intermediates…** reclaims that space safely; see [Intermediates](/users-guide/projects/intermediates/).
+Generation also leaves temporary files behind in each project. **Delete intermediates…** reclaims that space safely; see [Intermediates](/users-guide/image-generation/intermediates/).
 
 ## Exporting and importing
 
@@ -141,7 +145,7 @@ Export is also the simplest way to back up a project you care about, or to hand 
 
 ## Workflows in a project
 
-A project can hold several workflows. Each is saved as part of the project and changes automatically along with it; your [workflow library](/users-guide/workflows/using_workflows/) changes only when you save a workflow to it on purpose.
+A project can hold several workflows. Each is saved as part of the project and changes automatically along with it; your [workflow library](/users-guide/workflows/editor-reference/#your-workflows) changes only when you save a workflow to it on purpose.
 
 In the Workflow Library dialog, **This project** lists the project's own workflows, while **Browse** and **Yours** list bundled templates and your saved library. Opening a library workflow adds a copy to the current project. **Fork into new project** copies a workflow into a brand-new project of its own.
 

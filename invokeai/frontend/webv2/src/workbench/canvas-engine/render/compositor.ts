@@ -12,7 +12,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { CanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
 import type { SemanticLeaf } from '@workbench/canvas-engine/document-model/semanticLeaf';
-import type { LayerDamage, Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
+import type { FrameDamage, Mat2d, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { compileDocumentLeaves, lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import {
@@ -20,10 +20,10 @@ import {
   planScreenComposition,
 } from '@workbench/canvas-engine/document-model/screenComposition';
 import { fromTRS, multiply } from '@workbench/canvas-engine/math/mat2d';
-import { intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
+import { expand, intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 
 import type { DerivedSurfaceCache } from './derivedSurfaceCache';
-import type { GroupCompositeScope } from './groupCompositeScopes';
+import type { GroupCompositeScope, GroupSurfaceContent } from './groupCompositeScopes';
 import type { LayerCacheEntry, LayerCacheStore } from './layerCache';
 import type { RasterBackend, RasterSurface } from './raster';
 
@@ -53,11 +53,8 @@ export interface CheckerColors {
 /** Dark checker fallback before React supplies semantic theme colors, and for DOM-free callers. */
 export const DEFAULT_CHECKER_COLORS: CheckerColors = { a: '#2a2a2a', b: '#363636' };
 
-/**
- * Without a backend, approximate masks with coverage plus flat tint. Production uses source-in colorization at
- * layer opacity.
- */
-export const MASK_TINT_ALPHA = 0.5;
+/** Opacity of the display-only regenerate tint drawn over a raster layer's coverage. */
+export const REGION_OVERLAY_ALPHA = 0.5;
 
 /** Dashed outline drawn around a staged-generation preview so it reads as pending, not committed. */
 const STAGED_PREVIEW_OUTLINE_COLOR = '#3b82f6';
@@ -66,6 +63,8 @@ const STAGED_PREVIEW_OUTLINE_DASH = 6;
 
 /** Optional inputs to {@link compositeDocument}. */
 export interface CompositeOptions {
+  /** Allocates mask, control-effect and group intermediates; every composite renders through it. */
+  backend: RasterBackend;
   /** Clips document layers to this document-space rect without clipping the background or staged preview. */
   clipRect?: Rect | null;
   /** A staged generation candidate to draw at its placement (document space). */
@@ -81,10 +80,10 @@ export interface CompositeOptions {
    */
   imageSmoothing?: boolean;
   /**
-   * Layer-local damage clips clear, checkerboard and layer draws to its screen union, retaining other pixels.
-   * Null/absence repaints the whole target.
+   * Bounded damage clips clear, checkerboard and every draw to the screen union of its regions and culls
+   * contributors outside it; damage resolving offscreen draws nothing. Absence repaints the whole target.
    */
-  damage?: LayerDamage[] | null;
+  damage?: FrameDamage;
   /**
    * Transient transforms override committed values without changing the mirror. Missing scale/rotation retain
    * committed values, supporting position-only move previews.
@@ -95,11 +94,6 @@ export interface CompositeOptions {
   > | null;
   /** Skip an edited text layer to avoid drawing beneath its live portal; null/absence skips nothing. */
   skipLayerId?: string | null;
-  /**
-   * Backend supplies mask source-in intermediates. Absence uses {@link MASK_TINT_ALPHA} approximation; production
-   * always supplies it.
-   */
-  backend?: RasterBackend | null;
   /** Cached mask pattern by style/color; null means direct solid fill. Without a provider, only solid fills render. */
   maskPatternTile?: ((style: string, color: string) => RasterSurface | null) | null;
   /**
@@ -129,16 +123,20 @@ export interface CompositeOptions {
   /** Optional deterministic render counters; omitted in the normal zero-overhead path. */
   diagnostics?: CanvasDiagnostics | null;
   /**
-   * An adjusted group's document-space composite (stack applied), `null` when
-   * it has no drawable content; `excludeIds` members are left out for the
-   * caller to draw separately. Absent ⇒ members draw flat.
+   * Reused frame description from {@link prepareComposite}; ignored unless it was prepared for this document,
+   * isolation, grouping and transform overrides.
+   */
+  preparation?: CompositePreparation | null;
+  /**
+   * An isolated group's document-space composite (stack applied), `null` when it has no drawable content. Filter
+   * previews and the float of its members draw inside it. Absent ⇒ members draw flat.
    */
   groupSurface?:
     | ((
         scope: GroupCompositeScope,
         members: readonly SemanticLeaf[],
         memberMatrices: readonly Mat2d[],
-        excludeIds: ReadonlySet<string>
+        content: GroupSurfaceContent
       ) => { surface: RasterSurface; rect: Rect } | null)
     | null;
 }
@@ -152,40 +150,101 @@ export const blendToComposite = (mode: CanvasBlendMode): GlobalCompositeOperatio
 const isIsolated = (opts: CompositeOptions): boolean =>
   opts.isolationLayerId !== null && opts.isolationLayerId !== undefined;
 
+type TransformOverrides = NonNullable<CompositeOptions['transformOverrides']>;
+
+/** A stable key for override contents; engines mutate one map in place, so identity cannot tell revisions apart. */
+export const transformOverridesKey = (overrides: TransformOverrides | null | undefined): string => {
+  if (!overrides || overrides.size === 0) {
+    return '';
+  }
+  let key = '';
+  for (const [id, o] of overrides) {
+    key += `${id}:${o.x},${o.y},${o.scaleX ?? '-'},${o.scaleY ?? '-'},${o.rotation ?? '-'};`;
+  }
+  return key;
+};
+
+/**
+ * One frame description: the leaves drawn (bottom first), their effective matrices with overrides applied, the
+ * isolated group scopes, and optionally each leaf's document-space bounds this frame. Stable while the document,
+ * isolation, grouping and override contents are, so frame demand, compositing and sampling share it.
+ */
+export interface CompositePreparation {
+  readonly document: CanvasDocumentContractV3;
+  readonly isolationLayerId: string | null;
+  readonly grouped: boolean;
+  readonly overridesKey: string;
+  readonly leaves: readonly SemanticLeaf[];
+  readonly matrices: readonly Mat2d[];
+  readonly scopes: readonly GroupCompositeScope[];
+  /** Document-space bounds a leaf's pixels can cover this frame (a superset is safe); null bounds draw nothing. */
+  readonly bounds?: readonly (Rect | null)[];
+}
+
+const effectiveMatrix = (leaf: SemanticLeaf, overrides: TransformOverrides | null | undefined): Mat2d => {
+  const override = overrides?.get(leaf.id);
+  if (!override) {
+    return leaf.worldTransform;
+  }
+  const { layer } = leaf;
+  return fromTRS(
+    { x: override.x, y: override.y },
+    override.rotation ?? layer.transform.rotation,
+    override.scaleX ?? layer.transform.scaleX,
+    override.scaleY ?? layer.transform.scaleY
+  );
+};
+
+/** Plans the draw order, placement and isolated group scopes for `doc`, for callers compositing it repeatedly. */
+export const prepareComposite = (
+  doc: CanvasDocumentContractV3,
+  opts: Pick<CompositeOptions, 'groupSurface' | 'isolationLayerId' | 'transformOverrides'> = {}
+): CompositePreparation => {
+  const isolationLayerId = opts.isolationLayerId ?? null;
+  // The plan lists the leaves to draw bottom first; the `stagedPreview` lands on top of every stack.
+  const { leaves } = planScreenComposition(compileDocumentLeaves(doc), {
+    isolationLayerId,
+    showOverlayStacks: ALL_OVERLAY_STACKS_SHOWN,
+  });
+  // Isolation mode inspects raw members, so scopes are bypassed while active.
+  const grouped = !!opts.groupSurface && isolationLayerId === null;
+  const scopes = grouped ? planGroupCompositeScopes(leaves, collectCompositedGroups(doc)) : [];
+  const overrides = opts.transformOverrides ?? null;
+  return {
+    document: doc,
+    grouped,
+    isolationLayerId,
+    leaves,
+    matrices: leaves.map((leaf) => effectiveMatrix(leaf, overrides)),
+    overridesKey: transformOverridesKey(overrides),
+    scopes,
+  };
+};
+
+const isPreparedFor = (
+  preparation: CompositePreparation | null | undefined,
+  doc: CanvasDocumentContractV3,
+  opts: CompositeOptions
+): preparation is CompositePreparation =>
+  !!preparation &&
+  preparation.document === doc &&
+  preparation.isolationLayerId === (opts.isolationLayerId ?? null) &&
+  preparation.grouped === (!!opts.groupSurface && !isIsolated(opts)) &&
+  preparation.overridesKey === transformOverridesKey(opts.transformOverrides);
+
+/** Reuses `previous` while it still describes `doc` under these options, else prepares a new description. */
+export const reusePreparation = (
+  previous: CompositePreparation | null | undefined,
+  doc: CanvasDocumentContractV3,
+  opts: CompositeOptions
+): CompositePreparation => (isPreparedFor(previous, doc, opts) ? previous : prepareComposite(doc, opts));
+
 const setTransformFromMat = (ctx: Ctx, m: Mat2d): void => {
   ctx.setTransform(m.a, m.b, m.c, m.d, m.e, m.f);
 };
 
 const identityTransform = (ctx: Ctx): void => {
   ctx.setTransform(1, 0, 0, 1, 0, 0);
-};
-
-const getEffectiveLayerMatrix = (leaf: SemanticLeaf, opts: CompositeOptions): Mat2d => {
-  const override = opts.transformOverrides?.get(leaf.id);
-  if (!override) {
-    return leaf.worldTransform;
-  }
-  const { layer } = leaf;
-  return fromTRS(
-    { x: override?.x ?? layer.transform.x, y: override?.y ?? layer.transform.y },
-    override?.rotation ?? layer.transform.rotation,
-    override?.scaleX ?? layer.transform.scaleX,
-    override?.scaleY ?? layer.transform.scaleY
-  );
-};
-
-const isDefinitelyOffscreen = (
-  leaf: SemanticLeaf,
-  entry: LayerCacheEntry,
-  view: Mat2d,
-  target: RasterSurface,
-  opts: CompositeOptions
-): boolean => {
-  const bounds = transformBounds(multiply(view, getEffectiveLayerMatrix(leaf, opts)), entry.rect);
-  if (![bounds.x, bounds.y, bounds.width, bounds.height].every(Number.isFinite)) {
-    return false;
-  }
-  return intersect(bounds, { height: target.height, width: target.width, x: 0, y: 0 }) === null;
 };
 
 /** Build a reusable 2x2 checker tile through {@link RasterBackend}; frames use patterns instead of per-cell fills. */
@@ -225,31 +284,38 @@ const drawBackground = (ctx: Ctx, tile: RasterSurface | null, bounds: Rect): voi
   ctx.fillRect(bounds.x, bounds.y, bounds.width, bounds.height);
 };
 
+type ScreenDamage = { kind: 'full' } | { kind: 'none' } | { kind: 'rect'; rect: Rect };
+
 /**
- * Transform local damage by view*layerMatrix into screen bounds. Missing layers force full repaint. Round outward
- * and pad one pixel to cover antialiased seams.
+ * Transform local damage by view*layerMatrix into screen bounds, rounded outward with a one-pixel pad for
+ * antialiased seams. Unknown layers or non-finite geometry repaint everything; regions off the target repaint
+ * nothing.
  */
 const resolveDamage = (
-  doc: CanvasDocumentContractV3,
+  plan: CompositePreparation,
   view: Mat2d,
   target: RasterSurface,
-  opts: CompositeOptions
-): Rect | null => {
-  const damage = opts.damage;
-  if (!damage || damage.length === 0) {
-    return null;
+  damage: FrameDamage | undefined
+): ScreenDamage => {
+  if (!damage || damage.kind === 'full') {
+    return { kind: 'full' };
+  }
+  if (damage.kind === 'none') {
+    return { kind: 'none' };
   }
   let accumulated: Rect | null = null;
-  for (const region of damage) {
-    const leaf = lookupDocumentLeaf(doc, region.layerId);
+  for (const region of damage.regions) {
+    const index = plan.leaves.findIndex((leaf) => leaf.id === region.layerId);
+    const leaf = index >= 0 ? plan.leaves[index] : lookupDocumentLeaf(plan.document, region.layerId);
     if (!leaf) {
-      return null;
+      return { kind: 'full' };
     }
-    const bounds = transformBounds(multiply(view, getEffectiveLayerMatrix(leaf, opts)), region.rect);
+    const matrix = index >= 0 ? plan.matrices[index]! : leaf.worldTransform;
+    const bounds = transformBounds(multiply(view, matrix), region.rect);
     accumulated = accumulated ? union(accumulated, bounds) : bounds;
   }
   if (!accumulated) {
-    return null;
+    return { kind: 'none' };
   }
   const grown = roundOut({
     height: accumulated.height + 2,
@@ -257,18 +323,12 @@ const resolveDamage = (
     x: accumulated.x - 1,
     y: accumulated.y - 1,
   });
-  // A degenerate matrix would put NaN in here, and a NaN rect compares false
-  // against every bound — which would quietly skip the frame's drawing rather
-  // than widen it. Repaint everything instead.
-  if (
-    !Number.isFinite(grown.x) ||
-    !Number.isFinite(grown.y) ||
-    !Number.isFinite(grown.width) ||
-    !Number.isFinite(grown.height)
-  ) {
-    return null;
+  // A degenerate matrix yields NaN, which compares false against every bound; widen rather than skip drawing.
+  if (![grown.x, grown.y, grown.width, grown.height].every(Number.isFinite)) {
+    return { kind: 'full' };
   }
-  return intersect(grown, { height: target.height, width: target.width, x: 0, y: 0 });
+  const visible = intersect(grown, { height: target.height, width: target.width, x: 0, y: 0 });
+  return visible && !isEmpty(visible) ? { kind: 'rect', rect: visible } : { kind: 'none' };
 };
 
 const isMaskLayer = (
@@ -276,10 +336,7 @@ const isMaskLayer = (
 ): layer is Extract<CanvasLayerContract, { type: 'regional_guidance' | 'inpaint_mask' }> =>
   layer.type === 'regional_guidance' || layer.type === 'inpaint_mask';
 
-/**
- * Colorize mask alpha with fill/pattern on a source-in intermediate, then draw with the current layer
- * transform/opacity. Without a backend, approximate with coverage and flat tint.
- */
+/** Colorize mask alpha with fill/pattern on a source-in intermediate, then draw with the current layer transform. */
 const drawMaskLayer = (
   ctx: Ctx,
   layer: Extract<CanvasLayerContract, { type: 'regional_guidance' | 'inpaint_mask' }>,
@@ -289,32 +346,25 @@ const drawMaskLayer = (
   opts: CompositeOptions
 ): void => {
   const fill = layer.mask.fill;
-  if (opts.backend) {
-    const tile = opts.maskPatternTile ? opts.maskPatternTile(fill.style, fill.color) : null;
-    const colorized = opts.derivedSurfaces
-      ? opts.derivedSurfaces.get({
-          create: (target) => colorizeMask(opts.backend!, surface, surface.width, surface.height, fill, tile, target),
-          kind: 'mask-fill',
-          layerId: layer.id,
-          paramsKey: `${fill.style}:${fill.color}`,
-          source: surface,
-          sourceVersion,
-        })
-      : colorizeMask(opts.backend, surface, surface.width, surface.height, fill, tile);
-    // Draw at local content origin; the outer context already applies layer opacity.
-    ctx.drawImage(colorized.canvas, origin.x, origin.y);
-    return;
-  }
-  // Backend-less fallback (bare test call): coverage + flat translucent fill.
-  ctx.drawImage(surface.canvas, origin.x, origin.y);
-  ctx.globalAlpha = layer.opacity * MASK_TINT_ALPHA;
-  ctx.fillStyle = fill.color;
-  ctx.fillRect(origin.x, origin.y, surface.width, surface.height);
+  const tile = opts.maskPatternTile ? opts.maskPatternTile(fill.style, fill.color) : null;
+  const colorized = opts.derivedSurfaces
+    ? opts.derivedSurfaces.get({
+        create: (target) => colorizeMask(opts.backend, surface, surface.width, surface.height, fill, tile, target),
+        kind: 'mask-fill',
+        layerId: layer.id,
+        paramsKey: `${fill.style}:${fill.color}`,
+        source: surface,
+        sourceVersion,
+      })
+    : colorizeMask(opts.backend, surface, surface.width, surface.height, fill, tile);
+  // Draw at local content origin; the outer context already applies layer opacity.
+  ctx.drawImage(colorized.canvas, origin.x, origin.y);
 };
 
 const drawCachedLayer = (
   ctx: Ctx,
   leaf: SemanticLeaf,
+  matrix: Mat2d,
   entry: LayerCacheEntry,
   view: Mat2d,
   opts: CompositeOptions
@@ -323,9 +373,7 @@ const drawCachedLayer = (
   ctx.save();
   ctx.globalAlpha = layer.opacity;
   ctx.globalCompositeOperation = blendToComposite(layer.blendMode);
-
-  const layerMat = getEffectiveLayerMatrix(leaf, opts);
-  setTransformFromMat(ctx, multiply(view, layerMat));
+  setTransformFromMat(ctx, multiply(view, matrix));
 
   // The cache surface holds pixels for `entry.rect` in layer-local space; draw
   // it at that local origin (offset paint/mask layers place their content off-zero).
@@ -335,12 +383,12 @@ const drawCachedLayer = (
     // Draw the full filter output at its local rect with the same control-transparency display effect as committed
     // pixels.
     const displayPreview =
-      layer.type === 'control' && layer.withTransparencyEffect && opts.backend
+      layer.type === 'control' && layer.withTransparencyEffect
         ? opts.derivedSurfaces
           ? opts.derivedSurfaces.get({
               create: (target) =>
                 renderControlTransparency(
-                  opts.backend!,
+                  opts.backend,
                   preview.surface,
                   preview.surface.width,
                   preview.surface.height,
@@ -357,11 +405,11 @@ const drawCachedLayer = (
     ctx.drawImage(displayPreview.canvas, preview.rect.x, preview.rect.y);
   } else if (isMaskLayer(layer)) {
     drawMaskLayer(ctx, layer, entry.surface, entry.version, origin, opts);
-  } else if (layer.type === 'control' && layer.withTransparencyEffect && opts.backend) {
+  } else if (layer.type === 'control' && layer.withTransparencyEffect) {
     const effect = opts.derivedSurfaces
       ? opts.derivedSurfaces.get({
           create: (target) =>
-            renderControlTransparency(opts.backend!, entry.surface, entry.surface.width, entry.surface.height, target),
+            renderControlTransparency(opts.backend, entry.surface, entry.surface.width, entry.surface.height, target),
           kind: 'control-transparency',
           layerId: layer.id,
           paramsKey: 'committed',
@@ -396,34 +444,28 @@ const drawRegionCoverage = (
   opts: CompositeOptions
 ): void => {
   ctx.globalCompositeOperation = 'source-over';
-  ctx.globalAlpha = MASK_TINT_ALPHA;
-  if (opts.backend) {
-    const tile = opts.maskPatternTile ? opts.maskPatternTile(fill.style, fill.color) : null;
-    const colorized = opts.derivedSurfaces
-      ? opts.derivedSurfaces.get({
-          create: (target) =>
-            colorizeMask(
-              opts.backend!,
-              coverage.surface,
-              coverage.surface.width,
-              coverage.surface.height,
-              fill,
-              tile,
-              target
-            ),
-          kind: 'region-fill',
-          layerId,
-          paramsKey: `${fill.style}:${fill.color}`,
-          source: coverage.surface,
-          sourceVersion: coverage.version,
-        })
-      : colorizeMask(opts.backend, coverage.surface, coverage.surface.width, coverage.surface.height, fill, tile);
-    ctx.drawImage(colorized.canvas, coverage.rect.x, coverage.rect.y);
-    return;
-  }
-  ctx.fillStyle = fill.color;
-  ctx.drawImage(coverage.surface.canvas, coverage.rect.x, coverage.rect.y);
-  ctx.fillRect(coverage.rect.x, coverage.rect.y, coverage.rect.width, coverage.rect.height);
+  ctx.globalAlpha = REGION_OVERLAY_ALPHA;
+  const tile = opts.maskPatternTile ? opts.maskPatternTile(fill.style, fill.color) : null;
+  const colorized = opts.derivedSurfaces
+    ? opts.derivedSurfaces.get({
+        create: (target) =>
+          colorizeMask(
+            opts.backend,
+            coverage.surface,
+            coverage.surface.width,
+            coverage.surface.height,
+            fill,
+            tile,
+            target
+          ),
+        kind: 'region-fill',
+        layerId,
+        paramsKey: `${fill.style}:${fill.color}`,
+        source: coverage.surface,
+        sourceVersion: coverage.version,
+      })
+    : colorizeMask(opts.backend, coverage.surface, coverage.surface.width, coverage.surface.height, fill, tile);
+  ctx.drawImage(colorized.canvas, coverage.rect.x, coverage.rect.y);
 };
 
 /**
@@ -434,17 +476,45 @@ const drawRegionCoverage = (
 const drawFloatingSelection = (
   ctx: Ctx,
   leaf: SemanticLeaf,
+  matrix: Mat2d,
   view: Mat2d,
-  opts: CompositeOptions,
   float: NonNullable<CompositeOptions['floatingSelection']>
 ): void => {
   const { layer } = leaf;
   ctx.save();
   ctx.globalAlpha = layer.opacity;
   ctx.globalCompositeOperation = blendToComposite(layer.blendMode);
-  setTransformFromMat(ctx, multiply(multiply(view, getEffectiveLayerMatrix(leaf, opts)), float.matrix));
+  setTransformFromMat(ctx, multiply(multiply(view, matrix), float.matrix));
   ctx.drawImage(float.surface.canvas, float.rect.x, float.rect.y);
   ctx.restore();
+};
+
+/** Document-space bounds a leaf can cover this frame: committed pixels joined with its preview and float. */
+const leafBounds = (leaf: SemanticLeaf, matrix: Mat2d, committed: Rect | null, opts: CompositeOptions): Rect | null => {
+  const preview = isIsolated(opts) ? null : (opts.layerPreviews?.get(leaf.id) ?? null);
+  let bounds = committed;
+  if (preview) {
+    const previewBounds = transformBounds(matrix, preview.rect);
+    bounds = bounds ? union(bounds, previewBounds) : previewBounds;
+  }
+  const float = !isIsolated(opts) && opts.floatingSelection?.layerId === leaf.id ? opts.floatingSelection : null;
+  if (float && !isEmpty(float.rect)) {
+    const landing = transformBounds(multiply(matrix, float.matrix), float.rect);
+    bounds = bounds ? union(bounds, landing) : landing;
+  }
+  return bounds;
+};
+
+/** Whether document-space `bounds` reach the screen region; non-finite geometry counts as visible. */
+const reaches = (bounds: Rect | null, view: Mat2d, region: Rect): boolean => {
+  if (!bounds) {
+    return false;
+  }
+  const screen = transformBounds(view, bounds);
+  if (![screen.x, screen.y, screen.width, screen.height].every(Number.isFinite)) {
+    return true;
+  }
+  return intersect(screen, region) !== null;
 };
 
 export const compositeDocument = (
@@ -452,28 +522,27 @@ export const compositeDocument = (
   doc: CanvasDocumentContractV3,
   caches: LayerCacheStore,
   view: Mat2d,
-  opts: CompositeOptions = {}
+  opts: CompositeOptions
 ): void => {
+  const plan = reusePreparation(opts.preparation, doc, opts);
+  const targetRect: Rect = { height: target.height, width: target.width, x: 0, y: 0 };
+  const damage = resolveDamage(plan, view, target, opts.damage);
+  if (damage.kind === 'none') {
+    return;
+  }
   const ctx = target.ctx;
   opts.diagnostics?.increment('compositeFrames');
+  const repaint = damage.kind === 'rect' ? damage.rect : targetRect;
 
   ctx.save();
-
   // Set smoothing once under the outer save; nested layer restores preserve it.
   ctx.imageSmoothingEnabled = opts.imageSmoothing ?? true;
 
-  // Clear and checker-fill the viewport, clipping all draws to declared damage. Unchanged pixels retain the
-  // previous frame; empty visible damage leaves the target untouched.
+  // Clear and checker-fill the repaint region, clipping every draw to it. Unchanged pixels keep the previous frame.
   identityTransform(ctx);
-  const damageScreen = resolveDamage(doc, view, target, opts);
-  if (damageScreen && isEmpty(damageScreen)) {
-    ctx.restore();
-    return;
-  }
-  const repaint: Rect = damageScreen ?? { height: target.height, width: target.width, x: 0, y: 0 };
-  if (damageScreen) {
+  if (damage.kind === 'rect') {
     ctx.beginPath();
-    ctx.rect(damageScreen.x, damageScreen.y, damageScreen.width, damageScreen.height);
+    ctx.rect(repaint.x, repaint.y, repaint.width, repaint.height);
     ctx.clip();
   }
   ctx.clearRect(repaint.x, repaint.y, repaint.width, repaint.height);
@@ -487,53 +556,67 @@ export const compositeDocument = (
     ctx.clip();
   }
 
-  // The plan lists the leaves to draw bottom first; the `stagedPreview` lands on top of every stack.
-  const plan = planScreenComposition(compileDocumentLeaves(doc), {
-    isolationLayerId: opts.isolationLayerId ?? null,
-    showOverlayStacks: ALL_OVERLAY_STACKS_SHOWN,
-  });
-  // Isolation mode inspects raw members, so scopes are bypassed while active.
-  const scopes =
-    opts.groupSurface && !isIsolated(opts) ? planGroupCompositeScopes(plan.leaves, collectCompositedGroups(doc)) : [];
+  const { leaves, matrices, scopes } = plan;
+  const boundsAt = (index: number): Rect | null => {
+    const leaf = leaves[index]!;
+    const matrix = matrices[index]!;
+    let committed = plan.bounds?.[index];
+    if (committed === undefined) {
+      const entry = caches.peek(leaf.id);
+      committed = entry && !isEmpty(entry.rect) ? transformBounds(matrix, entry.rect) : null;
+    }
+    return leafBounds(leaf, matrix, committed, opts);
+  };
+  const previews = isIsolated(opts) ? null : (opts.layerPreviews ?? null);
+  const float = isIsolated(opts) ? null : (opts.floatingSelection ?? null);
   let scopeIndex = 0;
 
-  const drawLeafFlat = (leaf: SemanticLeaf): void => {
+  const drawLeafFlat = (index: number): void => {
+    const leaf = leaves[index]!;
     opts.diagnostics?.increment('layersConsidered');
-    const float = opts.floatingSelection?.layerId === leaf.id ? opts.floatingSelection : null;
-    const entry = caches.get(leaf.id);
-    // Skip layers with no cache or an empty content rect (a brand-new / cleared
-    // paint / mask layer holds no pixels — nothing to draw). A float still draws:
-    // its pixels are detached, so an emptied source layer must not hide them.
-    if (!entry || entry.rect.width <= 0 || entry.rect.height <= 0) {
-      if (float) {
-        drawFloatingSelection(ctx, leaf, view, opts, float);
-      }
-      return;
-    }
-    if (isDefinitelyOffscreen(leaf, entry, view, target, opts) && !float) {
+    if (!reaches(boundsAt(index), view, repaint)) {
       opts.diagnostics?.increment('layersCulled');
       return;
     }
-    drawCachedLayer(ctx, leaf, entry, view, opts);
-    if (float) {
-      drawFloatingSelection(ctx, leaf, view, opts, float);
+    const matrix = matrices[index]!;
+    const entry = caches.get(leaf.id);
+    // A float still draws over an emptied source: its pixels are detached.
+    if (entry && entry.rect.width > 0 && entry.rect.height > 0) {
+      drawCachedLayer(ctx, leaf, matrix, entry, view, opts);
+      opts.diagnostics?.increment('layersDrawn');
     }
-    opts.diagnostics?.increment('layersDrawn');
+    if (float?.layerId === leaf.id) {
+      drawFloatingSelection(ctx, leaf, matrix, view, float);
+    }
   };
 
-  for (let index = 0; index < plan.leaves.length; index += 1) {
+  const content = (start: number, end: number): GroupSurfaceContent => {
+    const excludeIds = new Set<string>();
+    for (let index = start; index < end; index += 1) {
+      if (leaves[index]!.id === opts.skipLayerId) {
+        excludeIds.add(leaves[index]!.id);
+      }
+    }
+    return { excludeIds, float, previews };
+  };
+
+  for (let index = 0; index < leaves.length; index += 1) {
     const scope = scopeIndex < scopes.length ? scopes[scopeIndex]! : null;
     if (scope && index === scope.start) {
-      const members = plan.leaves.slice(scope.start, scope.end);
-      const matrices = members.map((member) => getEffectiveLayerMatrix(member, opts));
-      // Skip targets and filter previews draw separately, without the group stack.
-      const excluded = new Set<string>();
-      for (const member of members) {
-        if (member.id === opts.skipLayerId || opts.layerPreviews?.has(member.id)) {
-          excluded.add(member.id);
-        }
+      scopeIndex += 1;
+      let scopeBounds: Rect | null = null;
+      for (let member = scope.start; member < scope.end; member += 1) {
+        const bounds = leaves[member]!.id === opts.skipLayerId ? null : boundsAt(member);
+        scopeBounds = bounds ? (scopeBounds ? union(scopeBounds, bounds) : bounds) : scopeBounds;
       }
-      const result = opts.groupSurface!(scope, members, matrices, excluded);
+      if (!reaches(scopeBounds, view, repaint)) {
+        opts.diagnostics?.increment('layersCulled');
+        index = scope.end - 1;
+        continue;
+      }
+      const members = leaves.slice(scope.start, scope.end);
+      const memberMatrices = matrices.slice(scope.start, scope.end);
+      const result = opts.groupSurface!(scope, members, memberMatrices, content(scope.start, scope.end));
       if (result) {
         ctx.save();
         ctx.globalAlpha = scope.opacity;
@@ -542,49 +625,34 @@ export const compositeDocument = (
         ctx.drawImage(result.surface.canvas, result.rect.x, result.rect.y);
         ctx.restore();
         opts.diagnostics?.increment('layersDrawn');
-        // A float whose member is in the composite draws alone.
-        for (const member of members) {
-          if (member.id === opts.skipLayerId) {
-            continue;
-          }
-          if (excluded.has(member.id)) {
-            drawLeafFlat(member);
-          } else if (opts.floatingSelection?.layerId === member.id) {
-            drawFloatingSelection(ctx, member, view, opts, opts.floatingSelection);
-          }
-        }
-        // Region overlays are display-only, so they ride ABOVE the group
-        // composite rather than being baked into (and staled with) its memo.
-        for (let memberIndex = 0; opts.regionOverlays && memberIndex < members.length; memberIndex += 1) {
-          const member = members[memberIndex]!;
-          const { layer } = member;
-          if (
-            excluded.has(member.id) ||
-            member.id === opts.skipLayerId ||
-            layer.type !== 'raster' ||
-            !layer.inpaint?.isEnabled
-          ) {
-            continue;
-          }
-          const memberEntry = caches.get(member.id);
-          if (memberEntry && memberEntry.rect.width > 0 && memberEntry.rect.height > 0) {
-            ctx.save();
-            setTransformFromMat(ctx, multiply(view, matrices[memberIndex]!));
-            drawRegionCoverage(ctx, layer.id, layer.inpaint.fill, memberEntry, opts);
-            ctx.restore();
-          }
-        }
-        index = scope.end - 1;
-        scopeIndex += 1;
-        continue;
       }
-      scopeIndex += 1;
-    }
-    const leaf = plan.leaves[index]!;
-    if (leaf.id === opts.skipLayerId) {
+      // Region overlays are display-only, so they ride ABOVE the group
+      // composite rather than being baked into (and staled with) its memo.
+      for (let member = scope.start; opts.regionOverlays && member < scope.end; member += 1) {
+        const { layer } = leaves[member]!;
+        if (
+          layer.id === opts.skipLayerId ||
+          previews?.has(layer.id) ||
+          layer.type !== 'raster' ||
+          !layer.inpaint?.isEnabled
+        ) {
+          continue;
+        }
+        const memberEntry = caches.get(layer.id);
+        if (memberEntry && memberEntry.rect.width > 0 && memberEntry.rect.height > 0) {
+          ctx.save();
+          setTransformFromMat(ctx, multiply(view, matrices[member]!));
+          drawRegionCoverage(ctx, layer.id, layer.inpaint.fill, memberEntry, opts);
+          ctx.restore();
+        }
+      }
+      index = scope.end - 1;
       continue;
     }
-    drawLeafFlat(leaf);
+    if (leaves[index]!.id === opts.skipLayerId) {
+      continue;
+    }
+    drawLeafFlat(index);
   }
 
   if (opts.clipRect) {
@@ -593,7 +661,8 @@ export const compositeDocument = (
 
   // Draw staged preview in document space with a dashed outline distinguishing pending pixels.
   const staged = isIsolated(opts) ? null : opts.stagedPreview;
-  if (staged) {
+  // Half the outline lands outside the rect, so a repaint beside it must still redraw that half.
+  if (staged && reaches(staged.rect, view, expand(repaint, STAGED_PREVIEW_OUTLINE_WIDTH))) {
     ctx.save();
     setTransformFromMat(ctx, view);
     ctx.globalAlpha = staged.opacity ?? 1;

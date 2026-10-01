@@ -1,8 +1,8 @@
+import type { CanvasEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
-import type { History } from '@workbench/canvas-engine/history/history';
 import type { ImagePatchApply } from '@workbench/canvas-engine/history/imagePatch';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
-import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
 import type { PixelEditTransaction } from '@workbench/canvas-engine/tools/tool';
 import type { Rect } from '@workbench/canvas-engine/types';
@@ -15,6 +15,8 @@ import { createImagePatchEntry } from '@workbench/canvas-engine/history/imagePat
 import { intersect, isEmpty, roundOut } from '@workbench/canvas-engine/math/rect';
 import { eraseMaskedRegion, fillMaskedRegion } from '@workbench/canvas-engine/selection/selectionOps';
 
+import type { CanvasMutationContext, EditTransaction } from './mutationContext';
+
 type PixelTarget =
   | { kind: 'raster'; layerId: string; transparencyLocked: boolean }
   | { kind: 'control'; transaction: PixelEditTransaction; transparencyLocked: false };
@@ -23,14 +25,14 @@ export interface SelectionPixelControllerOptions {
   readonly selection: SelectionState;
   readonly backend: RasterBackend;
   readonly layers: LayerCacheStore;
-  readonly history: History;
+  readonly ctx: Pick<CanvasMutationContext, 'begin'>;
+  readonly reportRefusal: (refusal: CanvasEditRefusal) => void;
   readonly applyImagePatch: ImagePatchApply;
   readonly getDocument: () => CanvasDocumentContractV3 | null;
   readonly beginPixelEdit: (layerId: string) => PixelEditTransaction | null;
   readonly canEdit: () => boolean;
   readonly isGestureActive: () => boolean;
   readonly getFillColor: () => string;
-  readonly endBurst: () => void;
   readonly deleteDerived: (layerId: string) => void;
   readonly invalidateLayer: (layerId: string) => void;
   readonly isRasterCacheReady: (layer: CanvasLayerContract, document: CanvasDocumentContractV3) => boolean;
@@ -105,124 +107,84 @@ export class SelectionPixelController {
     if (!target) {
       return;
     }
-    const cancelControl = (): void => {
-      if (target.kind === 'control') {
-        target.transaction.cancel();
-      }
-    };
     if (kind === 'erase' && target.transparencyLocked) {
-      cancelControl();
       return;
     }
-    const layerId = target.kind === 'control' ? target.transaction.layerId : target.layerId;
-    let before: ImageData | null = null;
-    let editOrigin: { x: number; y: number } | null = null;
-    let editRect: Rect | null = null;
-    let editSurface: RasterSurface | null = null;
-    let commitStarted = false;
-    let rollbackStarted = false;
-    let growthSnapshot:
-      | {
-          hasPublishedPixels: boolean;
-          lastUsed: number;
-          pixels: ImageData | null;
-          rect: Rect;
-          stale: boolean;
-          surface: RasterSurface;
-          version: number;
-        }
-      | null
-      | undefined;
-    const rollback = (): void => {
-      if (target.kind !== 'control' || rollbackStarted) {
-        return;
-      }
-      rollbackStarted = true;
-      try {
-        if (growthSnapshot !== undefined) {
-          if (growthSnapshot === null) {
-            this.deps.layers.delete(layerId);
-          } else {
-            const current = this.deps.layers.get(layerId);
-            if (current) {
-              growthSnapshot.surface.resize(growthSnapshot.rect.width, growthSnapshot.rect.height);
-              if (growthSnapshot.pixels) {
-                growthSnapshot.surface.ctx.putImageData(growthSnapshot.pixels, 0, 0);
-              }
-              current.hasPublishedPixels = growthSnapshot.hasPublishedPixels;
-              current.lastUsed = growthSnapshot.lastUsed;
-              current.rect = { ...growthSnapshot.rect };
-              current.stale = growthSnapshot.stale;
-              current.surface = growthSnapshot.surface;
-              current.version = growthSnapshot.version;
-            }
-          }
-          this.deps.deleteDerived(layerId);
-          this.deps.invalidateLayer(layerId);
-        } else if (before && editOrigin && editRect && editSurface) {
-          editSurface.ctx.putImageData(before, editRect.x - editOrigin.x, editRect.y - editOrigin.y);
-          this.deps.deleteDerived(layerId);
-          this.deps.invalidateLayer(layerId);
-        }
-      } finally {
-        target.transaction.cancel();
-      }
-    };
+    if (target.kind === 'control') {
+      this.edit(kind, target.transaction.layerId, target, selectionRect, placedMask);
+      return;
+    }
+    const txn = this.deps.ctx.begin({ historyBytes: 0 });
+    if (!('publish' in txn)) {
+      this.deps.reportRefusal(txn.status);
+      return;
+    }
     try {
-      if (target.kind === 'control' && kind === 'fill') {
-        const existing = this.deps.layers.get(layerId);
-        const needsGrowth =
-          !existing ||
-          isEmpty(existing.rect) ||
-          selectionRect.x < existing.rect.x ||
-          selectionRect.y < existing.rect.y ||
-          selectionRect.x + selectionRect.width > existing.rect.x + existing.rect.width ||
-          selectionRect.y + selectionRect.height > existing.rect.y + existing.rect.height;
-        if (needsGrowth) {
-          growthSnapshot = existing
-            ? {
-                hasPublishedPixels: existing.hasPublishedPixels,
-                lastUsed: existing.lastUsed,
-                pixels: isEmpty(existing.rect)
-                  ? null
-                  : existing.surface.ctx.getImageData(0, 0, existing.rect.width, existing.rect.height),
-                rect: { ...existing.rect },
-                stale: existing.stale,
-                surface: existing.surface,
-                version: existing.version,
-              }
-            : null;
-        }
+      this.edit(kind, target.layerId, { ...target, txn }, selectionRect, placedMask);
+    } finally {
+      txn.end();
+    }
+  }
+
+  /**
+   * Fills or erases the selection on one target. Only the touched region is captured: it is admitted before any
+   * pixel changes, and a refused or failed publication restores it and the cache's original extent.
+   */
+  private edit(
+    kind: 'fill' | 'erase',
+    layerId: string,
+    target:
+      | Exclude<PixelTarget, { kind: 'raster' }>
+      | (Extract<PixelTarget, { kind: 'raster' }> & { txn: EditTransaction }),
+    selectionRect: Rect,
+    placedMask: NonNullable<ReturnType<SelectionState['mask']>>
+  ): void {
+    const { deps } = this;
+    const live = target.kind === 'control' ? target.transaction : null;
+    const existing = deps.layers.get(layerId);
+    const grows = kind === 'fill' && !target.transparencyLocked;
+    const rect = grows
+      ? selectionRect
+      : existing && !isEmpty(existing.rect)
+        ? intersect(selectionRect, existing.rect)
+        : null;
+    if (!rect || isEmpty(rect)) {
+      live?.cancel();
+      return;
+    }
+    const footprint = rect.width * rect.height * 8;
+    if (!(live ? live.grow(footprint) : target.kind === 'raster' && target.txn.growHistory(footprint))) {
+      if (!live) {
+        deps.reportRefusal('over-budget');
       }
-      let rect: Rect | null;
-      let entry;
-      if (kind === 'fill' && !target.transparencyLocked) {
-        rect = selectionRect;
-        entry = this.deps.layers.growToRect(layerId, selectionRect);
+      live?.cancel();
+      return;
+    }
+    const originalRect = existing ? { ...existing.rect } : null;
+    let before: ImageData | null = null;
+    const rollback = (): void => {
+      const entry = deps.layers.get(layerId);
+      if (entry && before) {
+        entry.surface.ctx.putImageData(before, rect.x - entry.rect.x, rect.y - entry.rect.y);
+      }
+      if (!originalRect) {
+        deps.layers.delete(layerId);
       } else {
-        const existing = this.deps.layers.get(layerId);
-        if (!existing || isEmpty(existing.rect)) {
-          cancelControl();
-          return;
-        }
-        rect = intersect(selectionRect, existing.rect);
-        entry = existing;
+        deps.layers.shrinkToRect(layerId, originalRect);
       }
-      if (!rect || isEmpty(rect)) {
-        cancelControl();
-        return;
-      }
-      this.deps.endBurst();
+      deps.deleteDerived(layerId);
+      deps.invalidateLayer(layerId);
+    };
+    let published = false;
+    try {
+      const entry = grows ? deps.layers.growToRect(layerId, rect) : existing!;
       const surface = entry.surface;
       const origin = { x: entry.rect.x, y: entry.rect.y };
       before = surface.ctx.getImageData(rect.x - origin.x, rect.y - origin.y, rect.width, rect.height);
-      editOrigin = origin;
-      editRect = rect;
-      editSurface = surface;
       if (kind === 'fill') {
         fillMaskedRegion({
-          backend: this.deps.backend,
-          color: this.deps.getFillColor(),
+          backend: deps.backend,
+          color: deps.getFillColor(),
           composite: target.transparencyLocked ? 'source-atop' : 'source-over',
           mask: placedMask.surface,
           maskOrigin: placedMask.rect,
@@ -232,7 +194,7 @@ export class SelectionPixelController {
         });
       } else {
         eraseMaskedRegion({
-          backend: this.deps.backend,
+          backend: deps.backend,
           mask: placedMask.surface,
           maskOrigin: placedMask.rect,
           rect,
@@ -242,35 +204,36 @@ export class SelectionPixelController {
       }
       const after = surface.ctx.getImageData(rect.x - origin.x, rect.y - origin.y, rect.width, rect.height);
       const label = kind === 'fill' ? 'Fill selection' : 'Erase selection';
-      if (target.kind === 'control') {
-        if (imageDataEqual(before, after)) {
+      if (live) {
+        published = live.commitPatch(label, { after, before, rect });
+        return;
+      }
+      if (target.kind !== 'raster' || imageDataEqual(before, after)) {
+        return;
+      }
+      const result = target.txn.publish(
+        label,
+        {
+          notify: () => {
+            deps.notifyPainted(layerId);
+            deps.markDirty(layerId);
+          },
+        },
+        createImagePatchEntry({ after, apply: deps.applyImagePatch, before, label, layerId, rect }),
+        { origin: 'system' }
+      );
+      if (result.status === 'over-budget') {
+        deps.reportRefusal('over-budget');
+      }
+      published = result.status === 'committed';
+    } finally {
+      if (!published) {
+        try {
           rollback();
-          return;
-        }
-        commitStarted = true;
-        target.transaction.commitPatch(label, { after, before, rect });
-      } else {
-        this.deps.notifyPainted(target.layerId);
-        this.deps.markDirty(target.layerId);
-        if (!this.deps.history.isApplying()) {
-          this.deps.history.push(
-            createImagePatchEntry({
-              after,
-              apply: this.deps.applyImagePatch,
-              before,
-              label,
-              layerId: target.layerId,
-              rect,
-            })
-          );
+        } finally {
+          live?.cancel();
         }
       }
-    } catch (error) {
-      if (target.kind !== 'control' || commitStarted) {
-        throw error;
-      }
-      rollback();
-      throw error;
     }
   }
 

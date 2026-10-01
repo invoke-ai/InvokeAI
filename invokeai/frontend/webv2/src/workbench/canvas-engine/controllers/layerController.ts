@@ -15,7 +15,7 @@ import { ThumbnailController, type ThumbnailControllerOptions } from './thumbnai
 
 export type LayerControllerDeps = Omit<
   CanvasLayerCapability,
-  | 'applyStructuralPreview'
+  | 'beginStructuralPreview'
   | 'canCommitStructural'
   | 'commitPrepared'
   | 'commitStagedImage'
@@ -63,7 +63,7 @@ export class LayerController {
     this.copy = new CopyLayerController(deps.copy);
     this.newRasterLayer = new NewRasterLayerController(deps.newRasterLayer);
     this.layers = {
-      applyStructuralPreview: (action) => (this.disposed ? false : this.structural.preview(action)),
+      beginStructuralPreview: () => (this.disposed ? null : this.structural.beginPreview()),
       canCommitStructural: () => this.structural.canCommit(),
       commitGeneratedImageResult: (options) =>
         this.disposed ? Promise.resolve({ status: 'aborted' }) : deps.commitGeneratedImageResult(options),
@@ -71,7 +71,7 @@ export class LayerController {
         this.disposed ? { status: 'not-ready' } : this.structural.commitPrepared(label, edit, options),
       commitStructural: (label, forward, inverse, options) =>
         this.disposed ? { status: 'not-ready' } : this.structural.commit(label, forward, inverse, options),
-      invertMask: (layerId) => (this.disposed ? false : this.mask.invert(layerId)),
+      invertMask: (layerId) => (this.disposed ? { status: 'not-ready' } : this.mask.invert(layerId)),
     };
     this.previews = {
       drawLayerThumbnail: (layerId, target, maxSize) =>

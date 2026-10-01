@@ -60,7 +60,7 @@ const makeDoc = (layers: CanvasLayerContract[]): CanvasDocumentContractV3 => ({
 const makeDeps = (document: CanvasDocumentContractV3) => {
   const stub = createTestStubRasterBackend();
   const snapshot: RasterCompositeExportSnapshot = {
-    contentEpoch: 1,
+    directPixelEpoch: 1,
     document,
     documentGeneration: 1,
     lifecycleGeneration: 1,
@@ -75,6 +75,7 @@ const makeDeps = (document: CanvasDocumentContractV3) => {
     getLayerSurface: vi.fn(() =>
       Promise.resolve({
         rect: { height: 32, width: 64, x: 0, y: 0 },
+        release: () => undefined,
         surface: stub.createSurface(64, 32),
       })
     ),
@@ -144,11 +145,11 @@ describe('exportRasterComposite', () => {
   it('keeps its reservation and cache pins while rendering across generation release', async () => {
     const { deps } = makeDeps(makeDoc([rasterLayer('raster')]));
     const memory = new RasterMemoryBudgetController({ budgetBytes: 100_000 });
-    const layerSurface = createDeferred<{ rect: Rect; surface: RasterSurface }>();
+    const layerSurface = createDeferred<{ rect: Rect; release(): void; surface: RasterSurface }>();
     deps.getLayerSurface = vi.fn(() => layerSurface.promise);
     deps.reserve = (bytes) => memory.reserveOperation(bytes, { purpose: 'background-snapshot' });
     deps.pin = (layerIds) => {
-      const leases = layerIds.map((layerId) => memory.pinOperation(layerId));
+      const leases = layerIds.map((layerId) => memory.pin(layerId));
       return { release: () => leases.forEach((lease) => lease.release()) };
     };
 
@@ -160,11 +161,14 @@ describe('exportRasterComposite', () => {
     expect(memory.isPinned('raster')).toBe(true);
 
     const backend = createTestStubRasterBackend();
+    const releaseLease = vi.fn();
     layerSurface.resolve({
       rect: { height: 32, width: 64, x: 0, y: 0 },
+      release: releaseLease,
       surface: backend.createSurface(64, 32),
     });
     await expect(exported).resolves.toMatchObject({ status: 'ok' });
+    expect(releaseLease).toHaveBeenCalledOnce();
     expect(memory.snapshot().reservedBytes).toBe(0);
     expect(memory.isPinned('raster')).toBe(false);
   });

@@ -88,7 +88,7 @@ vi.mock('@workbench/WorkbenchContext', async () => {
 vi.mock('@workbench/useCanvasProjectMutationDispatch', () => ({
   useCanvasProjectMutationDispatch: () => () => true,
 }));
-vi.mock('@workbench/widgets/canvas/useCanvasEngine', () => ({ useCanvasEngine: () => harness.engine }));
+vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => harness.engine }));
 
 import { SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
 import { clearMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
@@ -505,6 +505,33 @@ describe('Properties pane', () => {
     }
   });
 
+  it('titles the pane with the running operation, else the selected layer or group', async () => {
+    const title = () => page.getByRole('heading', { level: 2 });
+    await mount(PropertiesPane);
+    await expect.element(title()).toHaveTextContent('No layer selected');
+
+    await act(() => root?.unmount());
+    host?.remove();
+    registry?.releaseEngine('p');
+    await mount(PropertiesPane, 'group');
+    await expect.element(title()).toHaveTextContent('Group: Folder');
+
+    await act(() => root?.unmount());
+    host?.remove();
+    registry?.releaseEngine('p');
+    await mount(PropertiesPane, 'mask');
+    await expect.element(title()).toHaveTextContent('Layer: Mask');
+    await act(() => operations!.start(true));
+    await settle();
+    await expect.element(title()).toHaveTextContent('Operation: Filter');
+    // The title replaces the operation section's own header; the group keeps its accessible name.
+    const section = host!.querySelector<HTMLElement>('[role="group"][aria-label="Operation"]')!;
+    expect(section.textContent).not.toContain('Operation');
+    await act(() => operations!.start(false));
+    await settle();
+    await expect.element(title()).toHaveTextContent('Layer: Mask');
+  });
+
   it('puts a running operation first with Cancel, locks the tool rows in place and hands them focus over', async () => {
     await mount(PropertiesPane);
     await act(() => engine!.tools.setTool('brush'));
@@ -512,7 +539,9 @@ describe('Properties pane', () => {
     await act(() => page.getByRole('slider', { exact: true, name: 'Brush size' }).element().focus());
     await act(() => operations!.start(true));
     await settle();
-    expect(host!.textContent?.indexOf('Operation')).toBeLessThan(host!.textContent?.indexOf('Tool') ?? -1);
+    const operationSection = host!.querySelector('[role="group"][aria-label="Operation"]')!;
+    const toolSection = host!.querySelector('[role="group"][aria-label="Tool"]')!;
+    expect(operationSection.compareDocumentPosition(toolSection) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     const cancel = page.getByRole('button', { exact: true, name: 'Cancel' });
     await expect.element(cancel).toBeEnabled();
     await expect.element(page.getByRole('button', { exact: true, name: 'Apply' })).toBeDisabled();
@@ -627,7 +656,7 @@ describe('Layer editor panes host', () => {
     await act(() => operations!.start(true));
     await settle();
     const draft = operations!.getFilterSessionState()!.draft;
-    expect(host!.textContent).toContain('Operation');
+    expect(host!.querySelector('[role="group"][aria-label="Operation"]')).not.toBeNull();
 
     await act(async () => {
       await userEvent.click(page.getByRole('tab', { exact: true, name: 'Overview' }));
@@ -644,7 +673,7 @@ describe('Layer editor panes host', () => {
     expect(operations!.resetFilterOperation).not.toHaveBeenCalled();
     expect(operations!.cancelFilterOperation).not.toHaveBeenCalled();
     expect(operations!.commitFilterOperation).not.toHaveBeenCalled();
-    expect(host!.textContent).toContain('Operation');
+    expect(host!.querySelector('[role="group"][aria-label="Operation"]')).not.toBeNull();
     await expect.element(page.getByRole('button', { exact: true, name: 'Cancel' })).toBeEnabled();
   });
 

@@ -1,5 +1,5 @@
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
-import type { FloatingSelection } from '@workbench/canvas-engine/selection/floatingSelection';
+import type { FloatingSelection, FloatLiftResult } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PointerInput } from '@workbench/canvas-engine/types';
@@ -99,8 +99,8 @@ interface HarnessOptions {
   selectedLayerIds?: readonly string[];
   /** Whether a live selection contains every point (the ants are "under" the cursor). */
   selectionContainsPoint?: boolean;
-  /** Whether a lift succeeds when the tool asks for one. */
-  canLift?: boolean;
+  /** What a lift returns when the tool asks for one; defaults to lifting. */
+  lift?: FloatLiftResult;
   /** A float that is already in flight before the gesture starts. */
   existingFloat?: boolean;
   /** Tests default snapping off to isolate raw deltas; snapping cases opt in. Product default is on. */
@@ -131,6 +131,7 @@ const createHarness = (doc: CanvasDocumentContractV3, options: HarnessOptions = 
     stores.bboxGrid.set(options.bboxGrid);
   }
   const ctx: ToolContext = {
+    scheduleFrame: () => () => undefined,
     backend: null as never,
     commitFloatingSelection: commitFloat,
     commitStructural: (label, forward, inverse) => {
@@ -141,7 +142,7 @@ const createHarness = (doc: CanvasDocumentContractV3, options: HarnessOptions = 
     createLayerId: () => 'x',
     createPath2D: (d) => ({ d }) as unknown as Path2D,
     dispatch: (action) => dispatched.push(action),
-    emitStrokeCommitted: vi.fn(),
+    beginStrokeEdit: () => null,
     getDocument: () => doc,
     getSelectedLayerIds: () => options.selectedLayerIds ?? (doc.selectedLayerId ? [doc.selectedLayerId] : []),
     getFloatingSelection: () => float.current,
@@ -149,12 +150,12 @@ const createHarness = (doc: CanvasDocumentContractV3, options: HarnessOptions = 
     isPointInSelection: () => options.selectionContainsPoint === true,
     layers: createLayerCacheStore(createTestStubRasterBackend()),
     liftFloatingSelection: (layerId) => {
-      if (options.canLift === false) {
-        return false;
-      }
+      const result = options.lift ?? 'lifted';
       lifts.push(layerId);
-      float.current = fakeFloat(layerId);
-      return true;
+      if (result === 'lifted') {
+        float.current = fakeFloat(layerId);
+      }
+      return result;
     },
     notifyLayerPainted: vi.fn(),
     setFloatingTransform: (transform) => {
@@ -509,7 +510,6 @@ describe('move tool: grid snapping', () => {
   it('does not snap a floating selection (its transform is layer-local)', () => {
     const h = createHarness(snapDoc(), {
       bboxGrid: 8,
-      canLift: true,
       selectionContainsPoint: true,
       snapToGrid: true,
     });
@@ -561,6 +561,24 @@ describe('move tool: dragging a floating selection', () => {
     expect(h.transforms.at(-1)).toMatchObject({ x: 20, y: 15 });
     expect(h.commits).toHaveLength(0);
     expect(h.overrides).toHaveLength(0);
+  });
+
+  it('cuts nothing for a click inside the ants, lifting only once the press becomes a drag', () => {
+    const h = createHarness(doc(), { selectionContainsPoint: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(11, 10));
+    up(tool, h.ctx, pointer(11, 10));
+    expect(h.lifts).toEqual([]);
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(11, 10));
+    expect(h.lifts).toEqual([]);
+    move(tool, h.ctx, pointer(20, 10));
+    expect(h.lifts).toEqual(['a']);
+    up(tool, h.ctx, pointer(20, 10));
+    expect(h.transforms.at(-1)).toMatchObject({ x: 10, y: 0 });
   });
 
   it('moves the layer when the press lands outside the ants', () => {
@@ -619,7 +637,7 @@ describe('move tool: dragging a floating selection', () => {
   });
 
   it('falls back to moving the layer when the lift finds nothing to take', () => {
-    const h = createHarness(doc(), { canLift: false, selectionContainsPoint: true });
+    const h = createHarness(doc(), { lift: 'unavailable', selectionContainsPoint: true });
     const tool = createMoveTool();
 
     down(tool, h.ctx, pointer(10, 10));
@@ -627,6 +645,21 @@ describe('move tool: dragging a floating selection', () => {
     up(tool, h.ctx, pointer(30, 25));
 
     expect(h.commits).toHaveLength(1);
+  });
+
+  it('moves nothing when the lift is refused, never the whole layer', () => {
+    const h = createHarness(doc(), { lift: 'refused', selectionContainsPoint: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(30, 25));
+    move(tool, h.ctx, pointer(40, 30));
+    up(tool, h.ctx, pointer(40, 30));
+
+    expect(h.lifts).toEqual(['a']);
+    expect(h.commits).toHaveLength(0);
+    expect(h.overrides).toHaveLength(0);
+    expect(h.transforms).toHaveLength(0);
   });
 
   it('constrains a float drag to the dominant axis under shift', () => {

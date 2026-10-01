@@ -1,15 +1,14 @@
-import type { CanvasStagingCandidateContract, CanvasStateContractV3 } from '@workbench/canvas-engine/contracts';
-import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import type { CanvasStagingCandidateContract } from '@workbench/canvas-engine/contracts';
+import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
+import type { Project } from '@workbench/projectContracts';
 
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
-import { removeNodes } from '@workbench/canvas-engine/document/documentTree';
-import { insertNodesAtAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
-import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/document/insertionAnchors.testStub';
-import { createTestEditConcurrency } from '@workbench/canvas-engine/editConcurrency.testStub';
+import { getDocumentLayer, getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
 import { createHistory, NO_HELD_ASSET_REFS } from '@workbench/canvas-engine/history/history';
+import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
+import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { describe, expect, it, vi } from 'vitest';
 
+import { createCanvasMutationContext } from './mutationContext';
 import { StagedResultController } from './stagedResultController';
 
 const candidate: CanvasStagingCandidateContract = {
@@ -24,280 +23,208 @@ const candidate: CanvasStagingCandidateContract = {
 };
 const selection = { candidate, selectedImageIndex: 0 } as const;
 
-const makeCanvas = (): CanvasStateContractV3 => ({
-  document: {
-    background: 'transparent',
-    bbox: { height: 100, width: 100, x: 0, y: 0 },
-    height: 100,
-    stacks: stacksFrom([]),
-    selectedLayerId: null,
-    version: 3,
-    width: 100,
-  },
-  documentRevision: 0,
-  snapshots: [],
-  stagingArea: {
-    areThumbnailsVisible: false,
-    autoSwitchMode: 'off',
-    isVisible: true,
-    pendingImageIds: [candidate.imageName],
-    pendingImages: [candidate],
-    selectedImageIndex: 0,
-  },
-  version: 3,
-});
+interface HarnessOptions {
+  readonly byteBudget?: number;
+  readonly gestureActive?: boolean;
+  readonly locked?: boolean;
+  /** The reducer keeps the project unchanged, as when the candidate moved on. */
+  readonly rejectDispatch?: boolean;
+  /** Mirror refresh fails, so an accepted mutation can never be mirrored. */
+  readonly mirrorBroken?: boolean;
+  readonly staged?: boolean;
+}
+
+/** A real reducer, history and transaction protocol around the controller; the mirror follows the reducer. */
+const createHarness = (options: HarnessOptions = {}) => {
+  const base = createInitialWorkbenchState().projects[0]!;
+  let project: Project = {
+    ...base,
+    canvas: {
+      ...base.canvas,
+      stagingArea: {
+        ...base.canvas.stagingArea,
+        isVisible: true,
+        pendingImageIds: options.staged === false ? [] : [candidate.imageName],
+        pendingImages: options.staged === false ? [] : [candidate],
+        selectedImageIndex: 0,
+      },
+    },
+  };
+  let mirrorBroken = options.mirrorBroken ?? false;
+  let mirrorDocument = project.canvas.document;
+  const dispatched: CanvasProjectMutation[] = [];
+  const listeners = new Set<() => void>();
+  const history = createHistory({ byteBudget: options.byteBudget });
+  const dispatch = (mutation: CanvasProjectMutation): boolean => {
+    dispatched.push(mutation);
+    if (options.rejectDispatch) {
+      return false;
+    }
+    const next = applyCanvasProjectMutation(project, mutation);
+    const changed = next !== project;
+    project = next;
+    if (!mirrorBroken) {
+      mirrorDocument = project.canvas.document;
+    }
+    listeners.forEach((listener) => listener());
+    return changed;
+  };
+  const ctx = createCanvasMutationContext({
+    commitEdit: vi.fn(),
+    createLayerId: () => 'layer-1',
+    dispatch,
+    editOwner: Symbol('owner'),
+    editingLocked: { get: () => options.locked ?? false, subscribe: () => () => undefined },
+    getDocument: () => mirrorDocument,
+    getReducerDocument: () => project.canvas.document,
+    history,
+    installPrepared: () => undefined,
+    isGestureActive: () => options.gestureActive ?? false,
+    isGuardCurrent: () => true,
+    preparePixels: () => ({}) as never,
+    projectId: base.id,
+    refreshMirror: () => {
+      if (mirrorBroken) {
+        throw new Error('mirror broken');
+      }
+      mirrorDocument = project.canvas.document;
+    },
+    reserveRaster: () => ({ lease: { release: () => undefined }, status: 'ok' }),
+    subscribeReducer: (listener) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  });
+  const controller = new StagedResultController({
+    createEventId: () => 'event-1',
+    ctx,
+    getCanvasState: () => project.canvas,
+    now: () => '2026-07-16T01:00:00.000Z',
+  });
+  return {
+    breakMirror: (broken: boolean) => {
+      mirrorBroken = broken;
+    },
+    controller,
+    dispatched,
+    history,
+    project: () => project,
+  };
+};
 
 describe('StagedResultController', () => {
-  it('commits the guarded candidate and records history only after reducer and mirror acceptance', () => {
-    let reducerCanvas = makeCanvas();
-    let mirrorDocument = reducerCanvas.document;
-    const history = createHistory();
-    const dispatchPrepared = vi.fn(
-      (mutation: CanvasProjectMutation, reducerAccepted: () => boolean, mirrorAccepted: () => boolean) => {
-        if (mutation.type === 'applyCanvasLayerStackMutation') {
-          reducerCanvas = {
-            ...reducerCanvas,
-            document: {
-              ...reducerCanvas.document,
-              stacks: mutation.removeIds
-                ? removeNodes(reducerCanvas.document.stacks, new Set(mutation.removeIds))
-                : (mutation.add ?? []).reduce(
-                    (stacks, insertion) => insertNodesAtAnchor(stacks, insertion.anchor, insertion.nodes),
-                    reducerCanvas.document.stacks
-                  ),
-              selectedLayerId:
-                mutation.selectedLayerId === undefined
-                  ? reducerCanvas.document.selectedLayerId
-                  : mutation.selectedLayerId,
-            },
-          };
-          expect(reducerAccepted()).toBe(true);
-          expect(mirrorAccepted()).toBe(false);
-          mirrorDocument = reducerCanvas.document;
-          expect(mirrorAccepted()).toBe(true);
-          return;
-        }
-        expect(mutation).toMatchObject({ selectedImageIndex: 0, type: 'commitStagedImage' });
-        if (mutation.type !== 'commitStagedImage') {
-          throw new Error('unexpected mutation');
-        }
-        const layer = mutation.layer;
-        reducerCanvas = {
-          ...reducerCanvas,
-          document: { ...reducerCanvas.document, stacks: stacksFrom([layer]), selectedLayerId: layer.id },
-          stagingArea: { ...reducerCanvas.stagingArea, isVisible: false, pendingImageIds: [], pendingImages: [] },
-        };
-        mirrorDocument = reducerCanvas.document;
-        expect(reducerAccepted()).toBe(true);
-        expect(mirrorAccepted()).toBe(true);
-      }
-    );
-    const controller = new StagedResultController({
-      captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
-      concurrency: createTestEditConcurrency({ capturePermit: () => ({ epoch: 1 }) }),
-      createEventId: () => 'event-1',
-      createLayerId: () => 'layer-1',
-      dispatchPrepared,
-      endBurst: vi.fn(),
-      getCanvasState: () => reducerCanvas,
-      getDocument: () => mirrorDocument,
-      history,
-      now: () => '2026-07-16T01:00:00.000Z',
-    });
+  it('commits the selected candidate as one undo step that replays both ways', async () => {
+    const h = createHarness();
+    const initial = h.project().canvas.document;
 
-    expect(controller.commit(selection)).toEqual({ status: 'committed', layerId: 'layer-1' });
-    expect(getDocumentLeaves(reducerCanvas.document)[0]).toMatchObject({
+    expect(h.controller.commit(selection)).toEqual({ layerId: 'layer-1', status: 'committed' });
+    expect(getDocumentLayer(h.project().canvas.document, 'layer-1')).toMatchObject({
       id: 'layer-1',
       opacity: 0.5,
       source: { image: { imageName: 'result.png' }, type: 'image' },
       transform: { scaleX: 2, scaleY: 2, x: 12, y: 18 },
       type: 'raster',
     });
-    expect(history.canUndo()).toBe(true);
+    expect(h.project().canvas.stagingArea.pendingImages).toEqual([]);
 
-    history.undo();
-    expect(getDocumentLeaves(reducerCanvas.document)).toEqual([]);
-    expect(reducerCanvas.document.selectedLayerId).toBeNull();
-    expect(reducerCanvas.stagingArea.pendingImages).toEqual([]);
+    expect(await h.history.undo()).toEqual({ status: 'applied' });
+    expect(getDocumentLeaves(h.project().canvas.document)).toEqual(getDocumentLeaves(initial));
+    expect(h.project().canvas.document.selectedLayerId).toBe(initial.selectedLayerId);
+    expect(h.project().canvas.stagingArea.pendingImages).toEqual([]);
 
-    history.redo();
-    expect(getDocumentLeaves(reducerCanvas.document)[0]).toBe(getDocumentLeaves(reducerCanvas.document)[0]);
-    expect(getDocumentLeaves(reducerCanvas.document)[0]?.id).toBe('layer-1');
-    expect(reducerCanvas.stagingArea.pendingImages).toEqual([]);
+    expect(await h.history.redo()).toEqual({ status: 'applied' });
+    expect(getDocumentLayer(h.project().canvas.document, 'layer-1')).not.toBeNull();
+    expect(h.project().canvas.document.selectedLayerId).toBe('layer-1');
   });
 
-  it('returns stale without history when the selected candidate changes before reducer acceptance', () => {
-    const canvas = makeCanvas();
-    const history = createHistory();
-    const controller = new StagedResultController({
-      captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
-      concurrency: createTestEditConcurrency({ capturePermit: () => ({ epoch: 1 }) }),
-      createEventId: () => 'event-1',
-      createLayerId: () => 'layer-1',
-      dispatchPrepared: () => {
-        throw new Error('reducer rejected stale candidate');
-      },
-      endBurst: vi.fn(),
-      getCanvasState: () => canvas,
-      getDocument: () => canvas.document,
-      history,
-      now: () => '2026-07-16T01:00:00.000Z',
-    });
+  it('returns stale without history when the reducer leaves the project unchanged', () => {
+    const h = createHarness({ rejectDispatch: true });
 
-    expect(controller.commit(selection)).toEqual({ status: 'stale' });
-    expect(getDocumentLeaves(canvas.document)).toEqual([]);
-    expect(canvas.stagingArea.pendingImages).toEqual([candidate]);
-    expect(history.canUndo()).toBe(false);
+    expect(h.controller.commit(selection)).toEqual({ status: 'stale' });
+    expect(h.project().canvas.stagingArea.pendingImages).toEqual([candidate]);
+    expect(h.history.canUndo()).toBe(false);
+  });
+
+  it('rolls the accepted commit back when the mirror cannot follow it', () => {
+    const h = createHarness({ mirrorBroken: true });
+    const before = h.project().canvas;
+
+    expect(h.controller.commit(selection)).toEqual({ status: 'stale' });
+    expect(getDocumentLeaves(h.project().canvas.document)).toEqual(getDocumentLeaves(before.document));
+    expect(h.project().canvas.stagingArea).toBe(before.stagingArea);
+    expect(h.dispatched.map((mutation) => mutation.type)).toEqual(['commitStagedImage', 'rollbackStagedImageCommit']);
+    expect(h.history.canUndo()).toBe(false);
   });
 
   it.each([
-    { gestureActive: false, name: 'edit lease is unavailable', permit: null, permitCurrent: false },
-    { gestureActive: true, name: 'a gesture is active', permit: { epoch: 1 }, permitCurrent: true },
-    { gestureActive: false, name: 'the captured edit permit is stale', permit: { epoch: 1 }, permitCurrent: false },
-  ])('returns busy without mutation when $name', ({ gestureActive, permit, permitCurrent }) => {
-    const canvas = makeCanvas();
-    const dispatchPrepared = vi.fn();
-    const history = createHistory();
-    const controller = new StagedResultController({
-      captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
-      concurrency: createTestEditConcurrency({
-        capturePermit: () => permit,
-        isGestureActive: () => gestureActive,
-        isPermitCurrent: () => permitCurrent,
-      }),
-      createEventId: () => 'event-1',
-      createLayerId: () => 'layer-1',
-      dispatchPrepared,
-      endBurst: vi.fn(),
-      getCanvasState: () => canvas,
-      getDocument: () => canvas.document,
-      history,
-      now: () => '2026-07-16T01:00:00.000Z',
-    });
+    { name: 'editing is locked', options: { locked: true } },
+    { name: 'a gesture is active', options: { gestureActive: true } },
+  ])('returns busy without mutation when $name', ({ options }) => {
+    const h = createHarness(options);
 
-    expect(controller.commit(selection)).toEqual({ status: 'busy' });
-    expect(dispatchPrepared).not.toHaveBeenCalled();
-    expect(history.canUndo()).toBe(false);
+    expect(h.controller.commit(selection)).toEqual({ status: 'busy' });
+    expect(h.dispatched).toEqual([]);
+    expect(h.history.canUndo()).toBe(false);
   });
 
-  it.each(['reducer', 'mirror'])('does not record history when %s acceptance rejects the commit', () => {
-    const canvas = makeCanvas();
-    const history = createHistory();
-    const controller = new StagedResultController({
-      captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
-      concurrency: createTestEditConcurrency({ capturePermit: () => ({ epoch: 1 }) }),
-      createEventId: () => 'event-1',
-      createLayerId: () => 'layer-1',
-      dispatchPrepared: () => {
-        throw new Error('acceptance rejected');
-      },
-      endBurst: vi.fn(),
-      getCanvasState: () => canvas,
-      getDocument: () => canvas.document,
-      history,
-      now: () => '2026-07-16T01:00:00.000Z',
-    });
+  it('refuses before mutating when history could never retain the step', () => {
+    const h = createHarness({ byteBudget: 16 });
 
-    expect(controller.commit(selection)).toEqual({ status: 'stale' });
-    expect(canvas.stagingArea.pendingImages).toEqual([candidate]);
-    expect(history.canUndo()).toBe(false);
+    expect(h.controller.commit(selection)).toEqual({ status: 'over-budget' });
+    expect(h.dispatched).toEqual([]);
+    expect(h.project().canvas.stagingArea.pendingImages).toEqual([candidate]);
   });
 
-  it('clears the redo stack after a new staged image commit', () => {
-    let reducerCanvas = makeCanvas();
-    let mirrorDocument = reducerCanvas.document;
-    const history = createHistory();
-    history.push({ bytes: 1, heldAssetRefs: NO_HELD_ASSET_REFS, label: 'older edit', redo: vi.fn(), undo: vi.fn() });
-    history.undo();
-    expect(history.canRedo()).toBe(true);
-    const controller = new StagedResultController({
-      captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
-      concurrency: createTestEditConcurrency({ capturePermit: () => ({ epoch: 1 }) }),
-      createEventId: () => 'event-1',
-      createLayerId: () => 'layer-1',
-      dispatchPrepared: (mutation, reducerAccepted, mirrorAccepted) => {
-        if (mutation.type !== 'commitStagedImage') {
-          throw new Error('unexpected mutation');
-        }
-        reducerCanvas = {
-          ...reducerCanvas,
-          document: {
-            ...reducerCanvas.document,
-            stacks: stacksFrom([mutation.layer]),
-            selectedLayerId: mutation.layer.id,
-          },
-          stagingArea: {
-            ...reducerCanvas.stagingArea,
-            isVisible: false,
-            pendingImageIds: [],
-            pendingImages: [],
-            selectedImageIndex: 0,
-          },
-        };
-        expect(reducerAccepted()).toBe(true);
-        mirrorDocument = reducerCanvas.document;
-        expect(mirrorAccepted()).toBe(true);
-      },
-      endBurst: vi.fn(),
-      getCanvasState: () => reducerCanvas,
-      getDocument: () => mirrorDocument,
-      history,
-      now: () => '2026-07-16T01:00:00.000Z',
-    });
+  it('keeps a failed undo on the stack with the document unchanged', async () => {
+    const h = createHarness();
+    h.controller.commit(selection);
+    const committed = getDocumentLeaves(h.project().canvas.document);
+    h.breakMirror(true);
 
-    expect(controller.commit(selection).status).toBe('committed');
-    expect(history.canRedo()).toBe(false);
+    expect((await h.history.undo()).status).toBe('failed');
+    expect(h.history.canUndo()).toBe(true);
+    expect(h.history.canRedo()).toBe(false);
+    expect(getDocumentLeaves(h.project().canvas.document)).toEqual(committed);
+  });
+
+  it('clears the redo stack after a new staged image commit', async () => {
+    const h = createHarness();
+    h.history
+      .admit(1)!
+      .publish({ bytes: 1, heldAssetRefs: NO_HELD_ASSET_REFS, label: 'older edit', redo: vi.fn(), undo: vi.fn() });
+    await h.history.undo();
+    expect(h.history.canRedo()).toBe(true);
+
+    expect(h.controller.commit(selection).status).toBe('committed');
+    expect(h.history.canRedo()).toBe(false);
   });
 
   it.each([
-    { canvas: null, name: 'project', options: selection },
-    {
-      canvas: makeCanvas(),
-      name: 'candidate',
-      options: { candidate: { ...candidate, imageName: 'missing.png' }, selectedImageIndex: 0 },
-    },
-  ])('returns missing without mutation when the $name is absent', ({ canvas, options }) => {
-    const dispatchPrepared = vi.fn();
-    const history = createHistory();
-    const controller = new StagedResultController({
-      captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
-      concurrency: createTestEditConcurrency({ capturePermit: () => ({ epoch: 1 }) }),
-      createEventId: () => 'event-1',
-      createLayerId: () => 'layer-1',
-      dispatchPrepared,
-      endBurst: vi.fn(),
-      getCanvasState: () => canvas,
-      getDocument: () => canvas?.document ?? null,
-      history,
-      now: () => '2026-07-16T01:00:00.000Z',
-    });
+    ['edits are locked', { locked: true }],
+    ['a gesture is active', { gestureActive: true }],
+  ])('refuses without mutating staging or history while %s', (_, options) => {
+    const h = createHarness(options);
+    const before = h.project();
 
-    expect(controller.commit(options)).toEqual({ status: 'missing' });
-    expect(dispatchPrepared).not.toHaveBeenCalled();
-    expect(history.canUndo()).toBe(false);
+    expect(h.controller.commit(selection).status).not.toBe('committed');
+    expect(h.dispatched).toEqual([]);
+    expect(h.project()).toBe(before);
+    expect(h.history.canUndo()).toBe(false);
+  });
+
+  it('returns missing without mutation when the candidate is no longer staged', () => {
+    const h = createHarness({ staged: false });
+
+    expect(h.controller.commit(selection)).toEqual({ status: 'missing' });
+    expect(h.dispatched).toEqual([]);
   });
 
   it('rejects retained commit capabilities after disposal', () => {
-    const canvas = makeCanvas();
-    const dispatchPrepared = vi.fn();
-    const history = createHistory();
-    const controller = new StagedResultController({
-      captureInsertionAnchor: createTestInsertionAnchorCapture('p'),
-      concurrency: createTestEditConcurrency({ capturePermit: () => ({ epoch: 1 }) }),
-      createEventId: () => 'event-1',
-      createLayerId: () => 'layer-1',
-      dispatchPrepared,
-      endBurst: vi.fn(),
-      getCanvasState: () => canvas,
-      getDocument: () => canvas.document,
-      history,
-      now: () => '2026-07-16T01:00:00.000Z',
-    });
+    const h = createHarness();
+    h.controller.dispose();
 
-    controller.dispose();
-
-    expect(controller.commit(selection)).toEqual({ status: 'missing' });
-    expect(dispatchPrepared).not.toHaveBeenCalled();
-    expect(history.canUndo()).toBe(false);
+    expect(h.controller.commit(selection)).toEqual({ status: 'missing' });
+    expect(h.dispatched).toEqual([]);
+    expect(h.history.canUndo()).toBe(false);
   });
 });

@@ -1,0 +1,118 @@
+---
+title: Anima
+description: Generate anime-style images with Anima, a 2B Cosmos Predict2 diffusion transformer with an LLM adapter, including its schedulers, regional prompting and ControlNet-LLLite adapters.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 1
+---
+
+Anima is a **2B-parameter**, anime-focused text-to-image model built on NVIDIA's **Cosmos Predict2**
+diffusion transformer. Instead of a large text encoder, it pairs a small **Qwen3 0.6B** encoder with a
+built-in **LLM adapter** that translates the encoder's output for the transformer. It decodes with the
+16-channel Wan 2.1 / Qwen Image VAE.
+
+InvokeAI supports Anima for text-to-image, and on the Canvas for image-to-image, inpainting, outpainting
+and regional prompts.
+
+## License
+
+Anima is released under the **CircleStone Labs Non-Commercial License**, and, because it is built on Cosmos-Predict2, the NVIDIA Open Model License also applies. The weights may not be used commercially; the model card says images you generate may be. The download is not gated.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
+## Hardware
+
+Anima is small by current standards: the transformer is a ~4.5 GB download, the Qwen3 encoder ~1.2 GB
+and the VAE ~200 MB. On low-VRAM GPUs,
+[Low-VRAM mode](/configuration/optimization/low-vram-mode/) and
+[FP8 Storage](/configuration/optimization/fp8-storage/) both apply to Anima.
+
+## Installing
+
+Install the **Anima** bundle from the Model Manager's Starter Models. It contains:
+
+- **Anima Base 1.0** — the main model (single-file checkpoint, ~4.5 GB)
+- **Anima Qwen3 0.6B Text Encoder** (~1.2 GB)
+- **Anima QwenImage VAE** (~200 MB)
+- **Anima LLLite Inpainting** and **Anima LLLite Sketch** — ControlNet-LLLite adapters (see
+  [below](#controlnet-lllite-adapters))
+
+Installing *Anima Base 1.0* on its own also installs the encoder and VAE as dependencies. Anima is
+distributed as a single file only, so the three components are always separate models:
+
+| Component    | Model                                                          |
+| ------------ | -------------------------------------------------------------- |
+| Transformer  | the Anima checkpoint (Cosmos Predict2 DiT + LLM adapter)       |
+| Text encoder | a **Qwen3 0.6B** encoder                                       |
+| VAE          | the 16-channel Wan 2.1 / Qwen Image VAE                        |
+
+Select the **Qwen3 Encoder** and **VAE** in the **Components** section next to the model; both are
+required. Only the 0.6B Qwen3 encoder is offered — the larger Qwen3 encoders used by Z-Image and FLUX.2
+are not compatible. The same VAE file may be installed under the Anima, Qwen Image or Wan base, and all
+three are listed. FLUX VAEs are **not** compatible.
+
+Anima also needs a T5-XXL tokenizer, which ships with InvokeAI; no T5 model has to be installed.
+
+## Generation settings
+
+Selecting an Anima model applies these defaults:
+
+- **Steps:** 35
+- **CFG Scale:** 4.5 (the minimum is 1, which turns CFG off)
+- **Scheduler:** Euler
+- **Size:** 1024×1024; width and height snap to multiples of 8.
+
+The **Scheduler** menu offers Anima's own set: **Euler**, **Heun (2nd order)**, **DPM++ 2M**,
+**DPM++ 2M SDE**, **ER-SDE** and **LCM**.
+
+The **negative prompt** is used only when CFG Scale is above 1; at CFG 1 it is ignored.
+
+## Regional prompting
+
+On the Canvas, **Regional Guidance** layers with a positive prompt work with Anima: each region's prompt is
+steered to its masked area, alongside the global prompt. The restriction is applied on alternating
+transformer blocks, leaving the others unrestricted to keep the image coherent. Regional negative prompts and regional
+reference images are not supported.
+
+In the workflow editor, the **Prompt - Anima** node has an optional **mask** input, and **Denoise -
+Anima** accepts a collection of conditionings for its positive and negative inputs.
+
+## LoRA
+
+Anima LoRAs (Kohya / LyCORIS format) are supported. They apply to the transformer and, where the LoRA
+includes text-encoder layers, to the Qwen3 encoder. In the workflow editor use **Apply LoRA - Anima** or
+**Apply LoRA Collection - Anima**.
+
+## ControlNet-LLLite adapters
+
+Anima supports kohya-ss's **ControlNet-LLLite** adapters, small models (8–66 MB) that condition the
+transformer on an image. These are available **in the workflow editor only**: add an **Anima
+ControlNet-LLLite** node, give it the conditioning image and a control model, and connect it to the
+**Control LLLite** input of **Denoise - Anima**. Several adapters can be combined by collecting them, but
+each adapter model may be used only once per generation. Each node has **Weight**, **Begin Step
+Percent** and **End Step Percent** settings.
+
+| Starter model                       | Purpose                                                        |
+| ----------------------------------- | -------------------------------------------------------------- |
+| **Anima LLLite Inpainting**         | Conditions on the masked image during inpainting/outpainting. Requires the node's **mask** input (white = area to inpaint). |
+| **Anima LLLite Sketch**             | Mixed scribble / HED / lineart / grayscale conditioning        |
+| **Anima LLLite Depth (Preview3)**   | Depth                                                          |
+| **Anima LLLite Scribble (Preview3)**| Scribble                                                       |
+| **Anima LLLite Lineart (Preview3)** | Lineart                                                        |
+| **Anima LLLite Pose (Preview3)**    | Pose                                                           |
+
+:::caution[Preview3 adapters]
+The four *Preview3* adapters were trained on an earlier Anima build and give reduced quality on Anima
+Base 1.0; the pose adapter is notably weak. Only the Inpainting and Sketch adapters are in the bundle.
+:::
+
+## Workflow nodes
+
+| Node                         | Purpose                                                   |
+| ---------------------------- | --------------------------------------------------------- |
+| **Main Model - Anima**       | Loads the transformer, Qwen3 encoder and VAE              |
+| **Prompt - Anima**           | Encodes a prompt, with an optional regional mask          |
+| **Denoise - Anima**          | Runs sampling; accepts img2img latents, masks and LLLite adapters |
+| **Image to Latents - Anima** | VAE encode                                                |
+| **Latents to Image - Anima** | VAE decode                                                |
+| **Anima ControlNet-LLLite**  | Configures one ControlNet-LLLite adapter                  |

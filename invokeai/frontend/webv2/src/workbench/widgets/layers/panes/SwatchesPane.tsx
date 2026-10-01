@@ -6,6 +6,7 @@ import { formatHexColor, normalizeHex, parseHexColor } from '@platform/ui/color'
 import { DEFAULT_COLOR_SWATCHES, recordRecentColor, useRecentColors } from '@platform/ui/colorPickerStore';
 import { Scrollable } from '@platform/ui/Scrollable';
 import { Tooltip } from '@platform/ui/Tooltip';
+import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { MAX_COLOR_PALETTE_SIZE } from '@workbench/widgets/canvas/color-system/colorPair';
 import {
   useActiveColorCommands,
@@ -14,7 +15,6 @@ import {
   useColorPalette,
 } from '@workbench/widgets/canvas/color-system/useActiveColors';
 import { useMaskTintEditor } from '@workbench/widgets/canvas/color-system/useMaskTintEditor';
-import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
 import { PlusIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';

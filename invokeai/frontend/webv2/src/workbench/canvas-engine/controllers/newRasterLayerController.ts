@@ -1,146 +1,86 @@
-import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
 import type { CanvasCommandRefusal } from '@workbench/canvas-engine/document/commandRefusal';
-import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
-import type { LayerStackKind } from '@workbench/canvas-engine/document/layerStacks';
-import type {
-  CanvasEditConcurrency,
-  CanvasTransactionOutcome,
-  SubsetOf,
-} from '@workbench/canvas-engine/editConcurrency';
-import type { History } from '@workbench/canvas-engine/history/history';
-import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
-import type { LayerCacheStore, PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
+import type { SubsetOf } from '@workbench/canvas-engine/editConcurrency';
+import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend, RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
 import type { Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { getDocumentLayer, isNodeAbsent } from '@workbench/canvas-engine/document/documentIndex';
-import { collectHistoryMediaRefs } from '@workbench/canvas-engine/history/history';
+import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
 import { isEmpty, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
 import { liftSelectedPixels } from '@workbench/canvas-engine/selection/floatingSelection';
 import { layerMatrix } from '@workbench/canvas-engine/tools/moveHitTest';
 
+import type { CanvasMutationContext } from './mutationContext';
+
+import {
+  addedLayerHistoryBytes,
+  layerEditRefusal,
+  layerOperationStatus,
+  paintLayerAt,
+  publishAddedRasterLayer,
+  type LayerEditRefusal,
+  type LayerStepContext,
+} from './editSteps';
+
 export type NewRasterLayerResult =
   | { status: 'created'; layerId: string }
-  | { status: SubsetOf<CanvasTransactionOutcome, 'busy'> | SubsetOf<CanvasCommandRefusal, 'missing'> | 'empty' };
+  | { status: LayerEditRefusal | SubsetOf<CanvasCommandRefusal, 'missing'> | 'empty' | 'failed' };
 
 export interface NewRasterLayerControllerOptions {
-  readonly concurrency: CanvasEditConcurrency;
+  readonly ctx: LayerStepContext &
+    Pick<CanvasMutationContext, 'begin' | 'captureInsertionAnchor' | 'createLayerId' | 'getDocument'>;
   readonly backend: RasterBackend;
   readonly layers: LayerCacheStore;
   readonly selection: SelectionState;
-  readonly history: History;
-  readonly getDocument: () => CanvasDocumentContractV3 | null;
-  readonly getReducerDocument: () => CanvasDocumentContractV3 | null;
-  readonly endBurst: () => void;
-  readonly createLayerId: () => string;
-  readonly captureInsertionAnchor: (stack: LayerStackKind, aboveId: string | null) => CanvasNodeInsertionAnchor;
-  readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => PreparedLayerCacheReplacement;
-  readonly installPrepared: (prepared: PreparedLayerCacheReplacement) => void;
-  readonly dispatchPrepared: (
-    action: CanvasProjectMutation,
-    expectedReducer: () => boolean,
-    expectedMirror: () => boolean
-  ) => void;
 }
 
-/**
- * Shared undoable insertion for Paste and Layer via Copy. Acquire a permit, verify reducer/mirror postconditions,
- * install the prepared cache, then record failure-atomic history with the same redo path. Insert above and select
- * the active layer's new sibling.
- */
+/** Shared undoable insertion for Paste and Layer via Copy, inserted above and selecting the active layer. */
 export class NewRasterLayerController {
   private disposed = false;
 
   constructor(private readonly deps: NewRasterLayerControllerOptions) {}
 
   /**
-   * Inserts `pixels` as a new paint layer covering `rect` (document space).
-   * `pixels` is consumed as-is — the caller owns getting it into document space.
+   * Inserts `pixels` as a new paint layer covering `rect` (document space). The undo entry takes ownership of
+   * `pixels`; the caller owns getting it into document space.
    */
   insert(rect: Rect, pixels: RasterSurface, name: string, label: string): NewRasterLayerResult {
-    const permit = this.deps.concurrency.capturePermit();
-    if (this.disposed || !permit || this.deps.concurrency.isGestureActive()) {
-      return { status: 'busy' };
+    const { ctx } = this.deps;
+    if (this.disposed) {
+      return { status: 'not-ready' };
     }
-    const document = this.deps.getDocument();
+    const document = ctx.getDocument();
     if (!document) {
       return { status: 'missing' };
     }
     if (isEmpty(rect)) {
       return { status: 'empty' };
     }
-    this.deps.endBurst();
-
-    const layerId = this.deps.createLayerId();
-    // Place pixels with the source offset, leaving the transform at identity for ordinary move, transform and
-    // float handling.
-    const layer: CanvasLayerContract = {
-      blendMode: 'normal',
-      id: layerId,
-      isEnabled: true,
-      isLocked: false,
-      name,
-      opacity: 1,
-      source: { bitmap: null, offset: { x: rect.x, y: rect.y }, type: 'paint' },
-      transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
-      type: 'raster',
-    };
-
-    const anchor = this.deps.captureInsertionAnchor('raster', document.selectedLayerId);
-    const previousSelectedLayerId = document.selectedLayerId;
-
-    const apply = (): void => {
-      const prepared = this.deps.preparePixels(layerId, rect, pixels);
-      this.deps.dispatchPrepared(
-        {
-          add: [{ anchor, nodes: [layer] }],
-          enabledUpdates: [],
-          selectedLayerId: layerId,
-          type: 'applyCanvasLayerStackMutation',
-        },
-        () =>
-          this.deps.getReducerDocument()?.selectedLayerId === layerId &&
-          getDocumentLayer(this.deps.getReducerDocument(), layer.id) === layer,
-        () =>
-          this.deps.getDocument()?.selectedLayerId === layerId &&
-          getDocumentLayer(this.deps.getDocument(), layer.id) === layer
-      );
-      this.deps.installPrepared(prepared);
-    };
-
-    if (!this.deps.concurrency.isPermitCurrent(permit)) {
-      return { status: 'busy' };
+    const txn = ctx.begin({ historyBytes: addedLayerHistoryBytes(rect) });
+    if (!('publish' in txn)) {
+      return { status: layerEditRefusal(txn.status) };
     }
-    apply();
-    this.deps.history.push({
-      bytes: rect.width * rect.height * 4 + 256,
-      heldAssetRefs: collectHistoryMediaRefs(layer),
-      label,
-      redo: apply,
-      replayFailureAtomic: true,
-      undo: () =>
-        this.deps.dispatchPrepared(
-          {
-            enabledUpdates: [],
-            removeIds: [layerId],
-            selectedLayerId: previousSelectedLayerId,
-            type: 'applyCanvasLayerStackMutation',
-          },
-          () =>
-            this.deps.getReducerDocument()?.selectedLayerId === previousSelectedLayerId &&
-            isNodeAbsent(this.deps.getReducerDocument(), layerId),
-          () =>
-            this.deps.getDocument()?.selectedLayerId === previousSelectedLayerId &&
-            isNodeAbsent(this.deps.getDocument(), layerId)
-        ),
-    });
-    return { layerId, status: 'created' };
+    try {
+      const layer = paintLayerAt(ctx.createLayerId(), name, rect);
+      const status = layerOperationStatus(
+        publishAddedRasterLayer(ctx, txn, {
+          anchor: ctx.captureInsertionAnchor('raster', document.selectedLayerId),
+          label,
+          layer,
+          pixels,
+          rect,
+          selectedLayerId: document.selectedLayerId,
+        })
+      );
+      return status === 'committed' ? { layerId: layer.id, status: 'created' } : { status };
+    } finally {
+      txn.end();
+    }
   }
 
-  /** Copies selected pixels into a new layer above the active layer without changing the source. */
+  /** Copies selected pixels into a new layer above the active one without changing the source. */
   liftSelectionToLayer(name: string, label: string): NewRasterLayerResult {
-    const document = this.deps.getDocument();
+    const document = this.deps.ctx.getDocument();
     const layer = getDocumentLayer(document, document?.selectedLayerId);
     const mask = this.deps.selection.mask();
     const entry = layer ? this.deps.layers.get(layer.id) : undefined;

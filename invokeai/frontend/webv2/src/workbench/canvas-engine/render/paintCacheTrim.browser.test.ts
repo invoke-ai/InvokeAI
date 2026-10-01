@@ -18,7 +18,7 @@ const published = () => {
   const store = createLayerCacheStore(createDomRasterBackend());
   const entry = store.growToRect('L', START);
   store.publishPixels('L');
-  return { deps: { isLayerBusy: () => false, layers: store }, entry, store };
+  return { deps: { isLayerBusy: () => false, isLayerPinned: () => false, layers: store }, entry, store };
 };
 
 /** Fills a 10x10 mark addressed in LAYER-LOCAL space. */

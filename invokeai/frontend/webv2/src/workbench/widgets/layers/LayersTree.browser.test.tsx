@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-function-as-prop */
 import type { CanvasNodeContract, PreparedDocumentEdit } from '@workbench/canvas-engine/api';
+import type { CanvasOperationState } from '@workbench/canvas-operations/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { Project } from '@workbench/projectContracts';
 
@@ -11,6 +12,7 @@ import {
   layerContract,
   stacksFrom,
 } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { attachCanvasOperations } from '@workbench/canvas-operations/operationAccess';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { applyCanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import {
@@ -23,7 +25,7 @@ import {
 } from '@workbench/layerPanelState';
 import { createInitialWorkbenchState } from '@workbench/workbenchState';
 import { createInstance } from 'i18next';
-import { act, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { act, useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -32,6 +34,7 @@ import { userEvent } from 'vitest/browser';
 import { clearLayerChildSelection, getLayerChildSelection } from './layerChildSelection';
 import { getLayerRowCommits, resetLayerRowCommits } from './layerPanelDiagnostics';
 import { LAYER_PANEL_DEGRADE_THRESHOLD, LAYER_ROW_HEIGHT_PX } from './layerPanelRows';
+import { clearLayerPropertiesRequest, requestLayerProperties } from './layerPropertiesRequestStore';
 import { LayersTree, type LayersTreeEngine } from './LayersTree';
 import { buildLayerStackRows } from './layerTreeRows';
 
@@ -143,6 +146,64 @@ const exportBakedLayerBlob = vi.fn(() =>
 const refusalChecks = vi.fn();
 const revealRequests = vi.fn();
 
+/** The one operation-state seam the tree reads; tests publish through `setOperation`. */
+const operationHarness = (() => {
+  const listeners = new Set<() => void>();
+  let state: CanvasOperationState = { status: 'idle' };
+  return {
+    getOperationState: () => state,
+    set: (next: CanvasOperationState) => {
+      state = next;
+      listeners.forEach((listener) => listener());
+    },
+    subscribeOperation: (listener: () => void) => {
+      listeners.add(listener);
+      return () => listeners.delete(listener);
+    },
+  };
+})();
+const withOperations = (engine: LayersTreeEngine): LayersTreeEngine => {
+  attachCanvasOperations(engine, operationHarness as never);
+  return engine;
+};
+// The real engine handle is stable across document changes; this one reads the harness's latest document.
+let harnessDocument = createEmptyCanvasDocument();
+const engine = withOperations({
+  document: {
+    model: () => {
+      const model = createDocumentModel(harnessDocument, { editRevision: 0, projectId: PROJECT_ID });
+      return {
+        ...model,
+        refusalFor: (command: Parameters<typeof model.refusalFor>[0]) => {
+          refusalChecks(command);
+          return model.refusalFor(command);
+        },
+      };
+    },
+  },
+  exports: { exportBakedLayerBlob: exportBakedLayerBlob, hasExportableLayerContent: () => false },
+  interaction: { get: () => false },
+  layers: {
+    commitPrepared: (_label: string, edit: PreparedDocumentEdit) => {
+      dispatchExternal(edit.forward);
+      return { status: 'committed' as const };
+    },
+  },
+  previews: { drawLayerThumbnail: () => false, requestLayerThumbnail: thumbnailRequests },
+  projectId: PROJECT_ID,
+} as unknown as LayersTreeEngine);
+const setOperation = (layerId: string | null) =>
+  operationHarness.set(
+    layerId === null
+      ? { status: 'idle' }
+      : {
+          error: null,
+          identity: { kind: 'select-object', layerId, projectId: PROJECT_ID },
+          phase: 'ready',
+          status: 'active',
+        }
+  );
+
 const Harness = ({ initialNodes }: { initialNodes: CanvasNodeContract[] }) => {
   const [project, setProject] = useState<Project>(() => {
     const initial = { ...createInitialWorkbenchState().projects[0]!, id: PROJECT_ID };
@@ -162,39 +223,9 @@ const Harness = ({ initialNodes }: { initialNodes: CanvasNodeContract[] }) => {
   useEffect(() => {
     dispatchExternal = dispatch;
   }, [dispatch]);
-  // The real engine handle is stable across document changes; the harness reads the document through a ref.
-  const documentRef = useRef(document);
-  useEffect(() => {
-    documentRef.current = document;
+  useLayoutEffect(() => {
+    harnessDocument = document;
   }, [document]);
-  const engine = useMemo(
-    () =>
-      ({
-        document: {
-          model: () => {
-            const model = createDocumentModel(documentRef.current, { editRevision: 0, projectId: PROJECT_ID });
-            return {
-              ...model,
-              refusalFor: (command: Parameters<typeof model.refusalFor>[0]) => {
-                refusalChecks(command);
-                return model.refusalFor(command);
-              },
-            };
-          },
-        },
-        exports: { exportBakedLayerBlob: exportBakedLayerBlob, hasExportableLayerContent: () => false },
-        interaction: { get: () => false },
-        layers: {
-          commitPrepared: (_label: string, edit: PreparedDocumentEdit) => {
-            dispatch(edit.forward);
-            return { status: 'committed' as const };
-          },
-        },
-        previews: { drawLayerThumbnail: () => false, requestLayerThumbnail: thumbnailRequests },
-        projectId: PROJECT_ID,
-      }) as unknown as LayersTreeEngine,
-    [dispatch]
-  );
   const expanded = useMemo(() => new Set(panel.expandedGroupIds), [panel.expandedGroupIds]);
   const stacks = useMemo(
     () => buildLayerStackRows(document.stacks, expanded, panel.filter),
@@ -315,6 +346,8 @@ beforeEach(() => {
   thumbnailRequests.mockClear();
   refusalChecks.mockClear();
   revealRequests.mockClear();
+  clearLayerPropertiesRequest();
+  setOperation(null);
 });
 
 afterEach(async () => {
@@ -662,6 +695,23 @@ describe('LayersTree selection, surfaces and structure', () => {
     expect(output('layer-order')).toBe('inner,third,first');
     expect(readLayerPanelState(PROJECT_ID, null).expandedGroupIds).toContain('g');
     expect(treeitem('Third')).toHaveAttribute('aria-level', '3');
+  });
+
+  it("reveals Properties for a running operation's layer but drops requests for any other layer", async () => {
+    await renderTree(trio());
+    // An operation started from a menu and its reveal request land in the same batch.
+    await act(() => {
+      setOperation('second');
+      requestLayerProperties('second');
+    });
+    await settle();
+    expect(revealRequests).toHaveBeenCalledWith('second');
+
+    revealRequests.mockClear();
+    await act(() => requestLayerProperties('third'));
+    await settle();
+    expect(revealRequests).not.toHaveBeenCalled();
+    expect(output('selected-layer')).not.toBe('third');
   });
 });
 

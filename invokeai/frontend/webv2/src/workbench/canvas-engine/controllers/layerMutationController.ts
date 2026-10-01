@@ -1,13 +1,8 @@
 import type { DuplicateLayersResult } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
-import type { RasterMemoryReservationResult } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
-import type { LayerStackKind } from '@workbench/canvas-engine/document/layerStacks';
-import type { CanvasEditConcurrency } from '@workbench/canvas-engine/editConcurrency';
-import type { History } from '@workbench/canvas-engine/history/history';
 import type { CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 import type { PreparedLayerCacheReplacement } from '@workbench/canvas-engine/render/layerCache';
-import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Rect } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
@@ -22,9 +17,19 @@ import {
 import { cloneSubtree, collectSubtreeLeaves } from '@workbench/canvas-engine/document/documentTree';
 import { insertNodesAtAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import { haveSameStructure } from '@workbench/canvas-engine/document/layerStacks';
-import { collectHistoryMediaRefs } from '@workbench/canvas-engine/history/history';
+import { collectHistoryMediaRefs, HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 
-export type CapturedLayerCache = { pixels: RasterSurface; rect: Rect } | null | 'not-ready';
+import type { CanvasMutationContext, EditStep } from './mutationContext';
+
+import {
+  guardedResultRefusal,
+  layerEditRefusal,
+  type LayerPixels,
+  rgbaBytes,
+  withReplayReservation,
+} from './editSteps';
+
+export type CapturedLayerCache = LayerPixels | null | 'not-ready' | 'over-budget';
 
 export type DuplicateLayerRasterPlan =
   | {
@@ -43,39 +48,55 @@ type DuplicateRasterPreparationResult =
   | { readonly status: 'not-ready' | 'over-budget' };
 
 export interface LayerMutationControllerOptions {
-  readonly concurrency: CanvasEditConcurrency;
-  readonly captureCache: (layer: CanvasLayerContract, document: CanvasDocumentContractV3) => CapturedLayerCache;
-  readonly captureInsertionAnchor: (stack: LayerStackKind, aboveId: string | null) => CanvasNodeInsertionAnchor;
-  readonly captureRestoreAnchor: (nodeId: string) => CanvasNodeInsertionAnchor | null;
-  readonly createLayerId: () => string;
+  readonly ctx: Pick<
+    CanvasMutationContext,
+    | 'applyStep'
+    | 'begin'
+    | 'canEdit'
+    | 'captureInsertionAnchor'
+    | 'capturePermit'
+    | 'captureRestoreAnchor'
+    | 'createLayerId'
+    | 'getDocument'
+    | 'getEditRevision'
+    | 'installPrepared'
+    | 'isGestureActive'
+    | 'isPermitCurrent'
+    | 'preparePixels'
+    | 'reserveRaster'
+  >;
+  /** Copies a layer's live cache; `admit` accounts its bytes first and refuses the copy as `over-budget`. */
+  readonly captureCache: (
+    layer: CanvasLayerContract,
+    document: CanvasDocumentContractV3,
+    admit?: (rect: Rect) => boolean
+  ) => CapturedLayerCache;
   readonly discardPersisted: (layerId: string) => void;
-  readonly dispatchPrepared: (
-    action: CanvasProjectMutation,
-    reducerAccepted: () => boolean,
-    mirrorAccepted: () => boolean
-  ) => void;
-  readonly endBurst: () => void;
   readonly getDuplicateRasterPlan: (
     layer: CanvasLayerContract,
     document: CanvasDocumentContractV3
   ) => DuplicateLayerRasterPlan;
-  readonly getDocument: () => CanvasDocumentContractV3 | null;
-  readonly getEditRevision: () => number;
-  readonly getReducerDocument: () => CanvasDocumentContractV3 | null;
   readonly getSelectedLayerIds: (document: CanvasDocumentContractV3) => readonly string[];
-  readonly history: History;
   readonly hasPendingPixelWork: (layerId: string) => boolean;
-  readonly installPrepared: (prepared: PreparedLayerCacheReplacement, persist?: boolean) => void;
   readonly needsPixelPersistence: (layer: CanvasLayerContract) => boolean;
-  readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => PreparedLayerCacheReplacement;
   readonly publishSelectedLayerIds: (primaryId: string | null, selectedIds: readonly string[]) => void;
   readonly prepareDuplicateRasterSource: (layerId: string) => Promise<DuplicateRasterPreparationResult>;
   readonly pinDuplicateRasterSources: (layerIds: readonly string[]) => { release(): void };
-  readonly reserve: (bytes: number) => RasterMemoryReservationResult;
   readonly scheduleDuplicateRasterization: (layerIds: readonly string[]) => void;
   readonly sameContract: (document: CanvasDocumentContractV3 | null, layer: CanvasLayerContract) => boolean;
   readonly trackDetached: (bytes: number) => { release(): void };
 }
+
+type StackMutation = Extract<CanvasProjectMutation, { type: 'applyCanvasLayerStackMutation' }>;
+
+/** A stack edit verified by `accepted`, rolled back by `rollback` until `restored` holds. */
+const stackStep = (
+  mutation: StackMutation,
+  accepted: (document: CanvasDocumentContractV3 | null) => boolean,
+  rollback: StackMutation,
+  restored: (document: CanvasDocumentContractV3 | null) => boolean,
+  effects: Pick<EditStep, 'install' | 'notify'> = {}
+): EditStep => ({ ...effects, accepted, mutation, rollback: { mutation: rollback, restored } });
 
 /** The outermost requested nodes in document order, or `null` when any id is absent or none is given. */
 const duplicateRoots = (document: CanvasDocumentContractV3, ids: readonly string[]): CanvasNodeEntry[] | null => {
@@ -87,19 +108,19 @@ const duplicateRoots = (document: CanvasDocumentContractV3, ids: readonly string
   return outermostNodes(index, unique);
 };
 
-/** Owns failure-atomic copy and cross-type conversion mutations. */
+/** Owns admitted, failure-atomic copy and cross-type conversion edits. */
 export class LayerMutationController {
   private duplicateInFlight = false;
 
   constructor(private readonly options: LayerMutationControllerOptions) {}
 
   async duplicate(layerIds: readonly string[]): Promise<DuplicateLayersResult> {
-    const o = this.options;
-    const permit = o.concurrency.capturePermit();
-    if (this.duplicateInFlight || !permit || !o.concurrency.canEdit() || o.concurrency.isGestureActive()) {
+    const { ctx, ...o } = this.options;
+    const permit = ctx.capturePermit();
+    if (this.duplicateInFlight || !permit || ctx.isGestureActive()) {
       return { status: 'busy' };
     }
-    const document = o.getDocument();
+    const document = ctx.getDocument();
     if (!document) {
       return { status: 'nothing' };
     }
@@ -129,7 +150,7 @@ export class LayerMutationController {
           return { status: 'stale' };
         }
       }
-      if (!o.concurrency.isPermitCurrent(permit) || o.concurrency.isGestureActive() || o.getDocument() !== document) {
+      if (!ctx.isPermitCurrent(permit) || ctx.isGestureActive() || ctx.getDocument() !== document) {
         return { status: 'stale' };
       }
       return this.commitDuplicate(layerIds);
@@ -140,12 +161,8 @@ export class LayerMutationController {
   }
 
   private commitDuplicate(layerIds: readonly string[]): DuplicateLayersResult {
-    const o = this.options;
-    if (!o.concurrency.canEdit() || o.concurrency.isGestureActive()) {
-      return { status: 'busy' };
-    }
-    o.endBurst();
-    const document = o.getDocument();
+    const { ctx, ...o } = this.options;
+    const document = ctx.getDocument();
     if (!document) {
       return { status: 'nothing' };
     }
@@ -168,27 +185,27 @@ export class LayerMutationController {
         reserveBytes += plan.initialReserveBytes;
       }
     }
-    const historyBytes = retainedBytes + sources.length * 256;
-    if (!o.history.canRetain(historyBytes)) {
-      return { status: 'over-budget' };
-    }
-    // Immutable durable sources rebuild caches on redo, needing one insertion copy. Unpersisted paint/mask pixels
-    // need separate history and live copies; both remain within the raster reservation.
-    const reservation = o.reserve(reserveBytes);
-    if (reservation.status === 'over-budget') {
-      return { status: 'over-budget' };
+    const historyBytes = retainedBytes + sources.length * HISTORY_ENTRY_OVERHEAD_BYTES;
+    const txn = ctx.begin({ historyBytes });
+    if (!('publish' in txn)) {
+      return { status: layerEditRefusal(txn.status) };
     }
     try {
+      // Immutable durable sources rebuild caches on redo, needing one insertion copy. Unpersisted paint/mask
+      // pixels need separate history and live copies; both remain within the raster reservation.
+      if (!txn.reserveRaster(reserveBytes)) {
+        return { status: 'over-budget' };
+      }
       const captures = sources.map((source, index) =>
         plans[index]?.type === 'capture' ? o.captureCache(source, document) : null
       );
-      if (captures.some((capture) => capture === 'not-ready')) {
+      if (captures.some((capture) => capture === 'not-ready' || capture === 'over-budget')) {
         return { status: 'not-ready' };
       }
       const existingIds = new Set(getDocumentIndex(document).byId.keys());
       const idMap = new Map<string, string>();
       const clones = roots.map((entry) => {
-        const { node } = cloneSubtree(entry.node, o.createLayerId, idMap);
+        const { node } = cloneSubtree(entry.node, ctx.createLayerId, idMap);
         return { ...node, name: `${entry.node.name} copy` };
       });
       const cloneLeaves = new Map(
@@ -214,7 +231,7 @@ export class LayerMutationController {
         return { status: 'stale' };
       }
       const insertions = roots.map((entry, index) => ({
-        anchor: o.captureInsertionAnchor(entry.stack, entry.node.id),
+        anchor: ctx.captureInsertionAnchor(entry.stack, entry.node.id),
         nodes: [clones[index]!],
       }));
       const expectedStacks = insertions.reduce(
@@ -230,29 +247,34 @@ export class LayerMutationController {
         candidate?.selectedLayerId === selectedLayerId && haveSameStructure(candidate.stacks, expectedStacks);
       const hasOriginals = (candidate: CanvasDocumentContractV3 | null): boolean =>
         candidate?.selectedLayerId === previousSelectedLayerId && haveSameStructure(candidate.stacks, document.stacks);
-      const applyPrepared = (
-        prepared: readonly { duplicate: CanvasLayerContract; replacement: PreparedLayerCacheReplacement }[]
-      ): void => {
-        o.dispatchPrepared(
-          {
-            add: insertions,
-            enabledUpdates: [],
-            selectedLayerId,
-            type: 'applyCanvasLayerStackMutation',
-          },
-          () => hasDuplicates(o.getReducerDocument()),
-          () => hasDuplicates(o.getDocument())
-        );
-        prepared.forEach(({ duplicate, replacement }) => {
-          o.installPrepared(replacement, o.needsPixelPersistence(duplicate));
-        });
-        o.publishSelectedLayerIds(selectedLayerId, duplicateIds);
+      const addDuplicates: StackMutation = {
+        add: insertions,
+        enabledUpdates: [],
+        selectedLayerId,
+        type: 'applyCanvasLayerStackMutation',
       };
+      const removeDuplicates: StackMutation = {
+        enabledUpdates: [],
+        removeIds: duplicateIds,
+        selectedLayerId: previousSelectedLayerId,
+        type: 'applyCanvasLayerStackMutation',
+      };
+      const added = (
+        prepared: readonly { duplicate: CanvasLayerContract; replacement: PreparedLayerCacheReplacement }[]
+      ): EditStep =>
+        stackStep(addDuplicates, hasDuplicates, removeDuplicates, hasOriginals, {
+          install: () => {
+            for (const { duplicate, replacement } of prepared) {
+              ctx.installPrepared(replacement, o.needsPixelPersistence(duplicate));
+            }
+          },
+          notify: () => o.publishSelectedLayerIds(selectedLayerId, duplicateIds),
+        });
       const retainedCaptures = captures.map((capture, index) =>
         plans[index]?.type === 'capture' && plans[index].retainForHistory ? capture : null
       );
       const initialPrepared = captures.flatMap((capture, index) => {
-        if (!capture || capture === 'not-ready') {
+        if (!capture || typeof capture === 'string') {
           return [];
         }
         const duplicate = duplicates[index]!;
@@ -262,25 +284,13 @@ export class LayerMutationController {
             duplicate,
             replacement:
               plan.type === 'capture' && plan.retainForHistory
-                ? o.preparePixels(duplicate.id, capture.rect, capture.pixels)
+                ? ctx.preparePixels(duplicate.id, capture.rect, capture.pixels)
                 : { layerId: duplicate.id, rect: capture.rect, surface: capture.pixels },
           },
         ];
       });
-      applyPrepared(initialPrepared);
-      initialPrepared.length = 0;
-      captures.forEach((_capture, index) => {
-        const plan = plans[index];
-        if (plan?.type !== 'capture' || !plan.retainForHistory) {
-          captures[index] = null;
-        }
-      });
-      const detachedLease = retainedBytes > 0 ? o.trackDetached(retainedBytes) : null;
+      let detachedLease: { release(): void } | null = null;
       const redo = (): void => {
-        const current = o.getDocument();
-        if (!current) {
-          throw new Error('Canvas document is not ready to restore duplicated layers');
-        }
         const replayPlans = sources.map((_source, index) => {
           const originalPlan = plans[index]!;
           if (originalPlan.type === 'capture' && originalPlan.retainForHistory) {
@@ -292,134 +302,120 @@ export class LayerMutationController {
           (total, plan) => total + (plan.type === 'capture' ? plan.replayReserveBytes : 0),
           0
         );
-        const replayReservation = o.reserve(replayBytes);
-        if (replayReservation.status === 'over-budget') {
-          throw new Error('Not enough raster memory to restore duplicated layers');
-        }
-        try {
+        withReplayReservation(ctx, replayBytes, () => {
           const prepared = replayPlans.flatMap((plan, index) => {
             if (plan.type !== 'capture') {
               return [];
             }
             const duplicate = duplicates[index]!;
             const retained = retainedCaptures[index];
-            if (!retained || retained === 'not-ready') {
+            if (!retained || typeof retained === 'string') {
               throw new Error('Layer pixels are not ready to restore duplicated layers');
             }
-            return [
-              {
-                duplicate,
-                replacement: o.preparePixels(duplicate.id, retained.rect, retained.pixels),
-              },
-            ];
+            return [{ duplicate, replacement: ctx.preparePixels(duplicate.id, retained.rect, retained.pixels) }];
           });
-          applyPrepared(prepared);
-          o.scheduleDuplicateRasterization(
-            replayPlans.flatMap((plan, index) =>
-              plan.type === 'reference' && plans[index]?.type === 'capture' ? [duplicates[index]!.id] : []
-            )
-          );
-        } finally {
-          replayReservation.lease.release();
-        }
+          ctx.applyStep(added(prepared));
+        });
+        o.scheduleDuplicateRasterization(
+          replayPlans.flatMap((plan, index) =>
+            plan.type === 'reference' && plans[index]?.type === 'capture' ? [duplicates[index]!.id] : []
+          )
+        );
       };
-      o.history.push({
-        bytes: historyBytes,
-        heldAssetRefs: collectHistoryMediaRefs(duplicates),
-        dispose: () => detachedLease?.release(),
-        label: duplicates.length === 1 ? 'Duplicate layer' : 'Duplicate layers',
-        redo,
-        replayFailureAtomic: true,
-        undo: () => {
-          o.dispatchPrepared(
-            {
-              enabledUpdates: [],
-              removeIds: duplicateIds,
-              selectedLayerId: previousSelectedLayerId,
-              type: 'applyCanvasLayerStackMutation',
-            },
-            () => hasOriginals(o.getReducerDocument()),
-            () => hasOriginals(o.getDocument())
-          );
-          o.publishSelectedLayerIds(previousSelectedLayerId, previousSelectedIds);
-        },
-      });
+      const result = txn.publish(
+        duplicates.length === 1 ? 'Duplicate layer' : 'Duplicate layers',
+        added(initialPrepared),
+        {
+          bytes: historyBytes,
+          dispose: () => detachedLease?.release(),
+          heldAssetRefs: collectHistoryMediaRefs(duplicates),
+          redo,
+          undo: () =>
+            ctx.applyStep(
+              stackStep(removeDuplicates, hasOriginals, addDuplicates, hasDuplicates, {
+                notify: () => o.publishSelectedLayerIds(previousSelectedLayerId, previousSelectedIds),
+              })
+            ),
+        }
+      );
+      if (result.status !== 'committed') {
+        return { status: guardedResultRefusal(result) };
+      }
+      if (retainedBytes > 0) {
+        detachedLease = o.trackDetached(retainedBytes);
+      }
       return { duplicateIds, selectedLayerId, status: 'duplicated' };
     } finally {
-      reservation.lease.release();
+      txn.end();
     }
   }
 
   copy(label: string, sourceLayerId: string, layer: CanvasLayerContract, anchor: CanvasNodeInsertionAnchor): boolean {
-    const o = this.options;
-    if (!o.concurrency.canEdit() || o.concurrency.isGestureActive()) {
-      return false;
-    }
-    o.endBurst();
-    const document = o.getDocument();
+    const { ctx, ...o } = this.options;
+    const document = ctx.getDocument();
     const source = getDocumentLayer(document, sourceLayerId);
     if (
       !document ||
       !source ||
-      anchor.capturedEditRevision !== o.getEditRevision() ||
+      anchor.capturedEditRevision !== ctx.getEditRevision() ||
       hasDocumentNode(document, layer.id)
     ) {
       return false;
     }
-    const captured = o.captureCache(source, document);
-    if (captured === 'not-ready') {
+    const txn = ctx.begin({ historyBytes: HISTORY_ENTRY_OVERHEAD_BYTES });
+    if (!('publish' in txn)) {
       return false;
     }
-    const selectedLayerId = document.selectedLayerId;
-    const apply = (): void => {
-      const prepared = captured ? o.preparePixels(layer.id, captured.rect, captured.pixels) : null;
-      o.dispatchPrepared(
-        {
-          add: [{ anchor, nodes: [layer] }],
-          enabledUpdates: [],
-          selectedLayerId: layer.id,
-          type: 'applyCanvasLayerStackMutation',
-        },
-        () =>
-          o.getReducerDocument()?.selectedLayerId === layer.id &&
-          getDocumentLayer(o.getReducerDocument(), layer.id) === layer,
-        () => o.getDocument()?.selectedLayerId === layer.id && getDocumentLayer(o.getDocument(), layer.id) === layer
+    try {
+      const captured = o.captureCache(
+        source,
+        document,
+        (rect) => txn.growHistory(rgbaBytes(rect)) && txn.reserveRaster(rgbaBytes(rect))
       );
-      if (prepared) {
-        o.installPrepared(prepared, o.needsPixelPersistence(layer));
+      if (captured === 'not-ready' || captured === 'over-budget') {
+        return false;
       }
-    };
-    apply();
-    o.history.push({
-      bytes: captured ? captured.rect.width * captured.rect.height * 4 + 256 : 256,
-      heldAssetRefs: collectHistoryMediaRefs(layer),
-      label,
-      redo: apply,
-      replayFailureAtomic: true,
-      undo: () =>
-        o.dispatchPrepared(
-          { enabledUpdates: [], removeIds: [layer.id], selectedLayerId, type: 'applyCanvasLayerStackMutation' },
-          () =>
-            o.getReducerDocument()?.selectedLayerId === selectedLayerId &&
-            isNodeAbsent(o.getReducerDocument(), layer.id),
-          () => o.getDocument()?.selectedLayerId === selectedLayerId && isNodeAbsent(o.getDocument(), layer.id)
-        ),
-    });
-    return true;
+      const selectedLayerId = document.selectedLayerId;
+      const hasCopy = (candidate: CanvasDocumentContractV3 | null): boolean =>
+        candidate?.selectedLayerId === layer.id && getDocumentLayer(candidate, layer.id) === layer;
+      const hasNoCopy = (candidate: CanvasDocumentContractV3 | null): boolean =>
+        candidate?.selectedLayerId === selectedLayerId && isNodeAbsent(candidate, layer.id);
+      const addCopy: StackMutation = {
+        add: [{ anchor, nodes: [layer] }],
+        enabledUpdates: [],
+        selectedLayerId: layer.id,
+        type: 'applyCanvasLayerStackMutation',
+      };
+      const removeCopy: StackMutation = {
+        enabledUpdates: [],
+        removeIds: [layer.id],
+        selectedLayerId,
+        type: 'applyCanvasLayerStackMutation',
+      };
+      const added = (prepared: PreparedLayerCacheReplacement | null): EditStep =>
+        stackStep(addCopy, hasCopy, removeCopy, hasNoCopy, {
+          install: prepared ? () => ctx.installPrepared(prepared, o.needsPixelPersistence(layer)) : undefined,
+        });
+      const prepare = (): PreparedLayerCacheReplacement | null =>
+        captured ? ctx.preparePixels(layer.id, captured.rect, captured.pixels) : null;
+      const result = txn.publish(label, added(prepare()), {
+        bytes: (captured ? rgbaBytes(captured.rect) : 0) + HISTORY_ENTRY_OVERHEAD_BYTES,
+        heldAssetRefs: collectHistoryMediaRefs(layer),
+        redo: () => replayPrepared(ctx, captured, () => ctx.applyStep(added(prepare()))),
+        undo: () => ctx.applyStep(stackStep(removeCopy, hasNoCopy, addCopy, hasCopy)),
+      });
+      return result.status === 'committed';
+    } finally {
+      txn.end();
+    }
   }
 
   convert(label: string, expected: CanvasLayerContract, after: CanvasLayerContract): boolean {
-    const o = this.options;
-    if (
-      !o.concurrency.canEdit() ||
-      o.concurrency.isGestureActive() ||
-      expected.id !== after.id ||
-      expected.type === after.type
-    ) {
+    const { ctx, ...o } = this.options;
+    if (expected.id !== after.id || expected.type === after.type) {
       return false;
     }
-    o.endBurst();
-    const document = o.getDocument();
+    const document = ctx.getDocument();
     const current = getDocumentLayer(document, expected.id);
     if (
       !document ||
@@ -430,40 +426,67 @@ export class LayerMutationController {
     ) {
       return false;
     }
-    const captured = o.captureCache(current, document);
-    if (captured === 'not-ready') {
+    const txn = ctx.begin({ historyBytes: HISTORY_ENTRY_OVERHEAD_BYTES });
+    if (!('publish' in txn)) {
       return false;
     }
-    // A conversion changes stacks, so undo carries the leaf back to its captured place.
-    const restoreAnchor = o.captureRestoreAnchor(current.id) ?? undefined;
-    const apply = (layer: CanvasLayerContract, anchor?: CanvasNodeInsertionAnchor): void => {
-      const prepared = captured ? o.preparePixels(layer.id, captured.rect, captured.pixels) : null;
-      o.dispatchPrepared(
-        { anchor, id: layer.id, layer, targetType: layer.type, type: 'convertCanvasLayer' },
-        () => o.sameContract(o.getReducerDocument(), layer),
-        () => o.sameContract(o.getDocument(), layer)
+    try {
+      const captured = o.captureCache(
+        current,
+        document,
+        (rect) => txn.growHistory(rgbaBytes(rect)) && txn.reserveRaster(rgbaBytes(rect))
       );
-      try {
-        o.discardPersisted(layer.id);
-      } catch {
-        /* Ancillary after reducer acceptance. */
+      if (captured === 'not-ready' || captured === 'over-budget') {
+        return false;
       }
-      if (prepared) {
-        o.installPrepared(prepared, o.needsPixelPersistence(layer));
-      }
-    };
-    const before = structuredClone(current);
-    apply(after);
-    o.history.push({
-      bytes: captured ? captured.rect.width * captured.rect.height * 4 + 256 : 256,
-      heldAssetRefs: collectHistoryMediaRefs(before, after),
-      label,
-      redo: () => apply(after),
-      replayFailureAtomic: true,
-      undo: () => apply(before, restoreAnchor),
-    });
-    return true;
+      // A conversion changes stacks, so undo carries the leaf back to its captured place.
+      const restoreAnchor = ctx.captureRestoreAnchor(current.id) ?? undefined;
+      const before = structuredClone(current);
+      const converted = (
+        layer: CanvasLayerContract,
+        restore: CanvasLayerContract,
+        anchor?: CanvasNodeInsertionAnchor
+      ): EditStep => {
+        const prepared = captured ? ctx.preparePixels(layer.id, captured.rect, captured.pixels) : null;
+        return {
+          accepted: (candidate) => o.sameContract(candidate, layer),
+          install: () => {
+            try {
+              o.discardPersisted(layer.id);
+            } catch {
+              /* Ancillary after reducer acceptance. */
+            }
+            if (prepared) {
+              ctx.installPrepared(prepared, o.needsPixelPersistence(layer));
+            }
+          },
+          mutation: { anchor, id: layer.id, layer, targetType: layer.type, type: 'convertCanvasLayer' },
+          rollback: {
+            mutation: { id: layer.id, layer: restore, targetType: restore.type, type: 'convertCanvasLayer' },
+            restored: (candidate) => o.sameContract(candidate, restore),
+          },
+        };
+      };
+      const result = txn.publish(label, converted(after, current), {
+        bytes: (captured ? rgbaBytes(captured.rect) : 0) + HISTORY_ENTRY_OVERHEAD_BYTES,
+        heldAssetRefs: collectHistoryMediaRefs(before, after),
+        redo: () => replayPrepared(ctx, captured, () => ctx.applyStep(converted(after, before))),
+        undo: () => replayPrepared(ctx, captured, () => ctx.applyStep(converted(before, after, restoreAnchor))),
+      });
+      return result.status === 'committed';
+    } finally {
+      txn.end();
+    }
   }
 
   dispose(): void {}
 }
+
+/** Runs a replay whose step prepares a copy of `captured`, reserving that copy first. */
+const replayPrepared = (
+  ctx: Pick<CanvasMutationContext, 'reserveRaster'>,
+  captured: CapturedLayerCache,
+  replay: () => void
+): void => {
+  withReplayReservation(ctx, captured && typeof captured !== 'string' ? rgbaBytes(captured.rect) : 0, replay);
+};

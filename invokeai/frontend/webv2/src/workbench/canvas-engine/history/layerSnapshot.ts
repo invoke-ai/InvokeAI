@@ -12,7 +12,8 @@ export interface LayerPixelSnapshot {
   pixels: ImageData | null;
 }
 
-export type LayerPixelSnapshotApply = (snapshot: LayerPixelSnapshot) => void;
+/** Installs a snapshot; throws or rejects, leaving the layer unchanged, when it cannot land. */
+export type LayerPixelSnapshotApply = (snapshot: LayerPixelSnapshot) => void | Promise<void>;
 
 export interface CreateLayerSnapshotEntryOptions {
   before: LayerPixelSnapshot;
@@ -62,7 +63,6 @@ export const createLayerSnapshotEntry = ({
     heldAssetRefs: collectHistoryMediaRefs(beforeSnapshot.layer, afterSnapshot.layer),
     label,
     redo: () => apply(afterSnapshot),
-    replayFailureAtomic: true,
     undo: () => apply(beforeSnapshot),
   };
 };

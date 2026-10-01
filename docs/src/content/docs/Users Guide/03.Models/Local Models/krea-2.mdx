@@ -3,7 +3,7 @@ title: Krea-2
 description: Generate images with the Krea-2 text-to-image models (Turbo and Raw), including the GGUF / single-file workflow, the conditioning enhancers and training-free style reference.
 lastUpdated: 2026-09-30
 sidebar:
-  order: 5
+  order: 7
 ---
 
 Krea-2 is a ~12B single-stream diffusion-transformer text-to-image family. InvokeAI supports both
@@ -17,6 +17,12 @@ published checkpoints:
 
 The variant is detected automatically on install, and selecting a Krea-2 model sets sensible defaults
 (steps, CFG, 1024×1024) for that variant.
+
+## License
+
+Krea-2 Turbo and Raw are released under the **Krea 2 Community License**. Commercial use of the model and its images is allowed only for companies with less than $1M in annual revenue; above that, an Enterprise license is needed. Redistributed copies must add "Krea" to the model name. The full Diffusers repositories are gated: accept the license on the model's HuggingFace page and add your HuggingFace token under **API Keys** in the Model Manager. The quantized GGUF and NVFP4 copies are not gated, but the same license applies.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
 
 ## Hardware
 

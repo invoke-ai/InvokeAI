@@ -364,6 +364,35 @@ describe('compileProjectGraph', () => {
     });
   });
 
+  it('resolves Auto and an unset board to the auto-add board and leaves None Uncategorized', () => {
+    const { doc, sinkId } = buildDocument();
+    const withBoard = (value: unknown) =>
+      compileProjectGraph(
+        projectGraphReducer(doc, { fieldName: 'board', nodeId: sinkId, type: 'setFieldValue', value }),
+        templates,
+        {
+          autoBoardId: 'auto-board',
+        }
+      ).backendGraph?.nodes[sinkId];
+
+    expect(withBoard('auto')).toMatchObject({ board: { board_id: 'auto-board' } });
+    expect(withBoard(undefined)).toMatchObject({ board: { board_id: 'auto-board' } });
+    expect(withBoard('none')).not.toHaveProperty('board');
+    expect(withBoard({ board_id: 'board-1' })).toMatchObject({ board: { board_id: 'board-1' } });
+
+    // An auto-add board of Uncategorized resolves Auto to no board at all.
+    const toUncategorized = projectGraphReducer(doc, {
+      fieldName: 'board',
+      nodeId: sinkId,
+      type: 'setFieldValue',
+      value: 'auto',
+    });
+
+    expect(
+      compileProjectGraph(toUncategorized, templates, { autoBoardId: 'none' }).backendGraph?.nodes[sinkId]
+    ).not.toHaveProperty('board');
+  });
+
   it('preserves auto/none board sentinels only in Call Saved Workflow inputs', () => {
     const callTemplate = template('call_saved_workflow', {
       workflow_id: input('workflow_id', { type: { batch: false, cardinality: 'SINGLE', name: 'StringField' } }),
@@ -383,6 +412,23 @@ describe('compileProjectGraph', () => {
     expect(graph.nodes[callNode.id]).toMatchObject({
       workflow_inputs: { [dynamicBoardName]: 'auto' },
     });
+    // The child workflow's Auto resolves like this workflow's own; None stays a sentinel for its builder.
+    const resolved = compileProjectGraph(
+      document,
+      { call_saved_workflow: callTemplate },
+      { autoBoardId: 'auto-board' }
+    );
+
+    expect(resolved.backendGraph.nodes[callNode.id]).toMatchObject({
+      workflow_inputs: { [dynamicBoardName]: { board_id: 'auto-board' } },
+    });
+
+    callNode.data.inputs[dynamicBoardName] = { label: 'Board', name: dynamicBoardName, value: 'none' };
+
+    expect(
+      compileProjectGraph(document, { call_saved_workflow: callTemplate }, { autoBoardId: 'auto-board' }).backendGraph
+        .nodes[callNode.id]
+    ).toMatchObject({ workflow_inputs: { [dynamicBoardName]: 'none' } });
   });
 
   it('resolves connector chains into executable backend edges', () => {
