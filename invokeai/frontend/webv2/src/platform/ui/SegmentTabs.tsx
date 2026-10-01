@@ -89,7 +89,8 @@ export const SegmentTabs = <T extends string>({
               bg="border.emphasized"
               flexShrink={0}
               h="3.5"
-              opacity={tab.id === activeId || tabs[index - 1]!.id === activeId ? 0 : 1}
+              // Only the shown tab's background replaces its neighbouring dividers; a collapsed strip keeps them all.
+              opacity={showActivePanel && (tab.id === activeId || tabs[index - 1]!.id === activeId) ? 0 : 1}
               rounded="full"
               transition="opacity var(--wb-motion-duration-fast)"
               w="1px"
