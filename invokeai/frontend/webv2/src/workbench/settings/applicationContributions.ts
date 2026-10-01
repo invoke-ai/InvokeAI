@@ -92,6 +92,7 @@ export const workflowSettings = section('workflow', 'Workflow', [
     'workflow edges wires links z-order'
   ),
   preference('workflowSnapToGrid', 'Always snap to grid', 'workflow nodes'),
+  preference('workflowGroupNodesByCategory', 'Group node search by category', 'workflow nodes add search categories'),
   preference('workflowShowMinimap', 'Show minimap'),
   preference('workflowValidateConnections', 'Validate connections', 'workflow edges'),
 ]);

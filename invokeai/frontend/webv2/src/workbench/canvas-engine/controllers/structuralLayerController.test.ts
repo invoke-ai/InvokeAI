@@ -16,7 +16,8 @@ import { createCanvasMutationContext } from './mutationContext';
 import { StructuralLayerController } from './structuralLayerController';
 
 interface HarnessOptions {
-  locked?: boolean;
+  /** A live flag lets a test lock edits mid-gesture. */
+  locked?: boolean | { value: boolean };
   gestureActive?: boolean;
   schedulePreview?: (flush: () => void) => () => void;
   /** Mirror refreshes only when asked, as when a store observer threw mid-notification. */
@@ -54,22 +55,35 @@ const createHarness = (options: HarnessOptions & { now?: () => number } = {}) =>
     listeners.forEach((listener) => listener());
     return changed;
   };
+  const history = createHistory();
   const ctx = createCanvasMutationContext({
     commitEdit: vi.fn(),
     createLayerId: () => 'new',
     projectId: base.id,
     dispatch,
     editOwner: Symbol('owner'),
-    editingLocked: { get: () => options.locked ?? false, subscribe: () => () => undefined },
-    endBurst: () => undefined,
+    editingLocked: {
+      get: () => (typeof options.locked === 'object' ? options.locked.value : (options.locked ?? false)),
+      subscribe: () => () => undefined,
+    },
     getDocument: () => mirrorDocument,
     getReducerDocument: () => project.canvas.document,
-    history: createHistory(),
+    history,
     installPrepared: () => undefined,
     isGestureActive: () => options.gestureActive ?? false,
     isGuardCurrent: () => true,
     preparePixels: () => ({}) as never,
     refreshMirror,
+    // As the engine wires it: unrecoverable step failures are reported with the edit's label.
+    report: (error, label) =>
+      report(
+        error.outcome === 'reverted-unmirrored'
+          ? 'Structural edit could not be mirrored'
+          : 'Structural edit could not be reverted',
+        label,
+        error
+      ),
+    reserveRaster: () => ({ lease: { release: () => undefined }, status: 'ok' }),
     subscribeReducer: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -87,14 +101,14 @@ const createHarness = (options: HarnessOptions & { now?: () => number } = {}) =>
     dispatched,
     projectId: base.id,
     document: () => project.canvas.document,
-    history: ctx.history,
+    history,
     layer,
     mirror: () => mirrorDocument,
     report,
   };
 };
 
-const rename = (id: string, name: string): CanvasProjectMutation => ({
+const rename = (id: string, name: string): Extract<CanvasProjectMutation, { type: 'updateCanvasLayer' }> => ({
   id,
   patch: { name },
   type: 'updateCanvasLayer',
@@ -111,8 +125,9 @@ describe('StructuralLayerController', () => {
         return () => undefined;
       },
     });
-    expect(harness.controller.preview(rename('layer', 'A'))).toBe(true);
-    expect(harness.controller.preview(rename('layer', 'B'))).toBe(true);
+    const session = harness.controller.beginPreview()!;
+    expect(session.apply(rename('layer', 'A'))).toBe(true);
+    expect(session.apply(rename('layer', 'B'))).toBe(true);
     expect(harness.dispatched).toHaveLength(0);
     flush!();
     expect(harness.dispatched).toHaveLength(1);
@@ -126,13 +141,13 @@ describe('StructuralLayerController', () => {
         cancelled += 1;
       },
     });
-    harness.controller.preview(rename('layer', 'Stale'));
+    harness.controller.beginPreview()!.apply(rename('layer', 'Stale'));
     expect(harness.controller.commit('Rename', rename('layer', 'Final'), rename('layer', 'Layer'))).toMatchObject({
       status: 'committed',
     });
     expect(cancelled).toBe(1);
     expect(layerName(harness.document())).toBe('Final');
-    harness.controller.preview(rename('layer', 'Orphan'));
+    harness.controller.beginPreview()!.apply(rename('layer', 'Orphan'));
     harness.controller.dispose();
     expect(cancelled).toBe(2);
     expect(layerName(harness.document())).toBe('Final');
@@ -140,11 +155,11 @@ describe('StructuralLayerController', () => {
 
   it('dispatches previews synchronously without an animation frame', () => {
     const harness = createHarness();
-    expect(harness.controller.preview(rename('layer', 'Live'))).toBe(true);
+    expect(harness.controller.beginPreview()!.apply(rename('layer', 'Live'))).toBe(true);
     expect(layerName(harness.document())).toBe('Live');
   });
 
-  it('commits through the guarded dispatch and records one failure-atomic history entry', () => {
+  it('commits through the guarded dispatch and records one failure-atomic history entry', async () => {
     const { controller, document, history, mirror } = createHarness();
 
     expect(controller.canCommit()).toBe(true);
@@ -155,9 +170,9 @@ describe('StructuralLayerController', () => {
     expect(mirror()).toBe(document());
     expect(history.canUndo()).toBe(true);
 
-    history.undo();
+    await history.undo();
     expect(layerName(document())).toBe('Layer');
-    history.redo();
+    await history.redo();
     expect(layerName(document())).toBe('Renamed');
   });
 
@@ -267,14 +282,14 @@ describe('StructuralLayerController', () => {
       return result.edit;
     };
 
-    it('applies a prepared edit, verifies its postconditions and records one entry', () => {
+    it('applies a prepared edit, verifies its postconditions and records one entry', async () => {
       const { controller, ctx, document, history, projectId } = createHarness();
       const model = createDocumentModel(document(), { editRevision: ctx.getEditRevision(), projectId });
 
       expect(controller.commitPrepared('Rename', prepareRename(model, 'Renamed'))).toEqual({ status: 'committed' });
       expect(layerName(document())).toBe('Renamed');
       expect(history.canUndo()).toBe(true);
-      history.undo();
+      await history.undo();
       expect(layerName(document())).toBe('Layer');
     });
 
@@ -294,6 +309,66 @@ describe('StructuralLayerController', () => {
       expect(controller.commitPrepared('Rename', foreign)).toEqual({ status: 'dispatch-rejected' });
       expect(layerName(document())).toBe('Elsewhere');
       expect(history.canUndo()).toBe(false);
+    });
+
+    it('records a previewed gesture as one step without dispatching its final value again', async () => {
+      const { controller, ctx, dispatched, document, history, projectId } = createHarness();
+      const edit = prepareRename(
+        createDocumentModel(document(), { editRevision: ctx.getEditRevision(), projectId }),
+        'Live'
+      );
+      const session = controller.beginPreview()!;
+      session.apply(rename('layer', 'Draft'));
+      session.apply(rename('layer', 'Live'));
+      const previews = dispatched.length;
+
+      expect(session.commit('Rename', edit)).toEqual({ status: 'committed' });
+      expect(dispatched).toHaveLength(previews);
+      expect(history.entries().past).toEqual(['Rename']);
+      await history.undo();
+      expect(layerName(document())).toBe('Layer');
+    });
+
+    it('restores the baseline on cancel and refuses a session a newer one replaced', () => {
+      const { controller, ctx, document, history, projectId } = createHarness();
+      const first = controller.beginPreview()!;
+      first.apply(rename('layer', 'Draft'));
+      const second = controller.beginPreview()!;
+
+      expect(first.apply(rename('layer', 'Ignored'))).toBe(false);
+      expect(
+        first.commit(
+          'Rename',
+          prepareRename(createDocumentModel(document(), { editRevision: ctx.getEditRevision(), projectId }), 'X')
+        )
+      ).toEqual({ status: 'busy' });
+      second.apply(rename('layer', 'Other'));
+      second.cancel(rename('layer', 'Layer'));
+      expect(layerName(document())).toBe('Layer');
+      expect(history.canUndo()).toBe(false);
+    });
+
+    it('returns to the baseline when a previewed gesture is refused, even under a lock', () => {
+      const locked = { value: false };
+      const { controller, ctx, document, history, projectId } = createHarness({ locked });
+      const edit = prepareRename(
+        createDocumentModel(document(), { editRevision: ctx.getEditRevision(), projectId }),
+        'Live'
+      );
+      const session = controller.beginPreview()!;
+      session.apply(rename('layer', 'Live'));
+      locked.value = true;
+
+      expect(session.commit('Rename', edit)).toEqual({ status: 'busy' });
+      expect(layerName(document())).toBe('Layer');
+      expect(history.canUndo()).toBe(false);
+
+      locked.value = false;
+      const cancelled = controller.beginPreview()!;
+      cancelled.apply(rename('layer', 'Draft'));
+      locked.value = true;
+      cancelled.cancel(rename('layer', 'Layer'));
+      expect(layerName(document())).toBe('Layer');
     });
 
     it('skips history for an edit whose policy is none', () => {
@@ -331,7 +406,7 @@ describe('StructuralLayerController', () => {
     expect(anchor.projectId).toBe(projectId);
   });
 
-  it('moves a replay the reducer refuses as a reported no-op instead of wedging history', () => {
+  it('moves a replay the reducer refuses as a reported no-op instead of wedging history', async () => {
     const { controller, ctx, document, history, projectId, report } = createHarness();
     const added = createEmptyPaintLayer('Added', 'added');
 
@@ -342,14 +417,14 @@ describe('StructuralLayerController', () => {
     );
     ctx.dispatch({ ids: ['added'], type: 'removeCanvasLayers' }, 'system');
 
-    expect(() => history.undo()).not.toThrow();
+    await expect(history.undo()).resolves.toEqual({ status: 'applied' });
     expect(report).toHaveBeenCalledWith('Structural history replay was refused', 'Add', expect.any(Error));
     expect(history.canUndo()).toBe(false);
     expect(history.canRedo()).toBe(true);
     expect(layerName(document(), 'added')).toBeUndefined();
   });
 
-  it('coalesces rapid nudges into one entry and reports an ineligible nudge as rejected', () => {
+  it('coalesces rapid nudges into one entry and reports an ineligible nudge as rejected', async () => {
     let now = 0;
     const { controller, document, history } = createHarness({ now: () => now });
 
@@ -358,7 +433,7 @@ describe('StructuralLayerController', () => {
     expect(controller.nudge(1, 0)).toEqual({ status: 'committed' });
     expect(getDocumentLayer(document(), 'layer')?.transform.x).toBe(2);
 
-    history.undo();
+    await history.undo();
     expect(getDocumentLayer(document(), 'layer')?.transform.x).toBe(0);
     expect(history.canUndo()).toBe(false);
 
@@ -372,7 +447,7 @@ describe('StructuralLayerController', () => {
 });
 
 describe('hierarchy recovery', () => {
-  it('reverts a reparent whose postconditions fail and leaves the tree, selection and history untouched', () => {
+  it('reverts a reparent whose postconditions fail and leaves the tree, selection and history untouched', async () => {
     const { controller, ctx, document, history, projectId } = createHarness();
     const inner = createEmptyPaintLayer('Inner', 'inner');
     const group = {
@@ -427,7 +502,7 @@ describe('hierarchy recovery', () => {
     }
     expect(controller.commitPrepared('Reparent', fresh.edit)).toEqual({ status: 'committed' });
     expect(parentOf('layer')).toBe('g');
-    history.undo();
+    await history.undo();
     expect(haveSameStructure(document().stacks, before.stacks)).toBe(true);
   });
 });

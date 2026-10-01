@@ -30,9 +30,9 @@ The **settings button** opens a list of customization options:
 
 - **Image Size:** A slider that lets you control the size of the image previews in the gallery.
 - **Auto-Switch to New Images:** When enabled, newly generated images will automatically load into the current image panel (on the Text to Image tab) or the result panel (on the Image to Image tab). This happens invisibly even if you are on a different tab during generation.
-- **Auto-Assign Board on Click:** Whenever an image is generated or saved, it is placed into a board. The destination board is marked with an `AUTO` badge.
+- **Send New Results to the Selected Board:** New generations, canvas saves and pasted uploads go to the auto-add board. Workflow nodes whose board is set to **Auto** use it too; **None** always saves to Uncategorized, as do workflow outputs from nodes that have no board input.
   - *When enabled:* The board selected at the moment you click **Invoke** becomes the destination. This allows you to queue multiple generations into different boards without waiting for them to finish.
-  - *When disabled:* An **Auto-Add Board** dropdown appears, allowing you to set one specific board as the permanent destination for all new images.
+  - *When disabled:* One fixed board is the destination, marked with an `Auto` badge. Turning the setting off keeps the current destination; choose another with **Auto-add to this Board**.
 - **Always Show Image Size Badge:** Toggles whether the resolution (e.g., 512x512) is displayed on each image preview thumbnail.
 
 Below these buttons is the **Search Boards** text entry area, allowing you to quickly find specific boards by name. Next to it is the **Add Board (+)** button for creating new boards.
@@ -49,7 +49,7 @@ Each board has a context menu accessible via right-click (or Ctrl+click).
 
 ![Thumbnail Menu](./assets/thumbnail_menu.png)
 
-- **Auto-add to this Board:** If *Auto-Assign Board on Click* is disabled in settings, use this option to quickly set the selected board as the default destination for new images.
+- **Auto-add to this Board:** Makes this board the fixed destination for new results, and turns off *Send New Results to the Selected Board*. On the auto-add board itself, **Stop auto-adding here** turns following back on.
 - **Download Board Images:** Packages all images within the board into a `.zip` file. A notification link will be provided when the download is ready. Videos are not included; download them individually from the gallery or viewer.
 - **Delete Board:** Opens a confirmation dialog. **Delete Board Only** removes the board and leaves its contents uncategorized; **Delete Board and Assets** permanently removes the board, its images, and its videos.
 

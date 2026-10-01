@@ -54,10 +54,16 @@ const context = {
     deleteBoard: vi.fn(),
     downloadBoard: vi.fn(),
     renameBoard: vi.fn(),
+    updateSettings: vi.fn(),
   },
   gallery: {
     projectBoardId: null,
+    settings: { autoAddBoardId: 'follow' },
   },
+} as unknown as GalleryWidgetContextValue;
+const targetContext = {
+  ...context,
+  gallery: { ...context.gallery, settings: { autoAddBoardId: 'board-1' } },
 } as unknown as GalleryWidgetContextValue;
 
 let host: HTMLDivElement | null = null;
@@ -104,4 +110,33 @@ it('shows image, video, and asset counts before deleting a mixed-media board', a
     expect(document.body.textContent).toContain('2 images · 1 videos · 0 assets');
   });
   expect(document.body.textContent).toContain('Delete Board and Media');
+});
+
+it('makes the board the auto-add destination', async () => {
+  const autoAddItem = document.querySelector<HTMLElement>('[role="menuitem"][data-value="auto-add-board"]');
+
+  expect(autoAddItem?.textContent).toBe('widgets.gallery.autoAddToBoard');
+  await act(() => userEvent.click(autoAddItem!));
+
+  expect(context.actions.updateSettings).toHaveBeenCalledExactlyOnceWith({ autoAddBoardId: 'board-1' });
+});
+
+it('hands results back to the selected board from the auto-add board itself', async () => {
+  await act(async () => {
+    root?.render(
+      <ChakraProvider value={system}>
+        <GalleryWidgetContext value={targetContext}>
+          <GalleryBoardMenu target={target} onClose={noop} />
+        </GalleryWidgetContext>
+      </ChakraProvider>
+    );
+    await Promise.resolve();
+  });
+
+  const item = document.querySelector<HTMLElement>('[role="menuitem"][data-value="auto-add-board"]');
+
+  expect(item?.textContent).toBe('widgets.gallery.stopAutoAdd');
+  await act(() => userEvent.click(item!));
+
+  expect(context.actions.updateSettings).toHaveBeenLastCalledWith({ autoAddBoardId: 'follow' });
 });

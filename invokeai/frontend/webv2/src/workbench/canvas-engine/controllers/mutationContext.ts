@@ -1,9 +1,15 @@
 import type { LayerExportGuard } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasStackForests } from '@workbench/canvas-engine/contracts';
+import type { RasterMemoryReservationResult } from '@workbench/canvas-engine/controllers/rasterMemoryBudgetController';
 import type { CanvasNodeInsertionAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import type { LayerStackKind } from '@workbench/canvas-engine/document/layerStacks';
-import type { CanvasEditConcurrency, DocumentEditPermit } from '@workbench/canvas-engine/editConcurrency';
-import type { History } from '@workbench/canvas-engine/history/history';
+import type {
+  CanvasEditConcurrency,
+  CanvasTransactionOutcome,
+  DocumentEditPermit,
+  SubsetOf,
+} from '@workbench/canvas-engine/editConcurrency';
+import type { History, HistoryEntry, HistoryEntryToken } from '@workbench/canvas-engine/history/history';
 import type {
   CanvasEditIntent,
   CanvasMutationOrigin,
@@ -17,11 +23,77 @@ import { EMPTY_STACKS } from '@workbench/canvas-engine/document/documentTree';
 import { captureInsertionAnchor, captureRestoreAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 
 /**
- * Shared guarded mutation protocol: edit permits, prepared-cache dispatch with reducer/mirror postconditions,
- * cache replacement, and required engine services.
+ * One visible change: an optional document mutation verified on reducer and mirror, then in-memory publication of
+ * prepared pixels. Publication and history replay apply steps the same way.
  */
+export interface EditStep {
+  readonly mutation?: CanvasProjectMutation;
+  /** The postcondition `mutation` must establish on the reducer document; the mirror must then follow it. */
+  readonly accepted?: (document: CanvasDocumentContractV3 | null) => boolean;
+  /** Restores the reducer when the mutation landed but its postconditions failed. */
+  readonly rollback?: {
+    readonly mutation: CanvasProjectMutation;
+    readonly restored: (document: CanvasDocumentContractV3 | null) => boolean;
+  };
+  /** Publishes prepared pixels once the document accepted the mutation. Must not fail partially. */
+  readonly install?: () => void;
+  /** Ancillary consequences (dirty marks, selection mirrors); a failure cannot undo the accepted step. */
+  readonly notify?: () => void;
+}
+
+/** Why a step did not land: the reducer left the document unchanged, or its postconditions failed. */
+export class EditStepError extends Error {
+  constructor(
+    readonly outcome: 'rejected' | 'reverted' | 'reverted-unmirrored' | 'unreverted',
+    options?: { cause?: unknown }
+  ) {
+    super(`Canvas edit step ${outcome === 'rejected' ? 'was rejected' : 'failed its postconditions'}.`, options);
+    this.name = 'EditStepError';
+  }
+}
+
+export type EditRefusal = SubsetOf<CanvasTransactionOutcome, 'busy' | 'gesture-active' | 'not-ready' | 'over-budget'>;
+
+export type EditPublishResult =
+  | { readonly status: 'committed'; readonly token: HistoryEntryToken }
+  | { readonly status: EditRefusal }
+  | { readonly status: 'dispatch-rejected' }
+  | { readonly status: 'postcondition-failed'; readonly recovered: 'reverted' | 'reverted-unmirrored' | 'unreverted' };
+
+/** The undo entry a publication records; its label comes from the publication. */
+export type EditEntry = Omit<HistoryEntry, 'label'>;
+
+/**
+ * An admitted edit. Admission happens before any mutation, so an edit that could never keep its undo entry is
+ * refused while the document, pixels and history are still untouched. Every resource the transaction reserves or
+ * holds is released by `end`, which callers run in `finally`.
+ */
+export interface EditTransaction {
+  /** Whether publication would still be accepted (permit, gesture, replay, disposal). */
+  isCurrent(): boolean;
+  /** Admits `bytes` more history; false when the edit could no longer keep its undo entry. */
+  growHistory(bytes: number): boolean;
+  /** Reserves raster bytes for preparation allocations until the transaction ends; false when they do not fit. */
+  reserveRaster(bytes: number): boolean;
+  /** Releases `resource` when the transaction ends. */
+  hold<T extends { release(): void }>(resource: T): T;
+  /** Applies `step`, records `entry` and routes the edit; refusals and failed steps leave history untouched. */
+  publish(
+    label: string,
+    step: EditStep,
+    entry: EditEntry,
+    options?: {
+      readonly replacing?: HistoryEntryToken;
+      readonly origin?: CanvasMutationOrigin;
+      /** The mutation this edit represents for routing; defaults to the step's own. */
+      readonly routed?: CanvasProjectMutation;
+    }
+  ): EditPublishResult;
+  end(): void;
+}
+
+/** The engine's single edit protocol: permits, admission, verified steps, history publication and cleanup. */
 export interface CanvasMutationContext extends CanvasEditConcurrency {
-  readonly history: History;
   getDocument(): CanvasDocumentContractV3 | null;
   getReducerDocument(): CanvasDocumentContractV3 | null;
   /** Where a new `stack` layer lands: above `aboveId` when it belongs to the stack, else the stack top. */
@@ -29,17 +101,26 @@ export interface CanvasMutationContext extends CanvasEditConcurrency {
   /** The anchor that restores `layerId` between its current same-stack neighbours; null when absent. */
   captureRestoreAnchor(layerId: string): CanvasNodeInsertionAnchor | null;
   isGuardCurrent(guard: LayerExportGuard): boolean;
+  createLayerId(): string;
+  /** The newest history entry, for coalescing edits that amend it. */
+  historyTop(): HistoryEntryToken | null;
+  /** Unrecorded dispatch for previews and reconciliation. */
   dispatch(action: CanvasProjectMutation, origin?: CanvasMutationOrigin): boolean;
-  dispatchPrepared(
-    action: CanvasProjectMutation,
-    reducerAccepted: () => boolean,
-    mirrorAccepted: () => boolean,
-    origin?: CanvasMutationOrigin
-  ): void;
+  /**
+   * Admits an edit. `gesture` marks an edit that belongs to the interaction in progress (a live stroke, a float landing
+   * as the user moves on), which an active gesture therefore neither refuses nor holds back.
+   */
+  begin(options: {
+    readonly historyBytes: number;
+    readonly owner?: symbol;
+    readonly gesture?: boolean;
+  }): EditTransaction | { status: EditRefusal };
+  /** Applies a step with verified postconditions; throws {@link EditStepError} when it does not land. */
+  applyStep(step: EditStep): void;
+  /** Reserves raster bytes for a replay's preparation; null when they do not fit. */
+  reserveRaster(bytes: number): { release(): void } | null;
   preparePixels(layerId: string, rect: Rect, pixels: RasterSurface): PreparedLayerCacheReplacement;
   installPrepared(prepared: PreparedLayerCacheReplacement, persist?: boolean): void;
-  endBurst(): void;
-  createLayerId(): string;
 }
 
 /** Engine-side wiring for {@link createCanvasMutationContext}. */
@@ -57,18 +138,28 @@ export interface CanvasMutationContextDeps {
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
   readonly preparePixels: (layerId: string, rect: Rect, pixels: RasterSurface) => PreparedLayerCacheReplacement;
   readonly installPrepared: (prepared: PreparedLayerCacheReplacement, persist?: boolean) => void;
-  readonly endBurst: () => void;
+  readonly reserveRaster: (bytes: number) => RasterMemoryReservationResult;
   readonly isGestureActive: () => boolean;
   readonly createLayerId: () => string;
+  readonly report?: (error: EditStepError, label: string) => void;
 }
 
+const runBestEffort = (notify: (() => void) | undefined): void => {
+  try {
+    notify?.();
+  } catch {
+    // The step is already accepted; a later render, dirty mark or store sync reconciles ancillary state.
+  }
+};
+
 /**
- * Owns edit-permit epochs and prepared-dispatch postconditions. The editing-lock subscription lasts until {@link
- * dispose}; other services delegate to `deps`.
+ * Owns edit-permit epochs and the transaction protocol. The editing-lock and reducer subscriptions last until
+ * {@link dispose}.
  */
 export const createCanvasMutationContext = (
   deps: CanvasMutationContextDeps
 ): CanvasMutationContext & { dispose(): void } => {
+  let disposed = false;
   let documentEditEpoch = 0;
   let documentEditingLocked = false;
   const syncDocumentEditingLock = (): void => {
@@ -94,78 +185,216 @@ export const createCanvasMutationContext = (
     return editRevision;
   };
   const currentStacks = (): CanvasStackForests => deps.getDocument()?.stacks ?? EMPTY_STACKS;
-  const canEdit = (owner?: symbol): boolean => owner === deps.editOwner || !deps.editingLocked.get();
+  const canEdit = (owner?: symbol): boolean =>
+    !disposed && !deps.history.isReplaying() && (owner === deps.editOwner || !deps.editingLocked.get());
   const capturePermit = (owner?: symbol): DocumentEditPermit | null =>
     canEdit(owner) ? { epoch: documentEditEpoch, owner } : null;
   const isPermitCurrent = (permit: DocumentEditPermit): boolean =>
-    permit.owner === deps.editOwner || (!deps.editingLocked.get() && permit.epoch === documentEditEpoch);
+    !disposed &&
+    !deps.history.isReplaying() &&
+    (permit.owner === deps.editOwner || (!deps.editingLocked.get() && permit.epoch === documentEditEpoch));
 
-  const dispatchPrepared = (
-    action: CanvasProjectMutation,
-    isApplied: () => boolean,
-    isMirrored: () => boolean,
-    origin: CanvasMutationOrigin = deps.history.isApplying() ? 'system' : 'user'
-  ): void => {
+  /** A postcondition that throws (a faulty state read) does not hold. */
+  const holds = (check: () => boolean): boolean => {
     try {
-      // Prepared mutations are not route-worthy until both reducer and mirror
-      // postconditions succeed. Commit their edit intent separately below.
-      if (!deps.dispatch(action, 'system')) {
-        throw new Error('Canvas document mutation was rejected');
-      }
-    } catch (error) {
-      // Ignore observer throws only when authoritative reducer state proves the exact mutation landed, so matching
-      // engine state/history can publish. Preserve actual dispatch failures.
-      if (!isApplied()) {
-        throw error;
-      }
-      // Notification may have been interrupted before DocumentMirror's
-      // subscriber ran. Reconcile it synchronously from authoritative state
-      // before publishing follow-up state or history.
-      try {
-        deps.refreshMirror();
-      } catch (refreshError) {
-        if (!isMirrored()) {
-          throw refreshError;
-        }
-      }
-      if (!isMirrored()) {
-        throw error;
-      }
+      return check();
+    } catch {
+      return false;
     }
+  };
+  const mirrored = (): boolean => holds(() => deps.getDocument() === deps.getReducerDocument());
 
-    // A reducer may reject a guarded transaction by returning the unchanged
-    // state without throwing. Do not install its prepared cache or consume a
-    // failure-atomic history entry unless the authoritative postcondition
-    // actually landed.
-    if (!isApplied()) {
-      throw new Error('Canvas document mutation was rejected');
+  /** Re-runs the mirror subscriber when an interrupted notification left it behind the reducer. */
+  const reconcileMirror = (): boolean => {
+    if (mirrored()) {
+      return true;
     }
-    if (!isMirrored()) {
-      try {
-        deps.refreshMirror();
-      } catch (refreshError) {
-        if (!isMirrored()) {
-          throw refreshError;
-        }
-      }
-      if (!isMirrored()) {
-        throw new Error('Canvas document mutation was not mirrored');
-      }
+    try {
+      deps.refreshMirror();
+    } catch {
+      // Judged by the identity check below.
     }
+    return mirrored();
+  };
 
-    if (origin === 'user') {
+  const applyStep = (step: EditStep): void => {
+    if (step.mutation) {
+      const before = deps.getReducerDocument();
+      const accepted = step.accepted ?? ((document) => document !== before);
+      let dispatchError: unknown;
       try {
-        deps.commitEdit({ kind: 'mutation', mutation: action });
+        deps.dispatch(step.mutation, 'system');
+      } catch (error) {
+        // An observer may throw after the reducer committed; the postconditions decide.
+        dispatchError = error;
+      }
+      let reducerDocument: CanvasDocumentContractV3 | null | undefined;
+      try {
+        reducerDocument = deps.getReducerDocument();
       } catch {
-        // Reducer and mirror acceptance are the transaction boundary. Routing
-        // the resulting edit intent is ancillary after that point; surfacing an
-        // observer failure would invite callers to roll back only their cache
-        // half and split it from the accepted document contract.
+        // Unreadable: neither rejected nor accepted, so the rollback decides.
       }
+      const landed = reducerDocument !== undefined && holds(() => accepted(reducerDocument!));
+      if (reducerDocument === before && !landed) {
+        throw new EditStepError('rejected', { cause: dispatchError });
+      }
+      if (!landed || !reconcileMirror()) {
+        throw new EditStepError(rollBack(step, reducerDocument), { cause: dispatchError });
+      }
+    } else if (!reconcileMirror()) {
+      throw new EditStepError('unreverted');
     }
+    step.install?.();
+    runBestEffort(step.notify);
+  };
+
+  /** Dispatches the step's rollback and reports how far the reducer and mirror returned. */
+  const rollBack = (
+    step: EditStep,
+    /** The document the step left, or undefined when it could not be read. */
+    failed: CanvasDocumentContractV3 | null | undefined
+  ): 'reverted' | 'reverted-unmirrored' | 'unreverted' => {
+    const { rollback } = step;
+    if (!rollback) {
+      return 'unreverted';
+    }
+    try {
+      deps.dispatch(rollback.mutation, 'system');
+    } catch {
+      // Judged by the restoration postcondition below.
+    }
+    const restored = holds(() => {
+      const reducerDocument = deps.getReducerDocument();
+      return reducerDocument !== failed && rollback.restored(reducerDocument);
+    });
+    if (!restored) {
+      return 'unreverted';
+    }
+    return reconcileMirror() ? 'reverted' : 'reverted-unmirrored';
+  };
+
+  const refusal = (owner?: symbol, gesture = false): EditRefusal | null => {
+    if (disposed) {
+      return 'not-ready';
+    }
+    if (!canEdit(owner)) {
+      return 'busy';
+    }
+    if (!gesture && deps.isGestureActive()) {
+      return 'gesture-active';
+    }
+    return deps.getReducerDocument() ? null : 'not-ready';
+  };
+
+  const begin = (options: {
+    readonly historyBytes: number;
+    readonly owner?: symbol;
+    readonly gesture?: boolean;
+  }): EditTransaction | { status: EditRefusal } => {
+    const refused = refusal(options.owner, options.gesture);
+    if (refused) {
+      return { status: refused };
+    }
+    const permit: DocumentEditPermit = { epoch: documentEditEpoch, owner: options.owner };
+    const admission = deps.history.admit(options.historyBytes);
+    if (!admission) {
+      return { status: 'over-budget' };
+    }
+    const held: { release(): void }[] = [admission];
+    let ended = false;
+    // An observer of the step may end the transaction mid-publication; its resources outlive that publication.
+    let publishing = false;
+    // A gesture's own edit may publish within it; any other waits until no gesture runs.
+    const isCurrent = (): boolean =>
+      !ended && isPermitCurrent(permit) && (options.gesture === true || !deps.isGestureActive());
+    const release = (): void => {
+      for (const resource of held.splice(0).reverse()) {
+        try {
+          resource.release();
+        } catch {
+          // Release every remaining resource regardless.
+        }
+      }
+    };
+    return {
+      end: () => {
+        if (ended) {
+          return;
+        }
+        ended = true;
+        if (!publishing) {
+          release();
+        }
+      },
+      growHistory: (bytes) => !ended && admission.grow(bytes),
+      hold: (resource) => {
+        if (ended) {
+          resource.release();
+        } else {
+          held.push(resource);
+        }
+        return resource;
+      },
+      isCurrent,
+      publish: (label, step, entry, publishOptions = {}) => {
+        if (ended) {
+          throw new Error('Canvas edit transaction has already ended.');
+        }
+        if (!isCurrent()) {
+          return { status: refusal(options.owner) ?? 'busy' };
+        }
+        if (entry.bytes > admission.bytes && !admission.grow(entry.bytes - admission.bytes)) {
+          return { status: 'over-budget' };
+        }
+        if (publishOptions.replacing !== undefined && deps.history.top() !== publishOptions.replacing) {
+          return { status: 'busy' };
+        }
+        publishing = true;
+        let token: HistoryEntryToken;
+        try {
+          applyStep({ ...step, notify: undefined });
+          token = admission.publish({ ...entry, label }, publishOptions.replacing);
+        } catch (error) {
+          if (!(error instanceof EditStepError)) {
+            throw error;
+          }
+          if (error.outcome === 'rejected') {
+            return { status: 'dispatch-rejected' };
+          }
+          if (error.outcome !== 'reverted') {
+            deps.report?.(error, label);
+          }
+          return { recovered: error.outcome, status: 'postcondition-failed' };
+        } finally {
+          publishing = false;
+          if (ended) {
+            release();
+          }
+        }
+        const routed = publishOptions.routed ?? step.mutation;
+        if (routed && (publishOptions.origin ?? 'user') === 'user') {
+          runBestEffort(() => deps.commitEdit({ kind: 'mutation', mutation: routed }));
+        }
+        runBestEffort(step.notify);
+        return { status: 'committed', token };
+      },
+      reserveRaster: (bytes) => {
+        if (ended) {
+          return false;
+        }
+        const reservation = deps.reserveRaster(bytes);
+        if (reservation.status !== 'ok') {
+          return false;
+        }
+        held.push(reservation.lease);
+        return true;
+      },
+    };
   };
 
   return {
+    applyStep,
+    begin,
     canEdit,
     captureInsertionAnchor: (stack, aboveId) =>
       captureInsertionAnchor(currentStacks(), {
@@ -179,21 +408,24 @@ export const createCanvasMutationContext = (
       captureRestoreAnchor(currentStacks(), layerId, deps.projectId, getEditRevision()),
     createLayerId: () => deps.createLayerId(),
     dispatch: (action, origin) => deps.dispatch(action, origin),
-    dispatchPrepared,
     dispose: () => {
+      disposed = true;
       unsubscribeDocumentEditingLock();
       unsubscribeReducer();
     },
-    endBurst: () => deps.endBurst(),
     getDocument: () => deps.getDocument(),
     getEditRevision,
     getReducerDocument: () => deps.getReducerDocument(),
-    history: deps.history,
+    historyTop: () => deps.history.top(),
     installPrepared: (prepared, persist) => deps.installPrepared(prepared, persist),
     isGestureActive: () => deps.isGestureActive(),
     isGuardCurrent: (guard) => deps.isGuardCurrent(guard),
     isPermitCurrent,
-    projectId: deps.projectId,
     preparePixels: (layerId, rect, pixels) => deps.preparePixels(layerId, rect, pixels),
+    projectId: deps.projectId,
+    reserveRaster: (bytes) => {
+      const reservation = deps.reserveRaster(bytes);
+      return reservation.status === 'ok' ? reservation.lease : null;
+    },
   };
 };

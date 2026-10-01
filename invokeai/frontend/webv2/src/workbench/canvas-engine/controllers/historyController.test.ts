@@ -1,25 +1,28 @@
+import type { HistoryEntry } from '@workbench/canvas-engine/history/history';
+
 import { NO_HELD_ASSET_REFS } from '@workbench/canvas-engine/history/history';
 import { describe, expect, it, vi } from 'vitest';
 
 import { HistoryController } from './historyController';
 
+const entry = (label: string, bytes: number, overrides: Partial<HistoryEntry> = {}): HistoryEntry => ({
+  bytes,
+  heldAssetRefs: NO_HELD_ASSET_REFS,
+  label,
+  redo: () => undefined,
+  undo: () => undefined,
+  ...overrides,
+});
+
+const record = (controller: HistoryController, recorded: HistoryEntry): void => {
+  controller.history.admit(recorded.bytes)!.publish(recorded);
+};
+
 describe('HistoryController', () => {
   it('owns history and trims it to the inactive byte budget', () => {
     const controller = new HistoryController({ activeByteBudget: 1_000, inactiveByteBudget: 100 });
-    controller.history.push({
-      bytes: 60,
-      heldAssetRefs: NO_HELD_ASSET_REFS,
-      label: 'old',
-      redo: () => undefined,
-      undo: () => undefined,
-    });
-    controller.history.push({
-      bytes: 70,
-      heldAssetRefs: NO_HELD_ASSET_REFS,
-      label: 'new',
-      redo: () => undefined,
-      undo: () => undefined,
-    });
+    record(controller, entry('old', 60));
+    record(controller, entry('new', 70));
 
     controller.cooldown();
 
@@ -30,62 +33,50 @@ describe('HistoryController', () => {
     expect(controller.history.byteSize()).toBe(0);
   });
 
-  it('owns guarded commands and synchronizes undo/redo stores', () => {
+  it('refuses replay while locked or mid-gesture and mirrors undo/redo availability', async () => {
     let canEdit = true;
     let gestureActive = false;
     const canUndo = { set: vi.fn() };
     const canRedo = { set: vi.fn() };
-    const endBurst = vi.fn();
     const controller = new HistoryController({
       canEdit: () => canEdit,
       canRedoStore: canRedo,
       canUndoStore: canUndo,
-      endBurst,
       isGestureActive: () => gestureActive,
     });
     const undo = vi.fn();
     const redo = vi.fn();
-    controller.history.push({ bytes: 1, heldAssetRefs: NO_HELD_ASSET_REFS, label: 'edit', redo, undo });
+    record(controller, entry('edit', 1, { redo, undo }));
 
-    controller.undo();
+    await expect(controller.undo()).resolves.toEqual({ status: 'applied' });
     expect(undo).toHaveBeenCalledOnce();
-    expect(endBurst).toHaveBeenCalledOnce();
     expect(canUndo.set).toHaveBeenLastCalledWith(false);
     expect(canRedo.set).toHaveBeenLastCalledWith(true);
 
     gestureActive = true;
-    controller.redo();
-    expect(redo).not.toHaveBeenCalled();
+    await expect(controller.redo()).resolves.toEqual({ status: 'refused' });
     gestureActive = false;
     canEdit = false;
-    controller.clear();
-    expect(controller.history.canRedo()).toBe(true);
-
-    canEdit = true;
-    controller.clear();
-    expect(controller.history.canRedo()).toBe(false);
-    controller.dispose();
+    await expect(controller.redo()).resolves.toEqual({ status: 'refused' });
+    expect(redo).not.toHaveBeenCalled();
   });
 
-  it('isolates store subscriber failures while synchronizing both flags', () => {
-    const canUndo = {
-      set: vi.fn(() => {
-        throw new Error('observer');
-      }),
-    };
-    const canRedo = { set: vi.fn() };
-    const controller = new HistoryController({ canRedoStore: canRedo, canUndoStore: canUndo });
-
-    expect(() =>
-      controller.history.push({
-        bytes: 1,
-        heldAssetRefs: NO_HELD_ASSET_REFS,
-        label: 'edit',
-        redo: () => undefined,
-        undo: () => undefined,
+  it('reports a failed replay and leaves the step where it was', async () => {
+    const reportFailure = vi.fn();
+    const controller = new HistoryController({ reportFailure });
+    const failure = new Error('pixels unavailable');
+    record(
+      controller,
+      entry('Brush stroke', 1, {
+        undo: () => {
+          throw failure;
+        },
       })
-    ).not.toThrow();
-    expect(canRedo.set).toHaveBeenCalled();
-    controller.dispose();
+    );
+
+    await expect(controller.undo()).resolves.toMatchObject({ status: 'failed' });
+
+    expect(reportFailure).toHaveBeenCalledWith('Brush stroke', failure);
+    expect(controller.history.entries()).toEqual({ future: [], past: ['Brush stroke'] });
   });
 });

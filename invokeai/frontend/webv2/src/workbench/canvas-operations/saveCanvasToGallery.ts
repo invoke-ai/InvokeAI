@@ -1,7 +1,7 @@
 import type { Rect } from '@workbench/canvas-engine/types';
 import type { Project } from '@workbench/projectContracts';
 
-import { getGalleryDestinationBoardId } from '@features/gallery/contracts';
+import { getGalleryAutoAddBoardId } from '@features/gallery/contracts';
 import { toModelIdentifier } from '@features/generation/graph';
 import {
   getEffectivePrompts,
@@ -47,7 +47,7 @@ const buildCanvasSaveMetadata = (project: Project, rect: Rect): Record<string, u
 };
 
 const getCanvasSaveBoardId = (project: Project): string | undefined => {
-  const boardId = getGalleryDestinationBoardId(getProjectWidgetValues(project, 'gallery'));
+  const boardId = getGalleryAutoAddBoardId(getProjectWidgetValues(project, 'gallery'));
 
   return boardId !== null && boardId !== 'none' ? boardId : undefined;
 };

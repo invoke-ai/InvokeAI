@@ -535,6 +535,15 @@ const createCommands = (
         });
         return { ok: true };
       },
+      /** Replaces a copy's document with a fresh load and activates it; one undo step restores the old one. */
+      replaceDocument: command(
+        'replaceProjectWorkflowDocument',
+        (
+          target: { projectId: string; workflowId: string },
+          document: ProjectGraphState,
+          options: { label: string; source: ProjectWorkflowSource }
+        ) => ({ ...target, ...options, document })
+      ),
       select: command('selectProjectWorkflow', (workflowId: string, projectId?: string) => ({ projectId, workflowId })),
       /** Records where a workflow was explicitly published; a no-op once the project or workflow is gone. */
       setSource: command(

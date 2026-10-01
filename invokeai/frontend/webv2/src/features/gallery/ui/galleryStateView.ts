@@ -17,7 +17,7 @@ import {
   parseGallerySemanticReference,
   type GallerySemanticReference,
 } from '@features/gallery/core/semanticImageQuery';
-import { getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
+import { GALLERY_AUTO_ADD_FOLLOW, getGallerySettings, type GallerySettings } from '@features/gallery/core/settings';
 
 /** Leave the placeholder name empty; getGalleryBoardLabel localizes it from kind. */
 const UNCATEGORIZED_BOARD: GalleryBoard = {
@@ -96,6 +96,13 @@ export const getGalleryDestinationBoardId = (values: Record<string, unknown>): s
   return selectedBoardId !== null && !isDateBoardId(selectedBoardId)
     ? selectedBoardId
     : getGalleryProjectBoardId(values);
+};
+
+/** Where results without a board of their own go: the auto-add board, or the destination above while following. */
+export const getGalleryAutoAddBoardId = (values: Record<string, unknown>): string | null => {
+  const { autoAddBoardId } = getGallerySettings(values);
+
+  return autoAddBoardId === GALLERY_AUTO_ADD_FOLLOW ? getGalleryDestinationBoardId(values) : autoAddBoardId;
 };
 
 /**

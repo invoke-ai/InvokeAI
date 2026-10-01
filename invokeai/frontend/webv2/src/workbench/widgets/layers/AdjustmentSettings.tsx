@@ -11,7 +11,7 @@ import type { PointerEvent as ReactPointerEvent } from 'react';
 import { chakra, createListCollection, HStack, Stack, Text } from '@chakra-ui/react';
 import { Field, Select, Slider } from '@platform/ui';
 import { buildCurveLut } from '@workbench/canvas-engine/api';
-import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -23,7 +23,6 @@ import {
   finishCurveDragResult,
   getCurveGridCoordinates,
 } from './curveEditorMath';
-import { applyStructuralPreview } from './layerOps';
 
 /**
  * Edit adjustment subrows through whole-stack patch-config. Preview gestures live and commit once; tree rows own
@@ -95,7 +94,7 @@ const AdjustmentEntryEditor = ({
   entry: CanvasAdjustmentEntry;
   layer: AdjustmentOwner;
 }) => {
-  const commitPrepared = usePreparedCommit(engine);
+  const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const { t } = useTranslation();
   const gestureBaselineRef = useRef<readonly CanvasAdjustmentEntry[] | null>(null);
   const configOf = useCallback(
@@ -110,13 +109,13 @@ const AdjustmentEntryEditor = ({
     (next: CanvasAdjustmentEntry) => {
       const entries = layer.adjustments ?? [];
       gestureBaselineRef.current ??= entries;
-      applyStructuralPreview(engine, {
+      previewStructural({
         config: configOf(entries.map((candidate) => (candidate.id === next.id ? next : candidate))),
         id: layer.id,
         type: 'updateCanvasLayerConfig',
       });
     },
-    [configOf, engine, layer.adjustments, layer.id]
+    [configOf, previewStructural, layer.adjustments, layer.id]
   );
 
   const commitEntry = useCallback(
@@ -142,13 +141,9 @@ const AdjustmentEntryEditor = ({
     const baseline = gestureBaselineRef.current;
     gestureBaselineRef.current = null;
     if (baseline) {
-      applyStructuralPreview(engine, {
-        config: configOf([...baseline]),
-        id: layer.id,
-        type: 'updateCanvasLayerConfig',
-      });
+      cancelPreview({ config: configOf([...baseline]), id: layer.id, type: 'updateCanvasLayerConfig' });
     }
-  }, [configOf, engine, layer.id]);
+  }, [cancelPreview, configOf, layer.id]);
 
   const handleScalarLive = useCallback(
     (field: ScalarField, next: number) => patchLive({ ...entry, [field]: next } as CanvasAdjustmentEntry),

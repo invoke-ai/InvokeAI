@@ -28,6 +28,7 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { getContrastRatio } from '@platform/ui/theme/contrastRatio.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { workbenchAutoScroll } from '@workbench/widgetDnd';
 import { PreviewFilmstrip } from '@workbench/widgets/preview/PreviewFilmstrip';
 import { PreviewFrame } from '@workbench/widgets/preview/PreviewFrame';
 import { createInstance } from 'i18next';
@@ -453,7 +454,7 @@ const Harness = ({
         <QueryClientProvider client={queryClient!}>
           <GalleryUiProvider adapter={createAdapter(progressSessions, liveFollowEnabled, pinnedSessionId)}>
             <GalleryWidgetContext value={contextValue}>
-              <DndContext sensors={sensors}>
+              <DndContext autoScroll={workbenchAutoScroll} sensors={sensors}>
                 <DragMonitor />
                 <Box bg={background} data-testid="gallery-surface" h="full">
                   <GalleryImageGrid />
@@ -566,6 +567,34 @@ afterEach(async () => {
 });
 
 describe('GalleryImageGrid mixed item cells', () => {
+  it('keeps the gallery scroll position when an image is dragged upward out of a long grid', async () => {
+    const items = Array.from({ length: 60 }, (_, index) => createItem('image', `image-${index}.png`));
+    await renderGallery(createGallery({ items, settings: DENSE_SETTINGS }));
+
+    const viewport = host!.querySelector<HTMLElement>('[data-part="viewport"]')!;
+    await interact(() => {
+      viewport.scrollTop = viewport.scrollHeight;
+    }, 50);
+    const initialScrollTop = viewport.scrollTop;
+    expect(initialScrollTop).toBeGreaterThan(viewport.clientHeight);
+
+    const tile = getButton('Select image-59.png for preview');
+    const rect = tile.getBoundingClientRect();
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
+    await interact(() => pointer('pointerdown', tile, x, y));
+    await interact(() => pointer('pointermove', document, x, y - 20), 50);
+    expect(onDragStart).toHaveBeenCalledOnce();
+
+    const edgeY = viewport.getBoundingClientRect().top + 2;
+    await interact(() => pointer('pointermove', document, x, edgeY), 250);
+    expect(viewport.scrollTop).toBe(initialScrollTop);
+
+    await interact(() => pointer('pointermove', document, x, edgeY - 20), 100);
+    await interact(() => pointer('pointerup', document, x, edgeY - 20));
+    expect(viewport.scrollTop).toBe(initialScrollTop);
+  });
+
   const starred = createItem('image', 'starred.png', { starred: true });
   const sectionOrder = () =>
     Array.from(host?.querySelectorAll('[data-gallery-section]') ?? []).map((row) =>

@@ -13,6 +13,7 @@ import { serializeProjectDocumentV3Json } from './projectDocument';
 const harness = vi.hoisted(() => ({
   close: vi.fn<() => ProjectCommandResult>(),
   deleteLibraryProject: vi.fn(),
+  flushCanvasPixels: vi.fn<() => Promise<void>>(),
   flush: vi.fn(),
   navigate: vi.fn(),
   notifyError: vi.fn(),
@@ -29,6 +30,7 @@ vi.mock('./library', () => ({
 vi.mock('@tanstack/react-router', () => ({ useNavigate: () => harness.navigate }));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: harness.notifyError }) }));
 vi.mock('@workbench/WorkbenchContext', () => ({
+  useWorkbenchLiveCanvasEngines: () => ({ flushPendingPixels: harness.flushCanvasPixels }),
   useWorkbenchCommands: () => ({ projects: { close: harness.close } }),
   useWorkbenchPersistenceAdapter: () => ({ getState: () => ({ projects: [harness.project] }) }),
   useWorkbenchPersistenceService: () => ({
@@ -67,6 +69,8 @@ beforeEach(() => {
   harness.deleteLibraryProject.mockReset();
   harness.deleteLibraryProject.mockResolvedValue(undefined);
   harness.flush.mockReset();
+  harness.flushCanvasPixels.mockReset();
+  harness.flushCanvasPixels.mockResolvedValue(undefined);
   harness.navigate.mockReset();
   harness.notifyError.mockReset();
   harness.persistEmptySession.mockReset();
@@ -105,6 +109,37 @@ describe('useProjectActions', () => {
     expect(harness.notifyError).toHaveBeenCalledWith('projects.closeBlocked', 'projects.activeRunsMustFinish');
     expect(harness.flush).not.toHaveBeenCalled();
     expect(harness.close).not.toHaveBeenCalled();
+  });
+
+  it('keeps the project open with its canvas state when unsaved pixels cannot be persisted', async () => {
+    harness.flushCanvasPixels.mockRejectedValueOnce(new Error('upload failed'));
+    await act(() => root?.render(<Harness />));
+
+    await act(() => userEvent.click(document.querySelector('button')!));
+    await vi.waitFor(() => expect(harness.notifyError).toHaveBeenCalledOnce());
+
+    expect(harness.notifyError).toHaveBeenCalledWith('projects.closeBlocked', 'projects.canvasPixelsNotSaved');
+    expect(harness.flush).not.toHaveBeenCalled();
+    expect(harness.close).not.toHaveBeenCalled();
+  });
+
+  it('persists canvas pixels before flushing the project document', async () => {
+    harness.flush.mockResolvedValue({
+      documentJson: serializeProjectDocumentV3Json(harness.project).documentJson,
+      kind: 'acknowledged',
+    });
+    await act(() => root?.render(<Harness />));
+
+    await act(() => userEvent.click(document.querySelector('button')!));
+    await vi.waitFor(() => expect(harness.close).toHaveBeenCalledOnce());
+
+    expect(harness.flushCanvasPixels.mock.invocationCallOrder[0]).toBeLessThan(
+      harness.flush.mock.invocationCallOrder[0]!
+    );
+    // Pixels painted while the document was being pushed are persisted before the tab closes.
+    expect(harness.flushCanvasPixels.mock.invocationCallOrder[1]).toBeGreaterThan(
+      harness.flush.mock.invocationCallOrder[0]!
+    );
   });
 
   it('reports a rejected close flush and keeps the tab open', async () => {

@@ -14,7 +14,7 @@ import { isLeafPaintable, isLayerTransparencyLocked } from '@workbench/canvas-en
 import { isMaskLayer } from '@workbench/canvas-engine/document/sources';
 import { fromTRS, invert } from '@workbench/canvas-engine/math/mat2d';
 
-import type { StrokeCommittedEvent, Tool, ToolContext } from './tool';
+import type { StrokeEdit, Tool, ToolContext } from './tool';
 
 import { createStrokeSession, type StrokeSession } from './strokeSession';
 
@@ -45,7 +45,9 @@ const MASK_STROKE_COLOR = '#ffffff';
 /** The resolved paint target for a gesture. `createdLayer` is set only when auto-created. */
 interface PaintTarget {
   layerId: string;
-  commit(event: StrokeCommittedEvent): void;
+  /** The admitted edit that records the finished stroke. */
+  edit: StrokeEdit;
+  /** Ends the gesture unrecorded, removing a layer it auto-created. */
   cancel(): void;
   /** When the gesture auto-created its layer, the created contract + its anchor (for history). */
   createdLayer?: { layer: CanvasLayerContract; anchor: CanvasNodeInsertionAnchor };
@@ -65,6 +67,17 @@ interface PaintTarget {
   /** Invert the committed layer transform to paint under the cursor; absence is identity for new layers. */
   transform?: CanvasLayerContract['transform'];
 }
+
+const editTarget = (
+  edit: StrokeEdit,
+  layerId: string,
+  extra: Omit<PaintTarget, 'cancel' | 'edit' | 'layerId'> = {}
+) => ({
+  cancel: () => edit.cancel(),
+  edit,
+  layerId,
+  ...extra,
+});
 
 /** Resolves (or auto-creates) the paint target for a gesture, or `null` to no-op. */
 const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget | null => {
@@ -91,14 +104,14 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
         return null;
       }
     }
+    const edit = ctx.beginStrokeEdit();
     // The cache (if any) keeps its current content extent; the stroke grows it.
-    return {
-      cancel: () => undefined,
-      commit: (event) => ctx.emitStrokeCommitted(event),
-      layerId: selected.id,
-      transform: selected.transform,
-      transparencyLocked: selected.isTransparencyLocked === true,
-    };
+    return edit
+      ? editTarget(edit, selected.id, {
+          transform: selected.transform,
+          transparencyLocked: selected.isTransparencyLocked === true,
+        })
+      : null;
   }
 
   if (leaf && selected?.type === 'raster' && selected.source.type === 'image' && tool === 'eraser') {
@@ -108,17 +121,10 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
       return null;
     }
     const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
-    if (!transaction) {
-      return null;
-    }
-    return {
-      cancel: transaction.cancel,
-      commit: transaction.commitStroke,
-      layerId: transaction.layerId,
-      // No transform on purpose: materialization BAKES the layer's placement
-      // into document-space pixels and resets the layer to identity, so the
-      // session's document coordinates already are the cache's coordinates.
-    };
+    // No transform on purpose: materialization BAKES the layer's placement
+    // into document-space pixels and resets the layer to identity, so the
+    // session's document coordinates already are the cache's coordinates.
+    return transaction ? editTarget(transaction, transaction.layerId) : null;
   }
 
   if (leaf && selected && isMaskLayer(selected)) {
@@ -134,29 +140,23 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
         return null;
       }
     }
-    return {
-      cancel: () => undefined,
-      color: MASK_STROKE_COLOR,
-      commit: (event) => ctx.emitStrokeCommitted(event),
-      forceOpaque: true,
-      layerId: selected.id,
-      transform: selected.transform,
-    };
+    const edit = ctx.beginStrokeEdit();
+    return edit
+      ? editTarget(edit, selected.id, { color: MASK_STROKE_COLOR, forceOpaque: true, transform: selected.transform })
+      : null;
   }
 
   if (selected?.type === 'control') {
     const transaction = ctx.beginPixelEdit?.(selected.id) ?? null;
-    if (!transaction) {
-      return null;
-    }
-    return {
-      cancel: transaction.cancel,
-      commit: transaction.commitStroke,
-      layerId: transaction.layerId,
-      // No transform on purpose: see the materialized-eraser branch above.
-    };
+    // No transform on purpose: see the materialized-eraser branch above.
+    return transaction ? editTarget(transaction, transaction.layerId) : null;
   }
 
+  // Admit the stroke before the layer exists, so a refusal leaves the document untouched.
+  const edit = ctx.beginStrokeEdit();
+  if (!edit) {
+    return null;
+  }
   // Other eligible selections create a selected paint layer at the top via the sole gesture-start dispatch.
   const layerId = ctx.createLayerId();
   const previousSelectedLayerId = doc.selectedLayerId;
@@ -179,16 +179,17 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
   entry.stale = false;
   return {
     // Gesture-start creation is outside history until a stroke commits. Roll it back for fully clipped strokes,
-    // cancellation or mid-drag switching.
+    // refusals, cancellation or mid-drag switching.
     cancel: () => {
+      edit.cancel();
       ctx.layers.delete(layerId);
       ctx.dispatch({ ids: [layerId], type: 'removeCanvasLayers' });
       // The reducer's nearest-neighbour fallback would otherwise select whatever sits
       // at the top, not what the user had selected when the gesture began.
       ctx.dispatch({ id: previousSelectedLayerId, type: 'setCanvasSelectedLayer' });
     },
-    commit: (event) => ctx.emitStrokeCommitted(event),
     createdLayer: { anchor, layer },
+    edit,
     layerId,
   };
 };
@@ -251,7 +252,9 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
       if (!resolvedTarget) {
         return;
       }
+      // Every refusal below ends the admitted edit (and removes a layer the gesture created).
       if (resolvedTarget.transparencyLocked && spec.id === 'eraser') {
+        resolvedTarget.cancel();
         return;
       }
       const composite = resolvedTarget.transparencyLocked && spec.id === 'brush' ? 'source-atop' : spec.composite;
@@ -265,6 +268,7 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
         : null;
       if (layerTransform && !invert(layerTransform)) {
         // A zero-scale layer has no paintable geometry to invert into.
+        resolvedTarget.cancel();
         return;
       }
       target = resolvedTarget;
@@ -282,6 +286,11 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
           ctx,
           layerId: target.layerId,
           layerTransform,
+          edit: target.edit,
+          // A deferred frame render fails outside this handler; abandon the stroke there too.
+          onRenderError: () => abortSession(),
+          // The session restored the layer; the target still removes a layer it created.
+          onRefused: () => abortSession(),
           opacity: target.forceOpaque ? 1 : spec.opacity(ctx),
           // A mask stroke is an all-or-nothing alpha stencil, so pressure must not thin it —
           // a partially-transparent mask would silently attenuate the denoise strength.
@@ -311,17 +320,15 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
       if (session && target) {
         const activeSession = session;
         const activeTarget = target;
-        let event: StrokeCommittedEvent | null;
+        let published: boolean;
         try {
-          event = activeSession.commit();
+          published = activeSession.commit((event) => activeTarget.edit.commit(event));
         } catch (error) {
           abortSession();
           throw error;
         }
         endSession();
-        if (event) {
-          activeTarget.commit(event);
-        } else {
+        if (!published) {
           activeTarget.cancel();
         }
       }

@@ -4,14 +4,17 @@ import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps'
 
 import { createListCollection, HStack, Stack } from '@chakra-ui/react';
 import { Button, ColorPicker, Field, IconButton, Select, Tooltip } from '@platform/ui';
+import { useNotify } from '@workbench/useNotify';
 import { armMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
 import { type ColorSamplerEngine, useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
-import { type CanvasPreparedEngine, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import {
+  type CanvasPreparedEngine,
+  reportMaskEdit,
+  useStructuralPreview,
+} from '@workbench/widgets/canvas/useStructuralCommit';
 import { PaletteIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { applyStructuralPreview } from './layerOps';
 
 /** The six mask fill styles, matching `CanvasMaskFillContract['style']` / legacy `zFillStyle`. */
 const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
@@ -34,7 +37,7 @@ interface InpaintMaskSettingsProps {
  */
 export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps) => {
   const { t } = useTranslation();
-  const commitPrepared = usePreparedCommit(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const sampleColor = useColorSampler(engine);
   const fillBeforeRef = useRef<CanvasMaskFillContract | null>(null);
 
@@ -68,7 +71,7 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
   const handleColorChange = useCallback(
     (hex: string) => {
       if (
-        !applyStructuralPreview(engine, {
+        !previewStructural({
           config: { layerType: 'inpaint_mask', mask: { fill: { ...fill, color: hex } } },
           id: layer.id,
           type: 'updateCanvasLayerConfig',
@@ -80,7 +83,7 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
         fillBeforeRef.current = fill;
       }
     },
-    [engine, fill, layer.id]
+    [previewStructural, fill, layer.id]
   );
 
   const handleArmTint = useCallback(() => armMaskTintTarget(layer.id), [layer.id]);
@@ -103,9 +106,12 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
     [commitFill, fill]
   );
 
+  const notify = useNotify();
   const handleInvert = useCallback(() => {
-    engine?.layers.invertMask(layer.id);
-  }, [engine, layer.id]);
+    if (engine) {
+      reportMaskEdit(engine.layers.invertMask(layer.id), notify.error, t);
+    }
+  }, [engine, layer.id, notify, t]);
 
   const styleValue = useMemo(() => [fill.style], [fill.style]);
   const colorAria = t('widgets.layers.maskFill.color');

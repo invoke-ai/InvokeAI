@@ -8,6 +8,8 @@ import type {
   CanvasBlendMode,
   CanvasDocumentContractV3,
 } from '@workbench/canvas-engine/contracts';
+import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { Mat2d, Rect } from '@workbench/canvas-engine/types';
 
 import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
 import { isGroupNode } from '@workbench/canvas-engine/document/documentTree';
@@ -26,6 +28,21 @@ export interface GroupCompositeScope {
   readonly end: number;
   /** Nested scopes, each fully inside [start, end), in list order. */
   readonly children: readonly GroupCompositeScope[];
+}
+
+/** What a group composite draws beyond its members' committed caches. */
+export interface GroupSurfaceContent {
+  /** Members left out entirely (the text layer whose live portal replaces it). */
+  readonly excludeIds: ReadonlySet<string>;
+  /** Filter previews drawn in place of their member's committed pixels, at layer-local output bounds. */
+  readonly previews: ReadonlyMap<string, { readonly surface: RasterSurface; readonly rect: Rect }> | null;
+  /** Lifted pixels drawn directly above their source member, through the member's and the float's matrices. */
+  readonly float: {
+    readonly layerId: string;
+    readonly surface: RasterSurface;
+    readonly rect: Rect;
+    readonly matrix: Mat2d;
+  } | null;
 }
 
 export interface GroupCompositeFacts {

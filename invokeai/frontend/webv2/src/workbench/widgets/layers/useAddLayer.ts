@@ -2,8 +2,8 @@ import type { CanvasNodeContract } from '@workbench/canvas-engine/api';
 
 import { useModelsSelector } from '@features/models';
 import { getDocumentIndex, getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { setLayerGroupExpanded } from '@workbench/layerPanelState';
-import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { nextLayerName } from '@workbench/workbenchState';

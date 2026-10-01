@@ -6,10 +6,10 @@ import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/ras
 import { describe, expect, it, vi } from 'vitest';
 
 /** Zero-alpha stub readbacks exercise empty-cache verdicts and guards; browser tests verify actual cropping. */
-const harness = (options: { busy?: boolean } = {}) => {
+const harness = (options: { busy?: boolean; pinned?: boolean } = {}) => {
   const store = createLayerCacheStore(createTestStubRasterBackend({ readbackAlpha: 0 }));
   const isLayerBusy = vi.fn(() => options.busy ?? false);
-  return { deps: { isLayerBusy, layers: store }, isLayerBusy, store };
+  return { deps: { isLayerBusy, isLayerPinned: () => options.pinned ?? false, layers: store }, isLayerBusy, store };
 };
 
 /** A published 40x40 cache at (10,10) — the shape a chunk-padded stroke leaves. */
@@ -61,6 +61,15 @@ describe('trimPaintCacheToAlpha', () => {
 
     expect(trimPaintCacheToAlpha(deps, 'L')).toBe('deferred');
     expect(isLayerBusy).toHaveBeenCalledWith('L');
+    expect(entry.rect).toEqual({ height: 40, width: 40, x: 10, y: 10 });
+    expect((entry.surface as StubRasterSurface).callLog.map((e) => e.op)).not.toContain('getImageData');
+  });
+
+  it('KEEPS a pinned cache untrimmed so persistence never waits on a read lease', () => {
+    const { deps, store } = harness({ pinned: true });
+    const entry = publish(store);
+
+    expect(trimPaintCacheToAlpha(deps, 'L')).toBe('kept');
     expect(entry.rect).toEqual({ height: 40, width: 40, x: 10, y: 10 });
     expect((entry.surface as StubRasterSurface).callLog.map((e) => e.op)).not.toContain('getImageData');
   });

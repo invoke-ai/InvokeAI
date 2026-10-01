@@ -10,8 +10,6 @@ export interface LayerChangeInput {
   readonly layer: CanvasLayerContract | undefined;
   /** Whether the mirror reported this layer's SOURCE reference as changed. */
   readonly sourceChanged: boolean;
-  /** The image this layer referenced before the change, if any. */
-  readonly previousImageName: string | null | undefined;
   /** The display key recorded for this layer's last-rendered thumbnail. */
   readonly currentThumbnailKey: string | undefined;
   /** The version recorded for this layer's thumbnail, if any. */
@@ -27,7 +25,6 @@ export interface LayerChangeInput {
 export type LayerChangeDecision =
   | {
       readonly kind: 'removed';
-      readonly releaseImageName: string | null;
       readonly cancelTransformSession: boolean;
       readonly cancelTextEditSession: boolean;
     }
@@ -39,7 +36,6 @@ export type LayerChangeDecision =
   | {
       readonly kind: 'source-changed';
       readonly thumbnailKey: string;
-      readonly releaseImageName: string | null;
       /** `false` when the swap is the bitmap store's own echo, whose pixels the cache already holds. */
       readonly invalidateCache: boolean;
     };
@@ -50,15 +46,13 @@ export type LayerChangeDecision =
  * pixels already match.
  */
 export const decideLayerChange = (input: LayerChangeInput): LayerChangeDecision => {
-  const { layer, previousImageName } = input;
-  const releaseImageName = previousImageName ?? null;
+  const { layer } = input;
 
   if (!layer) {
     return {
       cancelTextEditSession: input.hasTextEditSession,
       cancelTransformSession: input.hasTransformSession,
       kind: 'removed',
-      releaseImageName,
     };
   }
 
@@ -83,7 +77,6 @@ export const decideLayerChange = (input: LayerChangeInput): LayerChangeDecision 
   return {
     invalidateCache: !input.isSelfEcho(),
     kind: 'source-changed',
-    releaseImageName,
     thumbnailKey: getLayerThumbnailDisplayKey(layer),
   };
 };
