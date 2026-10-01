@@ -11,6 +11,12 @@ model as its text encoder and a 16-channel VAE. InvokeAI supports the base **Cog
 CogView4 support is basic: plain generation and Canvas image editing work, but the adapters and
 controls that other families offer are not available.
 
+## License
+
+CogView4-6B is released under **Apache 2.0**, which allows commercial use. The download is not gated.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
 ## Hardware
 
 The Diffusers download is about **31 GB**, including the GLM text encoder and VAE. See
@@ -42,7 +48,7 @@ When you select CogView4, InvokeAI applies the defaults from the model's referen
 - **No scheduler choice.** CogView4 uses its own flow-matching sampler, so the Scheduler control is
   hidden.
 - **Prompt weighting** (Compel syntax) does not apply to CogView4. See
-  [Prompt Syntax](/users-guide/image-generation/prompting-guide/#attention-weighting). The GLM encoder reads up to **1024
+  [Prompt Syntax](/users-guide/image-generation/advanced-prompt-syntax/#attention-weighting). The GLM encoder reads up to **1024
   tokens**, so long, descriptive prompts are fine.
 
 ## Canvas

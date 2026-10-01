@@ -1,0 +1,138 @@
+---
+title: Advanced Prompt Syntax
+description: Fine control over prompts — attention weighting, blending and conjunctions for SD 1.5, SD 2.x and SDXL, and the advanced dynamic prompt syntax for multiple choices, weights, variables and comments.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 3
+---
+
+Most prompts need nothing more than plain text, perhaps with a [prompt template](/users-guide/image-generation/prompting-guide/#prompt-templates) or a few [dynamic prompt](/users-guide/image-generation/prompting-guide/#dynamic-prompts) alternatives. This page covers the syntax for finer control: making parts of a prompt count for more or less, blending prompts, and the advanced forms of dynamic prompts.
+
+## Attention weighting
+
+Attention weighting makes parts of the prompt count for more or less than the rest. It uses Compel syntax, which applies to **SD 1.5, SD 2.x and SDXL**. Newer model families, including FLUX, Z-Image, CogView4 and Qwen Image, do not use it, and the symbols are passed to the model as ordinary text.
+
+:::note[Compatibility note]
+  If a weighted prompt seems to be ignored, check which model you are using. The syntax in this section only affects SD 1.5, SD 2.x and SDXL.
+:::
+
+| Syntax | Effect |
+|---|---|
+| `trees+` / `fog-` | Increase or decrease a single word |
+| `(golden hour light)+` | Weight a phrase |
+| `(cinematic lighting)1.25` | Use an exact numeric weight |
+| `(portrait with (blue eyes)1.3)1.1` | Nest weights |
+| `("portrait photo", "oil painting").blend(0.7, 0.3)` | Blend prompts |
+| `("red silk dress", "studio portrait", "soft rim light").and()` | Encode clauses separately |
+| `colored pencil \(medium\)` | Use literal parentheses |
+
+### Weighting with `+` and `-`
+
+Append `+` to increase influence, or `-` to reduce it.
+
+```text
+freckles+
+background crowd-
+(soft rim light)++
+```
+
+- Single words can be weighted directly. Wrap phrases of several words in parentheses.
+- Each additional `+` or `-` compounds, in steps of roughly 10%.
+- One or two steps is usually enough. Extreme weighting can overpower the rest of the prompt.
+
+### Numeric weights
+
+Use numeric weights when you want precise control instead of repeated plus or minus markers.
+
+```text
+(cinematic lighting)1.25
+(background crowd)0.8
+```
+
+`1` is neutral, values above `1` increase emphasis, and values between `0` and `1` reduce it. Wrap the weighted phrase in parentheses.
+
+Groups can be nested, and the weights combine. In `(portrait with (blue eyes)1.3)1.1`, the outer group strengthens the whole phrase, and `blue eyes` gets even more emphasis.
+
+### Adjusting weights with the keyboard
+
+In a prompt field, select text and press **Ctrl+Up** or **Ctrl+Down** to raise or lower its attention. With no selection, the shortcut targets the word at the cursor. Selecting a group's parentheses or weight targets its contents.
+
+- A selection inside a group changes only the selected words. A selection crossing a group boundary changes the selected words on both sides.
+- Symbolic weights move one `+` or `-` step. Numeric weights change by `0.1` of effective attention, including inherited group weights.
+- The numeric attention preference controls new weights; existing group weights keep their style.
+- Adjacent content with matching weights merges, and the adjusted content stays selected for the next keypress.
+- Inside prompt functions, the shortcut adjusts prompt arguments and preserves function parameters. Use **Ctrl+Z** to undo a weight change.
+
+### Blending with `.blend()`
+
+Use `.blend()` to mix the meaning of two or more prompts.
+
+```text
+("portrait photo, 85mm lens", "oil painting, visible brushstrokes").blend(0.7, 0.3)
+```
+
+Provide one weight for each prompt. Keeping the weights near a total of `1` makes the result easier to reason about, and quoting each prompt is safest, especially when they contain commas.
+
+### Combining clauses with `.and()`
+
+Use `.and()` when you want separate prompt clauses encoded individually instead of as one long comma-separated sentence.
+
+```text
+("red silk dress", "studio portrait", "soft rim light").and()
+```
+
+This can behave differently from `red silk dress, studio portrait, soft rim light`. If a normal prompt keeps collapsing ideas together, `.and()` is worth testing.
+
+### Literal parentheses
+
+Unescaped parentheses are treated as weighting syntax. To include actual parentheses in the text, escape them with backslashes:
+
+```text
+colored pencil \(medium\)
+A bear \(with razor-sharp teeth\) in a forest
+```
+
+## Advanced dynamic prompt syntax
+
+These additions to the [dynamic prompt](/users-guide/image-generation/prompting-guide/#dynamic-prompts) syntax give finer control over how variations are built.
+
+### Choosing more than one option
+
+Put a number and `$$` at the start of a group to pick several different options from it. They are joined with a comma:
+
+```text
+portrait, {2$$rim light|fog|rain}
+```
+
+gives prompts such as `portrait, rim light,fog` and `portrait, fog,rain`. To join them differently, put the separator between two `$$`:
+
+```text
+portrait, {2$$ and $$rim light|fog|rain}
+```
+
+gives prompts such as `portrait, rim light and fog`. A range picks a varying number of options: `{1-3$$rim light|fog|rain}` picks one, two or three.
+
+### Weighting options
+
+In **Random sample** mode, you can make some options more likely than others by putting a weight and `::` in front of them:
+
+```text
+a {0.7::red|0.2::green|0.1::blue} balloon
+```
+
+makes red balloons most common. Weights are ignored in All combinations mode, where every option appears once.
+
+### Variables
+
+A variable gives a group a name, so you can define it once and use it in several places. `${name={...}}` defines it and `${name}` uses it:
+
+```text
+${color={red|blue}} a ${color} hat with a ${color} scarf
+```
+
+Each use varies on its own, like a group written out in full, so this gives all four combinations from `a red hat with a red scarf` to `a blue hat with a blue scarf`. Variables are most useful for long lists you would otherwise repeat; for lists you use in many prompts, a [wildcard](/users-guide/image-generation/prompting-guide/#wildcards) is more convenient.
+
+### Comments
+
+Everything after a `#` is treated as a comment and left out of the prompt. Avoid `#` in ordinary prompts, since the rest of the prompt after it is dropped.
+

@@ -6,6 +6,10 @@ sidebar:
    order: 0
 ---
 
+import { Image } from 'astro:assets';
+import videoOverview from '../assets/video-panel-overview.png';
+import videoStartEnd from '../assets/video-panel-start-end-images.png';
+import videoRender from '../assets/video-panel-model-section.png';
 import { LinkCard, CardGrid, Steps } from '@astrojs/starlight/components';
 
 InvokeAI generates short MP4 clips from a text prompt, one or two images, an existing video, a soundtrack — or combinations of those — using three local model families:
@@ -26,7 +30,7 @@ Video generation is a prototype feature. Panel behavior, workflows, and starter-
 
 Open the **Video** entry in the editor's left rail (next to Generate and Upscale). The panel is a complete video pipeline: type a prompt, pick a model, press **Invoke**, and the finished MP4 appears in the gallery.
 
-![Video Panel Overview](../assets/video-panel-overview.png)
+<Image src={videoOverview} alt="The Video panel with a Wan 2.2 image-to-video model selected, a prompt, first and last frame images, and the Initial Video and Dimensions sections." width={380} />
 
 ### Quick start
 
@@ -79,7 +83,7 @@ Two drop targets: **First Frame** and **Last Frame**. Drag an image from the gal
 * A **last frame** anchors where it ends. Combined with a first frame, the model interpolates between the two. On MiniMax H3 and LTX-2 a last frame also works **alone** — the video builds toward your image.
 * Setting a first frame **disables the Initial Video section**, and vice-versa: a clip can start from a still or continue a video, not both. The disabled section says which input to clear.
 
-![Video Panel Start and End Images](../assets/video-panel-start-end-images.png)
+<Image src={videoStartEnd} alt="The Start & End Images section with a first frame and a last frame set, each with Remove image." width={420} />
 
 ### Initial Video
 
@@ -147,7 +151,7 @@ mode is variously called "Lightning," "Turbo,"  and "Distilled."
     installed with the LTX-2 bundle, but can be found among Starter
     Models by searching for "LTX-2.5 Distilled LoRA."
 
-![Video Panel Model Section](../assets/video-panel-model-section.png)
+<Image src={videoRender} alt="The Render section of the Video panel for Wan 2.2: the Lightning (fast) switch, Steps, CFG, CFG (Low Noise) and Seed." width={420} />
 
 ### Concepts (LoRAs)
 

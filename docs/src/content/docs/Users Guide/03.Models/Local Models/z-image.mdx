@@ -22,6 +22,12 @@ Base* in the Model Manager so the right defaults and schedulers apply.
 Z-Image works in the Generate tab, on the Canvas (text-to-image, image-to-image, inpainting and
 outpainting) and in the workflow editor.
 
+## License
+
+Z-Image Turbo, Z-Image (Base) and their Qwen3 text encoder are released under **Apache 2.0**, which allows commercial use. None of the downloads is gated.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
 ## Hardware
 
 See the [System Requirements](/start-here/system-requirements/) table. In short: a Q4_K GGUF or NVFP4
@@ -86,7 +92,7 @@ Selecting a Z-Image model applies these defaults:
 - **Schedulers**: *Euler* (the default and recommended), *Heun (2nd order)* (better quality, about twice as
   slow) and *LCM*. LCM works with Turbo only and is not offered for Z-Image Base.
 - **Resolution**: width and height must be multiples of 16.
-- **Prompt weighting**: Compel-style [prompt syntax](/users-guide/image-generation/prompting-guide/#attention-weighting) does not
+- **Prompt weighting**: Compel-style [prompt syntax](/users-guide/image-generation/advanced-prompt-syntax/#attention-weighting) does not
   apply to Z-Image. Write prompts in plain language.
 
 In the workflow editor, **Denoise - Z-Image** also has a **Shift** input that overrides the timestep

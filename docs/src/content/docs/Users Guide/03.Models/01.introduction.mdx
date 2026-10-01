@@ -50,7 +50,9 @@ choice.
 :::note[Model Licensing]
      Note that some models carry license terms that limit their use in
      commercial applications or on public servers. It's your responsibility
-     to adhere to the license terms.
+     to adhere to the license terms. The [Model Families](/users-guide/models/model-families/#model-families)
+     table below summarizes each family's license, and each model's page
+     has a **License** section with the details.
 :::
 
 ---
@@ -151,120 +153,9 @@ InvokeAI, the weights will be left alone.
 
 ---
 
-## Model Zoology
+## Model formats and families
 
-There are a bewildering number of model families, types and
-formats. This section provides a brief overview of the models that
-InvokeAI supports.
-
-### Checkpoints vs Diffusers Formats
-
-Model weights are distributed in two main layouts, and InvokeAI
-installs both:
-
-* **Diffusers** -- A folder, usually a HuggingFace repository, laid
-  out the way the HuggingFace `diffusers` library expects. Each
-  component of the model (the denoiser, the VAE, the text encoders,
-  the tokenizers and the scheduler settings) lives in its own
-  subfolder with its own configuration file. A Diffusers install is
-  self-contained: everything the model needs comes with it. Install
-  one by pasting its repository ID, such as
-  `stabilityai/stable-diffusion-xl-base-1.0`, into the Model Manager.
-* **Checkpoint** (single file) -- One file, usually `.safetensors`
-  (older models may use `.ckpt` or `.pt`), holding the weights of one
-  or more components. This is the usual format on Civitai. Single-file
-  checkpoints for Stable Diffusion 1.x and SDXL generally include the
-  VAE and text encoders. Checkpoints for most newer architectures
-  contain only the transformer, so you also have to install the VAE
-  and text encoder that go with them, either separately or as part of
-  the family's starter bundle.
-
-Newer models are often distributed in **quantized** forms, which
-store the weights at reduced precision to save disk space and
-VRAM. InvokeAI recognizes several of these, including **GGUF** files
-(named for their quantization level, such as `Q4_K_M` or `Q8_0`),
-**fp8**, **int8** and **nf4** builds. Like other single-file
-checkpoints, a quantized file usually carries only the transformer
-and needs separately installed companions. Lower precision trades a
-little image quality for a large saving in memory; each model family's
-page lists the builds it supports.
-
-A single-file Stable Diffusion 1.x, 2.x or SDXL model can be converted
-to Diffusers format with the **Convert to diffusers** action in the
-model's detail view. Conversion replaces the single file with an
-equivalent Diffusers folder. Converting is optional: InvokeAI runs
-the single-file checkpoint directly.
-
-### Submodels
-
-What we call "a model" is really a pipeline of several cooperating
-networks, called submodels or components. The prompt is split into
-tokens and turned into numbers by the text encoder. The denoiser then
-starts from random noise and, over a series of steps, gradually shapes
-it into an image guided by those numbers. It works in a compressed
-"latent" space rather than on pixels, so at the end the VAE decodes
-the result into the image you see.
-
-A Diffusers install carries all of these components together. With
-single-file and quantized installs you often pick some of them
-yourself. They appear as separate models in the Model Manager, and
-generation panels show slots for them (for example **VAE**, **Text
-encoder** or **Model components**) when the selected model needs
-them. Several families share components: FLUX.2 and Ideogram 4 use
-the same VAE, for example, so one download can serve both.
-
-| Component | What it does |
-|---|---|
-| **Denoiser** (UNet or transformer) | The core of the model and by far the largest part. At each step it predicts how to remove noise from the latent image, steered by the encoded prompt. Older models (SD 1.x, SDXL) use a convolutional **UNet**; newer ones use a **diffusion transformer** (DiT). Some models use two: the Wan 2.2 A14B models hand off from a high-noise expert to a low-noise expert partway through, and Ideogram 4 runs a conditional and an unconditional transformer side by side. |
-| **VAE** (variational autoencoder) | Translates between pixels and latents. The encoder half compresses an input image (for image-to-image, inpainting or a video's first frame) into latents; the decoder half turns the finished latents back into pixels. A different VAE can change color and fine detail. |
-| **Tokenizer** | Splits the prompt into tokens, the word pieces the text encoder understands. It is a small vocabulary file rather than a neural network, and it always comes with its text encoder. |
-| **Text encoder** | Turns the tokens into embeddings that tell the denoiser what to draw. Older models use CLIP; newer ones use large language models such as T5, Qwen3, Mistral or Gemma, which understand long, detailed prompts much better. These can be as large as the denoiser, and several families let you run them from a separately installed, quantized file. SDXL and FLUX.1 combine two encoders. |
-| **Image encoder** | Turns a reference image into embeddings the denoiser can use, the way a text encoder does for text. Used by IP-Adapters and FLUX Redux (CLIP Vision or SigLIP) to carry the style or content of a reference image. Vision-language text encoders such as Qwen-VL read reference images directly, which is how image-editing models like Qwen Image Edit see the image they edit. |
-| **Scheduler** | The algorithm that decides how much noise to remove at each step. It is configuration rather than a network; you can pick a different scheduler for many models in the generation settings. |
-| **Audio VAE** | Video-with-audio models only (LTX-2, MiniMax H3). The audio counterpart of the VAE: it encodes and decodes the latent form of the soundtrack that is denoised alongside the video. |
-| **Vocoder** | LTX-2 only. Converts the decoded audio spectrogram into a playable waveform. MiniMax H3's audio VAE produces a waveform directly and needs no vocoder. |
-| **Connectors** | LTX-2 only. A small network that adapts the Gemma text encoder's output, taken from every layer, into the form the LTX-2 transformer expects. |
-| **Latent upsampler** | LTX-2 only. Enlarges the latent video between the two passes of two-stage generation, so the second pass can refine at higher resolution. |
-
-### Model Families
-
-Every main model belongs to a family, also called its **base** or
-architecture. The family determines which components, LoRAs,
-ControlNets and other add-ons work with the model: a LoRA trained for
-SDXL cannot be used with FLUX.1, for example. InvokeAI detects the
-family when you install a model, shows it as a colored badge in the
-Model Manager, and only offers add-ons that match the selected main
-model.
-
-Families differ widely in size, speed and specialty. Older families
-such as SD 1.5 and SDXL run on modest hardware and have huge
-libraries of community fine-tunes, LoRAs and ControlNets. Newer
-families follow long prompts more faithfully and render text better,
-but need more VRAM. Many newer families also come in distilled
-"Turbo" or "Lightning" variants that trade some flexibility for much
-faster generation.
-
-| Family | Generates | Highlights | Details |
-|---|---|---|---|
-| **Stable Diffusion 1.x / 2.x** | Images | The original open model family. Small and fast, with the largest library of fine-tunes, LoRAs, ControlNets and IP-Adapters. Best at 512×512. | [SD 1.5 / 2.x](/users-guide/models/local-models/stable-diffusion-1-2/) |
-| **SDXL** | Images | Higher-resolution successor to SD 1.5 (1024×1024) with a similarly rich ecosystem of add-ons. An optional refiner model, used in the workflow editor, polishes fine detail. | [SDXL](/users-guide/models/local-models/sdxl/) |
-| **Stable Diffusion 3.5** | Images | Medium and Large transformer models from Stability AI, with three text encoders. | [SD 3.5](/users-guide/models/local-models/sd-3/) |
-| **FLUX.1** | Images | Dev, Schnell, Kontext (image editing) and Krea variants, plus Fill (inpainting, workflow editor only) and Redux, with ControlNets and IP-Adapters. | [FLUX.1](/users-guide/models/local-models/flux-1/) |
-| **FLUX.2** | Images | Klein 4B and 9B, and the much larger [dev]. Generates and edits images from reference images. | [FLUX.2](/users-guide/models/local-models/flux-2/) |
-| **CogView4** | Images | THUDM's 6B text-to-image model with a GLM text encoder. Basic support, without LoRAs, ControlNets or reference images. | [CogView4](/users-guide/models/local-models/cogview4/) |
-| **Z-Image** | Images | 6B model in a fast, few-step Turbo variant and a Base variant. Understands English and Chinese prompts, with ControlNets. | [Z-Image](/users-guide/models/local-models/z-image/) |
-| **ERNIE-Image** | Images | Baidu's 8B text-to-image model, in standard and distilled Turbo variants. | [ERNIE-Image](/users-guide/models/local-models/ernie-image/) |
-| **Qwen Image** | Images | Text-to-image (2512) and instruction-based image editing (Edit 2511), with fast Lightning variants. | [Qwen Image](/users-guide/models/local-models/qwen-image/) |
-| **Krea-2** | Images | 12B model in fast Turbo and undistilled Raw variants, with training-free style reference. | [Krea-2](/users-guide/models/local-models/krea-2/) |
-| **Ideogram 4** | Images | Structured prompts that place described elements in regions of the image. Non-commercial license. | [Ideogram 4](/users-guide/models/local-models/ideogram4/) |
-| **Anima** | Images | Compact 2B anime-focused model, with ControlNet-LLLite adapters for inpainting and sketch guidance. | [Anima](/users-guide/models/local-models/anima/) |
-| **Wan 2.2** | Video, images | Text-to-video and image-to-video, including first/last-frame interpolation. Can also generate single images. | [Wan 2.2](/users-guide/video-generation/wan-22/) |
-| **LTX-2** | Video with audio | Video with a synchronized soundtrack, audio-to-video and video-to-audio, keyframes and extension. | [LTX-2](/users-guide/video-generation/ltx-2/) |
-| **MiniMax H3** | Video with audio | Video with a stereo soundtrack, from first/last frames or from up to 12 reference images and videos. | [MiniMax H3](/users-guide/video-generation/minimax-h3/) |
-
-The video families are described in the [Video
-Generation](/users-guide/video-generation/introduction/) section, and
-are also listed under Local Models in the sidebar.
+[Model Formats and Families](/users-guide/models/model-families/) explains the [formats](/users-guide/models/model-families/#checkpoints-vs-diffusers-formats) models come in, the [components](/users-guide/models/model-families/#submodels) that make up a model, and the [model families](/users-guide/models/model-families/#model-families) InvokeAI supports, with their licenses and links to each family's page.
 
 ---
 
@@ -285,7 +176,6 @@ you want, by adding `:subfolder_name` to the repo ID.
 
   Add `:v2` to the repo ID and use that when installing the model: `monster-labs/control_v1p_sd15_qrcode_monster:v2`
 :::
-
 
 ## Editing model metadata
 

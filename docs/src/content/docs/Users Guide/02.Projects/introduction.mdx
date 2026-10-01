@@ -5,6 +5,8 @@ lastUpdated: 2026-09-29
 sidebar:
   order: 0
 ---
+import { Image } from 'astro:assets';
+import projectSwitcher from '../assets/project-switcher.webp';
 
 A **project** is a self-contained workspace. Everything you arrange while working on one idea stays together in it: the canvas and its layers, the workflows you have open, the panel layout, your prompt history, and a gallery board that collects the project's images and videos. Open the project again later, on the same computer or another one, and it comes back exactly as you left it.
 
@@ -59,6 +61,8 @@ The name of the active project appears in the top bar. Click it, or press <kbd>C
 - **Open projects**: every project open in this session, with a progress ring on any that is generating. Choose one to switch to it.
 - **Recent**: up to five other projects you edited lately.
 - **New project** and **Open project**, which lists every saved project that is not already open.
+
+<Image src={projectSwitcher} alt="The project switcher open from the top bar, showing project details and commands, the open project, recent projects, New project and Open project." width={420} />
 
 The switcher also carries commands for the active project: **Rename…**, **Details**, **Export**, **Close** and **Delete project…**. **Details** opens the **Project** widget, which shows the project's name, when it was last saved and whether it is in sync with the server.
 
@@ -141,7 +145,7 @@ Export is also the simplest way to back up a project you care about, or to hand 
 
 ## Workflows in a project
 
-A project can hold several workflows. Each is saved as part of the project and changes automatically along with it; your [workflow library](/users-guide/workflows/introduction/#your-workflows) changes only when you save a workflow to it on purpose.
+A project can hold several workflows. Each is saved as part of the project and changes automatically along with it; your [workflow library](/users-guide/workflows/editor-reference/#your-workflows) changes only when you save a workflow to it on purpose.
 
 In the Workflow Library dialog, **This project** lists the project's own workflows, while **Browse** and **Yours** list bundled templates and your saved library. Opening a library workflow adds a copy to the current project. **Fork into new project** copies a workflow into a brand-new project of its own.
 

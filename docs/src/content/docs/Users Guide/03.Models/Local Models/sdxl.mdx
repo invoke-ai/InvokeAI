@@ -17,6 +17,18 @@ supports it in the workflow editor (see [SDXL Refiner](#sdxl-refiner)).
 InvokeAI identifies SDXL models automatically on install, including their **variant** (normal or
 inpainting).
 
+## License
+
+| Model | License | Commercial use |
+|---|---|---|
+| SDXL base and Refiner | CreativeML OpenRAIL++-M | Allowed, subject to the license's use restrictions |
+| Dreamshaper XL v2 Turbo, RealVisXL V5.0 | OpenRAIL++ | Allowed, subject to the license's use restrictions |
+| Juggernaut XL v9 | CreativeML OpenRAIL-M | Allowed, but its card says it may not be served behind a paid API without a license from RunDiffusion |
+
+None of the starter downloads is gated.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
 ## Hardware
 
 The [System Requirements](/start-here/system-requirements/) table lists **8 GB VRAM** and 16 GB RAM as
@@ -77,7 +89,7 @@ Model Manager's **Default Settings**:
 - **Schedulers** — the full standard list (DDIM, DPM++ 2M Karras, DPM++ SDE Karras, Euler, Euler
   Ancestral, UniPC, and so on) is available.
 - **Prompt syntax** — SDXL prompts support
-  [Compel weighting and prompt functions](/users-guide/image-generation/prompting-guide/#attention-weighting). The prompt is
+  [Compel weighting and prompt functions](/users-guide/image-generation/advanced-prompt-syntax/#attention-weighting). The prompt is
   sent to both of SDXL's text encoders.
 
 The **Advanced** section of the Generate panel adds these controls for SDXL:

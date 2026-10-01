@@ -20,6 +20,17 @@ LoRAs, embeddings and ControlNets.
 InvokeAI identifies the family, the **variant** (normal or inpainting; SD 2.x also has a depth
 variant) and the **prediction type** (epsilon or v-prediction) automatically on install.
 
+## License
+
+| Model | License | Commercial use |
+|---|---|---|
+| SD 1.5 base, Dreamshaper 8, CyberRealistic v4.1, ReV Animated | CreativeML OpenRAIL-M | Allowed, subject to the license's use restrictions |
+| Deliberate v5 | CC BY-NC-ND 4.0 | Companies and services must contact the author; the author places no restrictions on private individuals |
+
+None of the starter downloads is gated.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
 ## Hardware
 
 SD 1.5 is the lightest local image model InvokeAI supports: the
@@ -81,7 +92,7 @@ Model Manager's **Default Settings**:
 - **Negative prompt** — fully supported.
 - **Schedulers** — the full standard list (DDIM, DPM++ 2M Karras, Euler, Euler Ancestral, UniPC, and
   so on) is available.
-- **Prompt syntax** — SD prompts support [Compel weighting and prompt functions](/users-guide/image-generation/prompting-guide/#attention-weighting).
+- **Prompt syntax** — SD prompts support [Compel weighting and prompt functions](/users-guide/image-generation/advanced-prompt-syntax/#attention-weighting).
 
 The **Advanced** section of the Generate panel adds these SD-specific controls:
 
@@ -90,8 +101,9 @@ The **Advanced** section of the Generate panel adds these SD-specific controls:
 - **CFG Rescale** — intended for models trained with zero-terminal SNR; a value around `0.7` is
   suggested for those. Leave it at 0 for ordinary models.
 - **Seamless Tiling** — generates images that tile without visible seams, on the X axis, Y axis or both.
-- **VAE** and **VAE Precision** — override the model's bundled VAE, and choose fp16 (default) or fp32
-  for encoding and decoding.
+- **VAE** and **VAE Precision** — override the model's bundled VAE, and choose fp32 or fp16 for
+  encoding and decoding. VAE Precision is fp32 unless the model's default settings in the Model
+  Manager say fp16.
 - **HiDiffusion** — improves structure at higher resolutions. See
   [HiDiffusion](/users-guide/image-generation/advanced-topics/hidiffusion/).
 
