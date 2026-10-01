@@ -1,7 +1,7 @@
 /**
  * Move targets panel selection, never stack hit tests. Dragging inside selection, or an existing float, moves
- * pixels across multiple drags until commit/cancel; otherwise move eligible selected layers with a primary-layer
- * fallback.
+ * pixels across multiple drags until commit/cancel; the pixels are cut only once a press becomes a drag, so a click
+ * leaves the layer whole. Otherwise move eligible selected layers with a primary-layer fallback.
  *
  * Shift locks the dominant axis. Layer movement uses the visible model grid unless Alt bypasses; local-space
  * floats never snap. Preview only during drag; changed layer moves commit once, float history waits for its later
@@ -35,12 +35,15 @@ export const constrainDelta = (dx: number, dy: number, shift: boolean): Vec2 => 
   return Math.abs(dx) >= Math.abs(dy) ? { x: dx, y: 0 } : { x: 0, y: dy };
 };
 
-/** Which thing this gesture moves. */
+type LayerDrag = {
+  kind: 'layer';
+  targets: readonly { id: string; origin: { x: number; y: number }; primary: boolean }[];
+};
+
+/** Which thing this gesture moves. `lift` cuts the selected pixels only once the press becomes a drag. */
 type DragMode =
-  | {
-      kind: 'layer';
-      targets: readonly { id: string; origin: { x: number; y: number }; primary: boolean }[];
-    }
+  | LayerDrag
+  | { kind: 'lift'; layerId: string; fallback: LayerDrag }
   | { kind: 'float'; layerId: string; origin: LayerTransform }
   | { kind: 'none' };
 
@@ -107,13 +110,7 @@ export const createMoveTool = (): Tool => {
     if (!primary) {
       return { kind: 'none' };
     }
-    if (ctx.isPointInSelection?.(point) && ctx.liftFloatingSelection?.(primary.id)) {
-      const lifted = ctx.getFloatingSelection?.();
-      if (lifted) {
-        return { kind: 'float', layerId: lifted.layerId, origin: { ...lifted.transform } };
-      }
-    }
-    return {
+    const layerDrag: LayerDrag = {
       kind: 'layer',
       targets: layers.map((layer) => ({
         id: layer.id,
@@ -121,6 +118,22 @@ export const createMoveTool = (): Tool => {
         primary: layer === primary,
       })),
     };
+    return ctx.isPointInSelection?.(point) && ctx.liftFloatingSelection
+      ? { fallback: layerDrag, kind: 'lift', layerId: primary.id }
+      : layerDrag;
+  };
+
+  /**
+   * A click must leave the layer whole, so the pixels are cut only when the drag starts. Only a selection with
+   * nothing to lift falls back to moving the layer; a refused lift moves nothing.
+   */
+  const liftOnDrag = (ctx: ToolContext, mode: Extract<DragMode, { kind: 'lift' }>): DragMode => {
+    const result = ctx.liftFloatingSelection?.(mode.layerId) ?? 'unavailable';
+    if (result === 'unavailable') {
+      return mode.fallback;
+    }
+    const lifted = result === 'lifted' ? ctx.getFloatingSelection?.() : null;
+    return lifted ? { kind: 'float', layerId: lifted.layerId, origin: { ...lifted.transform } } : { kind: 'none' };
   };
 
   /** The constrained document-space delta from the gesture start to `input`. */
@@ -211,6 +224,9 @@ export const createMoveTool = (): Tool => {
           return;
         }
         state.moved = true;
+        if (state.mode.kind === 'lift') {
+          state.mode = liftOnDrag(ctx, state.mode);
+        }
       }
       applyDelta(ctx, state, input);
     },
@@ -225,7 +241,7 @@ export const createMoveTool = (): Tool => {
         // A click never re-targets the layer selection — that is the panel's job.
         return;
       }
-      if (current.mode.kind === 'none') {
+      if (current.mode.kind === 'none' || current.mode.kind === 'lift') {
         // No movable layer is selected — nothing to commit.
         return;
       }

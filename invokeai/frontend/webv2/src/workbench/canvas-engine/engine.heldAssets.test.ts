@@ -301,7 +301,7 @@ describe('Canvas history holds resurrectable media', () => {
     expect(engine.stores.canUndo.get()).toBe(true);
     expect(engine.history.getHeldAssetRefs().images).toEqual(expect.arrayContaining(heldAfterOp));
 
-    engine.history.undo();
+    await engine.history.undo();
     expect(engine.stores.canRedo.get()).toBe(true);
     expect(engine.history.getHeldAssetRefs().images).toEqual(expect.arrayContaining(heldAfterUndo));
 

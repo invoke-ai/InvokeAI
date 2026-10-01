@@ -6,11 +6,9 @@ import type {
 
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import {
-  applyStructuralPreview,
-  type CanvasStructuralEngine,
   canConvertRasterControl,
   canMergeLayerDown,
   convertRasterToControl,
@@ -177,22 +175,6 @@ describe('canMergeLayerDown', () => {
   it('disallows merging when the below layer is locked', () => {
     const lockedMid = documentOf([paintLayer('top'), { ...imageLayer('mid'), isLocked: true }, maskLayer('bottom')]);
     expect(canMergeLayerDown(lockedMid, 'top', true)).toBe(false);
-  });
-});
-
-describe('applyStructuralPreview', () => {
-  const action = { id: 'layer', patch: { opacity: 0.5 }, type: 'updateCanvasLayer' } as const;
-
-  it('routes a live document edit through the engine guard', () => {
-    const applyPreview = vi.fn(() => false);
-    const engine = { layers: { applyStructuralPreview: applyPreview } } as unknown as CanvasStructuralEngine;
-
-    expect(applyStructuralPreview(engine, action)).toBe(false);
-    expect(applyPreview).toHaveBeenCalledWith(action);
-  });
-
-  it('refuses a live edit without an engine', () => {
-    expect(applyStructuralPreview(null, action)).toBe(false);
   });
 });
 

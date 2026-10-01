@@ -242,14 +242,12 @@ describe('selectionState: replaceMask', () => {
     // rather than the replacement's bounding rect.
     expect(selection.antsPaths()).toEqual([{ d: 'M 7 -2 L 8 -2 L 8 -1 L 7 -1 Z' } as unknown as Path2D]);
 
-    const put = maskLog(selection).find((entry) => entry.op === 'putImageData');
-    const copied = put?.args[0] as ImageData | undefined;
-    expect(copied).toBeDefined();
-    expect(copied).not.toBe(source.pixels);
-    expect([...copied!.data]).toEqual([...source.pixels.data]);
-
-    source.pixels.data.fill(0);
-    expect(copied!.data.filter((_, index) => index % 4 === 3)).toEqual(new Uint8ClampedArray([0, 64, 255, 0]));
+    // The mask owns a blitted copy; no RGBA readback is written back into it.
+    const log = maskLog(selection);
+    expect(log.filter((entry) => entry.op === 'drawImage').map((entry) => entry.args)).toEqual([
+      [source.placed.surface.canvas, 0, 0],
+    ]);
+    expect(log.some((entry) => entry.op === 'putImageData')).toBe(false);
     expect(onChange).toHaveBeenCalledOnce();
   });
 
@@ -300,7 +298,7 @@ describe('selectionState: replaceMask', () => {
     const createSurface = backend.createSurface;
     vi.spyOn(backend, 'createSurface').mockImplementation((width, height) => {
       const surface = createSurface(width, height);
-      Object.defineProperty(surface.ctx, 'putImageData', {
+      Object.defineProperty(surface.ctx, 'drawImage', {
         value: () => {
           throw new Error('selection pixel staging failed');
         },

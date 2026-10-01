@@ -1,5 +1,6 @@
 import { Flex, Heading, Stack } from '@chakra-ui/react';
 import { Scrollable } from '@platform/ui/Scrollable';
+import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import { isCanvasInteractionLocked } from '@workbench/widgets/canvas/canvasInteractionLock';
 import { useCanvasActiveTool, useCanvasOperation } from '@workbench/widgets/canvas/engineStoreHooks';
 import { PropertyGroup } from '@workbench/widgets/canvas/tool-presentation/PropertyPrimitives';
@@ -7,7 +8,6 @@ import {
   OPERATION_PRESENTATION_ADAPTERS,
   TOOL_PRESENTATION_ADAPTERS,
 } from '@workbench/widgets/canvas/tool-presentation/toolAdapters';
-import { useCanvasEngine, type CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { useLayoutEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';

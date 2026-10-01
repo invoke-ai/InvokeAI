@@ -9,13 +9,13 @@ import type {
 import type { Mat2d } from '@workbench/canvas-engine/types';
 
 import { createCanvasDiagnostics } from '@workbench/canvas-engine/diagnostics';
-import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { groupContract, stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { identity } from '@workbench/canvas-engine/math/mat2d';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { RasterCallLogEntry, StubRasterSurface } from './raster.testStub';
 
-import { compositeDocument, createCheckerboardTile, shouldSmoothAtZoom } from './compositor';
+import { compositeDocument, createCheckerboardTile, prepareComposite, shouldSmoothAtZoom } from './compositor';
 import { createDerivedSurfaceCache } from './derivedSurfaceCache';
 import { createLayerCacheStore } from './layerCache';
 import { createTestStubRasterBackend } from './raster.testStub';
@@ -108,7 +108,7 @@ describe('compositeDocument', () => {
     const bottomCache = caches.getOrCreate('bottom', 10, 10);
 
     const target = backend.createSurface(200, 200);
-    compositeDocument(target, makeDoc([top, bottom]), caches, VIEW);
+    compositeDocument(target, makeDoc([top, bottom]), caches, VIEW, { backend });
 
     const log = target.callLog;
     // First op is a clearRect (after the outer save + identity setTransform).
@@ -129,7 +129,7 @@ describe('compositeDocument', () => {
     const target = backend.createSurface(200, 200);
 
     const doc = makeDoc([rasterLayer('a', { isEnabled: false }), rasterLayer('b')]);
-    compositeDocument(target, doc, caches, VIEW);
+    compositeDocument(target, doc, caches, VIEW, { backend });
 
     const drawImages = target.callLog.filter((e) => e.op === 'drawImage');
     expect(drawImages).toHaveLength(1);
@@ -146,6 +146,7 @@ describe('compositeDocument', () => {
     const target = backend.createSurface(200, 200);
 
     compositeDocument(target, makeDoc([rasterLayer('isolated'), rasterLayer('other')]), caches, VIEW, {
+      backend,
       layerPreviews: new Map([['isolated', { rect: { height: 10, width: 10, x: 0, y: 0 }, surface: filterPreview }]]),
       isolationLayerId: 'isolated',
       stagedPreview: { rect: { height: 10, width: 10, x: 0, y: 0 }, surface: staged },
@@ -169,7 +170,7 @@ describe('compositeDocument', () => {
       makeDoc([rasterLayer('disabled', { isEnabled: false }), rasterLayer('visible')]),
       caches,
       VIEW,
-      { stagedPreview: { rect: { height: 10, width: 10, x: 0, y: 0 }, surface: staged } }
+      { backend, stagedPreview: { rect: { height: 10, width: 10, x: 0, y: 0 }, surface: staged } }
     );
 
     const drawImages = target.callLog.filter((entry) => entry.op === 'drawImage');
@@ -184,7 +185,7 @@ describe('compositeDocument', () => {
     const target = backend.createSurface(200, 200);
 
     const doc = makeDoc([rasterLayer('a'), rasterLayer('b')]);
-    compositeDocument(target, doc, caches, VIEW, { skipLayerId: 'a' });
+    compositeDocument(target, doc, caches, VIEW, { backend, skipLayerId: 'a' });
 
     const drawImages = target.callLog.filter((e) => e.op === 'drawImage');
     // 'a' is skipped (its live text is shown by the contenteditable portal); only 'b' draws.
@@ -199,7 +200,7 @@ describe('compositeDocument', () => {
     const target = backend.createSurface(200, 200);
 
     // 'b' has no cache; only 'a' should draw.
-    compositeDocument(target, makeDoc([rasterLayer('a'), rasterLayer('b')]), caches, VIEW);
+    compositeDocument(target, makeDoc([rasterLayer('a'), rasterLayer('b')]), caches, VIEW, { backend });
     expect(target.callLog.filter((e) => e.op === 'drawImage')).toHaveLength(1);
   });
 
@@ -210,7 +211,9 @@ describe('compositeDocument', () => {
     const target = backend.createSurface(200, 200);
 
     const blend: CanvasBlendMode = 'multiply';
-    compositeDocument(target, makeDoc([rasterLayer('a', { blendMode: blend, opacity: 0.4 })]), caches, VIEW);
+    compositeDocument(target, makeDoc([rasterLayer('a', { blendMode: blend, opacity: 0.4 })]), caches, VIEW, {
+      backend,
+    });
 
     expect(findSet(target.callLog, 'globalAlpha')).toContain(0.4);
     expect(findSet(target.callLog, 'globalCompositeOperation')).toContain('multiply');
@@ -247,7 +250,7 @@ describe('compositeDocument', () => {
     caches.getOrCreate('a', 10, 10);
     const target = backend.createSurface(200, 200);
 
-    compositeDocument(target, makeDoc([rasterLayer('a', { blendMode: 'normal' })]), caches, VIEW);
+    compositeDocument(target, makeDoc([rasterLayer('a', { blendMode: 'normal' })]), caches, VIEW, { backend });
     expect(findSet(target.callLog, 'globalCompositeOperation')).toContain('source-over');
   });
 
@@ -257,7 +260,10 @@ describe('compositeDocument', () => {
     const tile = createCheckerboardTile(backend);
 
     const target = backend.createSurface(200, 200);
-    compositeDocument(target, makeDoc([], { background: 'transparent' }), caches, VIEW, { checkerboardTile: tile });
+    compositeDocument(target, makeDoc([], { background: 'transparent' }), caches, VIEW, {
+      backend,
+      checkerboardTile: tile,
+    });
 
     // The pattern is created once from the tile (cheap: no per-cell fill loop).
     const patternCalls = target.callLog.filter((e) => e.op === 'createPattern');
@@ -284,7 +290,7 @@ describe('compositeDocument', () => {
     // covers the whole screen because it is screen-anchored, not doc-anchored.
     const view: Mat2d = { a: 3, b: 0, c: 0, d: 3, e: -500, f: 220 };
     const target = backend.createSurface(320, 240);
-    compositeDocument(target, makeDoc([], { height: 8, width: 8 }), caches, view, { checkerboardTile: tile });
+    compositeDocument(target, makeDoc([], { height: 8, width: 8 }), caches, view, { backend, checkerboardTile: tile });
 
     const fills = target.callLog.filter((e) => e.op === 'fillRect');
     expect(fills).toHaveLength(1);
@@ -296,7 +302,7 @@ describe('compositeDocument', () => {
     const caches = createLayerCacheStore(backend);
 
     const target = backend.createSurface(200, 200);
-    compositeDocument(target, makeDoc([], { background: 'transparent' }), caches, VIEW);
+    compositeDocument(target, makeDoc([], { background: 'transparent' }), caches, VIEW, { backend });
 
     // No tile → no pattern and no fill; the cleared surface shows the widget's bg.inset.
     expect(target.callLog.some((e) => e.op === 'createPattern')).toBe(false);
@@ -312,6 +318,7 @@ describe('compositeDocument', () => {
     const solidTarget = backend.createSurface(200, 200);
     // Document background no longer renders; checkerboard still fills the viewport.
     compositeDocument(solidTarget, makeDoc([], { background: { color: '#123456' } }), caches, VIEW, {
+      backend,
       checkerboardTile: createCheckerboardTile(backend),
     });
     const patternCalls = solidTarget.callLog.filter((e) => e.op === 'createPattern');
@@ -331,20 +338,7 @@ describe('compositeDocument', () => {
     expect(styles).toEqual(['#111111', '#222222']);
   });
 
-  it('draws mask-bearing layers as a tinted fill of the mask color (backend-less fallback)', () => {
-    const backend = createTestStubRasterBackend();
-    const caches = createLayerCacheStore(backend);
-    caches.getOrCreate('rg', 10, 10);
-    const target = backend.createSurface(200, 200);
-
-    compositeDocument(target, makeDoc([maskLayer('rg')]), caches, VIEW);
-
-    // Without a backend the mask draws its coverage then tints with a flat fill.
-    expect(target.callLog.some((e) => e.op === 'drawImage')).toBe(true);
-    expect(findSet(target.callLog, 'fillStyle')).toContain('#ff0000');
-  });
-
-  it('colorizes the mask alpha via source-in on an intermediate surface when a backend is supplied', () => {
+  it('colorizes the mask alpha via source-in on an intermediate surface', () => {
     const base = createTestStubRasterBackend();
     const created: StubRasterSurface[] = [];
     const backend = {
@@ -578,7 +572,7 @@ describe('compositeDocument', () => {
     caches.getOrCreate('a', 10, 10);
     const target = backend.createSurface(200, 200);
 
-    compositeDocument(target, makeDoc([rasterLayer('a')]), caches, VIEW, { imageSmoothing: false });
+    compositeDocument(target, makeDoc([rasterLayer('a')]), caches, VIEW, { backend, imageSmoothing: false });
     expect(findSet(target.callLog, 'imageSmoothingEnabled')).toEqual([false]);
   });
 
@@ -588,11 +582,11 @@ describe('compositeDocument', () => {
     caches.getOrCreate('a', 10, 10);
 
     const defaulted = backend.createSurface(200, 200);
-    compositeDocument(defaulted, makeDoc([rasterLayer('a')]), caches, VIEW);
+    compositeDocument(defaulted, makeDoc([rasterLayer('a')]), caches, VIEW, { backend });
     expect(findSet(defaulted.callLog, 'imageSmoothingEnabled')).toEqual([true]);
 
     const explicit = backend.createSurface(200, 200);
-    compositeDocument(explicit, makeDoc([rasterLayer('a')]), caches, VIEW, { imageSmoothing: true });
+    compositeDocument(explicit, makeDoc([rasterLayer('a')]), caches, VIEW, { backend, imageSmoothing: true });
     expect(findSet(explicit.callLog, 'imageSmoothingEnabled')).toEqual([true]);
   });
 
@@ -603,6 +597,7 @@ describe('compositeDocument', () => {
     const staged = backend.createSurface(50, 50);
 
     compositeDocument(target, makeDoc([]), caches, VIEW, {
+      backend,
       stagedPreview: { rect: { height: 40, width: 40, x: 5, y: 5 }, surface: staged },
     });
 
@@ -618,6 +613,7 @@ describe('compositeDocument', () => {
     const staged = backend.createSurface(23, 17);
 
     compositeDocument(target, makeDoc([]), caches, VIEW, {
+      backend,
       stagedPreview: {
         opacity: 0.35,
         rect: { height: 34, width: 46, x: -8, y: 13 },
@@ -646,6 +642,7 @@ describe('compositeDocument — raster adjustments', () => {
     const target = backend.createSurface(200, 200);
 
     compositeDocument(target, makeDoc([layer]), caches, VIEW, {
+      backend,
       adjustedSurface: (l) => (l.id === 'a' ? adjusted : null),
     });
 
@@ -663,7 +660,7 @@ describe('compositeDocument — raster adjustments', () => {
     const cache = caches.getOrCreate('a', 10, 10);
     const target = backend.createSurface(200, 200);
 
-    compositeDocument(target, makeDoc([layer]), caches, VIEW, { adjustedSurface: () => null });
+    compositeDocument(target, makeDoc([layer]), caches, VIEW, { backend, adjustedSurface: () => null });
 
     const drawImages = target.callLog.filter((e) => e.op === 'drawImage');
     expect(drawImages[0]!.args[0]).toBe(cache.surface.canvas);
@@ -700,7 +697,7 @@ describe('compositeDocument — floating selection', () => {
     const float = floatOf(backend, 'bottom');
 
     const target = backend.createSurface(200, 200);
-    compositeDocument(target, makeDoc([top, bottom]), caches, VIEW, { floatingSelection: float });
+    compositeDocument(target, makeDoc([top, bottom]), caches, VIEW, { backend, floatingSelection: float });
 
     const drawn = target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
     expect(drawn).toEqual([bottomCache.surface.canvas, float.surface.canvas, topCache.surface.canvas]);
@@ -714,7 +711,7 @@ describe('compositeDocument — floating selection', () => {
 
     const target = backend.createSurface(200, 200);
     const doc = makeDoc([rasterLayer('a', { blendMode: 'multiply' as CanvasBlendMode, opacity: 0.5 })]);
-    compositeDocument(target, doc, caches, VIEW, { floatingSelection: float });
+    compositeDocument(target, doc, caches, VIEW, { backend, floatingSelection: float });
 
     // Twice: once for the layer's own cache, once for the float over it.
     expect(findSet(target.callLog, 'globalAlpha').filter((value) => value === 0.5)).toHaveLength(2);
@@ -730,7 +727,7 @@ describe('compositeDocument — floating selection', () => {
     const float = floatOf(backend, 'a');
 
     const target = backend.createSurface(200, 200);
-    compositeDocument(target, makeDoc([rasterLayer('a')]), caches, VIEW, { floatingSelection: float });
+    compositeDocument(target, makeDoc([rasterLayer('a')]), caches, VIEW, { backend, floatingSelection: float });
 
     const drawn = target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
     expect(drawn).toEqual([float.surface.canvas]);
@@ -743,7 +740,7 @@ describe('compositeDocument — floating selection', () => {
     const float = floatOf(backend, 'gone');
 
     const target = backend.createSurface(200, 200);
-    compositeDocument(target, makeDoc([rasterLayer('a')]), caches, VIEW, { floatingSelection: float });
+    compositeDocument(target, makeDoc([rasterLayer('a')]), caches, VIEW, { backend, floatingSelection: float });
 
     const drawn = target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
     expect(drawn).toEqual([cache.surface.canvas]);
@@ -790,6 +787,7 @@ describe('compositeDocument — hidden layers', () => {
     const target = backend.createSurface(200, 200);
 
     compositeDocument(target, makeDoc([rasterLayer('isolated', { isEnabled: false })]), caches, VIEW, {
+      backend,
       isolationLayerId: 'isolated',
     });
 
@@ -805,5 +803,119 @@ describe('compositeDocument — hidden layers', () => {
     compositeDocument(target, makeDoc([hiddenMask('m')]), caches, VIEW, { backend, isolationLayerId: 'm' });
 
     expect(target.callLog.some((e) => e.op === 'drawImage')).toBe(true);
+  });
+});
+
+describe('compositeDocument — prepared plans', () => {
+  const scene = () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    const top = caches.getOrCreate('top', 10, 10);
+    const bottom = caches.getOrCreate('bottom', 10, 10);
+    const target = backend.createSurface(50, 50);
+    const drawn = (): unknown[] => target.callLog.filter((e) => e.op === 'drawImage').map((e) => e.args[0]);
+    return { backend, bottom, caches, drawn, target, top };
+  };
+
+  it('draws from a plan prepared for the same document and isolation', () => {
+    const { backend, caches, drawn, target, top } = scene();
+    const doc = makeDoc([rasterLayer('top'), rasterLayer('bottom')]);
+    const isolatedTop = prepareComposite(doc, { isolationLayerId: 'top' });
+
+    compositeDocument(target, doc, caches, VIEW, { backend, isolationLayerId: 'top', preparation: isolatedTop });
+
+    expect(drawn()).toEqual([top.surface.canvas]);
+  });
+
+  it('ignores a plan prepared for another document or isolation', () => {
+    const { backend, bottom, caches, drawn, target, top } = scene();
+    const doc = makeDoc([rasterLayer('top'), rasterLayer('bottom')]);
+    const isolatedTop = prepareComposite(doc, { isolationLayerId: 'top' });
+
+    compositeDocument(target, doc, caches, VIEW, { backend, preparation: isolatedTop });
+    compositeDocument(target, { ...doc, stacks: stacksFrom([rasterLayer('bottom')]) }, caches, VIEW, {
+      backend,
+      preparation: prepareComposite(doc),
+    });
+
+    expect(drawn()).toEqual([bottom.surface.canvas, top.surface.canvas, bottom.surface.canvas]);
+  });
+});
+
+describe('compositeDocument — damage', () => {
+  const scene = () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    const a = caches.getOrCreateRect('a', { height: 10, width: 10, x: 0, y: 0 });
+    const b = caches.getOrCreateRect('b', { height: 10, width: 10, x: 0, y: 0 });
+    const doc = makeDoc([
+      rasterLayer('a'),
+      rasterLayer('b', { transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 50, y: 50 } }),
+    ]);
+    const target = backend.createSurface(100, 100);
+    const ops = (op: string) => target.callLog.filter((entry) => entry.op === op);
+    return { a, b, backend, caches, doc, ops, target };
+  };
+
+  it('performs no clears and no draws when every damaged region is offscreen', () => {
+    const { backend, caches, doc, target } = scene();
+    const diagnostics = createCanvasDiagnostics(true);
+
+    compositeDocument(target, doc, caches, VIEW, {
+      backend,
+      damage: { kind: 'regions', regions: [{ layerId: 'a', rect: { height: 10, width: 10, x: 1000, y: 0 } }] },
+      diagnostics,
+    });
+    compositeDocument(target, doc, caches, VIEW, { backend, damage: { kind: 'none' }, diagnostics });
+
+    expect(target.callLog).toEqual([]);
+    expect(diagnostics.snapshot().compositeFrames).toBe(0);
+  });
+
+  it('clears only the damaged screen region and skips layers outside it', () => {
+    const { a, backend, caches, doc, ops, target } = scene();
+
+    compositeDocument(target, doc, caches, VIEW, {
+      backend,
+      damage: { kind: 'regions', regions: [{ layerId: 'a', rect: { height: 4, width: 4, x: 2, y: 2 } }] },
+    });
+
+    expect(ops('clearRect').map((entry) => entry.args)).toEqual([[1, 1, 6, 6]]);
+    expect(ops('drawImage').map((entry) => entry.args[0])).toEqual([a.surface.canvas]);
+  });
+
+  it('repaints everything when damage names a layer the document no longer has', () => {
+    const { backend, caches, doc, ops, target } = scene();
+
+    compositeDocument(target, doc, caches, VIEW, {
+      backend,
+      damage: { kind: 'regions', regions: [{ layerId: 'gone', rect: { height: 4, width: 4, x: 2, y: 2 } }] },
+    });
+
+    expect(ops('clearRect').map((entry) => entry.args)).toEqual([[0, 0, 100, 100]]);
+    expect(ops('drawImage')).toHaveLength(2);
+  });
+
+  it('never asks for a group composite whose members miss the repaint region', () => {
+    const backend = createTestStubRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    caches.getOrCreateRect('member', { height: 10, width: 10, x: 0, y: 0 });
+    caches.getOrCreateRect('other', { height: 10, width: 10, x: 0, y: 0 });
+    const doc = makeDoc([], {
+      stacks: stacksFrom([
+        groupContract('g', [rasterLayer('member')], { opacity: 0.5 }),
+        rasterLayer('other', { transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 60, y: 60 } }),
+      ]),
+    });
+    const groupSurface = vi.fn(() => null);
+    const target = backend.createSurface(100, 100);
+
+    compositeDocument(target, doc, caches, VIEW, {
+      backend,
+      damage: { kind: 'regions', regions: [{ layerId: 'other', rect: { height: 10, width: 10, x: 0, y: 0 } }] },
+      groupSurface,
+    });
+
+    expect(groupSurface).not.toHaveBeenCalled();
   });
 });

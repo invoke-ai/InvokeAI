@@ -3,6 +3,7 @@ import type { PointerInput, Rect } from '@workbench/canvas-engine/types';
 
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
+import { ADMIT_ALL, commitStroke } from '@workbench/canvas-engine/tools/strokeEdit.testStub';
 import { createStrokeSession } from '@workbench/canvas-engine/tools/strokeSession';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -19,7 +20,15 @@ const pointer = (x: number, y: number, pressure = 0.5): PointerInput => ({
 const paint = (
   path: PointerInput[],
   batchSize: number,
-  opts: { opacity: number; size: number; thinning: number; hardness?: number; clipMaskRect?: Rect }
+  opts: {
+    opacity: number;
+    size: number;
+    thinning: number;
+    hardness?: number;
+    clipMaskRect?: Rect;
+    /** Batches delivered per presented frame; 1 renders every batch. */
+    batchesPerFrame?: number;
+  }
 ): { pixels: Uint8ClampedArray; rect: Rect } => {
   const backend = createDomRasterBackend();
   const layers = createLayerCacheStore(backend);
@@ -32,15 +41,25 @@ const paint = (
         return { rect: opts.clipMaskRect, surface };
       })()
     : null;
+  const frames: (() => void)[] = [];
   const ctx = {
     backend,
     createPath2D: (d?: string) => new Path2D(d),
-    emitStrokeCommitted: vi.fn(),
     invalidate: vi.fn(),
     layers,
     notifyLayerPainted: vi.fn(),
+    scheduleFrame: (task: () => void) => {
+      frames.push(task);
+      return () => {
+        const index = frames.indexOf(task);
+        if (index >= 0) {
+          frames.splice(index, 1);
+        }
+      };
+    },
   } as unknown as ToolContext;
   const session = createStrokeSession({
+    edit: ADMIT_ALL,
     clipMask,
     color: '#3b82f6',
     composite: 'source-over',
@@ -53,10 +72,14 @@ const paint = (
     thinning: opts.thinning,
     tool: 'brush',
   });
-  for (let i = 0; i < path.length; i += batchSize) {
+  const batchesPerFrame = opts.batchesPerFrame ?? 1;
+  for (let i = 0, batch = 1; i < path.length; i += batchSize, batch += 1) {
     session.addPoints(path.slice(i, i + batchSize));
+    if (batch % batchesPerFrame === 0) {
+      frames.splice(0).forEach((task) => task());
+    }
   }
-  const event = session.commit()!;
+  const event = commitStroke(session)!;
   return { pixels: event.afterImageData.data, rect: event.dirtyRect };
 };
 
@@ -78,12 +101,16 @@ const tapCoverage = (
   const ctx = {
     backend,
     createPath2D: (d?: string) => new Path2D(d),
-    emitStrokeCommitted: vi.fn(),
     invalidate: vi.fn(),
     layers,
     notifyLayerPainted: vi.fn(),
+    scheduleFrame: (task: () => void) => {
+      task();
+      return () => undefined;
+    },
   } as unknown as ToolContext;
   const session = createStrokeSession({
+    edit: ADMIT_ALL,
     color: '#3b82f6',
     composite,
     ctx,
@@ -96,7 +123,7 @@ const tapCoverage = (
     tool: composite === 'source-over' ? 'brush' : 'eraser',
   });
   session.addPoints([pointer(16.5, 16.5, options.pressure)]);
-  const event = session.commit()!;
+  const event = commitStroke(session)!;
   let max = 0;
   let sum = 0;
   for (let index = 3; index < event.afterImageData.data.length; index += 4) {
@@ -185,17 +212,32 @@ const sweep = (): PointerInput[] => {
 describe('incremental compositing produces the same coverage as recompositing everything', () => {
   // Band updates and incremental before-snapshots must preserve interior coverage. Boundary antialiasing may
   // differ by subpixels across batches; interior gaps or compounded opacity may not. Deliberately shrinking the
-  // band by 30px fails all four cases.
-  const cases: { batchSize: number; label: string; opacity: number; size: number; thinning: number }[] = [
+  // band by 30px fails every case.
+  const cases: {
+    batchSize: number;
+    batchesPerFrame?: number;
+    label: string;
+    opacity: number;
+    size: number;
+    thinning: number;
+  }[] = [
     { batchSize: 1, label: 'one sample per batch, opaque', opacity: 1, size: 220, thinning: 0 },
+    {
+      batchSize: 1,
+      batchesPerFrame: 5,
+      label: 'several batches coalesced into each frame',
+      opacity: 0.6,
+      size: 220,
+      thinning: 0.5,
+    },
     { batchSize: 1, label: 'one sample per batch, semi-transparent', opacity: 0.4, size: 220, thinning: 0 },
     { batchSize: 3, label: 'coalesced batches with pressure thinning', opacity: 0.75, size: 400, thinning: 0.5 },
     { batchSize: 7, label: 'large brush, coarse batches', opacity: 1, size: 900, thinning: 0 },
   ];
 
-  it.each(cases)('$label', ({ batchSize, opacity, size, thinning }) => {
+  it.each(cases)('$label', ({ batchSize, batchesPerFrame, opacity, size, thinning }) => {
     const path = sweep();
-    const incremental = paint(path, batchSize, { opacity, size, thinning });
+    const incremental = paint(path, batchSize, { batchesPerFrame, opacity, size, thinning });
     const wholesale = paint(path, path.length, { opacity, size, thinning });
 
     expect(incremental.rect).toEqual(wholesale.rect);
@@ -228,5 +270,65 @@ describe('incremental compositing produces the same coverage as recompositing ev
     expect(interiorDiffering / total).toBeLessThan(0.001);
     // The antialiased boundary may land a subpixel differently, but only there.
     expect(edgeDiffering / total).toBeLessThan(0.005);
+  });
+});
+
+describe('dense stylus trace', () => {
+  // A 240 Hz pen delivers about four batches per 60 Hz frame. Timings are informational; counts are the gate.
+  const trace = Array.from({ length: 4000 }, (_, i) =>
+    pointer(20 + i * 0.5, 300 + 120 * Math.sin(i / 60), 0.5 + 0.3 * Math.sin(i / 15))
+  );
+  const BATCH = 8;
+
+  const run = (batchesPerFrame: number): { ms: number; renders: number } => {
+    const backend = createDomRasterBackend();
+    const layers = createLayerCacheStore(backend);
+    layers.getOrCreate('L', 0, 0);
+    const frames: (() => void)[] = [];
+    const invalidate = vi.fn();
+    const ctx = {
+      backend,
+      createPath2D: (d?: string) => new Path2D(d),
+      invalidate,
+      layers,
+      notifyLayerPainted: vi.fn(),
+      scheduleFrame: (task: () => void) => {
+        frames.push(task);
+        return () => frames.splice(0);
+      },
+    } as unknown as ToolContext;
+    const session = createStrokeSession({
+      edit: ADMIT_ALL,
+      clipMask: null,
+      color: '#3b82f6',
+      composite: 'source-over',
+      ctx,
+      hardness: 1,
+      layerId: 'L',
+      opacity: 1,
+      pressureOpacity: false,
+      size: 20,
+      thinning: 0.5,
+      tool: 'brush',
+    });
+    const start = performance.now();
+    for (let i = 0, batch = 1; i < trace.length; i += BATCH, batch += 1) {
+      session.addPoints(trace.slice(i, i + BATCH));
+      if (batch % batchesPerFrame === 0) {
+        frames.splice(0).forEach((task) => task());
+      }
+    }
+    commitStroke(session);
+    return { ms: Math.round((performance.now() - start) * 10) / 10, renders: invalidate.mock.calls.length };
+  };
+
+  it('renders once per frame however many batches arrive between frames', async ({ annotate }) => {
+    const batches = trace.length / BATCH;
+    const everyBatch = run(1);
+    const perFrame = run(4);
+
+    expect(everyBatch.renders).toBe(batches + 1);
+    expect(perFrame.renders).toBe(batches / 4 + 1);
+    await annotate(`dense stroke ms: every batch ${everyBatch.ms}, per frame ${perFrame.ms}`);
   });
 });

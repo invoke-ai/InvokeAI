@@ -4,6 +4,8 @@ import type {
   CanvasInteractionState,
   CanvasLayerContract,
   CanvasNodeContract,
+  MergeDownResult,
+  NewRasterLayerResult,
 } from '@workbench/canvas-engine/api';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 
@@ -61,26 +63,27 @@ const createEngine = (interaction: Partial<CanvasInteractionState> = {}) => {
       }),
     },
     layers: {
-      clearMask: vi.fn(),
+      clearMask: vi.fn(() => ({ status: 'committed' })),
       commitPrepared: vi.fn(() => ({ status: 'committed' as const })),
       commitStructural: vi.fn(),
       duplicateLayers: vi.fn(() =>
         Promise.resolve<
-          { status: 'duplicated'; duplicateIds: string[]; selectedLayerId: string } | { status: 'not-ready' }
+          | { status: 'duplicated'; duplicateIds: string[]; selectedLayerId: string }
+          | { status: 'not-ready' | 'over-budget' | 'stale' }
         >({
           duplicateIds: ['new-layer'],
           selectedLayerId: 'new-layer',
           status: 'duplicated',
         })
       ),
-      mergeLayerDown: vi.fn(),
+      mergeLayerDown: vi.fn((): MergeDownResult => 'merged'),
       nudgeSelectedLayer: vi.fn(() => ({ status: 'committed' as const })),
     },
     selection: {
       deselect: vi.fn(),
       eraseSelection: vi.fn(),
       invertSelection: vi.fn(),
-      liftSelectionToLayer: vi.fn(),
+      liftSelectionToLayer: vi.fn((): NewRasterLayerResult => ({ layerId: 'lifted', status: 'created' })),
       selectAll: vi.fn(),
     },
     tools: { setTool: vi.fn(), stepBrushSize: vi.fn() },
@@ -95,6 +98,7 @@ let pasteFromClipboard: Mock<() => void>;
 const contextOf = (overrides: Partial<CanvasHotkeyContext> = {}): CanvasHotkeyContext => ({
   copySelection,
   dispatch,
+  reportLayerOperation: vi.fn(),
   reportPreparedCommit: () => undefined,
   reportStructuralCommit: () => undefined,
   document: documentOf([rasterLayer('a'), rasterLayer('b')], 'a'),
@@ -330,19 +334,28 @@ describe('duplicate: lift vs whole layer', () => {
     expect(engine.layers.duplicateLayers).toHaveBeenCalledWith(['a', 'b']);
   });
 
-  it.each(['declines', 'throws'] as const)('reports when whole-layer duplication %s', async (failure) => {
+  it('reports when whole-layer duplication throws', async () => {
     const engine = createEngine();
-    if (failure === 'declines') {
-      engine.layers.duplicateLayers.mockImplementation(() => Promise.resolve({ status: 'not-ready' }));
-    } else {
-      engine.layers.duplicateLayers.mockImplementation(() => Promise.reject(new Error('rejected')));
-    }
+    engine.layers.duplicateLayers.mockImplementation(() => Promise.reject(new Error('rejected')));
     const notifyLayerDuplicateFailed = vi.fn();
 
     executeCanvasHotkeyCommand('canvas.duplicateLayer', contextOf({ engine, notifyLayerDuplicateFailed }));
 
     await vi.waitFor(() => expect(notifyLayerDuplicateFailed).toHaveBeenCalledOnce());
   });
+
+  it.each(['not-ready', 'over-budget', 'stale'] as const)(
+    'explains a %s whole-layer duplication refusal',
+    async (status) => {
+      const engine = createEngine();
+      engine.layers.duplicateLayers.mockImplementation(() => Promise.resolve({ status }));
+      const reportLayerOperation = vi.fn();
+
+      executeCanvasHotkeyCommand('canvas.duplicateLayer', contextOf({ engine, reportLayerOperation }));
+
+      await vi.waitFor(() => expect(reportLayerOperation).toHaveBeenCalledExactlyOnceWith(status));
+    }
+  );
 });
 
 describe('clipboard', () => {
@@ -467,6 +480,17 @@ describe('history, selection, and brush size', () => {
   it('resetSelected clears the selected layer mask', () => {
     expect(run('canvas.resetSelected').layers.clearMask).toHaveBeenCalledWith('a');
   });
+
+  it('resetSelected explains a refused clear and stays silent when there is nothing to clear', () => {
+    const engine = createEngine();
+    const reportLayerOperation = vi.fn();
+    engine.layers.clearMask.mockReturnValueOnce({ status: 'over-budget' }).mockReturnValueOnce({ status: 'nothing' });
+
+    executeCanvasHotkeyCommand('canvas.resetSelected', contextOf({ engine, reportLayerOperation }));
+    executeCanvasHotkeyCommand('canvas.resetSelected', contextOf({ engine, reportLayerOperation }));
+
+    expect(reportLayerOperation).toHaveBeenCalledExactlyOnceWith('over-budget');
+  });
 });
 
 describe('mergeDown', () => {
@@ -483,6 +507,14 @@ describe('mergeDown', () => {
   it('refuses with no selected layer', () => {
     const engine = run('canvas.mergeDown', { document: documentOf([rasterLayer('a')], null) });
     expect(engine.layers.mergeLayerDown).not.toHaveBeenCalled();
+  });
+
+  it('reports a merge the engine refused', () => {
+    const engine = createEngine();
+    engine.layers.mergeLayerDown.mockReturnValue('over-budget');
+    const reportLayerOperation = vi.fn();
+    executeCanvasHotkeyCommand('canvas.mergeDown', contextOf({ engine, reportLayerOperation }));
+    expect(reportLayerOperation).toHaveBeenCalledExactlyOnceWith('over-budget');
   });
 });
 

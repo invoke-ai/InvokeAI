@@ -4,11 +4,9 @@ import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps'
 
 import { Stack, Text } from '@chakra-ui/react';
 import { Field, Slider } from '@platform/ui';
-import { type CanvasPreparedEngine, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { type CanvasPreparedEngine, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { applyStructuralPreview } from './layerOps';
 
 /** Edit modifier magnitude here with one commit per gesture; tree rows own enabling and removal. */
 
@@ -36,7 +34,7 @@ export const MaskModifierSettings = ({
   layer: CanvasInpaintMaskLayerContract;
 }) => {
   const { t } = useTranslation();
-  const commitPrepared = usePreparedCommit(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const field = FIELD_OF[kind];
   const modifier = layer[field];
   const beforeRef = useRef<typeof modifier | null>(null);
@@ -51,11 +49,11 @@ export const MaskModifierSettings = ({
         layerType: 'inpaint_mask',
         [field]: field === 'noise' ? { ...modifier, level: next } : { ...modifier, limit: next },
       } as const;
-      if (applyStructuralPreview(engine, { config, id: layer.id, type: 'updateCanvasLayerConfig' })) {
+      if (previewStructural({ config, id: layer.id, type: 'updateCanvasLayerConfig' })) {
         beforeRef.current ??= modifier;
       }
     },
-    [engine, field, layer.id, modifier]
+    [previewStructural, field, layer.id, modifier]
   );
 
   const handleChangeEnd = useCallback(

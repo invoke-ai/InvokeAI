@@ -30,14 +30,29 @@ export const DEFAULT_MAX_CONSECUTIVE_FAILURES = 5;
 /** Short barrier poll while another canvas operation transiently owns pixels. */
 export const DEFAULT_DEFERRED_RETRY_MS = 50;
 
+/** Unsaved pixels the barrier could not persist: uploads `failed`, or an open edit `held` them. */
 export class BitmapPersistenceError extends Error {
   readonly layerIds: readonly string[];
+  readonly reason: 'failed' | 'held';
 
-  constructor(layerIds: readonly string[]) {
-    super(`Canvas pixel persistence failed for ${layerIds.length} layer${layerIds.length === 1 ? '' : 's'}.`);
+  constructor(layerIds: readonly string[], reason: 'failed' | 'held' = 'failed') {
+    super(
+      reason === 'held'
+        ? 'Finish or cancel the current canvas edit first.'
+        : `Canvas pixel persistence failed for ${layerIds.length} layer${layerIds.length === 1 ? '' : 's'}.`
+    );
     this.name = 'BitmapPersistenceError';
     this.layerIds = [...layerIds];
+    this.reason = reason;
   }
+}
+
+export interface FlushPendingUploadsOptions {
+  /**
+   * Whether to wait while an open edit (a session, gesture or suspension) holds dirty pixels. Document pushes
+   * that the user cannot see through pass false and fail fast instead.
+   */
+  readonly waitForHeldPixels?: boolean;
 }
 
 /** Injectable timer seam (defaults to the global timers). */
@@ -49,10 +64,10 @@ export interface BitmapStoreTimers {
 /** Dependencies for {@link createBitmapStore}. */
 export interface BitmapStoreDeps {
   /**
-   * Atomically reads the content-sized cache surface and layer-local offset, or null when absent. Encoding and
-   * persisted placement must describe the same pixels.
+   * Atomically reads the content-sized cache surface and layer-local offset. Encoding and persisted placement must
+   * describe the same pixels. `'empty'` is a cache without visible extent; null means no cache exists at all.
    */
-  getLayerSurface(layerId: string): { surface: RasterSurface; offset: { x: number; y: number } } | null;
+  getLayerSurface(layerId: string): { surface: RasterSurface; offset: { x: number; y: number } } | 'empty' | null;
   /**
    * Reads the current source to prevent an old dirty mark from persisting surviving cache pixels over a layer
    * converted away from paint.
@@ -126,7 +141,7 @@ export interface BitmapStore {
   /** Cancels pending persistence and invalidates an in-flight result for one layer. */
   discardLayer(layerId: string): void;
   /** Flushes every dirty layer immediately and resolves once all in-flight uploads settle. */
-  flushPendingUploads(): Promise<void>;
+  flushPendingUploads(options?: FlushPendingUploadsOptions): Promise<void>;
   /**
    * Detects the most recently applied paint ref so the engine skips self-echo rasterization. Different refs
    * rerasterize. Null is never an echo: clearing must collapse cache bounds.
@@ -401,22 +416,19 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       return;
     }
     const placed = deps.getLayerSurface(layerId);
-    if (pendingClears.has(layerId) && !placed) {
+    if (placed === 'empty' || (placed === null && pendingClears.has(layerId))) {
       dirty.delete(layerId);
       clearTimer(layerId);
       clearLayerBitmap(layerId, requeueFailure);
       return;
     }
-    if (pendingClears.has(layerId)) {
-      // A failed clear may outlive the empty cache that requested it. A later
-      // rasterization can restore visible pixels without calling markLayerDirty,
-      // so the fresh surface verdict wins over the stale clear intent.
-      pendingClears.delete(layerId);
-    }
+    // A failed clear may outlive the empty cache that requested it. A later
+    // rasterization can restore visible pixels without calling markLayerDirty,
+    // so the fresh surface verdict wins over the stale clear intent.
+    pendingClears.delete(layerId);
     if (!placed) {
-      // Layer or its cache is gone (or empty); nothing to persist.
-      dirty.delete(layerId);
-      clearTimer(layerId);
+      // Unpersisted pixels without a cache cannot be saved; reporting success would upload nothing.
+      requeueFailure(new Error('Canvas pixels for this layer are no longer available.'));
       return;
     }
     // Capture surface and offset atomically for encoding. Growth during awaits marks dirty again, so a follow-up
@@ -653,9 +665,9 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
   /** Safety net against a genuine infinite loop; real barrier calls settle in a handful of rounds. */
   const MAX_BARRIER_ITERATIONS = 10_000;
 
-  const flushPendingUploads = async (): Promise<void> => {
+  const flushPendingUploads = async ({ waitForHeldPixels = true }: FlushPendingUploadsOptions = {}): Promise<void> => {
     // Flush dirty layers and await in-flight work until newer strokes also persist. Do not retry failures within
-    // this barrier; poll deferred ownership until pixels are released.
+    // this barrier; poll deferred ownership until pixels are released, unless the caller cannot wait.
     const blockedThisBarrier = new Set<string>();
     for (let iteration = 0; iteration < MAX_BARRIER_ITERATIONS; iteration += 1) {
       const toFlush = Array.from(dirty).filter((layerId) => !blockedThisBarrier.has(layerId) && !isSuspended(layerId));
@@ -665,7 +677,11 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
       }
       const ops = [...inFlight.values()];
       if (ops.length === 0) {
-        if (Array.from(dirty).some((layerId) => isSuspended(layerId))) {
+        const suspendedLayerIds = Array.from(dirty).filter((layerId) => isSuspended(layerId));
+        if (suspendedLayerIds.length > 0) {
+          if (!waitForHeldPixels) {
+            throw new BitmapPersistenceError(suspendedLayerIds, 'held');
+          }
           await waitForSuspensionChange();
           continue;
         }
@@ -678,15 +694,18 @@ export const createBitmapStore = (deps: BitmapStoreDeps): BitmapStore => {
         return;
       }
       await Promise.all(ops);
-      let deferredThisRound = false;
+      const deferredLayerIds: string[] = [];
       for (const layerId of toFlush) {
         if (dirty.has(layerId) && dirtyReason.get(layerId) === 'failure') {
           blockedThisBarrier.add(layerId);
         } else if (dirty.has(layerId) && dirtyReason.get(layerId) === 'deferred') {
-          deferredThisRound = true;
+          deferredLayerIds.push(layerId);
         }
       }
-      if (deferredThisRound) {
+      if (deferredLayerIds.length > 0) {
+        if (!waitForHeldPixels) {
+          throw new BitmapPersistenceError(deferredLayerIds, 'held');
+        }
         await sleep(DEFAULT_DEFERRED_RETRY_MS);
       }
     }

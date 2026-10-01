@@ -67,7 +67,18 @@ const Harness = () => {
           ),
       },
       layers: {
-        applyStructuralPreview: apply,
+        beginStructuralPreview: () => ({
+          apply,
+          cancel: (restore?: CanvasProjectMutation) => {
+            if (restore) {
+              apply(restore);
+            }
+          },
+          commit: (label: string, edit: PreparedDocumentEdit) => {
+            commits.push({ edit, label });
+            return { status: apply(edit.forward) ? ('committed' as const) : ('dispatch-rejected' as const) };
+          },
+        }),
         commitPrepared: (label: string, edit: PreparedDocumentEdit) => {
           commits.push({ edit, label });
           return { status: apply(edit.forward) ? ('committed' as const) : ('dispatch-rejected' as const) };

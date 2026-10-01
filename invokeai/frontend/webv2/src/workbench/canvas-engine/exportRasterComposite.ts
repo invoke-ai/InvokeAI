@@ -18,7 +18,7 @@ export type RasterCompositeExportResult =
   | { status: 'empty' | 'stale' | 'not-ready' | 'over-budget' };
 
 export interface RasterCompositeExportSnapshot {
-  contentEpoch: number;
+  directPixelEpoch: number;
   document: CanvasDocumentContractV3 | null;
   documentGeneration: number;
   lifecycleGeneration: number;

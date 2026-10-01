@@ -9,6 +9,7 @@ import { createTestInsertionAnchorCapture } from '@workbench/canvas-engine/docum
 import { createEngineStores } from '@workbench/canvas-engine/engineStores';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createTestStubRasterBackend, type StubRasterSurface } from '@workbench/canvas-engine/render/raster.testStub';
+import { createRecordingStrokeEdit } from '@workbench/canvas-engine/tools/strokeEdit.testStub';
 import { describe, expect, it, vi } from 'vitest';
 
 import { createShapeTool, polygonShapeFrom, rectFromDrag } from './shapeTool';
@@ -63,6 +64,8 @@ interface StructuralCommit {
 }
 
 const createHarness = (doc: CanvasDocumentContractV3) => {
+  const strokeEdit = createRecordingStrokeEdit();
+  const admission = { refuse: false };
   const dispatched: CanvasProjectMutation[] = [];
   const commits: StructuralCommit[] = [];
   const stores = createEngineStores();
@@ -70,6 +73,7 @@ const createHarness = (doc: CanvasDocumentContractV3) => {
   const layers = createLayerCacheStore(backend);
   let idCounter = 0;
   const ctx: ToolContext = {
+    scheduleFrame: () => () => undefined,
     backend,
     commitStructural: (label, forward, inverse) => {
       commits.push({ forward, inverse, label });
@@ -79,7 +83,7 @@ const createHarness = (doc: CanvasDocumentContractV3) => {
     createLayerId: () => `shape-${++idCounter}`,
     createPath2D: (d) => ({ d }) as unknown as Path2D,
     dispatch: (action) => dispatched.push(action),
-    emitStrokeCommitted: vi.fn(),
+    beginStrokeEdit: () => (admission.refuse ? null : strokeEdit.edit),
     getDocument: () => doc,
     invalidate: vi.fn(),
     layers,
@@ -90,7 +94,16 @@ const createHarness = (doc: CanvasDocumentContractV3) => {
     updateCursor: vi.fn(),
     viewport: identityViewport,
   };
-  return { commits, ctx, dispatched, layers, previewOf: () => stores.shapePreview.get(), stores };
+  return {
+    commits,
+    ctx,
+    dispatched,
+    layers,
+    previewOf: () => stores.shapePreview.get(),
+    admission,
+    stores,
+    strokeEdit,
+  };
 };
 
 const down = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerDown?.(ctx, i);
@@ -291,6 +304,38 @@ describe('shape tool: polygon and freehand kinds', () => {
     }
   });
 
+  it('decimates a freehand trace by on-screen travel and keeps the release point', () => {
+    const h = createHarness(makeDoc());
+    h.stores.shapeOptions.set({ ...h.stores.shapeOptions.get(), kind: 'freehand' });
+    const tool = createShapeTool();
+    const zoomedOut = (x: number, y: number): PointerInput => ({
+      ...pointer(x, y),
+      screenPoint: { x: x / 10, y: y / 10 },
+    });
+
+    down(tool, h.ctx, zoomedOut(0, 0));
+    // 10 document units are 1 CSS px at 0.1× zoom: decimated away.
+    move(tool, h.ctx, zoomedOut(10, 0));
+    move(tool, h.ctx, zoomedOut(30, 0));
+    move(tool, h.ctx, zoomedOut(30, 30));
+    expect(h.stores.lassoPreview.get()).toMatchObject({
+      points: [
+        { x: 0, y: 0 },
+        { x: 30, y: 0 },
+        { x: 30, y: 30 },
+      ],
+    });
+    up(tool, h.ctx, zoomedOut(5, 30));
+
+    const forward = h.commits[0]?.forward;
+    if (forward?.type === 'addCanvasLayer' && forward.layer.type === 'raster') {
+      expect((forward.layer.source as { points?: unknown[] }).points).toHaveLength(4);
+      expect(forward.layer.source).toMatchObject({ height: 30, width: 30 });
+    } else {
+      throw new Error('expected a polygon layer');
+    }
+  });
+
   it('commits nothing for a flat polygon', () => {
     // The third point survives the 1px dedupe; only the sub-pixel bounds reject it.
     expect(
@@ -358,8 +403,8 @@ describe('shape tool: placement', () => {
     up(tool, h.ctx, pointer(170, 100));
 
     expect(h.commits).toHaveLength(0);
-    expect(h.ctx.emitStrokeCommitted).toHaveBeenCalledOnce();
-    const event = vi.mocked(h.ctx.emitStrokeCommitted).mock.calls[0]![0];
+    expect(h.strokeEdit.record.commits).toHaveLength(1);
+    const event = h.strokeEdit.record.commits[0]!;
     // Layer-local: the document rect minus the layer's offset.
     expect(event.dirtyRect).toEqual({ height: 40, width: 60, x: 10, y: 10 });
     expect(event.tool).toBe('shape');
@@ -367,6 +412,40 @@ describe('shape tool: placement', () => {
     expect(h.layers.get('paint-1')?.rect).toEqual({ height: 40, width: 60, x: 10, y: 10 });
     const surface = h.layers.get('paint-1')?.surface as StubRasterSurface;
     expect(surface.callLog.some((entry) => entry.op === 'drawImage')).toBe(true);
+  });
+
+  it('leaves the paint layer untouched when the shape is refused admission', () => {
+    const layer = paintLayer({ transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 100, y: 50 } });
+    const h = createHarness(makeDoc({ stacks: stacksFrom([layer]), selectedLayerId: 'paint-1' }));
+    h.admission.refuse = true;
+    const tool = createShapeTool();
+
+    down(tool, h.ctx, pointer(110, 60));
+    move(tool, h.ctx, pointer(170, 100));
+    up(tool, h.ctx, pointer(170, 100));
+
+    expect(h.strokeEdit.record.commits).toHaveLength(0);
+    expect(h.commits).toHaveLength(0);
+    expect(h.layers.peek('paint-1')).toBeUndefined();
+  });
+
+  it('restores the pixels and cache extent when the shape cannot be recorded', () => {
+    const layer = paintLayer({ transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 100, y: 50 } });
+    const h = createHarness(makeDoc({ stacks: stacksFrom([layer]), selectedLayerId: 'paint-1' }));
+    h.layers.getOrCreateRect('paint-1', { height: 4, width: 4, x: 0, y: 0 }).stale = false;
+    const cancel = vi.spyOn(h.strokeEdit.edit, 'cancel');
+    h.strokeEdit.edit.commit = () => false;
+    const tool = createShapeTool();
+
+    down(tool, h.ctx, pointer(110, 60));
+    move(tool, h.ctx, pointer(170, 100));
+    up(tool, h.ctx, pointer(170, 100));
+
+    expect(h.layers.peek('paint-1')?.rect).toEqual({ height: 4, width: 4, x: 0, y: 0 });
+    const writes = (h.layers.peek('paint-1')!.surface as StubRasterSurface).callLog.map((entry) => entry.op);
+    expect(writes.lastIndexOf('putImageData')).toBeGreaterThan(writes.lastIndexOf('drawImage'));
+    expect(cancel).toHaveBeenCalledOnce();
+    expect(h.commits).toHaveLength(0);
   });
 
   it('maps the shape through a scaled layer and clamps the cache growth to the selection', () => {
@@ -380,7 +459,7 @@ describe('shape tool: placement', () => {
     move(tool, h.ctx, pointer(170, 100));
     up(tool, h.ctx, pointer(170, 100));
 
-    const event = vi.mocked(h.ctx.emitStrokeCommitted).mock.calls[0]![0];
+    const event = h.strokeEdit.record.commits[0]!;
     // Document 110..140 × 60..90 (the selection's extent) → local (5..20, 5..20) at half scale.
     expect(event.dirtyRect).toEqual({ height: 15, width: 15, x: 5, y: 5 });
     expect(h.layers.get('paint-1')?.rect).toEqual(event.dirtyRect);
@@ -396,7 +475,7 @@ describe('shape tool: placement', () => {
     down(tool, h.ctx, pointer(4, 4));
     move(tool, h.ctx, pointer(60, 60));
     up(tool, h.ctx, pointer(60, 60));
-    expect(vi.mocked(h.ctx.emitStrokeCommitted).mock.calls[0]![0].dirtyRect).toEqual({
+    expect(h.strokeEdit.record.commits[0]!.dirtyRect).toEqual({
       height: 4,
       width: 4,
       x: 4,
@@ -407,7 +486,7 @@ describe('shape tool: placement', () => {
     move(tool, h.ctx, pointer(60, 60));
     up(tool, h.ctx, pointer(60, 60));
     // Nothing to draw: no stroke event, no history, no new layer.
-    expect(h.ctx.emitStrokeCommitted).toHaveBeenCalledOnce();
+    expect(h.strokeEdit.record.commits).toHaveLength(1);
     expect(h.commits).toHaveLength(0);
     expect(h.layers.get('paint-1')?.rect).toEqual({ height: 4, width: 4, x: 4, y: 4 });
   });
@@ -422,7 +501,7 @@ describe('shape tool: placement', () => {
     move(tool, h.ctx, pointer(70, 50));
     up(tool, h.ctx, pointer(70, 50));
 
-    expect(h.ctx.emitStrokeCommitted).not.toHaveBeenCalled();
+    expect(h.strokeEdit.record.commits).toHaveLength(0);
     expect(h.commits).toHaveLength(0);
   });
 
@@ -437,7 +516,7 @@ describe('shape tool: placement', () => {
     up(tool, h.ctx, pointer(70, 50));
 
     expect(h.ctx.requestLayerRasterization).toHaveBeenCalledWith('paint-1');
-    expect(h.ctx.emitStrokeCommitted).not.toHaveBeenCalled();
+    expect(h.strokeEdit.record.commits).toHaveLength(0);
     expect(h.commits).toHaveLength(0);
   });
 
@@ -453,7 +532,7 @@ describe('shape tool: placement', () => {
     move(tool, h.ctx, pointer(70, 50));
     up(tool, h.ctx, pointer(70, 50));
 
-    expect(h.ctx.emitStrokeCommitted).not.toHaveBeenCalled();
+    expect(h.strokeEdit.record.commits).toHaveLength(0);
     expect(h.commits[0]?.forward.type).toBe('addCanvasLayer');
   });
 
@@ -466,7 +545,7 @@ describe('shape tool: placement', () => {
     move(tool, h.ctx, pointer(70, 50));
     up(tool, h.ctx, pointer(70, 50));
 
-    expect(h.ctx.emitStrokeCommitted).not.toHaveBeenCalled();
+    expect(h.strokeEdit.record.commits).toHaveLength(0);
     expect(h.commits[0]?.forward.type).toBe('addCanvasLayer');
   });
 });

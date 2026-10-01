@@ -18,8 +18,10 @@ export type PaintCacheTrim = 'deferred' | 'emptied' | 'kept' | 'trimmed';
 
 export interface TrimPaintCacheDeps {
   readonly layers: LayerCacheStore;
-  /** Injected by the engine, so this module stays free of engine knowledge. */
+  /** A gesture, session or rasterization owns the pixels; persistence retries once it ends. */
   readonly isLayerBusy: (layerId: string) => boolean;
+  /** A read lease holds the surface; persist it untrimmed rather than reshaping pixels it reads. */
+  readonly isLayerPinned: (layerId: string) => boolean;
 }
 
 export const trimPaintCacheToAlpha = (deps: TrimPaintCacheDeps, layerId: string): PaintCacheTrim => {
@@ -33,6 +35,9 @@ export const trimPaintCacheToAlpha = (deps: TrimPaintCacheDeps, layerId: string)
   // would read a blank surface and clear a good bitmap on every document load.
   if (!entry.hasPublishedPixels || entry.stale || deps.isLayerBusy(layerId)) {
     return 'deferred';
+  }
+  if (deps.isLayerPinned(layerId)) {
+    return 'kept';
   }
   const bounds = alphaBounds(entry.surface.ctx.getImageData(0, 0, entry.rect.width, entry.rect.height));
   if (isEmpty(bounds)) {

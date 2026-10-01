@@ -12,8 +12,10 @@ const createHarness = () => {
   const deps = {
     closeProject: vi.fn(),
     deleteProject: vi.fn(() => Promise.resolve()),
+    flushPixels: vi.fn(() => Promise.resolve()),
     flushProject: vi.fn(() => Promise.resolve<ProjectPushOutcome>({ documentJson: '{}', kind: 'acknowledged' })),
     getOpenProjectIds: vi.fn(() => openIds),
+    getProject: vi.fn(() => undefined),
     markProjectDeleted: vi.fn(),
     renameProject: vi.fn(),
     unmarkProjectDeleted: vi.fn(),
@@ -119,6 +121,8 @@ describe('createOpenProjectBroker', () => {
 
     expect(harness.deps.renameProject).toHaveBeenCalledWith('a', 'New name');
     expect(order).toEqual(['rename', 'flush']);
+    // A rename never waits on, or fails with, the canvas paint barrier.
+    expect(harness.deps.flushPixels).not.toHaveBeenCalled();
   });
 
   it('routes deletion and closing at the project it was published for', async () => {

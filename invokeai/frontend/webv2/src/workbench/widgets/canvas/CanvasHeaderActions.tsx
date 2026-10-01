@@ -1,8 +1,8 @@
 import type { Rect } from '@workbench/canvas-engine/api';
+/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { Project } from '@workbench/projectContracts';
 import type { WidgetViewProps } from '@workbench/widgetContracts';
-/* oxlint-disable react-perf/jsx-no-new-function-as-prop */
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 
 import { Box, HStack, Icon, Menu, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { useModifierHeld } from '@platform/react/useModifierHeld';
@@ -12,6 +12,7 @@ import { Group } from '@platform/ui/Group';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getCanvasEngine } from '@workbench/canvas-operations/api';
+import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { useNotify } from '@workbench/useNotify';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
@@ -45,7 +46,6 @@ import {
 import { CANVAS_SNAP_TO_GRID_KEY, canvasSettingsEqual, resolveCanvasSettings } from './canvasSettings';
 import { useCanvasCanRedo, useCanvasCanUndo, useCanvasDocumentEditingLocked, useCanvasZoom } from './engineStoreHooks';
 import { computeFitBboxToLayers, computeFitBboxToMasks } from './fitBbox';
-import { useCanvasEngine } from './useCanvasEngine';
 import { useCanvasGallerySave } from './useCanvasGallerySave';
 import { reportStructuralCommit } from './useStructuralCommit';
 import { formatZoomPercent, zoomMenuOptions } from './zoomOptions';

@@ -2216,6 +2216,8 @@ describe('durable project persistence', () => {
       close: vi.fn(),
       deleteOnServer: vi.fn(() => Promise.resolve()),
       flush: vi.fn(() => Promise.resolve({ documentJson: '', kind: 'acknowledged' as const })),
+      current: vi.fn(() => undefined),
+      flushPixels: vi.fn(() => Promise.resolve()),
       markDeleted: vi.fn(),
       rename: vi.fn(() => Promise.resolve()),
       unmarkDeleted: vi.fn(),

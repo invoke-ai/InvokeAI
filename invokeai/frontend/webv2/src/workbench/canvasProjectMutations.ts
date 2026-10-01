@@ -23,13 +23,13 @@ import {
 } from '@workbench/canvas-engine/api';
 import {
   childrenAt,
-  deriveIndexForValueEdit,
   getDocumentIndex,
   getDocumentLayer,
   getDocumentNode,
   hasDocumentNode,
   indexStacks,
   outermostNodes,
+  updateNodeValues,
   type CanvasDocumentIndex,
   type CanvasNodeEntry,
 } from '@workbench/canvas-engine/document/documentIndex';
@@ -38,8 +38,6 @@ import {
   collectSubtreeLeaves,
   isGroupNode,
   removeNodes,
-  updateNodes,
-  updateNodesTracked,
 } from '@workbench/canvas-engine/document/documentTree';
 import { insertNodesAtAnchor } from '@workbench/canvas-engine/document/insertionAnchors';
 import { isOverlayStack, layerStackOf, reorderSiblings } from '@workbench/canvas-engine/document/layerStacks';
@@ -147,23 +145,11 @@ const withinLimits = (stacks: CanvasStackForests): boolean => {
   return index.maxDepth <= CANVAS_MAX_NODE_DEPTH && index.byId.size <= CANVAS_MAX_NODE_COUNT;
 };
 
-/** Value edits keep the structure, so the next forests inherit the index instead of rebuilding it. */
-const updateNodeValues = (
-  stacks: CanvasStackForests,
-  updates: Iterable<[string, (node: CanvasNodeContract) => CanvasNodeContract]>
-): CanvasStackForests => {
-  const next = updateNodesTracked(stacks, new Map(updates));
-  if (next.stacks !== stacks) {
-    deriveIndexForValueEdit(stacks, next.stacks, next.changed);
-  }
-  return next.stacks;
-};
-
 const mapNode = (
   document: CanvasDocumentContractV3,
   id: string,
   update: (node: CanvasNodeContract) => CanvasNodeContract
-): CanvasDocumentContractV3 => withStacks(document, updateNodeValues(document.stacks, [[id, update]]));
+): CanvasDocumentContractV3 => withStacks(document, updateNodeValues(document.stacks, new Map([[id, update]])));
 
 const mapLayer = (
   document: CanvasDocumentContractV3,
@@ -174,7 +160,7 @@ const mapLayer = (
 const mapNodes = (
   document: CanvasDocumentContractV3,
   updates: Iterable<[string, (node: CanvasNodeContract) => CanvasNodeContract]>
-): CanvasDocumentContractV3 => withStacks(document, updateNodeValues(document.stacks, updates));
+): CanvasDocumentContractV3 => withStacks(document, updateNodeValues(document.stacks, new Map(updates)));
 
 const setCanvasLayersEnabled = (
   document: CanvasDocumentContractV3,
@@ -446,15 +432,17 @@ const applyLayerStackMutation = (
   const lockedById = new Map(mutation.lockedUpdates?.map((update) => [update.id, update.isLocked]) ?? []);
   stacks = updateNodeValues(
     stacks,
-    [...new Set([...enabledById.keys(), ...lockedById.keys()])].map(
-      (id): [string, (node: CanvasNodeContract) => CanvasNodeContract] => [
-        id,
-        (node) => {
-          const isEnabled = enabledById.get(id) ?? node.isEnabled;
-          const isLocked = lockedById.get(id) ?? node.isLocked;
-          return isEnabled === node.isEnabled && isLocked === node.isLocked ? node : { ...node, isEnabled, isLocked };
-        },
-      ]
+    new Map(
+      [...new Set([...enabledById.keys(), ...lockedById.keys()])].map(
+        (id): [string, (node: CanvasNodeContract) => CanvasNodeContract] => [
+          id,
+          (node) => {
+            const isEnabled = enabledById.get(id) ?? node.isEnabled;
+            const isLocked = lockedById.get(id) ?? node.isLocked;
+            return isEnabled === node.isEnabled && isLocked === node.isLocked ? node : { ...node, isEnabled, isLocked };
+          },
+        ]
+      )
     )
   );
   if (stacks !== document.stacks && !withinLimits(stacks)) {
@@ -638,7 +626,7 @@ const mergeLayersDown = (
     type: 'raster',
   };
   const stacks = removeNodes(
-    updateNodes(document.stacks, new Map([[below.id, () => merged]])),
+    updateNodeValues(document.stacks, new Map([[below.id, () => merged]])),
     new Set([upper.node.id])
   );
   return {
@@ -884,10 +872,13 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
         if (!applicable) {
           return document;
         }
-        return mutation.updates.reduce(
-          (current, update) => mapNode(current, update.id, (node) => patchLayerConfig(node, update.config)),
-          document
-        );
+        // One value edit for the batch; repeated ids apply their patches in order.
+        const patches = new Map<string, (node: CanvasNodeContract) => CanvasNodeContract>();
+        for (const { config, id } of mutation.updates) {
+          const earlier = patches.get(id);
+          patches.set(id, (node) => patchLayerConfig(earlier ? earlier(node) : node, config));
+        }
+        return mapNodes(document, patches);
       });
     case 'convertCanvasLayer': {
       if (mutation.layer.type !== mutation.targetType) {
@@ -933,21 +924,23 @@ export const applyCanvasProjectMutation = (project: Project, mutation: CanvasPro
             ? document.stacks
             : updateNodeValues(
                 document.stacks,
-                getDocumentIndex(document).leaves.map(
-                  (leaf): [string, (node: CanvasNodeContract) => CanvasNodeContract] => [
-                    leaf.id,
-                    (node) =>
-                      isGroupNode(node)
-                        ? node
-                        : {
-                            ...node,
-                            transform: {
-                              ...node.transform,
-                              x: node.transform.x + offsetX,
-                              y: node.transform.y + offsetY,
+                new Map(
+                  getDocumentIndex(document).leaves.map(
+                    (leaf): [string, (node: CanvasNodeContract) => CanvasNodeContract] => [
+                      leaf.id,
+                      (node) =>
+                        isGroupNode(node)
+                          ? node
+                          : {
+                              ...node,
+                              transform: {
+                                ...node.transform,
+                                x: node.transform.x + offsetX,
+                                y: node.transform.y + offsetY,
+                              },
                             },
-                          },
-                  ]
+                    ]
+                  )
                 )
               ),
         width,
