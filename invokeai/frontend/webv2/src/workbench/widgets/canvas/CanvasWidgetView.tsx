@@ -14,7 +14,6 @@ import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { useCanvasProjectMutationDispatch } from '@workbench/useCanvasProjectMutationDispatch';
 import { useNotify } from '@workbench/useNotify';
 import { CanvasLayerContextMenu } from '@workbench/widgets/layers/LayerContextMenu';
-import { clearLayerPropertiesRequest } from '@workbench/widgets/layers/layerPropertiesRequestStore';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import {
   useActiveProjectId,
@@ -85,12 +84,6 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const fontReferences = useMemo(() => engine?.fonts.collectReferences(document) ?? [], [document, engine]);
   const operation = useCanvasOperation(engine);
   const operationKind = operation?.status === 'active' ? operation.identity.kind : null;
-  // An operation's panel supersedes any pending layer-properties request.
-  useEffect(() => {
-    if (operationKind) {
-      clearLayerPropertiesRequest();
-    }
-  }, [operationKind]);
   const { isSaving, save: saveToGallery } = useCanvasGallerySave(engine);
   const { createFromBbox, isCreating } = useCreateFromBbox(engine);
 

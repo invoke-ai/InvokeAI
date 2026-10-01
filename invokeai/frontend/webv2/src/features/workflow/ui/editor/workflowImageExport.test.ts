@@ -1,8 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
 import {
-  EXPORT_MAX_CANVAS_DIMENSION,
-  EXPORT_MAX_CANVAS_PIXELS,
   EXPORT_PADDING,
   EXPORT_SCALE,
   EXPORT_STYLE_PROPERTIES,
@@ -29,13 +27,16 @@ describe('workflow image export', () => {
     });
   });
 
-  it('keeps large exports within the total canvas pixel budget', () => {
-    const dimensions = getWorkflowImageDimensions({ x: 0, y: 0, width: 9000, height: 9000 });
+  it.each([
+    [9000, 9000, 18400, 18400],
+    [20000, 300, 40400, 1000],
+    [300, 20000, 1000, 40400],
+  ])('preserves full export resolution for %i by %i bounds', (width, height, canvasWidth, canvasHeight) => {
+    const dimensions = getWorkflowImageDimensions({ x: 0, y: 0, width, height });
 
-    expect(dimensions.canvasWidth).toBeLessThanOrEqual(EXPORT_MAX_CANVAS_DIMENSION);
-    expect(dimensions.canvasHeight).toBeLessThanOrEqual(EXPORT_MAX_CANVAS_DIMENSION);
-    expect(dimensions.canvasWidth * dimensions.canvasHeight).toBeLessThanOrEqual(EXPORT_MAX_CANVAS_PIXELS);
-    expect(dimensions.canvasWidth / dimensions.canvasHeight).toBeCloseTo(1);
+    expect(dimensions.canvasWidth).toBe(canvasWidth);
+    expect(dimensions.canvasHeight).toBe(canvasHeight);
+    expect(getWorkflowExportOptions(dimensions, 'white').skipAutoScale).toBe(true);
   });
 
   it('keeps capture clone local to an offscreen staging wrapper', () => {
@@ -69,6 +70,7 @@ describe('workflow image export', () => {
       canvasHeight: 1000,
       backgroundColor: 'rgb(1, 2, 3)',
       pixelRatio: 1,
+      skipAutoScale: true,
       includeStyleProperties: [...EXPORT_STYLE_PROPERTIES],
       imagePlaceholder: 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=',
       onImageErrorHandler: expect.any(Function),

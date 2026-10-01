@@ -69,6 +69,15 @@ export const popoverSlotRecipe = defineSlotRecipe({
   },
 });
 
+/** Chakra dims descriptions to 80%, which drops them below AA on the solid status fills. */
+export const toastSlotRecipe = defineSlotRecipe({
+  ...chakraSlotRecipes.toast,
+  base: {
+    ...chakraSlotRecipes.toast.base,
+    description: { ...chakraSlotRecipes.toast.base?.description, opacity: 1 },
+  },
+});
+
 export const tabsSlotRecipe = defineSlotRecipe({
   ...chakraSlotRecipes.tabs,
   base: {

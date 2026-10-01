@@ -16,6 +16,7 @@ import {
   getWorkflowContentBounds,
   getWorkflowExportOptions,
   WORKFLOW_EXPORT_TIMEOUT_MS,
+  WORKFLOW_EXPORT_IMAGE_TIMEOUT_MS,
 } from './workflowImageExport';
 
 type FakeElement = {
@@ -24,6 +25,7 @@ type FakeElement = {
   children: FakeElement[];
   cloneNode: () => FakeElement;
   id?: string;
+  isConnected: boolean;
   matches: () => boolean;
   parentElement: FakeElement | null;
   getBoundingClientRect: () => { left: number; top: number; width: number; height: number };
@@ -42,6 +44,7 @@ const createFakeElement = (overrides: Partial<FakeElement> = {}): FakeElement =>
     attributes: [],
     children: [],
     cloneNode: () => element,
+    isConnected: true,
     getBoundingClientRect: () => ({ left: 0, top: 0, width: 1000, height: 1000 }),
     matches: () => false,
     parentElement: null,
@@ -95,6 +98,129 @@ describe('workflow image export edge cases', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useRealTimers();
+  });
+
+  it.each(['failed', 'hung'] as const)(
+    'replaces %s source images without changing the editor or retaining timers',
+    async (state) => {
+      vi.useFakeTimers();
+      const { flowElement, clone, stagingWrapper } = createExportDom();
+      const decode = vi.fn(() =>
+        state === 'failed' ? Promise.reject(new Error('Unavailable')) : new Promise<void>(() => {})
+      );
+      const sourceImage = { decode, src: 'source.png' };
+      const replacement = vi.fn();
+      const clonedImage = { src: 'source.png', alt: 'source.png', replaceWith: replacement };
+      const selector = '[data-workflow-export-field-value="true"] img';
+      flowElement.querySelectorAll = (query) => (query === selector ? [sourceImage as unknown as FakeElement] : []);
+      clone.querySelectorAll = (query) => (query === selector ? [clonedImage as unknown as FakeElement] : []);
+      const fallback = { textContent: '', style: {} };
+      vi.stubGlobal('document', {
+        body: flowElement.parentElement,
+        createElement: (tag: string) => (tag === 'span' ? fallback : stagingWrapper),
+      });
+      vi.mocked(toBlob).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+      const exportPromise = exportWorkflowAsPng({
+        flowElement: flowElement as unknown as HTMLElement,
+        bounds: { x: 0, y: 0, width: 100, height: 100 },
+        workflowName: 'Workflow',
+        fallbackWorkflowName: 'Unnamed Workflow',
+      });
+      try {
+        await vi.advanceTimersByTimeAsync(state === 'hung' ? WORKFLOW_EXPORT_IMAGE_TIMEOUT_MS - 1 : 0);
+        if (state === 'hung') {
+          expect(toBlob).not.toHaveBeenCalled();
+          await vi.advanceTimersByTimeAsync(1);
+        }
+        await exportPromise;
+        expect(replacement).toHaveBeenCalledWith(fallback);
+        expect(fallback.textContent).toBe('source.png');
+        expect(flowElement.querySelectorAll(selector)).toEqual([sourceImage]);
+        expect(downloadBlob).toHaveBeenCalledOnce();
+        expect(stagingWrapper.remove).toHaveBeenCalledOnce();
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it.each(['removed', 'replaced'] as const)(
+    'matches decoded images after a source is %s during the wait',
+    async (change) => {
+      vi.useFakeTimers();
+      const { flowElement, clone, stagingWrapper } = createExportDom();
+      let failFirst!: () => void;
+      const first = {
+        src: 'first.png',
+        decode: () =>
+          new Promise<void>((_, reject) => {
+            failFirst = () => reject(new Error('Unavailable'));
+          }),
+      };
+      const second = { src: 'second.png', naturalWidth: 800, naturalHeight: 400, decode: () => Promise.resolve() };
+      let images = [first, second];
+      const replaceWith = vi.fn();
+      const clonedImage = { src: 'second.png', alt: 'second.png', replaceWith };
+      const selector = '[data-workflow-export-field-value="true"] img';
+      flowElement.querySelectorAll = (query) => (query === selector ? (images as unknown as FakeElement[]) : []);
+      clone.querySelectorAll = (query) => (query === selector ? [clonedImage as unknown as FakeElement] : []);
+      const fallback = { textContent: '', style: {} };
+      vi.stubGlobal('document', {
+        body: flowElement.parentElement,
+        createElement: (tag: string) => (tag === 'span' ? fallback : stagingWrapper),
+      });
+      vi.mocked(toBlob).mockResolvedValue(new Blob(['png'], { type: 'image/png' }));
+      const exportPromise = exportWorkflowAsPng({
+        flowElement: flowElement as unknown as HTMLElement,
+        bounds: { x: 0, y: 0, width: 100, height: 100 },
+        workflowName: 'Workflow',
+        fallbackWorkflowName: 'Unnamed Workflow',
+      });
+      try {
+        await vi.advanceTimersByTimeAsync(0);
+        images = [second];
+        if (change === 'replaced') {
+          second.src = 'new-source.png';
+          clonedImage.src = 'new-source.png';
+          clonedImage.alt = 'new-source.png';
+        }
+        failFirst();
+        await exportPromise;
+        if (change === 'removed') {
+          expect(replaceWith).not.toHaveBeenCalled();
+        } else {
+          expect(replaceWith).toHaveBeenCalledWith(fallback);
+          expect(fallback.textContent).toBe('new-source.png');
+        }
+        expect(vi.getTimerCount()).toBe(0);
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
+
+  it('cancels download if the editor unmounts during rasterization and removes staging', async () => {
+    const { flowElement, stagingWrapper } = createExportDom();
+    let finish!: (blob: Blob) => void;
+    vi.mocked(toBlob).mockReturnValue(
+      new Promise<Blob>((resolve) => {
+        finish = resolve;
+      })
+    );
+    const exportPromise = exportWorkflowAsPng({
+      flowElement: flowElement as unknown as HTMLElement,
+      bounds: { x: 0, y: 0, width: 100, height: 100 },
+      workflowName: 'Workflow',
+      fallbackWorkflowName: 'Unnamed Workflow',
+    });
+    const rejection = expect(exportPromise).rejects.toThrow('canceled');
+    await vi.waitFor(() => expect(toBlob).toHaveBeenCalledOnce());
+    flowElement.isConnected = false;
+    finish(new Blob(['png'], { type: 'image/png' }));
+    await rejection;
+    expect(downloadBlob).not.toHaveBeenCalled();
+    expect(stagingWrapper.remove).toHaveBeenCalledOnce();
   });
 
   it('allows one bounded retry when a previous rasterization never settles', async () => {
@@ -201,8 +327,8 @@ describe('workflow image export edge cases', () => {
     ).toMatchObject({ x: 0, y: 0, width: 690, height: 100 });
   });
 
-  it('includes inline export descriptions in content bounds', () => {
-    const description = {
+  it('includes overflowing output titles in content bounds', () => {
+    const outputTitle = {
       getBoundingClientRect: () => ({ left: 650, top: 250, width: 100, height: 50 }),
       scrollWidth: 100,
       scrollHeight: 50,
@@ -212,7 +338,7 @@ describe('workflow image export edge cases', () => {
       getBoundingClientRect: () => ({ left: 100, top: 200 }),
       querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
       querySelectorAll: (selector: string) =>
-        selector === '[data-workflow-export-content="true"]' ? [description] : [],
+        selector === '[data-workflow-export-output-title="true"]' ? [outputTitle] : [],
     };
 
     expect(
@@ -226,8 +352,64 @@ describe('workflow image export edge cases', () => {
     ).toMatchObject({ x: 0, y: 0, width: 650, height: 100 });
   });
 
-  it('measures export content in logical coordinates when the workflow is zoomed out', () => {
-    const description = {
+  it('includes full static field rows when measuring expanded snapshot content', () => {
+    const fieldContent = {
+      getBoundingClientRect: () => ({ left: 350, top: 120, width: 200, height: 420 }),
+      scrollWidth: 200,
+      scrollHeight: 420,
+    };
+    const viewport = { getBoundingClientRect: () => ({ left: 100, top: 100, width: 1000, height: 1000 }) };
+    const flowElement = {
+      getBoundingClientRect: () => ({ left: 100, top: 100 }),
+      querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
+      querySelectorAll: (selector: string) =>
+        selector === '[data-workflow-export-field-content="true"]' ? [fieldContent] : [],
+    };
+
+    vi.stubGlobal('getComputedStyle', () => ({ direction: 'ltr', transform: 'none' }));
+    try {
+      expect(
+        getWorkflowContentBounds(
+          flowElement as unknown as HTMLElement,
+          { x: 0, y: 0, width: 300, height: 200 },
+          { includeInputFieldLabels: false }
+        )
+      ).toMatchObject({ x: 0, y: 0, width: 450, height: 440 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('includes expanded static node content in snapshot bounds', () => {
+    const staticNodeContent = {
+      getBoundingClientRect: () => ({ left: 350, top: 120, width: 200, height: 420 }),
+      scrollWidth: 200,
+      scrollHeight: 420,
+    };
+    const viewport = { getBoundingClientRect: () => ({ left: 100, top: 100, width: 1000, height: 1000 }) };
+    const flowElement = {
+      getBoundingClientRect: () => ({ left: 100, top: 100 }),
+      querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
+      querySelectorAll: (selector: string) =>
+        selector === '[data-workflow-export-static-node-content="true"]' ? [staticNodeContent] : [],
+    };
+
+    vi.stubGlobal('getComputedStyle', () => ({ direction: 'ltr', transform: 'none' }));
+    try {
+      expect(
+        getWorkflowContentBounds(
+          flowElement as unknown as HTMLElement,
+          { x: 0, y: 0, width: 300, height: 200 },
+          { includeInputFieldLabels: false }
+        )
+      ).toMatchObject({ x: 0, y: 0, width: 450, height: 440 });
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('measures output titles in logical coordinates when the workflow is zoomed out', () => {
+    const outputTitle = {
       getBoundingClientRect: () => ({ left: 50, top: 50, width: 100, height: 25 }),
       scrollWidth: 200,
       scrollHeight: 50,
@@ -237,7 +419,7 @@ describe('workflow image export edge cases', () => {
       getBoundingClientRect: () => ({ left: 0, top: 0 }),
       querySelector: (selector: string) => (selector === '.react-flow__viewport' ? viewport : null),
       querySelectorAll: (selector: string) =>
-        selector === '[data-workflow-export-content="true"]' ? [description] : [],
+        selector === '[data-workflow-export-output-title="true"]' ? [outputTitle] : [],
     };
 
     vi.stubGlobal('getComputedStyle', (element: unknown) => ({
