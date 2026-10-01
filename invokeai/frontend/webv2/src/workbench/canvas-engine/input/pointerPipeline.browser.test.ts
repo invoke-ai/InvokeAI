@@ -33,11 +33,17 @@ const createInputHarness = () => {
   document.body.append(surface, button);
 
   const events: string[] = [];
+  const deactivations: string[] = [];
   const tools = Object.fromEntries(
     (['brush', 'view', 'transform', 'bbox', 'eraser'] as const).map((id): [ToolId, Tool] => [
       id,
       {
         id,
+        onDeactivate: (_ctx, options) => {
+          if (!options?.temporary) {
+            deactivations.push(id);
+          }
+        },
         onKeyCommand: (_ctx, command) => events.push(`${id}:${command}`),
         onPointerCancel: () => events.push(`${id}:cancel`),
         onPointerDown: () => events.push(`${id}:down`),
@@ -92,7 +98,18 @@ const createInputHarness = () => {
   });
   const pointer = (type: string, buttons: number): PointerEvent =>
     new PointerEvent(type, { bubbles: true, button: 0, buttons, pointerId: 1 });
-  return { button, canvas, clicks: () => clicks, events, interaction, observed, pipeline, pointer, surface };
+  return {
+    button,
+    canvas,
+    clicks: () => clicks,
+    deactivations,
+    events,
+    interaction,
+    observed,
+    pipeline,
+    pointer,
+    surface,
+  };
 };
 
 describe('pointer pipeline in Chromium: keyboard ownership', () => {
@@ -189,6 +206,19 @@ describe('pointer pipeline in Chromium: keyboard ownership', () => {
 });
 
 describe('pointer pipeline in Chromium: tool switches during a hold', () => {
+  it('choosing the held tool again only ends the hold', async () => {
+    const h = createInputHarness();
+    h.pipeline.onPointerEnter();
+    h.surface.focus();
+
+    await userEvent.keyboard('{Space>}');
+    h.interaction.setTool('brush');
+    expect(h.interaction.getActiveToolId()).toBe('brush');
+    expect(h.deactivations).toEqual([]);
+    await userEvent.keyboard('{/Space}');
+    expect(h.interaction.getActiveToolId()).toBe('brush');
+  });
+
   it('keeps a tool chosen while Space is still held when Space is released', async () => {
     const h = createInputHarness();
     h.interaction.setTool('eraser');

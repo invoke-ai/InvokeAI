@@ -300,7 +300,7 @@ describe('CanvasSurface during a resize drag', () => {
 });
 
 describe('CanvasSurface keyboard ownership', () => {
-  it('owns hold keys once the canvas is clicked, and leaves them to a tree row reached by keyboard', async () => {
+  it('gives hold keys to its keyboard root and leaves them to a tree row reached by keyboard', async () => {
     const registry = createTrackedRegistry(20);
     const { engine } = acquireTrackedEngine(registry, 'project-a', createEngineDeps(createEmptyCanvasState(64, 64)));
     const host = document.createElement('div');
@@ -320,22 +320,27 @@ describe('CanvasSurface keyboard ownership', () => {
       await nextFrame();
     });
     const overlay = host.querySelectorAll('canvas')[1]!;
+    const surface = overlay.parentElement!;
     const row = host.querySelector<HTMLElement>('[role="treeitem"]')!;
     const tool = () => engine.interaction.get('activeTool');
-    const initial = tool();
+    engine.tools.setTool('brush');
 
-    await userEvent.click(overlay);
-    expect(document.activeElement).toBe(overlay.parentElement);
+    // Focus that did not arrive by pointer is owned only through the keyboard root.
+    await userEvent.hover(overlay);
+    await userEvent.keyboard('{Tab}');
+    surface.focus();
     await userEvent.keyboard('{Space>}');
     expect(tool()).toBe('view');
     await userEvent.keyboard('{/Space}');
-    expect(tool()).toBe(initial);
+    expect(tool()).toBe('brush');
 
+    await userEvent.click(overlay);
+    expect(document.activeElement).toBe(surface);
     await userEvent.tab();
     expect(document.activeElement).toBe(row);
     await userEvent.hover(overlay);
     await userEvent.keyboard('{Space>}');
-    expect(tool()).toBe(initial);
+    expect(tool()).toBe('brush');
     await userEvent.keyboard('{/Space}');
   });
 });
