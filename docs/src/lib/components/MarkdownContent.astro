@@ -1,0 +1,55 @@
+---
+import '@astrojs/starlight/style/markdown.css';
+import { LOCALE_EXEMPT_PATHS } from '../link-localization.mjs';
+
+/*
+ * A localized route serves one of two things: a Crowdin translation, whose in-content links the
+ * `remark-localize-content` plugin already prefixed at build time, or — until that translation
+ * lands — the English source as Starlight fallback content. Fallback routes reuse the compiled
+ * English module verbatim, so their links cannot be rewritten at build time and are patched here
+ * at runtime instead.
+ *
+ * The tradeoff is deliberate: the static HTML of a fallback page still carries English URLs, so
+ * crawlers and visitors without JS follow links out of the locale.
+ *
+ * `define:vars` implies `is:inline`, which keeps this script running at parse time instead of
+ * being deferred as a bundled module. Inline scripts cannot import, so the exemption list is
+ * handed in from `link-localization.mjs` — that list is the part that drifts, not the loop below.
+ */
+
+const locale = Astro.locals.starlightRoute.locale;
+const base = import.meta.env.BASE_URL === '/' ? '' : import.meta.env.BASE_URL.replace(/\/$/, '');
+---
+
+<div class="sl-markdown-content"><slot /></div>
+
+{
+  locale && (
+    <script define:vars={{ base, locale, exemptPaths: LOCALE_EXEMPT_PATHS }}>
+      const localizedPrefix = `${base}/${locale}`;
+
+      for (const anchor of document.querySelectorAll('.sl-markdown-content a[href]')) {
+        const href = anchor.getAttribute('href');
+
+        if (!href || !href.startsWith('/') || href.startsWith('//')) {
+          continue;
+        }
+
+        const pathWithoutBase =
+          base && (href === base || href.startsWith(`${base}/`)) ? href.slice(base.length) || '/' : href;
+
+        if (pathWithoutBase === `/${locale}` || pathWithoutBase.startsWith(`/${locale}/`)) {
+          continue;
+        }
+
+        if (
+          exemptPaths.some((exempt) => pathWithoutBase === exempt || pathWithoutBase.startsWith(`${exempt}/`))
+        ) {
+          continue;
+        }
+
+        anchor.setAttribute('href', `${localizedPrefix}${pathWithoutBase}`);
+      }
+    </script>
+  )
+}
