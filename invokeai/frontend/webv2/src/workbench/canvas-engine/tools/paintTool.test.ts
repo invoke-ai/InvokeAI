@@ -357,6 +357,29 @@ describe('paint tool: target resolution', () => {
     expect(h.beginPixelEdit).toHaveBeenCalledTimes(2);
   });
 
+  it('aborts the gesture when a deferred frame render fails', () => {
+    const transaction = controlTransaction();
+    const h = createHarness(makeDoc([controlPaintLayer('control')], 'control'), transaction);
+    const frames: (() => void)[] = [];
+    h.ctx.scheduleFrame = (task) => {
+      frames.push(task);
+      return () => frames.splice(frames.indexOf(task), 1);
+    };
+    const brush = createBrushTool();
+    down(brush, h.ctx, pointer(10, 10));
+    move(brush, h.ctx, pointer(20, 20), [pointer(20, 20)]);
+    vi.spyOn(h.layers, 'growToRect').mockImplementation(() => {
+      throw new Error('frame paint failed');
+    });
+
+    expect(() => frames.splice(0).forEach((task) => task())).toThrow('frame paint failed');
+
+    expect(transaction.cancel).toHaveBeenCalledOnce();
+    up(brush, h.ctx, pointer(30, 30));
+    expect(transaction.commitStroke).not.toHaveBeenCalled();
+    expect(h.strokes).toHaveLength(0);
+  });
+
   it('aborts the control transaction and releases the gesture after stroke finalization fails', () => {
     const transaction = controlTransaction();
     const h = createHarness(makeDoc([controlPaintLayer('control')], 'control'), transaction);

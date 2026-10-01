@@ -3819,6 +3819,61 @@ describe('engine-owned history: stroke → undo → redo', () => {
     return { bitmapStore, commitEdit, engine, strokes, surfaces };
   };
 
+  it('renders a live stroke at most once per frame, flushing the final stroke on release', () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    class FakePath2D {
+      closePath() {}
+      lineTo() {}
+      moveTo() {}
+      quadraticCurveTo() {}
+    }
+    vi.stubGlobal('Path2D', FakePath2D);
+    const { store } = createReactiveStore(paintDoc());
+    const base = createTestStubRasterBackend();
+    const surfaces: StubRasterSurface[] = [];
+    const engine = createCanvasEngine({
+      backend: {
+        ...base,
+        createSurface: (w: number, h: number): StubRasterSurface => {
+          const surface = base.createSurface(w, h);
+          surfaces.push(surface);
+          return surface;
+        },
+      },
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const overlay = createInputCanvas();
+    engine.surface.attach(createInputCanvas().element, overlay.element);
+    engine.tools.setTool('brush');
+    raf.flush();
+    /** Stroke silhouettes filled so far; each live render fills the accumulated outline once. */
+    const strokeRenders = (): number =>
+      surfaces
+        .flatMap((surface) => surface.callLog)
+        .filter((entry) => entry.op === 'fill' && entry.args[0] instanceof FakePath2D).length;
+
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    for (let x = 22; x <= 40; x += 2) {
+      overlay.fire('pointermove', pointerAt(x, 20));
+    }
+    expect(strokeRenders()).toBe(0);
+    raf.flush();
+    expect(strokeRenders()).toBe(1);
+    overlay.fire('pointermove', pointerAt(50, 30));
+    overlay.fire('pointermove', pointerAt(60, 30));
+    overlay.fire('pointerup', pointerAt(60, 30, { buttons: 0 }));
+    expect(strokeRenders()).toBe(2);
+    raf.flush();
+    expect(strokeRenders()).toBe(2);
+    expect(engine.stores.canUndo.get()).toBe(true);
+    engine.lifecycle.dispose();
+  });
+
   it('records a stroke and restores before/after pixels on undo/redo', () => {
     const { bitmapStore, commitEdit, engine, strokes, surfaces } = drawStroke();
 

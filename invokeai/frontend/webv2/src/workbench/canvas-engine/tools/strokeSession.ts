@@ -1,6 +1,7 @@
 /**
  * Per-gesture brush/eraser sessions accumulate samples and draw one scratch silhouette, compositing at stroke
- * opacity without overlap darkening. Brush uses source-over or transparency-locked source-atop; erase uses
+ * opacity without overlap darkening. Samples append immediately; the accumulated stroke renders at most once per
+ * frame and commit renders the final stroke synchronously. Brush uses source-over or transparency-locked source-atop; erase uses
  * destination-out and is refused under transparency lock.
  *
  * Each preview restores affected pristine pixels before compositing the accumulated stroke. Extend
@@ -14,7 +15,14 @@ import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache
 import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
 import type { Mat2d, PlacedSurface, PointerInput, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
-import { strokeToPath, type StrokeSamplePoint } from '@workbench/canvas-engine/freehand';
+import {
+  createSampleDecimator,
+  polygonToPath,
+  sampleSpacing,
+  strokeOutlineFromSamples,
+  strokeToPath,
+  type StrokeSamplePoint,
+} from '@workbench/canvas-engine/freehand';
 import { applyToPoint, getScale, identity, invert, multiply } from '@workbench/canvas-engine/math/mat2d';
 import { expand, intersect, isEmpty, roundOut, transformBounds, union } from '@workbench/canvas-engine/math/rect';
 import { getPressureBands } from '@workbench/canvas-engine/pressureBands';
@@ -64,11 +72,13 @@ export interface StrokeSessionConfig {
    * local. Absence uses identity.
    */
   layerTransform?: Mat2d | null;
+  /** Called when a scheduled frame render throws, before the error propagates; the owner aborts the stroke. */
+  onRenderError?: (error: unknown) => void;
 }
 
 /** The imperative handle a tool drives across a gesture. */
 export interface StrokeSession {
-  /** Appends coalesced samples and repaints the accumulated stroke. */
+  /** Appends coalesced samples and schedules one repaint of the accumulated stroke for the next frame. */
   addPoints(inputs: readonly PointerInput[]): void;
   /** Finalizes the stroke and returns the completed edit for its owner to publish. */
   commit(): StrokeCommittedEvent | null;
@@ -105,6 +115,16 @@ const padToChunk = (r: Rect, chunk: number): Rect => {
   const right = Math.ceil((r.x + r.width) / chunk) * chunk;
   const bottom = Math.ceil((r.y + r.height) / chunk) * chunk;
   return { height: bottom - y, width: right - x, x, y };
+};
+
+/** Runs `task` before the next animation frame; synchronous where no frames exist. */
+const scheduleAnimationFrame = (task: () => void): (() => void) => {
+  if (typeof requestAnimationFrame !== 'function') {
+    task();
+    return () => undefined;
+  }
+  const frame = requestAnimationFrame(() => task());
+  return () => cancelAnimationFrame(frame);
 };
 
 /** The 2D context flavour a {@link RasterSurface} exposes. */
@@ -265,9 +285,15 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
   // The feathered copy of the silhouette; allocated only when hardness < 1.
   let soft: RasterSurface | null = null;
 
+  // Raw samples feed only the pressure bands; the outline reads the incrementally decimated samples.
   const points: StrokeSamplePoint[] = [];
+  const decimator = createSampleDecimator(sampleSpacing(localSize));
   // Below the travel threshold, preserve the first aim point as a round dab rather than a short capsule.
   const tapCollapseLength = Math.max(2, localSize * 0.25);
+  let travel = 0;
+  const scheduleFrame = ctx.scheduleFrame ?? scheduleAnimationFrame;
+  let cancelScheduledFrame: (() => void) | null = null;
+  let closed = false;
   // Before pixels cover `accumRect` in stable layer-local coordinates, unaffected by backing-store origin shifts.
   let beforeImageData: ImageData | null = null;
   let accumRect: Rect | null = null;
@@ -297,17 +323,12 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     if (points.length === 0) {
       return;
     }
-    let effective: readonly StrokeSamplePoint[] = points;
-    if (points.length > 1) {
-      let travel = 0;
-      for (let i = 1; i < points.length && travel < tapCollapseLength; i++) {
-        travel += Math.hypot(points[i]!.x - points[i - 1]!.x, points[i]!.y - points[i - 1]!.y);
-      }
-      if (travel < tapCollapseLength) {
-        effective = [points[0]!];
-      }
-    }
-    const { bounds, path, polygon } = strokeToPath(effective, { last, size: localSize, thinning }, ctx.createPath2D);
+    const isTap = travel < tapCollapseLength;
+    const effective: readonly StrokeSamplePoint[] = isTap ? [points[0]!] : points;
+    const { bounds, path, polygon } = polygonToPath(
+      strokeOutlineFromSamples(isTap ? effective : decimator.samples(last), { last, size: localSize, thinning }),
+      ctx.createPath2D
+    );
     let dirty: Rect | null = roundOut(featherBleed > 0 ? expand(bounds, featherBleed) : bounds);
     // Limit dirty/growth bounds to selection coverage and skip empty intersections.
     if (clipMaskLocalRect) {
@@ -499,14 +520,56 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
     ctx.invalidate({ damage: { layerId, rect: changed }, layers: [layerId] });
   };
 
+  const append = (sample: StrokeSamplePoint): void => {
+    const previous = points[points.length - 1];
+    if (previous && travel < tapCollapseLength) {
+      travel += Math.hypot(sample.x - previous.x, sample.y - previous.y);
+    }
+    points.push(sample);
+    decimator.push(sample);
+  };
+
+  const unschedule = (): void => {
+    cancelScheduledFrame?.();
+    cancelScheduledFrame = null;
+  };
+
+  const renderFrame = (): void => {
+    cancelScheduledFrame = null;
+    if (closed) {
+      return;
+    }
+    try {
+      paint(false);
+    } catch (error) {
+      config.onRenderError?.(error);
+      throw error;
+    }
+  };
+
   return {
     addPoints: (inputs) => {
-      for (const input of inputs) {
-        points.push(toSample(input));
+      if (closed) {
+        return;
       }
-      paint(false);
+      for (const input of inputs) {
+        append(toSample(input));
+      }
+      if (cancelScheduledFrame) {
+        return;
+      }
+      let ran = false;
+      const cancel = scheduleFrame(() => {
+        ran = true;
+        renderFrame();
+      });
+      if (!ran) {
+        cancelScheduledFrame = cancel;
+      }
     },
     cancel: () => {
+      closed = true;
+      unschedule();
       const entry = layers.get(layerId);
       if (entry && accumRect && beforeImageData) {
         entry.surface.ctx.putImageData(beforeImageData, accumRect.x - entry.rect.x, accumRect.y - entry.rect.y);
@@ -522,6 +585,11 @@ export const createStrokeSession = (config: StrokeSessionConfig): StrokeSession 
       }
     },
     commit: () => {
+      if (closed) {
+        return null;
+      }
+      closed = true;
+      unschedule();
       paint(true);
       const entry = layers.get(layerId);
       if (!entry || !accumRect || !beforeImageData) {

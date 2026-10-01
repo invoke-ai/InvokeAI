@@ -632,3 +632,106 @@ describe('tap collapse', () => {
     expect(sessionWithDrift(40)!.dirtyRect.width).toBeGreaterThan(clean.width);
   });
 });
+
+describe('frame-coalesced rendering', () => {
+  const makeFramedSession = () => {
+    const backend = createTestStubRasterBackend();
+    const layers = createLayerCacheStore(backend);
+    layers.getOrCreate('L', 100, 100);
+    const frames: (() => void)[] = [];
+    const invalidate = vi.fn();
+    const onRenderError = vi.fn();
+    const ctx = {
+      backend,
+      createPath2D: () => {
+        const path = { closePath: () => {}, lineTo: () => {}, moveTo: () => {}, quadraticCurveTo: () => {} };
+        return path as unknown as Path2D;
+      },
+      emitStrokeCommitted: vi.fn(),
+      invalidate,
+      layers,
+      notifyLayerPainted: vi.fn(),
+      scheduleFrame: (task: () => void) => {
+        frames.push(task);
+        return () => {
+          const index = frames.indexOf(task);
+          if (index >= 0) {
+            frames.splice(index, 1);
+          }
+        };
+      },
+    } as unknown as ToolContext;
+    const session = createStrokeSession({
+      clipMask: null,
+      color: '#ff0000',
+      composite: 'source-over',
+      ctx,
+      hardness: 1,
+      layerId: 'L',
+      onRenderError,
+      opacity: 1,
+      pressureOpacity: false,
+      size: 20,
+      thinning: 0,
+      tool: 'brush',
+    });
+    /** Live stroke renders so far: each one reports its damage to the scheduler. */
+    const renders = (): number => invalidate.mock.calls.length;
+    const presentFrame = (): void => frames.splice(0).forEach((task) => task());
+    return { frames, layers, onRenderError, presentFrame, renders, session };
+  };
+
+  it('renders the accumulated stroke at most once per presented frame', () => {
+    const { frames, presentFrame, renders, session } = makeFramedSession();
+    for (let frame = 0; frame < 4; frame++) {
+      for (let batch = 0; batch < 6; batch++) {
+        const x = 10 + frame * 12 + batch * 2;
+        session.addPoints([pointer(x, 10), pointer(x + 1, 11)]);
+      }
+      expect(frames).toHaveLength(1);
+      expect(renders()).toBe(frame);
+      presentFrame();
+      expect(renders()).toBe(frame + 1);
+    }
+  });
+
+  it('commits the final stroke synchronously and withdraws the frame still scheduled', () => {
+    const { frames, renders, session } = makeFramedSession();
+    session.addPoints([pointer(10, 10)]);
+    session.addPoints([pointer(60, 10)]);
+    expect(renders()).toBe(0);
+
+    const event = session.commit();
+
+    expect(renders()).toBe(1);
+    expect(frames).toHaveLength(0);
+    expect(event?.dirtyRect.width).toBeGreaterThan(50);
+    session.addPoints([pointer(80, 10)]);
+    expect(frames).toHaveLength(0);
+  });
+
+  it('cancellation removes scheduled work and leaves the cache untouched', () => {
+    const { frames, layers, renders, session } = makeFramedSession();
+    const version = layers.version('L');
+    session.addPoints([pointer(10, 10), pointer(40, 40)]);
+
+    session.cancel();
+
+    expect(frames).toHaveLength(0);
+    expect(renders()).toBe(0);
+    expect(layers.version('L')).toBe(version);
+    expect(session.commit()).toBeNull();
+  });
+
+  it('hands a failed frame render to its owner before propagating it', () => {
+    const { layers, onRenderError, presentFrame, session } = makeFramedSession();
+    session.addPoints([pointer(10, 10)]);
+    const failure = new Error('frame paint failed');
+    vi.spyOn(layers, 'growToRect').mockImplementation(() => {
+      throw failure;
+    });
+
+    expect(presentFrame).toThrow(failure);
+    expect(onRenderError).toHaveBeenCalledWith(failure);
+  });
+});

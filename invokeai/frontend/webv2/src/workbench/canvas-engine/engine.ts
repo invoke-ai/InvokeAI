@@ -981,6 +981,14 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     invalidate: (payload) => scheduler.invalidate(payload),
     layers: layerCache,
     notifyLayerPainted,
+    // Detached engines produce no frames; render immediately rather than hold work until the next attach.
+    scheduleFrame: (task) => {
+      if (scheduler.isPaused) {
+        task();
+        return () => undefined;
+      }
+      return scheduler.beforeNextFrame(task);
+    },
     requestLayerRasterization: (layerId) => scheduleLayerRasterization([layerId]),
     getSamInteraction: () => stores.samInteraction.get(),
     openTextCreate: (docPoint) => openTextCreate(docPoint),

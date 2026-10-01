@@ -213,6 +213,83 @@ describe('createRenderScheduler', () => {
   });
 });
 
+describe('beforeNextFrame', () => {
+  it('runs tasks first so their invalidations render in the same frame', () => {
+    const raf = createFakeRaf();
+    const order: string[] = [];
+    const render = vi.fn<(flags: RenderFlags) => void>(() => order.push('render'));
+    const scheduler = createRenderScheduler({ cancelFrame: raf.cancelFrame, render, requestFrame: raf.requestFrame });
+
+    scheduler.beforeNextFrame(() => {
+      order.push('task');
+      scheduler.invalidate({ layers: ['stroke'] });
+    });
+    expect(raf.pendingCount()).toBe(1);
+    raf.flush();
+
+    expect(order).toEqual(['task', 'render']);
+    expect([...render.mock.calls[0]![0].layers]).toEqual(['stroke']);
+    expect(raf.pendingCount()).toBe(0);
+  });
+
+  it('skips the render when tasks leave nothing invalidated, and a cancelled task never runs', () => {
+    const raf = createFakeRaf();
+    const render = vi.fn();
+    const scheduler = createRenderScheduler({ cancelFrame: raf.cancelFrame, render, requestFrame: raf.requestFrame });
+    const kept = vi.fn();
+    const dropped = vi.fn();
+
+    scheduler.beforeNextFrame(kept);
+    scheduler.beforeNextFrame(dropped)();
+    raf.flush();
+
+    expect(kept).toHaveBeenCalledOnce();
+    expect(dropped).not.toHaveBeenCalled();
+    expect(render).not.toHaveBeenCalled();
+  });
+
+  it('keeps rendering the frame after a task throws', () => {
+    const raf = createFakeRaf();
+    const render = vi.fn();
+    const reportError = vi.fn();
+    vi.stubGlobal('reportError', reportError);
+    try {
+      const scheduler = createRenderScheduler({ cancelFrame: raf.cancelFrame, render, requestFrame: raf.requestFrame });
+      const failure = new Error('task failed');
+      scheduler.beforeNextFrame(() => {
+        throw failure;
+      });
+      const later = vi.fn(() => scheduler.invalidate({ overlay: true }));
+      scheduler.beforeNextFrame(later);
+      raf.flush();
+
+      expect(reportError).toHaveBeenCalledWith(failure);
+      expect(later).toHaveBeenCalledOnce();
+      expect(render).toHaveBeenCalledOnce();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('holds tasks while paused and drops them on dispose', () => {
+    const raf = createFakeRaf();
+    const scheduler = createRenderScheduler({
+      cancelFrame: raf.cancelFrame,
+      render: vi.fn(),
+      requestFrame: raf.requestFrame,
+    });
+    const task = vi.fn();
+    scheduler.pause();
+    scheduler.beforeNextFrame(task);
+    expect(raf.pendingCount()).toBe(0);
+    scheduler.resume();
+    expect(raf.pendingCount()).toBe(1);
+    scheduler.dispose();
+    raf.flush();
+    expect(task).not.toHaveBeenCalled();
+  });
+});
+
 describe('damage coalescing', () => {
   const setup = () => {
     const raf = createFakeRaf();

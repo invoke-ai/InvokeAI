@@ -282,6 +282,8 @@ export const createPaintTool = (spec: PaintToolSpec): Tool => {
           ctx,
           layerId: target.layerId,
           layerTransform,
+          // A deferred frame render fails outside this handler; abandon the stroke there too.
+          onRenderError: () => abortSession(),
           opacity: target.forceOpaque ? 1 : spec.opacity(ctx),
           // A mask stroke is an all-or-nothing alpha stencil, so pressure must not thin it —
           // a partially-transparent mask would silently attenuate the denoise strength.
