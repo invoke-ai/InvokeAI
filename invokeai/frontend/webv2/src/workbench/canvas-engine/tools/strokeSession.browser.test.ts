@@ -3,6 +3,7 @@ import type { PointerInput, Rect } from '@workbench/canvas-engine/types';
 
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import { createDomRasterBackend } from '@workbench/canvas-engine/render/raster';
+import { ADMIT_ALL, commitStroke } from '@workbench/canvas-engine/tools/strokeEdit.testStub';
 import { createStrokeSession } from '@workbench/canvas-engine/tools/strokeSession';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -44,7 +45,6 @@ const paint = (
   const ctx = {
     backend,
     createPath2D: (d?: string) => new Path2D(d),
-    emitStrokeCommitted: vi.fn(),
     invalidate: vi.fn(),
     layers,
     notifyLayerPainted: vi.fn(),
@@ -59,6 +59,7 @@ const paint = (
     },
   } as unknown as ToolContext;
   const session = createStrokeSession({
+    edit: ADMIT_ALL,
     clipMask,
     color: '#3b82f6',
     composite: 'source-over',
@@ -78,7 +79,7 @@ const paint = (
       frames.splice(0).forEach((task) => task());
     }
   }
-  const event = session.commit()!;
+  const event = commitStroke(session)!;
   return { pixels: event.afterImageData.data, rect: event.dirtyRect };
 };
 
@@ -100,7 +101,6 @@ const tapCoverage = (
   const ctx = {
     backend,
     createPath2D: (d?: string) => new Path2D(d),
-    emitStrokeCommitted: vi.fn(),
     invalidate: vi.fn(),
     layers,
     notifyLayerPainted: vi.fn(),
@@ -110,6 +110,7 @@ const tapCoverage = (
     },
   } as unknown as ToolContext;
   const session = createStrokeSession({
+    edit: ADMIT_ALL,
     color: '#3b82f6',
     composite,
     ctx,
@@ -122,7 +123,7 @@ const tapCoverage = (
     tool: composite === 'source-over' ? 'brush' : 'eraser',
   });
   session.addPoints([pointer(16.5, 16.5, options.pressure)]);
-  const event = session.commit()!;
+  const event = commitStroke(session)!;
   let max = 0;
   let sum = 0;
   for (let index = 3; index < event.afterImageData.data.length; index += 4) {
@@ -288,7 +289,6 @@ describe('dense stylus trace', () => {
     const ctx = {
       backend,
       createPath2D: (d?: string) => new Path2D(d),
-      emitStrokeCommitted: vi.fn(),
       invalidate,
       layers,
       notifyLayerPainted: vi.fn(),
@@ -298,6 +298,7 @@ describe('dense stylus trace', () => {
       },
     } as unknown as ToolContext;
     const session = createStrokeSession({
+      edit: ADMIT_ALL,
       clipMask: null,
       color: '#3b82f6',
       composite: 'source-over',
@@ -317,7 +318,7 @@ describe('dense stylus trace', () => {
         frames.splice(0).forEach((task) => task());
       }
     }
-    session.commit();
+    commitStroke(session);
     return { ms: Math.round((performance.now() - start) * 10) / 10, renders: invalidate.mock.calls.length };
   };
 

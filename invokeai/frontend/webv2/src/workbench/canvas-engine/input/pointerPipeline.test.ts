@@ -75,6 +75,7 @@ const createHarness = (
     tools?: ToolId[];
     handleEscape?: (o: { gestureWasActive: boolean }) => void;
     maybeCommitModalSession?: () => boolean;
+    replaying?: () => boolean;
   } = {}
 ) => {
   const registered = new Set<ToolId>(opts.tools ?? ['view', 'brush']);
@@ -125,6 +126,7 @@ const createHarness = (
     getToolContext: () => ctx,
     handleEscape: opts.handleEscape,
     hasTool: (id) => registered.has(id),
+    isReplaying: () => opts.replaying?.() ?? false,
     maybeCommitModalSession: opts.maybeCommitModalSession,
     setTool,
     updateCursor: vi.fn(),
@@ -567,6 +569,26 @@ describe('pointer pipeline: canvas keyboard ownership', () => {
     h.pipeline.onKeyDown(owned);
     expect(h.setTool).toHaveBeenLastCalledWith('view', { temporary: true });
     expect(owned.preventDefault).toHaveBeenCalledOnce();
+  });
+});
+
+describe('pointer pipeline: history replay', () => {
+  it('starts no gesture while a replay runs, but still pans with the middle button', () => {
+    let replaying = true;
+    const h = createHarness({ replaying: () => replaying });
+    const press = makePointerEvent({ pointerId: 1 });
+    h.pipeline.onPointerDown(press);
+
+    expect(h.tool.downs).toHaveLength(0);
+    expect(h.pipeline.isGestureActive()).toBe(false);
+    expect(press.preventDefault).toHaveBeenCalled();
+    h.pipeline.onPointerDown(makePointerEvent({ button: 1, pointerId: 2 }));
+    expect(h.captures).toEqual([2]);
+
+    replaying = false;
+    h.pipeline.onPointerUp(makePointerEvent({ buttons: 0, pointerId: 2 }));
+    h.pipeline.onPointerDown(makePointerEvent({ pointerId: 3 }));
+    expect(h.tool.downs).toHaveLength(1);
   });
 });
 

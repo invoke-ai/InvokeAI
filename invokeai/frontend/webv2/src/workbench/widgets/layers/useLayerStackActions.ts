@@ -1,5 +1,5 @@
 import type { CanvasDocumentContractV3, LayerStackKind } from '@workbench/canvas-engine/api';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { LucideIcon } from 'lucide-react';
 
 import { toaster } from '@platform/ui';
@@ -98,6 +98,8 @@ export const useLayerStackActions = (
               toaster.create({ title: t('widgets.layers.groupActions.mergeNotReady'), type: 'warning' });
             } else if (result === 'over-budget') {
               toaster.create({ title: t('widgets.layers.groupActions.mergeOverBudget'), type: 'warning' });
+            } else if (result === 'failed') {
+              toaster.create({ title: t('widgets.layers.actions.operationFailed'), type: 'error' });
             }
           });
         },

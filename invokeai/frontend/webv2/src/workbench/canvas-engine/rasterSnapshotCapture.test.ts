@@ -49,7 +49,7 @@ interface Harness {
   memory: RasterMemoryBudgetController;
   state: {
     canvas: CanvasStateContractV3 | null;
-    contentEpoch: number;
+    directPixelEpoch: number;
     disposed: boolean;
     documentGeneration: number;
     lifecycleGeneration: number;
@@ -66,7 +66,7 @@ const makeHarness = (
 ): Harness => {
   const state = {
     canvas: canvasState() as CanvasStateContractV3 | null,
-    contentEpoch: 0,
+    directPixelEpoch: 0,
     disposed: false,
     documentGeneration: 1,
     lifecycleGeneration: 0,
@@ -80,7 +80,7 @@ const makeHarness = (
   const deps: CreateRasterSnapshotCaptureDeps = {
     createSurface: (width, height) => surface(width, height),
     getCanvasState: () => state.canvas,
-    getContentEpoch: () => state.contentEpoch,
+    getDirectPixelEpoch: () => state.directPixelEpoch,
     getDocumentGeneration: () => state.documentGeneration,
     getLifecycleGeneration: () => state.lifecycleGeneration,
     isDisposed: () => state.disposed,
@@ -122,7 +122,7 @@ describe('isDocumentSnapshotCurrent', () => {
 
   it.each([
     ['the canvas object is replaced', (h: Harness) => (h.state.canvas = canvasState())],
-    ['the raster content epoch advances', (h: Harness) => (h.state.contentEpoch += 1)],
+    ['the raster content epoch advances', (h: Harness) => (h.state.directPixelEpoch += 1)],
     ['the lifecycle generation advances', (h: Harness) => (h.state.lifecycleGeneration += 1)],
     ['the document generation advances', (h: Harness) => (h.state.documentGeneration += 1)],
     ['the engine is disposed', (h: Harness) => (h.state.disposed = true)],
@@ -318,7 +318,7 @@ describe('captureRasterSnapshot', () => {
     harness.state.canvas = canvasState(['a', 'b']);
     harness.rasterize.mockImplementation((layerId: string) => {
       if (layerId === 'b') {
-        harness.state.contentEpoch += 1;
+        harness.state.directPixelEpoch += 1;
       }
       const result = okPixels(layerId);
       harness.currentGuards.add(result.status === 'ok' ? result.guard : guard(layerId));
@@ -335,7 +335,7 @@ describe('captureRasterSnapshot', () => {
     detaching.state.canvas = canvasState(['a', 'b']);
     detaching.rasterize.mockImplementation((layerId: string) => {
       // The edit lands while the FIRST layer is still rasterizing.
-      detaching.state.contentEpoch += 1;
+      detaching.state.directPixelEpoch += 1;
       const result = okPixels(layerId);
       detaching.currentGuards.add(result.status === 'ok' ? result.guard : guard(layerId));
       return Promise.resolve(result);

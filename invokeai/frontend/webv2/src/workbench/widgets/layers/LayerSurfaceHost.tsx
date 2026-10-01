@@ -1,6 +1,6 @@
 import type { CanvasDocumentContractV3, LayerStackKind } from '@workbench/canvas-engine/api';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { Dispatch } from 'react';
 
 import { getDocumentLeaves, getDocumentNode } from '@workbench/canvas-engine/api';

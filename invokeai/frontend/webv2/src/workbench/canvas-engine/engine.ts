@@ -1,4 +1,6 @@
 import type {
+  CanvasEditRefusal,
+  CanvasHistoryReplayStatus,
   CanvasHistoryCapability,
   CanvasDiagnosticsCapability,
   CanvasEngine,
@@ -18,13 +20,17 @@ import type {
   CanvasViewportCapability,
   BooleanRasterOperation,
   BooleanRasterResult,
+  CopyLayerToRasterResult,
   CropLayerResult,
   ExportBakedLayerPixelsOptions,
   ExportLayerPixelsOptions,
   ExtractMaskedAreaResult,
+  MaskEditResult,
+  MergeDownResult,
   MergeVisibleResult,
   NewRasterLayerResult,
   PsdExportResult,
+  RasterizeLayerResult,
   StructuralCommitOptions,
   StructuralCommitResult,
 } from '@workbench/canvas-engine/capabilities';
@@ -93,6 +99,7 @@ import { HistoryController } from '@workbench/canvas-engine/controllers/historyC
 import { InteractionController } from '@workbench/canvas-engine/controllers/interactionController';
 import { LayerController } from '@workbench/canvas-engine/controllers/layerController';
 import {
+  type CapturedLayerCache,
   type DuplicateLayerRasterPlan,
   LayerMutationController,
 } from '@workbench/canvas-engine/controllers/layerMutationController';
@@ -184,7 +191,7 @@ import { createCompositeFrame } from './render/compositeFrame';
 import { floatingSelectionFrame } from './render/floatingSelectionFrame';
 import { createOverlayFrame } from './render/overlayFrame';
 import { createSelectObjectBridge } from './selectObjectBridge';
-import { createStrokeCommit } from './strokeCommit';
+import { createStrokeEdits } from './strokeCommit';
 import { createViewTool } from './tools/viewTool';
 
 /**
@@ -221,7 +228,7 @@ const createCleanupAccumulator = (): { run: (step: () => void) => void; throwIfF
 export interface CanvasEngineErrorReport {
   area: 'canvas-engine';
   /** The raw failure; notifications show its message and diagnostics keep its stack. */
-  context: { error: unknown; layerId: string };
+  context: { error: unknown; layerId?: string; label?: string };
   message:
     | 'Layer thumbnail rasterization failed'
     | 'Bitmap persistence failed'
@@ -230,7 +237,8 @@ export interface CanvasEngineErrorReport {
     | 'Structural edit could not be reverted'
     | 'Structural edit could not be mirrored'
     | 'Structural history replay was refused'
-    | 'Structural history replay could not be mirrored';
+    | 'Structural history replay could not be mirrored'
+    | 'History replay failed';
   namespace: 'canvas';
   projectId: string;
 }
@@ -304,22 +312,6 @@ export interface CanvasEngineCoreComposition {
   readonly applicationHost: CanvasApplicationHost;
 }
 
-const sourceImageName = (source: CanvasLayerSourceContract): string | null => {
-  if (source.type === 'image') {
-    return source.image.imageName;
-  }
-  if (source.type === 'paint') {
-    return source.bitmap?.imageName ?? null;
-  }
-  return null;
-};
-
-/** The image name a layer's source references, if any (raster/control source or mask bitmap). */
-const layerImageName = (layer: CanvasLayerContract): string | null => {
-  const source = renderableSourceOf(layer);
-  return source ? sourceImageName(source) : null;
-};
-
 /** Mints a fresh layer id for engine-created paint layers. */
 const createLayerId = (): string => `layer-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 const createEventId = (): string => `event-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
@@ -348,7 +340,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     backend,
     diagnostics,
     getDocument: () => mirror.getDocument(),
-    getLayerImageName: layerImageName,
     imageResolver,
     // A raster-image pixel transaction replaces the live cache with pixels that already include adjustments while
     // the contract keeps them until commit; applying them again would double them and snap back on pointer-up.
@@ -360,7 +351,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const stores = createEngineStores();
   const publishLayerThumbnailVersion = (layerId: string, version: number): void => {
     stores.thumbnailVersion.set(layerId, version);
-    stores.rasterContentEpoch.set(stores.rasterContentEpoch.get() + 1);
+    stores.layerPixelEpoch.set(stores.layerPixelEpoch.get() + 1);
   };
   const interactionStores: { [K in keyof CanvasInteractionState]: ScalarStore<CanvasInteractionState[K]> } = {
     activeTool: stores.activeTool,
@@ -383,7 +374,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     invertBrushSizeScroll: stores.invertBrushSizeScroll,
     lassoOptions: stores.lassoOptions,
     marqueeOptions: stores.marqueeOptions,
-    rasterContentEpoch: stores.rasterContentEpoch,
+    layerPixelEpoch: stores.layerPixelEpoch,
     ruleOfThirds: stores.ruleOfThirds,
     shapeOptions: stores.shapeOptions,
     showBbox: stores.showBbox,
@@ -628,18 +619,23 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     canEdit: () => canEditDocument(),
     canRedoStore: stores.canRedo,
     canUndoStore: stores.canUndo,
-    endBurst: () => endNudgeBurst(),
     isGestureActive: () => pipeline.isGestureActive(),
+    reportFailure: (label, error) =>
+      opts.reportError({
+        area: 'canvas-engine',
+        context: { error, label },
+        message: 'History replay failed',
+        namespace: 'canvas',
+        projectId,
+      }),
   });
   const history = historyController.history;
   const unsubscribeHistoryEpoch = history.subscribe(() => stores.historyEpoch.set(stores.historyEpoch.get() + 1));
-  const dispatchCanvasMutation = (
-    action: CanvasProjectMutation,
-    origin: 'system' | 'user' = history.isApplying() ? 'system' : 'user'
-  ): boolean => mutationPort.dispatch(action, origin);
+  const dispatchCanvasMutation = (action: CanvasProjectMutation, origin: 'system' | 'user' = 'user'): boolean =>
+    mutationPort.dispatch(action, origin);
   // Direct pixel writes do not replace the reducer canvas object. Snapshot
-  // freshness therefore also binds to this engine-local content epoch.
-  let rasterContentEpoch = 0;
+  // freshness therefore also binds to this engine-local direct-pixel epoch.
+  let directPixelEpoch = 0;
   const resolveSelectedLayerIds = (document: CanvasDocumentContractV3): readonly string[] => {
     const primaryId = document.selectedLayerId;
     if (!primaryId) {
@@ -656,22 +652,38 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   };
 
   let structuralController: StructuralLayerController;
-  const endNudgeBurst = (): void => structuralController.endBurst();
 
   /**
-   * Undo/redo restores cache pixels and marks dirty. An in-flight newer upload self-echoes without replacing
-   * restored pixels; the serialized follow-up flush persists the restored state.
+   * Undo/redo restores cache pixels and marks dirty. A patch lands only on trustworthy pixels: an evicted or stale
+   * cache is rasterized first under a read lease, and a layer that is gone moves the step as a no-op. An in-flight
+   * newer upload self-echoes without replacing restored pixels; the serialized follow-up flush persists them.
    */
-  const applyImagePatch: ImagePatchApply = (layerId, rect, pixels) => {
-    if (!layerCache.get(layerId)) {
-      // The layer's cache is gone (removed/evicted); nothing to restore into.
+  const applyImagePatch: ImagePatchApply = async (layerId, rect, pixels) => {
+    if (!getDocumentLayer(mirror.getDocument(), layerId)) {
       return;
     }
-    // Grow to the layer-local patch rect before writing; undo/redo may reach beyond a cache trimmed since capture.
-    const entry = layerCache.growToRect(layerId, rect);
-    entry.surface.ctx.putImageData(pixels, rect.x - entry.rect.x, rect.y - entry.rect.y);
+    const prepared = await rasterizeLayerPixels(layerId, { includeDisabled: true });
+    if (prepared.status === 'missing') {
+      return;
+    }
+    const resident = layerCache.get(layerId);
+    if (prepared.status === 'empty' && resident?.stale) {
+      // The source holds no pixels now, so stale ones must not survive around the patch.
+      layerCache.delete(layerId);
+    } else if (prepared.status !== 'ok' && prepared.status !== 'empty' && (!resident || resident.stale)) {
+      throw new Error(`Layer pixels could not be restored (${prepared.status}).`);
+    }
+    try {
+      // Grow to the layer-local patch rect before writing; undo/redo may reach beyond a cache trimmed since capture.
+      const entry = layerCache.growToRect(layerId, rect);
+      entry.surface.ctx.putImageData(pixels, rect.x - entry.rect.x, rect.y - entry.rect.y);
+      entry.stale = false;
+    } finally {
+      if (prepared.status === 'ok') {
+        prepared.release();
+      }
+    }
     notifyLayerPainted(layerId);
-    // Re-persist the restored pixels (converges the contract ref; see above).
     bitmapStore.markLayerDirty(layerId);
   };
 
@@ -697,7 +709,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const notifyLayerPainted = (layerId: string): void => {
     const entry = layerCache.publishPixels(layerId);
     if (entry) {
-      rasterContentEpoch += 1;
+      directPixelEpoch += 1;
       publishLayerThumbnailVersion(layerId, entry.version);
       stores.thumbnailStatus.set(layerId, 'ready');
     }
@@ -716,22 +728,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       clearFilterPreview(layerId);
     }
   };
-
-  /**
-   * Auto-created stroke history removes the layer on undo; redo recreates its blank cache and reapplies
-   * after-pixels.
-   */
-  const { commitOrdinaryStroke } = createStrokeCommit({
-    applyImagePatch,
-    commitPaintEdit: () => mutationPort.commitEdit({ kind: 'paint' }),
-    dispatchCanvasMutation,
-    endNudgeBurst,
-    history,
-    layerCache,
-    markLayerDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
-    notifyLayerPainted,
-    strokeListeners,
-  });
 
   // Engine-owned selection masks clip strokes and drive fill/erase. Marching ants redraw only the overlay while
   // selection exists and the engine is attached.
@@ -769,7 +765,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     dispatch: (action, origin) => dispatchCanvasMutation(action, origin),
     editOwner: documentEditOwner,
     editingLocked: stores.documentEditingLocked,
-    endBurst: () => endNudgeBurst(),
     getDocument: () => mirror.getDocument(),
     getReducerDocument: () => mutationPort.getCanvasState()?.document ?? null,
     history,
@@ -778,7 +773,37 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     isGuardCurrent: (guard) => isLayerExportGuardCurrent(guard),
     preparePixels: (layerId, rect, pixels) => prepareGeneratedPaintCache(layerId, rect, pixels),
     refreshMirror: () => mirror.refresh(),
+    report: (error, label) =>
+      reportError(
+        error.outcome === 'reverted-unmirrored'
+          ? 'Structural edit could not be mirrored'
+          : 'Structural edit could not be reverted',
+        label,
+        error
+      ),
+    reserveRaster: (bytes) => rasterController.memory.reserveOperation(bytes, { purpose: 'layer-operation' }),
     subscribeReducer: (listener) => mutationPort.subscribe(listener),
+  });
+  const editRefusalListeners = new Set<(refusal: CanvasEditRefusal) => void>();
+  const reportEditRefusal = (refusal: CanvasEditRefusal): void => {
+    for (const listener of editRefusalListeners) {
+      try {
+        listener(refusal);
+      } catch {
+        // A faulty notice must not affect the refused edit's cleanup.
+      }
+    }
+  };
+  /** Live strokes are admitted before their first pixel; auto-created layers compose into the same undo step. */
+  const strokeEdits = createStrokeEdits({
+    applyImagePatch,
+    commitPaintEdit: () => mutationPort.commitEdit({ kind: 'paint' }),
+    ctx: mutationContext,
+    layerCache,
+    markLayerDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
+    notifyLayerPainted,
+    reportRefusal: reportEditRefusal,
+    strokeListeners,
   });
   const captureInsertionAnchor: CanvasMutationContext['captureInsertionAnchor'] = (stack, aboveId) =>
     mutationContext.captureInsertionAnchor(stack, aboveId);
@@ -787,14 +812,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       applyImagePatch,
       backend,
       canEdit: () => canEditDocument(),
-      endBurst: () => endNudgeBurst(),
+      ctx: mutationContext,
       getDocument: () => mirror.getDocument(),
-      history,
       invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
       layers: layerCache,
       markDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
       notifyPainted: notifyLayerPainted,
       onChange: () => stores.hasFloatingSelection.set(floatingSelection.has()),
+      reportRefusal: reportEditRefusal,
+      suspendPersistence: (layerId) => bitmapStore.suspendLayer(layerId),
     },
     getDocument: () => mirror.getDocument(),
     history,
@@ -813,16 +839,16 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       beginPixelEdit: (layerId) => beginPixelEdit(layerId),
       canEdit: () => canEditDocument(),
       deleteDerived: deleteDerivedSurfaces,
-      endBurst: () => endNudgeBurst(),
       getDocument: () => mirror.getDocument(),
+      ctx: mutationContext,
       getFillColor: () => stores.brushOptions.get().color,
-      history,
       invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),
       isRasterCacheReady: (layer, document) => isLayerCacheReadyForOp(layer, document),
       isGestureActive: () => pipeline.isGestureActive(),
       layers: layerCache,
       markDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
       notifyPainted: notifyLayerPainted,
+      reportRefusal: reportEditRefusal,
       requestRasterization: (layerId) => scheduleLayerRasterization([layerId]),
     },
     selectionImage: {
@@ -846,21 +872,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     transform: {
       backend,
       canEdit: () => canEditDocument(),
-      dispatch: (action) => dispatchCanvasMutation(action),
-      endBurst: () => endNudgeBurst(),
+      commitStructural: (label, forward, inverse) => commitStructural(label, forward, inverse),
+      ctx: mutationContext,
       getCache: (layerId) => layerCache.get(layerId) ?? null,
       getDocument: () => mirror.getDocument(),
       invalidate: (payload) => scheduler.invalidate(payload),
       isGestureActive: () => pipeline.isGestureActive(),
-      pushHistory: (entry) => history.push(entry),
-      replaceCache: (layerId, rect, surface) => {
-        layerCache.delete(layerId);
-        const target = layerCache.getOrCreateRect(layerId, rect);
-        target.surface.ctx.drawImage(surface.canvas, 0, 0);
-        target.stale = false;
-        notifyLayerPainted(layerId);
-        bitmapStore.markLayerDirty(layerId);
-      },
+      reportRefusal: reportEditRefusal,
       restoreCache: restoreLayerCache,
       session: stores.transformSession,
       setOverride: (layerId, transform) => {
@@ -942,7 +960,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     applyTransform: () => applyTransform(),
     backend,
     captureInsertionAnchor,
-    beginPixelEdit: (layerId) => beginPixelEdit(layerId),
+    beginPixelEdit: (layerId) => beginPixelEdit(layerId, { gesture: true }),
     beginTransformSession: (layerId) => beginTransformSession(layerId),
     cancelTextEdit: () => cancelTextEdit(),
     cancelTransform: () => cancelTransform(),
@@ -966,7 +984,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     createLayerId,
     createPath2D: createPath2DImpl,
     dispatch: (action) => dispatchCanvasMutation(action),
-    emitStrokeCommitted: (event) => commitOrdinaryStroke(event),
+    beginStrokeEdit: (initialBytes) => strokeEdits.begin(initialBytes),
     getDocument: () => mirror.getDocument(),
     getSelectedLayerIds: () => {
       const document = mirror.getDocument();
@@ -1113,13 +1131,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     },
     layerCache,
     rasterize: (source, document, scratch, signal) => rasterizeSource(source, rasterizeDeps(document, signal), scratch),
-    releaseBitmapIfUnreferenced: (imageName) => rasterController.releaseBitmapIfUnreferenced(imageName),
     reportError,
     thumbnails: {
       setStatus: (layerId, status) => stores.thumbnailStatus.set(layerId, status),
       setVersion: publishLayerThumbnailVersion,
     },
-    trackPublishedLayerImage: (layer) => rasterController.trackPublishedLayerImage(layer),
   });
 
   structuralController = new StructuralLayerController({
@@ -1246,7 +1262,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const cropLayerToBbox = (layerId: string): Promise<CropLayerResult> => layerController.crop.crop(layerId);
 
-  const copyLayerToRaster = (layerId: string): Promise<string | null> => layerController.copy.copyToRaster(layerId);
+  const copyLayerToRaster = (layerId: string): Promise<CopyLayerToRasterResult> =>
+    layerController.copy.copyToRaster(layerId);
 
   /**
    * Leases rasterized layer pixels for a composite export. Missing, ineligible or unsupported layers throw so
@@ -1262,9 +1279,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
     throw new Error(`Cannot rasterize layer ${layerId} for export: ${result.status}.`);
   };
-
-  const releaseBitmapIfUnreferenced = (imageName: string): void =>
-    rasterController.releaseBitmapIfUnreferenced(imageName);
 
   const dropLayer = (layerId: string): void => {
     // Generation-cancel persistence before the id can be restored by undo/redo.
@@ -1398,14 +1412,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       cleanup.run(() => editingController.invalidateDocument());
       cleanup.run(() => pipeline.cancelActiveGesture());
       cleanup.run(cancelOpenPixelEdit);
-      const previousImageNames = rasterController.mirroredImageNames();
       cleanup.run(() => rasterController.invalidateDocument());
       cleanup.run(() => stores.thumbnailStatus.clear());
       // Whole-document swaps invalidate pixel history. Cancel the pointer gesture first to discard stale tool
       // anchors and clear active-gesture state; also clear any lingering bbox preview.
       cleanup.run(() => stores.bboxPreview.set(null));
       cleanup.run(() => history.clear());
-      cleanup.run(endNudgeBurst);
       cleanup.run(() => stores.transformSession.set(null));
       cleanup.run(() => transformOverrides.clear());
       // A text-edit session likewise belongs to the outgoing document; drop it.
@@ -1423,30 +1435,19 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       cleanup.run(() => stores.marqueePreview.set(null));
       const doc = mirror.getDocument();
       const present = new Set(doc ? getDocumentLeaves(doc).map((layer) => layer.id) : []);
-      rasterController.clearMirroredImages();
       rasterController.clearThumbnailKeys();
       for (const layer of getDocumentLeaves(doc)) {
         rasterController.setThumbnailKey(layer.id, getLayerThumbnailDisplayKey(layer));
-        const imageName = layerImageName(layer);
-        if (imageName) {
-          rasterController.setMirroredImage(layer.id, imageName);
-        }
       }
-      const trackedIds = rasterController.trackedImageIds();
-      for (const layerId of trackedIds) {
+      for (const layerId of layerCache.layerIds()) {
         if (!present.has(layerId)) {
           cleanup.run(() => dropLayer(layerId));
-        } else {
-          cleanup.run(() => rasterController.untrackLayerImage(layerId));
         }
       }
       // Invalidate every incoming cache on wholesale replacement: reused ids may still hold outgoing pixels,
       // regardless of reference diffs.
       for (const layerId of present) {
         cleanup.run(() => invalidateLayerCache(layerId));
-      }
-      for (const imageName of previousImageNames) {
-        cleanup.run(() => releaseBitmapIfUnreferenced(imageName));
       }
       // Discard old-document self-echo and pending persistence state before ids are reused.
       cleanup.run(() => bitmapStore.reset());
@@ -1485,16 +1486,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         cleanup.run(() => editingController.invalidateLayer(id));
       }
       const sourceChanged = new Set(sourceChangedIds);
-      const previousImageNames = new Map(ids.map((id) => [id, rasterController.getMirroredImage(id)]));
-      for (const id of ids) {
-        const layer = getDocumentLayer(doc, id);
-        const imageName = layer ? layerImageName(layer) : null;
-        if (imageName) {
-          rasterController.setMirroredImage(id, imageName);
-        } else {
-          rasterController.deleteMirroredImage(id);
-        }
-      }
       // Remove transform sessions and preview overrides when their layer disappears, even during temporary tool
       // switches.
       const session = stores.transformSession.get();
@@ -1507,16 +1498,11 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
           hasTransformSession: session?.layerId === id,
           isSelfEcho: () => bitmapStore.isSelfEcho(id, getLayerSourceById(id)),
           layer: getDocumentLayer(doc, id) ?? undefined,
-          previousImageName: previousImageNames.get(id),
           sourceChanged: sourceChanged.has(id),
         });
         if (decision.kind === 'removed') {
-          const { releaseImageName } = decision;
           rasterController.deleteThumbnailKey(id);
           cleanup.run(() => dropLayer(id));
-          if (releaseImageName) {
-            cleanup.run(() => releaseBitmapIfUnreferenced(releaseImageName));
-          }
           // Removed preview layers must drop decoded pixels and advance decode tokens so late results or restored
           // ids cannot revive stale previews.
           cleanup.run(() => clearFilterPreview(id));
@@ -1539,12 +1525,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
           }
           continue;
         }
-        const { releaseImageName } = decision;
         rasterController.setThumbnailKey(id, decision.thumbnailKey);
-        cleanup.run(() => rasterController.untrackLayerImage(id));
-        if (releaseImageName) {
-          cleanup.run(() => releaseBitmapIfUnreferenced(releaseImageName));
-        }
         if (decision.invalidateCache) {
           cleanup.run(() => invalidateLayerCache(id));
         }
@@ -1613,10 +1594,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   for (const layer of getDocumentLeaves(mirror.getDocument())) {
     rasterController.setThumbnailKey(layer.id, getLayerThumbnailDisplayKey(layer));
-    const imageName = layerImageName(layer);
-    if (imageName) {
-      rasterController.setMirroredImage(layer.id, imageName);
-    }
   }
 
   // A guarded filter preview belongs to one continuous active-project epoch.
@@ -1798,6 +1775,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getToolContext: () => toolContext,
     handleEscape: handleEscapePriority,
     hasTool: (id) => tools.has(id),
+    isReplaying: () => history.isReplaying(),
     // A primary-button pointerdown while a text-edit session is open commits it
     // (engine reads the live portal content). The pipeline swallows that press.
     maybeCommitModalSession: () => commitOpenTextSession(),
@@ -2012,15 +1990,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
   };
 
-  const getReducerDocument = (): CanvasDocumentContractV3 | null => mutationPort.getCanvasState()?.document ?? null;
   const getMainModelBase = (): string | null => {
     return opts.getMainModelBase?.() ?? null;
   };
   const getDefaultControlModel = (base: string | null): string | null => {
     return opts.getDefaultControlModel?.(base) ?? null;
   };
-
-  const dispatchPreparedMutation = mutationContext.dispatchPrepared;
 
   /** Conversion reducers clone contracts, so their publication postcondition compares by value. */
   const documentHasLayerContract = (
@@ -2036,19 +2011,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     backend,
     bitmapStore,
     canEdit: () => canEditDocument(),
+    ctx: mutationContext,
     deleteDerived: deleteDerivedSurfaces,
-    dispatchReplacement: (layer) =>
-      dispatchPreparedMutation(
-        { layer, layerId: layer.id, type: 'replaceCanvasLayer' },
-        () => documentHasLayerContract(getReducerDocument(), layer),
-        () => documentHasLayerContract(mirror.getDocument(), layer)
-      ),
-    endBurst: () => endNudgeBurst(),
     getActiveProjectId: () => projectId,
     getAdjustedSurface,
     getDocument: () => mirror.getDocument(),
     getTransformSession: () => stores.transformSession.get(),
-    history,
     installPrepared: installGeneratedPaintCache,
     invalidate: (layerId, overlay) => scheduler.invalidate({ layers: [layerId], overlay: overlay || undefined }),
     isCacheReady: isLayerCacheReadyForOp,
@@ -2062,6 +2030,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
         listener(event);
       }
     },
+    reportRefusal: reportEditRefusal,
     setTransformOverride: (layerId, transform) => {
       if (transform) {
         transformOverrides.set(layerId, transform);
@@ -2074,14 +2043,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const captureLayerCache = (
     layer: CanvasLayerContract,
-    doc: CanvasDocumentContractV3
-  ): { pixels: RasterSurface; rect: Rect } | null | 'not-ready' => {
+    doc: CanvasDocumentContractV3,
+    admit: (rect: Rect) => boolean = () => true
+  ): CapturedLayerCache => {
     const entry = layerCache.get(layer.id);
     if (!entry || isEmpty(entry.rect)) {
       return null;
     }
     if (isCurrentRasterizationJob(layer) || (entry.stale && !isEmpty(getSourceContentRect(layer, doc)))) {
       return 'not-ready';
+    }
+    if (!admit(entry.rect)) {
+      return 'over-budget';
     }
     const pixels = backend.createSurface(entry.rect.width, entry.rect.height, { willReadFrequently: true });
     pixels.ctx.drawImage(entry.surface.canvas, 0, 0);
@@ -2134,31 +2107,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     };
   };
 
-  const reserveLayerOperation = (bytes: number) =>
-    rasterController.memory.reserveOperation(bytes, { purpose: 'layer-operation' });
-
   const layerNeedsPixelPersistence = (layer: CanvasLayerContract): boolean =>
     renderableSourceOf(layer)?.type === 'paint';
 
   const layerMutationController = new LayerMutationController({
-    captureInsertionAnchor,
-    captureRestoreAnchor: (nodeId) => mutationContext.captureRestoreAnchor(nodeId),
     captureCache: captureLayerCache,
-    createLayerId,
-    concurrency: mutationContext,
+    ctx: mutationContext,
     discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
-    dispatchPrepared: dispatchPreparedMutation,
-    endBurst: () => endNudgeBurst(),
     getDuplicateRasterPlan,
-    getDocument: () => mirror.getDocument(),
-    getEditRevision: () => mutationContext.getEditRevision(),
-    getReducerDocument,
     getSelectedLayerIds: resolveSelectedLayerIds,
     hasPendingPixelWork: (layerId) => bitmapStore.hasPendingWork(layerId),
-    history,
-    installPrepared: installGeneratedPaintCache,
     needsPixelPersistence: layerNeedsPixelPersistence,
-    preparePixels: prepareGeneratedPaintCache,
     prepareDuplicateRasterSource: prepareLayerRasterCache,
     pinDuplicateRasterSources: (layerIds) => {
       const leases = layerIds.map((layerId) => rasterController.memory.pin(layerId));
@@ -2171,7 +2130,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
       };
     },
     publishSelectedLayerIds: (primaryId, selectedIds) => opts.setSelectedLayerIds?.(primaryId, selectedIds),
-    reserve: reserveLayerOperation,
     scheduleDuplicateRasterization: scheduleLayerRasterization,
     sameContract: documentHasLayerContract,
     trackDetached: (bytes) => rasterController.memory.trackDetached(bytes),
@@ -2182,17 +2140,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   const replaceSelectionFromImage = editingController.selectionImage.replace.bind(editingController.selectionImage);
 
-  const maskResultController = new MaskResultController({
-    captureInsertionAnchor,
-    concurrency: mutationContext,
-    createLayerId,
-    dispatchPrepared: dispatchPreparedMutation,
-    endBurst: () => endNudgeBurst(),
-    getDocument: () => mirror.getDocument(),
-    getReducerDocument,
-    history,
-    isGuardCurrent: isLayerExportGuardCurrent,
-  });
+  const maskResultController = new MaskResultController({ ctx: mutationContext });
   const commitMaskImageResult = maskResultController.commit.bind(maskResultController);
 
   const filterResultController = new FilterResultController({
@@ -2219,15 +2167,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const commitGeneratedImageResult = generatedResultController.commit.bind(generatedResultController);
 
   const stagedResultController = new StagedResultController({
-    captureInsertionAnchor,
     createEventId,
-    createLayerId,
-    concurrency: mutationContext,
-    dispatchPrepared: dispatchPreparedMutation,
-    endBurst: () => endNudgeBurst(),
+    ctx: mutationContext,
     getCanvasState: () => mutationPort.getCanvasState(),
-    getDocument: () => mirror.getDocument(),
-    history,
     now: () => new Date().toISOString(),
   });
   const commitStagedImage = stagedResultController.commit.bind(stagedResultController);
@@ -2240,7 +2182,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const extractMaskedArea = (maskLayerId: string): Promise<ExtractMaskedAreaResult> =>
     layerController.extractMaskedArea.extract(maskLayerId);
 
-  const mergeLayerDown = (upperLayerId: string): boolean => layerController.merge.mergeDown(upperLayerId);
+  const mergeLayerDown = (upperLayerId: string): MergeDownResult => layerController.merge.mergeDown(upperLayerId);
   const mergeSelectedRasterLayers = (layerIds: readonly string[]): Promise<MergeVisibleResult> =>
     layerController.merge.mergeSelected(layerIds);
   const mergeVisibleRasterLayers = (): Promise<MergeVisibleResult> => layerController.merge.mergeVisible();
@@ -2249,7 +2191,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     createRasterSnapshotCapture({
       createSurface: (width, height) => backend.createSurface(width, height),
       getCanvasState: () => mutationPort.getCanvasState(),
-      getContentEpoch: () => rasterContentEpoch,
+      getDirectPixelEpoch: () => directPixelEpoch,
       getDocumentGeneration: () => rasterController.getDocumentGeneration(),
       getLifecycleGeneration: () => lifecycleGeneration,
       isDisposed: () => disposed,
@@ -2269,7 +2211,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   });
   const exportRasterLayersToPsd = (fileName: string): Promise<PsdExportResult> => psdExportController.export(fileName);
 
-  const rasterizeLayer = (layerId: string): boolean => layerController.rasterize.rasterize(layerId);
+  const rasterizeLayer = (layerId: string): RasterizeLayerResult => layerController.rasterize.rasterize(layerId);
 
   // Transform sessions span gestures. Apply records one undoable parameter edit for image layers or pixel bake for
   // paint; Cancel drops previews. Tools and public UI share the session API.
@@ -2377,7 +2319,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     return layerController.newRasterLayer.liftSelectionToLayer('Selection', 'Layer via copy');
   };
 
-  const clearMask = (layerId: string): boolean => layerController.mask.clear(layerId);
+  const clearMask = (layerId: string): MaskEditResult => layerController.mask.clear(layerId);
   const dispose = (): void => {
     if (disposed) {
       return;
@@ -2432,6 +2374,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     cleanup.run(() => fontLoader.dispose());
     cleanup.run(() => stores.thumbnailStatus.clear());
     cleanup.run(() => strokeListeners.clear());
+    cleanup.run(() => editRefusalListeners.clear());
     cleanup.run(() => toolChangeListeners.clear());
     cleanup.run(() => {
       samInputHandler = null;
@@ -2443,6 +2386,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     strokeListeners.add(listener);
     return () => {
       strokeListeners.delete(listener);
+    };
+  };
+
+  const onEditRefused = (listener: (refusal: CanvasEditRefusal) => void): (() => void) => {
+    editRefusalListeners.add(listener);
+    return () => {
+      editRefusalListeners.delete(listener);
     };
   };
 
@@ -2492,14 +2442,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   // A live float holds pixels that no history entry knows about, so replaying an
   // entry over them would write into a layer with a hole in it. Put them back
   // first; the float is not itself undoable until it commits.
-  const undo = (): void => {
-    floatingSelection.cancel();
-    historyController.undo();
+  const replayHistory = async (direction: 'undo' | 'redo'): Promise<CanvasHistoryReplayStatus> => {
+    if (!history.isReplaying()) {
+      floatingSelection.cancel();
+    }
+    const result = await (direction === 'undo' ? historyController.undo() : historyController.redo());
+    return result.status;
   };
-  const redo = (): void => {
-    floatingSelection.cancel();
-    historyController.redo();
-  };
+  const undo = (): Promise<CanvasHistoryReplayStatus> => replayHistory('undo');
+  const redo = (): Promise<CanvasHistoryReplayStatus> => replayHistory('redo');
   const setBboxGrid = (size: number): void => stores.bboxGrid.set(size > 0 ? size : 1);
   const getViewport = (): Viewport => viewport;
   const getCompositeExecutorDeps = (): CanvasCompositeExecutorDeps => ({
@@ -2512,16 +2463,18 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     exportRasterCompositeWithDeps(request, {
       backend,
       captureSnapshot: (): RasterCompositeExportSnapshot => ({
-        contentEpoch: rasterContentEpoch,
+        directPixelEpoch: directPixelEpoch,
         document: mirror.getDocument(),
         documentGeneration: rasterController.getDocumentGeneration(),
         lifecycleGeneration,
       }),
+      adjustedSurface: (layerId, surface, adjustments) =>
+        rasterController.getAdjustedCacheSurface(layerId, surface, adjustments),
       getLayerSurface: requireLayerSurfaceForExport,
       isSnapshotCurrent: (snapshot) =>
         !disposed &&
         mutationPort.getCanvasState() !== null &&
-        snapshot.contentEpoch === rasterContentEpoch &&
+        snapshot.directPixelEpoch === directPixelEpoch &&
         snapshot.document === mirror.getDocument() &&
         snapshot.documentGeneration === rasterController.getDocumentGeneration() &&
         snapshot.lifecycleGeneration === lifecycleGeneration,
@@ -2539,18 +2492,15 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     });
   const surface: CanvasSurfaceCapability = { attach, detach, resize };
   const viewportCapability: CanvasViewportCapability = { fitToView, fitToViewOnFirstShow, getViewport, setBboxGrid };
-  const stepHistoryBy = (offset: number): void => {
-    const steps = Math.abs(Math.trunc(offset));
-    for (let i = 0; i < steps; i += 1) {
-      if (offset < 0 ? !history.canUndo() : !history.canRedo()) {
-        return;
-      }
-      if (offset < 0) {
-        undo();
-      } else {
-        redo();
+  const stepHistoryBy = async (offset: number): Promise<CanvasHistoryReplayStatus> => {
+    let status: CanvasHistoryReplayStatus = 'empty';
+    for (let step = 0; step < Math.abs(Math.trunc(offset)); step += 1) {
+      status = await (offset < 0 ? undo() : redo());
+      if (status !== 'applied') {
+        break;
       }
     }
+    return status;
   };
   const historyCapability: CanvasHistoryCapability = {
     clearHistory,
@@ -2570,101 +2520,54 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const layerController = new LayerController({
     booleanMerge: {
       backend,
-      captureInsertionAnchor,
-      createLayerId,
-      concurrency: mutationContext,
-      dispatchPrepared: dispatchPreparedMutation,
-      endBurst: () => endNudgeBurst(),
+      ctx: mutationContext,
       exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId),
-      getDocument: () => mirror.getDocument(),
-      getReducerDocument,
-      history,
-      installPrepared: (prepared) => installGeneratedPaintCache(prepared),
       isCacheReady: isLayerCacheReadyForOp,
       isGuardCurrent: isLayerExportGuardCurrent,
-      preparePixels: prepareGeneratedPaintCache,
     },
     crop: {
       backend,
       captureCache: captureLayerCache,
-      concurrency: mutationContext,
+      ctx: mutationContext,
       discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
-      dispatchPrepared: dispatchPreparedMutation,
-      endBurst: () => endNudgeBurst(),
       exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled: true }),
-      getDocument: () => mirror.getDocument(),
-      getReducerDocument,
-      history,
-      installPrepared: (prepared) => installGeneratedPaintCache(prepared),
       isGuardCurrent: isLayerExportGuardCurrent,
       isSupportedSource: isSupportedExportSource,
-      preparePixels: prepareGeneratedPaintCache,
     },
     copy: {
-      captureInsertionAnchor,
-      createLayerId,
-      concurrency: mutationContext,
-      dispatchPrepared: dispatchPreparedMutation,
-      endBurst: () => endNudgeBurst(),
+      backend,
+      ctx: mutationContext,
       exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled: true }),
-      getDocument: () => mirror.getDocument(),
-      getReducerDocument,
-      history,
-      installPrepared: (prepared) => installGeneratedPaintCache(prepared),
       isGuardCurrent: isLayerExportGuardCurrent,
-      preparePixels: prepareGeneratedPaintCache,
     },
     extractMaskedArea: {
       backend,
-      captureInsertionAnchor,
-      createLayerId,
-      concurrency: mutationContext,
+      ctx: mutationContext,
       derived: derivedSurfaceCache,
       diagnostics,
-      dispatchPrepared: dispatchPreparedMutation,
-      endBurst: () => endNudgeBurst(),
       exportBaked: (layerId, includeDisabled) => exportBakedLayerPixelsForStructural(layerId, { includeDisabled }),
       getAdjustedSurface,
       getGroupSurface,
-      getDocument: () => mirror.getDocument(),
       getMaskPattern: getMaskPatternTile,
-      getReducerDocument,
       hasExportableContent: hasExportableLayerContent,
-      history,
-      installPrepared: (prepared) => installGeneratedPaintCache(prepared),
       isCacheReady: isLayerCacheReadyForOp,
       isGuardCurrent: isLayerExportGuardCurrent,
       layers: layerCache,
-      preparePixels: prepareGeneratedPaintCache,
       rasterize: (layerId) => rasterizeLayerPixelsForStructural(layerId),
     },
     commitGeneratedImageResult,
     newRasterLayer: {
       backend,
-      captureInsertionAnchor,
-      createLayerId,
-      concurrency: mutationContext,
-      dispatchPrepared: dispatchPreparedMutation,
-      endBurst: () => endNudgeBurst(),
-      getDocument: () => mirror.getDocument(),
-      getReducerDocument,
-      history,
-      installPrepared: (prepared) => installGeneratedPaintCache(prepared),
+      ctx: mutationContext,
       layers: layerCache,
-      preparePixels: prepareGeneratedPaintCache,
       selection: editingController.selection,
     },
     mask: {
       applyImagePatch,
-      canEdit: () => canEditDocument(),
+      ctx: mutationContext,
       deleteDerived: deleteDerivedSurfaces,
       discardPersisted: (layerId) => bitmapStore.discardLayer(layerId),
-      dispatch: (action) => dispatchCanvasMutation(action),
-      endBurst: () => endNudgeBurst(),
-      getDocument: () => mirror.getDocument(),
-      history,
       isCacheReady: isLayerCacheReadyForOp,
-      isGestureActive: () => pipeline.isGestureActive(),
       layers: layerCache,
       markDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
       notifyPainted: notifyLayerPainted,
@@ -2672,29 +2575,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     },
     merge: {
       backend,
-      canEdit: () => canEditDocument(),
       ctx: mutationContext,
       exportBaked: (layerId) => exportBakedLayerPixelsForStructural(layerId),
       hasExportableContent: hasExportableLayerContent,
       isCacheReady: isLayerCacheReadyForOp,
       layers: layerCache,
-      markDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
       needsPixelPersistence: layerNeedsPixelPersistence,
-      notifyPainted: notifyLayerPainted,
       publishSelectedLayerIds: (primaryId, selectedIds) => opts.setSelectedLayerIds?.(primaryId, selectedIds),
-      reserve: reserveLayerOperation,
     },
     rasterize: {
       backend,
-      canEdit: () => canEditDocument(),
-      dispatch: (action) => dispatchCanvasMutation(action),
-      endBurst: () => endNudgeBurst(),
-      getDocument: () => mirror.getDocument(),
-      history,
-      isGestureActive: () => pipeline.isGestureActive(),
-      layers: layerCache,
-      markDirty: (layerId) => bitmapStore.markLayerDirty(layerId),
-      notifyPainted: notifyLayerPainted,
+      ctx: mutationContext,
       rasterizeDeps: (document) => rasterizeDeps(document),
     },
     structural: structuralController,
@@ -2781,6 +2672,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     ...interactionController.tools,
     canTargetLayerFromContextMenu,
     handleEscapePriority,
+    onEditRefused,
     onStrokeCommitted,
     requestColorSample,
     setColorSampleRouter: (router) => {

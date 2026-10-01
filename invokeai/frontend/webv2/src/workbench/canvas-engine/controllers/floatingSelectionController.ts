@@ -1,5 +1,5 @@
+import type { CanvasEditRefusal } from '@workbench/canvas-engine/capabilities';
 import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/canvas-engine/contracts';
-import type { History } from '@workbench/canvas-engine/history/history';
 import type { ImagePatchApply } from '@workbench/canvas-engine/history/imagePatch';
 import type { LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
@@ -23,15 +23,19 @@ import { eraseMaskedRegion } from '@workbench/canvas-engine/selection/selectionO
 import { layerMatrix } from '@workbench/canvas-engine/tools/moveHitTest';
 import { bakeMatrix, IDENTITY_TRANSFORM } from '@workbench/canvas-engine/transform/transformMath';
 
+import type { CanvasMutationContext } from './mutationContext';
+
 export interface FloatingSelectionControllerOptions {
   readonly backend: RasterBackend;
   readonly layers: LayerCacheStore;
   readonly selection: SelectionState;
-  readonly history: History;
+  readonly ctx: Pick<CanvasMutationContext, 'begin'>;
   readonly applyImagePatch: ImagePatchApply;
+  /** Holds back persistence of a layer until the returned release; the cut hole must never upload. */
+  readonly suspendPersistence: (layerId: string) => () => void;
+  readonly reportRefusal: (refusal: CanvasEditRefusal) => void;
   readonly getDocument: () => CanvasDocumentContractV3 | null;
   readonly canEdit: () => boolean;
-  readonly endBurst: () => void;
   readonly notifyPainted: (layerId: string) => void;
   readonly markDirty: (layerId: string) => void;
   readonly invalidateLayer: (layerId: string) => void;
@@ -47,12 +51,14 @@ const isIdentity = (transform: LayerTransform): boolean =>
   transform.rotation === 0;
 
 /**
- * Lifts pixels without history or dirtying, preventing persistence of the temporary hole. Commit records pre-lift
- * and post-bake pixels across the hole/landing union as one undo entry and marks dirty. Cancellation restores
- * pixels without history.
+ * Lifts pixels without history or dirtying, suspending the layer's persistence so the temporary hole never uploads.
+ * Commit is admitted before it lands anything and records pre-lift and post-bake pixels across the hole/landing union
+ * as one undo entry; a commit that cannot be recorded puts the pixels back instead. Cancellation restores pixels
+ * without history.
  */
 export class FloatingSelectionController {
   private float: FloatingSelection | null = null;
+  private releasePersistence: (() => void) | null = null;
   private disposed = false;
 
   constructor(private readonly deps: FloatingSelectionControllerOptions) {}
@@ -98,9 +104,7 @@ export class FloatingSelectionController {
       return false;
     }
 
-    // Close any coalescing burst before mutating pixels, so a pending nudge does
-    // not absorb this edit.
-    this.deps.endBurst();
+    this.releasePersistence = this.deps.suspendPersistence(layerId);
     const region = lifted.pixels.rect;
     const before = entry.surface.ctx.getImageData(
       region.x - entry.rect.x,
@@ -155,8 +159,7 @@ export class FloatingSelectionController {
     const layer = this.layerOf(float);
     if (!layer) {
       // The layer went away under the float; the pixels have nowhere to land.
-      this.float = null;
-      this.deps.onChange();
+      this.settle();
       return;
     }
     if (isIdentity(float.transform)) {
@@ -169,8 +172,35 @@ export class FloatingSelectionController {
     // The patch spans both the hole left behind and where the pixels land, so a
     // single undo restores both halves of the move.
     const patchRect = union(float.before.rect, landing);
+    const selectionBefore = this.deps.selection.snapshot();
+    const selectionBytes = (selectionBefore.alpha?.byteLength ?? 0) * 2;
+    // Banking a float is part of whatever the user moved on to, even mid-gesture.
+    const txn = this.deps.ctx.begin({
+      gesture: true,
+      historyBytes: patchRect.width * patchRect.height * 8 + selectionBytes,
+    });
+    if (!('publish' in txn)) {
+      this.cancel();
+      this.deps.reportRefusal(txn.status);
+      return;
+    }
+    try {
+      this.land(float, layer, matrix, patchRect, selectionBefore, txn);
+    } finally {
+      txn.end();
+    }
+  }
 
-    this.deps.endBurst();
+  private land(
+    float: FloatingSelection,
+    layer: CanvasLayerContract,
+    matrix: ReturnType<typeof bakeMatrix>,
+    patchRect: Rect,
+    selectionBefore: ReturnType<SelectionState['snapshot']>,
+    txn: Extract<ReturnType<CanvasMutationContext['begin']>, { publish: unknown }>
+  ): void {
+    const existing = this.deps.layers.get(float.layerId);
+    const originalRect = existing ? { ...existing.rect } : null;
     const entry = this.deps.layers.growToRect(float.layerId, patchRect);
 
     // Reconstruct the pre-lift pixels over the patch: the live cache is correct
@@ -202,40 +232,70 @@ export class FloatingSelectionController {
       patchRect.height
     );
 
-    this.float = null;
-    this.deps.onChange();
-    this.deps.notifyPainted(float.layerId);
-    this.deps.markDirty(float.layerId);
-    this.deps.invalidateLayer(float.layerId);
-
     // The ants travel with the pixels inside the same step, so one undo puts
     // both back; the raw selection records nothing of its own here.
-    const selectionBefore = this.deps.selection.snapshot();
     this.moveSelectionWithFloat(layer, matrix, float);
     const selectionAfter = this.deps.selection.snapshot();
 
-    if (!this.deps.history.isApplying()) {
-      const patch = createImagePatchEntry({
-        after,
-        apply: this.deps.applyImagePatch,
-        before,
-        label: 'Move selection',
-        layerId: float.layerId,
-        rect: patchRect,
-      });
-      this.deps.history.push({
+    const patch = createImagePatchEntry({
+      after,
+      apply: this.deps.applyImagePatch,
+      before,
+      label: 'Move selection',
+      layerId: float.layerId,
+      rect: patchRect,
+    });
+    const result = txn.publish(
+      patch.label,
+      {
+        notify: () => {
+          this.deps.notifyPainted(float.layerId);
+          this.deps.markDirty(float.layerId);
+          this.deps.invalidateLayer(float.layerId);
+        },
+      },
+      {
         bytes: patch.bytes + (selectionBefore.alpha?.byteLength ?? 0) + (selectionAfter.alpha?.byteLength ?? 0),
         heldAssetRefs: patch.heldAssetRefs,
-        label: patch.label,
-        redo: () => {
-          patch.redo();
+        redo: async () => {
+          await patch.redo();
           this.deps.selection.restore(selectionAfter);
         },
-        undo: () => {
-          patch.undo();
+        undo: async () => {
+          await patch.undo();
           this.deps.selection.restore(selectionBefore);
         },
-      });
+      },
+      { origin: 'system' }
+    );
+    if (result.status !== 'committed') {
+      // Nothing was recorded: return the layer and the ants to their pre-lift state.
+      const live = this.deps.layers.get(float.layerId);
+      live?.surface.ctx.putImageData(before, patchRect.x - live.rect.x, patchRect.y - live.rect.y);
+      if (originalRect) {
+        this.deps.layers.shrinkToRect(float.layerId, originalRect);
+      } else {
+        this.deps.layers.delete(float.layerId);
+      }
+      this.deps.selection.restore(selectionBefore);
+      this.deps.notifyPainted(float.layerId);
+      this.deps.invalidateLayer(float.layerId);
+      if (result.status === 'over-budget') {
+        this.deps.reportRefusal('over-budget');
+      }
+    }
+    this.settle();
+  }
+
+  /** Drops the float and lets its layer persist again. */
+  private settle(): void {
+    this.float = null;
+    const release = this.releasePersistence;
+    this.releasePersistence = null;
+    try {
+      release?.();
+    } finally {
+      this.deps.onChange();
     }
   }
 
@@ -260,19 +320,14 @@ export class FloatingSelectionController {
     if (!float) {
       return;
     }
-    this.float = null;
-    this.deps.onChange();
-    if (!this.layerOf(float)) {
-      return;
-    }
     const restoreRect: Rect = float.before.rect;
-    if (isEmpty(restoreRect)) {
-      return;
+    if (this.layerOf(float) && !isEmpty(restoreRect)) {
+      const entry = this.deps.layers.growToRect(float.layerId, restoreRect);
+      entry.surface.ctx.putImageData(float.before.data, restoreRect.x - entry.rect.x, restoreRect.y - entry.rect.y);
+      this.deps.notifyPainted(float.layerId);
+      this.deps.invalidateLayer(float.layerId);
     }
-    const entry = this.deps.layers.growToRect(float.layerId, restoreRect);
-    entry.surface.ctx.putImageData(float.before.data, restoreRect.x - entry.rect.x, restoreRect.y - entry.rect.y);
-    this.deps.notifyPainted(float.layerId);
-    this.deps.invalidateLayer(float.layerId);
+    this.settle();
   }
 
   dispose(): void {

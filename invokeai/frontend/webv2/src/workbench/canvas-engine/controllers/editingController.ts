@@ -20,7 +20,7 @@ import { TransformEditingController, type TransformEditingControllerOptions } fr
 export interface EditingControllerOptions {
   readonly selection: SelectionStateDeps;
   /** Records selection changes; the float folds its own mask move into its entry instead. */
-  readonly history: History;
+  readonly history: Pick<History, 'admit' | 'isReplaying'>;
   readonly getDocument: () => CanvasDocumentContractV3 | null;
   readonly createSelectionState?: (deps: SelectionStateDeps) => SelectionState;
   readonly createEditGate?: () => CanvasEditGateController;

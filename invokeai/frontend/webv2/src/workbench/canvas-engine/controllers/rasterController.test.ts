@@ -50,6 +50,26 @@ const publish = (controller: RasterController, layerId: string) => {
 };
 
 describe('RasterController', () => {
+  it("shares a live cache's adjusted copy with export, never a detached copy's or baked pixels'", () => {
+    let baked = false;
+    const controller = new RasterController({
+      backend: createTestStubRasterBackend(),
+      diagnostics: createCanvasDiagnostics(true),
+      isAdjustmentBaked: () => baked,
+    });
+    const entry = publish(controller, 'layer');
+    const { adjustments } = adjustedLayer('layer');
+
+    const shared = controller.getAdjustedCacheSurface('layer', entry.surface, adjustments!);
+    expect(shared).not.toBeNull();
+    expect(shared).toBe(controller.getAdjustedSurface(adjustedLayer('layer'), entry));
+    expect(
+      controller.getAdjustedCacheSurface('layer', createTestStubRasterBackend().createSurface(1, 1), adjustments!)
+    ).toBeNull();
+    baked = true;
+    expect(controller.getAdjustedCacheSurface('layer', entry.surface, adjustments!)).toBeNull();
+  });
+
   it('accounts base, derived and group surfaces as they are allocated and released', () => {
     const controller = createController(10_000);
     const entry = publish(controller, 'a');

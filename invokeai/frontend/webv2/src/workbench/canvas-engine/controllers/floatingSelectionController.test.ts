@@ -2,6 +2,7 @@ import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/c
 import type { SelectionState } from '@workbench/canvas-engine/selection/selectionState';
 import type { PlacedSurface, Rect } from '@workbench/canvas-engine/types';
 
+import { createCanvasMutationContext } from '@workbench/canvas-engine/controllers/mutationContext';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
 import { createHistory } from '@workbench/canvas-engine/history/history';
 import { createLayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
@@ -32,10 +33,12 @@ const makeDoc = (layers: CanvasLayerContract[]): CanvasDocumentContractV3 => ({
   width: 100,
 });
 
-const createHarness = (options: { layer?: CanvasLayerContract; maskRect?: Rect; cacheRect?: Rect } = {}) => {
+const createHarness = (
+  options: { layer?: CanvasLayerContract; maskRect?: Rect; cacheRect?: Rect; byteBudget?: number } = {}
+) => {
   const backend = createTestStubRasterBackend();
   const layers = createLayerCacheStore(backend);
-  const history = createHistory();
+  const history = createHistory({ byteBudget: options.byteBudget });
   const layer = options.layer ?? paintLayer('a');
   let document: CanvasDocumentContractV3 | null = makeDoc([layer]);
 
@@ -64,28 +67,52 @@ const createHarness = (options: { layer?: CanvasLayerContract; maskRect?: Rect; 
   // Seed a cache so there is something to lift out of.
   layers.getOrCreateRect(layer.id, options.cacheRect ?? { height: 100, width: 100, x: 0, y: 0 });
 
+  const releasePersistence = vi.fn();
   const calls = {
-    applyImagePatch: vi.fn(),
-    endBurst: vi.fn(),
+    applyImagePatch: vi.fn((_layerId: string, _rect: Rect, _pixels: ImageData) => Promise.resolve()),
     invalidateLayer: vi.fn(),
     markDirty: vi.fn(),
     notifyPainted: vi.fn(),
     onChange: vi.fn(),
+    releasePersistence,
+    reportRefusal: vi.fn(),
+    suspendPersistence: vi.fn(() => releasePersistence),
   };
+  const ctx = createCanvasMutationContext({
+    commitEdit: vi.fn(),
+    createLayerId: () => 'unused',
+    dispatch: () => true,
+    editOwner: Symbol('owner'),
+    editingLocked: { get: () => false, subscribe: () => () => undefined },
+    getDocument: () => document,
+    getReducerDocument: () => document,
+    history,
+    installPrepared: () => undefined,
+    isGestureActive: () => false,
+    isGuardCurrent: () => true,
+    preparePixels: () => {
+      throw new Error('unused');
+    },
+    projectId: 'p',
+    refreshMirror: () => undefined,
+    reserveRaster: () => ({ lease: { release: () => undefined }, status: 'ok' }),
+    subscribeReducer: () => () => undefined,
+  });
 
   const controller = new FloatingSelectionController({
     applyImagePatch: calls.applyImagePatch,
     backend,
     canEdit: () => true,
-    endBurst: calls.endBurst,
+    ctx,
     getDocument: () => document,
-    history,
     invalidateLayer: calls.invalidateLayer,
     layers,
     markDirty: calls.markDirty,
     notifyPainted: calls.notifyPainted,
     onChange: calls.onChange,
+    reportRefusal: calls.reportRefusal,
     selection,
+    suspendPersistence: calls.suspendPersistence,
   });
 
   return {
@@ -132,10 +159,23 @@ describe('FloatingSelectionController: lift', () => {
     expect(h.history.canUndo()).toBe(false);
   });
 
-  it('closes any coalescing burst before touching pixels', () => {
-    const h = createHarness();
-    h.controller.lift('a');
-    expect(h.calls.endBurst).toHaveBeenCalled();
+  it('suspends persistence of the layer until the float commits or cancels', () => {
+    const committed = createHarness();
+    committed.controller.lift('a');
+    expect(committed.calls.suspendPersistence).toHaveBeenCalledWith('a');
+    expect(committed.calls.releasePersistence).not.toHaveBeenCalled();
+    move(committed.controller, 40, 0);
+    committed.controller.commit();
+    expect(committed.calls.releasePersistence).toHaveBeenCalledOnce();
+    // Dirty before release, so the landed pixels are what persists.
+    expect(committed.calls.markDirty.mock.invocationCallOrder[0]).toBeLessThan(
+      committed.calls.releasePersistence.mock.invocationCallOrder[0]!
+    );
+
+    const cancelled = createHarness();
+    cancelled.controller.lift('a');
+    cancelled.controller.cancel();
+    expect(cancelled.calls.releasePersistence).toHaveBeenCalledOnce();
   });
 
   it('refuses a second lift while a float is live', () => {
@@ -223,7 +263,7 @@ describe('FloatingSelectionController: display effects', () => {
 });
 
 describe('FloatingSelectionController: commit', () => {
-  it('pushes exactly one undoable entry for the whole move, however many drags', () => {
+  it('pushes exactly one undoable entry for the whole move, however many drags', async () => {
     const h = createHarness();
     h.controller.lift('a');
     move(h.controller, 5, 0);
@@ -233,11 +273,11 @@ describe('FloatingSelectionController: commit', () => {
 
     expect(h.controller.has()).toBe(false);
     expect(h.history.canUndo()).toBe(true);
-    h.history.undo();
+    await h.history.undo();
     expect(h.history.canUndo()).toBe(false);
   });
 
-  it('spans both the hole and the landing region so one undo restores both', () => {
+  it('spans both the hole and the landing region so one undo restores both', async () => {
     const h = createHarness();
     h.controller.lift('a');
     move(h.controller, 40, 0);
@@ -246,16 +286,16 @@ describe('FloatingSelectionController: commit', () => {
     // The commit writes the cache directly; `applyImagePatch` is the history
     // entry's replay bridge, so it first runs on undo.
     expect(h.calls.applyImagePatch).not.toHaveBeenCalled();
-    h.history.undo();
+    await h.history.undo();
 
-    const [layerId, rect] = h.calls.applyImagePatch.mock.calls[0] as [string, Rect];
+    const [layerId, rect] = h.calls.applyImagePatch.mock.calls[0];
     expect(layerId).toBe('a');
     // The hole at x ∈ [20,50) unioned with the landing region at x ∈ [60,90).
     expect(rect.x).toBe(20);
     expect(rect.x + rect.width).toBe(90);
   });
 
-  it('moves the ants inside the same step as the pixels, so one undo puts both back', () => {
+  it('moves the ants inside the same step as the pixels, so one undo puts both back', async () => {
     const h = createHarness();
     const before = { alpha: null, bounds: null, commits: [], rect: null, selected: false };
     const after = { ...before, selected: true };
@@ -265,11 +305,38 @@ describe('FloatingSelectionController: commit', () => {
     h.controller.commit();
 
     expect(h.history.entries()).toEqual({ future: [], past: ['Move selection'] });
-    h.history.undo();
+    await h.history.undo();
     expect(h.calls.applyImagePatch).toHaveBeenCalledTimes(1);
     expect(h.selection.restore).toHaveBeenLastCalledWith(before);
-    h.history.redo();
+    await h.history.redo();
     expect(h.selection.restore).toHaveBeenLastCalledWith(after);
+  });
+
+  it('puts the pixels back and reports a move too large to undo, recording nothing', () => {
+    // The 100×30 patch alone exceeds the whole budget.
+    const h = createHarness({ byteBudget: 1000 });
+    h.controller.lift('a');
+    move(h.controller, 40, 0);
+    h.controller.commit();
+
+    expect(h.controller.has()).toBe(false);
+    expect(h.history.canUndo()).toBe(false);
+    expect(h.calls.reportRefusal).toHaveBeenCalledWith('over-budget');
+    expect(h.calls.markDirty).not.toHaveBeenCalled();
+    expect(h.replaceMask).not.toHaveBeenCalled();
+    expect(h.calls.releasePersistence).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the step and the ants in place when its pixels cannot be restored', async () => {
+    const h = createHarness();
+    h.controller.lift('a');
+    move(h.controller, 40, 0);
+    h.controller.commit();
+    h.calls.applyImagePatch.mockRejectedValueOnce(new Error('evicted'));
+
+    expect(await h.history.undo()).toMatchObject({ status: 'failed' });
+    expect(h.history.entries()).toEqual({ future: [], past: ['Move selection'] });
+    expect(h.selection.restore).not.toHaveBeenCalled();
   });
 
   it('marks the layer dirty so the baked pixels persist', () => {

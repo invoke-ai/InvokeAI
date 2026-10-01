@@ -82,6 +82,8 @@ export interface LayerCacheEntryState {
 export interface LayerCacheStore {
   /** Returns an entry without changing LRU order. */
   peek(layerId: string): LayerCacheEntry | undefined;
+  /** Ids of every layer that holds a cache entry. */
+  layerIds(): string[];
   /** Returns the existing cache entry for a layer, or `undefined`. Touches LRU order. */
   get(layerId: string): LayerCacheEntry | undefined;
   /**
@@ -604,6 +606,7 @@ export const createLayerCacheStore = (
     installReplacement,
     damageSince,
     invalidate,
+    layerIds: () => [...entries.keys()],
     peek,
     prepareReplacement,
     publishPixels,

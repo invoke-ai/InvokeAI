@@ -48,6 +48,8 @@ export interface PointerPipelineDeps {
    * without capture or tool routing, avoiding mid-gesture commit guards.
    */
   maybeCommitModalSession?(): boolean;
+  /** True while an undo/redo replays; primary presses start no gesture then (panning stays available). */
+  isReplaying(): boolean;
 }
 
 /** The pipeline handle: DOM handlers plus lifecycle reset. */
@@ -446,6 +448,10 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         return;
       }
       if (event.button !== 0) {
+        return;
+      }
+      if (deps.isReplaying()) {
+        event.preventDefault();
         return;
       }
       cancelledPointerId = null;

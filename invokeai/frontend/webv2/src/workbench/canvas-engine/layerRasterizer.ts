@@ -17,17 +17,6 @@ import { isSupportedExportSource } from '@workbench/canvas-engine/layerExportGua
 /** How a rasterization ended: pixels landed, the world moved, it threw, or it was cancelled. */
 export type LayerRasterizationOutcome = 'published' | 'stale' | 'error' | 'aborted';
 
-/** The image a source references, whose decoded bitmap the job holds a reference to. */
-const sourceImageName = (source: CanvasLayerSourceContract): string | null => {
-  if (source.type === 'image') {
-    return source.image.imageName;
-  }
-  if (source.type === 'paint') {
-    return source.bitmap?.imageName ?? null;
-  }
-  return null;
-};
-
 /** The registry of in-flight rasterizations, keyed by layer. */
 export interface RasterizationJobRegistry {
   getDocumentGeneration(): number;
@@ -57,8 +46,6 @@ export interface CreateLayerRasterizerDeps {
   readonly isDisposed: () => boolean;
   readonly invalidateLayerCache: (layerId: string) => void;
   readonly invalidateLayerRender: (layerId: string) => void;
-  readonly trackPublishedLayerImage: (layer: CanvasLayerContract) => void;
-  readonly releaseBitmapIfUnreferenced: (imageName: string) => void;
   readonly reportError: (message: 'Layer thumbnail rasterization failed', layerId: string, error: unknown) => void;
 }
 
@@ -161,7 +148,6 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
     };
     signal?.addEventListener('abort', abort, { once: true });
     jobs.install(layer.id, job);
-    let published = false;
     void (async () => {
       try {
         const result = await deps.rasterize(source, document, scratch, controller.signal);
@@ -181,8 +167,6 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
         }
 
         const publishedEntry = layerCache.publishRasterized(layer.id, result.rect, result.surface, renderedFontFamily);
-        deps.trackPublishedLayerImage(currentLayer);
-        published = true;
         deps.thumbnails.setVersion(layer.id, publishedEntry.version);
         deps.thumbnails.setStatus(layer.id, 'ready');
         deps.invalidateLayerRender(layer.id);
@@ -214,11 +198,6 @@ export const createLayerRasterizer = (deps: CreateLayerRasterizerDeps): LayerRas
       } finally {
         signal?.removeEventListener('abort', abort);
         jobs.finish(layer.id, job);
-        // A job that did not publish still holds the decoded bitmap it pulled in.
-        const imageName = sourceImageName(source);
-        if (!published && imageName) {
-          deps.releaseBitmapIfUnreferenced(imageName);
-        }
       }
     })().then(settleJob, () => settleJob('stale'));
     return promise;

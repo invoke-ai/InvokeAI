@@ -72,6 +72,7 @@ const createInputHarness = () => {
     getToolContext: () => ctx,
     handleEscape: () => events.push('escape'),
     hasTool: (id) => id in tools,
+    isReplaying: () => false,
     setTool: (id, options) => interaction.setTool(id, options),
     updateCursor: () => undefined,
     viewport: createViewport(),

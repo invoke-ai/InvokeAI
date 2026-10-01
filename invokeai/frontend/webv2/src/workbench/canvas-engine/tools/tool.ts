@@ -45,11 +45,24 @@ export interface PixelEditPatch {
   after: ImageData;
 }
 
-export interface PixelEditTransaction {
-  readonly layerId: string;
-  commitPatch(label: string, patch: PixelEditPatch): void;
-  commitStroke(event: StrokeCommittedEvent): void;
+/**
+ * An admitted live pixel edit. Its undo footprint is admitted before pixels change: `grow` admits more before the
+ * edit expands, and a refusal means the caller must restore its pixels and cancel. `commit` records the
+ * already-applied pixels as one undo step and reports whether it did; `cancel` ends it unrecorded.
+ */
+export interface StrokeEdit {
+  grow(bytes: number): boolean;
+  commit(event: StrokeCommittedEvent): boolean;
   cancel(): void;
+}
+
+/**
+ * A pixel edit that may first materialize its layer (control layers, raster images) in place. A `false` commit
+ * leaves it open: the caller restores the pixels it touched, then cancels, which undoes the materialization.
+ */
+export interface PixelEditTransaction extends StrokeEdit {
+  readonly layerId: string;
+  commitPatch(label: string, patch: PixelEditPatch): boolean;
 }
 
 /**
@@ -139,8 +152,8 @@ export interface ToolContext {
    * reevaluate it.
    */
   updateCursor(): void;
-  /** Emits a completed-stroke event to `engine.tools.onStrokeCommitted` subscribers. */
-  emitStrokeCommitted(event: StrokeCommittedEvent): void;
+  /** Admits a live pixel edit on a paint layer; null when refused (the engine reports why). */
+  beginStrokeEdit(initialBytes?: number): StrokeEdit | null;
   /** Bumps a layer's cache version (without marking it stale) after a direct paint, and recomposites. */
   notifyLayerPainted(layerId: string): void;
   commitSelection?(commit: SelectionCommit): void;

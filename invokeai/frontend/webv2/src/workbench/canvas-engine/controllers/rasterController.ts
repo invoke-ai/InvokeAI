@@ -1,4 +1,5 @@
 import type {
+  CanvasAdjustmentsContract,
   CanvasDocumentContractV3,
   CanvasImageRef,
   CanvasLayerContract,
@@ -41,7 +42,6 @@ export interface RasterControllerOptions {
   readonly budgetBytes?: number;
   readonly onVersionChange?: (layerId: string) => void;
   readonly getDocument?: () => CanvasDocumentContractV3 | null;
-  readonly getLayerImageName?: (layer: CanvasLayerContract) => string | null;
   readonly imageResolver?: (imageName: string, signal?: AbortSignal) => Promise<Blob>;
   /** Layers whose live pixels nothing else can reconstruct: unpersisted paint and open edit sessions. */
   readonly isLayerHeld?: (layerId: string) => boolean;
@@ -73,13 +73,10 @@ export class RasterController {
   private readonly isAdjustmentBaked: (layerId: string) => boolean;
   private readonly jobs = new Map<string, RasterizationJob>();
   private readonly activeJobs = new Set<RasterizationJob>();
-  private readonly trackedImages = new Map<string, string>();
-  private readonly mirroredImages = new Map<string, string>();
   private readonly thumbnailKeys = new Map<string, string>();
   private documentGeneration = 0;
   private disposed = false;
   private readonly getDocument: () => CanvasDocumentContractV3 | null;
-  private readonly getLayerImageName: (layer: CanvasLayerContract) => string | null;
   private readonly backend: RasterBackend;
   private readonly imageResolver: ((imageName: string, signal?: AbortSignal) => Promise<Blob>) | null;
 
@@ -96,7 +93,6 @@ export class RasterController {
       onVersionChange: options.onVersionChange,
     });
     this.getDocument = options.getDocument ?? (() => null);
-    this.getLayerImageName = options.getLayerImageName ?? (() => null);
     this.imageResolver = options.imageResolver ?? null;
     this.derived = createDerivedSurfaceCache(options.diagnostics, (bytes) => memory.setCategoryBytes('derived', bytes));
     this.adjustments = createAdjustedSurfaceCache(options.backend, this.derived, (layerId, version) =>
@@ -234,6 +230,18 @@ export class RasterController {
       : null;
   }
 
+  /** The memoized adjusted copy of a layer's live cache, when `surface` is that cache and its pixels are unbaked. */
+  getAdjustedCacheSurface(
+    layerId: string,
+    surface: RasterSurface,
+    adjustments: CanvasAdjustmentsContract
+  ): RasterSurface | null {
+    const entry = this.layers.peek(layerId);
+    return entry?.surface === surface && !this.isAdjustmentBaked(layerId)
+      ? this.adjustments.get(layerId, entry, adjustments)
+      : null;
+  }
+
   deleteDerivedSurfaces(layerId: string): void {
     this.adjustments.delete(layerId);
     this.derived.deleteLayer(layerId);
@@ -290,41 +298,6 @@ export class RasterController {
     return false;
   }
 
-  getTrackedImage(layerId: string): string | undefined {
-    return this.trackedImages.get(layerId);
-  }
-  setTrackedImage(layerId: string, imageName: string): void {
-    this.trackedImages.set(layerId, imageName);
-  }
-  deleteTrackedImage(layerId: string): void {
-    this.trackedImages.delete(layerId);
-  }
-  trackedImageIds(): string[] {
-    return [...this.trackedImages.keys()];
-  }
-  hasTrackedImage(imageName: string): boolean {
-    return [...this.trackedImages.values()].includes(imageName);
-  }
-  clearTrackedImages(): void {
-    this.trackedImages.clear();
-  }
-
-  getMirroredImage(layerId: string): string | undefined {
-    return this.mirroredImages.get(layerId);
-  }
-  setMirroredImage(layerId: string, imageName: string): void {
-    this.mirroredImages.set(layerId, imageName);
-  }
-  deleteMirroredImage(layerId: string): void {
-    this.mirroredImages.delete(layerId);
-  }
-  mirroredImageNames(): string[] {
-    return [...this.mirroredImages.values()];
-  }
-  clearMirroredImages(): void {
-    this.mirroredImages.clear();
-  }
-
   getThumbnailKey(layerId: string): string | undefined {
     return this.thumbnailKeys.get(layerId);
   }
@@ -338,37 +311,8 @@ export class RasterController {
     this.thumbnailKeys.clear();
   }
 
-  releaseBitmapIfUnreferenced(imageName: string): void {
-    // Leases close decoded bitmaps after the final rasterizer releases them; this hook also supports tracking
-    // callers.
-    void imageName;
-  }
-
-  untrackLayerImage(layerId: string): void {
-    const imageName = this.getTrackedImage(layerId);
-    if (!imageName) {
-      return;
-    }
-    this.deleteTrackedImage(layerId);
-    this.releaseBitmapIfUnreferenced(imageName);
-  }
-
-  trackPublishedLayerImage(layer: CanvasLayerContract): void {
-    const previous = this.getTrackedImage(layer.id);
-    const current = this.getLayerImageName(layer);
-    if (current) {
-      this.setTrackedImage(layer.id, current);
-    } else {
-      this.deleteTrackedImage(layer.id);
-    }
-    if (previous && previous !== current) {
-      this.releaseBitmapIfUnreferenced(previous);
-    }
-  }
-
   dropLayer(layerId: string): void {
     this.cancelRasterization(layerId);
-    this.untrackLayerImage(layerId);
     this.layers.delete(layerId);
     this.deleteDerivedSurfaces(layerId);
   }
@@ -379,8 +323,6 @@ export class RasterController {
     }
     this.disposed = true;
     this.cancelAllRasterization();
-    this.clearTrackedImages();
-    this.clearMirroredImages();
     this.clearThumbnailKeys();
     this.layers.dispose();
     this.derived.dispose();

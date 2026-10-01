@@ -5,11 +5,9 @@ import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps'
 import { createListCollection, HStack, Stack, Text } from '@chakra-ui/react';
 import { ColorPicker, Field, Select } from '@platform/ui';
 import { type ColorSamplerEngine, useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
-import { type CanvasPreparedEngine, usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
+import { type CanvasPreparedEngine, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-
-import { applyStructuralPreview } from './layerOps';
 
 const MASK_FILL_STYLES: readonly CanvasMaskFillContract['style'][] = [
   'solid',
@@ -30,7 +28,7 @@ interface LayerRegionSettingsProps {
 /** The regenerate region's dedicated Properties editor: its overlay fill color and style. */
 export const LayerRegionSettings = ({ engine, layer }: LayerRegionSettingsProps) => {
   const { t } = useTranslation();
-  const commitPrepared = usePreparedCommit(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const sampleColor = useColorSampler(engine);
   const fillBeforeRef = useRef<CanvasMaskFillContract | null>(null);
   const region = layer.inpaint;
@@ -69,7 +67,7 @@ export const LayerRegionSettings = ({ engine, layer }: LayerRegionSettingsProps)
         return;
       }
       if (
-        !applyStructuralPreview(engine, {
+        !previewStructural({
           config: {
             inpaint: { ...region, fill: { ...region.fill, color: hex } },
             layerType: 'raster',
@@ -82,7 +80,7 @@ export const LayerRegionSettings = ({ engine, layer }: LayerRegionSettingsProps)
       }
       fillBeforeRef.current ??= region.fill;
     },
-    [engine, layer.id, region]
+    [previewStructural, layer.id, region]
   );
 
   const handleColorChangeEnd = useCallback(

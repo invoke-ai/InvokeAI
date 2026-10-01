@@ -52,14 +52,10 @@ const STRUCTURAL_MUTATION_TYPES = [
 /** Explicitly allowlist structural-mutation owners to prevent bypassing the prepared-edit seam. */
 const STRUCTURAL_MUTATION_OWNER_PATHS = new Set([
   'workbench/canvasProjectMutations.ts',
-  'workbench/canvas-engine/controllers/booleanMergeController.ts',
-  'workbench/canvas-engine/controllers/copyLayerController.ts',
+  'workbench/canvas-engine/controllers/controlPixelController.ts',
   'workbench/canvas-engine/controllers/cropLayerController.ts',
-  'workbench/canvas-engine/controllers/extractMaskedAreaController.ts',
-  'workbench/canvas-engine/controllers/filterResultController.ts',
-  'workbench/canvas-engine/controllers/generatedResultController.ts',
+  'workbench/canvas-engine/controllers/layerResultSteps.ts',
   'workbench/canvas-engine/controllers/layerMutationController.ts',
-  'workbench/canvas-engine/controllers/maskResultController.ts',
   'workbench/canvas-engine/controllers/mergeLayerController.ts',
   'workbench/canvas-engine/controllers/newRasterLayerController.ts',
   'workbench/canvas-engine/controllers/rasterizeLayerController.ts',

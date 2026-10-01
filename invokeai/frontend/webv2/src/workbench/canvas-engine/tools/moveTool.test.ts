@@ -142,7 +142,7 @@ const createHarness = (doc: CanvasDocumentContractV3, options: HarnessOptions = 
     createLayerId: () => 'x',
     createPath2D: (d) => ({ d }) as unknown as Path2D,
     dispatch: (action) => dispatched.push(action),
-    emitStrokeCommitted: vi.fn(),
+    beginStrokeEdit: () => null,
     getDocument: () => doc,
     getSelectedLayerIds: () => options.selectedLayerIds ?? (doc.selectedLayerId ? [doc.selectedLayerId] : []),
     getFloatingSelection: () => float.current,
@@ -562,6 +562,24 @@ describe('move tool: dragging a floating selection', () => {
     expect(h.transforms.at(-1)).toMatchObject({ x: 20, y: 15 });
     expect(h.commits).toHaveLength(0);
     expect(h.overrides).toHaveLength(0);
+  });
+
+  it('cuts nothing for a click inside the ants, lifting only once the press becomes a drag', () => {
+    const h = createHarness(doc(), { selectionContainsPoint: true });
+    const tool = createMoveTool();
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(11, 10));
+    up(tool, h.ctx, pointer(11, 10));
+    expect(h.lifts).toEqual([]);
+
+    down(tool, h.ctx, pointer(10, 10));
+    move(tool, h.ctx, pointer(11, 10));
+    expect(h.lifts).toEqual([]);
+    move(tool, h.ctx, pointer(20, 10));
+    expect(h.lifts).toEqual(['a']);
+    up(tool, h.ctx, pointer(20, 10));
+    expect(h.transforms.at(-1)).toMatchObject({ x: 10, y: 0 });
   });
 
   it('moves the layer when the press lands outside the ants', () => {

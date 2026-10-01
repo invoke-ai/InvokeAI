@@ -162,7 +162,7 @@ const createHarness = (doc: CanvasDocumentContractV3, zoom = 1, float?: Floating
     createLayerId: () => 'x',
     createPath2D: (d) => ({ d }) as unknown as Path2D,
     dispatch: vi.fn(),
-    emitStrokeCommitted: vi.fn(),
+    beginStrokeEdit: () => null,
     getDocument: () => doc,
     getFloatingSelection: () => floatRef.current,
     invalidate: vi.fn(),

@@ -80,7 +80,7 @@ const createHarness = (doc: CanvasDocumentContractV3) => {
     createLayerId: () => `grad-${++idCounter}`,
     createPath2D: (d) => ({ d }) as unknown as Path2D,
     dispatch: (action) => dispatched.push(action),
-    emitStrokeCommitted: vi.fn(),
+    beginStrokeEdit: () => null,
     getDocument: () => doc,
     invalidate: vi.fn(),
     layers: null as never,

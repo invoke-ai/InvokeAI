@@ -168,27 +168,29 @@ describe('real browser raster acceptance', () => {
     bitmap.close();
   });
 
-  it('undoes and redoes a real pixel patch', () => {
+  it('undoes and redoes a real pixel patch', async () => {
     const backend = createDomRasterBackend();
     const surface = backend.createSurface(1, 1);
     const before = new ImageData(new Uint8ClampedArray([255, 0, 0, 255]), 1, 1);
     const after = new ImageData(new Uint8ClampedArray([0, 0, 255, 255]), 1, 1);
     const history = createHistory();
     surface.ctx.putImageData(after, 0, 0);
-    history.push(
-      createImagePatchEntry({
-        after,
-        apply: (_layerId, rect, pixels) => surface.ctx.putImageData(pixels, rect.x, rect.y),
-        before,
-        label: 'Browser pixel edit',
-        layerId: 'paint',
-        rect: { height: 1, width: 1, x: 0, y: 0 },
-      })
-    );
+    const entry = createImagePatchEntry({
+      after,
+      apply: (_layerId, rect, pixels) => {
+        surface.ctx.putImageData(pixels, rect.x, rect.y);
+        return Promise.resolve();
+      },
+      before,
+      label: 'Browser pixel edit',
+      layerId: 'paint',
+      rect: { height: 1, width: 1, x: 0, y: 0 },
+    });
+    history.admit(entry.bytes)!.publish(entry);
 
-    history.undo();
+    await history.undo();
     expectPixel(surface, 0, 0, [255, 0, 0, 255]);
-    history.redo();
+    await history.redo();
     expectPixel(surface, 0, 0, [0, 0, 255, 255]);
   });
 

@@ -34,7 +34,7 @@ export interface CreateRasterSnapshotCaptureDeps {
   readonly createSurface: (width: number, height: number) => RasterSurface;
   readonly getCanvasState: () => CanvasStateContractV3 | null;
   readonly getDocumentGeneration: () => number;
-  readonly getContentEpoch: () => number;
+  readonly getDirectPixelEpoch: () => number;
   readonly getLifecycleGeneration: () => number;
   readonly isDisposed: () => boolean;
   readonly isGuardCurrent: (guard: LayerExportGuard) => boolean;
@@ -72,7 +72,7 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
   const activeSnapshots = new Set<CanvasRasterSnapshot>();
   const snapshotSources = new WeakMap<
     CanvasDocumentSnapshot,
-    { canvas: CanvasStateContractV3; contentEpoch: number; lifecycleGeneration: number }
+    { canvas: CanvasStateContractV3; directPixelEpoch: number; lifecycleGeneration: number }
   >();
 
   const isDocumentSnapshotCurrent = (snapshot: CanvasDocumentSnapshot): boolean => {
@@ -81,7 +81,7 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
       !deps.isDisposed() &&
       source !== undefined &&
       source.canvas === deps.getCanvasState() &&
-      source.contentEpoch === deps.getContentEpoch() &&
+      source.directPixelEpoch === deps.getDirectPixelEpoch() &&
       source.lifecycleGeneration === deps.getLifecycleGeneration() &&
       snapshot.documentGeneration === deps.getDocumentGeneration()
     );
@@ -238,7 +238,7 @@ export const createRasterSnapshotCapture = (deps: CreateRasterSnapshotCaptureDep
       };
       snapshotSources.set(snapshot, {
         canvas,
-        contentEpoch: deps.getContentEpoch(),
+        directPixelEpoch: deps.getDirectPixelEpoch(),
         lifecycleGeneration: deps.getLifecycleGeneration(),
       });
       return snapshot;

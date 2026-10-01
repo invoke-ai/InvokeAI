@@ -60,7 +60,7 @@ const makeDoc = (layers: CanvasLayerContract[]): CanvasDocumentContractV3 => ({
 const makeDeps = (document: CanvasDocumentContractV3) => {
   const stub = createTestStubRasterBackend();
   const snapshot: RasterCompositeExportSnapshot = {
-    contentEpoch: 1,
+    directPixelEpoch: 1,
     document,
     documentGeneration: 1,
     lifecycleGeneration: 1,

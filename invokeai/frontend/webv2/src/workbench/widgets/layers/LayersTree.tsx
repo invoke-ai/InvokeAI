@@ -1,8 +1,8 @@
 import type { CollisionDetection, DragEndEvent, DragMoveEvent, DragOverEvent, DragStartEvent } from '@dnd-kit/core';
 import type { CanvasDocumentContractV3, DocumentCommand, LayerStackKind } from '@workbench/canvas-engine/api';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 import type { CanvasProjectMutation } from '@workbench/canvasProjectMutations';
 import type { LayerPanelState, LayerSelectionModifiers } from '@workbench/layerPanelState';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
 import type { Dispatch, FocusEvent, KeyboardEvent, ReactNode } from 'react';
 
 import { Box, Text } from '@chakra-ui/react';

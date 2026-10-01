@@ -104,7 +104,10 @@ const createHarness = (doc: CanvasDocumentContractV3 | null): Harness => {
     createLayerId: () => 'unused',
     createPath2D: (d) => ({ d }) as unknown as Path2D,
     dispatch: (action) => dispatched.push(action),
-    emitStrokeCommitted: (event) => strokes.push(event),
+    beginStrokeEdit: () => {
+      strokes.push('begin');
+      return null;
+    },
     getDocument: () => doc,
     invalidate: vi.fn(),
     layers,

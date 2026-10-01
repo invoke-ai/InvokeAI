@@ -1,6 +1,6 @@
 import type { CanvasControlLayerContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/api';
 import type { CanvasOperationCapability } from '@workbench/canvas-operations/api';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { Box } from '@chakra-ui/react';
 import { Button, Tooltip } from '@platform/ui';

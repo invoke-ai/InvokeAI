@@ -1,3 +1,4 @@
+import type { GuardedMutationRefusal } from '@workbench/canvas-engine/capabilities';
 import type {
   CommitRasterFilterResult,
   ExportLayerPixelsResult,
@@ -94,6 +95,17 @@ const sameGuard = (left: LayerExportGuard, right: LayerExportGuard): boolean =>
   left.documentGeneration === right.documentGeneration;
 
 const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+const FILTER_COMMIT_REFUSALS: Record<GuardedMutationRefusal, string> = {
+  aborted: 'The filter was cancelled before it was applied.',
+  busy: 'Another canvas edit is in progress. Try again when it finishes.',
+  locked: 'The layer is locked. Unlock it to apply the filter.',
+  missing: 'The layer is no longer in the canvas.',
+  'not-ready': 'The canvas is not ready to apply the filter yet.',
+  'over-budget': 'The filtered layer is too large to undo, so it was not applied.',
+  stale: 'The layer changed while the filter ran. Process it again.',
+  unsupported: 'This layer cannot take a filter result.',
+};
 
 export const createFilterOperationSession = (
   options: CreateFilterOperationSessionOptions
@@ -280,7 +292,7 @@ export const createFilterOperationSession = (
       }
       publish({
         ...state,
-        error: result.status === 'failed' ? result.message : `Filter commit is ${result.status}.`,
+        error: result.status === 'failed' ? result.message : FILTER_COMMIT_REFUSALS[result.status],
         status: 'error',
       });
       return result.status === 'locked' ? 'blocked' : 'stale';

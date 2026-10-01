@@ -1,9 +1,9 @@
 import type { CanvasDocumentContractV3, CanvasLayerContract, CanvasNodeContract } from '@workbench/canvas-engine/api';
-import type { CanvasEngineHandle } from '@workbench/widgets/canvas/useCanvasEngine';
+import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
 import { Stack, Switch, Text } from '@chakra-ui/react';
 import { getDocumentNode } from '@workbench/canvas-engine/api';
-import { useCanvasEngine } from '@workbench/widgets/canvas/useCanvasEngine';
+import { useCanvasEngine } from '@workbench/canvas-operations/react';
 import { usePreparedCommit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { AdjustmentSettings } from '@workbench/widgets/layers/AdjustmentSettings';
 import { ControlLayerSettings } from '@workbench/widgets/layers/ControlLayerSettings';

@@ -135,12 +135,12 @@ export const useCanvasDocumentEditingLocked = (engine: CanvasCoreStoreCapability
 };
 
 /** Re-renders when any live layer cache gains, loses, or changes pixels. */
-export const useCanvasRasterContentEpoch = (engine: CanvasCoreStoreCapability | null): number => {
+export const useCanvasLayerPixelEpoch = (engine: CanvasCoreStoreCapability | null): number => {
   const subscribe = useCallback(
-    (listener: () => void) => engine?.interaction.subscribe('rasterContentEpoch', listener) ?? (() => undefined),
+    (listener: () => void) => engine?.interaction.subscribe('layerPixelEpoch', listener) ?? (() => undefined),
     [engine]
   );
-  const getSnapshot = useCallback(() => engine?.interaction.get('rasterContentEpoch') ?? 0, [engine]);
+  const getSnapshot = useCallback(() => engine?.interaction.get('layerPixelEpoch') ?? 0, [engine]);
   return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 };
 
