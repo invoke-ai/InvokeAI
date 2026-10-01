@@ -28,6 +28,7 @@ import ParamClipSkip from 'features/parameters/components/Advanced/ParamClipSkip
 import ParamFlux2DevModelSelect from 'features/parameters/components/Advanced/ParamFlux2DevModelSelect';
 import ParamFlux2KleinModelSelect from 'features/parameters/components/Advanced/ParamFlux2KleinModelSelect';
 import {
+  ParamHiDiffusionAutoRatiosToggle,
   ParamHiDiffusionRauNetToggle,
   ParamHiDiffusionT1Ratio,
   ParamHiDiffusionT2Ratio,
@@ -170,6 +171,7 @@ export const AdvancedSettingsAccordion = memo(() => {
                     <ParamColorCompensation />
                     <ParamHiDiffusionRauNetToggle />
                     <ParamHiDiffusionWindowAttnToggle />
+                    <ParamHiDiffusionAutoRatiosToggle />
                     <ParamHiDiffusionT1Ratio />
                     <ParamHiDiffusionT2Ratio />
                   </SimpleGrid>
