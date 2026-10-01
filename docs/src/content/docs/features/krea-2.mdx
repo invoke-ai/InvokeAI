@@ -1,7 +1,7 @@
 ---
 title: Krea-2
-description: Generate images with the Krea-2 text-to-image models (Turbo and Raw), including the GGUF / single-file workflow and the conditioning enhancers.
-lastUpdated: 2026-07-30
+description: Generate images with the Krea-2 text-to-image models (Turbo and Raw), including the GGUF / single-file workflow, the conditioning enhancers and training-free style reference.
+lastUpdated: 2026-08-20
 sidebar:
   order: 5
 ---
@@ -89,6 +89,35 @@ still depends on the GPU, PyTorch build, dtype, and sequence shape. When no fuse
 falls back to math attention, which may use substantially more VRAM and can cause an out-of-memory error.
 Reducing image resolution or disabling regional prompting is the practical fallback. Automated CUDA coverage
 is skipped on unsupported hardware and cannot exercise every GPU/backend combination.
+:::
+
+## Style reference
+
+Krea-2 can transfer the *look* of a reference image — palette, texture, rendering — while the prompt keeps
+driving the content. There is **no adapter model and no LoRA**: the reference's attention keys and values
+are spliced into the target's, so it works with any Krea-2 checkpoint out of the box.
+
+On the canvas, add a **Reference Image** while a Krea-2 model is selected, pick an image, and set **Style
+Strength**. In the workflow editor the same thing is the **Style Reference - Krea-2** node, feeding the
+**Style Reference** input of **Denoise - Krea-2**.
+
+- **Style Strength** is the one knob you need. `1.0` is the recommended setting; the slider goes to `2.0`
+  for a heavier effect. `0` disables the reference entirely and costs nothing.
+- The remaining node inputs (block range, key/value scaling, AdaIN strengths) are for tuning and should be
+  left at their defaults. Style Strength already modulates several of them.
+- Style Strength is recorded in image metadata, so you can see what a given image was generated with. It has
+  no recall button of its own — the reference image itself is not part of the metadata.
+
+:::caution[One reference, matching size, roughly 2x runtime]
+- **Exactly one** reference image is used. If several are enabled on the canvas, only the first is applied
+  and the others are flagged with a warning.
+- The reference must be encoded at **the same width and height as the denoise node** — its image tokens are
+  appended to the target's. On the canvas this is wired up for you. In the workflow editor, set the same
+  width and height on both nodes, or the denoise node will refuse the reference.
+- Every step runs **one extra transformer pass** for the reference, so generation takes roughly **twice as
+  long**.
+- The reference's keys and values are retained for the whole step: about **0.5 GB at 1024²** and **1.7 GB at
+  2560×1440**. At 1440p that no longer fits on a 24 GB card alongside the model.
 :::
 
 ## LoRA

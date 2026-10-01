@@ -26,6 +26,7 @@ from invokeai.app.invocations.fields import (
     Input,
     InputField,
     Krea2ConditioningField,
+    Krea2StyleReferenceField,
     LatentsField,
     OutputField,
     QwenImageConditioningField,
@@ -586,6 +587,20 @@ class WanRefImageOutput(BaseInvocationOutput):
                 num_frames=num_frames,
             )
         )
+
+
+@invocation_output("krea2_style_reference_output")
+class Krea2StyleReferenceOutput(BaseInvocationOutput):
+    """Output of a Krea-2 style-reference encoder."""
+
+    style_reference: Krea2StyleReferenceField = OutputField(
+        description="Style-reference conditioning for Krea-2.",
+        title="Style Reference",
+    )
+
+    @classmethod
+    def build(cls, style_reference: Krea2StyleReferenceField) -> "Krea2StyleReferenceOutput":
+        return cls(style_reference=style_reference)
 
 
 @invocation_output("conditioning_output")

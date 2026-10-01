@@ -32,6 +32,15 @@ const mockFluxVAE = {
   format: 'checkpoint' as const,
 };
 
+const mockZImageQwen3Encoder = {
+  key: 'zimage-qwen3-4b-key',
+  hash: 'zimage-qwen3-4b-hash',
+  name: 'Z-Image Qwen3 4B Encoder',
+  base: 'any' as const,
+  type: 'qwen3_encoder' as const,
+  variant: 'qwen3_4b' as const,
+};
+
 const mockAnimaMainModel = {
   key: 'anima-main-key',
   hash: 'anima-main-hash',
@@ -153,7 +162,7 @@ const mockSelectQwen3VLEncoderModels = vi.fn((_state: unknown) => [mockKrea2Qwen
 const mockSelectZImageDiffusersModels = vi.fn((_state: unknown) => [] as unknown[]);
 // Z-Image borrows the FLUX.1 VAE pool - flux2 VAEs are deliberately not part of it.
 const mockSelectFlux1VAEModels = vi.fn((_state: unknown) => [] as unknown[]);
-const mockSelectQwen3EncoderModels = vi.fn((_state: unknown) => [] as unknown[]);
+const mockSelectZImageQwen3EncoderModels = vi.fn((_state: unknown) => [] as unknown[]);
 
 vi.mock('services/api/hooks/modelsByType', () => ({
   selectAnimaQwen3EncoderModels: (state: unknown) => mockSelectAnimaQwen3EncoderModels(state),
@@ -161,7 +170,7 @@ vi.mock('services/api/hooks/modelsByType', () => ({
   selectAnimaCompatibleVAEModels: (state: unknown) => mockSelectAnimaCompatibleVAEModels(state),
   selectQwenImageVAEModels: (state: unknown) => mockSelectQwenImageVAEModels(state),
   selectQwen3VLEncoderModels: (state: unknown) => mockSelectQwen3VLEncoderModels(state),
-  selectQwen3EncoderModels: (state: unknown) => mockSelectQwen3EncoderModels(state),
+  selectZImageQwen3EncoderModels: (state: unknown) => mockSelectZImageQwen3EncoderModels(state),
   selectZImageDiffusersModels: (state: unknown) => mockSelectZImageDiffusersModels(state),
   selectFlux1VAEModels: (state: unknown) => mockSelectFlux1VAEModels(state),
   selectGlobalRefImageModels: vi.fn(() => []),
@@ -247,6 +256,7 @@ const paramsSliceActual = (await vi.importActual('features/controlLayers/store/p
   animaVaeModelSelected: { type: string };
   krea2VaeModelSelected: { type: string };
   krea2Qwen3VlEncoderModelSelected: { type: string };
+  zImageQwen3EncoderModelSelected: { type: string };
   zImageQwen3SourceModelSelected: { type: string };
   zImageVaeModelSelected: { type: string };
 };
@@ -255,6 +265,7 @@ const {
   animaVaeModelSelected,
   krea2VaeModelSelected,
   krea2Qwen3VlEncoderModelSelected,
+  zImageQwen3EncoderModelSelected,
   zImageQwen3SourceModelSelected,
   zImageVaeModelSelected,
 } = paramsSliceActual;
@@ -764,7 +775,7 @@ describe('modelSelected listener - Z-Image VAE defaulting', () => {
     mockDispatch.mockClear();
     // No diffusers model installed, so the listener falls through to the encoder + VAE branch.
     mockSelectZImageDiffusersModels.mockReturnValue([]);
-    mockSelectQwen3EncoderModels.mockReturnValue([mockAnimaQwen3Encoder]);
+    mockSelectZImageQwen3EncoderModels.mockReturnValue([mockZImageQwen3Encoder]);
     mockSelectFlux1VAEModels.mockReturnValue([mockFluxVAE]);
   });
 
@@ -776,6 +787,42 @@ describe('modelSelected listener - Z-Image VAE defaulting', () => {
 
     const vaeDispatch = dispatched.find((a) => a.type === zImageVaeModelSelected.type && a.payload !== null);
     expect(vaeDispatch!.payload).toMatchObject({ key: mockFluxVAE.key, base: 'flux' });
+  });
+
+  // The encoder slot draws from the 4B pool: the general Qwen3 pool also lists Klein 9B's 8B encoder,
+  // and defaulting to it made the first denoise step fail with a 4096 vs 2560 shape mismatch (#9526).
+  it('should default the Z-Image encoder slot from the 4B pool', () => {
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockZImageTurboMain));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const encoderDispatch = dispatched.find(
+      (a) => a.type === zImageQwen3EncoderModelSelected.type && a.payload !== null
+    );
+    // The full identifier: the slot's reducer parses with zModelIdentifierField, which silently drops a
+    // payload without `hash` and `type` - the slot then stayed empty despite the dispatch.
+    expect(encoderDispatch!.payload).toEqual({
+      key: mockZImageQwen3Encoder.key,
+      hash: mockZImageQwen3Encoder.hash,
+      name: mockZImageQwen3Encoder.name,
+      base: mockZImageQwen3Encoder.base,
+      type: mockZImageQwen3Encoder.type,
+    });
+  });
+
+  it('should not default the Z-Image encoder slot when the 4B pool is empty', () => {
+    mockSelectZImageQwen3EncoderModels.mockReturnValue([]);
+
+    const state = buildMockState({ model: mockFluxMainModel });
+    const action = modelSelected(zParameterModel.parse(mockZImageTurboMain));
+
+    capturedEffect!(action, { getState: () => state, dispatch: mockDispatch });
+
+    const encoderDispatch = dispatched.find(
+      (a) => a.type === zImageQwen3EncoderModelSelected.type && a.payload !== null
+    );
+    expect(encoderDispatch).toBeUndefined();
   });
 
   it('should not default the Z-Image VAE slot when the FLUX.1 pool is empty', () => {

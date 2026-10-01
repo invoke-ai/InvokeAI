@@ -10,10 +10,11 @@ import { selectMainModelConfig } from 'features/controlLayers/store/paramsSlice'
 import {
   refImageSelected,
   selectIsRefImagePanelOpen,
+  selectReferenceImageEntities,
   selectSelectedRefEntityId,
 } from 'features/controlLayers/store/refImagesSlice';
 import { isIPAdapterConfig } from 'features/controlLayers/store/types';
-import { getGlobalReferenceImageWarnings } from 'features/controlLayers/store/validators';
+import { getGlobalReferenceImageWarningsInContext } from 'features/controlLayers/store/validators';
 import { DndListDropIndicator } from 'features/dnd/DndListDropIndicator';
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -111,9 +112,10 @@ export const RefImagePreview = memo(() => {
     };
   }, [entity.config, isExternalModel]);
 
+  const allRefImages = useAppSelector(selectReferenceImageEntities);
   const warnings = useMemo(() => {
-    return getGlobalReferenceImageWarnings(entity, mainModelConfig);
-  }, [entity, mainModelConfig]);
+    return getGlobalReferenceImageWarningsInContext(entity, allRefImages, mainModelConfig);
+  }, [entity, allRefImages, mainModelConfig]);
 
   const onClick = useCallback(() => {
     dispatch(refImageSelected({ id }));
