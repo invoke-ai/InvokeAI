@@ -2301,7 +2301,7 @@ class ModelCache:
 
         if self._execution_device.type == "cuda":
             vram_allocated = torch.cuda.memory_allocated(self._execution_device)
-            vram_free, _vram_total = torch.cuda.mem_get_info(self._execution_device)
+            vram_free, _vram_total = TorchDevice.cuda_mem_get_info(self._execution_device)
             # Blocks the caching allocator holds but is not using are just as available to this
             # process as driver-free memory: the allocator reuses them directly, and empty_cache()
             # returns whole unoccupied segments to the driver. mem_get_info() alone counts them as
@@ -2342,9 +2342,11 @@ class ModelCache:
 
         Best-effort: 0 when the backend does not expose allocator stats, and 0 under
         expandable-segments mode — there, freed blocks inside a segment are NOT counted as
-        inactive splits, empty_cache() reclaims nothing, and a large allocation cannot use the
-        holes, so the whole (reserved - allocated) figure is untrustworthy (a measured hard OOM
-        on an allocation the credited budget claimed would fit).
+        inactive splits and a large allocation cannot use the holes, so the whole
+        (reserved - allocated) figure is untrustworthy (a measured hard OOM on an allocation the
+        credited budget claimed would fit). empty_cache() does unmap the freed pages, which is why
+        `_offload_unlocked_models` runs one after each offload in that mode; what it cannot do is
+        make the credit trustworthy before it runs.
         """
         if _expandable_segments_enabled():
             return 0
@@ -2552,11 +2554,22 @@ class ModelCache:
             f"Offloading unlocked models with goal of making room for {vram_bytes_required / MB:.2f}MB of VRAM."
         )
         vram_bytes_freed = 0
+        # Under expandable segments the measurement credits no allocator-held blocks, so an offload
+        # only shows up once empty_cache() unmaps its pages; without it every unlocked model would
+        # be unloaded by the full shortfall. When a peer device is mid-session that release is
+        # deferred, and the bytes just freed are credited to the measurement instead. That credit is
+        # the same optimistic figure `_get_reclaimable_allocator_bytes` refuses to grant -- the
+        # allocator holds those bytes, but a large contiguous allocation may not be servable from
+        # them -- so it is deliberately loop-local: it stops this loop offloading everything, and
+        # the load that follows re-measures for itself (`lock`, `make_room_in_vram`) and streams
+        # from RAM if the room did not materialize.
+        empty_cache_per_offload = _expandable_segments_enabled()
+        vram_bytes_freed_uncounted = 0
         # TODO(ryand): Give more thought to the offloading policy used here.
         cache_entries_increasing_size = sorted(self._cached_models.values(), key=lambda x: x.cached_model.total_bytes())
         for cache_entry in cache_entries_increasing_size:
             # We do not fully trust the count of bytes freed, so we check again on each iteration.
-            vram_available = vram_available_fn()
+            vram_available = vram_available_fn() + vram_bytes_freed_uncounted
             vram_bytes_to_free = vram_bytes_required - vram_available
             if vram_bytes_to_free <= 0:
                 break
@@ -2569,13 +2582,18 @@ class ModelCache:
                 self._logger.debug(
                     f"Unloaded {cache_entry.key} from VRAM to free {(cache_entry_bytes_freed / MB):.0f} MB."
                 )
+                if empty_cache_per_offload:
+                    if TorchDevice.empty_cache():
+                        vram_bytes_freed_uncounted = 0
+                    else:
+                        vram_bytes_freed_uncounted += cache_entry_bytes_freed
             vram_bytes_freed += cache_entry_bytes_freed
 
         # Only pay for empty_cache() when something was actually offloaded. Paced VRAM moves run
         # this method once per pass, and on most passes there is nothing left to offload —
         # an unconditional empty_cache() would return the allocator's blocks to the driver
         # (and synchronize the device on ROCm) dozens of times per stream for no benefit.
-        if vram_bytes_freed > 0:
+        if vram_bytes_freed > 0 and not empty_cache_per_offload:
             TorchDevice.empty_cache()
         return vram_bytes_freed
 

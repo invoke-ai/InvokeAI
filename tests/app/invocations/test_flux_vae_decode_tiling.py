@@ -120,6 +120,31 @@ class TestAskingForTiling:
             _build_invocation(tiled=tiled, tile_size=256 if tiled else 0).invoke(context)
         assert estimate.call_args.kwargs["tile_size"] == expected_tile_size
 
+    @pytest.mark.parametrize("auto", [True, False], ids=["auto-tiled-decode-on", "auto-tiled-decode-off"])
+    def test_a_decode_too_large_for_its_gpu_is_tiled_up_front_unless_switched_off(self, auto, flux_shaped_vae):
+        """On Windows an allocation that does not fit is paged rather than refused, so the OOM retry never fires and
+        the decision has to be made from the estimate alone."""
+        module = "invokeai.app.invocations.vae.flux_vae_decode"
+        vae_info, context, tiling_state = _build_decode_mocks(
+            flux_shaped_vae(), torch.zeros(1, 16, 64, 64), torch.zeros(1, 3, 512, 512)
+        )
+        context.config.get.return_value.auto_tiled_decode = auto
+        with (
+            patch(f"{module}.estimate_vae_working_memory_flux", side_effect=[20 * 2**30, 2 * 2**30]) as estimate,
+            patch(f"{module}.should_pretile_vae_decode", return_value=True) as pretile,
+        ):
+            _build_invocation().invoke(context)
+
+        if auto:
+            pretile.assert_called_once_with(vae_info.compute_device, 20 * 2**30)
+            assert estimate.call_args.kwargs["tile_size"] == 0
+            vae_info.model_on_device.assert_called_once_with(working_mem_bytes=2 * 2**30)
+            assert tiling_state[0]["use_tiling"] is True
+            assert tiling_state[0]["tile_sample_min_size"] == DEFAULT_TILE_SAMPLE_MIN_SIZE
+        else:
+            pretile.assert_not_called()
+            assert tiling_state[0]["use_tiling"] is False
+
 
 class TestOomFallback:
     def test_an_untiled_oom_retries_once_tiled_and_says_so(self, flux_shaped_vae):

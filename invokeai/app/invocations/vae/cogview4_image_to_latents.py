@@ -41,7 +41,7 @@ class CogView4ImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
     def vae_encode(vae_info: LoadedModel, image_tensor: torch.Tensor) -> torch.Tensor:
         assert isinstance(vae_info.model, AutoencoderKL)
         estimated_working_memory = estimate_vae_working_memory_cogview4(
-            operation="encode", image_tensor=image_tensor, vae=vae_info.model
+            operation="encode", image_tensor=image_tensor, vae=vae_info.model, device=vae_info.compute_device
         )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoencoderKL)

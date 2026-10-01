@@ -122,7 +122,7 @@ def test_a_tiled_decode_applies_the_calibrated_geometry_and_restores_it():
     vae.decode = spy_decode
     with (
         patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),
-        patch.object(AnimaLatentsToImageInvocation, "_use_tiled_decode", return_value=True),
+        patch("invokeai.app.invocations.vae.anima_latents_to_image.should_pretile_vae_decode", return_value=True),
     ):
         _build_invocation().invoke(context)
 

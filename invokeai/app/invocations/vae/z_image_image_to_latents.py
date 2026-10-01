@@ -16,7 +16,6 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.stable_diffusion.diffusers_pipeline import image_resized_to_grid_as_tensor
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE, scoped_vae_tiling
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
 
@@ -70,6 +69,7 @@ class ZImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
             image_tensor=image_tensor,
             vae=vae_info.model,
             tile_size=effective_tile_size,
+            device=vae_info.compute_device,
         )
 
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
@@ -79,7 +79,9 @@ class ZImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard):
                 )
 
             vae_dtype = next(iter(vae.parameters())).dtype
-            image_tensor = image_tensor.to(device=TorchDevice.choose_torch_device(), dtype=vae_dtype)
+            # The VAE's own device, as in the decode nodes: a cpu_only VAE (or another worker's GPU)
+            # is not the session device, and encoding there would fail or run on the wrong card (#9373).
+            image_tensor = image_tensor.to(device=vae_info.compute_device, dtype=vae_dtype)
 
             # The VAE belongs to the model cache and is shared with the decode node and with every
             # other node that reaches this class. Tiling is a property of this one encode, so the

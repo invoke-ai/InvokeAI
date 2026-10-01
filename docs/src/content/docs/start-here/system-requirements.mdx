@@ -164,10 +164,18 @@ If, after restarting the app, this doesn't improve your performance, either rest
   On ROCm builds Invoke routes attention whose head dimension exceeds 256 to PyTorch's math kernel.
   The fused kernels return wrong output there on torch 2.13 / ROCm 7.2 (measured on a W7900), which
   showed up as black or noisy images from the image VAEs - their mid-block attention is one 512-wide
-  head. The math kernel materializes the attention matrix, so large untiled VAE decodes reserve
-  more VRAM (about 4 GB at 1024px, 21 GB at 1536px) and may push other models out of the cache;
-  tiled decoding keeps that bounded. Export `INVOKE_ROCM_FUSED_SDPA_MAX_HEAD_DIM` to raise the
-  threshold on a build whose fused kernels are known to be correct.
+  head. The math kernel builds the whole attention matrix (about 4 GB for a 1024px VAE decode, 21 GB
+  at 1536px), so Invoke computes it in pieces of at most 1 GB. The result can differ from a single
+  math call in the last bit of a bf16 value, and each such call is roughly 10% slower. Export
+  `INVOKE_ROCM_FUSED_SDPA_MAX_HEAD_DIM` to raise the threshold on a build whose fused kernels are
+  known to be correct.
+:::
+
+:::note[Attention without a fused kernel]
+  Where PyTorch has no fused attention kernel for a call, it runs on the math kernel as well, and
+  Invoke computes that in pieces of at most 1 GB too. That is what makes large models and
+  resolutions usable on such builds: Z-Image at 1024px would otherwise build 8 GB of attention
+  scores per call, Krea-2 almost 13 GB.
 :::
 
 :::note[Idle process pegging one CPU core]

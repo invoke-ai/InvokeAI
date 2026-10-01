@@ -615,6 +615,25 @@ def test_xpu_mem_get_info_estimates_when_native_and_sysman_both_fail(native_erro
         assert TorchDevice.xpu_mem_get_info(torch.device("xpu")) == (30 * gib, 32 * gib)
 
 
+@pytest.mark.parametrize(
+    ("budget_gib", "expected_free_gib"),
+    [(None, 10), (13, 7), (16, 10), (5, 0)],
+    ids=["no-budget", "budget-is-tighter", "torch-is-tighter", "over-budget"],
+)
+def test_cuda_mem_get_info_is_capped_by_the_windows_video_memory_budget(budget_gib, expected_free_gib):
+    """On Windows ROCm, torch's free figure ignores other processes and the point where Windows starts paging. The
+    headroom is the budget minus this process's live allocations (16 - 10 = 6 GiB here)."""
+    gib = 1024**3
+    device = torch.device("cuda", 0)
+    budget = None if budget_gib is None else budget_gib * gib
+    with (
+        patch.object(torch.cuda, "mem_get_info", return_value=(10 * gib, 16 * gib)),
+        patch("invokeai.backend.util.devices.video_memory_budget", return_value=budget) as mock_budget,
+    ):
+        assert TorchDevice.cuda_mem_get_info(device) == (expected_free_gib * gib, 16 * gib)
+    mock_budget.assert_called_once_with(device)
+
+
 def test_get_generation_devices_auto_expands_to_all_xpu():
     """With no CUDA, `auto` enumerates every visible XPU device."""
     config = get_config()

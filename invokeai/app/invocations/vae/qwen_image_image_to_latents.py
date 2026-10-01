@@ -75,6 +75,7 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
             image_tensor=image_tensor,
             vae=vae_info.model,
             tile_size=effective_tile_size,
+            device=vae_info.compute_device,
         )
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             # Reinterpret an Anima-classified Wan VAE as AutoencoderKLQwenImage (identical weights).

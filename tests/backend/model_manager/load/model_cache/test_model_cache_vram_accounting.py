@@ -15,6 +15,7 @@ import pytest
 import torch
 
 from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+from invokeai.backend.util.devices import TorchDevice
 
 GB = 1024**3
 MB = 1024**2
@@ -187,3 +188,73 @@ def test_physical_availability_shares_the_reclaimable_credit_policy(monkeypatch:
 
     monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
     assert cache._get_physical_vram_available() == 3 * GB
+
+
+def test_the_windows_video_memory_budget_caps_the_measured_free_vram(monkeypatch: pytest.MonkeyPatch):
+    """On Windows ROCm, torch reports the device total minus this process's usage. Windows pages allocations into
+    shared system memory once the process passes its video-memory budget, so the budget's headroom is what the cache
+    may plan with -- not the larger figure torch reports."""
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+        shared_cpu_weights=None,
+    )
+    cache._execution_device = torch.device("cuda")  # policy only; every VRAM query below is patched out
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda device: (12 * GB, 16 * GB))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda device: 2 * GB)
+    monkeypatch.setattr(torch.cuda, "memory_reserved", lambda device: 2 * GB)
+    monkeypatch.setattr(torch.cuda, "memory_stats", lambda device: {"inactive_split_bytes.all.current": 0})
+    monkeypatch.setattr("invokeai.backend.util.devices.video_memory_budget", lambda device: 11 * GB)
+
+    # 11 GB budget - 4 GB live = 7 GB headroom, + 2 GB allocated - 1 GB working - 2 GB in use; not torch's 12 GB.
+    assert cache._get_vram_available(None) == 6 * GB
+
+
+@pytest.mark.parametrize("peer_busy", [False, True], ids=["alone", "peer-device-busy"])
+def test_offloading_under_expandable_segments_stops_once_enough_is_free(monkeypatch: pytest.MonkeyPatch, peer_busy):
+    """Under expandable segments the driver sees an offloaded model's pages only after empty_cache(), and no
+    allocator credit stands in for them. Re-measuring without it saw no progress and unloaded every unlocked model.
+
+    `empty_cache` is peer-aware: while another generation device is mid-session it defers instead of releasing, so
+    the measurement cannot see the offload at all and the freed bytes are credited to it directly."""
+    cache = ModelCache(
+        execution_device_working_mem_gb=1.0,
+        enable_partial_loading=True,
+        keep_ram_copy_of_weights=True,
+        execution_device="cpu",
+        storage_device="cpu",
+        logger=MagicMock(),
+        shared_cpu_weights=None,
+    )
+    cache._execution_device = torch.device("cuda")  # policy only; every VRAM query below is patched out
+    device = {"free": 0, "allocated": 12 * GB, "unmappable": 0}
+
+    def move_to_ram(entry, bytes_to_free):
+        device["allocated"] -= 4 * GB
+        device["unmappable"] += 4 * GB
+        return 4 * GB
+
+    def empty_cache() -> bool:
+        if peer_busy:  # deferred: nothing is released, and the driver keeps reporting the old figure
+            return False
+        device["free"] += device["unmappable"]
+        device["unmappable"] = 0
+        return True
+
+    monkeypatch.setenv("PYTORCH_CUDA_ALLOC_CONF", "expandable_segments:True")
+    monkeypatch.setattr(torch.cuda, "mem_get_info", lambda d: (device["free"], 16 * GB))
+    monkeypatch.setattr(torch.cuda, "memory_allocated", lambda d: device["allocated"])
+    monkeypatch.setattr(TorchDevice, "empty_cache", empty_cache)
+    monkeypatch.setattr(cache, "_move_model_to_ram", MagicMock(side_effect=move_to_ram))
+    for key in "ABC":
+        entry = MagicMock(key=key, is_locked=False)
+        entry.cached_model.total_bytes.return_value = 4 * GB
+        cache._cached_models[key] = entry
+
+    # 2 GB needed + 1 GB working memory: one 4 GB model is enough.
+    assert cache._offload_unlocked_models(2 * GB) == 4 * GB
+    assert cache._move_model_to_ram.call_count == 1

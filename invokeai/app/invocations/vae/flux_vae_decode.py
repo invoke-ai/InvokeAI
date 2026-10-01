@@ -19,7 +19,10 @@ from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.oom import is_oom_error
 from invokeai.backend.util.vae_tiling_scope import MIN_TILE_SAMPLE_SIZE, scoped_vae_tiling
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_flux
+from invokeai.backend.util.vae_working_memory import (
+    estimate_vae_working_memory_flux,
+    should_pretile_vae_decode,
+)
 
 
 @invocation(
@@ -61,12 +64,33 @@ class FluxVaeDecodeInvocation(BaseInvocation, WithMetadata, WithBoard):
         # exercises on purpose. The encode node *is* guarded, because it used to reject every
         # `AutoencoderKL` and the swap is what widened it.
         assert isinstance(vae_info.model, AutoencoderKL)
-        use_tiling = self.tiled or context.config.get().force_tiled_decode
+        config = context.config.get()
+        use_tiling = self.tiled or config.force_tiled_decode
         tile_size = self.tile_size if use_tiling else None
 
         estimated_working_memory = estimate_vae_working_memory_flux(
-            operation="decode", image_tensor=latents, vae=vae_info.model, tile_size=tile_size
+            operation="decode",
+            image_tensor=latents,
+            vae=vae_info.model,
+            tile_size=tile_size,
+            device=vae_info.compute_device,
         )
+        # Where the untiled decode would claim most of what the device keeps resident, tile before it runs: on Windows
+        # an allocation that does not fit is paged rather than refused, so the retry below never fires.
+        if (
+            not use_tiling
+            and config.auto_tiled_decode
+            and should_pretile_vae_decode(vae_info.compute_device, estimated_working_memory)
+        ):
+            use_tiling = True
+            tile_size = self.tile_size
+            estimated_working_memory = estimate_vae_working_memory_flux(
+                operation="decode",
+                image_tensor=latents,
+                vae=vae_info.model,
+                tile_size=tile_size,
+                device=vae_info.compute_device,
+            )
 
         with vae_info.model_on_device(working_mem_bytes=estimated_working_memory) as (_, vae):
             assert isinstance(vae, AutoencoderKL)

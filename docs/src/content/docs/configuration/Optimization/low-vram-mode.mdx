@@ -39,6 +39,7 @@ Low-VRAM mode and related workload-specific optimizations include:
 - Dynamic RAM and VRAM cache sizes (`max_cache_ram_gb`, `max_cache_vram_gb`)
 - Working memory (`device_working_mem_gb`)
 - Keeping a RAM weight copy (`keep_ram_copy_of_weights`)
+- Tiled VAE decode and encode (`auto_tiled_decode`, `force_tiled_decode`)
 - Wan video memory optimization (`wan_memory_optimization`)
 - PiD decode activation chunking (`pid_memory_optimization`)
 
@@ -84,6 +85,8 @@ The PyTorch CUDA allocator's behavior can be configured using the `pytorch_cuda_
 pytorch_cuda_alloc_conf: "backend:cudaMallocAsync"
 ```
 
+When the setting is left unset, PyTorch's defaults apply, with one exception: with a ROCm build of PyTorch on Windows, Invoke uses `expandable_segments:True`. There, Windows does not fail an allocation it cannot fit into contiguous VRAM. It moves the allocation into much slower system memory instead, and fragmented VRAM makes that happen even when enough VRAM is free. Setting `pytorch_cuda_alloc_conf` yourself, or any of the `PYTORCH_ALLOC_CONF` / `PYTORCH_CUDA_ALLOC_CONF` / `PYTORCH_HIP_ALLOC_CONF` environment variables, replaces this default.
+
 A more complete explanation of the available configuration options is [here](https://pytorch.org/docs/stable/notes/cuda.html#optimizing-memory-usage-with-pytorch-cuda-alloc-conf).
 
 ### Dynamic RAM and VRAM cache sizes
@@ -112,7 +115,8 @@ But, if your GPU has enough VRAM to hold models fully, you might get a perf boos
 max_cache_ram_gb: 28
 
 # The default max cache VRAM size is adjusted dynamically based on the amount of available VRAM (taking into
-# consideration the VRAM used by other processes).
+# consideration the VRAM used by other processes; with a ROCm build on Windows, the video-memory budget Windows grants
+# Invoke, beyond which it would move allocations into system memory).
 # You can override the default value by setting `max_cache_vram_gb`.
 # CAUTION: Most users should not manually set this value. See warning below.
 max_cache_vram_gb: 16
@@ -168,6 +172,14 @@ keep_ram_copy_of_weights: false
 
 Without tiling, the memory a VAE needs grows with the square of the image size. For FLUX.1, an untiled 3072² encode peaks at about 18.8 GiB on an RTX 4090, and a tiled one at 0.8 GiB, while tiled memory stays roughly flat as the image grows. Tiling costs some speed on smaller images.
 
+Invoke tiles large decodes by itself: when an untiled decode would claim most of the memory the GPU keeps resident, it decodes in tiles instead, for the FLUX.1, Z-Image, Qwen-Image, Krea-2, Anima and Wan decodes. Because a tiled decode is not pixel-identical to an untiled one, this only kicks in for images too large for the card: for Z-Image on a 16GB GPU, for example, from about 1850x1850 on Nvidia and from about 1500x1500 on AMD, whose convolution library needs more memory. On a ROCm build under Windows the comparison uses the video-memory budget Windows grants Invoke, which is lower than the card's total and lower again while another program uses the GPU. Anima tiles a little earlier, because its untiled decode pushes the Anima model itself out of VRAM on 8GB cards.
+
+To always decode untiled unless you ask for tiling, turn this off. A decode too large for the card then runs out of memory: the FLUX.1 and Z-Image decodes retry in tiles, the others fail, and on Windows the driver may move the decode into system memory and run it very slowly instead. Anima is not affected by this setting: there, tiling a large decode is what keeps the Anima model in VRAM, and turning it off would only make those decodes slower.
+
+```yaml
+auto_tiled_decode: false
+```
+
 - **Always tile:** set `force_tiled_decode: true` in `invokeai.yaml`. It covers the VAE decode and encode for SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image, the Anima encode, and the Krea-2 style reference. Other model families (for example SD3, FLUX.2, Wan and LTX-2) ignore it.
 - **Per node:** the SD, FLUX.1, Z-Image and Qwen-Image **Latents to Image** and **Image to Latents** nodes, and **Image to Latents - Anima**, have **Tiled** and **Tile Size** fields for workflows. The [Upscale panel](/users-guide/image-generation/upscale/) turns tiling on by itself.
 - **Automatic retry:** if a FLUX.1, Z-Image or Anima decode, or a FLUX.1 encode, runs out of memory, InvokeAI retries it once with tiling and logs that it did.
@@ -210,6 +222,15 @@ It is strongly suggested to disable this feature:
 
   Unfortunately, the Nvidia implementation is not optimized for applications like Invoke and does more harm than good.
 :::
+
+### AMD GPUs on Windows (ROCm)
+
+Invoke does not officially support ROCm on Windows (see the [System Requirements](/start-here/system-requirements/)). If you run a ROCm build of PyTorch there anyway, Windows behaves as if the Nvidia sysmem fallback were always on: an allocation that does not fit is moved into much slower system memory instead of failing, and it stays there. Task Manager shows it as shared GPU memory. Invoke works around this where it can:
+
+- The model cache plans against the video-memory budget Windows grants Invoke, not against the card's total VRAM.
+- The PyTorch allocator defaults to `expandable_segments:True` (see [PyTorch CUDA allocator config](#pytorch-cuda-allocator-config)), so fragmented VRAM does not force allocations out.
+- Decodes too large for the card are tiled before they start (see [Tiled VAE decode and encode](#tiled-vae-decode-and-encode)); waiting for an out-of-memory error does not work there, because none comes.
+- When part of Invoke's GPU memory stays in system memory across two generations, the log says so. Other programs using the same GPU, like games or browsers, can push Invoke's memory out as well; close them. If it keeps happening, lower the image size, set `max_cache_vram_gb` lower or `device_working_mem_gb` higher, and restart Invoke to get the memory back into VRAM.
 
 ## Troubleshooting
 

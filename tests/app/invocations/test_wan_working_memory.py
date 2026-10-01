@@ -3,6 +3,7 @@
 from unittest.mock import MagicMock, patch
 
 import PIL.Image
+import pytest
 import torch
 from diffusers.models.autoencoders import AutoencoderKLWan
 
@@ -302,13 +303,16 @@ class TestWanInvocationsRequestWorkingMemory:
         vae.disable_tiling.assert_called_once()
         vae.decode.assert_not_called()
 
-    def test_latents_to_video_falls_back_to_tiling_when_estimate_exceeds_vram(self):
+    @pytest.mark.parametrize("auto", [True, False], ids=["auto-tiled-decode-on", "auto-tiled-decode-off"])
+    def test_latents_to_video_falls_back_to_tiling_when_estimate_exceeds_vram(self, auto):
         vae = _mock_wan_vae()
         # Not 256: the point of the change is that the tile comes from a module constant rather than
         # from the shared cache instance, and with 256 on the instance both implementations agree.
         vae.tile_sample_min_height = 999
         vae_info = _mock_vae_info(vae)
+        vae_info.compute_device = torch.device("cuda")
         mock_context = self._video_context(vae_info)
+        mock_context.config.get.return_value.auto_tiled_decode = auto
 
         with (
             patch(
@@ -327,23 +331,29 @@ class TestWanInvocationsRequestWorkingMemory:
             except Exception:
                 pass
 
-        assert mock_estimate.call_count == 2
-        assert mock_estimate.call_args_list[1].kwargs["tile_size"] == 256
-        # All four geometry values are set explicitly rather than inherited from the shared module:
-        # `enable_tiling` falls back to whatever the instance carries for any argument left out, and
-        # a min below the inherited stride drops whole bands of the frame.
-        vae.enable_tiling.assert_called_once_with(
-            tile_sample_min_height=256,
-            tile_sample_min_width=256,
-            tile_sample_stride_height=192,
-            tile_sample_stride_width=192,
-        )
-        vae_info.model_on_device.assert_called_once_with(working_mem_bytes=4 * 2**30)
+        if auto:
+            assert mock_estimate.call_count == 2
+            assert mock_estimate.call_args_list[1].kwargs["tile_size"] == 256
+            # All four geometry values are set explicitly rather than inherited from the shared module:
+            # `enable_tiling` falls back to whatever the instance carries for any argument left out, and
+            # a min below the inherited stride drops whole bands of the frame.
+            vae.enable_tiling.assert_called_once_with(
+                tile_sample_min_height=256,
+                tile_sample_min_width=256,
+                tile_sample_stride_height=192,
+                tile_sample_stride_width=192,
+            )
+            vae_info.model_on_device.assert_called_once_with(working_mem_bytes=4 * 2**30)
+        else:
+            assert mock_estimate.call_count == 1
+            vae.enable_tiling.assert_not_called()
+            vae_info.model_on_device.assert_called_once_with(working_mem_bytes=100 * 2**30)
 
     def test_latents_to_video_skips_tiling_for_cpu_only_vae(self):
-        """A cpu_only VAE runs in system RAM; VRAM-based tiling must not kick in."""
+        """A cpu_only VAE runs in system RAM; VRAM-based tiling must not kick in, even with a small GPU present."""
         vae = _mock_wan_vae()
         vae_info = _mock_vae_info(vae, cpu_only=True)
+        vae_info.compute_device = torch.device("cpu")
         mock_context = self._video_context(vae_info)
 
         with (
@@ -353,6 +363,7 @@ class TestWanInvocationsRequestWorkingMemory:
             ) as mock_estimate,
             patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cuda")),
             patch.object(TorchDevice, "empty_cache"),
+            patch("torch.cuda.get_device_properties", return_value=MagicMock(total_memory=8 * 2**30)),
         ):
             invocation = WanLatentsToVideoInvocation.model_construct(
                 latents=MagicMock(latents_name="l"), vae=MagicMock(vae=MagicMock()), fps=16
