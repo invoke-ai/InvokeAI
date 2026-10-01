@@ -50,12 +50,14 @@ export {
 } from './core/semanticImageQuery';
 export {
   DEFAULT_GALLERY_SETTINGS,
+  GALLERY_AUTO_ADD_FOLLOW,
   getGallerySettings,
   type GalleryPaginationMode,
   type GallerySettings,
   type GalleryThumbnailFit,
 } from './core/settings';
 export {
+  getGalleryAutoAddBoardId,
   getGalleryCompareImage,
   getGalleryDestinationBoardId,
   getGalleryPage,

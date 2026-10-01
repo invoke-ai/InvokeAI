@@ -26,6 +26,7 @@ import {
   isWidgetInstanceDragData,
   resolveWidgetDragEnd,
   type ActiveWidgetDrag,
+  workbenchAutoScroll,
   widgetCollisionDetection,
 } from '@workbench/widgetDnd';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
@@ -61,11 +62,6 @@ import { TopBar } from './topbar';
 
 const DND_MODIFIERS = [restrictToWindowEdges];
 
-/**
- * Keep 20% edge zones for short board lists but halve scrolling speed. Collision visibility checks exclude
- * offscreen targets rather than narrowing usable zones.
- */
-const DND_AUTO_SCROLL = { acceleration: 5 };
 const EMPTY_FLOATING: NonNullable<Project['floatingWidgets']> = {};
 
 export const WorkbenchShell = () => {
@@ -283,7 +279,7 @@ export const WorkbenchShell = () => {
   return (
     <FocusRegionProvider>
       <DndContext
-        autoScroll={DND_AUTO_SCROLL}
+        autoScroll={workbenchAutoScroll}
         collisionDetection={widgetCollisionDetection}
         modifiers={DND_MODIFIERS}
         sensors={sensors}

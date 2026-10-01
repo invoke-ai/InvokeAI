@@ -42,6 +42,7 @@ import { AddNodeDialog } from './editor/AddNodeDialog';
 import { CallSavedWorkflowSyncRuntime } from './editor/CallSavedWorkflowSyncRuntime';
 import { getWorkflowFlowInstance } from './editor/flowInstanceStore';
 import { releaseWorkflowViewportsExcept } from './editor/workflowViewportStore';
+import { LibraryCopyChoiceHost } from './library/LibraryCopyChoiceDialog';
 import { isUpdatableSource } from './library/projectWorkflowEntries';
 import { WorkflowLibraryDialog } from './library/WorkflowLibraryDialog';
 import { WorkflowPublicationHost } from './library/WorkflowPublicationHost';
@@ -571,6 +572,7 @@ export const WorkflowDialogHost = () => {
         onOpenChange={setAddNodeOpen}
       />
       <WorkflowLibraryDialog isOpen={isLibraryOpen} onOpenChange={setWorkflowLibraryOpen} />
+      <LibraryCopyChoiceHost />
       <RenameDialog
         key={renameRequest?.requestId ?? 0}
         initialName={renameTargetName}

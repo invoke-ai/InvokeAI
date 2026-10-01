@@ -159,6 +159,7 @@ export const GalleryBoardsPanel = () => {
                 <GalleryBoardRow
                   key={board.id}
                   board={board}
+                  isAutoAddTarget={board.id === gallery.settings.autoAddBoardId}
                   isMenuOpen={boardMenuTarget?.board.id === board.id}
                   isSelected={board.id === gallery.selectedBoardId}
                   loadedItemBoardIds={loadedItemBoardIds}
@@ -207,6 +208,7 @@ export const GalleryBoardsPanel = () => {
                   <GalleryBoardRow
                     key={board.id}
                     board={board}
+                    isAutoAddTarget={board.id === gallery.settings.autoAddBoardId}
                     isMenuOpen={boardMenuTarget?.board.id === board.id}
                     isSelected={board.id === gallery.selectedBoardId}
                     loadedItemBoardIds={loadedItemBoardIds}
