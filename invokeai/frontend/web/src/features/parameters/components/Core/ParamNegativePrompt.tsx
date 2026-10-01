@@ -11,6 +11,7 @@ import {
 import { ViewModePrompt } from 'features/parameters/components/Prompts/ViewModePrompt';
 import { AddPromptTriggerButton } from 'features/prompt/AddPromptTriggerButton';
 import { PromptPopover } from 'features/prompt/PromptPopover';
+import { PromptTokenCounter } from 'features/prompt/tokenCounter/PromptTokenCounter';
 import { usePrompt } from 'features/prompt/usePrompt';
 import { usePromptAttentionHotkeys } from 'features/prompt/usePromptAttentionHotkeys';
 import {
@@ -106,6 +107,7 @@ export const ParamNegativePrompt = memo(() => {
           <AddPromptTriggerButton isOpen={isOpen} onOpen={onOpen} />
         </PromptOverlayButtonWrapper>
         <PromptLabel label={t('parameters.negativePromptPlaceholder')} />
+        <PromptTokenCounter promptText={prompt} />
         {viewMode && (
           <ViewModePrompt
             prompt={prompt}
