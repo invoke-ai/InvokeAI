@@ -12366,7 +12366,10 @@ describe('guarded filter previews', () => {
 
       await expect(getCanvasOperations(engine).processFilterOperation()).resolves.toBe('stale');
       expect(getCanvasOperations(engine).stores.filterSession.get()).toMatchObject({
-        error: 'Canny Edge Detection output dimensions 9x10 do not match source dimensions 10x10.',
+        error: {
+          code: 'process-failed',
+          detail: 'Canny Edge Detection output dimensions 9x10 do not match source dimensions 10x10.',
+        },
         preview: null,
         status: 'error',
       });
@@ -12377,7 +12380,10 @@ describe('guarded filter previews', () => {
         'stale'
       );
       expect(getCanvasOperations(engine).stores.filterSession.get()).toMatchObject({
-        error: 'Canny Edge Detection output dimensions 10x9 do not match source dimensions 10x10.',
+        error: {
+          code: 'apply-failed',
+          detail: 'Canny Edge Detection output dimensions 10x9 do not match source dimensions 10x10.',
+        },
         preview: { imageName: 'canny.png' },
         status: 'error',
       });
@@ -12871,7 +12877,7 @@ describe('guarded filter previews', () => {
 
       await getCanvasOperations(engine).commitFilterOperation('apply', makeDurable);
       expect(getCanvasOperations(engine).stores.filterSession.get()).toMatchObject({
-        error: 'promotion failed',
+        error: { code: 'apply-failed', detail: 'promotion failed' },
         preview: { imageName: 'filtered.png' },
         status: 'error',
       });

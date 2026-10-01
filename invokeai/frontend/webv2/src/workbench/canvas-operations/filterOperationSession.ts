@@ -1,4 +1,3 @@
-import type { GuardedMutationRefusal } from '@workbench/canvas-engine/capabilities';
 import type {
   CommitRasterFilterResult,
   ExportLayerPixelsResult,
@@ -10,6 +9,8 @@ import type {
   FilterCommitTarget,
   FilterOperationPreview,
   FilterOperationSessionState,
+  FilterSessionError,
+  FilterSessionErrorCode,
   LayerFilterSettings,
 } from '@workbench/canvas-operations/operationTypes';
 export type {
@@ -94,17 +95,9 @@ const sameGuard = (left: LayerExportGuard, right: LayerExportGuard): boolean =>
   left.cacheVersion === right.cacheVersion &&
   left.documentGeneration === right.documentGeneration;
 
-const message = (error: unknown): string => (error instanceof Error ? error.message : String(error));
-
-const FILTER_COMMIT_REFUSALS: Record<GuardedMutationRefusal, string> = {
-  aborted: 'The filter was cancelled before it was applied.',
-  busy: 'Another canvas edit is in progress. Try again when it finishes.',
-  locked: 'The layer is locked. Unlock it to apply the filter.',
-  missing: 'The layer is no longer in the canvas.',
-  'not-ready': 'The canvas is not ready to apply the filter yet.',
-  'over-budget': 'The filtered layer is too large to undo, so it was not applied.',
-  stale: 'The layer changed while the filter ran. Process it again.',
-  unsupported: 'This layer cannot take a filter result.',
+const failure = (code: 'process-failed' | 'apply-failed', error: unknown): FilterSessionError => {
+  const detail = error instanceof Error ? error.message : typeof error === 'string' ? error : String(error ?? '');
+  return detail ? { code, detail } : { code };
 };
 
 export const createFilterOperationSession = (
@@ -180,15 +173,23 @@ export const createFilterOperationSession = (
     }
     clearAutoProcess();
     const requestDraft = structuredClone(state.draft);
+    let refusal: FilterSessionErrorCode | null = null;
     publish({ ...state, error: null, preview: null, status: 'processing' });
     const result = await operation.run(
       async (signal) => {
         const exported = await deps.exportPixels();
         if (exported.status !== 'ok') {
+          refusal =
+            exported.status === 'over-budget'
+              ? 'source-over-budget'
+              : exported.status === 'aborted'
+                ? 'not-ready'
+                : exported.status;
           throw new Error(`The filter source is ${exported.status}.`);
         }
         try {
           if (!sameGuard(exported.guard, guard) || !deps.isGuardCurrent(guard)) {
+            refusal = 'stale';
             throw new DOMException('The filter source became stale.', 'AbortError');
           }
           const filtered = await deps.runFilter({
@@ -198,14 +199,17 @@ export const createFilterOperationSession = (
             signal,
           });
           if (signal.aborted || !deps.isGuardCurrent(guard)) {
+            refusal = 'stale';
             throw new DOMException('The filter request was superseded.', 'AbortError');
           }
           const rect = { height: filtered.height, width: filtered.width, ...filtered.origin };
           const shown = await deps.publishPreview(filtered.imageName, rect, guard, requestDraft.type);
           if (signal.aborted || !deps.isGuardCurrent(guard)) {
+            refusal = 'stale';
             throw new DOMException('The filter request was superseded.', 'AbortError');
           }
           if (shown !== 'shown') {
+            refusal = 'stale';
             throw new DOMException('The filter source became stale.', 'AbortError');
           }
           return {
@@ -229,7 +233,10 @@ export const createFilterOperationSession = (
       const operationState = deps.controller.getSnapshot();
       publish({
         ...state,
-        error: operationState.status === 'active' ? operationState.error : 'The filter failed.',
+        error:
+          refusal !== null
+            ? { code: refusal }
+            : failure('process-failed', operationState.status === 'active' ? operationState.error : null),
         preview: null,
         status: 'error',
       });
@@ -292,13 +299,13 @@ export const createFilterOperationSession = (
       }
       publish({
         ...state,
-        error: result.status === 'failed' ? result.message : FILTER_COMMIT_REFUSALS[result.status],
+        error: result.status === 'failed' ? failure('apply-failed', result.message) : { code: result.status },
         status: 'error',
       });
       return result.status === 'locked' ? 'blocked' : 'stale';
     } catch (error) {
       if (!disposed && token === commitToken && !controller.signal.aborted) {
-        publish({ ...state, error: message(error), status: 'error' });
+        publish({ ...state, error: failure('apply-failed', error), status: 'error' });
       }
       return 'stale';
     } finally {

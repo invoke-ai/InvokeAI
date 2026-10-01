@@ -166,7 +166,7 @@ Undo and redo are asynchronous and failure-atomic: an entry moves to the other s
 
 ## Edit leases and staged-result acceptance
 
-Application operations acquire one exclusive lease from `CanvasEditGate`. A lease carries an `AbortSignal`, has an explicit `isCurrent()` freshness check, and is idempotently released. Release, document/project invalidation, cooldown, or disposal aborts and stales the lease. Expected cancellation and stale results use status unions; exceptions represent unexpected failures.
+Application operations acquire one exclusive lease from `CanvasEditGate`. A lease carries an `AbortSignal`, has an explicit `isCurrent()` freshness check, and is idempotently released. Release, document/project invalidation, cooldown, or disposal aborts and stales the lease. Expected cancellation and stale results use status unions; exceptions represent unexpected failures. Operation sessions publish typed error codes rather than copy (`FilterSessionError`, `SamSessionError`): the view translates the code when it renders, so a visible error follows a language change, and an unexpected failure shows a translated summary with its original message as technical detail.
 
 Staged-result acceptance is engine-owned. The UI enables Accept from interaction capabilities, but `StagedResultController` remains authoritative. It captures a document-edit permit, rejects an active gesture, and verifies the selected candidate's stable key immediately before dispatch.
 
