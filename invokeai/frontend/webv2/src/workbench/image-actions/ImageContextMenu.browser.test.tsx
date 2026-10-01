@@ -15,6 +15,9 @@ import { EMPTY_IMAGE_RECALL_CAPABILITIES } from './imageRecall';
 
 const NO_BOARDS: [] = [];
 
+const findGalleryItem = vi.fn();
+
+vi.mock('@workbench/image-actions/useFindGalleryItem', () => ({ useFindGalleryItem: () => findGalleryItem }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: () => vi.fn() }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchCommands: () => ({
@@ -224,6 +227,32 @@ describe('ImageContextMenu deletion delegation', () => {
 
     expect(deleteItems).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'single.png' }]);
     expect(getOpenAlertDialog()).toBeNull();
+  });
+});
+
+describe('ImageContextMenu find in gallery', () => {
+  it('reveals a single image or video by its gallery reference', async () => {
+    findGalleryItem.mockClear();
+    await renderMenu(createActions(vi.fn()), [image('still.png')]);
+    await interact(() => getMenuItem('widgets.gallery.findInGallery').click());
+    expect(findGalleryItem).toHaveBeenCalledExactlyOnceWith({ kind: 'image', name: 'still.png' });
+
+    await interact(() => root?.unmount());
+    const video = item('video', 'clip.mp4');
+    await renderItemMenu(createActions(vi.fn()), {
+      itemRefs: [{ kind: 'video', name: video.name }],
+      items: [video],
+      x: 20,
+      y: 20,
+    });
+    await interact(() => getMenuItem('widgets.gallery.findInGallery').click());
+    expect(findGalleryItem).toHaveBeenLastCalledWith({ kind: 'video', name: 'clip.mp4' });
+  });
+
+  it('is absent from bulk menus, which have no single item to reveal', async () => {
+    await renderMenu(createActions(vi.fn()), [image('a.png'), image('b.png')]);
+
+    expect(document.body.textContent).not.toContain('widgets.gallery.findInGallery');
   });
 });
 

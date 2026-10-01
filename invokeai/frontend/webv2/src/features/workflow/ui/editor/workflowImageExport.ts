@@ -6,9 +6,8 @@ const WORKFLOW_GRID_SIZE = 25;
 
 export const EXPORT_PADDING = 100;
 export const EXPORT_SCALE = 2;
-export const EXPORT_MAX_CANVAS_DIMENSION = 16_384;
-export const EXPORT_MAX_CANVAS_PIXELS = 16_777_216;
 export const WORKFLOW_EXPORT_TIMEOUT_MS = 30_000;
+export const WORKFLOW_EXPORT_IMAGE_TIMEOUT_MS = 5_000;
 const WORKFLOW_EXPORT_IMAGE_PLACEHOLDER = 'data:image/gif;base64,R0lGODlhAQABAAD/ACwAAAAAAQABAAACADs=';
 // html-to-image has no abort signal; bound captures that remain active after their caller times out.
 const MAX_ACTIVE_WORKFLOW_RASTERIZATIONS = 2;
@@ -146,10 +145,39 @@ export const getWorkflowContentBounds = (
   nodeBounds: Rect,
   { includeInputFieldLabels = true }: WorkflowContentBoundsOptions = {}
 ): Rect => {
-  let minX = nodeBounds.x;
-  let minY = nodeBounds.y;
-  let maxX = nodeBounds.x + nodeBounds.width;
-  let maxY = nodeBounds.y + nodeBounds.height;
+  const flowRect = flowElement.getBoundingClientRect();
+  const viewport = flowElement.querySelector<HTMLElement>('.react-flow__viewport');
+  const viewportRect = viewport?.getBoundingClientRect() ?? flowRect;
+  const transform = viewport ? (getComputedStyle(viewport).transform ?? 'none') : 'none';
+  const matrix = transform
+    .match(/^matrix\(([^)]+)\)$/)?.[1]
+    ?.split(',')
+    .map(Number);
+  const zoom = matrix?.[0] && Number.isFinite(matrix[0]) && matrix[0] > 0 ? matrix[0] : 1;
+  let minX = Infinity;
+  let minY = Infinity;
+  let maxX = -Infinity;
+  let maxY = -Infinity;
+
+  // The editor's measured nodes may be taller because of execution previews or textarea resize state.
+  flowElement.querySelectorAll<HTMLElement>('.react-flow__node').forEach((node) => {
+    const rect = node.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) {
+      return;
+    }
+    const x = (rect.left - viewportRect.left) / zoom;
+    const y = (rect.top - viewportRect.top) / zoom;
+    minX = Math.min(minX, x);
+    minY = Math.min(minY, y);
+    maxX = Math.max(maxX, x + rect.width / zoom);
+    maxY = Math.max(maxY, y + rect.height / zoom);
+  });
+  if (minX === Infinity) {
+    minX = nodeBounds.x;
+    minY = nodeBounds.y;
+    maxX = nodeBounds.x + nodeBounds.width;
+    maxY = nodeBounds.y + nodeBounds.height;
+  }
 
   flowElement.querySelectorAll<SVGGraphicsElement>('.react-flow__edge-path').forEach((path) => {
     let pathBounds: DOMRect;
@@ -174,21 +202,13 @@ export const getWorkflowContentBounds = (
   });
 
   {
-    const flowRect = flowElement.getBoundingClientRect();
-    const viewport = flowElement.querySelector<HTMLElement>('.react-flow__viewport');
-    const viewportRect = viewport?.getBoundingClientRect() ?? flowRect;
-    const transform = viewport ? (getComputedStyle(viewport).transform ?? 'none') : 'none';
-    const matrix = transform
-      .match(/^matrix\(([^)]+)\)$/)?.[1]
-      ?.split(',')
-      .map(Number);
-    const zoom = matrix?.[0] && Number.isFinite(matrix[0]) && matrix[0] > 0 ? matrix[0] : 1;
-
     const contentElements = new Set<HTMLElement>([
       ...(includeInputFieldLabels
         ? flowElement.querySelectorAll<HTMLElement>('[data-node-input-field-title="true"]')
         : []),
-      ...flowElement.querySelectorAll<HTMLElement>('[data-workflow-export-content="true"]'),
+      ...flowElement.querySelectorAll<HTMLElement>('[data-workflow-export-field-content="true"]'),
+      ...flowElement.querySelectorAll<HTMLElement>('[data-workflow-export-static-node-content="true"]'),
+      ...flowElement.querySelectorAll<HTMLElement>('[data-workflow-export-output-title="true"]'),
     ]);
     contentElements.forEach((element) => {
       const elementRect = element.getBoundingClientRect();
@@ -217,14 +237,8 @@ export const getWorkflowImageDimensions = (bounds: Rect): WorkflowImageDimension
   const width = Math.max(1, Math.ceil(paddedBounds.width));
   const height = Math.max(1, Math.ceil(paddedBounds.height));
 
-  const scale = Math.min(
-    EXPORT_SCALE,
-    EXPORT_MAX_CANVAS_DIMENSION / width,
-    EXPORT_MAX_CANVAS_DIMENSION / height,
-    Math.sqrt(EXPORT_MAX_CANVAS_PIXELS / (width * height))
-  );
-  const canvasWidth = Math.max(1, Math.floor(width * scale));
-  const canvasHeight = Math.max(1, Math.floor(height * scale));
+  const canvasWidth = width * EXPORT_SCALE;
+  const canvasHeight = height * EXPORT_SCALE;
 
   return { width, height, canvasWidth, canvasHeight };
 };
@@ -245,6 +259,7 @@ export const getWorkflowExportOptions = (dimensions: WorkflowImageDimensions, ba
   canvasHeight: dimensions.canvasHeight,
   backgroundColor,
   pixelRatio: 1,
+  skipAutoScale: true,
   includeStyleProperties: [...EXPORT_STYLE_PROPERTIES],
   imagePlaceholder: WORKFLOW_EXPORT_IMAGE_PLACEHOLDER,
   onImageErrorHandler: () => WORKFLOW_EXPORT_IMAGE_PLACEHOLDER,
@@ -497,6 +512,63 @@ const downloadPng = (blob: Blob, workflowName: string, fallbackWorkflowName: str
   downloadBlob(blob, `${sanitizeWorkflowImageFilename(workflowName, fallbackWorkflowName)}.png`);
 };
 
+const SOURCE_IMAGE_SELECTOR = '[data-workflow-export-field-value="true"] img';
+
+/** Decode concurrently before html-to-image freezes computed image dimensions. */
+const decodeSourceImages = async (flowElement: HTMLElement): Promise<Map<HTMLImageElement, string>> => {
+  const images = Array.from(flowElement.querySelectorAll<HTMLImageElement>(SOURCE_IMAGE_SELECTOR));
+  const decoded = new Map<HTMLImageElement, string>();
+  if (!images.length) {
+    return decoded;
+  }
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    await Promise.race([
+      Promise.all(
+        images.map((image) => {
+          const source = image.src;
+          return image.decode().then(
+            () => {
+              if (image.naturalWidth > 0 && image.naturalHeight > 0 && image.src === source) {
+                decoded.set(image, source);
+              }
+            },
+            () => undefined
+          );
+        })
+      ),
+      new Promise<void>((resolve) => {
+        timeoutId = setTimeout(resolve, WORKFLOW_EXPORT_IMAGE_TIMEOUT_MS);
+      }),
+    ]);
+    // Late decodes must not change which images this export includes.
+    return new Map(decoded);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
+  }
+};
+
+const replaceFailedSourceImages = (
+  flowElement: HTMLElement,
+  clone: HTMLElement,
+  decoded: Map<HTMLImageElement, string>
+) => {
+  const sourceImages = flowElement.querySelectorAll<HTMLImageElement>(SOURCE_IMAGE_SELECTOR);
+  clone.querySelectorAll<HTMLImageElement>(SOURCE_IMAGE_SELECTOR).forEach((image, index) => {
+    const original = sourceImages[index];
+    if (original && decoded.get(original) === original.src && original.src === image.src) {
+      return;
+    }
+    const fallback = document.createElement('span');
+    fallback.textContent = image.alt;
+    fallback.style.overflowWrap = 'anywhere';
+    fallback.style.maxWidth = '100%';
+    image.replaceWith(fallback);
+  });
+};
+
 export const exportWorkflowAsPng = async ({
   flowElement,
   bounds,
@@ -512,12 +584,17 @@ export const exportWorkflowAsPng = async ({
     throw new Error('A previous workflow image export is still running');
   }
 
+  const decoded = await decodeSourceImages(flowElement);
+  if (!flowElement.isConnected) {
+    throw new Error('Workflow image export canceled because the editor was unmounted');
+  }
   const contentBounds = getWorkflowContentBounds(flowElement, bounds, { includeInputFieldLabels: false });
   const dimensions = getWorkflowImageDimensions(contentBounds);
   const clone = flowElement.cloneNode(true) as HTMLElement;
   const stagingWrapper = document.createElement('div');
 
   try {
+    replaceFailedSourceImages(flowElement, clone, decoded);
     namespaceWorkflowExportIds(clone);
     prepareExportClone(clone, contentBounds, dimensions);
     Object.assign(stagingWrapper.style, getWorkflowExportStagingStyle(dimensions));
@@ -543,6 +620,9 @@ export const exportWorkflowAsPng = async ({
     );
     if (!blob) {
       throw new Error('Workflow image export returned an empty Blob');
+    }
+    if (!flowElement.isConnected) {
+      throw new Error('Workflow image export canceled because the editor was unmounted');
     }
     downloadPng(blob, workflowName, fallbackWorkflowName);
   } finally {
