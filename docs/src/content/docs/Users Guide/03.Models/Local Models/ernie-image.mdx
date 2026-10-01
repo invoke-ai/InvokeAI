@@ -26,10 +26,10 @@ This is a summary, not legal advice. Read the full license on the model's Huggin
 
 ## Hardware
 
-ERNIE-Image is not yet listed in the [System Requirements](/start-here/system-requirements/) table. For
-scale: the single-file transformer alone is about 16 GB and the standalone Ministral 3B encoder about
-7.7 GB. On smaller cards, [Low-VRAM mode](/configuration/optimization/low-vram-mode/) lets InvokeAI
-stream models that don't fit entirely in VRAM.
+See the [System Requirements](/start-here/system-requirements/) table. For scale: the single-file
+transformer alone is about 16 GB and the standalone Ministral 3B encoder about 7.7 GB. On smaller
+cards, [Low-VRAM mode](/configuration/optimization/low-vram-mode/) lets InvokeAI stream models that
+don't fit entirely in VRAM.
 
 ## Installing
 
@@ -60,7 +60,9 @@ single files do not. GGUF and quantized single files are not supported.
 When a single-file ERNIE-Image model is selected, the **Components** section next to the model asks for:
 
 - **Mistral Encoder**: the **ERNIE-Image Ministral Encoder** starter. Ministral 3B is a different
-  architecture from the Mistral Small 3 encoder FLUX.2 uses, and the two are not interchangeable.
+  architecture from the Mistral Small 3 encoder FLUX.2 uses, and the two are not interchangeable. The
+  prompt enhancer from the Diffusers folder has the same shape as the encoder but is refused as one, with
+  a message naming the file to install instead.
 - **VAE**: a FLUX.2 VAE. ERNIE-Image uses the same VAE as FLUX.2, which is why it installs under the
   FLUX.2 base.
 
