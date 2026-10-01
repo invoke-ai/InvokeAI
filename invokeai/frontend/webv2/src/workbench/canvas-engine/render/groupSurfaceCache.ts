@@ -83,7 +83,7 @@ interface GroupSlot {
 
 interface DrawnFloat {
   readonly placement: string;
-  /** Document-space bounds the float covers. */
+  /** Document-space bounds the float's resampled pixels can reach. */
   readonly landing: Rect;
 }
 
@@ -185,9 +185,13 @@ export const createGroupSurfaceCache = (deps: GroupSurfaceDeps): GroupSurfaceCac
       const float = content.float?.layerId === leaf.id ? content.float : null;
       let drawnFloat: DrawnFloat | null = null;
       if (float && !isEmpty(float.rect)) {
-        const landing = transformBounds(multiply(matrix, float.matrix), float.rect);
+        const placed = multiply(matrix, float.matrix);
+        const landing = transformBounds(placed, float.rect);
         bounds = bounds ? union(bounds, landing) : landing;
-        drawnFloat = { landing, placement: `${rectKey(float.rect)}*${matKey(float.matrix)}` };
+        drawnFloat = {
+          landing: transformBounds(placed, expand(float.rect, SOURCE_FILTER_RADIUS)),
+          placement: `${rectKey(float.rect)}*${matKey(float.matrix)}`,
+        };
       }
       drawn.push({ bounds, entry: preview ? null : entry, float: drawnFloat, leaf, matrix });
     }

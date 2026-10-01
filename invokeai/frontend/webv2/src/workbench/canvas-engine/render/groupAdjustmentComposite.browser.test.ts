@@ -486,26 +486,35 @@ describe('group-scoped previews and partial refresh', () => {
     expect(pixels).toEqual(allPixels(rebuilt.composite()));
   });
 
-  it('moves a floating selection inside a group by refreshing only the old and new landing', () => {
+  it.each<[string, GroupedSceneOptions]>([
+    ['an untransformed member', {}],
+    [
+      'a member scaled 4x',
+      {
+        member: { transform: { rotation: 0, scaleX: 4, scaleY: 4, x: 0, y: 0 } },
+        memberRect: { height: 16, width: 16, x: 0, y: 0 },
+      },
+    ],
+  ])('moves a floating selection on %s by refreshing only the old and new landing', (_, options) => {
     const lifted = (scene: ReturnType<typeof groupedScene>['scene']) => {
-      const surface = scene.backend.createSurface(8, 8);
+      const surface = scene.backend.createSurface(3, 3);
       surface.ctx.fillStyle = '#ffffff';
-      surface.ctx.fillRect(0, 0, 8, 8);
+      surface.ctx.fillRect(0, 0, 3, 3);
       return surface;
     };
     const floatAt = (surface: RasterSurface, x: number) => ({
-      floatingSelection: { layerId: 'member', matrix: identity(), rect: { height: 8, width: 8, x, y: 20 }, surface },
+      floatingSelection: { layerId: 'member', matrix: identity(), rect: { height: 3, width: 3, x, y: 5 }, surface },
     });
-    const dragged = groupedScene();
+    const dragged = groupedScene(options);
     const surface = lifted(dragged.scene);
-    dragged.composite(floatAt(surface, 10));
+    dragged.composite(floatAt(surface, 2));
     const before = dragged.diagnostics.snapshot();
-    const pixels = allPixels(dragged.composite(floatAt(surface, 30)));
+    const pixels = allPixels(dragged.composite(floatAt(surface, 8)));
     const after = dragged.diagnostics.snapshot();
 
     expect(after.groupSurfaceRebuilds).toBe(before.groupSurfaceRebuilds);
     expect(after.groupSurfaceRefreshes).toBe(before.groupSurfaceRefreshes + 1);
-    const fresh = groupedScene();
-    expect(pixels).toEqual(allPixels(fresh.composite(floatAt(lifted(fresh.scene), 30))));
+    const fresh = groupedScene(options);
+    expect(pixels).toEqual(allPixels(fresh.composite(floatAt(lifted(fresh.scene), 8))));
   });
 });
