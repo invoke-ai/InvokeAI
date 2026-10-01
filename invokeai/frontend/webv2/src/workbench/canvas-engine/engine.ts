@@ -81,6 +81,7 @@ import type {
   CanvasLayerSourceContract,
 } from '@workbench/canvas-engine/contracts';
 import type { CreatePath2D } from '@workbench/canvas-engine/freehand';
+import type { ColorSampleProviders, ColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import type { CanvasFontRuntime, CanvasTextSource, FontLoadApi } from '@workbench/canvas-engine/render/fontLoader';
 import type { LayerCacheEntry, LayerCacheStore } from '@workbench/canvas-engine/render/layerCache';
 import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRenderer';
@@ -141,6 +142,7 @@ import {
 import { createPointerPipeline, type PointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createWheelHandler } from '@workbench/canvas-engine/input/wheel';
 import { isEmpty, union } from '@workbench/canvas-engine/math/rect';
+import { createColorSampler } from '@workbench/canvas-engine/render/colorSample';
 import {
   compositeDocument,
   createCheckerboardTile,
@@ -149,7 +151,7 @@ import {
 import { createFontLoader, domFontLoadApi } from '@workbench/canvas-engine/render/fontLoader';
 import { hasLayerDisplayEffect } from '@workbench/canvas-engine/render/layerDisplayEffect';
 import { createMaskPatternTile } from '@workbench/canvas-engine/render/maskFill';
-import { renderOverlay } from '@workbench/canvas-engine/render/overlayRenderer';
+import { colorLoupePixels, renderOverlay } from '@workbench/canvas-engine/render/overlayRenderer';
 import { trimPaintCacheToAlpha } from '@workbench/canvas-engine/render/paintCacheTrim';
 import { createDomRasterBackend, type RasterBackend, type RasterSurface } from '@workbench/canvas-engine/render/raster';
 import { rasterizeSource, type ImageResolver, type RasterizeDeps } from '@workbench/canvas-engine/render/rasterizers';
@@ -434,6 +436,9 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
 
   // The brush/eraser cursor ring, drawn on the overlay (set by the active tool).
   let overlayCursor: OverlayCursor | null = null;
+  /** Whether the color picker wants its loupe; it sits at the pointer and is sampled when the overlay frame draws. */
+  let colorLoupeShown = false;
+  let colorLoupeSampler: ColorSampler | null = null;
 
   // Lazy checker tile reused until checker colors change, when the subscription clears it.
   let checkerboardTile: RasterSurface | null = null;
@@ -464,6 +469,12 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const groupSurfaces = rasterController.groups;
   const getGroupSurface: NonNullable<CompositeOptions['groupSurface']> = (scope, members, matrices, content) =>
     groupSurfaces.get(scope, members, matrices, content);
+  /** Picking and the picker's loupe see the same adjusted, derived and grouped pixels as the display. */
+  const colorSampleProviders: ColorSampleProviders = {
+    adjustedSurface: getAdjustedSurface,
+    derivedSurfaces: derivedSurfaceCache,
+    groupSurface: getGroupSurface,
+  };
 
   // Completed-stroke subscribers (persistence P2.2, history P2.3).
   const strokeListeners = new Set<(event: StrokeCommittedEvent) => void>();
@@ -1011,11 +1022,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getSamInteraction: () => stores.samInteraction.get(),
     openTextCreate: (docPoint) => openTextCreate(docPoint),
     openTextEdit: (layerId) => openTextEdit(layerId),
-    sampleProviders: {
-      adjustedSurface: getAdjustedSurface,
-      derivedSurfaces: derivedSurfaceCache,
-      groupSurface: getGroupSurface,
-    },
+    sampleProviders: colorSampleProviders,
     resolveColorSample: (hex) => {
       if (pendingColorSample) {
         pendingColorSample.sampledHex = hex;
@@ -1044,6 +1051,10 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     setOverlayCursor: (cursor) => {
       overlayCursor = cursor;
     },
+    showColorLoupe: (shown) => {
+      colorLoupeShown = shown;
+      scheduler.invalidate({ overlay: true });
+    },
     stores,
     updateCursor: () => updateCursor(),
     updateSamInput: (input) => samInputHandler?.(input),
@@ -1066,6 +1077,22 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     stores.cursor.set(cursor);
     // The store write alone never changes the pointer; apply to the DOM directly.
     applyCursorToInput(cursor);
+  };
+
+  /**
+   * A pointer that left the canvas takes its hover chrome along, unless a gesture still owns it; the loupe follows
+   * the pipeline's hover point, which leaves with it.
+   */
+  const onCanvasPointerLeave = (): void => {
+    pipeline.onPointerLeave();
+    if (!pipeline.isGestureActive()) {
+      overlayCursor = null;
+      scheduler.invalidate({ overlay: true });
+    }
+  };
+  const resetInput = (): void => {
+    pipeline.reset();
+    overlayCursor = null;
   };
 
   /** Size changes without pointer events update the cursor radius at its last center and invalidate the overlay. */
@@ -1333,7 +1360,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const renderController = new RenderController({
     applyCursor: (value) => applyCursorToInput(value),
     clearPreview: () => clearStagedPreview(),
-    getInputHandlers: () => ({ ...pipeline, onWheel, reset: () => pipeline.reset() }),
+    // Stable handlers: detach removes exactly the listeners attach added.
+    getInputHandlers: () => ({ ...pipeline, onPointerLeave: onCanvasPointerLeave, onWheel, reset: resetInput }),
     isEngineDisposed: () => disposed,
     onPageHide: () => onPageHide(),
     onVisibilityChange: () => onVisibilityChange(),
@@ -1367,6 +1395,17 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     getAntsPhase: () => antsPhase,
     getSamPulseTime: () => (samPulseActive() ? nowMs() : null),
     getFloatingSelection: () => floatingSelection.get(),
+    getColorLoupe: (doc) => {
+      const screenPoint = colorLoupeShown ? pipeline.hoverPoint() : null;
+      if (!screenPoint) {
+        return null;
+      }
+      const point = viewport.screenToDocument(screenPoint);
+      colorLoupeSampler ??= createColorSampler(backend);
+      const size = colorLoupePixels(viewport.getZoom());
+      const area = colorLoupeSampler.sampleArea(doc, layerCache, point, size, colorSampleProviders);
+      return area ? { checker: getCheckerboardTile(), color: area.center, pixels: area.pixels, point } : null;
+    },
     getOverlayCursor: () => overlayCursor,
     selection,
     stores,
@@ -1812,7 +1851,8 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     }
   };
   const onWindowBlur = (): void => {
-    pipeline.reset();
+    resetInput();
+    scheduler.invalidate({ overlay: true });
   };
 
   const clearSamPreview = (): void => {

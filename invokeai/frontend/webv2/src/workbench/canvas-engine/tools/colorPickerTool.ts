@@ -1,6 +1,7 @@
 /**
- * Samples composited cached color while pressed and routes it to the active color target. Alt-hold restoration
- * returns to the prior tool; the picker neither dispatches nor edits pixels. State is per engine.
+ * Shows a loupe of the composited pixels under the pointer, samples while pressed and routes the color to the active
+ * color target. Alt-hold restoration returns to the prior tool; the picker neither dispatches nor edits pixels.
+ * State is per engine.
  */
 
 import type { PointerInput } from '@workbench/canvas-engine/types';
@@ -13,13 +14,9 @@ import type { Tool, ToolContext } from './tool';
 /** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
 const PRIMARY_BUTTON = 1;
 
-/** Fixed on-screen radius (px) for the picker's ring cursor, independent of zoom. */
-const CURSOR_SCREEN_RADIUS_PX = 8;
-
-const updateCursorRing = (ctx: ToolContext, input: PointerInput): void => {
-  const zoom = ctx.viewport.getZoom();
-  ctx.setOverlayCursor({ point: input.documentPoint, radiusDoc: CURSOR_SCREEN_RADIUS_PX / Math.max(zoom, 1e-6) });
-  ctx.invalidate({ overlay: true });
+/** The loupe follows the pointer, hovering or pressed; the engine samples it once per overlay frame. */
+const updateLoupe = (ctx: ToolContext): void => {
+  ctx.showColorLoupe?.(true);
 };
 
 /** Offers sampled color to the one-shot claim then workbench router; standalone fallback updates brush color. */
@@ -53,9 +50,10 @@ export const createColorPickerTool = (): Tool => {
   return {
     cursor: () => 'crosshair',
     id: 'colorPicker',
+    // A pointer already over the canvas (an Alt hold, a pick request) gets the loupe without moving.
+    onActivate: (ctx) => updateLoupe(ctx),
     onDeactivate: (ctx) => {
-      ctx.setOverlayCursor(null);
-      ctx.invalidate({ overlay: true });
+      ctx.showColorLoupe?.(false);
     },
     onPointerCancel: (ctx) => {
       ctx.discardColorSample?.();
@@ -65,17 +63,17 @@ export const createColorPickerTool = (): Tool => {
         return;
       }
       ctx.discardColorSample?.();
-      updateCursorRing(ctx, input);
+      updateLoupe(ctx);
       pick(ctx, input);
     },
     onPointerMove: (ctx, input) => {
-      updateCursorRing(ctx, input);
+      updateLoupe(ctx);
       if (input.buttons & PRIMARY_BUTTON) {
         pick(ctx, input);
       }
     },
-    onPointerUp: (ctx, input) => {
-      updateCursorRing(ctx, input);
+    onPointerUp: (ctx) => {
+      updateLoupe(ctx);
       ctx.commitColorSample?.();
     },
   };

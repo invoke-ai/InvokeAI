@@ -2,6 +2,7 @@ import type { CanvasDocumentContractV3, CanvasLayerContract } from '@workbench/c
 import type { SamPreviewState } from '@workbench/canvas-engine/controllers/previewStateController';
 import type { EngineStores } from '@workbench/canvas-engine/engineStores';
 import type {
+  ColorLoupeOverlay,
   OverlayCursor,
   OverlayState,
   TransformFrameOverlay,
@@ -42,6 +43,8 @@ export interface CreateOverlayFrameDeps {
   readonly getActiveToolId: () => ToolId;
   readonly getFloatingSelection: () => FloatingSelection | null;
   readonly getOverlayCursor: () => OverlayCursor | null;
+  /** The picker's loupe over `doc`, sampled for this frame, or null while hidden. */
+  readonly getColorLoupe: (doc: CanvasDocumentContractV3) => ColorLoupeOverlay | null;
   readonly getAntsPhase: () => number;
   /** The clock while the SAM pulse animates, `null` for the static opacity (reduced motion, no preview). */
   readonly getSamPulseTime: () => number | null;
@@ -144,6 +147,7 @@ export const createOverlayFrame = (deps: CreateOverlayFrameDeps): OverlayFrame =
         bboxOverlay: stores.bboxOverlay.get(),
         // The checker's darker square is the theme's canvas surround (`bg.inset`).
         bboxOverlayColor: stores.checkerColors.get().a,
+        colorLoupe: deps.getColorLoupe(doc),
         cursor: deps.getOverlayCursor(),
         gradientPreview: stores.gradientPreview.get(),
         // Grid spans the viewport at bbox snap size, independent of document bounds.

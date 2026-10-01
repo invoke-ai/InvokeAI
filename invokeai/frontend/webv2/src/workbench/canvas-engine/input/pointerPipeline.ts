@@ -67,6 +67,11 @@ export interface PointerPipeline {
   /** Primary gesture state blocks undo/redo from injecting pixels during live strokes. */
   isGestureActive(): boolean;
   /**
+   * Where the pointer last moved over the canvas, in CSS pixels, including moves a middle-button pan consumes; null
+   * once it left (outside a gesture) or the pipeline reset.
+   */
+  hoverPoint(): Vec2 | null;
+  /**
    * Cancels capture/tool state and refreshes the cursor. Used on document replacement so a later release cannot
    * commit stale drag state; idle calls do nothing.
    */
@@ -160,6 +165,7 @@ const isDocumentRootTarget = (target: EventTarget | null): boolean => {
 /** Creates a pointer pipeline bound to the engine's injected deps. */
 export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipeline => {
   let hovered = false;
+  let hoverPoint: Vec2 | null = null;
   // Primary-button paint/drag gesture in progress.
   let gestureActive = false;
   let activePointerId: number | null = null;
@@ -201,8 +207,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     };
   };
 
-  const buildBatch = (event: PointerEvent): PointerInput[] => {
-    const origin = inputOrigin();
+  const buildBatch = (event: PointerEvent, origin = inputOrigin()): PointerInput[] => {
     const coalesced = event.getCoalescedEvents?.();
     if (coalesced && coalesced.length > 0) {
       return coalesced.map((sample) => buildPointerInput(sample, origin));
@@ -405,6 +410,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
         beginBboxTempTool();
       }
     },
+    hoverPoint: () => hoverPoint,
     isGestureActive: () => gestureActive,
     onFocusIn: (event) => {
       pointerFocused = event.target && arrivedByPointer(event.target) ? new WeakRef(event.target) : null;
@@ -474,14 +480,19 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
     },
     onPointerLeave: () => {
       hovered = false;
+      if (!gestureActive) {
+        hoverPoint = null;
+      }
     },
     onPointerMove: (event) => {
       // Ignore move events from a pointer other than the one driving the active gesture/pan.
       if (activePointerId !== null && event.pointerId !== activePointerId) {
         return;
       }
+      const origin = inputOrigin();
+      hoverPoint = { x: event.clientX - origin.left, y: event.clientY - origin.top };
       if (middlePanning && middleLast) {
-        const screenPoint = buildPointerInput(event).screenPoint;
+        const screenPoint = hoverPoint;
         deps.viewport.panBy({ x: screenPoint.x - middleLast.x, y: screenPoint.y - middleLast.y });
         middleLast = screenPoint;
         return;
@@ -492,7 +503,9 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       if (cancelledPointerId === event.pointerId && !cancelledPress) {
         cancelledPointerId = null;
       }
-      const batch = cancelledPress ? buildBatch(event).map((input) => ({ ...input, buttons: 0 })) : buildBatch(event);
+      const batch = cancelledPress
+        ? buildBatch(event, origin).map((input) => ({ ...input, buttons: 0 }))
+        : buildBatch(event, origin);
       const last = batch[batch.length - 1];
       if (!last) {
         return;
@@ -538,6 +551,7 @@ export const createPointerPipeline = (deps: PointerPipelineDeps): PointerPipelin
       }
       clearBboxTapTimer();
       hovered = false;
+      hoverPoint = null;
       gestureActive = false;
       activePointerId = null;
       cancelledPointerId = null;

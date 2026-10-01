@@ -81,7 +81,7 @@ interface Harness {
   layers: LayerCacheStore;
   dispatched: CanvasProjectMutation[];
   strokes: unknown[];
-  overlayCursors: unknown[];
+  loupes: unknown[];
 }
 
 const createHarness = (doc: CanvasDocumentContractV3 | null): Harness => {
@@ -94,7 +94,7 @@ const createHarness = (doc: CanvasDocumentContractV3 | null): Harness => {
   const stores = createEngineStores();
   const dispatched: CanvasProjectMutation[] = [];
   const strokes: unknown[] = [];
-  const overlayCursors: unknown[] = [];
+  const loupes: unknown[] = [];
 
   const ctx: ToolContext = {
     scheduleFrame: () => () => undefined,
@@ -113,13 +113,14 @@ const createHarness = (doc: CanvasDocumentContractV3 | null): Harness => {
     layers,
     notifyLayerPainted: vi.fn(),
     setLayerTransformOverride: vi.fn(),
-    setOverlayCursor: (cursor) => overlayCursors.push(cursor),
+    showColorLoupe: (shown) => loupes.push(shown),
+    setOverlayCursor: vi.fn(),
     stores,
     updateCursor: vi.fn(),
     viewport: { getZoom: () => 1 } as unknown as ToolContext['viewport'],
   };
 
-  return { ctx, dispatched, layers, overlayCursors, pixel, strokes };
+  return { ctx, dispatched, layers, loupes, pixel, strokes };
 };
 
 const down = (t: Tool, ctx: ToolContext, i: PointerInput): void => t.onPointerDown?.(ctx, i);
@@ -233,15 +234,18 @@ describe('color picker tool', () => {
     expect(h.strokes).toHaveLength(0);
   });
 
-  it('shows a ring cursor while active and clears it on deactivate', () => {
+  it('shows the loupe on activation and while the pointer moves, and hides it on deactivate', () => {
     const h = createHarness(makeDoc());
     const tool = createColorPickerTool();
 
+    tool.onActivate?.(h.ctx);
+    expect(h.loupes).toEqual([true]);
     move(tool, h.ctx, pointer(10, 10, { buttons: 0 }));
-    expect(h.overlayCursors.at(-1)).toMatchObject({ point: { x: 10, y: 10 } });
+    down(tool, h.ctx, pointer(12, 11));
+    expect(h.loupes.at(-1)).toBe(true);
 
     tool.onDeactivate?.(h.ctx);
-    expect(h.overlayCursors.at(-1)).toBeNull();
+    expect(h.loupes.at(-1)).toBe(false);
   });
 
   it('reports a crosshair cursor', () => {

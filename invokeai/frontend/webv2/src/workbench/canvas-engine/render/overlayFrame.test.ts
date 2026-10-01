@@ -60,6 +60,7 @@ const makeHarness = (): Harness => {
     deps: {
       getActiveToolId: () => state.tool,
       getAntsPhase: () => state.phase,
+      getColorLoupe: () => null,
       getSamPulseTime: () => state.pulseTime,
       getFloatingSelection: () => float.value,
       getOverlayCursor: () => state.cursor,

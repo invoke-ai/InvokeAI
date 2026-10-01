@@ -132,6 +132,8 @@ export interface ToolContext {
   getSamInteraction?(): SamInteractionState | null;
   /** Sets (or clears) the brush cursor ring drawn on the overlay. */
   setOverlayCursor(cursor: OverlayCursor | null): void;
+  /** Shows or hides the color picker's loupe, which follows the pointer while shown; optional in test harnesses. */
+  showColorLoupe?(shown: boolean): void;
   /**
    * Route samples to one-shot claim, then persistent workbench target. Return whether consumed; otherwise picker
    * falls back to brush color. Optional in test harnesses.

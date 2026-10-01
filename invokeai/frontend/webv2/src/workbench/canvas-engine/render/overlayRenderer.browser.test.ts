@@ -5,7 +5,8 @@ import { transformOverlayGeometry, transformTargetAt } from '@workbench/canvas-e
 import { createViewport } from '@workbench/canvas-engine/viewport';
 import { describe, expect, it } from 'vitest';
 
-import { renderOverlay } from './overlayRenderer';
+import { createCheckerboardTile } from './compositor';
+import { colorLoupePixels, renderOverlay } from './overlayRenderer';
 
 const CSS_SIZE = 200;
 const RECT = { height: 50, width: 50, x: 50, y: 50 };
@@ -100,5 +101,73 @@ describe('overlay chrome across device-pixel ratios', () => {
       expect(target.width).toBe(Math.round(CSS_SIZE * dpr));
       expect(viewport.viewMatrix(viewport.getDpr()).a).toBe(dpr);
     }
+  });
+});
+
+describe('color picker loupe', () => {
+  const RED = [239, 18, 52, 255];
+  const GREEN = [18, 200, 52, 255];
+  const CHECKER = createCheckerboardTile(createDomRasterBackend(), { a: '#101010', b: '#202020' });
+
+  /** A square of `size` pixels: red, transparent on the left two columns, green at the sampled center. */
+  const loupePixels = (size: number) => {
+    const pixels = createDomRasterBackend().createSurface(size, size);
+    pixels.ctx.fillStyle = 'rgb(239, 18, 52)';
+    pixels.ctx.fillRect(2, 0, size - 2, size);
+    pixels.ctx.fillStyle = 'rgb(18, 200, 52)';
+    pixels.ctx.fillRect((size - 1) / 2, (size - 1) / 2, 1, 1);
+    return pixels;
+  };
+
+  const renderLoupe = (dpr: number, color: { r: number; g: number; b: number; a: number } | null, size = 15) => {
+    const viewport = createViewport();
+    viewport.setViewportSize(CSS_SIZE, CSS_SIZE, dpr);
+    const target = createDomRasterBackend().createSurface(
+      Math.round(CSS_SIZE * viewport.getDpr()),
+      Math.round(CSS_SIZE * viewport.getDpr())
+    );
+    renderOverlay(target, {
+      bbox: { height: 0, width: 0, x: -1000, y: -1000 },
+      colorLoupe: {
+        checker: CHECKER,
+        color,
+        pixels: loupePixels(size),
+        point: viewport.screenToDocument({ x: 100, y: 100 }),
+      },
+      dpr: viewport.getDpr(),
+      showBbox: false,
+      view: viewport.viewMatrix(1),
+      viewportSize: viewport.getViewportSize(),
+    });
+    return (x: number, y: number) => [...target.ctx.getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data];
+  };
+
+  it.each([1, 2])('magnifies the pixels around the pointer without smoothing at %sx', (dpr) => {
+    const at = renderLoupe(dpr, null);
+
+    // The sampled pixel fills the 8 px cell under the pointer; its neighbours fill the next cells.
+    expect(at(100, 100)).toEqual(GREEN);
+    expect(at(110, 100)).toEqual(RED);
+    expect(at(90, 90)).toEqual(RED);
+    // Empty pixels show the checker, and nothing is drawn beyond the 60 px ring.
+    expect([
+      [16, 16, 16, 255],
+      [32, 32, 32, 255],
+    ]).toContainEqual(at(46, 100));
+    expect(at(100, 166)).toEqual([0, 0, 0, 0]);
+  });
+
+  it('shows fewer, larger pixels as the canvas zooms past the loupe', () => {
+    expect([0.25, 1, 4, 8, 20].map(colorLoupePixels)).toEqual([15, 15, 15, 7, 3]);
+    const at = renderLoupe(1, null, 7);
+
+    // Seven pixels span 120 px, so the sampled one covers about 17 px around the pointer (boxed at its edge).
+    expect(at(105, 100)).toEqual(GREEN);
+    expect(at(112, 100)).toEqual(RED);
+  });
+
+  it('labels the sampled color below the center, and shows no label over empty canvas', () => {
+    expect(renderLoupe(1, null)(100, 125)).toEqual(RED);
+    expect(renderLoupe(1, { a: 255, b: 52, g: 200, r: 18 })(100, 125)).not.toEqual(RED);
   });
 });

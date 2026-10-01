@@ -64,4 +64,27 @@ describe('color sampling with real browser rasterization', () => {
     expect([...viewport.ctx.getImageData(20, 0, 1, 1).data]).toEqual(EXPECTED_PIXEL);
     expect(createColorSampler(backend).sample(doc, caches, { x: 20, y: 0 })).toEqual(EXPECTED_COLOR);
   });
+
+  it('samples the square around a pixel with the pick at its center and empty canvas transparent', () => {
+    const backend = createDomRasterBackend();
+    const caches = createLayerCacheStore(backend);
+    const entry = caches.getOrCreate('far-layer', 8, 8);
+    entry.surface.ctx.fillStyle = '#ef1234';
+    entry.surface.ctx.fillRect(0, 0, 4, 8);
+    entry.surface.ctx.fillStyle = '#1234ef';
+    entry.surface.ctx.fillRect(4, 0, 4, 8);
+    caches.publishPixels('far-layer');
+    const doc = documentWith(layer(0));
+    const sampler = createColorSampler(backend);
+
+    const area = sampler.sampleArea(doc, caches, { x: 3.5, y: 0.5 }, 5)!;
+
+    expect(area.center).toEqual(sampler.sample(doc, caches, { x: 3.5, y: 0.5 }));
+    expect(area.center).toEqual(EXPECTED_COLOR);
+    const pixel = (x: number, y: number) => [...area.pixels.ctx.getImageData(x, y, 1, 1).data];
+    // The area spans document x 1..5 and y -2..2: red up to x 3, blue from x 4, nothing above the layer.
+    expect(pixel(2, 2)).toEqual(EXPECTED_PIXEL);
+    expect(pixel(3, 2)).toEqual([18, 52, 239, 255]);
+    expect(pixel(2, 0)).toEqual([0, 0, 0, 0]);
+  });
 });

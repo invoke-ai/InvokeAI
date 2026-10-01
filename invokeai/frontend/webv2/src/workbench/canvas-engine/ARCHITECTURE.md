@@ -146,6 +146,8 @@ A group surface is keyed by everything except its members' pixels and the float'
 
 The overlay renders in CSS pixels. It receives the document→CSS view, the CSS viewport size and the device-pixel ratio, clears the backing store in device pixels, then draws every handle, nub, dash and cursor under a DPR base transform (nested image and path transforms compose with it), so chrome keeps its CSS size at any ratio and matches the CSS-pixel hit tests. The viewport owns the ratio (capped at `MAX_DPR`, sub-one ratios kept) and both the backing-store size and the composite view matrix derive from it.
 
+The color picker shows a loupe of the pixels under the pointer. It is anchored to the pipeline's last pointer position in screen space, so pans and zooms keep it under the pointer, and it shows as soon as the picker activates over a still pointer. Each overlay frame composites the square around that point through the same sampler, providers and coverage rules as a pick, so the magnified center pixel and its RGB readout are exactly what a click picks; the square holds fewer, larger pixels once the canvas zoom passes the loupe's own magnification. Hover chrome (the loupe and the brush ring) leaves the canvas with the pointer unless a gesture still owns it, and input handlers are stable so detach removes every listener attach added.
+
 ## Derived surfaces and invalidation
 
 Every display-only pixel effect uses `DerivedSurfaceCache`. A slot is identified by layer ID and effect kind, and guarded by source surface identity, monotonic source version, and a deterministic parameter key. Reuse is safe only when every guard matches. Source replacement therefore cannot publish or reuse a surface produced for an older preview.

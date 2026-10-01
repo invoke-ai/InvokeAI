@@ -3100,6 +3100,7 @@ const createInputCanvas = (
 ): {
   element: HTMLCanvasElement;
   fire: (type: string, event: Partial<PointerEvent>) => void;
+  listenerCount: (type: string) => number;
   surface: StubRasterSurface;
 } => {
   const surface = createTestStubRasterBackend().createSurface(width, height);
@@ -3125,7 +3126,7 @@ const createInputCanvas = (
       handler({ preventDefault: () => {}, ...event } as unknown as Event);
     }
   };
-  return { element, fire, surface };
+  return { element, fire, listenerCount: (type) => listeners.get(type)?.size ?? 0, surface };
 };
 
 const pointerAt = (x: number, y: number, opts: { button?: number; buttons?: number } = {}): Partial<PointerEvent> => ({
@@ -18722,6 +18723,144 @@ describe('document epoch', () => {
 
     expect(engine.interaction.get('documentEpoch')).toBe(before + 1);
     expect(seen).toEqual([0.25]);
+    engine.lifecycle.dispose();
+  });
+});
+
+describe('color picker loupe', () => {
+  const attachPicker = () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+    const { store } = createReactiveStore(paintDoc());
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore: createSpyBitmapStore(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store,
+    });
+    const screen = createInputCanvas();
+    const overlay = createInputCanvas();
+    engine.surface.attach(screen.element, overlay.element);
+    raf.flush();
+    /** The arcs drawn in the next frame: the loupe's 60 px ring, and any other (the brush ring). */
+    const frame = (): { drawn: boolean; loupe: { x: number; y: number } | null; rings: number } => {
+      overlay.surface.callLog.length = 0;
+      raf.flush();
+      const arcs = overlay.surface.callLog.filter((op) => op.op === 'arc');
+      const loupe = arcs.find((op) => op.args[2] === 60);
+      return {
+        drawn: overlay.surface.callLog.length > 0,
+        loupe: loupe ? { x: loupe.args[0] as number, y: loupe.args[1] as number } : null,
+        rings: arcs.filter((op) => op.args[2] !== 60).length,
+      };
+    };
+    return { engine, frame, overlay, screen };
+  };
+
+  it('follows the hovering pointer and leaves the canvas with it', () => {
+    const { engine, frame, overlay } = attachPicker();
+    engine.tools.setTool('colorPicker');
+    overlay.fire('pointerenter', pointerAt(20, 20, { buttons: 0 }));
+    overlay.fire('pointermove', pointerAt(20, 20, { buttons: 0 }));
+    expect(frame().loupe).toEqual({ x: 20, y: 20 });
+
+    overlay.fire('pointerleave', pointerAt(120, 20, { buttons: 0 }));
+
+    expect(frame()).toMatchObject({ drawn: true, loupe: null });
+    engine.lifecycle.dispose();
+  });
+
+  it('stays with a pick that is dragged off the canvas', () => {
+    const { engine, frame, overlay } = attachPicker();
+    engine.tools.setTool('colorPicker');
+    overlay.fire('pointerenter', pointerAt(20, 20, { buttons: 0 }));
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(110, 20));
+    overlay.fire('pointerleave', pointerAt(110, 20));
+
+    expect(frame().loupe).toEqual({ x: 110, y: 20 });
+    overlay.fire('pointerup', pointerAt(110, 20, { buttons: 0 }));
+    engine.lifecycle.dispose();
+  });
+
+  it('appears at a still pointer when a pick request arms the picker', () => {
+    const { engine, frame, overlay } = attachPicker();
+    engine.tools.setTool('brush');
+    overlay.fire('pointerenter', pointerAt(30, 40, { buttons: 0 }));
+    overlay.fire('pointermove', pointerAt(30, 40, { buttons: 0 }));
+    frame();
+
+    void engine.tools.requestColorSample();
+
+    expect(frame().loupe).toEqual({ x: 30, y: 40 });
+    engine.lifecycle.dispose();
+  });
+
+  it('stays under the pointer while the canvas zooms around it', () => {
+    const { engine, frame, overlay } = attachPicker();
+    engine.tools.setTool('colorPicker');
+    overlay.fire('pointerenter', pointerAt(20, 20, { buttons: 0 }));
+    overlay.fire('pointermove', pointerAt(20, 20, { buttons: 0 }));
+    frame();
+
+    engine.viewport.getViewport().zoomAtPoint(4, { x: 70, y: 70 });
+
+    expect(frame().loupe).toEqual({ x: 20, y: 20 });
+    engine.lifecycle.dispose();
+  });
+
+  it('is gone once another tool takes over', () => {
+    const { engine, frame, overlay } = attachPicker();
+    engine.tools.setTool('colorPicker');
+    overlay.fire('pointerenter', pointerAt(20, 20, { buttons: 0 }));
+    overlay.fire('pointermove', pointerAt(20, 20, { buttons: 0 }));
+    frame();
+
+    engine.tools.setTool('view');
+
+    expect(frame().loupe).toBeNull();
+    engine.lifecycle.dispose();
+  });
+
+  it('takes the brush ring off the canvas on leave, but not during a stroke', () => {
+    const { engine, frame, overlay } = attachPicker();
+    engine.tools.setTool('brush');
+    overlay.fire('pointerenter', pointerAt(20, 20, { buttons: 0 }));
+    overlay.fire('pointermove', pointerAt(20, 20, { buttons: 0 }));
+    expect(frame().rings).toBeGreaterThan(0);
+    overlay.fire('pointerleave', pointerAt(120, 20, { buttons: 0 }));
+    expect(frame().rings).toBe(0);
+
+    overlay.fire('pointerenter', pointerAt(20, 20, { buttons: 0 }));
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(60, 20));
+    overlay.fire('pointerleave', pointerAt(60, 20));
+    expect(frame().rings).toBeGreaterThan(0);
+    overlay.fire('pointerup', pointerAt(60, 20, { buttons: 0 }));
+    engine.lifecycle.dispose();
+  });
+
+  it('removes on detach every listener attach added, across re-attaching', () => {
+    const { engine, overlay, screen } = attachPicker();
+
+    engine.surface.detach();
+    engine.surface.attach(screen.element, overlay.element);
+    engine.surface.detach();
+
+    for (const type of ['pointerdown', 'pointermove', 'pointerup', 'pointerleave', 'pointerenter', 'wheel']) {
+      expect(overlay.listenerCount(type), type).toBe(0);
+    }
     engine.lifecycle.dispose();
   });
 });
