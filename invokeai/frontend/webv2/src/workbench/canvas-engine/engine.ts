@@ -811,7 +811,6 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     floatingSelection: {
       applyImagePatch,
       backend,
-      canEdit: () => canEditDocument(),
       ctx: mutationContext,
       getDocument: () => mirror.getDocument(),
       invalidateLayer: (layerId) => scheduler.invalidate({ layers: [layerId] }),

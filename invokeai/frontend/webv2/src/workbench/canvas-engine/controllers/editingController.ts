@@ -110,6 +110,12 @@ export class EditingController {
 
   cooldown(): void {
     if (!this.disposed) {
+      // Leaving the canvas banks a float like a tool switch, so the flush that follows persists it.
+      try {
+        this.floatingSelection.commit();
+      } catch {
+        // A float that cannot land has been put back; cooldown proceeds regardless.
+      }
       this.editGate.cooldown();
     }
   }

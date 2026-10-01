@@ -123,15 +123,17 @@ export const createMoveTool = (): Tool => {
       : layerDrag;
   };
 
-  /** A click must leave the layer whole, so the pixels are cut only when the drag starts. */
+  /**
+   * A click must leave the layer whole, so the pixels are cut only when the drag starts. Only a selection with
+   * nothing to lift falls back to moving the layer; a refused lift moves nothing.
+   */
   const liftOnDrag = (ctx: ToolContext, mode: Extract<DragMode, { kind: 'lift' }>): DragMode => {
-    if (ctx.liftFloatingSelection?.(mode.layerId)) {
-      const lifted = ctx.getFloatingSelection?.();
-      if (lifted) {
-        return { kind: 'float', layerId: lifted.layerId, origin: { ...lifted.transform } };
-      }
+    const result = ctx.liftFloatingSelection?.(mode.layerId) ?? 'unavailable';
+    if (result === 'unavailable') {
+      return mode.fallback;
     }
-    return mode.fallback;
+    const lifted = result === 'lifted' ? ctx.getFloatingSelection?.() : null;
+    return lifted ? { kind: 'float', layerId: lifted.layerId, origin: { ...lifted.transform } } : { kind: 'none' };
   };
 
   /** The constrained document-space delta from the gesture start to `input`. */

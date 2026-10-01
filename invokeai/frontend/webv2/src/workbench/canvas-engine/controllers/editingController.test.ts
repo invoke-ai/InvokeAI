@@ -73,7 +73,6 @@ const createSelectionPixelOptions = () => ({
 const createFloatingSelectionOptions = () => ({
   applyImagePatch: vi.fn(),
   backend: {} as never,
-  canEdit: () => true,
   ctx: {} as never,
   getDocument: () => null,
   invalidateLayer: vi.fn(),

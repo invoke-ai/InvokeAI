@@ -167,8 +167,8 @@ export class TransformEditingController {
     const beforeRect = { ...cache.rect };
     const matrix = bakeMatrix(session.transform);
     const afterRect = roundOut(transformBounds(matrix, beforeRect));
-    const beforeBytes = beforeRect.width * beforeRect.height * 4;
-    const afterBytes = afterRect.width * afterRect.height * 4;
+    const beforeBytes = rgbaBytes(beforeRect);
+    const afterBytes = rgbaBytes(afterRect);
     const txn = this.deps.ctx.begin({ historyBytes: beforeBytes + afterBytes + HISTORY_ENTRY_OVERHEAD_BYTES });
     if (!('publish' in txn)) {
       this.settle(txn.status);

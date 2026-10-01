@@ -18612,3 +18612,79 @@ describe('refused strokes', () => {
     engine.lifecycle.dispose();
   });
 });
+
+describe('floating selection lifecycle', () => {
+  const liftFloat = () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+    const reactive = createReactiveStore(paintDoc());
+    const bitmapStore = createSpyBitmapStore();
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      bitmapStore,
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: 'p1',
+      store: reactive.store,
+    });
+    const overlay = createInputCanvas();
+    engine.surface.attach(createInputCanvas().element, overlay.element);
+    engine.tools.setTool('brush');
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(40, 40));
+    overlay.fire('pointerup', pointerAt(40, 40, { buttons: 0 }));
+    engine.selection.selectAll();
+    engine.tools.setTool('move');
+    overlay.fire('pointerdown', pointerAt(30, 30));
+    overlay.fire('pointermove', pointerAt(45, 35));
+    overlay.fire('pointerup', pointerAt(45, 35, { buttons: 0 }));
+    expect(engine.stores.hasFloatingSelection.get()).toBe(true);
+    expect(bitmapStore.suspendLayer).toHaveBeenCalledWith('paint1');
+    bitmapStore.markLayerDirty.mockClear();
+    return { bitmapStore, engine, ...reactive };
+  };
+
+  it('banks a float on cooldown, so the flush that follows persists the landed pixels', async () => {
+    const { bitmapStore, engine } = liftFloat();
+
+    const cooled = engine.lifecycle.beginCooldown();
+
+    expect(engine.stores.hasFloatingSelection.get()).toBe(false);
+    expect(engine.history.getEntries().past.at(-1)).toBe('Move selection');
+    expect(bitmapStore.markLayerDirty).toHaveBeenCalledWith('paint1');
+    expect(bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    await expect(cooled).resolves.toBe('cooled');
+    engine.lifecycle.dispose();
+  });
+
+  it('drops a float without recording it when the document is replaced', () => {
+    const { bitmapStore, engine, setDocument } = liftFloat();
+
+    setDocument({ ...paintDoc(), height: 200, width: 200 }, 1);
+
+    expect(engine.stores.hasFloatingSelection.get()).toBe(false);
+    expect(engine.history.getEntries().past).not.toContain('Move selection');
+    expect(bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    engine.lifecycle.dispose();
+  });
+
+  it('drops a float without recording it when its layer is deleted', () => {
+    const { bitmapStore, engine, setDocument } = liftFloat();
+
+    setDocument({ ...paintDoc(), selectedLayerId: null, stacks: stacksFrom([]) });
+
+    expect(engine.stores.hasFloatingSelection.get()).toBe(false);
+    expect(engine.history.getEntries().past).not.toContain('Move selection');
+    expect(bitmapStore.releaseSuspendedLayer).toHaveBeenCalledOnce();
+    engine.lifecycle.dispose();
+  });
+});

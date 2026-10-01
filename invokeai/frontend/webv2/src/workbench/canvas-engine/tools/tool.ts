@@ -17,7 +17,7 @@ import type { OverlayCursor } from '@workbench/canvas-engine/render/overlayRende
 import type { RasterBackend } from '@workbench/canvas-engine/render/raster';
 import type { InvalidatePayload } from '@workbench/canvas-engine/render/scheduler';
 import type { SamInteractionState, SamVisualInput } from '@workbench/canvas-engine/samInteraction';
-import type { FloatingSelection } from '@workbench/canvas-engine/selection/floatingSelection';
+import type { FloatingSelection, FloatLiftResult } from '@workbench/canvas-engine/selection/floatingSelection';
 import type { SelectionCommit } from '@workbench/canvas-engine/selection/selectionState';
 import type { LayerTransform } from '@workbench/canvas-engine/transform/transformMath';
 import type { PlacedSurface, PointerInput, PointerModifiers, Rect, ToolId, Vec2 } from '@workbench/canvas-engine/types';
@@ -166,11 +166,11 @@ export interface ToolContext {
   getStrokeClipRect?(): Rect | null;
   /** Updates visual SAM input for the active engine-owned Select Object session. */
   updateSamInput?(input: SamVisualInput): void;
-  /** Optional lift of selected layer pixels into a float; returns whether any were lifted. */
-  liftFloatingSelection?(layerId: string): boolean;
+  /** Optional lift of selected layer pixels into a float; a refused lift has already been reported. */
+  liftFloatingSelection?(layerId: string): FloatLiftResult;
   /** The live floating selection, or `null`. */
   getFloatingSelection?(): FloatingSelection | null;
-  /** Sets the float's live transform (LAYER-LOCAL space). */
+  /** Sets the float's live transform (LAYER-LOCAL space); one its undo budget cannot cover keeps the last. */
   setFloatingTransform?(transform: LayerTransform): void;
   /** Bakes the float back into its layer as one undoable entry. */
   commitFloatingSelection?(): void;
