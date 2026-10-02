@@ -946,6 +946,43 @@ describe('compileVideoGraph — LTX-2', () => {
     expect(hasEdge(backendGraph, conditioning.id, 'audio_conditioning', output.id, 'source_audio')).toBe(true);
   });
 
+  it('anchors the picture generated for a soundtrack on first and last frames', () => {
+    const model = ltx2Model('ltx2_dev');
+    const first = { height: 704, image_name: 'first.png', width: 1248 };
+    const last = { height: 704, image_name: 'last.png', width: 1248 };
+    const { backendGraph } = compileVideoGraph(
+      ltx2SettingsFor(model, {
+        conditioningClip: { clip: LTX2_CLIP, fpsKnown: true, role: 'audio' },
+        firstFrameImage: first,
+        lastFrameImage: last,
+        numFrames: 121,
+      }),
+      model
+    );
+    const audio = nodeOfType(backendGraph, 'ltx2_audio_conditioning');
+
+    expect(backendGraph.nodes.image_conditioning).toMatchObject({ frame_index: 0, image: { image_name: 'first.png' } });
+    expect(backendGraph.nodes.last_frame_conditioning).toMatchObject({
+      frame_index: -1,
+      image: { image_name: 'last.png' },
+    });
+    expect(
+      hasEdge(backendGraph, 'image_conditioning', 'video_conditioning', 'denoise_latents', 'video_conditioning')
+    ).toBe(true);
+    expect(
+      hasEdge(backendGraph, 'last_frame_conditioning', 'video_conditioning', 'denoise_latents', 'keyframe_conditioning')
+    ).toBe(true);
+    // The soundtrack is still held and still decides the length the last frame's -1 resolves against.
+    expect(hasEdge(backendGraph, audio.id, 'audio_conditioning', 'denoise_latents', 'audio_conditioning')).toBe(true);
+    expect(hasEdge(backendGraph, audio.id, 'num_frames', 'denoise_latents', 'num_frames')).toBe(true);
+    expect(backendGraph.nodes.core_metadata).toMatchObject({
+      first_frame_image: { image_name: 'first.png' },
+      generation_mode: 'ltx2_a2v',
+      last_frame_image: { image_name: 'last.png' },
+      ltx2_conditioning_role: 'audio',
+    });
+  });
+
   it("conditions on a clip's picture at the canvas its own ratio resolves to", () => {
     const model = ltx2Model('ltx2_dev');
     const { backendGraph } = compileVideoGraph(

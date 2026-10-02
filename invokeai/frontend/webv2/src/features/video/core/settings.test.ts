@@ -26,6 +26,7 @@ import {
   getReferencesPatch,
   isVideoSettings,
   createVideoConditioningClip,
+  getFrameImagePatch,
   isVideoSourceClip,
   normalizeVideoSettings,
   normalizeVideoWidgetValues,
@@ -96,6 +97,12 @@ describe('createVideoConditioningClip', () => {
     // condition on, so the only role it can fill is the audio one.
     expect(createVideoConditioningClip({ ...item, mediaOrigin: 'audio_upload' }).role).toBe('audio');
     expect(createVideoConditioningClip(item).role).toBe('video');
+  });
+
+  it('takes a clip for its soundtrack while start or end images are held, so they are not cleared', () => {
+    const item = { durationSeconds: 4, fps: 24, height: 704, name: 'clip.mp4', width: 1248 };
+
+    expect(createVideoConditioningClip(item, { framesHeld: true }).role).toBe('audio');
   });
 
   it('carries no trim bounds, which the conditioning nodes would not honour', () => {
@@ -502,14 +509,45 @@ describe('getDefaultReferenceImageDetail', () => {
   });
 });
 
+describe('getFrameImagePatch', () => {
+  const soundtrack = { clip: CONDITIONING_CLIP, fpsKnown: true, role: 'audio' as const };
+  const picture = { ...soundtrack, role: 'video' as const };
+
+  it('displaces a clip held for its picture, which already supplies every frame', () => {
+    expect(getFrameImagePatch('firstFrameImage', FIRST_FRAME, picture)).toEqual({
+      conditioningClip: null,
+      firstFrameImage: FIRST_FRAME,
+      sourceVideo: null,
+    });
+    expect(getFrameImagePatch('lastFrameImage', FIRST_FRAME, picture)).toEqual({
+      conditioningClip: null,
+      lastFrameImage: FIRST_FRAME,
+    });
+  });
+
+  it('keeps a soundtrack, whose generated picture the frame anchors', () => {
+    expect(getFrameImagePatch('firstFrameImage', FIRST_FRAME, soundtrack)).toEqual({
+      firstFrameImage: FIRST_FRAME,
+      sourceVideo: null,
+    });
+    expect(getFrameImagePatch('lastFrameImage', FIRST_FRAME, soundtrack)).toEqual({ lastFrameImage: FIRST_FRAME });
+  });
+
+  it('clears only its own slot', () => {
+    expect(getFrameImagePatch('firstFrameImage', null, picture)).toEqual({ firstFrameImage: null });
+  });
+});
+
 describe('normalizeVideoSettings — the conditioning clip', () => {
   const clip = { clip: CONDITIONING_CLIP, fpsKnown: true, role: 'audio' as const };
 
   it('drops a clip stored beside a slot that claims the same conditioning mask', () => {
     // A rolled-back or hand-edited project can hold both. Keeping them would resolve to a mode
     // whose graph silently ignores one of the two.
+    const picture = { ...clip, role: 'video' as const };
+
     expect(
-      normalizeVideoSettings({ ...createSettings({ firstFrameImage: FIRST_FRAME }), conditioningClip: clip })
+      normalizeVideoSettings({ ...createSettings({ firstFrameImage: FIRST_FRAME }), conditioningClip: picture })
         ?.conditioningClip
     ).toBeNull();
     expect(
@@ -517,6 +555,16 @@ describe('normalizeVideoSettings — the conditioning clip', () => {
         ?.conditioningClip
     ).toBeNull();
     expect(normalizeVideoSettings(createSettings({ conditioningClip: clip }))?.conditioningClip).toEqual(clip);
+  });
+
+  it('keeps a soundtrack beside the first frame that anchors the picture generated for it', () => {
+    const normalized = normalizeVideoSettings({
+      ...createSettings({ firstFrameImage: FIRST_FRAME }),
+      conditioningClip: clip,
+    });
+
+    expect(normalized?.conditioningClip).toEqual(clip);
+    expect(normalized?.firstFrameImage).toEqual(FIRST_FRAME);
   });
 
   it('drops a malformed clip rather than passing it to the graph builder', () => {
