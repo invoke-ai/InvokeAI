@@ -187,6 +187,30 @@ export const getRegionOrder = (
   return slots;
 };
 
+/**
+ * The one shape a window's state is written in. Persistence compares documents as JSON, key order included, so a
+ * window built by a reducer has to serialize exactly as the same window read back by a reload.
+ */
+export const toFloatingWidgetState = ({
+  heightPx,
+  mode,
+  returnIndex,
+  returnRegion,
+  stackOrder,
+  widthPx,
+  x,
+  y,
+}: FloatingWidgetState): FloatingWidgetState => ({
+  heightPx,
+  widthPx,
+  x,
+  y,
+  mode,
+  returnIndex,
+  returnRegion,
+  stackOrder,
+});
+
 /** Write a complete order back as the region's docked members and its markers' return indices. */
 export const writeRegionOrder = (
   slots: readonly RegionOrderSlot[],
@@ -198,7 +222,10 @@ export const writeRegionOrder = (
     const floating = nextFloatingWidgets?.[instanceId];
 
     if (isFloating && floating && floating.returnIndex !== index) {
-      nextFloatingWidgets = { ...nextFloatingWidgets, [instanceId]: { ...floating, returnIndex: index } };
+      nextFloatingWidgets = {
+        ...nextFloatingWidgets,
+        [instanceId]: toFloatingWidgetState({ ...floating, returnIndex: index }),
+      };
     }
   });
 
@@ -254,13 +281,13 @@ const validateFloatingWidgets = (
       continue;
     }
 
-    floatingWidgets[instanceId] = {
+    floatingWidgets[instanceId] = toFloatingWidgetState({
       ...clampSizeToMinimum({ heightPx: state.heightPx, widthPx: state.widthPx, x: state.x, y: state.y }),
       mode: state.mode as FloatingWidgetMode,
       returnIndex: state.returnIndex,
       returnRegion,
       stackOrder: state.stackOrder,
-    };
+    });
   }
 
   return floatingWidgets;

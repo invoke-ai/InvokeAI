@@ -191,6 +191,7 @@ import {
   normalizeFloatingPlacement,
   normalizeLastFloatingGeometry,
   rememberClosedWindows,
+  toFloatingWidgetState,
   withoutFloatedInstances,
   writeRegionOrder,
   type RegionOrderSlot,
@@ -3948,7 +3949,7 @@ export const __workbenchReducerInternal = (
         const remembered = project.lastFloatingGeometry?.[action.instanceId];
         let floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined = {
           ...project.floatingWidgets,
-          [action.instanceId]: {
+          [action.instanceId]: toFloatingWidgetState({
             ...(remembered
               ? action.viewport
                 ? fitWindowIntoViewport(remembered, action.viewport)
@@ -3957,7 +3958,7 @@ export const __workbenchReducerInternal = (
             mode: 'windowed',
             returnRegion,
             stackOrder: nextStackOrder(project.floatingWidgets),
-          },
+          }),
         };
         const widgetRegions = { ...project.widgetRegions };
 

@@ -818,7 +818,7 @@ describe('remembered window geometry', () => {
     expect(getActiveProject(state).lastFloatingGeometry).toEqual({ gallery: PLACED });
   });
 
-  it('always saves memory the way a reload would read it back', () => {
+  it('always saves windows and their memory the way a reload would read them back', () => {
     // Persistence compares what it sent with the document as a reload reads it, as JSON. Anything a reload would
     // drop or reorder in these fields turns a lost response into a conflict.
     const placement = (project: Project): string => {
@@ -846,6 +846,19 @@ describe('remembered window geometry', () => {
     state = workbenchReducer(state, { type: 'undoProjectChange' });
     savesCanonically(state);
     state = workbenchReducer(state, { type: 'redoProjectChange' });
+    savesCanonically(state);
+
+    // An open window, from the moment it floats and through everything that rewrites its state.
+    state = workbenchReducer(createInitialWorkbenchState(), { instanceId: 'image-map', type: 'floatWidget' });
+    savesCanonically(state);
+    // Removing a member ahead of the marker re-indexes it; a second float re-indexes around both.
+    state = workbenchReducer(state, { region: 'right', type: 'toggleRegionWidget', widgetId: 'gallery' });
+    savesCanonically(state);
+    state = workbenchReducer(state, { instanceId: 'queue', type: 'floatWidget' });
+    savesCanonically(state);
+    state = workbenchReducer(state, { instanceId: 'image-map', type: 'setFloatingWidgetGeometry', ...PLACED });
+    state = workbenchReducer(state, { instanceId: 'image-map', mode: 'shaded', type: 'setFloatingWidgetMode' });
+    state = workbenchReducer(state, { instanceId: 'image-map', type: 'raiseFloatingWidget' });
     savesCanonically(state);
   });
 
