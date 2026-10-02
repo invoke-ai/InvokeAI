@@ -97,6 +97,8 @@ const STARTER_MODEL = {
   type: 'main',
 };
 
+const MOCK_APP_VERSION = 'fixture';
+
 const STARTER_MODELS_RESPONSE = {
   starter_bundles: {
     'sd-1': { models: [STARTER_MODEL], name: 'Stable Diffusion 1.5' },
@@ -113,8 +115,13 @@ const createState = (profile) => {
 
   return {
     boards: new Map(fixture.boards.map((board) => [board.board_id, clone(board)])),
-    // Dismiss the alpha notice so journeys start on the requested page.
-    clientState: new Map([['webv2:workbench-settings', JSON.stringify({ alphaNoticeAcknowledged: true })]]),
+    // Dismiss the alpha notice and What's New notes so journeys start on the requested page.
+    clientState: new Map([
+      [
+        'webv2:workbench-settings',
+        JSON.stringify({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: MOCK_APP_VERSION }),
+      ],
+    ]),
     images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
     models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
     mutationClock: 0,
@@ -867,7 +874,7 @@ export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
       }
 
       if (method === 'GET' && path === '/api/v1/app/version') {
-        return json(200, { version: 'fixture' });
+        return json(200, { version: MOCK_APP_VERSION });
       }
 
       if (method === 'GET' && path === '/api/v1/app/generation_device_options') {
