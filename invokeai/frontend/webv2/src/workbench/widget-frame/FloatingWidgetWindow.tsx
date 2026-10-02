@@ -90,8 +90,24 @@ const WINDOW_SX: SystemStyleObject = {
 // The title bar has no room for a scrollbar; the strip scrolls by focus, a sideways scroll, and touch.
 const ACTIONS_SCROLL_SX: SystemStyleObject = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' };
 
-/** A window is never shown larger than the viewport, so a resize does not grow past it either. */
-const getViewportSize = () => ({ heightPx: window.innerHeight, widthPx: window.innerWidth });
+const getViewport = () => ({ height: window.innerHeight, width: window.innerWidth });
+
+const keepInViewport = (geometry: FloatingGeometry): FloatingGeometry => clampWindowToViewport(geometry, getViewport());
+
+/** What resizing the rectangle on screen commits, or null for nothing (see {@link commitResizedAxes}). */
+const resizeOnScreen = (
+  stored: FloatingGeometry,
+  start: FloatingGeometry,
+  edge: FloatingResizeEdge,
+  deltaX: number,
+  deltaY: number
+): FloatingGeometry | null => {
+  const viewport = getViewport();
+  // A window is never shown larger than the viewport, so a resize does not grow past it either.
+  const max = { heightPx: viewport.height, widthPx: viewport.width };
+
+  return commitResizedAxes(stored, start, resizeFloatingGeometry(start, edge, deltaX, deltaY, max), viewport);
+};
 
 // A drag rewrites the preview properties every frame. Custom properties inherit by default, which would restyle
 // the whole widget inside the window each time; registered as non-inheriting, only the window itself is restyled.
@@ -337,17 +353,14 @@ export const FloatingWidgetWindow = ({
   const { heightPx, mode, widthPx, x, y } = state;
 
   const commitGeometry = useCallback(
-    (geometry: FloatingGeometry) => {
-      const clamped = clampWindowToViewport(geometry, { height: window.innerHeight, width: window.innerWidth });
-
-      // The rendered rectangle a gesture starts from can sit on fractional pixels.
+    // The rendered rectangle a gesture starts from can sit on fractional pixels.
+    (geometry: FloatingGeometry) =>
       widgets.setFloatingGeometry(instanceId, {
-        heightPx: Math.round(clamped.heightPx),
-        widthPx: Math.round(clamped.widthPx),
-        x: Math.round(clamped.x),
-        y: Math.round(clamped.y),
-      });
-    },
+        heightPx: Math.round(geometry.heightPx),
+        widthPx: Math.round(geometry.widthPx),
+        x: Math.round(geometry.x),
+        y: Math.round(geometry.y),
+      }),
     [instanceId, widgets]
   );
 
@@ -453,10 +466,15 @@ export const FloatingWidgetWindow = ({
           // which is not the user's choice to persist.
           gesture.live =
             edge !== 'move'
-              ? commitResizedAxes(stored, start, resizeFloatingGeometry(start, edge, deltaX, deltaY, getViewportSize()))
+              ? resizeOnScreen(stored, start, edge, deltaX, deltaY)
               : deltaX === 0 && deltaY === 0
                 ? null
-                : { heightPx: stored.heightPx, widthPx: stored.widthPx, x: start.x + deltaX, y: start.y + deltaY };
+                : keepInViewport({
+                    heightPx: stored.heightPx,
+                    widthPx: stored.widthPx,
+                    x: start.x + deltaX,
+                    y: start.y + deltaY,
+                  });
           writePreview(gesture.live ? { geometry: gesture.live, mode: gesture.mode } : null);
         },
       });
@@ -517,7 +535,7 @@ export const FloatingWidgetWindow = ({
 
       event.preventDefault();
       // Like a pointer move: from where the window is on screen, keeping the stored size.
-      commitGeometry({ heightPx, widthPx, x: rendered.x + offset[0], y: rendered.y + offset[1] });
+      commitGeometry(keepInViewport({ heightPx, widthPx, x: rendered.x + offset[0], y: rendered.y + offset[1] }));
     },
     [commitGeometry, heightPx, mode, readRenderedGeometry, widthPx]
   );
@@ -546,11 +564,7 @@ export const FloatingWidgetWindow = ({
 
       event.preventDefault();
 
-      const resized = commitResizedAxes(
-        { heightPx, widthPx, x, y },
-        rendered,
-        resizeFloatingGeometry(rendered, 'se', offset[0], offset[1], getViewportSize())
-      );
+      const resized = resizeOnScreen({ heightPx, widthPx, x, y }, rendered, 'se', offset[0], offset[1]);
 
       if (resized) {
         commitGeometry(resized);

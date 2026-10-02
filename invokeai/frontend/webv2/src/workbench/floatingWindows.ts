@@ -66,27 +66,31 @@ export const clampWindowToViewport = (
 });
 
 /**
- * What a resize commits: on each axis the resize actually changed, the result from the rectangle on screen; on an
- * axis it left alone, what was stored. An untouched axis may be showing the viewport's clamp or cap, which is not
- * the user's choice to persist. Null when the resize changed nothing — a drag against the minimum or the cap.
+ * What a resize commits: on each axis the resize actually changed, the result from the rectangle on screen, held in
+ * the viewport by {@link clampWindowToViewport}; on an axis it left alone, what was stored. An untouched axis may be
+ * showing the viewport's clamp or cap, which is not the user's choice to persist. Null when the resize changed
+ * nothing — a drag against the minimum or the cap.
  */
 export const commitResizedAxes = (
   stored: FloatingGeometry,
   start: FloatingGeometry,
-  resized: FloatingGeometry
+  resized: FloatingGeometry,
+  viewport: { width: number; height: number }
 ): FloatingGeometry | null => {
   // The rectangle on screen can sit on fractional pixels, and what is committed is whole ones: a difference under
-  // half a pixel is arithmetic, not the user.
+  // half a pixel is arithmetic, not the user. Changes are read before the clamp, which works in whole viewport
+  // pixels and could otherwise move an axis the resize never touched.
   const changed = (from: number, to: number) => Math.abs(to - from) >= 0.5;
   const horizontal = changed(start.widthPx, resized.widthPx) || changed(start.x, resized.x);
   const vertical = changed(start.heightPx, resized.heightPx) || changed(start.y, resized.y);
+  const placed = clampWindowToViewport(resized, viewport);
 
   return horizontal || vertical
     ? {
-        heightPx: vertical ? resized.heightPx : stored.heightPx,
-        widthPx: horizontal ? resized.widthPx : stored.widthPx,
-        x: horizontal ? resized.x : stored.x,
-        y: vertical ? resized.y : stored.y,
+        heightPx: vertical ? placed.heightPx : stored.heightPx,
+        widthPx: horizontal ? placed.widthPx : stored.widthPx,
+        x: horizontal ? placed.x : stored.x,
+        y: vertical ? placed.y : stored.y,
       }
     : null;
 };

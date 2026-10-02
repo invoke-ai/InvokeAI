@@ -1049,6 +1049,29 @@ describe('FloatingWidgetWindow gestures', () => {
     });
   });
 
+  it('keeps the stored position of the axis a pointer resize leaves alone, wherever the viewport holds it', async () => {
+    await page.viewport(500, 260);
+    // Stored far off the bottom-right; shown at (452, 212) and capped to 260px tall.
+    await renderWindow({ ...state, heightPx: 300, widthPx: 400, x: 1000, y: 800 });
+
+    await drag(edge('e'), -50, 0);
+    expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
+      heightPx: 300,
+      widthPx: 350,
+      x: 452,
+      y: 800,
+    });
+
+    await nextFrame();
+    await drag(edge('s'), 0, -40);
+    expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
+      heightPx: 220,
+      widthPx: 400,
+      x: 1000,
+      y: 212,
+    });
+  });
+
   it('does not grow a window past the viewport, so an edge at the cap resizes nothing instead of sliding it', async () => {
     await page.viewport(600, 500);
     await renderWindow({ ...state, heightPx: 300, widthPx: 600, x: 0, y: 40 });
