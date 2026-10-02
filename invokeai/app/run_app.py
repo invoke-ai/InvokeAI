@@ -76,6 +76,13 @@ def run_app() -> None:
     else:
         apply_rocm_windows_allocator_default(logger)
 
+    # Decide on AOTriton's experimental attention kernels before anything can run attention: torch reads the switch
+    # once, at its first fused-kernel check, and the server already runs attention while starting up. This imports
+    # torch, so it comes after the allocator configuration.
+    from invokeai.app.util.rocm_aotriton import apply_rocm_aotriton_setting
+
+    apply_rocm_aotriton_setting(app_config.rocm_aotriton_experimental, app_config.generation_devices, logger)
+
     # This import must happen after configure_torch_cuda_allocator() is called, because the module imports torch.
     from invokeai.app.invocations.baseinvocation import InvocationRegistry
     from invokeai.app.invocations.load_custom_nodes import load_custom_nodes

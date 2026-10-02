@@ -642,6 +642,21 @@
       "validation": {}
     },
     {
+      "category": "DEVICE",
+      "default": "auto",
+      "description": "Use AOTriton's fused (flash and memory-efficient) attention kernels on AMD GPUs that PyTorch marks experimental for them, such as the RX 7600/7700/7800 series, Ryzen AI 300/Max and the RX 9060 series, by setting TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL. Without them, attention on those GPUs runs on the slower math kernel, which also needs far more memory. `auto` turns them on only with a ROCm 10 build of PyTorch, and only when every GPU used for generation is one they were measured correct on (so far gfx1200, the RX 9060 series); `on` and `off` decide for any build and GPU. A TORCH_ROCM_AOTRITON_ENABLE_EXPERIMENTAL value already set in the environment takes precedence. Has no effect on other GPUs.",
+      "env_var": "INVOKEAI_ROCM_AOTRITON_EXPERIMENTAL",
+      "literal_values": [
+        "auto",
+        "on",
+        "off"
+      ],
+      "name": "rocm_aotriton_experimental",
+      "required": false,
+      "type": "typing.Literal['auto', 'on', 'off']",
+      "validation": {}
+    },
+    {
       "category": "GENERATION",
       "default": false,
       "description": "Whether to calculate guidance in serial instead of in parallel, lowering memory requirements.",
