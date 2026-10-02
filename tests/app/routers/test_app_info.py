@@ -41,6 +41,26 @@ def _non_admin_user() -> Mock:
     return Mock(user_id="user-1", email="user@example.com", is_admin=False, is_active=True, token_epoch=0)
 
 
+@pytest.mark.parametrize(
+    ("setting", "visible"), [("", True), ("show_donation_link: true", True), ("show_donation_link: false", False)]
+)
+def test_frontend_config_exposes_only_public_yaml_settings(
+    setting: str, visible: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, client: TestClient
+) -> None:
+    config_path = tmp_path / "invokeai.yaml"
+    config_path.write_text(
+        f"schema_version: 4.0.2\nmultiuser: true\nexternal_openai_api_key: private-test-key\n{setting}\n"
+    )
+    config = load_and_migrate_config(config_path)
+    monkeypatch.setattr(app_info, "get_config", lambda: config)
+
+    # Public UI presentation does not require an administrator or expose the runtime config.
+    response = client.get("/api/v1/app/frontend_config")
+
+    assert response.status_code == 200
+    assert response.json() == {"show_donation_link": visible}
+
+
 def test_get_external_provider_statuses(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:
     statuses = {
         "gemini": ExternalProviderStatus(provider_id="gemini", configured=True, message=None),

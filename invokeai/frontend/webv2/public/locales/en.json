@@ -166,6 +166,7 @@
     }
   },
   "common": {
+    "donateToInvokeAI": "Donate to InvokeAI",
     "actions": "Actions",
     "active": "Active",
     "add": "Add",

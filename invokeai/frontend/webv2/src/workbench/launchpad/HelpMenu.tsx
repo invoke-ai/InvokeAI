@@ -1,16 +1,18 @@
-import type { ElementType } from 'react';
-
 import { chakra, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { APP_VERSION, DOCS_URL } from '@platform/runtime/appMetadata';
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { DiscordIcon, GithubIcon } from '@platform/ui/VendoredIcon';
 import { BookOpenTextIcon, ChevronRightIcon, ClapperboardIcon, CircleQuestionMarkIcon } from 'lucide-react';
+import { lazy, Suspense, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const MENU_POSITIONING = { placement: 'right-end' } as const;
 const GROUP_LABEL_PROPS = { color: 'fg.subtle', fontSize: '2xs', textTransform: 'uppercase' } as const;
 const TRIGGER_JUSTIFY = { justifyContent: 'space-between' } as const;
+const DonationMenuItem = lazy(() =>
+  import('@workbench/shell/DonationMenuItem').then((module) => ({ default: module.DonationMenuItem }))
+);
 
 interface HelpLink {
   href: string;
@@ -67,7 +69,7 @@ export const HelpMenu = () => {
   const { t } = useTranslation();
 
   return (
-    <Menu.Root positioning={MENU_POSITIONING}>
+    <Menu.Root lazyMount positioning={MENU_POSITIONING}>
       <Menu.Trigger asChild>
         <Button
           aria-label={t('launchpad.help.label')}
@@ -99,6 +101,9 @@ export const HelpMenu = () => {
               {COMMUNITY.map((link) => (
                 <HelpMenuLink key={link.value} {...link} />
               ))}
+              <Suspense fallback={null}>
+                <DonationMenuItem />
+              </Suspense>
             </Menu.ItemGroup>
             <Menu.Separator />
             <HStack justify="space-between" px="3" py="1.5">

@@ -26,13 +26,16 @@ import {
   SettingsIcon,
   TypeIcon,
 } from 'lucide-react';
-import { useCallback, type ElementType } from 'react';
+import { lazy, Suspense, useCallback, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useTopbarShortcut } from './useTopbarShortcut';
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
 const DISCORD_URL = 'https://discord.gg/ZmtBAhwWhy';
+const DonationMenuItem = lazy(() =>
+  import('@workbench/shell/DonationMenuItem').then((module) => ({ default: module.DonationMenuItem }))
+);
 
 export const AppMenu = () => {
   const { t } = useTranslation();
@@ -62,7 +65,7 @@ export const AppMenu = () => {
   const openSettings = useCallback(() => openWorkbenchSettings(), []);
 
   return (
-    <Menu.Root positioning={MENU_POSITIONING}>
+    <Menu.Root lazyMount positioning={MENU_POSITIONING}>
       <Menu.Trigger asChild>
         <IconButton aria-label={t('topbar.appMenu.open')} className="group" pe="1.5" size="sm" variant="ghost">
           <AppMenuGlyph />
@@ -143,6 +146,9 @@ export const AppMenu = () => {
               />
               <AppMenuLink href={DISCORD_URL} icon={DiscordIcon} label="Discord" value="discord" />
             </HStack>
+            <Suspense fallback={null}>
+              <DonationMenuItem />
+            </Suspense>
           </MenuContent>
         </Menu.Positioner>
       </Portal>
