@@ -1,32 +1,45 @@
-import { Dialog, HStack, Link, List, Portal, Stack, Text } from '@chakra-ui/react';
+import type { LucideIcon } from 'lucide-react';
+
+import v7LogoUrl from '@assets/V7Logo.webp';
+import { Badge, Box, Dialog, Flex, Grid, Image, Link, List, Portal, Stack, Text, VStack } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { DOCS_URL, getReleaseNotesUrl } from '@platform/runtime/appMetadata';
-import { CloseButton } from '@platform/ui';
-import { InvokeMark } from '@platform/ui/InvokeMark';
+import { Button, CloseButton } from '@platform/ui';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
 import { patchWorkbenchPreferences } from '@workbench/settings/store';
+import { BookOpenIcon, BoxesIcon, BrushIcon, FolderIcon, PanelsTopLeftIcon, ScrollTextIcon } from 'lucide-react';
 import { useCallback, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useWhatsNew } from './useWhatsNew';
 import { dismissWhatsNew } from './whatsNewStore';
 
-const EMPHASIS = /<StrongComponent>(.*?)<\/StrongComponent>/;
+/** Headline features get an icon and a title; the `whatsNew.items` catalog lists the smaller notes beneath them. */
+const HIGHLIGHTS: readonly { descriptionKey: string; icon: LucideIcon; titleKey: string }[] = [
+  {
+    descriptionKey: 'whatsNew.highlights.interface.description',
+    icon: PanelsTopLeftIcon,
+    titleKey: 'whatsNew.highlights.interface.title',
+  },
+  {
+    descriptionKey: 'whatsNew.highlights.projects.description',
+    icon: FolderIcon,
+    titleKey: 'whatsNew.highlights.projects.title',
+  },
+  {
+    descriptionKey: 'whatsNew.highlights.canvas.description',
+    icon: BrushIcon,
+    titleKey: 'whatsNew.highlights.canvas.title',
+  },
+  {
+    descriptionKey: 'whatsNew.highlights.models.description',
+    icon: BoxesIcon,
+    titleKey: 'whatsNew.highlights.models.title',
+  },
+];
 
 const readItems = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
-
-/** Items may emphasize a phrase with `<StrongComponent>…</StrongComponent>`; split captures land on odd indexes. */
-const WhatsNewItem = ({ text }: { text: string }) =>
-  text.split(EMPHASIS).map((part, index) =>
-    index % 2 === 1 ? (
-      <Text key={index} as="span" color="fg" fontWeight="600">
-        {part}
-      </Text>
-    ) : (
-      part
-    )
-  );
 
 /** Mounted only while the notes are open: workbench hotkeys stay quiet under them, as under the other dialogs. */
 const WhatsNewModalLayer = () => {
@@ -65,59 +78,93 @@ export const WhatsNewDialog = () => {
       initialFocusEl={getInitialFocusEl}
       open={isOpen}
       placement="center"
-      size="xs"
+      scrollBehavior="inside"
+      size="lg"
       onOpenChange={handleOpenChange}
     >
       {isOpen ? <WhatsNewModalLayer /> : null}
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>
-          <Dialog.Content ref={contentRef}>
-            <Dialog.Header>
-              <HStack gap="2.5">
-                <InvokeMark size={20} />
-                <Dialog.Title fontSize="sm">{t('whatsNew.whatsNewInInvoke')}</Dialog.Title>
-                {version ? (
-                  <Text color="fg.subtle" fontSize="xs">
-                    v{version}
-                  </Text>
-                ) : null}
-              </HStack>
+          <Dialog.Content ref={contentRef} overflow="hidden">
+            <Dialog.Header justifyContent="center" pb="4" pt="8">
+              <VStack gap="3">
+                <Image alt="" boxSize="24" draggable={false} src={v7LogoUrl} />
+                <VStack gap="1.5">
+                  <Dialog.Title textStyle="xl">{t('whatsNew.whatsNewInInvoke')}</Dialog.Title>
+                  {version ? (
+                    <Badge fontFamily="mono" size="sm" variant="subtle">
+                      v{version}
+                    </Badge>
+                  ) : null}
+                </VStack>
+              </VStack>
             </Dialog.Header>
-            <Dialog.Body>
-              <Stack gap="4">
-                <List.Root fontSize="xs" gap="1" ps="4">
-                  {items.map((item, index) => (
-                    // The catalog order is fixed for a build, so the index is a stable key.
-                    <List.Item key={index}>
-                      <WhatsNewItem text={item} />
-                    </List.Item>
+            <Dialog.Body px="6">
+              <Stack gap="5">
+                <Grid gap="3" templateColumns="repeat(auto-fit, minmax(15rem, 1fr))">
+                  {HIGHLIGHTS.map(({ descriptionKey, icon: HighlightIcon, titleKey }) => (
+                    <Flex
+                      key={titleKey}
+                      align="start"
+                      bg="bg.muted"
+                      borderColor="border.subtle"
+                      borderRadius="lg"
+                      borderWidth="1px"
+                      gap="3"
+                      p="3"
+                    >
+                      <Flex
+                        align="center"
+                        bg="accent.subtle"
+                        borderRadius="md"
+                        boxSize="8"
+                        color="accent.fg"
+                        flexShrink="0"
+                        justify="center"
+                      >
+                        <HighlightIcon aria-hidden size={16} />
+                      </Flex>
+                      <Box minW="0">
+                        <Text fontWeight="600" textStyle="sm">
+                          {t(titleKey)}
+                        </Text>
+                        <Text color="fg.muted" textStyle="xs">
+                          {t(descriptionKey)}
+                        </Text>
+                      </Box>
+                    </Flex>
                   ))}
-                </List.Root>
-                <Stack gap="1">
-                  <Link
-                    color="accent.fg"
-                    fontSize="xs"
-                    fontWeight="600"
-                    href={getReleaseNotesUrl(version)}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    {t('whatsNew.readReleaseNotes')}
-                  </Link>
-                  <Link
-                    color="accent.fg"
-                    fontSize="xs"
-                    fontWeight="600"
-                    href={DOCS_URL}
-                    rel="noreferrer"
-                    target="_blank"
-                  >
-                    {t('whatsNew.readTheDocs')}
-                  </Link>
-                </Stack>
+                </Grid>
+                {items.length > 0 ? (
+                  <Stack gap="1.5">
+                    <Text color="fg.subtle" fontWeight="600" textStyle="2xs" textTransform="uppercase">
+                      {t('whatsNew.alsoNew')}
+                    </Text>
+                    <List.Root color="fg.muted" gap="1" ps="4" textStyle="xs">
+                      {items.map((item, index) => (
+                        // The catalog order is fixed for a build, so the index is a stable key.
+                        <List.Item key={index}>{item}</List.Item>
+                      ))}
+                    </List.Root>
+                  </Stack>
+                ) : null}
               </Stack>
             </Dialog.Body>
+            <Dialog.Footer borderColor="border.subtle" borderTopWidth="1px" px="6" py="3">
+              <Button asChild size="xs" variant="outline">
+                <Link href={DOCS_URL} rel="noreferrer" target="_blank">
+                  <BookOpenIcon aria-hidden />
+                  {t('whatsNew.readTheDocs')}
+                </Link>
+              </Button>
+              <Button asChild size="xs" variant="solid">
+                <Link href={getReleaseNotesUrl(version)} rel="noreferrer" target="_blank">
+                  <ScrollTextIcon aria-hidden />
+                  {t('whatsNew.readReleaseNotes')}
+                </Link>
+              </Button>
+            </Dialog.Footer>
             <Dialog.CloseTrigger asChild>
               <CloseButton />
             </Dialog.CloseTrigger>

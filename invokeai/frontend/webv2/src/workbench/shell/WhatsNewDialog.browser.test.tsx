@@ -51,10 +51,8 @@ vi.mock('@platform/transport/http', () => ({
 }));
 
 const catalog = (await fetch('/locales/en.json').then((response) => response.json())) as {
-  whatsNew: { items: string[] };
+  whatsNew: { highlights: Record<string, { description: string; title: string }>; items: string[] };
 };
-// An emphasized item exercises the `<StrongComponent>` markup the shipped catalog may use.
-catalog.whatsNew.items = [...catalog.whatsNew.items, 'Try <StrongComponent>the new thing</StrongComponent> today.'];
 
 const i18n = createInstance();
 await i18n.use(initReactI18next).init({
@@ -115,13 +113,17 @@ describe('WhatsNewDialog', () => {
     await expect.element(page.getByRole('dialog', { name: title() })).toHaveFocus();
     expect(isHotkeyModalLayerActive()).toBe(true);
 
-    const items = i18n.t('whatsNew.items', { returnObjects: true }) as string[];
-    expect(page.getByRole('listitem').elements()).toHaveLength(items.length);
-    // Item text with `:` and `.` renders verbatim.
-    await expect.element(page.getByText('Video models: Wan-2.2, MiniMax H3, LTX-2.5.')).toBeVisible();
-    const emphasis = page.getByText('the new thing', { exact: true }).element();
-    expect(emphasis.tagName).toBe('SPAN');
-    expect(emphasis.parentElement?.textContent).toBe('Try the new thing today.');
+    // Every catalogued highlight renders with its title, and the smaller notes list beneath them.
+    for (const { description, title } of Object.values(catalog.whatsNew.highlights)) {
+      await expect.element(page.getByText(title, { exact: true })).toBeVisible();
+      await expect.element(page.getByText(description, { exact: true })).toBeVisible();
+    }
+    expect(
+      page
+        .getByRole('listitem')
+        .elements()
+        .map((item) => item.textContent)
+    ).toEqual(catalog.whatsNew.items);
 
     expect(page.getByRole('link', { name: i18n.t('whatsNew.readReleaseNotes') }).element()).toHaveAttribute(
       'href',
