@@ -1,5 +1,6 @@
 import babel from '@rolldown/plugin-babel';
 import react, { reactCompilerPreset } from '@vitejs/plugin-react';
+import { readFileSync } from 'node:fs';
 import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 
@@ -16,6 +17,19 @@ const ALLOWED_HOSTS = process.env.INVOKEAI_DEV_HOSTS?.split(',')
   .map((host) => host.trim())
   .filter(Boolean);
 const PROJECT_ROOT = fileURLToPath(new URL('.', import.meta.url));
+
+// The Python package owns the release version, and the release workflow checks it against the tag. Fail the build
+// rather than ship a guessed version if the file moves or its format changes.
+const VERSION_FILE = fileURLToPath(new URL('../../version/invokeai_version.py', import.meta.url));
+const readAppVersion = (): string => {
+  const version = /^__version__\s*=\s*["']([^"']+)["']/m.exec(readFileSync(VERSION_FILE, 'utf8'))?.[1];
+
+  if (!version) {
+    throw new Error(`No __version__ assignment found in ${VERSION_FILE}.`);
+  }
+
+  return version;
+};
 
 // Group eager dependencies shared by both routes to avoid extra chunk requests.
 const ROUTE_SHARED_MODULES = [
@@ -318,6 +332,8 @@ const getLegacyChunkName = (id: string): string | null => {
 
 export default defineConfig({
   define: {
+    // An env define, not a global: Vitest browser mode re-encodes string globals, wrapping them in quotes.
+    'import.meta.env.APP_VERSION': JSON.stringify(readAppVersion()),
     // Use a boolean: Vitest browser mode treats string defines as truthy string literals.
     __CANVAS_GOLDEN_UPDATE__: false,
   },
