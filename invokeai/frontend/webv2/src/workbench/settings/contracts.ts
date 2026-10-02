@@ -45,6 +45,8 @@ export interface StoredGeneratePreset {
 export interface WorkbenchPreferences {
   /** The alpha-build notice was dismissed; shown once per account until then. */
   alphaNoticeAcknowledged: boolean;
+  /** Server version whose What's New notes were last dismissed; a different version shows them once. */
+  whatsNewSeenVersion: string | null;
   themeId: WorkbenchThemeId;
   reduceMotion: boolean;
   showFocusRegionHighlight: boolean;

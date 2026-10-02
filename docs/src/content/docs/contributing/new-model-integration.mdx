@@ -1,7 +1,7 @@
 ---
 title: New Model Type Integration Checklist
 description: A step-by-step checklist for integrating a new model architecture into InvokeAI, from the model manager to the webv2 frontend and the tests that enforce completeness.
-lastUpdated: 2026-09-25
+lastUpdated: 2026-10-02
 ---
 
 import { Steps, FileTree } from '@astrojs/starlight/components';
@@ -20,6 +20,14 @@ The examples use a hypothetical architecture, `NewModel`, with the base value `n
 - **Krea-2**: a single-stream DiT with a Qwen3-VL encoder, installable as Diffusers, single-file or GGUF.
 - **Z-Image**: variants with different defaults, LoRA and control.
 - **Qwen-Image**: reference images and an edit variant.
+- **Anima**: depth-expanded finetunes (Anima-2.9B, Anima-3.8B) and a variant with a second text encoder.
+:::
+
+:::tip[Extending an architecture that already exists?]
+A finetune with a different depth, a new variant or an extra encoder for an architecture InvokeAI already
+supports is a different job: most of this checklist does not apply, and some traps apply only there --
+installed models whose stored records must keep validating, and adapters trained on the original layout.
+Start with [Extending an existing architecture](#14-extending-an-existing-architecture).
 :::
 
 :::caution[Frontend scope]
@@ -109,13 +117,21 @@ File: `invokeai/backend/model_manager/taxonomy.py`
    - `variant_type_adapter` in `taxonomy.py`
    - `ModelRecordChanges.variant` in `invokeai/app/services/model_records/model_records_base.py`
 
-   `tests/backend/architectures/test_variants.py` checks that the three agree and that the values are unique.
+   `tests/backend/architectures/test_variants.py` checks that the three agree and that the values are unique. A variant enum on a `base=Any` config (an encoder's) belongs to no architecture, so it also goes into `BASE_AGNOSTIC_VARIANT_ENUMS` in that test.
+
+   :::caution[Adding a variant to an architecture with installed models]
+   The model config's `variant` field must be **required** (`Field()` with no default), and existing records need a [migration](#persisted-records-and-migrations). Both shortcuts break every installed model of that class:
+   - Without a migration, a stored record without `variant` fails validation and is skipped on read; the models vanish from the model list.
+   - With a default, `Config_Base.get_tag` adds the variant to the class's discriminator tag, which a stored record's dict does not carry, so no record of that class deserializes at all.
+   :::
 
 3. **Add encoder types (only for a new text encoder).**
 
-   There is no generic text-encoder type. Each encoder family has its own `ModelType` member, and a `ModelFormat` member for its folder layout. Existing examples are `Qwen3Encoder`, `Qwen3VLEncoder`, `QwenVLEncoder`, `MistralEncoder` and `T5Encoder`.
+   There is no generic text-encoder type. Each encoder family has its own `ModelType` member. A matching `ModelFormat` member is needed only if the encoder ships as a folder; a single-file encoder uses `ModelFormat.Checkpoint`. Existing examples are `Qwen3Encoder`, `Qwen3VLEncoder`, `Qwen35Encoder`, `QwenVLEncoder`, `MistralEncoder` and `T5Encoder`.
 
-   Reuse an existing type whenever the encoder is a model InvokeAI already supports. Krea-2, Ideogram 4 and MiniMax H3 all use `ModelType.Qwen3VLEncoder`, told apart by `Qwen3VLVariantType`. Check whether the encoder weights are a stock checkpoint before adding a type.
+   Reuse an existing type whenever the encoder is a model InvokeAI already supports. Krea-2, Ideogram 4 and MiniMax H3 all use `ModelType.Qwen3VLEncoder`, told apart by `Qwen3VLVariantType`. Check whether the encoder weights are a stock checkpoint before adding a type: Anima-3.8B's `qwen35_4b.safetensors` ships its last layer without the MLP and replaces the LM head with a projection, and the conditioning was trained on exactly that.
+
+   Same width is not same family. A new family needs its own type when its architecture differs, even where an existing variant matches its hidden size: the Qwen3.5 4B and the Qwen3 4B are both 2560 wide.
 </Steps>
 
 :::tip[Checklist: Taxonomy]{icon="approve-check"}
@@ -296,6 +312,8 @@ Configs identify a model on disk. Every non-abstract subclass of `Config_Base` r
        ...
    ```
 
+   Widths and key prefixes are not enough where two families share them. A `model.`-prefixed Qwen3.5 export satisfies every heuristic of the Qwen3 encoder configs; only its `linear_attn` layers tell it apart, so `Qwen35Encoder_Checkpoint_Config` requires them and the Qwen3 configs reject them.
+
    **Configs must exclude each other.** Identification iterates `Config_Base.CONFIG_CLASSES`, which is a set, so the order in the `AnyModelConfig` union decides nothing. When two configs match the same file, `matches_sort_key` breaks the tie, which amounts to chance. For every existing config whose heuristic the new files could satisfy, add a negative check on one side or both. The same applies to LoRA and VAE configs, whose heuristics are often loose, for example "any key starting with `transformer_blocks.`". Cover each exclusion with a detection test.
 
 3. **VAE config (only for a new VAE)** (`configs/vae.py`)
@@ -335,7 +353,22 @@ Configs identify a model on disk. Every non-abstract subclass of `Config_Base` r
    ```python title="invokeai/backend/model_manager/configs/factory.py"
    Annotated[Main_Diffusers_NewModel_Config, Main_Diffusers_NewModel_Config.get_tag()],
    ```
+
+6. **Refuse what is recognized but not supported**
+
+   Raise `InvalidMatchError` for a file the config recognizes and cannot run, with a message that says what to install instead. `NotAMatchError` would let it fall through to another config or to `unknown`, and installing it as a working model would be worse. Anima refuses the Anima-3.8B v1.0 transformer this way: it loads cleanly as a 52-block Anima, but needs an adapter file InvokeAI does not load; its header (`qwen35_joint_dit_blocks`) is what gives it away.
 </Steps>
+
+### Persisted records and migrations
+
+Every installed model is stored as its config's JSON in the `models` table. `ModelRecordServiceSQL` *skips* a stored config that no longer validates, with a log line and nothing in the UI: the model just disappears from the model list. So any change that makes stored records invalid -- a new required field, a renamed enum value, a narrowed `Literal` -- needs a migration in `invokeai/app/services/shared/sqlite_migrator/migrations/` that rewrites them:
+
+- Name it `migration_<yyyy_mm_dd>_<what>.py` with a `build_migration(...)` that returns a `Migration`. Its `depends_on` names the newest migration on the main line. Discovery is automatic.
+- Request `app_config` in `build_migration` if the callback has to open model files; stored paths may be relative to `app_config.models_path`. Fall back to a safe value when a file is gone.
+- Touch only the records the change concerns (type, base and format), and leave records that already carry the field alone.
+- Test it against an in-memory `models` table, as `test_migration_2026_10_01_add_anima_variant.py` does.
+
+`migration_2026_09_16_add_qwen3_vl_encoder_variant` (a new required encoder variant) and `migration_2026_10_01_add_anima_variant` (a new required main-model variant that reads each checkpoint's header) are complete examples.
 
 :::tip[Checklist: Model configs]{icon="approve-check"}
 - [ ] Main configs per format (Diffusers, checkpoint, GGUF)
@@ -344,6 +377,8 @@ Configs identify a model on disk. Every non-abstract subclass of `Config_Base` r
 - [ ] VAE config and exclusions in the existing VAE detectors (if the VAE is new)
 - [ ] Encoder configs (if the encoder type is new)
 - [ ] Every new config in the `AnyModelConfig` union
+- [ ] `InvalidMatchError` for recognized files that cannot run
+- [ ] A migration for every change that would invalidate stored records
 :::
 
 ---
@@ -387,18 +422,21 @@ Loaders turn a config into an in-memory model. Every module in this folder is im
 
    Community single-file checkpoints often use key names that differ from diffusers, for example fused projections. Verify the conversion numerically against the diffusers module on a small config.
 
+   **Read structural hyperparameters from the checkpoint.** A loader that hard-codes the depth or a width and loads with `strict=False` builds the wrong model without an error when a finetune changes them: it fills the first N blocks of a deeper checkpoint and drops the rest as unexpected keys, which `log_unexpected_keys` reports at DEBUG only. `reject_incomplete_load` does not catch this either -- nothing is *missing*. Anima's loader took Anima-2.9B's first 28 of 40 blocks this way and generated degraded images. Count blocks from the state dict (`count_anima_dit_blocks`), refuse gaps, and read further hyperparameters from the safetensors header where the checkpoint records them (`read_safetensors_metadata`).
+
 3. **VAE loader (only for a new VAE)**
 
    Build the diffusers VAE class and load the converted state dict. `vae.py` and `flux.py` handle existing VAEs from native and ComfyUI layouts.
 
 4. **Text encoder loader (only for a new encoder type)**
 
-   Register with `base=BaseModelType.Any` and the encoder's `ModelType`, and serve both `SubModelType.TextEncoder` and `SubModelType.Tokenizer`. Vendor tokenizers and configs the loader needs, as `invokeai/backend/qwen2_5_vl/` does, so a single-file install loads without network access. Add the vendored files to `[tool.setuptools.package-data]` in `pyproject.toml`, or a wheel install fails with `FileNotFoundError`.
+   Register with `base=BaseModelType.Any` and the encoder's `ModelType`, and serve both `SubModelType.TextEncoder` and `SubModelType.Tokenizer`. Vendor tokenizers and configs the loader needs, as `invokeai/backend/qwen2_5_vl/` does, so a single-file install loads without network access. Add the vendored files to `[tool.setuptools.package-data]` in `pyproject.toml`, or a wheel install fails with `FileNotFoundError`; `tests/test_package_data.py` checks every `*.json` and `*.json.gz` under `invokeai/backend`.
 </Steps>
 
 :::tip[Checklist: Model loaders]{icon="approve-check"}
 - [ ] Loader per registered `(base, type, format)`
 - [ ] Key conversion for single-file and GGUF layouts, verified numerically against diffusers
+- [ ] Depth and other structural hyperparameters read from the checkpoint, not hard-coded
 - [ ] Quantized formats via the existing `invokeai/backend/quantization/` helpers
 - [ ] FP8 Storage: the loader casts, or declares `Unimplemented` / `NotApplicable` at registration
 - [ ] VAE and encoder loaders (if new)
@@ -588,6 +626,7 @@ Packages are discovered automatically. A directory of node modules without an `_
 - **Backend package (optional).** Put reusable math in `invokeai/backend/new_model/`: noise, packing, position IDs, schedules and text encoding. FLUX, FLUX.2 and Krea-2 have one; Qwen-Image and Z-Image keep the loop in the denoise node. Use a package once code is shared between nodes or needs its own tests.
 - **Schedulers.** Flow-matching architectures use diffusers' `FlowMatchEulerDiscreteScheduler`, or the shared maps in `invokeai/backend/flux/schedulers.py`: `FLUX_SCHEDULER_MAP`, `ZIMAGE_SCHEDULER_MAP` and `ERNIE_IMAGE_SCHEDULER_MAP`, each with name values and labels. Declare which set the UI offers in `FeaturesFacet.scheduler_set`. Set `scheduler_applies_to_graph=True` only if the denoise node really takes a scheduler field. Reproduce the reference sigma schedule and shift (`mu`, time-shift type, terminal shift) exactly, and test it against the reference scheduler.
 - **External noise (optional).** Only if the denoise node accepts a noise tensor: extend `LatentNoiseType` and its shape and grid logic in `invokeai/app/invocations/latent_noise.py`, and extend `noise_type` in `invocations/noise.py`. Validate with `validate_noise_tensor_shape`.
+- **Timestep-dependent conditioning.** Most architectures turn the text embeddings into the transformer's context once, before the loop. If a module between encoder and transformer reads the timestep -- Anima-3.8B's semantic connector does -- the context has to be recomputed at every step, for the positive, the negative and every regional conditioning. Pass the timestep exactly as the reference does: the connector scales sigma by 1000 before embedding it, so it gets a float32 sigma, where bf16's rounding would move its high frequencies by radians. A mask that leaves a query no key (an empty prompt encoded as one masked token) needs a defined result; `masked_sdpa` makes it zero instead of leaving it to the SDPA backend.
 - **Inpainting.** Rectified-flow models use `RectifiedFlowInpaintExtension` (`invokeai/backend/rectified_flow/rectified_flow_inpaint_extension.py`).
 - **Previews.** `LatentSpaceFacet` provides them; there is nothing to add in the step callback.
 
@@ -767,10 +806,14 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 
    - Add a `case` to `getBaseComponentSectionPolicy` in `baseGenerationPolicies.ts`. Its `default` returns an empty policy silently.
    - Add encoder filters in `componentCompatibility.ts`. If a main model can bring its own components, update `isBundledMainForBase`. VAE acceptance comes from the backend.
+   - A slot that only one variant needs goes into the policy conditionally: `getBaseComponentSectionPolicy` receives the model, so branch on `model.variant`, as FLUX.2 dev and Anima-3.8B do.
    - A **new** settings key must be added in all of these places:
      - `GenerateSettings` (`types.ts`)
      - `GenerateComponentValueKey`, `COMPONENT_SETTING_LABELS`, `getComponentPolicyContext` and `getDefaultGenerateSettings` (`baseGenerationPolicies.ts`)
-     - `normalizeGenerateSettings` and `cloneGenerateWidgetValues` (`settings.ts`)
+     - the second `getComponentPolicyContext` in `src/features/generation/ui/GenerateComponentsSection.tsx`
+     - `normalizeGenerateSettings`, `cloneGenerateWidgetValues` and `syncGenerateWidgetValuesWithModels` (`settings.ts`)
+     - `RecalledComponentSetting` and `RECALLED_COMPONENTS` (`src/workbench/image-actions/imageRecall.ts`), under the metadata key the builder writes
+     - the test fixtures that build a complete `GenerateWidgetValues` literal (`imageRecall.test.ts`, `workbenchState.test.ts`, `importGalleryImages.test.ts`). Vitest does not type-check them; `lint:tsc` does.
 
 5. **Canvas**
 
@@ -789,10 +832,16 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
 
    - `src/features/models/core/baseIdentity.ts`: `MODEL_BASES`, plus its pinned test
    - `src/features/models/core/types.ts`: `ModelBase`
-   - `src/features/models/core/taxonomy.ts`: variant values
+   - `src/features/models/core/taxonomy.ts`: variant values -- labels in `MODEL_VARIANT_LABELS`, main-model variants in `MAIN_VARIANTS_BY_BASE`, the variants of other types in `VARIANTS_BY_TYPE`
    - `src/features/models/core/relationships.ts`: which encoder and VAE types may link to the base
    - `src/features/workflow/core/modelRequirements.ts`: `BASE_LABELS`
    - New user-facing strings go in `invokeai/frontend/webv2/public/locales/en.json`.
+
+   A new **model type** (an encoder family) has its own set:
+   - `ModelTaxonomyType` in `types.ts`, and its label in the type list at the top of `taxonomy.ts`
+   - `NULL_BASE_ALLOWANCES` and `SINGLETON_LINK_TYPES` in `relationships.ts`
+   - the type label in `modelRequirements.ts`
+   - `CPU_ONLY_TYPES` in `src/features/models/ui/detail/CpuOnlySetting.tsx` if the config has `cpu_only`
 
 8. **Per-family UI (only for controls unique to the architecture)**
 
@@ -804,17 +853,18 @@ Paths below are relative to `invokeai/frontend/webv2/src/features/generation/cor
    pnpm -C invokeai/frontend/webv2 test src/features/generation/core/graphCoverage.test.ts -u
    ```
 
-   This rewrites `__snapshots__/generateGraphNodeTypes.json`. Then raise `SUPPORTED_BASE_COUNTS["generate"]` in `tests/app/invocations/test_frontend_graph_node_types.py`, and `LITERAL_FLOORS` if needed. That Python test checks every node type, edge field and literal value the builders emit against the backend's invocation registry.
+   This rewrites `__snapshots__/generateGraphNodeTypes.json`. Graph coverage and the remix round trip compile each base in the shapes listed in `graphCoverage.testing.ts`; a variant that changes the graph needs its own entry in `SHAPE_OVERRIDES`, and a component variant a slot filters for needs to be in `CANDIDATE_VARIANTS`, or neither test ever builds that graph. Then raise `SUPPORTED_BASE_COUNTS["generate"]` in `tests/app/invocations/test_frontend_graph_node_types.py`, and `LITERAL_FLOORS` if needed. That Python test checks every node type, edge field and literal value the builders emit against the backend's invocation registry.
 </Steps>
 
 :::tip[Checklist: webv2]{icon="approve-check"}
 - [ ] Capabilities fixture regenerated
 - [ ] `contracts.ts`, `supportedBases.ts` and its test
 - [ ] Builder in `graph.ts` and registered in `GRAPH_BUILDERS`
-- [ ] Component slot policy, encoder filters, new settings keys everywhere
+- [ ] Component slot policy (per variant where only one needs it), encoder filters, new settings keys everywhere
 - [ ] `CANVAS_I2L_NODE_TYPES` and `BASE_CASES`
 - [ ] Recall
 - [ ] Model registry, labels, `en.json`
+- [ ] `SHAPE_OVERRIDES` / `CANDIDATE_VARIANTS` for variant-dependent graphs
 - [ ] Graph snapshot regenerated, `SUPPORTED_BASE_COUNTS` raised
 - [ ] Changed interactions verified in the browser (`--webv2`)
 :::
@@ -857,19 +907,23 @@ Several tests pin hand-maintained tables, so a new architecture has to extend th
 | `tests/backend/architectures/test_latent_space.py` | `DECLARED_LATENT_SPACES` |
 | `tests/backend/architectures/test_default_settings.py` | Rows in `DEFAULT_SETTINGS_MATRIX` |
 | `tests/backend/architectures/test_conditioning.py` | The pinned numbers of conditioning types and architectures |
-| `tests/backend/architectures/test_variants.py` | Nothing if the variant lists and unique values are right; it checks them |
+| `tests/backend/architectures/test_variants.py` | A `base=Any` variant enum in `BASE_AGNOSTIC_VARIANT_ENUMS`; an architecture that gains variants out of the pinned list of variant-less ones. Otherwise it checks the variant lists and unique values itself |
 | `tests/backend/architectures/test_modality.py` | Nothing if `GENERATION_MODES` matches `ModalityFacet` |
 | `tests/backend/architectures/test_capabilities_fixture.py` | Regenerate the webv2 fixture (see section 11) |
 | `tests/app/invocations/test_frontend_graph_node_types.py` | `SUPPORTED_BASE_COUNTS`, possibly `LITERAL_FLOORS` |
 | `tests/backend/model_manager/load/test_diffusers_0XX_compatibility.py` | New classes, when the dependency is bumped |
+| `tests/test_package_data.py` | Nothing if `package-data` covers the vendored files; it checks them |
+| `src/features/generation/core/graphCoverage.testing.ts` (webv2) | `SHAPE_OVERRIDES` and `CANDIDATE_VARIANTS` for variant-dependent graphs |
+| `src/workbench/image-actions/imageRecall.test.ts` (webv2) | The recorded component setting in the remix round-trip list |
 
 Beyond those tables, test what can silently go wrong:
 - detection of every format, including negative cases against similar architectures
 - key conversion against the diffusers module
 - the text-encoder template
 - the sampling schedule against the reference scheduler
+- every migration, against an in-memory `models` table
 
-Use real lightweight modules with small configs rather than mocks.
+Use real lightweight modules with small configs rather than mocks. For layout tests, capture the key names and shapes of the real checkpoint into a fixture under `tests/backend/model_manager/load/state_dicts/` and build the model on the `meta` device: real extents are billions of elements. Where a module is ported rather than taken from `diffusers`/`transformers`, compare it once against the reference implementation on the real weights before writing the small-config tests.
 
 **CI gates for generated artifacts.** New or changed invocations change the OpenAPI schema. CI (`openapi-checks.yml`, `typegen-checks.yml`) requires the shared package's `invokeai/frontend/api/openapi.json` and `invokeai/frontend/api/schema.ts` to be current. Regenerate both from `invokeai/frontend/api` in the repository's Python environment after installing that package's locked dependencies:
 
@@ -886,6 +940,49 @@ python ../../../scripts/generate_openapi_schema.py | pnpm typegen
 - webv2 `lint:oxc`, `lint:tsc`, `architecture:check` and Vitest
 - a real generation in every mode on a GPU, compared against the reference pipeline with the same seed and settings
 - the browser flows in webv2: install, generate, canvas modes, recall
+
+---
+
+## 14. Extending an existing architecture
+
+Finetunes and variants of a supported architecture reuse almost everything above. Decide first what the new checkpoints actually change:
+
+| What changes | Treat it as | Work |
+| --- | --- | --- |
+| Only the weights (finetune, merge) | nothing | at most a starter model |
+| A structural hyperparameter nothing outside the loader depends on, such as depth | loader detection, **not** a variant | read it from the checkpoint ([5.2](#5-model-loaders)), test against the real key layout |
+| What the graph or UI needs: an extra encoder, a different conditioning path, different defaults | a **variant** | the checklist below |
+| The latent space, the VAE family or the transformer family | a new base | the rest of this guide |
+
+The scaffolder does not apply; it creates files for a new base.
+
+Anima-2.9B (40 blocks instead of 28) needed only the second row. Anima-3.8B (52 blocks, plus a connector that reads a second encoder) needed the third:
+
+<Steps>
+1. **Taxonomy.** The variant enum, with values unique across all enums, listed in the three places of [2.2](#2-taxonomy). Values describe what differs (`anima_qwen35`: conditioned on Qwen3.5 as well), not a release name, so the next finetune with the same requirements fits.
+
+2. **Config and migration.** A required `variant` field, detection from the checkpoint, `override_fields.pop("variant", None)` before detection, and a [migration](#persisted-records-and-migrations) for installed records. A model installed before the variant existed may already be the new kind; read its header in the migration rather than assume.
+
+3. **Declaration.** `VariantFacet`, per-variant `DefaultSettingsFacet` entries, the regenerated capabilities fixture. The model's defaults reach the UI through **Reset all to model defaults**; switching models keeps the user's settings.
+
+4. **Invocations.** New inputs optional, so existing workflows keep validating; node version bumps. The model loader checks the main model's variant and fails with a message naming what is missing, rather than letting the denoise node meet a `None`.
+
+5. **Frontend.** The per-variant slot and builder branch ([11.4](#11-frontend-webv2)), the variant in `MAIN_VARIANTS_BY_BASE` and `MODEL_VARIANT_LABELS`, `SHAPE_OVERRIDES` for both variants.
+
+6. **Unsupported releases.** Refuse a recognized checkpoint you do not support with `InvalidMatchError` and a pointer to the one you do.
+
+7. **Existing adapters.** LoRAs and control adapters address blocks by name, and names carry the block index. A depth expansion that inserts blocks between the original ones shifts every index after the first insertion, so an adapter trained on the original loads and runs against the wrong blocks. A remap needs the insertion positions, and model cards rarely list them, but the weights do. Compare each block of the expanded checkpoint with the original's: a block that was not trained further is bit-identical to its source, and one trained further still has a cosine similarity near 1 to it, while an inserted copy stays far lower. Record the measured table next to the architecture (Anima: `invokeai/backend/anima/block_layout.py`), apply it where the adapter binds, and say in the user guide which results to expect.
+</Steps>
+
+:::tip[Checklist: Extending an architecture]{icon="approve-check"}
+- [ ] Decided: weights only, loader detection, variant or new base
+- [ ] Structural hyperparameters read from the checkpoint, tested against a real-captured key fixture
+- [ ] Variant: required field, detection, migration with a test, `VariantFacet`, defaults per variant
+- [ ] Optional node inputs, variant check with a clear error in the model loader
+- [ ] Per-variant slot and graph branch, variant labels, `SHAPE_OVERRIDES`
+- [ ] `InvalidMatchError` for recognized but unsupported releases
+- [ ] Adapter compatibility documented
+:::
 
 ---
 

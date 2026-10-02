@@ -28,6 +28,11 @@ const DEFAULT_SHAPES: readonly ModelShape[] = [
 
 /** Check per-base shape overrides against supported bases. */
 export const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly ModelShape[]>> = {
+  // Anima ships single files only; Anima-3.8B's variant adds a second encoder.
+  anima: [
+    { label: 'qwen3', overrides: { format: 'checkpoint', variant: 'anima_qwen3' } },
+    { label: 'qwen35', overrides: { format: 'checkpoint', variant: 'anima_qwen35' } },
+  ],
   // Ideogram's standalone fixture is a conditional checkpoint, not GGUF.
   'ideogram-4': [
     { label: 'diffusers', overrides: { format: 'diffusers' } },
@@ -58,6 +63,7 @@ const CANDIDATE_VARIANTS = [
   'ministral3_3b',
   'qwen3_vl_4b',
   'qwen3_vl_8b',
+  'qwen3_5_4b',
 ] as const;
 /** Ideogram 4's two transformer branches; every other main leaves the field unset. */
 const CANDIDATE_BRANCHES = [undefined, 'conditional', 'unconditional'] as const;

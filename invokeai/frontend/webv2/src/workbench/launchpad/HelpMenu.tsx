@@ -1,7 +1,7 @@
 import type { ElementType } from 'react';
 
 import { chakra, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { APP_VERSION } from '@platform/runtime/appMetadata';
+import { APP_VERSION, DOCS_URL } from '@platform/runtime/appMetadata';
 import { Button } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { DiscordIcon, GithubIcon } from '@platform/ui/VendoredIcon';
@@ -22,7 +22,7 @@ interface HelpLink {
 
 const GUIDES: HelpLink[] = [
   {
-    href: 'https://invoke-ai.github.io/InvokeAI/',
+    href: DOCS_URL,
     icon: BookOpenTextIcon,
     labelKey: 'launchpad.help.documentation',
     value: 'documentation',

@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 893586,
+        "brotliBytes": 783834,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 892942,
-        "imageRawBytes": 156376,
-        "initialRawBytes": 2118609,
-        "largestAssetRawBytes": 749035,
+        "gzipBytes": 783016,
+        "imageRawBytes": 44398,
+        "initialRawBytes": 2012114,
+        "largestAssetRawBytes": 749225,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 93082,
+        "ownedRawBytes": 94155,
         "requestCount": 36,
         "scriptRequestCount": 20,
         "sourceOwners": [
@@ -197,6 +197,7 @@
           "source:src/platform/react/useMountEffect.ts",
           "source:src/platform/react/usePreservedScrollOffset.ts",
           "source:src/platform/react/useZodForm.ts",
+          "source:src/platform/runtime/appMetadata.ts",
           "source:src/platform/search/dateTokens.ts",
           "source:src/platform/state/accountLifecycle.ts",
           "source:src/platform/state/externalStore.ts",
@@ -325,7 +326,9 @@
           "source:src/workbench/settings/launchpad.tsx",
           "source:src/workbench/settings/settingsDialogStore.ts",
           "source:src/workbench/settings/settingsSearchShortcut.ts",
-          "source:src/workbench/settings/store.ts"
+          "source:src/workbench/settings/store.ts",
+          "source:src/workbench/shell/useWhatsNew.ts",
+          "source:src/workbench/shell/whatsNewStore.ts"
         ]
       },
       "owner": "app",
@@ -334,15 +337,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1243382,
+        "brotliBytes": 1139046,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1237668,
-        "imageRawBytes": 156376,
-        "initialRawBytes": 3203516,
-        "largestAssetRawBytes": 749035,
+        "gzipBytes": 1132999,
+        "imageRawBytes": 44398,
+        "initialRawBytes": 3111181,
+        "largestAssetRawBytes": 749225,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 144128,
+        "ownedRawBytes": 143824,
         "requestCount": 74,
         "scriptRequestCount": 58,
         "sourceOwners": [
@@ -715,6 +718,7 @@
           "source:src/platform/react/useMountEffect.ts",
           "source:src/platform/react/usePreservedScrollOffset.ts",
           "source:src/platform/react/useZodForm.ts",
+          "source:src/platform/runtime/appMetadata.ts",
           "source:src/platform/search/dateTokens.ts",
           "source:src/platform/state/accountLifecycle.ts",
           "source:src/platform/state/compareAndSwapRollback.ts",
@@ -1000,6 +1004,8 @@
           "source:src/workbench/shell/topbar/useLayoutDrift.ts",
           "source:src/workbench/shell/topbar/useTopbarShortcut.ts",
           "source:src/workbench/shell/useMountedInstanceIds.ts",
+          "source:src/workbench/shell/useWhatsNew.ts",
+          "source:src/workbench/shell/whatsNewStore.ts",
           "source:src/workbench/useNotify.ts",
           "source:src/workbench/useOpenWorkbenchWidget.ts",
           "source:src/workbench/widget-frame/FloatingWidgetLayer.tsx",
@@ -1066,7 +1072,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-09-29",
+  "capturedAt": "2026-10-02",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

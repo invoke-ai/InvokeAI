@@ -94,6 +94,7 @@ class ModelType(str, Enum):
     Qwen3Encoder = "qwen3_encoder"
     QwenVLEncoder = "qwen_vl_encoder"
     Qwen3VLEncoder = "qwen3_vl_encoder"
+    Qwen35Encoder = "qwen3_5_encoder"
     MistralEncoder = "mistral_encoder"
     WanT5Encoder = "wan_t5_encoder"
     Gemma2Encoder = "gemma2_encoder"
@@ -282,6 +283,34 @@ class Qwen3VLVariantType(str, Enum):
     of its layers for a 53248-wide feature vector."""
 
 
+class Qwen35VariantType(str, Enum):
+    """Qwen3.5 text encoder variants, by language-model width.
+
+    A family of its own: Qwen3.5 interleaves Gated DeltaNet linear-attention layers with gated full
+    attention, so its checkpoints share neither architecture nor key layout with `Qwen3VariantType`,
+    even at the same width.
+    """
+
+    Qwen35_4B = "qwen3_5_4b"
+    """Qwen3.5 4B (hidden_size=2560, 32 layers). Anima-3.8B's semantic encoder, read at layers 7/15/23/31."""
+
+
+class AnimaVariantType(str, Enum):
+    """Anima model variants, by how the transformer is conditioned.
+
+    The depth of the DiT (28 blocks for the official release, 40 for Anima-2.9B, 52 for Anima-3.8B)
+    is not a variant: the loader reads it from the checkpoint and nothing else depends on it.
+    """
+
+    Qwen3 = "anima_qwen3"
+    """Conditioned on Qwen3 0.6B through the native LLM adapter. Every release by CircleStone Labs
+    and Anima-2.9B."""
+
+    Qwen35 = "anima_qwen35"
+    """Additionally conditioned on Qwen3.5 4B through a bundled, timestep-aware semantic connector
+    (Anima-3.8B v1.1). Needs both encoders, and the connector runs at every denoising step."""
+
+
 class MiniMaxH3VariantType(str, Enum):
     """MiniMax H3 model variants (task-specific transformer checkpoints sharing every other component)."""
 
@@ -446,6 +475,8 @@ AnyVariant: TypeAlias = Union[
     WanLoRAVariantType,
     Qwen3VariantType,
     Qwen3VLVariantType,
+    Qwen35VariantType,
+    AnimaVariantType,
     Krea2VariantType,
     MiniMaxH3VariantType,
     LTX2VariantType,
@@ -463,6 +494,8 @@ variant_type_adapter = TypeAdapter[
     | WanLoRAVariantType
     | Qwen3VariantType
     | Qwen3VLVariantType
+    | Qwen35VariantType
+    | AnimaVariantType
     | Krea2VariantType
     | MiniMaxH3VariantType
     | LTX2VariantType
@@ -479,6 +512,8 @@ variant_type_adapter = TypeAdapter[
     | WanLoRAVariantType
     | Qwen3VariantType
     | Qwen3VLVariantType
+    | Qwen35VariantType
+    | AnimaVariantType
     | Krea2VariantType
     | MiniMaxH3VariantType
     | LTX2VariantType

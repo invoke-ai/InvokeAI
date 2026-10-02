@@ -31,6 +31,7 @@ import type {
 import {
   getCompatibleDiffusersComponentSource,
   isBundledMainForBase,
+  isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
   isClipVariant,
   isDiffusersMainForBase,
@@ -524,6 +525,7 @@ export const getDefaultGenerateSettings = (model?: GenerateModelConfig): Generat
     qwen3EncoderModel: null,
     qwenVLEncoderModel: null,
     qwen3VLEncoderModel: null,
+    qwen35EncoderModel: null,
     wanT5EncoderModel: null,
     ideogram4UnconditionalModel: null,
     wanLowNoiseModel: null,
@@ -592,6 +594,7 @@ export type GenerateComponentValueKey =
   | 'qwen3EncoderModel'
   | 'qwenVLEncoderModel'
   | 'qwen3VLEncoderModel'
+  | 'qwen35EncoderModel'
   | 'wanT5EncoderModel'
   | 'wanLowNoiseModel'
   | 'ideogram4UnconditionalModel'
@@ -636,6 +639,7 @@ const TYPE_MISTRAL: ModelTaxonomyType[] = ['mistral_encoder'];
 const TYPE_QWEN3: ModelTaxonomyType[] = ['qwen3_encoder'];
 const TYPE_QWEN_VL: ModelTaxonomyType[] = ['qwen_vl_encoder'];
 const TYPE_QWEN3_VL: ModelTaxonomyType[] = ['qwen3_vl_encoder'];
+const TYPE_QWEN35: ModelTaxonomyType[] = ['qwen3_5_encoder'];
 const TYPE_WAN_T5: ModelTaxonomyType[] = ['wan_t5_encoder'];
 const TYPE_PID_DECODER: ModelTaxonomyType[] = ['pid_decoder'];
 const TYPE_GEMMA2: ModelTaxonomyType[] = ['gemma2_encoder'];
@@ -697,6 +701,16 @@ const qwen3VlEncoderSlot = (helpText: string, filter: GenerateComponentFilter): 
     valueKind: 'component',
     helpText,
     filter,
+  });
+
+const qwen35EncoderSlot = (helpText: string): ComponentSlotPolicy =>
+  slot({
+    key: 'qwen35EncoderModel',
+    label: 'Qwen3.5 Encoder',
+    modelTypes: TYPE_QWEN35,
+    valueKind: 'component',
+    helpText,
+    filter: wrapFilter(isAnimaQwen35Encoder),
   });
 
 /** Expose PiD slots before enabling it; Z-Image uses FLUX's decoder. */
@@ -1107,6 +1121,16 @@ const getBaseComponentSectionPolicy = (
           required: () => true,
           missingMessage: 'Generate needs a Qwen3 Encoder for Anima models.',
         },
+        // Anima-3.8B reads a second encoder through its bundled semantic connector; no other Anima does.
+        ...(model.variant === 'anima_qwen35'
+          ? [
+              {
+                ...qwen35EncoderSlot('Anima-3.8B reads Qwen3.5 4B beside Qwen3 0.6B. Required for this model.'),
+                required: () => true,
+                missingMessage: 'Generate needs a Qwen3.5 Encoder for Anima-3.8B.',
+              },
+            ]
+          : []),
         {
           ...vaeSlot(
             'Anima decodes with the 16-channel Wan 2.1 VAE, which may be installed under the Anima, Qwen-Image, or Wan base, so all three are listed. Required for Anima models.',
@@ -1153,6 +1177,7 @@ const getComponentPolicyContext = (model: GenerateModelConfig, settings: Generat
     qwen3EncoderModel: settings.qwen3EncoderModel,
     qwenVLEncoderModel: settings.qwenVLEncoderModel,
     qwen3VLEncoderModel: settings.qwen3VLEncoderModel,
+    qwen35EncoderModel: settings.qwen35EncoderModel,
     wanT5EncoderModel: settings.wanT5EncoderModel,
     wanLowNoiseModel: settings.wanLowNoiseModel,
     ideogram4UnconditionalModel: settings.ideogram4UnconditionalModel,
@@ -1171,6 +1196,7 @@ const COMPONENT_SETTING_LABELS: Record<GenerateComponentValueKey, string> = {
   qwen3EncoderModel: 'Qwen3 Encoder',
   qwenVLEncoderModel: 'Qwen VL Encoder',
   qwen3VLEncoderModel: 'Qwen3-VL Encoder',
+  qwen35EncoderModel: 'Qwen3.5 Encoder',
   wanT5EncoderModel: 'Wan T5 Encoder',
   wanLowNoiseModel: 'Low-noise expert',
   ideogram4UnconditionalModel: 'Transformer (Unconditional)',

@@ -46,6 +46,7 @@ export type ModelTaxonomyType =
   | 'qwen3_encoder'
   | 'qwen_vl_encoder'
   | 'qwen3_vl_encoder'
+  | 'qwen3_5_encoder'
   | 'wan_t5_encoder'
   | 'mistral_encoder'
   | 'gemma2_encoder'
