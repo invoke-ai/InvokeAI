@@ -220,7 +220,9 @@ const renderWindow = async (
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
           <FocusRegionProvider controller={controller}>
-            {showUnavailablePanel ? <MissingWidgetFrame label="Image Map" region="right" /> : null}
+            {showUnavailablePanel ? (
+              <MissingWidgetFrame instanceId="image-map-instance" label="Image Map" region="right" typeId="image-map" />
+            ) : null}
             <FloatingWidgetWindow instanceId="image-map-instance" stackRank={0} state={floatingState} />
           </FocusRegionProvider>
         </ChakraProvider>
@@ -639,7 +641,7 @@ describe('FloatingWidgetWindow focus', () => {
   it('moves focus to the unavailable-widget panel when its floating window docks', async () => {
     windowMocks.useMissingWidget = true;
     const controller = createTestFocusController();
-    // MissingWidgetFrame has no data-hotkey-widget-type-id for the focus resolver to match.
+    // The panel the window docks into stands in for a widget whose view cannot render.
     await renderWindow(state, controller, true);
     const dock = host!.querySelector<HTMLButtonElement>('button[aria-label="Dock to right panel"]')!;
 

@@ -190,15 +190,20 @@ export const WorkbenchShell = () => {
     [placementProject, widgets]
   );
   const handleDragCancel = useCallback(() => setActiveDrag(null), []);
-  // Focus follows each of these: into the window a marker shows, into the region a window docks to, and into a
-  // center that gets its view back when the window is removed.
+  // Focus follows each of these: into the window a marker shows or the region a tab shows in, into the region a
+  // window docks to, and into a center that gets its view back when the window is removed. A tab that collapses
+  // its region shows nothing, and the move gives up.
   const handleSelect = useCallback(
     (region: WidgetBarGroup['region'], instanceId: string) => {
-      if (activateRailPlacement({ instanceId, project: placementProject, region, widgets }) === 'window') {
+      const activated = activateRailPlacement({ instanceId, project: placementProject, region, widgets });
+
+      if (activated === 'window') {
         focusFloating(instanceId);
+      } else if (activated === 'tab') {
+        focusRegion(region, placementProject.widgetInstances[instanceId]?.typeId);
       }
     },
-    [focusFloating, placementProject, widgets]
+    [focusFloating, focusRegion, placementProject, widgets]
   );
   const handleDock = useCallback(
     (instanceId: string) => {
