@@ -6,9 +6,10 @@ from invokeai.backend.architectures.facets.features import FeaturesFacet, Negati
 from invokeai.backend.architectures.facets.latent_space import WAN21_16, LatentSpaceFacet
 from invokeai.backend.architectures.facets.modality import ModalityFacet
 from invokeai.backend.architectures.facets.vae import VaeCompatibility, VaeFacet
+from invokeai.backend.architectures.facets.variant import VariantFacet
 from invokeai.backend.architectures.registry import register
 from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
-from invokeai.backend.model_manager.taxonomy import BaseModelType
+from invokeai.backend.model_manager.taxonomy import AnimaVariantType, BaseModelType, ModelType
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import AnimaConditioningInfo
 
 # Anima uses the Wan 2.1 VAE.
@@ -17,7 +18,14 @@ register(
     LatentSpaceFacet(WAN21_16),
     ConditioningFacet(AnimaConditioningInfo),
     DefaultSettingsFacet(
-        {None: MainModelDefaultSettings(scheduler="euler", steps=35, cfg_scale=4.5, width=1024, height=1024)}
+        {
+            # The author's reference workflow for Anima-3.8B v1.1 samples at CFG 6 for 40 steps; the
+            # model card recommends CFG 4-7 and 28-50 steps.
+            AnimaVariantType.Qwen35: MainModelDefaultSettings(
+                scheduler="euler", steps=40, cfg_scale=6.0, width=1024, height=1024
+            ),
+            None: MainModelDefaultSettings(scheduler="euler", steps=35, cfg_scale=4.5, width=1024, height=1024),
+        }
     ),
     ModalityFacet(frozenset({"txt2img", "img2img", "inpaint", "outpaint"}), metadata_slug="anima"),
     FeaturesFacet(
@@ -48,4 +56,6 @@ register(
             }
         )
     ),
+    # Variant values must be globally unique; see taxonomy.py.
+    VariantFacet({ModelType.Main: AnimaVariantType}),
 )

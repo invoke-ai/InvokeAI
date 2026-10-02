@@ -29,6 +29,7 @@ import {
 } from './baseGenerationPolicies';
 import {
   getCompatibleDiffusersComponentSource,
+  isAnimaQwen35Encoder,
   isAnimaQwen3Encoder,
   isBundledMainForBase,
   isErnieImageMistralEncoder,
@@ -1125,6 +1126,11 @@ const buildAnimaGraph = (
     settings.qwen3EncoderModel && isAnimaQwen3Encoder(settings.qwen3EncoderModel) ? settings.qwen3EncoderModel : null,
     'Qwen3 Encoder'
   );
+  // Anima-3.8B's bundled semantic connector also reads Qwen3.5; no other Anima model does.
+  const qwen35EncoderModel =
+    model.variant === 'anima_qwen35'
+      ? requireComponent(getCompatibleComponent(settings.qwen35EncoderModel, isAnimaQwen35Encoder), 'Qwen3.5 Encoder')
+      : null;
   const graph: BackendGraphContract = { edges: [], id: createId('anima_graph'), nodes: {} };
   const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
   const scheduler = coerceSchedulerForGraph(model, settings.scheduler);
@@ -1134,6 +1140,7 @@ const buildAnimaGraph = (
     id: 'model_loader',
     model,
     qwen3_encoder_model: qwen3EncoderModel,
+    ...(qwen35EncoderModel ? { qwen3_5_encoder_model: qwen35EncoderModel } : {}),
     type: 'anima_model_loader',
     vae_model: vaeModel,
   });
@@ -1162,6 +1169,10 @@ const buildAnimaGraph = (
 
   addEdge(graph, loraSource, 'transformer', denoise, 'transformer');
   addEdge(graph, loraSource, 'qwen3_encoder', posCond, 'qwen3_encoder');
+  if (qwen35EncoderModel) {
+    // Straight from the loader: the LoRA collection loader passes Qwen3.5 through untouched, so it has no output for it.
+    addEdge(graph, modelLoader, 'qwen3_5_encoder', posCond, 'qwen3_5_encoder');
+  }
   addEdge(graph, modelLoader, 'vae', output, 'vae');
   addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
   addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
@@ -1169,6 +1180,9 @@ const buildAnimaGraph = (
 
   if (negCond && negCondCollect) {
     addEdge(graph, loraSource, 'qwen3_encoder', negCond, 'qwen3_encoder');
+    if (qwen35EncoderModel) {
+      addEdge(graph, modelLoader, 'qwen3_5_encoder', negCond, 'qwen3_5_encoder');
+    }
     addEdge(graph, negativePrompt, 'value', negCond, 'prompt');
     addEdge(graph, negCond, 'conditioning', negCondCollect, 'item');
     addEdge(graph, negCondCollect, 'collection', denoise, 'negative_conditioning');
@@ -1178,6 +1192,7 @@ const buildAnimaGraph = (
   addEdge(graph, denoise, 'latents', output, 'latents');
   addMetadata(graph, output, settings, model, 'anima_txt2img', projectSettings, {
     qwen3_encoder: qwen3EncoderModel,
+    ...(qwen35EncoderModel ? { qwen3_5_encoder: qwen35EncoderModel } : {}),
     scheduler,
     vae: vaeModel,
   });

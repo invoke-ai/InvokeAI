@@ -10,6 +10,9 @@ from the module that defines it, the way `sd/ip_adapter.py` and `flux/flux_redux
 """
 
 from invokeai.backend.model_manager.starter_models.anima import (
+    anima_2_9b,
+    anima_2_9b_int8,
+    anima_3_8b,
     anima_base,
     anima_lllite_depth_preview3,
     anima_lllite_inpainting,
@@ -17,6 +20,7 @@ from invokeai.backend.model_manager.starter_models.anima import (
     anima_lllite_pose_preview3,
     anima_lllite_scribble_preview3,
     anima_lllite_sketch,
+    anima_qwen3_5_encoder,
     anima_vae,
 )
 from invokeai.backend.model_manager.starter_models.cogview4 import cogview4
@@ -496,7 +500,11 @@ STARTER_MODELS: list[StarterModel] = [
     alibabacloud_wan26_t2i,
     alibabacloud_qwen_image_edit_max,
     anima_base,
+    anima_2_9b,
+    anima_2_9b_int8,
+    anima_3_8b,
     anima_qwen3_encoder,
+    anima_qwen3_5_encoder,
     anima_vae,
     anima_lllite_inpainting,
     anima_lllite_sketch,

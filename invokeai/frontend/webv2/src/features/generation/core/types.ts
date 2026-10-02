@@ -229,6 +229,8 @@ export interface GenerateSettings {
   qwenVLEncoderModel: ComponentModelConfig | null;
   /** Krea-2's text encoder. Distinct from `qwenVLEncoderModel` (Qwen2.5-VL). */
   qwen3VLEncoderModel: ComponentModelConfig | null;
+  /** Anima-3.8B's second text encoder, read by its bundled semantic connector. */
+  qwen35EncoderModel: ComponentModelConfig | null;
   /** Wan 2.2's UMT5-XXL text encoder. */
   wanT5EncoderModel: ComponentModelConfig | null;
   /** The low-noise expert is optional; the selected expert can span the full schedule. */
