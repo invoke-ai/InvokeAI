@@ -1,8 +1,10 @@
 import type { GalleryImage } from '@features/gallery';
 import type {
   ComponentModelConfig,
+  GenerateLora,
   GenerateModelConfig,
   GenerateWidgetValues,
+  LoraModelConfig,
   MainModelConfig,
   VaeModelConfig,
 } from '@features/generation/contracts';
@@ -21,6 +23,8 @@ import {
   hasArchitectureCapabilities,
   hasModelDefaultVae,
   isKnownScheduler,
+  isLoraCompatibleWithModel,
+  isLoraModelConfig,
   isMainModelConfig,
   isModelIdentifierConfig,
   isVaeCompatibleWithGenerateModel,
@@ -67,11 +71,27 @@ type RecalledField =
   | 'hiDiffusion'
   | 'clipSkip'
   | 'components'
+  | 'loras'
   | 'referenceImages'
   | 'krea2Rebalance';
 
+export type ImageRecallSkipReason =
+  | 'ambiguous'
+  | 'duplicate'
+  | 'incompatible'
+  | 'invalid'
+  | 'modelUnavailable'
+  | 'unresolved';
+
+/** A recorded concept recall could not restore; `name` is the best label the record or catalog offers. */
+export interface ImageRecallSkip {
+  name: string | null;
+  reason: ImageRecallSkipReason;
+}
+
 export interface ImageRecallResult {
   fields: RecalledField[];
+  skipped: ImageRecallSkip[];
   values: GenerateWidgetValues;
 }
 
@@ -476,6 +496,133 @@ const getComponentPatch = (
 const hasComponentModels = (metadata: unknown, models: readonly ComponentModelConfig[]): boolean =>
   Object.keys(getComponentPatch(metadata, models)).length > 0;
 
+/** A recorded `ModelIdentifierField` — `{ key, hash, name, base }` — with every field optional on read. */
+interface RecordedModelRef {
+  base: string | null;
+  hash: string | null;
+  key: string | null;
+  name: string | null;
+}
+
+const toRecordedModelRef = (value: unknown): RecordedModelRef | null => {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const ref = {
+    base: getString(value, 'base'),
+    hash: getString(value, 'hash'),
+    key: getString(value, 'key'),
+    name: getString(value, 'name'),
+  };
+
+  return ref.key || ref.hash || (ref.name && ref.base) ? ref : null;
+};
+
+/**
+ * Resolve the install-local key first, then a portable identifier: the content hash when one was recorded, otherwise
+ * name and base. A recorded hash never falls back to a same-named file, and a portable identifier counts only when
+ * exactly one installed LoRA matches it.
+ */
+const resolveRecordedLora = (
+  ref: RecordedModelRef,
+  loraModels: readonly LoraModelConfig[]
+): LoraModelConfig | 'ambiguous' | null => {
+  const byKey = ref.key ? loraModels.find((model) => model.key === ref.key) : undefined;
+
+  if (byKey) {
+    return byKey;
+  }
+
+  const matches = ref.hash
+    ? loraModels.filter((model) => model.hash === ref.hash)
+    : ref.name && ref.base
+      ? loraModels.filter((model) => model.name === ref.name && model.base === ref.base)
+      : [];
+
+  return matches.length > 1 ? 'ambiguous' : (matches[0] ?? null);
+};
+
+/**
+ * Generation graphs stamp `generation_mode` and omit `loras` when no concept was active, so on such a record a
+ * missing list means "none". Other records that name a model, such as canvas saves, never record concepts.
+ */
+const isGenerationRecord = (metadata: unknown): boolean => getString(metadata, 'generation_mode') !== null;
+
+interface ConceptRecall {
+  /** The concept list to apply, or null when the metadata says nothing reliable about concepts. */
+  loras: GenerateLora[] | null;
+  skipped: ImageRecallSkip[];
+}
+
+/**
+ * Concepts the image was generated with, resolved against installed LoRAs that fit `model`, the model recall settles
+ * on. `sourceModel` is the recorded main model as resolved from the installed catalog. The metadata lists only the
+ * LoRAs that ran, so every restored concept is enabled at its recorded weight.
+ */
+const getMetadataConcepts = (
+  metadata: unknown,
+  models: readonly ComponentModelConfig[],
+  model: GenerateModelConfig,
+  sourceModel: GenerateModelConfig | null
+): ConceptRecall => {
+  const recorded = isRecord(metadata) ? metadata.loras : undefined;
+
+  // Matching keys alone are not enough: persisted settings can still name a model that is no longer installed.
+  if (getRecord(metadata, 'model') && sourceModel?.key !== model.key) {
+    // Concepts belong to the model they ran on. Without it the current set stays, rather than being judged against
+    // a model recall did not choose.
+    const entries = Array.isArray(recorded) ? recorded : [];
+
+    return {
+      loras: null,
+      skipped: entries.map((entry) => ({
+        name: toRecordedModelRef(getRecord(entry, 'model') ?? getRecord(entry, 'lora'))?.name ?? null,
+        reason: 'modelUnavailable',
+      })),
+    };
+  }
+
+  if (recorded === undefined || recorded === null) {
+    return { loras: isGenerationRecord(metadata) ? [] : null, skipped: [] };
+  }
+
+  if (!Array.isArray(recorded)) {
+    return { loras: null, skipped: [{ name: null, reason: 'invalid' }] };
+  }
+
+  const loraModels = models.filter(isLoraModelConfig);
+  const loras: GenerateLora[] = [];
+  const skipped: ImageRecallSkip[] = [];
+
+  for (const entry of recorded) {
+    // Records from before LoRA identifiers were `ModelIdentifierField`s name the LoRA under `lora`.
+    const ref = toRecordedModelRef(getRecord(entry, 'model') ?? getRecord(entry, 'lora'));
+    const weight = getNumber(entry, 'weight');
+    const recordedName = ref?.name ?? null;
+
+    if (!ref || weight === null) {
+      skipped.push({ name: recordedName, reason: 'invalid' });
+      continue;
+    }
+
+    const installed = resolveRecordedLora(ref, loraModels);
+
+    if (installed === null || installed === 'ambiguous') {
+      skipped.push({ name: recordedName, reason: installed === 'ambiguous' ? 'ambiguous' : 'unresolved' });
+    } else if (!isLoraCompatibleWithModel(installed, model)) {
+      skipped.push({ name: installed.name, reason: 'incompatible' });
+    } else if (loras.some((lora) => lora.model.key === installed.key)) {
+      skipped.push({ name: installed.name, reason: 'duplicate' });
+    } else {
+      // Kept exactly: graphs and model defaults accept weights beyond the panel's typed range, which bounds only edits.
+      loras.push({ isEnabled: true, model: installed, weight });
+    }
+  }
+
+  return { loras, skipped };
+};
+
 export const getMetadataReferenceImages = (metadata: unknown) => {
   if (!isRecord(metadata)) {
     return [];
@@ -561,6 +708,8 @@ export const getImageRecallCapabilities = ({
   const hasReferenceImages = getMetadataReferenceImages(metadata).length > 0;
   const hasModel = supportedMetadataModel !== null;
   const hasRebalance = hasKrea2Rebalance(metadata, clipSkipModel);
+  const hasConcepts =
+    (getMetadataConcepts(metadata, models, clipSkipModel, supportedMetadataModel).loras?.length ?? 0) > 0;
   const hasAnyMetadata =
     hasModel ||
     hasVae ||
@@ -572,6 +721,7 @@ export const getImageRecallCapabilities = ({
     hasClipSkip ||
     hasComponents ||
     hasReferenceImages ||
+    hasConcepts ||
     hasRebalance;
   const hasNonSeedMetadata =
     hasModel ||
@@ -583,6 +733,7 @@ export const getImageRecallCapabilities = ({
     hasClipSkip ||
     hasComponents ||
     hasReferenceImages ||
+    hasConcepts ||
     hasRebalance;
 
   return {
@@ -618,6 +769,7 @@ export const buildImageRecallSettings = ({
   }
 
   const fields: RecalledField[] = [];
+  const skipped: ImageRecallSkip[] = [];
   let values: GenerateWidgetValues = cloneGenerateWidgetValues(currentValues);
 
   if (kind === 'all' || kind === 'remix') {
@@ -669,6 +821,16 @@ export const buildImageRecallSettings = ({
     // Judged after the transition, which can complete or undo a recorded pick.
     if (recordedSettings.some((setting) => values[setting]?.key !== currentValues[setting]?.key)) {
       fields.push('components');
+    }
+
+    // Judged against the model the transition settled on; the recorded concepts replace the list it left.
+    const concepts = getMetadataConcepts(metadata, models, values.model, model);
+
+    skipped.push(...concepts.skipped);
+
+    if (concepts.loras && (concepts.loras.length > 0 || currentValues.loras.length > 0)) {
+      values = { ...values, loras: concepts.loras };
+      fields.push('loras');
     }
 
     // Recalled reference images must fit the effective model — when the
@@ -769,7 +931,7 @@ export const buildImageRecallSettings = ({
     }
   }
 
-  return fields.length > 0 ? { fields, values } : null;
+  return fields.length > 0 || skipped.length > 0 ? { fields, skipped, values } : null;
 };
 
 export const getImageRecallTitle = (kind: ImageRecallKind): string => {
@@ -791,3 +953,18 @@ export const getImageRecallTitle = (kind: ImageRecallKind): string => {
 
 export const getImageRecallMessage = (fields: RecalledField[]): string =>
   `${fields.length} field${fields.length === 1 ? '' : 's'} applied to Generate.`;
+
+const SKIP_REASON_LABELS: Record<ImageRecallSkipReason, string> = {
+  ambiguous: 'matches more than one installed model',
+  duplicate: 'listed more than once',
+  incompatible: 'incompatible with the selected model',
+  invalid: 'unreadable metadata',
+  modelUnavailable: "the image's model is not available",
+  unresolved: 'not installed',
+};
+
+/** One line naming every recorded concept recall left out and why. */
+export const getImageRecallSkipMessage = (skipped: readonly ImageRecallSkip[]): string =>
+  `Concepts not restored: ${skipped
+    .map(({ name, reason }) => `${name ?? 'unnamed concept'} (${SKIP_REASON_LABELS[reason]})`)
+    .join('; ')}.`;

@@ -2,6 +2,7 @@ import type { GalleryImage } from '@features/gallery';
 import type {
   ComponentModelConfig,
   GenerateWidgetValues,
+  LoraModelConfig,
   MainModelConfig,
   VaeModelConfig,
 } from '@features/generation/contracts';
@@ -14,7 +15,11 @@ import {
   architectureCapabilitiesFixture,
   seedArchitectureCapabilities,
 } from '@features/generation/core/architectureCapabilities.testing';
-import { fullyFilledSettingsFor, generateGraphCases } from '@features/generation/core/graphCoverage.testing';
+import {
+  fullyFilledSettingsFor,
+  generateGraphCases,
+  satisfiedSettingsFor,
+} from '@features/generation/core/graphCoverage.testing';
 import { compileGenerateGraph } from '@features/generation/graph';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
@@ -66,6 +71,23 @@ const qwenVLEncoder: ComponentModelConfig = {
   name: 'Qwen VL',
   type: 'qwen_vl_encoder',
 };
+
+const inkLora: LoraModelConfig = { base: 'sdxl', hash: 'blake3:ink', key: 'ink-lora', name: 'Ink', type: 'lora' };
+const grainLora: LoraModelConfig = {
+  base: 'sdxl',
+  hash: 'blake3:grain',
+  key: 'grain-lora',
+  name: 'Grain',
+  type: 'lora',
+};
+const staleLora: LoraModelConfig = { base: 'sdxl', key: 'stale-lora', name: 'Stale', type: 'lora' };
+const sd1Lora: LoraModelConfig = { base: 'sd-1', key: 'sd1-lora', name: 'Pixel', type: 'lora' };
+
+/** A recorded `ModelIdentifierField`, as the generation graph writes it. */
+const recordedLora = (lora: LoraModelConfig, weight: number) => ({
+  model: { base: lora.base, hash: lora.hash, key: lora.key, name: lora.name, type: lora.type },
+  weight,
+});
 
 const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWidgetValues => ({
   aspectRatioId: '1:1',
@@ -787,6 +809,286 @@ describe('image recall', () => {
     expect(result?.values.qwen3EncoderModel).toBeNull();
     expect(result?.values.qwenVLEncoderModel).toBeNull();
     expect(result?.fields).toContain('components');
+  });
+
+  describe('concepts', () => {
+    const loraMetadata = {
+      loras: [recordedLora(grainLora, 0.35), recordedLora(inkLora, 1.4)],
+      model: { key: sdxlModel.key },
+      positive_prompt: 'ink and grain',
+      steps: 30,
+    };
+    const recallConcepts = (
+      kind: ImageRecallKind,
+      recordedMetadata: unknown,
+      overrides: Partial<GenerateWidgetValues> = {},
+      models: ComponentModelConfig[] = [sdxlModel, inkLora, grainLora, staleLora, sd1Lora]
+    ) =>
+      buildImageRecallSettings({
+        currentValues: createValues({ loras: [{ isEnabled: true, model: staleLora, weight: 0.9 }], ...overrides }),
+        image,
+        kind,
+        metadata: recordedMetadata,
+        models,
+        supportedModels: models.filter((model): model is MainModelConfig => model.type === 'main'),
+        vaeModels: [],
+      });
+
+    it.each(['all', 'remix'] as const)('%s replaces the selected concepts with the recorded ones', (kind) => {
+      const result = recallConcepts(kind, loraMetadata);
+
+      expect(result?.values.loras).toEqual([
+        { isEnabled: true, model: grainLora, weight: 0.35 },
+        { isEnabled: true, model: inkLora, weight: 1.4 },
+      ]);
+      expect(result?.fields).toContain('loras');
+      expect(result?.skipped).toEqual([]);
+    });
+
+    it('clears stale concepts when a generation record lists none', () => {
+      const result = recallConcepts('all', {
+        generation_mode: 'sdxl_txt2img',
+        model: { key: sdxlModel.key },
+        steps: 30,
+      });
+
+      expect(result?.values.loras).toEqual([]);
+      expect(result?.fields).toContain('loras');
+    });
+
+    it('keeps the selected concepts for a canvas save, which names a model but never records concepts', () => {
+      const result = recallConcepts('all', {
+        height: 1024,
+        model: { base: 'sdxl', key: sdxlModel.key, name: sdxlModel.name, type: 'main' },
+        positive_prompt: 'saved from canvas',
+        seed: 9,
+        width: 1024,
+      });
+
+      expect(result?.values.loras).toEqual([{ isEnabled: true, model: staleLora, weight: 0.9 }]);
+      expect(result?.fields).not.toContain('loras');
+    });
+
+    it('keeps the selected concepts and reports the recorded ones when the image model is not installed', () => {
+      const result = recallConcepts('all', {
+        ...loraMetadata,
+        generation_mode: 'sdxl_txt2img',
+        model: { base: 'sdxl', key: 'uninstalled-model', name: 'Gone', type: 'main' },
+      });
+
+      expect(result?.values.loras).toEqual([{ isEnabled: true, model: staleLora, weight: 0.9 }]);
+      expect(result?.fields).not.toContain('loras');
+      expect(result?.skipped).toEqual([
+        { name: 'Grain', reason: 'modelUnavailable' },
+        { name: 'Ink', reason: 'modelUnavailable' },
+      ]);
+    });
+
+    it('keeps the selected concepts when the image model is the uninstalled one the panel still names', () => {
+      const uninstalled: MainModelConfig = { base: 'sdxl', key: 'uninstalled-model', name: 'Gone', type: 'main' };
+      const result = recallConcepts(
+        'all',
+        { generation_mode: 'sdxl_txt2img', model: { key: uninstalled.key }, positive_prompt: 'from the old model' },
+        { model: uninstalled, modelKey: uninstalled.key }
+      );
+
+      expect(result?.values.loras).toEqual([{ isEnabled: true, model: staleLora, weight: 0.9 }]);
+      expect(result?.fields).not.toContain('loras');
+    });
+
+    it('restores weights beyond the panel input range exactly', () => {
+      const result = recallConcepts('all', {
+        loras: [recordedLora(inkLora, 12), recordedLora(grainLora, -10.5)],
+        model: { key: sdxlModel.key },
+      });
+
+      expect(result?.values.loras.map((lora) => lora.weight)).toEqual([12, -10.5]);
+      expect(result?.skipped).toEqual([]);
+    });
+
+    it('restores concepts from records that name the LoRA under `lora`', () => {
+      const result = recallConcepts('remix', {
+        loras: [{ lora: { key: inkLora.key }, weight: 0.45 }],
+        model: { key: sdxlModel.key },
+      });
+
+      expect(result?.values.loras).toEqual([{ isEnabled: true, model: inkLora, weight: 0.45 }]);
+    });
+
+    it('keeps the selected concepts when the metadata does not record a generation', () => {
+      const result = recallConcepts('remix', { positive_prompt: 'prompt only' });
+
+      expect(result?.values.loras).toEqual([{ isEnabled: true, model: staleLora, weight: 0.9 }]);
+      expect(result?.fields).not.toContain('loras');
+    });
+
+    it.each(['prompts', 'seed', 'dimensions'] as const)('%s recall leaves the selected concepts alone', (kind) => {
+      const result = recallConcepts(kind, { ...loraMetadata, seed: 7 });
+
+      expect(result?.values.loras).toEqual([{ isEnabled: true, model: staleLora, weight: 0.9 }]);
+      expect(result?.fields).not.toContain('loras');
+      expect(result?.skipped).toEqual([]);
+    });
+
+    it('restores zero and negative weights as recorded, enabled', () => {
+      const result = recallConcepts('all', {
+        loras: [recordedLora(inkLora, 0), recordedLora(grainLora, -0.75)],
+        model: { key: sdxlModel.key },
+      });
+
+      expect(result?.values.loras).toEqual([
+        { isEnabled: true, model: inkLora, weight: 0 },
+        { isEnabled: true, model: grainLora, weight: -0.75 },
+      ]);
+    });
+
+    it('skips missing, incompatible, malformed, and duplicate entries and reports each', () => {
+      const result = recallConcepts('all', {
+        loras: [
+          recordedLora(inkLora, 0.5),
+          { model: { base: 'sdxl', key: 'deleted-lora', name: 'Deleted', type: 'lora' }, weight: 1 },
+          recordedLora(sd1Lora, 0.8),
+          { model: { key: grainLora.key } },
+          'not an entry',
+          recordedLora(inkLora, 0.9),
+        ],
+        model: { key: sdxlModel.key },
+      });
+
+      expect(result?.values.loras).toEqual([{ isEnabled: true, model: inkLora, weight: 0.5 }]);
+      expect(result?.skipped).toEqual([
+        { name: 'Deleted', reason: 'unresolved' },
+        { name: 'Pixel', reason: 'incompatible' },
+        { name: null, reason: 'invalid' },
+        { name: null, reason: 'invalid' },
+        { name: 'Ink', reason: 'duplicate' },
+      ]);
+    });
+
+    it('keeps the selected concepts and reports a concept list it cannot read', () => {
+      const result = recallConcepts('all', { loras: 'ink', model: { key: sdxlModel.key }, steps: 20 });
+
+      expect(result?.values.loras).toEqual([{ isEnabled: true, model: staleLora, weight: 0.9 }]);
+      expect(result?.skipped).toEqual([{ name: null, reason: 'invalid' }]);
+      expect(result?.fields).toContain('steps');
+    });
+
+    it('judges compatibility against the recalled model, not the one it replaces', () => {
+      const result = recallConcepts(
+        'all',
+        {
+          loras: [recordedLora(sd1Lora, 0.6), recordedLora(inkLora, 0.4)],
+          model: { key: sd1Model.key },
+        },
+        {},
+        [sd1Model, sdxlModel, sd1Lora, inkLora, staleLora]
+      );
+
+      expect(result?.values.model).toEqual(sd1Model);
+      expect(result?.values.loras).toEqual([{ isEnabled: true, model: sd1Lora, weight: 0.6 }]);
+      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'incompatible' }]);
+    });
+
+    it('resolves a reinstalled LoRA by its content hash, or by name and base when no hash was recorded', () => {
+      const reinstalledInk = { ...inkLora, key: 'reinstalled-ink' };
+      const result = recallConcepts(
+        'all',
+        {
+          loras: [
+            { model: { ...recordedLora(inkLora, 1).model, key: 'old-ink-key' }, weight: 0.3 },
+            { model: { base: 'sdxl', key: 'old-grain-key', name: 'Grain', type: 'lora' }, weight: 0.7 },
+          ],
+          model: { key: sdxlModel.key },
+        },
+        {},
+        [sdxlModel, reinstalledInk, grainLora]
+      );
+
+      expect(result?.values.loras).toEqual([
+        { isEnabled: true, model: reinstalledInk, weight: 0.3 },
+        { isEnabled: true, model: grainLora, weight: 0.7 },
+      ]);
+    });
+
+    it('does not pick between installed LoRAs a portable identifier matches equally', () => {
+      const result = recallConcepts(
+        'all',
+        {
+          loras: [{ model: { ...recordedLora(inkLora, 1).model, key: 'old-ink-key' }, weight: 1 }],
+          model: { key: sdxlModel.key },
+        },
+        {},
+        [sdxlModel, { ...inkLora, key: 'ink-copy-1' }, { ...inkLora, key: 'ink-copy-2' }]
+      );
+
+      expect(result?.values.loras).toEqual([]);
+      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'ambiguous' }]);
+    });
+
+    it('does not substitute a same-named LoRA whose content differs from the recorded hash', () => {
+      const result = recallConcepts(
+        'all',
+        {
+          loras: [{ model: { ...recordedLora(inkLora, 1).model, key: 'old-ink-key' }, weight: 1 }],
+          model: { key: sdxlModel.key },
+        },
+        {},
+        [sdxlModel, { ...inkLora, hash: 'blake3:retrained', key: 'retrained-ink' }]
+      );
+
+      expect(result?.skipped).toEqual([{ name: 'Ink', reason: 'unresolved' }]);
+    });
+
+    it('offers Recall All and Remix for metadata that records only concepts it can restore', () => {
+      const capabilitiesFor = (models: ComponentModelConfig[]) =>
+        getImageRecallCapabilities({
+          currentValues: createValues(),
+          image,
+          metadata: { loras: [recordedLora(inkLora, 0.5)] },
+          models,
+          supportedModels: [],
+          vaeModels: [],
+        });
+
+      expect(capabilitiesFor([inkLora])).toMatchObject({ all: true, remix: true });
+      expect(capabilitiesFor([sd1Lora])).toMatchObject({ all: false, remix: false });
+    });
+
+    it('submits the restored concepts at their recorded weights', () => {
+      const { model, settings } = satisfiedSettingsFor('sdxl', {
+        label: 'diffusers',
+        overrides: { format: 'diffusers' },
+      });
+      const generatedWith = {
+        ...settings,
+        loras: [
+          { isEnabled: true, model: grainLora, weight: -0.4 },
+          { isEnabled: false, model: staleLora, weight: 1 },
+          { isEnabled: true, model: inkLora, weight: 1.25 },
+        ],
+      };
+      const loraWeights = (backendGraph: { nodes: Record<string, Record<string, unknown>> }) =>
+        Object.values(backendGraph.nodes)
+          .filter((node) => node.type === 'lora_selector')
+          .map((node) => [(node.lora as { key: string }).key, node.weight]);
+      const generated = compileGenerateGraph(generatedWith, model, 'gallery', { useCpuNoise: true }).backendGraph;
+      const result = buildImageRecallSettings({
+        currentValues: createValues({ loras: [{ isEnabled: true, model: staleLora, weight: 0.9 }], model: sd1Model }),
+        image,
+        kind: 'all',
+        metadata: Object.values(generated.nodes).find((node) => node.type === 'core_metadata'),
+        models: [model, inkLora, grainLora, staleLora],
+        supportedModels: [model],
+        vaeModels: [],
+      });
+      const recalled = compileGenerateGraph(result!.values, result!.values.model, 'gallery', { useCpuNoise: true });
+
+      expect(loraWeights(recalled.backendGraph)).toEqual([
+        [grainLora.key, -0.4],
+        [inkLora.key, 1.25],
+      ]);
+      expect(loraWeights(recalled.backendGraph)).toEqual(loraWeights(generated));
+    });
   });
 
   describe('krea-2 conditioning rebalance', () => {

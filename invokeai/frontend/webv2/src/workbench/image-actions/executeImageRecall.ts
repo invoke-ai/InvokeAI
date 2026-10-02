@@ -30,6 +30,7 @@ import {
 import {
   buildImageRecallSettings,
   getImageRecallMessage,
+  getImageRecallSkipMessage,
   getImageRecallTitle,
   isImageRecallKindAvailable,
   type ImageRecallKind,
@@ -276,10 +277,12 @@ export const executeImageRecall = async ({
       }
     }
 
+    const skipMessage = result.skipped.length > 0 ? getImageRecallSkipMessage(result.skipped) : null;
+
     if (result.fields.length === 0) {
       commands.notifications.add({
         kind: 'info',
-        message: 'This image does not include supported Generate metadata.',
+        message: skipMessage ?? 'This image does not include supported Generate metadata.',
         title: 'No recallable image data',
       });
       return false;
@@ -291,6 +294,9 @@ export const executeImageRecall = async ({
       message: getImageRecallMessage(result.fields),
       title: getImageRecallTitle(kind),
     });
+    if (skipMessage) {
+      commands.notifications.add({ kind: 'info', message: skipMessage, title: 'Some image data was not recalled' });
+    }
     return true;
   } catch (error: unknown) {
     if (!isAccountScopeCurrent(owner)) {

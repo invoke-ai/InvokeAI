@@ -118,6 +118,35 @@ describe('generate graph coverage', () => {
     );
   });
 
+  // An image's metadata is what recall restores, so it must name exactly the LoRAs that reached inference.
+  it.each(generateGraphCases)('$label records only the concepts its graph loads', ({ base, shape }) => {
+    const { model, settings } = satisfiedSettingsFor(base, shape);
+    const lora = (key: string) => ({ base, key, name: key, type: 'lora' as const });
+    const { backendGraph } = compileGenerateGraph(
+      {
+        ...settings,
+        loras: [
+          { isEnabled: true, model: lora('first'), weight: 0.4 },
+          { isEnabled: false, model: lora('disabled'), weight: 1 },
+          { isEnabled: true, model: lora('second'), weight: -0.8 },
+        ],
+      },
+      model,
+      'gallery',
+      { useCpuNoise: true }
+    );
+    const nodes = Object.values(backendGraph.nodes);
+    const loaded = nodes
+      .filter((node) => node.type === 'lora_selector')
+      .map((node) => [(node.lora as { key: string }).key, node.weight]);
+    const recorded = (nodes.find((node) => node.type === 'core_metadata')?.loras ?? []) as {
+      model: { key: string };
+      weight: number;
+    }[];
+
+    expect(recorded.map((entry) => [entry.model.key, entry.weight])).toEqual(loaded);
+  });
+
   it('emits the node types and fields the backend has to provide', async () => {
     const byBase: Record<string, { componentsFilled: Record<string, string[]>; nodeTypes: string[] }> = {};
     const fields: Record<

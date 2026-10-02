@@ -100,6 +100,72 @@ describe('executeImageRecall', () => {
     expect(add).toHaveBeenCalledWith(expect.objectContaining({ kind: 'success', title: 'Recalled remix settings' }));
   });
 
+  it.each([
+    { label: 'restores every recorded concept', recorded: ['ink-lora'], skipNotice: false },
+    { label: 'reports concepts it could not restore', recorded: ['ink-lora', 'deleted-lora'], skipNotice: true },
+  ])('$label', async ({ recorded, skipNotice }) => {
+    const { add, commands, setSettings } = createCommands();
+    const inkLora = { base: 'sdxl', key: 'ink-lora', name: 'Ink', type: 'lora' } as ModelConfig;
+
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      loras: recorded.map((key) => ({ model: { base: 'sdxl', key, name: key, type: 'lora' }, weight: 0.6 })),
+      model: { key: model.key },
+    });
+
+    await expect(
+      executeImageRecall({
+        t,
+        commands,
+        generateValues: { modelKey: model.key },
+        image: { ...image, imageName: `concepts-${recorded.length}.png` },
+        kind: 'all',
+        models: [model, inkLora],
+        projectId: 'project-1',
+      })
+    ).resolves.toBe(true);
+
+    expect(setSettings).toHaveBeenCalledWith(
+      expect.objectContaining({ loras: [{ isEnabled: true, model: inkLora, weight: 0.6 }] }),
+      'project-1'
+    );
+    expect(add).toHaveBeenCalledWith(expect.objectContaining({ kind: 'success', title: 'Recalled image metadata' }));
+    expect(add).toHaveBeenCalledTimes(skipNotice ? 2 : 1);
+    if (skipNotice) {
+      expect(add).toHaveBeenCalledWith({
+        kind: 'info',
+        message: 'Concepts not restored: deleted-lora (not installed).',
+        title: 'Some image data was not recalled',
+      });
+    }
+  });
+
+  it('explains why nothing was recalled when no recorded concept can be restored', async () => {
+    const { add, commands, setSettings } = createCommands();
+
+    galleryApi.galleryImages.metadata.mockResolvedValue({
+      loras: [{ model: { base: 'sdxl', key: 'deleted-lora', name: 'Deleted', type: 'lora' }, weight: 1 }],
+    });
+
+    await expect(
+      executeImageRecall({
+        t,
+        commands,
+        generateValues: { modelKey: model.key },
+        image: { ...image, imageName: 'unrestorable-concepts.png' },
+        kind: 'remix',
+        models: [model],
+        projectId: 'project-1',
+      })
+    ).resolves.toBe(false);
+
+    expect(setSettings).not.toHaveBeenCalled();
+    expect(add).toHaveBeenCalledWith({
+      kind: 'info',
+      message: 'Concepts not restored: Deleted (not installed).',
+      title: 'No recallable image data',
+    });
+  });
+
   it('persists no remix until model capabilities load, and says why', async () => {
     const { add, commands, setSettings } = createCommands();
     // Initialised while the table is present, so only the recall itself is gated.
