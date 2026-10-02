@@ -20,6 +20,7 @@ import {
   BoxIcon,
   ChevronDownIcon,
   FolderIcon,
+  HouseIcon,
   ListOrderedIcon,
   SearchIcon,
   SettingsIcon,
@@ -42,6 +43,9 @@ export const AppMenu = () => {
   const openWorkbenchWidget = useOpenWorkbenchWidget();
   const queuedCount = useActiveProjectSelector((project) => getQueueSummary(project.queue.items).total);
 
+  const openHome = useCallback(() => {
+    void navigate({ to: '/' });
+  }, [navigate]);
   const openProjects = useCallback(() => {
     void navigate({ to: '/projects' });
   }, [navigate]);
@@ -75,6 +79,11 @@ export const AppMenu = () => {
                 v{APP_VERSION}
               </Text>
             </HStack>
+            <Menu.Separator />
+            <Menu.Item value="home" onClick={openHome}>
+              <Icon as={HouseIcon} boxSize="3.5" />
+              <Menu.ItemText>{t('launchpad.sections.home')}</Menu.ItemText>
+            </Menu.Item>
             <Menu.Separator />
             <Menu.ItemGroup>
               <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
