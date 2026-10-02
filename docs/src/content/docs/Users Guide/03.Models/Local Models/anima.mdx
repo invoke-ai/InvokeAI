@@ -70,6 +70,9 @@ iterations per second at 832×1216 on an RTX 4090), and its Qwen3.5 encoder adds
 is encoded. **Reset all to model defaults** sets 40 steps at CFG 6, the settings of the author's reference
 workflow.
 
+[FP8 Storage](/configuration/optimization/fp8-storage/) changes Anima-3.8B's images more than Anima's: at
+the same seed the composition can change, where Anima keeps it and only details differ.
+
 Only the v1.1 checkpoint of Anima-3.8B is supported. The earlier v1.0 transformer needs a separate adapter
 file and is refused at install with a message that says so.
 
@@ -80,7 +83,7 @@ LoRAs and ControlNet-LLLite adapters address the transformer's blocks by positio
 insert their extra blocks between the original ones. Invoke moves an adapter trained on Anima to the
 blocks the finetune kept from Anima, and one trained on Anima-2.9B to its blocks in Anima-3.8B.
 Anima-2.9B keeps Anima's blocks unchanged, so Anima adapters work there as on Anima itself.
-Anima-3.8B trained most of them further, so expect weaker or different results there.
+Anima-3.8B changed them slightly and adds the semantic connector, so results there can differ more.
 :::
 
 ## Generation settings

@@ -1049,14 +1049,12 @@ class AnimaTransformer(MiniTrainDIT):
             from invokeai.backend.anima.semantic_connector import AnimaSemanticConnector
 
             # Named as in the Anima-3.8B bundle (`net.anima_v2_connector.*`), so its keys load as-is.
+            # FP8 Storage casts all of it. Keeping its timestep path (`time_mlp`, `time_modulation`, 159M
+            # params) in bf16 by analogy with `t_embedder` was measured and changes nothing: 30 steps, three
+            # seeds, PSNR against bf16 8.4/10.3/9.6 dB with that exception and 8.4/10.2/9.6 dB without, and
+            # 8.3/10.1/9.6 dB with the whole connector in bf16. FP8 Storage moves Anima-3.8B's composition
+            # through the DiT blocks, not the connector; Anima base stays at 14-16 dB.
             self.anima_v2_connector = AnimaSemanticConnector(semantic_connector)
-            # The resampler's timestep path plays the role `t_embedder` plays for the DiT: its output
-            # modulates every resampler block. Kept out of FP8 Storage on that analogy -- unmeasured.
-            # Declared on the instance so a model without the connector does not carry dead patterns.
-            self._skip_layerwise_casting_patterns = [
-                *type(self)._skip_layerwise_casting_patterns,
-                r"^anima_v2_connector\.semantic_resampler\.(time_mlp|blocks\.\d+\.time_modulation)",
-            ]
 
     @property
     def has_semantic_connector(self) -> bool:

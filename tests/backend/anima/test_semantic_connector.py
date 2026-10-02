@@ -85,26 +85,22 @@ def test_transformer_built_from_the_bundle_takes_every_key() -> None:
     assert result.missing_keys == []
 
 
-def test_only_a_transformer_with_the_connector_declares_its_skip_pattern() -> None:
+def test_fp8_storage_casts_the_whole_connector() -> None:
+    """No connector module is kept out of FP8 Storage: keeping its timestep path in bf16 was measured to change
+    nothing (see `AnimaTransformer.__init__`), so a model with the connector declares the same patterns as one
+    without."""
     with accelerate.init_empty_weights():
-        plain = AnimaTransformer(**ANIMA_TRANSFORMER_CONFIG)
         expanded = AnimaTransformer(**ANIMA_TRANSFORMER_CONFIG, semantic_connector=AnimaSemanticConnectorConfig())
-    assert not plain.has_semantic_connector
-    assert plain._skip_layerwise_casting_patterns is AnimaTransformer._skip_layerwise_casting_patterns
-    skipped = {
+    assert expanded.has_semantic_connector
+    assert expanded._skip_layerwise_casting_patterns is AnimaTransformer._skip_layerwise_casting_patterns
+    kept = [
         name
         for name, module in expanded.named_modules()
-        if isinstance(module, torch.nn.Linear)
-        and any(
-            re.search(p, name)
-            for p in expanded._skip_layerwise_casting_patterns[len(plain._skip_layerwise_casting_patterns) :]
-        )
-    }
-    assert skipped == {
-        "anima_v2_connector.semantic_resampler.time_mlp.0",
-        "anima_v2_connector.semantic_resampler.time_mlp.2",
-        *(f"anima_v2_connector.semantic_resampler.blocks.{i}.time_modulation" for i in range(6)),
-    }
+        if name.startswith("anima_v2_connector.")
+        and isinstance(module, torch.nn.Linear)
+        and any(re.search(p, name) for p in expanded._skip_layerwise_casting_patterns)
+    ]
+    assert kept == []
 
 
 class TestMaskedSdpa:
