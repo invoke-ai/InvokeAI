@@ -644,7 +644,7 @@ export const FloatingWidgetWindow = ({
           gap="1.5"
           // Tighter than a docked panel's header: a window's chrome should take as little of it as it can. The
           // end padding keeps the Dock button clear of the top-right resize corner, which reaches 12px inside.
-          h={10}
+          h={8}
           pe="3"
           ps="3"
           tabIndex={isMaximized ? undefined : 0}
