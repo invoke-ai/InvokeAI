@@ -412,7 +412,7 @@ describe('geometry, mode, and stacking actions', () => {
     state = workbenchReducer(state, { instanceId: 'queue', type: 'floatWidget' });
 
     for (const instanceId of ['gallery', 'queue', 'gallery', 'queue', 'gallery']) {
-      state = workbenchReducer(state, { instanceId, type: 'focusFloatingWidget' });
+      state = workbenchReducer(state, { instanceId, type: 'raiseFloatingWidget' });
     }
 
     const floating = getActiveProject(state).floatingWidgets;
@@ -430,11 +430,11 @@ describe('geometry, mode, and stacking actions', () => {
     let state = floatGallery();
     state = workbenchReducer(state, { instanceId: 'queue', type: 'floatWidget' });
 
-    state = workbenchReducer(state, { instanceId: 'gallery', type: 'focusFloatingWidget' });
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'raiseFloatingWidget' });
     const floating = getActiveProject(state).floatingWidgets;
     expect(floating?.gallery.stackOrder).toBeGreaterThan(floating?.queue.stackOrder ?? 0);
 
-    expect(workbenchReducer(state, { instanceId: 'gallery', type: 'focusFloatingWidget' })).toBe(state);
+    expect(workbenchReducer(state, { instanceId: 'gallery', type: 'raiseFloatingWidget' })).toBe(state);
   });
 });
 
@@ -563,7 +563,7 @@ describe('rail order around floating markers', () => {
       y: 300,
     });
     state = workbenchReducer(state, { instanceId: 'image-map', mode: 'shaded', type: 'setFloatingWidgetMode' });
-    state = workbenchReducer(state, { instanceId: 'image-map', type: 'focusFloatingWidget' });
+    state = workbenchReducer(state, { instanceId: 'image-map', type: 'raiseFloatingWidget' });
 
     // The shell's selector equality: an equal projection keeps its previous snapshot, so the rails do not render.
     expect(areWidgetPlacementProjectsEqual(placement, getWidgetPlacementProject(getActiveProject(state)))).toBe(true);

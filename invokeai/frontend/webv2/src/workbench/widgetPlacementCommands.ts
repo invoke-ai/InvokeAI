@@ -227,8 +227,8 @@ export const dockFloatingPlacement = ({
 
 /**
  * Close a floating window outright — never dock-then-toggle, which would pop its panel open and retarget the route
- * on the way. Reports whether the reducer hands an emptied center its view back, so focus can follow it there
- * instead of dying with the window.
+ * on the way. Reports where the window would have returned and whether the reducer hands an emptied center its
+ * view back, so focus can go somewhere instead of dying with the window.
  */
 export const removeFloatingPlacement = ({
   instanceId,
@@ -238,8 +238,10 @@ export const removeFloatingPlacement = ({
   project: WidgetPlacementProject;
   instanceId: WidgetInstanceId;
   widgets: WorkbenchWidgetCommands;
-}): { restoresCenter: boolean } | null => {
-  if (!project.floatingPlacements?.[instanceId]) {
+}): { restoresCenter: boolean; returnRegion: WidgetRegion } | null => {
+  const placement = project.floatingPlacements?.[instanceId];
+
+  if (!placement) {
     return null;
   }
 
@@ -248,7 +250,7 @@ export const removeFloatingPlacement = ({
   flushWorkbenchDrafts();
   widgets.closeFloating(instanceId);
 
-  return { restoresCenter };
+  return { restoresCenter, returnRegion: placement.returnRegion };
 };
 
 export const dispatchWidgetDragEndPlacement = ({

@@ -72,7 +72,7 @@ const createWidgetCommands = (dispatch: (action: WorkbenchAction) => void): Work
   dockFloating: (instanceId) => dispatch({ instanceId, type: 'dockFloatingWidget' }),
   closeFloating: (instanceId) => dispatch({ instanceId, type: 'closeFloatingWidget' }),
   float: (instanceId) => dispatch({ instanceId, type: 'floatWidget' }),
-  focusFloating: (instanceId) => dispatch({ instanceId, type: 'focusFloatingWidget' }),
+  raiseFloating: (instanceId) => dispatch({ instanceId, type: 'raiseFloatingWidget' }),
   move: (options) => dispatch({ ...options, type: 'moveWidgetInstance' }),
   setAlignment: (options) => dispatch({ ...options, type: 'setWidgetInstanceAlignment' }),
   open: (options) => dispatch({ ...options, type: 'openRegionWidget' }),
@@ -338,7 +338,7 @@ describe('floating window rail commands', () => {
       removeFloatingPlacement({ instanceId: 'preview', project: placement, widgets })
     );
 
-    expect(result).toEqual({ restoresCenter: true });
+    expect(result).toEqual({ restoresCenter: true, returnRegion: 'right' });
     expect(project.floatingWidgets).toBeUndefined();
     expect(project.widgetRegions.center.instanceIds).toEqual(['preview']);
   });
@@ -349,7 +349,7 @@ describe('floating window rail commands', () => {
       removeFloatingPlacement({ instanceId: 'image-map', project: placement, widgets })
     );
 
-    expect(result).toEqual({ restoresCenter: false });
+    expect(result).toEqual({ restoresCenter: false, returnRegion: 'right' });
     expect(project.floatingWidgets).toBeUndefined();
     expect(project.widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
   });

@@ -4,7 +4,7 @@ import type { WidgetInstanceId } from '@workbench/widgetContracts';
 import type { FocusEvent, PointerEvent, ReactNode } from 'react';
 
 import { captureAccountScope, isAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
-import { createContext, use, useCallback, useState, useSyncExternalStore } from 'react';
+import { createContext, use, useCallback, useSyncExternalStore } from 'react';
 
 import { useWorkbenchPreferenceSelector } from './settings/store';
 
@@ -19,23 +19,36 @@ export type WorkbenchFocusTarget =
  * set under.
  */
 export interface WorkbenchFocusController {
-  /** Record what the user focused. Returns false for an event from a project that is no longer on screen. */
-  activate(target: WorkbenchFocusTarget, projectId?: string): boolean;
+  /**
+   * Record what the user focused: `'activated'` when the target changed, `'unchanged'` when it already held
+   * focus, `'refused'` for an event from a project that is no longer on screen. A pointer press on anything but a
+   * pending focus move's destination also abandons that move: the user went somewhere else on purpose.
+   */
+  activate(target: WorkbenchFocusTarget, options?: { byPointer?: boolean; projectId?: string }): FocusActivation;
   /** Forget the target and abandon any focus move still waiting for its widget to show. */
   clear(): void;
   /** Move keyboard focus into a floating window once it shows; focus arriving there activates it. */
   focusFloating(instanceId: WidgetInstanceId): void;
   /** Move keyboard focus into the region a control just opened a widget in, once that widget shows. */
   focusRegion(region: WidgetRegion, typeId: string): void;
-  /** The focus target, or null once the project or account it was set under is no longer the current one. */
+  /** The focus target, or null once it no longer describes something on screen in this project and account. */
   getTarget(): WorkbenchFocusTarget | null;
   subscribe(listener: () => void): () => void;
 }
 
-/** A lazy widget mounts within a few frames of opening; stop looking after about half a second. */
-const FOCUS_MOVE_FRAME_BUDGET = 30;
-/** Frames to keep the move after it lands: a closing menu or dialog hands focus back to its trigger on the way out. */
-const FOCUS_MOVE_SETTLE_FRAMES = 30;
+export type FocusActivation = 'activated' | 'refused' | 'unchanged';
+
+/** What the controller has to know about the workbench to keep its target honest. */
+export interface WorkbenchFocusScope {
+  getProjectId(): string;
+  /** Whether the instance floats in the project on screen; a window that docked or closed holds no focus. */
+  isFloating(instanceId: WidgetInstanceId): boolean;
+}
+
+/** How long a focus move waits for its widget to show: a lazy widget, or the window chunk, has to load first. */
+const FOCUS_MOVE_WAIT_MS = 1000;
+/** How long the move holds after it lands: a closing menu or dialog hands focus back to its trigger on the way out. */
+const FOCUS_MOVE_SETTLE_MS = 500;
 
 const isSameTarget = (left: WorkbenchFocusTarget | null, right: WorkbenchFocusTarget): boolean =>
   left !== null &&
@@ -43,33 +56,47 @@ const isSameTarget = (left: WorkbenchFocusTarget | null, right: WorkbenchFocusTa
     ? right.kind === 'region' && left.region === right.region
     : right.kind === 'floating' && left.instanceId === right.instanceId);
 
-export const createWorkbenchFocusController = (getProjectId: () => string): WorkbenchFocusController => {
+export const createWorkbenchFocusController = ({
+  getProjectId,
+  isFloating,
+}: WorkbenchFocusScope): WorkbenchFocusController => {
   let entry: { owner: AccountScope; projectId: string; target: WorkbenchFocusTarget } | null = null;
   // Only the latest move runs: a control that opens two widgets means the second one.
   let focusMove = 0;
+  let moveTarget: WorkbenchFocusTarget | null = null;
   const listeners = new Set<() => void>();
   const notify = () => {
     for (const listener of listeners) {
       listener();
     }
   };
+  // The one place a target is judged. The owner clears eagerly on project and account changes, which is what
+  // notifies subscribers and stops moves; this read-time check covers the instant between such a change and that
+  // clear, and a window that docked or closed without anything else taking focus.
   const getTarget = (): WorkbenchFocusTarget | null =>
-    entry && entry.projectId === getProjectId() && isAccountScopeCurrent(entry.owner) ? entry.target : null;
+    entry &&
+    entry.projectId === getProjectId() &&
+    isAccountScopeCurrent(entry.owner) &&
+    (entry.target.kind === 'region' || isFloating(entry.target.instanceId))
+      ? entry.target
+      : null;
 
   /**
-   * Leaves focus alone when it is already inside the container, and gives up if the container never shows or the
-   * project or account changes first.
+   * Leaves focus alone when it is already inside the container, and gives up if the container never shows, the
+   * project or account changes first, or the user presses somewhere else.
    */
-  const moveFocus = (findContainer: () => HTMLElement | null): void => {
+  const moveFocus = (target: WorkbenchFocusTarget, findContainer: () => HTMLElement | null): void => {
     // The control that asked, where a closing menu or dialog would put focus back.
     const opener = document.activeElement;
     const move = ++focusMove;
     const projectId = getProjectId();
     const owner = captureAccountScope();
     const isCurrent = () => move === focusMove && projectId === getProjectId() && isAccountScopeCurrent(owner);
-    let frames = 0;
+    const deadline = performance.now() + FOCUS_MOVE_WAIT_MS;
 
-    const settle = (container: HTMLElement, remaining: number) => {
+    moveTarget = target;
+
+    const settle = (container: HTMLElement, until: number) => {
       if (!isCurrent() || !container.isConnected) {
         return;
       }
@@ -79,8 +106,8 @@ export const createWorkbenchFocusController = (getProjectId: () => string): Work
       if (!container.contains(active) && (active === opener || active === document.body || active === null)) {
         container.focus({ preventScroll: true });
       }
-      if (remaining > 0) {
-        requestAnimationFrame(() => settle(container, remaining - 1));
+      if (performance.now() < until) {
+        requestAnimationFrame(() => settle(container, until));
       }
     };
 
@@ -96,13 +123,12 @@ export const createWorkbenchFocusController = (getProjectId: () => string): Work
           if (!container.hasAttribute('tabindex')) {
             container.tabIndex = -1;
           }
-          settle(container, FOCUS_MOVE_SETTLE_FRAMES);
+          settle(container, performance.now() + FOCUS_MOVE_SETTLE_MS);
         }
         return;
       }
 
-      frames += 1;
-      if (frames < FOCUS_MOVE_FRAME_BUDGET) {
+      if (performance.now() < deadline) {
         requestAnimationFrame(attempt);
       }
     };
@@ -111,27 +137,37 @@ export const createWorkbenchFocusController = (getProjectId: () => string): Work
   };
 
   return {
-    activate: (target, projectId = getProjectId()) => {
+    activate: (target, { byPointer = false, projectId = getProjectId() } = {}) => {
       if (projectId !== getProjectId()) {
-        return false;
+        return 'refused';
       }
-      if (!isSameTarget(getTarget(), target)) {
-        entry = { owner: captureAccountScope(), projectId, target };
-        notify();
+      if (byPointer && !isSameTarget(moveTarget, target)) {
+        focusMove += 1;
+        moveTarget = null;
       }
-      return true;
+      if (isSameTarget(getTarget(), target)) {
+        return 'unchanged';
+      }
+
+      entry = { owner: captureAccountScope(), projectId, target };
+      notify();
+
+      return 'activated';
     },
     clear: () => {
       focusMove += 1;
+      moveTarget = null;
       if (entry) {
         entry = null;
         notify();
       }
     },
     focusFloating: (instanceId) =>
-      moveFocus(() => document.querySelector<HTMLElement>(`[data-floating-window="${CSS.escape(instanceId)}"]`)),
+      moveFocus({ instanceId, kind: 'floating' }, () =>
+        document.querySelector<HTMLElement>(`[data-floating-window="${CSS.escape(instanceId)}"]`)
+      ),
     focusRegion: (region, typeId) =>
-      moveFocus(() => {
+      moveFocus({ kind: 'region', region }, () => {
         // A side region keeps the panels it showed before mounted but hidden, each in its own region frame; only
         // the frame on screen can take focus.
         for (const container of document.querySelectorAll<HTMLElement>(`[data-focus-region="${region}"]`)) {
@@ -182,60 +218,63 @@ const HIGHLIGHT_STYLES = {
   right: regionHighlight('0 -1px 0 0'),
 } satisfies Record<WidgetRegion, unknown>;
 
-/**
- * Provides workbench focus to everything below it. The workbench passes the controller it owns (see
- * `WorkbenchFocusProvider`); without one the provider keeps its own, which is all an isolated subtree needs.
- */
+/** Provides the workbench's focus controller (see `WorkbenchFocusProvider`) to everything below it. */
 export const FocusRegionProvider = ({
   children,
   controller,
 }: {
   children: ReactNode;
-  controller?: WorkbenchFocusController;
-}) => {
-  const [ownController] = useState(() => controller ?? createWorkbenchFocusController(() => ''));
+  controller: WorkbenchFocusController;
+}) => <FocusRegionContext value={controller}>{children}</FocusRegionContext>;
 
-  return <FocusRegionContext value={controller ?? ownController}>{children}</FocusRegionContext>;
-};
-
-const NO_FOCUS_TARGET = (): null => null;
 const subscribeToNothing = (): (() => void) => () => {};
 
-const useFocusTarget = (): WorkbenchFocusTarget | null => {
+/**
+ * Subscribe to one fact about the focus target. `select` returns a primitive, so a component re-renders only
+ * when its own answer changes — not every window and region on every activation.
+ */
+const useFocusSelector = <Selected extends string | boolean | null>(
+  select: (target: WorkbenchFocusTarget | null) => Selected
+): Selected => {
   const controller = use(FocusRegionContext);
+  const getSnapshot = () => select(controller?.getTarget() ?? null);
 
-  return useSyncExternalStore(
-    controller?.subscribe ?? subscribeToNothing,
-    controller?.getTarget ?? NO_FOCUS_TARGET,
-    controller?.getTarget ?? NO_FOCUS_TARGET
-  );
+  return useSyncExternalStore(controller?.subscribe ?? subscribeToNothing, getSnapshot, getSnapshot);
 };
 
 const useShowsFocusHighlight = (): boolean =>
   useWorkbenchPreferenceSelector((preferences) => preferences.showFocusRegionHighlight);
 
-const NO_FOCUS_MOVES: Pick<WorkbenchFocusController, 'focusFloating' | 'focusRegion' | 'getTarget'> = {
-  focusFloating: () => {},
-  focusRegion: () => {},
-  getTarget: NO_FOCUS_TARGET,
-};
+type WorkbenchFocusMoves = Pick<WorkbenchFocusController, 'focusFloating' | 'focusRegion'>;
+
+const NO_FOCUS_MOVES: WorkbenchFocusMoves = { focusFloating: () => {}, focusRegion: () => {} };
 
 /**
- * Focus moves and the current target, for controls that open, float, or dock a widget and for the hotkey runtime.
- * Outside a provider there is nothing to move focus between, so the moves do nothing.
+ * Focus moves for controls that open, float, or dock a widget. Some of those controls also render outside the
+ * workbench shell, where there is nothing to move focus between and the moves do nothing.
  */
-export const useWorkbenchFocus = (): Pick<WorkbenchFocusController, 'focusFloating' | 'focusRegion' | 'getTarget'> =>
-  use(FocusRegionContext) ?? NO_FOCUS_MOVES;
+export const useWorkbenchFocus = (): WorkbenchFocusMoves => use(FocusRegionContext) ?? NO_FOCUS_MOVES;
+
+/** Reads the focus target at call time, for the hotkey runtime. It has no meaning outside the provider. */
+export const useWorkbenchFocusTarget = (): (() => WorkbenchFocusTarget | null) => {
+  const controller = use(FocusRegionContext);
+
+  if (!controller) {
+    throw new Error('useWorkbenchFocusTarget must be used within a FocusRegionProvider.');
+  }
+
+  return controller.getTarget;
+};
 
 /**
  * The region whose outline is showing, if any. Borders the outline is drawn over hide while it shows, so a shared
  * edge draws one line at any display scale. No region is outlined while a floating window holds focus.
  */
 export const useHighlightedRegion = (): WidgetRegion | null => {
-  const target = useFocusTarget();
+  const region = useFocusSelector((target) => (target?.kind === 'region' ? target.region : null));
   const showsHighlight = useShowsFocusHighlight();
 
-  return showsHighlight && target?.kind === 'region' ? target.region : null;
+  return showsHighlight ? region : null;
 };
 
 export const useFocusRegionProps = (region: WidgetRegion) => {
@@ -246,38 +285,53 @@ export const useFocusRegionProps = (region: WidgetRegion) => {
   }
 
   const isHighlighted = useHighlightedRegion() === region;
-  const activate = () => controller.activate({ kind: 'region', region });
 
   return {
     css: HIGHLIGHT_STYLES[region],
     'data-focus-region': region,
     'data-highlighted': isHighlighted,
-    onFocusCapture: (_event: FocusEvent<HTMLElement>) => activate(),
-    onPointerDownCapture: (_event: PointerEvent<HTMLElement>) => activate(),
+    onFocusCapture: (_event: FocusEvent<HTMLElement>) => {
+      controller.activate({ kind: 'region', region });
+    },
+    onPointerDownCapture: (event: PointerEvent<HTMLElement>) => {
+      const container = event.currentTarget;
+
+      controller.activate({ kind: 'region', region }, { byPointer: true });
+      // A press that takes no focus of its own — a resize handle, the canvas — would leave the keys in a floating
+      // window while this region shows as focused. Pull focus out of the window; a focusable target then takes
+      // it as usual.
+      if (
+        document.activeElement?.closest('[data-floating-window]') &&
+        event.target instanceof Node &&
+        container.contains(event.target)
+      ) {
+        if (!container.hasAttribute('tabindex')) {
+          container.tabIndex = -1;
+        }
+        container.focus({ preventScroll: true });
+      }
+    },
     position: 'relative' as const,
   };
 };
 
 /**
  * Focus for one floating window. Pointer-down and keyboard focus activate it — hover does not — and `activate`
- * reports whether the window still belongs to the project on screen, so a late event cannot raise a stale one.
+ * reports what happened: a window whose project has left the screen is refused, so a late event cannot raise a
+ * stale one.
  */
 export const useFloatingWindowFocus = (
   instanceId: WidgetInstanceId,
   projectId: string
-): { activate: () => boolean; isActive: boolean; isHighlighted: boolean } => {
+): { activate: (options?: { byPointer?: boolean }) => FocusActivation; isHighlighted: boolean } => {
   const controller = use(FocusRegionContext);
-  const target = useFocusTarget();
+  const isActive = useFocusSelector((target) => target?.kind === 'floating' && target.instanceId === instanceId);
   const showsHighlight = useShowsFocusHighlight();
-  const isActive = target?.kind === 'floating' && target.instanceId === instanceId;
   const activate = useCallback(
-    () => controller?.activate({ instanceId, kind: 'floating' }, projectId) ?? true,
+    ({ byPointer }: { byPointer?: boolean } = {}) =>
+      controller?.activate({ instanceId, kind: 'floating' }, { byPointer, projectId }) ?? 'activated',
     [controller, instanceId, projectId]
   );
 
-  return {
-    activate,
-    isActive,
-    isHighlighted: isActive && showsHighlight,
-  };
+  return { activate, isHighlighted: isActive && showsHighlight };
 };

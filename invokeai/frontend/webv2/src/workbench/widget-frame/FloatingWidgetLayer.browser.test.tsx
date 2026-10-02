@@ -15,6 +15,7 @@ const layerMocks = vi.hoisted(() => ({
 
 vi.mock('@workbench/WorkbenchContext', () => ({
   shallowEqual: Object.is,
+  useActiveProjectId: () => layerMocks.project.id,
   useActiveProjectSelector: (selector: (project: typeof layerMocks.project) => unknown) => selector(layerMocks.project),
 }));
 
@@ -95,5 +96,18 @@ describe('FloatingWidgetLayer', () => {
     ]);
     expect(host!.querySelector('[data-window="queue"]')).toBe(queue);
     expect(document.activeElement).toBe(queue);
+  });
+
+  it('mounts a fresh host when another project floats an instance with the same id', async () => {
+    await render({ gallery: windowState(1) });
+    const first = host!.querySelector('[data-window="gallery"]');
+
+    // Instance ids repeat across projects; nothing of the old window — a gesture, its widget's state — may carry
+    // over.
+    layerMocks.project = { ...layerMocks.project, id: 'project-2' };
+    await render({ gallery: windowState(1) });
+
+    expect(host!.querySelector('[data-window="gallery"]')).not.toBe(first);
+    expect(first?.isConnected).toBe(false);
   });
 });

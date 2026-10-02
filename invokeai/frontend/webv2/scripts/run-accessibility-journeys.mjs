@@ -972,6 +972,38 @@ const runFloatingWindowJourney = async (browser) => {
     await waitForSettledDocument(page);
     await assertNoAxeViolations(page, `${id}:floating`);
 
+    // The window is operable from the keyboard: the one labelled grip resizes it, and the title bar moves it.
+    const width = async () => Math.round((await floatingWindow.boundingBox()).width);
+    const left = async () => Math.round((await floatingWindow.boundingBox()).x);
+    const windowedWidth = await width();
+    await floatingWindow.getByRole('separator', { exact: true, name: 'Resize window' }).focus();
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(
+      ([selector, expected]) => Math.round(document.querySelector(selector).getBoundingClientRect().width) === expected,
+      ['[data-hotkey-widget-region="floating"]', windowedWidth + 16]
+    );
+    const windowedLeft = await left();
+    await floatingWindow.getByLabel('Move Preview window', { exact: true }).focus();
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(
+      ([selector, expected]) => Math.round(document.querySelector(selector).getBoundingClientRect().left) === expected,
+      ['[data-hotkey-widget-region="floating"]', windowedLeft + 16]
+    );
+
+    // Maximize and collapse are explicit, labelled controls; each state is scanned.
+    await floatingWindow.getByRole('button', { exact: true, name: 'Maximize' }).click();
+    await floatingWindow.getByRole('button', { exact: true, name: 'Restore' }).waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:maximized`);
+    await floatingWindow.getByRole('button', { exact: true, name: 'Restore' }).click();
+    assert.equal(await width(), windowedWidth + 16, 'Restore must return to the windowed size.');
+    await floatingWindow.getByRole('button', { exact: true, name: 'Collapse' }).click();
+    await floatingWindow.getByRole('button', { exact: true, name: 'Expand' }).waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:collapsed`);
+    await floatingWindow.getByRole('button', { exact: true, name: 'Expand' }).click();
+    await floatingWindow.getByRole('button', { exact: true, name: 'Collapse' }).waitFor();
+
     // The marker is a keyboard stop, and it shows the window rather than docking it.
     await marker.focus();
     await page.keyboard.press('Enter');
@@ -1001,6 +1033,16 @@ const runFloatingWindowJourney = async (browser) => {
     await floatingWindow.waitFor();
     await waitForActiveWindow();
     await floatingWindow.getByRole('button', { exact: true, name: 'Dock to right panel' }).click();
+    await floatingWindow.waitFor({ state: 'detached' });
+    await waitForFocusedRegion('right');
+
+    // The rail's own dock path: the marker's menu, reached from the keyboard, with focus following the panel.
+    await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
+    await floatingWindow.waitFor();
+    await waitForActiveWindow();
+    await marker.focus();
+    await page.keyboard.press('Shift+F10');
+    await page.getByRole('menuitem', { exact: true, name: 'Dock to right panel' }).click();
     await floatingWindow.waitFor({ state: 'detached' });
     await waitForFocusedRegion('right');
     await waitForSettledDocument(page);

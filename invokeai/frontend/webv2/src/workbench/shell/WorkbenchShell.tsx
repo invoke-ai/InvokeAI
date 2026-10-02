@@ -212,10 +212,21 @@ export const WorkbenchShell = () => {
   );
   const closeFloating = useCallback(
     (instanceId: string) => {
-      const typeId = placementProject.widgetInstances[instanceId]?.typeId;
+      const { widgetInstances, widgetRegions } = placementProject;
+      const removed = removeFloatingPlacement({ instanceId, project: placementProject, widgets });
 
-      if (removeFloatingPlacement({ instanceId, project: placementProject, widgets })?.restoresCenter && typeId) {
-        focusRegion('center', typeId);
+      if (!removed) {
+        return;
+      }
+
+      // The menu that asked and the marker it hung from are both gone. Focus goes to the center when it gets its
+      // view back, otherwise to whatever the window's own rail is showing.
+      const region = removed.restoresCenter ? 'center' : removed.returnRegion;
+      const shownInstanceId = removed.restoresCenter ? instanceId : widgetRegions[region].activeInstanceId;
+      const typeId = widgetInstances[shownInstanceId]?.typeId;
+
+      if (typeId) {
+        focusRegion(region, typeId);
       }
     },
     [focusRegion, placementProject, widgets]

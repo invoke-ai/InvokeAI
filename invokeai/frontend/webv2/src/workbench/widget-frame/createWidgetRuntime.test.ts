@@ -58,7 +58,7 @@ const createDispatch = () => {
     closeFloating: (instanceId) => dispatch({ instanceId, type: 'closeFloatingWidget' }),
     float: (instanceId, region) =>
       dispatch(region ? { instanceId, region, type: 'floatWidget' } : { instanceId, type: 'floatWidget' }),
-    focusFloating: (instanceId) => dispatch({ instanceId, type: 'focusFloatingWidget' }),
+    raiseFloating: (instanceId) => dispatch({ instanceId, type: 'raiseFloatingWidget' }),
     move: (options) => dispatch({ ...options, type: 'moveWidgetInstance' }),
     setAlignment: (options) => dispatch({ ...options, type: 'setWidgetInstanceAlignment' }),
     open: (options) => dispatch({ ...options, type: 'openRegionWidget' }),

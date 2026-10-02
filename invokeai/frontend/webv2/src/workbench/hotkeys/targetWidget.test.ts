@@ -82,17 +82,31 @@ describe('resolveHotkeyTarget', () => {
   });
 
   it('prefers the widget under the event target over whatever holds focus', () => {
-    const target = resolveHotkeyTarget({
-      focusTarget: { instanceId: 'map', kind: 'floating' },
-      project,
-      targetWidget: { instanceId: 'canvas', region: 'center', typeId: 'canvas' },
-    });
-
-    expect(target).toMatchObject({
+    // Focus was last recorded on a window, but the press landed in the center: the press decides both the widget
+    // and the region.
+    expect(
+      resolveHotkeyTarget({
+        focusTarget: { instanceId: 'map', kind: 'floating' },
+        project,
+        targetWidget: { instanceId: 'canvas', region: 'center', typeId: 'canvas' },
+      })
+    ).toEqual({
       activeInstanceId: 'canvas',
       activeWidgetTypeId: 'canvas',
-      source: { instanceId: 'canvas', region: 'center' },
+      focusedRegion: 'center',
+      source: { instanceId: 'canvas', projectId: 'project-1', region: 'center', typeId: 'canvas' },
     });
+  });
+
+  it('keeps the focused region when the press lands in a popover or dialog a widget opened', () => {
+    const target = resolveHotkeyTarget({
+      focusTarget: { kind: 'region', region: 'right' },
+      project,
+      targetWidget: { instanceId: 'gallery', region: 'popover', typeId: 'gallery' },
+    });
+
+    expect(target.focusedRegion).toBe('right');
+    expect(target.source?.region).toBe('popover');
   });
 
   it('gives a key press inside a floating window a floating source', () => {
@@ -111,10 +125,23 @@ describe('resolveHotkeyTarget', () => {
     });
   });
 
-  it('ignores a floating focus whose instance no longer floats in this project', () => {
+  it('does not aim at a view that floated out of the focused region, even though the region still points at it', () => {
+    // The center emptied when its last view floated; it keeps naming that view so docking can bring it back.
+    const emptied: WidgetPlacementProject = {
+      ...project,
+      widgetRegions: { ...project.widgetRegions, center: region('map', []) },
+    };
+
+    // The view answers as a window. As "the center's widget" it would get a `center` source, and the commands it
+    // registered under `floating` would not be found while the key was still swallowed.
     expect(
-      resolveHotkeyTarget({ focusTarget: { instanceId: 'gallery', kind: 'floating' }, project, targetWidget: null })
-    ).toEqual({ activeInstanceId: null, activeWidgetTypeId: null, focusedRegion: null, source: null });
+      resolveHotkeyTarget({ focusTarget: { kind: 'region', region: 'center' }, project: emptied, targetWidget: null })
+    ).toEqual({
+      activeInstanceId: null,
+      activeWidgetTypeId: null,
+      focusedRegion: 'center',
+      source: null,
+    });
   });
 
   it('has no widget target for a focused region that is empty, or when nothing holds focus', () => {

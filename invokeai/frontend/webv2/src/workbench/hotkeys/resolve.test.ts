@@ -140,6 +140,8 @@ describe('resolveHotkey', () => {
     const global = hotkey('global', { kind: 'global' });
     const anyRegion = hotkey('any-region', { kind: 'focused-region' });
     const rightOnly = hotkey('right-only', { kind: 'focused-region', region: 'right' });
+    const thisWindow = hotkey('this-window', { floatingInstanceId: 'map-1', kind: 'focused-region' });
+    const otherWindow = hotkey('other-window', { floatingInstanceId: 'map-2', kind: 'focused-region' });
     const widget = hotkey('widget', { kind: 'widget', typeId: 'image-map' });
     const instance = hotkey('instance', { instanceId: 'map-1', kind: 'instance' });
     const resolve = (hotkeys: RegisteredHotkey[]) =>
@@ -151,6 +153,11 @@ describe('resolveHotkey', () => {
     expect(resolve([global, rightOnly, anyRegion, widget])).toBe('widget');
     expect(resolve([global, rightOnly, anyRegion, widget, instance])).toBe('instance');
     expect(resolve([rightOnly])).toBeUndefined();
+    // A floating widget's own focused-region shortcut follows its window, at focused-region priority: above
+    // global, below a widget-scoped binding on the same key, exactly as when it is docked.
+    expect(resolve([global, otherWindow, thisWindow])).toBe('this-window');
+    expect(resolve([global, otherWindow])).toBe('global');
+    expect(resolve([thisWindow, widget])).toBe('widget');
     // Modal suppression is unchanged by where focus is.
     expect(
       resolveHotkey({

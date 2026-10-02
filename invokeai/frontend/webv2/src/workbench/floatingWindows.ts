@@ -19,7 +19,7 @@ export const FLOATING_MIN_WIDTH_PX = 280;
 export const FLOATING_MIN_HEIGHT_PX = 200;
 
 /** Minimum sliver of a window that must stay reachable inside the viewport. */
-const VIEWPORT_MARGIN_PX = 48;
+export const FLOATING_VIEWPORT_MARGIN_PX = 48;
 const CASCADE_ORIGIN_PX = 96;
 const CASCADE_STEP_PX = 32;
 const CASCADE_WRAP = 8;
@@ -54,16 +54,85 @@ export const clampSizeToMinimum = (geometry: FloatingGeometry): FloatingGeometry
 
 /**
  * Keep at least a grabbable corner of the window inside the viewport so a
- * drag (or a shrunk browser window) can never strand it off-screen.
+ * drag (or a shrunk browser window) can never strand it off-screen. The window is never shown wider than the
+ * viewport, so that displayed width — not a larger stored one — is what has to stay reachable.
  */
 export const clampWindowToViewport = (
   geometry: FloatingGeometry,
   viewport: { width: number; height: number }
 ): FloatingGeometry => ({
   ...geometry,
-  x: Math.min(Math.max(geometry.x, VIEWPORT_MARGIN_PX - geometry.widthPx), viewport.width - VIEWPORT_MARGIN_PX),
-  y: Math.min(Math.max(geometry.y, 0), Math.max(0, viewport.height - VIEWPORT_MARGIN_PX)),
+  x: Math.min(
+    Math.max(geometry.x, FLOATING_VIEWPORT_MARGIN_PX - Math.min(geometry.widthPx, viewport.width)),
+    viewport.width - FLOATING_VIEWPORT_MARGIN_PX
+  ),
+  y: Math.min(Math.max(geometry.y, 0), Math.max(0, viewport.height - FLOATING_VIEWPORT_MARGIN_PX)),
 });
+
+/**
+ * What a resize commits: on each axis the resize actually changed, the result from the rectangle on screen; on an
+ * axis it left alone, what was stored. An untouched axis may be showing the viewport's clamp or cap, which is not
+ * the user's choice to persist. Null when the resize changed nothing — a drag against the minimum or the cap.
+ */
+export const commitResizedAxes = (
+  stored: FloatingGeometry,
+  start: FloatingGeometry,
+  resized: FloatingGeometry
+): FloatingGeometry | null => {
+  // The rectangle on screen can sit on fractional pixels, and what is committed is whole ones: a difference under
+  // half a pixel is arithmetic, not the user.
+  const changed = (from: number, to: number) => Math.abs(to - from) >= 0.5;
+  const horizontal = changed(start.widthPx, resized.widthPx) || changed(start.x, resized.x);
+  const vertical = changed(start.heightPx, resized.heightPx) || changed(start.y, resized.y);
+
+  return horizontal || vertical
+    ? {
+        heightPx: vertical ? resized.heightPx : stored.heightPx,
+        widthPx: horizontal ? resized.widthPx : stored.widthPx,
+        x: horizontal ? resized.x : stored.x,
+        y: vertical ? resized.y : stored.y,
+      }
+    : null;
+};
+
+/** A window edge or corner, by compass point. */
+export type FloatingResizeEdge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 'sw';
+
+/**
+ * Resize from one edge or corner by a pointer offset. The opposite side stays where it is, the size stays between
+ * the minimum and `max` (the viewport, which is as large as a window is ever shown), and the top edge stops at the
+ * viewport's top so the title bar stays reachable.
+ */
+export const resizeFloatingGeometry = (
+  start: FloatingGeometry,
+  edge: FloatingResizeEdge,
+  deltaX: number,
+  deltaY: number,
+  max: { heightPx: number; widthPx: number } = { heightPx: Number.POSITIVE_INFINITY, widthPx: Number.POSITIVE_INFINITY }
+): FloatingGeometry => {
+  const right = start.x + start.widthPx;
+  const bottom = start.y + start.heightPx;
+  const clampWidth = (widthPx: number) => Math.max(FLOATING_MIN_WIDTH_PX, Math.min(widthPx, max.widthPx));
+  const clampHeight = (heightPx: number) => Math.max(FLOATING_MIN_HEIGHT_PX, Math.min(heightPx, max.heightPx));
+  const geometry = { ...start };
+
+  if (edge.includes('e')) {
+    geometry.widthPx = clampWidth(start.widthPx + deltaX);
+  }
+  if (edge.includes('w')) {
+    geometry.widthPx = clampWidth(start.widthPx - deltaX);
+    geometry.x = right - geometry.widthPx;
+  }
+  if (edge.includes('s')) {
+    geometry.heightPx = clampHeight(start.heightPx + deltaY);
+  }
+  if (edge.includes('n')) {
+    geometry.heightPx = clampHeight(Math.min(start.heightPx - deltaY, bottom));
+    geometry.y = bottom - geometry.heightPx;
+  }
+
+  return geometry;
+};
 
 // Placement: where a floating window returns to. A floating instance belongs to no region's `instanceIds`; its
 // return region keeps a marker for it instead, and reducers, normalization, and rails all read that marker's

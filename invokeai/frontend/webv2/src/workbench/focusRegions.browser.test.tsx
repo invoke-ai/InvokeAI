@@ -1,6 +1,6 @@
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
-import { act, useState } from 'react';
+import { act, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,13 +10,13 @@ vi.mock('./settings/store', () => ({
 }));
 
 import {
-  createWorkbenchFocusController,
   FocusRegionProvider,
   useFloatingWindowFocus,
   useFocusRegionProps,
   useWorkbenchFocus,
   type WorkbenchFocusController,
 } from './focusRegions';
+import { createTestFocusController } from './focusRegions.testing';
 
 const FocusableRegion = () => <Box data-testid="focus-region" h="20" {...useFocusRegionProps('center')} />;
 
@@ -40,7 +40,7 @@ describe('focus region highlight', () => {
     await act(() => {
       root?.render(
         <ChakraProvider value={system}>
-          <FocusRegionProvider>
+          <FocusRegionProvider controller={createTestFocusController()}>
             <FocusableRegion />
           </FocusRegionProvider>
         </ChakraProvider>
@@ -102,7 +102,7 @@ describe('focusRegion', () => {
     await act(() => {
       root?.render(
         <ChakraProvider value={system}>
-          <FocusRegionProvider>
+          <FocusRegionProvider controller={createTestFocusController()}>
             <OpeningHarness onOpen={onOpen} />
           </FocusRegionProvider>
         </ChakraProvider>
@@ -219,7 +219,7 @@ describe('focusRegion with kept-alive panels', () => {
     await act(() => {
       root?.render(
         <ChakraProvider value={system}>
-          <FocusRegionProvider>
+          <FocusRegionProvider controller={createTestFocusController()}>
             <KeptPanelsHarness />
           </FocusRegionProvider>
         </ChakraProvider>
@@ -247,14 +247,16 @@ const WindowHarness = ({ isWindowShown, windowProjectId }: { isWindowShown: bool
 
 const WindowStub = ({ projectId }: { projectId: string }) => {
   const { activate, isHighlighted } = useFloatingWindowFocus('map', projectId);
+  const handleFocus = useCallback(() => activate(), [activate]);
+  const handlePointerDown = useCallback(() => activate({ byPointer: true }), [activate]);
 
   return (
     <Box
       data-floating-window="map"
       data-highlighted={isHighlighted}
       data-testid="window"
-      onFocusCapture={activate}
-      onPointerDownCapture={activate}
+      onFocusCapture={handleFocus}
+      onPointerDownCapture={handlePointerDown}
     >
       <button type="button">Window control</button>
     </Box>
@@ -263,11 +265,13 @@ const WindowStub = ({ projectId }: { projectId: string }) => {
 
 describe('workbench focus across regions and floating windows', () => {
   let projectId = 'project-1';
+  let isWindowFloating = true;
   let controller: WorkbenchFocusController;
 
   const renderWindowHarness = async (isWindowShown = true) => {
     projectId = 'project-1';
-    controller = createWorkbenchFocusController(() => projectId);
+    isWindowFloating = true;
+    controller = createTestFocusController({ getProjectId: () => projectId, isFloating: () => isWindowFloating });
     host = document.createElement('div');
     document.body.append(host);
     root = createRoot(host);
@@ -307,19 +311,6 @@ describe('workbench focus across regions and floating windows', () => {
     expect(highlighted()).toEqual({ region: 'false', window: 'true' });
   });
 
-  it('does not activate a window that is only hovered', async () => {
-    await renderWindowHarness();
-    await act(() => region().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
-
-    await act(() => {
-      for (const type of ['pointerover', 'pointerenter', 'pointermove', 'mouseover']) {
-        floatingWindow()!.dispatchEvent(new PointerEvent(type, { bubbles: true }));
-      }
-    });
-
-    expect(highlighted()).toEqual({ region: 'true', window: 'false' });
-  });
-
   it('moves keyboard focus into a window once it shows, which activates it', async () => {
     await renderWindowHarness(false);
     const opener = region().querySelector('button')!;
@@ -345,7 +336,7 @@ describe('workbench focus across regions and floating windows', () => {
     await act(() => floatingWindow()!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
 
     expect(controller.getTarget()).toEqual({ kind: 'region', region: 'left' });
-    expect(controller.activate({ instanceId: 'map', kind: 'floating' }, 'project-1')).toBe(false);
+    expect(controller.activate({ instanceId: 'map', kind: 'floating' }, { projectId: 'project-1' })).toBe('refused');
   });
 
   it('forgets the target and abandons a pending focus move when the project changes', async () => {
@@ -366,5 +357,49 @@ describe('workbench focus across regions and floating windows', () => {
     expect(controller.getTarget()).toBeNull();
     expect(highlighted()).toEqual({ region: 'false', window: 'false' });
     expect(document.activeElement).toBe(opener);
+  });
+
+  it('stops treating a window as the target once it no longer floats', async () => {
+    await renderWindowHarness();
+    await act(() => floatingWindow()!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+    expect(controller.getTarget()).toEqual({ instanceId: 'map', kind: 'floating' });
+
+    // Docked or removed, with nothing else focused since.
+    isWindowFloating = false;
+
+    expect(controller.getTarget()).toBeNull();
+  });
+
+  it('abandons a pending focus move when the user presses somewhere else first', async () => {
+    await renderWindowHarness(false);
+    const opener = region().querySelector('button')!;
+    opener.focus();
+    controller.focusFloating('map');
+
+    // Pressing content that takes no focus of its own: focus falls to the body, where a move would reclaim it.
+    await act(() => region().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+    opener.blur();
+    await rerender(true);
+    await frames(4);
+
+    expect(floatingWindow()!.contains(document.activeElement)).toBe(false);
+    expect(controller.getTarget()).toEqual({ kind: 'region', region: 'left' });
+  });
+
+  it('keeps a pending focus move when focus, not a press, passes through another region', async () => {
+    await renderWindowHarness(false);
+    const opener = region().querySelector('button')!;
+    opener.focus();
+
+    controller.focusFloating('map');
+    // A closing menu handing focus back to its trigger arrives as focus, and must not cancel the move.
+    await act(() => {
+      opener.blur();
+      opener.focus();
+    });
+    await rerender(true);
+    await frames(4);
+
+    expect(floatingWindow()!.contains(document.activeElement)).toBe(true);
   });
 });

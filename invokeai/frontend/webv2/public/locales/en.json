@@ -2060,6 +2060,7 @@
       "railMarker": "{{label}}, floating window",
       "railMarkerHint": "{{label}} is floating — click to show the window",
       "resize": "Resize window",
+      "resizeValue": "{{width}} by {{height}} pixels",
       "restore": "Restore",
       "shade": "Collapse",
       "showWindow": "Show window",

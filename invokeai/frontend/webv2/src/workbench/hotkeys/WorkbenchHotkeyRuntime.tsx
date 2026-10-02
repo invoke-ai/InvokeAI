@@ -1,6 +1,6 @@
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
 
-import { useWorkbenchFocus } from '@workbench/focusRegions';
+import { useWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { useActiveProjectSelector, useWorkbenchExtensions } from '@workbench/WorkbenchContext';
@@ -37,7 +37,7 @@ export const WorkbenchHotkeyRuntime = () => {
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const extensionHotkeys = useExtensionHotkeyDefinitions();
   const isModalLayerActive = useIsHotkeyModalLayerActive();
-  const focus = useWorkbenchFocus();
+  const getFocusTarget = useWorkbenchFocusTarget();
 
   const registeredHotkeys = useMemo(() => {
     const firstPartyHotkeys = firstPartyHotkeyCatalog.map((hotkey) => applyCustomHotkeys(hotkey, customHotkeys));
@@ -56,7 +56,7 @@ export const WorkbenchHotkeyRuntime = () => {
     }
 
     const { source, ...target } = resolveHotkeyTarget({
-      focusTarget: focus.getTarget(),
+      focusTarget: getFocusTarget(),
       project,
       targetWidget: getHotkeyTargetWidget(event.target),
     });

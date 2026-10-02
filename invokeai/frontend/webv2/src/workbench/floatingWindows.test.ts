@@ -2,7 +2,16 @@ import { describe, expect, it } from 'vitest';
 
 import type { FloatingWidgetState, WidgetRegion, WidgetRegionState } from './layoutContracts';
 
-import { getRegionOrder, normalizeFloatingPlacement, writeRegionOrder } from './floatingWindows';
+import {
+  clampWindowToViewport,
+  commitResizedAxes,
+  FLOATING_MIN_HEIGHT_PX,
+  FLOATING_MIN_WIDTH_PX,
+  getRegionOrder,
+  normalizeFloatingPlacement,
+  resizeFloatingGeometry,
+  writeRegionOrder,
+} from './floatingWindows';
 
 const floating = (overrides: Partial<FloatingWidgetState> = {}): FloatingWidgetState => ({
   heightPx: 400,
@@ -180,5 +189,97 @@ describe('normalizeFloatingPlacement', () => {
     );
 
     expect(normalized.floatingWidgets?.a).toMatchObject({ returnIndex: 1, returnRegion: 'right' });
+  });
+});
+
+describe('resizeFloatingGeometry', () => {
+  const start = { heightPx: 400, widthPx: 500, x: 100, y: 80 };
+
+  it('moves only the dragged side, keeping the opposite one anchored', () => {
+    expect(resizeFloatingGeometry(start, 'e', 40, 999)).toEqual({ ...start, widthPx: 540 });
+    expect(resizeFloatingGeometry(start, 's', 999, 30)).toEqual({ ...start, heightPx: 430 });
+    expect(resizeFloatingGeometry(start, 'w', -40, 999)).toEqual({ ...start, widthPx: 540, x: 60 });
+    expect(resizeFloatingGeometry(start, 'n', 999, -30)).toEqual({ ...start, heightPx: 430, y: 50 });
+    expect(resizeFloatingGeometry(start, 'nw', 10, 20)).toEqual({ heightPx: 380, widthPx: 490, x: 110, y: 100 });
+  });
+
+  it('stops at the minimum size without letting the anchored side drift', () => {
+    const shrunk = resizeFloatingGeometry(start, 'nw', 5000, 5000);
+
+    expect(shrunk).toEqual({
+      heightPx: FLOATING_MIN_HEIGHT_PX,
+      widthPx: FLOATING_MIN_WIDTH_PX,
+      x: 100 + 500 - FLOATING_MIN_WIDTH_PX,
+      y: 80 + 400 - FLOATING_MIN_HEIGHT_PX,
+    });
+    expect(resizeFloatingGeometry(start, 'se', -5000, -5000)).toEqual({
+      ...start,
+      heightPx: FLOATING_MIN_HEIGHT_PX,
+      widthPx: FLOATING_MIN_WIDTH_PX,
+    });
+  });
+
+  it('stops the top edge at the top of the viewport, growing only as far as that', () => {
+    expect(resizeFloatingGeometry(start, 'n', 0, -500)).toEqual({ ...start, heightPx: 480, y: 0 });
+  });
+});
+
+describe('resizeFloatingGeometry within a viewport', () => {
+  const viewport = { heightPx: 500, widthPx: 600 };
+
+  it('does not grow past the viewport, and keeps the anchored side where it is when it stops', () => {
+    const start = { heightPx: 300, widthPx: 600, x: 0, y: 40 };
+
+    // Already as wide as the viewport: dragging the left edge further left changes nothing.
+    expect(resizeFloatingGeometry(start, 'w', -80, 0, viewport)).toEqual(start);
+    expect(resizeFloatingGeometry(start, 'e', 80, 0, viewport)).toEqual(start);
+    expect(resizeFloatingGeometry(start, 's', 0, 900, viewport)).toEqual({ ...start, heightPx: 500 });
+  });
+});
+
+describe('commitResizedAxes', () => {
+  // Stored for a larger display; shown clamped and capped by a 600x500 viewport.
+  const stored = { heightPx: 900, widthPx: 900, x: 5000, y: 40 };
+  const start = { heightPx: 500, widthPx: 600, x: 552, y: 40 };
+
+  it('takes the resized values only on the axes the resize changed', () => {
+    expect(commitResizedAxes(stored, start, { ...start, widthPx: 550 })).toEqual({ ...stored, widthPx: 550, x: 552 });
+    expect(commitResizedAxes(stored, start, { ...start, heightPx: 350, y: 60 })).toEqual({
+      ...stored,
+      heightPx: 350,
+      y: 60,
+    });
+    expect(commitResizedAxes(stored, start, { heightPx: 350, widthPx: 550, x: 560, y: 60 })).toEqual({
+      heightPx: 350,
+      widthPx: 550,
+      x: 560,
+      y: 60,
+    });
+  });
+
+  it('commits nothing when the resize changed nothing, as a drag against the cap or the minimum does', () => {
+    expect(commitResizedAxes(stored, start, { ...start })).toBeNull();
+  });
+
+  it('does not read sub-pixel arithmetic on an axis as a resize of it', () => {
+    // At a fractional zoom the rectangle on screen is not on whole pixels, and the untouched axis comes back a
+    // fraction off: it must keep what was stored, not take the viewport's cap.
+    expect(commitResizedAxes(stored, start, { ...start, heightPx: 350, widthPx: 600.3 })).toEqual({
+      ...stored,
+      heightPx: 350,
+    });
+    expect(commitResizedAxes(stored, start, { ...start, widthPx: 599.7, x: 552.2 })).toBeNull();
+  });
+});
+
+describe('clampWindowToViewport', () => {
+  it('keeps a sliver of the width that is shown, not of a wider stored one', () => {
+    // Shown no wider than the 600px viewport, so the left limit is 48 - 600, not 48 - 2000.
+    const clamped = clampWindowToViewport(
+      { heightPx: 300, widthPx: 2000, x: -1900, y: 20 },
+      { height: 500, width: 600 }
+    );
+
+    expect(clamped.x).toBe(48 - 600);
   });
 });

@@ -293,7 +293,7 @@ describe('auto invocation route switching on widget reveal', () => {
 
     state = workbenchReducer(state, { instanceId: 'upscale', type: 'floatWidget' });
     state = workbenchReducer(state, { sourceId: 'generate', type: 'setInvocationSource' });
-    state = workbenchReducer(state, { instanceId: 'video', type: 'focusFloatingWidget' });
+    state = workbenchReducer(state, { instanceId: 'video', type: 'raiseFloatingWidget' });
 
     expect(getInvocation(state)).toMatchObject({ sourceId: 'video' });
 
@@ -313,7 +313,7 @@ describe('auto invocation route switching on widget reveal', () => {
 
     // Bound to `onPointerDownCapture`, so this fires on every scroll and click
     // inside the window, not just on a raise.
-    state = workbenchReducer(state, { instanceId: 'upscale', type: 'focusFloatingWidget' });
+    state = workbenchReducer(state, { instanceId: 'upscale', type: 'raiseFloatingWidget' });
 
     expect(state).toBe(before);
     expect(getInvocation(state)).toMatchObject({ sourceId: 'workflow' });

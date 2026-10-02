@@ -5,7 +5,11 @@ export type HotkeyCategory = 'app' | 'canvas' | 'gallery' | 'viewer' | 'workflow
 
 export type HotkeyScope =
   | { kind: 'global' }
-  | { kind: 'focused-region'; region?: WidgetRegion }
+  /**
+   * Matches while a region holds focus: any region, one named docked region, or — for a contribution made by a
+   * floating widget, whose window is no region others share — that one floating instance.
+   */
+  | { kind: 'focused-region'; region?: WidgetRegion; floatingInstanceId?: WidgetInstanceId }
   | { kind: 'widget'; typeId: WidgetTypeId }
   | { kind: 'instance'; instanceId: WidgetInstanceId };
 

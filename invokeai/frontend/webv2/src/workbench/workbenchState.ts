@@ -300,7 +300,7 @@ type WorkbenchReducerAction =
       heightPx: number;
     }
   | { type: 'setFloatingWidgetMode'; instanceId: WidgetInstanceId; mode: FloatingWidgetMode }
-  | { type: 'focusFloatingWidget'; instanceId: WidgetInstanceId }
+  | { type: 'raiseFloatingWidget'; instanceId: WidgetInstanceId }
   /** Bring a window forward so its content shows: raise it, and expand it when it is shaded. */
   | { type: 'revealFloatingWidget'; instanceId: WidgetInstanceId }
   | { type: 'setGenerateSettings'; values: GenerateWidgetValues; projectId?: string; origin?: WorkbenchActionOrigin }
@@ -4033,12 +4033,12 @@ export const __workbenchReducerInternal = (
         };
       });
     }
-    case 'focusFloatingWidget': {
+    case 'raiseFloatingWidget': {
       return updateActiveProject(state, (project) => {
         const floatingWidgets = raiseFloatingWidget(project.floatingWidgets, action.instanceId);
 
-        // Pointer capture runs for every interaction inside the window; only raising it should re-route or dirty
-        // the project.
+        // Every press and every focus arriving inside the window asks for this; only an actual raise should
+        // re-route or dirty the project.
         return floatingWidgets === project.floatingWidgets
           ? project
           : applyAutoRouteForRevealedInstance({ ...project, floatingWidgets }, action.instanceId, context);

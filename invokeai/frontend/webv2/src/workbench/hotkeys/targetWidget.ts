@@ -8,6 +8,8 @@ import type {
 } from '@workbench/widgetContracts';
 import type { WidgetPlacementProject } from '@workbench/widgetPlacementCommands';
 
+import { isWidgetRegion } from '@workbench/layoutContracts';
+
 export const getHotkeyTargetWidget = (
   target: EventTarget | null
 ): { instanceId: WidgetInstanceId; region: WorkbenchRegion | null; typeId: WidgetTypeId } | null => {
@@ -36,40 +38,55 @@ export interface HotkeyTarget {
 /**
  * What a key press is aimed at. The widget under the event target wins; outside any widget's DOM the press falls
  * back to whatever holds workbench focus — the active floating window, or the active instance of the focused
- * docked region. A floating target is never used to index `widgetRegions`, and is ignored once its instance no
- * longer floats in this project.
+ * docked region. A floating target is never used to index `widgetRegions`. A region's active pointer counts only
+ * while it names one of the region's members: an emptied center keeps pointing at the view that floated out of
+ * it, and that view answers as a window, not as the center.
  */
 export const resolveHotkeyTarget = ({
   focusTarget,
   project,
   targetWidget,
 }: {
+  /** From the focus controller, which already drops a floating target whose window is gone. */
   focusTarget: WorkbenchFocusTarget | null;
   project: WidgetPlacementProject;
   targetWidget: ReturnType<typeof getHotkeyTargetWidget>;
 }): HotkeyTarget => {
-  const focus =
-    focusTarget?.kind === 'floating' && !project.floatingPlacements?.[focusTarget.instanceId] ? null : focusTarget;
-  const focusedRegion = focus === null ? null : focus.kind === 'floating' ? 'floating' : focus.region;
+  // Where the press landed says more than where focus was last recorded; a popover or dialog is no region.
+  const targetRegion = targetWidget?.region;
+  const focusedRegion =
+    targetRegion === 'floating' || isWidgetRegion(targetRegion)
+      ? targetRegion
+      : focusTarget === null
+        ? null
+        : focusTarget.kind === 'floating'
+          ? 'floating'
+          : focusTarget.region;
+  const region = focusTarget?.kind === 'region' ? project.widgetRegions[focusTarget.region] : null;
   const focusedInstanceId =
-    focus === null
-      ? null
-      : focus.kind === 'floating'
-        ? focus.instanceId
-        : project.widgetRegions[focus.region].activeInstanceId;
-  const activeInstanceId = targetWidget?.instanceId ?? (focusedInstanceId || null);
+    focusTarget?.kind === 'floating'
+      ? focusTarget.instanceId
+      : region?.instanceIds.includes(region.activeInstanceId)
+        ? region.activeInstanceId
+        : null;
+  const activeInstanceId = targetWidget?.instanceId ?? focusedInstanceId;
   const activeWidgetTypeId = activeInstanceId
     ? (targetWidget?.typeId ?? project.widgetInstances[activeInstanceId]?.typeId ?? null)
     : null;
-  const region = targetWidget?.region ?? focusedRegion;
+  const sourceRegion = targetWidget?.region ?? focusedRegion;
 
   return {
     activeInstanceId,
     activeWidgetTypeId,
     focusedRegion,
     source:
-      activeInstanceId && activeWidgetTypeId && region
-        ? { instanceId: activeInstanceId, projectId: project.projectId ?? '', region, typeId: activeWidgetTypeId }
+      activeInstanceId && activeWidgetTypeId && sourceRegion
+        ? {
+            instanceId: activeInstanceId,
+            projectId: project.projectId ?? '',
+            region: sourceRegion,
+            typeId: activeWidgetTypeId,
+          }
         : null,
   };
 };

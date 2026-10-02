@@ -4,7 +4,8 @@ import type * as workbenchContext from '@workbench/WorkbenchContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
-import { createWorkbenchFocusController, FocusRegionProvider } from '@workbench/focusRegions';
+import { FocusRegionProvider } from '@workbench/focusRegions';
+import { createTestFocusController } from '@workbench/focusRegions.testing';
 import i18next from 'i18next';
 import { MapIcon } from 'lucide-react';
 import { act } from 'react';
@@ -77,7 +78,7 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const focusController = createWorkbenchFocusController(() => 'project-1');
+const focusController = createTestFocusController();
 const focusFloating = vi.spyOn(focusController, 'focusFloating');
 
 const renderButton = async (region: WorkbenchRegion, allowFloating = true) => {

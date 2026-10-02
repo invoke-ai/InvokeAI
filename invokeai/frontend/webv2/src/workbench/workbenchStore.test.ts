@@ -646,27 +646,30 @@ describe('createWorkbenchStore', () => {
       store.commands.widgets.setFloatingGeometry('image-map', { heightPx: 300, widthPx: 320, x: 100 + step, y: 100 });
     }
     store.commands.widgets.setFloatingMode('image-map', 'shaded');
-    store.commands.widgets.focusFloating('image-map');
+    store.commands.widgets.raiseFloating('image-map');
     store.commands.widgets.revealFloating('gallery');
 
     // 23 window writes, none of which reach the rails.
     expect(windowsWatcher.changeCount).toBe(2 + 23);
     expect(placementWatcher.changeCount).toBe(2);
+    // Raising is ordinary focus: it leaves a shaded window shaded. Only the explicit reveal expands one.
+    expect(store.getSnapshot().activeProject.floatingWidgets?.['image-map'].mode).toBe('shaded');
 
     store.commands.widgets.dockFloating('gallery');
     expect(placementWatcher.changeCount).toBe(3);
   });
 
-  it('writes nothing when focus keeps returning to the window already on top', () => {
+  it('notifies no subscriber when the window already on top is raised again', () => {
     const store = createWorkbenchStore();
 
     store.commands.widgets.float('image-map');
     store.commands.widgets.float('gallery');
     const stateWatcher = watchSelector(store, (snapshot) => snapshot.activeProject);
 
-    // What a click inside the window, then a closing dialog or popover handing focus back, each send.
+    // Every press inside a window asks for a raise. For the topmost window the reducer returns the same state, and
+    // the store must turn that into silence: no notification, so no re-render and no autosave.
     for (let repeat = 0; repeat < 5; repeat += 1) {
-      store.commands.widgets.focusFloating('gallery');
+      store.commands.widgets.raiseFloating('gallery');
     }
 
     expect(stateWatcher.changeCount).toBe(0);
