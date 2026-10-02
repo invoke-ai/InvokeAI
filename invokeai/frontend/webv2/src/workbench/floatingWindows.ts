@@ -1,4 +1,5 @@
 import type {
+  FloatingWidgetGeometry,
   FloatingWidgetMode,
   FloatingWidgetState,
   WidgetRegion,
@@ -24,12 +25,7 @@ const CASCADE_ORIGIN_PX = 96;
 const CASCADE_STEP_PX = 32;
 const CASCADE_WRAP = 8;
 
-export interface FloatingGeometry {
-  x: number;
-  y: number;
-  widthPx: number;
-  heightPx: number;
-}
+export type FloatingGeometry = FloatingWidgetGeometry;
 
 export const nextStackOrder = (floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined): number =>
   Object.values(floatingWidgets ?? {}).reduce((max, state) => Math.max(max, state.stackOrder), 0) + 1;
@@ -326,3 +322,88 @@ export const withoutFloatedInstances = (
   instanceIds,
   isCollapsed: instanceIds.length === 0 ? regionId !== 'center' : region.isCollapsed,
 });
+
+/** The one shape remembered geometry is written in; persistence compares documents as JSON, key order included. */
+const toRememberedGeometry = ({ heightPx, widthPx, x, y }: FloatingWidgetGeometry): FloatingWidgetGeometry => ({
+  heightPx,
+  widthPx,
+  x,
+  y,
+});
+
+/**
+ * Keep the memory of closed windows in step with a change to the open ones, so it always reads the way
+ * {@link normalizeLastFloatingGeometry} would leave it: a window that was open and no longer is leaves its
+ * geometry behind, one that is open now has none (its geometry is its own state), and an instance that no longer
+ * exists is forgotten. Returns the same memory when nothing changed, and undefined when nothing is remembered.
+ */
+export const rememberClosedWindows = (
+  remembered: Record<WidgetInstanceId, FloatingWidgetGeometry> | undefined,
+  before: Record<WidgetInstanceId, FloatingWidgetState> | undefined,
+  after: Record<WidgetInstanceId, FloatingWidgetState> | undefined,
+  hasInstance: (instanceId: WidgetInstanceId) => boolean = () => true
+): Record<WidgetInstanceId, FloatingWidgetGeometry> | undefined => {
+  const closed = Object.entries(before ?? {}).filter(([instanceId]) => !after?.[instanceId] && hasInstance(instanceId));
+  const staleIds = Object.keys(remembered ?? {}).filter(
+    (instanceId) => after?.[instanceId] !== undefined || !hasInstance(instanceId)
+  );
+
+  if (closed.length === 0 && staleIds.length === 0) {
+    return remembered;
+  }
+
+  const next = { ...remembered };
+
+  for (const instanceId of staleIds) {
+    delete next[instanceId];
+  }
+  for (const [instanceId, geometry] of closed) {
+    next[instanceId] = toRememberedGeometry(geometry);
+  }
+
+  return Object.keys(next).length > 0 ? next : undefined;
+};
+
+/**
+ * Bring a remembered rectangle wholly into the viewport. The sliver policy suits a window that was already open
+ * when the viewport shrank; a window the user has just asked to float should arrive where they can use it. The
+ * size is left alone: CSS caps what is shown, and the stored size returns when there is room.
+ */
+export const fitWindowIntoViewport = (
+  geometry: FloatingGeometry,
+  viewport: { width: number; height: number }
+): FloatingGeometry => ({
+  ...geometry,
+  x: Math.max(0, Math.min(geometry.x, viewport.width - Math.min(geometry.widthPx, viewport.width))),
+  y: Math.max(0, Math.min(geometry.y, viewport.height - Math.min(geometry.heightPx, viewport.height))),
+});
+
+/**
+ * Stored memory of where docked or closed windows last floated. Keeps well-formed geometry for instances that
+ * exist and are not floating now — a floating window's geometry is its own state — and reports none as undefined.
+ */
+export const normalizeLastFloatingGeometry = (
+  stored: unknown,
+  hasInstance: (instanceId: WidgetInstanceId) => boolean,
+  floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined
+): Record<WidgetInstanceId, FloatingWidgetGeometry> | undefined => {
+  if (!stored || typeof stored !== 'object') {
+    return undefined;
+  }
+
+  const remembered: Record<WidgetInstanceId, FloatingWidgetGeometry> = {};
+
+  for (const [instanceId, entry] of Object.entries(stored as Record<string, unknown>)) {
+    if (!entry || typeof entry !== 'object' || !hasInstance(instanceId) || floatingWidgets?.[instanceId]) {
+      continue;
+    }
+
+    const { heightPx, widthPx, x, y } = entry as Partial<FloatingWidgetGeometry>;
+
+    if (isFiniteNumber(x) && isFiniteNumber(y) && isFiniteNumber(widthPx) && isFiniteNumber(heightPx)) {
+      remembered[instanceId] = toRememberedGeometry(clampSizeToMinimum({ heightPx, widthPx, x, y }));
+    }
+  }
+
+  return Object.keys(remembered).length > 0 ? remembered : undefined;
+};

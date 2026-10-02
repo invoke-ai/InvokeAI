@@ -5,6 +5,7 @@ import type { FloatingWidgetState, WidgetRegion, WidgetRegionState } from './lay
 import {
   clampWindowToViewport,
   commitResizedAxes,
+  fitWindowIntoViewport,
   FLOATING_MIN_HEIGHT_PX,
   FLOATING_MIN_WIDTH_PX,
   getRegionOrder,
@@ -269,6 +270,25 @@ describe('commitResizedAxes', () => {
       heightPx: 350,
     });
     expect(commitResizedAxes(stored, start, { ...start, widthPx: 599.7, x: 552.2 })).toBeNull();
+  });
+});
+
+describe('fitWindowIntoViewport', () => {
+  it('brings a rectangle remembered from a larger viewport wholly on screen, keeping its size', () => {
+    const remembered = { heightPx: 360, widthPx: 480, x: 700, y: 520 };
+
+    expect(fitWindowIntoViewport(remembered, { height: 450, width: 720 })).toEqual({ ...remembered, x: 240, y: 90 });
+    // Larger than the viewport: pinned to the corner; CSS caps what is shown and the size is kept.
+    expect(fitWindowIntoViewport({ ...remembered, widthPx: 2000 }, { height: 450, width: 720 })).toMatchObject({
+      widthPx: 2000,
+      x: 0,
+    });
+    expect(fitWindowIntoViewport({ ...remembered, x: -300, y: -20 }, { height: 900, width: 1440 })).toMatchObject({
+      x: 0,
+      y: 0,
+    });
+    // Already on screen: untouched.
+    expect(fitWindowIntoViewport(remembered, { height: 900, width: 1440 })).toEqual(remembered);
   });
 });
 

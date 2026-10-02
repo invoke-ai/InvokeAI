@@ -16,6 +16,7 @@ import {
   doesProjectMatchLayoutPreset,
   resolveSavedLayoutPreset,
 } from './layoutPresetSnapshots';
+import { serializeProjectDocumentV3 } from './projects/projectDocument';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from './widgetPlacementMeta';
 import { createWidgetRegionViewModelFromState } from './widgetRegionViewModel';
 import { getWidgetsForRegion } from './widgetRegistry';
@@ -662,6 +663,199 @@ describe('revealFloatingWidget', () => {
 
     expect(workbenchReducer(state, { instanceId: 'gallery', type: 'revealFloatingWidget' })).toBe(state);
     expect(workbenchReducer(state, { instanceId: 'queue', type: 'revealFloatingWidget' })).toBe(state);
+  });
+});
+
+describe('remembered window geometry', () => {
+  const PLACED = { heightPx: 360, widthPx: 480, x: 700, y: 220 };
+  const moveGallery = (state: WorkbenchState): WorkbenchState =>
+    workbenchReducer(state, { instanceId: 'gallery', type: 'setFloatingWidgetGeometry', ...PLACED });
+
+  it('reopens a docked window where it last floated instead of cascading it again', () => {
+    let state = moveGallery(floatGallery());
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'dockFloatingWidget' });
+
+    expect(getActiveProject(state).lastFloatingGeometry).toEqual({ gallery: PLACED });
+
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'floatWidget' });
+    const project = getActiveProject(state);
+
+    expect(project.floatingWidgets?.gallery).toMatchObject({ ...PLACED, mode: 'windowed' });
+    // While the window is open its geometry is its own state; nothing stale is kept beside it.
+    expect(project.lastFloatingGeometry).toBeUndefined();
+  });
+
+  it('reopens a removed window there too, once its widget is back on the rail and floated', () => {
+    let state = moveGallery(floatGallery());
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'closeFloatingWidget' });
+    state = workbenchReducer(state, { region: 'right', type: 'openRegionWidget', widgetId: 'gallery' });
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'floatWidget' });
+
+    expect(getActiveProject(state).floatingWidgets?.gallery).toMatchObject(PLACED);
+  });
+
+  it('remembers each window on its own, and gives a first float the next cascade slot', () => {
+    let state = moveGallery(floatGallery());
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'dockFloatingWidget' });
+    state = workbenchReducer(state, { instanceId: 'queue', type: 'floatWidget' });
+    const project = getActiveProject(state);
+
+    expect(project.floatingWidgets?.queue).toMatchObject(cascadeDefaultGeometry(0));
+    expect(project.lastFloatingGeometry).toEqual({ gallery: PLACED });
+  });
+
+  it('survives a save and reload, through the durable project document', () => {
+    let state = moveGallery(floatGallery());
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'dockFloatingWidget' });
+    const document = JSON.parse(JSON.stringify(serializeProjectDocumentV3(getActiveProject(state)))) as Project;
+    const reloaded = withActiveProject(state, () => normalizeWorkbenchProject(document));
+
+    expect(getActiveProject(reloaded).lastFloatingGeometry).toEqual({ gallery: PLACED });
+    expect(
+      getActiveProject(workbenchReducer(reloaded, { instanceId: 'gallery', type: 'floatWidget' })).floatingWidgets
+        ?.gallery
+    ).toMatchObject(PLACED);
+  });
+
+  it('keeps only well-formed memory for instances that exist and are not floating now', () => {
+    const project = getActiveProject(floatGallery());
+    const normalized = normalizeWorkbenchProject({
+      ...project,
+      lastFloatingGeometry: {
+        // Floating right now: the window's own geometry is the truth.
+        gallery: PLACED,
+        'no-such-widget': PLACED,
+        preview: { ...PLACED, x: Number.NaN },
+        queue: { ...PLACED, heightPx: 1, widthPx: 1 },
+      },
+    } as Project);
+
+    expect(normalized.lastFloatingGeometry).toEqual({
+      queue: { ...PLACED, heightPx: FLOATING_MIN_HEIGHT_PX, widthPx: FLOATING_MIN_WIDTH_PX },
+    });
+  });
+
+  it('reopens windowed at the windowed rectangle, whatever mode the window was closed in', () => {
+    for (const mode of ['maximized', 'shaded'] as const) {
+      let state = moveGallery(floatGallery());
+      state = workbenchReducer(state, { instanceId: 'gallery', mode, type: 'setFloatingWidgetMode' });
+      state = workbenchReducer(state, { instanceId: 'gallery', type: 'dockFloatingWidget' });
+      state = workbenchReducer(state, { instanceId: 'gallery', type: 'floatWidget' });
+
+      expect(getActiveProject(state).floatingWidgets?.gallery).toMatchObject({ ...PLACED, mode: 'windowed' });
+    }
+  });
+
+  it('remembers the latest place a window was closed, not an earlier one', () => {
+    const LATER = { heightPx: 300, widthPx: 420, x: 120, y: 80 };
+    let state = moveGallery(floatGallery());
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'dockFloatingWidget' });
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'floatWidget' });
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'setFloatingWidgetGeometry', ...LATER });
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'closeFloatingWidget' });
+
+    expect(getActiveProject(state).lastFloatingGeometry).toEqual({ gallery: LATER });
+  });
+
+  it('remembers a window that an explicit open docks', () => {
+    let state = moveGallery(floatGallery());
+    state = workbenchReducer(state, { region: 'right', type: 'openRegionWidget', widgetId: 'gallery' });
+
+    expect(getActiveProject(state).floatingWidgets).toBeUndefined();
+    expect(getActiveProject(state).lastFloatingGeometry).toEqual({ gallery: PLACED });
+  });
+
+  it('brings a window remembered in a larger viewport back on screen when it floats into a smaller one', () => {
+    let state = moveGallery(floatGallery());
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'dockFloatingWidget' });
+    // Remembered at x=700 with a 480px width; the viewport is now 720px wide (the same window at 200% zoom).
+    state = workbenchReducer(state, {
+      instanceId: 'gallery',
+      type: 'floatWidget',
+      viewport: { height: 450, width: 720 },
+    });
+
+    expect(getActiveProject(state).floatingWidgets?.gallery).toMatchObject({
+      heightPx: 360,
+      widthPx: 480,
+      x: 720 - 480,
+      y: 450 - 360,
+    });
+  });
+
+  it('remembers a window a preset closes, and forgets the memory of one a preset opens', () => {
+    // Saved with Gallery floating at its first place; then the window is moved and the plain layout applied.
+    let state = workbenchReducer(floatGallery(), { presetId: 'compose', type: 'saveLayoutPreset' });
+    const savedPlace = { ...cascadeDefaultGeometry(0) };
+    state = moveGallery(state);
+    state = workbenchReducer(state, { presetId: 'edit', type: 'applyPreset' });
+
+    expect(getActiveProject(state).floatingWidgets).toBeUndefined();
+    expect(getActiveProject(state).lastFloatingGeometry).toEqual({ gallery: PLACED });
+
+    // Back to the layout that floats it: the window is the preset's, and no memory is kept beside it.
+    state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
+
+    expect(getActiveProject(state).floatingWidgets?.gallery).toMatchObject(savedPlace);
+    expect(getActiveProject(state).lastFloatingGeometry).toBeUndefined();
+  });
+
+  it('remembers a window an undo closes, and forgets the memory of one an undo reopens', () => {
+    // The undoable step is a preset switch taken while Gallery floats.
+    let state = moveGallery(floatGallery());
+    state = workbenchReducer(state, { presetId: 'edit', type: 'applyPreset' });
+    expect(getActiveProject(state).lastFloatingGeometry).toEqual({ gallery: PLACED });
+
+    state = workbenchReducer(state, { type: 'undoProjectChange' });
+
+    // Undo reopened the window, so its geometry is the window's own again.
+    expect(getActiveProject(state).floatingWidgets?.gallery).toMatchObject(PLACED);
+    expect(getActiveProject(state).lastFloatingGeometry).toBeUndefined();
+
+    state = workbenchReducer(state, { type: 'redoProjectChange' });
+
+    expect(getActiveProject(state).floatingWidgets).toBeUndefined();
+    expect(getActiveProject(state).lastFloatingGeometry).toEqual({ gallery: PLACED });
+  });
+
+  it('always saves memory the way a reload would read it back', () => {
+    // Persistence compares what it sent with the document as a reload reads it, as JSON. Anything a reload would
+    // drop or reorder in these fields turns a lost response into a conflict.
+    const placement = (project: Project): string => {
+      const { floatingWidgets, lastFloatingGeometry } = serializeProjectDocumentV3(project);
+
+      return JSON.stringify({ floatingWidgets, lastFloatingGeometry });
+    };
+    const savesCanonically = (state: WorkbenchState) => {
+      const saved = serializeProjectDocumentV3(getActiveProject(state));
+      const reloaded = normalizeWorkbenchProject(JSON.parse(JSON.stringify(saved)) as Project);
+
+      expect(placement(reloaded)).toBe(placement(getActiveProject(state)));
+    };
+    let state = workbenchReducer(floatGallery(), { presetId: 'compose', type: 'saveLayoutPreset' });
+    state = moveGallery(state);
+
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'dockFloatingWidget' });
+    savesCanonically(state);
+    // A preset that floats the docked window again.
+    state = workbenchReducer(state, { presetId: 'compose', type: 'applyPreset' });
+    savesCanonically(state);
+    // A preset that closes it, then an undo that reopens it, then a redo that closes it again.
+    state = workbenchReducer(state, { presetId: 'edit', type: 'applyPreset' });
+    savesCanonically(state);
+    state = workbenchReducer(state, { type: 'undoProjectChange' });
+    savesCanonically(state);
+    state = workbenchReducer(state, { type: 'redoProjectChange' });
+    savesCanonically(state);
+  });
+
+  it('is not layout: floating, moving, and docking back leaves the saved preset matching', () => {
+    let state = moveGallery(floatGallery());
+    state = workbenchReducer(state, { instanceId: 'gallery', type: 'dockFloatingWidget' });
+    const project = getActiveProject(state);
+
+    expect(project.lastFloatingGeometry).toBeDefined();
+    expect(doesProjectMatchLayoutPreset(project, resolveSavedLayoutPreset(state.account, 'compose'))).toBe(true);
   });
 });
 

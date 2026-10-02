@@ -41,6 +41,9 @@ export interface FloatingWidgetState {
   stackOrder: number;
 }
 
+/** Where a window sat and how large it was, kept after it docks or closes so floating it again reopens it there. */
+export type FloatingWidgetGeometry = Pick<FloatingWidgetState, 'heightPx' | 'widthPx' | 'x' | 'y'>;
+
 export interface WidgetRegionState {
   activeInstanceId: WidgetInstanceId;
   instanceIds: WidgetInstanceId[];

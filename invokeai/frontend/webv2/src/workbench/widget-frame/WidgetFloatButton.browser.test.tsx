@@ -127,7 +127,11 @@ describe('WidgetFloatButton', () => {
     });
 
     expect(floatMocks.flushWorkbenchDrafts).toHaveBeenCalled();
-    expect(floatMocks.float).toHaveBeenCalledWith('image-map-instance', 'right');
+    // With the viewport it opens into, so a position remembered from a larger one is brought on screen.
+    expect(floatMocks.float).toHaveBeenCalledWith('image-map-instance', 'right', {
+      height: window.innerHeight,
+      width: window.innerWidth,
+    });
     expect(floatMocks.flushWorkbenchDrafts.mock.invocationCallOrder[0]).toBeLessThan(
       floatMocks.float.mock.invocationCallOrder[0]
     );

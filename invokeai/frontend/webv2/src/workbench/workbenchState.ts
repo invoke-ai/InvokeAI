@@ -184,10 +184,13 @@ import {
 import {
   cascadeDefaultGeometry,
   clampSizeToMinimum,
+  fitWindowIntoViewport,
   getRegionOrder,
   isAwaitedCenterView,
   nextStackOrder,
   normalizeFloatingPlacement,
+  normalizeLastFloatingGeometry,
+  rememberClosedWindows,
   withoutFloatedInstances,
   writeRegionOrder,
   type RegionOrderSlot,
@@ -288,6 +291,8 @@ type WorkbenchReducerAction =
       instanceId: WidgetInstanceId;
       /** The chrome the float was asked from; docking returns the window there. */
       region?: WidgetRegion;
+      /** The viewport the window opens into, so a remembered position from a larger one is brought on screen. */
+      viewport?: { width: number; height: number };
     }
   | { type: 'dockFloatingWidget'; instanceId: WidgetInstanceId }
   | { type: 'closeFloatingWidget'; instanceId: WidgetInstanceId }
@@ -1217,6 +1222,14 @@ const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): P
   ...project,
   // Restore floating windows with widgetRegions to avoid duplicate or orphaned placements.
   floatingWidgets: snapshot.floatingWidgets ? { ...snapshot.floatingWidgets } : undefined,
+  // The memory is not part of the snapshot, but a window the undo closes is still remembered.
+  lastFloatingGeometry: rememberClosedWindows(
+    project.lastFloatingGeometry,
+    project.floatingWidgets,
+    snapshot.floatingWidgets,
+    // The snapshot's instances replace the project's, so an instance created since is gone.
+    (instanceId) => Object.hasOwn(snapshot.widgetInstances, instanceId)
+  ),
   invocation: { ...snapshot.invocation },
   layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
   widgetGraphs: cloneWidgetGraphs(snapshot.widgetGraphs),
@@ -1695,6 +1708,11 @@ const assembleWorkbenchProject = (
     canvas,
     events: isArriving ? [] : project.events.slice(0, PROJECT_EVENT_LIMIT),
     floatingWidgets: placement.floatingWidgets,
+    lastFloatingGeometry: normalizeLastFloatingGeometry(
+      (project as Partial<Project>).lastFloatingGeometry,
+      (instanceId) => Object.hasOwn(widgetInstances, instanceId),
+      placement.floatingWidgets
+    ),
     // Resolve historical built-in preset ids to their current arrangements to avoid false layout drift.
     layout: { ...project.layout, presetId: resolveLayoutPresetId(project.layout.presetId) },
     promptHistory: normalizePromptHistory((project as Partial<Project>).promptHistory),
@@ -1881,14 +1899,13 @@ const updateRegionOrder = (
   const before = getRegionOrder(regionId, region.instanceIds, project.floatingWidgets);
   const after = update(before);
   const markerIds = new Set(after.filter((slot) => slot.isFloating).map((slot) => slot.instanceId));
-  const remaining = before.reduce(
-    (floatingWidgets, slot) =>
-      slot.isFloating && !markerIds.has(slot.instanceId)
-        ? withoutFloatingWidget(floatingWidgets, slot.instanceId)
-        : floatingWidgets,
-    project.floatingWidgets
-  );
+  const closedIds = before
+    .filter((slot) => slot.isFloating && !markerIds.has(slot.instanceId))
+    .map((slot) => slot.instanceId);
+  const remaining = closedIds.reduce(withoutFloatingWidget, project.floatingWidgets);
   const order = writeRegionOrder(after, remaining);
+  // A window that docks or closes leaves its geometry behind, so floating the instance again reopens it there.
+  const lastFloatingGeometry = rememberClosedWindows(project.lastFloatingGeometry, project.floatingWidgets, remaining);
   const isMembershipUnchanged =
     order.instanceIds.length === region.instanceIds.length &&
     order.instanceIds.every((instanceId, index) => instanceId === region.instanceIds[index]);
@@ -1897,12 +1914,13 @@ const updateRegionOrder = (
   if (isMembershipUnchanged) {
     return order.floatingWidgets === project.floatingWidgets
       ? project
-      : { ...project, floatingWidgets: order.floatingWidgets };
+      : { ...project, floatingWidgets: order.floatingWidgets, lastFloatingGeometry };
   }
 
   return {
     ...project,
     floatingWidgets: order.floatingWidgets,
+    lastFloatingGeometry,
     widgetRegions: { ...project.widgetRegions, [regionId]: { ...region, instanceIds: order.instanceIds } },
   };
 };
@@ -2297,6 +2315,12 @@ const applyLayoutPresetToProject = (project: Project, preset: LayoutPreset): Pro
   return {
     ...project,
     floatingWidgets: snapshot.floatingWidgets,
+    // Presets carry no memory of their own, but a window the preset closes is still remembered.
+    lastFloatingGeometry: rememberClosedWindows(
+      project.lastFloatingGeometry,
+      project.floatingWidgets,
+      snapshot.floatingWidgets
+    ),
     layout: {
       ...snapshot.layout,
       panels: { ...snapshot.layout.panels },
@@ -3919,10 +3943,17 @@ export const __workbenchReducerInternal = (
           return project;
         }
 
+        // The window reopens where it last floated, brought on screen if that was in a larger viewport; a first
+        // float takes the next cascade slot.
+        const remembered = project.lastFloatingGeometry?.[action.instanceId];
         let floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined = {
           ...project.floatingWidgets,
           [action.instanceId]: {
-            ...cascadeDefaultGeometry(Object.keys(project.floatingWidgets ?? {}).length),
+            ...(remembered
+              ? action.viewport
+                ? fitWindowIntoViewport(remembered, action.viewport)
+                : remembered
+              : cascadeDefaultGeometry(Object.keys(project.floatingWidgets ?? {}).length)),
             mode: 'windowed',
             returnRegion,
             stackOrder: nextStackOrder(project.floatingWidgets),
@@ -3947,7 +3978,17 @@ export const __workbenchReducerInternal = (
         }
 
         return applyAutoRouteForRevealedInstance(
-          { ...project, floatingWidgets, widgetRegions },
+          {
+            ...project,
+            floatingWidgets,
+            // The memory is spent while the window is open: its geometry is the window's own state again.
+            lastFloatingGeometry: rememberClosedWindows(
+              project.lastFloatingGeometry,
+              project.floatingWidgets,
+              floatingWidgets
+            ),
+            widgetRegions,
+          },
           // The window lands on top of everything, so it is the revealed
           // surface — not the tab the rail promotes behind it.
           action.instanceId,

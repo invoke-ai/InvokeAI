@@ -172,7 +172,7 @@ export const WidgetFloatButton = ({
     }
 
     flushWorkbenchDrafts();
-    widgets.float(instanceId, dockableRegion);
+    widgets.float(instanceId, dockableRegion, { height: window.innerHeight, width: window.innerWidth });
     focusFloating(instanceId);
   }, [dockableRegion, focusFloating, instanceId, widgets]);
   const canFloat = Boolean(manifest.allowFloating) && dockableRegion !== undefined;
