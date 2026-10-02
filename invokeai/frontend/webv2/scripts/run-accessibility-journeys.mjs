@@ -952,16 +952,31 @@ const runFloatingWindowJourney = async (browser) => {
     };
     const focusedRegion = () =>
       page.evaluate(() => document.activeElement?.closest('[data-focus-region]')?.getAttribute('data-focus-region'));
+    // Focus, the accent outline, and the top of the stack all name the same window.
+    const waitForActiveWindow = () =>
+      page.waitForFunction(() => {
+        const active = document.activeElement?.closest('[data-floating-window]');
+
+        return active !== null && active !== undefined && active.getAttribute('data-highlighted') === 'true';
+      });
+    const waitForFocusedRegion = (region) =>
+      page.waitForFunction(
+        (expected) =>
+          document.activeElement?.closest('[data-focus-region]')?.getAttribute('data-focus-region') === expected,
+        region
+      );
 
     await floatPreviewFromRail();
+    await waitForActiveWindow();
     await center.getByText('Preview is in a floating window', { exact: true }).waitFor();
     await waitForSettledDocument(page);
     await assertNoAxeViolations(page, `${id}:floating`);
 
-    // The marker is a keyboard stop with a visible focus ring, and it shows the window rather than docking it.
+    // The marker is a keyboard stop, and it shows the window rather than docking it.
     await marker.focus();
     await page.keyboard.press('Enter');
     assert.equal(await floatingWindow.count(), 1, 'Activating the marker must keep the window floating.');
+    await waitForActiveWindow();
 
     await marker.click({ button: 'right' });
     assert.deepEqual(await page.getByRole('menuitem').allInnerTexts(), ['Dock to right panel', 'Remove Preview']);
@@ -969,19 +984,25 @@ const runFloatingWindowJourney = async (browser) => {
     await centerViewTrigger(page, 'Preview').waitFor();
     await floatingWindow.waitFor({ state: 'detached' });
     assert.equal(await marker.count(), 0, 'Removing the window must free its rail slot.');
-    await page.waitForFunction(
-      () => document.activeElement?.closest('[data-focus-region]')?.getAttribute('data-focus-region') === 'center'
-    );
+    await waitForFocusedRegion('center');
 
     await floatPreviewFromRail();
+    await waitForActiveWindow();
     await center.getByRole('button', { exact: true, name: 'Dock to right panel' }).click();
     await centerViewTrigger(page, 'Preview').waitFor();
     await floatingWindow.waitFor({ state: 'detached' });
     await rail.getByRole('button', { exact: true, name: 'Preview' }).waitFor();
-    await page.waitForFunction(
-      () => document.activeElement?.closest('[data-focus-region]')?.getAttribute('data-focus-region') === 'center'
-    );
+    await waitForFocusedRegion('center');
     assert.equal(await focusedRegion(), 'center');
+
+    // Docking brought Preview to the front of the right panel. Float it again: docking from the window's own
+    // control returns focus to that panel.
+    await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
+    await floatingWindow.waitFor();
+    await waitForActiveWindow();
+    await floatingWindow.getByRole('button', { exact: true, name: 'Dock to right panel' }).click();
+    await floatingWindow.waitFor({ state: 'detached' });
+    await waitForFocusedRegion('right');
     await waitForSettledDocument(page);
     await assertNoAxeViolations(page, `${id}:docked`);
 

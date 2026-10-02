@@ -148,9 +148,9 @@ vi.mock('@features/workflow/react', async (importOriginal) => {
   };
 });
 vi.mock('@workbench/focusRegions', () => ({
-  focusOpenedWidget: () => {},
   useFocusRegionProps: () => ({}),
   useHighlightedRegion: () => null,
+  useWorkbenchFocus: () => ({ focusFloating: () => {}, focusRegion: () => {}, getTarget: () => null }),
 }));
 vi.mock('@workbench/widgetRegionViewModel', () => ({
   createWidgetRegionViewModelFromState: ({ regionState }: { regionState: { instanceIds: string[] } }) => ({

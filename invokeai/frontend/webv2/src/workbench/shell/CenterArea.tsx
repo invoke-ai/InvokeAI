@@ -9,7 +9,7 @@ import type {
 import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { Button, IconButton, MenuContent } from '@platform/ui';
-import { focusOpenedWidget, useFocusRegionProps } from '@workbench/focusRegions';
+import { useFocusRegionProps, useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import {
   WidgetChromeSlotById,
@@ -446,15 +446,19 @@ const FloatedCenterView = ({
 }) => {
   const { t } = useTranslation();
   const { widgets } = useWorkbenchCommands();
+  const { focusFloating, focusRegion } = useWorkbenchFocus();
   const widget = getWidgetById(typeId);
   const label = widget ? resolveWidgetInstanceLabel({ title }, widget.manifest, t) : (title ?? instanceId);
-  const handleShow = useCallback(() => widgets.revealFloating(instanceId), [instanceId, widgets]);
+  const handleShow = useCallback(() => {
+    widgets.revealFloating(instanceId);
+    focusFloating(instanceId);
+  }, [focusFloating, instanceId, widgets]);
   // Docking from here always gives the center its view back, so focus follows it.
   const handleDock = useCallback(() => {
     flushWorkbenchDrafts();
     widgets.dockFloating(instanceId);
-    focusOpenedWidget('center', typeId);
-  }, [instanceId, typeId, widgets]);
+    focusRegion('center', typeId);
+  }, [focusRegion, instanceId, typeId, widgets]);
 
   return (
     <Flex align="center" direction="column" gap="3" h="full" justify="center" px="6" textAlign="center" w="full">

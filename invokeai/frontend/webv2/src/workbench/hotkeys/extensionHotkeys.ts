@@ -35,6 +35,16 @@ export const toExtensionHotkeyDefinition = (hotkey: WidgetHotkeyContribution): H
     return { ...hotkey, category: 'app', implemented: true, scope: { kind: 'focused-region', region: source.region } };
   }
 
+  // A floating window is not a region other widgets share: "while my region is focused" means "while my window is".
+  if (scope === 'focused-region' && source?.region === 'floating') {
+    return {
+      ...hotkey,
+      category: 'app',
+      implemented: true,
+      scope: { instanceId: source.instanceId, kind: 'instance' },
+    };
+  }
+
   if (source) {
     return { ...hotkey, category: 'app', implemented: true, scope: { kind: 'widget', typeId: source.typeId } };
   }

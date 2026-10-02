@@ -12,7 +12,7 @@ import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { GalleryDragCursor, GalleryDragScope } from '@features/gallery/utility';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { focusOpenedWidget, FocusRegionProvider } from '@workbench/focusRegions';
+import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { PROJECT_CONTENT_PANEL_ID } from '@workbench/projects/projectTabsA11y';
 import { WidgetBar, type WidgetBarGroup } from '@workbench/widget-frame';
@@ -63,6 +63,7 @@ const DND_MODIFIERS = [restrictToWindowEdges];
 
 export const WorkbenchShell = () => {
   const { notifications, widgets } = useWorkbenchCommands();
+  const { focusFloating, focusRegion } = useWorkbenchFocus();
   const { t } = useTranslation();
   const panels = useActiveProjectSelector((project) => project.layout.panels);
   const projectName = useActiveProjectSelector((project) => project.name);
@@ -188,27 +189,36 @@ export const WorkbenchShell = () => {
     [placementProject, widgets]
   );
   const handleDragCancel = useCallback(() => setActiveDrag(null), []);
+  // Focus follows each of these: into the window a marker shows, into the region a window docks to, and into a
+  // center that gets its view back when the window is removed.
   const handleSelect = useCallback(
     (region: WidgetBarGroup['region'], instanceId: string) => {
-      activateRailPlacement({ instanceId, project: placementProject, region, widgets });
+      if (activateRailPlacement({ instanceId, project: placementProject, region, widgets }) === 'window') {
+        focusFloating(instanceId);
+      }
     },
-    [placementProject, widgets]
+    [focusFloating, placementProject, widgets]
   );
   const handleDock = useCallback(
     (instanceId: string) => {
-      dockFloatingPlacement({ instanceId, project: placementProject, widgets });
+      const typeId = placementProject.widgetInstances[instanceId]?.typeId;
+      const returnRegion = dockFloatingPlacement({ instanceId, project: placementProject, widgets });
+
+      if (returnRegion && typeId) {
+        focusRegion(returnRegion, typeId);
+      }
     },
-    [placementProject, widgets]
+    [focusRegion, placementProject, widgets]
   );
   const closeFloating = useCallback(
     (instanceId: string) => {
       const typeId = placementProject.widgetInstances[instanceId]?.typeId;
 
       if (removeFloatingPlacement({ instanceId, project: placementProject, widgets })?.restoresCenter && typeId) {
-        focusOpenedWidget('center', typeId);
+        focusRegion('center', typeId);
       }
     },
-    [placementProject, widgets]
+    [focusRegion, placementProject, widgets]
   );
   const handleToggleLeft = useCallback(
     (item: (typeof leftMenuItems)[number]) =>
@@ -274,77 +284,75 @@ export const WorkbenchShell = () => {
   );
 
   return (
-    <FocusRegionProvider>
-      <DndContext
-        autoScroll={workbenchAutoScroll}
-        collisionDetection={widgetCollisionDetection}
-        modifiers={DND_MODIFIERS}
-        sensors={sensors}
-        onDragCancel={handleDragCancel}
-        onDragEnd={handleDragEnd}
-        onDragStart={handleDragStart}
-      >
-        <GalleryDragScope value>
-          <Flex direction="column" h="100vh" w="100vw">
-            <WorkbenchNotificationToaster />
-            <DocumentTitleProgress />
-            <TopBar />
-            <ProjectConflictBanner />
-            <QueueRecoveryBanner />
+    <DndContext
+      autoScroll={workbenchAutoScroll}
+      collisionDetection={widgetCollisionDetection}
+      modifiers={DND_MODIFIERS}
+      sensors={sensors}
+      onDragCancel={handleDragCancel}
+      onDragEnd={handleDragEnd}
+      onDragStart={handleDragStart}
+    >
+      <GalleryDragScope value>
+        <Flex direction="column" h="100vh" w="100vw">
+          <WorkbenchNotificationToaster />
+          <DocumentTitleProgress />
+          <TopBar />
+          <ProjectConflictBanner />
+          <QueueRecoveryBanner />
 
-            <Flex aria-labelledby="workbench-project-heading" as="main" flex="1" minH="0" overflow="hidden">
-              <VisuallyHidden as="h1" id="workbench-project-heading">
-                {projectName}
-              </VisuallyHidden>
-              {/* Use a named content region: the project switcher is no longer a tablist. */}
-              <Flex
-                aria-labelledby="workbench-project-heading"
-                flex="1"
-                id={PROJECT_CONTENT_PANEL_ID}
-                minH="0"
-                overflow="hidden"
-                role="region"
-              >
-                <WidgetBar
-                  edgeRegion={isLeftPanelShown ? 'left' : 'center'}
-                  groups={leftRailGroups}
-                  menuItems={leftMenuItems}
-                  side="left"
-                  onDock={handleDock}
-                  onSelect={handleSelect}
-                  onToggle={handleToggleLeft}
-                />
-                {isLeftPanelShown ? <LeftPanel instanceId={leftRegion.activeInstanceId} /> : null}
-                <CenterArea />
-                {isRightPanelShown ? <RightPanel instanceId={rightRegion.activeInstanceId} /> : null}
-                <WidgetBar
-                  edgeRegion={isRightPanelShown ? 'right' : 'center'}
-                  groups={rightRailGroups}
-                  menuItems={rightMenuItems}
-                  side="right"
-                  onDock={handleDock}
-                  onSelect={handleSelect}
-                  onToggle={handleToggleRight}
-                />
-              </Flex>
+          <Flex aria-labelledby="workbench-project-heading" as="main" flex="1" minH="0" overflow="hidden">
+            <VisuallyHidden as="h1" id="workbench-project-heading">
+              {projectName}
+            </VisuallyHidden>
+            {/* Use a named content region: the project switcher is no longer a tablist. */}
+            <Flex
+              aria-labelledby="workbench-project-heading"
+              flex="1"
+              id={PROJECT_CONTENT_PANEL_ID}
+              minH="0"
+              overflow="hidden"
+              role="region"
+            >
+              <WidgetBar
+                edgeRegion={isLeftPanelShown ? 'left' : 'center'}
+                groups={leftRailGroups}
+                menuItems={leftMenuItems}
+                side="left"
+                onDock={handleDock}
+                onSelect={handleSelect}
+                onToggle={handleToggleLeft}
+              />
+              {isLeftPanelShown ? <LeftPanel instanceId={leftRegion.activeInstanceId} /> : null}
+              <CenterArea />
+              {isRightPanelShown ? <RightPanel instanceId={rightRegion.activeInstanceId} /> : null}
+              <WidgetBar
+                edgeRegion={isRightPanelShown ? 'right' : 'center'}
+                groups={rightRailGroups}
+                menuItems={rightMenuItems}
+                side="right"
+                onDock={handleDock}
+                onSelect={handleSelect}
+                onToggle={handleToggleRight}
+              />
             </Flex>
-
-            <BottomPanel />
-            <StatusBar dropState={bottomDropState} />
           </Flex>
-          <FloatingWidgetLayer />
-          <GalleryDragCursor />
-          <PasteMediaRuntime />
-          {/*
-           * Allow pointer events through the full-size drag overlay so another finger can reach Preview pinch
-           * handlers.
-           */}
-          <DragOverlay style={DRAG_OVERLAY_STYLE}>
-            {activeDrag ? <WidgetDragPreview activeDrag={activeDrag} /> : null}
-          </DragOverlay>
-        </GalleryDragScope>
-      </DndContext>
-    </FocusRegionProvider>
+
+          <BottomPanel />
+          <StatusBar dropState={bottomDropState} />
+        </Flex>
+        <FloatingWidgetLayer />
+        <GalleryDragCursor />
+        <PasteMediaRuntime />
+        {/*
+         * Allow pointer events through the full-size drag overlay so another finger can reach Preview pinch
+         * handlers.
+         */}
+        <DragOverlay style={DRAG_OVERLAY_STYLE}>
+          {activeDrag ? <WidgetDragPreview activeDrag={activeDrag} /> : null}
+        </DragOverlay>
+      </GalleryDragScope>
+    </DndContext>
   );
 };
 

@@ -30,7 +30,8 @@ export interface RegisteredHotkey extends HotkeyDefinition {
 }
 
 export interface HotkeyContext {
-  focusedRegion: WidgetRegion | null;
+  /** The docked region holding focus, or `'floating'` while a floating window does. Never persisted. */
+  focusedRegion: WidgetRegion | 'floating' | null;
   activeInstanceId: WidgetInstanceId | null;
   activeWidgetTypeId: WidgetTypeId | null;
   isModalLayerActive: boolean;

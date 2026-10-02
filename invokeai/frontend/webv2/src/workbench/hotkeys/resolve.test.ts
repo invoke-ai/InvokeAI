@@ -123,6 +123,45 @@ describe('resolveHotkey', () => {
     ).toBe('focused');
   });
 
+  it('keeps every scope working under a floating window, except shortcuts tied to a named docked region', () => {
+    const hotkey = (id: string, scope: RegisteredHotkey['scope']): RegisteredHotkey => ({
+      ...base,
+      commandId: id,
+      id,
+      scope,
+      title: id,
+    });
+    const floating = {
+      ...context,
+      activeInstanceId: 'map-1',
+      activeWidgetTypeId: 'image-map',
+      focusedRegion: 'floating',
+    } as const;
+    const global = hotkey('global', { kind: 'global' });
+    const anyRegion = hotkey('any-region', { kind: 'focused-region' });
+    const rightOnly = hotkey('right-only', { kind: 'focused-region', region: 'right' });
+    const widget = hotkey('widget', { kind: 'widget', typeId: 'image-map' });
+    const instance = hotkey('instance', { instanceId: 'map-1', kind: 'instance' });
+    const resolve = (hotkeys: RegisteredHotkey[]) =>
+      resolveHotkey({ context: floating, event, hotkeys, matchedKey: 'x' })?.commandId;
+
+    // The dock-specific shortcut never matches; the rest keep their priority order.
+    expect(resolve([global, rightOnly])).toBe('global');
+    expect(resolve([global, rightOnly, anyRegion])).toBe('any-region');
+    expect(resolve([global, rightOnly, anyRegion, widget])).toBe('widget');
+    expect(resolve([global, rightOnly, anyRegion, widget, instance])).toBe('instance');
+    expect(resolve([rightOnly])).toBeUndefined();
+    // Modal suppression is unchanged by where focus is.
+    expect(
+      resolveHotkey({
+        context: { ...floating, isModalLayerActive: true },
+        event,
+        hotkeys: [global, anyRegion, widget, instance],
+        matchedKey: 'x',
+      })
+    ).toBeNull();
+  });
+
   it('does not resolve hotkeys contributed by another project source', () => {
     const staleProjectHotkey: RegisteredHotkey = {
       ...base,

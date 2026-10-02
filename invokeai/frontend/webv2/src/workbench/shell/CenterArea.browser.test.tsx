@@ -57,7 +57,14 @@ const centerAreaMocks = vi.hoisted(() => {
     },
   };
 
-  return { activeItem, dockFloating: vi.fn(), focusOpenedWidget: vi.fn(), project, revealFloating: vi.fn() };
+  return {
+    activeItem,
+    dockFloating: vi.fn(),
+    focusFloating: vi.fn(),
+    focusRegion: vi.fn(),
+    project,
+    revealFloating: vi.fn(),
+  };
 });
 
 vi.mock('@features/models', () => ({ useModelLoads: () => [] }));
@@ -66,9 +73,13 @@ vi.mock('@features/queue/contracts', () => ({
 }));
 vi.mock('@features/queue/react', () => ({ useQueueItemProgress: () => null }));
 vi.mock('@workbench/focusRegions', () => ({
-  focusOpenedWidget: centerAreaMocks.focusOpenedWidget,
   useFocusRegionProps: () => ({}),
   useHighlightedRegion: () => null,
+  useWorkbenchFocus: () => ({
+    focusFloating: centerAreaMocks.focusFloating,
+    focusRegion: centerAreaMocks.focusRegion,
+    getTarget: () => null,
+  }),
 }));
 vi.mock('@workbench/widgetRegionViewModel', () => ({
   // The center's placed views are exactly its docked members.
@@ -198,7 +209,8 @@ describe('CenterArea with its last view floating', () => {
     centerAreaMocks.project.widgetInstances = {};
     centerAreaMocks.project.widgetRegions.center = dockedCenter;
     centerAreaMocks.dockFloating.mockClear();
-    centerAreaMocks.focusOpenedWidget.mockClear();
+    centerAreaMocks.focusFloating.mockClear();
+    centerAreaMocks.focusRegion.mockClear();
     centerAreaMocks.revealFloating.mockClear();
   });
 
@@ -226,6 +238,8 @@ describe('CenterArea with its last view floating', () => {
     });
 
     expect(centerAreaMocks.revealFloating).toHaveBeenCalledWith('preview-instance');
+    // Showing the window also moves focus into it.
+    expect(centerAreaMocks.focusFloating).toHaveBeenCalledWith('preview-instance');
     expect(centerAreaMocks.dockFloating).not.toHaveBeenCalled();
 
     await act(async () => {
@@ -235,7 +249,7 @@ describe('CenterArea with its last view floating', () => {
 
     expect(centerAreaMocks.dockFloating).toHaveBeenCalledWith('preview-instance');
     // Docking from here restores the center view, so focus follows it.
-    expect(centerAreaMocks.focusOpenedWidget).toHaveBeenCalledWith('center', 'preview');
+    expect(centerAreaMocks.focusRegion).toHaveBeenCalledWith('center', 'preview');
   });
 
   it('still reports an empty center whose view is not floating as unavailable', async () => {

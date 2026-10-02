@@ -17,7 +17,7 @@ import { IconButton } from '@platform/ui/Button';
 import { PanelHeader } from '@platform/ui/PanelHeader';
 import { isResizeDragActive, ResizeHandle, subscribeResizeDrag } from '@platform/ui/ResizeHandle';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { useFocusRegionProps, useHighlightedRegion } from '@workbench/focusRegions';
+import { useFocusRegionProps, useHighlightedRegion, useWorkbenchFocus } from '@workbench/focusRegions';
 import { isWidgetRegion } from '@workbench/layoutContracts';
 import { WidgetSettingsButton } from '@workbench/settings/WidgetSettingsButton';
 import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
@@ -162,9 +162,10 @@ export const WidgetFloatButton = ({
 }) => {
   const { t } = useTranslation();
   const { widgets } = useWorkbenchCommands();
+  const { focusFloating } = useWorkbenchFocus();
   const dockableRegion = isWidgetRegion(region) && region !== 'center' ? region : undefined;
   // Flush drafts before floating unmounts the docked view; preserve the clicked region as the multi-region
-  // instance's dock origin.
+  // instance's dock origin. Focus follows the widget into its window.
   const handleFloat = useCallback(() => {
     if (!dockableRegion) {
       return;
@@ -172,7 +173,8 @@ export const WidgetFloatButton = ({
 
     flushWorkbenchDrafts();
     widgets.float(instanceId, dockableRegion);
-  }, [dockableRegion, instanceId, widgets]);
+    focusFloating(instanceId);
+  }, [dockableRegion, focusFloating, instanceId, widgets]);
   const canFloat = Boolean(manifest.allowFloating) && dockableRegion !== undefined;
 
   if (!canFloat) {

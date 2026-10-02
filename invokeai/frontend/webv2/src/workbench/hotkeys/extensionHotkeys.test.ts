@@ -1,3 +1,5 @@
+import type { WidgetHotkeyContribution } from '@workbench/widgetContracts';
+
 import { describe, expect, it } from 'vitest';
 
 import { toExtensionHotkeyDefinition } from './extensionHotkeys';
@@ -16,5 +18,27 @@ describe('toExtensionHotkeyDefinition', () => {
         title: 'Test hotkey',
       })
     ).toMatchObject({ source });
+  });
+
+  it('scopes a focused-region shortcut to its docked region, or to its own window when it floats', () => {
+    const contribution: WidgetHotkeyContribution = {
+      commandId: 'test.command',
+      defaultKeys: ['mod+x'],
+      id: 'test.hotkey',
+      scope: 'focused-region',
+      title: 'Test hotkey',
+    };
+    const docked = { instanceId: 'alpha', projectId: 'project-1', region: 'right', typeId: 'test-widget' } as const;
+    const floating = { ...docked, region: 'floating' } as const;
+
+    expect(toExtensionHotkeyDefinition({ ...contribution, source: docked })?.scope).toEqual({
+      kind: 'focused-region',
+      region: 'right',
+    });
+    // A window is not a region other widgets share, so the shortcut follows this instance.
+    expect(toExtensionHotkeyDefinition({ ...contribution, source: floating })?.scope).toEqual({
+      instanceId: 'alpha',
+      kind: 'instance',
+    });
   });
 });

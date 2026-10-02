@@ -14,23 +14,35 @@ const EMPTY_FLOATING: Record<WidgetInstanceId, FloatingWidgetState> = {};
 
 /**
  * Render floating windows with z-order derived from stackOrder rank, keeping persisted ordering within UI layer
- * bounds.
+ * bounds. The windows render in a fixed order and stack by z-index alone: raising one must not move its DOM node,
+ * which would drop keyboard focus from the very window that focus just raised.
  */
 export const FloatingWidgetLayer = () => {
   const floatingWidgets = useActiveProjectSelector(
     (project) => project.floatingWidgets ?? EMPTY_FLOATING,
     shallowEqual
   );
-  const entries = Object.entries(floatingWidgets).sort(([, left], [, right]) => left.stackOrder - right.stackOrder);
+  const instanceIds = Object.keys(floatingWidgets).sort();
 
-  if (entries.length === 0) {
+  if (instanceIds.length === 0) {
     return null;
   }
 
+  const stackRanks = new Map(
+    [...instanceIds]
+      .sort((left, right) => floatingWidgets[left].stackOrder - floatingWidgets[right].stackOrder)
+      .map((instanceId, stackRank) => [instanceId, stackRank])
+  );
+
   return (
     <Suspense fallback={null}>
-      {entries.map(([instanceId, state], stackRank) => (
-        <FloatingWidgetWindow key={instanceId} instanceId={instanceId} stackRank={stackRank} state={state} />
+      {instanceIds.map((instanceId) => (
+        <FloatingWidgetWindow
+          key={instanceId}
+          instanceId={instanceId}
+          stackRank={stackRanks.get(instanceId) ?? 0}
+          state={floatingWidgets[instanceId]}
+        />
       ))}
     </Suspense>
   );

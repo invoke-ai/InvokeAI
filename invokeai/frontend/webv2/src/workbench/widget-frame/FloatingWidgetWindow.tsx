@@ -12,9 +12,10 @@ import {
   FLOATING_MIN_WIDTH_PX,
   type FloatingGeometry,
 } from '@workbench/floatingWindows';
+import { useFloatingWindowFocus, useWorkbenchFocus } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { DOCK_DESTINATION_ICONS, resolveDockLabel, resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
-import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
 import { ChevronsDownUpIcon, ChevronsUpDownIcon, Maximize2Icon, Minimize2Icon, TriangleAlertIcon } from 'lucide-react';
 import {
@@ -87,6 +88,9 @@ export const FloatingWidgetWindow = ({
     (project) => project.widgetInstances[instanceId],
     areWidgetRenderInstancesEqual
   );
+  const projectId = useActiveProjectId();
+  const { activate, isHighlighted } = useFloatingWindowFocus(instanceId, projectId);
+  const { focusRegion } = useWorkbenchFocus();
   const windowRef = useRef<HTMLDivElement>(null);
   const liveGeometryRef = useRef<FloatingGeometry | null>(null);
   const startDrag = usePointerDrag();
@@ -216,12 +220,38 @@ export const FloatingWidgetWindow = ({
     [commitGeometry, state]
   );
 
-  const handleFocus = useCallback(() => widgets.focusFloating(instanceId), [instanceId, widgets]);
-  // Flush drafts before docking remounts the widget; registry cleanup only removes flushers.
+  // Pointer-down and keyboard focus make this the active window and raise it; hover does neither. Raising is a
+  // no-op for the topmost window, so focus returning from a closing dialog or popover writes nothing, and a late
+  // event from a project that has left the screen is refused before it can raise anything.
+  const handleActivate = useCallback(() => {
+    if (activate()) {
+      widgets.focusFloating(instanceId);
+    }
+  }, [activate, instanceId, widgets]);
+  // A press on content that takes no focus of its own (or on the title bar, whose drag prevents it) would leave
+  // keyboard focus wherever it was, and the keys would go there while this window shows as active. Presses that
+  // reach here from a menu or popover portaled out of the window keep their own focus.
+  const handlePointerDownCapture = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      const element = event.currentTarget;
+
+      handleActivate();
+      if (event.target instanceof Node && element.contains(event.target) && !element.contains(document.activeElement)) {
+        element.focus({ preventScroll: true });
+      }
+    },
+    [handleActivate]
+  );
+  const typeId = instance?.typeId;
+  // Flush drafts before docking remounts the widget; registry cleanup only removes flushers. Focus follows the
+  // widget to the region it returns to.
   const handleDock = useCallback(() => {
     flushWorkbenchDrafts();
     widgets.dockFloating(instanceId);
-  }, [instanceId, widgets]);
+    if (typeId) {
+      focusRegion(state.returnRegion, typeId);
+    }
+  }, [focusRegion, instanceId, state.returnRegion, typeId, widgets]);
   const handleToggleShade = useCallback(
     () => widgets.setFloatingMode(instanceId, state.mode === 'shaded' ? 'windowed' : 'shaded'),
     [instanceId, state.mode, widgets]
@@ -259,20 +289,29 @@ export const FloatingWidgetWindow = ({
   return (
     <Flex
       ref={windowRef}
+      aria-label={label}
       bg="bg.subtle"
-      borderColor="border.emphasized"
+      // The active window carries the same accent outline, under the same preference, as a focused region.
+      borderColor={isHighlighted ? 'accent.solid' : 'border.emphasized'}
       borderWidth="1px"
       direction="column"
       overflow="hidden"
       position="fixed"
       rounded={isMaximized ? 'none' : 'md'}
+      role="group"
       shadow="xl"
+      // Focusable by script only, so focus can move into a window that has just been floated or revealed.
+      tabIndex={-1}
+      transition="border-color var(--wb-motion-duration-fast) ease"
       zIndex={FLOATING_BASE_Z_INDEX + stackRank}
+      data-floating-window={instanceId}
+      data-highlighted={isHighlighted}
       // Mark floating widget identity and region so hotkeys target it rather than the last focused docked widget.
       data-hotkey-widget-instance-id={instanceId}
       data-hotkey-widget-region="floating"
       data-hotkey-widget-type-id={instance.typeId}
-      onPointerDownCapture={handleFocus}
+      onFocusCapture={handleActivate}
+      onPointerDownCapture={handlePointerDownCapture}
       {...positionProps}
     >
       <HStack

@@ -9,6 +9,11 @@ import type {
 
 import { ChakraProvider, HStack } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import {
+  createWorkbenchFocusController,
+  FocusRegionProvider,
+  type WorkbenchFocusController,
+} from '@workbench/focusRegions';
 import { closeWorkbenchSettings, settingsDialogStore } from '@workbench/settings/settingsDialogStore';
 import i18next from 'i18next';
 import { MapIcon, TagsIcon } from 'lucide-react';
@@ -153,12 +158,14 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const renderWindow = async (floatingState: FloatingWidgetState = state) => {
+const renderWindow = async (floatingState: FloatingWidgetState = state, controller?: WorkbenchFocusController) => {
   await act(async () => {
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <FloatingWidgetWindow instanceId="image-map-instance" stackRank={0} state={floatingState} />
+          <FocusRegionProvider controller={controller}>
+            <FloatingWidgetWindow instanceId="image-map-instance" stackRank={0} state={floatingState} />
+          </FocusRegionProvider>
         </ChakraProvider>
       </I18nextProvider>
     );
@@ -175,6 +182,7 @@ beforeEach(() => {
   windowMocks.actionsRegion = null;
   windowMocks.useFailingWidget = false;
   windowMocks.dockFloating.mockClear();
+  windowMocks.focusFloating.mockClear();
   windowMocks.setFloatingGeometry.mockClear();
   host = document.createElement('div');
   document.body.append(host);
@@ -289,6 +297,96 @@ describe('FloatingWidgetWindow chrome', () => {
     });
 
     expect(windowMocks.dockFloating).toHaveBeenCalledWith('image-map-instance');
+  });
+});
+
+describe('FloatingWidgetWindow focus', () => {
+  const floatingWindow = () => host!.querySelector<HTMLElement>('[data-floating-window="image-map-instance"]')!;
+
+  it('becomes the active, outlined window on pointer-down or keyboard focus, and raises itself', async () => {
+    const controller = createWorkbenchFocusController(() => 'project-1');
+    await renderWindow(state, controller);
+
+    expect(floatingWindow().getAttribute('data-highlighted')).toBe('false');
+
+    await act(() => floatingWindow().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+
+    expect(controller.getTarget()).toEqual({ instanceId: 'image-map-instance', kind: 'floating' });
+    expect(floatingWindow().getAttribute('data-highlighted')).toBe('true');
+    expect(windowMocks.focusFloating).toHaveBeenCalledWith('image-map-instance');
+
+    controller.clear();
+    await act(() => host!.querySelector<HTMLButtonElement>('button[aria-label="Shade"]')!.focus());
+
+    expect(controller.getTarget()).toEqual({ instanceId: 'image-map-instance', kind: 'floating' });
+  });
+
+  it('takes keyboard focus from elsewhere when pressed, so keys follow the outline', async () => {
+    const outside = document.createElement('button');
+    document.body.append(outside);
+    await renderWindow(
+      state,
+      createWorkbenchFocusController(() => 'project-1')
+    );
+    outside.focus();
+
+    await act(() =>
+      host!.querySelector('[data-testid="map-body"]')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    );
+
+    expect(document.activeElement).toBe(floatingWindow());
+
+    // Focus already inside the window stays where it is.
+    const shade = host!.querySelector<HTMLButtonElement>('button[aria-label="Shade"]')!;
+    shade.focus();
+    await act(() =>
+      host!.querySelector('[data-testid="map-body"]')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true }))
+    );
+
+    expect(document.activeElement).toBe(shade);
+    outside.remove();
+  });
+
+  it('is not activated or raised by hover', async () => {
+    const controller = createWorkbenchFocusController(() => 'project-1');
+    await renderWindow(state, controller);
+
+    await act(() => {
+      for (const type of ['pointerover', 'pointerenter', 'pointermove']) {
+        floatingWindow().dispatchEvent(new PointerEvent(type, { bubbles: true }));
+      }
+    });
+
+    expect(controller.getTarget()).toBeNull();
+    expect(windowMocks.focusFloating).not.toHaveBeenCalled();
+  });
+
+  it('neither activates nor raises once its project has left the screen', async () => {
+    // The window was rendered for project-1; the controller now answers for another project.
+    const controller = createWorkbenchFocusController(() => 'project-2');
+    await renderWindow(state, controller);
+
+    await act(() => floatingWindow().dispatchEvent(new PointerEvent('pointerdown', { bubbles: true })));
+    await act(() => host!.querySelector<HTMLButtonElement>('button[aria-label="Shade"]')!.focus());
+
+    expect(controller.getTarget()).toBeNull();
+    expect(windowMocks.focusFloating).not.toHaveBeenCalled();
+  });
+
+  it('can take scripted focus, and sends focus to its return region when it docks', async () => {
+    const controller = createWorkbenchFocusController(() => 'project-1');
+    const focusRegion = vi.spyOn(controller, 'focusRegion');
+    await renderWindow(state, controller);
+
+    await act(() => floatingWindow().focus());
+    expect(document.activeElement).toBe(floatingWindow());
+
+    await act(async () => {
+      host?.querySelector<HTMLButtonElement>('button[aria-label="Dock to right panel"]')?.click();
+      await Promise.resolve();
+    });
+
+    expect(focusRegion).toHaveBeenCalledWith('right', 'image-map');
   });
 });
 

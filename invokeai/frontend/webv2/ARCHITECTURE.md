@@ -115,6 +115,17 @@ A project places each widget instance in regions (`widgetRegions`) or in a float
 
 The rails subscribe to placement only (`getWidgetPlacementProject` projects `floatingPlacements`), so a window's geometry, mode, and stacking change without re-rendering them. A marker is not a tab: it stays out of the sortable list, activating it raises and expands its window, and Dock and Remove live in its context menu. Marker UI exists only on the left and right rails.
 
+### Focus
+
+Workbench focus is transient and never persisted. `WorkbenchFocusProvider` (`workbench/WorkbenchRuntime.tsx`) owns one controller (`workbench/focusRegions.tsx`) above the UI ports, the hotkey runtime, and the shell; there is no module-level focus state. The target is a docked region or one floating instance.
+
+- Pointer-down and keyboard focus activate a region or window; hover does not. The active window carries the same accent outline, under the same preference, as a focused region, and no region is outlined while a window is active.
+- The target is fenced to the project and account it was set under and is cleared — with any focus move still waiting for its widget to mount — when the active project changes, the account changes, or the workbench unmounts. A window passes its own project id when it activates, so a late event from a project that has left the screen is refused before it can raise anything.
+- Activating a window raises it through the reducer, which is a no-op for the topmost window: focus returning from a closing dialog or popover writes nothing. Ordinary focus leaves a shaded window shaded; the explicit reveal (marker, center "Show window", recall) expands it.
+- A press inside a window also moves keyboard focus into it when focus was elsewhere, so the keys follow the outline. The floating layer renders windows in a fixed DOM order and stacks them by z-index alone: raising a window never moves its node, which would drop the focus that raised it.
+- Focus follows placement: into the window after Float and after a marker or "Show window" reveal, into the return region after Dock, and into the center when Remove gives it its view back. A focus move targets the region frame that is on screen; side regions keep earlier panels mounted but hidden.
+- Hotkeys read the same target. `HotkeyContext.focusedRegion` is `WidgetRegion | 'floating' | null`; the persisted `WidgetRegion` is unchanged. A key press is aimed at the widget under the event target first and, outside any widget's DOM, at the active floating instance or the focused region's active instance (`resolveHotkeyTarget`). A floating command source carries `region: 'floating'` and is never used to index `widgetRegions`. Generic `focused-region` shortcuts match under a window, shortcuts tied to a named docked region do not, and a floating widget's own `focused-region` contribution binds to its instance.
+
 ## Settings contributions
 
 Settings are declared by their owners and presented by Workbench. Platform UI owns domain-neutral field metadata and controls; it does not own setting values or persistence. A widget manifest exposes a `settings` contribution containing localized field metadata, an ordered `quick` subset, and a deferred field binding loader. The full dialog includes every declared field. Bindings retain the owner's normalization and command path, including Gallery's size/density conversion and project/instance fencing.

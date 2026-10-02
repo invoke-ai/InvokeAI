@@ -4,6 +4,7 @@ import type * as workbenchContext from '@workbench/WorkbenchContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
+import { createWorkbenchFocusController, FocusRegionProvider } from '@workbench/focusRegions';
 import i18next from 'i18next';
 import { MapIcon } from 'lucide-react';
 import { act } from 'react';
@@ -76,12 +77,17 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+const focusController = createWorkbenchFocusController(() => 'project-1');
+const focusFloating = vi.spyOn(focusController, 'focusFloating');
+
 const renderButton = async (region: WorkbenchRegion, allowFloating = true) => {
   await act(async () => {
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <WidgetFloatButton instanceId="image-map-instance" manifest={manifest(allowFloating)} region={region} />
+          <FocusRegionProvider controller={focusController}>
+            <WidgetFloatButton instanceId="image-map-instance" manifest={manifest(allowFloating)} region={region} />
+          </FocusRegionProvider>
         </ChakraProvider>
       </I18nextProvider>
     );
@@ -95,6 +101,7 @@ beforeEach(() => {
   floatMocks.centerInstanceIds = ['image-map-instance'];
   floatMocks.float.mockClear();
   floatMocks.flushWorkbenchDrafts.mockClear();
+  focusFloating.mockClear();
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -123,6 +130,8 @@ describe('WidgetFloatButton', () => {
     expect(floatMocks.flushWorkbenchDrafts.mock.invocationCallOrder[0]).toBeLessThan(
       floatMocks.float.mock.invocationCallOrder[0]
     );
+    // Focus follows the widget into the window it just became.
+    expect(focusFloating).toHaveBeenCalledWith('image-map-instance');
   });
 
   it('renders nothing for a widget its manifest does not allow to float', async () => {
