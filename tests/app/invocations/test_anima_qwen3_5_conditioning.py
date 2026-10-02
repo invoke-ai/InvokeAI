@@ -5,6 +5,8 @@ step, with that step's sigma -- in float32, because the connector scales sigma b
 it -- while every other Anima model keeps computing its context once.
 """
 
+import subprocess
+import sys
 from contextlib import contextmanager, nullcontext
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -53,7 +55,8 @@ class _FakeQwen35Encoder(torch.nn.Module):
 def _encode_qwen3_5(monkeypatch, prompt: str) -> tuple[torch.Tensor, torch.Tensor, _FakeQwen35Encoder]:
     module = "invokeai.app.invocations.text_encoder.anima_text_encoder"
     monkeypatch.setattr(f"{module}.PreTrainedTokenizerBase", _FakeQwen35Tokenizer)
-    monkeypatch.setattr(f"{module}.Qwen35Encoder", _FakeQwen35Encoder)
+    # The node imports Qwen35Encoder when it runs, from its own module.
+    monkeypatch.setattr("invokeai.backend.qwen3_5.qwen3_5_encoder.Qwen35Encoder", _FakeQwen35Encoder)
     encoder = _FakeQwen35Encoder()
     context = MagicMock()
     context.models.load.side_effect = [_Loaded(_FakeQwen35Tokenizer()), _Loaded(encoder)]
@@ -70,6 +73,20 @@ def test_qwen3_5_is_read_at_the_trained_layers_with_an_attention_only_last_layer
     assert encoder.calls == [([5, 6, 7], QWEN35_LAYER_INDICES, True)]
     assert states.shape == (len(QWEN35_LAYER_INDICES), 3, 8)
     assert mask.tolist() == [True, True, True]
+
+
+def test_the_prompt_node_does_not_import_transformers_qwen3_5_at_startup() -> None:
+    """Every app start imports every node module; transformers' qwen3_5 modeling costs ~0.25 s of it."""
+    program = (
+        "import sys\n"
+        "import invokeai.app.invocations.text_encoder.anima_text_encoder\n"
+        "loaded = [m for m in sys.modules if m.startswith('transformers.models.qwen3_5')]\n"
+        "assert not loaded, loaded\n"
+        "print('OK')\n"
+    )
+    result = subprocess.run([sys.executable, "-c", program], capture_output=True, text=True, timeout=300)
+    assert result.returncode == 0, f"stderr:\n{result.stderr[-3000:]}"
+    assert "OK" in result.stdout
 
 
 def test_an_empty_prompt_is_one_masked_padding_token(monkeypatch) -> None:
@@ -91,6 +108,7 @@ class _FakeTransformer(torch.nn.Module):
         self.has_semantic_connector = connector
         self.adapter_calls: list[tuple[torch.Tensor | None, bool]] = []
         self.patch_spatial = 2
+        self.blocks = torch.nn.ModuleList([torch.nn.Identity() for _ in range(28)])
 
     def preprocess_text_embeds(self, text_embeds, text_ids, t5xxl_weights=None, *, semantic_states=None,
                                semantic_mask=None, timesteps=None):  # fmt: skip

@@ -40,7 +40,6 @@ from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_QWEN3_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes, requires_sidecar_patching
-from invokeai.backend.qwen3_5.qwen3_5_encoder import Qwen35Encoder
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     AnimaConditioningInfo,
     ConditioningFieldData,
@@ -267,6 +266,10 @@ class AnimaTextEncoderInvocation(BaseInvocation):
                 raise ValueError("The Qwen3.5 tokenizer has no padding token to encode an empty prompt with.")
             token_ids = [pad_token_id]
         mask = torch.full((len(token_ids),), not is_empty, dtype=torch.bool)
+
+        # Imported here: transformers' qwen3_5 modeling module costs ~0.25 s, which every app start would
+        # otherwise pay for a node that only Anima-3.8B uses.
+        from invokeai.backend.qwen3_5.qwen3_5_encoder import Qwen35Encoder
 
         encoder_info = context.models.load(self.qwen3_5_encoder.text_encoder)
         with encoder_info.model_on_device() as (_, encoder):
