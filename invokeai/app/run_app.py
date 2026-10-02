@@ -69,6 +69,12 @@ def run_app() -> None:
 
     logger = InvokeAILogger.get_logger(config=app_config)
 
+    # Before torch is imported anywhere: HIP reads its device list once, when torch initializes it, and an explicit
+    # allocator configuration below imports torch. Runs a short child process on Windows ROCm.
+    from invokeai.app.util.rocm_integrated_gpu import hide_integrated_gpus_on_rocm_windows
+
+    hide_integrated_gpus_on_rocm_windows(app_config.device, app_config.generation_devices, logger)
+
     # Configure the torch CUDA memory allocator.
     # NOTE: It is important that this happens before torch is imported.
     if app_config.pytorch_cuda_alloc_conf:
