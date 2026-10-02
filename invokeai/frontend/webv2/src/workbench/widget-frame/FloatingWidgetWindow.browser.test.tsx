@@ -405,19 +405,54 @@ describe('FloatingWidgetWindow chrome', () => {
     expect(windowMocks.setFloatingMode).toHaveBeenCalledExactlyOnceWith('image-map-instance', 'windowed');
   });
 
-  it('leaves room for the focus ring of a contributed action inside the row that clips them', async () => {
+  // The ring is a 2px outline offset by 2px.
+  const FOCUS_RING_PX = 4;
+  const showsWithRing = (action: Element): boolean => {
+    const strip = host!.querySelector('[data-floating-actions]')!.getBoundingClientRect();
+    const rect = action.getBoundingClientRect();
+
+    return (
+      rect.top - FOCUS_RING_PX >= strip.top &&
+      rect.bottom + FOCUS_RING_PX <= strip.bottom &&
+      rect.left - FOCUS_RING_PX >= strip.left &&
+      rect.right + FOCUS_RING_PX <= strip.right
+    );
+  };
+
+  it('leaves room for the focus ring of a contributed action inside the strip that holds them', async () => {
     await renderWindow();
 
-    const row = host!.querySelector('[data-floating-actions]')!;
-    const clip = row.getBoundingClientRect();
-    const action = host!.querySelector('button[aria-label="Toggle cluster labels"]')!.getBoundingClientRect();
-    // The ring is a 2px outline offset by 2px.
-    const ring = 4;
+    expect(showsWithRing(host!.querySelector('button[aria-label="Toggle cluster labels"]')!)).toBe(true);
+  });
 
-    expect(getComputedStyle(row).overflowX).toBe('clip');
-    expect(action.top - ring).toBeGreaterThanOrEqual(clip.top);
-    expect(action.bottom + ring).toBeLessThanOrEqual(clip.bottom);
-    expect(action.left - ring).toBeGreaterThanOrEqual(clip.left);
+  it('brings a contributed action a narrow title bar cannot hold into view, ring included, when it takes focus', async () => {
+    windowMocks.useWideActions = true;
+    await renderWindow({ ...state, widthPx: 280 });
+
+    const button = (name: string) =>
+      [...host!.querySelectorAll<HTMLButtonElement>('[data-floating-actions] button')].find(
+        (candidate) => (candidate.getAttribute('aria-label') ?? candidate.textContent) === name
+      )!;
+
+    // In Tab order: one in the middle of the strip, the last, then back to the first.
+    for (const name of ['Legend', 'Image Map settings', 'Toggle cluster labels']) {
+      expect(showsWithRing(button(name)), `${name} before focus`).toBe(false);
+
+      await act(() => button(name).focus());
+
+      expect(showsWithRing(button(name)), `${name} with focus`).toBe(true);
+    }
+  });
+
+  it('scrolls the contributed actions with a plain wheel', async () => {
+    windowMocks.useWideActions = true;
+    await renderWindow({ ...state, widthPx: 280 });
+
+    const strip = host!.querySelector<HTMLElement>('[data-floating-actions]')!;
+
+    await act(() => strip.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 60 })));
+
+    expect(strip.scrollLeft).toBe(60);
   });
 
   it('keeps its own controls inside a minimum-width window whatever the widget contributes', async () => {
