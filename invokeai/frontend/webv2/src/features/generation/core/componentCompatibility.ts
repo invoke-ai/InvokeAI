@@ -74,6 +74,10 @@ export const isClipVariant =
 export const isAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_encoder' && model.variant === 'qwen3_06b';
 
+/** Anima-3.8B's semantic connector was trained on the Qwen3.5 4B. */
+export const isAnimaQwen35Encoder: GenerateComponentFilter = (model) =>
+  model.type === 'qwen3_5_encoder' && model.variant === 'qwen3_5_4b';
+
 export const isNonAnimaQwen3Encoder: GenerateComponentFilter = (model) =>
   model.type === 'qwen3_encoder' && model.variant !== 'qwen3_06b';
 

@@ -132,6 +132,7 @@ from invokeai.backend.model_manager.configs.pid_decoder import (
     PiDDecoder_Checkpoint_SD3_Config,
     PiDDecoder_Checkpoint_SDXL_Config,
 )
+from invokeai.backend.model_manager.configs.qwen3_5_encoder import Qwen35Encoder_Checkpoint_Config
 from invokeai.backend.model_manager.configs.qwen3_encoder import (
     Qwen3Encoder_Checkpoint_Config,
     Qwen3Encoder_GGUF_Config,
@@ -537,6 +538,7 @@ AnyModelConfig = Annotated[
         # satisfies the text-only Qwen3 GGUF heuristic in full.
         Annotated[Qwen3VLEncoder_GGUF_Config, Qwen3VLEncoder_GGUF_Config.get_tag()],
         Annotated[Qwen3VLEncoder_Qwen3VLEncoder_Config, Qwen3VLEncoder_Qwen3VLEncoder_Config.get_tag()],
+        Annotated[Qwen35Encoder_Checkpoint_Config, Qwen35Encoder_Checkpoint_Config.get_tag()],
         # Qwen3 Encoder
         Annotated[Qwen3Encoder_Qwen3Encoder_Config, Qwen3Encoder_Qwen3Encoder_Config.get_tag()],
         Annotated[Qwen3Encoder_Checkpoint_Config, Qwen3Encoder_Checkpoint_Config.get_tag()],

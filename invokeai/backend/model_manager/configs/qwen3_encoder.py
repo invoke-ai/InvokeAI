@@ -197,6 +197,17 @@ def _has_qwen3_specific_keys(tensor_names: Iterable[str | int]) -> bool:
     return False
 
 
+def _has_qwen3_5_layers(tensor_names: Iterable[str | int]) -> bool:
+    """Check for Qwen3.5's Gated DeltaNet layers, which a Qwen3 model never has.
+
+    Qwen3.5 is as wide as Qwen3 at 4B (2560) and keeps the `model.layers.*` / `q_norm` naming on its
+    full-attention layers, so it satisfies every heuristic above and would install as a Qwen3 4B
+    encoder the Qwen3 loader cannot build. Its linear-attention layers are named `linear_attn` in
+    PyTorch exports and `ssm_*` in llama.cpp ones.
+    """
+    return any(isinstance(key, str) and (".linear_attn." in key or ".ssm_" in key) for key in tensor_names)
+
+
 def _get_qwen3_variant_from_state_dict(state_dict: dict[str | int, Any]) -> Optional[Qwen3VariantType]:
     """Determine Qwen3 variant (0.6B, 4B, or 8B) from state dict based on hidden_size.
 
@@ -315,6 +326,9 @@ class Qwen3Encoder_Checkpoint_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError(
                 "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, not a text-only Qwen3 encoder"
             )
+        # Reject Qwen3.5: same width as Qwen3 at 4B, a different architecture (`Qwen35Encoder_*`).
+        if _has_qwen3_5_layers(state_dict):
+            raise NotAMatchError("state dict has Qwen3.5 linear-attention layers; this is a Qwen3.5 encoder, not Qwen3")
 
     @classmethod
     def _validate_does_not_look_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:
@@ -496,6 +510,9 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError(
                 "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, not a text-only Qwen3 encoder"
             )
+        # Reject Qwen3.5: same width as Qwen3 at 4B, a different architecture (`Qwen35Encoder_*`).
+        if _has_qwen3_5_layers(state_dict):
+            raise NotAMatchError("state dict has Qwen3.5 linear-attention layers; this is a Qwen3.5 encoder, not Qwen3")
         # Reject Qwen3-VL language towers. The visual-tower check above cannot see them: llama.cpp
         # keeps the visual tower in a separate ``mmproj-*.gguf``, so a Qwen3-VL GGUF is structurally
         # identical to a text-only Qwen3 of the same width (both 36 layers at hidden 2560 for the
@@ -568,6 +585,9 @@ class Qwen3Encoder_SDNQ_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError(
                 "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, not a text-only Qwen3 encoder"
             )
+        # Reject Qwen3.5: same width as Qwen3 at 4B, a different architecture (`Qwen35Encoder_*`).
+        if _has_qwen3_5_layers(state_dict):
+            raise NotAMatchError("state dict has Qwen3.5 linear-attention layers; this is a Qwen3.5 encoder, not Qwen3")
         if not _has_qwen3_specific_keys(state_dict):
             raise NotAMatchError(
                 "state dict lacks Qwen3 QK-normalization (q_norm/k_norm) weights; looks like a Qwen2 model, "
