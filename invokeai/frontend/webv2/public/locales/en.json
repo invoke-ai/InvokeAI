@@ -2226,6 +2226,7 @@
       },
       "conceptWeight": "{{name}} weight",
       "concepts": "Concepts",
+      "conceptsUnsupported": "Concepts are not supported by the selected model.",
       "copyValue": "Copy value",
       "couldNotExpandPrompt": "Could not expand the prompt.",
       "couldNotGeneratePromptFromImage": "Could not generate a prompt from the selected image.",

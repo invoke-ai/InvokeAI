@@ -11,6 +11,7 @@ import type { ModelIdentifierConfig, VaeModelConfig } from './types';
 import {
   getComponentSectionPolicy,
   getGenerationValidationReasons,
+  isLoraSupported,
   SUPPORTED_GENERATE_BASES,
 } from './baseGenerationPolicies';
 import { compileGenerateGraph, GRAPH_BUILDERS } from './graph';
@@ -119,7 +120,7 @@ describe('generate graph coverage', () => {
   });
 
   // An image's metadata is what recall restores, so it must name exactly the LoRAs that reached inference.
-  it.each(generateGraphCases)('$label records only the concepts its graph loads', ({ base, shape }) => {
+  it.each(generateGraphCases)('$label loads concepts as policy says, and records only those', ({ base, shape }) => {
     const { model, settings } = satisfiedSettingsFor(base, shape);
     const lora = (key: string) => ({ base, key, name: key, type: 'lora' as const });
     const { backendGraph } = compileGenerateGraph(
@@ -144,6 +145,10 @@ describe('generate graph coverage', () => {
       weight: number;
     }[];
 
+    // The concept picker trusts this policy, so a builder that gains or loses a LoRA loader must update it.
+    expect(loaded.length > 0, `${base}/${shape.label} LoRA support disagrees with isLoraSupported`).toBe(
+      isLoraSupported(model)
+    );
     expect(recorded.map((entry) => [entry.model.key, entry.weight])).toEqual(loaded);
   });
 
