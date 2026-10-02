@@ -177,6 +177,12 @@ systems ROCm 10 supports. AMD lists Windows 11; the Invoke team has run it on Wi
   come out wrong or generation fails. The startup log says whether they are on.
 :::
 
+:::note[Integrated graphics]
+  ROCm lists the Radeon graphics built into Ryzen CPUs as a GPU of its own. When a discrete GPU is
+  present, Invoke leaves the integrated one out of `generation_devices: auto`; list it in
+  `generation_devices` to generate on it anyway.
+:::
+
 :::note[Wide-head attention runs on the math kernel]
   On ROCm builds Invoke routes attention whose head dimension exceeds 256 to PyTorch's math kernel.
   The fused kernels return wrong output there on torch 2.13 / ROCm 7.2 (measured on a W7900), which
