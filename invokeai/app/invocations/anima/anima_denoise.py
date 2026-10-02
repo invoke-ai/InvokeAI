@@ -60,6 +60,7 @@ from invokeai.backend.flux.schedulers import (
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import anima_lora_for_depth
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
     RectifiedFlowInpaintExtension,
@@ -482,16 +483,58 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     t5xxl_ids=cond_info.t5xxl_ids,
                     t5xxl_weights=cond_info.t5xxl_weights,
                     mask=mask,
+                    qwen35_states=cond_info.qwen35_states,
+                    qwen35_mask=cond_info.qwen35_mask,
                 )
             )
 
         return text_conditionings
+
+    @staticmethod
+    def _run_llm_adapter(
+        transformer,
+        tc: AnimaTextConditioning,
+        dtype: torch.dtype,
+        timesteps: torch.Tensor | None,
+    ) -> torch.Tensor:
+        """Run the LLM Adapter -- or, on Anima-3.8B, the semantic connector -- for one conditioning.
+
+        Args:
+            transformer: The AnimaTransformer instance (must be on device).
+            tc: The conditioning.
+            dtype: Inference dtype.
+            timesteps: The flow timestep, float32, shape (1,). Only the semantic connector reads it; it
+                is None for every other model, whose context does not change between steps.
+
+        Returns:
+            Context of shape (1, 512, 1024).
+        """
+        qwen3_embeds = tc.qwen3_embeds.unsqueeze(0)  # (1, seq_len, 1024)
+        t5xxl_ids = tc.t5xxl_ids.unsqueeze(0)  # (1, seq_len)
+        t5xxl_weights = None
+        if tc.t5xxl_weights is not None:
+            t5xxl_weights = tc.t5xxl_weights.unsqueeze(0).unsqueeze(-1).to(dtype=dtype)  # (1, seq_len, 1)
+        semantic_states = None
+        semantic_mask = None
+        if timesteps is not None and tc.qwen35_states is not None:
+            # (num_layers, seq_len, 2560) -> one (1, seq_len, 2560) tensor per layer.
+            semantic_states = [state.unsqueeze(0).to(dtype=dtype) for state in tc.qwen35_states]
+            semantic_mask = tc.qwen35_mask.unsqueeze(0) if tc.qwen35_mask is not None else None
+        return transformer.preprocess_text_embeds(
+            qwen3_embeds.to(dtype=dtype),
+            t5xxl_ids,
+            t5xxl_weights=t5xxl_weights,
+            semantic_states=semantic_states,
+            semantic_mask=semantic_mask,
+            timesteps=timesteps,
+        )
 
     def _run_llm_adapter_for_regions(
         self,
         transformer,
         text_conditionings: list[AnimaTextConditioning],
         dtype: torch.dtype,
+        timesteps: torch.Tensor | None = None,
     ) -> AnimaRegionalTextConditioning:
         """Run the LLM Adapter separately for each regional conditioning and concatenate.
 
@@ -499,6 +542,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
             transformer: The AnimaTransformer instance (must be on device).
             text_conditionings: List of per-region conditioning data.
             dtype: Inference dtype.
+            timesteps: See `_run_llm_adapter`.
 
         Returns:
             AnimaRegionalTextConditioning with concatenated context and masks.
@@ -509,20 +553,8 @@ class AnimaDenoiseInvocation(BaseInvocation):
         cur_len = 0
 
         for tc in text_conditionings:
-            qwen3_embeds = tc.qwen3_embeds.unsqueeze(0)  # (1, seq_len, 1024)
-            t5xxl_ids = tc.t5xxl_ids.unsqueeze(0)  # (1, seq_len)
-            t5xxl_weights = None
-            if tc.t5xxl_weights is not None:
-                t5xxl_weights = tc.t5xxl_weights.unsqueeze(0).unsqueeze(-1)  # (1, seq_len, 1)
-
-            # Run the LLM Adapter to produce context for this region
-            context = transformer.preprocess_text_embeds(
-                qwen3_embeds.to(dtype=dtype),
-                t5xxl_ids,
-                t5xxl_weights=t5xxl_weights.to(dtype=dtype) if t5xxl_weights is not None else None,
-            )
             # context shape: (1, 512, 1024) — squeeze batch dim
-            context_2d = context.squeeze(0)  # (512, 1024)
+            context_2d = self._run_llm_adapter(transformer, tc, dtype, timesteps).squeeze(0)  # (512, 1024)
 
             context_embeds_list.append(context_2d)
             context_ranges.append(Range(start=cur_len, end=cur_len + context_2d.shape[0]))
@@ -536,6 +568,26 @@ class AnimaDenoiseInvocation(BaseInvocation):
             image_masks=image_masks,
             context_ranges=context_ranges,
         )
+
+    @staticmethod
+    def _check_qwen3_5_conditioning(
+        context: InvocationContext,
+        uses_connector: bool,
+        positive: list[AnimaTextConditioning],
+        negative: list[AnimaTextConditioning],
+    ) -> None:
+        """Refuse Anima-3.8B conditioning without Qwen3.5 states; note Qwen3.5 states nothing will read."""
+        conditionings = [*positive, *negative]
+        if uses_connector:
+            if any(tc.qwen35_states is None for tc in conditionings):
+                raise ValueError(
+                    "This Anima model bundles a Qwen3.5 semantic connector, but a prompt was encoded without "
+                    "Qwen3.5. Connect the model loader's Qwen3.5 Encoder output to every Anima prompt node."
+                )
+        elif any(tc.qwen35_states is not None for tc in conditionings):
+            context.logger.warning(
+                "This Anima model has no semantic connector; the prompt's Qwen3.5 encoding is unused."
+            )
 
     def _run_diffusion(self, context: InvocationContext) -> torch.Tensor:
         device = TorchDevice.choose_torch_device()
@@ -710,64 +762,68 @@ class AnimaDenoiseInvocation(BaseInvocation):
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=transformer,
-                    patches=self._lora_iterator(context),
+                    patches=self._lora_iterator(context, len(transformer.blocks)),
                     prefix=ANIMA_LORA_TRANSFORMER_PREFIX,
                     dtype=inference_dtype,
                     cached_weights=cached_weights,
                 )
             )
 
-            # Run LLM Adapter for each regional conditioning to produce context vectors.
-            # This must happen with the transformer on device since it uses the adapter weights.
-            if has_regional:
-                pos_regional = self._run_llm_adapter_for_regions(transformer, pos_text_conditionings, inference_dtype)
-                pos_context = pos_regional.context_embeds.unsqueeze(0)  # (1, total_ctx_len, 1024)
+            # Anima-3.8B's semantic connector conditions the context on the timestep, so its context
+            # is recomputed at every step; every other Anima model's context is computed once here.
+            uses_connector = bool(getattr(transformer, "has_semantic_connector", False))
+            self._check_qwen3_5_conditioning(
+                context, uses_connector, pos_text_conditionings, neg_text_conditionings or []
+            )
 
-                # Build regional prompting extension with cross-attention mask
-                regional_extension = AnimaRegionalPromptingExtension.from_regional_conditioning(
-                    pos_regional, img_seq_len
+            def build_contexts(
+                sigma: float | None,
+            ) -> tuple[torch.Tensor, torch.Tensor | None, AnimaRegionalTextConditioning | None]:
+                # float32, as the reference passes it: the connector's timestep embedding scales sigma by
+                # 1000, where bf16's rounding of sigma would move its high frequencies by radians.
+                timesteps = (
+                    torch.tensor([sigma * ANIMA_MULTIPLIER], device=device, dtype=torch.float32)
+                    if sigma is not None
+                    else None
                 )
-
-                # For negative, concatenate all regions without masking (matches Z-Image behavior)
-                neg_context = None
-                if do_cfg and neg_text_conditionings is not None:
-                    neg_regional = self._run_llm_adapter_for_regions(
-                        transformer, neg_text_conditionings, inference_dtype
+                # Must run with the transformer on device since it uses the adapter weights.
+                if has_regional:
+                    pos_regional = self._run_llm_adapter_for_regions(
+                        transformer, pos_text_conditionings, inference_dtype, timesteps
                     )
-                    neg_context = neg_regional.context_embeds.unsqueeze(0)
-            else:
-                # Single conditioning — run LLM Adapter via normal forward path
-                tc = pos_text_conditionings[0]
-                pos_qwen3_embeds = tc.qwen3_embeds.unsqueeze(0)
-                pos_t5xxl_ids = tc.t5xxl_ids.unsqueeze(0)
-                pos_t5xxl_weights = None
-                if tc.t5xxl_weights is not None:
-                    pos_t5xxl_weights = tc.t5xxl_weights.unsqueeze(0).unsqueeze(-1)
-
-                # Pre-compute context via LLM Adapter
-                pos_context = transformer.preprocess_text_embeds(
-                    pos_qwen3_embeds.to(dtype=inference_dtype),
-                    pos_t5xxl_ids,
-                    t5xxl_weights=pos_t5xxl_weights.to(dtype=inference_dtype)
-                    if pos_t5xxl_weights is not None
-                    else None,
-                )
-
-                neg_context = None
+                    pos = pos_regional.context_embeds.unsqueeze(0)  # (1, total_ctx_len, 1024)
+                    # For negative, concatenate all regions without masking (matches Z-Image behavior)
+                    neg = None
+                    if do_cfg and neg_text_conditionings is not None:
+                        neg_regional = self._run_llm_adapter_for_regions(
+                            transformer, neg_text_conditionings, inference_dtype, timesteps
+                        )
+                        neg = neg_regional.context_embeds.unsqueeze(0)
+                    return pos, neg, pos_regional
+                pos = self._run_llm_adapter(transformer, pos_text_conditionings[0], inference_dtype, timesteps)
+                neg = None
                 if do_cfg and neg_text_conditionings is not None:
-                    ntc = neg_text_conditionings[0]
-                    neg_qwen3 = ntc.qwen3_embeds.unsqueeze(0)
-                    neg_ids = ntc.t5xxl_ids.unsqueeze(0)
-                    neg_weights = None
-                    if ntc.t5xxl_weights is not None:
-                        neg_weights = ntc.t5xxl_weights.unsqueeze(0).unsqueeze(-1)
-                    neg_context = transformer.preprocess_text_embeds(
-                        neg_qwen3.to(dtype=inference_dtype),
-                        neg_ids,
-                        t5xxl_weights=neg_weights.to(dtype=inference_dtype) if neg_weights is not None else None,
-                    )
+                    neg = self._run_llm_adapter(transformer, neg_text_conditionings[0], inference_dtype, timesteps)
+                return pos, neg, None
 
-                regional_extension = None
+            first_sigma = sigmas[0] if uses_connector else None
+            pos_context, neg_context, pos_regional = build_contexts(first_sigma)
+            context_sigma = first_sigma
+
+            def contexts_at(sigma: float) -> tuple[torch.Tensor, torch.Tensor | None]:
+                nonlocal pos_context, neg_context, context_sigma
+                if uses_connector and sigma != context_sigma:
+                    pos_context, neg_context, _ = build_contexts(sigma)
+                    context_sigma = sigma
+                return pos_context, neg_context
+
+            # The regional cross-attention mask depends only on how many context tokens each region
+            # contributes (512 each), not on their values, so it is built once.
+            regional_extension = (
+                AnimaRegionalPromptingExtension.from_regional_conditioning(pos_regional, img_seq_len)
+                if pos_regional is not None
+                else None
+            )
 
             # Apply regional prompting patch if we have regional masks
             exit_stack.enter_context(patch_anima_for_regional_prompting(transformer, regional_extension))
@@ -802,11 +858,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
                         timestep = torch.tensor(
                             [it.sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
                         ).expand(latents.shape[0])
+                        step_pos_context, step_neg_context = contexts_at(it.sigma_curr)
 
-                        noise_pred_cond = _run_transformer(pos_context, latents, timestep).float()
+                        noise_pred_cond = _run_transformer(step_pos_context, latents, timestep).float()
 
-                        if do_cfg and neg_context is not None:
-                            noise_pred_uncond = _run_transformer(neg_context, latents, timestep).float()
+                        if do_cfg and step_neg_context is not None:
+                            noise_pred_uncond = _run_transformer(step_neg_context, latents, timestep).float()
                             noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
                         else:
                             noise_pred = noise_pred_cond
@@ -858,11 +915,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
                         timestep = torch.tensor(
                             [sigma_curr * ANIMA_MULTIPLIER], device=device, dtype=inference_dtype
                         ).expand(latents.shape[0])
+                        step_pos_context, step_neg_context = contexts_at(sigma_curr)
 
-                        noise_pred_cond = _run_transformer(pos_context, latents, timestep).float()
+                        noise_pred_cond = _run_transformer(step_pos_context, latents, timestep).float()
 
-                        if do_cfg and neg_context is not None:
-                            noise_pred_uncond = _run_transformer(neg_context, latents, timestep).float()
+                        if do_cfg and step_neg_context is not None:
+                            noise_pred_uncond = _run_transformer(step_neg_context, latents, timestep).float()
                             noise_pred = noise_pred_uncond + self.guidance_scale * (noise_pred_cond - noise_pred_uncond)
                         else:
                             noise_pred = noise_pred_cond
@@ -933,8 +991,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         return step_callback
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
-        """Iterate over LoRA models to apply to the transformer."""
+    def _lora_iterator(self, context: InvocationContext, transformer_depth: int) -> Iterator[PatchSpec]:
+        """Iterate over LoRA models to apply to the transformer.
+
+        A LoRA trained on a shallower Anima has its blocks moved to where this depth-expanded model keeps
+        them (see `invokeai.backend.anima.block_layout`).
+        """
         for lora in self.transformer.loras:
             lora_info = context.models.load(lora.lora)
             if not isinstance(lora_info.model, ModelPatchRaw):
@@ -942,4 +1004,11 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
                     "The LoRA model may be corrupted or incompatible."
                 )
-            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
+            patch, moved_from = anima_lora_for_depth(lora_info.model, transformer_depth)
+            if moved_from is not None:
+                name = lora_info.config.name if lora_info.config is not None else lora.lora.key
+                context.logger.info(
+                    f"LoRA '{name}' was trained on a {moved_from}-block Anima; applying it to the "
+                    f"matching blocks of this {transformer_depth}-block model."
+                )
+            yield (patch, lora.weight, lora_info.model_in_ram())

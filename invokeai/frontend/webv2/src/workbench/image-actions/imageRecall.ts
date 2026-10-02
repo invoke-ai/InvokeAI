@@ -410,6 +410,7 @@ type RecalledComponentSetting = keyof Pick<
   | 'pidDecoderModel'
   | 'qwen3EncoderModel'
   | 'qwen3VLEncoderModel'
+  | 'qwen35EncoderModel'
   | 'qwenVLEncoderModel'
   | 't5EncoderModel'
   | 'wanLowNoiseModel'
@@ -439,6 +440,7 @@ const RECALLED_COMPONENTS: readonly RecalledComponent[] = [
   { metadataKey: 'pid_decoder', setting: 'pidDecoderModel' },
   { metadataKey: 'qwen3_encoder', setting: 'qwen3EncoderModel' },
   { metadataKey: 'qwen3_vl_encoder', setting: 'qwen3VLEncoderModel' },
+  { metadataKey: 'qwen3_5_encoder', setting: 'qwen35EncoderModel' },
   { metadataKey: 'qwen_image_qwen_vl_encoder', setting: 'qwenVLEncoderModel' },
   { metadataKey: 't5_encoder', setting: 't5EncoderModel' },
   { metadataKey: 'wan_t5_encoder_model', setting: 'wanT5EncoderModel' },

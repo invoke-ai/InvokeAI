@@ -21,6 +21,7 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.lora import LoraModelDefaultSettings
 from invokeai.backend.model_manager.configs.main import MainModelDefaultSettings
 from invokeai.backend.model_manager.taxonomy import (
+    AnimaVariantType,
     BaseModelType,
     ClipVariantType,
     Flux2VariantType,
@@ -36,6 +37,7 @@ from invokeai.backend.model_manager.taxonomy import (
     PiDDecoderVariantType,
     Qwen3VariantType,
     Qwen3VLVariantType,
+    Qwen35VariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
     WanLoRAVariantType,
@@ -152,6 +154,8 @@ class ModelRecordChanges(BaseModelExcludeNull):
         | WanLoRAVariantType
         | Qwen3VariantType
         | Qwen3VLVariantType
+        | Qwen35VariantType
+        | AnimaVariantType
         | Krea2VariantType
         | MiniMaxH3VariantType
         | LTX2VariantType

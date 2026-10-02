@@ -7,10 +7,12 @@ ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack use pnpm@10.x && corepack enable
 
-WORKDIR /build
+# Mirror the repository layout: the webv2 build reads the release version from invokeai/version.
+WORKDIR /build/invokeai/frontend/webv2
 COPY invokeai/frontend/webv2/ ./
 RUN --mount=type=cache,target=/pnpm/store \
     pnpm install --frozen-lockfile
+COPY invokeai/version/invokeai_version.py /build/invokeai/version/
 RUN pnpm exec vite build
 
 FROM web-builder AS legacy-web-builder
@@ -100,7 +102,7 @@ ENTRYPOINT ["/opt/invokeai/docker-entrypoint.sh"]
 CMD ["invokeai-web"]
 
 # --link requires buldkit w/ dockerfile syntax 1.4, does not work with podman
-COPY --link --from=web-builder /build/dist ${INVOKEAI_SRC}/invokeai/frontend/webv2/dist
+COPY --link --from=web-builder /build/invokeai/frontend/webv2/dist ${INVOKEAI_SRC}/invokeai/frontend/webv2/dist
 COPY --link --from=legacy-web-builder /legacy-build/dist ${INVOKEAI_SRC}/invokeai/frontend/webv1/dist
 
 # add sources last to minimize image changes on code changes

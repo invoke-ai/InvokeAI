@@ -108,8 +108,9 @@ describe('generate graph coverage', () => {
     // Require nonempty cross-base coverage after runtime seeding.
     expect(checked).toEqual(
       expect.arrayContaining([
-        'anima/standalone-components:qwen-image/undefined',
-        'anima/standalone-components:wan/16',
+        'anima/qwen3:qwen-image/undefined',
+        'anima/qwen3:wan/16',
+        'anima/qwen35:qwen-image/undefined',
         'krea-2/standalone-components:anima/undefined',
         'qwen-image/standalone-components:anima/undefined',
         'z-image/standalone-components:flux/undefined',

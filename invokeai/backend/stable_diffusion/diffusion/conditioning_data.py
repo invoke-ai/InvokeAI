@@ -173,11 +173,22 @@ class AnimaConditioningInfo:
     t5xxl_weights: Optional[torch.Tensor] = None
     """Per-token weights for prompt weighting. Shape: (seq_len,). None means uniform weight."""
 
+    qwen35_states: Optional[torch.Tensor] = None
+    """Qwen3.5 4B hidden states for Anima-3.8B's semantic connector, one row per tapped layer (7, 15,
+    23, 31). Shape: (num_layers, seq_len, 2560). None when the prompt was encoded without Qwen3.5."""
+
+    qwen35_mask: Optional[torch.Tensor] = None
+    """True for valid Qwen3.5 tokens. Shape: (seq_len,). All False for an empty prompt."""
+
     def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
         self.qwen3_embeds = self.qwen3_embeds.to(device=device, dtype=dtype)
         self.t5xxl_ids = self.t5xxl_ids.to(device=device)
         if self.t5xxl_weights is not None:
             self.t5xxl_weights = self.t5xxl_weights.to(device=device, dtype=dtype)
+        if self.qwen35_states is not None:
+            self.qwen35_states = self.qwen35_states.to(device=device, dtype=dtype)
+        if self.qwen35_mask is not None:
+            self.qwen35_mask = self.qwen35_mask.to(device=device)
         return self
 
 

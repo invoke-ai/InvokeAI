@@ -1,7 +1,7 @@
 ---
 title: Anima
 description: Generate anime-style images with Anima, a 2B Cosmos Predict2 diffusion transformer with an LLM adapter, including its schedulers, regional prompting and ControlNet-LLLite adapters.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-02
 sidebar:
   order: 1
 ---
@@ -12,7 +12,8 @@ built-in **LLM adapter** that translates the encoder's output for the transforme
 16-channel Wan 2.1 / Qwen Image VAE.
 
 InvokeAI supports Anima for text-to-image, and on the Canvas for image-to-image, inpainting, outpainting
-and regional prompts.
+and regional prompts. Two community finetunes are supported as well: **Anima-2.9B** and **Anima-3.8B**
+(see [below](#community-finetunes)).
 
 ## License
 
@@ -52,6 +53,38 @@ are not compatible. The same VAE file may be installed under the Anima, Qwen Ima
 three are listed. FLUX VAEs are **not** compatible.
 
 Anima also needs a T5-XXL tokenizer, which ships with InvokeAI; no T5 model has to be installed.
+
+## Community finetunes
+
+Both finetunes keep Anima's VAE, schedulers and Canvas support, and install from the Starter Models.
+
+| Model | What changes | Components |
+| ----- | ------------ | ---------- |
+| **Anima-2.9B** (Preview v1) | 40 transformer blocks instead of 28, trained on 1.7M more images (cutoff July 2026). An int8 build (~3.1 GB) halves the memory of the bf16 one (~5.8 GB); it is not faster. | Same as Anima |
+| **Anima-3.8B** (v1.1) | 52 blocks, plus a **semantic connector** bundled in the checkpoint that adds a second text encoder, **Qwen3.5 4B**, for better prompt adherence, multi-character binding and mixed natural-language/tag prompts. | Qwen3 0.6B **and** Qwen3.5 4B encoder, VAE |
+
+With an Anima-3.8B model selected, the **Components** section shows a third picker, **Qwen3.5 Encoder**,
+and generation needs it. Its starter model (~4.8 GB) installs together with Anima-3.8B. The connector
+runs once per denoising step, so Anima-3.8B is slower per step than Anima-2.9B (about 1.3 against 1.7
+iterations per second at 832×1216 on an RTX 4090), and its Qwen3.5 encoder adds memory while the prompt
+is encoded. **Reset all to model defaults** sets 40 steps at CFG 6, the settings of the author's reference
+workflow.
+
+[FP8 Storage](/configuration/optimization/fp8-storage/) changes Anima-3.8B's images more than Anima's: at
+the same seed the composition can change, where Anima keeps it and only details differ.
+
+Only the v1.1 checkpoint of Anima-3.8B is supported. The earlier v1.0 transformer needs a separate adapter
+file and is refused at install with a message that says so.
+
+Both finetunes are derivatives of Anima and fall under the same non-commercial license.
+
+:::note[LoRAs and LLLite adapters]
+LoRAs and ControlNet-LLLite adapters address the transformer's blocks by position, and the finetunes
+insert their extra blocks between the original ones. Invoke moves an adapter trained on Anima to the
+blocks the finetune kept from Anima, and one trained on Anima-2.9B to its blocks in Anima-3.8B.
+Anima-2.9B keeps Anima's blocks unchanged, so Anima adapters work there as on Anima itself.
+Anima-3.8B changed them slightly and adds the semantic connector, so results there can differ more.
+:::
 
 ## Generation settings
 
@@ -110,8 +143,8 @@ Base 1.0; the pose adapter is notably weak. Only the Inpainting and Sketch adapt
 
 | Node                         | Purpose                                                   |
 | ---------------------------- | --------------------------------------------------------- |
-| **Main Model - Anima**       | Loads the transformer, Qwen3 encoder and VAE              |
-| **Prompt - Anima**           | Encodes a prompt, with an optional regional mask          |
+| **Main Model - Anima**       | Loads the transformer, Qwen3 encoder and VAE, and for Anima-3.8B the Qwen3.5 encoder |
+| **Prompt - Anima**           | Encodes a prompt, with an optional regional mask; connect the Qwen3.5 encoder for Anima-3.8B |
 | **Denoise - Anima**          | Runs sampling; accepts img2img latents, masks and LLLite adapters |
 | **Image to Latents - Anima** | VAE encode                                                |
 | **Latents to Image - Anima** | VAE decode                                                |
