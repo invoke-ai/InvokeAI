@@ -6,7 +6,6 @@ import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { IconButton } from '@platform/ui/Button';
 import { ResizeCorner, trackResizeDrag, usePointerDrag } from '@platform/ui/ResizeHandle';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { wheelScrollsHorizontally } from '@platform/ui/wheelScrollsHorizontally';
 import {
   clampWindowToViewport,
   commitResizedAxes,
@@ -88,7 +87,7 @@ const WINDOW_SX: SystemStyleObject = {
   '&:focus-visible > [data-floating-frame]': FOCUS_RING,
 };
 
-// The title bar has no room for a scrollbar; the strip scrolls by focus, wheel, and touch.
+// The title bar has no room for a scrollbar; the strip scrolls by focus, a sideways scroll, and touch.
 const ACTIONS_SCROLL_SX: SystemStyleObject = { '&::-webkit-scrollbar': { display: 'none' }, scrollbarWidth: 'none' };
 
 /** A window is never shown larger than the viewport, so a resize does not grow past it either. */
@@ -721,13 +720,12 @@ export const FloatingWidgetWindow = ({
            * Render widget actions and settings in a row because floating content has no frame header; window
            * controls already own layout actions. Contributed actions give way before they can push the window's
            * own controls out of a narrow title bar: the ones that do not fit scroll, so focus brings each into
-           * view and a wheel reaches the rest.
+           * view and a sideways scroll or swipe reaches the rest.
            */}
           {isEnabled && widget ? (
             <FloatingChromeBoundary>
               <Suspense fallback={null}>
                 <HStack
-                  ref={wheelScrollsHorizontally}
                   css={ACTIONS_SCROLL_SX}
                   flex="0 1 auto"
                   gap="1"

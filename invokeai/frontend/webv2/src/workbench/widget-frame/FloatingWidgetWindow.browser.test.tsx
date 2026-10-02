@@ -444,17 +444,6 @@ describe('FloatingWidgetWindow chrome', () => {
     }
   });
 
-  it('scrolls the contributed actions with a plain wheel', async () => {
-    windowMocks.useWideActions = true;
-    await renderWindow({ ...state, widthPx: 280 });
-
-    const strip = host!.querySelector<HTMLElement>('[data-floating-actions]')!;
-
-    await act(() => strip.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaY: 60 })));
-
-    expect(strip.scrollLeft).toBe(60);
-  });
-
   it('keeps its own controls inside a minimum-width window whatever the widget contributes', async () => {
     windowMocks.useWideActions = true;
     await renderWindow({ ...state, widthPx: 280 });
