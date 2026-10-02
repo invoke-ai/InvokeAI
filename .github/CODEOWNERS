@@ -1,0 +1,10 @@
+# continuous integration - just maintainers
+/.github/workflows/  @lstein @blessedcoolant @joshistoast
+
+# dependencies - just maintainers
+/pyproject.toml @lstein @blessedcoolant @joshistoast
+
+# version - just maintainers
+/invokeai/version @lstein @blessedcoolant @joshistoast
+
+
