@@ -75,11 +75,12 @@ file and is refused at install with a message that says so.
 
 Both finetunes are derivatives of Anima and fall under the same non-commercial license.
 
-:::caution[LoRAs and LLLite adapters]
-LoRAs and ControlNet-LLLite adapters trained on Anima address its transformer blocks by position. The
-finetunes insert their extra blocks between the original ones, so from the third block on, such an
-adapter patches different blocks than it was trained on. It loads and runs, but expect weaker or
-different results than on Anima itself.
+:::note[LoRAs and LLLite adapters]
+LoRAs and ControlNet-LLLite adapters address the transformer's blocks by position, and the finetunes
+insert their extra blocks between the original ones. Invoke moves an adapter trained on Anima to the
+blocks the finetune kept from Anima, and one trained on Anima-2.9B to its blocks in Anima-3.8B.
+Anima-2.9B keeps Anima's blocks unchanged, so Anima adapters work there as on Anima itself.
+Anima-3.8B trained most of them further, so expect weaker or different results there.
 :::
 
 ## Generation settings

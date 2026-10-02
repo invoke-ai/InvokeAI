@@ -60,6 +60,7 @@ from invokeai.backend.flux.schedulers import (
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import ANIMA_LORA_TRANSFORMER_PREFIX
+from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import anima_lora_for_depth
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import (
     RectifiedFlowInpaintExtension,
@@ -761,7 +762,7 @@ class AnimaDenoiseInvocation(BaseInvocation):
             exit_stack.enter_context(
                 LayerPatcher.apply_smart_model_patches(
                     model=transformer,
-                    patches=self._lora_iterator(context),
+                    patches=self._lora_iterator(context, len(transformer.blocks)),
                     prefix=ANIMA_LORA_TRANSFORMER_PREFIX,
                     dtype=inference_dtype,
                     cached_weights=cached_weights,
@@ -990,8 +991,12 @@ class AnimaDenoiseInvocation(BaseInvocation):
 
         return step_callback
 
-    def _lora_iterator(self, context: InvocationContext) -> Iterator[PatchSpec]:
-        """Iterate over LoRA models to apply to the transformer."""
+    def _lora_iterator(self, context: InvocationContext, transformer_depth: int) -> Iterator[PatchSpec]:
+        """Iterate over LoRA models to apply to the transformer.
+
+        A LoRA trained on a shallower Anima has its blocks moved to where this depth-expanded model keeps
+        them (see `invokeai.backend.anima.block_layout`).
+        """
         for lora in self.transformer.loras:
             lora_info = context.models.load(lora.lora)
             if not isinstance(lora_info.model, ModelPatchRaw):
@@ -999,4 +1004,11 @@ class AnimaDenoiseInvocation(BaseInvocation):
                     f"Expected ModelPatchRaw for LoRA '{lora.lora.key}', got {type(lora_info.model).__name__}. "
                     "The LoRA model may be corrupted or incompatible."
                 )
-            yield (lora_info.model, lora.weight, lora_info.model_in_ram())
+            patch, moved_from = anima_lora_for_depth(lora_info.model, transformer_depth)
+            if moved_from is not None:
+                name = lora_info.config.name if lora_info.config is not None else lora.lora.key
+                context.logger.info(
+                    f"LoRA '{name}' was trained on a {moved_from}-block Anima; applying it to the "
+                    f"matching blocks of this {transformer_depth}-block model."
+                )
+            yield (patch, lora.weight, lora_info.model_in_ram())

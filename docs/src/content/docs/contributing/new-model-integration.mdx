@@ -971,7 +971,7 @@ Anima-2.9B (40 blocks instead of 28) needed only the second row. Anima-3.8B (52 
 
 6. **Unsupported releases.** Refuse a recognized checkpoint you do not support with `InvalidMatchError` and a pointer to the one you do.
 
-7. **Existing adapters.** LoRAs and control adapters address blocks by name, and names carry the block index. A depth expansion that inserts blocks between the original ones shifts every index after the first insertion, so an adapter trained on the original loads and runs against the wrong blocks. Say so in the user guide; a remap needs the insertion positions, which only some checkpoints record.
+7. **Existing adapters.** LoRAs and control adapters address blocks by name, and names carry the block index. A depth expansion that inserts blocks between the original ones shifts every index after the first insertion, so an adapter trained on the original loads and runs against the wrong blocks. A remap needs the insertion positions, and model cards rarely list them, but the weights do. Compare each block of the expanded checkpoint with the original's: a block that was not trained further is bit-identical to its source, and one trained further still has a cosine similarity near 1 to it, while an inserted copy stays far lower. Record the measured table next to the architecture (Anima: `invokeai/backend/anima/block_layout.py`), apply it where the adapter binds, and say in the user guide which results to expect.
 </Steps>
 
 :::tip[Checklist: Extending an architecture]{icon="approve-check"}
