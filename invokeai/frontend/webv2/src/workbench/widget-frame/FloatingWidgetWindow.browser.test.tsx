@@ -1017,6 +1017,38 @@ describe('FloatingWidgetWindow gestures', () => {
     expect(windowMocks.setFloatingGeometry).toHaveBeenCalledTimes(2);
   });
 
+  it('preserves an offscreen stored x position during a vertical resize', async () => {
+    await page.viewport(240, 500);
+    // The window is shown at x=192, but its stored x is still 1000 while the viewport is narrow.
+    await renderWindow({ ...state, heightPx: 300, widthPx: 520, x: 1000, y: 40 });
+    expect(rect().left).toBe(192);
+
+    await act(() => corner().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
+
+    expect(windowMocks.setFloatingGeometry).toHaveBeenCalledExactlyOnceWith('image-map-instance', {
+      heightPx: 316,
+      widthPx: 520,
+      x: 1000,
+      y: 40,
+    });
+  });
+
+  it('preserves an offscreen stored y position during a horizontal resize', async () => {
+    await page.viewport(500, 180);
+    // The window is shown at y=132, but its stored y is still 800 while the viewport is short.
+    await renderWindow({ ...state, heightPx: 300, widthPx: 400, x: 40, y: 800 });
+    expect(rect().top).toBe(132);
+
+    await act(() => corner().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })));
+
+    expect(windowMocks.setFloatingGeometry).toHaveBeenCalledExactlyOnceWith('image-map-instance', {
+      heightPx: 300,
+      widthPx: 416,
+      x: 40,
+      y: 800,
+    });
+  });
+
   it('does not grow a window past the viewport, so an edge at the cap resizes nothing instead of sliding it', async () => {
     await page.viewport(600, 500);
     await renderWindow({ ...state, heightPx: 300, widthPx: 600, x: 0, y: 40 });
