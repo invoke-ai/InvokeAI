@@ -37,6 +37,8 @@ interface WidgetBarProps {
   side: 'left' | 'right';
   groups: WidgetBarGroup[];
   menuItems: WidgetBarItem[];
+  /** The project the rail shows. A marker menu opened for another project closes instead of acting on this one. */
+  projectId: string;
   /** Dock the floating window a marker stands for. */
   onDock: (instanceId: WidgetInstanceId) => void;
   /** Remove the floating window a marker stands for, asked from that marker's own menu. */
@@ -53,6 +55,7 @@ export const WidgetBar = ({
   onRemoveFloating,
   onSelect,
   onToggle,
+  projectId,
   side,
 }: WidgetBarProps) => {
   const { t } = useTranslation();
@@ -62,18 +65,30 @@ export const WidgetBar = ({
     x: number;
     y: number;
   } | null>(null);
-  const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
+  const [instanceMenu, setInstanceMenu] = useState<(WidgetInstanceContextMenuTarget & { projectId: string }) | null>(
+    null
+  );
+
+  // Instance ids repeat across projects (default widgets share theirs), so a menu left open across a project switch
+  // would dock or remove the new project's window. It closes instead, and stays closed if the old project returns.
+  if (instanceMenu && instanceMenu.projectId !== projectId) {
+    setInstanceMenu(null);
+  }
+  const instanceMenuTarget = instanceMenu?.projectId === projectId ? instanceMenu : null;
 
   const openEnableMenu = useCallback((event: MouseEvent) => {
     event.preventDefault();
     setEnableMenuTarget({ x: event.clientX, y: event.clientY });
   }, []);
 
-  const openInstanceMenu = useCallback((item: WidgetBarItem, event: MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setInstanceMenuTarget({ item, x: event.clientX, y: event.clientY });
-  }, []);
+  const openInstanceMenu = useCallback(
+    (item: WidgetBarItem, event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setInstanceMenu({ item, projectId, x: event.clientX, y: event.clientY });
+    },
+    [projectId]
+  );
 
   const positioning = useMemo(
     () =>
@@ -86,7 +101,7 @@ export const WidgetBar = ({
   const trigger = useMemo(() => ({ kind: 'rail', region }) as const, [region]);
   const handleContextClose = useCallback(() => setEnableMenuTarget(null), []);
   const handleMenuToggle = useCallback((item: WidgetEnableMenuItem) => onToggle(item as WidgetBarItem), [onToggle]);
-  const handleInstanceClose = useCallback(() => setInstanceMenuTarget(null), []);
+  const handleInstanceClose = useCallback(() => setInstanceMenu(null), []);
   const handleInstanceDock = useCallback((item: WidgetEnableMenuItem) => onDock(item.id), [onDock]);
   // A marker's menu closes and its marker goes with the window, unlike the enable menu, which stays open: the
   // caller has focus to place only for this one.

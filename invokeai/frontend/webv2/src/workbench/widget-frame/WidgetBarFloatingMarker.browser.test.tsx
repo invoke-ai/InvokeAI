@@ -101,7 +101,7 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const renderBar = async () => {
+const renderBar = async (projectId = 'project-a') => {
   await act(async () => {
     root?.render(
       <I18nextProvider i18n={i18n}>
@@ -111,6 +111,7 @@ const renderBar = async () => {
               edgeRegion="right"
               groups={GROUPS}
               menuItems={viewModel.placedItems}
+              projectId={projectId}
               side="right"
               {...handlers}
             />
@@ -257,6 +258,21 @@ describe('WidgetBar floating marker', () => {
 
     expect(handlers.onToggle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 'queue' }));
     expect(handlers.onRemoveFloating).not.toHaveBeenCalled();
+  });
+
+  it("closes a marker's menu when the project changes, so it cannot dock or remove the new project's window", async () => {
+    await renderBar('project-a');
+    await openMenu(marker());
+    expect(menuItem('dock-widget')).not.toBeNull();
+
+    // Project B has a floating window with the same instance id, as default widgets do.
+    await renderBar('project-b');
+    expect(menuItem('dock-widget')).toBeNull();
+    expect(menuItem('remove-widget')).toBeNull();
+
+    // Coming back to project A does not bring the old menu back.
+    await renderBar('project-a');
+    expect(menuItem('dock-widget')).toBeNull();
   });
 
   it('offers no Dock item for a docked tab', async () => {

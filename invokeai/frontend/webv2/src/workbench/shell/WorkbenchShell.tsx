@@ -38,7 +38,7 @@ import {
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { createWidgetRegionViewModelFromState, getWidgetRegionItems } from '@workbench/widgetRegionViewModel';
 import { getWidgetById, getWidgetsForRegion, widgetRegistrationFailures } from '@workbench/widgetRegistry';
-import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
+import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -66,6 +66,7 @@ export const WorkbenchShell = () => {
   const { focusFloating, focusRegion } = useWorkbenchFocus();
   const { t } = useTranslation();
   const panels = useActiveProjectSelector((project) => project.layout.panels);
+  const projectId = useActiveProjectId();
   const projectName = useActiveProjectSelector((project) => project.name);
   const leftRegion = useActiveProjectSelector((project) => project.widgetRegions.left);
   const rightRegion = useActiveProjectSelector((project) => project.widgetRegions.right);
@@ -333,6 +334,7 @@ export const WorkbenchShell = () => {
                 edgeRegion={isLeftPanelShown ? 'left' : 'center'}
                 groups={leftRailGroups}
                 menuItems={leftMenuItems}
+                projectId={projectId}
                 side="left"
                 onDock={handleDock}
                 onRemoveFloating={handleRemoveFloating}
@@ -346,6 +348,7 @@ export const WorkbenchShell = () => {
                 edgeRegion={isRightPanelShown ? 'right' : 'center'}
                 groups={rightRailGroups}
                 menuItems={rightMenuItems}
+                projectId={projectId}
                 side="right"
                 onDock={handleDock}
                 onRemoveFloating={handleRemoveFloating}
