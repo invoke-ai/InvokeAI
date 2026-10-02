@@ -3,7 +3,9 @@ import type { LucideIcon } from 'lucide-react';
 
 import { Icon, Stack, Text } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
+import { LightbulbFilamentIcon } from '@platform/ui/VendoredIcon';
 import { Link } from '@tanstack/react-router';
+import { openWhatsNew } from '@workbench/shell/whatsNewStore';
 import { useId, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -19,7 +21,7 @@ const FOOTER_MARGIN_TOP = { md: 'auto' } as const;
 
 /**
  * Sections are routes, so the rail is route links in visual order: Workspace, the open projects, Manage, then the
- * footer (Preferences). Tab and reading order follow what the rail shows.
+ * footer (Preferences, then the What's New and Help actions). Tab and reading order follow what the rail shows.
  */
 
 export type LaunchpadNavGroupId = 'workspace' | 'manage' | 'footer';
@@ -67,6 +69,22 @@ const NavLink = ({ isActive, item }: { isActive: boolean; item: LaunchpadNavItem
     </Link>
   </Button>
 );
+
+const WHATS_NEW_JUSTIFY = { justifyContent: 'start' } as const;
+
+/** An action, not a route: styled like the Help trigger beneath it rather than as a rail link. */
+const WhatsNewButton = () => {
+  const { t } = useTranslation();
+
+  return (
+    <Button color="fg.muted" css={WHATS_NEW_JUSTIFY} size="xs" variant="ghost" w="full" onClick={openWhatsNew}>
+      <Icon as={LightbulbFilamentIcon} boxSize="3.5" />
+      <Text flex="1" textAlign="start" truncate>
+        {t('whatsNew.whatsNewInInvoke')}
+      </Text>
+    </Button>
+  );
+};
 
 const NavGroup = ({
   activeId,
@@ -131,6 +149,7 @@ export const LaunchpadNav = ({ activeId, items }: { activeId: string; items: Lau
         {footerItems.map((item) => (
           <NavLink key={item.id} isActive={item.id === activeId} item={item} />
         ))}
+        <WhatsNewButton />
         <HelpMenu />
       </Stack>
     </Stack>

@@ -67,6 +67,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   showPromptSyntaxHighlighting: true,
   showFocusRegionHighlight: true,
   themeId: DEFAULT_THEME_ID,
+  whatsNewSeenVersion: null,
   workflowEdgeStyle: 'curved',
   workflowEdgesBehindNodes: false,
   workflowGroupNodesByCategory: true,
@@ -348,6 +349,10 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
       ? preferences.showPromptSyntaxHighlighting
       : DEFAULT_PREFERENCES.showPromptSyntaxHighlighting,
   themeId: resolveWorkbenchThemeId(preferences?.themeId) ?? DEFAULT_PREFERENCES.themeId,
+  whatsNewSeenVersion:
+    typeof preferences?.whatsNewSeenVersion === 'string'
+      ? preferences.whatsNewSeenVersion
+      : DEFAULT_PREFERENCES.whatsNewSeenVersion,
   workflowEdgeStyle:
     preferences?.workflowEdgeStyle === 'square' || preferences?.workflowEdgeStyle === 'straight'
       ? 'square'

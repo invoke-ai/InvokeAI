@@ -4,6 +4,7 @@ import { AppToaster } from '@platform/ui/toaster';
 import { RouterProvider } from '@tanstack/react-router';
 import { system } from '@theme/system';
 import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
+import { useWhatsNew } from '@workbench/shell/useWhatsNew';
 import { lazy, Suspense } from 'react';
 
 import { FeatureHintsAdapterProvider } from './FeatureHintsProvider';
@@ -28,6 +29,21 @@ const AlphaNoticeGate = () => {
   ) : null;
 };
 
+const WhatsNewDialog = lazy(() =>
+  import('@workbench/shell/WhatsNewDialog').then((module) => ({ default: module.WhatsNewDialog }))
+);
+
+/** Load the What's New notes when a new version has not been seen yet, or when the app menu asks for them. */
+const WhatsNewGate = () => {
+  const { isOpen } = useWhatsNew();
+
+  return isOpen ? (
+    <Suspense fallback={null}>
+      <WhatsNewDialog />
+    </Suspense>
+  ) : null;
+};
+
 export const App = () => (
   <AppProviders>
     <ChakraProvider value={system}>
@@ -35,6 +51,7 @@ export const App = () => (
       <I18nController />
       <AppToaster />
       <AlphaNoticeGate />
+      <WhatsNewGate />
       <FeatureHintsAdapterProvider>
         <RouterProvider router={router} />
       </FeatureHintsAdapterProvider>

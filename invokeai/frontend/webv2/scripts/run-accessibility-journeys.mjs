@@ -534,16 +534,18 @@ const runTopbarMenuJourney = async (browser) => {
     const appMenu = page.getByRole('menu', { exact: true, name: 'Open menu' });
     const commandPaletteItem = page.getByRole('menuitem', { name: /^Command palette/ });
     const settingsItem = appMenu.getByRole('menuitem', { name: /^Settings(?: \(.+\))?$/ });
+    const whatsNewItem = page.getByRole('menuitem', { exact: true, name: "What's New in Invoke" });
     const documentationItem = page.getByRole('menuitem', { exact: true, name: 'Documentation' });
     const discordItem = page.getByRole('menuitem', { exact: true, name: 'Discord' });
     await commandPaletteItem.waitFor();
     await settingsItem.waitFor();
+    await whatsNewItem.waitFor();
     await documentationItem.waitFor();
     await discordItem.waitFor();
 
     const footerMetrics = await appMenu.evaluate((menu) => {
       const menuBounds = menu.getBoundingClientRect();
-      const footerItems = [...menu.querySelectorAll('[role="menuitem"]')].slice(-4);
+      const footerItems = [...menu.querySelectorAll('[role="menuitem"]')].slice(-5);
 
       return {
         itemsFit: footerItems.every((item) => {
@@ -567,7 +569,7 @@ const runTopbarMenuJourney = async (browser) => {
 
     await appMenu.press('End');
     assert.equal(await appMenu.getAttribute('aria-activedescendant'), await discordItem.getAttribute('id'));
-    for (const item of [documentationItem, settingsItem, commandPaletteItem]) {
+    for (const item of [documentationItem, whatsNewItem, settingsItem, commandPaletteItem]) {
       await appMenu.press('ArrowUp');
       assert.equal(await appMenu.getAttribute('aria-activedescendant'), await item.getAttribute('id'));
     }

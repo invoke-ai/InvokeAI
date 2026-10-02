@@ -4593,5 +4593,42 @@
       "estimate": "{{count, number}} selected · {{images}}, {{videos}}, about {{size}}",
       "available": "{{images}}, {{videos}} unused · about {{size}} reclaimable"
     }
+  },
+  "whatsNew": {
+    "alsoNew": "Also in this release",
+    "highlights": {
+      "canvas": {
+        "description": "A new engine with layer groups, blend modes, pressure-sensitive brushes, text, and PSD export.",
+        "title": "Rebuilt Canvas"
+      },
+      "interface": {
+        "description": "One workbench of widgets you can arrange, pop out into windows, or reach from the command palette.",
+        "title": "Redesigned interface"
+      },
+      "models": {
+        "description": "New video models like Wan-2.2, MiniMax H3, and LTX-2.5, plus larger Anima models.",
+        "title": "Expanded model support"
+      },
+      "projects": {
+        "description": "Autosaving projects keep your canvas, settings, and workflows together, and export as .invk files.",
+        "title": "Projects"
+      }
+    },
+    "items": [
+      "Generation settings presets.",
+      "For-loop workflows.",
+      "Search galleries by content or image similarity.",
+      "An interactive image map that groups your gallery by theme and autotags images.",
+      "Dynamic prompts, wildcards, and prompt templates.",
+      "Smaller, faster models with FP8, NVFP4, and int8 quantization.",
+      "Full color theming system with 6 presets.",
+      "Multi-GPU support.",
+      "Interactive intermediates manager.",
+      "Full tablet support.",
+      "And much more!"
+    ],
+    "readReleaseNotes": "Read Release Notes",
+    "readTheDocs": "Read the Docs",
+    "whatsNewInInvoke": "What's New in Invoke"
   }
 }
