@@ -31,8 +31,10 @@ const windowMocks = vi.hoisted(() => ({
   actionsRegion: null as string | null,
   dockFloating: vi.fn(),
   flushWorkbenchDrafts: vi.fn(),
+  layout: { setRegionCollapsed: vi.fn(), setRegionSize: vi.fn() },
   showFocusHighlight: true,
   useFailingWidget: false,
+  useMissingWidget: false,
   useWideActions: false,
   raiseFloating: vi.fn(),
   setFloatingGeometry: vi.fn(),
@@ -49,7 +51,10 @@ const project = {
       typeId: 'image-map',
     },
   },
-  widgetRegions: { center: { activeInstanceId: null, instanceIds: [] } },
+  widgetRegions: {
+    center: { activeInstanceId: null, instanceIds: [] },
+    right: { activeInstanceId: null, instanceIds: [], isCollapsed: false, sizePx: 320 },
+  },
 };
 
 vi.mock('@workbench/WorkbenchContext', () => ({
@@ -59,7 +64,7 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     getProject: (projectId: string) => (projectId === project.id ? project : null),
     isActiveProject: (projectId: string) => projectId === project.id,
   }),
-  useWorkbenchCommands: () => ({ widgets: windowMocks }),
+  useWorkbenchCommands: () => ({ layout: windowMocks.layout, widgets: windowMocks }),
 }));
 
 vi.mock('@platform/react/draftRegistry', async (importOriginal) => ({
@@ -81,7 +86,8 @@ vi.mock('@workbench/settings/store', async (importOriginal) => {
 
 vi.mock('@workbench/WorkbenchWidgetRegistryContext', () => ({
   useWorkbenchWidgetRegistry: () => ({
-    getWidgetById: () => (windowMocks.useFailingWidget ? failingWidget : registeredWidget),
+    getWidgetById: () =>
+      windowMocks.useMissingWidget ? undefined : windowMocks.useFailingWidget ? failingWidget : registeredWidget,
     getWidgetsForRegion: () => [],
   }),
 }));
@@ -91,6 +97,7 @@ vi.mock('@workbench/WorkbenchWidgetRegistryContext', () => ({
 vi.mock('./createWidgetRuntime', () => ({ useWidgetRuntime: () => ({}) }));
 
 import { FloatingWidgetWindow } from './FloatingWidgetWindow';
+import { MissingWidgetFrame } from './WidgetRenderer';
 
 // Floating chrome includes settings; overflow belongs to the docked header cluster.
 const manifest = {
@@ -205,13 +212,15 @@ let testController = createTestFocusController();
 
 const renderWindow = async (
   floatingState: FloatingWidgetState = state,
-  controller: WorkbenchFocusController = testController
+  controller: WorkbenchFocusController = testController,
+  showUnavailablePanel = false
 ) => {
   await act(async () => {
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
           <FocusRegionProvider controller={controller}>
+            {showUnavailablePanel ? <MissingWidgetFrame label="Image Map" region="right" /> : null}
             <FloatingWidgetWindow instanceId="image-map-instance" stackRank={0} state={floatingState} />
           </FocusRegionProvider>
         </ChakraProvider>
@@ -231,6 +240,7 @@ beforeEach(async () => {
   closeWorkbenchSettings();
   windowMocks.actionsRegion = null;
   windowMocks.useFailingWidget = false;
+  windowMocks.useMissingWidget = false;
   windowMocks.useWideActions = false;
   windowMocks.showFocusHighlight = true;
   testController = createTestFocusController();
@@ -624,6 +634,24 @@ describe('FloatingWidgetWindow focus', () => {
     });
 
     expect(focusRegion).toHaveBeenCalledWith('right', 'image-map');
+  });
+
+  it('moves focus to the unavailable-widget panel when its floating window docks', async () => {
+    windowMocks.useMissingWidget = true;
+    const controller = createTestFocusController();
+    // MissingWidgetFrame has no data-hotkey-widget-type-id for the focus resolver to match.
+    await renderWindow(state, controller, true);
+    const dock = host!.querySelector<HTMLButtonElement>('button[aria-label="Dock to right panel"]')!;
+
+    await act(() => dock.click());
+    await act(
+      () =>
+        new Promise<void>((resolve) => {
+          requestAnimationFrame(() => resolve());
+        })
+    );
+
+    expect(document.activeElement).toBe(host!.querySelector('[data-focus-region="right"]'));
   });
 });
 
