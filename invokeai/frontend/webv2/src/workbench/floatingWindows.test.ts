@@ -236,6 +236,14 @@ describe('resizeFloatingGeometry within a viewport', () => {
     expect(resizeFloatingGeometry(start, 'e', 80, 0, viewport)).toEqual(start);
     expect(resizeFloatingGeometry(start, 's', 0, 900, viewport)).toEqual({ ...start, heightPx: 500 });
   });
+
+  it('never raises an axis to a minimum the viewport is smaller than', () => {
+    const narrow = { heightPx: 500, widthPx: 240 };
+    const start = { heightPx: 300, widthPx: 240, x: 0, y: 40 };
+
+    expect(resizeFloatingGeometry(start, 'se', 0, 20, narrow)).toEqual({ ...start, heightPx: 320 });
+    expect(resizeFloatingGeometry(start, 'e', -60, 0, narrow)).toEqual(start);
+  });
 });
 
 describe('commitResizedAxes', () => {

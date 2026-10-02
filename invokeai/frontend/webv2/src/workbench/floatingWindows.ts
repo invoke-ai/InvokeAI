@@ -97,7 +97,8 @@ export type FloatingResizeEdge = 'n' | 's' | 'e' | 'w' | 'ne' | 'nw' | 'se' | 's
 /**
  * Resize from one edge or corner by a pointer offset. The opposite side stays where it is, the size stays between
  * the minimum and `max` (the viewport, which is as large as a window is ever shown), and the top edge stops at the
- * viewport's top so the title bar stays reachable.
+ * viewport's top so the title bar stays reachable. A viewport smaller than the minimum lowers the minimum to it:
+ * the window is shown at the viewport's size there, and raising it to the minimum would read as a resize.
  */
 export const resizeFloatingGeometry = (
   start: FloatingGeometry,
@@ -108,8 +109,10 @@ export const resizeFloatingGeometry = (
 ): FloatingGeometry => {
   const right = start.x + start.widthPx;
   const bottom = start.y + start.heightPx;
-  const clampWidth = (widthPx: number) => Math.max(FLOATING_MIN_WIDTH_PX, Math.min(widthPx, max.widthPx));
-  const clampHeight = (heightPx: number) => Math.max(FLOATING_MIN_HEIGHT_PX, Math.min(heightPx, max.heightPx));
+  const clampWidth = (widthPx: number) =>
+    Math.max(Math.min(FLOATING_MIN_WIDTH_PX, max.widthPx), Math.min(widthPx, max.widthPx));
+  const clampHeight = (heightPx: number) =>
+    Math.max(Math.min(FLOATING_MIN_HEIGHT_PX, max.heightPx), Math.min(heightPx, max.heightPx));
   const geometry = { ...start };
 
   if (edge.includes('e')) {

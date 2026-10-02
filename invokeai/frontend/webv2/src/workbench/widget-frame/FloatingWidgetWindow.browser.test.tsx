@@ -993,6 +993,30 @@ describe('FloatingWidgetWindow gestures', () => {
     });
   });
 
+  it('keeps the stored width when a viewport narrower than the minimum shows the window narrower still', async () => {
+    await page.viewport(240, 500);
+    // 520px wide in storage, shown capped at 240px: below the 280px minimum, which is not the user's choice either.
+    await renderWindow({ ...state, heightPx: 300, widthPx: 520, x: 0, y: 40 });
+
+    await drag(corner(), 0, 50);
+    expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
+      heightPx: 350,
+      widthPx: 520,
+      x: 0,
+      y: 40,
+    });
+
+    await nextFrame();
+    await act(() => corner().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowDown' })));
+    expect(windowMocks.setFloatingGeometry).toHaveBeenLastCalledWith('image-map-instance', {
+      heightPx: 316,
+      widthPx: 520,
+      x: 0,
+      y: 40,
+    });
+    expect(windowMocks.setFloatingGeometry).toHaveBeenCalledTimes(2);
+  });
+
   it('does not grow a window past the viewport, so an edge at the cap resizes nothing instead of sliding it', async () => {
     await page.viewport(600, 500);
     await renderWindow({ ...state, heightPx: 300, widthPx: 600, x: 0, y: 40 });
