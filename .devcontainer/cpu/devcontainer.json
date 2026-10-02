@@ -1,0 +1,53 @@
+{
+    "$schema": "https://raw.githubusercontent.com/devcontainers/spec/main/schemas/devContainer.schema.json",
+    "name": "InvokeAI (CPU-only)",
+    "build": {
+        "dockerfile": "../Containerfile"
+    },
+    "mounts": [
+        {
+            "type": "volume",
+            "source": "InvokeAIData",
+            "target": "/invokeai"
+        }
+    ],
+    "forwardPorts": [
+        9090
+    ],
+    "portsAttributes": {
+        "5173": {
+            "label": "vite"
+        },
+        "6006": {
+            "label": "Storybook"
+        },
+        "9090": {
+            "label": "InvokeAI server"
+        }
+    },
+    "containerEnv": {
+        "GPU_DRIVER": "cpu",
+        "HF_HOME": "/invokeai/.cache/huggingface",
+        "INVOKEAI_ROOT": "/invokeai",
+        "PYTHONPATH": "/invokeai/node-deps/",
+        "UV_CACHE_DIR": "${containerWorkspaceFolder}/.devcontainer/.uv_cache",
+        "UV_COMPILE_BYTECODE": "1",
+        "UV_PYTHON": "3.12"
+    },
+    "onCreateCommand": {
+        "pnpm": "sudo adduser $( id -un ) pnpm",
+        "uv": "sh .devcontainer/install-python.sh"
+    },
+    "postCreateCommand": "sh .devcontainer/post-create.sh $GPU_DRIVER",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "charliermarsh.ruff",
+                "dbaeumer.vscode-eslint",
+                "esbenp.prettier-vscode",
+                "ms-python.python",
+                "vitest.explorer"
+            ]
+        }
+    }
+}
