@@ -40,6 +40,10 @@ const ROUTE_SHARED_MODULES = [
   '/platform/ui/settings/contracts.ts',
   '/platform/core/concurrency.ts',
   '/platform/query/client.ts',
+  // The What's New gate mounts at boot; the app menu and the lazy dialog share these with it.
+  '/platform/runtime/appMetadata.ts',
+  '/workbench/shell/useWhatsNew.ts',
+  '/workbench/shell/whatsNewStore.ts',
   '/platform/time/serverTimestamp.ts',
   '/platform/transport/connectionStore.ts',
   '/platform/transport/socketHub.ts',

@@ -4593,5 +4593,20 @@
       "estimate": "{{count, number}} selected · {{images}}, {{videos}}, about {{size}}",
       "available": "{{images}}, {{videos}} unused · about {{size}} reclaimable"
     }
+  },
+  "whatsNew": {
+    "items": [
+      "Complete frontend facelift with flexible UI widgets.",
+      "Projects that help keep your work organized.",
+      "Powerful new Canvas features.",
+      "Video models: Wan-2.2, MiniMax H3, LTX-2.5.",
+      "Search galleries by content or image similarity.",
+      "An interactive image map that groups your gallery by theme and autotags images.",
+      "Smaller and faster models.",
+      "And much more!"
+    ],
+    "readReleaseNotes": "Read Release Notes",
+    "readTheDocs": "Read the Docs",
+    "whatsNewInInvoke": "What's New in Invoke"
   }
 }

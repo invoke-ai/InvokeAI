@@ -1,16 +1,17 @@
 import { Badge, Box, chakra, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { AccountMenuSection, useCapabilities, useHasAccountSection } from '@features/identity';
 import { getQueueSummary } from '@features/queue/contracts';
-import { APP_VERSION } from '@platform/runtime/appMetadata';
+import { APP_VERSION, DOCS_URL } from '@platform/runtime/appMetadata';
 import { IconButton } from '@platform/ui/Button';
 import { InvokeMark } from '@platform/ui/InvokeMark';
 import { MenuContent } from '@platform/ui/Menu';
 import { Tooltip } from '@platform/ui/Tooltip';
-import { DiscordIcon } from '@platform/ui/VendoredIcon';
+import { DiscordIcon, LightbulbFilamentIcon } from '@platform/ui/VendoredIcon';
 import { useNavigate } from '@tanstack/react-router';
 import { OPEN_COMMAND_PALETTE_HOTKEY } from '@workbench/hotkeys/catalog';
 import { openCommandPalette } from '@workbench/palette/paletteStore';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
+import { openWhatsNew } from '@workbench/shell/whatsNewStore';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';
 import { useActiveProjectId, useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import {
@@ -23,7 +24,6 @@ import {
   SearchIcon,
   SettingsIcon,
   TypeIcon,
-  type LucideIcon,
 } from 'lucide-react';
 import { useCallback, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -31,7 +31,6 @@ import { useTranslation } from 'react-i18next';
 import { useTopbarShortcut } from './useTopbarShortcut';
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
-const DOCS_URL = 'https://invoke-ai.github.io/InvokeAI/';
 const DISCORD_URL = 'https://discord.gg/ZmtBAhwWhy';
 
 export const AppMenu = () => {
@@ -121,6 +120,12 @@ export const AppMenu = () => {
             <HStack gap="0.5" px="0" py="0">
               <SearchMenuAction />
               <SettingsMenuAction onClick={openSettings} />
+              <AppMenuAction
+                icon={LightbulbFilamentIcon}
+                label={t('whatsNew.whatsNewInInvoke')}
+                value="whats-new"
+                onClick={openWhatsNew}
+              />
               <AppMenuLink
                 href={DOCS_URL}
                 icon={BookOpenTextIcon}
@@ -188,7 +193,8 @@ const AppMenuAction = ({
   onClick,
   value,
 }: {
-  icon: LucideIcon;
+  /** Lucide for generic actions, a vendored glyph where one is kept for continuity. */
+  icon: ElementType;
   label: string;
   onClick: () => void;
   value: string;
