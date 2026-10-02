@@ -1,4 +1,3 @@
-import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { RegisteredWidget } from '@workbench/widgetContracts';
 import type {
   PlacedWidgetRegionItem,
@@ -7,9 +6,8 @@ import type {
 } from '@workbench/widgetRegionViewModel';
 
 import { Box, Flex, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
-import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
-import { Button, IconButton, MenuContent } from '@platform/ui';
-import { useFocusRegionProps, useWorkbenchFocus } from '@workbench/focusRegions';
+import { IconButton, MenuContent } from '@platform/ui';
+import { useFocusRegionProps } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import {
   WidgetChromeSlotById,
@@ -20,7 +18,7 @@ import {
   type WidgetEnableMenuItem,
 } from '@workbench/widget-frame';
 import { areWidgetRenderInstancesEqual } from '@workbench/widget-frame/widgetRenderInstance';
-import { resolveDockLabel, resolveWidgetInstanceLabel, resolveWidgetLabel } from '@workbench/widgetLabels';
+import { resolveDockLabel, resolveWidgetLabel } from '@workbench/widgetLabels';
 import { closeWidgetPlacement, openWidgetPlacement, revealWidgetPlacement } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import {
@@ -31,7 +29,7 @@ import {
 import { getWidgetById, getWidgetsForRegion } from '@workbench/widgetRegistry';
 import { useActiveProjectId, useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { CheckIcon, ChevronDownIcon, XIcon } from 'lucide-react';
-import { Activity, Suspense, use, useCallback, useMemo, useRef, type ReactNode } from 'react';
+import { Activity, lazy, Suspense, use, useCallback, useMemo, useRef, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -49,6 +47,12 @@ const CENTER_PREFERRED_REGIONS = ['center'] as const;
 const CENTER_CHROME_INSET_STYLE = { '--wb-center-chrome-inset': '3rem' } as React.CSSProperties;
 // Reserve a usable center width; side panels shrink to honor this floor.
 const CENTER_MIN_WIDTH = '20rem';
+
+// Shown only while the center's last view floats, so it loads once something floats rather than at startup. Its
+// labels are resolved here, so it shares no module with the startup chunks that would have to split out.
+const FloatedCenterView = lazy(() =>
+  import('./FloatedCenterView').then((module) => ({ default: module.FloatedCenterView }))
+);
 
 export const CenterArea = () => {
   const { t } = useTranslation();
@@ -90,13 +94,10 @@ export const CenterArea = () => {
     : centerViewItems[0]?.id;
   const activeItem = centerViewItems.find((item) => item.id === activeCenterViewId);
   // The center emptied because its last view floated away: say so, rather than call the view unavailable.
-  const floatedView =
-    centerRegion.instanceIds.length === 0
-      ? {
-          instance: placementProject.widgetInstances[centerRegion.activeInstanceId],
-          placement: placementProject.floatingPlacements?.[centerRegion.activeInstanceId],
-        }
-      : null;
+  const floatedInstance =
+    centerRegion.instanceIds.length === 0 ? placementProject.widgetInstances[centerRegion.activeInstanceId] : undefined;
+  const floatedPlacement = floatedInstance && placementProject.floatingPlacements?.[floatedInstance.id];
+  const floatedWidget = floatedInstance && getWidgetById(floatedInstance.typeId);
   const projectId = useActiveProjectId();
   const activeIdsElsewhere = useActiveProjectSelector(
     (project) => getActiveInstanceIdsOutside(project.widgetRegions, 'center', project.floatingWidgets),
@@ -174,13 +175,17 @@ export const CenterArea = () => {
                 <KeptCenterViewSlot instanceId={instanceId} />
               </Activity>
             ))
-          ) : floatedView?.instance && floatedView.placement ? (
-            <FloatedCenterView
-              instanceId={floatedView.instance.id}
-              returnRegion={floatedView.placement.returnRegion}
-              title={floatedView.instance.title}
-              typeId={floatedView.instance.typeId}
-            />
+          ) : floatedInstance && floatedPlacement ? (
+            <Suspense fallback={null}>
+              <FloatedCenterView
+                dockLabel={resolveDockLabel(floatedPlacement.returnRegion, t)}
+                instanceId={floatedInstance.id}
+                label={
+                  floatedInstance.title ?? (floatedWidget ? getWidgetLabel(floatedWidget.manifest) : floatedInstance.id)
+                }
+                typeId={floatedInstance.typeId}
+              />
+            </Suspense>
           ) : (
             <FallbackCenterView label="Center widget unavailable" />
           )}
@@ -430,51 +435,6 @@ const KeptCenterViewSlot = ({ instanceId }: { instanceId: string }) => {
   }
 
   return <WidgetRendererById instanceId={instance.id} widget={widget} region="center" />;
-};
-
-/** The empty center while its last view is a floating window: where the view went, and the two ways back. */
-const FloatedCenterView = ({
-  instanceId,
-  returnRegion,
-  title,
-  typeId,
-}: {
-  instanceId: string;
-  returnRegion: WidgetRegion;
-  title?: string;
-  typeId: string;
-}) => {
-  const { t } = useTranslation();
-  const { widgets } = useWorkbenchCommands();
-  const { focusFloating, focusRegion } = useWorkbenchFocus();
-  const widget = getWidgetById(typeId);
-  const label = widget ? resolveWidgetInstanceLabel({ title }, widget.manifest, t) : (title ?? instanceId);
-  const handleShow = useCallback(() => {
-    widgets.revealFloating(instanceId);
-    focusFloating(instanceId);
-  }, [focusFloating, instanceId, widgets]);
-  // Docking from here always gives the center its view back, so focus follows it.
-  const handleDock = useCallback(() => {
-    flushWorkbenchDrafts();
-    widgets.dockFloating(instanceId);
-    focusRegion('center', typeId);
-  }, [focusRegion, instanceId, typeId, widgets]);
-
-  return (
-    <Flex align="center" direction="column" gap="3" h="full" justify="center" px="6" textAlign="center" w="full">
-      <Text color="fg.muted" fontSize="sm">
-        {t('widgets.floating.centerFloating', { label })}
-      </Text>
-      <HStack gap="2" wrap="wrap" justify="center">
-        <Button size="xs" variant="outline" onClick={handleShow}>
-          {t('widgets.floating.showWindow')}
-        </Button>
-        <Button size="xs" variant="outline" onClick={handleDock}>
-          {resolveDockLabel(returnRegion, t)}
-        </Button>
-      </HStack>
-    </Flex>
-  );
 };
 
 const FallbackCenterView = ({ label }: { label: string }) => (

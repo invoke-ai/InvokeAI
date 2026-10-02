@@ -229,7 +229,8 @@ describe('CenterArea with its last view floating', () => {
     floatLastView();
     await render(<CenterArea />);
 
-    expect(host?.textContent).toContain('Preview is in a floating window');
+    // The view loads lazily, once something floats.
+    await vi.waitFor(() => expect(host?.textContent).toContain('Preview is in a floating window'));
     expect(host?.textContent).not.toContain('unavailable');
 
     await act(async () => {

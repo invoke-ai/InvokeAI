@@ -241,45 +241,27 @@ export const WorkbenchShell = () => {
     [focusRegion, isLeftPanelShown, isRightPanelShown, placementProject, widgets]
   );
   // The enable menu stays open and keeps focus, so removing a window from it moves none.
-  const handleToggleLeft = useCallback(
-    (item: (typeof leftMenuItems)[number]) =>
+  const toggleRailItem = useCallback(
+    (region: WidgetBarGroup['region'], item: (typeof leftMenuItems)[number]) =>
       item.isEnabled && item.isFloating
         ? removeFloatingPlacement({ instanceId: item.id, project: placementProject, widgets })
         : item.isEnabled
-          ? closeWidgetPlacement({
-              widgets,
-              getWidgetById,
-              instanceId: item.id,
-              project: placementProject,
-              region: 'left',
-            })
+          ? closeWidgetPlacement({ widgets, getWidgetById, instanceId: item.id, project: placementProject, region })
           : openWidgetPlacement({
               widgets,
               getWidgetsForRegion,
-              options: { createNew: item.allowMultiple, preferredRegions: ['left'] },
+              options: { createNew: item.allowMultiple, preferredRegions: [region] },
               typeId: item.typeId,
             }),
     [placementProject, widgets]
   );
+  const handleToggleLeft = useCallback(
+    (item: (typeof leftMenuItems)[number]) => toggleRailItem('left', item),
+    [toggleRailItem]
+  );
   const handleToggleRight = useCallback(
-    (item: (typeof rightMenuItems)[number]) =>
-      item.isEnabled && item.isFloating
-        ? removeFloatingPlacement({ instanceId: item.id, project: placementProject, widgets })
-        : item.isEnabled
-          ? closeWidgetPlacement({
-              widgets,
-              getWidgetById,
-              instanceId: item.id,
-              project: placementProject,
-              region: 'right',
-            })
-          : openWidgetPlacement({
-              widgets,
-              getWidgetsForRegion,
-              options: { createNew: item.allowMultiple, preferredRegions: ['right'] },
-              typeId: item.typeId,
-            }),
-    [placementProject, widgets]
+    (item: (typeof rightMenuItems)[number]) => toggleRailItem('right', item),
+    [toggleRailItem]
   );
   const leftRailGroups = useMemo(
     () => [
