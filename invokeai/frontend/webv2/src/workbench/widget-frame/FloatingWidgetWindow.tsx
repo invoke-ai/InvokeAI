@@ -30,6 +30,7 @@ import {
   useCallback,
   useMemo,
   useRef,
+  useSyncExternalStore,
   type CSSProperties,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
@@ -241,6 +242,50 @@ interface WindowGesture {
   /** What was stored, which the gesture keeps on every axis it does not change. */
   stored: FloatingGeometry;
 }
+
+const subscribeToViewportSize = (onChange: () => void): (() => void) => {
+  window.addEventListener('resize', onChange);
+  return () => window.removeEventListener('resize', onChange);
+};
+const getViewportWidthPx = (): number => window.innerWidth;
+const getViewportHeightPx = (): number => window.innerHeight;
+
+/**
+ * The window's one labelled resize control. It announces the size on screen, which the viewport may cap below the
+ * stored one, and follows the viewport: a browser window that shrinks re-renders this grip and nothing else, so
+ * it never announces a size nobody sees.
+ */
+const FloatingResizeCorner = ({
+  heightPx,
+  onKeyDown,
+  onPointerDown,
+  widthPx,
+}: {
+  /** The stored size. */
+  heightPx: number;
+  widthPx: number;
+  onKeyDown: (event: ReactKeyboardEvent<HTMLDivElement>) => void;
+  onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
+}) => {
+  const { t } = useTranslation();
+  const viewportWidthPx = useSyncExternalStore(subscribeToViewportSize, getViewportWidthPx);
+  const viewportHeightPx = useSyncExternalStore(subscribeToViewportSize, getViewportHeightPx);
+  const shownWidthPx = Math.min(widthPx, viewportWidthPx);
+  const shownHeightPx = Math.min(heightPx, viewportHeightPx);
+
+  return (
+    <ResizeCorner
+      label={t('widgets.floating.resize')}
+      valueMax={viewportWidthPx}
+      // A viewport narrower than the minimum shows the window narrower still.
+      valueMin={Math.min(FLOATING_MIN_WIDTH_PX, shownWidthPx)}
+      valueNow={shownWidthPx}
+      valueText={t('widgets.floating.resizeValue', { height: shownHeightPx, width: shownWidthPx })}
+      onKeyDown={onKeyDown}
+      onPointerDown={onPointerDown}
+    />
+  );
+};
 
 /**
  * Isolate arbitrary widget controls from title-bar drag and double-click maximize gestures; not every control is a
@@ -753,12 +798,9 @@ export const FloatingWidgetWindow = ({
       {isShaded || isMaximized ? null : (
         <>
           <FloatingResizeHandles onResizeStart={startWindowDrag} />
-          <ResizeCorner
-            label={t('widgets.floating.resize')}
-            valueMax={Math.max(widthPx, window.innerWidth)}
-            valueMin={FLOATING_MIN_WIDTH_PX}
-            valueNow={widthPx}
-            valueText={t('widgets.floating.resizeValue', { height: heightPx, width: widthPx })}
+          <FloatingResizeCorner
+            heightPx={heightPx}
+            widthPx={widthPx}
             onKeyDown={handleResizeKeyDown}
             onPointerDown={handleCornerPointerDown}
           />

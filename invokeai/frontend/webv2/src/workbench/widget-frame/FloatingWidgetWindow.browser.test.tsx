@@ -822,6 +822,31 @@ describe('FloatingWidgetWindow gestures', () => {
     expect(Number(corner().getAttribute('aria-valuemax'))).toBeGreaterThanOrEqual(500);
   });
 
+  it('announces the size on screen through the resize control, following the viewport that caps it', async () => {
+    await renderWindow({ ...state, heightPx: 700, widthPx: 900, x: 0, y: 0 });
+
+    expect(corner().getAttribute('aria-valuenow')).toBe('900');
+    expect(corner().getAttribute('aria-valuetext')).toBe('900 by 700 pixels');
+
+    // The browser window shrinks under a window that nothing else re-renders.
+    await act(() => page.viewport(600, 500));
+    await nextFrame();
+
+    expect(rect()).toMatchObject({ height: 500, width: 600 });
+    expect(corner().getAttribute('aria-valuenow')).toBe('600');
+    expect(corner().getAttribute('aria-valuemax')).toBe('600');
+    expect(corner().getAttribute('aria-valuetext')).toBe('600 by 500 pixels');
+    expect(windowMocks.setFloatingGeometry).not.toHaveBeenCalled();
+  });
+
+  it('never announces a minimum above the size a viewport narrower than it shows', async () => {
+    await page.viewport(240, 500);
+    await renderWindow({ ...state, x: 0, y: 0 });
+
+    expect(corner().getAttribute('aria-valuenow')).toBe('240');
+    expect(corner().getAttribute('aria-valuemin')).toBe('240');
+  });
+
   it('has no resize handles while maximized or collapsed', async () => {
     for (const mode of ['maximized', 'shaded'] as const) {
       await renderWindow({ ...state, mode });
