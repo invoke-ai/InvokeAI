@@ -29,8 +29,11 @@ export interface WorkbenchFocusController {
   clear(): void;
   /** Move keyboard focus into a floating window once it shows; focus arriving there activates it. */
   focusFloating(instanceId: WidgetInstanceId): void;
-  /** Move keyboard focus into the region a control just opened a widget in, once that widget shows. */
-  focusRegion(region: WidgetRegion, typeId: string): void;
+  /**
+   * Move keyboard focus into the region a control just opened a widget in, once that widget shows. Without a
+   * widget, focus moves into the region as it stands.
+   */
+  focusRegion(region: WidgetRegion, typeId?: string): void;
   /** The focus target, or null once it no longer describes something on screen in this project and account. */
   getTarget(): WorkbenchFocusTarget | null;
   subscribe(listener: () => void): () => void;
@@ -173,7 +176,7 @@ export const createWorkbenchFocusController = ({
         for (const container of document.querySelectorAll<HTMLElement>(`[data-focus-region="${region}"]`)) {
           if (
             container.getClientRects().length > 0 &&
-            container.querySelector(`[data-hotkey-widget-type-id="${CSS.escape(typeId)}"]`)
+            (typeId === undefined || container.querySelector(`[data-hotkey-widget-type-id="${CSS.escape(typeId)}"]`))
           ) {
             return container;
           }

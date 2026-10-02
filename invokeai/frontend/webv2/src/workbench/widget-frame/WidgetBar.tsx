@@ -39,11 +39,22 @@ interface WidgetBarProps {
   menuItems: WidgetBarItem[];
   /** Dock the floating window a marker stands for. */
   onDock: (instanceId: WidgetInstanceId) => void;
+  /** Remove the floating window a marker stands for, asked from that marker's own menu. */
+  onRemoveFloating: (instanceId: WidgetInstanceId) => void;
   onSelect: (region: WidgetBarGroup['region'], instanceId: WidgetInstanceId) => void;
   onToggle: (item: WidgetBarItem) => void;
 }
 
-export const WidgetBar = ({ edgeRegion, groups, menuItems, onDock, onSelect, onToggle, side }: WidgetBarProps) => {
+export const WidgetBar = ({
+  edgeRegion,
+  groups,
+  menuItems,
+  onDock,
+  onRemoveFloating,
+  onSelect,
+  onToggle,
+  side,
+}: WidgetBarProps) => {
   const { t } = useTranslation();
   const isEdgeOutlined = useHighlightedRegion() === edgeRegion;
   const region = side;
@@ -77,6 +88,13 @@ export const WidgetBar = ({ edgeRegion, groups, menuItems, onDock, onSelect, onT
   const handleMenuToggle = useCallback((item: WidgetEnableMenuItem) => onToggle(item as WidgetBarItem), [onToggle]);
   const handleInstanceClose = useCallback(() => setInstanceMenuTarget(null), []);
   const handleInstanceDock = useCallback((item: WidgetEnableMenuItem) => onDock(item.id), [onDock]);
+  // A marker's menu closes and its marker goes with the window, unlike the enable menu, which stays open: the
+  // caller has focus to place only for this one.
+  const handleInstanceRemove = useCallback(
+    (item: WidgetEnableMenuItem) =>
+      (item as WidgetBarItem).isFloating ? onRemoveFloating(item.id) : onToggle(item as WidgetBarItem),
+    [onRemoveFloating, onToggle]
+  );
   // A marker only ever shows in the rail its window returns to.
   const isMarkerMenu = (instanceMenuTarget?.item as WidgetBarItem | undefined)?.isFloating === true;
 
@@ -125,7 +143,7 @@ export const WidgetBar = ({ edgeRegion, groups, menuItems, onDock, onSelect, onT
         target={instanceMenuTarget}
         onClose={handleInstanceClose}
         onDock={handleInstanceDock}
-        onRemove={handleMenuToggle}
+        onRemove={handleInstanceRemove}
       />
     </Flex>
   );

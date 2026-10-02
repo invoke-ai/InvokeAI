@@ -1048,6 +1048,63 @@ const runFloatingWindowJourney = async (browser) => {
     await waitForSettledDocument(page);
     await assertNoAxeViolations(page, `${id}:docked`);
 
+    // Removing a window from its marker's menu takes the menu and the marker with it. Focus goes to the panel the
+    // window's rail is showing, or to the center when that rail shows none: collapsed, or emptied by the float.
+    const floatImageMapFrom = async (widgetRail, menuName) => {
+      await widgetRail.getByRole('button', { exact: true, name: menuName }).click();
+      await page.getByRole('menuitemcheckbox', { exact: true, name: 'Image Map' }).click();
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
+      await floatingWindow.waitFor();
+      await waitForActiveWindow();
+    };
+    // From the keyboard, where losing focus costs the most: Remove is the menu's last item.
+    const removeImageMapFrom = async (widgetRail, focusedRegionAfter) => {
+      await widgetRail.getByRole('button', { exact: true, name: 'Image Map, floating window' }).focus();
+      await page.keyboard.press('Shift+F10');
+      await page.waitForFunction(() => Boolean(document.activeElement?.closest('[role="menu"]')));
+      await page.keyboard.press('End');
+      await page.keyboard.press('Enter');
+      await floatingWindow.waitFor({ state: 'detached' });
+      await waitForFocusedRegion(focusedRegionAfter);
+    };
+
+    await floatImageMapFrom(rail, 'Inspect widgets');
+    await removeImageMapFrom(rail, 'right');
+
+    await floatImageMapFrom(rail, 'Inspect widgets');
+    await rail.getByRole('button', { pressed: true }).click();
+    await page.getByRole('complementary', { exact: true, name: 'right widget panel' }).waitFor({ state: 'detached' });
+    await removeImageMapFrom(rail, 'center');
+
+    const leftRail = page.getByRole('navigation', { exact: true, name: 'Create widget visibility' });
+    for (const name of ['Video', 'Upscale']) {
+      await leftRail.getByRole('button', { exact: true, name }).click({ button: 'right' });
+      await page.getByRole('menuitem', { exact: true, name: `Remove ${name}` }).click();
+    }
+    await floatImageMapFrom(leftRail, 'Create widgets');
+    await page.getByRole('complementary', { exact: true, name: 'left widget panel' }).waitFor({ state: 'detached' });
+    await removeImageMapFrom(leftRail, 'center');
+
+    // The enable menu stays open across a toggle and keeps focus; removing a window from it moves none.
+    await floatImageMapFrom(leftRail, 'Create widgets');
+    await leftRail.getByRole('button', { exact: true, name: 'Create widgets' }).click();
+    await page.getByRole('menuitemcheckbox', { exact: true, name: 'Image Map' }).click();
+    await floatingWindow.waitFor({ state: 'detached' });
+    // A focus move would have landed within a frame of the removal.
+    await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        })
+    );
+    assert.equal(
+      await page.evaluate(() => Boolean(document.activeElement?.closest('[role="menu"]'))),
+      true,
+      'Removing a window from the enable menu must leave focus in that menu.'
+    );
+    await page.keyboard.press('Escape');
+
     if (pageErrors.length > 0) {
       throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
     }

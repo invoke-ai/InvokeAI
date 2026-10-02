@@ -210,31 +210,35 @@ export const WorkbenchShell = () => {
     },
     [focusRegion, placementProject, widgets]
   );
-  const closeFloating = useCallback(
+  const handleRemoveFloating = useCallback(
     (instanceId: string) => {
-      const { widgetInstances, widgetRegions } = placementProject;
+      const typeId = placementProject.widgetInstances[instanceId]?.typeId;
       const removed = removeFloatingPlacement({ instanceId, project: placementProject, widgets });
 
       if (!removed) {
         return;
       }
 
-      // The menu that asked and the marker it hung from are both gone. Focus goes to the center when it gets its
-      // view back, otherwise to whatever the window's own rail is showing.
-      const region = removed.restoresCenter ? 'center' : removed.returnRegion;
-      const shownInstanceId = removed.restoresCenter ? instanceId : widgetRegions[region].activeInstanceId;
-      const typeId = widgetInstances[shownInstanceId]?.typeId;
-
-      if (typeId) {
-        focusRegion(region, typeId);
+      // The marker's menu that asked and the marker itself are both gone. Focus goes to the center when it gets
+      // its view back, otherwise to the panel the window's own rail is showing. Removing leaves that rail as it
+      // was, so a rail showing no panel — emptied by the float, or collapsed — hands focus to the center instead.
+      if (removed.restoresCenter) {
+        focusRegion('center', typeId);
+        return;
       }
+
+      const isRailPanelShown =
+        removed.returnRegion === 'left' ? isLeftPanelShown : removed.returnRegion === 'right' && isRightPanelShown;
+
+      focusRegion(isRailPanelShown ? removed.returnRegion : 'center');
     },
-    [focusRegion, placementProject, widgets]
+    [focusRegion, isLeftPanelShown, isRightPanelShown, placementProject, widgets]
   );
+  // The enable menu stays open and keeps focus, so removing a window from it moves none.
   const handleToggleLeft = useCallback(
     (item: (typeof leftMenuItems)[number]) =>
       item.isEnabled && item.isFloating
-        ? closeFloating(item.id)
+        ? removeFloatingPlacement({ instanceId: item.id, project: placementProject, widgets })
         : item.isEnabled
           ? closeWidgetPlacement({
               widgets,
@@ -249,12 +253,12 @@ export const WorkbenchShell = () => {
               options: { createNew: item.allowMultiple, preferredRegions: ['left'] },
               typeId: item.typeId,
             }),
-    [closeFloating, placementProject, widgets]
+    [placementProject, widgets]
   );
   const handleToggleRight = useCallback(
     (item: (typeof rightMenuItems)[number]) =>
       item.isEnabled && item.isFloating
-        ? closeFloating(item.id)
+        ? removeFloatingPlacement({ instanceId: item.id, project: placementProject, widgets })
         : item.isEnabled
           ? closeWidgetPlacement({
               widgets,
@@ -269,7 +273,7 @@ export const WorkbenchShell = () => {
               options: { createNew: item.allowMultiple, preferredRegions: ['right'] },
               typeId: item.typeId,
             }),
-    [closeFloating, placementProject, widgets]
+    [placementProject, widgets]
   );
   const leftRailGroups = useMemo(
     () => [
@@ -331,6 +335,7 @@ export const WorkbenchShell = () => {
                 menuItems={leftMenuItems}
                 side="left"
                 onDock={handleDock}
+                onRemoveFloating={handleRemoveFloating}
                 onSelect={handleSelect}
                 onToggle={handleToggleLeft}
               />
@@ -343,6 +348,7 @@ export const WorkbenchShell = () => {
                 menuItems={rightMenuItems}
                 side="right"
                 onDock={handleDock}
+                onRemoveFloating={handleRemoveFloating}
                 onSelect={handleSelect}
                 onToggle={handleToggleRight}
               />

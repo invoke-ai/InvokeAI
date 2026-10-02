@@ -79,6 +79,7 @@ await i18n.use(initReactI18next).init({
             railMarker: '{{label}}, floating window',
             railMarkerHint: '{{label}} is floating — click to show the window',
           },
+          rail: { inspectWidgets: 'Inspect widgets' },
           removeWidget: 'Remove {{label}}',
         },
       },
@@ -86,7 +87,7 @@ await i18n.use(initReactI18next).init({
   },
 });
 
-const handlers = { onDock: vi.fn(), onSelect: vi.fn(), onToggle: vi.fn() };
+const handlers = { onDock: vi.fn(), onRemoveFloating: vi.fn(), onSelect: vi.fn(), onToggle: vi.fn() };
 const GROUPS: WidgetBarGroup[] = [
   {
     activeId: 'gallery',
@@ -218,8 +219,44 @@ describe('WidgetBar floating marker', () => {
       await Promise.resolve();
     });
 
-    expect(handlers.onToggle).toHaveBeenCalledWith(expect.objectContaining({ id: 'image-map', isFloating: true }));
+    expect(handlers.onRemoveFloating).toHaveBeenCalledExactlyOnceWith('image-map');
+    expect(handlers.onToggle).not.toHaveBeenCalled();
     expect(handlers.onDock).not.toHaveBeenCalled();
+  });
+
+  it('removes the window from the enable menu as a toggle, not as a marker removal', async () => {
+    await renderBar();
+    await act(async () => {
+      slot('Inspect widgets').click();
+      await Promise.resolve();
+    });
+
+    const row = [...document.body.querySelectorAll<HTMLElement>('[role="menuitemcheckbox"]')].find(
+      (item) => item.textContent === 'Image Map'
+    )!;
+
+    await act(async () => {
+      row.click();
+      await Promise.resolve();
+    });
+
+    expect(handlers.onToggle).toHaveBeenCalledExactlyOnceWith(
+      expect.objectContaining({ id: 'image-map', isFloating: true })
+    );
+    expect(handlers.onRemoveFloating).not.toHaveBeenCalled();
+  });
+
+  it('removes a docked tab from its menu as a toggle', async () => {
+    await renderBar();
+    await openMenu(slot('Queue'));
+
+    await act(async () => {
+      menuItem('remove-widget')?.click();
+      await Promise.resolve();
+    });
+
+    expect(handlers.onToggle).toHaveBeenCalledExactlyOnceWith(expect.objectContaining({ id: 'queue' }));
+    expect(handlers.onRemoveFloating).not.toHaveBeenCalled();
   });
 
   it('offers no Dock item for a docked tab', async () => {

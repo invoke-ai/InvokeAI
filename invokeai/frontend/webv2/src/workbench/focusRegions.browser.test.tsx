@@ -131,6 +131,18 @@ describe('focusRegion', () => {
     expect(center.getAttribute('data-highlighted')).toBe('true');
   });
 
+  it('moves focus into a region as it stands when no widget is named', async () => {
+    // The editor never opens here, so a move waiting on a widget would leave focus on the opener.
+    const { center, opener } = await renderHarness((_open, focusRegion) => focusRegion('center'));
+    opener.focus();
+
+    await act(() => opener.click());
+    await frames(3);
+
+    expect(document.activeElement).toBe(center);
+    expect(center.getAttribute('data-highlighted')).toBe('true');
+  });
+
   it('keeps the move when a closing menu hands focus back to the control that opened it', async () => {
     const { center, opener } = await renderHarness();
     // A menu item's menu restores focus to its trigger as it closes, after the move has landed.
