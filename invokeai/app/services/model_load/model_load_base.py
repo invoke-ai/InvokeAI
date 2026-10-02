@@ -1,4 +1,3 @@
-# Copyright (c) 2024 Lincoln D. Stein and the InvokeAI Team
 """Base class for model loader."""
 
 from abc import ABC, abstractmethod

@@ -84,7 +84,7 @@ def mm2_app_config(mm2_root_dir: Path) -> InvokeAIAppConfig:
 
 @pytest.fixture
 def mm2_download_queue(mm2_session: Session) -> DownloadQueueServiceBase:
-    download_queue = DownloadQueueService(requests_session=mm2_session)
+    download_queue = DownloadQueueService(requests_session=mm2_session, requests_session_is_trusted=True)
     download_queue.start()
     yield download_queue
     download_queue.stop()

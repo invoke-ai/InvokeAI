@@ -1,0 +1,171 @@
+---
+title: Krea-2
+description: Generate images with the Krea-2 text-to-image models (Turbo and Raw), including the GGUF / single-file workflow, the conditioning enhancers and training-free style reference.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 7
+---
+
+Krea-2 is a ~12B single-stream diffusion-transformer text-to-image family. InvokeAI supports both
+published checkpoints:
+
+- **Krea-2-Turbo** — distilled for fast, low-step generation. Runs at **8 steps** with **CFG disabled**
+  (CFG Scale `1.0`). This is the recommended checkpoint for everyday use.
+- **Krea-2-Raw** — the undistilled base checkpoint. Runs at **more steps (~28)** with **CFG enabled**
+  (CFG Scale ~`5.5`, equivalent to the reference pipeline's guidance `4.5`) and supports negative prompts. It is primarily intended as a base for
+  finetuning / LoRA training, but full inference is supported.
+
+The variant is detected automatically on install, and selecting a Krea-2 model sets sensible defaults
+(steps, CFG, 1024×1024) for that variant.
+
+## License
+
+Krea-2 Turbo and Raw are released under the **Krea 2 Community License**. Commercial use of the model and its images is allowed only for companies with less than $1M in annual revenue; above that, an Enterprise license is needed. Redistributed copies must add "Krea" to the model name. The full Diffusers repositories are gated: accept the license on the model's HuggingFace page and add your HuggingFace token under **API Keys** in the Model Manager. The quantized GGUF and NVFP4 copies are not gated, but the same license applies.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
+## Hardware
+
+Krea-2 is a large model. See the [System Requirements](/start-here/system-requirements/) table for
+details. In short, on a 24 GB card enable **FP8** in the model's Default Settings to fit 1024² (with a
+LoRA). For lower VRAM, use a smaller transformer build:
+
+| Transformer build           | Transformer size | Notes                                                       |
+| --------------------------- | ---------------- | ----------------------------------------------------------- |
+| NVFP4 (starter model)       | ≈ 7.2 GiB        | stays packed, unpacked per layer on any GPU                 |
+| GGUF Q4_K_M (starter model) | ≈ 7 GB           | stays packed, unpacked per layer                            |
+| GGUF Q8_0 (starter model)   | ≈ 13 GB          | near-full quality                                           |
+| int8 (`int8_convrot`)       | ≈ 12.6 GiB       | stays int8 on every device, no FP8 setting needed           |
+| fp8 / `fp8_scaled`          | ≈ 12.6 GB        | with FP8 Storage (switched on at install) or `fp8_compute`  |
+| MXFP8                       | ≈ 24 GB          | unpacked to BF16 at load; prefer the fp8, NVFP4 or GGUF build |
+
+The Qwen3-VL encoder and the small VAE come on top of these sizes. The encoder takes about 8.5 GB as bf16
+(the starter bundle's encoder), about half that as fp8, and about 2.8 GB as a Q4_K_M
+[GGUF Qwen3-VL encoder](#qwen3-vl-gguf-encoders).
+
+## Installing
+
+The easiest path is the **Krea-2 launchpad bundle** in the Model Manager, which installs the models and
+their dependencies together.
+
+Krea-2 needs three components:
+
+| Component               | Diffusers install       | GGUF / single-file install           |
+| ----------------------- | ----------------------- | ------------------------------------ |
+| Transformer             | bundled in the pipeline | the `.gguf` / single-file checkpoint (GGUF, fp8, int8, NVFP4, MXFP8) |
+| VAE (Qwen-Image)        | bundled                 | installed separately                 |
+| Text encoder (Qwen3-VL) | bundled                 | installed separately                 |
+
+- **Diffusers** (e.g. `krea/Krea-2-Turbo`, `krea/Krea-2-Raw`): a single ~26 GB install that bundles the
+  VAE and text encoder. Nothing else is required.
+- **GGUF / single-file**: the checkpoint ships **only the transformer**. You must also install a
+  standalone **Qwen-Image VAE** and a **Qwen3-VL encoder** (both included in the launchpad bundle).
+
+When you select a GGUF/single-file Krea-2 model, InvokeAI auto-selects an installed VAE and Qwen3-VL
+encoder if you have them. If none are installed, you'll be prompted to pick them (in the model dropdowns)
+before you can generate. Selecting a Diffusers Krea-2 model clears those standalone selections and uses
+the bundled components.
+
+:::note[Qwen3-VL encoder]
+Single-file Qwen3-VL encoders bundle only the weights. Their tokenizer and architecture config ship
+with InvokeAI, so these encoders load without network access. A single-file fp8 encoder is kept
+resident in fp8 (roughly half the VRAM of the bf16 encoder).
+:::
+
+### Qwen3-VL GGUF encoders
+
+The Qwen3-VL encoder can also be a llama.cpp GGUF, for the 4B encoder Krea-2 uses and for the 8B encoder
+Ideogram 4 uses. A Q4_K_M 4B file is about 2.5 GB and takes about 2.8 GB of VRAM, against 8.5 GB for
+the bf16 safetensors encoder, so encoder and transformer fit on the GPU together. Images match the bf16
+encoder closely; the remaining difference is the quantization of the encoder.
+
+- Use a Qwen3-VL GGUF, such as the files in `Qwen/Qwen3-VL-4B-Instruct-GGUF`. A plain Qwen3 GGUF has the
+  same shapes but conditions wrongly, so InvokeAI identifies the encoder from the file's
+  `qwen3vl` architecture tag and does not install a plain Qwen3 file as one.
+- The `mmproj-*.gguf` file next to it holds the vision part and is not needed. Installing it is refused
+  with a message saying so.
+- LoRAs with text-encoder layers still apply to a quantized encoder.
+
+## Conditioning enhancers
+
+Two optional, off-by-default toggles are available under **Advanced Options** (below CFG Scale). They
+transform the text conditioning and are especially useful for the distilled Turbo checkpoint:
+
+- **Conditioning Rebalance** — per-layer weighting of the text embedding to improve prompt adherence.
+- **Seed Variance Enhancer** — injects controlled noise into the conditioning to restore per-seed
+  diversity (the distilled model otherwise produces near-identical images across seeds), trading some
+  prompt adherence for variety.
+
+Both are recorded in image metadata and can be recalled.
+When enabled on the canvas, the same enhancer chain is applied independently to the global prompt and
+each positive regional prompt before their conditionings are collected.
+
+## Multiple conditionings
+
+In the workflow editor, the **Denoise - Krea-2** node accepts one conditioning or a collection for both
+its positive and negative conditioning inputs. Multiple independently encoded conditionings are concatenated
+after padding tokens are removed.
+
+The **Text Encoder - Krea-2** node also accepts an optional mask. A masked conditioning applies to that
+image region; an unmasked conditioning applies to the background not covered by any regional mask. If
+regional masks cover the full image, an unmasked conditioning falls back to the full image instead of being
+ignored. Krea-2 uses restricted attention on alternating main transformer blocks, leaving the other blocks
+unrestricted to preserve image-wide coherence. Positive regional prompts are available on the canvas. In
+workflows, masked conditioning collections can also be supplied to the negative input when CFG is enabled.
+Canvas regional negative prompts, auto-negative, and regional reference images are not supported.
+
+:::caution[Regional prompting memory]
+Regional prompting builds a dense boolean attention mask whose memory grows quadratically with the combined
+text and image token count. Invoke reserves memory for retained masks, construction scratch space, and the
+dtype-sized additive attention bias created by SDPA. Fused memory-efficient attention support for dense masks
+still depends on the GPU, PyTorch build, dtype, and sequence shape. When no fused kernel is available, PyTorch
+falls back to math attention, which may use substantially more VRAM and can cause an out-of-memory error.
+Reducing image resolution or disabling regional prompting is the practical fallback. Automated CUDA coverage
+is skipped on unsupported hardware and cannot exercise every GPU/backend combination.
+:::
+
+## Style reference
+
+Krea-2 can transfer the *look* of a reference image — palette, texture, rendering — while the prompt keeps
+driving the content. There is **no adapter model and no LoRA**: the reference's attention keys and values
+are spliced into the target's, so it works with any Krea-2 checkpoint out of the box.
+
+On the canvas, add a **Reference Image** while a Krea-2 model is selected, pick an image, and set **Style
+Strength**. In the workflow editor the same thing is the **Style Reference - Krea-2** node, feeding the
+**Style Reference** input of **Denoise - Krea-2**.
+
+- **Style Strength** is the one knob you need. `1.0` is the recommended setting; the slider goes to `2.0`
+  for a heavier effect. `0` disables the reference entirely and costs nothing.
+- The remaining node inputs (block range, key/value scaling, AdaIN strengths) are for tuning and should be
+  left at their defaults. Style Strength already modulates several of them.
+- Style Strength is recorded in image metadata, so you can see what a given image was generated with. It has
+  no recall button of its own — the reference image itself is not part of the metadata.
+
+:::caution[One reference, matching size, roughly 2x runtime]
+- **Exactly one** reference image is used. If several are enabled on the canvas, only the first is applied
+  and the others are flagged with a warning.
+- The reference must be encoded at **the same width and height as the denoise node** — its image tokens are
+  appended to the target's. On the canvas this is wired up for you. In the workflow editor, set the same
+  width and height on both nodes, or the denoise node will refuse the reference.
+- Every step runs **one extra transformer pass** for the reference, so generation takes roughly **twice as
+  long**.
+- The reference's keys and values are retained for the whole step: about **0.5 GB at 1024²** and **1.7 GB at
+  2560×1440**. At 1440p that no longer fits on a 24 GB card alongside the model.
+:::
+
+## LoRA
+
+Krea-2 LoRAs (diffusers PEFT format) are supported and apply to both the transformer and — where the
+LoRA includes text-encoder layers — the Qwen3-VL encoder. On quantized builds (GGUF, int8, NVFP4) the LoRA
+is applied alongside the packed weights rather than merged into them.
+
+## Attention backend
+
+On CUDA, Krea-2 picks the fastest available attention kernel by itself (Flash Attention where the PyTorch
+build has it, then cuDNN, then memory-efficient attention). For benchmarking or support questions you
+can force one kernel with the environment variable `INVOKE_KREA2_SDPA_BACKEND`: `flash`, `cudnn`,
+`efficient` or `math`, or `default` for the automatic order. A forced kernel that the GPU or build does
+not support raises an error instead of quietly falling back, and an unknown value stops InvokeAI at startup.
+
+Any value, `default` included, also turns on per-step timing in the log, which synchronizes the GPU after
+every step and slows generation slightly. Unset the variable for normal use.

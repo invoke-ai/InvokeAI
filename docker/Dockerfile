@@ -8,10 +8,17 @@ ENV PATH="$PNPM_HOME:$PATH"
 RUN corepack use pnpm@10.x && corepack enable
 
 WORKDIR /build
-COPY invokeai/frontend/web/ ./
+COPY invokeai/frontend/webv2/ ./
 RUN --mount=type=cache,target=/pnpm/store \
     pnpm install --frozen-lockfile
-RUN npx vite build
+RUN pnpm exec vite build
+
+FROM web-builder AS legacy-web-builder
+WORKDIR /legacy-build
+COPY invokeai/frontend/webv1/ ./
+RUN --mount=type=cache,target=/pnpm/store \
+    pnpm install --frozen-lockfile
+RUN pnpm exec vite build
 
 ## Backend ---------------------------------------
 
@@ -53,7 +60,7 @@ ENV \
 ARG GPU_DRIVER=cuda
 
 # Install `uv` for package management
-COPY --from=ghcr.io/astral-sh/uv:0.6.9 /uv /uvx /bin/
+COPY --from=ghcr.io/astral-sh/uv:0.11.28 /uv /uvx /bin/
 
 # Install python & allow non-root user to use it by traversing the /root dir without read permissions
 RUN --mount=type=cache,target=/root/.cache/uv \
@@ -66,10 +73,8 @@ WORKDIR ${INVOKEAI_SRC}
 # Install project's dependencies as a separate layer so they aren't rebuilt every commit.
 # bind-mount instead of copy to defer adding sources to the image until next layer.
 #
-# NOTE: on arm64 (aarch64), torch/torchvision resolve to PyPI CPU wheels regardless of
-# GPU_DRIVER — the WHL indexes carry aarch64 torch wheels (+cpu/+cu128) but no aarch64
-# torchvision wheels, so the pinned pairs only apply on x86_64. Use GPU_DRIVER=cpu on arm64.
-# CUDA-on-arm64 (e.g. Grace/GH200) would need a torchvision-specific workaround; see pyproject.toml.
+# NOTE: on arm64 (aarch64), torch/torchvision resolve to the PyPI CPU wheels (2.7.1) regardless of
+# GPU_DRIVER -- the pinned WHL-index pairs only apply on x86_64 (see pyproject.toml). Use GPU_DRIVER=cpu on arm64.
 # x86_64/CUDA is the default
 RUN --mount=type=cache,target=/root/.cache/uv \
     --mount=type=bind,source=pyproject.toml,target=pyproject.toml \
@@ -95,7 +100,8 @@ ENTRYPOINT ["/opt/invokeai/docker-entrypoint.sh"]
 CMD ["invokeai-web"]
 
 # --link requires buldkit w/ dockerfile syntax 1.4, does not work with podman
-COPY --link --from=web-builder /build/dist ${INVOKEAI_SRC}/invokeai/frontend/web/dist
+COPY --link --from=web-builder /build/dist ${INVOKEAI_SRC}/invokeai/frontend/webv2/dist
+COPY --link --from=legacy-web-builder /legacy-build/dist ${INVOKEAI_SRC}/invokeai/frontend/webv1/dist
 
 # add sources last to minimize image changes on code changes
 COPY invokeai ${INVOKEAI_SRC}/invokeai

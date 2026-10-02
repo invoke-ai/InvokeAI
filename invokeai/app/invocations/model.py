@@ -170,6 +170,82 @@ class WanT5EncoderField(BaseModel):
     loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
 
 
+class MiniMaxH3TextEncoderField(BaseModel):
+    """Field for the Qwen3-VL-32B conditioner used by MiniMax H3 models.
+
+    Unlike :class:`Qwen3VLEncoderField`, H3 also needs the Qwen3VLProcessor — even for
+    text-only prompts (its multimodal token-type ids drive Qwen3-VL's 3D rotary layout), and
+    for feeding first/last keyframes to the conditioner as vision context.
+    """
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    processor: ModelIdentifierField = Field(description="Info to load processor submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+
+
+class MiniMaxH3AdaLNOverlayField(BaseModel):
+    """Hybrid AdaLN overlay for MiniMax H3: the AdaLN modulation projections of a second task
+    transformer (typically Ref2VA) swapped onto the loaded transformer (typically FL2VA) at
+    denoise time, for an inclusive block range and optionally the final layer."""
+
+    overlay: ModelIdentifierField = Field(description="The single-file H3 transformer the AdaLN projections come from.")
+    start_block: int = Field(description="First transformer block (inclusive) whose AdaLN projection is overlaid.")
+    end_block: int = Field(description="Last transformer block (inclusive) whose AdaLN projection is overlaid.")
+    include_final_layer: bool = Field(description="Whether the final-layer AdaLN projection is overlaid too.")
+
+
+class MiniMaxH3TransformerField(BaseModel):
+    """Transformer field for MiniMax H3 models (FL2VA or Ref2VA)."""
+
+    transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+    variant: Optional[str] = Field(
+        default=None,
+        description="The task variant of the loaded transformer ('fl2va' / 'ref2va'), stamped by the model "
+        "loader so the denoise node can reject a task/conditioning mismatch.",
+    )
+    adaln_overlay: Optional[MiniMaxH3AdaLNOverlayField] = Field(
+        default=None,
+        description="Hybrid AdaLN overlay applied on top of the transformer at denoise time, if any.",
+    )
+
+
+class LTX2TextEncoderField(BaseModel):
+    """Field for the LTX-2 prompt conditioner: the Gemma-4 tower and the text connectors.
+
+    The connectors are a separate model, not a submodel of the encoder: they consume the stacked
+    per-layer hidden states and produce the two per-modality streams the transformer reads.
+    """
+
+    tokenizer: ModelIdentifierField = Field(description="Info to load tokenizer submodel")
+    text_encoder: ModelIdentifierField = Field(description="Info to load text_encoder submodel")
+    connectors: ModelIdentifierField = Field(description="Info to load the text connectors submodel")
+
+
+class LTX2TransformerField(BaseModel):
+    """Transformer field for LTX-2 models."""
+
+    transformer: ModelIdentifierField = Field(description="Info to load Transformer submodel")
+    loras: List[LoRAField] = Field(default_factory=list, description="LoRAs to apply on model loading")
+    variant: Optional[str] = Field(
+        default=None,
+        description="The loaded transformer's variant ('ltx2_dev' / 'ltx2_distilled'), stamped by the model "
+        "loader so the denoise node can pick the schedule the checkpoint was trained for.",
+    )
+
+
+class LTX2VocoderField(BaseModel):
+    """Vocoder field for LTX-2: mel spectrogram to 48 kHz stereo waveform."""
+
+    vocoder: ModelIdentifierField = Field(description="Info to load vocoder submodel")
+
+
+class LTX2LatentUpsamplerField(BaseModel):
+    """Latent upsampler field for LTX-2: the x2 spatial upscaler the refine pass runs on top of."""
+
+    latent_upsampler: ModelIdentifierField = Field(description="Info to load the latent upsampler submodel")
+
+
 class VAEField(BaseModel):
     vae: ModelIdentifierField = Field(description="Info to load vae submodel")
     seamless_axes: List[str] = Field(default_factory=list, description='Axes("x" and "y") to which apply seamless')

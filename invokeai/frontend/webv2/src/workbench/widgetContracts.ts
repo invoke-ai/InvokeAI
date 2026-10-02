@@ -1,0 +1,331 @@
+import type { Logger, LogNamespace } from '@platform/logging/contracts';
+import type { SettingsContribution } from '@platform/ui/settings/contracts';
+import type { TFunction } from 'i18next';
+import type { ComponentType, ExoticComponent, JSXElementConstructor, SVGProps } from 'react';
+
+import type { DeferredResource, DeferredResourceStatus } from './deferredResource';
+import type { GraphId } from './graphContracts';
+import type { InvocationSourceId } from './invocationContracts';
+import type { WidgetRegion } from './layoutContracts';
+
+export type FirstPartyWidgetTypeId =
+  | 'autosave-status'
+  | 'canvas'
+  | 'diagnostics'
+  | 'gallery'
+  | 'generate'
+  | 'history-controls'
+  | 'image-map'
+  | 'layers'
+  | 'notifications'
+  | 'preview'
+  | 'project'
+  | 'queue'
+  | 'queue-status'
+  | 'server-status'
+  | 'upscale'
+  | 'video'
+  | 'users'
+  | 'workflow';
+
+export type WidgetTypeId = FirstPartyWidgetTypeId | (string & {});
+
+export type WidgetInstanceId = string;
+
+export type WidgetId = WidgetTypeId;
+
+export type WorkbenchRegion = 'left' | 'right' | 'center' | 'bottom' | 'dialog' | 'popover' | 'floating';
+
+export interface WidgetStateContract {
+  id: WidgetTypeId;
+  label: string;
+  version: 1;
+  values: Record<string, unknown>;
+  graphId?: GraphId;
+}
+
+export type WidgetStateMap = Record<string, WidgetStateContract>;
+
+export interface WidgetInstanceContract {
+  id: WidgetInstanceId;
+  typeId: WidgetTypeId;
+  title?: string;
+  state: WidgetStateContract;
+  createdAt: string;
+}
+
+export interface WidgetInstanceRuntimeMeta {
+  id: WidgetInstanceId;
+  typeId: WidgetTypeId;
+  title?: string;
+  createdAt: string;
+}
+
+export interface GraphBearingSurfaceContract {
+  surfaceId: string;
+  widgetId: WidgetId;
+  label: string;
+  sourceId: InvocationSourceId;
+  graphId: GraphId;
+  region: WorkbenchRegion;
+  canSetSource: boolean;
+  canPreviewGraph: boolean;
+}
+
+export interface WidgetViewProps {
+  region: WorkbenchRegion;
+  manifest: WidgetManifest;
+  /** Chrome metadata only. Read reactive widget values through `runtime.state`. */
+  instance: WidgetInstanceRuntimeMeta;
+  runtime: WidgetRuntimeApi;
+  presentation?: 'compact' | 'expanded' | 'tooltip';
+}
+
+export type WidgetView = ComponentType<WidgetViewProps>;
+
+export type WidgetHeaderActions = ComponentType<WidgetViewProps>;
+
+export type WidgetHeaderMenu = ComponentType<WidgetViewProps>;
+
+export type WidgetFooter = ComponentType<WidgetViewProps>;
+
+export type WidgetHost = ComponentType;
+
+/** Deferred render implementation shared by every slot for one widget type. */
+export interface WidgetImplementation {
+  view: WidgetView;
+  headerActions?: WidgetHeaderActions;
+  settingsActions?: WidgetHeaderActions;
+  headerLabel?: WidgetHeaderLabel;
+  headerMenu?: WidgetHeaderMenu;
+  footer?: WidgetFooter;
+}
+
+export type WidgetImplementationLoadStatus = DeferredResourceStatus;
+
+/** Registry-owned, single-flight resource for a deferred widget implementation. */
+export type WidgetImplementationResource = DeferredResource<WidgetImplementation>;
+
+export interface WidgetLabelProps {
+  region: WorkbenchRegion;
+  presentation?: 'compact' | 'expanded' | 'tooltip';
+}
+
+export type WidgetLabel = string | ((t: TFunction) => string);
+
+export type WidgetHeaderLabel = ComponentType<WidgetLabelProps>;
+
+export type WidgetIconComponent =
+  | JSXElementConstructor<SVGProps<SVGSVGElement>>
+  | ExoticComponent<SVGProps<SVGSVGElement>>;
+
+export interface WidgetStateRegistration<State extends Record<string, unknown> = Record<string, unknown>> {
+  version: 1;
+  createInitial: () => State;
+  migrate?: (state: unknown, fromVersion: number) => State;
+  persistence?: 'project' | 'workspace' | 'session' | 'none';
+}
+
+export interface WidgetRuntimeApi<State extends Record<string, unknown> = Record<string, unknown>> {
+  instanceId: WidgetInstanceId;
+  typeId: WidgetTypeId;
+  region: WorkbenchRegion;
+  state: WidgetRuntimeStateApi<State>;
+  diagnostics: WidgetDiagnosticsApi;
+  commands: WidgetCommandApi;
+  hotkeys: WidgetHotkeyApi;
+  menus: WidgetMenuApi;
+  palette: WidgetCommandPaletteApi;
+  search: WidgetSearchApi;
+  toolbars: WidgetToolbarApi;
+  workbench: WidgetWorkbenchApi;
+}
+
+export interface WidgetDiagnosticsApi {
+  /** A logger attributed to this widget instance and its project. */
+  logger: (namespace: LogNamespace) => Logger;
+}
+
+export interface WidgetRuntimeStateApi<State extends Record<string, unknown> = Record<string, unknown>> {
+  getSnapshot: () => Readonly<State>;
+  patch: (values: Partial<State>) => void;
+  set: (values: State) => void;
+}
+
+export interface WidgetContributionSource {
+  instanceId: WidgetInstanceId;
+  projectId: string;
+  region: WorkbenchRegion;
+  typeId: WidgetTypeId;
+}
+
+export interface WidgetCommandApi {
+  execute: (commandId: string, ...args: unknown[]) => Promise<unknown>;
+  executeForSource: (
+    commandId: string,
+    source: WidgetContributionSource | null,
+    ...args: unknown[]
+  ) => Promise<unknown>;
+  register: (command: WidgetCommandContribution) => () => void;
+}
+
+export interface WidgetCommandContribution {
+  id: string;
+  title: string;
+  handler: (...args: unknown[]) => unknown | Promise<unknown>;
+  source?: WidgetContributionSource;
+}
+
+export interface WidgetHotkeyApi {
+  register: (hotkey: WidgetHotkeyContribution) => () => void;
+}
+
+export interface WidgetHotkeyContribution {
+  id: string;
+  commandId: string;
+  defaultKeys: string[];
+  title: string;
+  description?: string;
+  scope?: 'focused-region' | 'global' | 'instance' | 'widget';
+  source?: WidgetContributionSource;
+  preventDefault?: boolean;
+  allowInEditable?: boolean;
+}
+
+export interface WidgetMenuApi {
+  register: (menu: WidgetMenuContribution) => () => void;
+}
+
+export interface WidgetMenuContribution {
+  id: string;
+  items: Array<{ commandId: string; group?: string }>;
+  source?: WidgetContributionSource;
+}
+
+export interface WidgetCommandPaletteApi {
+  register: (entry: WidgetCommandPaletteContribution) => () => void;
+}
+
+export interface WidgetCommandPaletteContribution {
+  commandId: string;
+  title: string;
+  keywords?: string[];
+  source?: WidgetContributionSource;
+}
+
+export interface WidgetSearchApi {
+  registerProvider: (provider: WidgetSearchProvider) => () => void;
+}
+
+export interface WidgetSearchContext {
+  signal?: AbortSignal;
+}
+
+export interface WidgetSearchProvider {
+  /** Identifies mutable inputs that affect results for the same query. */
+  contextKey?: string;
+  id: string;
+  label: string;
+  search: (query: string, context?: WidgetSearchContext) => Promise<WidgetSearchResult[]> | WidgetSearchResult[];
+  source?: WidgetContributionSource;
+}
+
+export interface WidgetSearchResult {
+  id: string;
+  title: string;
+  subtitle?: string;
+  /** Commandless results are informational and are omitted from the command palette. */
+  commandId?: string;
+}
+
+export interface WidgetToolbarApi {
+  register: (toolbar: WidgetToolbarContribution) => () => void;
+}
+
+export interface WidgetToolbarContribution {
+  id: string;
+  location: 'center.tabs.trailing' | 'status.left' | 'status.right';
+  items: Array<{
+    commandId: string;
+    icon?: WidgetIconComponent;
+    label?: string;
+  }>;
+  source?: WidgetContributionSource;
+}
+
+export interface OpenWorkbenchWidgetOptions {
+  createNew?: boolean;
+  preferredRegions?: ReadonlyArray<WidgetRegion>;
+  requireCenterView?: boolean;
+}
+
+export type WidgetWorkbenchApiResult =
+  | { ok: true; region?: WidgetRegion }
+  | { ok: false; reason: 'unavailable' | 'unsupported' | 'not-found' };
+
+export interface WidgetWorkbenchApi {
+  openWidget: (typeId: WidgetTypeId, options?: OpenWorkbenchWidgetOptions) => WidgetWorkbenchApiResult;
+  revealWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
+  closeWidgetInstance: (instanceId: WidgetInstanceId) => WidgetWorkbenchApiResult;
+}
+
+export interface WidgetManifest {
+  /** Widget runtime API contract version. Defaults to 1 during registry normalization. */
+  apiVersion?: 1;
+  id: WidgetTypeId;
+  label: WidgetLabel;
+  headerLabel?: WidgetHeaderLabel;
+  version: 1;
+  allowedRegions: WidgetRegion[];
+  allowMultiple: boolean;
+  icon: WidgetIconComponent;
+  /** `popover`: the compact chip opens a dismissable popover instead of claiming the bottom panel. */
+  bottomPanel?: 'expandable' | 'tooltip' | 'popover';
+  centerPlacement?: 'toolbar' | 'view';
+  /** Opt-in: the widget can be detached into a movable floating window. */
+  allowFloating?: boolean;
+  /** Only offered while an admin is signed in to a multi-user backend. */
+  requiresAdmin?: boolean;
+  chrome?: {
+    header?: 'hidden' | 'visible';
+  };
+  /**
+   * Literal dynamic loader for all render slots. The registry owns caching,
+   * failure state, and retry; callers never invoke this directly.
+   */
+  load: () => Promise<WidgetImplementation>;
+  /** Load always-on runtimes and dialog shells separately so boot does not download their widget views. */
+  loadHost?: () => Promise<WidgetHost>;
+  /** Shared definitions for the shell's quick controls and full settings dialog. */
+  settings?: SettingsContribution;
+  state?: WidgetStateRegistration;
+  graphBearing?: {
+    sourceId: InvocationSourceId;
+    defaultGraphId: GraphId;
+    surfaces: WorkbenchRegion[];
+  };
+  failurePolicy: {
+    onRegistrationFailure: 'disable' | 'hide';
+    isolateRenderFailure: boolean;
+  };
+}
+
+export interface NormalizedWidgetManifest extends Omit<WidgetManifest, 'apiVersion' | 'state'> {
+  apiVersion: 1;
+  state: WidgetStateRegistration;
+}
+
+export interface RegisteredWidget {
+  implementation: WidgetImplementationResource;
+  manifest: NormalizedWidgetManifest;
+  status: 'enabled' | 'disabled' | 'hidden';
+  failure?: WidgetFailure;
+  host?: DeferredResource<WidgetHost>;
+}
+
+export interface WidgetFailure {
+  widgetId: WidgetTypeId;
+  message: string;
+  details: string;
+  occurredAt: string;
+}

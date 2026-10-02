@@ -1,9 +1,9 @@
-"""Tests for the Krea-2 starter-model bundle and its GGUF dependency wiring.
+"""Tests for the Krea-2 and MiniMax H3 starter-model bundles.
 
-A single-file / GGUF Krea-2 transformer ships *only* the transformer, so it is unusable without a
+A single-file (nvfp4) or GGUF Krea-2 transformer ships *only* the transformer, so it is unusable without a
 standalone Qwen-Image VAE and Qwen3-VL text encoder. These tests assert that the Krea-2 launchpad
-bundle exists, exposes both the diffusers and GGUF options, and that each GGUF entry declares the two
-standalone dependencies so installing it also pulls the pieces needed to run it.
+bundle exists, exposes the diffusers, GGUF and nvfp4 options, and that each transformer-only entry declares the
+two standalone dependencies so installing it also pulls the pieces needed to run it.
 """
 
 from invokeai.backend.model_manager.starter_models import (
@@ -37,7 +37,8 @@ def test_krea2_bundle_contains_diffusers_gguf_and_standalone_components() -> Non
     assert "krea/Krea-2-Raw" in by_source
     assert any(s.endswith("krea2_turbo-Q4_K_M.gguf") for s in by_source)
     assert any(s.endswith("krea2_turbo-Q8_0.gguf") for s in by_source)
-    # Standalone components (also declared as GGUF dependencies).
+    assert any(s.endswith("krea2_turbo_nvfp4.safetensors") for s in by_source)
+    # Standalone components (also declared as dependencies of the transformer-only entries).
     assert any(m.type is ModelType.VAE for m in by_source.values())
     assert any(m.type is ModelType.Qwen3VLEncoder for m in by_source.values())
 
@@ -49,19 +50,22 @@ def test_krea2_diffusers_variants() -> None:
     assert by_source["krea/Krea-2-Raw"].variant is Krea2VariantType.Base
 
 
-def test_krea2_gguf_entries_declare_vae_and_encoder_dependencies() -> None:
-    gguf_models = [
+def test_krea2_transformer_only_entries_declare_vae_and_encoder_dependencies() -> None:
+    # Everything but the diffusers pipelines is a single file holding only the transformer: the GGUFs and the nvfp4
+    # safetensors alike.
+    transformer_only = [
         m
         for m in _krea2_bundle_by_source().values()
-        if m.format is ModelFormat.GGUFQuantized and m.base is BaseModelType.Krea2
+        if m.type is ModelType.Main and m.base is BaseModelType.Krea2 and m.source.startswith("https://")
     ]
-    assert len(gguf_models) == 2
+    assert {m.format for m in transformer_only} == {ModelFormat.GGUFQuantized, None}
+    assert len(transformer_only) == 3
 
-    for model in gguf_models:
+    for model in transformer_only:
         assert model.variant is Krea2VariantType.Turbo
         assert model.dependencies is not None, f"{model.name} must declare its standalone dependencies"
         dep_types = {dep.type for dep in model.dependencies}
-        # GGUF ships only the transformer -> it must pull a VAE and a Qwen3-VL encoder.
+        # It ships only the transformer -> it must pull a VAE and a Qwen3-VL encoder.
         assert ModelType.VAE in dep_types, f"{model.name} is missing a VAE dependency"
         assert ModelType.Qwen3VLEncoder in dep_types, f"{model.name} is missing a Qwen3-VL encoder dependency"
 
@@ -76,5 +80,33 @@ def test_krea2_gguf_dependency_models_are_registered_in_starter_models() -> None
     # Every dependency source must itself be an installable starter model.
     starter_sources = {m.source for m in STARTER_MODELS}
     for model in STARTER_BUNDLES[BaseModelType.Krea2].models:
+        for dep in model.dependencies or []:
+            assert dep.source in starter_sources, f"dependency {dep.name} is not registered in STARTER_MODELS"
+
+
+def test_minimax_h3_bundle_contains_working_set_and_turbo_loras() -> None:
+    bundle = STARTER_BUNDLES[BaseModelType.MiniMaxH3]
+    by_source = {model.source: model for model in bundle.models}
+    # The minimal working set: shared components, text encoder, and both task transformers.
+    assert any(s.startswith("MiniMaxAI/MiniMax-H3::") for s in by_source)
+    assert any(m.type is ModelType.Qwen3VLEncoder for m in by_source.values())
+    assert any(m.type is ModelType.Main and m.format is ModelFormat.Checkpoint for m in by_source.values())
+    assert "Comfy-Org/MiniMax-H3::diffusion_models/minimax_h3_fl2va_pruned_int8_convrot.safetensors" in by_source
+    assert "Comfy-Org/MiniMax-H3::diffusion_models/minimax_h3_ref2va_pruned_int8_convrot.safetensors" in by_source
+    # All three turbo (step-distillation) LoRAs.
+    loras = [m for m in bundle.models if m.type is ModelType.LoRA]
+    lora_sources = {m.source for m in loras}
+    assert "larryvrh/MiniMax-H3-Turbo-Lora::minimax_h3_turbo_v4_step600_ema.safetensors" in lora_sources
+    assert "lightx2v/Minimax-h3-Turbo::minimax_h3_fl2v_turbo_8step_v1.0_comfyui_bf16.safetensors" in lora_sources
+    assert "lightx2v/Minimax-h3-Turbo::minimax_h3_ref2v_turbo_8step_v1.0_768p_comfyui_bf16.safetensors" in lora_sources
+    # The 4-step v0.1 Ref2V repack pans the camera whenever a video reference is used; it
+    # must not come back as a starter.
+    assert not any("ref2v_turbo_4step_v0.1" in s for s in lora_sources)
+
+
+def test_minimax_h3_bundle_models_are_registered_in_starter_models() -> None:
+    starter_sources = {m.source for m in STARTER_MODELS}
+    for model in STARTER_BUNDLES[BaseModelType.MiniMaxH3].models:
+        assert model.source in starter_sources, f"{model.name} is not registered in STARTER_MODELS"
         for dep in model.dependencies or []:
             assert dep.source in starter_sources, f"dependency {dep.name} is not registered in STARTER_MODELS"

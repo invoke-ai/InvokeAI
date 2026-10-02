@@ -6,6 +6,7 @@
 # play well with fixtures (F401 and F811), so this is cleaner than importing in all files that use these fixtures.
 import logging
 import shutil
+import sys
 from pathlib import Path
 
 import pytest
@@ -19,17 +20,23 @@ from invokeai.app.services.client_state_persistence.client_state_persistence_sql
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
+from invokeai.app.services.image_index.image_index_default import ImageIndexService
+from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
+from invokeai.app.services.intermediates.intermediates_default import IntermediatesService
+from invokeai.app.services.intermediates.intermediates_records_sqlite import IntermediatesRecordsSqlite
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
 from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import (
     SqliteSystemPromptRecordsStorage,
 )
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
@@ -37,9 +44,23 @@ from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: 
 from tests.test_nodes import TestEventService
 
 
+@pytest.fixture(autouse=True)
+def _clear_deferred_empty_cache():
+    """`TorchDevice._empty_cache_deferred` is process-global: a test that exercises a peer-aware
+    skip must not make a later test perform a real (GPU-initializing) empty_cache."""
+    from invokeai.backend.util.devices import TorchDevice
+
+    TorchDevice._empty_cache_deferred.clear()
+    yield
+    TorchDevice._empty_cache_deferred.clear()
+
+
 @pytest.fixture
 def mock_services() -> InvocationServices:
-    configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
+    # Image indexing is on by default, but `model_manager` below is None: starting
+    # the indexer against these stub services would fail while resolving the
+    # embedding model. Tests that exercise the index enable it themselves.
+    configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0, image_index_enabled=False)
     logger = InvokeAILogger.get_logger()
     db = create_mock_sqlite_database(configuration, logger)
 
@@ -76,7 +97,9 @@ def mock_services() -> InvocationServices:
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistenceSqlite(db=db),
+        project_records=ProjectRecordsSqlite(db=db),
         users=UserService(db),
+        wildcard_records=SqliteWildcardRecordsStorage(db=db),
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
         video_records=SqliteVideoRecordStorage(db=db),
@@ -84,6 +107,9 @@ def mock_services() -> InvocationServices:
         # Real SQLite-backed gallery service: the virtual-boards router reads dates and
         # per-date item names through it, and MagicMock cannot exercise the filter SQL.
         gallery=SqliteGalleryService(db=db),
+        image_index_records=ImageIndexRecordsSqlite(db=db),
+        image_index=ImageIndexService(),
+        intermediates=IntermediatesService(records=IntermediatesRecordsSqlite(db=db), logger=logger),
     )
 
 
@@ -98,3 +124,49 @@ def invokeai_root_dir(tmp_path_factory) -> Path:
     temp_dir: Path = tmp_path_factory.mktemp("data") / "invokeai_root"
     shutil.copytree(root_template, temp_dir)
     return temp_dir
+
+
+# --- Peak memory reporting -------------------------------------------------------------------
+#
+# Running the suite across xdist workers multiplies its memory footprint, and the failure mode is
+# silent: the runner is killed mid-run, so there is no summary, no failing test and no clue which
+# file was responsible. Reporting each worker's peak turns a future blow-up into a number that
+# moves in the CI log before it takes a runner down. `--max-worker-restart=0` in the workflow
+# makes the death itself fail the run immediately rather than after sixteen restarts.
+
+_worker_peak_rss: dict[str, int] = {}
+
+
+def _peak_rss_bytes() -> int:
+    if sys.platform == "win32":
+        import psutil
+
+        return psutil.Process().memory_info().peak_wset
+    import resource
+
+    peak = resource.getrusage(resource.RUSAGE_SELF).ru_maxrss
+    # ru_maxrss is bytes on macOS and kilobytes on Linux.
+    return peak if sys.platform == "darwin" else peak * 1024
+
+
+def pytest_sessionfinish(session: pytest.Session) -> None:
+    """Hands this worker's peak to the controller; `workeroutput` exists only in a worker."""
+    output = getattr(session.config, "workeroutput", None)
+    if output is not None:
+        output["peak_rss_bytes"] = _peak_rss_bytes()
+
+
+def pytest_testnodedown(node, error) -> None:  # noqa: ANN001  # xdist types are not exported
+    peak = getattr(node, "workeroutput", {}).get("peak_rss_bytes")
+    if peak is not None:
+        _worker_peak_rss[node.gateway.id] = peak
+
+
+def pytest_terminal_summary(terminalreporter) -> None:  # noqa: ANN001
+    if not _worker_peak_rss:
+        return
+    peaks = _worker_peak_rss.values()
+    terminalreporter.write_line(
+        f"peak RSS: {max(peaks) / 2**30:.2f}GB worst worker, "
+        f"{sum(peaks) / 2**30:.2f}GB summed over {len(_worker_peak_rss)} workers"
+    )

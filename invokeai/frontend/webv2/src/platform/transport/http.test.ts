@@ -1,0 +1,278 @@
+import { DEFAULT_LOGGING_CONFIG } from '@platform/logging/contracts';
+import { configureLogging, getLogSnapshot, resetLogging } from '@platform/logging/logger';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+vi.mock('./deploymentBase', () => ({
+  getDeploymentBasePath: () => '/invoke',
+  getDeploymentBaseUrl: () => 'https://app.example/invoke',
+}));
+
+import {
+  ApiError,
+  absolutizeApiUrl,
+  apiFetch,
+  apiFetchJson,
+  buildApiUrl,
+  configureHttpAuth,
+  getBackendSocketPath,
+  getBackendSocketUrl,
+} from './http';
+
+describe('deployment-aware backend URLs', () => {
+  beforeEach(() => {
+    vi.stubGlobal('window', { location: { origin: 'https://app.example' } });
+  });
+
+  it('prefixes API requests with the deployment root', () => {
+    expect(buildApiUrl('/api/v1/app/version')).toBe('https://app.example/invoke/api/v1/app/version');
+  });
+
+  it('prefixes backend-relative resource URLs and preserves absolute URLs', () => {
+    expect(absolutizeApiUrl('/api/v1/images/i/image.png/full')).toBe(
+      'https://app.example/invoke/api/v1/images/i/image.png/full'
+    );
+    expect(absolutizeApiUrl('https://cdn.example/image.png')).toBe('https://cdn.example/image.png');
+  });
+
+  it('uses the page origin with a deployment-prefixed Socket.IO path', () => {
+    expect(getBackendSocketUrl()).toBe('https://app.example');
+    expect(getBackendSocketPath()).toBe('/invoke/ws/socket.io');
+  });
+});
+
+describe('request identity ownership', () => {
+  it('preserves response headers on API errors for Retry-After handling', async () => {
+    const identity = {};
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('{"detail":{"code":"project_write_busy"}}', {
+          headers: { 'Retry-After': '1' },
+          status: 429,
+        })
+      )
+    );
+    configureHttpAuth({ getIdentity: () => identity, getToken: () => null, onUnauthorized: vi.fn() });
+
+    const error = await apiFetch('/api/v1/projects/').catch((error: unknown) => error);
+
+    expect(error).toBeInstanceOf(ApiError);
+    expect((error as ApiError).headers.get('Retry-After')).toBe('1');
+  });
+
+  it('does not expire a newer account when an older request returns 401', async () => {
+    let token: string | null = 'token-a';
+    let identity = {};
+    const onUnauthorized = vi.fn();
+    let resolveFetch: ((response: Response) => void) | undefined;
+    let sentInit: RequestInit | undefined;
+    const fetchMock = vi.fn((_input: RequestInfo | URL, init?: RequestInit) => {
+      sentInit = init;
+
+      return new Promise<Response>((resolve) => {
+        resolveFetch = resolve;
+      });
+    });
+    vi.stubGlobal('fetch', fetchMock);
+    configureHttpAuth({ getIdentity: () => identity, getToken: () => token, onUnauthorized });
+
+    const oldRequest = apiFetch('/api/v1/projects/');
+    const sentHeaders = sentInit?.headers as Headers;
+
+    expect(sentHeaders.get('Authorization')).toBe('Bearer token-a');
+
+    token = 'token-b';
+    identity = {};
+    resolveFetch?.(new Response('', { status: 401 }));
+
+    await expect(oldRequest).rejects.toMatchObject({ name: 'HttpRequestIdentityExpiredError' });
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('expires the account whose token was rejected', async () => {
+    const onUnauthorized = vi.fn();
+    const identity = {};
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('', { status: 401 })));
+    configureHttpAuth({ getIdentity: () => identity, getToken: () => 'current-token', onUnauthorized });
+
+    await expect(apiFetch('/api/v1/projects/')).rejects.toMatchObject({ status: 401 });
+
+    expect(onUnauthorized).toHaveBeenCalledWith('current-token', identity);
+  });
+
+  it('does not expire a new epoch when the backend reuses the same token string', async () => {
+    const token = 'stable-token';
+    let identity = {};
+    const onUnauthorized = vi.fn();
+    let resolveFetch: ((response: Response) => void) | undefined;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(
+        () =>
+          new Promise<Response>((resolve) => {
+            resolveFetch = resolve;
+          })
+      )
+    );
+    configureHttpAuth({ getIdentity: () => identity, getToken: () => token, onUnauthorized });
+
+    const oldRequest = apiFetch('/api/v1/projects/');
+
+    identity = {};
+    resolveFetch?.(new Response('', { status: 401 }));
+
+    await expect(oldRequest).rejects.toMatchObject({ name: 'HttpRequestIdentityExpiredError' });
+    expect(onUnauthorized).not.toHaveBeenCalled();
+  });
+
+  it('rejects a tokenless error body that finishes under a newer identity lifetime', async () => {
+    let identity = {};
+    let resolveBody: ((value: string) => void) | undefined;
+    const response = {
+      ok: false,
+      status: 401,
+      statusText: 'Unauthorized',
+      text: () =>
+        new Promise<string>((resolve) => {
+          resolveBody = resolve;
+        }),
+    } as Response;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+    configureHttpAuth({ getIdentity: () => identity, getToken: () => null, onUnauthorized: vi.fn() });
+
+    const oldRequest = apiFetch('/api/v1/auth/status');
+    await vi.waitFor(() => {
+      expect(resolveBody).toBeDefined();
+    });
+
+    identity = {};
+    resolveBody?.('Unauthorized');
+
+    await expect(oldRequest).rejects.toMatchObject({ name: 'HttpRequestIdentityExpiredError' });
+  });
+
+  it('rejects a response body that finishes under a newer identity lifetime', async () => {
+    let identity = {};
+    let resolveBody: ((value: unknown) => void) | undefined;
+    const response = {
+      json: () =>
+        new Promise((resolve) => {
+          resolveBody = resolve;
+        }),
+      ok: true,
+      status: 200,
+    } as Response;
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(response));
+    configureHttpAuth({ getIdentity: () => identity, getToken: () => 'stable-token', onUnauthorized: vi.fn() });
+
+    const oldRequest = apiFetchJson<{ owner: string }>('/api/v1/projects/');
+    await vi.waitFor(() => {
+      expect(resolveBody).toBeDefined();
+    });
+
+    identity = {};
+    resolveBody?.({ owner: 'user-a' });
+
+    await expect(oldRequest).rejects.toMatchObject({ name: 'HttpRequestIdentityExpiredError' });
+  });
+});
+
+describe('transport diagnostics', () => {
+  beforeEach(() => {
+    const identity = {};
+    configureHttpAuth({ getIdentity: () => identity, getToken: () => null, onUnauthorized: vi.fn() });
+    resetLogging();
+    configureLogging({ ...DEFAULT_LOGGING_CONFIG, level: 'debug' });
+  });
+
+  it('records failed responses and network failures as debug breadcrumbs without query strings', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(new Response('{"detail":"nope"}', { status: 503 }))
+        .mockRejectedValueOnce(new TypeError('Failed to fetch'))
+    );
+
+    await expect(apiFetch('/api/v1/images?token=abc', { method: 'POST' })).rejects.toBeInstanceOf(ApiError);
+    await expect(apiFetch('/api/v1/boards')).rejects.toBeInstanceOf(TypeError);
+
+    expect(getLogSnapshot().entries).toMatchObject([
+      {
+        error: { message: 'Failed to fetch', name: 'TypeError' },
+        level: 'debug',
+        name: 'http.request-failed',
+        source: { area: 'http', namespace: 'transport' },
+      },
+      {
+        context: { method: 'POST', path: '/api/v1/images', status: 503 },
+        level: 'debug',
+        message: 'POST /api/v1/images responded 503',
+        name: 'http.response-error',
+      },
+    ]);
+  });
+
+  it('drops breadcrumbs from requests whose account lifetime ended and ignores aborts', async () => {
+    accountLifecycle.activate('user-a');
+    let settle: (response: Response) => void = () => undefined;
+
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockImplementationOnce(
+          () =>
+            new Promise<Response>((resolve) => {
+              settle = resolve;
+            })
+        )
+        .mockRejectedValueOnce(new DOMException('aborted', 'AbortError'))
+    );
+
+    const late = apiFetch('/api/v1/boards');
+
+    accountLifecycle.invalidate();
+    configureLogging({ ...DEFAULT_LOGGING_CONFIG, level: 'debug' });
+    settle(new Response('', { status: 500 }));
+    await expect(late).rejects.toBeInstanceOf(ApiError);
+    await expect(apiFetch('/api/v1/images')).rejects.toBeInstanceOf(DOMException);
+
+    expect(getLogSnapshot().entries).toEqual([]);
+  });
+
+  it('records nothing for successful requests', async () => {
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('{}', { status: 200 })));
+
+    await apiFetch('/api/v1/app/version');
+
+    expect(getLogSnapshot().entries).toEqual([]);
+  });
+});
+
+describe('media cookie credentials', () => {
+  beforeEach(() => {
+    // Keep the identity object stable; a fresh object would simulate rotation before the assertion.
+    const identity = {};
+    configureHttpAuth({ getIdentity: () => identity, getToken: () => null, onUnauthorized: vi.fn() });
+  });
+
+  it('sends credentials so login can set the media cookie that authenticates <img> requests', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiFetch('/api/v1/auth/login', { method: 'POST' });
+
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: 'same-origin' });
+  });
+
+  it('lets a caller override credentials for a cross-origin API base', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response('', { status: 200 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await apiFetch('/api/v1/auth/media-cookie', { credentials: 'include', method: 'POST' });
+
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ credentials: 'include' });
+  });
+});

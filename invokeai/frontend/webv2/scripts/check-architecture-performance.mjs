@@ -1,0 +1,278 @@
+import assert from 'node:assert/strict';
+import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+
+import { analyzeSource, closeSourceAnalysis, primeSourceAnalysis } from '#architecture/source-analysis';
+
+import {
+  applyBuildReference,
+  BUDGET_REMEDY,
+  BUILD_METRIC_KEYS,
+  BUILD_REFERENCE_FILE,
+  checkRouteBudget,
+  createBuildReference,
+  isBudgetFailure,
+  loadPerformanceReference,
+  measureRouteBuild,
+  PERFORMANCE_REFERENCE_DIR_VARIABLE,
+  PERFORMANCE_REFERENCE_LABEL_VARIABLE,
+  validateArchitectureBaseline,
+  validateChunkSourceManifest,
+} from './performance-budgets.mjs';
+import { WIDGET_IMPLEMENTATION_PATTERN, WIDGET_SOURCES } from './widget-sources.mjs';
+
+const root = resolve(import.meta.dirname, '..');
+const baselinePath = resolve(root, 'performance/architecture-baseline.json');
+const baselineInput = JSON.parse(await readFile(baselinePath, 'utf8'));
+const manifest = JSON.parse(await readFile(resolve(root, 'dist/.vite/manifest.json'), 'utf8'));
+const chunkSourceManifest = validateChunkSourceManifest(
+  JSON.parse(await readFile(resolve(root, 'dist/.vite/chunk-sources.json'), 'utf8'))
+);
+const readAsset = async (file) => new Uint8Array(await readFile(resolve(root, 'dist', file)));
+const updateBaseline = process.argv.includes('--update-baseline');
+const referenceDir = process.env[PERFORMANCE_REFERENCE_DIR_VARIABLE] || null;
+const referenceLabel = process.env[PERFORMANCE_REFERENCE_LABEL_VARIABLE] || null;
+const artifactDir = resolve(root, 'artifacts/architecture-performance');
+
+const assetCache = new Map();
+for (const chunk of Object.values(manifest)) {
+  for (const file of [chunk.file, ...(chunk.css ?? []), ...(chunk.assets ?? [])]) {
+    if (file && !assetCache.has(file)) {
+      assetCache.set(file, await readAsset(file));
+    }
+  }
+}
+
+const routeEntries = Object.entries(baselineInput.build);
+const measurements = routeEntries.map(([routeId, budget]) =>
+  measureRouteBuild(manifest, chunkSourceManifest, routeId, budget.source, (file) => assetCache.get(file))
+);
+// Written before any check so a failing main still records what it measured for the next PR.
+await mkdir(artifactDir, { recursive: true });
+await writeFile(
+  resolve(artifactDir, BUILD_REFERENCE_FILE),
+  `${JSON.stringify(createBuildReference(measurements), null, 2)}\n`
+);
+
+let baseline;
+if (updateBaseline) {
+  const build = Object.fromEntries(
+    routeEntries.map(([routeId, previousBudget]) => {
+      const measurement = measurements.find((candidate) => candidate.routeId === routeId);
+      return [
+        routeId,
+        {
+          baseline: {
+            ...Object.fromEntries(BUILD_METRIC_KEYS.map((key) => [key, measurement[key]])),
+            sourceOwners: measurement.sourceOwners,
+          },
+          owner: previousBudget.owner,
+          remediationTicket: previousBudget.remediationTicket,
+          source: previousBudget.source,
+        },
+      ];
+    })
+  );
+  baseline = {
+    build,
+    capturedAt: new Date().toISOString().slice(0, 10),
+    developmentInvalidation: baselineInput.developmentInvalidation,
+    schemaVersion: 2,
+    structural: {
+      ...baselineInput.structural,
+      editorForbiddenInitialChunkNames: [...baselineInput.structural.editorForbiddenInitialChunkNames].sort(),
+      launchpadForbiddenInitialSources: [...baselineInput.structural.launchpadForbiddenInitialSources].sort(),
+    },
+  };
+  validateArchitectureBaseline(baseline);
+  await writeFile(baselinePath, `${JSON.stringify(baseline, null, 2)}\n`);
+} else {
+  baseline = validateArchitectureBaseline(baselineInput);
+}
+
+const referenceName = referenceLabel ? `base-branch reference ${referenceLabel}` : 'base-branch reference';
+let reference = null;
+let referenceReason = null;
+if (referenceDir && !updateBaseline) {
+  const loaded = await loadPerformanceReference({
+    directory: referenceDir,
+    fileName: BUILD_REFERENCE_FILE,
+    kind: 'build',
+    metricKeys: BUILD_METRIC_KEYS,
+    root,
+  });
+  referenceReason = loaded.reason;
+  reference = loaded.reason ? null : loaded.reference;
+}
+const { build: budgets, uncovered: uncoveredRoutes } = applyBuildReference(baseline.build, reference);
+process.stdout.write(
+  reference
+    ? `Byte budgets: allowance over the higher of ${referenceName} captured ${reference.capturedAt} and committed measurements, bounded by the committed hard ceiling.\n`
+    : referenceReason
+      ? `Byte budgets: against committed baseline captured ${baseline.capturedAt}; ${referenceName} was recorded with ${referenceReason} and cannot be applied.\n`
+      : `Byte budgets: against committed baseline captured ${baseline.capturedAt}.\n`
+);
+if (uncoveredRoutes.length > 0) {
+  process.stdout.write(`Routes absent from the reference use the committed baseline: ${uncoveredRoutes.join(', ')}.\n`);
+}
+
+const failures = measurements.flatMap((measurement) => checkRouteBudget(measurement, budgets[measurement.routeId]));
+const launchpad = measurements.find((measurement) => measurement.routeId === 'launchpad');
+const editor = measurements.find((measurement) => measurement.routeId === 'editor');
+// Launchpad overlays and pages load lazily, but must still never pull in (and run) the editor: loading its modules
+// ahead of the /app route mis-orders their start-up. Shared gallery and settings code is where that creeps in.
+for (const source of [
+  'src/features/fonts/ui/FontsPage.tsx',
+  'src/features/gallery/ui/picker/GalleryPickerView.tsx',
+  'src/features/models/ui/ModelManagerView.tsx',
+  'src/features/nodes/ui/NodeManagerView.tsx',
+  'src/workbench/palette/LaunchpadCommandPaletteDialog.tsx',
+  'src/workbench/settings/PreferencesPage.tsx',
+  'src/workbench/settings/SettingsDialog.tsx',
+]) {
+  const overlay = measureRouteBuild(manifest, chunkSourceManifest, source, source, (file) => assetCache.get(file));
+  for (const owner of ['src/app/WorkbenchApp.tsx', 'src/workbench/widget-frame/WidgetRenderer.tsx']) {
+    assert.ok(!overlay.sourceOwners.includes(`source:${owner}`), `${source} eagerly includes editor runtime ${owner}.`);
+  }
+}
+const widgetImplementationSources = [...WIDGET_SOURCES.keys()];
+for (const source of widgetImplementationSources) {
+  assert.ok(manifest[source], `Registered widget implementation ${source} is missing from the build manifest.`);
+}
+for (const source of Object.keys(manifest)) {
+  if (WIDGET_IMPLEMENTATION_PATTERN.test(source)) {
+    assert.ok(
+      WIDGET_SOURCES.has(source),
+      `Widget implementation ${source} must be registered in scripts/widget-sources.mjs.`
+    );
+  }
+}
+const getInactiveWidgetFailures = (sources) =>
+  widgetImplementationSources
+    .filter((source) => sources.includes(source))
+    .map((source) => ({
+      message: `editor eagerly includes inactive widget implementation ${source}.`,
+      owner: 'workbench',
+      remediationTicket: 'deepen-widget-registry-loading',
+      routeId: 'editor',
+    }));
+
+assert.equal(
+  new Set(widgetImplementationSources.map((source) => manifest[source].file)).size,
+  widgetImplementationSources.length,
+  'Every first-party widget implementation must have an independently identifiable chunk.'
+);
+assert.equal(
+  getInactiveWidgetFailures(['src/features/gallery/widget.ts']).length,
+  1,
+  'A synthetic eager widget implementation must fail the structural gate.'
+);
+failures.push(...getInactiveWidgetFailures(editor.sources));
+for (const forbidden of baseline.structural.launchpadForbiddenInitialSources) {
+  if (launchpad.sources.some((source) => source === forbidden || source.startsWith(forbidden))) {
+    failures.push({
+      message: `launchpad eagerly includes ${forbidden}.`,
+      owner: 'app',
+      remediationTicket: 'set-performance-budgets',
+      routeId: 'launchpad',
+    });
+  }
+}
+for (const forbidden of baseline.structural.editorForbiddenInitialChunkNames) {
+  if (editor.chunkNames.includes(forbidden)) {
+    failures.push({
+      message: `editor eagerly includes ${forbidden}.`,
+      owner: 'workbench',
+      remediationTicket: 'deepen-widget-registry-loading',
+      routeId: 'editor',
+    });
+  }
+}
+
+const collectFiles = async (directory) => {
+  const collected = [];
+  for (const entry of await readdir(directory, { withFileTypes: true })) {
+    const path = resolve(directory, entry.name);
+    if (entry.isDirectory()) {
+      collected.push(...(await collectFiles(path)));
+    } else if (/\.(?:ts|tsx)$/.test(entry.name) && !/\.test\.|\.type-test\.|\.testing\./.test(entry.name)) {
+      collected.push(path);
+    }
+  }
+  return collected;
+};
+const productionFiles = await collectFiles(resolve(root, 'src'));
+const importerCounts = new Map(Object.values(baseline.developmentInvalidation).map((budget) => [budget.specifier, 0]));
+const productionSources = await Promise.all(productionFiles.map(async (path) => [path, await readFile(path, 'utf8')]));
+try {
+  // One snapshot for the whole tree keeps the sweep to a single round trip.
+  primeSourceAnalysis(productionSources, { jsx: true });
+
+  for (const [path, source] of productionSources) {
+    const seen = new Set();
+    for (const reference of analyzeSource(path, source, { jsx: true }).moduleReferences) {
+      if (reference.form === 'import-declaration' || reference.form === 'export-declaration') {
+        seen.add(reference.specifier);
+      }
+    }
+    for (const specifier of seen) {
+      if (importerCounts.has(specifier)) {
+        importerCounts.set(specifier, importerCounts.get(specifier) + 1);
+      }
+    }
+  }
+  for (const [metricId, budget] of Object.entries(baseline.developmentInvalidation)) {
+    const actual = importerCounts.get(budget.specifier) ?? 0;
+    if (actual > budget.maxDirectImporters) {
+      failures.push({
+        message: `${metricId} has ${actual} direct importers (budget ${budget.maxDirectImporters}).`,
+        owner: budget.owner,
+        remediationTicket: budget.remediationTicket,
+        routeId: 'development-invalidation',
+      });
+    }
+  }
+
+  const reportPath = resolve(artifactDir, 'build-report.json');
+  await writeFile(
+    reportPath,
+    `${JSON.stringify(
+      {
+        baselineCapturedAt: baseline.capturedAt,
+        capturedAt: new Date().toISOString(),
+        failures,
+        importerCounts: Object.fromEntries(importerCounts),
+        measurements,
+        reference: referenceDir
+          ? {
+              applied: reference !== null,
+              capturedAt: reference?.capturedAt ?? null,
+              label: referenceLabel,
+              reason: referenceReason,
+              uncoveredRoutes,
+            }
+          : null,
+      },
+      null,
+      2
+    )}\n`
+  );
+
+  if (failures.length > 0) {
+    throw new Error(
+      failures
+        .map(
+          (failure) =>
+            `${failure.message} Owner: ${failure.owner}. Remediation: ${failure.remediationTicket}. Route: ${failure.routeId}.`
+        )
+        .join('\n')
+        .concat(failures.some((failure) => isBudgetFailure(failure.message)) ? `\n${BUDGET_REMEDY}` : '')
+    );
+  }
+
+  process.stdout.write(
+    `${JSON.stringify({ importerCounts: Object.fromEntries(importerCounts), measurements }, null, 2)}\n`
+  );
+} finally {
+  closeSourceAnalysis();
+}

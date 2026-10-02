@@ -1,0 +1,275 @@
+import type { GalleryBoard, GalleryImage } from '@features/gallery/contracts';
+import type { GenerationModelCatalogItem } from '@features/generation/contracts';
+import type { ModelConfig } from '@features/models';
+import type { TFunction } from 'i18next';
+
+import { ApiError } from '@platform/transport/http';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const { ensureModelsLoaded, fetchQuery, getModelsSnapshot, listPaletteImages, listPaletteSemanticImages } = vi.hoisted(
+  () => ({
+    ensureModelsLoaded: vi.fn(() => Promise.resolve()),
+    fetchQuery: vi.fn(),
+    getModelsSnapshot: vi.fn(),
+    listPaletteImages: vi.fn(),
+    listPaletteSemanticImages: vi.fn(),
+  })
+);
+
+vi.mock('@features/models', () => ({
+  ensureModelsLoaded,
+  getModelBaseLabel: (base: string) => base,
+  getModelsSnapshot,
+}));
+
+vi.mock('@features/generation/react', () => ({ focusPositivePrompt: vi.fn() }));
+vi.mock('@features/gallery/paletteSearch', () => ({
+  ALL_READABLE_BOARDS_ID: 'all',
+  listPaletteImages: (...args: unknown[]) => listPaletteImages(...args),
+  listPaletteSemanticImages: (...args: unknown[]) => listPaletteSemanticImages(...args),
+}));
+vi.mock('@platform/query/client', () => ({ queryClient: { fetchQuery: (...args: unknown[]) => fetchQuery(...args) } }));
+
+import { PaletteSearchUnavailableError } from './entries';
+import {
+  createBoardsProvider,
+  createImagesProvider,
+  createModelsProvider,
+  createPromptHistoryProvider,
+  createSemanticImagesProvider,
+} from './paletteProviders';
+
+const model = (key: string, base: string, type = 'main'): ModelConfig =>
+  ({ base, key, name: key, type }) as unknown as ModelConfig;
+const t = ((key: string) => key) as TFunction;
+const searchContext = () => ({ signal: new AbortController().signal });
+
+const uncategorized: GalleryBoard = {
+  archived: false,
+  assetCount: 0,
+  assetVideoCount: 0,
+  id: 'none',
+  imageCount: 1,
+  kind: 'uncategorized',
+  name: '',
+  projectId: null,
+  videoCount: 0,
+};
+const galleryT = ((key: string) => {
+  if (key === 'widgets.gallery.uncategorized' || key === 'commandPalette.providers.uncategorized') {
+    return 'Uncategorized';
+  }
+
+  return key;
+}) as TFunction;
+
+describe('localized gallery board labels', () => {
+  it('searches and displays the localized Uncategorized board name', async () => {
+    fetchQuery.mockResolvedValue([uncategorized]);
+    const provider = createBoardsProvider({ openGalleryWidget: vi.fn(), selectBoard: vi.fn(), t: galleryT });
+
+    const entries = await provider.search({ text: 'cat' }, searchContext());
+
+    expect(entries.map((entry) => entry.title)).toEqual(['Uncategorized']);
+  });
+
+  it('uses the localized board name in image-result subtitles', async () => {
+    const image = {
+      boardId: 'none',
+      height: 512,
+      imageCategory: 'general',
+      imageName: 'image.png',
+      imageUrl: '/full/image.png',
+      queuedAt: '2026-07-30T00:00:00.000Z',
+      starred: false,
+      thumbnailUrl: '/thumb/image.png',
+      width: 512,
+    } as GalleryImage;
+    fetchQuery.mockResolvedValue([uncategorized]);
+    listPaletteImages.mockResolvedValue({ images: [image], total: 1 });
+    const provider = createImagesProvider({
+      locale: 'en',
+      openPreviewWidget: vi.fn(),
+      revealImage: vi.fn(),
+      selectImage: vi.fn(),
+      t: galleryT,
+    });
+
+    const entries = await provider.search({ text: '' }, searchContext());
+
+    expect(entries[0]?.subtitle).toBe('Uncategorized · 512×512');
+  });
+});
+
+describe('createSemanticImagesProvider', () => {
+  const board: GalleryBoard = { ...uncategorized, id: 'board-1', kind: 'board', name: 'Boats' };
+  const image = (imageName: string, createdAt: string) =>
+    ({
+      boardId: 'board-1',
+      createdAt,
+      height: 512,
+      imageCategory: 'general',
+      imageName,
+      imageUrl: `/full/${imageName}`,
+      starred: false,
+      thumbnailUrl: `/thumb/${imageName}`,
+      width: 768,
+    }) as GalleryImage;
+  let indexState: 'disabled' | 'ready';
+  const createProvider = () => {
+    const deps = {
+      locale: 'en',
+      openPreviewWidget: vi.fn(),
+      revealImage: vi.fn(),
+      selectImage: vi.fn(),
+      t: galleryT,
+    };
+
+    return { deps, provider: createSemanticImagesProvider(deps) };
+  };
+
+  beforeEach(() => {
+    indexState = 'ready';
+    listPaletteSemanticImages.mockReset();
+    fetchQuery.mockReset();
+    fetchQuery.mockImplementation(({ queryKey }: { queryKey: readonly unknown[] }) =>
+      Promise.resolve(queryKey.includes('image-index') ? { modelName: null, state: indexState } : [board])
+    );
+  });
+
+  it('ranks the whole library by meaning and opens or reveals each match', async () => {
+    const match = image('boat.png', '2026-08-02T10:00:00Z');
+    listPaletteSemanticImages.mockResolvedValue([match]);
+    const { deps, provider } = createProvider();
+
+    const [entry] = await provider.search({ text: '  sailing boat ' }, searchContext());
+
+    expect(listPaletteSemanticImages).toHaveBeenCalledWith(expect.objectContaining({ query: 'sailing boat' }));
+    expect(entry).toMatchObject({ id: 'semantic-image:boat.png', subtitle: 'Boats · 768×512' });
+
+    entry?.run();
+    expect(deps.openPreviewWidget).toHaveBeenCalled();
+    expect(deps.selectImage).toHaveBeenCalledWith(match);
+
+    entry?.secondary?.run();
+    expect(deps.revealImage).toHaveBeenCalledWith(match);
+  });
+
+  it('stays empty without a query or an index, and explains a missing text encoder', async () => {
+    const { provider } = createProvider();
+
+    await expect(provider.search({ text: ' ' }, searchContext())).resolves.toEqual([]);
+
+    indexState = 'disabled';
+    await expect(provider.search({ text: 'boat' }, searchContext())).resolves.toEqual([]);
+    expect(listPaletteSemanticImages).not.toHaveBeenCalled();
+
+    indexState = 'ready';
+    listPaletteSemanticImages.mockRejectedValueOnce(new ApiError('no text encoder', 409));
+    await expect(provider.search({ text: 'boat' }, searchContext())).rejects.toBeInstanceOf(
+      PaletteSearchUnavailableError
+    );
+
+    listPaletteSemanticImages.mockRejectedValueOnce(new ApiError('boom', 500));
+    await expect(provider.search({ text: 'boat' }, searchContext())).rejects.toThrow('boom');
+  });
+});
+
+describe('createModelsProvider', () => {
+  it('lists only supported Generate models and applies one before opening the widget', async () => {
+    const supported = model('supported-sdxl', 'sdxl');
+    const external = model('external-provider', 'external', 'external_image_generator');
+    const models = [
+      supported,
+      external,
+      model('refiner', 'sdxl-refiner'),
+      model('unknown', 'unknown'),
+      model('any', 'any'),
+      model('vae', 'sdxl', 'vae'),
+    ];
+    const order: string[] = [];
+    const applyModel = vi.fn((_selected: GenerationModelCatalogItem, _models: readonly ModelConfig[]) => {
+      order.push('apply');
+    });
+    const openGenerateWidget = vi.fn(() => {
+      order.push('open');
+    });
+    const openModelManager = vi.fn();
+    getModelsSnapshot.mockReturnValue({ models, status: 'loaded' });
+    const provider = createModelsProvider({ applyModel, openGenerateWidget, openModelManager, t });
+
+    const entries = await provider.search({ text: '' }, searchContext());
+
+    expect(entries.map((entry) => entry.title)).toEqual(['supported-sdxl', 'external-provider']);
+
+    entries[0]?.run();
+    expect(applyModel).toHaveBeenCalledWith(supported, models);
+    expect(order).toEqual(['apply', 'open']);
+
+    entries[0]?.secondary?.run();
+    expect(openModelManager).toHaveBeenCalledOnce();
+  });
+
+  it('retains model name and base text matching', async () => {
+    const models = [model('cinematic-xl', 'sdxl'), model('fast-flux', 'flux')];
+    getModelsSnapshot.mockReturnValue({ models, status: 'loaded' });
+    const provider = createModelsProvider({
+      applyModel: vi.fn(),
+      openGenerateWidget: vi.fn(),
+      openModelManager: vi.fn(),
+      t,
+    });
+
+    expect((await provider.search({ text: 'cinematic' }, searchContext())).map((entry) => entry.title)).toEqual([
+      'cinematic-xl',
+    ]);
+    expect((await provider.search({ text: 'flux' }, searchContext())).map((entry) => entry.title)).toEqual([
+      'fast-flux',
+    ]);
+    expect((await provider.search({ text: 'SDXL CINEMATIC' }, searchContext())).map((entry) => entry.title)).toEqual([
+      'cinematic-xl',
+    ]);
+    expect(await provider.search({ text: 'cinematic flux' }, searchContext())).toEqual([]);
+  });
+});
+
+describe('createPromptHistoryProvider', () => {
+  const history = [
+    { negativePrompt: 'fog', positivePrompt: 'Red Mountain' },
+    { negativePrompt: 'fog', positivePrompt: 'Red Mountain' },
+    { negativePrompt: null, positivePrompt: 'Blue Ocean' },
+  ];
+
+  it('deduplicates results, preserves AND matching, and executes the selected item', async () => {
+    const openGenerateWidget = vi.fn();
+    const recallPrompt = vi.fn();
+    const provider = createPromptHistoryProvider({
+      openGenerateWidget,
+      projectId: 'project-1',
+      promptHistory: history,
+      recallPrompt,
+      t,
+    });
+
+    const entries = await provider.search({ text: 'MoUnTaIn ReD' }, searchContext());
+
+    expect(entries).toHaveLength(1);
+    expect(entries[0]?.title).toBe('Red Mountain');
+    vi.stubGlobal('window', { requestAnimationFrame: vi.fn() });
+    entries[0]?.run();
+    expect(openGenerateWidget).toHaveBeenCalledOnce();
+    expect(recallPrompt).toHaveBeenCalledWith(history[0]);
+    vi.unstubAllGlobals();
+  });
+
+  it('keys search results only by project and prompt-history identity', () => {
+    const createProvider = (projectId: string, promptHistory: typeof history, recallPrompt = vi.fn()) =>
+      createPromptHistoryProvider({ openGenerateWidget: vi.fn(), projectId, promptHistory, recallPrompt, t });
+
+    const first = createProvider('project-1', history, vi.fn());
+
+    expect(createProvider('project-1', history, vi.fn()).contextKey).toBe(first.contextKey);
+    expect(createProvider('project-2', history).contextKey).not.toBe(first.contextKey);
+    expect(createProvider('project-1', [...history]).contextKey).not.toBe(first.contextKey);
+  });
+});

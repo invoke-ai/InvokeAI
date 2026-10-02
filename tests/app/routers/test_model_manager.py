@@ -1,9 +1,11 @@
+import logging
 import os
 from pathlib import Path
 from typing import Any
 
 import pytest
 from fastapi.testclient import TestClient
+from PIL import Image
 
 from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api_app import app
@@ -206,6 +208,8 @@ def _make_stats_services(ram_caches: dict) -> Any:
     # The stats route requires auth; in single-user mode the auth dependency only reads
     # configuration.multiuser before returning the default admin user.
     services.configuration = type("Config", (), {"multiuser": False})()
+    # empty_model_cache logs before clearing.
+    services.logger = logging.getLogger("test.model_manager_router")
     return services
 
 
@@ -222,9 +226,9 @@ def test_get_stats_aggregates_per_device_caches(monkeypatch: Any, client: TestCl
 
     # Both caches report the shared global capacity (200). Their high watermarks sample the same
     # global usage at different moments, so the true system high watermark is the max (120).
-    stats_0 = CacheStats(hits=3, misses=1, in_cache=2, cleared=1, cache_size=200, high_watermark=80)
+    stats_0 = CacheStats(hits=3, misses=1, in_cache=2, cleared=1, cache_size=200, high_watermark=80, cache_used=55)
     stats_0.loaded_model_sizes = {"m1": 50}
-    stats_1 = CacheStats(hits=5, misses=2, in_cache=1, cleared=0, cache_size=200, high_watermark=120)
+    stats_1 = CacheStats(hits=5, misses=2, in_cache=1, cleared=0, cache_size=200, high_watermark=120, cache_used=70)
     stats_1.loaded_model_sizes = {"m2": 70}
 
     services = _make_stats_services({"cuda:0": _Cache(stats_0), "cuda:1": _Cache(stats_1)})
@@ -242,6 +246,10 @@ def test_get_stats_aggregates_per_device_caches(monkeypatch: Any, client: TestCl
     assert payload["cleared"] == 1
     assert payload["cache_size"] == 200
     assert payload["high_watermark"] == 120
+    # cache_used is this fork's *current* usage field. It observes the same global RamBudget as
+    # cache_size, so it takes the max, not the sum. If it were dropped from the aggregate it would
+    # report 0 and webv2's usage gauge would silently fall back to high_watermark (peak).
+    assert payload["cache_used"] == 70
     assert payload["loaded_model_sizes"] == {"m1": 50, "m2": 70}
 
 
@@ -264,6 +272,63 @@ def test_get_stats_counts_duplicate_cache_objects_once(monkeypatch: Any, client:
 
     assert response.status_code == 200
     assert response.json()["hits"] == 4
+
+
+def test_empty_model_cache_aggregates_per_device_results(monkeypatch: Any, client: TestClient) -> None:
+    """Upstream's multi-GPU fan-out returns None from this route, but webv2's clearModelCache awaits
+    the cleared-model count and freed bytes to build its toast. Every per-device cache must be
+    cleared and their results summed."""
+    from invokeai.backend.model_manager.load.model_cache.model_cache import CacheClearResult
+
+    class _Cache:
+        def __init__(self, models_cleared: int, bytes_freed: int) -> None:
+            self._result = CacheClearResult(models_cleared=models_cleared, bytes_freed=bytes_freed)
+            self.requested: list[int] = []
+
+        def make_room(self, bytes_needed: int) -> CacheClearResult:
+            self.requested.append(bytes_needed)
+            return self._result
+
+    cache_0 = _Cache(models_cleared=2, bytes_freed=100)
+    cache_1 = _Cache(models_cleared=3, bytes_freed=250)
+    services = _make_stats_services({"cuda:0": cache_0, "cuda:1": cache_1})
+    invoker = DummyInvoker(services)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
+
+    response = client.post("/api/v2/models/empty_model_cache")
+
+    assert response.status_code == 200
+    assert response.json() == {"models_cleared": 5, "bytes_freed": 350}
+    # Both devices were actually asked to clear, not just the API thread's default cache.
+    assert len(cache_0.requested) == 1
+    assert len(cache_1.requested) == 1
+
+
+def test_empty_model_cache_clears_duplicate_cache_objects_once(monkeypatch: Any, client: TestClient) -> None:
+    """ram_caches can map several device keys to one cache object. Clearing it twice would report
+    the second (already-empty) pass, so the id() guard keeps the totals honest."""
+    from invokeai.backend.model_manager.load.model_cache.model_cache import CacheClearResult
+
+    class _Cache:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def make_room(self, bytes_needed: int) -> CacheClearResult:
+            self.calls += 1
+            return CacheClearResult(models_cleared=2, bytes_freed=100)
+
+    shared = _Cache()
+    services = _make_stats_services({"cuda:0": shared, "cpu": shared})
+    invoker = DummyInvoker(services)
+    monkeypatch.setattr("invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(invoker))
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", MockApiDependencies(invoker))
+
+    response = client.post("/api/v2/models/empty_model_cache")
+
+    assert response.status_code == 200
+    assert response.json() == {"models_cleared": 2, "bytes_freed": 100}
+    assert shared.calls == 1
 
 
 def test_get_stats_returns_null_when_no_stats(monkeypatch: Any, client: TestClient) -> None:
@@ -523,6 +588,41 @@ def test_reidentify_is_refused_while_the_same_model_is_being_converted(conversio
         deps.invoker.services.model_manager.store.replace_model.assert_not_called()
 
 
+def test_reidentify_keeps_a_backbone_only_the_install_source_names(
+    monkeypatch: Any, mm2_record_store: Any, mm2_app_config: Any
+) -> None:
+    """A 16-channel VAE is FLUX.1's or SD3's by its name alone. Copied into the models folder it keeps a
+    generic file name in a folder named for its key, and only the Hugging Face source still says SD3."""
+    from types import SimpleNamespace
+
+    import torch
+    from safetensors.torch import save_file
+
+    from invokeai.app.api.routers.model_manager import _reidentify_model
+    from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
+    from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelSourceType
+
+    path = mm2_app_config.models_path / "7c1f9d2e" / "diffusion_pytorch_model.safetensors"
+    path.parent.mkdir(parents=True)
+    save_file(
+        {"encoder.conv_in.weight": torch.zeros(8, 3, 3, 3), "decoder.conv_in.weight": torch.zeros(8, 16, 3, 3)}, path
+    )
+    source = {
+        "source": "stabilityai/stable-diffusion-3.5-large::vae/diffusion_pytorch_model.safetensors",
+        "source_type": ModelSourceType.HFRepoID,
+    }
+    installed = ModelConfigFactory.from_model_on_disk(path, source, allow_unknown=False).config
+    assert installed is not None and installed.base is BaseModelType.StableDiffusion3
+    mm2_record_store.add_model(installed)
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(store=mm2_record_store), configuration=mm2_app_config)
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.model_manager.ApiDependencies", MockApiDependencies(DummyInvoker(services))
+    )
+
+    assert _reidentify_model(installed.key).base is BaseModelType.StableDiffusion3
+
+
 @pytest.mark.anyio
 async def test_update_model_record_is_refused_while_the_same_model_is_being_converted(
     conversion_in_flight,
@@ -636,3 +736,309 @@ def test_bulk_reidentify_reports_a_busy_key_instead_of_racing_it(conversion_in_f
     assert [entry["key"] for entry in response.failed] == ["busy-key"]
     assert "already in progress" in response.failed[0]["error"]
     reidentify.assert_called_once_with("free-key")
+
+
+@pytest.fixture
+def real_model_images(tmp_path: Path):
+    from unittest.mock import MagicMock
+
+    from invokeai.app.services.model_images.model_images_default import ModelImageFileStorageDisk
+
+    storage = ModelImageFileStorageDisk(tmp_path / "model_images")
+    storage.start(MagicMock())
+    return storage
+
+
+def test_delete_model_image_removes_the_image_of_a_deleted_model(real_model_images) -> None:
+    """Deleting a model leaves its cover image behind, and this route is how that orphan is cleaned up - so it must
+    not require the model's record to still exist."""
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers import model_manager
+    from invokeai.app.services.model_records.model_records_base import UnknownModelException
+
+    real_model_images.save(Image.new("RGB", (8, 8)), "deleted-model")
+    image_path = real_model_images.get_path("deleted-model")
+    assert image_path.exists()
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = real_model_images
+        deps.invoker.services.model_manager.store.get_model.side_effect = UnknownModelException("deleted-model")
+
+        model_manager.delete_model_image(MagicMock(), key="deleted-model")
+
+    assert not image_path.exists()
+
+
+# `../escaped` is the case that matters on posix: the backslash and `..` shapes are literal (and missing) filenames
+# there, so they would 404 even with no key validation at all.
+@pytest.mark.parametrize("key", ["no-such-model", "../escaped", "..\\escaped", ".."])
+def test_delete_model_image_404s_for_a_missing_image_or_an_unsafe_key(real_model_images, key: str) -> None:
+    """A missing image and a key that is not a plain filename are both 404s - not 500s, and never an unlink of a
+    path outside the images folder. A file is planted at the traversal target so a missing guard would show."""
+    from unittest.mock import MagicMock, patch
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+
+    images_dir = real_model_images._model_images_folder
+    images_dir.mkdir(parents=True, exist_ok=True)
+    planted = images_dir.parent / "escaped.webp"
+    planted.write_bytes(b"not yours")
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = real_model_images
+
+        with pytest.raises(HTTPException) as exc_info:
+            model_manager.delete_model_image(MagicMock(), key=key)
+
+    assert exc_info.value.status_code == 404
+    assert planted.exists()
+    assert key not in model_manager._CLAIMED_MODEL_KEYS
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("key", ["no-such-model", "..\\..\\pwned", ".."])
+async def test_update_model_image_404s_for_a_key_that_names_no_model(key: str) -> None:
+    from unittest.mock import MagicMock, patch
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+    from invokeai.app.services.model_records.model_records_base import UnknownModelException
+
+    image = MagicMock()
+    image.content_type = "image/png"
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = MagicMock()
+        deps.invoker.services.model_manager.store.get_model.side_effect = UnknownModelException(key)
+
+        with pytest.raises(HTTPException) as exc_info:
+            await model_manager.update_model_image(key, image, MagicMock())
+
+        assert exc_info.value.status_code == 404
+        deps.invoker.services.model_images.save.assert_not_called()
+        assert key not in model_manager._CLAIMED_MODEL_KEYS
+
+
+@pytest.mark.anyio
+async def test_update_model_image_404s_for_a_legacy_unsafe_model_key(real_model_images) -> None:
+    """A persisted legacy record can outlive current key validation, but an upload must still return a client error
+    when the storage layer rejects its key instead of surfacing a 500."""
+    from io import BytesIO
+    from unittest.mock import MagicMock, patch
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+
+    key = "../escaped"
+    escaped_image_path = real_model_images._model_images_folder.parent / "escaped.webp"
+    image_bytes = BytesIO()
+    Image.new("RGB", (8, 8)).save(image_bytes, format="PNG")
+    image = MagicMock()
+    image.content_type = "image/png"
+
+    async def read() -> bytes:
+        return image_bytes.getvalue()
+
+    async def run_in_thread(function: Any, *args: Any, **kwargs: Any) -> Any:
+        return function(*args, **kwargs)
+
+    image.read = read
+
+    with (
+        patch.object(model_manager, "ApiDependencies") as deps,
+        patch.object(model_manager.asyncio, "to_thread", run_in_thread),
+    ):
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = real_model_images
+        # Simulate a model record written before unsafe model keys were rejected.
+        deps.invoker.services.model_manager.store.get_model.return_value = MagicMock()
+
+        with pytest.raises(HTTPException) as exc_info:
+            await model_manager.update_model_image(key, image, MagicMock())
+
+    assert exc_info.value.status_code == 404
+    assert not escaped_image_path.exists()
+    assert key not in model_manager._CLAIMED_MODEL_KEYS
+
+
+@pytest.mark.anyio
+async def test_update_model_image_checks_the_record_while_holding_the_claim() -> None:
+    """Deletion and conversion claim the key too, so checking the record under the claim is what stops one of them
+    from removing the model between the check and the save - which would leave an orphan image behind a 200."""
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers import model_manager
+
+    image = MagicMock()
+    image.content_type = "image/png"
+    claimed_during_lookup: list[bool] = []
+
+    def get_model(key: str) -> MagicMock:
+        claimed_during_lookup.append(key in model_manager._CLAIMED_MODEL_KEYS)
+        return MagicMock()
+
+    async def read() -> bytes:
+        return b"irrelevant"
+
+    image.read = read
+
+    with (
+        patch.object(model_manager, "ApiDependencies") as deps,
+        patch.object(model_manager.Image, "open", return_value=MagicMock()),
+    ):
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = MagicMock()
+        deps.invoker.services.model_manager.store.get_model.side_effect = get_model
+
+        await model_manager.update_model_image("some-model", image, MagicMock())
+
+    assert claimed_during_lookup == [True]
+    deps.invoker.services.model_images.save.assert_called_once()
+
+
+def test_update_model_image_documents_its_404(client: TestClient) -> None:
+    operation = client.get("/openapi.json").json()["paths"]["/api/v2/models/i/{key}/image"]["patch"]
+    assert "404" in operation["responses"]
+
+
+def test_a_case_variant_of_a_claimed_key_is_refused() -> None:
+    """Cover images are `<key>.webp`, which is one file for `K` and `k` on a case-insensitive filesystem - so a
+    claim on one must block the other, or an image delete could race a conversion of the same model."""
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+
+    with model_manager._claim_model_key("abc-model"):
+        with pytest.raises(HTTPException) as exc_info:
+            with model_manager._claim_model_key("ABC-Model"):
+                pass
+        assert exc_info.value.status_code == 409
+
+    assert not model_manager._CLAIMED_MODEL_KEYS
+
+
+def test_a_normalization_variant_of_a_claimed_key_is_refused() -> None:
+    """APFS ignores Unicode normalization, so `é.webp` and `é.webp` are one file there - the claims must
+    conflict just like case variants do."""
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+
+    with model_manager._claim_model_key("café"):
+        with pytest.raises(HTTPException) as exc_info:
+            with model_manager._claim_model_key("CAFÉ"):
+                pass
+        assert exc_info.value.status_code == 409
+
+    assert not model_manager._CLAIMED_MODEL_KEYS
+
+
+@pytest.mark.anyio
+@pytest.mark.parametrize("new_key", ["../../pwned", "..:stream", "a-different-but-valid-key"])
+async def test_update_model_record_refuses_to_change_the_key(new_key: str) -> None:
+    """`update_model` copies every set field into the stored config, so a `key` in the body is written into the
+    blob while the row id keeps the old one. The record then answers to a key nothing can look it up by:
+    `replace_model` (and so reidentify) raises UnknownModelException forever after, and the UI caches the model
+    under the new key so every later request 404s. Note the last case - a *valid* key does this too, so the guard
+    is on the key changing, not on it being unsafe."""
+    from unittest.mock import MagicMock, patch
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager
+    from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        with pytest.raises(HTTPException) as exc_info:
+            await model_manager.update_model_record(
+                key="real-key", changes=ModelRecordChanges(key=new_key, name="x"), current_admin=MagicMock()
+            )
+
+        assert exc_info.value.status_code == 422
+        deps.invoker.services.model_manager.store.update_model.assert_not_called()
+
+
+@pytest.mark.anyio
+async def test_update_model_record_accepts_the_forms_unchanged_key_echo() -> None:
+    """`ModelEdit.tsx` seeds its form from the whole config, so the key rides along on every save. That echo must
+    go through - including for a key that predates key validation, which has no other way to be edited."""
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers import model_manager
+    from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
+
+    for key in ("ecd3b3a5-6c4f-4a5f-9a0e-4b1c2d3e4f50", "legacy:key", "legacy?key"):
+        with patch.object(model_manager, "_update_model_record") as update:
+            await model_manager.update_model_record(
+                key=key, changes=ModelRecordChanges(key=key, name="renamed"), current_admin=MagicMock()
+            )
+            assert update.call_args.args[0] == key
+
+
+@pytest.mark.anyio
+@pytest.mark.skipif(os.name == "nt", reason="Legacy colon keys could only have been stored on POSIX filesystems")
+async def test_a_legacy_posix_key_can_still_replace_and_delete_its_cover(real_model_images) -> None:
+    """No released version checked model keys, so a posix install can hold a model keyed `legacy:key` with a cover
+    already on disk. The image routes must keep managing it rather than 404ing on a Windows-only rule."""
+    from io import BytesIO
+    from unittest.mock import MagicMock, patch
+
+    from invokeai.app.api.routers import model_manager
+
+    key = "legacy:key"
+    image_bytes = BytesIO()
+    Image.new("RGB", (8, 8)).save(image_bytes, format="PNG")
+    image = MagicMock()
+    image.content_type = "image/png"
+
+    async def read() -> bytes:
+        return image_bytes.getvalue()
+
+    image.read = read
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        deps.invoker.services.logger = MagicMock()
+        deps.invoker.services.model_images = real_model_images
+        deps.invoker.services.model_manager.store.get_model.return_value = MagicMock()
+
+        await model_manager.update_model_image(key, image, MagicMock())
+        image_path = real_model_images._model_images_folder / f"{key}.webp"
+        assert image_path.exists()
+
+        model_manager.delete_model_image(MagicMock(), key=key)
+        assert not image_path.exists()
+
+
+def test_model_image_url_encodes_the_key() -> None:
+    """Unencoded, a stored key like `X?y` makes the cover URL address the route for model `X` instead."""
+    from invokeai.app.services.urls.urls_default import LocalUrlService
+
+    urls = LocalUrlService()
+    assert urls.get_model_image_url("X?y") == "api/v2/models/i/X%3Fy/image"
+    assert urls.get_model_image_url("a#b%c") == "api/v2/models/i/a%23b%25c/image"
+    assert urls.get_model_image_url("openai-dall-e-3") == "api/v2/models/i/openai-dall-e-3/image"
+
+
+def test_an_encoded_key_reaches_the_image_route_intact(client: TestClient, tmp_path: Path) -> None:
+    """The other half of the encoding: the server decodes `%3F` back into the key, rather than routing on it."""
+    from unittest.mock import patch
+
+    from invokeai.app.api.routers import model_manager
+
+    cover = tmp_path / "cover.webp"
+    Image.new("RGB", (8, 8)).save(cover, format="webp")
+
+    with patch.object(model_manager, "ApiDependencies") as deps:
+        deps.invoker.services.model_images.get_path.return_value = cover
+        response = client.get("/api/v2/models/i/X%3Fy/image")
+
+    assert response.status_code == 200
+    deps.invoker.services.model_images.get_path.assert_called_once_with("X?y")

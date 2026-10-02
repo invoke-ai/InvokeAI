@@ -4,7 +4,9 @@ from collections.abc import Generator
 from contextlib import contextmanager
 from logging import Logger
 from pathlib import Path
+from typing import get_args
 
+from invokeai.app.services.config.config_default import DB_SYNCHRONOUS
 from invokeai.app.services.shared.sqlite.sqlite_common import sqlite_memory
 
 
@@ -15,6 +17,8 @@ class SqliteDatabase:
     :param db_path: Path to the database file. If None, an in-memory database is used.
     :param logger: Logger to use for logging.
     :param verbose: Whether to log SQL statements. Provides `logger.debug` as the SQLite trace callback.
+    :param synchronous: SQLite `synchronous` setting. Defaults to `full`, what InvokeAI has always used.
+        `normal` is refused, with a warning, for a database file whose journal mode did not become WAL.
 
     This is a light wrapper around the `sqlite3` module, providing a few conveniences:
     - The database file is written to disk if it does not exist.
@@ -27,8 +31,20 @@ class SqliteDatabase:
     - `clean()`: Runs the SQL `VACUUM;` command and reports on the freed space.
     """
 
-    def __init__(self, db_path: Path | None, logger: Logger, verbose: bool = False) -> None:
+    def __init__(
+        self,
+        db_path: Path | None,
+        logger: Logger,
+        verbose: bool = False,
+        synchronous: DB_SYNCHRONOUS = "full",
+    ) -> None:
         """Initializes the database. This is used internally by the class constructor."""
+        # This constructor is called directly (user management commands, tests), not only through the
+        # validated config, and `synchronous` is interpolated into a PRAGMA below. `DB_SYNCHRONOUS` is
+        # a static annotation, so the value is checked here, before anything is opened.
+        if synchronous not in get_args(DB_SYNCHRONOUS):
+            raise ValueError(f"Invalid synchronous setting {synchronous!r}, expected one of {get_args(DB_SYNCHRONOUS)}")
+
         self._logger = logger
         self._db_path = db_path
         self._verbose = verbose
@@ -49,11 +65,36 @@ class SqliteDatabase:
         # Enable foreign key constraints
         self._conn.execute("PRAGMA foreign_keys = ON;")
 
-        # Enable Write-Ahead Logging (WAL) mode for better concurrency
-        self._conn.execute("PRAGMA journal_mode = WAL;")
+        # Enable Write-Ahead Logging (WAL) mode for better concurrency. The statement reports the mode
+        # that was actually established: WAL needs shared memory, so it can fail to engage -- quietly --
+        # on network filesystems, some container volume drivers and `SQLITE_OMIT_WAL` builds.
+        journal_mode = str(self._conn.execute("PRAGMA journal_mode = WAL;").fetchone()[0]).lower()
 
         # Set a busy timeout to prevent database lockups during writes
         self._conn.execute("PRAGMA busy_timeout = 5000;")  # 5 seconds
+
+        # Durability. SQLite's own default is `full`, which fsyncs on every commit; `normal` trades the
+        # last transactions on a power loss or OS crash for roughly 12x shorter commits. Shorter commits
+        # matter twice here, because every write holds the lock that serialises all database work.
+        #
+        # `normal` cannot corrupt the database only *because* of WAL; on a rollback journal it can, so a
+        # database file that did not get WAL keeps `full` instead. In-memory databases report `memory`
+        # and have no durability to trade, so the requirement does not apply to them.
+        #
+        # Refused rather than fatal: the setting is a performance preference, and starting with stronger
+        # durability than asked for costs commit time, where starting with weaker durability than the
+        # documented guarantee risks the user's database. A warning names the mode so the cause is
+        # visible instead of merely slow.
+        if synchronous == "normal" and self._db_path is not None and journal_mode != "wal":
+            self._logger.warning(
+                f"Journal mode is '{journal_mode}', not WAL, so db_synchronous='normal' was refused and "
+                "'full' used instead: without WAL that setting can corrupt the database on power loss."
+            )
+            synchronous = "full"
+
+        # PRAGMA does not take bind parameters, so the value is interpolated. It is checked against
+        # DB_SYNCHRONOUS at the top of this constructor.
+        self._conn.execute(f"PRAGMA synchronous = {synchronous.upper()};")
 
     def clean(self) -> None:
         """
@@ -63,7 +104,12 @@ class SqliteDatabase:
         if not self._db_path:
             return
         try:
-            with self._conn as conn:
+            # Serialize with transaction() users: services with their own
+            # threads (e.g. the image index worker) may have a statement in
+            # progress on this shared connection, and VACUUM refuses to run
+            # concurrently with one ("cannot VACUUM - SQL statements in
+            # progress").
+            with self._lock, self._conn as conn:
                 initial_db_size = Path(self._db_path).stat().st_size
                 conn.execute("VACUUM;")
                 conn.commit()

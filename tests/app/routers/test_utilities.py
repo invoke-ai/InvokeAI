@@ -5,14 +5,18 @@ Covers:
 - image-to-prompt: image read-access check must fire BEFORE the model is loaded,
   so non-owners can't probe stored images.
 - image-to-prompt: a missing image surfaces as 404, not 500.
+- expand-prompt with an image: the same read-access check, and a text-only model is refused before loading.
 """
 
+import shutil
+from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
 from fastapi import status
 from fastapi.testclient import TestClient
+from fontTools.ttLib import TTFont
 
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.invoker import Invoker
@@ -37,6 +41,12 @@ def _create_extra_user(mock_invoker: Invoker, email: str) -> str:
         UserCreateRequest(email=email, display_name=email, password="TestPass123", is_admin=False)
     )
     return user.user_id
+
+
+@pytest.fixture
+def font_root(mock_invoker: Invoker, invokeai_root_dir: Path) -> Path:
+    mock_invoker.services.configuration._root = invokeai_root_dir
+    return invokeai_root_dir
 
 
 # ----------------------------- Auth gating -----------------------------
@@ -84,18 +94,23 @@ def test_dynamicprompts_unknown_wildcard_returns_error_without_hanging(client: T
     assert body["prompts"] == ["{__random__8chan|fenster|stuff}"]
 
 
-def test_dynamicprompts_bare_unknown_wildcard_still_generates(client: TestClient, user1_token: str):
-    """A wildcard used as plain literal text (not a variant value) does not hang and must not error."""
+def test_dynamicprompts_bare_unknown_wildcard_returns_error(client: TestClient, user1_token: str):
+    """A wildcard outside a variant does not hang, but it does not generate usefully either.
+
+    The combinatorial generator emits `max_prompts` copies of one prompt and drops every other
+    variant's values, so a caller that generated anyway would queue N identical results. This case
+    was previously allowed through with `error: None`; it must report the unresolvable name instead.
+    """
     r = client.post(
         "/api/v1/utilities/dynamicprompts",
-        json={"prompt": "a photo, __my_style__"},
+        json={"prompt": "a {red|green} photo, __my_style__"},
         headers={"Authorization": f"Bearer {user1_token}"},
     )
     assert r.status_code == status.HTTP_200_OK
     body = r.json()
-    assert body["error"] is None
-    assert body["prompts"]  # non-empty
-    assert all(p == "a photo, __my_style__" for p in body["prompts"])
+    assert body["error"] is not None
+    assert "my_style" in body["error"]
+    assert body["prompts"] == ["a {red|green} photo, __my_style__"]
 
 
 def test_dynamicprompts_random_generator_ignores_unknown_wildcard(client: TestClient, user1_token: str):
@@ -171,3 +186,246 @@ def test_image_to_prompt_admin_can_access_any_image(
     )
     # Admin passes the read-access check; model loading then fails with 404.
     assert r.status_code == status.HTTP_404_NOT_FOUND
+
+
+def test_list_user_fonts_requires_auth(enable_multiuser: Any, font_root: Path, client: TestClient) -> None:
+    fonts_dir = font_root / "fonts"
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    (fonts_dir / "MyFont.ttf").write_bytes(b"not-a-real-font")
+
+    r = client.get("/api/v1/utilities/fonts")
+
+    assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_get_user_font_file_requires_auth(enable_multiuser: Any, font_root: Path, client: TestClient) -> None:
+    fonts_dir = font_root / "fonts"
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    (fonts_dir / "MyFont.ttf").write_bytes(b"not-a-real-font")
+
+    r = client.get("/api/v1/utilities/fonts/MyFont.ttf")
+
+    assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+def test_user_fonts_support_real_font_files_and_configured_directory(
+    admin_token: str, client: TestClient, font_root: Path, mock_invoker: Invoker
+) -> None:
+    assert mock_invoker.services.configuration.root_path == font_root
+    mock_invoker.services.configuration.fonts_dir = Path("custom-fonts")
+    fonts_dir = mock_invoker.services.configuration.fonts_path
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    source_font = Path(__file__).parents[3] / "invokeai" / "assets" / "fonts" / "inter" / "Inter-Regular.ttf"
+    shutil.copyfile(source_font, fonts_dir / "Inter-Regular.ttf")
+
+    r = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert r.status_code == status.HTTP_200_OK
+    body = r.json()
+    assert len(body["fonts"]) == 1
+    assert body["fonts"][0]["family"] == "Inter"
+    assert body["fonts"][0]["url"] == "api/v1/utilities/fonts/Inter-Regular.ttf"
+
+    font_response = client.get(
+        "/api/v1/utilities/fonts/Inter-Regular.ttf",
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+
+    assert font_response.status_code == status.HTTP_200_OK
+    assert font_response.headers["content-type"] == "font/ttf"
+    assert font_response.headers["cache-control"] == "private, no-cache"
+    assert font_response.headers["content-disposition"].startswith('inline; filename="Inter-Regular.ttf"')
+    assert font_response.content == source_font.read_bytes()
+
+
+def test_list_user_fonts_reads_real_woff2_file(
+    admin_token: str, client: TestClient, mock_invoker: Invoker, tmp_path: Path
+) -> None:
+    mock_invoker.services.configuration.fonts_dir = tmp_path / "fonts"
+    fonts_dir = mock_invoker.services.configuration.fonts_path
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    source_font = Path(__file__).parents[3] / "invokeai" / "assets" / "fonts" / "inter" / "Inter-Regular.ttf"
+    font = TTFont(source_font)
+    try:
+        font.flavor = "woff2"
+        font.save(fonts_dir / "Inter-Regular.woff2")
+    finally:
+        font.close()
+
+    r = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert r.status_code == status.HTTP_200_OK
+    body = r.json()
+    assert len(body["fonts"]) == 1
+    assert body["fonts"][0]["family"] == "Inter"
+    assert body["fonts"][0]["faces"][0]["path"] == "Inter-Regular.woff2"
+
+
+def test_list_user_fonts_allows_authenticated_access(
+    admin_token: str, client: TestClient, font_root: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fonts_dir = font_root / "fonts"
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    (fonts_dir / "MyFont.ttf").write_bytes(b"not-a-real-font")
+    monkeypatch.setattr(
+        "invokeai.app.api.routers.utilities._get_font_metadata",
+        lambda _font_file: ("My Font", "My Font", 400, "normal"),
+    )
+
+    r = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert r.status_code == status.HTTP_200_OK
+    body = r.json()
+    assert len(body["fonts"]) == 1
+    assert body["fonts"][0]["id"] == "user:my font"
+
+
+def test_list_user_fonts_id_is_stable_when_preferred_face_changes(
+    admin_token: str,
+    client: TestClient,
+    mock_invoker: Invoker,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    mock_invoker.services.configuration.fonts_dir = tmp_path / "fonts"
+    fonts_dir = mock_invoker.services.configuration.fonts_path
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    (fonts_dir / "MyFont-Bold.ttf").write_bytes(b"not-a-real-font")
+
+    def get_metadata(font_file: Path) -> tuple[str, str, int, str]:
+        weight = 400 if "Regular" in font_file.stem else 700
+        return ("My Font", "My Font", weight, "normal")
+
+    monkeypatch.setattr("invokeai.app.api.routers.utilities._get_font_metadata", get_metadata)
+
+    first_response = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
+    first_font = first_response.json()["fonts"][0]
+    assert first_font["id"] == "user:my font"
+    assert first_font["path"] == "MyFont-Bold.ttf"
+
+    (fonts_dir / "MyFont-Regular.ttf").write_bytes(b"not-a-real-font")
+    second_response = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
+    second_font = second_response.json()["fonts"][0]
+    assert second_font["id"] == first_font["id"]
+    assert second_font["path"] == "MyFont-Regular.ttf"
+
+
+def test_list_user_fonts_skips_malformed_fonts_and_logs_warning(
+    admin_token: str,
+    client: TestClient,
+    font_root: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    fonts_dir = font_root / "fonts"
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    (fonts_dir / "BrokenFont.ttf").write_bytes(b"not-a-real-font")
+
+    with caplog.at_level("WARNING"):
+        r = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert r.status_code == status.HTTP_200_OK
+    assert r.json()["fonts"] == []
+    assert "Skipping font file" in caplog.text
+
+
+def test_get_user_font_file_rejects_symlink(
+    admin_token: str, client: TestClient, font_root: Path, tmp_path: Path
+) -> None:
+    fonts_dir = font_root / "fonts"
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    outside_file = tmp_path / "outside.ttf"
+    outside_file.write_bytes(b"outside-font")
+    symlink_path = fonts_dir / "linked.ttf"
+
+    try:
+        symlink_path.symlink_to(outside_file)
+    except (NotImplementedError, OSError):
+        pytest.skip("Symlinks are not available in this test environment")
+
+    r = client.get("/api/v1/utilities/fonts/linked.ttf", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert r.status_code == status.HTTP_400_BAD_REQUEST
+
+
+def test_list_user_fonts_skips_symlinked_files(
+    admin_token: str, client: TestClient, font_root: Path, tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    fonts_dir = font_root / "fonts"
+    fonts_dir.mkdir(parents=True, exist_ok=True)
+    outside_dir = tmp_path / "outside-fonts"
+    outside_dir.mkdir()
+    (outside_dir / "outside.ttf").write_bytes(b"outside-font")
+    symlink_path = fonts_dir / "linked-dir"
+
+    try:
+        symlink_path.symlink_to(outside_dir, target_is_directory=True)
+    except (NotImplementedError, OSError):
+        pytest.skip("Symlinks are not available in this test environment")
+
+    with caplog.at_level("WARNING"):
+        r = client.get("/api/v1/utilities/fonts", headers={"Authorization": f"Bearer {admin_token}"})
+
+    assert r.status_code == status.HTTP_200_OK
+    assert r.json()["fonts"] == []
+    assert "Skipping font path" in caplog.text
+
+
+# ----------------------------- expand_prompt with an image -----------------------------
+
+
+def test_expand_prompt_image_forbidden_for_non_owner(
+    client: TestClient, user1_token: str, user2_token: str, mock_invoker: Invoker
+):
+    """Attaching an image must not let a second user read a private image through the rewrite."""
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    _save_image(mock_invoker, "private-frame.png", user1.user_id)
+
+    r = client.post(
+        "/api/v1/utilities/expand-prompt",
+        json={"prompt": "she waves", "model_key": "some-key", "image_name": "private-frame.png"},
+        headers={"Authorization": f"Bearer {user2_token}"},
+    )
+    assert r.status_code == status.HTTP_403_FORBIDDEN
+    mock_invoker.services.model_manager.store.get_model.assert_not_called()
+
+
+def test_expand_prompt_image_with_text_only_model_is_rejected_before_loading(
+    client: TestClient, user1_token: str, mock_invoker: Invoker
+):
+    from invokeai.backend.model_manager.taxonomy import ModelType
+
+    user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+    assert user1 is not None
+    _save_image(mock_invoker, "frame.png", user1.user_id)
+    mock_invoker.services.model_manager.store.get_model = MagicMock(
+        return_value=MagicMock(type=ModelType.TextLLM, supports_images=False)
+    )
+    mock_invoker.services.model_manager.load.load_model = MagicMock()
+
+    r = client.post(
+        "/api/v1/utilities/expand-prompt",
+        json={"prompt": "she waves", "model_key": "qwen", "image_name": "frame.png"},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+    assert r.status_code == status.HTTP_422_UNPROCESSABLE_CONTENT
+    assert "cannot read images" in r.json()["detail"]
+    mock_invoker.services.model_manager.load.load_model.assert_not_called()
+
+
+def test_expand_prompt_missing_image_is_404_for_an_admin(client: TestClient, admin_token: str, mock_invoker: Invoker):
+    """Admins skip the ownership lookup, so a missing record surfaces on the read and must still be a 404."""
+    from invokeai.backend.model_manager.taxonomy import ModelType
+
+    mock_invoker.services.model_manager.store.get_model = MagicMock(
+        return_value=MagicMock(type=ModelType.TextLLM, supports_images=True)
+    )
+    mock_invoker.services.model_manager.load.load_model = MagicMock()
+
+    r = client.post(
+        "/api/v1/utilities/expand-prompt",
+        json={"prompt": "she waves", "model_key": "e2b", "image_name": "deleted-frame.png"},
+        headers={"Authorization": f"Bearer {admin_token}"},
+    )
+    assert r.status_code == status.HTTP_404_NOT_FOUND
+    mock_invoker.services.model_manager.load.load_model.assert_not_called()

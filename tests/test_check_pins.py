@@ -49,6 +49,27 @@ def _set_requires_python(repo: Path, specifier: str) -> None:
     path.write_text(updated)
 
 
+def _repo_pinned_python() -> str | None:
+    """pins.json's `python`, or None if pins.json cannot be read for it.
+
+    Never raises. A malformed pins.json is precisely what half of this file exists to diagnose,
+    and raising at import time would take the whole file's collection with it - including the
+    torchIndexUrl drift checks, which have nothing to do with the pin. Returning None instead
+    costs only the three advisory assertions, and those fail by name.
+    """
+    try:
+        return json.loads((REPO_ROOT / "pins.json").read_text()).get("python")
+    except (OSError, ValueError, AttributeError):
+        return None
+
+
+# The real pin, read rather than restated, so the advisory tests below don't have to name it.
+PINNED_PYTHON = _repo_pinned_python()
+# Any version that is not the pin. The advisory tests declare it as the sole python classifier, so
+# it never has to match reality - only to differ from PINNED_PYTHON.
+OTHER_PYTHON = "3.13"
+
+
 # Every (platform, backend) the checker must insist on, derived from the checker's own matrix so
 # the two cannot drift apart.
 REQUIRED_ENTRIES = [
@@ -161,14 +182,18 @@ def test_requires_python_moving_off_the_pin_fails(repo_copy: Path, capsys: pytes
     assert "pins.json python is '3.12'" in capsys.readouterr().err
 
 
-@pytest.mark.parametrize("pinned", ["3.10", "3.13", "3.9", "4.0"])
-def test_python_outside_requires_python_fails(repo_copy: Path, pinned: str):
-    """The other direction: pins.json moved to a version the metadata rejects."""
+@pytest.mark.parametrize("pinned", ["3.10", "3.11", "3.13", "3.9", "4.0"])
+def test_python_outside_requires_python_fails(repo_copy: Path, capsys: pytest.CaptureFixture[str], pinned: str):
+    """The other direction: pins.json moved to a version the metadata rejects. 3.11 is in here
+    because it used to be legal: a pins.json left behind on it must fail, not merely warn."""
     pins = _read_pins(repo_copy)
     pins["python"] = pinned
     _write_pins(repo_copy, pins)
 
     assert check_pins.main(repo_copy) == 1
+    # Name the reason: a narrowed _VERSION_RE would also fail these, leaving the bound itself
+    # unguarded while the suite stayed green.
+    assert "pyproject.toml requires-python is" in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(
@@ -221,29 +246,37 @@ def _drop_python_classifiers(repo: Path) -> None:
     path.write_text(updated)
 
 
+def _replace_python_classifiers(repo: Path, *versions: str) -> None:
+    """Declare exactly `versions` as the python classifiers, dropping the real ones.
+
+    Inserted verbatim rather than through tomllib, because several callers depend on spellings
+    reaching the checker exactly as written - "3.012", a 4400-digit "version".
+    """
+    _drop_python_classifiers(repo)
+    path = repo / "pyproject.toml"
+    added = "".join(f"  'Programming Language :: Python :: {version}',\n" for version in versions)
+    path.write_text(path.read_text().replace("classifiers = [\n", f"classifiers = [\n{added}", 1))
+
+
 def test_pin_allowed_by_requires_python_passes_without_a_classifier(
     repo_copy: Path, capsys: pytest.CaptureFixture[str]
 ):
-    """requires-python is ">=3.11, <3.13", so 3.11 is a legal pin whether or not a 3.11
-    classifier exists. Classifiers are optional and informational, so they must not veto it."""
-    pins = _read_pins(repo_copy)
-    pins["python"] = "3.11"
-    _write_pins(repo_copy, pins)
+    """The pin satisfies requires-python, and nothing else decides installability: classifiers
+    are optional and informational, so a pin they do not name must not be vetoed."""
+    _replace_python_classifiers(repo_copy, OTHER_PYTHON)
 
     assert check_pins.main(repo_copy) == 0
     # Mentioned, but only as advice.
-    assert "warning: pins.json python is '3.11'" in capsys.readouterr().err
+    assert f"warning: pins.json python is '{PINNED_PYTHON}'" in capsys.readouterr().err
 
 
 def test_unmentioned_pin_is_a_warning_not_an_error(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
     """The advisory names the classifier to add and says why it is not fatal."""
-    pins = _read_pins(repo_copy)
-    pins["python"] = "3.11"
-    _write_pins(repo_copy, pins)
+    _replace_python_classifiers(repo_copy, OTHER_PYTHON)
 
     check_pins.main(repo_copy)
     stderr = capsys.readouterr().err
-    assert "Programming Language :: Python :: 3.11" in stderr
+    assert f"Programming Language :: Python :: {PINNED_PYTHON}" in stderr
     assert "out of sync" not in stderr  # the failure banner
 
 
@@ -251,21 +284,19 @@ def test_leading_zero_classifier_does_not_count_as_mentioning_the_pin(
     repo_copy: Path, capsys: pytest.CaptureFixture[str]
 ):
     """'Programming Language :: Python :: 3.012' is not a trove classifier, so PyPI shows no
-    3.12 support. Normalizing it to (3, 12) would silence the advisory - so 3.11 is declared
-    alongside it, leaving the advisory something to report against."""
-    _drop_python_classifiers(repo_copy)
-    path = repo_copy / "pyproject.toml"
-    added = "  'Programming Language :: Python :: 3.012',\n  'Programming Language :: Python :: 3.11',\n"
-    path.write_text(path.read_text().replace("classifiers = [\n", f"classifiers = [\n{added}", 1))
+    3.12 support. Normalizing it to (3, 12) would silence the advisory - so a sound classifier
+    for another version is declared alongside it, leaving the advisory something to report."""
+    _replace_python_classifiers(repo_copy, "3.012", OTHER_PYTHON)
 
     assert check_pins.main(repo_copy) == 0
-    # The pin is 3.12, and 3.11 is the only version really declared.
-    assert "they list 3.11)" in capsys.readouterr().err
+    # The pin's own classifier is the malformed one, so only the sound one is listed back.
+    assert f"they list {OTHER_PYTHON})" in capsys.readouterr().err
 
 
 def test_advisory_is_still_printed_on_a_failing_run(repo_copy: Path, capsys: pytest.CaptureFixture[str]):
     """The warning loop runs after the errors are printed, not instead of them: a wrong pin and
-    an unmentioned pin are usually the same edit, so both belong in the same output."""
+    an unmentioned pin are usually the same edit, so both belong in the same output. 3.11 is both
+    at once now - below the floor, and never classified."""
     pins = _read_pins(repo_copy)
     pins["python"] = "3.11"
     pins["torchIndexUrl"]["linux"]["rocm"] = "https://download.pytorch.org/whl/rocm6.3"
@@ -287,7 +318,8 @@ def test_unreal_version_inside_an_open_ended_requires_python_is_not_caught(repo_
     """Documenting the deliberate gap: with no upper bound in requires-python there is no
     normative metadata left to reject '3.99' with. Gating on classifiers would catch it, but at
     the cost of rejecting legal pins - see test_pin_allowed_by_requires_python_passes_*."""
-    _set_requires_python(repo_copy, ">=3.11")
+    # Illustrative, and deliberately not the repo's bound: what matters is that it has no ceiling.
+    _set_requires_python(repo_copy, ">=3.12")
     pins = _read_pins(repo_copy)
     pins["python"] = "3.99"
     _write_pins(repo_copy, pins)
@@ -366,12 +398,9 @@ def test_absurdly_long_classifier_version_does_not_mask_url_drift(repo_copy: Pat
     torchIndexUrl reporting, this run must still name the drift, and an unbounded pattern
     would quote all 4400 digits back at the reader in the advisory."""
     digits = "9" * 4400
-    absurd = f"  'Programming Language :: Python :: {digits}.0',\n"
-    # 3.11 gives the advisory something real to list; the pin is 3.12.
-    real = "  'Programming Language :: Python :: 3.11',\n"
-    _drop_python_classifiers(repo_copy)
-    path = repo_copy / "pyproject.toml"
-    path.write_text(path.read_text().replace("classifiers = [\n", f"classifiers = [\n{absurd}{real}", 1))
+    # The second classifier is a real version, giving the advisory something to list; neither
+    # names the pin.
+    _replace_python_classifiers(repo_copy, f"{digits}.0", OTHER_PYTHON)
     pins = _read_pins(repo_copy)
     pins["torchIndexUrl"]["linux"]["rocm"] = "https://download.pytorch.org/whl/rocm6.3"
     _write_pins(repo_copy, pins)
@@ -379,7 +408,7 @@ def test_absurdly_long_classifier_version_does_not_mask_url_drift(repo_copy: Pat
     assert check_pins.main(repo_copy) == 1
     stderr = capsys.readouterr().err
     assert "torchIndexUrl.linux.rocm" in stderr
-    assert "they list 3.11)" in stderr
+    assert f"they list {OTHER_PYTHON})" in stderr
     assert digits not in stderr
 
 
@@ -402,9 +431,12 @@ def test_non_object_pins_does_not_raise(repo_copy: Path, value: object):
     assert check_pins.main(repo_copy) == 1
 
 
-def test_unevaluatable_requires_python_fails(repo_copy: Path):
+# "==3.12.*" is uv's own normalization of the repo's bound, so it is what a maintainer would copy
+# out of uv.lock. The checker rejects wildcards deliberately - it must say so, not guess.
+@pytest.mark.parametrize("specifier", ["~=3.12", "==3.12.*"])
+def test_unevaluatable_requires_python_fails(repo_copy: Path, specifier: str):
     """A specifier form the checker cannot reason about must fail loudly rather than pass."""
-    _set_requires_python(repo_copy, "~=3.12")
+    _set_requires_python(repo_copy, specifier)
 
     assert check_pins.main(repo_copy) == 1
 
@@ -429,7 +461,9 @@ def test_non_string_requires_python_fails(repo_copy: Path, literal: str):
 
 def test_trailing_comma_in_requires_python_is_accepted(repo_copy: Path):
     """A trailing comma is legal and must not be reported as an unevaluatable clause."""
-    _set_requires_python(repo_copy, ">=3.11, <3.13,")
+    # Derived from the real bound, so the pin keeps satisfying it whatever the bound becomes.
+    requires_python = tomllib.loads((repo_copy / "pyproject.toml").read_text())["project"]["requires-python"]
+    _set_requires_python(repo_copy, f"{requires_python},")
 
     assert check_pins.main(repo_copy) == 0
 
@@ -487,11 +521,13 @@ def test_non_object_torch_index_url_fails(repo_copy: Path, value: object):
         ("3.12", "==", "3.12.0", True),
         ("3.12.0", ">=", "3.12", True),
         # The repo's own bounds.
-        ("3.12", ">=", "3.11", True),
+        ("3.12", ">=", "3.12", True),
+        ("3.11", ">=", "3.12", False),
         ("3.12", "<", "3.13", True),
         ("3.13", "<", "3.13", False),
+        # Adjacent minors, component-wise rather than lexicographic - "3.9" is not above "3.10".
+        ("3.12", ">=", "3.11", True),
         ("3.10", ">=", "3.11", False),
-        # Component-wise, not lexicographic - "3.9" is not above "3.10".
         ("3.9", "<", "3.10", True),
         ("3.9", ">", "3.10", False),
         ("3.12.7", ">", "3.12", True),

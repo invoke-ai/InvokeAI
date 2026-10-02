@@ -53,3 +53,15 @@ def test_bundled_tokenizer_has_chat_template() -> None:
         enable_thinking=True,
     )
     assert "<|im_start|>" in formatted
+
+
+def test_bundled_tokenizer_exposes_the_full_special_token_set() -> None:
+    """The vendored tokenizer_config once carried an `extra_special_tokens: {}` that upstream does
+    not have -- an artefact of the save_pretrained round trip that produced the bundle. It left
+    only <|im_end|> and <|endoftext|> marked special where Qwen/Qwen3-4B marks fourteen. Prompt ids
+    were unaffected, but the bundle is only worth having if it matches what it claims to mirror.
+    """
+    special = set(load_bundled_qwen3_tokenizer().all_special_tokens)
+
+    assert {"<|im_start|>", "<|im_end|>", "<|endoftext|>", "<|vision_start|>", "<|image_pad|>"} <= special
+    assert len(special) == 14

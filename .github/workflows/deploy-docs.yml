@@ -76,14 +76,14 @@ jobs:
       - name: setup uv
         uses: astral-sh/setup-uv@v8.1.0
         with:
-          version: '0.11.12'
+          version: '0.11.28'  # When updating this, make sure the version in launcher's package.json gets updated too.
           enable-cache: true
-          python-version: '3.11'
+          python-version: '3.12'
 
       - name: setup python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.11'
+          python-version: '3.12'
 
       # generate_docs_json.py only needs the invokeai package importable
       # (pydantic + invokeai.app/backend). Skip the [test] extra to keep CI fast.
@@ -107,6 +107,10 @@ jobs:
         working-directory: docs
 
       # Checks
+      - name: test docs tooling
+        run: pnpm test
+        working-directory: docs
+
       - name: verify generated docs data
         run: pnpm run check-docs-data
         working-directory: docs

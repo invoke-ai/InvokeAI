@@ -13,6 +13,7 @@ from invokeai.app.api_app import app
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
@@ -74,6 +75,7 @@ def mock_services() -> InvocationServices:
     )
     from invokeai.app.services.users.users_default import UserService
     from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+    from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
     from tests.test_nodes import TestEventService
 
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
@@ -111,13 +113,18 @@ def mock_services() -> InvocationServices:
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistenceSqlite(db=db),
+        project_records=ProjectRecordsSqlite(db=db),
         users=UserService(db),
+        wildcard_records=SqliteWildcardRecordsStorage(db=db),
         external_generation=None,  # type: ignore
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
         video_records=SqliteVideoRecordStorage(db=db),
         board_video_records=SqliteBoardVideoRecordStorage(db=db),
         gallery=None,  # type: ignore
+        image_index_records=None,  # type: ignore
+        image_index=None,  # type: ignore
+        intermediates=None,  # type: ignore
     )
 
 

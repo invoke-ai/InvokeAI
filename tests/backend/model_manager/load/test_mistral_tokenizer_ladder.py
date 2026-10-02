@@ -16,9 +16,17 @@ from typing import Any
 from unittest.mock import MagicMock
 
 import pytest
-from transformers import AutoProcessor, AutoTokenizer
+import torch
+from safetensors.torch import save_file
+from transformers import AutoProcessor, AutoTokenizer, PreTrainedTokenizerBase
 
 from invokeai.backend.model_manager.load.model_loaders import mistral_encoder
+from invokeai.backend.model_manager.taxonomy import MistralVariantType
+
+# These rungs exist for the encoders that consume FLUX.2's template, so that is the variant they
+# are exercised with. `Ministral3B` takes a different route through the same ladder — see the
+# tests at the bottom of this module.
+FLUX2_VARIANT = MistralVariantType.Cow
 
 
 def test_ladder_contract() -> None:
@@ -53,7 +61,7 @@ def model_dir(tmp_path: Path) -> Path:
 
 
 def _no_hf_fallback(monkeypatch: pytest.MonkeyPatch) -> None:
-    def _fail(logger: Any) -> Any:
+    def _fail(logger: Any, **_kwargs: Any) -> Any:
         raise AssertionError("ladder fell through to the HuggingFace fetch")
 
     monkeypatch.setattr(mistral_encoder, "_load_tokenizer_from_hf", _fail)
@@ -66,7 +74,7 @@ def test_root_directory_falls_back_to_autotokenizer(monkeypatch: pytest.MonkeyPa
     monkeypatch.setattr(mistral_encoder, "_TOKENIZER_LOADER_CLASSES", (processor, auto_tokenizer))
     _no_hf_fallback(monkeypatch)
 
-    assert mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock()) is tokenizer
+    assert mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock(), FLUX2_VARIANT) is tokenizer
     # Order matters: AutoProcessor stays the preferred loader, AutoTokenizer is the fallback.
     assert processor.calls == [model_dir]
     assert auto_tokenizer.calls == [model_dir]
@@ -81,7 +89,7 @@ def test_sibling_tokenizer_dir_falls_back_to_autotokenizer(monkeypatch: pytest.M
     monkeypatch.setattr(mistral_encoder, "_TOKENIZER_LOADER_CLASSES", (processor, auto_tokenizer))
     _no_hf_fallback(monkeypatch)
 
-    assert mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock()) is tokenizer
+    assert mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock(), FLUX2_VARIANT) is tokenizer
     assert auto_tokenizer.calls == [tokenizer_dir]
 
 
@@ -93,9 +101,9 @@ def test_tekken_only_dir_keyerror_does_not_escape(monkeypatch: pytest.MonkeyPatc
     monkeypatch.setattr(mistral_encoder, "_TOKENIZER_LOADER_CLASSES", (processor, auto_tokenizer))
 
     from_hf = object()
-    monkeypatch.setattr(mistral_encoder, "_load_tokenizer_from_hf", lambda logger: from_hf)
+    monkeypatch.setattr(mistral_encoder, "_load_tokenizer_from_hf", lambda logger, **_kwargs: from_hf)
 
-    assert mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock()) is from_hf
+    assert mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock(), FLUX2_VARIANT) is from_hf
 
 
 def test_hf_fallback_reports_every_attempt_instead_of_raising_keyerror(
@@ -107,8 +115,8 @@ def test_hf_fallback_reports_every_attempt_instead_of_raising_keyerror(
     auto_tokenizer = _FakeLoader("AutoTokenizer", raises=KeyError("special_tokens"))
     monkeypatch.setattr(mistral_encoder, "_TOKENIZER_LOADER_CLASSES", (processor, auto_tokenizer))
 
-    with pytest.raises(RuntimeError, match="Could not load FLUX.2 Mistral tokenizer") as exc_info:
-        mistral_encoder._load_tokenizer_from_hf(MagicMock())
+    with pytest.raises(RuntimeError, match="Could not load the Mistral tokenizer") as exc_info:
+        mistral_encoder._load_tokenizer_from_hf(MagicMock(), policy=mistral_encoder._tokenizer_policy(FLUX2_VARIANT))
 
     assert "AutoTokenizer(local_only=True): KeyError" in str(exc_info.value)
 
@@ -134,9 +142,9 @@ def test_unknown_tokenizer_class_attributeerror_does_not_escape(
     monkeypatch.setattr(mistral_encoder, "_TOKENIZER_LOADER_CLASSES", (processor, auto_tokenizer))
 
     from_hf = object()
-    monkeypatch.setattr(mistral_encoder, "_load_tokenizer_from_hf", lambda logger: from_hf)
+    monkeypatch.setattr(mistral_encoder, "_load_tokenizer_from_hf", lambda logger, **_kwargs: from_hf)
 
-    assert mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock()) is from_hf
+    assert mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock(), FLUX2_VARIANT) is from_hf
     assert auto_tokenizer.calls == [model_dir]
 
 
@@ -146,8 +154,8 @@ def test_hf_fallback_records_attributeerror_instead_of_escaping(monkeypatch: pyt
     auto_tokenizer = _FakeLoader("AutoTokenizer", raises=_UNKNOWN_TOKENIZER_CLASS_ERROR)
     monkeypatch.setattr(mistral_encoder, "_TOKENIZER_LOADER_CLASSES", (processor, auto_tokenizer))
 
-    with pytest.raises(RuntimeError, match="Could not load FLUX.2 Mistral tokenizer") as exc_info:
-        mistral_encoder._load_tokenizer_from_hf(MagicMock())
+    with pytest.raises(RuntimeError, match="Could not load the Mistral tokenizer") as exc_info:
+        mistral_encoder._load_tokenizer_from_hf(MagicMock(), policy=mistral_encoder._tokenizer_policy(FLUX2_VARIANT))
 
     assert "AutoTokenizer(local_only=True): AttributeError" in str(exc_info.value)
 
@@ -220,7 +228,7 @@ def test_valid_tekken_file_is_read_before_transformers_sees_the_dir(
     monkeypatch.setattr(mistral_encoder, "_TOKENIZER_LOADER_CLASSES", (probe,))
     _no_hf_fallback(monkeypatch)
 
-    tokenizer = mistral_encoder._load_tokenizer_for_model(tekken_model_dir, MagicMock())
+    tokenizer = mistral_encoder._load_tokenizer_for_model(tekken_model_dir, MagicMock(), FLUX2_VARIANT)
 
     assert isinstance(tokenizer, mistral_encoder._TekkenRawTextAdapter)
     assert tokenizer is not probe_result
@@ -231,7 +239,7 @@ def test_tekken_markers_encode_as_single_special_ids(tekken_model_dir: Path) -> 
     """The reason the rung exists: the markers must be spliced as single Tekken ids. A
     mistral-common tokenizer would emit the BPE of the literal characters instead, which "works"
     and silently degrades conditioning."""
-    tokenizer = mistral_encoder._load_tokenizer_for_model(tekken_model_dir, MagicMock())
+    tokenizer = mistral_encoder._load_tokenizer_for_model(tekken_model_dir, MagicMock(), FLUX2_VARIANT)
     special_ids = tokenizer._special_ids
 
     assert set(special_ids) == {"[SYSTEM_PROMPT]", "[/SYSTEM_PROMPT]", "[INST]", "[/INST]"}
@@ -265,7 +273,7 @@ def test_mistral_common_backed_result_is_rewrapped(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(mistral_encoder, "_TOKENIZER_LOADER_CLASSES", (probe,))
     _no_hf_fallback(monkeypatch)
 
-    tokenizer = mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock())
+    tokenizer = mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock(), FLUX2_VARIANT)
 
     assert isinstance(tokenizer, mistral_encoder._TekkenRawTextAdapter)
     assert tokenizer._tok is inner
@@ -280,9 +288,9 @@ def test_mistral_common_backed_result_without_inner_tokenizer_keeps_falling(
     monkeypatch.setattr(mistral_encoder, "_TOKENIZER_LOADER_CLASSES", (probe,))
 
     from_hf = object()
-    monkeypatch.setattr(mistral_encoder, "_load_tokenizer_from_hf", lambda logger: from_hf)
+    monkeypatch.setattr(mistral_encoder, "_load_tokenizer_from_hf", lambda logger, **_kwargs: from_hf)
 
-    assert mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock()) is from_hf
+    assert mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock(), FLUX2_VARIANT) is from_hf
 
 
 def test_ordinary_tokenizers_are_not_rewrapped(monkeypatch: pytest.MonkeyPatch, model_dir: Path) -> None:
@@ -292,4 +300,67 @@ def test_ordinary_tokenizers_are_not_rewrapped(monkeypatch: pytest.MonkeyPatch, 
     monkeypatch.setattr(mistral_encoder, "_TOKENIZER_LOADER_CLASSES", (probe,))
     _no_hf_fallback(monkeypatch)
 
-    assert mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock()) is tokenizer
+    assert mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock(), FLUX2_VARIANT) is tokenizer
+
+
+# ---------------------------------------------------------------------------------------------
+# Ministral 3B (ERNIE-Image) takes the same vocab through a different form.
+# ---------------------------------------------------------------------------------------------
+
+
+@pytest.fixture
+def embedded_tekken_file(tmp_path: Path) -> Path:
+    """A single file the way Comfy-Org ships one: the Tekken vocab as a `tekken_model` U8 tensor."""
+    vocab = tmp_path / "vocab.json"
+    _write_valid_tekken(vocab)
+    path = tmp_path / "ministral-3-3b.safetensors"
+    save_file({"tekken_model": torch.frombuffer(bytearray(vocab.read_bytes()), dtype=torch.uint8)}, str(path))
+    return path
+
+
+def test_the_embedded_blob_rung_serves_each_family_its_own_form(
+    monkeypatch: pytest.MonkeyPatch, embedded_tekken_file: Path
+) -> None:
+    """The rung every released single file actually takes, and the one whose failure is invisible:
+    if it stops returning a tokenizer the ladder falls through to the HuggingFace fetch, which
+    still succeeds wherever the cache is warm and fails only on an offline install."""
+    _no_hf_fallback(monkeypatch)
+
+    ministral = mistral_encoder._load_tokenizer_for_model(
+        embedded_tekken_file, MagicMock(), MistralVariantType.Ministral3B
+    )
+    flux2 = mistral_encoder._load_tokenizer_for_model(embedded_tekken_file, MagicMock(), FLUX2_VARIANT)
+
+    assert isinstance(ministral, PreTrainedTokenizerBase)
+    assert isinstance(flux2, mistral_encoder._TekkenRawTextAdapter)
+
+
+def test_ministral_gets_a_real_huggingface_tokenizer_not_the_adapter(
+    monkeypatch: pytest.MonkeyPatch, tekken_model_dir: Path
+) -> None:
+    """The adapter exists to splice FLUX.2's template markers. Ministral 3B has no chat template,
+    and the conditioning node type-checks for `PreTrainedTokenizerBase` and indexes plain id
+    lists — the adapter is neither, so this route hands back transformers' own backend."""
+    _no_hf_fallback(monkeypatch)
+
+    tokenizer = mistral_encoder._load_tokenizer_for_model(tekken_model_dir, MagicMock(), MistralVariantType.Ministral3B)
+
+    assert isinstance(tokenizer, PreTrainedTokenizerBase)
+    assert not isinstance(tokenizer, mistral_encoder._TekkenRawTextAdapter)
+    assert isinstance(tokenizer("hello", add_special_tokens=True, padding=False)["input_ids"], list)
+    # The backend carries no length limit of its own; ERNIE-Image's released tokenizer config
+    # truncates at 2048, and a dropped kwarg here would silently re-encode long prompts in full.
+    assert tokenizer.model_max_length == mistral_encoder._MINISTRAL_3B_MAX_PROMPT_TOKENS
+
+
+def test_ministral_keeps_a_mistral_common_probe_result_as_is(monkeypatch: pytest.MonkeyPatch, model_dir: Path) -> None:
+    """The re-wrap into the adapter is FLUX.2-only. Applying it here would replace a usable HF
+    tokenizer with one the ERNIE-Image conditioning node rejects."""
+    probe_result = _FakeMistralCommonTokenizer(object())
+    probe = _FakeLoader("AutoTokenizer", result=probe_result)
+    monkeypatch.setattr(mistral_encoder, "_TOKENIZER_LOADER_CLASSES", (probe,))
+    _no_hf_fallback(monkeypatch)
+
+    tokenizer = mistral_encoder._load_tokenizer_for_model(model_dir, MagicMock(), MistralVariantType.Ministral3B)
+
+    assert tokenizer is probe_result

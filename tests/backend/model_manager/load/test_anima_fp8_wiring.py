@@ -139,6 +139,10 @@ def test_single_file_loader_applies_fp8_layerwise_casting(monkeypatch, tmp_path)
     loader = object.__new__(AnimaCheckpointModel)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
     loader._apply_fp8_layerwise_casting = _record_cast
+    # The real loader gets both from `ModelLoader.__init__`; `_keep_fp8_weights` reads them to ask
+    # whether this device can hold fp8 at all.
+    loader._torch_device = torch.device("cpu")
+    loader._logger = MagicMock()
 
     model = loader._load_from_singlefile(config)
 

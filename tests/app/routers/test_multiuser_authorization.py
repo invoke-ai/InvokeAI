@@ -22,7 +22,8 @@ from invokeai.app.api_app import app
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
+from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
+from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem, SessionQueueItemSummary
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
@@ -91,6 +92,7 @@ def mock_services() -> InvocationServices:
     )
     from invokeai.app.services.users.users_default import UserService
     from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+    from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
     from tests.test_nodes import TestEventService
 
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
@@ -133,13 +135,18 @@ def mock_services() -> InvocationServices:
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistenceSqlite(db=db),
+        project_records=ProjectRecordsSqlite(db=db),
         users=UserService(db),
+        wildcard_records=SqliteWildcardRecordsStorage(db=db),
         external_generation=None,  # type: ignore
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
         video_records=SqliteVideoRecordStorage(db=db),
         board_video_records=SqliteBoardVideoRecordStorage(db=db),
         gallery=None,  # type: ignore
+        image_index_records=None,  # type: ignore
+        image_index=None,  # type: ignore
+        intermediates=None,  # type: ignore
     )
 
 
@@ -239,6 +246,16 @@ def _create_board(client: TestClient, token: str, name: str = "Test Board") -> s
 def _share_board(client: TestClient, token: str, board_id: str) -> None:
     r = client.patch(f"/api/v1/boards/{board_id}", json={"board_visibility": "shared"}, headers=_auth(token))
     assert r.status_code == status.HTTP_201_CREATED
+
+
+def _share_board_with_user(mock_invoker: Invoker, board_id: str, user_id: str) -> None:
+    """Insert an explicit per-user share row directly into the shared_boards table."""
+    board_records: Any = mock_invoker.services.board_records
+    with board_records._db.transaction() as cursor:
+        cursor.execute(
+            "INSERT OR IGNORE INTO shared_boards (board_id, user_id) VALUES (?, ?)",
+            (board_id, user_id),
+        )
 
 
 def _set_board_visibility(client: TestClient, token: str, board_id: str, visibility: str) -> None:
@@ -1113,6 +1130,53 @@ class TestImageReadAuth:
         # Should not be 403 — image is on a shared board
         assert r.status_code != status.HTTP_403_FORBIDDEN
 
+    def test_explicit_share_grants_image_read_to_member(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """An image on a private board explicitly shared with user2 should be readable
+        by user2 — matching the visibility the board_id="all" listing already grants."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+        _save_image(mock_invoker, "explicit-share-img", user1.user_id)
+        board_id = _create_board(client, user1_token, "Explicit Share Board")
+        mock_invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name="explicit-share-img")
+
+        r = client.get("/api/v1/images/i/explicit-share-img", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+
+        r = client.get("/api/v1/images/i/explicit-share-img", headers=_auth(user2_token))
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_board_owner_can_read_contributor_image_on_private_board(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """A board owner should be able to read an image another user contributed to
+        their board, even after the board returns to private — matching the visibility
+        the board_id="all" listing already grants."""
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        board_id = _create_board(client, user1_token, "Owner Read Board")
+        _set_board_visibility(client, user1_token, board_id, "public")
+        _save_image(mock_invoker, "contributor-img", user2.user_id)
+        mock_invoker.services.board_image_records.add_image_to_board(board_id=board_id, image_name="contributor-img")
+        _set_board_visibility(client, user1_token, board_id, "private")
+
+        # The owner sees the image in the board_id="all" listing...
+        r = client.get("/api/v1/images/names?board_id=all", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_200_OK
+        assert "contributor-img" in r.json()["image_names"]
+
+        # ...and individual-image authorization agrees with the listing.
+        r = client.get("/api/v1/images/i/contributor-img/metadata", headers=_auth(user1_token))
+        assert r.status_code == status.HTTP_200_OK
+
+        # The contributor keeps read access to their own image.
+        r = client.get("/api/v1/images/i/contributor-img/metadata", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+
     def test_non_owner_cannot_read_image_metadata(
         self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
     ):
@@ -1141,6 +1205,43 @@ class TestImageReadAuth:
         _share_board(client, user1_token, board_id)
 
         r = client.get(f"/api/v1/images/?board_id={board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+
+    def test_list_images_explicitly_shared_private_board_allowed_for_member(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 should be able to list a private board explicitly shared with them,
+        on both the DTO and names endpoints."""
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        board_id = _create_board(client, user1_token, "Explicit Share Enum Board")
+        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+
+        r = client.get(f"/api/v1/images/?board_id={board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+
+        r = client.get(f"/api/v1/images/names?board_id={board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+
+    def test_explicitly_shared_private_board_dto_and_image_names_allowed_for_member(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 should be able to fetch the board DTO and board image_names of a private
+        board explicitly shared with them; a non-member (user1's other boards aside) stays 403."""
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user2 is not None
+        board_id = _create_board(client, user1_token, "Explicit Share DTO Board")
+
+        r = client.get(f"/api/v1/boards/{board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+        r = client.get(f"/api/v1/boards/{board_id}/image_names", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+
+        r = client.get(f"/api/v1/boards/{board_id}", headers=_auth(user2_token))
+        assert r.status_code == status.HTTP_200_OK
+        r = client.get(f"/api/v1/boards/{board_id}/image_names", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_200_OK
 
     def test_get_image_names_private_board_rejected_for_non_owner(
@@ -1500,11 +1601,18 @@ class TestImageMutationAuth:
         _save_image(mock_invoker, "user1-public-delete", user1.user_id)
         mock_invoker.services.board_image_records.add_image_to_board(public_board_id, "user1-public-delete")
 
+        # The delete route no longer swallows service failures, so the test env needs
+        # working urls/image_files services for the deletion to actually succeed.
+        mock_invoker.services.urls = MagicMock()
+        mock_invoker.services.urls.get_image_url.return_value = "http://localhost/img.png"
+        mock_invoker.services.image_files = MagicMock()
+
         r = client.delete(
             "/api/v1/images/i/user1-public-delete",
             headers=_auth(user2_token),
         )
         assert r.status_code == status.HTTP_200_OK
+        assert r.json()["deleted_images"] == ["user1-public-delete"]
 
     def test_clear_intermediates_non_admin_forbidden(self, client: TestClient, user1_token: str):
         r = client.delete("/api/v1/images/intermediates", headers=_auth(user1_token))
@@ -1712,6 +1820,33 @@ class TestWorkflowMutationAuth:
         )
         assert r.status_code == 200
 
+    def test_update_last_run_at_requires_auth(self, enable_multiuser: Any, client: TestClient):
+        r = client.put("/api/v1/workflows/i/some-id/last_run_at")
+        assert r.status_code == status.HTTP_401_UNAUTHORIZED
+
+    def test_update_last_run_at_missing_workflow_404s(self, client: TestClient, user1_token: str):
+        r = client.put(
+            "/api/v1/workflows/i/some-id/last_run_at",
+            headers=_auth(user1_token),
+        )
+        assert r.status_code == status.HTTP_404_NOT_FOUND
+
+    def test_non_owner_cannot_update_last_run_at(self, client: TestClient, user1_token: str, user2_token: str):
+        workflow_id = _create_workflow(client, user1_token)
+        r = client.put(
+            f"/api/v1/workflows/i/{workflow_id}/last_run_at",
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+    def test_owner_can_update_last_run_at(self, client: TestClient, user1_token: str):
+        workflow_id = _create_workflow(client, user1_token)
+        r = client.put(
+            f"/api/v1/workflows/i/{workflow_id}/last_run_at",
+            headers=_auth(user1_token),
+        )
+        assert r.status_code == 204
+
 
 # ===========================================================================
 # 4. Workflow thumbnail authorization
@@ -1839,6 +1974,7 @@ class TestSessionQueueSanitization:
             completed_at=None,
             queue_id="default",
             user_id="owner-user",
+            project_id="owner-project",
             user_display_name="Owner Display",
             user_email="owner@test.com",
             field_values=None,
@@ -1890,6 +2026,7 @@ class TestSessionQueueSanitization:
         assert result.user_id == "redacted"
         assert result.user_display_name is None
         assert result.user_email is None
+        assert result.project_id is None
 
         # Stripped: generation metadata
         assert result.batch_id == "redacted"
@@ -1902,6 +2039,24 @@ class TestSessionQueueSanitization:
         assert result.workflow is None
         assert result.session.id == "redacted"
         assert len(result.session.graph.nodes) == 0
+
+    @pytest.mark.parametrize("model", [SessionQueueItem, SessionQueueItemSummary])
+    def test_every_queue_item_field_is_redacted_or_deliberately_public(self, model: type):
+        from invokeai.app.api.routers.session_queue import _REDACTIONS
+
+        # A field added to either projection must choose a side here, or it leaks to other accounts.
+        public = {
+            "item_id",
+            "queue_id",
+            "status",
+            "status_sequence",
+            "device",
+            "created_at",
+            "updated_at",
+            "started_at",
+            "completed_at",
+        }
+        assert set(model.model_fields) - public - set(_REDACTIONS) == set()
 
     def test_sanitization_does_not_mutate_original(self, _sample_queue_item: SessionQueueItem):
         from invokeai.app.api.routers.session_queue import sanitize_queue_item_for_user
@@ -1997,6 +2152,35 @@ class TestRecallImageAccess:
         r = client.post(
             "/api/v1/recall/default",
             json={"ip_adapters": [{"model_name": "some-ip-adapter", "image_name": "shared-recall-img"}]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code != status.HTTP_403_FORBIDDEN
+
+    def test_recall_explicitly_shared_board_image_allowed_for_member(
+        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+    ):
+        """User2 should be able to reference an image on a private board explicitly shared with them."""
+        user1 = mock_invoker.services.users.get_by_email("user1@test.com")
+        user2 = mock_invoker.services.users.get_by_email("user2@test.com")
+        assert user1 is not None and user2 is not None
+        _save_image(mock_invoker, "explicit-share-recall-img", user1.user_id)
+        board_id = _create_board(client, user1_token, "Explicit Share Recall Board")
+        mock_invoker.services.board_image_records.add_image_to_board(
+            board_id=board_id, image_name="explicit-share-recall-img"
+        )
+
+        r = client.post(
+            "/api/v1/recall/default",
+            json={"ip_adapters": [{"model_name": "some-ip-adapter", "image_name": "explicit-share-recall-img"}]},
+            headers=_auth(user2_token),
+        )
+        assert r.status_code == status.HTTP_403_FORBIDDEN
+
+        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+
+        r = client.post(
+            "/api/v1/recall/default",
+            json={"ip_adapters": [{"model_name": "some-ip-adapter", "image_name": "explicit-share-recall-img"}]},
             headers=_auth(user2_token),
         )
         assert r.status_code != status.HTTP_403_FORBIDDEN
@@ -3141,6 +3325,30 @@ class TestWebSocketAuth:
         # And never to the shared queue room, which would leak to other users.
         assert "default" not in room
 
+    def test_video_recall_is_emitted_once_to_the_owner_only(self, socketio: Any) -> None:
+        """A video recall names the owner's media and no admin UI consumes it, so it goes to the
+        owner's room alone, in one emit: a reference-video recall appends, so a second delivery
+        would add the video twice."""
+        import asyncio
+        from unittest.mock import AsyncMock
+
+        from invokeai.app.services.events.events_common import VideoRecallRequestedEvent, VideoRecallVideo
+
+        event = VideoRecallRequestedEvent.build(
+            queue_id="default",
+            user_id="owner-video",
+            action="reference_video",
+            video=VideoRecallVideo(video_name="clip.mp4", width=832, height=480, duration=5.0),
+        )
+
+        mock_emit = AsyncMock()
+        socketio._sio.emit = mock_emit
+
+        asyncio.run(socketio._handle_queue_event(("video_recall_requested", event)))
+
+        assert mock_emit.call_count == 1
+        assert mock_emit.call_args.kwargs.get("room") == "user:owner-video"
+
 
 class TestCustomNodesAuthorization:
     """Tests that custom_nodes endpoints enforce AdminUserOrDefault.
@@ -3206,18 +3414,21 @@ class TestCustomNodesAuthorization:
 
     def test_install_allows_admin(self, client: TestClient, admin_token: str, monkeypatch: Any, tmp_path: Any) -> None:
         """Admin caller can successfully install a node pack (filesystem/subprocess mocked)."""
+        from types import SimpleNamespace
+
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._get_custom_nodes_path", lambda: tmp_path)
 
         # Simulate a successful git clone by creating the target dir with __init__.py
-        def fake_git_clone(cmd: list[str], **kwargs: Any) -> MagicMock:
+        def fake_clone_node_pack(cmd: list[str], **kwargs: Any) -> Any:
             target_dir = tmp_path / "test-pack"
             target_dir.mkdir(parents=True, exist_ok=True)
             (target_dir / "__init__.py").touch()
-            result = MagicMock()
-            result.returncode = 0
-            return result
+            return SimpleNamespace(returncode=0, stderr="")
 
-        monkeypatch.setattr("invokeai.app.api.routers.custom_nodes.subprocess.run", fake_git_clone)
+        monkeypatch.setattr(
+            "invokeai.app.api.routers.custom_nodes.subprocess.run",
+            fake_clone_node_pack,
+        )
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._load_node_pack", lambda *a, **kw: None)
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._import_workflows_from_pack", lambda *a, **kw: [])
         monkeypatch.setattr("invokeai.app.api.routers.custom_nodes._write_pack_manifest", lambda *a, **kw: None)

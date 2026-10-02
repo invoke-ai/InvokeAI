@@ -10,8 +10,8 @@ import torch
 import torch.nn.functional as F
 from torch import nn
 
-from invokeai.app.invocations.anima_denoise import AnimaDenoiseInvocation
-from invokeai.app.invocations.anima_lllite import AnimaLLLiteField
+from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
+from invokeai.app.invocations.anima.anima_lllite import AnimaLLLiteField
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.backend.anima.control_net_lllite import (
     AnimaControlNetLLLite,

@@ -1,0 +1,140 @@
+---
+title: Media Metadata
+description: How generation metadata travels inside PNG and MP4 files, the versioned record schema, and what a recall can restore on another install.
+lastUpdated: 2026-09-19
+---
+
+Every image and video InvokeAI produces carries its generation record **inside the file**, so a
+download dropped into any Invoke instance is recallable and remixable without access to the
+database that produced it. This page is the reference for that contract: where the record lives
+in each container, the record's fields, and how the format evolves.
+
+## Envelope: three keys, two containers
+
+The same three strings are written to every media file. Each value is compact UTF-8 JSON.
+
+| Key | Content | Required |
+|---|---|---|
+| `invokeai_metadata` | The generation record (schema below) | when the graph produced one |
+| `invokeai_workflow` | The `WorkflowWithoutID` the session ran, verbatim | only when a workflow was run |
+| `invokeai_graph` | The executed `Graph`, verbatim | when available |
+
+| Container | Where the keys live | Writer | Reader |
+|---|---|---|---|
+| PNG | `tEXt` chunks, one per key | `DiskImageFileStorage.save` via Pillow's `PngInfo` | `extract_metadata_from_image` reads `Image.info` |
+| MP4 | QuickTime keyed metadata: `moov/udta/meta` with an `mdta` `keys` table and `ilst` UTF-8 `data` atoms | `DiskVideoFileStorage.save` remuxes through the bundled ffmpeg (`-movflags use_metadata_tags`, stream copy, `+faststart`) | `invokeai.app.util.mp4_metadata.read_mp4_tags`, a pure-Python box walk |
+
+Both readers feed `extract_metadata` in `invokeai/app/api/extract_metadata.py`, which owns the
+validation rules: the metadata must parse to a JSON object, the workflow must validate as a
+`WorkflowWithoutID`, and the graph must be an object with a `nodes` object and an `edges` list.
+Anything else degrades to "absent". On upload, a client-supplied `metadata` form field wins over
+the embedded copy; workflow and graph are never client-overridable.
+
+The MP4 layout is the one `ffprobe`, `exiftool` and `mediainfo` display. Like PNG chunks it
+survives a container-aware copy — for ffmpeg that is a remux with `-movflags use_metadata_tags`;
+a plain `-c copy` or a re-encode drops it.
+
+:::note[Videos stored before embedding]
+Videos saved by earlier releases keep their record in a JSON sidecar under
+`outputs/videos/sidecars/`. The reader consults the MP4 first and the sidecar second; the sidecar
+is also the fallback written when the remux fails, so a record is never lost to ffmpeg.
+:::
+
+## The record: `invokeai_metadata`
+
+A flat JSON object, the output of the `core_metadata` node. Video is a *profile* of the same
+record as images, discriminated by `generation_mode`, not a second format. Every key is
+optional; readers ignore keys they do not know and never reject a record for having them.
+
+Common shapes:
+
+```
+ModelIdentifier = { key, hash, name, base, type, submodel_type? }
+ImageRef        = { image_name }
+VideoRef        = { video_name }
+LoRA            = { model: ModelIdentifier, weight }
+H3Reference     = { kind: "image" | "video", image_name?, video_name?, detail?, conditioning?, start_frame?, end_frame? }
+```
+
+### Versioning
+
+| Key | Type | Meaning |
+|---|---|---|
+| `metadata_version` | semver string | The record schema version, currently `1.0.0`. Absent on records written before versioning; they are read with the same rules plus the aliases listed below. |
+| `app_version` | string | The InvokeAI release that wrote the record. Informational. |
+
+The version is over the **record**, not the node that writes it. A **minor** bump adds keys or
+widens a value set: any 1.x reader parses any other 1.x. A **major** bump renames, removes or
+retypes a key. Readers are tolerant by construction: they read the keys they know, ignore the
+rest, and never reject a record for its version, so a newer record still recalls what it can.
+The current value is `CORE_METADATA_VERSION` in `invokeai/app/invocations/metadata.py`.
+
+### Shared with images
+
+| Key | Type |
+|---|---|
+| `generation_mode` | string. Video values: `wan_t2v`, `wan_i2v`, `wan_interpolate`, `wan_extend_video`, `minimax_h3_t2v`, `minimax_h3_i2v`, `minimax_h3_lf2v`, `minimax_h3_flf2v`, `minimax_h3_extend_video`, `minimax_h3_ref2v`. A record is video metadata iff this is one of them. |
+| `positive_prompt`, `negative_prompt` | string; `negative_prompt` is absent for MiniMax H3, which has no CFG |
+| `seed`, `steps` | integer |
+| `cfg_scale` | number (Wan only) |
+| `width`, `height` | integer |
+| `model` | `ModelIdentifier`: the main (transformer) model |
+| `vae` | `ModelIdentifier`: a standalone VAE override |
+| `loras` | `LoRA[]` |
+
+### Video profile
+
+| Key | Type | Notes |
+|---|---|---|
+| `num_frames` | integer | |
+| `fps` | integer | The delivered frame rate. MiniMax H3 records its fixed 24. |
+| `first_frame_image`, `last_frame_image` | `ImageRef` | In extend mode the first frame is the one *extracted* from the source clip, so recall ignores it when `source_video` is set. |
+| `source_video` | `VideoRef` | The clip an extension continues |
+| `source_video_start_frame`, `source_video_end_frame` | integer | Inclusive trim bounds of the source clip |
+| `wan_guidance_scale_low_noise` | number | The low-noise expert's CFG when it differed from `cfg_scale` |
+| `wan_t5_encoder_model` | `ModelIdentifier` | Standalone UMT5-XXL used with a single-file Wan main |
+| `wan_transformer_low_noise` | `ModelIdentifier` | Standalone low-noise expert used with a single-file Wan main |
+| `wan_component_source` | `ModelIdentifier` | Wan Diffusers install that supplied VAE and encoder to a single-file main |
+| `minimax_h3_transformer_model` | `ModelIdentifier` | Legacy: single-file transformer recorded as an override of a Diffusers `model` |
+| `minimax_h3_text_encoder_model` | `ModelIdentifier` | Standalone Qwen3-VL text encoder |
+| `minimax_h3_component_source` | `ModelIdentifier` | H3 Diffusers install that supplied VAEs and tokenizer to a single-file transformer |
+| `minimax_h3_hybrid_base_model` | `ModelIdentifier` | The FL2VA transformer overlaid on a Ref2VA main |
+| `minimax_h3_hybrid_start_block` | integer | First block taken from the hybrid base |
+| `minimax_h3_references` | `H3Reference[]` | Ref2VA references in conditioning order |
+| `media_origin` | string | Set by the upload route, not the graph: `audio_upload` marks an audio file wrapped into a video |
+
+### Aliases read for pre-1.0 records
+
+Earlier writers spelled three Wan keys differently. Readers accept both spellings; the current
+graph builders write only the canonical ones.
+
+| Canonical | Also read as |
+|---|---|
+| `wan_guidance_scale_low_noise` | `guidance_scale_low_noise` |
+| `wan_t5_encoder_model` | `wan_t5_encoder` |
+| `wan_transformer_low_noise` | `transformer_low_noise` |
+
+## What a recall can restore elsewhere
+
+- **Models** in a video record resolve against the local catalog by `key`, then by `hash`, then
+  by `name` + `base` + `type`. Keys are minted per install, so a record that travelled with a file
+  names keys the receiving catalog has never seen; the BLAKE3 hash is the content identity and
+  resolves the same weights wherever they are installed. The name step is the last resort and the
+  only one that can pick a different file of the same model. Image recall still resolves by key
+  only.
+- **Media references** (`image_name`, `video_name`) are names in the originating gallery, exactly
+  as an image record's `init_image` is. Recall restores everything else and clears media it
+  cannot find rather than substituting.
+- **Workflow and graph** load into the editor on any install, subject to the same model and
+  media resolution.
+
+The [Video Recall API](/development/guides/video-recall-api/) takes its parameters under these
+same key names from an external process, with models given by name.
+
+## Evolving the record
+
+1. Add a typed `Optional` field to `CoreMetadataInvocation` under its canonical name, stamp it from
+   the graph builder, and read it in the recall mappers.
+2. Bump `CORE_METADATA_VERSION`'s minor component. Bump the major only for a rename, removal or
+   type change, and add the old spelling to the readers' alias table.
+3. Update the tables on this page.

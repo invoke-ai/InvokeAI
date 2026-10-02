@@ -4,10 +4,15 @@ Covers the per-user scoping semantics added on top of the original CRUD:
 - get_many returns own + public for a user_id, all rows for None (admin)
 - update/delete with a non-owner user_id raises NotFound and leaves the row untouched
 - the migration-seeded defaults (user_id='system', is_public=TRUE) are visible to every user
+- the per-prompt `max_tokens` cap, whose explicit null clears rather than meaning "no change"
 """
+
+import pytest
+from pydantic import ValidationError
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.system_prompt_records.system_prompt_records_common import (
+    EXPAND_PROMPT_MAX_TOKENS_MAX,
     SystemPromptChanges,
     SystemPromptNotFoundError,
     SystemPromptWithoutId,
@@ -154,3 +159,59 @@ def test_owner_can_flip_is_public() -> None:
     # Now visible to everyone
     bob_view = svc.get_many(user_id="bob")
     assert alice.id in {p.id for p in bob_view}
+
+
+def test_created_prompt_defaults_to_no_cap() -> None:
+    # NULL is what tells the client to fall back to the endpoint default.
+    svc = _storage()
+    created = svc.create(SystemPromptWithoutId(name="alice", content="x"), user_id="alice")
+    assert created.max_tokens is None
+
+
+def test_create_and_update_round_trip_a_cap() -> None:
+    svc = _storage()
+    created = svc.create(SystemPromptWithoutId(name="alice", content="x", max_tokens=500), user_id="alice")
+    assert created.max_tokens == 500
+
+    raised = svc.update(created.id, SystemPromptChanges(max_tokens=900), user_id="alice")
+    assert raised.max_tokens == 900
+
+
+def test_update_that_omits_max_tokens_leaves_the_cap_alone() -> None:
+    svc = _storage()
+    created = svc.create(SystemPromptWithoutId(name="alice", content="x", max_tokens=500), user_id="alice")
+
+    renamed = svc.update(created.id, SystemPromptChanges(name="renamed"), user_id="alice")
+
+    assert renamed.max_tokens == 500
+
+
+def test_explicit_null_clears_the_cap_back_to_the_default() -> None:
+    # The one field where null is a value rather than "no change" -- without this a cap could be
+    # set but never removed.
+    svc = _storage()
+    created = svc.create(SystemPromptWithoutId(name="alice", content="x", max_tokens=500), user_id="alice")
+
+    cleared = svc.update(created.id, SystemPromptChanges(max_tokens=None), user_id="alice")
+
+    assert cleared.max_tokens is None
+
+
+def test_non_owner_cannot_change_the_cap() -> None:
+    svc = _storage()
+    alice = svc.create(SystemPromptWithoutId(name="alice", content="x", max_tokens=500), user_id="alice")
+
+    try:
+        svc.update(alice.id, SystemPromptChanges(max_tokens=2048), user_id="bob")
+        raise AssertionError("expected SystemPromptNotFoundError")
+    except SystemPromptNotFoundError:
+        pass
+    assert svc.get(alice.id).max_tokens == 500
+
+
+def test_out_of_range_caps_are_rejected_by_the_model() -> None:
+    for out_of_range in (0, EXPAND_PROMPT_MAX_TOKENS_MAX + 1):
+        with pytest.raises(ValidationError):
+            SystemPromptWithoutId(name="alice", content="x", max_tokens=out_of_range)
+        with pytest.raises(ValidationError):
+            SystemPromptChanges(max_tokens=out_of_range)

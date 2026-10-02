@@ -1,0 +1,45 @@
+{
+  "errors": {},
+  "executed": [],
+  "executed_history": [],
+  "execution_effects": {},
+  "execution_graph": {
+    "edges": [],
+    "id": "execution-graph",
+    "nodes": {}
+  },
+  "execution_refs": {},
+  "execution_tokens": {},
+  "finalized_loop_contexts": [],
+  "graph": {
+    "edges": [
+      {
+        "destination": {"field": "a", "node_id": "join"},
+        "source": {"field": "value", "node_id": "left"},
+        "type": "default"
+      },
+      {
+        "destination": {"field": "b", "node_id": "join"},
+        "source": {"field": "value", "node_id": "right"},
+        "type": "default"
+      }
+    ],
+    "id": "source-graph",
+    "nodes": {
+      "join": {"a": 0, "b": 0, "id": "join", "is_intermediate": false, "type": "mul", "use_cache": true},
+      "left": {"a": 1, "b": 2, "id": "left", "is_intermediate": false, "type": "add", "use_cache": true},
+      "right": {"a": 3, "b": 4, "id": "right", "is_intermediate": false, "type": "add", "use_cache": true}
+    }
+  },
+  "id": "fixture-state",
+  "indegree": {},
+  "max_workflow_call_depth": 4,
+  "prepared_iteration_paths": {},
+  "prepared_source_mapping": {},
+  "ready_order": [],
+  "results": {},
+  "source_prepared_mapping": {},
+  "workflow_call_history": [],
+  "workflow_call_stack": [],
+  "execution_state_version": 1
+}

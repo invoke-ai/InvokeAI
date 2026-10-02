@@ -1,0 +1,30 @@
+import type { ForLoopValidationReason } from '@features/workflow/utility';
+
+export type InvocationSourceId = 'generate' | 'workflow' | 'upscale' | 'video' | 'canvas';
+
+export type InvocationMode = 'global' | 'dialog';
+
+export type ResultDestination = 'canvas' | 'gallery';
+
+export interface InvocationRoute {
+  sourceId: InvocationSourceId;
+  destination: ResultDestination;
+  sourceLocked: boolean;
+  destinationLocked: boolean;
+}
+
+export interface ResolvedInvocationRoute extends InvocationRoute {
+  mode: InvocationMode;
+  sourceValid: boolean;
+  destinationValid: boolean;
+  /** The top validation issue, shown on the fixed Invoke control's secondary line. */
+  validationMessage?: string | ForLoopValidationReason;
+  /** Every reason the route cannot run right now (legacy `reasonsWhyCannotEnqueue` equivalent). */
+  validationReasons: Array<string | ForLoopValidationReason>;
+  /** Present when the workflow has batch nodes; size is null until an async generator resolves on invoke. */
+  workflowBatch?: { size: number | null };
+}
+
+export interface InvocationControllerState extends InvocationRoute {
+  lastSubmittedRunId?: string;
+}

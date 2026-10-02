@@ -83,6 +83,13 @@ ERNIE_IMAGE_SCHEDULER_MAP: dict[str, Type[SchedulerMixin]] = {
 if _HAS_LCM:
     ERNIE_IMAGE_SCHEDULER_MAP["lcm"] = FlowMatchLCMScheduler
 
+# The shift both released ERNIE-Image pipelines ship in `scheduler/scheduler_config.json`
+# (base and Turbo alike), against diffusers' default of 1.0. Unlike Anima below, the ERNIE
+# driver hands the scheduler *raw* sigmas and relies on it to apply the shift, so this belongs
+# on the scheduler rather than being folded into the sigmas. A single-file checkpoint ships no
+# scheduler config at all, which is what makes the constant necessary.
+ERNIE_IMAGE_SHIFT = 4.0
+
 
 # Anima scheduler types.
 # Anima uses rectified flow with shift=3.0. The driver passes pre-shifted sigmas via

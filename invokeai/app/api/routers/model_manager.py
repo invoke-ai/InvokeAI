@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein
 """FastAPI route for model configuration records."""
 
 import asyncio
@@ -7,6 +6,7 @@ import io
 import pathlib
 import threading
 import traceback
+import unicodedata
 from collections.abc import Generator
 from copy import deepcopy
 from enum import Enum
@@ -14,7 +14,7 @@ from tempfile import TemporaryDirectory
 from typing import Any, List, Optional, Type
 
 import huggingface_hub
-from fastapi import Body, Path, Query, Response, UploadFile
+from fastapi import Body, Header, Path, Query, Request, Response, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse
 from fastapi.routing import APIRouter
 from PIL import Image
@@ -24,7 +24,10 @@ from typing_extensions import Annotated
 
 from invokeai.app.api.auth_dependencies import AdminUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.services.model_images.model_images_common import ModelImageFileNotFoundException
+from invokeai.app.services.model_images.model_images_common import (
+    ModelImageFileDeleteException,
+    ModelImageFileNotFoundException,
+)
 from invokeai.app.services.model_install.model_install_common import ModelInstallJob
 from invokeai.app.services.model_records import (
     InvalidModelException,
@@ -34,7 +37,9 @@ from invokeai.app.services.model_records import (
 )
 from invokeai.app.services.orphaned_models import CONVERSION_SCRATCH_DIRNAME, OrphanedModelInfo
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.app.util.suppress_output import SuppressOutput
+from invokeai.backend.architectures import ArchitectureCapabilities, architecture_capabilities
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig, ModelConfigFactory
 from invokeai.backend.model_manager.configs.main import (
@@ -43,12 +48,13 @@ from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_SDXL_Config,
     Main_Checkpoint_SDXLRefiner_Config,
 )
+from invokeai.backend.model_manager.load.fp8_capability import Fp8StorageSupport, fp8_storage_support
 from invokeai.backend.model_manager.load.model_cache.cache_stats import CacheStats
 from invokeai.backend.model_manager.load.model_cache.model_cache import MODEL_LOAD_LOCK
 from invokeai.backend.model_manager.metadata.fetch.huggingface import HuggingFaceMetadataFetch
 from invokeai.backend.model_manager.metadata.metadata_base import ModelMetadataWithFiles, UnknownMetadataException
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
-from invokeai.backend.model_manager.search import ModelSearch
+from invokeai.backend.model_manager.search import ModelSearch, ModelSearchCancelled
 from invokeai.backend.model_manager.starter_models import (
     STARTER_BUNDLES,
     STARTER_MODELS,
@@ -77,6 +83,18 @@ _MODEL_KEY_CLAIM_LOCK = threading.Lock()
 _CLAIMED_MODEL_KEYS: set[str] = set()
 
 
+def _claim_token(key: str) -> str:
+    """The form of a key recorded in `_CLAIMED_MODEL_KEYS`.
+
+    A model's cover image is stored as `<key>.webp`, and some filesystems map different strings to one file: the
+    macOS and Windows defaults are case-insensitive, and APFS also ignores Unicode normalization, so `\u00e9` and
+    `e\u0301` name the same entry. Claims use Unicode canonical caseless matching (NFD, casefold, NFD) so that such a
+    variant of a key cannot slip past a claim held on the key itself and touch that file. Two keys that are
+    distinct on disk but equal under this form would at worst serialize against each other.
+    """
+    return unicodedata.normalize("NFD", unicodedata.normalize("NFD", key).casefold())
+
+
 @contextlib.contextmanager
 def _claim_model_key(key: str) -> Generator[None, None, None]:
     """Hold the exclusive claim on one model key, or raise 409 if another request holds it."""
@@ -87,20 +105,21 @@ def _claim_model_key(key: str) -> Generator[None, None, None]:
             status_code=409,
             detail="Another model operation is already in progress. Wait for it to finish and try again.",
         )
+    token = _claim_token(key)
     try:
-        if key in _CLAIMED_MODEL_KEYS:
+        if token in _CLAIMED_MODEL_KEYS:
             raise HTTPException(
                 status_code=409,
                 detail=f"Another operation on model {key} is already in progress. Wait for it to finish and try again.",
             )
-        _CLAIMED_MODEL_KEYS.add(key)
+        _CLAIMED_MODEL_KEYS.add(token)
     finally:
         _MODEL_KEY_CLAIM_LOCK.release()
     try:
         yield
     finally:
         with _MODEL_KEY_CLAIM_LOCK:
-            _CLAIMED_MODEL_KEYS.discard(key)
+            _CLAIMED_MODEL_KEYS.discard(token)
 
 
 @contextlib.contextmanager
@@ -112,17 +131,18 @@ def _install_and_claim_model(
     # request claims so a delete cannot observe the new record before its key is claimed.
     with _MODEL_KEY_CLAIM_LOCK:
         new_key = installer.install_path(model_path, config=config)
-        if new_key in _CLAIMED_MODEL_KEYS:
+        token = _claim_token(new_key)
+        if token in _CLAIMED_MODEL_KEYS:
             raise HTTPException(
                 status_code=409,
                 detail=f"Another operation on model {new_key} is already in progress. Wait for it to finish and try again.",
             )
-        _CLAIMED_MODEL_KEYS.add(new_key)
+        _CLAIMED_MODEL_KEYS.add(token)
     try:
         yield new_key
     finally:
         with _MODEL_KEY_CLAIM_LOCK:
-            _CLAIMED_MODEL_KEYS.discard(new_key)
+            _CLAIMED_MODEL_KEYS.discard(token)
 
 
 # The HF token is process-global state backed by a file in the HF cache. Concurrent writers would
@@ -140,6 +160,11 @@ class ModelsList(BaseModel):
     models: List[AnyModelConfig]
 
     model_config = ConfigDict(use_enum_values=True)
+
+
+class EmptyModelCacheResponse(BaseModel):
+    models_cleared: int
+    bytes_freed: int
 
 
 class CacheType(str, Enum):
@@ -225,6 +250,53 @@ example_model_input = {
 
 
 @model_manager_router.get(
+    "/capabilities",
+    operation_id="list_architecture_capabilities",
+    responses={200: {"description": "What each model architecture supports"}},
+)
+def list_architecture_capabilities(current_user: CurrentUserOrDefault) -> list[ArchitectureCapabilities]:
+    """What each model architecture can generate, and which generation features it supports.
+
+    A static table, the same for every install and every user, derived from what the architectures
+    declare under `invokeai/backend/architectures/defs/`. Fetch it once and join it against model
+    records locally: look up `(base, variant)`, fall back to `(base, null)`.
+
+    Deliberately not a field on the model records themselves — it is the same for every model of an
+    architecture, and putting it there would add these fields to all 115 config schemas.
+
+    Authenticated like every other route here even though the response holds nothing user-specific:
+    the allowlist for public routes is short and deliberate, and this is not a reason to lengthen it.
+
+    Declared `def`, not `async def`: it awaits nothing, so FastAPI runs it in a threadpool instead of
+    on the event loop. See docs/contributing/blocking-work-in-api-routes.
+    """
+    return architecture_capabilities()
+
+
+@model_manager_router.get(
+    "/fp8_storage_support",
+    operation_id="list_fp8_storage_support",
+    responses={200: {"description": "Whether FP8 Storage does anything, per loader key"}},
+)
+def list_fp8_storage_support(current_user: CurrentUserOrDefault) -> list[Fp8StorageSupport]:
+    """Which kinds of model FP8 Storage actually reaches, so a client stops offering it for the rest.
+
+    Keyed `(base, type, format)` -- the key model loaders are registered under, because the answer
+    differs along all three: FLUX main implements the cast and FLUX ControlNet does not, and a GGUF
+    main model must never be re-encoded. A key with no row is not supported; that is also what the
+    server itself concludes for one.
+
+    A static table, the same for every install and every user. Fetch it once and join it against model
+    records locally. Whether the *device* can do fp8 is deliberately not in here -- that probe belongs
+    on the loading thread, not behind an HTTP handler.
+
+    Declared `def`, not `async def`: it awaits nothing, so FastAPI runs it in a threadpool instead of
+    on the event loop. See docs/contributing/blocking-work-in-api-routes.
+    """
+    return fp8_storage_support()
+
+
+@model_manager_router.get(
     "/",
     operation_id="list_model_records",
 )
@@ -294,6 +366,20 @@ def list_missing_models(current_user: CurrentUserOrDefault) -> ModelsList:
             missing_models.append(model_config)
 
     return ModelsList(models=missing_models)
+
+
+@model_manager_router.get(
+    "/models_dir",
+    operation_id="get_models_dir",
+    responses={200: {"description": "The absolute path of the models directory"}},
+)
+def get_models_dir(current_user: CurrentUserOrDefault) -> str:
+    """Get the absolute path of the directory managed models are stored in.
+
+    Model config `path` values are relative to this directory unless they are
+    absolute (in-place installs from outside it).
+    """
+    return ApiDependencies.invoker.services.configuration.models_path.resolve().as_posix()
 
 
 @model_manager_router.get(
@@ -396,7 +482,11 @@ def _reidentify_model(key: str) -> AnyModelConfig:
     else:
         model_path = models_path / config.path
     mod = ModelOnDisk(model_path)
-    result = ModelConfigFactory.from_model_on_disk(mod)
+    # The install source is evidence identification reads: for a model whose weights cannot name its
+    # backbone (a 16-channel VAE, a PiD decoder), the HF repo or URL may. A file copied into the models
+    # folder has also lost the folder it came from, so without the source a re-probe refiles it under
+    # the default.
+    result = ModelConfigFactory.from_model_on_disk(mod, {"source": config.source, "source_type": config.source_type})
     if result.config is None:
         raise InvalidModelException("Unable to identify model format")
 
@@ -429,7 +519,8 @@ class FoundModel(BaseModel):
     status_code=200,
     response_model=List[FoundModel],
 )
-def scan_for_models(
+async def scan_for_models(
+    request: Request,
     current_admin: AdminUserOrDefault,
     scan_path: str = Query(description="Directory path to search for models", default=None),
 ) -> List[FoundModel]:
@@ -448,27 +539,44 @@ def scan_for_models(
     if not path.is_dir():
         raise scan_failed
 
-    search = ModelSearch()
+    # The walk runs off the event loop and is polled against the request: a client that cancels the scan
+    # (or navigates away) disconnects, and the walk stops at the next directory instead of crawling on.
+    stop = threading.Event()
     try:
-        found_model_paths = search.search(path)
-        models_path = ApiDependencies.invoker.services.configuration.models_path
+        search = ModelSearch(should_stop=stop.is_set)
+        walk = asyncio.ensure_future(asyncio.to_thread(search.search, path))
+        # A cancelled handler never awaits the walk; retrieving its outcome keeps asyncio from logging it at GC.
+        walk.add_done_callback(lambda task: None if task.cancelled() else task.exception())
+        try:
+            while not walk.done():
+                if await request.is_disconnected():
+                    break
+                await asyncio.wait({walk}, timeout=0.25)
+        finally:
+            # Covers the disconnect branch and a cancelled handler alike: the thread must not keep crawling.
+            stop.set()
+        try:
+            found_model_paths = await walk
+        except ModelSearchCancelled:
+            return []
 
-        # If the search path includes the main models directory, we need to exclude core models from the list.
-        # TODO(MM2): Core models should be handled by the model manager so we can determine if they are installed
-        # without needing to crawl the filesystem.
-        core_models_path = pathlib.Path(models_path, "core").resolve()
-        non_core_model_paths = [p for p in found_model_paths if not p.is_relative_to(core_models_path)]
+        def classify_found_models() -> list[FoundModel]:
+            models_path = ApiDependencies.invoker.services.configuration.models_path
 
-        installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
+            # If the search path includes the main models directory, we need to exclude core models from the list.
+            # TODO(MM2): Core models should be handled by the model manager so we can determine if they are installed
+            # without needing to crawl the filesystem.
+            core_models_path = pathlib.Path(models_path, "core").resolve()
+            non_core_model_paths = [p for p in found_model_paths if not p.is_relative_to(core_models_path)]
 
-        scan_results: list[FoundModel] = []
+            installed_models = ApiDependencies.invoker.services.model_manager.store.search_by_attr()
+            installed_paths = {str(models_path / m.path) for m in installed_models}
 
-        # Check if the model is installed by comparing paths, appending to the scan result.
-        for p in non_core_model_paths:
-            path = str(p)
-            is_installed = any(str(models_path / m.path) == path for m in installed_models)
-            found_model = FoundModel(path=path, is_installed=is_installed)
-            scan_results.append(found_model)
+            # Check if the model is installed by comparing paths.
+            return [FoundModel(path=str(p), is_installed=str(p) in installed_paths) for p in non_core_model_paths]
+
+        # The store query and the path comparison are blocking work; this handler is async only to watch the request.
+        scan_results = await asyncio.to_thread(classify_found_models)
     except Exception as e:
         ApiDependencies.invoker.services.logger.error(
             f"Error scanning '{scan_path}' for models: {type(e).__name__}: {e}"
@@ -580,6 +688,13 @@ async def update_model_record(
     current_admin: AdminUserOrDefault,
 ) -> AnyModelConfig:
     """Update a model's config."""
+    # The key identifies the row; it is not an editable field, and there is no UI to change one. The edit form
+    # does post the record back whole, so an unchanged echo is expected and accepted - but a *different* key is
+    # written into the stored config while the row id keeps the old one, which leaves a record that answers to a
+    # key nothing can look it up by: `replace_model` (and so reidentify) raises `UnknownModelException` forever
+    # after, and the UI caches the model under the new key so every later request for it 404s.
+    if "key" in changes.model_fields_set and changes.key != key:
+        raise HTTPException(status_code=422, detail="A model's key cannot be changed")
     return await asyncio.to_thread(_update_model_record, key, changes)
 
 
@@ -643,6 +758,7 @@ def get_model_image(
             "description": "The model image was updated successfully",
         },
         400: {"description": "Bad request"},
+        404: {"description": "The model could not be found"},
         409: {"description": "Another operation on this model is already in progress"},
     },
     status_code=200,
@@ -660,6 +776,25 @@ async def update_model_image(
     # A conversion moves this model's image to the replacement's key when it finishes, so claim
     # the key before reading the upload and hold it until the image is saved.
     with _claim_model_key(key):
+        # The image is stored in a file named after the key, so a key that names no model would have us write a
+        # stray file - and a key that is not a plain filename would have us write it outside the images folder.
+        # Resolving the record turns both into a 404 instead. It has to happen under the claim: the delete and
+        # convert routes claim the key too, so they cannot remove the record between this check and the save.
+        # (Removing an external provider's models in `app_info.py` does not take the claim, so that path can
+        # still leave an orphan image - which the image-delete route below can clean up.)
+        try:
+            ApiDependencies.invoker.services.model_manager.store.get_model(key)
+        except UnknownModelException as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
+        # A record written before install requests had their keys validated can still carry a key that is not a
+        # plain filename. The storage service refuses to build a path from it; ask it now, so that is a 404
+        # rather than a save failure surfacing as a 500 after the upload has been read.
+        try:
+            model_images.get_path(key)
+        except ModelImageFileNotFoundException as e:
+            raise HTTPException(status_code=404, detail=str(e))
+
         contents = await image.read()
         try:
             pil_image = await asyncio.to_thread(Image.open, io.BytesIO(contents))
@@ -847,13 +982,17 @@ def delete_model_image(
     # Claimed for the same reason as the upload: a conversion carries this model's image over to
     # the replacement's key, so a delete accepted meanwhile is undone by that copy.
     with _claim_model_key(key):
+        # Unlike the upload, this does not require the model's record: deleting a model leaves its image
+        # behind, and this route is how that orphan gets cleaned up. The storage service rejects a key that
+        # is not a plain filename, and that - like a missing file - is a 404.
         try:
             model_images.delete(key)
             logger.info(f"Deleted model image: {key}")
             return
-        except UnknownModelException as e:
-            logger.error(str(e))
-            raise HTTPException(status_code=404, detail=str(e))
+        except ModelImageFileDeleteException as e:
+            if isinstance(e.__cause__, ModelImageFileNotFoundException):
+                raise HTTPException(status_code=404, detail=str(e.__cause__))
+            raise
 
 
 @model_manager_router.post(
@@ -872,6 +1011,11 @@ def install_model(
     source: str = Query(description="Model source to install, can be a local path, repo_id, or remote URL"),
     inplace: Optional[bool] = Query(description="Whether or not to install a local model in place", default=False),
     access_token: Optional[str] = Query(description="access token for the remote resource", default=None),
+    source_access_token: Optional[str] = Header(
+        alias="X-Model-Source-Access-Token",
+        description="access token for the remote resource",
+        default=None,
+    ),
     config: ModelRecordChanges = Body(
         description="Object containing fields that override auto-probed values in the model config record, such as name, description and prediction_type ",
         examples=[{"name": "string", "description": "string"}],
@@ -906,12 +1050,18 @@ def install_model(
     """
     logger = ApiDependencies.invoker.services.logger
 
+    # A caller may name the key it wants, and the key names the directory the model is moved into and the file its
+    # cover image is written to. Reject an unusable one here, where it is being chosen, rather than letting the
+    # install fail later at one of those joins. Existing records are not held to this - see `ModelRecordChanges.key`.
+    if config.key is not None and not is_plain_filename(config.key):
+        raise HTTPException(status_code=422, detail=f"Invalid model key {config.key!r}: it must be a plain filename")
+
     try:
         installer = ApiDependencies.invoker.services.model_manager.install
         result: ModelInstallJob = installer.heuristic_import(
             source=source,
             config=config,
-            access_token=access_token,
+            access_token=source_access_token or access_token,
             inplace=bool(inplace),
         )
         logger.info(f"Started installation of {source}")
@@ -1383,11 +1533,13 @@ def get_is_installed(
 
         # Determine expected variant from source pattern
         expected_variant: Qwen3VariantType | None = None
-        if "klein-9B" in starter_model.source or "qwen3_8b" in starter_model.source.lower():
+        source = starter_model.source.lower()
+        if "klein-9B" in starter_model.source or "qwen3_8b" in source or "qwen_3_8b" in source:
             expected_variant = Qwen3VariantType.Qwen3_8B
         elif (
             "klein-4B" in starter_model.source
-            or "qwen3_4b" in starter_model.source.lower()
+            or "qwen3_4b" in source
+            or "qwen_3_4b" in source
             or "Z-Image" in starter_model.source
         ):
             expected_variant = Qwen3VariantType.Qwen3_4B
@@ -1467,11 +1619,15 @@ def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
         aggregate.misses += stats.misses
         aggregate.in_cache += stats.in_cache
         aggregate.cleared += stats.cleared
-        # cache_size and high_watermark are already system-wide values: every per-device cache
-        # shares one global RamBudget, so each reports the same global capacity and observes the
-        # same global usage. Summing them would over-report an N-GPU system ~N times; take the max.
+        # cache_size, high_watermark and cache_used are already system-wide values: every per-device
+        # cache shares one global RamBudget, so each reports the same global capacity and observes
+        # the same global usage. Summing them would over-report an N-GPU system ~N times; take the
+        # max. cache_used must be carried through explicitly — it is this fork's field for *current*
+        # usage, and the Queue widget's gauge silently falls back to high_watermark (peak) when it
+        # is absent, which reads as a cache that never releases memory.
         aggregate.high_watermark = max(aggregate.high_watermark, stats.high_watermark)
         aggregate.cache_size = max(aggregate.cache_size, stats.cache_size)
+        aggregate.cache_used = max(aggregate.cache_used, stats.cache_used)
         aggregate.loaded_model_sizes.update(stats.loaded_model_sizes)
     return aggregate
 
@@ -1480,13 +1636,26 @@ def get_stats(current_admin: AdminUserOrDefault) -> Optional[CacheStats]:
     "/empty_model_cache",
     operation_id="empty_model_cache",
     status_code=200,
+    response_model=EmptyModelCacheResponse,
 )
-def empty_model_cache(current_admin: AdminUserOrDefault) -> None:
+def empty_model_cache(current_admin: AdminUserOrDefault) -> EmptyModelCacheResponse:
     """Drop all models from the model cache to free RAM/VRAM. 'Locked' models that are in active use will not be dropped."""
     # Request 1000GB of room in order to force each per-device cache to drop all models.
     ApiDependencies.invoker.services.logger.info("Emptying model cache.")
+    models_cleared = 0
+    bytes_freed = 0
+    seen_cache_ids: set[int] = set()
+    # ram_caches can map several device keys to the same cache object; clearing one twice would
+    # report the second (empty) pass and double-count nothing, but the id() guard keeps the totals
+    # honest and matches get_stats above.
     for cache in ApiDependencies.invoker.services.model_manager.load.ram_caches.values():
-        cache.make_room(1000 * 2**30)
+        if id(cache) in seen_cache_ids:
+            continue
+        seen_cache_ids.add(id(cache))
+        result = cache.make_room(1000 * 2**30)
+        models_cleared += result.models_cleared
+        bytes_freed += result.bytes_freed
+    return EmptyModelCacheResponse(models_cleared=models_cleared, bytes_freed=bytes_freed)
 
 
 class HFTokenStatus(str, Enum):

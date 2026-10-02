@@ -1,6 +1,6 @@
 import pytest
 
-from invokeai.app.invocations.flux_denoise import FluxDenoiseInvocation
+from invokeai.app.invocations.flux.flux_denoise import FluxDenoiseInvocation
 
 TIMESTEPS = [1.0, 0.75, 0.5, 0.25, 0.0]
 

@@ -12,7 +12,7 @@ from typing import Callable, Optional, Sequence
 
 import torch
 
-from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Transformer
+from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Transformer, compute_dtype_of
 from invokeai.backend.ideogram4.sampling_utils import (
     LATENT_DIM,
     build_denoise_inputs,
@@ -24,6 +24,11 @@ from invokeai.backend.ideogram4.scheduler import get_schedule_for_resolution, ma
 # packed_latents is the current estimate in packed grid form ``(1, LATENT_DIM, grid_h, grid_w)`` —
 # ready for a preview (unpatchify + VAE decode / RGB approximation) without re-deriving the grid.
 StepCallback = Callable[[int, int, torch.Tensor], None]
+
+
+def _compute_dtype(transformer: Ideogram4Transformer) -> torch.dtype:
+    """The dtype `transformer` computes in — the model's own rule, not a second copy of it."""
+    return compute_dtype_of(transformer.input_proj)
 
 
 @torch.no_grad()
@@ -72,17 +77,26 @@ def run_ideogram4_denoise(
     else:
         gw_per_step = torch.full((num_steps,), float(guidance_scale), dtype=torch.float32, device=device)
 
+    # Both conditioning buffers are built in the dtype the transformer computes in, not in the
+    # float32 the encoder stored. They are 53248 wide -- at 1024px that is ~900 MB each in float32,
+    # and `forward` casts them to this dtype anyway, so keeping them float32 here only buys a second
+    # full-size copy inside every step. The rule is the model's own (see `Ideogram4Transformer`),
+    # because a quantized build's weight dtype is not the dtype it computes in.
+    conditioning_dtype = _compute_dtype(conditional_transformer)
+
     # Conditional branch: text features followed by zeros for the image tokens.
     llm_features_full = torch.zeros(
-        1, num_text_tokens + num_image_tokens, llm_dim, dtype=llm_features.dtype, device=device
+        1, num_text_tokens + num_image_tokens, llm_dim, dtype=conditioning_dtype, device=device
     )
-    llm_features_full[0, :num_text_tokens] = llm_features.to(device)
+    llm_features_full[0, :num_text_tokens] = llm_features.to(device=device, dtype=conditioning_dtype)
 
     # Unconditional (negative) branch is image-only with zeroed conditioning.
     neg_position_ids = inputs["position_ids"][:, num_text_tokens:]
     neg_segment_ids = inputs["segment_ids"][:, num_text_tokens:]
     neg_indicator = inputs["indicator"][:, num_text_tokens:]
-    neg_llm_features = torch.zeros(1, num_image_tokens, llm_dim, dtype=llm_features.dtype, device=device)
+    neg_llm_features = torch.zeros(
+        1, num_image_tokens, llm_dim, dtype=_compute_dtype(unconditional_transformer), device=device
+    )
 
     generator = torch.Generator(device=device)
     if seed is not None:

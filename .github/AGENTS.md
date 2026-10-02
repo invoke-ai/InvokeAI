@@ -1,24 +1,11 @@
-# Agent Instructions
+# CI and contributions
 
-## Package Management
-
-This project uses **pnpm** exclusively for package management in the frontend (`invokeai/frontend/web/`).
-
-- ✅ Use `pnpm` commands (e.g., `pnpm install`, `pnpm run`)
-- ❌ Never use `npm` or `yarn` commands
-- ❌ Never suggest creating or using `package-lock.json` or `yarn.lock`
-- ✅ The lock file is `pnpm-lock.yaml`
-
-Use the following pnpm commands for typical operations:
-
-- pnpm -C invokeai/frontend/web install
-- pnpm -C invokeai/frontend/web build
-- pnpm -C invokeai/frontend/web lint:tsc
-- pnpm -C invokeai/frontend/web lint:dpdm
-- pnpm -C invokeai/frontend/web lint:eslint
-- pnpm -C invokeai/frontend/web lint:prettier
-
-## Project Structure
-
-- Backend: Python in `invokeai/`
-- Frontend: TypeScript/React in `invokeai/frontend/web/` (uses pnpm)
+- Read affected package guidance before changing checks.
+- Preserve PR, main-push, merge-group, manual-dispatch, and reusable-workflow events. `github.base_ref` is not always populated outside PRs.
+- Change detection must include workflows and relevant shared actions/configuration; test-only and tooling-only changes must trigger owning checks.
+- Preserve tool versions, lockfiles, reproducible installs, hardware/platform matrices, and pinned action revisions.
+- Prefer package completion commands over duplicating them in YAML. For webv2's `pnpm check:release`, install Chromium and required Linux dependencies first.
+- Preserve failure diagnostics with `always()` where appropriate; keep generated review/performance artifacts out of Git.
+- Match hooks to CI's Ruff version/configuration; validation must not rewrite formatting.
+- Follow [the PR template](pull_request_template.md); keep summaries short and omit subagent counts, tiers, and process narration.
+- Workflow changes do not configure hosted branch protection or install local hooks; verify before claiming either.

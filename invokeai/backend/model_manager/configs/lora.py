@@ -49,6 +49,16 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
 )
 from invokeai.backend.patches.lora_conversions.flux_control_lora_utils import is_state_dict_likely_flux_control
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import is_kohya_krea2_lora_key
+from invokeai.backend.patches.lora_conversions.ltx2_lora_constants import (
+    has_ltx2_lora_keys,
+    has_non_ltx2_architecture_keys,
+    has_unsupported_ltx2_lora_variant_keys,
+)
+from invokeai.backend.patches.lora_conversions.minimax_h3_lora_constants import (
+    has_minimax_h3_lora_keys,
+    has_non_minimax_h3_architecture_keys,
+    has_unsupported_minimax_h3_lora_variant_keys,
+)
 from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
     detect_wan_lora_variant,
     has_non_wan_architecture_keys,
@@ -58,7 +68,7 @@ from invokeai.backend.patches.lora_conversions.wan_lora_constants import (
 
 # Defaults used to compute the effective slider range when one or both bounds
 # are unset. These intentionally mirror the frontend's DEFAULT_LORA_WEIGHT_CONFIG
-# in invokeai/frontend/web/src/features/controlLayers/store/lorasSlice.ts so that
+# in invokeai/frontend/webv1/src/features/controlLayers/store/lorasSlice.ts so that
 # bound/weight validation produces the same result whether it runs in the form
 # or in this pydantic model.
 _DEFAULT_LORA_WEIGHT_SLIDER_MIN = -1.0
@@ -1226,6 +1236,122 @@ class LoRA_LyCORIS_Wan_Config(LoRA_LyCORIS_Config_Base, Config_Base):
                 instance.expert = detected
 
         return instance
+
+
+class LoRA_LyCORIS_MiniMaxH3_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for MiniMax H3 LoRA models in LyCORIS (single-file PEFT) format.
+
+    H3 LoRAs (e.g. the MiniMax-H3 Turbo step-distillation LoRA) target the
+    ``MiniMaxH3Transformer3DModel`` in the checkpoint's native single-file layout.
+    Detection keys on H3-exclusive submodule names (the fused ``attn.qkv_proj``
+    under a bare ``attn.``, and ``adaln_proj.linear``) and rejects any state dict
+    carrying another architecture's signature — see
+    ``minimax_h3_lora_constants`` for the exact patterns and why ``mlp.fc1``
+    alone would not be safe.
+    """
+
+    base: Literal[BaseModelType.MiniMaxH3] = Field(default=BaseModelType.MiniMaxH3)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        has_h3_keys = has_minimax_h3_lora_keys(str_keys)
+        # LyCORIS variants (LoKR/LoHA/DoRA) cannot be applied across H3's fused qkv/SwiGLU
+        # tensors; admitting them here would only defer the failure to generation time (or,
+        # for DoRA's per-output-row magnitudes, silently mis-apply them). Reject at install.
+        if has_h3_keys and has_unsupported_minimax_h3_lora_variant_keys(str_keys):
+            raise NotAMatchError(
+                "MiniMax H3 LoRAs must be plain low-rank (lora_A/lora_B); LoKR/LoHA/DoRA variants "
+                "are not supported on H3's fused transformer layers"
+            )
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+            },
+        )
+
+        if has_h3_keys and has_lora_suffix and not has_non_minimax_h3_architecture_keys(str_keys):
+            return
+
+        raise NotAMatchError("model does not match MiniMax H3 LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        if (
+            has_minimax_h3_lora_keys(str_keys)
+            and not has_non_minimax_h3_architecture_keys(str_keys)
+            and not has_unsupported_minimax_h3_lora_variant_keys(str_keys)
+        ):
+            return BaseModelType.MiniMaxH3
+
+        raise NotAMatchError("model does not look like a MiniMax H3 LoRA")
+
+
+class LoRA_LyCORIS_LTX2_Config(LoRA_LyCORIS_Config_Base, Config_Base):
+    """Model config for LTX-2 LoRA models in LyCORIS (single-file PEFT) format.
+
+    LTX-2 LoRAs (e.g. the 2.5 distilled step-accelerator) target the
+    ``LTX2VideoTransformer3DModel`` in the official Lightricks single-file layout. Detection keys
+    on submodules that exist only because LTX-2 is a *dual-stream* video+audio transformer -- the
+    per-block audio tower and the cross-modal attentions, or the top-level cross-modal modulation
+    heads -- and rejects any state dict carrying another architecture's signature. See
+    ``ltx2_lora_constants`` for the exact patterns, and for why the block path alone is not
+    sufficient: LTX-2 shares ``transformer_blocks.N.attn1`` with Wan's diffusers layout and with
+    QwenImage.
+    """
+
+    base: Literal[BaseModelType.LTX2] = Field(default=BaseModelType.LTX2)
+
+    @classmethod
+    def _validate_looks_like_lora(cls, mod: ModelOnDisk) -> None:
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        has_keys = has_ltx2_lora_keys(str_keys)
+        # The conversion emits ordinary low-rank pairs; a LoKR/LoHA factorization or DoRA's
+        # per-row magnitudes are a different patch shape. Admitting them here would only defer
+        # the failure to generation time. Reject at install.
+        if has_keys and has_unsupported_ltx2_lora_variant_keys(str_keys):
+            raise NotAMatchError(
+                "LTX-2 LoRAs must be plain low-rank (lora_A/lora_B); LoKR/LoHA/DoRA variants are not supported"
+            )
+        has_lora_suffix = state_dict_has_any_keys_ending_with(
+            state_dict,
+            {
+                "lora_A.weight",
+                "lora_B.weight",
+                "lora_down.weight",
+                "lora_up.weight",
+            },
+        )
+
+        if has_keys and has_lora_suffix and not has_non_ltx2_architecture_keys(str_keys):
+            return
+
+        raise NotAMatchError("model does not match LTX-2 LoRA heuristics")
+
+    @classmethod
+    def _get_base_or_raise(cls, mod: ModelOnDisk) -> BaseModelType:
+        state_dict = mod.load_state_dict()
+        str_keys = [k for k in state_dict.keys() if isinstance(k, str)]
+
+        if (
+            has_ltx2_lora_keys(str_keys)
+            and not has_non_ltx2_architecture_keys(str_keys)
+            and not has_unsupported_ltx2_lora_variant_keys(str_keys)
+        ):
+            return BaseModelType.LTX2
+
+        raise NotAMatchError("model does not look like an LTX-2 LoRA")
 
 
 class ControlAdapter_Config_Base(ABC, BaseModel):

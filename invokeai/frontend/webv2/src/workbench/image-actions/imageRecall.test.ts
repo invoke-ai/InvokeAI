@@ -1,0 +1,930 @@
+import type { GalleryImage } from '@features/gallery';
+import type {
+  ComponentModelConfig,
+  GenerateWidgetValues,
+  MainModelConfig,
+  VaeModelConfig,
+} from '@features/generation/contracts';
+
+import {
+  resetArchitectureCapabilities,
+  setArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities';
+import {
+  architectureCapabilitiesFixture,
+  seedArchitectureCapabilities,
+} from '@features/generation/core/architectureCapabilities.testing';
+import { fullyFilledSettingsFor, generateGraphCases } from '@features/generation/core/graphCoverage.testing';
+import { compileGenerateGraph } from '@features/generation/graph';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+
+import { buildImageRecallSettings, getImageRecallCapabilities, type ImageRecallKind } from './imageRecall';
+
+const sdxlModel: MainModelConfig = { base: 'sdxl', key: 'sdxl-model', name: 'SDXL', type: 'main' };
+const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
+const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
+const krea2Model: MainModelConfig = { base: 'krea-2', key: 'krea2-model', name: 'Krea 2', type: 'main' };
+const flux2DevModel: MainModelConfig = {
+  base: 'flux2',
+  key: 'flux2-dev',
+  name: 'FLUX.2 dev',
+  type: 'main',
+  variant: 'dev',
+};
+const krea2Qwen3VL: ComponentModelConfig = {
+  base: 'any',
+  key: 'qwen3-vl-4b',
+  name: 'Qwen3-VL 4B',
+  type: 'qwen3_vl_encoder',
+  variant: 'qwen3_vl_4b',
+};
+const ideogram4Qwen3VL: ComponentModelConfig = {
+  base: 'any',
+  key: 'qwen3-vl-8b',
+  name: 'Qwen3-VL 8B',
+  type: 'qwen3_vl_encoder',
+  variant: 'qwen3_vl_8b',
+};
+const vaeModel: VaeModelConfig = { base: 'sd-1', key: 'vae-model', name: 'SD 1.5 VAE', type: 'vae' };
+const qwenImageVae: VaeModelConfig = { base: 'qwen-image', key: 'qwen-vae', name: 'Qwen VAE', type: 'vae' };
+const animaQwen3: ComponentModelConfig = {
+  base: 'any',
+  key: 'anima-qwen3',
+  name: 'Anima Qwen3',
+  type: 'qwen3_encoder',
+  variant: 'qwen3_06b',
+};
+const mistralEncoder: ComponentModelConfig = {
+  base: 'any',
+  key: 'mistral',
+  name: 'Mistral Encoder',
+  type: 'mistral_encoder',
+};
+const qwenVLEncoder: ComponentModelConfig = {
+  base: 'any',
+  key: 'qwen-vl',
+  name: 'Qwen VL',
+  type: 'qwen_vl_encoder',
+};
+
+const createValues = (overrides: Partial<GenerateWidgetValues> = {}): GenerateWidgetValues => ({
+  aspectRatioId: '1:1',
+  aspectRatioIsLocked: false,
+  aspectRatioValue: 1,
+  batchCount: 1,
+  pidMode: 'off',
+  pidDecoderModel: null,
+  gemma2EncoderModel: null,
+  pidSteps: 4,
+  cfgRescaleMultiplier: 0,
+  cfgScale: 7,
+  clipEmbedModel: null,
+  clipGEmbedModel: null,
+  clipLEmbedModel: null,
+  clipSkip: 0,
+  colorCompensation: false,
+  hiDiffusionEnabled: false,
+  hiDiffusionRauNetEnabled: true,
+  hiDiffusionT1Ratio: 0.4,
+  hiDiffusionT2Ratio: 0,
+  hiDiffusionWindowAttentionEnabled: true,
+  dynamicPromptsCombinatorial: true,
+  dynamicPromptsMaxPrompts: 100,
+  dynamicPromptsSampleSeed: 0,
+  dynamicPromptsSeedBehaviour: 'per-iteration',
+  componentSourceModel: null,
+  height: 1024,
+  loras: [],
+  model: sdxlModel,
+  modelKey: sdxlModel.key,
+  negativePromptEnabled: true,
+  negativePrompt: '',
+  negativePromptHeightPx: 56,
+  positivePrompt: '',
+  positivePromptHeightPx: 96,
+  expandPromptModelKey: null,
+  imageToPromptModelKey: null,
+  promptTemplate: null,
+  promptTemplateViewMode: false,
+  mistralEncoderModel: null,
+  qwen3EncoderModel: null,
+  qwenVLEncoderModel: null,
+  qwen3VLEncoderModel: null,
+  wanT5EncoderModel: null,
+  wanLowNoiseModel: null,
+  ideogram4UnconditionalModel: null,
+  wanGuidanceScaleLowNoise: null,
+  ideogram4SamplerPreset: 'V4_QUALITY_48',
+  ideogram4Steps: null,
+  ideogram4GuidanceScale: null,
+  ideogram4Mu: null,
+  ideogram4ColorPalette: [],
+  krea2RebalanceEnabled: false,
+  krea2RebalanceMultiplier: 4,
+  krea2RebalanceWeights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,2.5,5.0,1.1,4.0,1.0',
+  krea2SeedVarianceEnabled: false,
+  krea2SeedVarianceStrength: 0.1,
+  krea2SeedVarianceRandomizePercent: 50,
+  referenceImages: [],
+  scheduler: 'euler_a',
+  seamlessXAxis: false,
+  seamlessYAxis: false,
+  seed: 123,
+  seedMode: 'random',
+  steps: 30,
+  t5EncoderModel: null,
+  vae: null,
+  vaePrecision: 'fp32',
+  width: 1024,
+  ...overrides,
+});
+
+const image: GalleryImage = {
+  boardId: 'none',
+  height: 770,
+  imageCategory: 'general',
+  imageName: 'image.png',
+  imageUrl: '/image.png',
+  queuedAt: '2026-06-12T00:00:00.000Z',
+  sourceQueueItemId: 'backend-gallery',
+  starred: false,
+  thumbnailUrl: '/thumbnail.png',
+  width: 513,
+};
+
+const metadata = {
+  cfg_rescale_multiplier: 0.25,
+  cfg_scale: 8,
+  height: 770,
+  model: { key: sd1Model.key },
+  negative_prompt: null,
+  positive_prompt: 'a recalled prompt',
+  scheduler: 'euler',
+  seamless_x: true,
+  seed: 42,
+  steps: 25,
+  vae: { key: vaeModel.key },
+  width: 513,
+};
+
+seedArchitectureCapabilities();
+
+describe('image recall', () => {
+  it.each(['all', 'remix', 'prompts'] as const)(
+    'clears the active template and view mode when %s recalls prompt metadata',
+    (kind) => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues({
+          promptTemplate: {
+            id: 'template-1',
+            name: 'Cinematic',
+            negativePrompt: 'lowres',
+            positivePrompt: '{prompt}, cinematic',
+          },
+          promptTemplateViewMode: true,
+        }),
+        image,
+        kind,
+        metadata: { positive_prompt: 'a recalled prompt' },
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(result?.values.promptTemplate).toBeNull();
+      expect(result?.values.promptTemplateViewMode).toBe(false);
+    }
+  );
+
+  it.each(['seed', 'dimensions', 'clipSkip'] as const)(
+    'preserves the active template and view mode when %s has no prompt metadata',
+    (kind) => {
+      const currentValues = createValues({
+        ...(kind === 'clipSkip' ? { model: sd1Model, modelKey: sd1Model.key } : {}),
+        promptTemplate: {
+          id: 'template-1',
+          name: 'Cinematic',
+          negativePrompt: 'lowres',
+          positivePrompt: '{prompt}, cinematic',
+        },
+        promptTemplateViewMode: true,
+      });
+      const result = buildImageRecallSettings({
+        currentValues,
+        image,
+        kind,
+        metadata: kind === 'seed' ? { seed: 42 } : kind === 'clipSkip' ? { clip_skip: 1 } : null,
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(result?.values.promptTemplate).toEqual(currentValues.promptTemplate);
+      expect(result?.values.promptTemplateViewMode).toBe(true);
+    }
+  );
+
+  it('recalls supported image metadata into generate settings', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata,
+      models: [sd1Model, vaeModel],
+      supportedModels: [sd1Model],
+      vaeModels: [vaeModel],
+    });
+
+    expect(result?.values).toMatchObject({
+      cfgRescaleMultiplier: 0.25,
+      cfgScale: 8,
+      clipSkip: 0,
+      height: 768,
+      modelKey: sd1Model.key,
+      negativePrompt: '',
+      positivePrompt: 'a recalled prompt',
+      scheduler: 'euler',
+      seamlessXAxis: true,
+      seed: 42,
+      seedMode: 'fixed',
+      steps: 25,
+      width: 512,
+    });
+    expect(result?.values.vae).toEqual(vaeModel);
+    expect(result?.fields).toContain('model');
+    expect(result?.fields).toContain('vae');
+    expect(result?.fields).toContain('prompts');
+    expect(result?.fields).toContain('seed');
+  });
+
+  it('recalls reference images from metadata, re-targeting configs to the effective model', () => {
+    // The metadata model is not installed, so the current SDXL model stays
+    // selected and the Qwen reference config is rebuilt for SDXL.
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        ref_images: [
+          {
+            id: 'ref-1',
+            isEnabled: true,
+            config: {
+              image: {
+                height: 770,
+                imageName: 'reference.png',
+                imageUrl: '/api/v1/images/i/reference.png/full',
+                queuedAt: '2026-01-01T00:00:00.000Z',
+                sourceQueueItemId: 'backend-gallery',
+                thumbnailUrl: '/api/v1/images/i/reference.png/thumbnail',
+                width: 513,
+              },
+              type: 'qwen_image_reference_image',
+            },
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages).toHaveLength(1);
+    expect(result?.values.referenceImages[0]?.config).toMatchObject({
+      image: { original: { image: { height: 770, image_name: 'reference.png', width: 513 } } },
+      type: 'ip_adapter',
+    });
+    expect(result?.fields).toContain('referenceImages');
+  });
+
+  it('preserves canonical original and crop provenance from legacy metadata', () => {
+    const crop = {
+      box: { height: 256, width: 320, x: 12, y: 24 },
+      image: { height: 256, image_name: 'crop.png', width: 320 },
+      ratio: null,
+    };
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        ref_images: [
+          {
+            config: {
+              image: {
+                crop,
+                original: { image: { height: 768, image_name: 'original.png', width: 512 } },
+              },
+              type: 'qwen_image_reference_image',
+            },
+            id: 'canonical-ref',
+            isEnabled: false,
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages[0]).toMatchObject({
+      id: 'canonical-ref',
+      isEnabled: false,
+      config: {
+        image: {
+          crop,
+          original: { image: { height: 768, image_name: 'original.png', width: 512 } },
+        },
+      },
+    });
+  });
+
+  it('falls back to pre-v6 canvas ipAdapter metadata when ref_images has no valid entries', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        canvas_v2_metadata: {
+          referenceImages: {
+            entities: [
+              {
+                id: 'legacy-canvas-ref',
+                ipAdapter: {
+                  beginEndStepPct: [0.2, 0.9],
+                  clipVisionModel: 'ViT-G',
+                  image: { height: 512, image_name: 'legacy.png', width: 512 },
+                  method: 'composition',
+                  model: { base: 'sdxl', key: 'adapter', name: 'Adapter', type: 'ip_adapter' },
+                  type: 'ip_adapter',
+                  weight: 0.7,
+                },
+                isEnabled: false,
+              },
+            ],
+          },
+        },
+        ref_images: [
+          { id: 'invalid' },
+          {
+            config: { image: null, type: 'qwen_image_reference_image' },
+            id: 'incomplete-direct-ref',
+            isEnabled: true,
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages).toHaveLength(1);
+    expect(result?.values.referenceImages[0]).toMatchObject({
+      id: 'legacy-canvas-ref',
+      isEnabled: false,
+      config: {
+        image: { original: { image: { image_name: 'legacy.png' } } },
+        type: 'ip_adapter',
+      },
+    });
+  });
+
+  it('prefers valid ref_images over canvas fallback entries', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: {
+        canvas_v2_metadata: {
+          referenceImages: {
+            entities: [
+              {
+                id: 'fallback',
+                ipAdapter: { image: { height: 1, image_name: 'fallback.png', width: 1 }, type: 'flux_redux' },
+              },
+            ],
+          },
+        },
+        ref_images: [
+          {
+            config: {
+              image: { height: 64, image_name: 'direct.png', width: 64 },
+              type: 'qwen_image_reference_image',
+            },
+            id: 'direct',
+            isEnabled: true,
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [sdxlModel],
+      vaeModels: [],
+    });
+
+    expect(result?.values.referenceImages.map((referenceImage) => referenceImage.id)).toEqual(['direct']);
+  });
+
+  it('drops recalled reference images when the effective model does not support them', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: animaModel, modelKey: animaModel.key }),
+      image,
+      kind: 'all',
+      metadata: {
+        positive_prompt: 'a recalled prompt',
+        ref_images: [
+          {
+            id: 'ref-1',
+            isEnabled: true,
+            config: {
+              image: {
+                height: 770,
+                imageName: 'reference.png',
+                imageUrl: '/api/v1/images/i/reference.png/full',
+                queuedAt: '2026-01-01T00:00:00.000Z',
+                sourceQueueItemId: 'backend-gallery',
+                thumbnailUrl: '/api/v1/images/i/reference.png/thumbnail',
+                width: 513,
+              },
+              type: 'qwen_image_reference_image',
+            },
+          },
+        ],
+      },
+      models: [],
+      supportedModels: [animaModel],
+      vaeModels: [],
+    });
+
+    expect(result?.fields).toContain('prompts');
+    expect(result?.values.referenceImages).toEqual([]);
+    expect(result?.fields).not.toContain('referenceImages');
+  });
+
+  it('remixes without changing the current seed state', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ seed: 999, seedMode: 'fixed' }),
+      image,
+      kind: 'remix',
+      metadata,
+      models: [sd1Model],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.seed).toBe(999);
+    expect(result?.values.seedMode).toBe('fixed');
+    expect(result?.values.positivePrompt).toBe('a recalled prompt');
+    expect(result?.fields).not.toContain('seed');
+  });
+
+  it.each(['all', 'remix'] as const)('recalls valid HiDiffusion metadata for supported models with %s', (kind) => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind,
+      metadata: {
+        hidiffusion: true,
+        hidiffusion_raunet: false,
+        hidiffusion_t1_ratio: 0.35,
+        hidiffusion_t2_ratio: 0.15,
+        hidiffusion_window_attn: true,
+        model: { key: sd1Model.key },
+      },
+      models: [sd1Model],
+      supportedModels: [sd1Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values).toMatchObject({
+      hiDiffusionEnabled: true,
+      hiDiffusionRauNetEnabled: false,
+      hiDiffusionT1Ratio: 0.35,
+      hiDiffusionT2Ratio: 0.15,
+      hiDiffusionWindowAttentionEnabled: true,
+    });
+    expect(result?.fields).toContain('hiDiffusion');
+  });
+
+  it('ignores HiDiffusion metadata for unsupported models', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: animaModel, modelKey: animaModel.key }),
+      image,
+      kind: 'all',
+      metadata: {
+        hidiffusion: true,
+        hidiffusion_raunet: false,
+        hidiffusion_t1_ratio: 0.35,
+        hidiffusion_t2_ratio: 0.15,
+        hidiffusion_window_attn: true,
+        positive_prompt: 'keep the recall non-empty',
+      },
+      models: [],
+      supportedModels: [animaModel],
+      vaeModels: [],
+    });
+
+    expect(result?.values.hiDiffusionEnabled).toBe(false);
+    expect(result?.fields).not.toContain('hiDiffusion');
+  });
+
+  it('uses actual image dimensions for Use Size', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'dimensions',
+      metadata: null,
+      models: [],
+      supportedModels: [],
+      vaeModels: [],
+    });
+
+    expect(result?.values.width).toBe(512);
+    expect(result?.values.height).toBe(768);
+    expect(result?.values.aspectRatioId).toBe('2:3');
+  });
+
+  it('recalls the size for an external generator, which has no architecture row to wait for', () => {
+    // External providers have no capability row and must remain eligible for dimension recall.
+    const externalModel = {
+      base: 'external',
+      capabilities: { modes: ['txt2img'], supports_seed: true },
+      format: 'external_api',
+      key: 'external-model',
+      name: 'OpenAI Image',
+      provider_id: 'openai',
+      type: 'external_image_generator',
+    } as GenerateWidgetValues['model'];
+    const recall = () =>
+      buildImageRecallSettings({
+        currentValues: createValues({ model: externalModel, modelKey: externalModel.key }),
+        image,
+        kind: 'dimensions',
+        metadata: null,
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+    expect(recall()?.values).toMatchObject({ height: 768, width: 512 });
+
+    resetArchitectureCapabilities();
+    try {
+      expect(recall()?.values).toMatchObject({ height: 768, width: 512 });
+    } finally {
+      setArchitectureCapabilities(architectureCapabilitiesFixture);
+    }
+  });
+
+  describe('before the capability table arrives', () => {
+    // Require the model's grid before persisting recalled dimensions; fallback grid 8 can produce invalid sizes.
+    beforeEach(() => {
+      resetArchitectureCapabilities();
+    });
+
+    afterEach(() => {
+      setArchitectureCapabilities(architectureCapabilitiesFixture);
+    });
+
+    it('recalls no size from the image rather than one snapped to the fallback grid', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'dimensions',
+        metadata: null,
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      // Without the fix this is ['size'] with the width snapped to the fallback grid 8.
+      expect(result?.fields ?? []).not.toContain('size');
+    });
+
+    it('withholds Recall All and Remix but keeps prompts and seed', () => {
+      const metadata = { height: 768, model: { key: sdxlModel.key }, positive_prompt: 'a cat', seed: 7, width: 512 };
+      const recall = (kind: ImageRecallKind) =>
+        buildImageRecallSettings({
+          currentValues: createValues(),
+          image,
+          kind,
+          metadata,
+          models: [],
+          supportedModels: [sdxlModel],
+          vaeModels: [],
+        });
+
+      // Recall All must not persist fallback defaults while capabilities are unavailable.
+      expect(recall('all')).toBeNull();
+      expect(recall('remix')).toBeNull();
+      expect(recall('prompts')?.fields).toEqual(['prompts']);
+      expect(recall('seed')?.fields).toEqual(['seed']);
+      expect(
+        getImageRecallCapabilities({
+          currentValues: createValues(),
+          image,
+          metadata,
+          models: [],
+          supportedModels: [sdxlModel],
+          vaeModels: [],
+        })
+      ).toMatchObject({ all: false, clipSkip: false, prompts: true, remix: false, seed: true });
+    });
+  });
+
+  it('only enables standalone CLIP skip when the current model supports it', () => {
+    const sdxlCapabilities = getImageRecallCapabilities({
+      currentValues: createValues({ model: sdxlModel, modelKey: sdxlModel.key }),
+      image,
+      metadata: { clip_skip: 3 },
+      models: [],
+      supportedModels: [],
+      vaeModels: [],
+    });
+    const sd1Capabilities = getImageRecallCapabilities({
+      currentValues: createValues({ model: sd1Model, modelKey: sd1Model.key }),
+      image,
+      metadata: { clip_skip: 3 },
+      models: [],
+      supportedModels: [],
+      vaeModels: [],
+    });
+
+    expect(sdxlCapabilities.clipSkip).toBe(false);
+    expect(sd1Capabilities.clipSkip).toBe(true);
+  });
+
+  it('enables recall actions for component-only metadata', () => {
+    const capabilities = getImageRecallCapabilities({
+      currentValues: createValues(),
+      image,
+      metadata: { qwen3_encoder: { key: animaQwen3.key } },
+      models: [animaQwen3],
+      supportedModels: [],
+      vaeModels: [],
+    });
+
+    expect(capabilities.all).toBe(true);
+    expect(capabilities.remix).toBe(true);
+  });
+
+  it('recalls required component models for component-based families', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: sd1Model, modelKey: sd1Model.key }),
+      image,
+      kind: 'all',
+      metadata: {
+        height: 1024,
+        model: { key: animaModel.key },
+        qwen3_encoder: { key: animaQwen3.key },
+        vae: { key: qwenImageVae.key },
+        width: 1024,
+      },
+      models: [animaModel, animaQwen3, qwenImageVae],
+      supportedModels: [animaModel],
+      vaeModels: [qwenImageVae],
+    });
+
+    expect(result?.values.model).toBe(animaModel);
+    expect(result?.values.qwen3EncoderModel).toBe(animaQwen3);
+    expect(result?.values.vae).toBe(qwenImageVae);
+    expect(result?.fields).toContain('components');
+  });
+
+  it('recalls FLUX.2 [dev] Mistral encoder metadata', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues(),
+      image,
+      kind: 'all',
+      metadata: { mistral_encoder: { key: mistralEncoder.key }, model: { key: flux2DevModel.key } },
+      models: [mistralEncoder],
+      supportedModels: [flux2DevModel],
+      vaeModels: [],
+    });
+
+    expect(result?.values.mistralEncoderModel).toBe(mistralEncoder);
+    expect(result?.fields).toContain('components');
+  });
+
+  it('remixes a Krea-2 image with its Qwen3-VL encoder', () => {
+    const krea2Metadata = { model: { key: krea2Model.key }, qwen3_vl_encoder: { key: krea2Qwen3VL.key } };
+    const recallInput = {
+      currentValues: createValues(),
+      image,
+      metadata: krea2Metadata,
+      models: [krea2Qwen3VL],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    };
+
+    expect(buildImageRecallSettings({ ...recallInput, kind: 'remix' })?.values.qwen3VLEncoderModel).toBe(krea2Qwen3VL);
+    expect(
+      getImageRecallCapabilities({ ...recallInput, metadata: { qwen3_vl_encoder: krea2Metadata.qwen3_vl_encoder } })
+        .remix
+    ).toBe(true);
+  });
+
+  it('keeps a fitting pick when the recorded component does not fit the current model', () => {
+    // The image's Ideogram model is gone, so Remix stays on the current Krea-2 model and its 4B encoder.
+    const result = buildImageRecallSettings({
+      currentValues: createValues({ model: krea2Model, modelKey: krea2Model.key, qwen3VLEncoderModel: krea2Qwen3VL }),
+      image,
+      kind: 'remix',
+      metadata: {
+        model: { key: 'uninstalled-ideogram' },
+        positive_prompt: 'a lighthouse',
+        qwen3_vl_encoder: { key: ideogram4Qwen3VL.key },
+      },
+      models: [krea2Qwen3VL, ideogram4Qwen3VL],
+      supportedModels: [krea2Model],
+      vaeModels: [],
+    });
+
+    expect(result?.values.qwen3VLEncoderModel).toEqual(krea2Qwen3VL);
+    expect(result?.fields).toEqual(['prompts']);
+  });
+
+  it('drops components that do not fit the remixed model, recorded or left over', () => {
+    const recall = (metadata: Record<string, unknown>) =>
+      buildImageRecallSettings({
+        // Ideogram 4's 8B encoder does not fit Krea-2, which takes the 4B variant.
+        currentValues: createValues({ qwen3VLEncoderModel: ideogram4Qwen3VL }),
+        image,
+        kind: 'remix',
+        metadata: { model: { key: krea2Model.key }, ...metadata },
+        models: [krea2Qwen3VL, ideogram4Qwen3VL],
+        supportedModels: [krea2Model],
+        vaeModels: [],
+      })?.values.qwen3VLEncoderModel;
+
+    expect(recall({})).toBeNull();
+    expect(recall({ qwen3_vl_encoder: { key: ideogram4Qwen3VL.key } })).toBeNull();
+  });
+
+  it('clears component models when recalled metadata explicitly stores null', () => {
+    const result = buildImageRecallSettings({
+      currentValues: createValues({
+        componentSourceModel: sd1Model,
+        mistralEncoderModel: mistralEncoder,
+        qwen3EncoderModel: animaQwen3,
+        qwenVLEncoderModel: qwenVLEncoder,
+      }),
+      image,
+      kind: 'all',
+      metadata: {
+        mistral_encoder: null,
+        qwen3_encoder: null,
+        qwen3_source: null,
+        qwen_image_qwen_vl_encoder: null,
+      },
+      models: [sd1Model, mistralEncoder, animaQwen3, qwenVLEncoder],
+      supportedModels: [],
+      vaeModels: [],
+    });
+
+    expect(result?.values.componentSourceModel).toBeNull();
+    expect(result?.values.mistralEncoderModel).toBeNull();
+    expect(result?.values.qwen3EncoderModel).toBeNull();
+    expect(result?.values.qwenVLEncoderModel).toBeNull();
+    expect(result?.fields).toContain('components');
+  });
+
+  describe('krea-2 conditioning rebalance', () => {
+    const krea2Metadata = {
+      krea2_rebalance_enabled: true,
+      krea2_rebalance_multiplier: 6.5,
+      krea2_rebalance_weights: '1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0',
+      model: { key: krea2Model.key },
+    };
+
+    it('restores the curve and gain a Krea-2 image was generated with', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: krea2Metadata,
+        models: [],
+        supportedModels: [krea2Model],
+        vaeModels: [],
+      });
+
+      expect(result?.values.krea2RebalanceEnabled).toBe(true);
+      expect(result?.values.krea2RebalanceMultiplier).toBe(6.5);
+      expect(result?.values.krea2RebalanceWeights).toBe('1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0,1.0');
+      expect(result?.fields).toContain('krea2Rebalance');
+    });
+
+    it('recalls the rebalance on a remix too', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'remix',
+        metadata: krea2Metadata,
+        models: [],
+        supportedModels: [krea2Model],
+        vaeModels: [],
+      });
+
+      expect(result?.fields).toContain('krea2Rebalance');
+    });
+
+    it('ignores the rebalance when the recalled model is not Krea-2', () => {
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: { ...krea2Metadata, model: { key: sdxlModel.key } },
+        models: [],
+        supportedModels: [sdxlModel],
+        vaeModels: [],
+      });
+
+      expect(result?.values.krea2RebalanceEnabled).toBe(false);
+      expect(result?.fields).not.toContain('krea2Rebalance');
+    });
+
+    it('drops a weights string the backend would reject', () => {
+      // The string is forwarded to the node verbatim, so a malformed blob must not
+      // become a queued item that fails mid-generation.
+      const result = buildImageRecallSettings({
+        currentValues: createValues(),
+        image,
+        kind: 'all',
+        metadata: { ...krea2Metadata, krea2_rebalance_weights: '0x10,1,1,1,1,1,1,1,1,1,1,1' },
+        models: [],
+        supportedModels: [krea2Model],
+        vaeModels: [],
+      });
+
+      expect(result?.values.krea2RebalanceWeights).toBe(createValues().krea2RebalanceWeights);
+      // The enabled flag and gain are still sound on their own.
+      expect(result?.values.krea2RebalanceMultiplier).toBe(6.5);
+    });
+
+    it('offers recall for an image whose only recallable delta is the rebalance', () => {
+      const capabilities = getImageRecallCapabilities({
+        currentValues: createValues({ model: krea2Model }),
+        image,
+        metadata: { krea2_rebalance_enabled: true },
+        models: [],
+        supportedModels: [],
+        vaeModels: [],
+      });
+
+      expect(capabilities.all).toBe(true);
+      expect(capabilities.remix).toBe(true);
+    });
+  });
+});
+
+/** Remix from the metadata a fully filled graph records, starting from SDXL defaults. */
+const remixRoundTrip = ({ base, shape }: (typeof generateGraphCases)[number]) => {
+  const { filled, model, settings } = fullyFilledSettingsFor(base, shape);
+  const graph = compileGenerateGraph(settings, model, 'gallery', { useCpuNoise: true }).backendGraph;
+  const recordedMetadata = Object.values(graph.nodes).find((node) => node.type === 'core_metadata');
+  const serializedMetadata = JSON.stringify(recordedMetadata);
+  // A slot the graph leaves unused (e.g. a bundled model's) is not recorded, so there is nothing to restore.
+  const recorded = filled.filter((key) => serializedMetadata.includes(`"${settings[key]?.key}"`));
+  const components = recorded.map((key) => settings[key]).filter((component) => component !== null);
+  const result = buildImageRecallSettings({
+    currentValues: createValues(),
+    image,
+    kind: 'remix',
+    metadata: recordedMetadata,
+    models: components.filter((component) => component.type !== 'vae'),
+    supportedModels: [model],
+    vaeModels: components.filter((component): component is VaeModelConfig => component.type === 'vae'),
+  });
+  const keysOf = (values: GenerateWidgetValues | undefined) =>
+    Object.fromEntries(recorded.map((key) => [key, values?.[key]?.key ?? null]));
+
+  return { expected: keysOf(settings as GenerateWidgetValues), recorded, restored: keysOf(result?.values) };
+};
+
+describe('remix round trip', () => {
+  // Every component a graph records must come back; one recorded under a key Remix does not know fails here.
+  it.each(generateGraphCases)('restores the components $label records', (graphCase) => {
+    const { expected, restored } = remixRoundTrip(graphCase);
+
+    expect(restored).toEqual(expected);
+  });
+
+  it('exercises every component setting Remix restores', () => {
+    const recorded = new Set(generateGraphCases.flatMap((graphCase) => remixRoundTrip(graphCase).recorded));
+
+    expect([...recorded].sort()).toEqual([
+      'clipEmbedModel',
+      'componentSourceModel',
+      'gemma2EncoderModel',
+      'ideogram4UnconditionalModel',
+      'mistralEncoderModel',
+      'pidDecoderModel',
+      'qwen3EncoderModel',
+      'qwen3VLEncoderModel',
+      'qwenVLEncoderModel',
+      't5EncoderModel',
+      'vae',
+      'wanLowNoiseModel',
+      'wanT5EncoderModel',
+    ]);
+  });
+});

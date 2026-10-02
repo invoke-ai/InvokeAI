@@ -55,6 +55,13 @@ _ANIMA_ANTI_RE = re.compile(r"blocks[\._]\d+[\._](mlp|adaln_modulation)")
 # in both Kohya (``self_attn_q_proj``) and PEFT (``self_attn.q_proj``) forms.
 _ANIMA_ATTN_ANTI_RE = re.compile(r"(self_attn|cross_attn)[\._]([qkv]_proj|output_proj)")
 _QWEN_ANTI_RE = re.compile(r"(^|\.)transformer_blocks\.\d+\.")
+# MiniMax H3: fused ``attn.qkv_proj`` under a bare ``attn.`` and the per-block
+# ``adaln_proj`` time-conditioning projection. Wan has neither (its attention is
+# self_attn/cross_attn native or attn1/attn2 diffusers, and its modulation module
+# is called ``modulation``). Mostly redundant with the Anima mlp anti-pattern
+# (H3 LoRAs also carry ``blocks.N.mlp.fc1``), but kept explicit so an H3 LoRA
+# without MLP layers still can't fall through to the Wan probe.
+_MINIMAX_H3_ANTI_RE = re.compile(r"blocks[\._]\d+[\._](attn[\._]qkv_proj|adaln_proj)|final_layer[\._]adaln_proj")
 _FLUX_ANTI_RE = re.compile(r"(^|\.|_)(double_blocks|single_blocks|single_transformer_blocks)[\._]\d+")
 _Z_IMAGE_ANTI_RE = re.compile(r"diffusion_model\.layers\.\d+\.")
 
@@ -155,7 +162,7 @@ def detect_wan_lora_variant(state_dict: dict) -> WanLoRAVariantType | None:
 
 
 def has_non_wan_architecture_keys(str_keys: list[str]) -> bool:
-    """True if any key indicates a non-Wan architecture (Anima, Qwen, Flux, Z-Image).
+    """True if any key indicates a non-Wan architecture (Anima, Qwen, Flux, Z-Image, MiniMax H3).
 
     Used as an exclusion guard — a Wan LoRA should never carry these patterns,
     so finding them is grounds to reject the Wan probe.
@@ -170,5 +177,7 @@ def has_non_wan_architecture_keys(str_keys: list[str]) -> bool:
         if _FLUX_ANTI_RE.search(k) is not None:
             return True
         if _Z_IMAGE_ANTI_RE.search(k) is not None:
+            return True
+        if _MINIMAX_H3_ANTI_RE.search(k) is not None:
             return True
     return False

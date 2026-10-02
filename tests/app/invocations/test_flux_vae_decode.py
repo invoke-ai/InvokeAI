@@ -12,7 +12,7 @@ import pytest
 import torch
 from diffusers.models.autoencoders.autoencoder_kl import AutoencoderKL
 
-from invokeai.app.invocations.flux_vae_decode import FluxVaeDecodeInvocation
+from invokeai.app.invocations.vae.flux_vae_decode import FluxVaeDecodeInvocation
 
 
 def _loaded_vae(shift_factor: float | None, scaling_factor: float = 0.3611) -> MagicMock:
@@ -39,6 +39,13 @@ def _loaded_vae(shift_factor: float | None, scaling_factor: float = 0.3611) -> M
     return vae_info
 
 
+def _context() -> MagicMock:
+    """An invocation context whose `force_tiled_decode` reads False rather than truthy-by-mock."""
+    context = MagicMock()
+    context.config.get.return_value.force_tiled_decode = False
+    return context
+
+
 @pytest.mark.parametrize("shift_factor", [None, 0.1159])
 def test_decode_handles_a_config_with_or_without_a_shift_factor(shift_factor: float | None) -> None:
     """A config lacking `shift_factor` used to raise `TypeError: unsupported operand ... NoneType`."""
@@ -46,7 +53,7 @@ def test_decode_handles_a_config_with_or_without_a_shift_factor(shift_factor: fl
     latents = torch.ones(1, 16, 1, 1)
 
     image = FluxVaeDecodeInvocation._vae_decode(
-        FluxVaeDecodeInvocation.model_construct(), vae_info=vae_info, latents=latents
+        FluxVaeDecodeInvocation.model_construct(), context=_context(), vae_info=vae_info, latents=latents
     )
 
     assert image.size == (8, 8)
@@ -62,7 +69,9 @@ def test_decode_treats_an_explicit_none_shift_factor_as_no_shift() -> None:
     vae_info.model.config.shift_factor = None
     latents = torch.ones(1, 16, 1, 1)
 
-    FluxVaeDecodeInvocation._vae_decode(FluxVaeDecodeInvocation.model_construct(), vae_info=vae_info, latents=latents)
+    FluxVaeDecodeInvocation._vae_decode(
+        FluxVaeDecodeInvocation.model_construct(), context=_context(), vae_info=vae_info, latents=latents
+    )
 
     passed = vae_info.model.decode.call_args.args[0]
     assert torch.allclose(passed, latents / 0.3611)
