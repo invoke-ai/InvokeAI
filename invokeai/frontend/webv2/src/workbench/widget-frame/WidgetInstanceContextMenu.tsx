@@ -1,5 +1,8 @@
+import type { WidgetRegion } from '@workbench/layoutContracts';
+
 import { Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { MenuContent } from '@platform/ui/Menu';
+import { DOCK_DESTINATION_ICONS, resolveDockLabel } from '@workbench/widgetLabels';
 import { ArrowLeftToLineIcon, ArrowRightToLineIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -14,11 +17,14 @@ export interface WidgetInstanceContextMenuTarget {
 
 interface WidgetInstanceContextMenuProps {
   target: WidgetInstanceContextMenuTarget | null;
+  /** Set, with `onDock`, when the target is a floating window's marker: the region docking returns it to. */
+  dockRegion?: WidgetRegion;
   /** With `onSetAlignment`, offers moving the widget between the strip's two clusters. */
   isAlignedEnd?: (item: WidgetEnableMenuItem) => boolean;
   isRemoveDisabled?: (item: WidgetEnableMenuItem) => boolean;
   removeDisabledLabel?: string;
   onClose: () => void;
+  onDock?: (item: WidgetEnableMenuItem) => void;
   onRemove: (item: WidgetEnableMenuItem) => void;
   onSetAlignment?: (item: WidgetEnableMenuItem, align: 'start' | 'end') => void;
 }
@@ -26,9 +32,11 @@ interface WidgetInstanceContextMenuProps {
 const REMOVE_DISABLED_PROPS = { opacity: 0.4 };
 
 export const WidgetInstanceContextMenu = ({
+  dockRegion,
   isAlignedEnd,
   isRemoveDisabled,
   onClose,
+  onDock,
   onRemove,
   onSetAlignment,
   removeDisabledLabel = 'Required',
@@ -57,6 +65,11 @@ export const WidgetInstanceContextMenu = ({
       onSetAlignment?.(target.item, isEnd ? 'start' : 'end');
     }
   }, [isEnd, onSetAlignment, target]);
+  const handleDock = useCallback(() => {
+    if (target) {
+      onDock?.(target.item);
+    }
+  }, [onDock, target]);
   const handleRemove = useCallback(() => {
     if (target && isRemoveDisabled?.(target.item) !== true) {
       onRemove(target.item);
@@ -76,6 +89,12 @@ export const WidgetInstanceContextMenu = ({
         <Menu.Positioner>
           {target ? (
             <MenuContent minW="12rem">
+              {onDock && dockRegion ? (
+                <Menu.Item value="dock-widget" onClick={handleDock}>
+                  <Icon as={DOCK_DESTINATION_ICONS[dockRegion]} boxSize="3.5" />
+                  <Menu.ItemText>{resolveDockLabel(dockRegion, t)}</Menu.ItemText>
+                </Menu.Item>
+              ) : null}
               {onSetAlignment && target.item.isEnabled ? (
                 <Menu.Item value="toggle-alignment" onClick={handleToggleAlignment}>
                   <Icon as={isEnd ? ArrowLeftToLineIcon : ArrowRightToLineIcon} boxSize="3.5" />

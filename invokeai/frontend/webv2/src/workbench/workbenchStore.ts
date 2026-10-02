@@ -455,6 +455,7 @@ const createCommands = (
         })
       ),
       reorder: command('reorderWidgetInstances'),
+      revealFloating: command('revealFloatingWidget', (instanceId: string) => ({ instanceId })),
       setAlignment: command('setWidgetInstanceAlignment'),
       select: command('selectRegionWidget'),
       setFloatingGeometry: command(

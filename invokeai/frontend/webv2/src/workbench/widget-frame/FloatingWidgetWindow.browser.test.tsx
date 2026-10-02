@@ -134,7 +134,13 @@ await i18n.use(initReactI18next).init({
     en: {
       translation: {
         widgets: {
-          floating: { dock: 'Dock to panel', maximize: 'Maximize', move: 'Move {{label}} window', shade: 'Shade' },
+          floating: {
+            destinations: { right: 'right panel' },
+            dockTo: 'Dock to {{destination}}',
+            maximize: 'Maximize',
+            move: 'Move {{label}} window',
+            shade: 'Shade',
+          },
           labels: { imageMap: 'Image Map' },
           settingsLabel: '{{label}} settings',
         },
@@ -197,7 +203,7 @@ describe('FloatingWidgetWindow chrome', () => {
     expect(host?.querySelectorAll('button[aria-label="Image Map settings"]')).toHaveLength(1);
     expect(host?.querySelector('button[aria-label*="actions"]')).toBeNull();
     expect(host?.querySelector('button[aria-label="Float Window"]')).toBeNull();
-    expect(host?.querySelector<HTMLButtonElement>('button[aria-label="Dock to panel"]')).not.toBeNull();
+    expect(host?.querySelector<HTMLButtonElement>('button[aria-label="Dock to right panel"]')).not.toBeNull();
   });
 
   it('keeps the settings gear in the title-bar strip instead of beneath the widget actions', async () => {
@@ -237,7 +243,7 @@ describe('FloatingWidgetWindow chrome', () => {
 
     // Contain repeated rejected-resource throws in the title bar so the window's dock control survives.
     expect(host?.querySelector('button[aria-label="Toggle cluster labels"]')).toBeNull();
-    expect(host?.querySelector<HTMLButtonElement>('button[aria-label="Dock to panel"]')).not.toBeNull();
+    expect(host?.querySelector<HTMLButtonElement>('button[aria-label="Dock to right panel"]')).not.toBeNull();
   });
 
   it('does not move the window when an arrow key is pressed on a widget action', async () => {
@@ -278,7 +284,7 @@ describe('FloatingWidgetWindow chrome', () => {
     await renderWindow();
 
     await act(async () => {
-      host?.querySelector<HTMLButtonElement>('button[aria-label="Dock to panel"]')?.click();
+      host?.querySelector<HTMLButtonElement>('button[aria-label="Dock to right panel"]')?.click();
       await Promise.resolve();
     });
 

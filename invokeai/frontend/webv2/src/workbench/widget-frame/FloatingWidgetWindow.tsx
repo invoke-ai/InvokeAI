@@ -13,17 +13,10 @@ import {
   type FloatingGeometry,
 } from '@workbench/floatingWindows';
 import { WidgetIcon } from '@workbench/iconResolver';
-import { resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
+import { DOCK_DESTINATION_ICONS, resolveDockLabel, resolveWidgetInstanceLabel } from '@workbench/widgetLabels';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
 import { useWorkbenchWidgetRegistry } from '@workbench/WorkbenchWidgetRegistryContext';
-import {
-  ChevronsDownUpIcon,
-  ChevronsUpDownIcon,
-  Maximize2Icon,
-  Minimize2Icon,
-  PanelRightIcon,
-  TriangleAlertIcon,
-} from 'lucide-react';
+import { ChevronsDownUpIcon, ChevronsUpDownIcon, Maximize2Icon, Minimize2Icon, TriangleAlertIcon } from 'lucide-react';
 import {
   Component,
   Suspense,
@@ -255,6 +248,7 @@ export const FloatingWidgetWindow = ({
   // Retain window chrome for missing or failed widgets so users can dock them back to the retry surface.
   const isEnabled = widget?.status === 'enabled';
   const label = widget ? resolveWidgetInstanceLabel(instance, widget.manifest, t) : (instance.title ?? instance.id);
+  const dockLabel = resolveDockLabel(state.returnRegion, t);
   const position = toWindowPosition(state);
   const isMaximized = state.mode === 'maximized';
   const isShaded = state.mode === 'shaded';
@@ -343,15 +337,9 @@ export const FloatingWidgetWindow = ({
               <Icon as={isMaximized ? Minimize2Icon : Maximize2Icon} boxSize="3.5" />
             </IconButton>
           </Tooltip>
-          <Tooltip content={t('widgets.floating.dock')}>
-            <IconButton
-              aria-label={t('widgets.floating.dock')}
-              color="fg.muted"
-              size="2xs"
-              variant="ghost"
-              onClick={handleDock}
-            >
-              <Icon as={PanelRightIcon} boxSize="3.5" />
+          <Tooltip content={dockLabel}>
+            <IconButton aria-label={dockLabel} color="fg.muted" size="2xs" variant="ghost" onClick={handleDock}>
+              <Icon as={DOCK_DESTINATION_ICONS[state.returnRegion]} boxSize="3.5" />
             </IconButton>
           </Tooltip>
         </HStack>

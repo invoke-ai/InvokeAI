@@ -181,7 +181,17 @@ import {
   getFirstCanvasPlaceholderSlotIndex,
   type CanvasStagingSlot,
 } from './canvasStagingView';
-import { cascadeDefaultGeometry, clampSizeToMinimum, nextStackOrder } from './floatingWindows';
+import {
+  cascadeDefaultGeometry,
+  clampSizeToMinimum,
+  getRegionOrder,
+  isAwaitedCenterView,
+  nextStackOrder,
+  normalizeFloatingPlacement,
+  withoutFloatedInstances,
+  writeRegionOrder,
+  type RegionOrderSlot,
+} from './floatingWindows';
 import { getSourceIdForWidgetTypeId } from './graphWidgets';
 import {
   defaultInvocationRoute,
@@ -200,9 +210,9 @@ import {
   resolveLayoutPresetId,
 } from './layoutPresets';
 import {
-  cloneFloatingWidgets,
   cloneLayoutPresetWidgetRegions,
   createLayoutPresetSnapshot,
+  normalizeLayoutPresetSnapshot,
   resolveSavedLayoutPreset,
 } from './layoutPresetSnapshots';
 import { normalizeProjectSettings } from './settings/store';
@@ -291,6 +301,8 @@ type WorkbenchReducerAction =
     }
   | { type: 'setFloatingWidgetMode'; instanceId: WidgetInstanceId; mode: FloatingWidgetMode }
   | { type: 'focusFloatingWidget'; instanceId: WidgetInstanceId }
+  /** Bring a window forward so its content shows: raise it, and expand it when it is shaded. */
+  | { type: 'revealFloatingWidget'; instanceId: WidgetInstanceId }
   | { type: 'setGenerateSettings'; values: GenerateWidgetValues; projectId?: string; origin?: WorkbenchActionOrigin }
   | {
       type: 'patchGenerateSettings';
@@ -1422,7 +1434,7 @@ const withoutRetiredInstances = (
   };
 };
 
-// Adopt queue-status for the historical bottom default. reconcileFloatingWidgets removes any instance already
+// Adopt queue-status for the historical bottom default. Placement normalization removes any instance already
 // hosted in a window.
 const LEGACY_DEFAULT_BOTTOM_REGION_WIDGET_IDS: readonly WidgetInstanceId[] = [
   'server-status',
@@ -1490,127 +1502,6 @@ const ensureCenterRegion = (
     activeInstanceId: normalizedActiveInstanceId,
     instanceIds,
     isCollapsed: false,
-  };
-};
-
-const WIDGET_REGION_IDS: WidgetRegion[] = [...WIDGET_REGIONS];
-const FLOATING_WIDGET_MODES: FloatingWidgetMode[] = ['windowed', 'maximized', 'shaded'];
-
-const isFiniteNumber = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
-
-const isFloatingWidgetMode = (value: unknown): value is FloatingWidgetMode =>
-  FLOATING_WIDGET_MODES.includes(value as FloatingWidgetMode);
-
-const isWidgetRegionId = (value: unknown): value is WidgetRegion => WIDGET_REGION_IDS.includes(value as WidgetRegion);
-
-/** Restore the pre-float tab index, clamped to the current rail, so float/dock does not reorder the layout. */
-const insertAtReturnIndex = (
-  instanceIds: WidgetInstanceId[],
-  instanceId: WidgetInstanceId,
-  returnIndex: number | undefined
-): WidgetInstanceId[] => {
-  const next = [...instanceIds];
-
-  next.splice(
-    isFiniteNumber(returnIndex) && returnIndex >= 0 ? Math.min(Math.floor(returnIndex), next.length) : next.length,
-    0,
-    instanceId
-  );
-
-  return next;
-};
-
-/**
- * Drop malformed floating entries so widgets remain docked and invalid region names or geometry cannot reach
- * reducers or CSS.
- */
-const normalizeFloatingWidgets = (
-  value: unknown,
-  widgetInstances: Record<WidgetInstanceId, WidgetInstanceContract>
-): Record<WidgetInstanceId, FloatingWidgetState> | undefined => {
-  if (!value || typeof value !== 'object') {
-    return undefined;
-  }
-
-  const floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> = {};
-
-  for (const [instanceId, entry] of Object.entries(value as Record<string, unknown>)) {
-    if (!entry || typeof entry !== 'object' || !widgetInstances[instanceId]) {
-      continue;
-    }
-
-    const state = entry as Partial<FloatingWidgetState>;
-    // The right rail's docks folded back into one region; a window floated out of one returns to the rail.
-    const rawReturnRegion: unknown = state.returnRegion;
-    const returnRegion =
-      rawReturnRegion === 'rightTop' || rawReturnRegion === 'rightBottom' ? 'right' : state.returnRegion;
-
-    if (
-      !isFiniteNumber(state.x) ||
-      !isFiniteNumber(state.y) ||
-      !isFiniteNumber(state.widthPx) ||
-      !isFiniteNumber(state.heightPx) ||
-      !isFiniteNumber(state.stackOrder) ||
-      !isFloatingWidgetMode(state.mode) ||
-      !isWidgetRegionId(returnRegion)
-    ) {
-      continue;
-    }
-
-    floatingWidgets[instanceId] = {
-      ...clampSizeToMinimum({ heightPx: state.heightPx, widthPx: state.widthPx, x: state.x, y: state.y }),
-      mode: state.mode,
-      // Omit invalid docking indices; docking then appends.
-      ...(isFiniteNumber(state.returnIndex) && state.returnIndex >= 0
-        ? { returnIndex: Math.floor(state.returnIndex) }
-        : {}),
-      returnRegion,
-      stackOrder: state.stackOrder,
-    };
-  }
-
-  return Object.keys(floatingWidgets).length > 0 ? floatingWidgets : undefined;
-};
-
-/**
- * Floating placement wins over migrated rail defaults to prevent duplicate rendering, even when it leaves the
- * center on its fallback view.
- */
-const reconcileFloatingWidgets = (
-  widgetRegions: Record<WidgetRegion, WidgetRegionState>,
-  floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined
-): {
-  widgetRegions: Record<WidgetRegion, WidgetRegionState>;
-  floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined;
-} => {
-  if (!floatingWidgets) {
-    return { floatingWidgets, widgetRegions };
-  }
-
-  let remainingFloating = floatingWidgets;
-  const reconciledRegions = { ...widgetRegions };
-
-  for (const regionId of WIDGET_REGION_IDS) {
-    const region = reconciledRegions[regionId];
-    const instanceIds = region.instanceIds.filter((instanceId) => !remainingFloating[instanceId]);
-
-    if (instanceIds.length === region.instanceIds.length) {
-      continue;
-    }
-
-    reconciledRegions[regionId] = {
-      ...region,
-      activeInstanceId: instanceIds.includes(region.activeInstanceId)
-        ? region.activeInstanceId
-        : (instanceIds[0] ?? emptiedActiveInstanceId(regionId, region)),
-      instanceIds,
-      isCollapsed: instanceIds.length === 0 ? regionId !== 'center' : region.isCollapsed,
-    };
-  }
-
-  return {
-    floatingWidgets: Object.keys(remainingFloating).length > 0 ? remainingFloating : undefined,
-    widgetRegions: reconciledRegions,
   };
 };
 
@@ -1788,14 +1679,15 @@ const assembleWorkbenchProject = (
     )
   );
 
-  const placement = reconcileFloatingWidgets(
+  const placement = normalizeFloatingPlacement(
     {
       left: leftRegion,
       right: rightRegion,
       bottom: bottomRegion,
       center: ensureCenterRegion(legacyWidgetRegions?.center, project.layout.centerViewId),
     },
-    normalizeFloatingWidgets((project as Partial<Project>).floatingWidgets, widgetInstances)
+    (project as Partial<Project>).floatingWidgets,
+    (instanceId) => Object.hasOwn(widgetInstances, instanceId)
   );
 
   return {
@@ -1916,7 +1808,10 @@ export const resolvePanelToggle = (
   return { regions: occupied, shouldCollapse: occupied.some((region) => !widgetRegions[region].isCollapsed) };
 };
 
-/** A region with nothing left names no active instance; the center keeps its id because it never empties. */
+/**
+ * A region with nothing left names no active instance. The center keeps naming the view it lost: that pointer is
+ * what lets a floated last view come back (see `isAwaitedCenterView`).
+ */
 const emptiedActiveInstanceId = (regionId: WidgetRegion, region: WidgetRegionState): WidgetInstanceId =>
   regionId === 'center' ? region.activeInstanceId : '';
 
@@ -1926,15 +1821,6 @@ const getNextInstanceId = (region: WidgetRegionState, instanceId: WidgetInstance
   }
 
   return region.instanceIds.find((enabledInstanceId) => enabledInstanceId !== instanceId) ?? null;
-};
-
-const insertAt = <Value>(values: Value[], value: Value, index: number): Value[] => {
-  const nextValues = values.filter((candidate) => candidate !== value);
-  const nextIndex = Math.min(nextValues.length, Math.max(0, index));
-
-  nextValues.splice(nextIndex, 0, value);
-
-  return nextValues;
 };
 
 const updateActiveWidgetRegion = (
@@ -1972,6 +1858,116 @@ const openPanelForRegion = (layout: ProjectLayoutState, region: WidgetRegion): P
   },
 });
 
+const withoutFloatingWidget = (
+  floatingWidgets: Project['floatingWidgets'],
+  instanceId: WidgetInstanceId
+): Project['floatingWidgets'] => {
+  const { [instanceId]: _removed, ...remaining } = floatingWidgets ?? {};
+
+  return Object.keys(remaining).length > 0 ? remaining : undefined;
+};
+
+/**
+ * Edit one region's complete order — docked members and floating markers together — so the markers' return
+ * indices stay in step with the members around them. A marker the edit docks or drops takes its window with it,
+ * which keeps an instance from ending up both docked and floating.
+ */
+const updateRegionOrder = (
+  project: Project,
+  regionId: WidgetRegion,
+  update: (slots: RegionOrderSlot[]) => RegionOrderSlot[]
+): Project => {
+  const region = project.widgetRegions[regionId];
+  const before = getRegionOrder(regionId, region.instanceIds, project.floatingWidgets);
+  const after = update(before);
+  const markerIds = new Set(after.filter((slot) => slot.isFloating).map((slot) => slot.instanceId));
+  const remaining = before.reduce(
+    (floatingWidgets, slot) =>
+      slot.isFloating && !markerIds.has(slot.instanceId)
+        ? withoutFloatingWidget(floatingWidgets, slot.instanceId)
+        : floatingWidgets,
+    project.floatingWidgets
+  );
+  const order = writeRegionOrder(after, remaining);
+  const isMembershipUnchanged =
+    order.instanceIds.length === region.instanceIds.length &&
+    order.instanceIds.every((instanceId, index) => instanceId === region.instanceIds[index]);
+
+  // An edit that only moves markers leaves the region object alone, so its subscribers do not re-render.
+  if (isMembershipUnchanged) {
+    return order.floatingWidgets === project.floatingWidgets
+      ? project
+      : { ...project, floatingWidgets: order.floatingWidgets };
+  }
+
+  return {
+    ...project,
+    floatingWidgets: order.floatingWidgets,
+    widgetRegions: { ...project.widgetRegions, [regionId]: { ...region, instanceIds: order.instanceIds } },
+  };
+};
+
+/**
+ * Put a floating instance back where it came from: its return region, at its marker's position, and the center
+ * too when the center has stayed empty since the instance left it. `reveal` also fronts it in the return region.
+ */
+const restoreFloatingInstance = (
+  project: Project,
+  instanceId: WidgetInstanceId,
+  { reveal }: { reveal: boolean }
+): Project => {
+  const floating = project.floatingWidgets?.[instanceId];
+
+  if (!floating) {
+    return project;
+  }
+
+  const { returnRegion } = floating;
+  // Counting the docked members ahead of the marker keeps every other slot where the rail shows it.
+  const docked = updateProjectWidgetRegion(
+    updateRegionOrder(project, returnRegion, (slots) =>
+      slots.map((slot) => (slot.instanceId === instanceId ? { ...slot, isFloating: false } : slot))
+    ),
+    returnRegion,
+    (region) =>
+      reveal || !region.instanceIds.includes(region.activeInstanceId)
+        ? { ...region, activeInstanceId: instanceId, isCollapsed: reveal ? false : region.isCollapsed }
+        : region
+  );
+  const restored =
+    returnRegion !== 'center' && isAwaitedCenterView(project.widgetRegions.center, instanceId)
+      ? updateRegionOrder(docked, 'center', (slots) => [...slots, { instanceId, isFloating: false }])
+      : docked;
+
+  return reveal ? { ...restored, layout: openPanelForRegion(restored.layout, returnRegion) } : restored;
+};
+
+/** Raise a window to the top of the stack; the same map comes back when it is missing or already topmost. */
+const raiseFloatingWidget = (
+  floatingWidgets: Project['floatingWidgets'],
+  instanceId: WidgetInstanceId
+): Project['floatingWidgets'] => {
+  const floating = floatingWidgets?.[instanceId];
+
+  if (!floatingWidgets || !floating || floating.stackOrder === nextStackOrder(floatingWidgets) - 1) {
+    return floatingWidgets;
+  }
+
+  // Compact persisted stackOrder to 1..N rather than growing it on every raise.
+  const below = Object.entries(floatingWidgets)
+    .filter(([otherInstanceId]) => otherInstanceId !== instanceId)
+    .sort(([, left], [, right]) => left.stackOrder - right.stackOrder);
+  const raised: Record<WidgetInstanceId, FloatingWidgetState> = {};
+
+  for (const [otherInstanceId, windowState] of below) {
+    raised[otherInstanceId] = { ...windowState, stackOrder: Object.keys(raised).length + 1 };
+  }
+
+  raised[instanceId] = { ...floating, stackOrder: below.length + 1 };
+
+  return raised;
+};
+
 const cloneLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): LayoutPresetSnapshot => {
   // Strip retired editor instances when rebuilding account presets to keep applied layouts drift-free.
   const retired = new Set(
@@ -1983,8 +1979,9 @@ const cloneLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): LayoutPreset
   for (const region of Object.keys(widgetRegions) as WidgetRegion[]) {
     widgetRegions[region] = withoutRetiredInstances(widgetRegions[region], retired);
   }
-  return {
-    ...(snapshot.floatingWidgets ? { floatingWidgets: cloneFloatingWidgets(snapshot.floatingWidgets) } : {}),
+  // Stored placements are read the way a project's are, so an applied preset matches the snapshot it came from.
+  return normalizeLayoutPresetSnapshot({
+    floatingWidgets: snapshot.floatingWidgets,
     layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
     widgetInstances: Object.fromEntries(
       Object.entries(snapshot.widgetInstances)
@@ -1992,7 +1989,7 @@ const cloneLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): LayoutPreset
         .map(([instanceId, instance]) => [instanceId, { ...instance }])
     ),
     widgetRegions,
-  };
+  });
 };
 
 const centerViewIds = new Set<CenterViewId>(['canvas', 'gallery', 'preview', 'workflow']);
@@ -2287,7 +2284,8 @@ const setBuiltInLayoutPresetMetadata = (
 };
 
 const applyLayoutPresetToProject = (project: Project, preset: LayoutPreset): Project => {
-  const snapshot = preset.snapshot;
+  // Presets replace all placements, including floating windows, and bypass normalizeWorkbenchProject.
+  const snapshot = normalizeLayoutPresetSnapshot(preset.snapshot);
   const widgetInstances = { ...project.widgetInstances };
 
   for (const instance of Object.values(snapshot.widgetInstances)) {
@@ -2296,23 +2294,16 @@ const applyLayoutPresetToProject = (project: Project, preset: LayoutPreset): Pro
       : createWidgetInstance(instance.typeId, instance.id);
   }
 
-  // Presets replace all placements, including floating windows. Validate account-stored windows here because
-  // presets bypass normalizeWorkbenchProject.
-  const placement = reconcileFloatingWidgets(
-    cloneLayoutPresetWidgetRegions(snapshot.widgetRegions),
-    normalizeFloatingWidgets(snapshot.floatingWidgets, widgetInstances)
-  );
-
   return {
     ...project,
-    floatingWidgets: placement.floatingWidgets,
+    floatingWidgets: snapshot.floatingWidgets,
     layout: {
       ...snapshot.layout,
       panels: { ...snapshot.layout.panels },
       presetId: preset.id,
     },
     widgetInstances,
-    widgetRegions: placement.widgetRegions,
+    widgetRegions: cloneLayoutPresetWidgetRegions(snapshot.widgetRegions),
   };
 };
 
@@ -3788,30 +3779,29 @@ export const __workbenchReducerInternal = (
           Object.values(project.widgetInstances).find((instance) => instance.typeId === action.widgetId);
         const instanceId =
           action.createNew || !existingInstance ? createId(`widget-${action.widgetId}`) : existingInstance.id;
-        const instanceIds = region.instanceIds.includes(instanceId)
-          ? region.instanceIds
-          : [...region.instanceIds, instanceId];
         const widgetInstances = project.widgetInstances[instanceId]
           ? project.widgetInstances
           : {
               ...project.widgetInstances,
               [instanceId]: createWidgetInstance(action.widgetId, instanceId, action.initialValues),
             };
-        // Placing an instance docks it to prevent simultaneous region/window rendering.
-        const { [instanceId]: _floated, ...floatingWidgets } = project.floatingWidgets ?? {};
+        // An explicit open docks a floating instance where it came from before placing it here, so it is never
+        // both a window and a region member.
+        const docked = restoreFloatingInstance({ ...project, widgetInstances }, instanceId, { reveal: false });
+        const placed = docked.widgetRegions[action.region].instanceIds.includes(instanceId)
+          ? docked
+          : updateRegionOrder(docked, action.region, (slots) => [...slots, { instanceId, isFloating: false }]);
 
+        // One reveal, for the placement that ends up in front.
         return applyAutoRouteForWidgetReveal(
           {
-            ...project,
-            floatingWidgets,
-            layout: openPanelForRegion(project.layout, action.region),
-            widgetInstances,
+            ...placed,
+            layout: openPanelForRegion(placed.layout, action.region),
             widgetRegions: {
-              ...project.widgetRegions,
+              ...placed.widgetRegions,
               [action.region]: {
-                ...region,
+                ...placed.widgetRegions[action.region],
                 activeInstanceId: instanceId,
-                instanceIds,
                 isCollapsed: false,
               },
             },
@@ -3825,14 +3815,16 @@ export const __workbenchReducerInternal = (
       return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
         const region = project.widgetRegions[action.region];
 
-        // Selecting a region slot docks the instance to prevent simultaneous region/window rendering.
-        const { [action.widgetId]: _floated, ...floatingWidgets } = project.floatingWidgets ?? {};
+        // A request that names an instance the region no longer holds — it floated, or left — is stale. It changes
+        // nothing; in particular it must not discard the window.
+        if (!region.instanceIds.includes(action.widgetId)) {
+          return project;
+        }
 
         if (action.region === 'center') {
           return applyAutoRouteForRevealedInstance(
             {
               ...project,
-              floatingWidgets,
               widgetRegions: {
                 ...project.widgetRegions,
                 center: { ...region, activeInstanceId: action.widgetId, isCollapsed: false },
@@ -3847,7 +3839,6 @@ export const __workbenchReducerInternal = (
         if (region.activeInstanceId === action.widgetId) {
           const disclosed = {
             ...project,
-            floatingWidgets,
             layout: openPanelForRegion(project.layout, action.region),
             widgetRegions: {
               ...project.widgetRegions,
@@ -3863,7 +3854,6 @@ export const __workbenchReducerInternal = (
         return applyAutoRouteForRevealedInstance(
           {
             ...project,
-            floatingWidgets,
             layout: openPanelForRegion(project.layout, action.region),
             widgetRegions: {
               ...project.widgetRegions,
@@ -3878,91 +3868,86 @@ export const __workbenchReducerInternal = (
     case 'toggleRegionWidget': {
       return updateProjectById(state, action.projectId ?? state.activeProjectId, (project) => {
         const previousRegion = project.widgetRegions[action.region];
-        const nextProject = updateProjectWidgetRegion(project, action.region, (region) => {
-          const isEnabled = region.instanceIds.includes(action.widgetId);
+        const isEnabled = previousRegion.instanceIds.includes(action.widgetId);
 
-          if (action.region === 'center' && isEnabled && region.instanceIds.length === 1) {
-            return region;
-          }
-
-          const instanceIds = isEnabled
-            ? region.instanceIds.filter((widgetId) => widgetId !== action.widgetId)
-            : [...region.instanceIds, action.widgetId];
-          const fallbackInstanceId = getNextInstanceId(region, action.widgetId);
-
-          return {
-            ...region,
-            activeInstanceId: isEnabled
-              ? (fallbackInstanceId ?? emptiedActiveInstanceId(action.region, region))
-              : action.widgetId,
-            instanceIds,
-            isCollapsed: action.region === 'center' ? false : instanceIds.length === 0 ? true : region.isCollapsed,
-          };
-        });
-
-        // A refused toggle (the work surface keeping its last view) must stay a
-        // no-op down to object identity: the persistence layer treats any new
-        // `projects` reference as a change worth autosaving.
-        if (nextProject === project) {
+        // A refused toggle must stay a no-op down to object identity: the persistence layer treats any new
+        // `projects` reference as a change worth autosaving. The work surface keeps its last view, and a floating
+        // instance belongs to no region.
+        if (
+          isEnabled
+            ? action.region === 'center' && previousRegion.instanceIds.length === 1
+            : project.floatingWidgets?.[action.widgetId] !== undefined
+        ) {
           return project;
         }
+
+        const nextProject = updateProjectWidgetRegion(
+          updateRegionOrder(project, action.region, (slots) =>
+            isEnabled
+              ? slots.filter((slot) => slot.instanceId !== action.widgetId)
+              : [...slots, { instanceId: action.widgetId, isFloating: false }]
+          ),
+          action.region,
+          (region) => ({
+            ...region,
+            activeInstanceId: isEnabled
+              ? (getNextInstanceId(previousRegion, action.widgetId) ??
+                emptiedActiveInstanceId(action.region, previousRegion))
+              : action.widgetId,
+            isCollapsed:
+              action.region === 'center' ? false : region.instanceIds.length === 0 ? true : region.isCollapsed,
+          })
+        );
 
         return applyAutoRouteForRegionFront(nextProject, previousRegion, action.region, context);
       });
     }
     case 'floatWidget': {
       return updateActiveProject(state, (project) => {
-        if (project.floatingWidgets?.[action.instanceId]) {
+        if (project.floatingWidgets?.[action.instanceId] || !project.widgetInstances[action.instanceId]) {
           return project;
         }
 
-        // Use the clicked region as the dock-back origin for multi-region widgets; map order is not a stable
-        // origin.
-        const findHost = (match: (regionId: WidgetRegion, region: WidgetRegionState) => boolean) =>
-          (Object.entries(project.widgetRegions) as [WidgetRegion, WidgetRegionState][]).find(([regionId, region]) =>
-            match(regionId, region)
-          );
-        const hostEntry = action.region
-          ? findHost((regionId, region) => regionId === action.region && region.instanceIds.includes(action.instanceId))
-          : undefined;
-        const resolvedHostEntry = hostEntry ?? findHost((_, region) => region.instanceIds.includes(action.instanceId));
+        const memberRegions = WIDGET_REGIONS.filter((regionId) =>
+          project.widgetRegions[regionId].instanceIds.includes(action.instanceId)
+        );
+        // The window returns to the chrome the float was asked from; without that hint, to its first member region.
+        // The reducer accepts a center origin; the UI float control only offers dockable panel origins.
+        const returnRegion = action.region && memberRegions.includes(action.region) ? action.region : memberRegions[0];
 
-        if (!resolvedHostEntry || !project.widgetInstances[action.instanceId]) {
+        if (!returnRegion) {
           return project;
         }
 
-        const [hostRegionId, hostRegion] = resolvedHostEntry;
-
-        // The reducer accepts center-origin floating and preserves its fallback; the UI float control only offers
-        // dockable panel origins.
-        const instanceIds = hostRegion.instanceIds.filter((instanceId) => instanceId !== action.instanceId);
-        const fallbackInstanceId = getNextInstanceId(hostRegion, action.instanceId);
-        const floating: FloatingWidgetState = {
-          ...cascadeDefaultGeometry(Object.keys(project.floatingWidgets ?? {}).length),
-          mode: 'windowed',
-          returnIndex: hostRegion.instanceIds.indexOf(action.instanceId),
-          returnRegion: hostRegionId,
-          stackOrder: nextStackOrder(project.floatingWidgets),
+        let floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> | undefined = {
+          ...project.floatingWidgets,
+          [action.instanceId]: {
+            ...cascadeDefaultGeometry(Object.keys(project.floatingWidgets ?? {}).length),
+            mode: 'windowed',
+            returnRegion,
+            stackOrder: nextStackOrder(project.floatingWidgets),
+          },
         };
+        const widgetRegions = { ...project.widgetRegions };
+
+        // A floating instance belongs to no region: it leaves every one that held it, and only the return region
+        // keeps its slot, as a marker.
+        for (const regionId of memberRegions) {
+          const region = project.widgetRegions[regionId];
+          const slots = getRegionOrder(regionId, region.instanceIds, project.floatingWidgets);
+          const order = writeRegionOrder(
+            regionId === returnRegion
+              ? slots.map((slot) => (slot.instanceId === action.instanceId ? { ...slot, isFloating: true } : slot))
+              : slots.filter((slot) => slot.instanceId !== action.instanceId),
+            floatingWidgets
+          );
+
+          floatingWidgets = order.floatingWidgets;
+          widgetRegions[regionId] = withoutFloatedInstances(regionId, region, order.instanceIds);
+        }
 
         return applyAutoRouteForRevealedInstance(
-          {
-            ...project,
-            floatingWidgets: { ...project.floatingWidgets, [action.instanceId]: floating },
-            widgetRegions: {
-              ...project.widgetRegions,
-              [hostRegionId]: {
-                ...hostRegion,
-                activeInstanceId:
-                  hostRegion.activeInstanceId === action.instanceId
-                    ? (fallbackInstanceId ?? emptiedActiveInstanceId(hostRegionId, hostRegion))
-                    : hostRegion.activeInstanceId,
-                instanceIds,
-                // Empty rails collapse; an empty center uses its fallback view.
-                isCollapsed: instanceIds.length === 0 && hostRegionId !== 'center' ? true : hostRegion.isCollapsed,
-              },
-            },
-          },
+          { ...project, floatingWidgets, widgetRegions },
           // The window lands on top of everything, so it is the revealed
           // surface — not the tab the rail promotes behind it.
           action.instanceId,
@@ -3971,6 +3956,17 @@ export const __workbenchReducerInternal = (
       });
     }
     case 'dockFloatingWidget': {
+      return updateActiveProject(state, (project) =>
+        project.floatingWidgets?.[action.instanceId]
+          ? applyAutoRouteForRevealedInstance(
+              restoreFloatingInstance(project, action.instanceId, { reveal: true }),
+              action.instanceId,
+              context
+            )
+          : project
+      );
+    }
+    case 'closeFloatingWidget': {
       return updateActiveProject(state, (project) => {
         const floating = project.floatingWidgets?.[action.instanceId];
 
@@ -3978,41 +3974,18 @@ export const __workbenchReducerInternal = (
           return project;
         }
 
-        const { [action.instanceId]: _docked, ...remaining } = project.floatingWidgets ?? {};
-        const region = project.widgetRegions[floating.returnRegion];
-        const instanceIds = region.instanceIds.includes(action.instanceId)
-          ? region.instanceIds
-          : insertAtReturnIndex(region.instanceIds, action.instanceId, floating.returnIndex);
-
-        return applyAutoRouteForRevealedInstance(
-          {
-            ...project,
-            floatingWidgets: remaining,
-            layout: openPanelForRegion(project.layout, floating.returnRegion),
-            widgetRegions: {
-              ...project.widgetRegions,
-              [floating.returnRegion]: {
-                ...region,
-                activeInstanceId: action.instanceId,
-                instanceIds,
-                isCollapsed: false,
-              },
-            },
-          },
-          action.instanceId,
-          context
+        // Removing closes the window and frees its rail slot. It opens no panel, but a center left empty by this
+        // instance gets its view back rather than staying blank.
+        const closed = updateRegionOrder(project, floating.returnRegion, (slots) =>
+          slots.filter((slot) => slot.instanceId !== action.instanceId)
         );
-      });
-    }
-    case 'closeFloatingWidget': {
-      return updateActiveProject(state, (project) => {
-        if (!project.floatingWidgets?.[action.instanceId]) {
-          return project;
-        }
 
-        const { [action.instanceId]: _closed, ...remaining } = project.floatingWidgets;
-
-        return { ...project, floatingWidgets: Object.keys(remaining).length > 0 ? remaining : undefined };
+        return isAwaitedCenterView(project.widgetRegions.center, action.instanceId)
+          ? updateRegionOrder(closed, 'center', (slots) => [
+              ...slots,
+              { instanceId: action.instanceId, isFloating: false },
+            ])
+          : closed;
       });
     }
     case 'setFloatingWidgetGeometry': {
@@ -4062,43 +4035,61 @@ export const __workbenchReducerInternal = (
     }
     case 'focusFloatingWidget': {
       return updateActiveProject(state, (project) => {
-        const floating = project.floatingWidgets?.[action.instanceId];
-        const topOrder = nextStackOrder(project.floatingWidgets) - 1;
+        const floatingWidgets = raiseFloatingWidget(project.floatingWidgets, action.instanceId);
 
         // Pointer capture runs for every interaction inside the window; only raising it should re-route or dirty
         // the project.
-        if (!floating || floating.stackOrder === topOrder) {
-          return project;
-        }
+        return floatingWidgets === project.floatingWidgets
+          ? project
+          : applyAutoRouteForRevealedInstance({ ...project, floatingWidgets }, action.instanceId, context);
+      });
+    }
+    case 'revealFloatingWidget': {
+      return updateActiveProject(state, (project) => {
+        const raised = raiseFloatingWidget(project.floatingWidgets, action.instanceId);
+        const floating = raised?.[action.instanceId];
+        // A shaded window is rolled up to its title bar; raising it alone would still hide its content.
+        const floatingWidgets: Project['floatingWidgets'] =
+          floating?.mode === 'shaded' ? { ...raised, [action.instanceId]: { ...floating, mode: 'windowed' } } : raised;
 
-        // Compact persisted stackOrder to 1..N rather than growing it on every raise.
-        const below = Object.entries(project.floatingWidgets ?? {})
-          .filter(([instanceId]) => instanceId !== action.instanceId)
-          .sort(([, left], [, right]) => left.stackOrder - right.stackOrder);
-        const floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState> = {};
-
-        for (const [instanceId, windowState] of below) {
-          floatingWidgets[instanceId] = { ...windowState, stackOrder: Object.keys(floatingWidgets).length + 1 };
-        }
-
-        floatingWidgets[action.instanceId] = { ...floating, stackOrder: below.length + 1 };
-
-        return applyAutoRouteForRevealedInstance({ ...project, floatingWidgets }, action.instanceId, context);
+        return floatingWidgets === project.floatingWidgets
+          ? project
+          : applyAutoRouteForRevealedInstance({ ...project, floatingWidgets }, action.instanceId, context);
       });
     }
     case 'moveWidgetInstance': {
       return updateActiveProject(state, (project) => {
         const fromRegion = project.widgetRegions[action.fromRegion];
-        const toRegion = project.widgetRegions[action.toRegion];
-        const nextFromInstanceIds = fromRegion.instanceIds.filter((instanceId) => instanceId !== action.instanceId);
-        const nextToInstanceIds = insertAt(toRegion.instanceIds, action.instanceId, action.toIndex);
+
+        // Only a docked member can be dragged; a stale request for one that has left or floated changes nothing.
+        if (!fromRegion.instanceIds.includes(action.instanceId)) {
+          return project;
+        }
+
+        const detached = updateRegionOrder(project, action.fromRegion, (slots) =>
+          slots.filter((slot) => slot.instanceId !== action.instanceId)
+        );
+        // `toIndex` counts docked members; the instance lands in front of the member at that index, wherever the
+        // region's markers sit.
+        const moved = updateRegionOrder(detached, action.toRegion, (slots) => {
+          const others = slots.filter((slot) => slot.instanceId !== action.instanceId);
+          const target = others.filter((slot) => !slot.isFloating)[Math.max(0, action.toIndex)];
+          const position = target ? others.indexOf(target) : others.length;
+
+          return [
+            ...others.slice(0, position),
+            { instanceId: action.instanceId, isFloating: false },
+            ...others.slice(position),
+          ];
+        });
+        const nextFromInstanceIds = detached.widgetRegions[action.fromRegion].instanceIds;
 
         return applyAutoRouteForRevealedInstance(
           {
-            ...project,
+            ...moved,
             layout: openPanelForRegion(project.layout, action.toRegion),
             widgetRegions: {
-              ...project.widgetRegions,
+              ...moved.widgetRegions,
               [action.fromRegion]: {
                 ...fromRegion,
                 activeInstanceId:
@@ -4110,9 +4101,9 @@ export const __workbenchReducerInternal = (
                   action.fromRegion === 'center' ? false : nextFromInstanceIds.length === 0 || fromRegion.isCollapsed,
               },
               [action.toRegion]: {
-                ...toRegion,
+                ...project.widgetRegions[action.toRegion],
                 activeInstanceId: action.instanceId,
-                instanceIds: nextToInstanceIds,
+                instanceIds: moved.widgetRegions[action.toRegion].instanceIds,
                 isCollapsed: false,
               },
             },
@@ -4126,6 +4117,18 @@ export const __workbenchReducerInternal = (
     case 'reorderWidgetInstances': {
       return updateActiveProject(state, (project) => {
         const previousRegion = project.widgetRegions[action.region];
+        const members = new Set(previousRegion.instanceIds);
+
+        // A reorder only permutes the docked members, which then fill the docked positions around stationary
+        // markers. Anything else is stale: it could re-add an instance that floated or left.
+        if (
+          action.instanceIds.length !== members.size ||
+          new Set(action.instanceIds).size !== members.size ||
+          !action.instanceIds.every((instanceId) => members.has(instanceId))
+        ) {
+          return project;
+        }
+
         const nextProject = updateProjectWidgetRegion(project, action.region, (region) => ({
           ...region,
           activeInstanceId: action.activeInstanceId ?? region.activeInstanceId,

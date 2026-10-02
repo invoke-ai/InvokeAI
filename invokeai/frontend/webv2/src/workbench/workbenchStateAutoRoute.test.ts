@@ -101,9 +101,15 @@ const getInvocation = (state: State) => getProject(state).invocation;
 const getRegion = (state: State, region: 'left' | 'right' | 'center' | 'bottom') =>
   getProject(state).widgetRegions[region];
 
+/** The default layout keeps Video off the left rail; a tab has to be there before it can be brought to the front. */
+const createStateWithVideoTab = (): State =>
+  workbenchReducer(createInitialWorkbenchState(), { region: 'left', type: 'toggleRegionWidget', widgetId: 'video' });
+
 describe('auto invocation route switching on widget reveal', () => {
   it('follows the rail tab that is brought to the front', () => {
-    let state = createInitialWorkbenchState();
+    let state = createStateWithVideoTab();
+
+    state = workbenchReducer(state, { region: 'left', type: 'selectRegionWidget', widgetId: 'generate' });
 
     expect(getInvocation(state)).toMatchObject({ sourceId: 'generate' });
 
@@ -117,9 +123,8 @@ describe('auto invocation route switching on widget reveal', () => {
   });
 
   it('routes when a collapsed rail is expanded back onto a graph widget, but not when it is collapsed', () => {
-    let state = createInitialWorkbenchState();
+    let state = createStateWithVideoTab();
 
-    state = workbenchReducer(state, { region: 'left', type: 'selectRegionWidget', widgetId: 'video' });
     // Collapsing the rail puts nothing in front, so the route must not move.
     state = workbenchReducer(state, { region: 'left', type: 'selectRegionWidget', widgetId: 'video' });
 
@@ -224,31 +229,49 @@ describe('auto invocation route switching on widget reveal', () => {
   });
 
   it('ignores reveals of widgets that are not invocation sources', () => {
-    let state = createInitialWorkbenchState();
+    let state = createStateWithVideoTab();
 
-    state = workbenchReducer(state, { region: 'left', type: 'selectRegionWidget', widgetId: 'video' });
     state = workbenchReducer(state, { region: 'right', type: 'selectRegionWidget', widgetId: 'gallery' });
 
     expect(getInvocation(state)).toMatchObject({ sourceId: 'video' });
   });
 
   it('respects the source lock and the preference', () => {
-    let locked = createInitialWorkbenchState();
+    // Video is on the rail behind Generate, with Generate routed: selecting Video is what would move the route.
+    const generateInFront = workbenchReducer(createStateWithVideoTab(), {
+      region: 'left',
+      type: 'selectRegionWidget',
+      widgetId: 'generate',
+    });
 
-    locked = workbenchReducer(locked, { type: 'toggleSourceLock' });
+    expect(getInvocation(generateInFront)).toMatchObject({ sourceId: 'generate' });
+
+    let locked = workbenchReducer(generateInFront, { type: 'toggleSourceLock' });
     locked = workbenchReducer(locked, { region: 'left', type: 'selectRegionWidget', widgetId: 'video' });
 
+    expect(getRegion(locked, 'left').activeInstanceId).toBe('video');
     expect(getInvocation(locked)).toMatchObject({ sourceId: 'generate' });
 
-    let preferenceOffState = createInitialWorkbenchState();
-
-    preferenceOffState = workbenchReducer(
-      preferenceOffState,
+    const preferenceOffState = workbenchReducer(
+      generateInFront,
       { region: 'left', type: 'selectRegionWidget', widgetId: 'video' },
       preferenceOff
     );
 
+    expect(getRegion(preferenceOffState, 'left').activeInstanceId).toBe('video');
     expect(getInvocation(preferenceOffState)).toMatchObject({ sourceId: 'generate' });
+  });
+
+  it('routes to a floating window that is revealed from behind another', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), { instanceId: 'generate', type: 'floatWidget' });
+    state = workbenchReducer(state, { instanceId: 'upscale', type: 'floatWidget' });
+    state = workbenchReducer(state, { instanceId: 'generate', mode: 'shaded', type: 'setFloatingWidgetMode' });
+
+    expect(getInvocation(state)).toMatchObject({ sourceId: 'upscale' });
+
+    state = workbenchReducer(state, { instanceId: 'generate', type: 'revealFloatingWidget' });
+
+    expect(getInvocation(state)).toMatchObject({ sourceId: 'generate' });
   });
 
   it('follows a widget opened into a region', () => {
@@ -297,7 +320,11 @@ describe('auto invocation route switching on widget reveal', () => {
   });
 
   it('follows a tab dragged into another region, and a reorder only when it changes the front tab', () => {
-    let state = createInitialWorkbenchState();
+    let state = createStateWithVideoTab();
+
+    // Generate is routed and in front, so the drag is what moves the route.
+    state = workbenchReducer(state, { region: 'left', type: 'selectRegionWidget', widgetId: 'generate' });
+    expect(getInvocation(state)).toMatchObject({ sourceId: 'generate' });
 
     state = workbenchReducer(state, {
       fromRegion: 'left',

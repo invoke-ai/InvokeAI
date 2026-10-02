@@ -3,12 +3,13 @@ import type { WidgetInstanceId } from '@workbench/widgetContracts';
 import type { WidgetRegionDropState } from '@workbench/widgetDnd';
 import type { WidgetPlacementInstanceMeta, WidgetRegionItem } from '@workbench/widgetRegionViewModel';
 
-import { Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
+import { Box, Flex, Icon, type SystemStyleObject } from '@chakra-ui/react';
 import { verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Row } from '@platform/ui/Row';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { useHighlightedRegion } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
+import { PictureInPicture2Icon } from 'lucide-react';
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -36,11 +37,13 @@ interface WidgetBarProps {
   side: 'left' | 'right';
   groups: WidgetBarGroup[];
   menuItems: WidgetBarItem[];
+  /** Dock the floating window a marker stands for. */
+  onDock: (instanceId: WidgetInstanceId) => void;
   onSelect: (region: WidgetBarGroup['region'], instanceId: WidgetInstanceId) => void;
   onToggle: (item: WidgetBarItem) => void;
 }
 
-export const WidgetBar = ({ edgeRegion, groups, menuItems, onSelect, onToggle, side }: WidgetBarProps) => {
+export const WidgetBar = ({ edgeRegion, groups, menuItems, onDock, onSelect, onToggle, side }: WidgetBarProps) => {
   const { t } = useTranslation();
   const isEdgeOutlined = useHighlightedRegion() === edgeRegion;
   const region = side;
@@ -73,6 +76,9 @@ export const WidgetBar = ({ edgeRegion, groups, menuItems, onSelect, onToggle, s
   const handleContextClose = useCallback(() => setEnableMenuTarget(null), []);
   const handleMenuToggle = useCallback((item: WidgetEnableMenuItem) => onToggle(item as WidgetBarItem), [onToggle]);
   const handleInstanceClose = useCallback(() => setInstanceMenuTarget(null), []);
+  const handleInstanceDock = useCallback((item: WidgetEnableMenuItem) => onDock(item.id), [onDock]);
+  // A marker only ever shows in the rail its window returns to.
+  const isMarkerMenu = (instanceMenuTarget?.item as WidgetBarItem | undefined)?.isFloating === true;
 
   return (
     <Flex
@@ -115,8 +121,10 @@ export const WidgetBar = ({ edgeRegion, groups, menuItems, onSelect, onToggle, s
       />
 
       <WidgetInstanceContextMenu
+        dockRegion={isMarkerMenu ? region : undefined}
         target={instanceMenuTarget}
         onClose={handleInstanceClose}
+        onDock={handleInstanceDock}
         onRemove={handleMenuToggle}
       />
     </Flex>
@@ -188,7 +196,7 @@ export const WIDGET_ITEM_SX: SystemStyleObject = {
   h: 9,
   w: 9,
   color: 'fg.muted',
-  '&[aria-pressed="false"]:hover': {
+  '&[aria-pressed="false"]:hover, &[data-floating]:hover': {
     bg: 'bg.emphasized',
     color: 'fg',
   },
@@ -196,12 +204,16 @@ export const WIDGET_ITEM_SX: SystemStyleObject = {
     bg: 'bg.emphasized',
     color: 'brand.fg',
   },
-  // A floating slot reads as a placeholder for the window: outlined, not filled.
+  // A floating marker reads as a placeholder for the window: outlined, not filled, with a popped-out badge.
   '&[data-floating]': {
+    color: 'fg.subtle',
+    position: 'relative',
+  },
+  // The dashed outline yields to the row's focus ring, which a keyboard user needs more.
+  '&[data-floating]:not(:focus-visible)': {
     outline: '1px dashed',
     outlineColor: 'border.emphasized',
     outlineOffset: '-1px',
-    color: 'fg.subtle',
   },
   _disabled: WIDGET_SLOT_DISABLED_PROPS,
 };
@@ -223,10 +235,12 @@ const WidgetSlot = ({
 }) => {
   const { t } = useTranslation();
   const tooltipLabel = item.isFloating
-    ? t('widgets.floating.railSlot', { label: item.label })
+    ? t('widgets.floating.railMarkerHint', { label: item.label })
     : item.failureMessage
       ? `${item.label}: ${item.failureMessage}`
       : item.label;
+  // The name says what the control is; how to use it belongs to the tooltip.
+  const accessibleName = item.isFloating ? t('widgets.floating.railMarker', { label: item.label }) : tooltipLabel;
   const isDisabled = item.status === 'disabled';
   const positioning = useMemo(() => ({ placement: tooltipPlacement }) as const, [tooltipPlacement]);
 
@@ -250,11 +264,13 @@ const WidgetSlot = ({
     <Tooltip showArrow closeDelay={80} content={tooltipLabel} openDelay={250} positioning={positioning}>
       <Box ref={setNodeRef} pb="1" style={style}>
         <Row
-          {...dragHandleProps}
+          // A marker is not a tab: it takes no drag listeners and does not announce itself as sortable.
+          {...(item.isFloating ? undefined : dragHandleProps)}
           css={WIDGET_ITEM_SX}
-          aria-label={tooltipLabel}
+          aria-label={accessibleName}
           aria-disabled={isDisabled}
-          aria-pressed={isActive}
+          // A marker is a plain button: activating it shows the window and toggles nothing.
+          aria-pressed={item.isFloating ? undefined : isActive}
           as="button"
           data-disabled={isDisabled ? '' : undefined}
           data-floating={item.isFloating ? '' : undefined}
@@ -264,6 +280,19 @@ const WidgetSlot = ({
           onContextMenu={handleContextMenu}
         >
           <WidgetIcon icon={item.icon} boxSize="5" />
+          {item.isFloating ? (
+            <Icon
+              as={PictureInPicture2Icon}
+              bg="bg.subtle"
+              boxSize="3"
+              color="fg.muted"
+              data-floating-badge=""
+              position="absolute"
+              right="-0.5"
+              rounded="xs"
+              top="-0.5"
+            />
+          ) : null}
         </Row>
       </Box>
     </Tooltip>

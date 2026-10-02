@@ -1,5 +1,3 @@
-import type { Project } from '@workbench/projectContracts';
-
 import { Flex, HStack, Text, VisuallyHidden } from '@chakra-ui/react';
 import {
   DndContext,
@@ -13,9 +11,8 @@ import {
 import { restrictToWindowEdges } from '@dnd-kit/modifiers';
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { GalleryDragCursor, GalleryDragScope } from '@features/gallery/utility';
-import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { FocusRegionProvider } from '@workbench/focusRegions';
+import { focusOpenedWidget, FocusRegionProvider } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
 import { PROJECT_CONTENT_PANEL_ID } from '@workbench/projects/projectTabsA11y';
 import { WidgetBar, type WidgetBarGroup } from '@workbench/widget-frame';
@@ -31,10 +28,12 @@ import {
 } from '@workbench/widgetDnd';
 import { resolveWidgetLabel } from '@workbench/widgetLabels';
 import {
+  activateRailPlacement,
   closeWidgetPlacement,
   dispatchWidgetDragEndPlacement,
+  dockFloatingPlacement,
   openWidgetPlacement,
-  revealWidgetPlacement,
+  removeFloatingPlacement,
 } from '@workbench/widgetPlacementCommands';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
 import { createWidgetRegionViewModelFromState, getWidgetRegionItems } from '@workbench/widgetRegionViewModel';
@@ -62,8 +61,6 @@ import { TopBar } from './topbar';
 
 const DND_MODIFIERS = [restrictToWindowEdges];
 
-const EMPTY_FLOATING: NonNullable<Project['floatingWidgets']> = {};
-
 export const WorkbenchShell = () => {
   const { notifications, widgets } = useWorkbenchCommands();
   const { t } = useTranslation();
@@ -71,8 +68,9 @@ export const WorkbenchShell = () => {
   const projectName = useActiveProjectSelector((project) => project.name);
   const leftRegion = useActiveProjectSelector((project) => project.widgetRegions.left);
   const rightRegion = useActiveProjectSelector((project) => project.widgetRegions.right);
-  const floatingWidgets = useActiveProjectSelector((project) => project.floatingWidgets ?? EMPTY_FLOATING);
+  // Placement only: a window's geometry, mode, and stacking change without re-rendering the shell or its rails.
   const placementProject = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
+  const { floatingPlacements } = placementProject;
   const sensors = useSensors(
     useSensor(PrimaryMouseSensor, { activationConstraint: { distance: 6 } }),
     useSensor(HoldToDragSensor, {
@@ -88,26 +86,26 @@ export const WorkbenchShell = () => {
   const leftRegionViewModel = useMemo(
     () =>
       createWidgetRegionViewModelFromState({
-        floatingWidgets,
+        floatingWidgets: floatingPlacements,
         region: 'left',
         regionState: leftRegion,
         widgetInstances: placementProject.widgetInstances,
         widgets: getWidgetsForRegion('left'),
         getWidgetLabel,
       }),
-    [floatingWidgets, getWidgetLabel, leftRegion, placementProject.widgetInstances]
+    [floatingPlacements, getWidgetLabel, leftRegion, placementProject.widgetInstances]
   );
   const rightRegionViewModel = useMemo(
     () =>
       createWidgetRegionViewModelFromState({
-        floatingWidgets,
+        floatingWidgets: floatingPlacements,
         region: 'right',
         regionState: rightRegion,
         widgetInstances: placementProject.widgetInstances,
         widgets: getWidgetsForRegion('right'),
         getWidgetLabel,
       }),
-    [floatingWidgets, getWidgetLabel, placementProject.widgetInstances, rightRegion]
+    [floatingPlacements, getWidgetLabel, placementProject.widgetInstances, rightRegion]
   );
   const leftMenuItems = useMemo(() => getWidgetRegionItems(leftRegionViewModel), [leftRegionViewModel]);
   const rightMenuItems = useMemo(() => getWidgetRegionItems(rightRegionViewModel), [rightRegionViewModel]);
@@ -190,28 +188,27 @@ export const WorkbenchShell = () => {
     [placementProject, widgets]
   );
   const handleDragCancel = useCallback(() => setActiveDrag(null), []);
-  // Flush drafts before rail-side docking, as the window's dock control does.
   const handleSelect = useCallback(
     (region: WidgetBarGroup['region'], instanceId: string) => {
-      if (floatingWidgets[instanceId]) {
-        flushWorkbenchDrafts();
-        widgets.dockFloating(instanceId);
-
-        return;
-      }
-
-      revealWidgetPlacement({ instanceId, project: placementProject, region, widgets });
+      activateRailPlacement({ instanceId, project: placementProject, region, widgets });
     },
-    [floatingWidgets, placementProject, widgets]
+    [placementProject, widgets]
   );
-  // Removing a floating slot closes the window outright — never dock-then-
-  // toggle, which would pop the panel open and retarget the route on the way.
+  const handleDock = useCallback(
+    (instanceId: string) => {
+      dockFloatingPlacement({ instanceId, project: placementProject, widgets });
+    },
+    [placementProject, widgets]
+  );
   const closeFloating = useCallback(
     (instanceId: string) => {
-      flushWorkbenchDrafts();
-      widgets.closeFloating(instanceId);
+      const typeId = placementProject.widgetInstances[instanceId]?.typeId;
+
+      if (removeFloatingPlacement({ instanceId, project: placementProject, widgets })?.restoresCenter && typeId) {
+        focusOpenedWidget('center', typeId);
+      }
     },
-    [widgets]
+    [placementProject, widgets]
   );
   const handleToggleLeft = useCallback(
     (item: (typeof leftMenuItems)[number]) =>
@@ -313,6 +310,7 @@ export const WorkbenchShell = () => {
                   groups={leftRailGroups}
                   menuItems={leftMenuItems}
                   side="left"
+                  onDock={handleDock}
                   onSelect={handleSelect}
                   onToggle={handleToggleLeft}
                 />
@@ -324,6 +322,7 @@ export const WorkbenchShell = () => {
                   groups={rightRailGroups}
                   menuItems={rightMenuItems}
                   side="right"
+                  onDock={handleDock}
                   onSelect={handleSelect}
                   onToggle={handleToggleRight}
                 />

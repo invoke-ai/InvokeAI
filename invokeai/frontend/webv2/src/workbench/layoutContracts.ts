@@ -32,7 +32,10 @@ export interface FloatingWidgetState {
   mode: FloatingWidgetMode;
   /** The dockable region this window returns to when docked. */
   returnRegion: WidgetRegion;
-  /** Original rail index for docking; absent or invalid indices append. */
+  /**
+   * Position in the return region's complete order: its docked members plus one marker per floating window.
+   * Placement normalization makes it canonical; only data stored by an older build lacks it or disagrees.
+   */
   returnIndex?: number;
   /** Z-order within the floating layer; higher renders on top. */
   stackOrder: number;

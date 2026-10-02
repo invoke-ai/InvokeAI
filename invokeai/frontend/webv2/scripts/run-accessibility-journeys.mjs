@@ -926,6 +926,75 @@ const runLayersPanesJourney = async (browser) => {
   }
 };
 
+/**
+ * Floating a rail panel that is also the center's only view: the rail keeps a marker, the center says where the
+ * view went, and removing or docking the window gives the center its view — and keyboard focus — back.
+ */
+const runFloatingWindowJourney = async (browser) => {
+  const { context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
+  const id = 'workbench-floating-window';
+
+  try {
+    await waitForWorkbench(page);
+    await selectLayoutPreset(page, 'Video', 'Preview');
+
+    const rail = page.getByRole('navigation', { exact: true, name: 'Inspect widget visibility' });
+    const center = centerRegion(page);
+    const floatingWindow = page.locator('[data-hotkey-widget-region="floating"]');
+    const marker = rail.getByRole('button', { exact: true, name: 'Preview, floating window' });
+    const floatPreviewFromRail = async () => {
+      await rail.getByRole('button', { exact: true, name: 'Inspect widgets' }).click();
+      await page.getByRole('menuitemcheckbox', { exact: true, name: 'Preview' }).click();
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
+      await floatingWindow.waitFor();
+      await marker.waitFor();
+    };
+    const focusedRegion = () =>
+      page.evaluate(() => document.activeElement?.closest('[data-focus-region]')?.getAttribute('data-focus-region'));
+
+    await floatPreviewFromRail();
+    await center.getByText('Preview is in a floating window', { exact: true }).waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:floating`);
+
+    // The marker is a keyboard stop with a visible focus ring, and it shows the window rather than docking it.
+    await marker.focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await floatingWindow.count(), 1, 'Activating the marker must keep the window floating.');
+
+    await marker.click({ button: 'right' });
+    assert.deepEqual(await page.getByRole('menuitem').allInnerTexts(), ['Dock to right panel', 'Remove Preview']);
+    await page.getByRole('menuitem', { exact: true, name: 'Remove Preview' }).click();
+    await centerViewTrigger(page, 'Preview').waitFor();
+    await floatingWindow.waitFor({ state: 'detached' });
+    assert.equal(await marker.count(), 0, 'Removing the window must free its rail slot.');
+    await page.waitForFunction(
+      () => document.activeElement?.closest('[data-focus-region]')?.getAttribute('data-focus-region') === 'center'
+    );
+
+    await floatPreviewFromRail();
+    await center.getByRole('button', { exact: true, name: 'Dock to right panel' }).click();
+    await centerViewTrigger(page, 'Preview').waitFor();
+    await floatingWindow.waitFor({ state: 'detached' });
+    await rail.getByRole('button', { exact: true, name: 'Preview' }).waitFor();
+    await page.waitForFunction(
+      () => document.activeElement?.closest('[data-focus-region]')?.getAttribute('data-focus-region') === 'center'
+    );
+    assert.equal(await focusedRegion(), 'center');
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:docked`);
+
+    if (pageErrors.length > 0) {
+      throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
+    }
+
+    return { id, status: 'passed' };
+  } finally {
+    await context.close();
+  }
+};
+
 const SETTINGS_DIALOG_SCOPE = { include: ['[data-scope="dialog"][data-part="content"]'] };
 
 const runSettingsJourney = async (browser) => {
@@ -1035,6 +1104,9 @@ try {
   }
   if (!requestedJourney || requestedJourney === 'workbench-layers-panes') {
     reports.push(await runLayersPanesJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-floating-window') {
+    reports.push(await runFloatingWindowJourney(browser));
   }
   if (!requestedJourney || requestedJourney === 'workbench-settings') {
     reports.push(await runSettingsJourney(browser));

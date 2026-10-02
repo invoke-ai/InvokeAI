@@ -66,6 +66,7 @@ const createDispatch = () => {
       dispatch({ instanceId, projectId, type: 'patchWidgetInstanceValues', values }),
     patchValues: (widgetId, values, projectId) => dispatch({ projectId, type: 'patchWidgetValues', values, widgetId }),
     reorder: (options) => dispatch({ ...options, type: 'reorderWidgetInstances' }),
+    revealFloating: (instanceId) => dispatch({ instanceId, type: 'revealFloatingWidget' }),
     select: (options) => dispatch({ ...options, type: 'selectRegionWidget' }),
     setFloatingGeometry: (instanceId, geometry) =>
       dispatch({ instanceId, type: 'setFloatingWidgetGeometry', ...geometry }),
