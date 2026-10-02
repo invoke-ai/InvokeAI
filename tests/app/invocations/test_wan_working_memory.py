@@ -3,13 +3,14 @@
 from unittest.mock import MagicMock, patch
 
 import PIL.Image
+import pytest
 import torch
 from diffusers.models.autoencoders import AutoencoderKLWan
 
-from invokeai.app.invocations.wan_image_to_latents import WanImageToLatentsInvocation
-from invokeai.app.invocations.wan_latents_to_image import WanLatentsToImageInvocation
-from invokeai.app.invocations.wan_latents_to_video import WanLatentsToVideoInvocation
-from invokeai.app.invocations.wan_ref_image_encoder import WanRefImageEncoderInvocation
+from invokeai.app.invocations.vae.wan_image_to_latents import WanImageToLatentsInvocation
+from invokeai.app.invocations.vae.wan_latents_to_image import WanLatentsToImageInvocation
+from invokeai.app.invocations.vae.wan_latents_to_video import WanLatentsToVideoInvocation
+from invokeai.app.invocations.wan.wan_ref_image_encoder import WanRefImageEncoderInvocation
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_wan
 
@@ -27,7 +28,13 @@ def _mock_wan_vae(
     vae.config.scale_factor_temporal = temporal_scale
     vae.config.latents_mean = [0.0] * z_dim
     vae.config.latents_std = [1.0] * z_dim
+    # `patch_qwen_image_vae_tiling` snapshots and restores all five, and `enable_tiling` writes
+    # all four geometry values rather than inheriting any.
+    vae.use_tiling = False
     vae.tile_sample_min_height = 256
+    vae.tile_sample_min_width = 256
+    vae.tile_sample_stride_height = 192
+    vae.tile_sample_stride_width = 192
     return vae
 
 
@@ -136,7 +143,9 @@ class TestWanInvocationsRequestWorkingMemory:
         mock_context.models.load.return_value = vae_info
         mock_context.tensors.load.return_value = torch.zeros(1, 16, 64, 64)
 
-        with patch("invokeai.app.invocations.wan_latents_to_image.estimate_vae_working_memory_wan") as mock_estimate:
+        with patch(
+            "invokeai.app.invocations.vae.wan_latents_to_image.estimate_vae_working_memory_wan"
+        ) as mock_estimate:
             mock_estimate.return_value = 1234
             invocation = WanLatentsToImageInvocation.model_construct(
                 latents=MagicMock(latents_name="l"), vae=MagicMock(vae=MagicMock())
@@ -159,7 +168,9 @@ class TestWanInvocationsRequestWorkingMemory:
         mock_context.models.load.return_value = vae_info
         mock_context.tensors.load.return_value = torch.zeros(1, 48, 32, 32)
 
-        with patch("invokeai.app.invocations.wan_latents_to_image.estimate_vae_working_memory_wan") as mock_estimate:
+        with patch(
+            "invokeai.app.invocations.vae.wan_latents_to_image.estimate_vae_working_memory_wan"
+        ) as mock_estimate:
             mock_estimate.return_value = 1
             invocation = WanLatentsToImageInvocation.model_construct(
                 latents=MagicMock(latents_name="l"), vae=MagicMock(vae=MagicMock())
@@ -176,7 +187,9 @@ class TestWanInvocationsRequestWorkingMemory:
         vae = _mock_wan_vae()
         vae_info = _mock_vae_info(vae)
 
-        with patch("invokeai.app.invocations.wan_image_to_latents.estimate_vae_working_memory_wan") as mock_estimate:
+        with patch(
+            "invokeai.app.invocations.vae.wan_image_to_latents.estimate_vae_working_memory_wan"
+        ) as mock_estimate:
             mock_estimate.return_value = 4321
             try:
                 WanImageToLatentsInvocation.vae_encode(vae_info, torch.zeros(1, 3, 512, 512))
@@ -196,9 +209,11 @@ class TestWanInvocationsRequestWorkingMemory:
         mock_context.tensors.save.return_value = "t"
 
         with (
-            patch("invokeai.app.invocations.wan_ref_image_encoder.estimate_vae_working_memory_wan") as mock_estimate,
             patch(
-                "invokeai.app.invocations.wan_ref_image_encoder.encode_reference_image_to_condition",
+                "invokeai.app.invocations.wan.wan_ref_image_encoder.estimate_vae_working_memory_wan"
+            ) as mock_estimate,
+            patch(
+                "invokeai.app.invocations.wan.wan_ref_image_encoder.encode_reference_image_to_condition",
                 return_value=torch.zeros(1, 20, 1, 4, 4),
             ),
         ):
@@ -230,7 +245,9 @@ class TestWanInvocationsRequestWorkingMemory:
         vae_info = _mock_vae_info(vae)
         mock_context = self._video_context(vae_info)
 
-        with patch("invokeai.app.invocations.wan_latents_to_video.estimate_vae_working_memory_wan") as mock_estimate:
+        with patch(
+            "invokeai.app.invocations.vae.wan_latents_to_video.estimate_vae_working_memory_wan"
+        ) as mock_estimate:
             mock_estimate.return_value = 5678
             invocation = WanLatentsToVideoInvocation.model_construct(
                 latents=MagicMock(latents_name="l"), vae=MagicMock(vae=MagicMock()), fps=16
@@ -261,15 +278,15 @@ class TestWanInvocationsRequestWorkingMemory:
 
         with (
             patch(
-                "invokeai.app.invocations.wan_latents_to_video.estimate_vae_working_memory_wan",
+                "invokeai.app.invocations.vae.wan_latents_to_video.estimate_vae_working_memory_wan",
                 return_value=5678,
             ) as mock_estimate,
             patch(
-                "invokeai.app.invocations.wan_latents_to_video.iter_wan_vae_decode_chunks",
+                "invokeai.app.invocations.vae.wan_latents_to_video.iter_wan_vae_decode_chunks",
                 return_value=iter(chunks),
             ) as mock_decode_chunks,
-            patch("invokeai.app.invocations.wan_latents_to_video.make_mp4_writer", return_value=writer),
-            patch("invokeai.app.invocations.wan_latents_to_video.VideoOutput.build", return_value=expected_output),
+            patch("invokeai.app.invocations.vae.wan_latents_to_video.make_mp4_writer", return_value=writer),
+            patch("invokeai.app.invocations.vae.wan_latents_to_video.VideoOutput.build", return_value=expected_output),
             patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cpu")),
             patch.object(TorchDevice, "empty_cache"),
         ):
@@ -286,14 +303,20 @@ class TestWanInvocationsRequestWorkingMemory:
         vae.disable_tiling.assert_called_once()
         vae.decode.assert_not_called()
 
-    def test_latents_to_video_falls_back_to_tiling_when_estimate_exceeds_vram(self):
+    @pytest.mark.parametrize("auto", [True, False], ids=["auto-tiled-decode-on", "auto-tiled-decode-off"])
+    def test_latents_to_video_falls_back_to_tiling_when_estimate_exceeds_vram(self, auto):
         vae = _mock_wan_vae()
+        # Not 256: the point of the change is that the tile comes from a module constant rather than
+        # from the shared cache instance, and with 256 on the instance both implementations agree.
+        vae.tile_sample_min_height = 999
         vae_info = _mock_vae_info(vae)
+        vae_info.compute_device = torch.device("cuda")
         mock_context = self._video_context(vae_info)
+        mock_context.config.get.return_value.auto_tiled_decode = auto
 
         with (
             patch(
-                "invokeai.app.invocations.wan_latents_to_video.estimate_vae_working_memory_wan",
+                "invokeai.app.invocations.vae.wan_latents_to_video.estimate_vae_working_memory_wan",
                 side_effect=[100 * 2**30, 4 * 2**30],
             ) as mock_estimate,
             patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cuda")),
@@ -308,25 +331,39 @@ class TestWanInvocationsRequestWorkingMemory:
             except Exception:
                 pass
 
-        assert mock_estimate.call_count == 2
-        assert mock_estimate.call_args_list[1].kwargs["tile_size"] == 256
-        vae.enable_tiling.assert_called_once()
-        vae.disable_tiling.assert_called_once()
-        vae_info.model_on_device.assert_called_once_with(working_mem_bytes=4 * 2**30)
+        if auto:
+            assert mock_estimate.call_count == 2
+            assert mock_estimate.call_args_list[1].kwargs["tile_size"] == 256
+            # All four geometry values are set explicitly rather than inherited from the shared module:
+            # `enable_tiling` falls back to whatever the instance carries for any argument left out, and
+            # a min below the inherited stride drops whole bands of the frame.
+            vae.enable_tiling.assert_called_once_with(
+                tile_sample_min_height=256,
+                tile_sample_min_width=256,
+                tile_sample_stride_height=192,
+                tile_sample_stride_width=192,
+            )
+            vae_info.model_on_device.assert_called_once_with(working_mem_bytes=4 * 2**30)
+        else:
+            assert mock_estimate.call_count == 1
+            vae.enable_tiling.assert_not_called()
+            vae_info.model_on_device.assert_called_once_with(working_mem_bytes=100 * 2**30)
 
     def test_latents_to_video_skips_tiling_for_cpu_only_vae(self):
-        """A cpu_only VAE runs in system RAM; VRAM-based tiling must not kick in."""
+        """A cpu_only VAE runs in system RAM; VRAM-based tiling must not kick in, even with a small GPU present."""
         vae = _mock_wan_vae()
         vae_info = _mock_vae_info(vae, cpu_only=True)
+        vae_info.compute_device = torch.device("cpu")
         mock_context = self._video_context(vae_info)
 
         with (
             patch(
-                "invokeai.app.invocations.wan_latents_to_video.estimate_vae_working_memory_wan",
+                "invokeai.app.invocations.vae.wan_latents_to_video.estimate_vae_working_memory_wan",
                 return_value=100 * 2**30,
             ) as mock_estimate,
             patch.object(TorchDevice, "choose_torch_device", return_value=torch.device("cuda")),
             patch.object(TorchDevice, "empty_cache"),
+            patch("torch.cuda.get_device_properties", return_value=MagicMock(total_memory=8 * 2**30)),
         ):
             invocation = WanLatentsToVideoInvocation.model_construct(
                 latents=MagicMock(latents_name="l"), vae=MagicMock(vae=MagicMock()), fps=16

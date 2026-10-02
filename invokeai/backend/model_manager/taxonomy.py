@@ -66,6 +66,12 @@ class BaseModelType(str, Enum):
     """Indicates the model is associated with the Krea 2 model architecture, including Krea-2-Turbo."""
     Wan = "wan"
     """Indicates the model is associated with the Wan 2.2 model architecture (T2V-A14B / TI2V-5B), used for image generation at num_frames=1."""
+    MiniMaxH3 = "minimax-h3"
+    """Indicates the model is associated with the MiniMax H3 (Hailuo 3.0) omni-modal architecture, which
+    generates video with jointly-denoised stereo audio."""
+    LTX2 = "ltx-2"
+    """Indicates the model is associated with the Lightricks LTX-2 family (LTX-2.5 in this version), a
+    dual-stream video+audio DiT conditioned by a Gemma text encoder through learned connectors."""
     Unknown = "unknown"
     """Indicates the model's base architecture is unknown."""
 
@@ -91,6 +97,7 @@ class ModelType(str, Enum):
     MistralEncoder = "mistral_encoder"
     WanT5Encoder = "wan_t5_encoder"
     Gemma2Encoder = "gemma2_encoder"
+    Gemma4Encoder = "gemma4_encoder"
     SpandrelImageToImage = "spandrel_image_to_image"
     SigLIP = "siglip"
     FluxRedux = "flux_redux"
@@ -99,6 +106,7 @@ class ModelType(str, Enum):
     TextLLM = "text_llm"
     ExternalImageGenerator = "external_image_generator"
     PiDDecoder = "pid_decoder"
+    LTX2DurationHead = "ltx2_duration_head"
     Unknown = "unknown"
 
 
@@ -114,11 +122,17 @@ class SubModelType(str, Enum):
     Tokenizer = "tokenizer"
     Tokenizer2 = "tokenizer_2"
     Tokenizer3 = "tokenizer_3"
+    Processor = "processor"
     PromptEnhancer = "pe"
     PromptEnhancerTokenizer = "pe_tokenizer"
     VAE = "vae"
     VAEDecoder = "vae_decoder"
     VAEEncoder = "vae_encoder"
+    AudioVAE = "audio_vae"
+    Vocoder = "vocoder"
+    Connectors = "connectors"
+    LatentUpsampler = "latent_upsampler"
+    TemporalLatentUpsampler = "temporal_latent_upsampler"
     Scheduler = "scheduler"
     SafetyChecker = "safety_checker"
 
@@ -252,8 +266,52 @@ class Qwen3VariantType(str, Enum):
     """Qwen3 0.6B text encoder (hidden_size=1024). Used by Anima."""
 
 
+class Qwen3VLVariantType(str, Enum):
+    """Qwen3-VL (vision-language) text encoder variants, by language-model width.
+
+    Separate from `Qwen3VariantType`: those are the text-only Qwen3 encoders (Z-Image, FLUX.2
+    Klein). The VL models carry a visual tower and are not interchangeable with them, and the two
+    families do not even share widths at the same parameter count.
+    """
+
+    Qwen3VL_4B = "qwen3_vl_4b"
+    """Qwen3-VL 4B (hidden_size=2560, 36 layers). The encoder Krea-2 conditions on."""
+
+    Qwen3VL_8B = "qwen3_vl_8b"
+    """Qwen3-VL 8B (hidden_size=4096, 36 layers). The encoder Ideogram 4 conditions on, tapping 13
+    of its layers for a 53248-wide feature vector."""
+
+
+class MiniMaxH3VariantType(str, Enum):
+    """MiniMax H3 model variants (task-specific transformer checkpoints sharing every other component)."""
+
+    FL2VA = "fl2va"
+    """First/last-frame + text to audio-video: text-to-video and first/last-frame image-to-video
+    (HF repo subfolder ``transformer``)."""
+
+    REF2VA = "ref2va"
+    """Multi-reference to audio-video: up to 3 video + 9 image references condition generation
+    (HF repo subfolder ``transformer_ref``). Same architecture and config as FL2VA, different
+    weights; supports only the reference task."""
+
+
+class LTX2VariantType(str, Enum):
+    """LTX-2 transformer variants. Dev and Distilled are key-for-key identical checkpoints of the same
+    architecture; the variant decides the sampling recipe (guided ~40-step schedule vs the fixed
+    8-sigma distilled schedule with CFG off), so it must travel with the model record.
+
+    Values carry the family prefix because variant values are globally unique across enums
+    (`FluxVariantType.Dev` already owns "dev")."""
+
+    Dev = "ltx2_dev"
+    """The guided model: CFG / STG / modality-isolation guidance over a shifted flow schedule."""
+
+    Distilled = "ltx2_distilled"
+    """The step-distilled model: fixed 8-sigma schedule, no guidance, no negative prompt."""
+
+
 class MistralVariantType(str, Enum):
-    """Mistral text encoder variants used by FLUX.2 [dev]."""
+    """Mistral text encoder variants used by FLUX.2 [dev] and ERNIE-Image."""
 
     Cow = "cow_mistral3_small"
     """The 30-layer BFL "cow-mistral3-small" distillation (hidden_size=5120).
@@ -270,6 +328,14 @@ class MistralVariantType(str, Enum):
     of those instead of BFL's release will load fine but produces visibly
     weaker prompt adherence than the cow distillation, so the cow variants
     remain the recommended default."""
+
+    Ministral3B = "ministral3_3b"
+    """The 26-layer Ministral 3B (hidden_size=3072) ERNIE-Image encodes its
+    prompts with. A different model family from the two above, not a smaller
+    build of them: it is loaded as ``Ministral3Model`` and uses YaRN RoPE
+    scaling, so the geometry alone decides the variant. The final RMSNorm is
+    kept — ERNIE reads the second-to-last hidden state, which the norm never
+    touches."""
 
 
 class PiDDecoderVariantType(str, Enum):
@@ -308,12 +374,24 @@ class ModelFormat(str, Enum):
     MistralEncoder = "mistral_encoder"
     WanT5Encoder = "wan_t5_encoder"
     Gemma2Encoder = "gemma2_encoder"
+    Gemma4Encoder = "gemma4_encoder"
     BnbQuantizedLlmInt8b = "bnb_quantized_int8b"
     BnbQuantizednf4b = "bnb_quantized_nf4b"
     GGUFQuantized = "gguf_quantized"
     ExternalApi = "external_api"
     SDNQQuantized = "sdnq_quantized"
     Unknown = "unknown"
+
+
+QUANTIZED_MODEL_FORMATS: frozenset[ModelFormat] = frozenset(
+    {
+        ModelFormat.GGUFQuantized,
+        ModelFormat.BnbQuantizednf4b,
+        ModelFormat.BnbQuantizedLlmInt8b,
+        ModelFormat.SDNQQuantized,
+    }
+)
+"""Formats whose weights are already quantized: packed payloads FP8 Storage must never re-encode."""
 
 
 class SchedulerPredictionType(str, Enum):
@@ -367,7 +445,10 @@ AnyVariant: TypeAlias = Union[
     WanVariantType,
     WanLoRAVariantType,
     Qwen3VariantType,
+    Qwen3VLVariantType,
     Krea2VariantType,
+    MiniMaxH3VariantType,
+    LTX2VariantType,
     MistralVariantType,
     PiDDecoderVariantType,
 ]
@@ -381,7 +462,10 @@ variant_type_adapter = TypeAdapter[
     | WanVariantType
     | WanLoRAVariantType
     | Qwen3VariantType
+    | Qwen3VLVariantType
     | Krea2VariantType
+    | MiniMaxH3VariantType
+    | LTX2VariantType
     | MistralVariantType
     | PiDDecoderVariantType
 ](
@@ -394,7 +478,10 @@ variant_type_adapter = TypeAdapter[
     | WanVariantType
     | WanLoRAVariantType
     | Qwen3VariantType
+    | Qwen3VLVariantType
     | Krea2VariantType
+    | MiniMaxH3VariantType
+    | LTX2VariantType
     | MistralVariantType
     | PiDDecoderVariantType
 )

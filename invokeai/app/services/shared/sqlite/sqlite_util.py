@@ -21,7 +21,7 @@ def init_db(config: InvokeAIAppConfig, logger: Logger, image_files: ImageFileSto
     - Runs all migrations
     """
     db_path = None if config.use_memory_db else config.db_path
-    db = SqliteDatabase(db_path=db_path, logger=logger, verbose=config.log_sql)
+    db = SqliteDatabase(db_path=db_path, logger=logger, verbose=config.log_sql, synchronous=config.db_synchronous)
 
     migrator = SqliteMigrator(db=db)
     migration_context = MigrationBuildContext(app_config=config, logger=logger, image_files=image_files)

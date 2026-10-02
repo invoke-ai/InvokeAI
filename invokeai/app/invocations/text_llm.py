@@ -7,6 +7,9 @@ from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import StringOutput
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.app.services.system_prompt_records.system_prompt_records_common import (
+    EXPAND_PROMPT_MAX_TOKENS_DEFAULT,
+    EXPAND_PROMPT_MAX_TOKENS_MAX,
+    EXPAND_PROMPT_MAX_TOKENS_MIN,
     SystemPromptNotFoundError,
     SystemPromptRecordDTO,
 )
@@ -70,9 +73,9 @@ class TextLLMInvocation(BaseInvocation):
         ui_model_type=ModelType.TextLLM,
     )
     max_tokens: int = InputField(
-        default=300,
-        ge=1,
-        le=2048,
+        default=EXPAND_PROMPT_MAX_TOKENS_DEFAULT,
+        ge=EXPAND_PROMPT_MAX_TOKENS_MIN,
+        le=EXPAND_PROMPT_MAX_TOKENS_MAX,
         description="Maximum number of tokens to generate.",
     )
     seed: int = InputField(default=0, ge=0, le=SEED_MAX, description=FieldDescriptions.seed)
@@ -95,7 +98,7 @@ class TextLLMInvocation(BaseInvocation):
     title="Text LLM (with System Prompt Preset)",
     tags=["llm", "text", "prompt", "preset", "template"],
     category="llm",
-    version="1.1.0",
+    version="1.2.0",
     classification=Classification.Beta,
 )
 class TextLLMWithPresetInvocation(BaseInvocation):
@@ -125,10 +128,15 @@ class TextLLMWithPresetInvocation(BaseInvocation):
         ui_model_type=ModelType.TextLLM,
     )
     max_tokens: int = InputField(
-        default=300,
-        ge=1,
-        le=2048,
-        description="Maximum number of tokens to generate.",
+        # 0 rather than None as the "defer to the preset" sentinel, matching `tile_size` elsewhere
+        # in this package. An `int | None` field serialises its bounds into an OpenAPI `anyOf`,
+        # where the editors' field-template builders cannot see them: the node would render with
+        # a 0 default they reject, and with no min/max at all.
+        default=0,
+        ge=0,
+        le=EXPAND_PROMPT_MAX_TOKENS_MAX,
+        description="Maximum number of tokens to generate. 0 uses the preset's own cap, "
+        f"or {EXPAND_PROMPT_MAX_TOKENS_DEFAULT} if it does not set one.",
     )
     seed: int = InputField(default=0, ge=0, le=SEED_MAX, description=FieldDescriptions.seed)
 
@@ -174,7 +182,17 @@ class TextLLMWithPresetInvocation(BaseInvocation):
             text_llm_model=self.text_llm_model,
             prompt=self.prompt,
             system_prompt=record.content,
-            max_tokens=self.max_tokens,
+            # The preset carries its own output-length cap (structured prompts need more room
+            # than the default), so the 0 default defers to it rather than to a fixed number.
+            # Any non-zero field value still wins -- it is the node author overriding the preset.
+            max_tokens=self._resolve_max_tokens(record),
             seed=self.seed,
         )
         return StringOutput(value=output)
+
+    def _resolve_max_tokens(self, record: SystemPromptRecordDTO) -> int:
+        if self.max_tokens:
+            return self.max_tokens
+        if record.max_tokens is not None:
+            return record.max_tokens
+        return EXPAND_PROMPT_MAX_TOKENS_DEFAULT

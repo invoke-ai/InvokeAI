@@ -1,0 +1,183 @@
+from abc import ABC, abstractmethod
+from typing import AbstractSet, Literal, Optional
+
+import numpy as np
+from PIL import Image
+
+from invokeai.app.services.image_index.image_index_common import ImageIndexStatus, IndexedItem, MediaKind
+
+
+class TextSearchUnavailableError(Exception):
+    """The configured embedding model has no usable text tower installed."""
+
+
+# unavailable: the indexer is not running (disabled, or its model is missing).
+# idle: nothing has asked for cluster labels yet; the build runs on demand.
+# building: a build is queued or in progress (including after an invalidation).
+# ready: the vocabulary embeddings are cached and serving.
+# error: the last build failed; invalidate_vocab() clears the failure and retries.
+VocabBuildState = Literal["unavailable", "idle", "building", "ready", "error"]
+
+
+class ImageIndexServiceBase(ABC):
+    """Background service that keeps the semantic index up to date.
+
+    When enabled and an embedding model is available, the service embeds every
+    eligible gallery item (non-intermediate, `general` category) on a worker
+    thread: a backfill pass covers items that existed before the service
+    started, and image- and video-service callbacks cover items created
+    afterwards. A video is embedded through its thumbnail — the representative
+    frame extracted when the video was created — so it takes part in the map
+    and in search exactly as an image does.
+    """
+
+    @property
+    @abstractmethod
+    def model_id(self) -> str | None:
+        """Content hash of the active embedding model, or None if the indexer is not running."""
+        pass
+
+    def try_activate(self) -> bool:
+        """Start indexing if the configured embedding model has since been installed.
+
+        Concrete when the base's other methods are abstract because the answer
+        for an inert implementation is simply "whatever it already was": only
+        the real service can pick a model up mid-run. Callers use this on
+        request paths that would otherwise report `model_missing` for the rest
+        of the process. Returns True if the indexer is running on return; may
+        touch the model store, so call it off the event loop.
+        """
+        return self.model_id is not None
+
+    @abstractmethod
+    def get_status(self) -> ImageIndexStatus | None:
+        """Get index progress counts, or None if the indexer is not running."""
+        pass
+
+    @abstractmethod
+    def embed_text(self, text: str) -> np.ndarray:
+        """Embed a text query into the image embedding space (L2-normalized).
+
+        Slow on first call (loads the model's text tower); cheap afterwards.
+        Call off the event loop.
+
+        Raises:
+            TextSearchUnavailableError: The indexer is not running, or the
+                configured model's directory has no text encoder (some
+                vision-only CLIP installs, e.g. for IP-Adapter, ship only the
+                image tower).
+        """
+        pass
+
+    @abstractmethod
+    def embed_image(self, image: Image.Image) -> np.ndarray:
+        """Embed one image with the index's vision encoder (L2-normalized, (D,)).
+
+        Used for one-off similarity queries (assets and external images that
+        are not in the index). Call off the event loop — this may load the
+        model.
+
+        Raises:
+            RuntimeError: The indexer is not running.
+        """
+        pass
+
+    @abstractmethod
+    def get_accessible_embeddings(self, user_id: str | None) -> tuple[list[IndexedItem], np.ndarray]:
+        """Items + L2-normalized embedding matrix of the user's accessible gallery.
+
+        Served from a small LRU keyed by the accessible-set scope hash (which
+        self-invalidates on any set change). Rows align with items. Pass
+        user_id=None for the admin scope. Call off the event loop.
+        """
+        pass
+
+    @abstractmethod
+    def get_vocab_embeddings(self) -> tuple[list[str], np.ndarray]:
+        """Get the cluster-labeling vocabulary and its phrase embeddings.
+
+        Slow on the first call per model (the whole vocabulary is embedded
+        through the text tower, then disk-cached); cheap afterwards. Call off
+        the event loop.
+
+        Raises:
+            TextSearchUnavailableError: No usable text encoder is installed.
+        """
+        pass
+
+    @abstractmethod
+    def invalidate_vocab(self) -> None:
+        """Discard the cached vocabulary embeddings and queue a rebuild.
+
+        Called after the supplementary vocabulary changes. Must never block:
+        it may be called from a request thread while the worker holds the
+        vocabulary lock for a minutes-long build, so implementations signal
+        the worker rather than clearing caches inline. Also clears a memoized
+        build failure, so it doubles as the retry path for a failed build.
+
+        Safe to call when the indexer is not running: the vocabulary lives in
+        the database and the next start builds from current state anyway.
+        """
+        pass
+
+    @abstractmethod
+    def get_vocab_build_state(self) -> tuple[VocabBuildState, Optional[str]]:
+        """The vocabulary embedding build's state, plus an error message when failed.
+
+        Never blocks and never triggers a build; safe on request threads.
+        """
+        pass
+
+    @abstractmethod
+    def search_similar(
+        self,
+        user_id: str | None,
+        query_embedding: np.ndarray,
+        limit: int,
+        kinds: Optional[tuple[MediaKind, ...]] = None,
+        within: Optional[AbstractSet[str]] = None,
+    ) -> list[tuple[IndexedItem, float]]:
+        """Rank the user's accessible embedded items by cosine similarity.
+
+        Embeddings are L2-normalized, so similarity is a dot product. Pass
+        user_id=None for the admin scope, `kinds` to restrict results to
+        those media kinds (None means every kind), and `within` to restrict
+        them to those item names, such as one board's listing (None means
+        every accessible item). Returns (item, score) pairs, best first.
+        Call off the event loop — the accessible embedding matrix may be
+        read from the database on a cache miss.
+        """
+        pass
+
+    @abstractmethod
+    def request_projection(
+        self,
+        user_id: str,
+        all_images: bool = False,
+        failed_scope: Optional[str] = None,
+        user_initiated: bool = False,
+    ) -> bool:
+        """Ask the worker to (re)compute a user's image map projection.
+
+        Requests are deduplicated per user; the projection runs after any
+        pending embedding work, and an `image_map_projection_ready` event is
+        emitted when the cache is updated.
+
+        Args:
+            user_id: The user whose projection cache to update.
+            all_images: Compute over every embedded item (admin scope)
+                rather than the user's accessible set.
+            failed_scope: The scope hash of a cached projection the caller
+                believes to be a failed fit. The request is refused once that
+                scope's single retry has been used, so a caller that asks on
+                every poll cannot drive an endless request/event cycle.
+            user_initiated: This request came from a person rather than from
+                polling, so a spent retry budget is cleared and the failed
+                scope gets another fit. Callers driven by a timer, an event, or
+                a staleness check must leave this False.
+
+        Returns:
+            True if the request was accepted (or already pending); False if
+            the indexer is not running.
+        """
+        pass

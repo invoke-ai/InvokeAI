@@ -15,6 +15,7 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.video_records.video_records_common import MEDIA_ORIGIN_SQL_EXPR, coerce_media_origin
 from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
 
 
@@ -48,6 +49,9 @@ class SqliteGalleryService(GalleryServiceABC):
         search_term: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
     ) -> OffsetPaginatedResults[GalleryItem]:
         image_half, image_params, image_count_query = self._build_half(
             kind="image",
@@ -58,6 +62,9 @@ class SqliteGalleryService(GalleryServiceABC):
             search_term=search_term,
             user_id=user_id,
             is_admin=is_admin,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
         )
         video_half, video_params, video_count_query = self._build_half(
             kind="video",
@@ -68,18 +75,34 @@ class SqliteGalleryService(GalleryServiceABC):
             search_term=search_term,
             user_id=user_id,
             is_admin=is_admin,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
         )
 
         order_clause = self._build_order_clause(starred_first, order_dir)
 
+        # `media_origin` is joined back onto the CHOSEN page rather than selected inside the
+        # union halves. It is projected out of `videos.metadata`, a blob that lives on
+        # overflow pages, and the halves feed a sorter -- so selecting it there reads and
+        # JSON-parses every video row in the library before LIMIT, on a connection held
+        # behind a process-wide lock. Measured at 20k videos with 4 KB metadata that is
+        # ~+47ms on every gallery page; joining after LIMIT touches at most `limit` rows.
+        # (`ORDER BY` is repeated outside: a join over an ordered subquery does not preserve
+        # its order. Both clauses reference only columns the page already carries.)
         union_query = f"""--sql
-        SELECT * FROM (
-            {image_half}
-            UNION ALL
-            {video_half}
-        )
+        SELECT page.*, {MEDIA_ORIGIN_SQL_EXPR}
+        FROM (
+            SELECT * FROM (
+                {image_half}
+                UNION ALL
+                {video_half}
+            )
+            {order_clause}
+            LIMIT ? OFFSET ?
+        ) AS page
+        LEFT JOIN videos ON page.kind = 'video' AND videos.video_name = page.name
         {order_clause}
-        LIMIT ? OFFSET ?
         ;
         """
 
@@ -113,6 +136,9 @@ class SqliteGalleryService(GalleryServiceABC):
         user_id: Optional[str],
         is_admin: bool,
         created_date: Optional[str],
+        created_from: Optional[str],
+        created_to: Optional[str],
+        starred: Optional[bool],
     ) -> tuple[list[sqlite3.Row], int]:
         """Runs the ordered name query and returns its rows plus the starred count.
 
@@ -130,6 +156,9 @@ class SqliteGalleryService(GalleryServiceABC):
             is_admin=is_admin,
             names_only=True,
             created_date=created_date,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
         )
         video_half, video_params, _ = self._build_half(
             kind="video",
@@ -142,6 +171,9 @@ class SqliteGalleryService(GalleryServiceABC):
             is_admin=is_admin,
             names_only=True,
             created_date=created_date,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
         )
 
         order_clause = self._build_order_clause(starred_first, order_dir)
@@ -178,6 +210,9 @@ class SqliteGalleryService(GalleryServiceABC):
         user_id: Optional[str] = None,
         is_admin: bool = False,
         created_date: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
     ) -> GalleryItemNamesResult:
         rows, starred_count = self._query_name_rows(
             starred_first=starred_first,
@@ -190,6 +225,9 @@ class SqliteGalleryService(GalleryServiceABC):
             user_id=user_id,
             is_admin=is_admin,
             created_date=created_date,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
         )
         refs = [GalleryItemRef(kind=GalleryItemKind(row["kind"]), name=row["name"]) for row in rows]
         return GalleryItemNamesResult(items=refs, starred_count=starred_count, total_count=len(refs))
@@ -206,6 +244,9 @@ class SqliteGalleryService(GalleryServiceABC):
         user_id: Optional[str] = None,
         is_admin: bool = False,
         created_date: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
     ) -> GalleryItemNames:
         rows, starred_count = self._query_name_rows(
             starred_first=starred_first,
@@ -218,6 +259,9 @@ class SqliteGalleryService(GalleryServiceABC):
             user_id=user_id,
             is_admin=is_admin,
             created_date=created_date,
+            created_from=created_from,
+            created_to=created_to,
+            starred=starred,
         )
         # A list comprehension over the raw column, deliberately: building one model per row
         # is what made the deprecated variant expensive.
@@ -263,7 +307,11 @@ class SqliteGalleryService(GalleryServiceABC):
             DATE(created_at) AS date,
             SUM(CASE WHEN kind = 'image' AND category = 'general' THEN 1 ELSE 0 END) AS image_count,
             SUM(CASE WHEN kind = 'image' AND category != 'general' THEN 1 ELSE 0 END) AS asset_count,
-            SUM(CASE WHEN kind = 'video' THEN 1 ELSE 0 END) AS video_count
+            SUM(CASE WHEN kind = 'video' THEN 1 ELSE 0 END) AS video_count,
+            -- Same not-'general' predicate as the image asset_count above (rather than the
+            -- listing services' explicit asset-category allowlist), so image and video
+            -- counts stay consistent within this query.
+            SUM(CASE WHEN kind = 'video' AND category != 'general' THEN 1 ELSE 0 END) AS asset_video_count
         FROM ({union})
         GROUP BY DATE(created_at)
         ORDER BY date DESC;
@@ -308,6 +356,7 @@ class SqliteGalleryService(GalleryServiceABC):
                     image_count=row["image_count"],
                     asset_count=row["asset_count"],
                     video_count=row["video_count"],
+                    asset_video_count=row["asset_video_count"],
                     cover_image_name=cover_name if cover_kind == "image" else None,
                     cover_video_name=cover_name if cover_kind == "video" else None,
                 )
@@ -326,6 +375,7 @@ class SqliteGalleryService(GalleryServiceABC):
             SUM(CASE WHEN kind = 'image' AND category = 'general' THEN 1 ELSE 0 END) AS image_count,
             SUM(CASE WHEN kind = 'image' AND category != 'general' THEN 1 ELSE 0 END) AS asset_count,
             SUM(CASE WHEN kind = 'video' THEN 1 ELSE 0 END) AS video_count,
+            SUM(CASE WHEN kind = 'video' AND category != 'general' THEN 1 ELSE 0 END) AS asset_video_count,
             MAX(CASE WHEN rank = 1 AND kind = 'image' THEN name END) AS cover_image_name,
             MAX(CASE WHEN rank = 1 AND kind = 'video' THEN name END) AS cover_video_name
         FROM (
@@ -376,6 +426,7 @@ class SqliteGalleryService(GalleryServiceABC):
                 image_count=row["image_count"],
                 video_count=row["video_count"],
                 asset_count=row["asset_count"],
+                asset_video_count=row["asset_video_count"],
             )
         return summaries
 
@@ -406,12 +457,16 @@ class SqliteGalleryService(GalleryServiceABC):
         is_admin: bool,
         names_only: bool = False,
         created_date: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
+        starred: Optional[bool] = None,
     ) -> tuple[str, list[Union[int, str, bool]], str]:
         """Builds one half of the union (either `images` or `videos`).
 
         Returns `(query_with_select, params, count_query)`. Both halves emit the same columns so
         UNION ALL is shape-compatible: `kind`, `name`, `width`, `height`, `category`, `starred`,
-        `is_intermediate`, `board_id`, `created_at`, `duration`, `fps`.
+        `is_intermediate`, `board_id`, `created_at`, `duration`, `fps`. (`media_origin` is
+        NOT one of them -- `list_items` joins it onto the chosen page instead; see there.)
 
         `names_only=True` selects only `kind`, `name`, `starred`, `created_at` (the minimum needed
         for ordering + the counts result).
@@ -493,9 +548,21 @@ class SqliteGalleryService(GalleryServiceABC):
             conditions += f" AND {base_table}.is_intermediate = ? "
             params.append(is_intermediate)
 
+        if starred is not None:
+            conditions += f" AND {base_table}.starred = ? "
+            params.append(starred)
+
         if created_date is not None:
             conditions += f" AND DATE({base_table}.created_at) = ? "
             params.append(created_date)
+
+        if created_from is not None:
+            conditions += f" AND {base_table}.created_at >= ? "
+            params.append(created_from)
+
+        if created_to is not None:
+            conditions += f" AND {base_table}.created_at < DATE(?, '+1 day') "
+            params.append(created_to)
 
         if board_id == "none":
             conditions += f""" AND NOT EXISTS (
@@ -532,11 +599,13 @@ class SqliteGalleryService(GalleryServiceABC):
             thumbnail_url = urls.get_image_url(name, thumbnail=True)
             duration = None
             fps = None
+            media_origin = None
         else:
             full_url = urls.get_video_url(name)
             thumbnail_url = urls.get_video_url(name, thumbnail=True)
             duration = row["duration"]
             fps = row["fps"]
+            media_origin = coerce_media_origin(row["media_origin"])
         return GalleryItem(
             kind=kind,
             name=name,
@@ -551,4 +620,5 @@ class SqliteGalleryService(GalleryServiceABC):
             created_at=row["created_at"],
             duration=duration,
             fps=fps,
+            media_origin=media_origin,
         )

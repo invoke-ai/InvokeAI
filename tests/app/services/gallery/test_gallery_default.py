@@ -157,6 +157,161 @@ def _backdate(services, table: str, name_col: str, name: str, created_at: str) -
         cursor.execute(f"UPDATE {table} SET created_at = ? WHERE {name_col} = ?", (created_at, name))
 
 
+def _star(services, table: str, name_col: str, name: str) -> None:
+    db = services["images"]._db
+    with db.transaction() as cursor:
+        cursor.execute(f"UPDATE {table} SET starred = 1 WHERE {name_col} = ?", (name,))
+
+
+def _start_gallery_for_item_results(services) -> None:
+    """Provide the URL service dependency required when gallery rows become item DTOs."""
+    urls = SimpleNamespace(
+        get_image_url=lambda name, thumbnail=False: f"/images/{name}{'?thumbnail=1' if thumbnail else ''}",
+        get_video_url=lambda name, thumbnail=False: f"/videos/{name}{'?thumbnail=1' if thumbnail else ''}",
+    )
+    services["gallery"].start(SimpleNamespace(services=SimpleNamespace(urls=urls)))
+
+
+def _seed_created_range(services) -> None:
+    """Seed inclusive-day boundaries, excluded neighbours, and another user's matching media."""
+    for name in ("before.png", "range-start.png", "range-end.png", "after.png"):
+        _save_image(services["images"], name, user_id="alice")
+    for name in ("before.mp4", "range-video.mp4", "range-video-end.mp4", "bob-range.mp4"):
+        _save_video(services["videos"], name, user_id="bob" if name == "bob-range.mp4" else "alice")
+
+    for table, name_col, name, created_at in [
+        ("images", "image_name", "before.png", "2026-03-09 23:59:59.999"),
+        ("images", "image_name", "range-start.png", "2026-03-10 00:00:00.000"),
+        ("images", "image_name", "range-end.png", "2026-03-11 23:59:59.999"),
+        ("images", "image_name", "after.png", "2026-03-12 00:00:00.000"),
+        ("videos", "video_name", "before.mp4", "2026-03-09 23:59:59.999"),
+        ("videos", "video_name", "range-video.mp4", "2026-03-10 15:00:00.000"),
+        ("videos", "video_name", "range-video-end.mp4", "2026-03-11 09:00:00.000"),
+        ("videos", "video_name", "bob-range.mp4", "2026-03-11 12:00:00.000"),
+    ]:
+        _backdate(services, table, name_col, name, created_at)
+
+
+def _seed_starred(services) -> None:
+    """Alice owns a starred and a plain item of each kind; Bob owns one starred image."""
+    for name in ("starred.png", "plain.png"):
+        _save_image(services["images"], name, user_id="alice")
+    for name in ("starred.mp4", "plain.mp4"):
+        _save_video(services["videos"], name, user_id="alice")
+    _save_image(services["images"], "bob-starred.png", user_id="bob")
+
+    for table, name_col, name, created_at in [
+        ("images", "image_name", "starred.png", "2026-04-01 10:00:00"),
+        ("videos", "video_name", "starred.mp4", "2026-04-01 11:00:00"),
+        ("images", "image_name", "plain.png", "2026-04-02 10:00:00"),
+        ("videos", "video_name", "plain.mp4", "2026-04-02 11:00:00"),
+        ("images", "image_name", "bob-starred.png", "2026-04-02 12:00:00"),
+    ]:
+        _backdate(services, table, name_col, name, created_at)
+    for table, name_col, name in [
+        ("images", "image_name", "starred.png"),
+        ("videos", "video_name", "starred.mp4"),
+        ("images", "image_name", "bob-starred.png"),
+    ]:
+        _star(services, table, name_col, name)
+
+
+class TestStarredFiltering:
+    def test_list_items_starred_true_returns_only_starred_of_both_kinds_with_total(self, services) -> None:
+        _seed_starred(services)
+        _start_gallery_for_item_results(services)
+
+        result = services["gallery"].list_items(limit=10, user_id="alice", is_admin=False, starred=True)
+
+        assert [(item.kind, item.name) for item in result.items] == [
+            (GalleryItemKind.VIDEO, "starred.mp4"),
+            (GalleryItemKind.IMAGE, "starred.png"),
+        ]
+        assert result.total == 2
+
+    def test_list_items_starred_false_returns_only_unstarred(self, services) -> None:
+        _seed_starred(services)
+        _start_gallery_for_item_results(services)
+
+        result = services["gallery"].list_items(limit=10, user_id="alice", is_admin=False, starred=False)
+
+        assert {(item.kind, item.name) for item in result.items} == {
+            (GalleryItemKind.VIDEO, "plain.mp4"),
+            (GalleryItemKind.IMAGE, "plain.png"),
+        }
+        assert result.total == 2
+
+    def test_list_items_without_starred_is_unfiltered(self, services) -> None:
+        _seed_starred(services)
+        _start_gallery_for_item_results(services)
+
+        result = services["gallery"].list_items(limit=10, user_id="alice", is_admin=False)
+
+        assert result.total == 4
+
+    def test_starred_filter_respects_non_admin_isolation(self, services) -> None:
+        _seed_starred(services)
+        gallery = services["gallery"]
+
+        as_admin = gallery.list_item_names(user_id="alice", is_admin=True, starred=True)
+        as_user = gallery.list_item_names(user_id="alice", is_admin=False, starred=True)
+
+        assert {item.name for item in as_admin.items} == {"starred.png", "starred.mp4", "bob-starred.png"}
+        assert {item.name for item in as_user.items} == {"starred.png", "starred.mp4"}
+
+    def test_starred_filter_composes_with_board_scope(self, services) -> None:
+        _seed_starred(services)
+        board = services["boards"].save("Board", "alice")
+        services["board_images"].add_image_to_board(board.board_id, "starred.png")
+        services["board_images"].add_image_to_board(board.board_id, "plain.png")
+        gallery = services["gallery"]
+
+        on_board = gallery.list_item_names(board_id=board.board_id, user_id="alice", is_admin=False, starred=True)
+        off_board = gallery.list_item_names(board_id="none", user_id="alice", is_admin=False, starred=True)
+
+        assert [item.name for item in on_board.items] == ["starred.png"]
+        assert [item.name for item in off_board.items] == ["starred.mp4"]
+
+    def test_starred_filter_composes_with_date_filters_and_search(self, services) -> None:
+        _seed_starred(services)
+        gallery = services["gallery"]
+
+        by_date = gallery.list_item_names(user_id="alice", is_admin=False, created_date="2026-04-01", starred=True)
+        by_range = gallery.get_item_names(
+            user_id="alice",
+            is_admin=False,
+            created_from="2026-04-02",
+            created_to="2026-04-02",
+            starred=False,
+        )
+        by_search = gallery.get_item_names(user_id="alice", is_admin=False, search_term="2026-04-01 11", starred=True)
+
+        assert {item.name for item in by_date.items} == {"starred.png", "starred.mp4"}
+        assert set(by_range.item_names) == {"plain.png", "plain.mp4"}
+        assert by_search.item_names == ["starred.mp4"]
+
+    def test_name_lists_keep_starred_count_semantics_under_filter(self, services) -> None:
+        _seed_starred(services)
+        gallery = services["gallery"]
+
+        starred = gallery.list_item_names(user_id="alice", is_admin=False, starred=True)
+        unstarred = gallery.list_item_names(user_id="alice", is_admin=False, starred=False)
+        unsorted = gallery.list_item_names(user_id="alice", is_admin=False, starred=True, starred_first=False)
+        flat = gallery.get_item_names(user_id="alice", is_admin=False, starred=True)
+
+        assert starred.starred_count == starred.total_count == 2
+        assert unstarred.starred_count == 0
+        assert unsorted.starred_count == 0
+        assert flat.item_names == [item.name for item in starred.items]
+
+    def test_starred_first_ordering_is_unchanged_when_unfiltered(self, services) -> None:
+        _seed_starred(services)
+
+        names = [item.name for item in services["gallery"].list_item_names(user_id="alice", is_admin=False).items]
+
+        assert names == ["starred.mp4", "starred.png", "plain.mp4", "plain.png"]
+
+
 class TestGetDatesPolymorphic:
     def test_video_only_date_appears(self, services) -> None:
         # A date with videos and no images must still produce a virtual board — with the
@@ -249,6 +404,79 @@ class TestListItemNamesByCreatedDate:
         assert [(item.kind, item.name) for item in result.items] == [(GalleryItemKind.VIDEO, "alice-day.mp4")]
 
 
+class TestCreatedRangeFiltering:
+    def test_list_items_includes_utc_day_bounds_and_reports_total(self, services) -> None:
+        _seed_created_range(services)
+        _start_gallery_for_item_results(services)
+
+        result = services["gallery"].list_items(
+            limit=10,
+            user_id="alice",
+            is_admin=False,
+            created_from="2026-03-10",
+            created_to="2026-03-11",
+        )
+
+        assert [(item.kind, item.name) for item in result.items] == [
+            (GalleryItemKind.IMAGE, "range-end.png"),
+            (GalleryItemKind.VIDEO, "range-video-end.mp4"),
+            (GalleryItemKind.VIDEO, "range-video.mp4"),
+            (GalleryItemKind.IMAGE, "range-start.png"),
+        ]
+        assert result.total == 4
+
+    def test_list_item_names_created_range_matches_item_order_and_counts(self, services) -> None:
+        _seed_created_range(services)
+
+        result = services["gallery"].list_item_names(
+            user_id="alice",
+            is_admin=False,
+            created_from="2026-03-10",
+            created_to="2026-03-11",
+        )
+
+        assert [(item.kind, item.name) for item in result.items] == [
+            (GalleryItemKind.IMAGE, "range-end.png"),
+            (GalleryItemKind.VIDEO, "range-video-end.mp4"),
+            (GalleryItemKind.VIDEO, "range-video.mp4"),
+            (GalleryItemKind.IMAGE, "range-start.png"),
+        ]
+        assert result.total_count == 4
+
+    def test_get_item_names_created_range_matches_legacy_result(self, services) -> None:
+        _seed_created_range(services)
+
+        result = services["gallery"].get_item_names(
+            user_id="alice",
+            is_admin=False,
+            created_from="2026-03-10",
+            created_to="2026-03-11",
+        )
+
+        assert result.item_names == [
+            "range-end.png",
+            "range-video-end.mp4",
+            "range-video.mp4",
+            "range-start.png",
+        ]
+        assert result.total_count == 4
+
+    def test_created_date_remains_an_exact_day_filter_without_ranges(self, services) -> None:
+        _seed_created_range(services)
+
+        result = services["gallery"].list_item_names(
+            user_id="alice",
+            is_admin=False,
+            created_date="2026-03-10",
+        )
+
+        assert [(item.kind, item.name) for item in result.items] == [
+            (GalleryItemKind.VIDEO, "range-video.mp4"),
+            (GalleryItemKind.IMAGE, "range-start.png"),
+        ]
+        assert result.total_count == 2
+
+
 class TestGetBoardMediaSummaries:
     def test_returns_counts_and_deterministic_covers_in_one_result(self, services) -> None:
         populated = services["boards"].save("Populated", "alice")
@@ -256,9 +484,13 @@ class TestGetBoardMediaSummaries:
         _save_image(services["images"], "cover.png", user_id="alice")
         _save_video(services["videos"], "cover.mp4", user_id="alice")
         _save_video(services["videos"], "intermediate.mp4", user_id="alice")
+        # An uploaded (user-category) video is an asset: counted in video_count AND
+        # asset_video_count, so clients can split the Media/Assets views.
+        _save_video(services["videos"], "uploaded.mp4", user_id="alice", category=ImageCategory.USER)
         services["board_images"].add_image_to_board(populated.board_id, "cover.png")
         services["board_videos"].add_video_to_board(populated.board_id, "cover.mp4")
         services["board_videos"].add_video_to_board(populated.board_id, "intermediate.mp4")
+        services["board_videos"].add_video_to_board(populated.board_id, "uploaded.mp4")
         with services["images"]._db.transaction() as cursor:
             cursor.execute(
                 "UPDATE images SET starred = 1, created_at = ? WHERE image_name = ?",
@@ -280,12 +512,14 @@ class TestGetBoardMediaSummaries:
         )
 
         assert summaries[populated.board_id].image_count == 1
-        assert summaries[populated.board_id].video_count == 1
+        assert summaries[populated.board_id].video_count == 2
         assert summaries[populated.board_id].asset_count == 0
+        assert summaries[populated.board_id].asset_video_count == 1
         assert summaries[populated.board_id].cover_image_name is None
         assert summaries[populated.board_id].cover_video_name == "cover.mp4"
         assert summaries[empty.board_id].image_count == 0
         assert summaries[empty.board_id].video_count == 0
+        assert summaries[empty.board_id].asset_video_count == 0
         assert summaries[empty.board_id].cover_image_name is None
         assert summaries[empty.board_id].cover_video_name is None
         assert next(i for i, detail in enumerate(details) if "board_images" in detail) < next(
@@ -328,6 +562,7 @@ class TestGalleryQueryPlans:
             {"user_id": "alice", "is_admin": False},
             {"user_id": "alice", "is_admin": False, "order_dir": SQLiteDirection.Ascending},
             {"user_id": "alice", "is_admin": False, "starred_first": False},
+            {"user_id": "alice", "is_admin": False, "starred": True},
         ],
     )
     def test_name_shapes_do_not_force_indexes(self, services, kwargs) -> None:
@@ -345,6 +580,30 @@ class TestGalleryQueryPlans:
 
         assert "INDEXED BY" not in statement
         assert "NOT INDEXED" not in statement
+
+    def test_starred_filter_searches_the_starred_index(self, services) -> None:
+        # The bounded starred strip asks for `starred = 1` on every board visit, so the
+        # filter must be served by idx_*_starred rather than a table scan per half.
+        _save_image(services["images"], "starred.png", user_id="alice")
+        _save_image(services["images"], "plain.png", user_id="alice")
+        _save_video(services["videos"], "starred.mp4", user_id="alice")
+        _save_video(services["videos"], "plain.mp4", user_id="alice")
+        _star(services, "images", "image_name", "starred.png")
+        _star(services, "videos", "video_name", "starred.mp4")
+
+        result, _, details = _capture_plan(
+            services,
+            lambda: services["gallery"].list_item_names(
+                categories=[ImageCategory.GENERAL],
+                is_intermediate=False,
+                is_admin=True,
+                starred=True,
+            ),
+            "UNION ALL",
+        )
+
+        assert result.total_count == 2
+        assert not any(detail.startswith(("SCAN images", "SCAN videos")) for detail in details)
 
     def test_explicit_board_starts_from_mixed_membership(self, services) -> None:
         board = services["boards"].save("Small", "alice")
@@ -517,3 +776,73 @@ class TestOrderingTieBreakers:
 
         # One stable choice across refetches: the kind/name-descending winner (b.mp4).
         assert covers == {(None, "b.mp4")}
+
+
+def _save_marked_video(store: SqliteVideoRecordStorage, name: str, user_id: str, metadata: str | None) -> None:
+    store.save(
+        video_name=name,
+        video_origin=ResourceOrigin.EXTERNAL,
+        video_category=ImageCategory.USER,
+        width=640,
+        height=360,
+        duration=1.0,
+        fps=24.0,
+        has_workflow=False,
+        is_intermediate=False,
+        metadata=metadata,
+        user_id=user_id,
+    )
+
+
+class TestMediaOriginOnListedItems:
+    """The listing carries `media_origin`, so a clip picked straight off the gallery grid
+    can be conditioned correctly without a follow-up /metadata request.
+
+    "Extend in Video" builds its source clip from a listed item rather than a resolve, so
+    the marker has to survive the polymorphic UNION as well as the video DTO.
+    """
+
+    def test_a_wrapped_audio_upload_is_marked(self, services) -> None:
+        _save_marked_video(services["videos"], "wrapped.mp4", "alice", '{"media_origin": "audio_upload"}')
+
+        listed = services["gallery"].list_items(user_id="alice", is_admin=False)
+
+        assert [(item.name, item.media_origin) for item in listed.items] == [("wrapped.mp4", "audio_upload")]
+
+    def test_ordinary_videos_and_images_carry_no_marker(self, services) -> None:
+        _save_marked_video(services["videos"], "plain.mp4", "alice", '{"note": "kept"}')
+        _save_marked_video(services["videos"], "bare.mp4", "alice", None)
+        _save_image(services["images"], "still.png", user_id="alice")
+
+        listed = services["gallery"].list_items(user_id="alice", is_admin=False)
+        origins = {item.name: item.media_origin for item in listed.items}
+
+        assert origins == {"plain.mp4": None, "bare.mp4": None, "still.png": None}
+
+    def test_a_non_string_marker_does_not_break_the_listing(self, services) -> None:
+        """One video with an odd `media_origin` must not fail the whole gallery page.
+
+        Upload metadata is validated only as a JSON object, so the extracted value can be an
+        int; building `GalleryItem` from it used to raise, and the listing is a UNION over
+        every item, so the failure was not confined to the offending video.
+        """
+        _save_marked_video(services["videos"], "odd.mp4", "alice", '{"media_origin": 7}')
+        _save_marked_video(services["videos"], "wrapped.mp4", "alice", '{"media_origin": "audio_upload"}')
+
+        listed = services["gallery"].list_items(user_id="alice", is_admin=False)
+        origins = {item.name: item.media_origin for item in listed.items}
+
+        assert origins == {"odd.mp4": None, "wrapped.mp4": "audio_upload"}
+
+    def test_a_malformed_metadata_blob_does_not_fail_the_page(self, services) -> None:
+        """The listing is a UNION over every item, so an unguarded `json_extract` raise here
+        would 500 the whole gallery page for one bad row — and for an admin, for everyone."""
+        _save_marked_video(services["videos"], "bad.mp4", "alice", "not json at all")
+        _save_marked_video(services["videos"], "wrapped.mp4", "alice", '{"media_origin": "audio_upload"}')
+
+        listed = services["gallery"].list_items(user_id="alice", is_admin=False)
+
+        assert {item.name: item.media_origin for item in listed.items} == {
+            "bad.mp4": None,
+            "wrapped.mp4": "audio_upload",
+        }

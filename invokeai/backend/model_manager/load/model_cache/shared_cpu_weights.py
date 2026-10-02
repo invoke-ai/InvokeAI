@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 
 import torch
 
-from invokeai.backend.util.calc_tensor_size import calc_tensor_size
+from invokeai.backend.model_manager.load.model_cache.tensor_aliases import analyze_state_dict
 
 
 @dataclass
@@ -90,7 +90,8 @@ class SharedCpuWeightsStore:
             if entry is None:
                 entry = _SharedWeightsEntry(
                     state_dict=state_dict,
-                    total_bytes=sum(calc_tensor_size(v) for v in state_dict.values()),
+                    # Tied weights appear under several keys; charging each name would count that memory twice.
+                    total_bytes=sum(analyze_state_dict(state_dict).bytes_by_key.values()),
                 )
                 self._entries[key] = entry
             entry.refcount += 1

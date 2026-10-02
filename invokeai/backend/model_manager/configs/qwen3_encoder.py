@@ -496,6 +496,26 @@ class Qwen3Encoder_GGUF_Config(Checkpoint_Config_Base, Config_Base):
             raise NotAMatchError(
                 "state dict bundles a Qwen-VL visual tower; this is a Qwen-VL encoder, not a text-only Qwen3 encoder"
             )
+        # Reject Qwen3-VL language towers. The visual-tower check above cannot see them: llama.cpp
+        # keeps the visual tower in a separate ``mmproj-*.gguf``, so a Qwen3-VL GGUF is structurally
+        # identical to a text-only Qwen3 of the same width (both 36 layers at hidden 2560 for the
+        # 4B). Only the architecture metadata separates them, and without this the file installs as
+        # a Z-Image encoder and never reaches Krea-2.
+        cls._reject_qwen3_vl_architecture(mod)
+
+    @classmethod
+    def _reject_qwen3_vl_architecture(cls, mod: ModelOnDisk) -> None:
+        # `mod.metadata()` caches GGUF string fields across the whole identification sweep and
+        # yields {} for anything it cannot read, so a non-GGUF simply finds no architecture here and
+        # is left to `_validate_looks_like_gguf_quantized`.
+        architecture = mod.metadata().get("general.architecture")
+        # Broader than the Qwen3-VL config's exact match on purpose: rejecting a variant we cannot
+        # build (e.g. "qwen3vlmoe") is correct here, whereas accepting one there would not be.
+        if architecture is not None and architecture.startswith("qwen3vl"):
+            raise NotAMatchError(
+                f"GGUF architecture is {architecture!r}: this is a Qwen3-VL encoder (Krea-2 / Ideogram 4), "
+                "not a text-only Qwen3 encoder"
+            )
 
     @classmethod
     def _validate_looks_like_gguf_quantized(cls, mod: ModelOnDisk) -> None:

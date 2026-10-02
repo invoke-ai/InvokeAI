@@ -4,7 +4,7 @@ from unittest.mock import MagicMock
 
 import torch
 
-from invokeai.app.invocations.sd3_text_encoder import Sd3TextEncoderInvocation
+from invokeai.app.invocations.text_encoder.sd3_text_encoder import Sd3TextEncoderInvocation
 from invokeai.backend.model_manager.taxonomy import ModelFormat
 
 
@@ -94,7 +94,7 @@ class FakeLoadedModel:
 def test_sd3_clip_encode_uses_compute_device(monkeypatch):
     # Regression test for #9373: the encoder's weights are offloaded to CPU, but its intended compute device is the
     # accelerator. The encode must run on the intended compute device, not the current residency.
-    module_path = "invokeai.app.invocations.sd3_text_encoder"
+    module_path = "invokeai.app.invocations.text_encoder.sd3_text_encoder"
     compute_device = torch.device("meta")
     text_encoder = FakeSd3ClipTextEncoder(effective_device=torch.device("cpu"))
     tokenizer = FakeClipTokenizer()
@@ -138,7 +138,7 @@ def test_sd3_clip_encode_uses_compute_device(monkeypatch):
 
 def test_sd3_t5_encode_uses_compute_device(monkeypatch):
     # Regression test for #9373: same as the CLIP case, for the T5 encode path.
-    module_path = "invokeai.app.invocations.sd3_text_encoder"
+    module_path = "invokeai.app.invocations.text_encoder.sd3_text_encoder"
     compute_device = torch.device("meta")
     text_encoder = FakeSd3T5Encoder(effective_device=torch.device("cpu"))
     tokenizer = FakeT5Tokenizer()

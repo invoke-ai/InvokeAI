@@ -1,4 +1,3 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654) and the InvokeAI Team
 from __future__ import annotations
 
 from typing import TYPE_CHECKING
@@ -7,6 +6,7 @@ from invokeai.app.services.object_serializer.object_serializer_base import Objec
 from invokeai.app.services.style_preset_images.style_preset_images_base import StylePresetImageFileStorageBase
 from invokeai.app.services.style_preset_records.style_preset_records_base import StylePresetRecordsStorageBase
 from invokeai.app.services.system_prompt_records.system_prompt_records_base import SystemPromptRecordsStorageBase
+from invokeai.app.services.wildcard_records.wildcard_records_base import WildcardRecordsStorageBase
 
 if TYPE_CHECKING:
     from logging import Logger
@@ -24,11 +24,15 @@ if TYPE_CHECKING:
     from invokeai.app.services.download import DownloadQueueServiceBase
     from invokeai.app.services.events.events_base import EventServiceBase
     from invokeai.app.services.external_generation.external_generation_base import ExternalGenerationServiceBase
+    from invokeai.app.services.fonts.fonts_default import FontService
     from invokeai.app.services.gallery.gallery_base import GalleryServiceABC
     from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
+    from invokeai.app.services.image_index.image_index_base import ImageIndexServiceBase
+    from invokeai.app.services.image_index.image_index_records_base import ImageIndexRecordsBase
     from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
     from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
     from invokeai.app.services.images.images_base import ImageServiceABC
+    from invokeai.app.services.intermediates.intermediates_base import IntermediatesServiceBase
     from invokeai.app.services.invocation_cache.invocation_cache_base import InvocationCacheBase
     from invokeai.app.services.invocation_stats.invocation_stats_base import InvocationStatsServiceBase
     from invokeai.app.services.model_images.model_images_base import ModelImageFileStorageBase
@@ -38,6 +42,8 @@ if TYPE_CHECKING:
     )
     from invokeai.app.services.model_relationships.model_relationships_base import ModelRelationshipsServiceABC
     from invokeai.app.services.names.names_base import NameServiceBase
+    from invokeai.app.services.progress_previews.progress_previews_base import ProgressPreviewsBase
+    from invokeai.app.services.project_records.project_records_base import ProjectRecordsStorageBase
     from invokeai.app.services.session_processor.session_processor_base import SessionProcessorBase
     from invokeai.app.services.session_queue.session_queue_base import SessionQueueBase
     from invokeai.app.services.urls.urls_base import UrlServiceBase
@@ -48,6 +54,12 @@ if TYPE_CHECKING:
     from invokeai.app.services.workflow_records.workflow_records_base import WorkflowRecordsStorageBase
     from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_base import WorkflowThumbnailServiceBase
     from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
+
+
+def _default_progress_previews() -> "ProgressPreviewsBase":
+    from invokeai.app.services.progress_previews.progress_previews_default import MemoryProgressPreviews
+
+    return MemoryProgressPreviews()
 
 
 class InvocationServices:
@@ -82,17 +94,24 @@ class InvocationServices:
         tensors: "ObjectSerializerBase[torch.Tensor]",
         conditioning: "ObjectSerializerBase[ConditioningFieldData]",
         style_preset_records: "StylePresetRecordsStorageBase",
+        wildcard_records: "WildcardRecordsStorageBase",
         style_preset_image_files: "StylePresetImageFileStorageBase",
         system_prompt_records: "SystemPromptRecordsStorageBase",
         workflow_thumbnails: "WorkflowThumbnailServiceBase",
         client_state_persistence: "ClientStatePersistenceABC",
+        project_records: "ProjectRecordsStorageBase",
         users: "UserServiceBase",
         videos: "VideoServiceABC",
         video_files: "VideoFileStorageBase",
         video_records: "VideoRecordStorageBase",
         board_video_records: "BoardVideoRecordStorageBase",
         gallery: "GalleryServiceABC",
+        image_index_records: "ImageIndexRecordsBase",
+        image_index: "ImageIndexServiceBase",
+        intermediates: "IntermediatesServiceBase",
         image_moves: "ImageMoveService | None" = None,
+        progress_previews: "ProgressPreviewsBase | None" = None,
+        fonts: "FontService | None" = None,
     ):
         self.board_images = board_images
         self.board_image_records = board_image_records
@@ -114,6 +133,11 @@ class InvocationServices:
         self.performance_statistics = performance_statistics
         self.session_queue = session_queue
         self.image_moves = image_moves
+        # Pure in-memory state with no dependencies, so callers (including the many test
+        # constructors) may leave it out.
+        self.progress_previews: "ProgressPreviewsBase" = (
+            progress_previews if progress_previews is not None else _default_progress_previews()
+        )
         self.session_processor = session_processor
         self.invocation_cache = invocation_cache
         self.names = names
@@ -122,13 +146,19 @@ class InvocationServices:
         self.tensors = tensors
         self.conditioning = conditioning
         self.style_preset_records = style_preset_records
+        self.wildcard_records = wildcard_records
         self.style_preset_image_files = style_preset_image_files
         self.system_prompt_records = system_prompt_records
         self.workflow_thumbnails = workflow_thumbnails
         self.client_state_persistence = client_state_persistence
+        self.project_records = project_records
         self.users = users
         self.videos = videos
         self.video_files = video_files
         self.video_records = video_records
         self.board_video_records = board_video_records
         self.gallery = gallery
+        self.image_index_records = image_index_records
+        self.image_index = image_index
+        self.fonts = fonts
+        self.intermediates = intermediates

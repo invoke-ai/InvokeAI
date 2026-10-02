@@ -5,6 +5,7 @@ from logging import Logger
 
 import pytest
 
+from invokeai.app.services.shared.media_references import create_media_references_table
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users import users_default
 from invokeai.app.services.users.users_common import UserCreateRequest, UserUpdateRequest
@@ -36,6 +37,8 @@ def db(logger: Logger) -> SqliteDatabase:
             token_epoch INTEGER NOT NULL DEFAULT 0
         );
     """)
+    # Deleting an account also drops the media references its documents held.
+    create_media_references_table(db._conn.cursor())
     db._conn.commit()
     return db
 
@@ -177,6 +180,21 @@ def test_delete_user(user_service: UserService):
 
     retrieved_user = user_service.get(user.user_id)
     assert retrieved_user is None
+
+
+def test_delete_user_drops_references_only_of_documents_that_cascade(user_service: UserService, db: SqliteDatabase):
+    user = user_service.create(
+        UserCreateRequest(email="test@example.com", display_name="T", password="TestPassword123")
+    )
+    db._conn.executemany(
+        "INSERT INTO media_references VALUES (?, ?, 'owner', 'image', 'a.png');",
+        [(kind, user.user_id) for kind in ("project", "client_state", "workflow", "quarantined_project")],
+    )
+
+    user_service.delete(user.user_id)
+
+    rows = db._conn.execute("SELECT owner_kind FROM media_references ORDER BY owner_kind;").fetchall()
+    assert [row[0] for row in rows] == ["quarantined_project", "workflow"]
 
 
 def test_authenticate_valid_credentials(user_service: UserService):

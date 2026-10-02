@@ -26,9 +26,10 @@ class FakeCache:
         self.lock_calls = 0
         self.unlock_calls = 0
 
-    def lock(self, cache_record: CacheRecord, working_mem_bytes: int | None) -> None:
-        del cache_record, working_mem_bytes
+    def lock(self, cache_record: CacheRecord, working_mem_bytes: int | None, max_move_bytes: int | None = None) -> bool:
+        del cache_record, working_mem_bytes, max_move_bytes
         self.lock_calls += 1
+        return True
 
     def unlock(self, cache_record: CacheRecord) -> None:
         del cache_record

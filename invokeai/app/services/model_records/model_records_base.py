@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
 """
 Abstract base class for storing and retrieving model configuration records.
 """
@@ -27,6 +26,8 @@ from invokeai.backend.model_manager.taxonomy import (
     Flux2VariantType,
     FluxVariantType,
     Krea2VariantType,
+    LTX2VariantType,
+    MiniMaxH3VariantType,
     MistralVariantType,
     ModelFormat,
     ModelSourceType,
@@ -34,6 +35,7 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelVariantType,
     PiDDecoderVariantType,
     Qwen3VariantType,
+    Qwen3VLVariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
     WanLoRAVariantType,
@@ -149,7 +151,10 @@ class ModelRecordChanges(BaseModelExcludeNull):
         | WanVariantType
         | WanLoRAVariantType
         | Qwen3VariantType
+        | Qwen3VLVariantType
         | Krea2VariantType
+        | MiniMaxH3VariantType
+        | LTX2VariantType
         | MistralVariantType
         | PiDDecoderVariantType
     ] = Field(description="The variant of the model.", default=None)

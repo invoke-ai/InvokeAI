@@ -101,6 +101,26 @@ def test_registration_meta_override_succeed(mm2_installer: ModelInstallServiceBa
     assert model_record.key == "xyzzy"
 
 
+def test_registration_keeps_the_default_settings_sent_with_the_install(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path
+) -> None:
+    """Identification computes a model's default settings; the ones a user picked while installing must survive it."""
+    import torch
+    from safetensors.torch import save_file
+
+    checkpoint = tmp_path / "qwen_image.safetensors"
+    save_file(
+        {"img_in.weight": torch.zeros(8, 4), "txt_in.weight": torch.zeros(8, 4), "txt_norm.weight": torch.ones(4)},
+        str(checkpoint),
+    )
+
+    key = mm2_installer.register_path(checkpoint, ModelRecordChanges(default_settings={"fp8_storage": True}))
+
+    record = mm2_installer.record_store.get_model(key)
+    assert record.default_settings is not None
+    assert record.default_settings.fp8_storage is True
+
+
 def test_install(
     mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
 ) -> None:
@@ -1186,6 +1206,36 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
     mm2_installer.wait_for_job(install_job2, timeout=10)
     assert install_job2.complete
     assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
+
+
+def test_multifile_download_layout_with_explicit_files(mm2_installer: ModelInstallServiceBase, tmp_path: Path) -> None:
+    """Explicit file entries in a multi-subfolder source keep their repo-relative paths: the root
+    pipeline index lands at the model root and transformer/config.json stays inside transformer/
+    (naive relative_to() matching would flatten it to the root), while plain subfolder entries keep
+    the pre-existing one-directory-per-subfolder layout."""
+    from invokeai.backend.model_manager.metadata.metadata_base import RemoteModelFile
+
+    remote_files = [
+        RemoteModelFile(url="https://example.com/root_index", path=Path("MiniMax-H3/modular_model_index.json")),
+        RemoteModelFile(url="https://example.com/transformer_config", path=Path("MiniMax-H3/transformer/config.json")),
+        RemoteModelFile(url="https://example.com/vae_config", path=Path("MiniMax-H3/vae/config.json")),
+        RemoteModelFile(
+            url="https://example.com/vae_weights", path=Path("MiniMax-H3/vae/diffusion_pytorch_model.safetensors")
+        ),
+    ]
+    job = mm2_installer._multifile_download(  # pyright: ignore[reportAttributeAccessIssue]
+        remote_files=remote_files,
+        dest=tmp_path,
+        subfolders=[Path("modular_model_index.json"), Path("transformer/config.json"), Path("vae")],
+        submit_job=False,
+    )
+    top = Path("MiniMax-H3_modular_model_index_config_vae")
+    assert {part.dest.relative_to(tmp_path.resolve()) for part in job.download_parts} == {
+        top / "modular_model_index.json",
+        top / "transformer" / "config.json",
+        top / "vae" / "config.json",
+        top / "vae" / "diffusion_pytorch_model.safetensors",
+    }
 
 
 def test_restore_keeps_a_legacy_marker_whose_key_predates_key_validation(

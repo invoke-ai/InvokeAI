@@ -85,6 +85,26 @@ INSTALL_MARKER_FILENAME = ".invokeai_install.json"
 INSTALL_MARKER_VERSION = 1
 
 
+# Filesystems cap a single path component at 255 bytes. A source that lists many explicit files
+# (an LTX-2 component folder names eight) would otherwise produce a folder name that cannot be
+# created; the combined name is only a label, so it is shortened past this point with a count.
+_MAX_COMBINED_SUBFOLDER_NAME = 96
+
+
+def _combined_subfolder_name(subfolder_names: List[str]) -> str:
+    combined = "_".join(subfolder_names)
+    if len(combined) <= _MAX_COMBINED_SUBFOLDER_NAME:
+        return combined
+    kept: List[str] = []
+    for name in subfolder_names:
+        candidate = "_".join([*kept, name])
+        if kept and len(candidate) > _MAX_COMBINED_SUBFOLDER_NAME - 16:
+            break
+        kept.append(name)
+    remaining = len(subfolder_names) - len(kept)
+    return "_".join(kept) + (f"_and_{remaining}_more" if remaining else "")
+
+
 class ModelInstallService(ModelInstallServiceBase):
     """class for InvokeAI model installation."""
 
@@ -1433,10 +1453,14 @@ class ModelInstallService(ModelInstallServiceBase):
         # subdirectory within the model folder.
 
         if subfolders and len(subfolders) > 1:
-            # Multiple subfolders: create combined name and keep subfolder structure
+            # Multiple subfolders: create combined name and keep subfolder structure. Entries may
+            # also be explicit files (e.g. "modular_model_index.json" or "transformer/config.json");
+            # use their stems in the combined name so it stays a sane directory name.
             top = Path(remote_files[0].path.parts[0])  # e.g. "Z-Image-Turbo/"
-            subfolder_names = [sf.name.replace("/", "_").replace("\\", "_") for sf in subfolders]
-            combined_name = "_".join(subfolder_names)
+            subfolder_names = [
+                (sf.stem if sf.suffix else sf.name).replace("/", "_").replace("\\", "_") for sf in subfolders
+            ]
+            combined_name = _combined_subfolder_name(subfolder_names)
             path_to_add = Path(f"{top}_{combined_name}")
 
             parts: List[RemoteModelFile] = []
@@ -1446,6 +1470,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 file_path = model_file.path
                 new_path: Optional[Path] = None
                 for sf in subfolders:
+                    if file_path == top / sf:
+                        # An explicit file entry: keep its repo-relative path so e.g.
+                        # transformer/config.json stays inside transformer/. (relative_to() below
+                        # would return "." here and flatten the file to the model root.)
+                        new_path = path_to_add / sf
+                        break
                     try:
                         # Try to get relative path from this subfolder
                         relative = file_path.relative_to(top / sf)

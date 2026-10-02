@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "InvokeAI"
 description = "A full-featured AI-assisted image generation environment designed for creatives and enthusiasts."
-requires-python = ">=3.11, <3.13"
+requires-python = ">=3.12, <3.13"
 readme = { content-type = "text/markdown", file = "README.md" }
 keywords = ["stable-diffusion", "AI"]
 dynamic = ["version"]
@@ -52,14 +52,16 @@ dependencies = [
   "sentencepiece==0.2.0",                 # 0.2.1 coredumps windows when loading t5 tokenizer
   "spandrel",
   # Loosely pinned, will respect requirement of `diffusers[torch]`. Split by platform: linux/win allow
-  # >=2.10 so the rocm extra can use torch 2.10.0+rocm7.1, while macOS stays on 2.7.x — newer macOS torch
-  # wheels exercise MPS on CI runners (no usable Metal GPU) and fail with MPS OOM.
-  # Deliberately NOT capped below 2.12 here. torch 2.12.x+rocm7.1 is reported to break generation (#9410), but
-  # this range is what every backend-agnostic install resolves against — manual installs use
+  # the 2.13 line every backend extra pins (the lock itself is held there by `constraint-dependencies` in
+  # [tool.uv]), while macOS stays on 2.7.x — newer macOS torch wheels exercise MPS on CI runners (no
+  # usable Metal GPU) and fail with MPS OOM.
+  # Deliberately NOT capped below 2.12 here. torch 2.12.x+rocm7.1 was reported to break generation (#9410),
+  # but this range is what every backend-agnostic install resolves against — manual installs use
   # `--torch-backend=<x>` with no extra (see docs/start-here/manual), so a blanket cap would also
   # reject torch>=2.12 on Windows/Linux CUDA, CPU and ARM64, where 2.12 has no known problem.
   # The ROCm path is constrained where it can actually be targeted: the `rocm` extra below pins an
-  # exact version, and the manual docs carry the ROCm-specific caveat.
+  # exact version — 2.13.0+rocm7.2, validated end-to-end on gfx1100 (W7900), where its bundled
+  # AOTriton 0.12b also triples flash-attention throughput vs the 2.10.0+rocm7.1 pin.
   "torch>=2.7.0,<3.0; sys_platform != 'darwin'",
   "torch>=2.7.0,<2.8.0; sys_platform == 'darwin'",
   "torchsde",                             # diffusers needs this for SDE solvers, but it is not an explicit dep of diffusers
@@ -73,7 +75,7 @@ dependencies = [
   # is fixed as of 0.124.0 — no change to AnyInvocation was needed.
   #
   # Two later changes did need adapting to, both handled: 0.130 emits `contentMediaType` instead of
-  # `format: binary` for file uploads (see the Blob mapping in frontend/web/scripts/typegen.js), and 0.141 keeps
+  # `format: binary` for file uploads (see the Blob mapping in frontend/api/scripts/typegen.js), and 0.141 keeps
   # included routers as a single node in `app.routes` rather than copying their routes into it (see
   # `_iter_route_contexts` in tests/app/routers/test_model_manager_authorization.py). Keep the minor-version bound:
   # both of those were silent breakages that only surfaced because something happened to assert on them.
@@ -104,6 +106,16 @@ dependencies = [
   "requests",
   "semver~=3.0.1",
   "PyWavelets",
+
+  # Semantic image index (image map / semantic search).
+  # numba is a umap-learn transitive, pinned to the range this stack has been
+  # exercised against rather than for numpy compatibility: every release from
+  # 0.59 to at least 0.63 accepts the numpy 1.26.x resolved under numpy<2.0
+  # above (0.62 widened its floor back to >=1.22). Raise the ceiling once a
+  # newer numba has been run against the image map, not just resolved.
+  "umap-learn~=0.5.7",
+  "scikit-learn~=1.5",
+  "numba>=0.59,<0.62",
 ]
 
 [project.optional-dependencies]
@@ -113,35 +125,42 @@ dependencies = [
   # torch 2.4+cu carries its own triton dependency
 ]
 
-# The +cpu/+cu128/+rocm7.1 pins live on PyTorch's WHL indexes. torchvision has no
-# linux_aarch64 wheels there (torch does for +cpu/+cu128), so on linux_aarch64 these
-# pins are unsatisfiable and are gated behind a marker that excludes only that
-# platform; every other platform (Windows, macOS, Linux x86_64) is unaffected. On
-# linux_aarch64 the base `torch` / `torchvision` declarations resolve from PyPI
-# instead (CPU-only wheels — an aarch64 install requesting `cuda` gets CPU torch).
-# Since torch+cu128 aarch64 wheels DO exist on the index, real CUDA-on-aarch64
-# (e.g. Grace/GH200) is feasible later with a torchvision-specific workaround.
+# The +cpu/+cu130/+rocm7.2 pins live on PyTorch's WHL indexes and are gated to the
+# platforms the project resolves and tests them on: Windows and Linux x86_64 (rocm: Linux
+# only). macOS is capped below torch 2.8 (see the base requirement), and linux_aarch64 stays
+# on the CPU-only PyPI 2.7.1 it was set up with (an aarch64 install requesting `cuda` gets
+# CPU torch), so both fall back to the base `torch` / `torchvision` from PyPI. The index has
+# carried aarch64 torchvision since 0.28, so moving aarch64 onto the pinned pairs -- and real
+# CUDA-on-aarch64 (e.g. Grace/GH200) -- is open, just untested.
+#
+# cu130 builds cover compute capability 7.5 and newer (Turing through Blackwell) and need
+# an NVIDIA driver from the R580 series or newer. CUDA 13 cannot build for Maxwell, Pascal
+# or Volta; the cu126 builds that still can have no Blackwell kernels, and cu128 stops at
+# torch 2.11.
 "cpu" = [
-  "torch==2.7.1+cpu; sys_platform != 'linux' or platform_machine != 'aarch64'",
-  "torchvision==0.22.1+cpu; sys_platform != 'linux' or platform_machine != 'aarch64'",
-  # linux_aarch64 fallback: same versions, resolved from PyPI. Without these
-  # explicit entries the extra's conflict-universe would contain no torch at all
-  # on aarch64 (uv partitions the base declarations into the no-extra universe).
-  "torch==2.7.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
-  "torchvision==0.22.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
+  "torch==2.13.0+cpu; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  "torchvision==0.28.0+cpu; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  # macOS / linux_aarch64 fallback, resolved from PyPI. Without these explicit entries
+  # the extra's conflict-universe would contain no torch at all there (uv partitions
+  # the base declarations into the no-extra universe).
+  "torch==2.7.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
+  "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
 ]
 "cuda" = [
-  "torch==2.7.1+cu128; sys_platform != 'linux' or platform_machine != 'aarch64'",
-  "torchvision==0.22.1+cu128; sys_platform != 'linux' or platform_machine != 'aarch64'",
-  # linux_aarch64 fallback, see note under "cpu"
-  "torch==2.7.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
-  "torchvision==0.22.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
+  "torch==2.13.0+cu130; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  "torchvision==0.28.0+cu130; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
+  # macOS / linux_aarch64 fallback, see note under "cpu"
+  "torch==2.7.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
+  "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
 ]
 "rocm" = [
   # ROCm wheels are x86_64-linux-only; gate by platform so macOS/win/linux-aarch64 resolution is unaffected.
-  "torch==2.10.0+rocm7.1; sys_platform == 'linux' and platform_machine != 'aarch64'",
-  "torchvision==0.25.0+rocm7.1; sys_platform == 'linux' and platform_machine != 'aarch64'",
-  "triton-rocm==3.6.0; sys_platform == 'linux' and platform_machine != 'aarch64'",
+  # 2.13.0+rocm7.2 bundles AOTriton 0.12b, whose regenerated gfx1100 tuning database triples
+  # flash-attention throughput on RDNA3 vs the previous 2.10.0+rocm7.1 pin (measured 17.9 ->
+  # 57.3 TFLOPS effective at the MiniMax H3 attention shape on a W7900).
+  "torch==2.13.0+rocm7.2; sys_platform == 'linux' and platform_machine != 'aarch64'",
+  "torchvision==0.28.0+rocm7.2; sys_platform == 'linux' and platform_machine != 'aarch64'",
+  "triton-rocm==3.7.1; sys_platform == 'linux' and platform_machine != 'aarch64'",
   # linux_aarch64 fallback, see note under "cpu"
   "torch==2.7.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
   "torchvision==0.22.1; sys_platform == 'linux' and platform_machine == 'aarch64'",
@@ -150,10 +169,9 @@ dependencies = [
 # windows-amd64 on PyTorch's WHL index. Gate the +xpu pins to those platforms; the
 # Intel oneAPI runtime libs (intel-sycl-rt, etc.) come in automatically as deps of
 # torch+xpu.
-# Pinned ahead of the cpu/cuda extras (2.7.1), as the rocm extra already is. Intel's XPU
-# backend matured considerably after 2.7.1: torch.xpu.mem_get_info() works on driver/kernel
-# combinations where it previously raised, and the bundled oneAPI runtime ships with the wheel
-# (intel-sycl-rt), so upgrading torch upgrades the user-space runtime too.
+# Intel's XPU backend matured considerably after 2.7.1: torch.xpu.mem_get_info() works on
+# driver/kernel combinations where it previously raised, and the bundled oneAPI runtime ships
+# with the wheel (intel-sycl-rt), so upgrading torch upgrades the user-space runtime too.
 "xpu" = [
   "torch==2.13.0+xpu; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
   "torchvision==0.28.0+xpu; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
@@ -161,9 +179,7 @@ dependencies = [
   # Renamed from pytorch-triton-xpu to triton-xpu upstream.
   "triton-xpu==3.7.2; (sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'",
   # macOS / linux_aarch64 have no +xpu wheels: fall back to base torch so the extra's
-  # conflict-universe always contains a torch. See note under "cpu". These stay on 2.7.1 to
-  # match the other extras and the project's `torch<2.8.0` constraint on darwin -- only the
-  # +xpu wheels above move.
+  # conflict-universe always contains a torch. See note under "cpu".
   "torch==2.7.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
   "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
 ]
@@ -181,6 +197,7 @@ dependencies = [
   "pytest>6.0.0",
   "pytest-cov",
   "pytest-timeout",
+  "pytest-xdist",
   "pytest-datadir",
   "requests_testadapter",
   "httpx",
@@ -198,6 +215,16 @@ index-strategy = "unsafe-best-match"
 # and macOS. (ROCm and the PyTorch WHL-index pins are x86_64-only; on aarch64
 # Linux torch/torchvision fall back to PyPI via the markers below.)
 environments = ["sys_platform == 'win32' or sys_platform == 'darwin' or (sys_platform == 'linux' and (platform_machine == 'x86_64' or platform_machine == 'aarch64'))"]
+# Hold every resolution on Windows and Linux x86_64 to the torch the backend extras pin -- including the
+# no-extra one, which is what CI installs and tests. Without this the lock is free to keep an older torch
+# there, or move it to the newest PyPI release, independently of the extras. `tool.uv` never reaches the
+# published metadata, so installing the released package with `--torch-backend` keeps the open range of the base
+# requirement; only `uv pip install` inside a checkout is held to it.
+# `==2.13.0` also matches the local builds (+cpu, +cu130, +rocm7.2, +xpu).
+constraint-dependencies = [
+  "torch==2.13.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+  "torchvision==0.28.0; sys_platform == 'win32' or (sys_platform == 'linux' and platform_machine == 'x86_64')",
+]
 
 # compel, could you please not pull in all of Jupyter. (compel declares `notebook>=6.5.7` but does not
 # reference IPython/Jupyter anywhere in its code.) Dropping it takes ~65 packages out of the environment.
@@ -212,26 +239,31 @@ environments = ["sys_platform == 'win32' or sys_platform == 'darwin' or (sys_pla
 exclude-dependencies = ["notebook"]
 
 [tool.uv.sources]
-# Exclude linux_aarch64 from the PyTorch WHL indexes so that uv resolves torch /
-# torchvision from PyPI on that platform. The indexes DO carry aarch64 torch wheels
-# (+cpu/+cu128), but no aarch64 torchvision wheels, so the pinned pairs cannot
-# resolve there. All other platforms (Windows, macOS, Linux x86_64) are unaffected.
+# Keep linux_aarch64 (and, for cpu/cuda, macOS) off the PyTorch WHL indexes so that uv
+# resolves their 2.7.1 fallback pins from PyPI; see the note above the extras.
 torch = [
-  { index = "torch-cpu", extra = "cpu", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
-  { index = "torch-cuda", extra = "cuda", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-cpu", extra = "cpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
+  { index = "torch-cuda", extra = "cuda", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "torch-rocm", extra = "rocm", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
   { index = "torch-xpu", extra = "xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "pypi", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]
 torchvision = [
-  { index = "torch-cpu", extra = "cpu", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
-  { index = "torch-cuda", extra = "cuda", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
+  { index = "torch-cpu", extra = "cpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
+  { index = "torch-cuda", extra = "cuda", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "torch-rocm", extra = "rocm", marker = "sys_platform != 'linux' or platform_machine != 'aarch64'" },
   { index = "torch-xpu", extra = "xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
   { index = "pypi", marker = "sys_platform == 'linux' and platform_machine == 'aarch64'" },
 ]
 triton-rocm = [
   { index = "torch-rocm", marker = "sys_platform == 'linux' and platform_machine != 'aarch64'" },
+]
+# PyPI's xformers wheels are built against CUDA 12.8 and cannot load their extension next to a CUDA 13 torch (every
+# memory-efficient attention call then fails); PyTorch's cu130 index carries the CUDA 13 build of the same release.
+# Not scoped to the `cuda` extra: uv only allows that for packages the extra itself lists, and the CUDA 13 torch that
+# PyPI serves on Linux needs the same build. The cpu/rocm/xpu builds cannot use xformers' CUDA kernels either way.
+xformers = [
+  { index = "torch-cuda", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
 ]
 triton-xpu = [
   { index = "torch-xpu", marker = "(sys_platform == 'linux' and platform_machine == 'x86_64') or sys_platform == 'win32'" },
@@ -248,12 +280,12 @@ explicit = true
 
 [[tool.uv.index]]
 name = "torch-cuda"
-url = "https://download.pytorch.org/whl/cu128"
+url = "https://download.pytorch.org/whl/cu130"
 explicit = true
 
 [[tool.uv.index]]
 name = "torch-rocm"
-url = "https://download.pytorch.org/whl/rocm7.1"
+url = "https://download.pytorch.org/whl/rocm7.2"
 explicit = true
 
 [[tool.uv.index]]
@@ -286,8 +318,8 @@ version = { attr = "invokeai.version.__version__" }
   "invokeai.generator*",
   "invokeai.backend*",
   "invokeai.frontend*",
-  "invokeai.frontend.web.dist*",
-  "invokeai.frontend.web.static*",
+  "invokeai.frontend.webv1.dist*",
+  "invokeai.frontend.webv1.static*",
   "invokeai.configs*",
   "invokeai.app*",
   "invokeai.invocation_api*",
@@ -295,9 +327,14 @@ version = { attr = "invokeai.version.__version__" }
 
 [tool.setuptools.package-data]
 "invokeai.app.assets" = ["**/*.png"]
-"invokeai.backend.anima" = ["tokenizer/*.json"]
 "invokeai.backend.qwen3" = ["tokenizer/*.json", "tokenizer/*.json.gz"]
+"invokeai.backend.qwen3_vl" = ["tokenizer/*.json", "tokenizer/*.json.gz", "config/*.json"]
+"invokeai.backend.qwen2_5_vl" = ["*.json", "tokenizer/*.json", "tokenizer/*.json.gz"]
+# Read at load time by the MiniMax H3 single-file encoder loader. Without this the file is
+# absent from a wheel install and that loader raises FileNotFoundError.
+"invokeai.backend.minimax_h3" = ["*.json"]
 "invokeai.backend.t5" = ["tokenizer/*.json"]
+"invokeai.app.services.image_index" = ["*.txt"]
 "invokeai.app.services.workflow_records.default_workflows" = ["*.json"]
 "invokeai.backend.hidiffusion" = ["sd_module_key/*.txt"]
 "invokeai.app.services.style_preset_records" = ["*.json"]
@@ -307,13 +344,21 @@ version = { attr = "invokeai.version.__version__" }
 "invokeai.assets.fonts" = ["**/*.ttf"]
 "invokeai.backend" = ["**.png", "**/*.icc"]
 "invokeai.configs" = ["*.example", "**/*.yaml", "*.txt"]
-"invokeai.frontend.web.dist" = ["**"]
-"invokeai.frontend.web.static" = ["**"]
+"invokeai.frontend.webv1.dist" = ["**"]
+"invokeai.frontend.webv2.dist" = ["**"]
+"invokeai.frontend.webv1.static" = ["**"]
 "invokeai.app.invocations" = ["**"]
 
 #=== Begin: PyTest and Coverage
 [tool.pytest.ini_options]
-addopts = "--cov-report term --cov-report html --cov-report xml --strict-markers -m \"not slow\""
+# `--dist loadfile` keeps a file's tests together on one xdist worker, so module-scoped
+# fixtures are set up once per file instead of in every worker that received part of it.
+# It is not isolation: a worker process runs many files, in an order that depends on the
+# worker count and on which file finished first, so a file must still set up its own
+# process-global state. It costs nothing -- per-test distribution measured the same wall
+# clock on the full suite -- and it lives here rather than in the CI command so that it
+# also holds when `-n` is passed by hand. Coverage is opt-in via `--cov`.
+addopts = "--strict-markers --dist loadfile -m \"not slow\""
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
   "timeout: Marks the timeout override.",
@@ -342,7 +387,9 @@ exclude = [
   "__pycache__",
   "build",
   "dist",
-  "invokeai/frontend/web/node_modules/",
+  "invokeai/frontend/api/node_modules/",
+  "invokeai/frontend/webv1/node_modules/",
+  "invokeai/frontend/webv2/node_modules/",
   ".venv*",
   "*.ipynb",
   "invokeai/backend/image_util/mediapipe_face/", # External code
@@ -360,6 +407,31 @@ ignore = [
   "B904", # https://docs.astral.sh/ruff/rules/raise-without-from-inside-except/
 ]
 select = ["B", "C", "E", "F", "W", "I", "TID"]
+
+[tool.ruff.lint.per-file-ignores]
+# Vendored from the diffusers MiniMax-H3 branch (see invokeai/backend/minimax_h3/__init__.py);
+# kept as close to upstream as possible, so upstream's zip() style is tolerated.
+"invokeai/backend/minimax_h3/transformer_minimax_h3.py" = ["B905"]
+"invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3.py" = ["B905"]
+"invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3_audio.py" = ["B905"]
+"invokeai/backend/minimax_h3/scheduling_minimax_h3.py" = ["B905"]
+
+[tool.ruff.format]
+# The vendored MiniMax-H3 files are kept byte-identical to upstream diffusers (modulo the
+# absolute-import rewrite) so that re-syncing when a tagged diffusers ships them is a clean copy
+# rather than a manual re-application of formatting. Upstream wraps at a narrower line length, so
+# `ruff format` would rewrap lines for no semantic gain. `ruff check` still runs on them, so the
+# import sorting this project does enforce stays enforced.
+#
+# Listed file by file rather than as a directory glob: the package also holds first-party modules
+# (presets.py, sampling.py, denoise.py, int8_convrot.py, ...) which must stay formatted.
+exclude = [
+  "invokeai/backend/minimax_h3/packing.py",
+  "invokeai/backend/minimax_h3/transformer_minimax_h3.py",
+  "invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3.py",
+  "invokeai/backend/minimax_h3/autoencoder_kl_minimax_h3_audio.py",
+  "invokeai/backend/minimax_h3/scheduling_minimax_h3.py",
+]
 
 [tool.ruff.lint.flake8-tidy-imports]
 # Disallow all relative imports.
@@ -381,8 +453,8 @@ exclude = ["tests/*"]
 follow_imports = "skip" # skips type checking of the modules listed below
 module = [
   "invokeai.app.api.routers.models",
-  "invokeai.app.invocations.compel",
-  "invokeai.app.invocations.denoise_latents",
+  "invokeai.app.invocations.text_encoder.compel",
+  "invokeai.app.invocations.sd.denoise_latents",
   "invokeai.app.services.invocation_stats.invocation_stats_default",
   "invokeai.app.services.model_manager.model_manager_base",
   "invokeai.app.services.model_manager.model_manager_default",

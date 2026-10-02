@@ -1,0 +1,1343 @@
+{
+  "name": "Reference to Video - MiniMax H3",
+  "author": "InvokeAI",
+  "description": "Generate video+audio conditioned on reference media with MiniMax H3 Ref2VA.",
+  "version": "1.1.0",
+  "contact": "",
+  "tags": "minimax h3, text to video, video, audio",
+  "notes": "Condition a new clip on reference media: wire up to 3 Video Reference and up to 9 Image Reference nodes through chained Collect nodes into BOTH the Reference Conditioning node and the Prompt node - the same ordered references must reach both, and reference ORDER changes the result. A video reference can contribute its image track, its soundtrack, or both (soundtrack-only references must be paired with at least one visual reference).\n\nNumber of Frames appears twice: the Denoise node's dropdown and the integer field feeding the Prompt and Reference Conditioning nodes. They must match; the run stops with a clear error if they do not.\n\nSelect the Ref2VA transformer (e.g. 'MiniMax H3 Ref2VA Transformer (int8, pruned)') in the model loader's Transformer field - the FL2VA transformer cannot consume references.\n\nEach InvokeAI install assigns its own internal model IDs, so every model field ships blank -- pick your installed models in the form before invoking.",
+  "exposedFields": [
+    {
+      "nodeId": "9c0f3e11-2a3b-4c5d-8e6f-7a8b9c0d1e02",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "fieldName": "width"
+    },
+    {
+      "nodeId": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "fieldName": "height"
+    },
+    {
+      "nodeId": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "fieldName": "target_resolution"
+    },
+    {
+      "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "fieldName": "num_frames"
+    },
+    {
+      "nodeId": "9d1a4f22-3b4c-4d6e-9f70-8b9c0d1e2f03",
+      "fieldName": "value"
+    },
+    {
+      "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "fieldName": "model"
+    },
+    {
+      "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "fieldName": "transformer_model"
+    },
+    {
+      "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "fieldName": "text_encoder_model"
+    },
+    {
+      "nodeId": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+      "fieldName": "lora"
+    },
+    {
+      "nodeId": "8fa10001-1a2b-4c3d-8e4f-5a6b7c8d0001",
+      "fieldName": "video"
+    },
+    {
+      "nodeId": "8fa10001-1a2b-4c3d-8e4f-5a6b7c8d0001",
+      "fieldName": "conditioning"
+    },
+    {
+      "nodeId": "8fa10001-1a2b-4c3d-8e4f-5a6b7c8d0001",
+      "fieldName": "start_frame"
+    },
+    {
+      "nodeId": "8fa10001-1a2b-4c3d-8e4f-5a6b7c8d0001",
+      "fieldName": "end_frame"
+    },
+    {
+      "nodeId": "8fa20002-1a2b-4c3d-8e4f-5a6b7c8d0002",
+      "fieldName": "image"
+    },
+    {
+      "nodeId": "8fa20002-1a2b-4c3d-8e4f-5a6b7c8d0002",
+      "fieldName": "detail"
+    },
+    {
+      "nodeId": "8fa60006-1a2b-4c3d-8e4f-5a6b7c8d0006",
+      "fieldName": "value"
+    }
+  ],
+  "meta": {
+    "version": "4.0.0",
+    "category": "default"
+  },
+  "nodes": [
+    {
+      "id": "9c0f3e11-2a3b-4c5d-8e6f-7a8b9c0d1e02",
+      "type": "invocation",
+      "data": {
+        "id": "9c0f3e11-2a3b-4c5d-8e6f-7a8b9c0d1e02",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "Prompt",
+        "notes": "Feeds the text encoder and the metadata record from one place, so the recorded prompt is always the prompt that ran.",
+        "type": "string",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Prompt",
+            "description": "",
+            "value": ""
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 620,
+        "y": -320
+      }
+    },
+    {
+      "id": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "type": "invocation",
+      "data": {
+        "id": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+        "version": "1.4.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "minimax_h3_model_loader",
+        "inputs": {
+          "model": {
+            "name": "model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "transformer_model": {
+            "name": "transformer_model",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "text_encoder_model": {
+            "name": "text_encoder_model",
+            "label": "",
+            "description": "",
+            "value": null
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false
+      },
+      "position": {
+        "x": 140,
+        "y": 420
+      }
+    },
+    {
+      "id": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+      "type": "invocation",
+      "data": {
+        "id": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "The Turbo step-distillation LoRA is what makes 6 steps enough. Remove this node and raise the step count to about 50.",
+        "type": "minimax_h3_lora_loader",
+        "inputs": {
+          "lora": {
+            "name": "lora",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "weight": {
+            "name": "weight",
+            "label": "",
+            "description": "",
+            "value": 1
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 620,
+        "y": 620
+      }
+    },
+    {
+      "id": "9f3c6144-5d6e-4f80-b192-0d1e2f3a4b05",
+      "type": "invocation",
+      "data": {
+        "id": "9f3c6144-5d6e-4f80-b192-0d1e2f3a4b05",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "LoRAs (metadata)",
+        "notes": "",
+        "type": "collect",
+        "inputs": {
+          "collection": {
+            "name": "collection",
+            "label": "",
+            "description": "",
+            "value": []
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1000,
+        "y": 700
+      }
+    },
+    {
+      "id": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "type": "invocation",
+      "data": {
+        "id": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "Prompt",
+        "notes": "H3 is guidance-distilled: there is no negative prompt. The prompt and canvas arrive over edges so they always match the denoise node.",
+        "type": "minimax_h3_text_encoder",
+        "inputs": {
+          "prompt": {
+            "name": "prompt",
+            "label": "Prompt",
+            "description": "",
+            "value": ""
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1344
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 768
+          },
+          "references": {
+            "name": "references",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "num_frames": {
+            "name": "num_frames",
+            "label": "",
+            "description": "",
+            "value": null
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 620,
+        "y": -140
+      }
+    },
+    {
+      "id": "9c4cab0b-316c-8faf-c05e-6d7baf90eb03",
+      "type": "invocation",
+      "data": {
+        "id": "9c4cab0b-316c-8faf-c05e-6d7baf90eb03",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "rand_int",
+        "inputs": {
+          "low": {
+            "name": "low",
+            "label": "",
+            "description": "",
+            "value": 0
+          },
+          "high": {
+            "name": "high",
+            "label": "",
+            "description": "",
+            "value": 2147483647
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": false
+      },
+      "position": {
+        "x": 1000,
+        "y": 900
+      }
+    },
+    {
+      "id": "9d1a4f22-3b4c-4d6e-9f70-8b9c0d1e2f03",
+      "type": "invocation",
+      "data": {
+        "id": "9d1a4f22-3b4c-4d6e-9f70-8b9c0d1e2f03",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "Steps",
+        "notes": "6 steps assumes the Turbo LoRA. Without it, about 50.",
+        "type": "integer",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "Steps",
+            "description": "",
+            "value": 6
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 620,
+        "y": 900
+      }
+    },
+    {
+      "id": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "type": "invocation",
+      "data": {
+        "id": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+        "version": "1.4.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "minimax_h3_denoise",
+        "inputs": {
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1344
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 768
+          },
+          "num_frames": {
+            "name": "num_frames",
+            "label": "Frames",
+            "description": "",
+            "value": "124"
+          },
+          "steps": {
+            "name": "steps",
+            "label": "",
+            "description": "",
+            "value": 6
+          },
+          "seed": {
+            "name": "seed",
+            "label": "",
+            "description": "",
+            "value": 0
+          },
+          "reference_conditioning": {
+            "name": "reference_conditioning",
+            "label": "",
+            "description": "",
+            "value": null
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1420,
+        "y": -60
+      }
+    },
+    {
+      "id": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "type": "invocation",
+      "data": {
+        "id": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+        "version": "2.7.0",
+        "nodePack": "invokeai",
+        "label": "Core Metadata",
+        "notes": "Everything except the generation mode arrives over an edge from the node that used the value, so the record cannot go stale.",
+        "type": "core_metadata",
+        "inputs": {
+          "generation_mode": {
+            "name": "generation_mode",
+            "label": "",
+            "description": "",
+            "value": "minimax_h3_ref2v"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 1860,
+        "y": 380
+      }
+    },
+    {
+      "id": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "type": "invocation",
+      "data": {
+        "id": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "minimax_h3_latents_to_video",
+        "inputs": {},
+        "isOpen": true,
+        "isIntermediate": false,
+        "useCache": true
+      },
+      "position": {
+        "x": 2300,
+        "y": -60
+      }
+    },
+    {
+      "id": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "type": "invocation",
+      "data": {
+        "id": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "Type the aspect ratio you want as width/height; the node snaps it onto a canvas H3 can render. '768 lowres' pins the long edge to 768 for fast renders -- switch to '768 highres' for the model's native canvas.",
+        "type": "minimax_h3_ideal_dimensions",
+        "inputs": {
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 768
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 768
+          },
+          "target_resolution": {
+            "name": "target_resolution",
+            "label": "",
+            "description": "",
+            "value": "768 lowres"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 120,
+        "y": 60
+      }
+    },
+    {
+      "id": "8fa10001-1a2b-4c3d-8e4f-5a6b7c8d0001",
+      "type": "invocation",
+      "data": {
+        "id": "8fa10001-1a2b-4c3d-8e4f-5a6b7c8d0001",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "Video Reference",
+        "notes": "One reference video, trimmed to [start_frame, end_frame]. 'Audio only' conditions on its soundtrack alone.",
+        "type": "minimax_h3_video_reference",
+        "inputs": {
+          "video": {
+            "name": "video",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "conditioning": {
+            "name": "conditioning",
+            "label": "",
+            "description": "",
+            "value": "video_audio"
+          },
+          "start_frame": {
+            "name": "start_frame",
+            "label": "",
+            "description": "",
+            "value": 0
+          },
+          "end_frame": {
+            "name": "end_frame",
+            "label": "",
+            "description": "",
+            "value": -1
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -340,
+        "y": -320
+      }
+    },
+    {
+      "id": "8fa20002-1a2b-4c3d-8e4f-5a6b7c8d0002",
+      "type": "invocation",
+      "data": {
+        "id": "8fa20002-1a2b-4c3d-8e4f-5a6b7c8d0002",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "Image Reference",
+        "notes": "One reference image. 'Max' detail (2048px) is highest fidelity but adds rows to every denoising step.",
+        "type": "minimax_h3_image_reference",
+        "inputs": {
+          "image": {
+            "name": "image",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "detail": {
+            "name": "detail",
+            "label": "",
+            "description": "",
+            "value": "max"
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -340,
+        "y": -40
+      }
+    },
+    {
+      "id": "8fa30003-1a2b-4c3d-8e4f-5a6b7c8d0003",
+      "type": "invocation",
+      "data": {
+        "id": "8fa30003-1a2b-4c3d-8e4f-5a6b7c8d0003",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "References 1",
+        "notes": "Chained collectors keep the reference order deterministic - order is part of the request.",
+        "type": "collect",
+        "inputs": {
+          "collection": {
+            "name": "collection",
+            "label": "",
+            "description": "",
+            "value": []
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -60,
+        "y": -320
+      }
+    },
+    {
+      "id": "8fa40004-1a2b-4c3d-8e4f-5a6b7c8d0004",
+      "type": "invocation",
+      "data": {
+        "id": "8fa40004-1a2b-4c3d-8e4f-5a6b7c8d0004",
+        "version": "1.1.0",
+        "nodePack": "invokeai",
+        "label": "References 2",
+        "notes": "",
+        "type": "collect",
+        "inputs": {
+          "collection": {
+            "name": "collection",
+            "label": "",
+            "description": "",
+            "value": []
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -60,
+        "y": -80
+      }
+    },
+    {
+      "id": "8fa50005-1a2b-4c3d-8e4f-5a6b7c8d0005",
+      "type": "invocation",
+      "data": {
+        "id": "8fa50005-1a2b-4c3d-8e4f-5a6b7c8d0005",
+        "version": "1.0.0",
+        "nodePack": "invokeai",
+        "label": "",
+        "notes": "",
+        "type": "minimax_h3_reference_conditioning",
+        "inputs": {
+          "references": {
+            "name": "references",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "vae": {
+            "name": "vae",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "audio_vae": {
+            "name": "audio_vae",
+            "label": "",
+            "description": "",
+            "value": null
+          },
+          "num_frames": {
+            "name": "num_frames",
+            "label": "",
+            "description": "",
+            "value": 124
+          },
+          "width": {
+            "name": "width",
+            "label": "",
+            "description": "",
+            "value": 1344
+          },
+          "height": {
+            "name": "height",
+            "label": "",
+            "description": "",
+            "value": 768
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": 220,
+        "y": -200
+      }
+    },
+    {
+      "id": "8fa60006-1a2b-4c3d-8e4f-5a6b7c8d0006",
+      "type": "invocation",
+      "data": {
+        "id": "8fa60006-1a2b-4c3d-8e4f-5a6b7c8d0006",
+        "version": "1.0.1",
+        "nodePack": "invokeai",
+        "label": "Number of Frames (references)",
+        "notes": "Must match the Denoise node's Number of Frames; the run stops with a clear error if they differ.",
+        "type": "integer",
+        "inputs": {
+          "value": {
+            "name": "value",
+            "label": "",
+            "description": "",
+            "value": 124
+          }
+        },
+        "isOpen": true,
+        "isIntermediate": true,
+        "useCache": true
+      },
+      "position": {
+        "x": -340,
+        "y": 200
+      }
+    }
+  ],
+  "edges": [
+    {
+      "id": "edge-9c0f3e11-value-9b2f7d8c-prompt",
+      "source": "9c0f3e11-2a3b-4c5d-8e6f-7a8b9c0d1e02",
+      "sourceHandle": "value",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "targetHandle": "prompt",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-text_encoder-9b2f7d8c-text_encoder",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "text_encoder",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "targetHandle": "text_encoder",
+      "type": "default"
+    },
+    {
+      "id": "edge-9b2f7d8c-conditioning-9d3b9faf-positive_conditioning",
+      "source": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "sourceHandle": "conditioning",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "positive_conditioning",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-transformer-9f10ad7a-transformer",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "transformer",
+      "target": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+      "targetHandle": "transformer",
+      "type": "default"
+    },
+    {
+      "id": "edge-9f10ad7a-transformer-9d3b9faf-transformer",
+      "source": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+      "sourceHandle": "transformer",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "transformer",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d1a4f22-value-9d3b9faf-steps",
+      "source": "9d1a4f22-3b4c-4d6e-9f70-8b9c0d1e2f03",
+      "sourceHandle": "value",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "steps",
+      "type": "default"
+    },
+    {
+      "id": "edge-9c4cab0b-value-9d3b9faf-seed",
+      "source": "9c4cab0b-316c-8faf-c05e-6d7baf90eb03",
+      "sourceHandle": "value",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "seed",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e8d7c6b-width-9b2f7d8c-width",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "width",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e8d7c6b-height-9b2f7d8c-height",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "height",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e8d7c6b-width-9d3b9faf-width",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "width",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e8d7c6b-height-9d3b9faf-height",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "height",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d3b9faf-video_latents-9e5dcb1c-video_latents",
+      "source": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "video_latents",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "targetHandle": "video_latents",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d3b9faf-audio_latents-9e5dcb1c-audio_latents",
+      "source": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "audio_latents",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "targetHandle": "audio_latents",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-vae-9e5dcb1c-vae",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "vae",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "targetHandle": "vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-audio_vae-9e5dcb1c-audio_vae",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "audio_vae",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "targetHandle": "audio_vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-9c0f3e11-value-9e2b5033-positive_prompt",
+      "source": "9c0f3e11-2a3b-4c5d-8e6f-7a8b9c0d1e02",
+      "sourceHandle": "value",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "positive_prompt",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d1a4f22-value-9e2b5033-steps",
+      "source": "9d1a4f22-3b4c-4d6e-9f70-8b9c0d1e2f03",
+      "sourceHandle": "value",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "steps",
+      "type": "default"
+    },
+    {
+      "id": "edge-9c4cab0b-value-9e2b5033-seed",
+      "source": "9c4cab0b-316c-8faf-c05e-6d7baf90eb03",
+      "sourceHandle": "value",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "seed",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d3b9faf-width-9e2b5033-width",
+      "source": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "width",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d3b9faf-height-9e2b5033-height",
+      "source": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "height",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-9d3b9faf-num_frames-9e2b5033-num_frames",
+      "source": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "sourceHandle": "num_frames",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "num_frames",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-model-9e2b5033-model",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "model",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "model",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-transformer_model-9e2b5033-minimax_h3_transformer_model",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "transformer_model",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "minimax_h3_transformer_model",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-text_encoder_model-9e2b5033-minimax_h3_text_encoder_model",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "text_encoder_model",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "minimax_h3_text_encoder_model",
+      "type": "default"
+    },
+    {
+      "id": "edge-9f10ad7a-lora_metadata-9f3c6144-item",
+      "source": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+      "sourceHandle": "lora_metadata",
+      "target": "9f3c6144-5d6e-4f80-b192-0d1e2f3a4b05",
+      "targetHandle": "item",
+      "type": "default"
+    },
+    {
+      "id": "edge-9f3c6144-collection-9e2b5033-loras",
+      "source": "9f3c6144-5d6e-4f80-b192-0d1e2f3a4b05",
+      "sourceHandle": "collection",
+      "target": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "targetHandle": "loras",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e2b5033-metadata-9e5dcb1c-metadata",
+      "source": "9e2b5033-4c5d-4e7f-a081-9c0d1e2f3a04",
+      "sourceHandle": "metadata",
+      "target": "9e5dcb1c-527d-9fb0-d16f-7e8cbaa1fc05",
+      "targetHandle": "metadata",
+      "type": "default"
+    },
+    {
+      "id": "edge-8fa10001-reference-8fa30003-item",
+      "source": "8fa10001-1a2b-4c3d-8e4f-5a6b7c8d0001",
+      "sourceHandle": "reference",
+      "target": "8fa30003-1a2b-4c3d-8e4f-5a6b7c8d0003",
+      "targetHandle": "item",
+      "type": "default"
+    },
+    {
+      "id": "edge-8fa30003-collection-8fa40004-collection",
+      "source": "8fa30003-1a2b-4c3d-8e4f-5a6b7c8d0003",
+      "sourceHandle": "collection",
+      "target": "8fa40004-1a2b-4c3d-8e4f-5a6b7c8d0004",
+      "targetHandle": "collection",
+      "type": "default"
+    },
+    {
+      "id": "edge-8fa20002-reference-8fa40004-item",
+      "source": "8fa20002-1a2b-4c3d-8e4f-5a6b7c8d0002",
+      "sourceHandle": "reference",
+      "target": "8fa40004-1a2b-4c3d-8e4f-5a6b7c8d0004",
+      "targetHandle": "item",
+      "type": "default"
+    },
+    {
+      "id": "edge-8fa40004-collection-8fa50005-references",
+      "source": "8fa40004-1a2b-4c3d-8e4f-5a6b7c8d0004",
+      "sourceHandle": "collection",
+      "target": "8fa50005-1a2b-4c3d-8e4f-5a6b7c8d0005",
+      "targetHandle": "references",
+      "type": "default"
+    },
+    {
+      "id": "edge-8fa40004-collection-9b2f7d8c-references",
+      "source": "8fa40004-1a2b-4c3d-8e4f-5a6b7c8d0004",
+      "sourceHandle": "collection",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "targetHandle": "references",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-vae-8fa50005-vae",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "vae",
+      "target": "8fa50005-1a2b-4c3d-8e4f-5a6b7c8d0005",
+      "targetHandle": "vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-9a1e6c7b-audio_vae-8fa50005-audio_vae",
+      "source": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+      "sourceHandle": "audio_vae",
+      "target": "8fa50005-1a2b-4c3d-8e4f-5a6b7c8d0005",
+      "targetHandle": "audio_vae",
+      "type": "default"
+    },
+    {
+      "id": "edge-8fa50005-reference_conditioning-9d3b9faf-reference_conditioning",
+      "source": "8fa50005-1a2b-4c3d-8e4f-5a6b7c8d0005",
+      "sourceHandle": "reference_conditioning",
+      "target": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+      "targetHandle": "reference_conditioning",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e8d7c6b-width-8fa50005-width",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "width",
+      "target": "8fa50005-1a2b-4c3d-8e4f-5a6b7c8d0005",
+      "targetHandle": "width",
+      "type": "default"
+    },
+    {
+      "id": "edge-9e8d7c6b-height-8fa50005-height",
+      "source": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+      "sourceHandle": "height",
+      "target": "8fa50005-1a2b-4c3d-8e4f-5a6b7c8d0005",
+      "targetHandle": "height",
+      "type": "default"
+    },
+    {
+      "id": "edge-8fa60006-value-9b2f7d8c-num_frames",
+      "source": "8fa60006-1a2b-4c3d-8e4f-5a6b7c8d0006",
+      "sourceHandle": "value",
+      "target": "9b2f7d8c-2e3f-5c4d-9f2b-3a4e5d6c7b02",
+      "targetHandle": "num_frames",
+      "type": "default"
+    },
+    {
+      "id": "edge-8fa60006-value-8fa50005-num_frames",
+      "source": "8fa60006-1a2b-4c3d-8e4f-5a6b7c8d0006",
+      "sourceHandle": "value",
+      "target": "8fa50005-1a2b-4c3d-8e4f-5a6b7c8d0005",
+      "targetHandle": "num_frames",
+      "type": "default"
+    }
+  ],
+  "form": {
+    "elements": {
+      "root": {
+        "id": "root",
+        "type": "container",
+        "data": {
+          "children": [
+            "heading-t2v-gen",
+            "node-field-t2v-prompt",
+            "heading-ref2v-refs",
+            "node-field-ref2v-video",
+            "node-field-ref2v-conditioning",
+            "container-ref2v-trim",
+            "node-field-ref2v-image",
+            "node-field-ref2v-detail",
+            "node-field-ref2v-frames-int",
+            "container-t2v-size",
+            "container-t2v-len",
+            "divider-t2v",
+            "heading-t2v-model",
+            "container-t2v-model"
+          ],
+          "layout": "column"
+        }
+      },
+      "heading-t2v-gen": {
+        "id": "heading-t2v-gen",
+        "parentId": "root",
+        "type": "heading",
+        "data": {
+          "content": "Generation"
+        }
+      },
+      "node-field-t2v-prompt": {
+        "id": "node-field-t2v-prompt",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9c0f3e11-2a3b-4c5d-8e6f-7a8b9c0d1e02",
+            "fieldName": "value"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "string-field-config",
+            "component": "textarea"
+          }
+        }
+      },
+      "container-t2v-size": {
+        "id": "container-t2v-size",
+        "parentId": "root",
+        "type": "container",
+        "data": {
+          "children": [
+            "container-t2v-wh",
+            "node-field-t2v-resolution"
+          ],
+          "layout": "column"
+        }
+      },
+      "container-t2v-wh": {
+        "id": "container-t2v-wh",
+        "parentId": "container-t2v-size",
+        "type": "container",
+        "data": {
+          "children": [
+            "node-field-t2v-width",
+            "node-field-t2v-height"
+          ],
+          "layout": "row"
+        }
+      },
+      "node-field-t2v-width": {
+        "id": "node-field-t2v-width",
+        "parentId": "container-t2v-wh",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+            "fieldName": "width"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-t2v-height": {
+        "id": "node-field-t2v-height",
+        "parentId": "container-t2v-wh",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+            "fieldName": "height"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-t2v-resolution": {
+        "id": "node-field-t2v-resolution",
+        "parentId": "container-t2v-size",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9e8d7c6b-5a4f-4e3d-9c2b-1a0f9e8d7c6b",
+            "fieldName": "target_resolution"
+          },
+          "showDescription": false
+        }
+      },
+      "container-t2v-len": {
+        "id": "container-t2v-len",
+        "parentId": "root",
+        "type": "container",
+        "data": {
+          "children": [
+            "node-field-t2v-frames",
+            "node-field-t2v-steps"
+          ],
+          "layout": "row"
+        }
+      },
+      "node-field-t2v-frames": {
+        "id": "node-field-t2v-frames",
+        "parentId": "container-t2v-len",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9d3b9faf-405b-7e6f-bf4d-5c6a7f8e9d04",
+            "fieldName": "num_frames"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-t2v-steps": {
+        "id": "node-field-t2v-steps",
+        "parentId": "container-t2v-len",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9d1a4f22-3b4c-4d6e-9f70-8b9c0d1e2f03",
+            "fieldName": "value"
+          },
+          "showDescription": false,
+          "settings": {
+            "type": "integer-field-config",
+            "showShuffle": false,
+            "component": "number-input"
+          }
+        }
+      },
+      "divider-t2v": {
+        "id": "divider-t2v",
+        "parentId": "root",
+        "type": "divider"
+      },
+      "heading-t2v-model": {
+        "id": "heading-t2v-model",
+        "parentId": "root",
+        "type": "heading",
+        "data": {
+          "content": "Model"
+        }
+      },
+      "container-t2v-model": {
+        "id": "container-t2v-model",
+        "parentId": "root",
+        "type": "container",
+        "data": {
+          "children": [
+            "node-field-t2v-model",
+            "node-field-t2v-transformer",
+            "node-field-t2v-textencoder",
+            "node-field-t2v-lora"
+          ],
+          "layout": "column"
+        }
+      },
+      "node-field-t2v-model": {
+        "id": "node-field-t2v-model",
+        "parentId": "container-t2v-model",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+            "fieldName": "model"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-t2v-transformer": {
+        "id": "node-field-t2v-transformer",
+        "parentId": "container-t2v-model",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+            "fieldName": "transformer_model"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-t2v-textencoder": {
+        "id": "node-field-t2v-textencoder",
+        "parentId": "container-t2v-model",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9a1e6c7b-1d2f-4b3c-8e1a-2f3d4c5b6a01",
+            "fieldName": "text_encoder_model"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-t2v-lora": {
+        "id": "node-field-t2v-lora",
+        "parentId": "container-t2v-model",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "nodeId": "9f10ad7a-1c2b-4d3e-8f40-5a6b7c8d9e01",
+            "fieldName": "lora"
+          },
+          "showDescription": false
+        }
+      },
+      "heading-ref2v-refs": {
+        "id": "heading-ref2v-refs",
+        "parentId": "root",
+        "type": "heading",
+        "data": {
+          "content": "References"
+        }
+      },
+      "node-field-ref2v-video": {
+        "id": "node-field-ref2v-video",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "fieldName": "video",
+            "nodeId": "8fa10001-1a2b-4c3d-8e4f-5a6b7c8d0001"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-ref2v-conditioning": {
+        "id": "node-field-ref2v-conditioning",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "fieldName": "conditioning",
+            "nodeId": "8fa10001-1a2b-4c3d-8e4f-5a6b7c8d0001"
+          },
+          "showDescription": false
+        }
+      },
+      "container-ref2v-trim": {
+        "id": "container-ref2v-trim",
+        "parentId": "root",
+        "type": "container",
+        "data": {
+          "children": [
+            "node-field-ref2v-start",
+            "node-field-ref2v-end"
+          ],
+          "layout": "row"
+        }
+      },
+      "node-field-ref2v-start": {
+        "id": "node-field-ref2v-start",
+        "parentId": "container-ref2v-trim",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "fieldName": "start_frame",
+            "nodeId": "8fa10001-1a2b-4c3d-8e4f-5a6b7c8d0001"
+          },
+          "showDescription": false,
+          "settings": {
+            "component": "number-input",
+            "showShuffle": false,
+            "type": "integer-field-config"
+          }
+        }
+      },
+      "node-field-ref2v-end": {
+        "id": "node-field-ref2v-end",
+        "parentId": "container-ref2v-trim",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "fieldName": "end_frame",
+            "nodeId": "8fa10001-1a2b-4c3d-8e4f-5a6b7c8d0001"
+          },
+          "showDescription": false,
+          "settings": {
+            "component": "number-input",
+            "showShuffle": false,
+            "type": "integer-field-config"
+          }
+        }
+      },
+      "node-field-ref2v-image": {
+        "id": "node-field-ref2v-image",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "fieldName": "image",
+            "nodeId": "8fa20002-1a2b-4c3d-8e4f-5a6b7c8d0002"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-ref2v-detail": {
+        "id": "node-field-ref2v-detail",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "fieldName": "detail",
+            "nodeId": "8fa20002-1a2b-4c3d-8e4f-5a6b7c8d0002"
+          },
+          "showDescription": false
+        }
+      },
+      "node-field-ref2v-frames-int": {
+        "id": "node-field-ref2v-frames-int",
+        "parentId": "root",
+        "type": "node-field",
+        "data": {
+          "fieldIdentifier": {
+            "fieldName": "value",
+            "nodeId": "8fa60006-1a2b-4c3d-8e4f-5a6b7c8d0006"
+          },
+          "showDescription": false,
+          "settings": {
+            "component": "number-input",
+            "showShuffle": false,
+            "type": "integer-field-config"
+          }
+        }
+      }
+    },
+    "rootElementId": "root"
+  },
+  "id": "default_minimax_h3_ref2v"
+}

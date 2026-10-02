@@ -230,7 +230,6 @@
   "clean_up_tokenization_spaces": false,
   "eos_token": "<|im_end|>",
   "errors": "replace",
-  "extra_special_tokens": {},
   "model_max_length": 131072,
   "pad_token": "<|endoftext|>",
   "split_special_tokens": false,

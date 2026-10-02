@@ -4,6 +4,7 @@ from typing import Optional
 
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import (
@@ -66,6 +67,22 @@ class VideoRecordStorageBase(ABC):
         pass
 
     @abstractmethod
+    def get_subfolders(self, video_names: list[str]) -> dict[str, str]:
+        """Maps each existing named video to its on-disk subfolder; absent names are omitted."""
+        pass
+
+    @abstractmethod
+    def delete_intermediates_by_names(
+        self, video_names: list[str], guard: Optional[IntermediateDeleteGuard] = None
+    ) -> list[str]:
+        """Deletes the named records that are still intermediates, returning exactly the names removed.
+
+        Mirrors the image store: the `is_intermediate` predicate rides on the DELETE, and ``guard``
+        narrows each chunk on the deleting transaction.
+        """
+        pass
+
+    @abstractmethod
     def delete_many(self, video_names: list[str]) -> None:
         """Deletes many video records."""
         pass
@@ -88,8 +105,19 @@ class VideoRecordStorageBase(ABC):
         metadata: Optional[str] = None,
         user_id: Optional[str] = None,
         video_subfolder: str = "",
+        project_id: Optional[str] = None,
     ) -> datetime:
         """Saves a video record."""
+        pass
+
+    @abstractmethod
+    def set_file_size_bytes(self, video_name: str, file_size_bytes: Optional[int]) -> None:
+        """Records the measured on-disk size of a video and its companions; None marks it unmeasured."""
+        pass
+
+    @abstractmethod
+    def set_file_sizes_bytes(self, sizes: dict[str, int]) -> None:
+        """Records many measured sizes in one transaction, leaving rows that already have a size."""
         pass
 
     @abstractmethod

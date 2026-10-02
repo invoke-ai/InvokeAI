@@ -1,0 +1,206 @@
+---
+title: SDXL
+description: Generate images with Stable Diffusion XL models, including the fp16-fix VAE, ControlNet, T2I-Adapter, IP-Adapter reference images, PiD decoding and the SDXL Refiner.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 9
+---
+
+Stable Diffusion XL (SDXL) is a latent-diffusion UNet model trained at **1024×1024**, with two CLIP
+text encoders. It has a large ecosystem of community fine-tunes, LoRAs, ControlNets and IP-Adapters,
+and runs comfortably on mid-range GPUs.
+
+SDXL was released together with a separate **SDXL Refiner** model — a second pass that polishes the
+last denoising steps of an SDXL image. InvokeAI treats the refiner as its own model family and
+supports it in the workflow editor (see [SDXL Refiner](#sdxl-refiner)).
+
+InvokeAI identifies SDXL models automatically on install, including their **variant** (normal or
+inpainting).
+
+## License
+
+| Model | License | Commercial use |
+|---|---|---|
+| SDXL base and Refiner | CreativeML OpenRAIL++-M | Allowed, subject to the license's use restrictions |
+| Dreamshaper XL v2 Turbo, RealVisXL V5.0 | OpenRAIL++ | Allowed, subject to the license's use restrictions |
+| Juggernaut XL v9 | CreativeML OpenRAIL-M | Allowed, but its card says it may not be served behind a paid API without a license from RunDiffusion |
+
+None of the starter downloads is gated.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
+## Hardware
+
+The [System Requirements](/start-here/system-requirements/) table lists **8 GB VRAM** and 16 GB RAM as
+the minimum for SDXL at 1024×1024. On smaller cards, see
+[Low-VRAM mode](/configuration/optimization/low-vram-mode/). For large SDXL checkpoints,
+[FP8 Storage](/configuration/optimization/fp8-storage/) can reduce VRAM use further on NVIDIA GPUs.
+
+## Installing
+
+The easiest path is the **SDXL** bundle in the Model Manager's starter models. It installs:
+
+- **Juggernaut XL v9** — a photograph-focused main model
+- **sdxl-vae-fp16-fix** — an SDXL VAE that works at fp16 precision (see [VAE](#vae))
+- Two **IP-Adapters** for reference images — Standard and Precise — plus their image encoder
+- **ControlNets**: Hard Edge Detection (canny), Depth Map, Soft Edge Detection (softedge),
+  Pose Detection (openpose), Contour Detection (scribble) and Tile
+- **SwinIR**, a 4× upscaler used by the Upscale tool
+
+Other SDXL starter models can be installed individually:
+
+| Starter model | Notes |
+| --- | --- |
+| Dreamshaper XL v2 Turbo | A turbo model — see [Turbo models](#turbo-models) |
+| Architecture (RealVisXL5) | Photorealistic, with architecture among its use cases |
+| SDXL Refiner | The original Stability AI refiner (`stabilityai/stable-diffusion-xl-refiner-1.0`) |
+| Alien Style, Noodles Style | Style LoRAs; trigger with `alienzkin` and `noodlez` respectively |
+| Multi-Guidance Detection (Union Pro) | A single ControlNet that supports 10+ control types |
+| QRCode Monster (SDXL) | ControlNet for scannable, stylized QR codes |
+| T2I-Adapters: Hard Edge Detection (canny), Lineart, Sketch | Lighter-weight alternatives to ControlNet |
+| PiD Decoder SDXL (2K to 4K) | 4× super-resolution decoder — see [PiD](#pid-decoding) |
+
+Every SDXL main model in the starter list installs **sdxl-vae-fp16-fix** as a dependency.
+
+SDXL main models are self-contained: the UNet, both text encoders and the VAE come in one install. Both
+formats are supported:
+
+- **Diffusers** folders (for example a HuggingFace repo ID such as `RunDiffusion/Juggernaut-XL-v9`).
+- **Single-file checkpoints** (`.safetensors` / `.ckpt`), the format most community fine-tunes are
+  published in.
+
+No HuggingFace token is needed for the starter models.
+
+## Generation settings
+
+Selecting an SDXL model applies these defaults, which you can override globally or per model in the
+Model Manager's **Default Settings**:
+
+| Setting | SDXL default |
+| --- | --- |
+| Width × Height | 1024 × 1024 |
+| Steps | 30 |
+| CFG Scale | 7 |
+| Scheduler | Euler Ancestral |
+
+- **Resolution** — dimensions must be multiples of 8. An image size equivalent to 1024×1024 in pixel
+  count is recommended; use the aspect-ratio control to change shape at roughly the same area.
+- **Negative prompt** — fully supported.
+- **Schedulers** — the full standard list (DDIM, DPM++ 2M Karras, DPM++ SDE Karras, Euler, Euler
+  Ancestral, UniPC, and so on) is available.
+- **Prompt syntax** — SDXL prompts support
+  [Compel weighting and prompt functions](/users-guide/image-generation/advanced-prompt-syntax/#attention-weighting). The prompt is
+  sent to both of SDXL's text encoders.
+
+The **Advanced** section of the Generate panel adds these controls for SDXL:
+
+- **VAE** and **VAE Precision** — see [VAE](#vae).
+- **Color Compensation** — adjusts the input image to reduce color shifts during inpainting and
+  image-to-image. This control is available only for SDXL.
+- **Seamless Tiling** — generates images that tile without visible seams, on the X axis, Y axis or both.
+- **HiDiffusion** — improves structure at higher resolutions (it is most noticeable at 1536px and
+  above). See [HiDiffusion](/users-guide/image-generation/advanced-topics/hidiffusion/).
+- **PiD** — see [PiD decoding](#pid-decoding).
+
+CLIP Skip and CFG Rescale are not offered for SDXL.
+
+### Turbo models
+
+Turbo fine-tunes need far fewer steps and a much lower CFG than the defaults. For
+**Dreamshaper XL v2 Turbo**, the starter model's description recommends **CFG Scale 2**, **4–8 steps**
+and the **DPM++ SDE Karras** scheduler. Set these as the model's Default Settings in the Model Manager so they
+are applied whenever you select it.
+
+## VAE
+
+The original SDXL VAE is prone to numeric overflow at fp16, which can produce black images. There are
+two remedies:
+
+- Select **sdxl-vae-fp16-fix** in the **VAE** field (or set it as the model's default VAE in the Model
+  Manager). It is installed alongside every SDXL starter model.
+- Or set **VAE Precision** to **fp32**, at the cost of more memory and time for decoding.
+
+## Inpainting models
+
+SDXL models with an inpainting variant are detected automatically and can be used to fill masked areas
+and extend images on the Canvas. There is no SDXL inpainting model among the starter models.
+
+## LoRAs and embeddings
+
+- **LoRAs** for SDXL, including LyCORIS variants, are supported. Add them in the LoRA section of the
+  Generate panel. LoRAs made for a different model family are not applied.
+- **Textual-inversion embeddings** for SDXL are supported in the positive and negative prompts. Type `<`
+  in a prompt box to pick from the compatible embeddings you have installed.
+
+## Control layers
+
+SDXL supports **ControlNet** and **T2I-Adapter** models as control layers on the Canvas. A control layer
+guides composition from an image — edges, depth, pose, line art and so on. The
+**Multi-Guidance Detection (Union Pro)** ControlNet handles many control types with one model. See
+[Adding a gallery image to a layer](/users-guide/canvas/introduction/#adding-a-gallery-image-to-a-layer) for creating a control layer from an image.
+
+## Reference images (IP-Adapter)
+
+SDXL supports up to **five reference images**, using IP-Adapter models:
+
+- **Standard Reference (IP Adapter ViT-H)**
+- **Precise Reference (IP Adapter Plus ViT-H)** — references the image with higher precision.
+
+Each reference image has a **Mode** — **Style**, **Composition** or **Both** — and a **Weight**. Under
+**Advanced**, you can set the range of steps the reference is active for and, in Style mode, choose a
+**Style variant** (Standard, Strong or Precise).
+
+The starter IP-Adapters carry their own image encoder. The **CLIP Vision** selector next to the model
+matters only for IP-Adapters installed from a single checkpoint file; if the chosen encoder is not
+installed, it is downloaded on first use.
+
+## Regional guidance
+
+SDXL supports **regional guidance** on the Canvas: each region can have its own positive prompt, its
+own negative prompt, and its own IP-Adapter reference images.
+
+## PiD decoding
+
+SDXL supports NVIDIA's **PiD** decoder, which replaces the VAE decode with a 4× super-resolution decode.
+Install **PiD Decoder SDXL (2K to 4K)** from the starter models — only this 2K-to-4K preset exists for
+SDXL — and enable **PiD** in the Advanced section before generating. See
+[PiD Decode](/users-guide/image-generation/advanced-topics/pid-decode/) for details and limitations. In the workflow
+editor, the corresponding node is **Latents to Image - SDXL + PiD (4x SR)**.
+
+## Upscaling
+
+The **Upscale** tool supports SDXL main models. It requires an SDXL **Tile** or **Union** ControlNet
+(the starter **Tile** ControlNet is part of the bundle), and the bundle's **SwinIR** model can serve as
+the upscaler.
+
+## SDXL Refiner
+
+The refiner is a separate model that runs as a second pass over an SDXL latent. It cannot generate an
+image on its own.
+
+- **Installing** — install **SDXL Refiner** from the starter models, or any refiner checkpoint or
+  Diffusers folder; InvokeAI recognizes refiners automatically and lists them under their own
+  **SDXL Refiner** family.
+- **Using it** — the refiner is not selectable in the Generate panel or on the Canvas. Use it in the
+  workflow editor.
+
+A refiner workflow runs two denoise passes over the same latents:
+
+1. Load the base model with **Main Model - SDXL** and prompt it with **Prompt - SDXL**. In its
+   **Denoise - SD1.5, SDXL** node, set **Denoising End** below 1 (for example `0.8`) so the base model
+   stops before the last steps.
+2. Load the refiner with **Refiner Model - SDXL** and prompt it with **Prompt - SDXL Refiner** — one
+   node for the positive and one for the negative conditioning. This node takes a **Style** prompt and an
+   **Aesthetic Score** (default `6`).
+3. Feed the base pass's latents into a second **Denoise - SD1.5, SDXL** node that uses the refiner's
+   UNet, with **Denoising Start** set to the value where the base pass stopped, then decode with
+   **Latents to Image - SD1.5, SDXL**.
+
+The refiner uses SDXL's VAE.
+
+## Workflows
+
+The workflow library includes **Text to Image - SDXL** and **MultiDiffusion SDXL**. Other nodes that
+work with SDXL include **Apply LoRA - SDXL**, **Apply LoRA Collection - SDXL**,
+**ControlNet - SD1.5, SD2, SDXL**, **T2I-Adapter - SD1.5, SDXL**, **IP-Adapter - SD1.5, SDXL**,
+**Apply Seamless - SD1.5, SDXL** and **Tiled Multi-Diffusion Denoise - SD1.5, SDXL**.

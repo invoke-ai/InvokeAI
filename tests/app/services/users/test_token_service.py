@@ -2,7 +2,14 @@
 
 from datetime import timedelta
 
-from invokeai.app.services.auth.token_service import TokenData, create_access_token, verify_token
+import pytest
+
+from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret, verify_token
+
+
+@pytest.fixture(scope="module", autouse=True)
+def setup_jwt_secret() -> None:
+    set_jwt_secret("test-secret-key-for-unit-tests-only-do-not-use-in-production")
 
 
 def test_create_access_token():

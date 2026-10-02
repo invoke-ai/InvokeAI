@@ -14,6 +14,7 @@ import getpass
 import json
 import os
 import sys
+from typing import Any
 
 _root_help = (
     "Path to the InvokeAI root directory. If omitted, the root is resolved in this order: "
@@ -32,6 +33,36 @@ _LIVE_SERVER_NOTE = (
     "   ℹ️  A running server applies this to new requests immediately; already-open\n"
     "      connections are re-checked within about a minute."
 )
+
+
+def _prepare_deleted_user_fonts(config: Any, db: Any, user_id: str, logger: Any) -> tuple[Any | None, tuple[str, ...]]:
+    """Snapshot private managed paths before the user-row foreign-key cascade."""
+    try:
+        from invokeai.app.services.fonts.fonts_default import FontService
+
+        fonts = FontService(
+            db=db,
+            fonts_dir=config.fonts_path,
+            storage_dir=config.fonts_storage_path,
+            logger=logger,
+            max_upload_bytes=config.max_font_upload_bytes,
+            max_library_bytes=config.max_font_library_bytes,
+        )
+        return fonts, fonts.prepare_user_cleanup(user_id)
+    except Exception:
+        logger.warning("Unable to snapshot fonts before deleting user %s", user_id, exc_info=True)
+        return None, ()
+
+
+def _cleanup_deleted_user_fonts(fonts: Any | None, user_id: str, storage_paths: tuple[str, ...], logger: Any) -> None:
+    """Best-effort cleanup of only the paths captured for a deleted user."""
+    if fonts is None:
+        return
+    try:
+        fonts.cleanup_user(user_id, storage_paths)
+    except Exception:
+        logger.warning("Unable to clean up fonts after deleting user %s", user_id, exc_info=True)
+
 
 # ---------------------------------------------------------------------------
 # useradd
@@ -76,7 +107,7 @@ def _add_user_interactive() -> bool:
 
     try:
         config = get_config()
-        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger())
+        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger(), synchronous=config.db_synchronous)
         user_service = UserService(db)
 
         user_data = UserCreateRequest(email=email, display_name=display_name, password=password, is_admin=is_admin)
@@ -117,7 +148,7 @@ def _add_user_cli(email: str, password: str, display_name: str | None = None, is
 
     try:
         config = get_config()
-        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger())
+        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger(), synchronous=config.db_synchronous)
         user_service = UserService(db)
 
         user_data = UserCreateRequest(email=email, display_name=display_name, password=password, is_admin=is_admin)
@@ -192,7 +223,8 @@ def _delete_user_interactive() -> bool:
 
     try:
         config = get_config()
-        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger())
+        logger = InvokeAILogger.get_logger(config=config)
+        db = SqliteDatabase(config.db_path, logger, synchronous=config.db_synchronous)
         user_service = UserService(db)
 
         user = user_service.get_by_email(email)
@@ -212,7 +244,9 @@ def _delete_user_interactive() -> bool:
             print("Deletion cancelled.")
             return False
 
+        fonts, font_storage_paths = _prepare_deleted_user_fonts(config, db, user.user_id, logger)
         user_service.delete(user.user_id)
+        _cleanup_deleted_user_fonts(fonts, user.user_id, font_storage_paths, logger)
         print("\n✅ User deleted successfully!")
         print(_LIVE_SERVER_NOTE)
         return True
@@ -237,7 +271,8 @@ def _delete_user_cli(email: str, force: bool = False) -> bool:
 
     try:
         config = get_config()
-        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger())
+        logger = InvokeAILogger.get_logger(config=config)
+        db = SqliteDatabase(config.db_path, logger, synchronous=config.db_synchronous)
         user_service = UserService(db)
 
         user = user_service.get_by_email(email)
@@ -258,7 +293,9 @@ def _delete_user_cli(email: str, force: bool = False) -> bool:
                 print("Deletion cancelled.")
                 return False
 
+        fonts, font_storage_paths = _prepare_deleted_user_fonts(config, db, user.user_id, logger)
         user_service.delete(user.user_id)
+        _cleanup_deleted_user_fonts(fonts, user.user_id, font_storage_paths, logger)
         print("✅ User deleted successfully!")
         print(_LIVE_SERVER_NOTE)
         return True
@@ -311,7 +348,7 @@ def _list_users_table() -> bool:
 
     config = get_config()
     logger = InvokeAILogger.get_logger(config=config)
-    db = SqliteDatabase(config.db_path, logger)
+    db = SqliteDatabase(config.db_path, logger, synchronous=config.db_synchronous)
     user_service = UserService(db)
 
     try:
@@ -351,7 +388,7 @@ def _list_users_json() -> bool:
 
     config = get_config()
     logger = InvokeAILogger.get_logger(config=config)
-    db = SqliteDatabase(config.db_path, logger)
+    db = SqliteDatabase(config.db_path, logger, synchronous=config.db_synchronous)
     user_service = UserService(db)
 
     try:
@@ -426,7 +463,7 @@ def _modify_user_interactive() -> bool:
 
     try:
         config = get_config()
-        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger())
+        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger(), synchronous=config.db_synchronous)
         user_service = UserService(db)
 
         user = user_service.get_by_email(email)
@@ -527,7 +564,7 @@ def _modify_user_cli(
 
     try:
         config = get_config()
-        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger())
+        db = SqliteDatabase(config.db_path, InvokeAILogger.get_logger(), synchronous=config.db_synchronous)
         user_service = UserService(db)
 
         user = user_service.get_by_email(email)

@@ -1,0 +1,101 @@
+import type { GeneratedImageContract } from '@features/gallery';
+import type { NodeProps } from '@xyflow/react';
+
+import { Box, Flex, Text } from '@chakra-ui/react';
+import { useProgressImage } from '@features/queue/react';
+import {
+  getWorkflowNodeHeaderProps,
+  getWorkflowNodeShellProps,
+  useIsWorkflowImageExport,
+} from '@features/workflow/ui/nodeChrome';
+import { useWorkflowProjectSelector } from '@features/workflow/ui/WorkflowUiContext';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
+import {
+  imageUrlToStreamingSource,
+  progressImageToStreamingSource,
+} from '@platform/ui/streaming-image/streamingImageSource';
+import { memo } from 'react';
+
+import type { CurrentImageFlowNode as CurrentImageFlowNodeType } from './flowAdapters';
+
+const getLatestImage = (values: Record<string, unknown>): GeneratedImageContract | null => {
+  const recentImages = Array.isArray(values.recentImages) ? (values.recentImages as GeneratedImageContract[]) : [];
+
+  return recentImages[0] ?? null;
+};
+
+const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNodeType>) => {
+  const galleryValues = useWorkflowProjectSelector((project) => project.galleryValues);
+  const progressImage = useProgressImage();
+  const node = data.documentNode;
+  const latestImage = getLatestImage(galleryValues);
+
+  return (
+    <Box
+      data-is-selected={selected}
+      data-workflow-node-shell="true"
+      overflow="hidden"
+      w="20rem"
+      {...getWorkflowNodeShellProps({ selected })}
+    >
+      <Flex {...getWorkflowNodeHeaderProps()}>
+        <Text fontWeight="700">{node.data.label || 'Current Image'}</Text>
+        {progressImage ? (
+          <Text color="brand.solid" data-node-status-indicator="true" fontSize="2xs" ms="auto">
+            generating…
+          </Text>
+        ) : null}
+      </Flex>
+      <StreamingImageFrame
+        fallbackImage={imageUrlToStreamingSource({
+          alt: latestImage?.imageName ?? 'Current image',
+          height: latestImage?.height,
+          kind: 'fallback',
+          src: latestImage?.imageUrl,
+          width: latestImage?.width,
+        })}
+        fit="contain"
+        h="18rem"
+        liveImage={progressImageToStreamingSource(progressImage)}
+        w="full"
+      >
+        <Flex align="center" color="fg.subtle" fontSize="2xs" h="full" justify="center" px="4" textAlign="center">
+          No image yet — the latest generation will appear here.
+        </Flex>
+      </StreamingImageFrame>
+    </Box>
+  );
+};
+
+const CurrentImageSnapshotNode = ({ data, selected }: NodeProps<CurrentImageFlowNodeType>) => {
+  const node = data.documentNode;
+
+  return (
+    <Box
+      data-is-selected={selected}
+      data-workflow-node-shell="true"
+      w="20rem"
+      {...getWorkflowNodeShellProps({ selected })}
+    >
+      <Flex {...getWorkflowNodeHeaderProps()}>
+        <MiddleTruncate
+          data-workflow-export-node-title="true"
+          data-workflow-export-static-node-content="true"
+          flex="1"
+          fontWeight="700"
+          minW="0"
+          text={node.data.label || 'Current Image'}
+        />
+      </Flex>
+    </Box>
+  );
+};
+
+const CurrentImageFlowNodeComponent = (props: NodeProps<CurrentImageFlowNodeType>) => {
+  const isWorkflowImageExport = useIsWorkflowImageExport();
+
+  return isWorkflowImageExport ? <CurrentImageSnapshotNode {...props} /> : <CurrentImageEditorNode {...props} />;
+};
+
+export const CurrentImageFlowNode = memo(CurrentImageFlowNodeComponent);

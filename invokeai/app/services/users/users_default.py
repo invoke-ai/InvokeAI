@@ -263,6 +263,13 @@ class UserService(UserServiceBase):
             cursor.execute("BEGIN IMMEDIATE")
             self._assert_not_last_admin(cursor, user_id, is_deleting=True)
             cursor.execute("DELETE FROM users WHERE user_id = ?", (user_id,))
+            # Projects and client state cascade with the account; the media references they held
+            # would otherwise protect a departed account's intermediates from every cleanup forever.
+            # Workflows and quarantined projects do not cascade, so their references stay with them.
+            cursor.execute(
+                "DELETE FROM media_references WHERE user_id = ? AND owner_kind IN ('project', 'client_state')",
+                (user_id,),
+            )
 
     def authenticate(self, email: str, password: str) -> UserDTO | None:
         """Authenticate user credentials."""

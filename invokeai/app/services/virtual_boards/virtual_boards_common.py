@@ -12,6 +12,9 @@ class VirtualSubBoardDTO(BaseModel):
     image_count: int = Field(description="The number of general images for this date.")
     asset_count: int = Field(description="The number of asset images for this date.")
     video_count: int = Field(default=0, description="The number of videos for this date.")
+    asset_video_count: int = Field(
+        default=0, description="The number of asset-category (non-'general') videos for this date."
+    )
     cover_image_name: Optional[str] = Field(default=None, description="The most recent image name for this date.")
     cover_video_name: Optional[str] = Field(
         default=None,

@@ -18,7 +18,7 @@ from invokeai.backend.model_manager.configs.qwen3_vl_encoder import (
     _is_qwen3_vl_encoder_state_dict,
 )
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, Qwen3VLVariantType
 
 _REQUIRED_FIELDS = {
     "hash": "blake3:fakehash",
@@ -88,6 +88,7 @@ class TestQwen3VLEncoderCheckpointConfig:
         assert config.type == ModelType.Qwen3VLEncoder
         assert config.base == BaseModelType.Any
         assert config.format == ModelFormat.Checkpoint
+        assert config.variant is Qwen3VLVariantType.Qwen3VL_4B
 
     @patch("invokeai.backend.model_manager.configs.qwen3_vl_encoder.raise_if_not_file")
     @patch("invokeai.backend.model_manager.configs.qwen3_vl_encoder.raise_for_override_fields")
@@ -117,7 +118,10 @@ class TestQwen3VLEncoderCheckpointConfig:
 
     @patch("invokeai.backend.model_manager.configs.qwen3_vl_encoder.raise_if_not_file")
     @patch("invokeai.backend.model_manager.configs.qwen3_vl_encoder.raise_for_override_fields")
-    def test_rejects_non_4b_checkpoint_shape(self, _rfo, _rif) -> None:
+    def test_records_the_8b_variant(self, _rfo, _rif) -> None:
+        # Ideogram 4's encoder. Same type, same layout, twice the width -- and the loader builds the
+        # architecture from a HuggingFace config chosen by this variant, so a mislabelled one fails
+        # on shapes thousands of tensors in.
         mod = self._make_mock_mod(
             {
                 "model.embed_tokens.weight": MagicMock(shape=(151936, 4096)),
@@ -126,7 +130,38 @@ class TestQwen3VLEncoderCheckpointConfig:
             }
         )
 
-        with pytest.raises(NotAMatchError, match="4B|hidden"):
+        config = Qwen3VLEncoder_Checkpoint_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
+        assert config.variant is Qwen3VLVariantType.Qwen3VL_8B
+
+    @patch("invokeai.backend.model_manager.configs.qwen3_vl_encoder.raise_if_not_file")
+    @patch("invokeai.backend.model_manager.configs.qwen3_vl_encoder.raise_for_override_fields")
+    def test_rejects_an_unsupported_width(self, _rfo, _rif) -> None:
+        # Qwen3-VL-32B (hidden 5120): a real encoder with no architecture here. Only MiniMax H3's
+        # truncated build of it is supported, and that has its own config class.
+        mod = self._make_mock_mod(
+            {
+                "model.embed_tokens.weight": MagicMock(shape=(151936, 5120)),
+                "model.layers.35.self_attn.q_proj.weight": object(),
+                "model.visual.blocks.0.attn.qkv.weight": object(),
+            }
+        )
+
+        with pytest.raises(NotAMatchError, match="hidden size"):
+            Qwen3VLEncoder_Checkpoint_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
+
+    @patch("invokeai.backend.model_manager.configs.qwen3_vl_encoder.raise_if_not_file")
+    @patch("invokeai.backend.model_manager.configs.qwen3_vl_encoder.raise_for_override_fields")
+    def test_rejects_a_truncated_language_stack(self, _rfo, _rif) -> None:
+        mod = self._make_mock_mod(
+            {
+                "model.embed_tokens.weight": MagicMock(shape=(151936, 4096)),
+                "model.layers.20.self_attn.q_proj.weight": object(),
+                "model.visual.blocks.0.attn.qkv.weight": object(),
+            }
+        )
+
+        with pytest.raises(NotAMatchError, match="layer 35"):
             Qwen3VLEncoder_Checkpoint_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
 
 
@@ -181,13 +216,24 @@ class TestQwen3VLEncoderDirectoryConfig:
 
         assert config.format is ModelFormat.Qwen3VLEncoder
 
-    @pytest.mark.parametrize(("hidden_size", "num_hidden_layers"), [(4096, 36), (2560, 28)])
-    def test_rejects_non_4b_directory_config(self, tmp_path: Path, hidden_size: int, num_hidden_layers: int) -> None:
+    def test_records_the_8b_variant_from_the_directory_config(self, tmp_path: Path) -> None:
+        self._write_config(tmp_path / "config.json", hidden_size=4096)
+        (tmp_path / "model.safetensors").touch()
+        (tmp_path / "tokenizer.json").touch()
+
+        config = Qwen3VLEncoder_Qwen3VLEncoder_Config.from_model_on_disk(ModelOnDisk(tmp_path), self._fields(tmp_path))
+
+        assert config.variant is Qwen3VLVariantType.Qwen3VL_8B
+
+    @pytest.mark.parametrize(("hidden_size", "num_hidden_layers"), [(5120, 36), (2560, 28)])
+    def test_rejects_an_unsupported_directory_config(
+        self, tmp_path: Path, hidden_size: int, num_hidden_layers: int
+    ) -> None:
         self._write_config(tmp_path / "config.json", hidden_size=hidden_size, num_hidden_layers=num_hidden_layers)
         (tmp_path / "model.safetensors").touch()
         (tmp_path / "tokenizer.json").touch()
 
-        with pytest.raises(NotAMatchError, match="4B|hidden|layers"):
+        with pytest.raises(NotAMatchError, match="hidden size|layers"):
             Qwen3VLEncoder_Qwen3VLEncoder_Config.from_model_on_disk(ModelOnDisk(tmp_path), self._fields(tmp_path))
 
     def test_rejects_malformed_text_config(self, tmp_path: Path) -> None:

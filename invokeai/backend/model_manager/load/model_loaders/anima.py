@@ -1,4 +1,3 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Class for Anima model loading in InvokeAI."""
 
 from pathlib import Path
@@ -6,11 +5,13 @@ from typing import Optional
 
 import accelerate
 
+from invokeai.backend.model_manager.checkpoint_prefix import CheckpointPrefix
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.controlnet import ControlNet_Checkpoint_Anima_Config
 from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import Main_Checkpoint_Anima_Config
-from invokeai.backend.model_manager.load.load_default import ModelLoader
+from invokeai.backend.model_manager.load.fp8_capability import NotApplicable
+from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
 from invokeai.backend.model_manager.load.model_loader_registry import ModelLoaderRegistry
 from invokeai.backend.model_manager.taxonomy import (
     AnyModel,
@@ -19,11 +20,33 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelType,
     SubModelType,
 )
+from invokeai.backend.quantization.fp8_scaled import (
+    attach_fp8_scales,
+    cast_state_dict,
+    dequantize_fp8_scaled,
+    extract_comfy_quant_hints,
+    extract_fp8_scaled_layers,
+    full_precision_hints_respected,
+    parse_quantization_metadata,
+    read_safetensors_metadata,
+    reject_quantized_side_channel,
+    split_fp8_scaled_layers,
+    strip_layer_path_prefix,
+    warn_on_unattached_scales,
+)
+from invokeai.backend.quantization.load_plan import reserve_for_load
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.backend.util.state_dict_loading import log_unexpected_keys, reject_incomplete_load
 
 logger = InvokeAILogger.get_logger(__name__)
+
+
+#: Anima's own wrapper namespaces. `net.` is the official packaging; the ComfyUI bundle uses the
+#: usual `model.diffusion_model.`. `diffusion_model.` is deliberately absent -- no Anima
+#: redistribution measured uses it, and `net.` is not stripped anywhere else because it is also the
+#: root module name of a PiD checkpoint.
+ANIMA_KEY_PREFIXES = ("model.diffusion_model.", "net.")
 
 
 def _strip_anima_bundle_prefix(sd: dict) -> dict:
@@ -38,21 +61,7 @@ def _strip_anima_bundle_prefix(sd: dict) -> dict:
     checkpoints (VAE, text encoder) are dropped. If no known prefix is present, the
     state dict is returned unchanged.
     """
-    prefix_to_strip = None
-    for prefix in ["model.diffusion_model.", "net."]:
-        if any(k.startswith(prefix) for k in sd.keys() if isinstance(k, str)):
-            prefix_to_strip = prefix
-            break
-
-    if prefix_to_strip is None:
-        return sd
-
-    stripped_sd: dict = {}
-    for key, value in sd.items():
-        if isinstance(key, str) and key.startswith(prefix_to_strip):
-            stripped_sd[key[len(prefix_to_strip) :]] = value
-        # Skip non-transformer keys from bundled checkpoints (VAE, text encoder)
-    return stripped_sd
+    return CheckpointPrefix.detect(sd, ANIMA_KEY_PREFIXES).strip(sd, drop_foreign=True)
 
 
 # Checkpoint tensors that are not part of the transformer's in-memory state. Suffixes match
@@ -158,22 +167,62 @@ class AnimaCheckpointModel(ModelLoader):
         # Drop runtime-derived buffers and exporter metadata that aren't model weights.
         sd = _filter_non_model_keys(sd)
 
+        target_device = TorchDevice.choose_torch_device()
+        model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
+
+        # ComfyUI 'scaled fp8': an fp8 weight plus a `weight_scale`. `_filter_non_model_keys` above
+        # keeps those keys, and `load_state_dict` below rejects the checkpoint outright over them --
+        # 500 unexpected keys on a plain scaled export, 749 on one that also ships `comfy_quant`
+        # markers. Such a checkpoint therefore does not load at all today.
+        #
+        # Anima keeps `q_proj`/`k_proj`/`v_proj` separate and the only key rewrite is a prefix strip,
+        # so a sibling scale travels with its weight and nothing has to be split.
+        keep_fp8 = self._keep_fp8_weights(config, SubModelType.Transformer)
+        header_hints = parse_quantization_metadata(read_safetensors_metadata(model_path, logger))
+        # The header names layers in the checkpoint's own scheme -- `net.`-prefixed on every Anima
+        # redistribution measured -- while the scales are read after `_strip_anima_bundle_prefix`
+        # has run. Without this the per-layer flags, `full_precision_matrix_mult` above all, match
+        # nothing and are silently ignored.
+        layer_hints = {
+            **extract_comfy_quant_hints(sd),
+            **strip_layer_path_prefix(header_hints),
+        }
+        fp8_layers = extract_fp8_scaled_layers(sd, layer_hints=layer_hints)
+
         # Create an empty AnimaTransformer with Anima's default architecture parameters
         with accelerate.init_empty_weights():
             model = AnimaTransformer(**ANIMA_TRANSFORMER_CONFIG)
 
-        # Determine safe dtype
-        target_device = TorchDevice.choose_torch_device()
-        model_dtype = TorchDevice.choose_anima_inference_dtype(target_device)
+        skip_patterns = _model_declared_skip_patterns(model)
+        # Reserve before anything below widens a weight -- the fold and the split both do, and
+        # reserving afterwards lets either peak land on a cache that was only ever sized for the
+        # file. `scaled_layers` is what keeps the prediction honest where the weights are kept: the
+        # split also widens layers whose scale layout `scaled_mm` cannot apply, and without the
+        # mapping the prediction would charge those 1 byte/element and arrive at 2. Where they are
+        # not kept the prediction charges every float at `model_dtype`, folded yet or not, so the
+        # number is the same on either side of the fold -- what changes is when the room exists.
+        # Building the model first costs nothing: `init_empty_weights` leaves every param on meta.
+        reserve_for_load(
+            self._ram_cache.make_room,
+            sd,
+            model_dtype,
+            keep_fp8=keep_fp8,
+            model=model,
+            skip_patterns=skip_patterns,
+            fp8_layers=fp8_layers,
+            nvfp4_payloads={},
+        )
 
-        # Handle memory management
-        new_sd_size = sum(ten.nelement() * model_dtype.itemsize for ten in sd.values())
-        self._ram_cache.make_room(new_sd_size)
+        if fp8_layers and not keep_fp8:
+            # Neither the matmul nor FP8 Storage asked for them, so keeping them quantized would
+            # dequantize on every forward to save memory nobody wanted saved. Fold the scale in.
+            dequantize_fp8_scaled(sd, fp8_layers, model_dtype)
+            fp8_layers = {}
 
-        # Convert to target dtype (skip non-float tensors like embedding indices)
-        for k in sd.keys():
-            if sd[k].is_floating_point():
-                sd[k] = sd[k].to(model_dtype)
+        # Layers the cast would dequantize anyway are folded here too, scale applied, so the cast
+        # never strips a scale that can no longer be put back.
+        fp8_layers = split_fp8_scaled_layers(sd, fp8_layers, model_dtype, model=model, skip_patterns=skip_patterns)
+        kept = cast_state_dict(sd, model_dtype, keep_fp8=keep_fp8, model=model, skip_patterns=skip_patterns)
 
         load_result = model.load_state_dict(sd, assign=True, strict=False)
         log_unexpected_keys("Anima transformer checkpoint", load_result.unexpected_keys)
@@ -184,15 +233,40 @@ class AnimaCheckpointModel(ModelLoader):
         # `RuntimeError` was really standing in for.
         reject_incomplete_load(model, what="Anima transformer checkpoint")
 
-        # Without this the `fp8_storage` toggle is shown for Anima models but does nothing. The
-        # state dict was cast to a single `model_dtype` above, so the layerwise cast has one
-        # unambiguous compute dtype to restore to. AnimaTransformer is a plain nn.Module, so this
-        # takes the hook-based path in `_apply_fp8_to_nn_module`.
+        # Without this the `fp8_storage` toggle is shown for Anima models but does nothing. When
+        # nothing stayed packed, the state dict was cast to a single `model_dtype` above, so the
+        # layerwise cast has one unambiguous compute dtype to restore to; when something did stay
+        # packed, the cast bails out on its own rather than upcast a scaled weight without applying
+        # its scale. AnimaTransformer is a plain nn.Module, so this takes the hook-based path in
+        # `_apply_fp8_to_nn_module`.
+        if fp8_layers:
+            attached = attach_fp8_scales(model, fp8_layers)
+            logger.info(
+                f"Anima: kept {attached} layer(s) in fp8 (scaled fp8 checkpoint, kept for {self._fp8_kept_reason()})"
+            )
+            warn_on_unattached_scales(logger, "Anima", attached, fp8_layers)
+            marked = sum(1 for layer in fp8_layers.values() if layer.full_precision_matmul)
+            if marked and full_precision_hints_respected():
+                logger.info(
+                    f"Anima: {marked} of {len(fp8_layers)} layer(s) are marked full_precision_matrix_mult "
+                    "and will dequantize per forward."
+                )
+        elif kept:
+            logger.info(f"Anima: kept {kept} raw fp8 weight(s) quantized ({self._fp8_kept_reason()}).")
+
         model = self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
         return model
 
 
-@ModelLoaderRegistry.register(base=BaseModelType.Anima, type=ModelType.ControlNet, format=ModelFormat.Checkpoint)
+@ModelLoaderRegistry.register(
+    base=BaseModelType.Anima,
+    type=ModelType.ControlNet,
+    format=ModelFormat.Checkpoint,
+    fp8_storage=NotApplicable(
+        "an LLLite adapter is 8-66 MB (every one in the starter catalog), so the saving is tens of "
+        "megabytes bought with an upcast on each of its per-Linear modules, every forward"
+    ),
+)
 class AnimaControlNetLLLiteModel(ModelLoader):
     """Class to load Anima ControlNet-LLLite adapter models from safetensors checkpoints.
 
@@ -219,6 +293,7 @@ class AnimaControlNetLLLiteModel(ModelLoader):
         model_path = Path(config.path)
 
         sd = load_file(model_path)
+        reject_quantized_side_channel(sd, f"Anima ControlNet checkpoint {model_path.name}")
         with safe_open(model_path, framework="pt", device="cpu") as f:
             metadata = f.metadata()
 

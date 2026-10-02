@@ -17,6 +17,21 @@ from typing import Any
 # keeps their value.
 os.environ.setdefault("TOKENIZERS_PARALLELISM", "false")
 
+# ROCm: run MIOpen's convolution-kernel search in FAST mode. The default mode benchmarks
+# every candidate kernel the first time a convolution shape is seen, which on a VAE-shaped
+# workload (many layers x spatial tiles x temporal chunks, separately per dtype) costs minutes
+# of "warm-up" per new shape set, and torch's MIOpen ``chooseAlgorithm`` falls back to a
+# *global* ``emptyCache`` whenever a candidate's workspace allocation fails - on multi-GPU
+# installs that convoys the peer device mid-step (see ``install_peer_aware_empty_cache``).
+# FAST looks the shape up in MIOpen's find-db and takes the first viable kernel otherwise;
+# with a warmed find-db the difference in kernel quality is negligible. MIOpen reads the
+# variable when it is first used, so, like the tokenizer flag, it is set at module level -
+# before torch is even imported - rather than inside ``run_app()``, so no early import can run
+# a convolution ahead of it. On
+# CUDA/CPU/MPS builds MIOpen is absent and the variable is inert. ``setdefault`` keeps an
+# explicitly exported value (e.g. ``MIOPEN_FIND_MODE=NORMAL`` to re-tune the find-db).
+os.environ.setdefault("MIOPEN_FIND_MODE", "FAST")
+
 
 def get_app():
     """Import the app and event loop. We wrap this in a function to more explicitly control when it happens, because
@@ -43,7 +58,10 @@ def run_app() -> None:
     import uvicorn
 
     from invokeai.app.services.config.config_default import get_config
-    from invokeai.app.util.torch_cuda_allocator import configure_torch_cuda_allocator
+    from invokeai.app.util.torch_cuda_allocator import (
+        apply_rocm_windows_allocator_default,
+        configure_torch_cuda_allocator,
+    )
     from invokeai.backend.util.logging import InvokeAILogger
 
     # Load config.
@@ -55,6 +73,8 @@ def run_app() -> None:
     # NOTE: It is important that this happens before torch is imported.
     if app_config.pytorch_cuda_alloc_conf:
         configure_torch_cuda_allocator(app_config.pytorch_cuda_alloc_conf, logger)
+    else:
+        apply_rocm_windows_allocator_default(logger)
 
     # This import must happen after configure_torch_cuda_allocator() is called, because the module imports torch.
     from invokeai.app.invocations.baseinvocation import InvocationRegistry
@@ -67,11 +87,13 @@ def run_app() -> None:
     # Import from startup_utils here to avoid importing torch before configure_torch_cuda_allocator() is called.
     from invokeai.app.util.startup_utils import (
         apply_monkeypatches,
+        check_cuda_build_compatibility,
         check_cudnn,
         enable_dev_reload,
         find_open_port,
         register_mime_types,
     )
+    from invokeai.backend.krea2.attention import resolve_krea2_sdpa_backends
 
     # Find an open port, and modify the config accordingly.
     first_open_port = find_open_port(app_config.port)
@@ -84,6 +106,10 @@ def run_app() -> None:
     apply_monkeypatches()
     register_mime_types()
     check_cudnn(logger)
+    check_cuda_build_compatibility(logger)
+    # Fail here rather than inside a generation: the value is read per generation, so a typo would
+    # otherwise surface as a failed queue item minutes after the server came up.
+    resolve_krea2_sdpa_backends()
 
     # Initialize the app and event loop.
     app, loop = get_app()

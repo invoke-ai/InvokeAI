@@ -1,7 +1,16 @@
-"""Performance tests for multiuser authentication system.
+"""Performance and concurrency tests for the multiuser authentication system.
 
-These tests measure the performance overhead of authentication and
-ensure the system performs acceptably under load.
+Two kinds of test live here. The benchmark classes assert wall-clock or throughput thresholds
+and are marked `slow`, so they stay out of the default run: CI now spreads the suite over xdist
+workers that share the runner's cores, which moves those numbers by more than the regressions
+they are meant to catch (`test_concurrent_token_operations` already had to have its floor
+lowered after failing roughly one CI run in five). Run them deliberately with
+`uv run --no-sync pytest -m slow tests/app/services/auth/test_performance.py`.
+
+`TestConcurrentAuthOperations` is not a benchmark. It asserts that concurrent password, token
+and login operations all succeed, which nothing else covers: the threaded tests in
+`tests/app/services/users/` exercise the last-admin write invariants, not the read-side
+authentication path. Those tests keep running by default, without timing assertions.
 """
 
 import time
@@ -48,6 +57,7 @@ def user_service(logger: Logger) -> UserService:
     return UserService(db)
 
 
+@pytest.mark.slow
 class TestPasswordPerformance:
     """Tests for password hashing and verification performance."""
 
@@ -92,31 +102,8 @@ class TestPasswordPerformance:
 
         print(f"Password verification performance: {avg_time_ms:.2f}ms per verification")
 
-    def test_concurrent_password_operations(self):
-        """Test password operations under concurrent load."""
-        password = "TestPassword123"
-        num_operations = 20
 
-        def hash_and_verify():
-            hashed = hash_password(password)
-            return verify_password(password, hashed)
-
-        start_time = time.time()
-
-        with ThreadPoolExecutor(max_workers=4) as executor:
-            futures = [executor.submit(hash_and_verify) for _ in range(num_operations)]
-
-            results = [future.result() for future in as_completed(futures)]
-
-        elapsed_time = time.time() - start_time
-
-        # All operations should succeed
-        assert all(results)
-
-        # Total time should be less than sequential time due to parallelization
-        print(f"Concurrent password operations ({num_operations}): {elapsed_time:.2f}s total")
-
-
+@pytest.mark.slow
 class TestTokenPerformance:
     """Tests for JWT token performance."""
 
@@ -165,40 +152,8 @@ class TestTokenPerformance:
 
         print(f"Token verification performance: {avg_time_ms:.3f}ms per verification")
 
-    def test_concurrent_token_operations(self):
-        """Test token operations under concurrent load."""
-        token_data = TokenData(
-            user_id="user123",
-            email="test@example.com",
-            is_admin=False,
-        )
 
-        num_operations = 1000
-
-        def create_and_verify():
-            token = create_access_token(token_data)
-            verified = verify_token(token)
-            return verified is not None
-
-        start_time = time.time()
-
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            futures = [executor.submit(create_and_verify) for _ in range(num_operations)]
-
-            results = [future.result() for future in as_completed(futures)]
-
-        elapsed_time = time.time() - start_time
-
-        # All operations should succeed
-        assert all(results)
-
-        ops_per_second = num_operations / elapsed_time
-        print(f"Concurrent token operations: {ops_per_second:.0f} ops/second")
-
-        # Should handle at least 1000 operations per second
-        assert ops_per_second > 1000, f"Only {ops_per_second:.0f} ops/second"
-
-
+@pytest.mark.slow
 class TestAuthenticationOverhead:
     """Tests for overall authentication system overhead."""
 
@@ -274,6 +229,7 @@ class TestAuthenticationOverhead:
         print(f"Token verification overhead: {overhead_ms:.4f}ms per request")
 
 
+@pytest.mark.slow
 class TestUserServicePerformance:
     """Tests for user service performance."""
 
@@ -356,8 +312,46 @@ class TestUserServicePerformance:
         print(f"User listing performance (50 users): {avg_time_ms:.2f}ms per query")
 
 
-class TestConcurrentUserSessions:
-    """Tests for concurrent user session handling."""
+class TestConcurrentAuthOperations:
+    """Concurrency correctness of the authentication path. Not benchmarks: no timing assertions.
+
+    A throughput number here would measure the runner, but "every concurrent operation
+    succeeded" holds however many workers share the machine.
+    """
+
+    def test_concurrent_password_hashing_and_verification_all_succeed(self):
+        """Every thread must get back a hash it can verify; bcrypt state must not be shared."""
+        password = "TestPassword123"
+        num_operations = 20
+
+        def hash_and_verify():
+            hashed = hash_password(password)
+            return verify_password(password, hashed)
+
+        with ThreadPoolExecutor(max_workers=4) as executor:
+            futures = [executor.submit(hash_and_verify) for _ in range(num_operations)]
+            results = [future.result() for future in as_completed(futures)]
+
+        assert all(results)
+
+    def test_concurrent_token_creation_and_verification_all_succeed(self):
+        """The module-global JWT secret is read from many threads; every token must verify."""
+        token_data = TokenData(
+            user_id="user123",
+            email="test@example.com",
+            is_admin=False,
+        )
+        num_operations = 1000
+
+        def create_and_verify():
+            token = create_access_token(token_data)
+            return verify_token(token) is not None
+
+        with ThreadPoolExecutor(max_workers=10) as executor:
+            futures = [executor.submit(create_and_verify) for _ in range(num_operations)]
+            results = [future.result() for future in as_completed(futures)]
+
+        assert all(results)
 
     def test_multiple_concurrent_logins(self, user_service: UserService):
         """Test handling multiple concurrent user logins."""
@@ -390,28 +384,17 @@ class TestConcurrentUserSessions:
             verified = verify_token(token)
             return verified is not None
 
-        start_time = time.time()
-
         # Simulate concurrent logins
         with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(authenticate_user, i) for i in range(num_users)]
-
             results = [future.result() for future in as_completed(futures)]
 
-        elapsed_time = time.time() - start_time
-
-        # All logins should succeed
         assert all(results), "Some concurrent logins failed"
-
-        print(f"\nConcurrent logins ({num_users} users): {elapsed_time:.2f}s total")
-
-        # Should complete in reasonable time
-        assert elapsed_time < 10.0, f"Concurrent logins took {elapsed_time:.2f}s"
 
 
 @pytest.mark.slow
 class TestScalabilityBenchmarks:
-    """Scalability benchmarks (marked as slow tests)."""
+    """Sustained-load scalability benchmarks."""
 
     def test_authentication_under_load(self, user_service: UserService):
         """Test authentication system under sustained load."""

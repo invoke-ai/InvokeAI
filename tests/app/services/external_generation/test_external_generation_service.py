@@ -251,7 +251,7 @@ def test_generate_resizes_inpaint_result_to_original_init_size() -> None:
 
 
 def test_qwen_image_edit_max_enforces_three_reference_images() -> None:
-    from invokeai.backend.model_manager.starter_models import alibabacloud_qwen_image_edit_max
+    from invokeai.backend.model_manager.starter_models.external import alibabacloud_qwen_image_edit_max
 
     capabilities = alibabacloud_qwen_image_edit_max.capabilities
     assert capabilities is not None

@@ -58,6 +58,27 @@ class ImageFileStorageBase(ABC):
         pass
 
     @abstractmethod
+    def copy(
+        self,
+        source_image_name: str,
+        image_name: str,
+        source_subfolder: str = "",
+        image_subfolder: str = "",
+        thumbnail_size: int = 256,
+    ) -> None:
+        """Duplicates an existing image's file and thumbnail under a new name.
+
+        A byte-level copy, not a re-encode: every PNG chunk travels, including ones this
+        application does not parse, and no pixels are decoded.
+        """
+        pass
+
+    @abstractmethod
+    def get_file_size_bytes(self, image_name: str, image_subfolder: str = "") -> Optional[int]:
+        """Bytes the image and its thumbnail occupy; None when the full-size file is missing."""
+        pass
+
+    @abstractmethod
     def delete(self, image_name: str, image_subfolder: str = "") -> None:
         """Deletes an image and its thumbnail (if one exists)."""
         pass

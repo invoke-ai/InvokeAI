@@ -479,7 +479,9 @@ def test_background_recovery_can_start_when_journal_job_is_active(tmp_path: Path
     job_id = service.create_move_job(service.plan_batch(last_image_name="", limit=100))
 
     status = service.start_background_recovery()
-    assert status.is_running is True
+    # Not `is_running`: that samples whether the worker happens to still be going, and on a loaded
+    # machine the recovery can finish before the status is read. What the active journal job must
+    # not do is prevent recovery from being started at all, which the rest of this test observes.
     assert status.operation == "recovery"
 
     assert service._future is not None

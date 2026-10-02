@@ -49,7 +49,9 @@ def test_sql_injection_payload_in_delete_does_not_delete_other_rows() -> None:
     second = storage.save("second board", "0")
 
     payload = f"{first.board_id}' OR '1'='1"
-    storage.delete(payload)
+    # `delete_if_unclaimed` is the only deletion there is; the unconditional `delete` beside it had
+    # no callers and bypassed the project guard, so it went.
+    assert storage.delete_if_unclaimed(payload) is False
 
     remaining = storage.get_many(
         order_by=BoardRecordOrderBy.CreatedAt,

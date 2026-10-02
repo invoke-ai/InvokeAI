@@ -1,5 +1,6 @@
 import threading
 from collections import Counter, defaultdict
+from functools import wraps
 from typing import Dict, Literal, Optional, Union
 
 import torch
@@ -8,6 +9,7 @@ from deprecated import deprecated
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.util.level_zero import xpu_device_is_integrated, xpu_memory_info
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.wddm import video_memory_budget
 
 # legacy APIs
 TorchPrecisionNames = Literal["float32", "float16", "bfloat16"]
@@ -66,6 +68,12 @@ class TorchDevice:
     # This is the lynchpin that makes the ~79 `choose_torch_device()` call sites (nodes, model
     # patcher, etc.) resolve to the calling worker's GPU without per-call-site changes.
     _session_device = threading.local()
+
+    # Set when a peer-aware empty_cache (this class's or the installed torch.cuda wrapper) skipped
+    # the real call because another generation device was mid-session. The skipped release is
+    # not lost: `flush_deferred_empty_cache()` performs it at the next quiet moment — a busy
+    # worker's step boundary or a session's end (see `flush_deferred_empty_cache`).
+    _empty_cache_deferred = threading.Event()
 
     @classmethod
     def set_session_device(cls, device: Union[str, torch.device]) -> None:
@@ -154,6 +162,17 @@ class TorchDevice:
                 return cls._to_dtype(config.precision)
         # CPU / safe fallback
         return cls._to_dtype("float32")
+
+    @classmethod
+    def choose_noise_dtype(cls, legacy_dtype: torch.dtype) -> torch.dtype:
+        """The dtype to draw seeded noise in on the CPU, for the draws that used to happen in `legacy_dtype`.
+
+        float32 unless `noise_dtype` asks for the old draw. torch's float32 `randn`/`rand` give the same numbers on
+        every version, but its float16/bfloat16 ones changed after 2.7 (for tensors of 16 or more elements), so a
+        seed drawn in half precision gives a different image on macOS, which stays on torch 2.7, than on
+        Windows/Linux.
+        """
+        return legacy_dtype if get_config().noise_dtype == "float16" else torch.float32
 
     @classmethod
     def get_device_name(cls, device: torch.device) -> str:
@@ -326,14 +345,77 @@ class TorchDevice:
         return device
 
     @classmethod
-    def empty_cache(cls) -> None:
-        """Clear the GPU device cache."""
+    def empty_cache(cls) -> bool:
+        """Clear the GPU device cache — unless another generation device is mid-session. Says whether it ran.
+
+        ``torch.cuda.empty_cache()`` is process-global: it takes EVERY device's
+        caching-allocator mutex and cudaFree/hipFrees their cached blocks, and a free on a
+        device with a long kernel in flight blocks until that kernel completes with the mutex
+        held. On a multi-GPU box this freezes the busy worker — it cannot allocate or even
+        deallocate a tensor — for the remainder of its current step (observed via py-spy on a
+        dual-GPU ROCm rig: one worker spinning in HIP ``release_block`` inside ``emptyCache``,
+        the other parked on the allocator mutex; a video step is 40-100 s).
+
+        empty_cache is advisory — torch reuses its own cached blocks whether or not they are
+        returned to the driver — so when any OTHER registered generation device is running a
+        session, skip it rather than convoy. Cost of skipping: driver-level free-memory
+        queries (``mem_get_info``) count the still-cached blocks as used, so the model cache's
+        VRAM accounting turns conservative until a quiet-moment call runs. On single-GPU
+        installs a worker never sees another busy device, so its own calls run as before; only
+        a thread with no session device (the cache keep-alive timer, the cache's background
+        worker) defers while the worker is mid-session, and that release now lands at the
+        worker's next step boundary instead of being dropped.
+
+        A skipped call is recorded as deferred rather than dropped: the memory it would have
+        returned (a canceled session's working set, a timed-out cache's weights) stays cached in
+        the allocator — invisible to the caller's own accounting, but counted as used by the
+        driver and every other process — until `flush_deferred_empty_cache()` runs it from a
+        quiet moment. Without that, VRAM freed on one GPU stayed resident until the peer's
+        whole render finished and something else happened to call empty_cache.
+        """
+        if cls._another_generation_device_busy():
+            cls._empty_cache_deferred.set()
+            InvokeAILogger.get_logger(cls.__name__).debug(
+                "Deferring empty_cache: another generation device is mid-session."
+            )
+            return False
+        # Clear before running: a skip that races in after this point re-sets the flag, so a
+        # request is never lost, only (harmlessly) repeated.
+        cls._empty_cache_deferred.clear()
         if torch.backends.mps.is_available():
             torch.mps.empty_cache()
         if torch.cuda.is_available():
             torch.cuda.empty_cache()
         if _xpu_is_available():
             torch.xpu.empty_cache()
+        return True
+
+    @classmethod
+    def flush_deferred_empty_cache(cls) -> None:
+        """Run an empty_cache that a peer-aware skip deferred, if the pool is quiet now.
+
+        Call this from points where the calling worker's own device is at a natural sync point
+        and a driver-level free is cheap — a denoise step boundary (the progress path calls it)
+        or the end of a session. It is a flag test when nothing is pending, so it is safe to call
+        often. When a device other than the caller's is still mid-session the flush is skipped
+        again (and stays pending): on a two-GPU box the requester's session has ended, so the
+        busy worker's own step boundary is the first quiet moment and the release lands there —
+        within one of its steps instead of at the end of its render. The cost to the busy worker
+        is re-allocating its own cached working blocks on the next step, once per request.
+        """
+        if not cls._empty_cache_deferred.is_set():
+            return
+        cls.empty_cache()
+
+    @classmethod
+    def _another_generation_device_busy(cls) -> bool:
+        """True when a generation device OTHER than this thread's session device is running.
+
+        Imported lazily: the device pool module imports this one at top level.
+        """
+        from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+
+        return GENERATION_DEVICE_POOL.any_other_device_busy(cls.get_session_device())
 
     @classmethod
     def xpu_mem_get_info(cls, device: torch.device) -> tuple[int, int]:
@@ -390,6 +472,21 @@ class TorchDevice:
         return (max(total_bytes - reserved_bytes, 0), total_bytes)
 
     @classmethod
+    def cuda_mem_get_info(cls, device: torch.device) -> tuple[int, int]:
+        """Return ``(free, total)`` VRAM in bytes for a CUDA or ROCm device.
+
+        ``torch.cuda.mem_get_info``, except that on a ROCm build under Windows the free figure is capped by what the
+        Windows video-memory budget still allows this process (`wddm.video_memory_budget`). There, torch's figure is
+        the device total minus this process's own live allocations: it ignores other processes, and Windows pages
+        allocations into shared system memory well before it is exhausted instead of failing them.
+        """
+        free, total = torch.cuda.mem_get_info(device)
+        budget = video_memory_budget(device)
+        if budget is not None:
+            free = min(free, max(budget - (total - free), 0))
+        return free, total
+
+    @classmethod
     def _to_dtype(cls, precision_name: TorchPrecisionNames) -> torch.dtype:
         return NAME_TO_PRECISION[precision_name]
 
@@ -400,23 +497,33 @@ class TorchDevice:
         This is useful for models that require bfloat16 precision (e.g., Z-Image, Flux)
         but need to run on hardware that may not support bfloat16.
 
+        Asking costs no device memory. A device that cannot be reached at all still raises, as
+        it did before: that is a broken device, not a verdict on dtypes, and it belongs to the
+        caller.
+
         Args:
             device: The target device. If None, uses choose_torch_device().
 
         Returns:
-            torch.bfloat16 if supported, torch.float16 for CUDA without bfloat16 support,
-            or torch.float32 for CPU/MPS.
+            torch.bfloat16 if supported, torch.float16 for CUDA that rejects bfloat16, or
+            torch.float32 for any other device that rejects it (CPU, MPS, XPU).
         """
         device = device or cls.choose_torch_device()
         try:
-            # Test if bfloat16 is supported on this device
-            torch.tensor([1.0], dtype=torch.bfloat16, device=device)
-            return torch.bfloat16
+            # Zero elements, because this is a question about the dtype and not about memory. A
+            # backend rejects an unsupported dtype from a size-independent check it runs before
+            # it reaches its allocator, and an allocator is asked for nothing at all: torch's
+            # `empty_mps` gates bfloat16 on the macOS version above the allocate() call, and the
+            # MPS allocator skips the Metal buffer entirely for zero bytes. Probing with a real
+            # element instead put an allocation between a caller and its dtype -- 256 bytes that
+            # a full GPU can refuse, failing a run where no memory had been asked for yet.
+            torch.empty(0, dtype=torch.bfloat16, device=device)
         except TypeError:
             # bfloat16 not supported - fallback based on device type
             if device.type == "cuda":
                 return torch.float16
             return torch.float32
+        return torch.bfloat16
 
     @classmethod
     def choose_anima_inference_dtype(cls, device: Optional[torch.device] = None) -> torch.dtype:
@@ -431,3 +538,72 @@ class TorchDevice:
         if config.precision == "auto":
             return cls.choose_bfloat16_safe_dtype(device)
         return NAME_TO_PRECISION[config.precision]
+
+
+_PEER_AWARE_SENTINEL = "_invokeai_peer_aware"
+
+
+def install_peer_aware_empty_cache() -> None:
+    """Rebind ``torch.cuda.empty_cache`` itself with the peer-aware guard (idempotent).
+
+    ``TorchDevice.empty_cache`` already skips while another generation device is mid-session,
+    but third-party libraries call ``torch.cuda.empty_cache`` directly and convoy the peer all
+    the same — py-spy caught diffusers doing it from inside every model materialization
+    (``from_pretrained`` -> ``_load_pretrained_model`` -> ``empty_device_cache``,
+    ``modeling_utils.py``; likewise ``from_single_file``), freezing the other GPU's in-flight
+    denoise for the remainder of its step. Wrapping the torch entry point makes every Python
+    caller inherit the policy. (Torch-internal C++ callers — e.g. MIOpen's chooseAlgorithm
+    workspace-OOM fallback — bypass Python entirely and remain out of reach.)
+
+    Installed once at startup via ``apply_monkeypatches``. Single-GPU installs never have an
+    "other" busy device, so the wrapper is a pass-through there.
+    """
+    if getattr(torch.cuda.empty_cache, _PEER_AWARE_SENTINEL, False):
+        return
+    original_empty_cache = torch.cuda.empty_cache
+
+    @wraps(original_empty_cache)
+    def peer_aware_empty_cache() -> None:
+        if TorchDevice._another_generation_device_busy():
+            # Deferred, not dropped — see TorchDevice.empty_cache / flush_deferred_empty_cache.
+            TorchDevice._empty_cache_deferred.set()
+            InvokeAILogger.get_logger("TorchDevice").debug(
+                "Deferring torch.cuda.empty_cache: another generation device is mid-session."
+            )
+            return
+        TorchDevice._empty_cache_deferred.clear()
+        original_empty_cache()
+
+    setattr(peer_aware_empty_cache, _PEER_AWARE_SENTINEL, True)
+    torch.cuda.empty_cache = peer_aware_empty_cache
+
+
+def disable_conv_benchmark_empty_cache() -> None:
+    """Stop torch's conv algorithm search from calling global emptyCache() after each find.
+
+    When torch searches for a convolution algorithm (cuDNN benchmark mode; MIOpen on ROCm on
+    every algo-cache miss, benchmark flag or not), ``findAlgorithm`` ends the search with a
+    process-global ``CUDACachingAllocator::emptyCache()`` to release benchmarking workspace
+    (``aten/src/ATen/native/miopen/Conv_miopen.cpp``, likewise the cuDNN path). That call takes
+    every CUDA/HIP device's allocator mutex and frees their cached blocks — freezing a peer
+    GPU's worker mid-step exactly like the Python-level ``torch.cuda.empty_cache`` calls
+    handled by ``install_peer_aware_empty_cache``, but from C++, out of reach of that wrapper
+    (observed via py-spy on a dual-GPU ROCm rig: one worker inside
+    ``chooseAlgorithm -> emptyCache -> hipFree`` waiting out the other worker's 40-100 s
+    denoise step; each new conv shape in the process re-triggers it).
+
+    The call is gated on ``_cudnn_get_conv_benchmark_empty_cache()``, which torch exposes a
+    setter for. Disabling it leaves the benchmarking workspace blocks cached in the allocator
+    for reuse instead of returning them to the driver — the same trade the peer-aware skips
+    already make everywhere else. Called only on multi-GPU installs (see
+    ``DefaultSessionProcessor.start``); single-GPU installs keep torch's default behavior.
+
+    No-op on torch builds that lack the flag (e.g. CPU-only builds).
+    """
+    setter = getattr(torch._C, "_cudnn_set_conv_benchmark_empty_cache", None)
+    if setter is None:
+        return
+    setter(False)
+    InvokeAILogger.get_logger("TorchDevice").debug(
+        "Disabled torch's post-conv-algorithm-search global emptyCache (multi-GPU install)."
+    )
