@@ -98,10 +98,13 @@ class SegmentAnything2Pipeline(RawModel):
         outputs = self._sam2_model(**processed_inputs)
 
         # Post-process the masks to get the final segmentation
+        post_process_kwargs = {}
+        if "reshaped_input_sizes" in processed_inputs.keys():
+            post_process_kwargs["reshaped_input_sizes"] = processed_inputs.reshaped_input_sizes
         masks = self._sam2_processor.post_process_masks(
             masks=outputs.pred_masks,
             original_sizes=processed_inputs.original_sizes,
-            reshaped_input_sizes=processed_inputs.reshaped_input_sizes,
+            **post_process_kwargs,
         )
 
         # There should be only one batch.
