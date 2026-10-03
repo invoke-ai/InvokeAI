@@ -900,14 +900,17 @@ const rowFocusRing = {
   outlineOffset: '-2px',
 } as const;
 
+/** Hover, extended to a row whose context menu is open so the row it acts on stays marked. */
+const ROW_POINTED = '&:is(:hover, [data-hover], [data-menu-open]):not(:disabled, [data-disabled])';
+
 /** One row surface for every list-like control; `Row` and `ListItem` both build on it. */
 const rowSurface = {
   borderRadius: 'sm',
   textAlign: 'start',
   transition: 'background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease',
   w: 'full',
-  // Keep hover below selected emphasis so pointing does not resemble selection.
-  _hover: { bg: 'bg.muted/60' },
+  // Keep the pointed fill below selected emphasis so pointing does not resemble selection.
+  [ROW_POINTED]: { bg: 'bg.muted/60' },
   _disabled: { cursor: 'not-allowed', opacity: 0.5 },
 } as const;
 
@@ -915,17 +918,17 @@ const rowSurface = {
 const rowTones = {
   none: {},
   muted: { bg: 'bg.muted' },
-  selected: { bg: 'bg.emphasized/60', _hover: { bg: 'bg.emphasized/60' } },
-  emphasized: { bg: 'bg.emphasized', _hover: { bg: 'bg.emphasized' } },
+  selected: { bg: 'bg.emphasized/60', [ROW_POINTED]: { bg: 'bg.emphasized/60' } },
+  emphasized: { bg: 'bg.emphasized', [ROW_POINTED]: { bg: 'bg.emphasized' } },
   brand: {
     bg: 'brand.subtle',
     color: 'brand.fg',
-    _hover: { bg: 'brand.subtle' },
+    [ROW_POINTED]: { bg: 'brand.subtle' },
   },
   accent: {
     bg: 'accent.solid',
     color: 'accent.contrast',
-    _hover: { bg: 'accent.solid' },
+    [ROW_POINTED]: { bg: 'accent.solid' },
   },
 } as const;
 
@@ -973,8 +976,6 @@ export const listItemSlotRecipe = defineSlotRecipe({
       '&:has([data-list-primary]:focus-visible)': rowFocusRing,
       // Rows of a page being replaced stay readable; only the pointer says the list is working.
       '&[data-busy]': { cursor: 'progress' },
-      // Nothing to press: pointing must not look like an affordance.
-      '&[data-static]:hover': { bg: 'transparent' },
     },
     check: {
       alignItems: 'center',

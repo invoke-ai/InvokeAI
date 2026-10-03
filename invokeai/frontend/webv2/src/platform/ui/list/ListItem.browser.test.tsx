@@ -93,6 +93,19 @@ describe('ListItem', () => {
     expect(onContextMenu).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps the hover surface while its context menu is open', async () => {
+    const surface = () => getComputedStyle(primary().parentElement!).backgroundColor;
+
+    await userEvent.unhover(document.body);
+    await render(<ListItem title="A model" onContextMenu={vi.fn()} />);
+    const resting = surface();
+
+    await render(<ListItem isMenuOpen title="A model" onContextMenu={vi.fn()} />);
+
+    expect(resting).toBe('rgba(0, 0, 0, 0)');
+    expect(surface()).not.toBe(resting);
+  });
+
   it('renders a static row without a press handler as plain content, not a button', async () => {
     await render(<ListItem title="Read only" />);
 

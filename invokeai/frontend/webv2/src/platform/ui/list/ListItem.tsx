@@ -48,6 +48,8 @@ export interface ListItemProps {
   isBusy?: boolean;
   /** The row discloses content below itself; announced with aria-expanded. */
   isExpanded?: boolean;
+  /** This row's context menu is open; the row keeps its hover surface so it is clear what the menu acts on. */
+  isMenuOpen?: boolean;
   /** Accessible name of the checkbox when the title alone is ambiguous; defaults to "Select {title}". */
   checkLabel?: string;
   /** Identifies the row to its owning List for focus management. */
@@ -85,6 +87,7 @@ export const ListItem = ({
   isBusy = false,
   isChecked = false,
   isExpanded,
+  isMenuOpen = false,
   itemKey,
   leading,
   positionInSet,
@@ -197,7 +200,7 @@ export const ListItem = ({
       css={styles.root}
       data-busy={isBusy || undefined}
       data-list-row={itemKey}
-      data-static={isInteractive || tone !== 'none' ? undefined : ''}
+      data-menu-open={isMenuOpen || undefined}
       role={role}
       onContextMenu={onContextMenu ? handleContextMenu : undefined}
     >

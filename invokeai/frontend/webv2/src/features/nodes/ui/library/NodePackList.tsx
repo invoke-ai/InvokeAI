@@ -55,6 +55,7 @@ export const NodePackList = ({
   const renderItem = (pack: NodePackInfo, rowProps: ListRowProps) => (
     <ListItem
       {...rowProps}
+      isMenuOpen={contextMenuTarget?.pack.name === pack.name}
       leading={
         <Icon as={BlocksIcon} boxSize="4" color={rowProps.isActive ? 'accent.contrast' : 'fg.subtle'} flexShrink={0} />
       }

@@ -97,6 +97,7 @@ export const ModelLibraryList = ({
       fileSize={model.file_size}
       format={model.format}
       imageVersion={coverImageVersions[model.key]}
+      isMenuOpen={contextMenuTarget?.modelKey === model.key}
       isMissing={missingModelKeys.has(model.key)}
       isSelected={selectedKeys.has(model.key)}
       modelKey={model.key}
@@ -147,6 +148,7 @@ interface ModelRowProps extends ListRowProps {
   fileSize: number;
   format: Parameters<typeof ModelFormatBadge>[0]['format'];
   imageVersion?: number;
+  isMenuOpen: boolean;
   isMissing: boolean;
   isSelected: boolean;
   modelKey: string;
