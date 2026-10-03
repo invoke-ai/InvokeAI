@@ -8,7 +8,13 @@ import { galleryImageUrls } from '@features/gallery/utility';
 import { GenerationUiProvider } from '@features/generation/react';
 import { normalizeRebalancePresets } from '@features/generation/settings';
 import { useAuthSession, useCapabilities } from '@features/identity';
-import { ensureModelsLoaded, getModelBaseColorPalette, getModelBaseLabel, useModelsSelector } from '@features/models';
+import {
+  ensureModelsLoaded,
+  getModelBaseColorPalette,
+  getModelBaseLabel,
+  getModelImageUrl,
+  useModelsSelector,
+} from '@features/models';
 import { getQueueReadModelOptions } from '@features/queue';
 import {
   buildProjectQueueItemOriginPrefix,
@@ -165,6 +171,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       error: modelsError,
       getBaseColorPalette: getModelBaseColorPalette,
       getBaseLabel: getModelBaseLabel,
+      getImageUrl: getModelImageUrl,
       // Use hash navigation and lazy filter seeding to keep router/manager code out of initial bundles; set the
       // filter before navigation.
       openManager: (options) => {

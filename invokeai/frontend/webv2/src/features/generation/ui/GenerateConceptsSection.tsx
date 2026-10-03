@@ -7,18 +7,14 @@ import type {
   LoraModelConfig,
 } from '@features/generation/core/types';
 
-import { Badge, HStack, Stack, Text } from '@chakra-ui/react';
+import { Stack, Text } from '@chakra-ui/react';
 import {
-  DEFAULT_LORA_WEIGHT_CONFIG,
   getDefaultLoraWeight,
   isLoraCompatibleWithModel,
   isLoraModelConfig,
   syncGenerateLorasWithModels,
 } from '@features/generation/core/settings';
-import { Field, IconButton, Tooltip } from '@platform/ui';
-import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
-import { ScrubberField } from '@platform/ui/ScrubberField';
-import { Trash2Icon } from 'lucide-react';
+import { Field } from '@platform/ui';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -26,8 +22,7 @@ import type { GenerateSettingsUpdate } from './generateDebounce';
 
 import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
-import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
-import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
+import { ConceptList, ConceptRow, type ConceptUpdate } from './shared/ConceptRow';
 import { useDebouncedDraftValue } from './useDebouncedDraftValue';
 
 interface GenerateConceptsContentProps {
@@ -39,7 +34,6 @@ interface GenerateConceptsContentProps {
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
 
-const LORA_WEIGHT_MARKS = [-1, 0, 1, 2];
 const LORA_WEIGHT_DEBOUNCE_MS = 250;
 
 const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateModelConfig | undefined): boolean =>
@@ -67,7 +61,7 @@ export const GenerateConceptsContent = ({
     });
   };
 
-  const updateLora = (modelKey: string, patch: Partial<Pick<GenerateLora, 'isEnabled' | 'weight'>>) => {
+  const updateLora = (modelKey: string, patch: ConceptUpdate) => {
     onCommit((settings) => {
       const latestLoras = syncGenerateLorasWithModels(settings.loras, loraModels);
       const hasLora = latestLoras.some((lora) => lora.model.key === modelKey);
@@ -114,51 +108,45 @@ export const GenerateConceptsContent = ({
           {t('widgets.generate.addConceptsHelp')}
         </Text>
       ) : (
-        <Stack gap="2">
+        <ConceptList>
           {loras.map((lora) => (
-            <LoraRow
+            <GenerateConceptRow
               key={lora.model.key}
               isCompatible={isCompatibleLora(lora, selectedModel)}
               lora={lora}
               projectId={projectId}
-              onRemove={() => removeLora(lora.model.key)}
-              onToggle={(isEnabled) => updateLora(lora.model.key, { isEnabled })}
-              onWeightChange={(weight) => updateLora(lora.model.key, { weight })}
+              onRemove={removeLora}
+              onUpdate={updateLora}
             />
           ))}
-        </Stack>
+        </ConceptList>
       )}
     </Stack>
   );
 };
 
-const LoraRow = ({
+/** Holds the weight as a debounced draft so scrubbing does not commit settings per step. */
+const GenerateConceptRow = ({
   isCompatible,
   lora,
   onRemove,
+  onUpdate,
   projectId,
-  onToggle,
-  onWeightChange,
 }: {
   isCompatible: boolean;
   lora: GenerateLora;
-  onRemove: () => void;
+  onRemove: (key: string) => void;
+  onUpdate: (key: string, update: ConceptUpdate) => void;
   projectId: string;
-  onToggle: (isEnabled: boolean) => void;
-  onWeightChange: (weight: number) => void;
 }) => {
-  const { t } = useTranslation();
-  const { getBaseColorPalette, getBaseLabel } = useGenerationUi().models;
-  const isActive = lora.isEnabled && isCompatible;
-  const defaultWeight = getDefaultLoraWeight(lora.model);
-
+  const models = useGenerationUi().models;
   const {
     draftValue: draftWeight,
     flushDraftValue,
     setDraftValue: setWeight,
   } = useDebouncedDraftValue({
     delayMs: LORA_WEIGHT_DEBOUNCE_MS,
-    onCommit: onWeightChange,
+    onCommit: (weight: number) => onUpdate(lora.model.key, { weight }),
     resetKey: projectId,
     value: lora.weight,
   });
@@ -166,87 +154,12 @@ const LoraRow = ({
   useRegisterGenerateDraftFlusher(flushDraftValue);
 
   return (
-    <Stack
-      bg="bg.subtle"
-      borderColor={isActive ? 'border.emphasized' : 'border.subtle'}
-      borderWidth="1px"
-      gap="2"
-      opacity={isCompatible ? 1 : 0.68}
-      p="2"
-      rounded="md"
-    >
-      <HStack gap="2" minW="0">
-        <Stack flex="1" gap="0.5" minW="0">
-          <HStack gap="1.5" minW="0">
-            <MiddleTruncate
-              color={isActive ? 'fg' : 'fg.muted'}
-              fontSize="xs"
-              fontWeight="medium"
-              minW="0"
-              text={lora.model.name}
-            />
-            <Badge colorPalette={getBaseColorPalette(lora.model.base)} flexShrink={0} size="xs" variant="surface">
-              {getBaseLabel(lora.model.base)}
-            </Badge>
-            {!isCompatible ? (
-              <Badge colorPalette="orange" flexShrink={0} size="xs" variant="surface">
-                {t('widgets.generate.incompatible')}
-              </Badge>
-            ) : null}
-          </HStack>
-          {lora.model.trigger_phrases?.length ? (
-            <Text color="fg.muted" fontSize="2xs" truncate>
-              {lora.model.trigger_phrases.join(', ')}
-            </Text>
-          ) : null}
-        </Stack>
-
-        <HStack flexShrink="0" gap="1">
-          <GenerateToggleSwitch
-            checked={isActive}
-            disabled={!isCompatible}
-            label={
-              isActive
-                ? t('widgets.generate.disableConcept', { name: lora.model.name })
-                : t('widgets.generate.enableConcept', { name: lora.model.name })
-            }
-            onCheckedChange={onToggle}
-          />
-
-          <Tooltip content={t('widgets.generate.removeConcept')}>
-            <IconButton
-              aria-label={t('widgets.generate.removeConceptNamed', { name: lora.model.name })}
-              color="fg.muted"
-              size="2xs"
-              variant="ghost"
-              onClick={onRemove}
-            >
-              <Trash2Icon />
-            </IconButton>
-          </Tooltip>
-        </HStack>
-      </HStack>
-
-      <GenerateFieldContextMenu
-        copyValue={() => String(draftWeight)}
-        isAtDefault={draftWeight === defaultWeight}
-        onReset={() => setWeight(defaultWeight)}
-        resetLabel={t('widgets.generate.resetToConceptDefault')}
-      >
-        <ScrubberField
-          defaultValue={defaultWeight}
-          disabled={!isActive}
-          inputMax={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMax}
-          inputMin={DEFAULT_LORA_WEIGHT_CONFIG.numberInputMin}
-          label={t('widgets.generate.weight')}
-          marks={LORA_WEIGHT_MARKS}
-          max={DEFAULT_LORA_WEIGHT_CONFIG.sliderMax}
-          min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
-          step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
-          value={draftWeight}
-          onChange={setWeight}
-        />
-      </GenerateFieldContextMenu>
-    </Stack>
+    <ConceptRow
+      identity={models}
+      isCompatible={isCompatible}
+      lora={draftWeight === lora.weight ? lora : { ...lora, weight: draftWeight }}
+      onRemove={onRemove}
+      onUpdate={(key, update) => (update.weight === undefined ? onUpdate(key, update) : setWeight(update.weight))}
+    />
   );
 };

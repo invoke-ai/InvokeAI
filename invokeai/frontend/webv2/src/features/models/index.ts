@@ -9,6 +9,7 @@ export type {
   StarterModelResponse,
 } from './core/types';
 export { getModelBaseColorPalette, getModelBaseLabel, type ModelBaseColorPalette } from './core/baseIdentity';
+export { getModelImageUrl } from './data/api';
 export { useActiveInstallSources } from './data/installsStore';
 export {
   ensureModelsLoaded,

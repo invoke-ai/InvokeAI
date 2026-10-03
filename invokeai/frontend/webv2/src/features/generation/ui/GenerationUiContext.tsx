@@ -68,6 +68,7 @@ export interface GenerationUiAdapter {
     error: string | null;
     getBaseColorPalette(base: string): string;
     getBaseLabel(base: string): string;
+    getImageUrl(key: string): string;
     /** Apply the optional model-type filter when opening Add Models. */
     openManager(options?: { modelType?: string }): void;
     status: 'error' | 'idle' | 'loaded' | 'loading';

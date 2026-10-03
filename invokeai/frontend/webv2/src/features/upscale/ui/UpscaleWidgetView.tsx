@@ -4,7 +4,13 @@ import type { ModelConfig, ModelTaxonomyType } from '@features/models';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
 
 import { Badge, createListCollection, DataList, SegmentGroup, SimpleGrid, Stack, Text } from '@chakra-ui/react';
-import { GenerationSettingsSection, SeedField } from '@features/generation/components';
+import {
+  ConceptList,
+  type ConceptModelIdentity,
+  ConceptRow,
+  GenerationSettingsSection,
+  SeedField,
+} from '@features/generation/components';
 import {
   getDefaultLoraWeight,
   isLoraCompatibleWithModel,
@@ -14,7 +20,13 @@ import {
   isVaeModelConfig,
   SCHEDULER_OPTIONS,
 } from '@features/generation/settings';
-import { ensureModelsLoaded, useModelsSelector } from '@features/models';
+import {
+  ensureModelsLoaded,
+  getModelBaseColorPalette,
+  getModelBaseLabel,
+  getModelImageUrl,
+  useModelsSelector,
+} from '@features/models';
 import { ModelSelect } from '@features/models/react';
 import {
   createDefaultUpscaleWidgetValues,
@@ -47,7 +59,7 @@ import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { areInputImagesEquivalent, valuesAreEqual } from './upscaleComparators';
-import { UpscaleLoraRow, UpscalePromptFields } from './UpscaleFormFields';
+import { UpscalePromptFields } from './UpscaleFormFields';
 import { UpscaleImageField } from './UpscaleImageField';
 import { useUpscaleUi, useUpscaleUiActions } from './UpscaleUiContext';
 
@@ -66,6 +78,11 @@ const MEGAPIXEL_FORMATTER = new Intl.NumberFormat(undefined, { maximumFractionDi
 const SPANDREL_MODEL_TYPES: readonly ModelTaxonomyType[] = ['spandrel_image_to_image'];
 const MAIN_MODEL_TYPES: readonly ModelTaxonomyType[] = ['main'];
 const LORA_MODEL_TYPES: readonly ModelTaxonomyType[] = ['lora'];
+const CONCEPT_IDENTITY: ConceptModelIdentity = {
+  getBaseColorPalette: getModelBaseColorPalette,
+  getBaseLabel: getModelBaseLabel,
+  getImageUrl: getModelImageUrl,
+};
 const CONTROLNET_MODEL_TYPES: readonly ModelTaxonomyType[] = ['controlnet'];
 const VAE_MODEL_TYPES: readonly ModelTaxonomyType[] = ['vae'];
 const T5_ENCODER_MODEL_TYPES: readonly ModelTaxonomyType[] = ['t5_encoder'];
@@ -604,9 +621,19 @@ export const UpscaleWidgetView = () => {
               onChange={addLora}
             />
           </Field>
-          {values.loras.map((lora) => (
-            <UpscaleLoraRow key={lora.model.key} lora={lora} onRemove={removeLora} onUpdate={updateLora} />
-          ))}
+          {values.loras.length > 0 ? (
+            <ConceptList>
+              {values.loras.map((lora) => (
+                <ConceptRow
+                  key={lora.model.key}
+                  identity={CONCEPT_IDENTITY}
+                  lora={lora}
+                  onRemove={removeLora}
+                  onUpdate={updateLora}
+                />
+              ))}
+            </ConceptList>
+          ) : null}
         </Stack>
       </GenerationSettingsSection>
 
