@@ -13,12 +13,18 @@ import { useTranslation } from 'react-i18next';
 import type { InvocationState } from './useInvocationState';
 
 import { getInvokeIconMode } from './invokeButtonModel';
-import { INVOKE_BUTTON_CSS } from './invokeClusterCss';
 import { HIDE_BELOW_HINT_WIDTH } from './topbarBreakpoints';
 import { TopbarShortcutKeys } from './TopbarShortcutKeys';
 import { useTopbarShortcutBinding } from './useTopbarShortcut';
 
 const TOOLTIP_CONTENT_PROPS = { p: '0' };
+
+/**
+ * Invoke sits on top of its attached neighbours with full control corners; the iterations field and routing button
+ * each run a tail of their frame under those corners so they read as a continuing border, not a notch.
+ * Doubled specificity outranks the attached Group's `!important` corner reset.
+ */
+const INVOKE_BUTTON_CSS = { '&&': { borderRadius: 'control !important' } } as const;
 /** The hint inherits the button's text color; its frame is that color, faded. */
 const SHORTCUT_BORDER = 'color-mix(in oklab, currentColor 40%, transparent)';
 

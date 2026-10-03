@@ -6,8 +6,26 @@ import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/Workb
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { TAIL_UNDER_INVOKE_AFTER_CSS } from './invokeClusterCss';
 import { getBatchCount } from './useInvocationState';
+
+/**
+ * Invoke's rounded corners overlap this field, so its edge facing Invoke is hidden and a tail continues the frame
+ * beneath them. The input is a replaced element, so the root carries the tail; it overlaps the input by 2px so the
+ * opaque border rows join without a sub-pixel seam.
+ */
+const TAIL_UNDER_INVOKE_AFTER_CSS = {
+  '& input': { borderInlineEndColor: 'transparent' },
+  '&::after': {
+    borderBlockWidth: '1px',
+    content: '""',
+    pointerEvents: 'none',
+    position: 'absolute',
+    borderColor: 'border',
+    insetBlock: 0,
+    insetInlineStart: 'calc(100% - 2px)',
+    width: 'calc({radii.control} + 2px)',
+  },
+} as const;
 
 export const IterationsField = () => {
   const { t } = useTranslation();

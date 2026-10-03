@@ -15,8 +15,31 @@ import { useTranslation } from 'react-i18next';
 
 import type { InvocationState } from './useInvocationState';
 
-import { TAIL_UNDER_INVOKE_BEFORE_CSS } from './invokeClusterCss';
 import { RoutingDestinationSegments } from './RoutingDestinationSegments';
+
+/**
+ * Invoke's rounded corners overlap this button, so its edge facing Invoke stays a transparent 1px border (keeping the
+ * content box centred) and a tail continues the frame beneath them. The tail inherits the surface so hover and active
+ * states carry under the corners; it covers the edge column with its border rows but clips its fill off that column,
+ * where the button's translucent fill would double.
+ */
+const TAIL_UNDER_INVOKE_BEFORE_CSS = {
+  borderInlineStartColor: 'transparent',
+  '&::before': {
+    borderBlockWidth: '1px',
+    content: '""',
+    pointerEvents: 'none',
+    position: 'absolute',
+    backgroundClip: 'content-box',
+    backgroundColor: 'inherit',
+    borderBlockColor: 'inherit',
+    // Offsets resolve inside the button's border; step out so the tail continues its rows and spans its edge column.
+    insetBlock: '-1px',
+    insetInlineEnd: '100%',
+    paddingInlineEnd: '1px',
+    width: 'calc({radii.control} + 2px)',
+  },
+} as const;
 
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
