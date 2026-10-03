@@ -11,6 +11,7 @@ import { ChakraProvider, Stack, Text } from '@chakra-ui/react';
 import { StatusWidgetChip } from '@platform/ui';
 import { system } from '@theme/system';
 import { FocusRegionProvider } from '@workbench/focusRegions';
+import { createTestFocusController } from '@workbench/focusRegions.testing';
 import { createWidgetImplementationResource } from '@workbench/widgetImplementationResource';
 import i18next from 'i18next';
 import { CircleIcon } from 'lucide-react';
@@ -157,6 +158,8 @@ const createInstance = (title?: string): WidgetInstanceContract => ({
   typeId: 'test',
 });
 
+const focusController = createTestFocusController();
+
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
@@ -171,7 +174,7 @@ const render = async (children: ReactNode) => {
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <FocusRegionProvider>{children}</FocusRegionProvider>
+          <FocusRegionProvider controller={focusController}>{children}</FocusRegionProvider>
         </ChakraProvider>
       </I18nextProvider>
     );
@@ -202,6 +205,8 @@ const getIdentityGeometry = ({ loadedIcon = false } = {}) => {
 };
 
 afterEach(async () => {
+  // Focus is per test: the next one starts with no region outlined and no move pending.
+  focusController.clear();
   await act(async () => {
     root?.unmount();
     await Promise.resolve();
