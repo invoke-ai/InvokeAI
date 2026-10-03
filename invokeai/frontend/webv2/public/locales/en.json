@@ -1897,7 +1897,15 @@
         "label": "Connection style",
         "description": "How connections between nodes are drawn."
       },
+      "promptFontSize": {
+        "label": "Prompt text size",
+        "description": "Size of the text in prompt fields."
+      },
       "options": {
+        "small": "Small",
+        "default": "Default",
+        "large": "Large",
+        "larger": "Larger",
         "curved": "Curved",
         "square": "Square",
         "activeProject": "Active project",
