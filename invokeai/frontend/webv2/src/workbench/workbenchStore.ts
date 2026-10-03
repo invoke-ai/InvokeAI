@@ -426,10 +426,15 @@ const createCommands = (
     widgets: {
       dockFloating: command('dockFloatingWidget', (instanceId: string) => ({ instanceId })),
       closeFloating: command('closeFloatingWidget', (instanceId: string) => ({ instanceId })),
-      float: command('floatWidget', (instanceId: string, region?: ActionPayload<'floatWidget'>['region']) =>
-        region ? { instanceId, region } : { instanceId }
+      float: command(
+        'floatWidget',
+        (
+          instanceId: string,
+          region?: ActionPayload<'floatWidget'>['region'],
+          viewport?: ActionPayload<'floatWidget'>['viewport']
+        ) => ({ instanceId, ...(region ? { region } : {}), ...(viewport ? { viewport } : {}) })
       ),
-      focusFloating: command('focusFloatingWidget', (instanceId: string) => ({ instanceId })),
+      raiseFloating: command('raiseFloatingWidget', (instanceId: string) => ({ instanceId })),
       move: command('moveWidgetInstance'),
       open: command('openRegionWidget'),
       patchInstanceValues: command(
@@ -455,6 +460,7 @@ const createCommands = (
         })
       ),
       reorder: command('reorderWidgetInstances'),
+      revealFloating: command('revealFloatingWidget', (instanceId: string) => ({ instanceId })),
       setAlignment: command('setWidgetInstanceAlignment'),
       select: command('selectRegionWidget'),
       setFloatingGeometry: command(

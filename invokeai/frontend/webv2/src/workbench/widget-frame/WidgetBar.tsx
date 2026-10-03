@@ -3,12 +3,13 @@ import type { WidgetInstanceId } from '@workbench/widgetContracts';
 import type { WidgetRegionDropState } from '@workbench/widgetDnd';
 import type { WidgetPlacementInstanceMeta, WidgetRegionItem } from '@workbench/widgetRegionViewModel';
 
-import { Box, Flex, type SystemStyleObject } from '@chakra-ui/react';
+import { Box, Flex, Icon, type SystemStyleObject } from '@chakra-ui/react';
 import { verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Row } from '@platform/ui/Row';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { useHighlightedRegion } from '@workbench/focusRegions';
 import { WidgetIcon } from '@workbench/iconResolver';
+import { PictureInPicture2Icon } from 'lucide-react';
 import { type MouseEvent, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -36,11 +37,27 @@ interface WidgetBarProps {
   side: 'left' | 'right';
   groups: WidgetBarGroup[];
   menuItems: WidgetBarItem[];
+  /** The project the rail shows. A marker menu opened for another project closes instead of acting on this one. */
+  projectId: string;
+  /** Dock the floating window a marker stands for. */
+  onDock: (instanceId: WidgetInstanceId) => void;
+  /** Remove the floating window a marker stands for, asked from that marker's own menu. */
+  onRemoveFloating: (instanceId: WidgetInstanceId) => void;
   onSelect: (region: WidgetBarGroup['region'], instanceId: WidgetInstanceId) => void;
   onToggle: (item: WidgetBarItem) => void;
 }
 
-export const WidgetBar = ({ edgeRegion, groups, menuItems, onSelect, onToggle, side }: WidgetBarProps) => {
+export const WidgetBar = ({
+  edgeRegion,
+  groups,
+  menuItems,
+  onDock,
+  onRemoveFloating,
+  onSelect,
+  onToggle,
+  projectId,
+  side,
+}: WidgetBarProps) => {
   const { t } = useTranslation();
   const isEdgeOutlined = useHighlightedRegion() === edgeRegion;
   const region = side;
@@ -48,18 +65,30 @@ export const WidgetBar = ({ edgeRegion, groups, menuItems, onSelect, onToggle, s
     x: number;
     y: number;
   } | null>(null);
-  const [instanceMenuTarget, setInstanceMenuTarget] = useState<WidgetInstanceContextMenuTarget | null>(null);
+  const [instanceMenu, setInstanceMenu] = useState<(WidgetInstanceContextMenuTarget & { projectId: string }) | null>(
+    null
+  );
+
+  // Instance ids repeat across projects (default widgets share theirs), so a menu left open across a project switch
+  // would dock or remove the new project's window. It closes instead, and stays closed if the old project returns.
+  if (instanceMenu && instanceMenu.projectId !== projectId) {
+    setInstanceMenu(null);
+  }
+  const instanceMenuTarget = instanceMenu?.projectId === projectId ? instanceMenu : null;
 
   const openEnableMenu = useCallback((event: MouseEvent) => {
     event.preventDefault();
     setEnableMenuTarget({ x: event.clientX, y: event.clientY });
   }, []);
 
-  const openInstanceMenu = useCallback((item: WidgetBarItem, event: MouseEvent) => {
-    event.preventDefault();
-    event.stopPropagation();
-    setInstanceMenuTarget({ item, x: event.clientX, y: event.clientY });
-  }, []);
+  const openInstanceMenu = useCallback(
+    (item: WidgetBarItem, event: MouseEvent) => {
+      event.preventDefault();
+      event.stopPropagation();
+      setInstanceMenu({ item, projectId, x: event.clientX, y: event.clientY });
+    },
+    [projectId]
+  );
 
   const positioning = useMemo(
     () =>
@@ -72,7 +101,17 @@ export const WidgetBar = ({ edgeRegion, groups, menuItems, onSelect, onToggle, s
   const trigger = useMemo(() => ({ kind: 'rail', region }) as const, [region]);
   const handleContextClose = useCallback(() => setEnableMenuTarget(null), []);
   const handleMenuToggle = useCallback((item: WidgetEnableMenuItem) => onToggle(item as WidgetBarItem), [onToggle]);
-  const handleInstanceClose = useCallback(() => setInstanceMenuTarget(null), []);
+  const handleInstanceClose = useCallback(() => setInstanceMenu(null), []);
+  const handleInstanceDock = useCallback((item: WidgetEnableMenuItem) => onDock(item.id), [onDock]);
+  // A marker's menu closes and its marker goes with the window, unlike the enable menu, which stays open: the
+  // caller has focus to place only for this one.
+  const handleInstanceRemove = useCallback(
+    (item: WidgetEnableMenuItem) =>
+      (item as WidgetBarItem).isFloating ? onRemoveFloating(item.id) : onToggle(item as WidgetBarItem),
+    [onRemoveFloating, onToggle]
+  );
+  // A marker only ever shows in the rail its window returns to.
+  const isMarkerMenu = (instanceMenuTarget?.item as WidgetBarItem | undefined)?.isFloating === true;
 
   return (
     <Flex
@@ -115,9 +154,11 @@ export const WidgetBar = ({ edgeRegion, groups, menuItems, onSelect, onToggle, s
       />
 
       <WidgetInstanceContextMenu
+        dockRegion={isMarkerMenu ? region : undefined}
         target={instanceMenuTarget}
         onClose={handleInstanceClose}
-        onRemove={handleMenuToggle}
+        onDock={handleInstanceDock}
+        onRemove={handleInstanceRemove}
       />
     </Flex>
   );
@@ -188,7 +229,7 @@ export const WIDGET_ITEM_SX: SystemStyleObject = {
   h: 9,
   w: 9,
   color: 'fg.muted',
-  '&[aria-pressed="false"]:hover': {
+  '&[aria-pressed="false"]:hover, &[data-floating]:hover': {
     bg: 'bg.emphasized',
     color: 'fg',
   },
@@ -196,12 +237,16 @@ export const WIDGET_ITEM_SX: SystemStyleObject = {
     bg: 'bg.emphasized',
     color: 'brand.fg',
   },
-  // A floating slot reads as a placeholder for the window: outlined, not filled.
+  // A floating marker reads as a placeholder for the window: outlined, not filled, with a popped-out badge.
   '&[data-floating]': {
+    color: 'fg.subtle',
+    position: 'relative',
+  },
+  // The dashed outline yields to the row's focus ring, which a keyboard user needs more.
+  '&[data-floating]:not(:focus-visible)': {
     outline: '1px dashed',
     outlineColor: 'border.emphasized',
     outlineOffset: '-1px',
-    color: 'fg.subtle',
   },
   _disabled: WIDGET_SLOT_DISABLED_PROPS,
 };
@@ -223,10 +268,12 @@ const WidgetSlot = ({
 }) => {
   const { t } = useTranslation();
   const tooltipLabel = item.isFloating
-    ? t('widgets.floating.railSlot', { label: item.label })
+    ? t('widgets.floating.railMarkerHint', { label: item.label })
     : item.failureMessage
       ? `${item.label}: ${item.failureMessage}`
       : item.label;
+  // The name says what the control is; how to use it belongs to the tooltip.
+  const accessibleName = item.isFloating ? t('widgets.floating.railMarker', { label: item.label }) : tooltipLabel;
   const isDisabled = item.status === 'disabled';
   const positioning = useMemo(() => ({ placement: tooltipPlacement }) as const, [tooltipPlacement]);
 
@@ -250,11 +297,13 @@ const WidgetSlot = ({
     <Tooltip showArrow closeDelay={80} content={tooltipLabel} openDelay={250} positioning={positioning}>
       <Box ref={setNodeRef} pb="1" style={style}>
         <Row
-          {...dragHandleProps}
+          // A marker is not a tab: it takes no drag listeners and does not announce itself as sortable.
+          {...(item.isFloating ? undefined : dragHandleProps)}
           css={WIDGET_ITEM_SX}
-          aria-label={tooltipLabel}
+          aria-label={accessibleName}
           aria-disabled={isDisabled}
-          aria-pressed={isActive}
+          // A marker is a plain button: activating it shows the window and toggles nothing.
+          aria-pressed={item.isFloating ? undefined : isActive}
           as="button"
           data-disabled={isDisabled ? '' : undefined}
           data-floating={item.isFloating ? '' : undefined}
@@ -264,6 +313,19 @@ const WidgetSlot = ({
           onContextMenu={handleContextMenu}
         >
           <WidgetIcon icon={item.icon} boxSize="5" />
+          {item.isFloating ? (
+            <Icon
+              as={PictureInPicture2Icon}
+              bg="bg.subtle"
+              boxSize="3"
+              color="fg.muted"
+              data-floating-badge=""
+              position="absolute"
+              right="-0.5"
+              rounded="xs"
+              top="-0.5"
+            />
+          ) : null}
         </Row>
       </Box>
     </Tooltip>
