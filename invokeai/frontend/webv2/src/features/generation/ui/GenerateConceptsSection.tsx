@@ -16,15 +16,13 @@ import {
   syncGenerateLorasWithModels,
 } from '@features/generation/core/settings';
 import { Field } from '@platform/ui';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { GenerateSettingsUpdate } from './generateDebounce';
 
-import { useRegisterGenerateDraftFlusher } from './generateDraftRegistry';
 import { GenerationModelSelect as ModelSelect, useGenerationUi } from './GenerationUiContext';
 import { ConceptList, ConceptRow, type ConceptUpdate } from './shared/ConceptRow';
-import { useDebouncedDraftValue } from './useDebouncedDraftValue';
 
 interface GenerateConceptsContentProps {
   settings: GenerateSettings;
@@ -34,8 +32,6 @@ interface GenerateConceptsContentProps {
   onCommit: (update: GenerateSettingsUpdate) => void;
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
-
-const LORA_WEIGHT_DEBOUNCE_MS = 250;
 
 /** Whether the selected model's graph will load this concept: its family must take LoRAs and match the LoRA. */
 export const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateModelConfig | undefined): boolean =>
@@ -50,6 +46,7 @@ export const GenerateConceptsContent = ({
   settings,
 }: GenerateConceptsContentProps) => {
   const { t } = useTranslation();
+  const models = useGenerationUi().models;
   const loras = useMemo(() => syncGenerateLorasWithModels(settings.loras, loraModels), [loraModels, settings.loras]);
   const selectedLoraKeys = useMemo(() => new Set(loras.map((lora) => lora.model.key)), [loras]);
 
@@ -63,36 +60,42 @@ export const GenerateConceptsContent = ({
     });
   };
 
-  const updateLora = (modelKey: string, patch: ConceptUpdate) => {
-    onCommit((settings) => {
-      const latestLoras = syncGenerateLorasWithModels(settings.loras, loraModels);
-      const hasLora = latestLoras.some((lora) => lora.model.key === modelKey);
+  const updateLora = useCallback(
+    (modelKey: string, patch: ConceptUpdate) => {
+      onCommit((settings) => {
+        const latestLoras = syncGenerateLorasWithModels(settings.loras, loraModels);
+        const hasLora = latestLoras.some((lora) => lora.model.key === modelKey);
 
-      if (!hasLora) {
-        return settings;
-      }
+        if (!hasLora) {
+          return settings;
+        }
 
-      return {
-        ...settings,
-        loras: latestLoras.map((lora) => (lora.model.key === modelKey ? { ...lora, ...patch } : lora)),
-      };
-    });
-  };
+        return {
+          ...settings,
+          loras: latestLoras.map((lora) => (lora.model.key === modelKey ? { ...lora, ...patch } : lora)),
+        };
+      });
+    },
+    [loraModels, onCommit]
+  );
 
-  const removeLora = (modelKey: string) => {
-    onCommitImmediate({ loras: loras.filter((lora) => lora.model.key !== modelKey) });
-  };
+  const removeLora = useCallback(
+    (modelKey: string) => {
+      onCommit((settings) => ({ ...settings, loras: settings.loras.filter((lora) => lora.model.key !== modelKey) }));
+    },
+    [onCommit]
+  );
 
   const rows =
     loras.length > 0 ? (
       <Box mx={-1}>
         <ConceptList label={t('widgets.generate.concepts')} projectId={projectId}>
           {loras.map((lora) => (
-            <GenerateConceptRow
+            <ConceptRow
               key={lora.model.key}
               isCompatible={isCompatibleLora(lora, selectedModel)}
               lora={lora}
-              projectId={projectId}
+              models={models}
               onRemove={removeLora}
               onUpdate={updateLora}
             />
@@ -141,44 +144,5 @@ export const GenerateConceptsContent = ({
         </Text>
       )}
     </Stack>
-  );
-};
-
-/** Holds the weight as a debounced draft so scrubbing does not commit settings per step. */
-const GenerateConceptRow = ({
-  isCompatible,
-  lora,
-  onRemove,
-  onUpdate,
-  projectId,
-}: {
-  isCompatible: boolean;
-  lora: GenerateLora;
-  onRemove: (key: string) => void;
-  onUpdate: (key: string, update: ConceptUpdate) => void;
-  projectId: string;
-}) => {
-  const models = useGenerationUi().models;
-  const {
-    draftValue: draftWeight,
-    flushDraftValue,
-    setDraftValue: setWeight,
-  } = useDebouncedDraftValue({
-    delayMs: LORA_WEIGHT_DEBOUNCE_MS,
-    onCommit: (weight: number) => onUpdate(lora.model.key, { weight }),
-    resetKey: projectId,
-    value: lora.weight,
-  });
-
-  useRegisterGenerateDraftFlusher(flushDraftValue);
-
-  return (
-    <ConceptRow
-      models={models}
-      isCompatible={isCompatible}
-      lora={draftWeight === lora.weight ? lora : { ...lora, weight: draftWeight }}
-      onRemove={onRemove}
-      onUpdate={(key, update) => (update.weight === undefined ? onUpdate(key, update) : setWeight(update.weight))}
-    />
   );
 };

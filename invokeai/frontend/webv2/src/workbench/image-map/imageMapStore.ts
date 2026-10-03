@@ -64,6 +64,9 @@ let statusInflight: Promise<void> | null = null;
 // Bumped by every socket-delivered status report, so a status fetch that
 // started earlier can tell whether one landed while it was in flight.
 let indexEventSequence = 0;
+// Status and points can discover model changes concurrently. Only a response
+// that began against the current read model may replace its availability.
+let mapRevision = 0;
 
 // The projection is per-user server state: a login/logout must drop it before
 // the next account's widgets can observe it.
@@ -79,6 +82,7 @@ registerAccountOwnedResource({
     labelsSequence += 1;
     statusInflight = null;
     indexEventSequence += 1;
+    mapRevision += 1;
     imageMapStore.setSnapshot(EMPTY_IMAGE_MAP_SNAPSHOT);
   },
   name: 'image-map',
@@ -123,20 +127,22 @@ export const refreshImageMapPoints = (): Promise<void> => {
   }
 
   const owner = captureAccountScope();
+  const revision = mapRevision;
   imageMapStore.patchSnapshot({ loadState: 'loading' });
 
   const refresh = fetchImageMapPoints(clusterEps !== null ? { eps: clusterEps } : undefined)
     .then((data) => {
-      if (!isAccountScopeCurrent(owner)) {
+      if (!isAccountScopeCurrent(owner) || revision !== mapRevision) {
         return;
       }
 
+      mapRevision += 1;
       // Clear renderError on retry so fresh points receive a new WebGL draw attempt.
       imageMapStore.patchSnapshot({ data, error: null, loadState: 'loaded', renderError: null });
       refreshClusterLabels(data);
     })
     .catch((error: unknown) => {
-      if (!isAccountScopeCurrent(owner)) {
+      if (!isAccountScopeCurrent(owner) || revision !== mapRevision) {
         return;
       }
 
@@ -152,7 +158,7 @@ export const refreshImageMapPoints = (): Promise<void> => {
         inflight = null;
       }
 
-      if (rerunRequested) {
+      if (isAccountScopeCurrent(owner) && rerunRequested) {
         rerunRequested = false;
         void refreshImageMapPoints();
       }
@@ -348,16 +354,56 @@ export const refreshImageIndexStatus = (): void => {
   // Events that land while this is in flight are strictly newer than what it
   // will return, and must not be rewound by it.
   const sequence = indexEventSequence;
+  const revision = mapRevision;
 
   const request: Promise<void> = fetchImageMapStatus()
     .then((status) => {
-      // Non-admins get no counts at all — the totals aggregate every user's
-      // images — so `index` is null for them and there is nothing to record.
-      if (status.index === null || !isAccountScopeCurrent(owner) || sequence !== indexEventSequence) {
+      if (!isAccountScopeCurrent(owner)) {
         return;
       }
 
-      recordImageIndexStatus(status.index, Date.now(), { measure: false });
+      if (revision === mapRevision) {
+        const { data } = imageMapStore.getSnapshot();
+        const missing = status.state === 'model_missing';
+        const replaced = data !== null && status.modelId !== null && data.modelId !== status.modelId;
+        const recovered = data?.state === 'model_missing' && status.state !== 'disabled';
+
+        if (missing || replaced || recovered) {
+          mapRevision += 1;
+          labelsSequence += 1;
+          imageMapStore.patchSnapshot({
+            clusterLabels: null,
+            clusterLabelsEps: null,
+            clusterLabelsHash: null,
+            data: {
+              clusterEps: null,
+              modelId: status.modelId,
+              modelName: status.modelName,
+              pointCount: 0,
+              points: [],
+              stale: false,
+              state: missing ? 'model_missing' : 'computing',
+              updatedAt: null,
+              visibleHash: null,
+            },
+            error: null,
+            indexCounts: null,
+            indexUpdatedAt: null,
+            loadState: 'loaded',
+            renderError: null,
+          });
+          if (missing) {
+            return;
+          }
+          void refreshImageMapPoints();
+        }
+      }
+
+      // Counts aggregate every account and are omitted for non-admins. Newer
+      // socket counts fence this part of the response, not its model diagnosis.
+      if (status.index !== null && sequence === indexEventSequence) {
+        recordImageIndexStatus(status.index, Date.now(), { measure: false });
+      }
     })
     .catch(() => {
       // Progress failure is optional detail; point loading reports its own errors.
@@ -385,4 +431,18 @@ export const ensureImageMapLoaded = (): void => {
   // Always refresh cheap status counts on reopen; a paused worker may emit no event. Store guards prevent stale
   // rewinds.
   refreshImageIndexStatus();
+};
+
+/** Poll only while a map view is mounted; missing encoders produce no index events. */
+export const attachImageMapStatusPolling = (): (() => void) => {
+  const owner = captureAccountScope();
+  const timer = setInterval(refreshImageIndexStatus, 5_000);
+  const dispose = () => {
+    clearInterval(timer);
+    owner.signal.removeEventListener('abort', dispose);
+  };
+
+  owner.signal.addEventListener('abort', dispose, { once: true });
+
+  return dispose;
 };

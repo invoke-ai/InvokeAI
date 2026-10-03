@@ -1,3 +1,4 @@
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({
@@ -23,7 +24,9 @@ import type { ImageMapPoint, ImageMapPoints } from './api';
 
 import { fetchImageMapPoints, fetchImageMapStatus, requestImageMapRefresh } from './api';
 import { CLUSTER_PALETTE, getClusterColor, NOISE_COLOR } from './clusterPalette';
+import { getImageLabels } from './imageLabelCache';
 import {
+  attachImageMapStatusPolling,
   ensureImageMapLoaded,
   imageMapStore,
   recordImageIndexStatus,
@@ -890,6 +893,7 @@ const EMPTY_SNAPSHOT = {
 
 const LOADED_POINTS: ImageMapPoints = {
   clusterEps: null,
+  modelId: null,
   modelName: null,
   pointCount: 0,
   points: [],
@@ -905,7 +909,11 @@ describe('image map status', () => {
   });
 
   it('derives the pending count the backend computes but does not serialize', async () => {
-    mocks.apiFetchJson.mockResolvedValue({ enabled: true, index: { embedded: 30, failed: 2, total: 100 } });
+    mocks.apiFetchJson.mockResolvedValue({
+      enabled: true,
+      projection: { state: 'ready' },
+      index: { embedded: 30, failed: 2, total: 100 },
+    });
 
     const status = await fetchImageMapStatus();
 
@@ -918,7 +926,7 @@ describe('image map status', () => {
   });
 
   it('has no counts for a non-admin, who is not told the aggregate totals', async () => {
-    mocks.apiFetchJson.mockResolvedValue({ enabled: true, index: null });
+    mocks.apiFetchJson.mockResolvedValue({ enabled: true, projection: { state: 'ready' }, index: null });
 
     expect((await fetchImageMapStatus()).index).toBeNull();
   });
@@ -927,7 +935,160 @@ describe('image map status', () => {
 describe('image index progress', () => {
   beforeEach(() => {
     mocks.apiFetchJson.mockReset();
+    accountLifecycle.invalidate();
     imageMapStore.setSnapshot({ ...EMPTY_SNAPSHOT });
+  });
+
+  it('polls only for the mounted view lifetime, without overlapping requests or surviving account changes', async () => {
+    vi.useFakeTimers();
+    try {
+      let resolveStatus: (value: unknown) => void = () => {};
+      mocks.apiFetchJson.mockImplementation(
+        () =>
+          new Promise((resolve) => {
+            resolveStatus = resolve;
+          })
+      );
+      const detach = attachImageMapStatusPolling();
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+      await vi.advanceTimersByTimeAsync(10_000);
+      expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+      resolveStatus({ enabled: true, index: null, projection: { state: 'computing' } });
+      await vi.advanceTimersByTimeAsync(0);
+      detach();
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+
+      const detachNext = attachImageMapStatusPolling();
+      accountLifecycle.activate('next-account');
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+      detachNext();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('replaces stalled progress with the missing encoder reported by a status poll, including for non-admins', async () => {
+    const item = { kind: 'image', name: 'before-removal.png' } as const;
+    mocks.apiFetchJson.mockResolvedValue({ alternates: [], label: 'old encoder label', score: 0.7 });
+    expect((await getImageLabels(item))?.label).toBe('old encoder label');
+    imageMapStore.patchSnapshot({ data: LOADED_POINTS, loadState: 'loaded' });
+    recordImageIndexStatus({ embedded: 40, failed: 0, pending: 60, total: 100 }, 1_000);
+    mocks.apiFetchJson.mockResolvedValue({
+      enabled: false,
+      index: null,
+      model_name: 'removed-encoder',
+      projection: { point_count: 0, stale: false, state: 'model_missing' },
+    });
+
+    refreshImageIndexStatus();
+    await drainMacrotask();
+
+    expect(imageMapStore.getSnapshot().data).toMatchObject({ modelName: 'removed-encoder', state: 'model_missing' });
+    expect(imageMapStore.getSnapshot().indexCounts).toBeNull();
+    expect(imageMapStore.getSnapshot().indexUpdatedAt).toBeNull();
+    mocks.apiFetchJson.mockResolvedValue({ alternates: [], label: 'reinstalled encoder label', score: 0.8 });
+    expect((await getImageLabels(item))?.label).toBe('reinstalled encoder label');
+  });
+
+  it('keeps a missing-model diagnosis when an older points request completes', async () => {
+    let resolvePoints: (value: unknown) => void = () => {};
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      url.startsWith('/api/v1/image_map/status')
+        ? Promise.resolve({
+            enabled: false,
+            index: null,
+            model_name: 'removed-encoder',
+            projection: { state: 'model_missing' },
+          })
+        : new Promise((resolve) => {
+            resolvePoints = resolve;
+          })
+    );
+    const points = refreshImageMapPoints();
+    refreshImageIndexStatus();
+    await drainMacrotask();
+    resolvePoints(BACKEND_RESPONSE);
+    await points;
+
+    expect(imageMapStore.getSnapshot().data?.state).toBe('model_missing');
+    expect(imageMapStore.getSnapshot().clusterLabels).toBeNull();
+  });
+
+  it('reloads points when status discovers the encoder reinstalled', async () => {
+    imageMapStore.patchSnapshot({
+      data: { ...LOADED_POINTS, modelName: 'encoder', state: 'model_missing' },
+      loadState: 'loaded',
+    });
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url.startsWith('/api/v1/image_map/status')) {
+        return Promise.resolve({ enabled: true, projection: { state: 'ready' }, index: null });
+      }
+      return Promise.resolve(
+        url.startsWith('/api/v1/image_map/cluster_labels') ? FOREIGN_LABELS_RESPONSE : BACKEND_RESPONSE
+      );
+    });
+
+    refreshImageIndexStatus();
+    await drainMacrotask();
+
+    expect(imageMapStore.getSnapshot().data?.state).toBe('ready');
+    expect(imageMapStore.getSnapshot().data?.pointCount).toBe(3);
+  });
+
+  it('discards old in-flight points when status discovers a replacement encoder', async () => {
+    imageMapStore.patchSnapshot({ data: { ...LOADED_POINTS, modelId: 'encoder-a' }, loadState: 'loaded' });
+    let resolveOldPoints: (value: unknown) => void = () => {};
+    mocks.apiFetchJson.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveOldPoints = resolve;
+        })
+    );
+    const oldPoints = refreshImageMapPoints();
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url.startsWith('/api/v1/image_map/status')) {
+        return Promise.resolve({ enabled: true, model_id: 'encoder-b', projection: { state: 'ready' } });
+      }
+      return Promise.resolve(
+        url.startsWith('/api/v1/image_map/cluster_labels')
+          ? FOREIGN_LABELS_RESPONSE
+          : { ...BACKEND_RESPONSE, model_id: 'encoder-b' }
+      );
+    });
+
+    refreshImageIndexStatus();
+    await drainMacrotask();
+    expect(imageMapStore.getSnapshot().data).toMatchObject({ modelId: 'encoder-b', points: [] });
+    resolveOldPoints({ ...BACKEND_RESPONSE, model_id: 'encoder-a' });
+    await oldPoints;
+    await drainMacrotask();
+
+    expect(imageMapStore.getSnapshot().data).toMatchObject({ modelId: 'encoder-b', pointCount: 3, state: 'ready' });
+  });
+
+  it('ignores an old account status response without clearing its newer request', async () => {
+    const resolvers: Array<(value: unknown) => void> = [];
+    mocks.apiFetchJson.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        })
+    );
+    accountLifecycle.activate('first');
+    refreshImageIndexStatus();
+    accountLifecycle.activate('second');
+    refreshImageIndexStatus();
+    resolvers[0]?.({ enabled: false, index: null, model_name: 'foreign', projection: { state: 'model_missing' } });
+    await drainMacrotask();
+    refreshImageIndexStatus();
+    expect(resolvers).toHaveLength(2);
+    expect(imageMapStore.getSnapshot().data).toBeNull();
+    resolvers[1]?.({ enabled: false, index: null, model_name: 'current', projection: { state: 'model_missing' } });
+    await drainMacrotask();
+    expect(imageMapStore.getSnapshot().data?.modelName).toBe('current');
   });
 
   it('stamps when the index last moved so the UI can say how long it has stood still', () => {
@@ -958,7 +1119,11 @@ describe('image index progress', () => {
     // worker is parked behind a generation would otherwise show no progress.
     mocks.apiFetchJson.mockImplementation((url: string) => {
       if (url.startsWith('/api/v1/image_map/status')) {
-        return Promise.resolve({ enabled: true, index: { embedded: 40, failed: 0, total: 100 } });
+        return Promise.resolve({
+          enabled: true,
+          projection: { state: 'ready' },
+          index: { embedded: 40, failed: 0, total: 100 },
+        });
       }
 
       return url.startsWith('/api/v1/image_map/cluster_labels')
@@ -988,7 +1153,7 @@ describe('image index progress', () => {
 
     ensureImageMapLoaded();
     recordImageIndexStatus({ embedded: 90, failed: 0, pending: 10, total: 100 }, 1_000);
-    resolveStatus({ enabled: true, index: { embedded: 40, failed: 0, total: 100 } });
+    resolveStatus({ enabled: true, projection: { state: 'ready' }, index: { embedded: 40, failed: 0, total: 100 } });
 
     // A macrotask drains everything the resolved seed queued behind it.
     await drainMacrotask();
@@ -1000,7 +1165,11 @@ describe('image index progress', () => {
     // Reopening mid-backfill must fetch counts even if the worker is paused and no event is due.
     mocks.apiFetchJson.mockImplementation((url: string) =>
       url.startsWith('/api/v1/image_map/status')
-        ? Promise.resolve({ enabled: true, index: { embedded: 70, failed: 0, total: 100 } })
+        ? Promise.resolve({
+            enabled: true,
+            projection: { state: 'ready' },
+            index: { embedded: 70, failed: 0, total: 100 },
+          })
         : Promise.resolve(BACKEND_RESPONSE)
     );
 
@@ -1036,7 +1205,11 @@ describe('image index progress', () => {
     // without this the progress UI claims a finished backfill is still running
     // until the page is reloaded.
     recordImageIndexStatus({ embedded: 40, failed: 0, pending: 60, total: 100 }, 1_000);
-    mocks.apiFetchJson.mockResolvedValue({ enabled: true, index: { embedded: 100, failed: 0, total: 100 } });
+    mocks.apiFetchJson.mockResolvedValue({
+      enabled: true,
+      projection: { state: 'ready' },
+      index: { embedded: 100, failed: 0, total: 100 },
+    });
 
     refreshImageIndexStatus();
 
@@ -1047,7 +1220,11 @@ describe('image index progress', () => {
     // Otherwise pressing "Check again" — the one thing a user watching a
     // frozen bar will do — pushes the note out by another interval, forever.
     recordImageIndexStatus({ embedded: 40, failed: 0, pending: 60, total: 100 }, 1_000);
-    mocks.apiFetchJson.mockResolvedValue({ enabled: true, index: { embedded: 40, failed: 0, total: 100 } });
+    mocks.apiFetchJson.mockResolvedValue({
+      enabled: true,
+      projection: { state: 'ready' },
+      index: { embedded: 40, failed: 0, total: 100 },
+    });
 
     refreshImageIndexStatus();
 
@@ -1073,12 +1250,12 @@ describe('image index progress', () => {
 
     expect(resolvers).toHaveLength(1);
 
-    resolvers[0]?.({ enabled: true, index: { embedded: 40, failed: 0, total: 100 } });
+    resolvers[0]?.({ enabled: true, projection: { state: 'ready' }, index: { embedded: 40, failed: 0, total: 100 } });
     await vi.waitFor(() => expect(imageMapStore.getSnapshot().indexCounts).not.toBeNull());
 
     refreshImageIndexStatus();
     expect(resolvers).toHaveLength(2);
-    resolvers[1]?.({ enabled: true, index: { embedded: 40, failed: 0, total: 100 } });
+    resolvers[1]?.({ enabled: true, projection: { state: 'ready' }, index: { embedded: 40, failed: 0, total: 100 } });
     await drainMacrotask();
   });
 });

@@ -29,7 +29,7 @@ export const VideoConceptsSection = memo(
   }: {
     loras: GenerateLora[];
     model: MainModelConfig | null;
-    onChangeLoras: (loras: GenerateLora[]) => void;
+    onChangeLoras: (update: (current: GenerateLora[]) => GenerateLora[]) => void;
     projectId: string;
   }) {
     const { t } = useTranslation();
@@ -55,18 +55,21 @@ export const VideoConceptsSection = memo(
           return;
         }
 
-        onChangeLoras([...loras, { isEnabled: true, model: candidate, weight: getDefaultLoraWeight(candidate) }]);
+        onChangeLoras((current) => [
+          ...current,
+          { isEnabled: true, model: candidate, weight: getDefaultLoraWeight(candidate) },
+        ]);
       },
-      [loras, model, onChangeLoras]
+      [model, onChangeLoras]
     );
     const updateLora = useCallback(
       (key: string, update: Partial<GenerateLora>) =>
-        onChangeLoras(loras.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora))),
-      [loras, onChangeLoras]
+        onChangeLoras((current) => current.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora))),
+      [onChangeLoras]
     );
     const removeLora = useCallback(
-      (key: string) => onChangeLoras(loras.filter((candidate) => candidate.model.key !== key)),
-      [loras, onChangeLoras]
+      (key: string) => onChangeLoras((current) => current.filter((candidate) => candidate.model.key !== key)),
+      [onChangeLoras]
     );
 
     return (

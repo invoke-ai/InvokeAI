@@ -347,22 +347,29 @@ export const UpscaleWidgetView = () => {
 
   const addLora = useCallback(
     (model: ModelConfig | null) => {
-      if (!values.model || !isLoraModelConfig(model) || !isLoraCompatibleWithModel(model, values.model)) {
+      if (!isLoraModelConfig(model)) {
         return;
       }
 
-      patch({ loras: [...values.loras, { isEnabled: true, model, weight: getDefaultLoraWeight(model) }] });
+      patchValues((current) =>
+        current.model && isLoraCompatibleWithModel(model, current.model)
+          ? { loras: [...current.loras, { isEnabled: true, model, weight: getDefaultLoraWeight(model) }] }
+          : {}
+      );
     },
-    [patch, values.loras, values.model]
+    [patchValues]
   );
   const updateLora = useCallback(
     (key: string, update: Partial<GenerateLora>) =>
-      patch({ loras: values.loras.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora)) }),
-    [patch, values.loras]
+      patchValues((current) => ({
+        loras: current.loras.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora)),
+      })),
+    [patchValues]
   );
   const removeLora = useCallback(
-    (key: string) => patch({ loras: values.loras.filter((candidate) => candidate.model.key !== key) }),
-    [patch, values.loras]
+    (key: string) =>
+      patchValues((current) => ({ loras: current.loras.filter((candidate) => candidate.model.key !== key) })),
+    [patchValues]
   );
   const selectedLoraKeys = useMemo(() => new Set(values.loras.map((lora) => lora.model.key)), [values.loras]);
 

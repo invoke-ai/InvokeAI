@@ -96,6 +96,9 @@ describe('GenerateConceptsContent', () => {
   it('discards a concept menu when switching projects with the same concept', async () => {
     const { onCommit, onCommitImmediate, renderProject, row } = await render();
 
+    await stepWeight(row);
+    expect(row.querySelector('[role="slider"]')?.getAttribute('aria-valuenow')).toBe('0.8');
+
     await act(() => {
       row
         .querySelector('[data-list-primary]')
@@ -108,6 +111,7 @@ describe('GenerateConceptsContent', () => {
     expect(document.querySelector('[role="menu"][data-state="open"]')).toBeNull();
     await renderProject('project-1');
     expect(document.querySelector('[role="menu"][data-state="open"]')).toBeNull();
+    act(() => flushGenerateDrafts());
     expect(onCommit).not.toHaveBeenCalled();
     expect(onCommitImmediate).not.toHaveBeenCalled();
   });
@@ -161,7 +165,7 @@ describe('GenerateConceptsContent', () => {
   });
 
   it('keeps concepts from another model removable when the model cannot use concepts', async () => {
-    const { row, onCommitImmediate } = await render(SD3_MODEL);
+    const { row, onCommit } = await render(SD3_MODEL);
 
     expect(row.textContent).toContain('Ink Wash');
     expect(row.textContent).toContain('widgets.generate.incompatible');
@@ -173,7 +177,8 @@ describe('GenerateConceptsContent', () => {
       remove?.click();
     });
 
-    expect(onCommitImmediate).toHaveBeenCalledWith({ loras: [] });
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    expect(applied(onCommit.mock.calls[0]?.[0])).toBeUndefined();
   });
 
   it('marks a same-family concept incompatible when the model cannot use concepts', async () => {

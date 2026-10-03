@@ -886,7 +886,7 @@ const rowFocusRing = {
 } as const;
 
 /** Hover, extended to a row whose context menu is open so the row it acts on stays marked. */
-const ROW_POINTED = '&:is(:hover, [data-hover], [data-menu-open]):not(:disabled, [data-disabled])';
+const ROW_POINTED = '&:is(:hover, [data-hover], [data-menu-open]):not(:disabled, [data-disabled], [data-static])';
 
 /** One row surface for every list-like control; `Row` and `ListItem` both build on it. */
 const rowSurface = {

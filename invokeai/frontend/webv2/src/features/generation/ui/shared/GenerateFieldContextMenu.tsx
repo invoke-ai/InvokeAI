@@ -2,9 +2,7 @@
 import type { ReactNode } from 'react';
 
 import { Box, Menu, Portal } from '@chakra-ui/react';
-import { createExternalStore } from '@platform/state/externalStore';
-import { MenuContent } from '@platform/ui/Menu';
-import { useId } from 'react';
+import { MenuContent, useContextMenu } from '@platform/ui/Menu';
 import { useTranslation } from 'react-i18next';
 
 interface GenerateFieldContextMenuProps {
@@ -18,13 +16,6 @@ interface GenerateFieldContextMenuProps {
   resetLabel?: string;
 }
 
-/**
- * One field menu is open at a time. A right-click on a second field leaves the first menu open (right-button
- * presses don't dismiss it), and the two menus' dismissal then raced so the next right-click closed both; switching
- * owners closes the first menu instead.
- */
-const openMenu = createExternalStore<{ owner: string | null; x: number; y: number }>({ owner: null, x: 0, y: 0 });
-
 export const GenerateFieldContextMenu = ({
   children,
   copyValue,
@@ -33,15 +24,14 @@ export const GenerateFieldContextMenu = ({
   resetLabel,
 }: GenerateFieldContextMenuProps) => {
   const { t } = useTranslation();
-  const owner = useId();
-  const point = openMenu.useSelector((menu) => (menu.owner === owner ? { x: menu.x, y: menu.y } : null));
+  const { anchor: point, close, open } = useContextMenu();
 
   return (
     <Box
       w="full"
       onContextMenu={(event) => {
         event.preventDefault();
-        openMenu.setSnapshot({ owner, x: event.clientX, y: event.clientY });
+        open({ x: event.clientX, y: event.clientY });
       }}
     >
       {children}
@@ -52,8 +42,8 @@ export const GenerateFieldContextMenu = ({
           placement: 'bottom-start',
         }}
         onOpenChange={(event) => {
-          if (!event.open && openMenu.getSnapshot().owner === owner) {
-            openMenu.patchSnapshot({ owner: null });
+          if (!event.open) {
+            close();
           }
         }}
       >

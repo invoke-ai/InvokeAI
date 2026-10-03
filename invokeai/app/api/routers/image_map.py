@@ -3,7 +3,7 @@ import threading
 import time
 from collections import OrderedDict
 from datetime import date
-from typing import AbstractSet, Literal, Optional
+from typing import AbstractSet, Any, Callable, Literal, Optional, TypeVar
 
 import numpy as np
 from fastapi import File, HTTPException, Query, UploadFile, status
@@ -24,7 +24,11 @@ from invokeai.app.services.image_index.cluster_labels import (
     MAX_CUSTOM_VOCAB_TERMS,
     normalize_custom_vocab_terms,
 )
-from invokeai.app.services.image_index.image_index_base import TextSearchUnavailableError, VocabBuildState
+from invokeai.app.services.image_index.image_index_base import (
+    ImageIndexServiceBase,
+    TextSearchUnavailableError,
+    VocabBuildState,
+)
 from invokeai.app.services.image_index.image_index_common import (
     ImageIndexStatus,
     IndexedItem,
@@ -66,6 +70,9 @@ class ImageMapPointsResponse(BaseModel):
         description="disabled: indexing is off; model_missing: indexing is enabled but the configured embedding "
         "model is not installed; empty: nothing to show; computing: a projection is being built; ready: points are served"
     )
+    model_id: Optional[str] = Field(
+        default=None, description="Active encoder fingerprint; clients must discard cached labels when it changes"
+    )
     model_name: Optional[str] = Field(
         default=None,
         description="The configured embedding model's name; only set when state is model_missing, so the client "
@@ -101,6 +108,9 @@ class ImageMapStatusResponse(BaseModel):
     """Combined index + projection status for the current user."""
 
     enabled: bool = Field(description="Whether the embedding index is running")
+    model_id: Optional[str] = Field(
+        default=None, description="Active encoder fingerprint; clients must discard cached labels when it changes"
+    )
     model_name: Optional[str] = Field(
         default=None,
         description="The configured embedding model's name; only set when the projection state is model_missing",
@@ -270,19 +280,24 @@ def _log_cluster_diagnostics(services, user_id: str, diagnostics: ClusterDiagnos
 
 
 def _active_model_id(services) -> Optional[str]:
-    """The running indexer's model id, activating it if the encoder was installed since startup.
-
-    The encoder is often installed *after* the server came up — the image map's
-    own message links the starter install — and `start()` resolved the model
-    only once. Retrying here (throttled by the service) means opening or
-    refreshing the map picks the model up, rather than reporting
-    `model_missing` until the next restart.
-    """
-    model_id = services.image_index.model_id
-    if model_id is None and services.configuration.image_index_enabled:
+    """Reconcile encoder deletion/reinstallation through the service's throttled lifecycle."""
+    if services.configuration.image_index_enabled:
         services.image_index.try_activate()
-        model_id = services.image_index.model_id
-    return model_id
+    return services.image_index.model_id
+
+
+_T = TypeVar("_T")
+
+
+def _with_model(indexer: ImageIndexServiceBase, model_id: str, operation: Callable[..., _T], *args: Any) -> _T:
+    """Fence each executor step against the model that supplied its inputs."""
+    with indexer.use_model():
+        if indexer.model_id != model_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="The embedding model changed during this request; try again",
+            )
+        return operation(*args)
 
 
 # Videos are indexed whether or not a client can render them, so serving them is opt-in: a
@@ -411,13 +426,13 @@ async def get_image_map_points(
 
     if record is None:
         if not current_items:
-            return ImageMapPointsResponse(points=[], state="empty", stale=False, point_count=0)
+            return ImageMapPointsResponse(points=[], state="empty", model_id=model_id, stale=False, point_count=0)
         enqueued = services.image_index.request_projection(user_id, all_images=is_admin)
         # stale means "a recompute is pending"; when nothing could be enqueued
         # (the indexer is not running) nothing is pending, and a client that
         # polls on stale would wait forever.
         return ImageMapPointsResponse(
-            points=[], state="computing" if enqueued else "empty", stale=enqueued, point_count=0
+            points=[], state="computing" if enqueued else "empty", model_id=model_id, stale=enqueued, point_count=0
         )
 
     current_hash = scope_hash(model_id, current_items)
@@ -537,6 +552,7 @@ async def get_image_map_points(
     return ImageMapPointsResponse(
         points=points,
         state=state,
+        model_id=model_id,
         stale=stale,
         point_count=len(points),
         cluster_eps=resolved_eps,
@@ -603,7 +619,9 @@ async def search_image_map(
 
     if q is not None:
         try:
-            query_embedding = await asyncio.to_thread(services.image_index.embed_text, q)
+            query_embedding = await asyncio.to_thread(
+                _with_model, services.image_index, model_id, services.image_index.embed_text, q
+            )
         except TextSearchUnavailableError as e:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     else:
@@ -633,7 +651,7 @@ async def search_image_map(
                 return services.image_index.embed_image(pil)
 
             try:
-                query_embedding = await asyncio.to_thread(embed_from_file)
+                query_embedding = await asyncio.to_thread(_with_model, services.image_index, model_id, embed_from_file)
             except HTTPException:
                 raise
             except (ImageFileNotFoundException, ImageRecordNotFoundException, VideoRecordNotFoundException, OSError):
@@ -660,6 +678,9 @@ async def search_image_map(
                 )
 
     results = await asyncio.to_thread(
+        _with_model,
+        services.image_index,
+        model_id,
         services.image_index.search_similar,
         scope_user,
         query_embedding,
@@ -851,7 +872,7 @@ async def search_image_map_by_image(
         return services.image_index.embed_image(pil)
 
     try:
-        query_embedding = await asyncio.to_thread(embed_bytes)
+        query_embedding = await asyncio.to_thread(_with_model, services.image_index, model_id, embed_bytes)
     except HTTPException:
         raise
     except Exception:
@@ -862,6 +883,9 @@ async def search_image_map_by_image(
         )
 
     results = await asyncio.to_thread(
+        _with_model,
+        services.image_index,
+        model_id,
         services.image_index.search_similar,
         scope_user,
         query_embedding,
@@ -931,7 +955,9 @@ async def get_image_map_cluster_labels(
         return ImageMapClusterLabelsResponse(labels={})
 
     try:
-        vocabulary, vocab_embeddings = await asyncio.to_thread(services.image_index.get_vocab_embeddings)
+        vocabulary, vocab_embeddings = await asyncio.to_thread(
+            _with_model, services.image_index, model_id, services.image_index.get_vocab_embeddings
+        )
     except TextSearchUnavailableError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
 
@@ -1000,7 +1026,7 @@ async def get_image_map_cluster_labels(
         aligned = np.fromiter((cluster_by_item[item] for item in found_items), dtype=np.int64, count=len(found_items))
         return label_clusters(aligned, embeddings, vocabulary, vocab_embeddings, top_k=top_k), visible_hash
 
-    labels, visible_hash = await asyncio.to_thread(build)
+    labels, visible_hash = await asyncio.to_thread(_with_model, services.image_index, model_id, build)
     return ImageMapClusterLabelsResponse(
         labels={
             str(cluster_id): ImageMapClusterLabel(
@@ -1049,7 +1075,9 @@ async def get_image_map_image_labels(
         assert_image_read_access(item.name, current_user)
 
     try:
-        vocabulary, vocab_embeddings = await asyncio.to_thread(services.image_index.get_vocab_embeddings)
+        vocabulary, vocab_embeddings = await asyncio.to_thread(
+            _with_model, services.image_index, model_id, services.image_index.get_vocab_embeddings
+        )
     except TextSearchUnavailableError as e:
         raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=str(e))
     if not vocabulary:
@@ -1249,4 +1277,4 @@ def get_image_map_status(
         )
     # Index counts aggregate over all users' images; expose them to admins only.
     index = services.image_index.get_status() if is_admin else None
-    return ImageMapStatusResponse(enabled=True, index=index, projection=projection)
+    return ImageMapStatusResponse(enabled=True, model_id=model_id, index=index, projection=projection)

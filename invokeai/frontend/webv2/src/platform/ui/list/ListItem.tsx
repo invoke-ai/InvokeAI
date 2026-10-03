@@ -66,6 +66,7 @@ export interface ListItemProps {
   onIntent?: () => void;
   /** Renders the leading checkbox. */
   onCheckedChange?: (checked: boolean) => void;
+  /** Without onPress, activating the primary button also opens this menu. */
   onContextMenu?: (anchor: ListContextMenuAnchor) => void;
 }
 
@@ -109,20 +110,14 @@ export const ListItem = ({
   // Inside a List every row is a keyboard stop; a standalone row is a button only when pressing it does something.
   const isInteractive = onPress !== undefined || onContextMenu !== undefined || itemKey !== undefined;
 
-  const handleContextMenu = useCallback(
-    (event: MouseEvent<HTMLDivElement>) => {
-      // A nested control (e.g. a field in `detail`) that opened its own menu already claimed the gesture.
-      if (!onContextMenu || event.defaultPrevented) {
+  const openContextMenu = useCallback(
+    (row: HTMLElement, point?: { x: number; y: number }) => {
+      if (!onContextMenu) {
         return;
       }
 
-      event.preventDefault();
-      const row = event.currentTarget;
       const viewport = row.closest<HTMLElement>('[data-list-viewport]');
       const key = row.getAttribute('data-list-row');
-      // Firefox reports keyboard-invoked menus at (0,0); Chromium reports a point on the element, which the pointer
-      // branch anchors just as well.
-      const fromKeyboard = event.clientX === 0 && event.clientY === 0;
       const rect = row.getBoundingClientRect();
       const focusTarget = (): HTMLElement | null => {
         if (row.isConnected) {
@@ -144,11 +139,25 @@ export const ListItem = ({
       onContextMenu({
         focusTarget,
         restoreFocus: () => focusTarget()?.focus(),
-        x: fromKeyboard ? rect.left + 8 : event.clientX,
-        y: fromKeyboard ? rect.bottom : event.clientY,
+        x: point?.x ?? rect.left + 8,
+        y: point?.y ?? rect.bottom,
       });
     },
     [onContextMenu]
+  );
+  const handleContextMenu = useCallback(
+    (event: MouseEvent<HTMLDivElement>) => {
+      // A nested field's menu takes precedence. Keyboard-invoked menus can report (0,0).
+      if (event.defaultPrevented) {
+        return;
+      }
+      event.preventDefault();
+      openContextMenu(
+        event.currentTarget,
+        event.clientX === 0 && event.clientY === 0 ? undefined : { x: event.clientX, y: event.clientY }
+      );
+    },
+    [openContextMenu]
   );
   const handleCheckedChange = useCallback(
     (details: { checked: boolean | 'indeterminate' }) => onCheckedChange?.(details.checked === true),
@@ -156,11 +165,16 @@ export const ListItem = ({
   );
   const handlePress = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
-      if (!isBusy) {
-        onPress?.(event);
+      if (isBusy) {
+        return;
+      }
+      if (onPress) {
+        onPress(event);
+      } else if (event.currentTarget.parentElement) {
+        openContextMenu(event.currentTarget.parentElement);
       }
     },
-    [isBusy, onPress]
+    [isBusy, onPress, openContextMenu]
   );
   // Plain text keeps to its line; a node (badge row, figures) lays itself out.
   const descriptionCss = useMemo(
@@ -200,7 +214,9 @@ export const ListItem = ({
       css={styles.root}
       data-busy={isBusy || undefined}
       data-list-row={itemKey}
+      data-list-surface=""
       data-menu-open={isMenuOpen || undefined}
+      data-static={!isInteractive || undefined}
       role={role}
       onContextMenu={onContextMenu ? handleContextMenu : undefined}
     >
@@ -223,7 +239,8 @@ export const ListItem = ({
         <chakra.button
           aria-current={isActive || undefined}
           aria-disabled={isBusy || undefined}
-          aria-expanded={isExpanded}
+          aria-expanded={onContextMenu && !onPress ? isMenuOpen : isExpanded}
+          aria-haspopup={onContextMenu && !onPress ? 'menu' : undefined}
           css={styles.primary}
           data-list-primary=""
           tabIndex={tabIndex}

@@ -7,7 +7,7 @@
     "#architecture/source-analysis": "./src/architecture/tsSourceAnalysis.ts"
   },
   "scripts": {
-    "architecture:check": "vitest run --config vitest.config.mts src/architecture/dependencyPolicy.test.ts src/architecture/workbenchOwnership.test.ts src/architecture/architectureWorkflow.test.ts src/architecture/canvasSeamOwnership.test.ts src/architecture/tsSourceAnalysis.test.ts src/architecture/secureContextApis.test.ts src/architecture/axeAudits.test.ts && node --experimental-strip-types scripts/write-workbench-ownership-inventory.mjs && node --experimental-strip-types scripts/write-contract-caller-matrix.mjs && node --experimental-strip-types scripts/write-canvas-import-matrix.mjs",
+    "architecture:check": "vitest run --config vitest.config.mts src/architecture/dependencyPolicy.test.ts src/architecture/workbenchOwnership.test.ts src/architecture/architectureWorkflow.test.ts src/architecture/canvasSeamOwnership.test.ts src/architecture/tsSourceAnalysis.test.ts src/architecture/secureContextApis.test.ts src/architecture/axeAudits.test.ts src/architecture/typographyPolicy.test.ts && node --experimental-strip-types scripts/write-workbench-ownership-inventory.mjs && node --experimental-strip-types scripts/write-contract-caller-matrix.mjs && node --experimental-strip-types scripts/write-canvas-import-matrix.mjs",
     "build": "pnpm run lint && vite build",
     "check:architecture": "pnpm run lint && pnpm run test:all && pnpm run test:performance:architecture && pnpm run test:project-files:browser",
     "check:release": "pnpm run check:architecture && pnpm run test:accessibility:browser",

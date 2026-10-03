@@ -17,6 +17,7 @@ import {
   getImageMapShowClusterLabels,
 } from '@workbench/image-map/imageMapSettings';
 import {
+  attachImageMapStatusPolling,
   ensureImageMapLoaded,
   imageMapStore,
   refreshImageIndexStatus,
@@ -103,9 +104,11 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
     setClusterEps(clusterEps);
   }, [clusterEps]);
 
-  useEffect(() => {
+  useMountEffect(() => {
     ensureImageMapLoaded();
-  }, []);
+
+    return attachImageMapStatusPolling();
+  });
 
   // Pushed into the store so turning labels off stops the request, not just the
   // drawing of what it returns.

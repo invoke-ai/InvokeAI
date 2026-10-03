@@ -1,18 +1,19 @@
 /* oxlint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop -- ListItem slots take JSX; the React Compiler memoizes them. */
 import type { GenerateLora } from '@features/generation/core/types';
-import type { ListContextMenuAnchor } from '@platform/ui/list/ListItem';
 import type { MouseEvent, ReactNode } from 'react';
 
 import { Avatar, Badge, Box, Flex, Icon, Menu, Portal } from '@chakra-ui/react';
 import { DEFAULT_LORA_WEIGHT_CONFIG, getDefaultLoraWeight } from '@features/generation/core/settings';
+import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
+import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
 import { IconButton } from '@platform/ui/Button';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ListStack } from '@platform/ui/list/ListStack';
-import { MenuActionItem, MenuContent } from '@platform/ui/Menu';
+import { MenuActionItem, MenuContent, useContextMenu } from '@platform/ui/Menu';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { BoxIcon, ExternalLinkIcon, PowerIcon, PowerOffIcon, RotateCcwIcon, Trash2Icon } from 'lucide-react';
-import { createContext, memo, use, useCallback, useMemo, useState } from 'react';
+import { createContext, memo, use, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { GenerateFieldContextMenu } from './GenerateFieldContextMenu';
@@ -34,11 +35,11 @@ export type ConceptUpdate = Partial<Pick<GenerateLora, 'isEnabled' | 'weight'>>;
 export interface ConceptRowProps {
   /** False dims the row, badges it, and locks it off; the caller decides compatibility against its main model. */
   isCompatible?: boolean;
-  /** `lora.weight` is the displayed weight, so a caller that defers commits passes its draft here. */
+  /** The committed concept. Weight edits stay in a local draft until idle or a workbench flush. */
   lora: GenerateLora;
   models: ConceptModelPort;
   onRemove: (key: string) => void;
-  /** Fires per weight step and on toggle; the caller owns any debouncing. */
+  /** Weight commits are debounced; toggles commit immediately. Apply updates to the latest settings. */
   onUpdate: (key: string, update: ConceptUpdate) => void;
 }
 
@@ -59,29 +60,9 @@ const findNeighbourRow = (from: Element | null): HTMLElement | null => {
   return null;
 };
 
-/** What the list's one context menu acts on, captured from the row that opened it. */
-interface ConceptMenuTarget extends ListContextMenuAnchor {
-  isActive: boolean;
-  isAtDefault: boolean;
-  isCompatible: boolean;
-  key: string;
-  onOpenInModelManager?: () => void;
-  onRemove: () => void;
-  onReset: () => void;
-  onToggle: () => void;
-}
+const ConceptProjectContext = createContext<string | undefined>(undefined);
 
-interface ConceptMenuPort {
-  open: (target: ConceptMenuTarget) => void;
-  openKey: string | null;
-}
-
-const ConceptMenuContext = createContext<ConceptMenuPort | null>(null);
-
-/**
- * The family's short list, with dividers between concepts. It owns the rows' single context menu: one menu per row
- * raced when a second row was right-clicked while the first's menu was closing, and both closed.
- */
+/** A short concept list shares its project lifetime with the rows' drafts and menus. */
 export const ConceptList = ({
   children,
   label,
@@ -90,47 +71,64 @@ export const ConceptList = ({
   children: ReactNode;
   label: string;
   projectId: string;
-}) => {
-  const [target, setTarget] = useState<ConceptMenuTarget | null>(null);
-  const [menuProjectId, setMenuProjectId] = useState(projectId);
-  // Reset only the menu: remounting rows would flush their pending weight drafts into the new project.
-  if (menuProjectId !== projectId) {
-    setMenuProjectId(projectId);
-    setTarget(null);
-  }
-  const port = useMemo<ConceptMenuPort>(() => ({ open: setTarget, openKey: target?.key ?? null }), [target]);
-  const handleClose = useCallback(() => {
-    target?.restoreFocus();
-    setTarget(null);
-  }, [target]);
-
-  return (
-    <ConceptMenuContext value={port}>
-      <ListStack dividers label={label}>
-        {children}
-      </ListStack>
-      {/* Keyed per row so switching rows replaces the menu rather than retargeting an open one. */}
-      <ConceptContextMenu key={target?.key ?? 'closed'} target={target} onClose={handleClose} />
-    </ConceptMenuContext>
-  );
-};
+}) => (
+  <ConceptProjectContext value={projectId}>
+    <ListStack dividers label={label}>
+      {children}
+    </ListStack>
+  </ConceptProjectContext>
+);
 
 /**
  * One applied LoRA/concept: a list row (thumbnail, identity, toggle, remove, and a context menu) with its weight
  * scrubber as the row's detail, so the whole item shares one hover surface.
  */
-export const ConceptRow = memo(function ConceptRow({
+export const ConceptRow = memo(function ConceptRow(props: ConceptRowProps) {
+  const projectId = use(ConceptProjectContext);
+  const { lora, onUpdate } = props;
+  const commitWeight = useCallback(
+    (weight: number) => onUpdate(lora.model.key, { weight }),
+    [lora.model.key, onUpdate]
+  );
+  const {
+    draftValue: weight,
+    flushDraftValue,
+    setDraftValue,
+  } = useDebouncedDraftValue({
+    delayMs: 250,
+    onCommit: commitWeight,
+    resetKey: projectId,
+    value: lora.weight,
+  });
+  useRegisterDraftFlusher(flushDraftValue);
+  const update = useCallback(
+    (key: string, update: ConceptUpdate) => {
+      if (update.weight === undefined) {
+        onUpdate(key, update);
+      } else {
+        setDraftValue(update.weight);
+      }
+    },
+    [onUpdate, setDraftValue]
+  );
+
+  // Reset the menu on project changes without remounting/flushing the weight draft into the next project.
+  return <ConceptRowContent key={projectId} {...props} weight={weight} onUpdate={update} />;
+});
+
+const ConceptRowContent = ({
   isCompatible = true,
   lora,
   models,
   onRemove,
   onUpdate,
-}: ConceptRowProps) {
+  weight,
+}: ConceptRowProps & { weight: number }) => {
   const { t } = useTranslation();
   const { key, name, trigger_phrases: triggerPhrases } = lora.model;
   const isActive = lora.isEnabled && isCompatible;
   const defaultWeight = getDefaultLoraWeight(lora.model);
-  const menu = use(ConceptMenuContext);
+  const menu = useContextMenu();
   const handleToggle = useCallback((isEnabled: boolean) => onUpdate(key, { isEnabled }), [key, onUpdate]);
   const handleWeightChange = useCallback((weight: number) => onUpdate(key, { weight }), [key, onUpdate]);
   const removeFrom = useCallback(
@@ -149,21 +147,8 @@ export const ConceptRow = memo(function ConceptRow({
     [removeFrom]
   );
   const handleReset = useCallback(() => onUpdate(key, { weight: defaultWeight }), [defaultWeight, key, onUpdate]);
-  const copyWeight = useCallback(() => String(lora.weight), [lora.weight]);
+  const copyWeight = useCallback(() => String(weight), [weight]);
   const { openInModelManager } = models;
-  const isAtDefault = lora.weight === defaultWeight;
-  const handleContextMenu = (anchor: ListContextMenuAnchor) =>
-    menu?.open({
-      ...anchor,
-      isActive,
-      isAtDefault,
-      isCompatible,
-      key,
-      onOpenInModelManager: openInModelManager ? () => openInModelManager(key) : undefined,
-      onRemove: () => removeFrom(anchor.focusTarget()),
-      onReset: handleReset,
-      onToggle: () => handleToggle(!isActive),
-    });
 
   return (
     <Box role="listitem">
@@ -213,7 +198,7 @@ export const ConceptRow = memo(function ConceptRow({
             <Box bg="bg.muted" rounded="control">
               <GenerateFieldContextMenu
                 copyValue={copyWeight}
-                isAtDefault={lora.weight === defaultWeight}
+                isAtDefault={weight === defaultWeight}
                 resetLabel={t('widgets.generate.resetToConceptDefault')}
                 onReset={handleReset}
               >
@@ -227,7 +212,7 @@ export const ConceptRow = memo(function ConceptRow({
                   max={DEFAULT_LORA_WEIGHT_CONFIG.sliderMax}
                   min={DEFAULT_LORA_WEIGHT_CONFIG.sliderMin}
                   step={DEFAULT_LORA_WEIGHT_CONFIG.coarseStep}
-                  value={lora.weight}
+                  value={weight}
                   onChange={handleWeightChange}
                 />
               </GenerateFieldContextMenu>
@@ -251,74 +236,67 @@ export const ConceptRow = memo(function ConceptRow({
               {lora.model.cover_image ? <Avatar.Image alt="" src={models.getImageUrl(key)} /> : null}
             </Avatar.Root>
           }
-          isMenuOpen={menu?.openKey === key}
+          isMenuOpen={menu.anchor !== null}
           role="presentation"
           title={name}
-          onContextMenu={menu ? handleContextMenu : undefined}
+          onContextMenu={menu.open}
         />
       </Box>
-    </Box>
-  );
-});
-
-const ConceptContextMenu = ({ onClose, target }: { onClose: () => void; target: ConceptMenuTarget | null }) => {
-  const { t } = useTranslation();
-
-  return (
-    <Menu.Root
-      lazyMount
-      open={target !== null}
-      positioning={{
-        getAnchorRect: () => (target ? { height: 1, width: 1, x: target.x, y: target.y } : null),
-        placement: 'bottom-start',
-      }}
-      unmountOnExit
-      onOpenChange={(event) => {
-        if (!event.open) {
-          onClose();
-        }
-      }}
-    >
-      <Portal>
-        <Menu.Positioner>
-          {target ? (
-            <MenuContent minW="12rem">
-              {target.onOpenInModelManager ? (
+      <Menu.Root
+        lazyMount
+        open={menu.anchor !== null}
+        positioning={{
+          getAnchorRect: () => (menu.anchor ? { height: 1, width: 1, x: menu.anchor.x, y: menu.anchor.y } : null),
+          placement: 'bottom-start',
+        }}
+        unmountOnExit
+        onOpenChange={(event) => {
+          if (!event.open) {
+            menu.close();
+          }
+        }}
+      >
+        <Portal>
+          <Menu.Positioner>
+            {menu.anchor ? (
+              <MenuContent minW="12rem">
+                {openInModelManager ? (
+                  <MenuActionItem
+                    icon={ExternalLinkIcon}
+                    label={t('widgets.generate.conceptMenu.openInModelManager')}
+                    value="open-in-model-manager"
+                    onSelect={() => openInModelManager(key)}
+                  />
+                ) : null}
                 <MenuActionItem
-                  icon={ExternalLinkIcon}
-                  label={t('widgets.generate.conceptMenu.openInModelManager')}
-                  value="open-in-model-manager"
-                  onSelect={target.onOpenInModelManager}
+                  disabled={weight === defaultWeight || !isActive}
+                  icon={RotateCcwIcon}
+                  label={t('widgets.generate.resetToConceptDefault')}
+                  value="reset-weight"
+                  onSelect={handleReset}
                 />
-              ) : null}
-              <MenuActionItem
-                disabled={target.isAtDefault || !target.isActive}
-                icon={RotateCcwIcon}
-                label={t('widgets.generate.resetToConceptDefault')}
-                value="reset-weight"
-                onSelect={target.onReset}
-              />
-              <MenuActionItem
-                disabled={!target.isCompatible}
-                icon={target.isActive ? PowerOffIcon : PowerIcon}
-                label={
-                  target.isActive ? t('widgets.generate.conceptMenu.disable') : t('widgets.generate.conceptMenu.enable')
-                }
-                value="toggle"
-                onSelect={target.onToggle}
-              />
-              <Menu.Separator />
-              <MenuActionItem
-                icon={Trash2Icon}
-                label={t('widgets.generate.conceptMenu.remove')}
-                tone="danger"
-                value="remove"
-                onSelect={target.onRemove}
-              />
-            </MenuContent>
-          ) : null}
-        </Menu.Positioner>
-      </Portal>
-    </Menu.Root>
+                <MenuActionItem
+                  disabled={!isCompatible}
+                  icon={isActive ? PowerOffIcon : PowerIcon}
+                  label={
+                    isActive ? t('widgets.generate.conceptMenu.disable') : t('widgets.generate.conceptMenu.enable')
+                  }
+                  value="toggle"
+                  onSelect={() => handleToggle(!isActive)}
+                />
+                <Menu.Separator />
+                <MenuActionItem
+                  icon={Trash2Icon}
+                  label={t('widgets.generate.conceptMenu.remove')}
+                  tone="danger"
+                  value="remove"
+                  onSelect={() => removeFrom(menu.anchor?.focusTarget?.() ?? null)}
+                />
+              </MenuContent>
+            ) : null}
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
+    </Box>
   );
 };

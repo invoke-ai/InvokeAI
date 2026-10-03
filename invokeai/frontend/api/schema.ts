@@ -19286,6 +19286,11 @@ export type components = {
              */
             state: "disabled" | "model_missing" | "empty" | "computing" | "ready";
             /**
+             * Model Id
+             * @description Active encoder fingerprint; clients must discard cached labels when it changes
+             */
+            model_id?: string | null;
+            /**
              * Model Name
              * @description The configured embedding model's name; only set when state is model_missing, so the client can tell the user which model to install
              */
@@ -19418,6 +19423,11 @@ export type components = {
              * @description Whether the embedding index is running
              */
             enabled: boolean;
+            /**
+             * Model Id
+             * @description Active encoder fingerprint; clients must discard cached labels when it changes
+             */
+            model_id?: string | null;
             /**
              * Model Name
              * @description The configured embedding model's name; only set when the projection state is model_missing

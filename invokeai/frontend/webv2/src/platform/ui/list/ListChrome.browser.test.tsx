@@ -218,16 +218,35 @@ describe('list dividers', () => {
     expect(rowA.right - line.right).toBeCloseTo(8, 0);
   });
 
+  it('keeps static rows and their neighbouring dividers unchanged on hover', async () => {
+    await render(
+      <ListStack dividers label="subjects">
+        <ListItem title="one" />
+        <div role="listitem">
+          <ListItem role="presentation" title="two" />
+        </div>
+        <ListItem title="three" />
+      </ListStack>
+    );
+    const row = host.querySelectorAll<HTMLElement>('[data-list-surface]')[1]!;
+    const background = getComputedStyle(row).backgroundColor;
+
+    await userEvent.hover(row);
+    expect(row.querySelector('button')).toBeNull();
+    expect(getComputedStyle(row).backgroundColor).toBe(background);
+    expect(hairlines().map((line) => getComputedStyle(line).opacity)).toEqual(['1', '1']);
+  });
+
   it('hides the hairlines either side of a pointed row, stacked or virtualized', async () => {
     const opacities = () =>
       [...host.querySelectorAll<HTMLElement>('[data-list-divider]')].map((line) => getComputedStyle(line).opacity);
 
     await render(
       <ListStack dividers label="subjects">
-        <ListItem title="one" />
-        <ListItem title="two" />
-        <ListItem title="three" />
-        <ListItem title="four" />
+        <ListItem onPress={() => undefined} title="one" />
+        <ListItem onPress={() => undefined} title="two" />
+        <ListItem onPress={() => undefined} title="three" />
+        <ListItem onPress={() => undefined} title="four" />
       </ListStack>
     );
     const stacked = host.querySelectorAll<HTMLElement>('[role="listitem"]');
@@ -236,10 +255,10 @@ describe('list dividers', () => {
     await expect.poll(opacities).toEqual(['0', '0', '1']);
     await render(
       <ListStack dividers label="subjects">
-        <ListItem isMenuOpen title="one" />
-        <ListItem title="two" />
-        <ListItem title="three" />
-        <ListItem title="four" />
+        <ListItem onContextMenu={() => undefined} isMenuOpen title="one" />
+        <ListItem onPress={() => undefined} title="two" />
+        <ListItem onPress={() => undefined} title="three" />
+        <ListItem onPress={() => undefined} title="four" />
       </ListStack>
     );
     await userEvent.unhover(host);
@@ -248,12 +267,12 @@ describe('list dividers', () => {
     // A caller-wrapped row (its own list item around the row) holding an open menu.
     await render(
       <ListStack dividers label="subjects">
-        <ListItem title="one" />
+        <ListItem onPress={() => undefined} title="one" />
         <div role="listitem">
-          <ListItem isMenuOpen role="presentation" title="two" />
+          <ListItem onContextMenu={() => undefined} isMenuOpen role="presentation" title="two" />
         </div>
-        <ListItem title="three" />
-        <ListItem title="four" />
+        <ListItem onPress={() => undefined} title="three" />
+        <ListItem onPress={() => undefined} title="four" />
       </ListStack>
     );
     await expect.poll(opacities).toEqual(['0', '0', '1']);

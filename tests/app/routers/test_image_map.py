@@ -382,6 +382,7 @@ def test_points_computing_and_enqueues_when_cache_missing(
 
     body = response.json()
     assert body["state"] == "computing"
+    assert body["model_id"] == MODEL_ID
     assert body["stale"] is True
     # System user is admin in single-user mode -> all_images scope.
     assert image_index_service.projection_requests == [(SYSTEM_USER_ID, True)]
@@ -515,6 +516,47 @@ def test_points_serve_the_index_once_it_is_activated(
     assert client.get("/api/v1/image_map/status").json()["enabled"] is True
 
 
+@pytest.mark.parametrize("endpoint", ["points", "status"])
+def test_reads_revalidate_an_encoder_deleted_after_activation(
+    endpoint: str, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    mock_invoker.services.configuration.image_index_enabled = True
+
+    def revalidate() -> bool:
+        image_index_service._model_id = None
+        return False
+
+    image_index_service.try_activate = revalidate  # type: ignore[method-assign]
+    body = client.get(f"/api/v1/image_map/{endpoint}").json()
+    projection = body["projection"] if endpoint == "status" else body
+    assert projection["state"] == "model_missing"
+    assert body["model_id"] is None
+    assert body["model_name"] == mock_invoker.services.configuration.image_index_model
+    if endpoint == "status":
+        assert body["enabled"] is False
+        assert body["index"] is None
+
+
+@pytest.mark.parametrize("endpoint", ["points", "status"])
+def test_encoder_fingerprint_changes_without_a_missing_model_response(
+    endpoint: str, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    _seed_embedded_image(mock_invoker, "a.png")
+    _seed_projection(mock_invoker, SYSTEM_USER_ID, imgs("a.png"), np.zeros((1, 2), dtype=np.float32))
+    before = client.get(f"/api/v1/image_map/{endpoint}").json()
+    assert before["model_id"] == MODEL_ID
+    assert (before["projection"] if endpoint == "status" else before)["point_count"] == 1
+
+    # The browser can miss the whole removal/reinstall while closed or suspended.
+    # The new encoder must identify itself before it has any projected points.
+    image_index_service._model_id = "replacement-model-hash"
+    after = client.get(f"/api/v1/image_map/{endpoint}").json()
+    assert after["model_id"] == "replacement-model-hash"
+    projection = after["projection"] if endpoint == "status" else after
+    assert projection["state"] == "empty"
+    assert projection["point_count"] == 0
+
+
 def test_status_disabled(mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient) -> None:
     image_index_service._model_id = None
     mock_invoker.services.configuration.image_index_enabled = False
@@ -522,6 +564,19 @@ def test_status_disabled(mock_invoker: Invoker, image_index_service: FakeImageIn
     assert body["enabled"] is False
     assert body["model_name"] is None
     assert body["projection"]["state"] == "disabled"
+
+
+def test_search_refuses_a_model_replaced_after_query_embedding(
+    image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    def embed_then_replace(text: str) -> np.ndarray:
+        image_index_service._model_id = "replacement-model"
+        return np.ones(DIM, dtype=np.float32)
+
+    image_index_service.embed_text = embed_then_replace  # type: ignore[method-assign]
+    response = client.get("/api/v1/image_map/search", params={"q": "a cat"})
+    assert response.status_code == 409
+    assert image_index_service.search_calls == []
 
 
 def test_eps_validation(client: TestClient) -> None:

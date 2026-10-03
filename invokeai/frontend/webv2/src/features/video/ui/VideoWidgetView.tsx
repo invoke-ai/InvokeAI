@@ -356,36 +356,45 @@ export const VideoWidgetView = () => {
   );
   const clearReferences = useCallback(() => patch({ references: [] }), [patch]);
   const setLoras = useCallback(
-    (loras: VideoWidgetValues['loras']) => {
-      // While enabled, follow a replacement accelerator set or restore model sampling defaults if none remains.
-      // Preserve the edit and notify; never enable acceleration from a list edit.
-      if (!values.model) {
-        patch({ loras });
-        return;
-      }
+    (update: (current: VideoWidgetValues['loras']) => VideoWidgetValues['loras']) => {
+      let notice: Parameters<typeof toaster.create>[0] | undefined;
+      patchValues((current) => {
+        const loras = update(current.loras);
+        // While enabled, follow a replacement accelerator set or restore model sampling defaults if none remains.
+        // Preserve the edit and notify; never enable acceleration from a list edit.
+        if (!current.model) {
+          return { loras };
+        }
 
-      const result = getAcceleratorLoraChangeResult(values, values.model, models, loras);
+        const result = getAcceleratorLoraChangeResult(current, current.model, models, loras);
 
-      patch({ ...result.settings });
+        if (result.outcome === 'switched') {
+          notice = {
+            description: t('widgets.video.acceleratorSwitchedDescription', {
+              name: result.acceleratorLoras?.map((lora) => lora.name).join(', ') ?? '',
+              steps: result.settings.steps,
+            }),
+            title: t('widgets.video.acceleratorSwitched', {
+              label: getVideoModelPolicy(current.model, current).ui.accelerator?.label ?? '',
+            }),
+            type: 'info',
+          };
+        } else if (result.outcome === 'disabled') {
+          notice = {
+            description: t('widgets.video.acceleratorBrokenDescription'),
+            title: t('widgets.video.acceleratorBroken'),
+            type: 'info',
+          };
+        }
 
-      if (result.outcome === 'switched') {
-        toaster.create({
-          description: t('widgets.video.acceleratorSwitchedDescription', {
-            name: result.acceleratorLoras?.map((lora) => lora.name).join(', ') ?? '',
-            steps: result.settings.steps,
-          }),
-          title: t('widgets.video.acceleratorSwitched', { label: policy.ui.accelerator?.label ?? '' }),
-          type: 'info',
-        });
-      } else if (result.outcome === 'disabled') {
-        toaster.create({
-          description: t('widgets.video.acceleratorBrokenDescription'),
-          title: t('widgets.video.acceleratorBroken'),
-          type: 'info',
-        });
+        return { ...result.settings };
+      });
+
+      if (notice) {
+        toaster.create(notice);
       }
     },
-    [models, patch, policy.ui.accelerator?.label, t, values]
+    [models, patchValues, t]
   );
   const clearFirstFrame = useCallback(() => patch({ firstFrameImage: null }), [patch]);
   const clearLastFrame = useCallback(() => patch({ lastFrameImage: null }), [patch]);
