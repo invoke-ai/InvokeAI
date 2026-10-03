@@ -101,6 +101,16 @@ def test_db_synchronous_defaults_to_full_and_loads_from_yaml(tmp_path: Path, pat
     assert load_and_migrate_config(temp_config_file).db_synchronous == "normal"
 
 
+def test_attention_backend_defaults_to_auto_and_loads_from_yaml(tmp_path: Path, patch_rootdir: None) -> None:
+    # The default must stay `auto`: SageAttention changes images at the same seed, so it is opt-in only.
+    assert InvokeAIAppConfig().attention_backend == "auto"
+
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text('schema_version: "4.0.3"\nattention_backend: sage\n')
+
+    assert load_and_migrate_config(temp_config_file).attention_backend == "sage"
+
+
 def test_read_config_from_file(tmp_path: Path, patch_rootdir: None):
     """Test reading configuration from a file."""
     temp_config_file = tmp_path / "temp_invokeai.yaml"
