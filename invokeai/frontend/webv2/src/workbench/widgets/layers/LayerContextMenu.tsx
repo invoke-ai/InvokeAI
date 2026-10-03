@@ -32,7 +32,7 @@ import {
   renderableSourceOf,
 } from '@workbench/canvas-engine/api';
 import { getCanvasOperations } from '@workbench/canvas-operations/api';
-import { focusOpenedWidget } from '@workbench/focusRegions';
+import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { formatHotkeyForPlatform } from '@workbench/hotkeys/keys';
 import { publishLayerPanelSelection, readLayerPanelState, useLayerPanelState } from '@workbench/layerPanelState';
 import { useNotify } from '@workbench/useNotify';
@@ -646,10 +646,11 @@ const LayerMenu = ({
     }
   }, [engine, layer.id, makeStatusError]);
 
+  const { focusRegion } = useWorkbenchFocus();
   const handleOpenProperties = useCallback(() => {
     revealProperties(layer.id);
-    focusOpenedWidget('right', 'layers');
-  }, [layer.id, revealProperties]);
+    focusRegion('right', 'layers');
+  }, [focusRegion, layer.id, revealProperties]);
 
   const handleBooleanRaster = useCallback(
     async (operation: BooleanRasterOperation) => {

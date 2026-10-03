@@ -11,11 +11,16 @@ import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { registerAccountOwnedResource } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 
+import type { FloatingWidgetPlacement } from './floatingWindows';
 import type { WidgetDragEndResolution } from './widgetDnd';
 import type { WidgetPlacementMeta } from './widgetRegionViewModel';
 import type { WorkbenchWidgetCommands } from './workbenchStore';
 
+import { isAwaitedCenterView } from './floatingWindows';
+
 export interface WidgetPlacementProject {
+  /** Where each floating window returns to; absent means none float, as with `Project.floatingWidgets`. */
+  floatingPlacements?: Record<WidgetInstanceId, FloatingWidgetPlacement>;
   projectId?: string;
   widgetInstances: WidgetPlacementMeta;
   widgetRegions: Record<WidgetRegion, Pick<WidgetRegionState, 'activeInstanceId' | 'instanceIds'>>;
@@ -171,6 +176,81 @@ export const revealWidgetPlacement = ({
   widgets.select({ projectId: project.projectId, region, widgetId: instanceId });
 
   return { ok: true, region };
+};
+
+/**
+ * Activate a rail slot. A docked tab is revealed in its region. A floating window's marker brings the window
+ * forward and expands it instead: docking is the window's own control and the marker's menu.
+ */
+export const activateRailPlacement = ({
+  instanceId,
+  project,
+  region,
+  widgets,
+}: {
+  project: WidgetPlacementProject;
+  region: WidgetRegion;
+  instanceId: WidgetInstanceId;
+  widgets: WorkbenchWidgetCommands;
+}): 'tab' | 'window' | null => {
+  if (project.floatingPlacements?.[instanceId]) {
+    widgets.revealFloating(instanceId);
+
+    return 'window';
+  }
+
+  return revealWidgetPlacement({ instanceId, project, region, widgets }).ok ? 'tab' : null;
+};
+
+/** Dock a floating window where it came from; returns that region, or null when the instance does not float. */
+export const dockFloatingPlacement = ({
+  instanceId,
+  project,
+  widgets,
+}: {
+  project: WidgetPlacementProject;
+  instanceId: WidgetInstanceId;
+  widgets: WorkbenchWidgetCommands;
+}): WidgetRegion | null => {
+  const placement = project.floatingPlacements?.[instanceId];
+
+  if (!placement) {
+    return null;
+  }
+
+  // Docking remounts the widget; registry cleanup only removes flushers.
+  flushWorkbenchDrafts();
+  widgets.dockFloating(instanceId);
+
+  return placement.returnRegion;
+};
+
+/**
+ * Close a floating window outright — never dock-then-toggle, which would pop its panel open and retarget the route
+ * on the way. Reports where the window would have returned and whether the reducer hands an emptied center its
+ * view back, so focus can go somewhere instead of dying with the window.
+ */
+export const removeFloatingPlacement = ({
+  instanceId,
+  project,
+  widgets,
+}: {
+  project: WidgetPlacementProject;
+  instanceId: WidgetInstanceId;
+  widgets: WorkbenchWidgetCommands;
+}): { restoresCenter: boolean; returnRegion: WidgetRegion } | null => {
+  const placement = project.floatingPlacements?.[instanceId];
+
+  if (!placement) {
+    return null;
+  }
+
+  const restoresCenter = isAwaitedCenterView(project.widgetRegions.center, instanceId);
+
+  flushWorkbenchDrafts();
+  widgets.closeFloating(instanceId);
+
+  return { restoresCenter, returnRegion: placement.returnRegion };
 };
 
 export const dispatchWidgetDragEndPlacement = ({

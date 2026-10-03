@@ -18,6 +18,10 @@ const getScopePriority = (hotkey: RegisteredHotkey, context: HotkeyContext): num
   }
 
   if (scope.kind === 'focused-region') {
+    if (scope.floatingInstanceId) {
+      return context.focusedRegion === 'floating' && scope.floatingInstanceId === context.activeInstanceId ? 200 : -1;
+    }
+
     return context.focusedRegion && (!scope.region || scope.region === context.focusedRegion) ? 200 : -1;
   }
 
