@@ -55,6 +55,22 @@ export const GalleryUiAdapterProvider = ({ children }: { children: ReactNode }) 
       exportProject,
       gallery: {
         ...gallery,
+        selectItem: (item) => {
+          livePreview.showSaved();
+          gallery.selectItem(item);
+        },
+        selectImage: (image) => {
+          livePreview.showSaved();
+          gallery.selectImage(image);
+        },
+        setItemMultiSelection: (itemKeys, primaryItem) => {
+          livePreview.showSaved();
+          gallery.setItemMultiSelection(itemKeys, primaryItem);
+        },
+        toggleItemSelection: (item, nextPrimaryItem) => {
+          livePreview.showSaved();
+          gallery.toggleItemSelection(item, nextPrimaryItem);
+        },
         updateSettings: (settings) => {
           if (isAccountScopeCurrent(accountScope) && queries.isActiveProject(projectId)) {
             gallery.updateSettings(settings, projectId);
