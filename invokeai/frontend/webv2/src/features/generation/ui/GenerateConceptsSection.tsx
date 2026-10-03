@@ -7,7 +7,7 @@ import type {
   LoraModelConfig,
 } from '@features/generation/core/types';
 
-import { Stack, Text } from '@chakra-ui/react';
+import { Box, Stack, Text } from '@chakra-ui/react';
 import {
   getDefaultLoraWeight,
   isLoraCompatibleWithModel,
@@ -109,18 +109,20 @@ export const GenerateConceptsContent = ({
           {t('widgets.generate.addConceptsHelp')}
         </Text>
       ) : (
-        <ConceptList>
-          {loras.map((lora) => (
-            <GenerateConceptRow
-              key={lora.model.key}
-              isCompatible={isCompatibleLora(lora, selectedModel)}
-              lora={lora}
-              projectId={projectId}
-              onRemove={removeLora}
-              onUpdate={updateLora}
-            />
-          ))}
-        </ConceptList>
+        <Box mx={-1}>
+          <ConceptList label={t('widgets.generate.concepts')}>
+            {loras.map((lora) => (
+              <GenerateConceptRow
+                key={lora.model.key}
+                isCompatible={isCompatibleLora(lora, selectedModel)}
+                lora={lora}
+                projectId={projectId}
+                onRemove={removeLora}
+                onUpdate={updateLora}
+              />
+            ))}
+          </ConceptList>
+        </Box>
       )}
     </Stack>
   );
@@ -156,7 +158,7 @@ const GenerateConceptRow = ({
 
   return (
     <ConceptRow
-      identity={models}
+      models={models}
       isCompatible={isCompatible}
       lora={draftWeight === lora.weight ? lora : { ...lora, weight: draftWeight }}
       onRemove={onRemove}

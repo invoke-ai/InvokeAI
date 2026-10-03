@@ -6,7 +6,7 @@ import type { UpscaleWidgetValues } from '@features/upscale/core/types';
 import { Badge, createListCollection, DataList, SegmentGroup, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import {
   ConceptList,
-  type ConceptModelIdentity,
+  type ConceptModelPort,
   ConceptRow,
   GenerationSettingsSection,
   SeedField,
@@ -26,6 +26,7 @@ import {
   getModelBaseLabel,
   getModelImageUrl,
   useModelsSelector,
+  useOpenModelInManager,
 } from '@features/models';
 import { ModelSelect } from '@features/models/react';
 import {
@@ -78,11 +79,6 @@ const MEGAPIXEL_FORMATTER = new Intl.NumberFormat(undefined, { maximumFractionDi
 const SPANDREL_MODEL_TYPES: readonly ModelTaxonomyType[] = ['spandrel_image_to_image'];
 const MAIN_MODEL_TYPES: readonly ModelTaxonomyType[] = ['main'];
 const LORA_MODEL_TYPES: readonly ModelTaxonomyType[] = ['lora'];
-const CONCEPT_IDENTITY: ConceptModelIdentity = {
-  getBaseColorPalette: getModelBaseColorPalette,
-  getBaseLabel: getModelBaseLabel,
-  getImageUrl: getModelImageUrl,
-};
 const CONTROLNET_MODEL_TYPES: readonly ModelTaxonomyType[] = ['controlnet'];
 const VAE_MODEL_TYPES: readonly ModelTaxonomyType[] = ['vae'];
 const T5_ENCODER_MODEL_TYPES: readonly ModelTaxonomyType[] = ['t5_encoder'];
@@ -231,6 +227,16 @@ const UpscaleModelReconciler = ({
 
 export const UpscaleWidgetView = () => {
   const { t } = useTranslation();
+  const openInModelManager = useOpenModelInManager();
+  const conceptModels = useMemo<ConceptModelPort>(
+    () => ({
+      getBaseColorPalette: getModelBaseColorPalette,
+      getBaseLabel: getModelBaseLabel,
+      getImageUrl: getModelImageUrl,
+      openInModelManager: openInModelManager ?? undefined,
+    }),
+    [openInModelManager]
+  );
   const selection = useUpscaleUi();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
@@ -623,11 +629,11 @@ export const UpscaleWidgetView = () => {
             />
           </Field>
           {values.loras.length > 0 ? (
-            <ConceptList>
+            <ConceptList label={t('widgets.upscale.concepts')}>
               {values.loras.map((lora) => (
                 <ConceptRow
                   key={lora.model.key}
-                  identity={CONCEPT_IDENTITY}
+                  models={conceptModels}
                   lora={lora}
                   onRemove={removeLora}
                   onUpdate={updateLora}

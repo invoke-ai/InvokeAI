@@ -14,7 +14,7 @@ export { GenerateCollapsibleSection as GenerationSettingsSection } from './ui/sh
 export {
   ConceptList,
   ConceptRow,
-  type ConceptModelIdentity,
+  type ConceptModelPort,
   type ConceptRowProps,
   type ConceptUpdate,
 } from './ui/shared/ConceptRow';

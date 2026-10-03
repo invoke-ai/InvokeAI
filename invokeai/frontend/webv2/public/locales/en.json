@@ -2227,6 +2227,12 @@
         "coherenceMinDenoise": "Coherence min denoise",
         "maskBlur": "Mask blur"
       },
+      "conceptMenu": {
+        "disable": "Disable",
+        "enable": "Enable",
+        "openInModelManager": "Open in Model Manager",
+        "remove": "Remove"
+      },
       "conceptWeight": "{{name}} weight",
       "concepts": "Concepts",
       "copyValue": "Copy value",

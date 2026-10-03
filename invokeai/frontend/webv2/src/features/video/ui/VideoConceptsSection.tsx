@@ -4,12 +4,12 @@ import type { ModelConfig, ModelTaxonomyType } from '@features/models';
 import { Stack, Text } from '@chakra-ui/react';
 import {
   ConceptList,
-  type ConceptModelIdentity,
+  type ConceptModelPort,
   ConceptRow,
   GenerationSettingsSection,
 } from '@features/generation/components';
 import { getDefaultLoraWeight, isLoraCompatibleWithModel, isLoraModelConfig } from '@features/generation/settings';
-import { getModelBaseColorPalette, getModelBaseLabel, getModelImageUrl } from '@features/models';
+import { getModelBaseColorPalette, getModelBaseLabel, getModelImageUrl, useOpenModelInManager } from '@features/models';
 import { ModelSelect } from '@features/models/react';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -19,11 +19,6 @@ import { areVideoLorasEquivalent, areVideoModelsEquivalent } from './videoCompar
 /** Graph compilation routes LoRAs to experts from their probed tags; the UI supplies no target override. */
 
 const LORA_MODEL_TYPES: readonly ModelTaxonomyType[] = ['lora'];
-const CONCEPT_IDENTITY: ConceptModelIdentity = {
-  getBaseColorPalette: getModelBaseColorPalette,
-  getBaseLabel: getModelBaseLabel,
-  getImageUrl: getModelImageUrl,
-};
 
 export const VideoConceptsSection = memo(
   function VideoConceptsSection({
@@ -36,6 +31,16 @@ export const VideoConceptsSection = memo(
     onChangeLoras: (loras: GenerateLora[]) => void;
   }) {
     const { t } = useTranslation();
+    const openInModelManager = useOpenModelInManager();
+    const conceptModels = useMemo<ConceptModelPort>(
+      () => ({
+        getBaseColorPalette: getModelBaseColorPalette,
+        getBaseLabel: getModelBaseLabel,
+        getImageUrl: getModelImageUrl,
+        openInModelManager: openInModelManager ?? undefined,
+      }),
+      [openInModelManager]
+    );
     const selectedLoraKeys = useMemo(() => new Set(loras.map((lora) => lora.model.key)), [loras]);
     const loraFilter = useCallback(
       (candidate: ModelConfig) =>
@@ -81,11 +86,11 @@ export const VideoConceptsSection = memo(
               {t('widgets.video.noLoras')}
             </Text>
           ) : (
-            <ConceptList>
+            <ConceptList label={t('widgets.video.concepts')}>
               {loras.map((lora) => (
                 <ConceptRow
                   key={lora.model.key}
-                  identity={CONCEPT_IDENTITY}
+                  models={conceptModels}
                   lora={lora}
                   onRemove={removeLora}
                   onUpdate={updateLora}
