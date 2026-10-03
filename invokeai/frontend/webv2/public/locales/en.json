@@ -181,9 +181,9 @@
     "clearSearch": "Clear search",
     "dontShowMeThese": "Don't show me these",
     "learnMore": "Learn more",
-    "noSchedulersFound": "No schedulers found",
+    "noOptionsFound": "No matches",
     "openSelector": "Open selector",
-    "searchSchedulers": "Search schedulers…",
+    "searchOptions": "Search…",
     "close": "Close",
     "colorPicker": {
       "format": "Color format",
