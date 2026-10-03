@@ -10,6 +10,8 @@ import type {
 import type { AccountState, Project } from '@workbench/projectContracts';
 import type { WidgetInstanceId } from '@workbench/widgetContracts';
 
+import { normalizeFloatingPlacement } from '@workbench/floatingWindows';
+import { WIDGET_REGIONS } from '@workbench/layoutContracts';
 import {
   builtInLayoutPresetDescriptors,
   getLayoutPreset,
@@ -29,8 +31,6 @@ export const getLayoutPresetCommandTitleOverrides = (
       return savedLabel === preset.label ? [] : [[`app.${hotkeyId}`, formatTitle(savedLabel)]];
     })
   );
-
-const widgetRegions: WidgetRegion[] = ['left', 'right', 'bottom', 'center'];
 
 /** Apply, revert, and drift checks all resolve account overrides here so Save changes has consistent meaning. */
 export const resolveSavedLayoutPreset = (account: AccountState, presetId: LayoutPresetId): LayoutPreset => {
@@ -53,7 +53,7 @@ export const resolveSavedLayoutPreset = (account: AccountState, presetId: Layout
     : builtInPreset;
 };
 
-export const cloneFloatingWidgets = (
+const cloneFloatingWidgets = (
   floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState>
 ): Record<WidgetInstanceId, FloatingWidgetState> =>
   Object.fromEntries(Object.entries(floatingWidgets).map(([instanceId, state]) => [instanceId, { ...state }]));
@@ -76,7 +76,7 @@ export const cloneLayoutPresetWidgetRegions = (
 export const createLayoutPresetSnapshot = (project: Project): LayoutPresetSnapshot => {
   const referencedInstanceIds = new Set<WidgetInstanceId>();
 
-  for (const region of widgetRegions) {
+  for (const region of WIDGET_REGIONS) {
     referencedInstanceIds.add(project.widgetRegions[region].activeInstanceId);
 
     for (const instanceId of project.widgetRegions[region].instanceIds) {
@@ -108,6 +108,39 @@ export const createLayoutPresetSnapshot = (project: Project): LayoutPresetSnapsh
   };
 };
 
+/**
+ * Read a snapshot's placements the way a hydrated project's are. Stored presets, applied presets, and drift
+ * comparison share this, so a freshly applied preset always matches the snapshot it came from.
+ */
+export const normalizeLayoutPresetSnapshot = (snapshot: LayoutPresetSnapshot): LayoutPresetSnapshot => {
+  const { floatingWidgets, widgetRegions } = normalizeFloatingPlacement(
+    snapshot.widgetRegions,
+    snapshot.floatingWidgets,
+    (instanceId) => Object.hasOwn(snapshot.widgetInstances, instanceId)
+  );
+  // A window normalization dropped leaves an instance nothing places; applying the preset would not place it
+  // either, so the snapshot stops naming it.
+  const orphanedIds = Object.keys(snapshot.floatingWidgets ?? {}).filter(
+    (instanceId) =>
+      !floatingWidgets?.[instanceId] &&
+      WIDGET_REGIONS.every(
+        (region) =>
+          widgetRegions[region].activeInstanceId !== instanceId &&
+          !widgetRegions[region].instanceIds.includes(instanceId)
+      )
+  );
+
+  return {
+    ...(floatingWidgets ? { floatingWidgets } : {}),
+    layout: snapshot.layout,
+    widgetInstances:
+      orphanedIds.length > 0
+        ? Object.fromEntries(Object.entries(snapshot.widgetInstances).filter(([id]) => !orphanedIds.includes(id)))
+        : snapshot.widgetInstances,
+    widgetRegions,
+  };
+};
+
 const areArraysEqual = (left: string[], right: string[]): boolean =>
   left.length === right.length && left.every((value, index) => value === right[index]);
 
@@ -131,7 +164,7 @@ const areWidgetInstanceSnapshotsEqual = (
   );
 };
 
-/** Geometry counts as saved-layout drift; focus-driven stack ordering does not. */
+/** Geometry and the return slot count as saved-layout drift; focus-driven stack ordering does not. */
 const areFloatingWidgetsEqual = (
   left: LayoutPresetSnapshot['floatingWidgets'],
   right: LayoutPresetSnapshot['floatingWidgets']
@@ -151,20 +184,30 @@ const areFloatingWidgetsEqual = (
         leftState?.widthPx === rightState?.widthPx &&
         leftState?.heightPx === rightState?.heightPx &&
         leftState?.mode === rightState?.mode &&
-        leftState?.returnRegion === rightState?.returnRegion
+        leftState?.returnRegion === rightState?.returnRegion &&
+        leftState?.returnIndex === rightState?.returnIndex
       );
     })
   );
 };
 
-export const areLayoutPresetSnapshotsEqual = (left: LayoutPresetSnapshot, right: LayoutPresetSnapshot): boolean =>
-  left.layout.centerViewId === right.layout.centerViewId &&
-  left.layout.panels.isBottomOpen === right.layout.panels.isBottomOpen &&
-  left.layout.panels.isLeftOpen === right.layout.panels.isLeftOpen &&
-  left.layout.panels.isRightOpen === right.layout.panels.isRightOpen &&
-  widgetRegions.every((region) => areWidgetRegionsEqual(left.widgetRegions[region], right.widgetRegions[region])) &&
-  areFloatingWidgetsEqual(left.floatingWidgets, right.floatingWidgets) &&
-  areWidgetInstanceSnapshotsEqual(left.widgetInstances, right.widgetInstances);
+export const areLayoutPresetSnapshotsEqual = (
+  leftSnapshot: LayoutPresetSnapshot,
+  rightSnapshot: LayoutPresetSnapshot
+): boolean => {
+  const left = normalizeLayoutPresetSnapshot(leftSnapshot);
+  const right = normalizeLayoutPresetSnapshot(rightSnapshot);
+
+  return (
+    left.layout.centerViewId === right.layout.centerViewId &&
+    left.layout.panels.isBottomOpen === right.layout.panels.isBottomOpen &&
+    left.layout.panels.isLeftOpen === right.layout.panels.isLeftOpen &&
+    left.layout.panels.isRightOpen === right.layout.panels.isRightOpen &&
+    WIDGET_REGIONS.every((region) => areWidgetRegionsEqual(left.widgetRegions[region], right.widgetRegions[region])) &&
+    areFloatingWidgetsEqual(left.floatingWidgets, right.floatingWidgets) &&
+    areWidgetInstanceSnapshotsEqual(left.widgetInstances, right.widgetInstances)
+  );
+};
 
 export const doesProjectMatchLayoutPreset = (project: Project, preset: LayoutPreset): boolean =>
   areLayoutPresetSnapshotsEqual(createLayoutPresetSnapshot(project), preset.snapshot);

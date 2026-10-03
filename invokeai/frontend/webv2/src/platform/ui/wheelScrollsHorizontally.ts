@@ -12,7 +12,9 @@ const handleWheel = (event: WheelEvent): void => {
     return;
   }
   event.preventDefault();
-  element.scrollLeft += event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY * LINE_HEIGHT_PX : event.deltaY;
+  const delta = event.deltaMode === WheelEvent.DOM_DELTA_LINE ? event.deltaY * LINE_HEIGHT_PX : event.deltaY;
+  // Wheeling down travels toward the strip's end, which a right-to-left strip reaches at negative `scrollLeft`.
+  element.scrollLeft += getComputedStyle(element).direction === 'rtl' ? -delta : delta;
 };
 
 /** Map vertical wheels to horizontal scrolling; preserve horizontal gestures and non-overflowing strips. */

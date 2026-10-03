@@ -5,6 +5,7 @@ import type { CanvasLoadRefusal } from './canvasLoadContracts';
 import type { GraphContract } from './graphContracts';
 import type { InvocationControllerState } from './invocationContracts';
 import type {
+  FloatingWidgetGeometry,
   FloatingWidgetState,
   LayoutPreset,
   LayoutPresetId,
@@ -37,6 +38,11 @@ export interface Project {
   widgetRegions: Record<WidgetRegion, WidgetRegionState>;
   /** Floating instances leave their region's instanceIds; absent in older projects means no floating windows. */
   floatingWidgets?: Record<WidgetInstanceId, FloatingWidgetState>;
+  /**
+   * The last window geometry of instances that are not floating now. It is a convenience, not layout: presets,
+   * layout drift, and undo leave it out. Absent means nothing is remembered.
+   */
+  lastFloatingGeometry?: Record<WidgetInstanceId, FloatingWidgetGeometry>;
   widgetGraphs: Partial<Record<WidgetTypeId, GraphContract>>;
   canvas: CanvasStateContractV3;
   promptHistory: PromptHistoryItem[];
