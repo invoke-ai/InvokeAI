@@ -30,11 +30,30 @@ import {
 import {
   buildImageRecallSettings,
   getImageRecallMessage,
-  getImageRecallSkipMessage,
   getImageRecallTitle,
   isImageRecallKindAvailable,
   type ImageRecallKind,
+  type ImageRecallSkip,
 } from './imageRecall';
+
+const getSkippedConceptMessage = ({ name, reason }: ImageRecallSkip, t: TFunction): string => {
+  const values = { name: name ?? t('widgets.gallery.itemActions.recall.unnamedConcept') };
+
+  switch (reason) {
+    case 'ambiguous':
+      return t('widgets.gallery.itemActions.recall.skippedConcept.ambiguous', values);
+    case 'duplicate':
+      return t('widgets.gallery.itemActions.recall.skippedConcept.duplicate', values);
+    case 'incompatible':
+      return t('widgets.gallery.itemActions.recall.skippedConcept.incompatible', values);
+    case 'invalid':
+      return t('widgets.gallery.itemActions.recall.skippedConcept.invalid', values);
+    case 'modelUnavailable':
+      return t('widgets.gallery.itemActions.recall.skippedConcept.modelUnavailable', values);
+    case 'unresolved':
+      return t('widgets.gallery.itemActions.recall.skippedConcept.unresolved', values);
+  }
+};
 
 /**
  * Open the workflow editor before requesting replacement with the image's embedded graph; false means no editor
@@ -263,7 +282,7 @@ export const executeImageRecall = async ({
       commands.notifications.add({
         kind: 'info',
         message: 'This image does not include supported Generate metadata.',
-        title: 'No recallable image data',
+        title: t('widgets.gallery.itemActions.recall.nothingRecalled'),
       });
       return false;
     }
@@ -277,13 +296,18 @@ export const executeImageRecall = async ({
       }
     }
 
-    const skipMessage = result.skipped.length > 0 ? getImageRecallSkipMessage(result.skipped) : null;
+    const skipMessage =
+      result.skipped.length > 0
+        ? t('widgets.gallery.itemActions.recall.conceptsNotRestored', {
+            concepts: result.skipped.map((skipped) => getSkippedConceptMessage(skipped, t)).join('; '),
+          })
+        : null;
 
     if (result.fields.length === 0) {
       commands.notifications.add({
         kind: 'info',
         message: skipMessage ?? 'This image does not include supported Generate metadata.',
-        title: 'No recallable image data',
+        title: t('widgets.gallery.itemActions.recall.nothingRecalled'),
       });
       return false;
     }
@@ -295,7 +319,11 @@ export const executeImageRecall = async ({
       title: getImageRecallTitle(kind),
     });
     if (skipMessage) {
-      commands.notifications.add({ kind: 'info', message: skipMessage, title: 'Some image data was not recalled' });
+      commands.notifications.add({
+        kind: 'info',
+        message: skipMessage,
+        title: t('widgets.gallery.itemActions.recall.partiallyRecalled'),
+      });
     }
     return true;
   } catch (error: unknown) {

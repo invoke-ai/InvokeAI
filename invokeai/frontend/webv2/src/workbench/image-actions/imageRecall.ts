@@ -953,18 +953,3 @@ export const getImageRecallTitle = (kind: ImageRecallKind): string => {
 
 export const getImageRecallMessage = (fields: RecalledField[]): string =>
   `${fields.length} field${fields.length === 1 ? '' : 's'} applied to Generate.`;
-
-const SKIP_REASON_LABELS: Record<ImageRecallSkipReason, string> = {
-  ambiguous: 'matches more than one installed model',
-  duplicate: 'listed more than once',
-  incompatible: 'incompatible with the selected model',
-  invalid: 'unreadable metadata',
-  modelUnavailable: "the image's model is not available",
-  unresolved: 'not installed',
-};
-
-/** One line naming every recorded concept recall left out and why. */
-export const getImageRecallSkipMessage = (skipped: readonly ImageRecallSkip[]): string =>
-  `Concepts not restored: ${skipped
-    .map(({ name, reason }) => `${name ?? 'unnamed concept'} (${SKIP_REASON_LABELS[reason]})`)
-    .join('; ')}.`;
