@@ -12,6 +12,7 @@ import { previewWidgetManifest } from './preview/manifest';
 import { projectWidgetManifest } from './project/manifest';
 import { queueStatusWidgetManifest } from './queue-status/manifest';
 import { queueWidgetManifest } from './queue/manifest';
+import { remoteWorkersWidgetManifest } from './remote-workers/manifest';
 import { serverStatusWidgetManifest } from './server-status/manifest';
 import { upscaleWidgetManifest } from './upscale/manifest';
 import { videoWidgetManifest } from './video/manifest';
@@ -30,6 +31,7 @@ export const firstPartyWidgetManifests: WidgetManifest[] = [
   projectWidgetManifest,
   layersWidgetManifest,
   queueWidgetManifest,
+  remoteWorkersWidgetManifest,
   notificationsWidgetManifest,
   serverStatusWidgetManifest,
   queueStatusWidgetManifest,
