@@ -19,6 +19,11 @@ interface CenterAreaTestProject {
 }
 
 const centerAreaMocks = vi.hoisted(() => {
+  let didRequestFloatedCenterModule = false;
+  let resolveFloatedCenterModule!: () => void;
+  const floatedCenterModulePending = new Promise<void>((resolve) => {
+    resolveFloatedCenterModule = resolve;
+  });
   const icon = () => null;
   // Use a settled resource so the center icon reads synchronously without suspending.
   const loadedImplementation = () => {
@@ -59,10 +64,16 @@ const centerAreaMocks = vi.hoisted(() => {
 
   return {
     activeItem,
+    didRequestFloatedCenterModule: () => didRequestFloatedCenterModule,
     dockFloating: vi.fn(),
+    floatedCenterModulePending,
     focusFloating: vi.fn(),
     focusRegion: vi.fn(),
     project,
+    requestFloatedCenterModule: () => {
+      didRequestFloatedCenterModule = true;
+    },
+    resolveFloatedCenterModule: () => resolveFloatedCenterModule(),
     revealFloating: vi.fn(),
   };
 });
@@ -125,6 +136,11 @@ vi.mock('@workbench/widget-frame', () => ({
   WidgetSourceLockBadge: () => null,
   useWidgetIntentPreloadProps: () => ({}),
 }));
+vi.mock('./FloatedCenterView', async (importOriginal) => {
+  centerAreaMocks.requestFloatedCenterModule();
+  await centerAreaMocks.floatedCenterModulePending;
+  return importOriginal();
+});
 
 import { CenterArea } from './CenterArea';
 
@@ -224,6 +240,22 @@ describe('CenterArea with its last view floating', () => {
   };
   const button = (name: string) =>
     [...host!.querySelectorAll<HTMLButtonElement>('button')].find((candidate) => candidate.textContent === name);
+
+  it('keeps the center recovery controls available while their lazy chunk loads', async () => {
+    floatLastView();
+    await render(<CenterArea />);
+
+    try {
+      await vi.waitFor(() => expect(centerAreaMocks.didRequestFloatedCenterModule()).toBe(true));
+      expect(host?.textContent).toContain('Preview is in a floating window');
+      expect(button('Show window')).not.toBeUndefined();
+    } finally {
+      act(() => {
+        centerAreaMocks.resolveFloatedCenterModule();
+      });
+      await vi.waitFor(() => expect(host?.textContent).toContain('Preview is in a floating window'));
+    }
+  });
 
   it('says where the view went and offers both ways back, instead of calling it unavailable', async () => {
     floatLastView();
