@@ -37,7 +37,7 @@ type LayerSectionEngine = Pick<
 // Reference equality is exact: the document index hands back the same node
 // object until the node itself changes, and the section renders the whole
 // node, so a narrower comparison would serve stale views of it.
-export const selectSelectedNode = (project: {
+const selectSelectedNode = (project: {
   canvas: { document: Pick<CanvasDocumentContractV3, 'stacks' | 'selectedLayerId'> };
 }): CanvasNodeContract | null => getDocumentNode(project.canvas.document, project.canvas.document.selectedLayerId);
 
