@@ -9,9 +9,12 @@ import type { WorkbenchWidgetCommands } from './workbenchStore';
 
 import { createWidgetImplementationResource } from './widgetImplementationResource';
 import {
+  activateRailPlacement,
   closeWidgetPlacement,
+  dockFloatingPlacement,
   getCenterPreviewToggleState,
   openWidgetPlacement,
+  removeFloatingPlacement,
   revealWidgetPlacement,
   toggleCenterPreview,
 } from './widgetPlacementCommands';
@@ -69,7 +72,7 @@ const createWidgetCommands = (dispatch: (action: WorkbenchAction) => void): Work
   dockFloating: (instanceId) => dispatch({ instanceId, type: 'dockFloatingWidget' }),
   closeFloating: (instanceId) => dispatch({ instanceId, type: 'closeFloatingWidget' }),
   float: (instanceId) => dispatch({ instanceId, type: 'floatWidget' }),
-  focusFloating: (instanceId) => dispatch({ instanceId, type: 'focusFloatingWidget' }),
+  raiseFloating: (instanceId) => dispatch({ instanceId, type: 'raiseFloatingWidget' }),
   move: (options) => dispatch({ ...options, type: 'moveWidgetInstance' }),
   setAlignment: (options) => dispatch({ ...options, type: 'setWidgetInstanceAlignment' }),
   open: (options) => dispatch({ ...options, type: 'openRegionWidget' }),
@@ -77,6 +80,7 @@ const createWidgetCommands = (dispatch: (action: WorkbenchAction) => void): Work
     dispatch({ instanceId, projectId, type: 'patchWidgetInstanceValues', values }),
   patchValues: (widgetId, values, projectId) => dispatch({ projectId, type: 'patchWidgetValues', values, widgetId }),
   reorder: (options) => dispatch({ ...options, type: 'reorderWidgetInstances' }),
+  revealFloating: (instanceId) => dispatch({ instanceId, type: 'revealFloatingWidget' }),
   select: (options) => dispatch({ ...options, type: 'selectRegionWidget' }),
   setFloatingGeometry: (instanceId, geometry) =>
     dispatch({ instanceId, type: 'setFloatingWidgetGeometry', ...geometry }),
@@ -269,10 +273,94 @@ describe('widget placement commands', () => {
   });
 });
 
+describe('floating window rail commands', () => {
+  /** Run a rail command against the real reducer, with the placement projection the shell hands it. */
+  const run = <Result>(
+    state: WorkbenchState,
+    command: (widgets: WorkbenchWidgetCommands, project: ReturnType<typeof getWidgetPlacementProject>) => Result
+  ): { project: Project; result: Result } => {
+    let result!: Result;
+    const next = applyCommand(state, (widgets) => {
+      result = command(widgets, getWidgetPlacementProject(getActiveProject(state)));
+    });
+
+    return { project: getActiveProject(next), result };
+  };
+  const float = (state: WorkbenchState, instanceId: string, region?: WidgetRegion): WorkbenchState =>
+    workbenchReducer(state, region ? { instanceId, region, type: 'floatWidget' } : { instanceId, type: 'floatWidget' });
+
+  it('activates a marker by raising and expanding its window, not by docking it', () => {
+    let state = float(float(createInitialWorkbenchState(), 'image-map'), 'gallery');
+    state = workbenchReducer(state, { instanceId: 'image-map', mode: 'shaded', type: 'setFloatingWidgetMode' });
+    const railBefore = getActiveProject(state).widgetRegions.right;
+
+    const { project, result } = run(state, (widgets, placement) =>
+      activateRailPlacement({ instanceId: 'image-map', project: placement, region: 'right', widgets })
+    );
+
+    expect(result).toBe('window');
+    expect(project.floatingWidgets?.['image-map']).toMatchObject({ mode: 'windowed', stackOrder: 2 });
+    expect(project.widgetRegions.right).toBe(railBefore);
+  });
+
+  it('activates a docked tab by revealing it in its rail', () => {
+    const { project, result } = run(createInitialWorkbenchState(), (widgets, placement) =>
+      activateRailPlacement({ instanceId: 'queue', project: placement, region: 'right', widgets })
+    );
+
+    expect(result).toBe('tab');
+    expect(project.widgetRegions.right.activeInstanceId).toBe('queue');
+  });
+
+  it('docks a window where it came from and names that region', () => {
+    const state = float(createInitialWorkbenchState(), 'image-map');
+    const docked = run(state, (widgets, placement) =>
+      dockFloatingPlacement({ instanceId: 'image-map', project: placement, widgets })
+    );
+    const stale = run(createInitialWorkbenchState(), (widgets, placement) =>
+      dockFloatingPlacement({ instanceId: 'image-map', project: placement, widgets })
+    );
+
+    expect(docked.result).toBe('right');
+    expect(docked.project.floatingWidgets).toBeUndefined();
+    expect(docked.project.widgetRegions.right.instanceIds).toEqual(['gallery', 'image-map', 'queue']);
+    // Nothing floats there: no dispatch, no region to move focus to.
+    expect(stale.result).toBeNull();
+  });
+
+  it('reports that removing the window hands an emptied center its view back', () => {
+    // Video shows Preview only in the center; it is added to the right rail and floated from there.
+    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'video', type: 'applyPreset' });
+    state = workbenchReducer(state, { region: 'right', type: 'openRegionWidget', widgetId: 'preview' });
+    state = float(state, 'preview', 'right');
+
+    const { project, result } = run(state, (widgets, placement) =>
+      removeFloatingPlacement({ instanceId: 'preview', project: placement, widgets })
+    );
+
+    expect(result).toEqual({ restoresCenter: true, returnRegion: 'right' });
+    expect(project.floatingWidgets).toBeUndefined();
+    expect(project.widgetRegions.center.instanceIds).toEqual(['preview']);
+  });
+
+  it('reports no center restore when the center kept another view', () => {
+    const state = float(createInitialWorkbenchState(), 'image-map');
+    const { project, result } = run(state, (widgets, placement) =>
+      removeFloatingPlacement({ instanceId: 'image-map', project: placement, widgets })
+    );
+
+    expect(result).toEqual({ restoresCenter: false, returnRegion: 'right' });
+    expect(project.floatingWidgets).toBeUndefined();
+    expect(project.widgetRegions.right.instanceIds).toEqual(['gallery', 'queue']);
+  });
+});
+
 const previewRegistry = createRegistry({ center: [createWidget({ id: 'preview', label: 'Preview' })] });
 
-const createPreviewToggleHarness = () => {
-  let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' });
+const createPreviewToggleHarness = (
+  initial = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' })
+) => {
+  let state = initial;
   const dispatch = (action: WorkbenchAction): void => {
     state = workbenchReducer(state, action);
   };
@@ -287,7 +375,12 @@ const createPreviewToggleHarness = () => {
       widgets,
     });
 
-  return { getRegions: () => getActiveProject(state).widgetRegions, select: widgets.select, toggle };
+  return {
+    getProject: () => getActiveProject(state),
+    getRegions: () => getActiveProject(state).widgetRegions,
+    select: widgets.select,
+    toggle,
+  };
 };
 
 describe('toggleCenterPreview', () => {
@@ -311,6 +404,36 @@ describe('toggleCenterPreview', () => {
 
     expect(getRegions().center.activeInstanceId).toBe('preview');
     expect(getRegions().right.activeInstanceId).toBe('queue');
+  });
+
+  it('docks a floating preview back to its rail slot, behind the tab already showing, and fronts it in the center', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'automate', type: 'applyPreset' });
+    const railBefore = getActiveProject(state).widgetRegions.right;
+    state = workbenchReducer(state, { instanceId: 'preview', region: 'right', type: 'floatWidget' });
+    const { getProject, toggle } = createPreviewToggleHarness(state);
+
+    expect(toggle()).toBe(true);
+
+    expect(getProject().floatingWidgets).toBeUndefined();
+    expect(getProject().widgetRegions.center.activeInstanceId).toBe('preview');
+    expect(getProject().widgetRegions.right).toMatchObject({
+      activeInstanceId: railBefore.activeInstanceId,
+      instanceIds: railBefore.instanceIds,
+    });
+  });
+
+  it('gives an emptied center its floating preview back without duplicating it', () => {
+    let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'video', type: 'applyPreset' });
+    state = workbenchReducer(state, { region: 'right', type: 'openRegionWidget', widgetId: 'preview' });
+    state = workbenchReducer(state, { instanceId: 'preview', region: 'right', type: 'floatWidget' });
+    const { getProject, toggle } = createPreviewToggleHarness(state);
+
+    expect(getProject().widgetRegions.center.instanceIds).toEqual([]);
+    expect(toggle()).toBe(true);
+
+    expect(getProject().floatingWidgets).toBeUndefined();
+    expect(getProject().widgetRegions.center).toMatchObject({ activeInstanceId: 'preview', instanceIds: ['preview'] });
+    expect(getProject().widgetRegions.right.instanceIds).toEqual(['gallery', 'queue', 'preview']);
   });
 
   it('falls back to another center view when nothing was remembered', () => {

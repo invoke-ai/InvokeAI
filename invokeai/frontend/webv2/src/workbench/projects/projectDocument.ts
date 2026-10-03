@@ -16,6 +16,7 @@ export type ProjectDocumentV3 = Omit<
     | 'floatingWidgets'
     | 'id'
     | 'invocation'
+    | 'lastFloatingGeometry'
     | 'layout'
     | 'name'
     | 'promptHistory'
@@ -24,10 +25,11 @@ export type ProjectDocumentV3 = Omit<
     | 'widgetInstances'
     | 'widgetRegions'
   >,
-  'floatingWidgets'
+  'floatingWidgets' | 'lastFloatingGeometry'
 > & {
   documentSchemaVersion: typeof PROJECT_DOCUMENT_SCHEMA_VERSION;
   floatingWidgets?: Project['floatingWidgets'];
+  lastFloatingGeometry?: Project['lastFloatingGeometry'];
   workflows: ProjectWorkflowCollection;
 };
 
@@ -67,6 +69,7 @@ export const serializeProjectDocumentV3 = (project: Project): ProjectDocumentV3 
     ...(persistent.floatingWidgets ? { floatingWidgets: persistent.floatingWidgets } : {}),
     id: persistent.id,
     invocation: persistent.invocation,
+    ...(persistent.lastFloatingGeometry ? { lastFloatingGeometry: persistent.lastFloatingGeometry } : {}),
     layout: persistent.layout,
     name: persistent.name,
     promptHistory: persistent.promptHistory,

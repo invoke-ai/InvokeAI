@@ -32,7 +32,7 @@ Hover over a numbered circle, or tap it on a touchscreen, for a short descriptio
 | 10 | **Center panel** | The main work area: Preview, Canvas, Gallery, Workflow editor or Image Map. |
 | 11 | **Center view menu** | Switches what the center shows, and adds or closes center views. |
 | 12 | **Floating window** | A panel detached from its rail, which you can move and resize anywhere. |
-| 13 | **Floating panel's rail slot** | A dashed icon that marks where a floating panel came from. Click it to dock the panel again. |
+| 13 | **Floating panel's rail slot** | A dashed icon that marks where a floating panel came from. Click it to bring the window to the front; right-click it to dock or remove the panel. |
 | 14 | **Status bar** | Small status chips: server connection, queue, gallery, autosave and notifications. |
 
 ### Rails and side panels
@@ -63,10 +63,17 @@ The status bar along the bottom holds small chips. Hover over **Server Status**,
 
 **Preview** and **Image Map** can float in their own windows above the rest of the workbench. Click **Float Window** in the panel's header to detach it. Then:
 
-- Drag the title bar to move the window, and drag the corner grip to resize it.
-- Double-click the title bar, or use **Collapse**, to shrink the window to just its title bar.
-- **Maximize** enlarges the window; **Restore** returns it to its previous size.
-- **Dock to panel** returns the panel to the rail it came from. Clicking its dashed rail icon does the same.
+- Drag the title bar to move the window, and drag any edge or corner to resize it.
+- From the keyboard, focus the title bar and press the arrow keys to move the window, or focus the grip in the bottom-right corner and press the arrow keys to resize it. Hold <kbd>Shift</kbd> for larger steps; <kbd>Home</kbd> on the grip shrinks the window to its smallest size.
+- Double-click the title bar, or use **Maximize**, to fill the workbench; double-click again, or use **Restore**, to return to the previous size and position. Double-clicking a collapsed window's title bar expands it.
+- **Collapse** shrinks the window to just its title bar and **Expand** opens it again. The panel keeps what you were doing while collapsed.
+- Click a window, or move keyboard focus into it, to make it the active one: it comes to the front and is outlined like a focused panel, and keyboard shortcuts for its panel apply to it.
+- The dock button in the title bar, named for where the window came from (for example **Dock to right panel**), returns the panel to the place it floated from.
+- The panel's dashed rail icon keeps its place while the window floats. Click it to bring the window to the front and expand it; right-click it to dock or remove the panel.
+
+A window remembers where it was. Dock or remove a floating panel and float it again later, and it reopens at the same position and size.
+
+If the panel you float was also the only view in the center, the center shows where it went, with **Show window** and a dock button. Docking or removing the window gives the center its view back.
 
 A floating Preview is handy on the **Edit** layout: keep the canvas in the center and watch results in a small window beside your work.
 
