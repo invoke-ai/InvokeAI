@@ -28,7 +28,7 @@ import {
 } from '@workbench/WorkbenchContext';
 import {
   CheckIcon,
-  ChevronsUpDownIcon,
+  ChevronDownIcon,
   FileDownIcon,
   FolderCogIcon,
   FolderOpenIcon,
@@ -180,7 +180,7 @@ export const ProjectSwitcher = () => {
             onContextMenu={handleTriggerContextMenu}
           >
             <MiddleTruncate css={HIDE_BELOW_PROJECT_NAME_WIDTH} fontWeight="500" minW="0" text={activeProjectName} />
-            <Icon as={ChevronsUpDownIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+            <Icon as={ChevronDownIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
           </Button>
         </Menu.Trigger>
         <Portal>
