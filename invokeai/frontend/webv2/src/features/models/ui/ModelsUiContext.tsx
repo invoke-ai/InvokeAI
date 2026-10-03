@@ -44,3 +44,20 @@ export const useOpenModelInManager = (): ((modelKey: string) => void) | null => 
 
   return canManageModels ? open : null;
 };
+
+/** Opens Add Models searching the starter catalog for `query`, so the user reviews it before installing. */
+export const useOpenAddModelsSearch = (): ((query: string) => void) | null => {
+  const { canManageModels, managerProjectId } = useModelsUi();
+  const navigate = useNavigate();
+  const open = useCallback(
+    (query: string) => {
+      void import('./uiStore').then(({ requestAddModelsSearch }) => {
+        requestAddModelsSearch(query);
+        void navigate({ search: { project: managerProjectId ?? undefined }, to: '/models' });
+      });
+    },
+    [managerProjectId, navigate]
+  );
+
+  return canManageModels ? open : null;
+};

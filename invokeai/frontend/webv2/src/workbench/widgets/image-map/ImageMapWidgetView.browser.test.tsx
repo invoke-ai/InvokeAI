@@ -52,8 +52,9 @@ const models = vi.hoisted(() => {
         return () => listeners.delete(listener);
       },
     },
+    canManageModels: true,
     ensureStartersLoaded: vi.fn(),
-    install: vi.fn((_request: { config?: unknown; source: string }) => Promise.resolve(true)),
+    openAddModelsSearch: vi.fn(),
   };
 });
 
@@ -65,13 +66,12 @@ vi.mock('@features/models', async (importOriginal) => {
     ensureStartersLoaded: models.ensureStartersLoaded,
     useActiveInstallSources: () =>
       useSyncExternalStore(models.activeSources.subscribe, models.activeSources.get, models.activeSources.get),
-    useInstallActions: () => ({ install: models.install, installMany: vi.fn(), pendingSources: EMPTY_SOURCES }),
+    useOpenAddModelsSearch: () => (models.canManageModels ? models.openAddModelsSearch : null),
     useStartersSelector: (selector: (snapshot: unknown) => unknown) =>
       selector({ response: { starter_models: STARTERS } }),
   };
 });
 
-const EMPTY_SOURCES: ReadonlySet<string> = new Set<string>();
 const ENCODER_SOURCE = 'apple/DFN2B-CLIP-ViT-L-14-39B';
 const ENCODER_DEPENDENCY_SOURCE = 'InvokeAI/encoder-preprocessor';
 const STARTERS = [
@@ -199,6 +199,7 @@ beforeEach(() => {
   registered.commands = [];
   registered.hotkeys = [];
   models.activeSources.set([]);
+  models.canManageModels = true;
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -248,8 +249,8 @@ describe('Image Map unavailable states', () => {
   );
 });
 
-describe('Image Map missing-model install link', () => {
-  it('queues the starter install for the configured encoder', async () => {
+describe('Image Map missing-model link', () => {
+  it('opens Add Models on the configured encoder instead of downloading it', async () => {
     await renderState('model_missing', 'DFN2B-CLIP-ViT-L-14-39B');
 
     expect(host?.textContent).toContain(
@@ -260,34 +261,19 @@ describe('Image Map missing-model install link', () => {
 
     expect(link?.textContent).toBe('DFN2B-CLIP-ViT-L-14-39B');
 
-    await act(async () => {
-      link?.click();
-      await Promise.resolve();
-    });
+    await act(() => link?.click());
 
-    expect(models.install).toHaveBeenCalledWith(expect.objectContaining({ source: 'apple/DFN2B-CLIP-ViT-L-14-39B' }));
+    expect(models.openAddModelsSearch).toHaveBeenCalledWith('DFN2B-CLIP-ViT-L-14-39B');
   });
 
-  it('queues the starter dependencies ahead of the model itself', async () => {
+  it('leaves the encoder as plain text for a session that cannot manage models', async () => {
+    models.canManageModels = false;
     await renderState('model_missing', 'DFN2B-CLIP-ViT-L-14-39B');
 
-    await act(async () => {
-      host?.querySelector('button')?.click();
-      await Promise.resolve();
-    });
-
-    expect(models.install.mock.calls.map(([request]) => request.source)).toEqual([
-      ENCODER_DEPENDENCY_SOURCE,
-      ENCODER_SOURCE,
-    ]);
-    // The curated metadata rides along, so the model registers under its
-    // starter identity instead of whatever probing guesses.
-    expect(models.install).toHaveBeenLastCalledWith(
-      expect.objectContaining({
-        config: expect.objectContaining({ name: 'DFN2B-CLIP-ViT-L-14-39B', type: 'clip_vision' }),
-        source: ENCODER_SOURCE,
-      })
+    expect(host?.textContent).toContain(
+      'install the image encoder model DFN2B-CLIP-ViT-L-14-39B from the Model Manager'
     );
+    expect(buttonLabels()).toEqual(['Check again']);
   });
 
   it('reports an in-flight download instead of offering the install again', async () => {

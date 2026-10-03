@@ -30,4 +30,9 @@ export { useInstallActions } from './ui/add-models/useInstallActions';
 export { getStarterModelInstallSources, type StarterInstallSource } from './ui/add-models/starterModelInstallSources';
 export { ModelInstallRuntime } from './ui/ModelInstallRuntime';
 export { ModelsPage } from './ui/ModelsPage';
-export { ModelsUiProvider, useOpenModelInManager, type ModelsUiAdapter } from './ui/ModelsUiContext';
+export {
+  ModelsUiProvider,
+  useOpenAddModelsSearch,
+  useOpenModelInManager,
+  type ModelsUiAdapter,
+} from './ui/ModelsUiContext';

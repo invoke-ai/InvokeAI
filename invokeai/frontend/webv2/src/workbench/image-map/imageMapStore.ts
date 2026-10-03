@@ -374,7 +374,11 @@ export const refreshImageIndexStatus = (): void => {
 };
 
 export const ensureImageMapLoaded = (): void => {
-  if (imageMapStore.getSnapshot().loadState === 'idle') {
+  const { data, loadState } = imageMapStore.getSnapshot();
+
+  // A missing encoder is installed from the Model Manager, which unmounts this widget: ask again on every reopen
+  // rather than keep the retained diagnosis until someone presses Check again.
+  if (loadState === 'idle' || (data?.state === 'model_missing' && loadState !== 'loading')) {
     void refreshImageMapPoints();
   }
 

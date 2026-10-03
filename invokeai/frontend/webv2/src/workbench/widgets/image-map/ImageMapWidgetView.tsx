@@ -7,7 +7,7 @@ import {
   ensureStartersLoaded,
   getStarterModelInstallSources,
   useActiveInstallSources,
-  useInstallActions,
+  useOpenAddModelsSearch,
   useStartersSelector,
 } from '@features/models';
 import { useMountEffect } from '@platform/react/useMountEffect';
@@ -171,9 +171,9 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
 
   // Ahead of the loading spinner, unlike every other message: a refresh from
   // this state flips `loadState` to `loading`, and flashing a spinner over the
-  // message would unmount the install link — losing the in-flight download's
-  // pending state and the "refresh when it lands" watcher with it. The
-  // diagnosis is also what a refresh is least likely to change.
+  // message would unmount the model link — losing the "refresh when the
+  // download lands" watcher with it. The diagnosis is also what a refresh is
+  // least likely to change.
   if (data?.state === 'model_missing') {
     return (
       <CenteredMessage
@@ -311,13 +311,13 @@ const CenteredMessage = ({
 );
 
 /**
- * Offer one-click encoder installation when the starter catalog resolves it; otherwise show text while unknown,
- * loading, or already downloading.
+ * Link the encoder to its Add Models entry, where the user reviews and installs it; plain text while the catalog
+ * does not carry it, while it downloads, or for sessions that cannot manage models.
  */
 const ImageIndexModelInstallLink = ({ modelName }: { modelName: string }) => {
   const starterModels = useStartersSelector(selectStarterModels);
   const activeInstallSources = useActiveInstallSources();
-  const { install, pendingSources } = useInstallActions();
+  const openAddModelsSearch = useOpenAddModelsSearch();
 
   useMountEffect(() => {
     ensureStartersLoaded();
@@ -329,9 +329,7 @@ const ImageIndexModelInstallLink = ({ modelName }: { modelName: string }) => {
     return starter ? getStarterModelInstallSources(starter) : [];
   }, [modelName, starterModels]);
 
-  const installing = sources.some(
-    (entry) => pendingSources.has(entry.source) || activeInstallSources.has(entry.source)
-  );
+  const installing = sources.some((entry) => activeInstallSources.has(entry.source));
   const wasInstalling = useRef(false);
 
   // The server picks a freshly installed encoder up on the next map request,
@@ -345,25 +343,9 @@ const ImageIndexModelInstallLink = ({ modelName }: { modelName: string }) => {
     wasInstalling.current = installing;
   }, [installing]);
 
-  const handleInstall = useCallback(() => {
-    void (async () => {
-      // Sequential, matching the Add Models starter path: the install queue is
-      // ordered anyway, and a dependency must not race the model that needs it.
-      for (const entry of sources) {
-        // Re-checked here rather than trusted from the render that drew the
-        // link: an install of the same source may have started elsewhere (the
-        // Models page, another tab) in between, and queueing it twice
-        // downloads it twice.
-        if (pendingSources.has(entry.source) || activeInstallSources.has(entry.source)) {
-          continue;
-        }
+  const handleOpen = useCallback(() => openAddModelsSearch?.(modelName), [modelName, openAddModelsSearch]);
 
-        await install(entry);
-      }
-    })();
-  }, [activeInstallSources, install, pendingSources, sources]);
-
-  if (sources.length === 0 || installing) {
+  if (sources.length === 0 || installing || !openAddModelsSearch) {
     return (
       <Text as="span" fontWeight="medium">
         {modelName}
@@ -373,7 +355,7 @@ const ImageIndexModelInstallLink = ({ modelName }: { modelName: string }) => {
   }
 
   return (
-    <Link as="button" colorPalette="accent" onClick={handleInstall} type="button" variant="underline">
+    <Link as="button" colorPalette="accent" onClick={handleOpen} type="button" variant="underline">
       {modelName}
     </Link>
   );

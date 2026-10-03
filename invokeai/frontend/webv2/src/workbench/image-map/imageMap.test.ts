@@ -19,7 +19,7 @@ vi.mock('@platform/transport/http', () => ({
   getApiErrorMessage: (_error: unknown, fallback: string) => fallback,
 }));
 
-import type { ImageMapPoint } from './api';
+import type { ImageMapPoint, ImageMapPoints } from './api';
 
 import { fetchImageMapPoints, fetchImageMapStatus, requestImageMapRefresh } from './api';
 import { CLUSTER_PALETTE, getClusterColor, NOISE_COLOR } from './clusterPalette';
@@ -888,6 +888,17 @@ const EMPTY_SNAPSHOT = {
   renderError: null,
 } as const;
 
+const LOADED_POINTS: ImageMapPoints = {
+  clusterEps: null,
+  modelName: null,
+  pointCount: 0,
+  points: [],
+  stale: false,
+  state: 'ready',
+  updatedAt: null,
+  visibleHash: null,
+};
+
 describe('image map status', () => {
   beforeEach(() => {
     mocks.apiFetchJson.mockReset();
@@ -998,6 +1009,26 @@ describe('image index progress', () => {
 
     await vi.waitFor(() => expect(imageMapStore.getSnapshot().indexCounts).not.toBeNull());
     expect(imageMapStore.getSnapshot().indexCounts).toEqual({ embedded: 70, failed: 0, pending: 30, total: 100 });
+  });
+
+  it('asks again on reopen while the map reports its encoder missing', async () => {
+    // The encoder is installed from the Model Manager, which unmounts the widget and its install watcher.
+    mocks.apiFetchJson.mockResolvedValue(BACKEND_RESPONSE);
+    imageMapStore.setSnapshot({
+      ...EMPTY_SNAPSHOT,
+      data: { ...LOADED_POINTS, modelName: 'encoder', state: 'model_missing' },
+      loadState: 'loaded',
+    });
+    ensureImageMapLoaded();
+
+    await vi.waitFor(() => expect(imageMapStore.getSnapshot().data?.state).toBe('ready'));
+  });
+
+  it('keeps loaded points on reopen', () => {
+    imageMapStore.setSnapshot({ ...EMPTY_SNAPSHOT, data: LOADED_POINTS, loadState: 'loaded' });
+    ensureImageMapLoaded();
+
+    expect(mocks.apiFetchJson).not.toHaveBeenCalledWith(expect.stringMatching(/^\/api\/v1\/image_map\/points/));
   });
 
   it('lets a later status fetch correct counts an event left stale', async () => {
