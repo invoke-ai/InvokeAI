@@ -19,6 +19,8 @@ import { useTranslation } from 'react-i18next';
 const TRACK_INSET_PX = 10;
 /** The fill runs this far past the thumb so its rounded end frames it. */
 const FILL_OVERHANG_PX = 6;
+/** Clearance between the fill and the frame's border. */
+const FILL_INSET_PX = 1.5;
 /** Shift-drag moves the value this fraction of the pointer's track distance. */
 const FINE_DRAG_RATIO = 0.1;
 /** Shift/PageUp/PageDown step multiplier. */
@@ -99,11 +101,12 @@ const ROOT_CSS = {
   _disabled: { cursor: 'not-allowed', opacity: 0.5 },
   '&[data-dragging]': { borderColor: 'border.emphasized' },
   '& [data-part="fill"]': {
-    bg: 'bg.emphasized',
-    // Concentric with the frame's corner inside its 1px border.
-    borderEndRadius: 'calc({radii.control} - 1px)',
-    insetBlock: 0,
-    insetInlineStart: 0,
+    // The same pointed tint as list rows, so a field and the row it sits in share one interaction color.
+    bg: 'bg.hover',
+    // Concentric with the frame's corner inside its 1px border and the fill's clearance.
+    borderRadius: `calc({radii.control} - ${1 + FILL_INSET_PX}px)`,
+    insetBlock: `${FILL_INSET_PX}px`,
+    insetInlineStart: `${FILL_INSET_PX}px`,
     pointerEvents: 'none',
     position: 'absolute',
     transitionDuration: 'var(--wb-motion-duration-fast)',
@@ -566,7 +569,7 @@ export const ScrubberField = ({
         onDoubleClick={handleDoubleClick}
         onPointerDown={handlePointerDown}
       >
-        <div data-part="fill" style={{ width: `calc(${thumbPosition} + ${FILL_OVERHANG_PX}px)` }} />
+        <div data-part="fill" style={{ width: `calc(${thumbPosition} + ${FILL_OVERHANG_PX - FILL_INSET_PX}px)` }} />
         {markEntries?.map(({ mark, state }) => (
           <div
             key={mark}
