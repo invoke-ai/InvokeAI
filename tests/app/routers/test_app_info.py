@@ -45,7 +45,12 @@ def _non_admin_user() -> Mock:
     ("setting", "visible"), [("", True), ("show_donation_link: true", True), ("show_donation_link: false", False)]
 )
 def test_frontend_config_exposes_only_public_yaml_settings(
-    setting: str, visible: bool, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, client: TestClient
+    setting: str,
+    visible: bool,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    client: TestClient,
+    enable_multiuser: Any,
 ) -> None:
     config_path = tmp_path / "invokeai.yaml"
     config_path.write_text(
@@ -54,6 +59,7 @@ def test_frontend_config_exposes_only_public_yaml_settings(
     config = load_and_migrate_config(config_path)
     monkeypatch.setattr(app_info, "get_config", lambda: config)
 
+    assert client.get("/api/v1/app/runtime_config").status_code == 401
     # Public UI presentation does not require an administrator or expose the runtime config.
     response = client.get("/api/v1/app/frontend_config")
 
