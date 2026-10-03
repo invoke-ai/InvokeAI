@@ -18,7 +18,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
-import { focusOpenedWidget } from '@workbench/focusRegions';
+import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { resolveAndSubmitGraphPreviewInvocation } from '@workbench/graphPreviewInvocation';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
@@ -192,6 +192,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const notify = useNotify();
+  const { focusRegion } = useWorkbenchFocus();
 
   useMountEffect(() => {
     void ensureModelsLoaded();
@@ -296,7 +297,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
         // Workflow opens widgets from its buttons: the opened widget takes focus and the region highlight.
         open: (options) => {
           commands.widgets.open(options);
-          focusOpenedWidget(options.region, options.widgetId);
+          focusRegion(options.region, options.widgetId);
         },
         patchValues: (widgetId, values) => commands.widgets.patchValues(widgetId, values),
       },
@@ -305,6 +306,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
       capabilities,
       commands,
       findInGallery,
+      focusRegion,
       notify.error,
       notify.info,
       notify.success,
