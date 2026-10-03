@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 
 import type { InvocationState } from './useInvocationState';
 
+import { TAIL_UNDER_INVOKE_BEFORE_CSS } from './invokeClusterCss';
 import { RoutingDestinationSegments } from './RoutingDestinationSegments';
 
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
@@ -56,6 +57,7 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
         <Menu.Trigger asChild>
           <Button
             aria-label={accessibleName}
+            css={TAIL_UNDER_INVOKE_BEFORE_CSS}
             data-routing-control=""
             flexShrink={0}
             maxW="36px"

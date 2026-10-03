@@ -6,6 +6,7 @@ import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/Workb
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { TAIL_UNDER_INVOKE_AFTER_CSS } from './invokeClusterCss';
 import { getBatchCount } from './useInvocationState';
 
 export const IterationsField = () => {
@@ -40,6 +41,7 @@ export const IterationsField = () => {
     <Tooltip content={t('topbar.iterations.tooltip', { count: batchCount })} showArrow>
       <NumberInput.Root
         allowMouseWheel
+        css={TAIL_UNDER_INVOKE_AFTER_CSS}
         flexShrink={0}
         min={MIN_BATCH_COUNT}
         rounded="control"
