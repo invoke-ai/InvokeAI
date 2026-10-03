@@ -195,13 +195,18 @@ const Krea2SeedVarianceFields = ({ onCommit, settings }: Pick<GenerateRenderSect
 
   return (
     <>
-      <Field label={t('widgets.generate.krea2SeedVariance')} helpText={t('widgets.generate.krea2SeedVarianceHelp')}>
-        <GenerateToggleSwitch
-          checked={settings.krea2SeedVarianceEnabled}
-          label={t('widgets.generate.enabled')}
-          labelVisible
-          onCheckedChange={(checked) => onCommit({ krea2SeedVarianceEnabled: checked })}
-        />
+      <Field
+        helpText={t('widgets.generate.krea2SeedVarianceHelp')}
+        label={t('widgets.generate.krea2SeedVariance')}
+        labelEnd={
+          <GenerateToggleSwitch
+            checked={settings.krea2SeedVarianceEnabled}
+            label={t('widgets.generate.krea2SeedVariance')}
+            onCheckedChange={(checked) => onCommit({ krea2SeedVarianceEnabled: checked })}
+          />
+        }
+      >
+        {null}
       </Field>
       {settings.krea2SeedVarianceEnabled ? (
         <>
