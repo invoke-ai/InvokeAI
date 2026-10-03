@@ -40,28 +40,31 @@ let root: Root | null = null;
 
 const render = async () => {
   const onCommit = vi.fn<(update: GenerateSettingsUpdate) => void>();
+  const onCommitImmediate = vi.fn();
 
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
-  await act(() =>
-    root?.render(
-      <ChakraProvider value={system}>
-        <GenerationUiProvider adapter={ADAPTER}>
-          <GenerateConceptsContent
-            loraModels={LORA_MODELS}
-            projectId="project-1"
-            selectedModel={MAIN_MODEL}
-            settings={SETTINGS}
-            onCommit={onCommit}
-            onCommitImmediate={vi.fn()}
-          />
-        </GenerationUiProvider>
-      </ChakraProvider>
-    )
-  );
+  const renderProject = (projectId: string) =>
+    act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <GenerationUiProvider adapter={ADAPTER}>
+            <GenerateConceptsContent
+              loraModels={LORA_MODELS}
+              projectId={projectId}
+              selectedModel={MAIN_MODEL}
+              settings={SETTINGS}
+              onCommit={onCommit}
+              onCommitImmediate={onCommitImmediate}
+            />
+          </GenerationUiProvider>
+        </ChakraProvider>
+      )
+    );
+  await renderProject('project-1');
 
-  return { onCommit, row: host };
+  return { onCommit, onCommitImmediate, renderProject, row: host };
 };
 
 /** The settings a recorded commit produces from the rendered ones. */
@@ -83,6 +86,25 @@ afterEach(async () => {
 });
 
 describe('GenerateConceptsContent', () => {
+  it('discards a concept menu when switching projects with the same concept', async () => {
+    const { onCommit, onCommitImmediate, renderProject, row } = await render();
+
+    await act(() => {
+      row
+        .querySelector('[data-list-primary]')
+        ?.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    });
+    await expect.poll(() => document.querySelector('[role="menu"][data-state="open"]')).not.toBeNull();
+
+    await renderProject('project-2');
+
+    expect(document.querySelector('[role="menu"][data-state="open"]')).toBeNull();
+    await renderProject('project-1');
+    expect(document.querySelector('[role="menu"][data-state="open"]')).toBeNull();
+    expect(onCommit).not.toHaveBeenCalled();
+    expect(onCommitImmediate).not.toHaveBeenCalled();
+  });
+
   it('holds weight steps as a draft and commits them once the debounce settles', async () => {
     const { onCommit, row } = await render();
 

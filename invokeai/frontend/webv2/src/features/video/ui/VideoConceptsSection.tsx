@@ -25,10 +25,12 @@ export const VideoConceptsSection = memo(
     loras,
     model,
     onChangeLoras,
+    projectId,
   }: {
     loras: GenerateLora[];
     model: MainModelConfig | null;
     onChangeLoras: (loras: GenerateLora[]) => void;
+    projectId: string;
   }) {
     const { t } = useTranslation();
     const openInModelManager = useOpenModelInManager();
@@ -85,7 +87,7 @@ export const VideoConceptsSection = memo(
               {t('widgets.video.noLoras')}
             </Text>
           ) : (
-            <ConceptList label={t('widgets.video.concepts')}>
+            <ConceptList label={t('widgets.video.concepts')} projectId={projectId}>
               {loras.map((lora) => (
                 <ConceptRow
                   key={lora.model.key}
@@ -102,6 +104,7 @@ export const VideoConceptsSection = memo(
     );
   },
   (previous, next) =>
+    previous.projectId === next.projectId &&
     previous.onChangeLoras === next.onChangeLoras &&
     areVideoModelsEquivalent(previous.model, next.model) &&
     areVideoLorasEquivalent(previous.loras, next.loras)

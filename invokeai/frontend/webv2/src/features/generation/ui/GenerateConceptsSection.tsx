@@ -109,7 +109,7 @@ export const GenerateConceptsContent = ({
         </Text>
       ) : (
         <Box mx={-1}>
-          <ConceptList label={t('widgets.generate.concepts')}>
+          <ConceptList label={t('widgets.generate.concepts')} projectId={projectId}>
             {loras.map((lora) => (
               <GenerateConceptRow
                 key={lora.model.key}

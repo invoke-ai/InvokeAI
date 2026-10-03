@@ -82,8 +82,22 @@ const ConceptMenuContext = createContext<ConceptMenuPort | null>(null);
  * The family's short list, with dividers between concepts. It owns the rows' single context menu: one menu per row
  * raced when a second row was right-clicked while the first's menu was closing, and both closed.
  */
-export const ConceptList = ({ children, label }: { children: ReactNode; label: string }) => {
+export const ConceptList = ({
+  children,
+  label,
+  projectId,
+}: {
+  children: ReactNode;
+  label: string;
+  projectId: string;
+}) => {
   const [target, setTarget] = useState<ConceptMenuTarget | null>(null);
+  const [menuProjectId, setMenuProjectId] = useState(projectId);
+  // Reset only the menu: remounting rows would flush their pending weight drafts into the new project.
+  if (menuProjectId !== projectId) {
+    setMenuProjectId(projectId);
+    setTarget(null);
+  }
   const port = useMemo<ConceptMenuPort>(() => ({ open: setTarget, openKey: target?.key ?? null }), [target]);
   const handleClose = useCallback(() => {
     target?.restoreFocus();

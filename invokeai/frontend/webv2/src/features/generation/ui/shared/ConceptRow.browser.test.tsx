@@ -38,7 +38,7 @@ const renderList = async (loras: GenerateLora[], handlers: Handlers = {}) => {
   await act(() =>
     root?.render(
       <ChakraProvider value={system}>
-        <ConceptList label="Concepts">
+        <ConceptList label="Concepts" projectId="project-1">
           {loras.map((lora) => (
             <ConceptRow
               key={lora.model.key}

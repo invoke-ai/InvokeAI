@@ -1,8 +1,8 @@
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { shallowEqual } from '@platform/state/selectors';
-import { applyThemeToRoot } from '@theme/applyTheme';
-import { applyPromptFontSizeToRoot } from '@theme/promptFontSize';
+import { applyPromptFontSizeToRoot, applyThemeToRoot } from '@theme/applyTheme';
 import { DEFAULT_THEME, THEMES_BY_ID } from '@theme/system';
-import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
+import { subscribeWorkbenchPreferences, useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { useLayoutEffect } from 'react';
 
 /** Root data attributes drive theme and motion CSS without React rerenders. */
@@ -31,10 +31,9 @@ const applyRootFlag = (dataKey: 'highContrast' | 'reduceMotion', hintKey: string
 };
 
 export const ThemeController = () => {
-  const { highContrast, promptFontSize, reduceMotion, status, themeId } = useWorkbenchSettingsSelector(
+  const { highContrast, reduceMotion, status, themeId } = useWorkbenchSettingsSelector(
     (snapshot) => ({
       highContrast: snapshot.preferences.highContrast,
-      promptFontSize: snapshot.preferences.promptFontSize,
       reduceMotion: snapshot.preferences.reduceMotion,
       status: snapshot.status,
       themeId: snapshot.preferences.themeId,
@@ -73,11 +72,9 @@ export const ThemeController = () => {
   }, [hasResolved, highContrast]);
 
   // No pre-paint hint: prompt fields are not on screen before settings resolve.
-  useLayoutEffect(() => {
-    if (hasResolved) {
-      applyPromptFontSizeToRoot(promptFontSize);
-    }
-  }, [hasResolved, promptFontSize]);
+  useMountEffect(() =>
+    subscribeWorkbenchPreferences(({ promptFontSize }) => applyPromptFontSizeToRoot(promptFontSize))
+  );
 
   return null;
 };

@@ -848,7 +848,7 @@ export const VideoWidgetView = () => {
         </GenerationSettingsSection>
       ) : null}
 
-      <VideoConceptsSection loras={values.loras} model={values.model} onChangeLoras={setLoras} />
+      <VideoConceptsSection projectId={projectId} loras={values.loras} model={values.model} onChangeLoras={setLoras} />
       <VideoComponentsSection values={values} onPatch={patch} />
     </Stack>
   );

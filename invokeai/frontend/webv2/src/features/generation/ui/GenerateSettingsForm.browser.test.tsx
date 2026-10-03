@@ -1,5 +1,6 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GenerationModelCatalogItem } from '@features/generation/contracts';
+import type { LoraModelConfig } from '@features/generation/core/types';
 import type { ComponentType } from 'react';
 
 import { ChakraProvider } from '@chakra-ui/react';
@@ -288,6 +289,27 @@ describe('GenerateSettingsForm render isolation', () => {
     expect(patches).toEqual([{ patch: { steps: 31 }, projectId: 'project-1' }]);
     expect(storedValues('project-2').getSnapshot().steps).toBe(50);
     expect(stepsValue()).toBe(50);
+  });
+
+  it('discards a pending concept weight when another project finishes opening', async () => {
+    const model: LoraModelConfig = { base: 'sdxl', key: 'ink-wash', name: 'Ink Wash', type: 'lora' };
+    stableGroups.models.catalog = [MODEL, model];
+    storedValues().patchSnapshot({ loras: [{ isEnabled: true, model, weight: 0.75 }] });
+    storedValues('project-2').patchSnapshot({ loras: [{ isEnabled: true, model, weight: 1.25 }] });
+    await renderAdapter(buildAdapter());
+    const weight = () => host!.querySelector('[role="group"][aria-label="Ink Wash"] [role="slider"]');
+
+    await settle(() => weight()?.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' })));
+    expect(weight()?.getAttribute('aria-valuenow')).toBe('0.8');
+    expect(patches).toEqual([]);
+
+    // The open action already flushed before its server request; edits made during that request must not leak.
+    await renderAdapter(buildAdapter('project-2'));
+    await settle(noop, 400);
+
+    expect(patches).toEqual([]);
+    expect(storedValues('project-2').getSnapshot().loras).toEqual([{ isEnabled: true, model, weight: 1.25 }]);
+    expect(weight()?.getAttribute('aria-valuenow')).toBe('1.25');
   });
 
   it('flushes a pending edit to its own project on unmount, not on ordinary re-renders', async () => {

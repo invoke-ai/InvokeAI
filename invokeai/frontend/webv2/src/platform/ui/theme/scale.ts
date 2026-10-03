@@ -8,6 +8,22 @@ export const CONTROL_HEIGHT_PX = { xs: 20, sm: 24, md: 28, lg: 32, xl: 36, '2xl'
 
 export type ControlSize = keyof typeof CONTROL_HEIGHT_PX;
 
+/** Prompt editors share this scale through a root CSS property set by the appearance preference. */
+export const PROMPT_FONT_SIZES = {
+  small: '0.75rem',
+  default: '0.82rem',
+  large: '0.9375rem',
+  larger: '1.0625rem',
+} as const;
+
+export type PromptFontSize = keyof typeof PROMPT_FONT_SIZES;
+
+export const PROMPT_FONT_SIZE_PROPERTY = '--prompt-font-size';
+export const PROMPT_FONT_SIZE = `var(${PROMPT_FONT_SIZE_PROPERTY}, ${PROMPT_FONT_SIZES.default})`;
+
+export const isPromptFontSize = (value: unknown): value is PromptFontSize =>
+  typeof value === 'string' && Object.hasOwn(PROMPT_FONT_SIZES, value);
+
 interface TypeStep {
   fontSize: string;
   letterSpacing?: string;

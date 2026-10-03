@@ -5,7 +5,7 @@ import { Box } from '@chakra-ui/react';
 import { HighlightedPrompt, MAX_HIGHLIGHTED_PROMPT_LENGTH } from '@features/generation/ui/promptFields/PromptHighlight';
 import { getLineNumberGutterCh, PromptLineNumbers } from '@features/generation/ui/promptFields/PromptLineNumbers';
 import { ResizableTextarea } from '@platform/ui';
-import { PROMPT_FONT_SIZE } from '@theme/promptFontSize';
+import { PROMPT_FONT_SIZE } from '@theme/scale';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 const PROMPT_TEXTAREA_LINE_HEIGHT = '1.6';
 // Use literal lengths; fractional Chakra spacing variables fail inside calc.

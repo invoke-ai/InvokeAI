@@ -631,7 +631,7 @@ export const UpscaleWidgetView = () => {
           </Field>
           {values.loras.length > 0 ? (
             <Box mx={-1}>
-              <ConceptList label={t('widgets.upscale.concepts')}>
+              <ConceptList label={t('widgets.upscale.concepts')} projectId={projectId}>
                 {values.loras.map((lora) => (
                   <ConceptRow
                     key={lora.model.key}
