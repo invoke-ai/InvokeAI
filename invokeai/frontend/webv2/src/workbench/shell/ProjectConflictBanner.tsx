@@ -199,7 +199,7 @@ export const ProjectConflictBanner = () => {
   return (
     <>
       {recoverableDraft ? (
-        <Alert.Root borderRadius="none" status="warning" variant="surface">
+        <Alert.Root borderRadius="none" size="lg" status="warning" variant="surface">
           <Alert.Indicator />
           <Alert.Content>
             <HStack align="center" gap="4" justify="space-between" w="full">
@@ -261,7 +261,12 @@ export const ProjectConflictBanner = () => {
         </Alert.Root>
       ) : null}
       {hasProjectAlert ? (
-        <Alert.Root borderRadius="none" status={conflict || schemaRefusal ? 'warning' : 'info'} variant="surface">
+        <Alert.Root
+          borderRadius="none"
+          size="lg"
+          status={conflict || schemaRefusal ? 'warning' : 'info'}
+          variant="surface"
+        >
           <Alert.Indicator />
           <Alert.Content>
             <HStack align="center" gap="4" justify="space-between" w="full">

@@ -72,6 +72,7 @@ export const LoginScreen = () => {
             autoComplete="email"
             autoFocus
             placeholder="you@example.com"
+            size="lg"
             value={form.values.email}
             onChange={handleEmailChange}
           />
@@ -81,6 +82,7 @@ export const LoginScreen = () => {
             aria-invalid={form.errors.password ? true : undefined}
             autoComplete="current-password"
             placeholder={t('auth.yourPassword')}
+            size="lg"
             value={form.values.password}
             onChange={handlePasswordChange}
           />

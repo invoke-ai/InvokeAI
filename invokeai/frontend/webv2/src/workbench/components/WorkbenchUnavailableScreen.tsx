@@ -105,20 +105,20 @@ export const WorkbenchUnavailableScreen = ({
             <Heading size="3xl">{t('shell.backendUnavailable.title')}</Heading>
             <Text color="fg.muted">{t('shell.backendUnavailable.description')}</Text>
           </Stack>
-          <Alert.Root status="error" variant="surface">
+          <Alert.Root size="lg" status="error" variant="surface">
             <Alert.Indicator />
             <Alert.Content>
               <Alert.Title>{t('shell.backendUnavailable.connectionFailed')}</Alert.Title>
               <Alert.Description overflowWrap="anywhere">{message}</Alert.Description>
             </Alert.Content>
           </Alert.Root>
-          <Button alignSelf="start" onClick={onRetry}>
+          <Button alignSelf="start" size="lg" onClick={onRetry}>
             {t('shell.backendUnavailable.retry')}
           </Button>
           <Stack gap="3">
             <Heading size="xl">{t('shell.backendUnavailable.draftsTitle')}</Heading>
             {draftError ? (
-              <Alert.Root status="error" variant="surface">
+              <Alert.Root size="lg" status="error" variant="surface">
                 <Alert.Indicator />
                 <Alert.Content>
                   <Alert.Description>{draftError}</Alert.Description>

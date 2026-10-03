@@ -38,8 +38,8 @@ export const IconButton = ({ colorPalette, ...props }: IconButtonProps) => (
   <ChakraIconButton colorPalette={colorPalette ?? defaultPalette(props.variant)} {...props} />
 );
 
-/** Chakra defaults close buttons to a full `xl` control; dismissal chrome here is small and muted. */
-export const CloseButton = (props: CloseButtonProps) => <ChakraCloseButton color="fg.muted" size="md" {...props} />;
+/** Dismissal chrome is muted. */
+export const CloseButton = (props: CloseButtonProps) => <ChakraCloseButton color="fg.muted" {...props} />;
 
 export interface ToggleIconButtonProps extends Omit<
   IconButtonProps,

@@ -93,7 +93,7 @@ export const ModelSelect = ({
   placeholder,
   scopeLabel: scopeLabelOverride,
   showManagerButton = true,
-  size = 'lg',
+  size = 'md',
   value,
 }: {
   className?: string;

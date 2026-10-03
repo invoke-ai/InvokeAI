@@ -28,7 +28,7 @@ afterEach(async () => {
   root = null;
 });
 
-const renderControls = async (size: ControlSize): Promise<Record<string, HTMLElement>> => {
+const renderControls = async (size?: ControlSize): Promise<Record<string, HTMLElement>> => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
@@ -86,5 +86,13 @@ describe('control heights', () => {
         expect(element.getBoundingClientRect().height, id).toBeCloseTo(height, 1);
       }
     });
+  });
+
+  it('renders controls that name no size at md', async () => {
+    const controls = await renderControls();
+
+    for (const [id, element] of Object.entries(controls)) {
+      expect(element.getBoundingClientRect().height, id).toBeCloseTo(CONTROL_HEIGHT_PX.md, 1);
+    }
   });
 });

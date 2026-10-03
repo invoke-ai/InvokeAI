@@ -10,6 +10,7 @@ const theme = baseConfig.theme!;
 
 type TextStyleValue = { fontSize: string; letterSpacing?: string; lineHeight: string };
 type StyleRecord = Record<string, Record<string, string>>;
+type AnyDefaults = { defaultVariants?: Record<string, unknown> };
 type StockRecipe = { base?: StyleRecord; variants?: { size?: Record<string, StyleRecord> } };
 
 const stockRecipe = (name: string): StockRecipe =>
@@ -113,8 +114,6 @@ describe('rebaseRecipe', () => {
     expect(renamed?.md).toMatchObject({ h: stock.xs!.h, textStyle: 'md' });
     expect(renamed?.['3xl']).toMatchObject({ h: stock.lg!.h, textStyle: 'xl' });
     expect(Object.keys(renamed ?? {})).not.toContain('2xs');
-    // Bare buttons keep their stock size until callers move to the workbench default.
-    expect(recipes.button.defaultVariants).toMatchObject({ size: 'xl' });
   });
 
   // The theme pins button, input, select, combobox, and segment heights itself; these keep their stock heights, so
@@ -140,6 +139,19 @@ describe('rebaseRecipe', () => {
 
       expect(px, `${name} ${stockSize}`).toBe(CONTROL_HEIGHT_PX[renamed as ControlSize]);
     }
+  });
+
+  it('defaults rescaled recipes to the working size', () => {
+    for (const name of ['badge', 'button', 'input', 'select', 'spinner', 'switch'] as const) {
+      expect(
+        (recipes as Record<string, AnyDefaults>)[name] ?? (slotRecipes as Record<string, AnyDefaults>)[name],
+        name
+      ).toMatchObject({ defaultVariants: { size: 'md' } });
+    }
+    // Headings follow the type scale; icons inherit their font size; tabs have no md step.
+    expect(recipes.heading.defaultVariants).toMatchObject({ size: '3xl' });
+    expect(recipes.icon.defaultVariants).toMatchObject({ size: 'inherit' });
+    expect(slotRecipes.tabs.defaultVariants).toMatchObject({ size: '2xl' });
   });
 
   it('renames fonts in stock recipes it does not resize', () => {

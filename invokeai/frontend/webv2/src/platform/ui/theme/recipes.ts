@@ -327,10 +327,6 @@ export const segmentGroupSlotRecipe = defineSlotRecipe({
       SEGMENT_BASIS
     ),
   } as unknown as typeof chakraSlotRecipes.segmentGroup.variants,
-  defaultVariants: {
-    ...chakraSlotRecipes.segmentGroup.defaultVariants,
-    size: 'md',
-  },
 });
 
 const formControlFocused = {
@@ -517,10 +513,6 @@ export const menuSlotRecipe = defineSlotRecipe({
       ...chakraSlotRecipes.menu.base?.separator,
       bg: 'border.subtle',
     },
-  },
-  defaultVariants: {
-    ...chakraSlotRecipes.menu.defaultVariants,
-    size: 'md',
   },
 });
 
@@ -832,10 +824,6 @@ export const colorPickerSlotRecipe = defineSlotRecipe({
       ...chakraSlotRecipes.colorPicker.base?.transparencyGrid,
       borderRadius: 'inherit',
     },
-  },
-  defaultVariants: {
-    ...chakraSlotRecipes.colorPicker.defaultVariants,
-    size: 'lg',
   },
 });
 

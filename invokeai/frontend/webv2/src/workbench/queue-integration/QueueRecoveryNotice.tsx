@@ -167,7 +167,7 @@ export const QueueRecoveryNotice = ({
   }
   if (query.data?.kind === 'unavailable' || query.isError) {
     return (
-      <Alert.Root borderRadius="none" status="warning" variant="surface">
+      <Alert.Root borderRadius="none" size="lg" status="warning" variant="surface">
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Title>{t('shell.queueRecovery.storageUnavailableTitle')}</Alert.Title>
@@ -182,7 +182,7 @@ export const QueueRecoveryNotice = ({
 
   return (
     <>
-      <Alert.Root borderRadius="none" status="warning" variant="surface">
+      <Alert.Root borderRadius="none" size="lg" status="warning" variant="surface">
         <Alert.Indicator />
         <Alert.Content>
           <HStack align="center" flexWrap="wrap" gap="4" justify="space-between" w="full">

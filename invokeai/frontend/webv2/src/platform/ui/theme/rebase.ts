@@ -63,7 +63,7 @@ export const SIZE_NAMES: Readonly<Record<string, NameMap>> = {
   button: { '2xs': 'sm', xs: 'md', sm: 'lg', md: 'xl', lg: '3xl' },
   checkbox: ONE_STEP,
   checkmark: ONE_STEP,
-  code: TWO_STEPS,
+  code: ONE_STEP,
   colorPicker: { '2xs': 'md', xs: 'lg', sm: 'xl', md: '2xl', lg: '3xl' },
   combobox: { xs: 'md', sm: 'lg', md: 'xl' },
   dataList: ONE_STEP,
@@ -179,8 +179,25 @@ export const rebaseRecipe = <T extends AnyRecipe>(name: string, recipe: T, sizes
   };
 };
 
+/**
+ * Rescaled recipes default to `md`, the working size, so a control that names no size is already dense. Heading
+ * follows the type scale, and recipes without an `md` step or with a non-scale default (icon's `inherit`) keep theirs.
+ */
+const withWorkingDefault = <T extends AnyRecipe>(name: string, recipe: T): T =>
+  name !== 'heading' &&
+  SIZE_NAMES[name] &&
+  recipe.variants?.size?.md &&
+  SCALE_NAMES.has(String(recipe.defaultVariants?.size))
+    ? { ...recipe, defaultVariants: { ...recipe.defaultVariants, size: 'md' } }
+    : recipe;
+
 const rebaseAll = <T extends AnyRecipe>(all: Record<string, T>): Record<string, T> =>
-  Object.fromEntries(Object.entries(all).map(([name, recipe]) => [name, rebaseRecipe(name, recipe, SIZE_NAMES[name])]));
+  Object.fromEntries(
+    Object.entries(all).map(([name, recipe]) => [
+      name,
+      withWorkingDefault(name, rebaseRecipe(name, recipe, SIZE_NAMES[name])),
+    ])
+  );
 
 export const recipes = rebaseAll<RecipeDefinition>(stockRecipes) as Record<keyof typeof stockRecipes, RecipeDefinition>;
 
