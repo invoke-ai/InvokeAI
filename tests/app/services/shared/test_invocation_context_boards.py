@@ -33,8 +33,8 @@ def test_get_all_runs_as_admin_in_single_user_mode() -> None:
 @pytest.mark.parametrize(
     ("user", "expected_is_admin"),
     [
-        (MagicMock(is_admin=True), True),
-        (MagicMock(is_admin=False), False),
+        (MagicMock(is_admin=True, is_active=True), True),
+        (MagicMock(is_admin=False, is_active=True), False),
         (None, False),
     ],
 )
@@ -47,3 +47,13 @@ def test_get_all_uses_queue_user_role_in_multiuser_mode(user: MagicMock | None, 
     services.boards.get_all.assert_called_once_with(
         "queue-user", expected_is_admin, order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
     )
+
+
+@pytest.mark.parametrize("is_admin", [True, False])
+def test_get_all_rejects_deactivated_queue_user_in_multiuser_mode(is_admin: bool) -> None:
+    boards, services = _make_interface(multiuser=True, user=MagicMock(is_admin=is_admin, is_active=False))
+
+    with pytest.raises(PermissionError):
+        boards.get_all()
+
+    services.boards.get_all.assert_not_called()

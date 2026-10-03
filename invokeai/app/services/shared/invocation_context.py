@@ -150,6 +150,10 @@ class BoardsInterface(InvocationContextInterface):
             is_admin = True
         else:
             user = self._services.users.get(user_id)
+            # See ImagesInterface._assert_read_access: deactivated accounts keep no
+            # queue-time privileges, including an admin's view of other users' boards.
+            if user is not None and not user.is_active:
+                raise PermissionError("Queue user is not authorized to list boards")
             is_admin = user is not None and user.is_admin
         return self._services.boards.get_all(
             user_id, is_admin, order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
