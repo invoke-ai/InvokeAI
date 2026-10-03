@@ -118,7 +118,7 @@ export const FormNumberField = ({
         startElementProps={START_ELEMENT_PROPS}
         startOffset={label ? affixOffset(label.length) : affixOffset(2)}
       >
-        <NumberInput.Input aria-label={ariaLabel} fontSize="md" fontVariantNumeric="tabular-nums" textAlign="end" />
+        <NumberInput.Input aria-label={ariaLabel} fontVariantNumeric="tabular-nums" textAlign="end" />
       </InputGroup>
     </NumberInput.Root>
   );

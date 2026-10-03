@@ -13,7 +13,7 @@ export const QueueHeaderLabel = () => {
 
   return (
     <Stack gap="0.5" minW="0">
-      <Text fontSize="md" fontWeight="700" lineHeight="1.15">
+      <Text fontWeight="700" lineHeight="1.15">
         {t('widgets.labels.queue')}
       </Text>
       <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums" lineHeight="1.15" truncate mb="-1.5">

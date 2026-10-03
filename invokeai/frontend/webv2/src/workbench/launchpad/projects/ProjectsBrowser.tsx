@@ -223,9 +223,7 @@ const VirtualProjectsRow = ({
   if (row.kind === 'header') {
     return (
       <Flex align="baseline" css={ABSOLUTE_ROW_SX} gap="2" pb="2" pt="3" transform={transform}>
-        <Text fontSize="md" fontWeight="700">
-          {t(GROUP_LABEL_KEY[row.group])}
-        </Text>
+        <Text fontWeight="700">{t(GROUP_LABEL_KEY[row.group])}</Text>
         {/* `fg.subtle` only reaches 4.11:1 at this size — `fg.muted` clears 4.5:1. */}
         <Text color="fg.muted" fontSize="xs">
           {row.count}

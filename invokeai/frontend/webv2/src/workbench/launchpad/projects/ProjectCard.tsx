@@ -83,7 +83,7 @@ export const ProjectCard = ({
       </Box>
       <Flex align="center" gap="2" p="3" pointerEvents="none">
         <Stack flex="1" gap="0" minW="0">
-          <MiddleTruncate fontSize="md" fontWeight="600" text={summary.name} />
+          <MiddleTruncate fontWeight="600" text={summary.name} />
           <Text color="fg.muted" fontSize="xs">
             {t('projects.editedRelative', { time: formatRelativeTime(summary.updatedAt) })}
           </Text>

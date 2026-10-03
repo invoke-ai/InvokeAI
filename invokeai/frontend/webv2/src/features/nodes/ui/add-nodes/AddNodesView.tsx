@@ -133,7 +133,7 @@ export const AddNodesView = () => {
       <Stack gap="4" maxW="44rem">
         <Alert.Root borderRadius="md" status="warning" variant="surface">
           <Alert.Indicator />
-          <Alert.Title fontSize="md">{t('nodes.trustWarning')}</Alert.Title>
+          <Alert.Title>{t('nodes.trustWarning')}</Alert.Title>
         </Alert.Root>
         <Field error={fieldError} helpText={t('nodes.gitUrlHelp')} label={t('nodes.gitUrl')}>
           <HStack align="start" gap="2" w="full">
@@ -157,9 +157,7 @@ export const AddNodesView = () => {
               {t('nodes.installManually')}
             </Text>
           </HStack>
-          <Text color="fg.muted" fontSize="md">
-            {t('nodes.scanFolderDescription')}
-          </Text>
+          <Text color="fg.muted">{t('nodes.scanFolderDescription')}</Text>
           {customNodesPath ? (
             <Box bg="bg.subtle" borderColor="border.subtle" borderWidth="1px" p="3" rounded="md">
               <HStack justify="space-between">
@@ -175,7 +173,7 @@ export const AddNodesView = () => {
                   <Icon as={ClipboardCopyIcon} boxSize="3" />
                 </IconButton>
               </HStack>
-              <Text fontFamily="mono" fontSize="md" mt="1" overflowWrap="anywhere">
+              <Text fontFamily="mono" mt="1" overflowWrap="anywhere">
                 {customNodesPath}
               </Text>
             </Box>

@@ -61,9 +61,7 @@ const AddLayerMenuItems = () => {
                   <Menu.Item key={item.id} value={item.id} onSelect={handleSelect(item.id)}>
                     <HStack gap="2" minW="0" w="full">
                       <Icon as={ItemIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-                      <Text flex="1" fontSize="md">
-                        {t(item.labelKey)}
-                      </Text>
+                      <Text flex="1">{t(item.labelKey)}</Text>
                     </HStack>
                   </Menu.Item>
                 );

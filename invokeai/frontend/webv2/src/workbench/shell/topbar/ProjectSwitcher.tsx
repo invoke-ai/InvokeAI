@@ -190,7 +190,7 @@ export const ProjectSwitcher = () => {
                 <Text color="fg.subtle" fontSize="xs" textTransform="uppercase">
                   {t('projects.projectDetails')}
                 </Text>
-                <MiddleTruncate fontSize="md" fontWeight="700" text={activeProjectName} />
+                <MiddleTruncate fontWeight="700" text={activeProjectName} />
               </Stack>
               <Menu.Separator />
               <Menu.Item value="rename-project" onClick={renameActiveProject}>

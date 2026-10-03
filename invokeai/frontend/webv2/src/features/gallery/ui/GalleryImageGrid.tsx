@@ -670,7 +670,7 @@ export const GalleryImageGrid = () => {
               {isEmpty ? (
                 gallery.isLoading || hasActiveSearch || isVirtualBoard || gallery.starredOnly ? (
                   <Flex align="center" color="fg.muted" flex="1" justify="center" minH="8rem">
-                    <Text fontSize="md">
+                    <Text>
                       {gallery.isLoading
                         ? t('widgets.gallery.loadingBackendGallery')
                         : gallery.starredOnly && gallery.semanticImageQuery === null
@@ -686,7 +686,6 @@ export const GalleryImageGrid = () => {
                       alignItems="center"
                       display="flex"
                       flex="1"
-                      fontSize="md"
                       isOver={isDropActive}
                       justifyContent="center"
                       role="button"

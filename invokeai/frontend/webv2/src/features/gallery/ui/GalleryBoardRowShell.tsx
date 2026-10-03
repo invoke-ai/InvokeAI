@@ -78,12 +78,7 @@ export const GalleryBoardRowShell = ({
         >
           {cover}
           <Stack align="stretch" flex="1" gap="0" minW="0" textAlign="start">
-            <MiddleTruncate
-              fontSize="md"
-              fontWeight={labelWeight ?? (isSelected ? '600' : '500')}
-              minW="0"
-              text={label}
-            />
+            <MiddleTruncate fontWeight={labelWeight ?? (isSelected ? '600' : '500')} minW="0" text={label} />
             {subtitle}
           </Stack>
           {children}

@@ -114,9 +114,7 @@ export const HomePage = () => {
         </Box>
 
         <Stack gap="3">
-          <Text fontSize="md" fontWeight="700">
-            {t('launchpad.home.intents.heading')}
-          </Text>
+          <Text fontWeight="700">{t('launchpad.home.intents.heading')}</Text>
           <IntentTiles />
         </Stack>
 

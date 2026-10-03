@@ -67,7 +67,7 @@ export const NodeActivityBar = () => {
           ) : (
             <Icon as={ListOrderedIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
           )}
-          <MiddleTruncate flex="1" fontSize="md" fontWeight="600" minW="0" text={summary} />
+          <MiddleTruncate flex="1" fontWeight="600" minW="0" text={summary} />
           {installingCount > 0 ? (
             <Badge colorPalette="accent" flexShrink={0} fontSize="xs" size="lg" variant="solid">
               {installingCount}

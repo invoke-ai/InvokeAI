@@ -16,7 +16,7 @@ const GROUP_HEADER_HOVER = { color: 'fg' } as const;
  */
 export const PropertyControlRow = ({ children, label }: { children: ReactNode; label?: string }) => (
   <Grid alignItems="center" columnGap="2" gridTemplateColumns="4.5rem minmax(0, 1fr) auto" minH="7" w="full">
-    <Text color="fg.muted" fontSize="md" minW="0" title={label} truncate>
+    <Text color="fg.muted" minW="0" title={label} truncate>
       {label}
     </Text>
     {children}
@@ -106,7 +106,7 @@ export const PropertyGroup = ({
           </Text>
         </chakra.button>
       ) : (
-        <Text color="fg.muted" fontSize="md" fontWeight="600">
+        <Text color="fg.muted" fontWeight="600">
           {label}
         </Text>
       )}
@@ -180,9 +180,7 @@ export const HintCard = ({ rows }: { rows: readonly { gesture: string; effect: s
         <Badge colorPalette="gray" fontFamily="mono" size="lg" variant="surface">
           {row.gesture}
         </Badge>
-        <Text color="fg.muted" fontSize="md">
-          {row.effect}
-        </Text>
+        <Text color="fg.muted">{row.effect}</Text>
       </Grid>
     ))}
   </Stack>

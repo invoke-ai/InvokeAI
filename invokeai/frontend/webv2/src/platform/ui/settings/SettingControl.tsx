@@ -113,11 +113,7 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, isMo
           </Field.Label>
           {isModified ? <ModifiedSettingIndicator label={label} /> : null}
         </HStack>
-        {description ? (
-          <Field.HelperText color="fg.muted" fontSize="md">
-            {description}
-          </Field.HelperText>
-        ) : null}
+        {description ? <Field.HelperText color="fg.muted">{description}</Field.HelperText> : null}
       </Stack>
       {field.kind === 'select' ? (
         <Select

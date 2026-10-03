@@ -171,9 +171,7 @@ const FilterSubMenu = ({
     <Menu.TriggerItem>
       <HStack gap="2" minW="0" w="full">
         <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-        <Text flexShrink={0} fontSize="md">
-          {label}
-        </Text>
+        <Text flexShrink={0}>{label}</Text>
         {summary ? (
           <Text color="fg.subtle" fontSize="xs" ms="auto" minW="0" truncate>
             {summary}

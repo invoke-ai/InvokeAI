@@ -162,9 +162,7 @@ const CanvasHeaderActionsInner = ({
         <Menu.Trigger asChild>
           <IconButton aria-label={t('widgets.canvas.controls.zoomLevel')} minW="4rem" px="2" size="sm" variant="ghost">
             <HStack gap="1">
-              <Text fontSize="md" fontVariantNumeric="tabular-nums">
-                {formatZoomPercent(zoom)}
-              </Text>
+              <Text fontVariantNumeric="tabular-nums">{formatZoomPercent(zoom)}</Text>
               <ChevronDownIcon size={12} />
             </HStack>
           </IconButton>
@@ -175,7 +173,7 @@ const CanvasHeaderActionsInner = ({
               {ZOOM_OPTIONS.map((option) => (
                 <Menu.Item key={option.value} value={option.label} onClick={() => setZoom(option.value)}>
                   <CheckIcon size={12} opacity={formatZoomPercent(zoom) === option.label ? 1 : 0} />
-                  <Menu.ItemText fontSize="md">{option.label}</Menu.ItemText>
+                  <Menu.ItemText>{option.label}</Menu.ItemText>
                 </Menu.Item>
               ))}
             </MenuContent>
@@ -284,7 +282,7 @@ const CanvasHeaderActionsInner = ({
             <MenuContent minW="11rem" py="1">
               <Menu.Item value="save-bbox" onClick={() => void saveToGallery('bbox')}>
                 <Icon as={SaveIcon} boxSize="3.5" color="fg.subtle" />
-                <Menu.ItemText fontSize="md">{t('widgets.canvas.contextMenu.saveBboxToGallery')}</Menu.ItemText>
+                <Menu.ItemText>{t('widgets.canvas.contextMenu.saveBboxToGallery')}</Menu.ItemText>
               </Menu.Item>
             </MenuContent>
           </Menu.Positioner>
@@ -312,7 +310,7 @@ const CanvasHeaderActionsInner = ({
             <MenuContent minW="11rem" py="1">
               <Menu.Item value="new-canvas" onClick={openNewCanvas}>
                 <Icon as={FilePlusIcon} boxSize="3.5" color="fg.subtle" />
-                <Menu.ItemText fontSize="md">{t('widgets.canvas.controls.newCanvas')}</Menu.ItemText>
+                <Menu.ItemText>{t('widgets.canvas.controls.newCanvas')}</Menu.ItemText>
               </Menu.Item>
             </MenuContent>
           </Menu.Positioner>

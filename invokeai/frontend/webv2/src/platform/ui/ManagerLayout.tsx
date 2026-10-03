@@ -28,7 +28,7 @@ export const ManagerColumn = ({
         {title}
       </Text>
       {count === undefined ? null : (
-        <Text color="fg.muted" fontSize="md" fontVariantNumeric="tabular-nums">
+        <Text color="fg.muted" fontVariantNumeric="tabular-nums">
           {count}
         </Text>
       )}

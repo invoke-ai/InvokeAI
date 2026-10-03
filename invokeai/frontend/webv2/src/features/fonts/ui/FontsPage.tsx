@@ -554,7 +554,7 @@ const FontLibrary = () => {
                     {filterOptions.map((option) => (
                       <Menu.RadioItem key={option.value} value={option.value}>
                         <Menu.ItemIndicator />
-                        <Menu.ItemText fontSize="md">{option.label}</Menu.ItemText>
+                        <Menu.ItemText>{option.label}</Menu.ItemText>
                       </Menu.RadioItem>
                     ))}
                   </Menu.RadioItemGroup>
@@ -672,7 +672,7 @@ const FontLibrary = () => {
                   <Text color="fg.muted" fontSize="lg" fontWeight="600">
                     {t('fonts.selectFont')}
                   </Text>
-                  <Text color="fg.muted" fontSize="md" maxW="22rem" textAlign="center">
+                  <Text color="fg.muted" maxW="22rem" textAlign="center">
                     {t('fonts.selectFontDescription')}
                   </Text>
                 </Flex>

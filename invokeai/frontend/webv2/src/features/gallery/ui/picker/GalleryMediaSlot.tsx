@@ -357,7 +357,7 @@ export const GalleryMediaSlot = ({
                 {isBusy ? (
                   <Spinner size="lg" />
                 ) : (
-                  <HStack color="fg" fontSize="md" fontWeight="600" gap="1.5">
+                  <HStack color="fg" fontWeight="600" gap="1.5">
                     <Icon as={ImagePlusIcon} boxSize="4" />
                     {labels.choose}
                     <Icon as={ChevronDownIcon} boxSize="3" color="fg.subtle" />

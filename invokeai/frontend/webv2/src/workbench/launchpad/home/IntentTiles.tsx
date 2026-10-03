@@ -29,9 +29,7 @@ const IntentTile = ({ entry }: { entry: LaunchpadStartEntry }) => {
         _hover={TILE_HOVER}
       >
         <Icon as={entry.icon} boxSize="4" color="fg.muted" />
-        <Text fontSize="md" fontWeight="600">
-          {t(entry.labelKey)}
-        </Text>
+        <Text fontWeight="600">{t(entry.labelKey)}</Text>
         <Text color="fg.muted" fontSize="xs">
           {t(entry.descriptionKey)}
         </Text>

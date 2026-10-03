@@ -52,9 +52,7 @@ export const QueueStatusBand = () => {
       ) : (
         <Icon aria-hidden as={HourglassIcon} boxSize="3.5" color="fg.muted" />
       )}
-      <Text fontSize="md" fontWeight="600">
-        {t('launchpad.home.queue.summary', { inProgress, pending })}
-      </Text>
+      <Text fontWeight="600">{t('launchpad.home.queue.summary', { inProgress, pending })}</Text>
     </Flex>
   );
 };

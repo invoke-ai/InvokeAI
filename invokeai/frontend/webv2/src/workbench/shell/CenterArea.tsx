@@ -288,7 +288,7 @@ const CenterViewMenu = ({
         >
           <HStack gap="2" minW="0" position="relative" zIndex="1">
             {activeItem ? <CenterViewIcon widget={activeItem.widget} /> : null}
-            <Text fontSize="md" fontWeight="700" truncate>
+            <Text fontWeight="700" truncate>
               {label}
             </Text>
             <ChevronDownIcon size={12} />
@@ -331,9 +331,7 @@ const CenterViewMenu = ({
                 <Menu.Separator borderColor="border.subtle" />
                 <Menu.Item disabled={isCloseDisabled} value="close-center-view" onClick={onClose}>
                   <Icon as={XIcon} boxSize="3.5" color="fg.subtle" />
-                  <Menu.ItemText fontSize="md">
-                    {t('widgets.centerViewClose', { label: activeItem.label })}
-                  </Menu.ItemText>
+                  <Menu.ItemText>{t('widgets.centerViewClose', { label: activeItem.label })}</Menu.ItemText>
                 </Menu.Item>
               </>
             ) : null}
@@ -395,7 +393,7 @@ const CenterViewMenuRow = ({
     >
       <Icon as={CheckIcon} boxSize="3" opacity={isActive ? 1 : 0} />
       <WidgetIcon icon={item.icon} boxSize="3.5" />
-      <Menu.ItemText fontSize="md">{item.label}</Menu.ItemText>
+      <Menu.ItemText>{item.label}</Menu.ItemText>
     </Menu.Item>
   );
 };

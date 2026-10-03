@@ -201,6 +201,6 @@ const BoardVisibilityItem = ({
   <Menu.Item aria-checked={isChecked} closeOnSelect={false} role="menuitemcheckbox" value={value} onClick={onSelect}>
     <Icon as={CheckIcon} boxSize="3" opacity={isChecked ? 1 : 0} />
     <Icon as={icon} boxSize="3.5" color="fg.subtle" />
-    <Menu.ItemText fontSize="md">{label}</Menu.ItemText>
+    <Menu.ItemText>{label}</Menu.ItemText>
   </Menu.Item>
 );

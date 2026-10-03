@@ -64,7 +64,7 @@ export const MenuActionItem = ({
       ) : null}
       {hint ? (
         <Stack flex="1" gap="0" minW="0">
-          <Text fontSize="md">{label}</Text>
+          <Text>{label}</Text>
           <Text color="fg.subtle" fontSize="xs">
             {hint}
           </Text>

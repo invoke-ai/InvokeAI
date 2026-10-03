@@ -64,11 +64,11 @@ export const GalleryWidgetLabel = ({ region }: GalleryChromeProps) => {
   return (
     <HStack flex="1" gap="1" minW="0" pe={region === 'center' ? undefined : '2'}>
       {region === 'center' ? null : (
-        <Text flexShrink={0} fontSize="md" fontWeight="700" pe="2">
+        <Text flexShrink={0} fontWeight="700" pe="2">
           {t('widgets.labels.gallery')}
         </Text>
       )}
-      <Text color="fg.subtle" flexShrink={0} fontSize="md">
+      <Text color="fg.subtle" flexShrink={0}>
         /
       </Text>
       {/* No tooltip: it renders over the button and steals its hover. */}

@@ -161,7 +161,7 @@ export const InstallQueueBar = () => {
           onClick={() => setQueueExpanded(!queueExpanded)}
         >
           <Icon as={queueExpanded ? ChevronDownIcon : ChevronUpIcon} boxSize="3.5" />
-          <Text color="fg" fontSize="md" fontWeight="700">
+          <Text color="fg" fontWeight="700">
             {t('models.installQueue')}
           </Text>
         </Button>
@@ -332,7 +332,7 @@ const CollapsedSummary = ({
       {featured ? (
         <FeaturedJob row={featured} />
       ) : (
-        <Text color="fg.muted" flex="1 1 10rem" fontSize="md" minW="0" truncate>
+        <Text color="fg.muted" flex="1 1 10rem" minW="0" truncate>
           {summary.paused > 0
             ? t('models.queuePausedCount', { count: summary.paused })
             : jobCount > 0

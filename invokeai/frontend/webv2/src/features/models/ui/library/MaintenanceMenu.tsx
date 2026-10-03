@@ -63,15 +63,15 @@ export const MaintenanceMenu = () => {
             <MenuContent minW="14rem">
               <Menu.Item value="refresh" onClick={() => void handleRefresh()}>
                 <Icon as={RefreshCcwIcon} boxSize="3.5" />
-                <Menu.ItemText fontSize="md">{t('models.refreshList')}</Menu.ItemText>
+                <Menu.ItemText>{t('models.refreshList')}</Menu.ItemText>
               </Menu.Item>
               <Menu.Item value="sync" onClick={() => setIsSyncDialogOpen(true)}>
                 <Icon as={FolderSearchIcon} boxSize="3.5" />
-                <Menu.ItemText fontSize="md">{t('models.cleanupOrphaned')}</Menu.ItemText>
+                <Menu.ItemText>{t('models.cleanupOrphaned')}</Menu.ItemText>
               </Menu.Item>
               <Menu.Item value="empty-cache" onClick={() => setIsEmptyCacheConfirmOpen(true)}>
                 <Icon as={BrushCleaningIcon} boxSize="3.5" />
-                <Menu.ItemText fontSize="md">{t('models.emptyCache')}</Menu.ItemText>
+                <Menu.ItemText>{t('models.emptyCache')}</Menu.ItemText>
               </Menu.Item>
             </MenuContent>
           </Menu.Positioner>

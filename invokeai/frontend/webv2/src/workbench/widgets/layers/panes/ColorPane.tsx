@@ -448,7 +448,6 @@ const HexField = ({ hex, onCommit }: { hex: string; onCommit: (hex: string) => v
       aria-label={t('widgets.layers.colorPane.channels.hex')}
       flex="1"
       fontFamily="mono"
-      fontSize="md"
       minW="24"
       value={draft ?? hex}
       onBlur={commit}

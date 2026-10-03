@@ -276,7 +276,7 @@ export const ModelSelect = ({
               {selectedModel ? (
                 <ModelButtonContent model={selectedModel} />
               ) : (
-                <Text as="span" color="fg.muted" fontSize="md" minW="0" truncate>
+                <Text as="span" color="fg.muted" minW="0" truncate>
                   {isEmpty ? emptyMessage : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel }))}
                 </Text>
               )}
@@ -463,7 +463,7 @@ const BaseChip = ({
 
 const ModelButtonContent = ({ model }: { model: ModelConfig }) => (
   <HStack as="span" flex="1" gap="2" minW="0">
-    <MiddleTruncate as="span" fontSize="md" minW="0" text={model.name} />
+    <MiddleTruncate as="span" minW="0" text={model.name} />
     <Badge colorPalette={getModelBaseColorPalette(model.base)} flexShrink={0} fontSize="xs" size="lg" variant="surface">
       {getModelBaseLabel(model.base)}
     </Badge>

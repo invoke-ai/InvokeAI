@@ -265,7 +265,7 @@ export const WidgetHeader = ({
         {HeaderLabel && !instance.title ? (
           <HeaderLabel region={region} />
         ) : (
-          <Text data-widget-identity-label="" fontSize="md" fontWeight="700">
+          <Text data-widget-identity-label="" fontWeight="700">
             {label}
           </Text>
         )}

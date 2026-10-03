@@ -181,7 +181,7 @@ const SettingsDialog = () => {
           <PanelHeader px="4" pe="12" py="0">
             <HStack gap="2">
               <Icon as={searching ? SearchIcon : active.icon} boxSize="4" />
-              <Dialog.Title fontSize="md" fontWeight="700">
+              <Dialog.Title fontWeight="700">
                 <VisuallyHidden>{t('settings.title')}: </VisuallyHidden>
                 {searching ? t('settingsDialog.results') : resolveSettingsText(active.label, t)}
               </Dialog.Title>

@@ -72,9 +72,7 @@ export const AppMenu = () => {
         <Menu.Positioner>
           <MenuContent minW="15rem">
             <HStack justify="space-between" px="3" py="2">
-              <Text fontSize="md" fontWeight="800">
-                Invoke
-              </Text>
+              <Text fontWeight="800">Invoke</Text>
               <Text color="fg.subtle" fontSize="xs">
                 v{APP_VERSION}
               </Text>

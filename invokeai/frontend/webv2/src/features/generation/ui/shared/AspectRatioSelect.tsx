@@ -72,9 +72,7 @@ export const AspectRatioSelect = ({
       renderItem={(option) => (
         <HStack as="span" gap="2">
           <AspectRatioPreview boxSize="6" ratio={option.ratio} />
-          <Text as="span" fontSize="md">
-            {option.id}
-          </Text>
+          <Text as="span">{option.id}</Text>
         </HStack>
       )}
       size={size}
@@ -83,7 +81,7 @@ export const AspectRatioSelect = ({
       valueText={
         <HStack as="span" gap="2" minW="0">
           <AspectRatioPreview boxSize="5" ratio={activePreviewRatio} />
-          <Text as="span" fontSize="md" truncate>
+          <Text as="span" truncate>
             {value}
           </Text>
         </HStack>

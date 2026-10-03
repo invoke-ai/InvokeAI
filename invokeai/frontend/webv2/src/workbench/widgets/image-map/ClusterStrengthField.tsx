@@ -226,11 +226,7 @@ export const ClusterStrengthField = ({ field, surface, target }: SettingFieldPro
           </Field.Label>
           {chosen !== null ? <ModifiedSettingIndicator label={label} /> : null}
         </HStack>
-        {description ? (
-          <Field.HelperText color="fg.muted" fontSize="md">
-            {description}
-          </Field.HelperText>
-        ) : null}
+        {description ? <Field.HelperText color="fg.muted">{description}</Field.HelperText> : null}
         {invalid ? <Field.ErrorText fontSize="md">{invalid}</Field.ErrorText> : null}
       </Stack>
       <HStack flexShrink={0} gap="2">

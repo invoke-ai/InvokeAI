@@ -166,7 +166,6 @@ export const GallerySearchField = ({
         borderRadius="0"
         caretColor="fg"
         color="transparent"
-        fontSize="md"
         h="7"
         minW="0"
         px="0"

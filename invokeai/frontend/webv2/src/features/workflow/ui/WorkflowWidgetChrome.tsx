@@ -93,11 +93,7 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
   );
 
   if (region !== 'center') {
-    return (
-      <Text fontSize="md" fontWeight="700">
-        {t('widgets.labels.workflow')}
-      </Text>
-    );
+    return <Text fontWeight="700">{t('widgets.labels.workflow')}</Text>;
   }
 
   // Center chrome already names the widget; the workflow name opens the project's workflows with this one selected.
@@ -105,7 +101,7 @@ export const WorkflowWidgetLabel = ({ region }: WorkflowWidgetLabelProps) => {
 
   return (
     <HStack flex="1" gap="1" minW="0">
-      <Text color="fg.subtle" flexShrink={0} fontSize="md">
+      <Text color="fg.subtle" flexShrink={0}>
         /
       </Text>
       <Tooltip content={t('widgets.workflow.projectWorkflows')}>
