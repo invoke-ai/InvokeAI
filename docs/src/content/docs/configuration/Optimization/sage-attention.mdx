@@ -18,8 +18,20 @@ the video models were checked against PyTorch's attention for picture changes an
 
 ## Supported models
 
-SageAttention is enabled per model family once that family has been measured with it. No model family uses it yet,
-so every model keeps PyTorch's attention.
+SageAttention is enabled per model family once that family has been measured with it. All other models keep PyTorch's
+attention.
+
+Whole generation (text encoding, denoising and decoding) with the model already loaded, on an RTX 4090 under Windows,
+compared with PyTorch's default attention there:
+
+| Model (as measured) | 1024×1024 | 2048×2048 | Notes |
+| --- | --- | --- | --- |
+| FLUX.1 dev (FP8) | 16.1 s → 14.0 s (−13 %) | 84.2 s → 54.8 s (−35 %) | Also serves ControlNets inside the denoising loop. |
+
+At 1024×1024 most of a step is spent outside attention, so the gain is small; at high resolutions and for video,
+attention dominates. GGUF models spend much of each step dequantizing weights, which SageAttention does not touch.
+Windows' PyTorch has no flash-attention kernel; on Linux PyTorch's own baseline is faster and the gain correspondingly
+smaller (not measured).
 
 ## Requirements
 
