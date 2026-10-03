@@ -44,6 +44,8 @@ export const RecentSection = ({
       aria-labelledby={segmentTabsTabId(QUEUE_FILTER_TABS_ID, filter)}
       gap="1"
       id={segmentTabsPanelId(QUEUE_FILTER_TABS_ID)}
+      // Row surfaces bleed into the widget padding so their content lines up with the tabs above.
+      mx="-2"
       role="tabpanel"
     >
       {cannotReveal && revealRequest ? (
@@ -59,7 +61,7 @@ export const RecentSection = ({
               : t('common.nothingHereYet')}
         </Text>
       ) : (
-        <ListStack label={t('common.recent')}>
+        <ListStack dividers label={t('common.recent')}>
           {filtered.map((item) => (
             <QueueItemRow
               key={item.id}
