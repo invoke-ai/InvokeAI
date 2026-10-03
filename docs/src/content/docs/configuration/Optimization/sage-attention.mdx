@@ -33,6 +33,10 @@ compared with PyTorch's default attention there:
 | Krea-2 Turbo (GGUF Q4_K_M) | 11.5 s → 11.0 s (−4 %) | 42.7 s → 36.2 s (−15 %) | Off while `INVOKE_KREA2_SDPA_BACKEND` pins a PyTorch kernel. |
 | SDXL | 4.4 s → 4.2 s (−5 %) | 19.6 s → 16.1 s (−18 %) | Text cross-attention stays on PyTorch (too short to gain). Also serves ControlNets. |
 
+| Video model (as measured) | Resolution | Generation | Notes |
+| --- | --- | --- | --- |
+| LTX-2.5 distilled (int8) | 1248×704, 121 frames | 72.0 s → 63.4 s (−12 %) | Video self-attention only; text cross-attention and the audio streams stay on PyTorch. |
+
 At 1024×1024 most of a step is spent outside attention, so the gain is small; at high resolutions and for video,
 attention dominates. GGUF models spend much of each step dequantizing weights, which SageAttention does not touch.
 Windows' PyTorch has no flash-attention kernel; on Linux PyTorch's own baseline is faster and the gain correspondingly
