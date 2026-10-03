@@ -1,6 +1,6 @@
 import type { ComponentProps, FocusEvent } from 'react';
 
-import { Box, HStack, Icon, Kbd, ProgressCircle, Separator, Stack, Text } from '@chakra-ui/react';
+import { Box, HStack, Icon, Kbd, ProgressCircle, Separator, Spinner, Stack, Text } from '@chakra-ui/react';
 import { getDeterminateProgressFraction } from '@features/queue/contracts';
 import { Button } from '@platform/ui/Button';
 import { Tooltip } from '@platform/ui/Tooltip';
@@ -101,15 +101,18 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
         zIndex="2"
       >
         <Box alignItems="center" boxSize="3.5" display="flex" justifyContent="center" position="relative">
-          {iconMode.mode === 'progress' ? (
-            <ProgressCircle.Root size={ICON_RING_SIZE} value={iconMode.value === null ? null : iconMode.value * 100}>
+          {iconMode.mode === 'play' ? (
+            <Icon as={PlayIcon} boxSize="3.5" />
+          ) : iconMode.value === null ? (
+            // The app-wide spinner, not the ring's indeterminate sweep, for unknown progress.
+            <Spinner borderWidth="1.5px" boxSize="3.5" color="bg" />
+          ) : (
+            <ProgressCircle.Root size={ICON_RING_SIZE} value={iconMode.value * 100}>
               <ProgressCircle.Circle>
                 <ProgressCircle.Track stroke="bg/40" />
                 <ProgressCircle.Range stroke="bg" strokeLinecap="round" />
               </ProgressCircle.Circle>
             </ProgressCircle.Root>
-          ) : (
-            <Icon as={PlayIcon} boxSize="3.5" />
           )}
         </Box>
         {t('topbar.invoke.invoke')}

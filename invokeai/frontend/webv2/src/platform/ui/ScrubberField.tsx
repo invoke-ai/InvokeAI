@@ -17,6 +17,8 @@ import { useTranslation } from 'react-i18next';
 
 /** Track inset from the frame edge; the text padding clears it so the thumb never crosses a glyph. */
 const TRACK_INSET_PX = 10;
+/** The fill runs this far past the thumb so its rounded end frames it. */
+const FILL_OVERHANG_PX = 6;
 /** Shift-drag moves the value this fraction of the pointer's track distance. */
 const FINE_DRAG_RATIO = 0.1;
 /** Shift/PageUp/PageDown step multiplier. */
@@ -98,6 +100,8 @@ const ROOT_CSS = {
   '&[data-dragging]': { borderColor: 'border.emphasized' },
   '& [data-part="fill"]': {
     bg: 'bg.emphasized',
+    // Concentric with the frame's corner inside its 1px border.
+    borderEndRadius: 'calc({radii.control} - 1px)',
     insetBlock: 0,
     insetInlineStart: 0,
     pointerEvents: 'none',
@@ -562,7 +566,7 @@ export const ScrubberField = ({
         onDoubleClick={handleDoubleClick}
         onPointerDown={handlePointerDown}
       >
-        <div data-part="fill" style={{ width: thumbPosition }} />
+        <div data-part="fill" style={{ width: `calc(${thumbPosition} + ${FILL_OVERHANG_PX}px)` }} />
         {markEntries?.map(({ mark, state }) => (
           <div
             key={mark}
