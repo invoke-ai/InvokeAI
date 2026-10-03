@@ -2046,14 +2046,24 @@
       "title": "{{label}} failed"
     },
     "floating": {
-      "dock": "Dock to panel",
+      "centerFloating": "{{label}} is in a floating window",
+      "destinations": {
+        "bottom": "bottom panel",
+        "center": "center",
+        "left": "left panel",
+        "right": "right panel"
+      },
+      "dockTo": "Dock to {{destination}}",
       "floatWindow": "Float Window",
       "maximize": "Maximize",
       "move": "Move {{label}} window",
-      "railSlot": "{{label}} (floating — click to dock)",
+      "railMarker": "{{label}}, floating window",
+      "railMarkerHint": "{{label}} is floating — click to show the window",
       "resize": "Resize window",
+      "resizeValue": "{{width}} by {{height}} pixels",
       "restore": "Restore",
       "shade": "Collapse",
+      "showWindow": "Show window",
       "unshade": "Expand"
     },
     "loadingLabel": "Loading {{label}}",

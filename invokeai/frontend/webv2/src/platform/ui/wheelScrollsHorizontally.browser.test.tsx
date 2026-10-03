@@ -18,13 +18,13 @@ afterEach(async () => {
   root = null;
 });
 
-const render = async (contentWidth: number) => {
+const render = async (contentWidth: number, dir: 'ltr' | 'rtl' = 'ltr') => {
   host = document.createElement('div');
   document.body.append(host);
   root = createRoot(host);
   await act(() =>
     root!.render(
-      <div ref={wheelScrollsHorizontally} data-testid="strip" style={{ overflowX: 'auto', width: 200 }}>
+      <div ref={wheelScrollsHorizontally} data-testid="strip" dir={dir} style={{ overflowX: 'auto', width: 200 }}>
         <div style={{ height: 20, width: contentWidth }} />
       </div>
     )
@@ -45,6 +45,14 @@ describe('wheelScrollsHorizontally', () => {
     expect(strip.scrollLeft).toBe(40);
     wheel(strip, { deltaMode: WheelEvent.DOM_DELTA_LINE, deltaY: -1 });
     expect(strip.scrollLeft).toBe(24);
+  });
+
+  it('travels toward the end of a right-to-left strip, where scrollLeft runs negative', async () => {
+    const strip = await render(1000, 'rtl');
+    expect(wheel(strip, { deltaY: 40 }).defaultPrevented).toBe(true);
+    expect(strip.scrollLeft).toBe(-40);
+    wheel(strip, { deltaY: -16 });
+    expect(strip.scrollLeft).toBe(-24);
   });
 
   it('leaves trackpad gestures with their own horizontal delta alone', async () => {

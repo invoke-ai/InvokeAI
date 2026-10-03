@@ -92,7 +92,15 @@ const canScopesOverlap = (left: HotkeyDefinition, right: HotkeyDefinition): bool
   }
 
   if (left.scope.kind === 'focused-region' && right.scope.kind === 'focused-region') {
-    return !left.scope.region || !right.scope.region || left.scope.region === right.scope.region;
+    const { floatingInstanceId: leftWindow, region: leftRegion } = left.scope;
+    const { floatingInstanceId: rightWindow, region: rightRegion } = right.scope;
+
+    // A shortcut for any focused region meets every other; one for a floating window meets only that window's.
+    if ((!leftRegion && !leftWindow) || (!rightRegion && !rightWindow)) {
+      return true;
+    }
+
+    return leftWindow || rightWindow ? leftWindow === rightWindow : leftRegion === rightRegion;
   }
 
   return false;
