@@ -10,6 +10,7 @@ export {
   addNode,
   createId,
   getActiveCompatibleLoras,
+  getLoadedLoras,
   toGraphContract,
   toModelIdentifier,
 } from './core/graphBuilder';

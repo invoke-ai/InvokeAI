@@ -80,7 +80,7 @@ The current value is `CORE_METADATA_VERSION` in `invokeai/app/invocations/metada
 | `width`, `height` | integer |
 | `model` | `ModelIdentifier`: the main (transformer) model |
 | `vae` | `ModelIdentifier`: a standalone VAE override |
-| `loras` | `LoRA[]` |
+| `loras` | `LoRA[]`: the LoRAs the graph loaded, in order; absent when none ran |
 
 ### Video profile
 
@@ -120,8 +120,9 @@ graph builders write only the canonical ones.
   by `name` + `base` + `type`. Keys are minted per install, so a record that travelled with a file
   names keys the receiving catalog has never seen; the BLAKE3 hash is the content identity and
   resolves the same weights wherever they are installed. The name step is the last resort and the
-  only one that can pick a different file of the same model. Image recall still resolves by key
-  only.
+  only one that can pick a different file of the same model. Image recall resolves its main model
+  and components by key only; its **LoRAs** resolve by `key`, then by `hash` when one was recorded,
+  otherwise by `name` + `base`, and skip any portable identifier that matches more than one install.
 - **Media references** (`image_name`, `video_name`) are names in the originating gallery, exactly
   as an image record's `init_image` is. Recall restores everything else and clears media it
   cannot find rather than substituting.

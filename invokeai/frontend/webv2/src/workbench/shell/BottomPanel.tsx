@@ -29,8 +29,10 @@ export const BottomPanel = () => {
   if (!instance || !widget) {
     return (
       <MissingWidgetFrame
+        instanceId={bottomRegion.activeInstanceId}
         label={widget ? resolveWidgetLabel(widget.manifest, t) : bottomRegion.activeInstanceId}
         region="bottom"
+        typeId={instance?.typeId}
       />
     );
   }
