@@ -515,7 +515,6 @@ export const VideoWidgetView = () => {
             invalid={!values.model}
             modelTypes={MAIN_MODEL_TYPES}
             placeholder={t('widgets.video.selectModel')}
-            size="md"
             value={values.model?.key ?? null}
             onChange={selectMainModel}
           />
@@ -673,7 +672,6 @@ export const VideoWidgetView = () => {
                 collection={ASPECT_RATIO_COLLECTION}
                 disabled={hasConditioningMedia}
                 flex="1"
-                size="md"
                 value={aspectRatioValue}
                 valueText={derivedSourceValueText}
                 onValueChange={set.aspectRatio}
@@ -681,7 +679,6 @@ export const VideoWidgetView = () => {
               <IconButton
                 aria-label={t('widgets.video.swapAspectRatio')}
                 disabled={hasConditioningMedia}
-                size="md"
                 variant="ghost"
                 onClick={swapAspectRatio}
               >
@@ -692,7 +689,6 @@ export const VideoWidgetView = () => {
           <Field helpText={twoStageHelpText} label={t('widgets.video.targetResolution')}>
             <Select
               collection={targetResolutionCollection}
-              size="md"
               value={targetResolutionValue}
               onValueChange={set.targetResolution}
             />
@@ -747,7 +743,7 @@ export const VideoWidgetView = () => {
               })}
               label={t('widgets.video.accelerator', { label: policy.ui.accelerator.label })}
             >
-              <Switch.Root checked={values.acceleratorEnabled} size="md" onCheckedChange={toggleAccelerator}>
+              <Switch.Root checked={values.acceleratorEnabled} onCheckedChange={toggleAccelerator}>
                 <Switch.HiddenInput />
                 <Switch.Control _checked={SWITCH_CHECKED_PROPS}>
                   <Switch.Thumb />

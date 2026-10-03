@@ -269,7 +269,6 @@ export const PositivePromptField = ({
           defaultHeightPx={heightPx}
           minHeightPx={96}
           resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}
-          size="md"
           fontFamily="mono"
           highlightDynamicPrompts={dynamicPrompts !== null}
           knownWildcards={knownWildcards}

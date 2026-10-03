@@ -45,7 +45,6 @@ export const SegmentedControl = ({
     <SegmentGroup.Root
       aria-label={ariaLabel}
       disabled={disabled}
-      size="md"
       value={value}
       w={isFullWidth ? 'full' : undefined}
       onValueChange={handleValueChange}

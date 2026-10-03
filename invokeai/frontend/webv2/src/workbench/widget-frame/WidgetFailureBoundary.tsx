@@ -78,7 +78,7 @@ const WidgetFailureCard = ({
       <Text color="fg.error" fontSize="md" fontWeight="700">
         {t('widgets.failure.title', { label })}
       </Text>
-      <ScrollArea.Root maxH="8rem" size="md" variant="hover">
+      <ScrollArea.Root maxH="8rem" variant="hover">
         <ScrollArea.Viewport ref={viewportRef} maxH="8rem">
           <ScrollArea.Content>
             <Code display="block" p="2" whiteSpace="pre-wrap">

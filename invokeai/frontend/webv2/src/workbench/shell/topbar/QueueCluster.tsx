@@ -319,7 +319,6 @@ const QueueTooltip = ({
         <Progress.Root
           aria-label={t('topbar.queue.currentImageProgress')}
           max={1}
-          size="md"
           value={getDeterminateProgressFraction(progress?.percentage)}
         >
           <Progress.Track>

@@ -58,7 +58,7 @@ export const SeedModeMenu = ({ contentClassName, description, onChange, value }:
         ids={triggerIds}
       >
         <Menu.Trigger asChild>
-          <Button aria-label={accessibleName} flexShrink={0} gap="1" maxW="9rem" minW="0" size="md" variant="outline">
+          <Button aria-label={accessibleName} flexShrink={0} gap="1" maxW="9rem" minW="0" variant="outline">
             <Icon as={SEED_MODE_ICONS[value]} boxSize="3.5" color="fg.muted" flexShrink={0} />
             <Text as="span" minW="0" truncate>
               {valueLabel}
@@ -173,7 +173,6 @@ export const SeedInput = ({
           max={SEED_MAX}
           min={0}
           minW="0"
-          size="md"
           value={seed === undefined ? '' : String(seed)}
           translations={stepperTranslations}
           onValueChange={({ valueAsNumber }) => {
@@ -198,7 +197,6 @@ export const SeedInput = ({
             color="fg.muted"
             disabled={isRandom}
             flexShrink={0}
-            size="md"
             variant="outline"
             onClick={() => onCommit({ seed: Math.floor(Math.random() * SEED_MAX) })}
           >

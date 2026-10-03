@@ -403,11 +403,11 @@ export const GenerateDimensionFields = ({
 
   const badges = (
     <>
-      <Badge size="md">
+      <Badge>
         {displayDimensions.width}x{displayDimensions.height}
       </Badge>
       {isRatioConstrained && (
-        <Badge size="md">
+        <Badge>
           <Icon as={LockIcon} boxSize="3" />
         </Badge>
       )}

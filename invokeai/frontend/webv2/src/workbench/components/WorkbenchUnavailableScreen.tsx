@@ -127,7 +127,7 @@ export const WorkbenchUnavailableScreen = ({
             ) : null}
             {drafts === null ? (
               <HStack color="fg.muted">
-                <Spinner size="md" />
+                <Spinner />
                 <Text>{t('shell.backendUnavailable.loadingDrafts')}</Text>
               </HStack>
             ) : drafts === 'unavailable' ? (

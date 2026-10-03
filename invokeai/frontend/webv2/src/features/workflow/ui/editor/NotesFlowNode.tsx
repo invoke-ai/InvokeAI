@@ -66,7 +66,6 @@ const NotesEditorNode = ({ data, selected }: NodeProps<NotesFlowNodeType>) => {
         className="nodrag"
         fontWeight="700"
         mb="1.5"
-        size="md"
         value={node.data.label}
         variant="flushed"
         onChange={onLabelChange}
@@ -78,7 +77,6 @@ const NotesEditorNode = ({ data, selected }: NodeProps<NotesFlowNodeType>) => {
         minH="5rem"
         placeholder="Write a note…"
         resize="vertical"
-        size="md"
         value={node.data.notes}
         onChange={onNotesChange}
       />

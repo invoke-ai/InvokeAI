@@ -112,11 +112,10 @@ export const GenerateWidgetView = () => {
             alignSelf="flex-start"
             aria-busy={isRetrying}
             aria-disabled={isRetrying}
-            size="md"
             variant="outline"
             onClick={retryCapabilities}
           >
-            {isRetrying ? <Spinner size="md" /> : null}
+            {isRetrying ? <Spinner /> : null}
             {t('widgets.generate.retry')}
           </Button>
         </Stack>
@@ -136,7 +135,7 @@ export const GenerateWidgetView = () => {
         p="1"
         role="status"
       >
-        <Spinner size="md" />
+        <Spinner />
         <Text fontSize="xs">{t('widgets.generate.loadingCapabilities')}</Text>
       </HStack>
     );

@@ -61,7 +61,7 @@ export const AlphaNoticeDialog = () => {
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button ref={dismissRef} colorPalette="accent" size="md" variant="solid" onClick={acknowledge}>
+              <Button ref={dismissRef} colorPalette="accent" variant="solid" onClick={acknowledge}>
                 {t('alphaNotice.dismiss')}
               </Button>
             </Dialog.Footer>

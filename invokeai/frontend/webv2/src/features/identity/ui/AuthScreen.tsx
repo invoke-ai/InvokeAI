@@ -42,7 +42,7 @@ export const AuthScreen = ({
 
 /** Inline alert used for form-level failures on the auth screens. */
 export const AuthFormAlert = ({ message, tone }: { message: string; tone: 'error' | 'warning' }) => (
-  <Alert.Root borderRadius="md" size="md" status={tone}>
+  <Alert.Root borderRadius="md" status={tone}>
     <Alert.Indicator />
     <Alert.Title fontSize="md">{message}</Alert.Title>
   </Alert.Root>

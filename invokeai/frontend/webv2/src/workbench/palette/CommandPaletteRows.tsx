@@ -101,7 +101,7 @@ const EntryRow = ({
       {entry.keys ? (
         <HStack flexShrink={0} gap="0.5">
           {entry.keys.map((part) => (
-            <Kbd key={part} size="md" textTransform="lowercase">
+            <Kbd key={part} textTransform="lowercase">
               <ShortcutKeyGlyph fallback={part} part={part} />
             </Kbd>
           ))}
@@ -168,7 +168,7 @@ const ScopeRow = ({
       {label}
     </Text>
     <Spacer />
-    <Kbd size="md" textTransform="lowercase">
+    <Kbd textTransform="lowercase">
       <ShortcutKeyGlyph fallback="tab" part="tab" />
     </Kbd>
   </HStack>
@@ -281,7 +281,7 @@ export const CommandPaletteRows = ({
   ]);
 
   return (
-    <ScrollArea.Root maxH="min(400px, 55dvh)" size="md" variant="hover" w="full">
+    <ScrollArea.Root maxH="min(400px, 55dvh)" variant="hover" w="full">
       <ScrollArea.Viewport ref={setScrollElement} maxH="inherit" w="full">
         <ScrollArea.Content
           id={RESULT_LIST_ID}

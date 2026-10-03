@@ -223,7 +223,7 @@ export const ClearDialog = ({
                 <Dialog.Description asChild>
                   <Box aria-busy={(preview === null && !state?.previewError) || undefined} aria-live="polite">
                     {state?.previewError ? (
-                      <Alert.Root size="md" status="error" variant="surface">
+                      <Alert.Root status="error" variant="surface">
                         <Alert.Indicator />
                         <Alert.Content>
                           <Alert.Description>{state.previewError}</Alert.Description>
@@ -234,7 +234,7 @@ export const ClearDialog = ({
                       </Alert.Root>
                     ) : preview === null ? (
                       <Stack align="center" direction="row" gap="2">
-                        <Spinner color="fg.muted" size="md" />
+                        <Spinner color="fg.muted" />
                         <Text color="fg.muted" fontSize="md">
                           {t('intermediates.dialog.loadingPreview')}
                         </Text>
@@ -248,7 +248,6 @@ export const ClearDialog = ({
                   checked={isForce}
                   colorPalette="red"
                   disabled={state?.isStarting}
-                  size="md"
                   onCheckedChange={(event) => onModeChange(event.checked === true ? 'force' : 'safe')}
                 >
                   <Checkbox.HiddenInput />
@@ -256,7 +255,7 @@ export const ClearDialog = ({
                   <Checkbox.Label fontSize="md">{t('intermediates.dialog.forceToggle')}</Checkbox.Label>
                 </Checkbox.Root>
                 {isForce ? (
-                  <Alert.Root size="md" status="warning" variant="surface">
+                  <Alert.Root status="warning" variant="surface">
                     <Alert.Indicator />
                     <Alert.Content>
                       <Alert.Description>
@@ -275,7 +274,6 @@ export const ClearDialog = ({
                     <Checkbox.Root
                       checked={acknowledged}
                       colorPalette="red"
-                      size="md"
                       onCheckedChange={(event) => setAcknowledged(event.checked === true)}
                     >
                       <Checkbox.HiddenInput />
@@ -289,7 +287,6 @@ export const ClearDialog = ({
                       <Input
                         autoComplete="off"
                         id={confirmInputId}
-                        size="md"
                         spellCheck={false}
                         value={typed}
                         onChange={(event) => setTyped(event.currentTarget.value)}
@@ -305,14 +302,13 @@ export const ClearDialog = ({
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button ref={cancelRef} disabled={state?.isStarting} size="md" variant="ghost" onClick={onClose}>
+              <Button ref={cancelRef} disabled={state?.isStarting} variant="ghost" onClick={onClose}>
                 {t('common.cancel')}
               </Button>
               <Button
                 colorPalette="red"
                 disabled={!canConfirm}
                 loading={state?.isStarting}
-                size="md"
                 variant="solid"
                 onClick={onConfirm}
               >

@@ -163,7 +163,7 @@ const ResolutionControl = ({
   );
 
   return (
-    <SegmentGroup.Root size="md" value={value ?? null} onValueChange={handleValueChange}>
+    <SegmentGroup.Root value={value ?? null} onValueChange={handleValueChange}>
       <SegmentGroup.Indicator />
       {RESOLUTIONS.map((resolution) => (
         <SegmentGroup.Item key={resolution} value={resolution}>

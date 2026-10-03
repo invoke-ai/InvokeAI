@@ -227,7 +227,6 @@ const InputSetting = ({ id, value, onCommit }: { id: string; value: string; onCo
         id={id}
         resize="none"
         rows={4}
-        size="md"
         value={value}
         onChange={onTextChange}
       />
@@ -504,7 +503,6 @@ export const GeneratorFieldInput = ({ id, invalid, onChange, template, value }: 
         className="nodrag"
         collection={variantCollection}
         invalid={invalid}
-        size="md"
         value={variantValue}
         valueTextProps={SELECT_VALUE_TEXT_PROPS}
         w="full"
@@ -611,13 +609,7 @@ export const GeneratorFieldInput = ({ id, invalid, onChange, template, value }: 
             <chakra.label color="fg.subtle" flexShrink={0} fontSize="xs" htmlFor={`${prefix}-split-on`}>
               {t('nodes.splitOn')}
             </chakra.label>
-            <Input
-              className="nodrag"
-              id={`${prefix}-split-on`}
-              size="md"
-              value={generator.splitOn}
-              onChange={onSplitOnChange}
-            />
+            <Input className="nodrag" id={`${prefix}-split-on`} value={generator.splitOn} onChange={onSplitOnChange} />
           </HStack>
           <InputSetting id={`${prefix}-input`} value={generator.input} onCommit={onInputChange} />
         </Stack>
@@ -663,7 +655,6 @@ export const GeneratorFieldInput = ({ id, invalid, onChange, template, value }: 
               aria-label={t('nodes.generatorImagesCategory')}
               className="nodrag"
               collection={categoryCollection}
-              size="md"
               value={categoryValue}
               valueTextProps={SELECT_VALUE_TEXT_PROPS}
               w="full"

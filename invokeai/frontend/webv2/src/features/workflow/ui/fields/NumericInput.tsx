@@ -159,7 +159,6 @@ export const NumericInput = ({
       max={max !== undefined ? String(max) : undefined}
       min={min !== undefined ? String(min) : undefined}
       fontVariantNumeric="tabular-nums"
-      size="md"
       step={
         multipleOf !== undefined ? String(multipleOf) : step !== undefined ? String(step) : isInteger ? '1' : FLOAT_STEP
       }

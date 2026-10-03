@@ -28,7 +28,7 @@ const TAB_HINT_KEYS = ['tab'];
 const FooterHint = ({ children, keys, shrink = false }: { children: string; keys: string[]; shrink?: boolean }) => (
   <HStack flexShrink={shrink ? 1 : 0} gap="1" minW="0">
     {keys.map((key) => (
-      <Kbd key={key} flexShrink={0} size="md" textTransform="lowercase">
+      <Kbd key={key} flexShrink={0} textTransform="lowercase">
         {key}
       </Kbd>
     ))}
@@ -123,7 +123,7 @@ const CommandPaletteContent = ({
           py="6"
           title={t('commandPalette.states.couldNotSearch', { label: controller.scopeLabel })}
         >
-          <Button size="md" variant="subtle" onClick={controller.onRetry}>
+          <Button variant="subtle" onClick={controller.onRetry}>
             {t('common.retry')}
           </Button>
         </EmptyState>

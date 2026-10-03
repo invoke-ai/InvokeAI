@@ -30,7 +30,7 @@ export const RecentProjectsRow = ({
         <Text fontSize="md" fontWeight="700">
           {t('launchpad.home.recentProjects')}
         </Text>
-        <Button asChild size="md" variant="ghost">
+        <Button asChild variant="ghost">
           <Link to="/projects">
             {t('launchpad.home.viewAllProjects')}
             <ArrowRightIcon />

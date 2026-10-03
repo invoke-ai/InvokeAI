@@ -214,7 +214,6 @@ const ExternalProviderKeyCard = ({
             aria-label={t('models.apiKeyFor', { title })}
             disabled={isBusy}
             placeholder={config.api_key_configured ? t('models.apiKeyConfigured') : placeholder}
-            size="md"
             type="password"
             value={apiKeyDraft}
             onChange={(event) => setApiKeyDraft(event.currentTarget.value)}
@@ -229,7 +228,6 @@ const ExternalProviderKeyCard = ({
         <Switch.Root
           checked={overrideBaseUrl}
           disabled={isBusy}
-          size="md"
           onCheckedChange={(event) => {
             const checked = event.checked === true;
 
@@ -253,7 +251,6 @@ const ExternalProviderKeyCard = ({
             aria-label={t('models.baseUrlFor', { title })}
             disabled={isBusy}
             placeholder="https://api.example.com"
-            size="md"
             value={baseUrlDraft}
             onChange={(event) => setBaseUrlDraft(event.currentTarget.value)}
             onKeyDown={(event) => {
@@ -270,7 +267,6 @@ const ExternalProviderKeyCard = ({
         <Button
           disabled={(!hasApiKeyDraft && !hasBaseUrlChange) || isBusy}
           loading={isBusy}
-          size="md"
           variant="solid"
           onClick={() => void handleSave()}
         >

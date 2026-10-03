@@ -47,7 +47,7 @@ const MENU_ITEM_DISABLED_PROPS = { opacity: 0.4 };
 const getWidgetEnableMenuTriggerButton = (label: string, trigger: WidgetEnableMenuTrigger) => {
   if (trigger.kind === 'center') {
     return (
-      <IconButton aria-label={label} size="md" variant="ghost">
+      <IconButton aria-label={label} variant="ghost">
         <Icon as={MoreHorizontalIcon} boxSize="4" />
       </IconButton>
     );

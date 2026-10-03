@@ -183,7 +183,6 @@ export const EditorToolbar = ({
               <IconButton
                 aria-label="Node opacity"
                 aria-pressed={nodeOpacity < 1}
-                size="md"
                 variant={nodeOpacity < 1 ? 'solid' : 'ghost'}
               >
                 <Icon as={BlendIcon} boxSize="3.5" />
@@ -198,14 +197,7 @@ export const EditorToolbar = ({
                     <Text color="fg.muted" fontSize="xs" fontWeight="600">
                       Node opacity · {Math.round(nodeOpacity * 100)}%
                     </Text>
-                    <Slider.Root
-                      max={100}
-                      min={20}
-                      size="md"
-                      step={5}
-                      value={opacityValue}
-                      onValueChange={onSliderValueChange}
-                    >
+                    <Slider.Root max={100} min={20} step={5} value={opacityValue} onValueChange={onSliderValueChange}>
                       <Slider.Control>
                         <Slider.Track>
                           <Slider.Range />

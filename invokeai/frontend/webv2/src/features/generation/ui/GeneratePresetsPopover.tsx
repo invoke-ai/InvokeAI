@@ -105,7 +105,6 @@ const PresetRow = ({
       <Tooltip content={t('common.rename')}>
         <IconButton
           aria-label={t('widgets.generate.renamePresetNamed', { name: preset.label })}
-          size="md"
           variant="ghost"
           onClick={handleRename}
         >
@@ -116,7 +115,6 @@ const PresetRow = ({
         <IconButton
           aria-label={t('widgets.generate.deletePresetNamed', { name: preset.label })}
           colorPalette="red"
-          size="md"
           variant="ghost"
           onClick={handleDelete}
         >
@@ -308,7 +306,6 @@ export const GeneratePresetsPopover = () => {
                       <Input
                         aria-label={t('widgets.generate.searchPresets')}
                         placeholder={t('widgets.generate.searchPresets')}
-                        size="md"
                         value={searchTerm}
                         onChange={handleSearchChange}
                       />

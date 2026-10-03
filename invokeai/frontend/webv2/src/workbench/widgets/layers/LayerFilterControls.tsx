@@ -292,7 +292,6 @@ const FilterParamField = ({ disabled, param, policy, settings, value, onChange }
           max={numberBounds.sliderMax}
           minH={policy.controlMinH}
           min={numberBounds.sliderMin}
-          size="md"
           step={numberBounds.step}
           value={numberValue}
           withThumbTooltip

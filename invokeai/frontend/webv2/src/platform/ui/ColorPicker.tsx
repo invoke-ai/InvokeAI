@@ -89,7 +89,6 @@ const FormatTrigger = ({
       flexShrink="0"
       fontSize="xs"
       fontWeight="medium"
-      size="md"
       variant="subtle"
       w="10"
       onClick={handleClick}
@@ -141,7 +140,6 @@ const AlphaInput = ({
       className="colorPicker__channelInput"
       flexShrink="0"
       inputMode="numeric"
-      size="md"
       value={draft ?? String(Math.round(alpha * 100))}
       w="12"
       onBlur={handleBlur}
@@ -306,7 +304,6 @@ export const ColorPicker = ({
               {onSampleColor ? (
                 <IconButton
                   aria-label={t('common.colorPicker.sampleFromCanvas')}
-                  size="md"
                   variant="ghost"
                   onClick={handleSampleColor}
                 >
@@ -315,7 +312,7 @@ export const ColorPicker = ({
               ) : canUseScreenEyeDropper ? (
                 // Use asChild with IconButton: Ark's bare trigger has no icon or workbench styling.
                 <ChakraColorPicker.EyeDropperTrigger asChild>
-                  <IconButton aria-label={t('common.colorPicker.sampleFromScreen')} size="md" variant="ghost">
+                  <IconButton aria-label={t('common.colorPicker.sampleFromScreen')} variant="ghost">
                     <Icon as={Pipette} boxSize="4" />
                   </IconButton>
                 </ChakraColorPicker.EyeDropperTrigger>

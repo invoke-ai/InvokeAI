@@ -25,7 +25,7 @@ const retrySave = () => {
 const SEARCH_START_ELEMENT = <Icon as={SearchIcon} boxSize="3.5" color="fg.muted" />;
 /** The `/` shortcut its surface handles with `focusSettingsSearchOnSlash`. */
 const SEARCH_HOTKEY_HINT = (
-  <Kbd aria-hidden pointerEvents="none" size="md" variant="outline">
+  <Kbd aria-hidden pointerEvents="none" variant="outline">
     /
   </Kbd>
 );
@@ -114,9 +114,7 @@ export const SettingsBrowseBody = ({
           <Text fontSize="md" color="fg.error" flex="1">
             {error}
           </Text>
-          <Button size="md" onClick={retrySave}>
-            {t('common.retry')}
-          </Button>
+          <Button onClick={retrySave}>{t('common.retry')}</Button>
         </HStack>
       ) : null}
       <VisuallyHidden role="status">{searching ? t('settingsDialog.resultCount', { count }) : ''}</VisuallyHidden>

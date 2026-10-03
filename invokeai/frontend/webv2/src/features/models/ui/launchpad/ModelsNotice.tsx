@@ -69,7 +69,7 @@ const InstallProgress = ({ count }: { count: number }) => {
 
   return (
     <Flex align="center" gap="2">
-      <Spinner color="fg.muted" size="md" />
+      <Spinner color="fg.muted" />
       <Text color="fg.muted" fontSize="md">
         {t('models.launchpad.installing', { count })}
       </Text>
@@ -108,7 +108,7 @@ const StarterBundleButton = ({ bundle, bundleKey }: { bundle: StarterModelBundle
   }, [bundle.name, bundleKey, navigate]);
 
   return (
-    <Button size="md" variant="outline" onClick={handleOpen}>
+    <Button variant="outline" onClick={handleOpen}>
       {bundle.name || bundleKey}
       <Icon as={ArrowRightIcon} boxSize="3" color="fg.muted" />
     </Button>

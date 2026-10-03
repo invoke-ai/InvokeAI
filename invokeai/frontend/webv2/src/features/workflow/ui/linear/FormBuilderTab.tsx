@@ -448,7 +448,6 @@ const BuilderElementBase = ({
             fontSize="lg"
             fontWeight="700"
             placeholder="Heading"
-            size="md"
             value={element.data.content}
             variant="flushed"
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
@@ -468,7 +467,6 @@ const BuilderElementBase = ({
             minH="2.5rem"
             placeholder="Text"
             resize="vertical"
-            size="md"
             value={element.data.content}
             variant="flushed"
             onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { useQueueCounts } from './queueDataStore';
 
 const QueueStatCard = ({ value, label, danger }: { value: number; label: string; danger?: boolean }) => (
-  <Stat.Root size="md" colorScheme={danger ? 'red' : undefined} gap="0">
+  <Stat.Root colorScheme={danger ? 'red' : undefined} gap="0">
     <Stat.Label fontSize="md" order="2">
       {label}
     </Stat.Label>

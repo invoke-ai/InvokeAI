@@ -92,14 +92,14 @@ export const ResumeCard = ({
         </Stack>
         <HStack gap="1.5" pointerEvents="auto">
           {isCompatible ? (
-            <Button asChild size="md" variant="solid">
+            <Button asChild variant="solid">
               <Link search={search} to="/app">
                 {t('launchpad.home.resumeAction')}
                 <ArrowRightIcon />
               </Link>
             </Button>
           ) : (
-            <Button disabled size="md" title={t('projects.file.updateClient')} variant="solid">
+            <Button disabled title={t('projects.file.updateClient')} variant="solid">
               {t('launchpad.home.resumeAction')}
               <ArrowRightIcon />
             </Button>
@@ -109,7 +109,6 @@ export const ResumeCard = ({
             aria-haspopup="menu"
             aria-label={t('common.actions')}
             color="fg.muted"
-            size="md"
             variant="ghost"
             onClick={menuTrigger.onClick}
             onPointerDown={menuTrigger.onPointerDown}

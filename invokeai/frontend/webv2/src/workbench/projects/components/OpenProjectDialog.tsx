@@ -177,11 +177,11 @@ export const OpenProjectDialog = ({ isOpen, onClose }: { isOpen: boolean; onClos
               </Scrollable>
             </Dialog.Body>
             <Dialog.Footer justifyContent="space-between">
-              <Button size="md" variant="outline" onClick={startImport}>
+              <Button variant="outline" onClick={startImport}>
                 <FileUpIcon />
                 {t('projects.importWithEllipsis')}
               </Button>
-              <Button size="md" variant="ghost" onClick={onClose}>
+              <Button variant="ghost" onClick={onClose}>
                 {t('common.cancel')}
               </Button>
             </Dialog.Footer>
@@ -219,7 +219,7 @@ const OpenProjectRow = ({
           </Text>
           <ProjectCompatibilityBadge summary={summary} />
         </Stack>
-        {isBusy ? <Spinner color="fg.muted" size="md" /> : <Icon as={ArrowRightIcon} boxSize="3.5" color="fg.muted" />}
+        {isBusy ? <Spinner color="fg.muted" /> : <Icon as={ArrowRightIcon} boxSize="3.5" color="fg.muted" />}
       </button>
     </Row>
   );

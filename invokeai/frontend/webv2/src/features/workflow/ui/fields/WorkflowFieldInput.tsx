@@ -122,12 +122,12 @@ import { useTranslation } from 'react-i18next';
 
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
 const MODEL_SELECT_FALLBACK = (
-  <Button disabled size="md" w="full">
+  <Button disabled w="full">
     Loading models…
   </Button>
 );
 const RECORD_PICKER_FALLBACK = (
-  <Button disabled size="md" w="full">
+  <Button disabled w="full">
     Loading…
   </Button>
 );
@@ -192,7 +192,6 @@ const StringInput = ({ ariaLabel, id, invalid, onChange, template, value }: Scal
         id={id ? `${id}-textarea` : undefined}
         minHeightPx={56}
         resizeHandleAriaLabel={`Resize ${template.title}`}
-        size="md"
         value={text}
         w="full"
         {...invalidProps(invalid)}
@@ -207,7 +206,6 @@ const StringInput = ({ ariaLabel, id, invalid, onChange, template, value }: Scal
       aria-label={ariaLabel ?? template.title}
       className="nodrag"
       id={id ? `${id}-input` : undefined}
-      size="md"
       value={text}
       w="full"
       {...invalidProps(invalid)}
@@ -287,7 +285,6 @@ const BooleanInput = ({ id, invalid, onChange, template, value }: WorkflowFieldI
       className="nodrag"
       ids={switchIds}
       invalid={invalid}
-      size="md"
       onCheckedChange={onCheckedChange}
     >
       <Switch.HiddenInput aria-label={template.title} {...invalidProps(invalid)} />
@@ -340,7 +337,6 @@ const SelectInput = ({
       collection={collection}
       ids={selectIds}
       invalid={invalid}
-      size="md"
       value={selectedValue}
       valueTextProps={SELECT_VALUE_TEXT_PROPS}
       w="full"
@@ -374,7 +370,6 @@ const EnumInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInpu
         id={id ? `${id}-scheduler-combobox` : undefined}
         invalid={invalid}
         options={options}
-        size="md"
         value={typeof value === 'string' ? value : null}
         onValueChange={onOptionChange}
       />
@@ -427,7 +422,6 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
         invalid={invalid}
         isClearable={false}
         modelTypes={modelTypes}
-        size="md"
         value={selectedKey}
         onChange={onModelChange}
       />
@@ -442,7 +436,6 @@ const SchedulerInput = ({ id, invalid, onChange, template, value }: WorkflowFiel
     id={id ? `${id}-scheduler-combobox` : undefined}
     invalid={invalid}
     options={SCHEDULER_OPTIONS}
-    size="md"
     value={typeof value === 'string' ? value : null}
     onValueChange={onChange}
   />
@@ -1062,7 +1055,6 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
             insetInlineEnd="1"
             pointerEvents="none"
             position="absolute"
-            size="md"
             variant="solid"
           >
             {badge}
@@ -1262,7 +1254,6 @@ const FrameScrubber = ({
           insetInlineEnd="1"
           pointerEvents="none"
           position="absolute"
-          size="md"
           variant="solid"
         >
           {`${resolvedIndex} / ${frameCount - 1}`}
@@ -1274,7 +1265,6 @@ const FrameScrubber = ({
           aria-label={FRAME_SLIDER_ARIA_LABEL}
           max={frameCount - 1}
           min={0}
-          size="md"
           step={1}
           value={sliderValue}
           withThumbTooltip
@@ -1384,7 +1374,6 @@ const LoRACollectionInput = ({ id, invalid, onChange, template, value }: Workflo
           invalid={invalid}
           modelTypes={(template.uiModelType as ModelTaxonomyType[] | null) ?? LORA_MODEL_TYPES}
           placeholder="Add LoRA…"
-          size="md"
           value={null}
           onChange={onAdd}
         />
@@ -1734,13 +1723,7 @@ const SavedWorkflowInput = ({ nodeId, onChange, template, value }: WorkflowField
           onValueChange={onWorkflowChange}
         />
         {nodeId && workflowId && detailQuery.isError ? (
-          <IconButton
-            aria-label={t('common.retry')}
-            className="nodrag"
-            size="md"
-            variant="ghost"
-            onClick={retrySelection}
-          >
+          <IconButton aria-label={t('common.retry')} className="nodrag" variant="ghost" onClick={retrySelection}>
             <RotateCcwIcon />
           </IconButton>
         ) : null}
@@ -1748,7 +1731,6 @@ const SavedWorkflowInput = ({ nodeId, onChange, template, value }: WorkflowField
           <IconButton
             aria-label={t('nodes.savedWorkflowClear')}
             className="nodrag"
-            size="md"
             variant="ghost"
             onClick={clearSelection}
           >

@@ -167,12 +167,10 @@ const ConnectedTransform = ({ engine }: { engine: CanvasEngineHandle }) => {
         </PropertyControlRow>
         {pending ? (
           <Flex gap="2" justify="flex-end">
-            <Button size="md" variant="ghost" onClick={onCancel}>
+            <Button variant="ghost" onClick={onCancel}>
               {t('common.cancel')}
             </Button>
-            <Button size="md" onClick={onApply}>
-              {t('common.apply')}
-            </Button>
+            <Button onClick={onApply}>{t('common.apply')}</Button>
           </Flex>
         ) : (
           <Text color="fg.muted" fontSize="xs">

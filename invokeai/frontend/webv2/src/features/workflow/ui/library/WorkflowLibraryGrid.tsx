@@ -136,7 +136,7 @@ export const WorkflowLibraryGrid = ({
         ) : null}
         {hasEntries && status === 'loadingMore' ? (
           <HStack color="fg.subtle" gap="2" justify="center" py="2">
-            <Spinner size="md" />
+            <Spinner />
             <Text fontSize="xs">{t('workflowLibrary.loadingMore')}</Text>
           </HStack>
         ) : null}

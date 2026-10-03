@@ -196,10 +196,10 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
         </Stack>
       </Dialog.Body>
       <Dialog.Footer>
-        <Button size="md" variant="ghost" onClick={onClose}>
+        <Button variant="ghost" onClick={onClose}>
           {t('common.cancel')}
         </Button>
-        <Button loading={form.isSubmitting} size="md" variant="solid" onClick={handleSave}>
+        <Button loading={form.isSubmitting} variant="solid" onClick={handleSave}>
           {t('users.saveChanges')}
         </Button>
       </Dialog.Footer>

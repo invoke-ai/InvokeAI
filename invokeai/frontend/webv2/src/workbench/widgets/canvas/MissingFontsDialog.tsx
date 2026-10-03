@@ -40,7 +40,7 @@ export const MissingFontsDialog = ({ engine, groups }: { engine: CanvasEngine; g
   return (
     <>
       <Box position="absolute" top="2" left="50%" transform="translateX(-50%)" zIndex="2">
-        <Button colorPalette="orange" size="md" onClick={reopen}>
+        <Button colorPalette="orange" onClick={reopen}>
           {t('fonts.missing.warning', { count: unavailable.length })}
         </Button>
       </Box>
@@ -211,17 +211,10 @@ const RecoveryRow = ({ group, engine }: { group: FontGroup; engine: CanvasEngine
       </NativeSelect.Root>
       {offset > 0 || (catalog.data?.total ?? 0) > 50 ? (
         <Flex gap="2" justify="flex-end">
-          <Button
-            size="md"
-            variant="outline"
-            color="fg"
-            disabled={offset === 0 || catalog.isFetching}
-            onClick={previousPage}
-          >
+          <Button variant="outline" color="fg" disabled={offset === 0 || catalog.isFetching} onClick={previousPage}>
             {t('common.previousPage')}
           </Button>
           <Button
-            size="md"
             variant="outline"
             color="fg"
             disabled={catalog.isFetching || offset + 50 >= (catalog.data?.total ?? 0)}
@@ -235,7 +228,7 @@ const RecoveryRow = ({ group, engine }: { group: FontGroup; engine: CanvasEngine
       {catalog.isError ? (
         <Text role="alert" color="fg.error" fontSize="md">
           {t('fonts.missing.catalogError')}
-          <Button size="md" color="fg" variant="outline" ml="2" onClick={retryCatalog}>
+          <Button color="fg" variant="outline" ml="2" onClick={retryCatalog}>
             {t('common.retry')}
           </Button>
         </Text>

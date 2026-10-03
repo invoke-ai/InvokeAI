@@ -275,7 +275,7 @@ export const GraphPreviewDialog = ({
             </Dialog.Body>
             <Dialog.Footer justifyContent="space-between">
               <Box display="flex" gap="2">
-                <Button disabled={!graph} size="md" variant="outline" onClick={copyJson}>
+                <Button disabled={!graph} variant="outline" onClick={copyJson}>
                   <Icon
                     as={hasCopied ? CheckIcon : CopyIcon}
                     boxSize="3.5"
@@ -290,7 +290,7 @@ export const GraphPreviewDialog = ({
                     sourceLabel={sourceLabel}
                     onClose={closeDialog}
                   >
-                    <Button size="md" variant="outline">
+                    <Button variant="outline">
                       {t('graphPreview.openAs')}
                       <Icon as={ChevronUpIcon} boxSize="3.5" />
                     </Button>
@@ -303,14 +303,13 @@ export const GraphPreviewDialog = ({
                     aria-disabled={!canInvoke}
                     cursor={canInvoke ? undefined : 'not-allowed'}
                     opacity={canInvoke ? undefined : 0.6}
-                    size="md"
                     title={validationMessage}
                     onClick={invokeRoute}
                   >
                     {t('graphPreview.invokeRoute', { route: dialogRoute.label })}
                   </Button>
                 ) : null}
-                <Button size="md" variant="ghost" onClick={closeDialog}>
+                <Button variant="ghost" onClick={closeDialog}>
                   {t('common.close')}
                 </Button>
               </Box>

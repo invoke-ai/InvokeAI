@@ -156,7 +156,6 @@ export const WildcardsPanel = ({
           <Input
             aria-invalid={nameError !== null && nameError !== 'empty' ? true : undefined}
             placeholder={t('widgets.generate.dynamicPrompts.wildcardNamePlaceholder')}
-            size="md"
             value={draft.name}
             onChange={(event: ChangeEvent<HTMLInputElement>) => setDraft({ ...draft, name: event.currentTarget.value })}
           />
@@ -174,7 +173,6 @@ export const WildcardsPanel = ({
           resizeHandleAriaLabel={t('widgets.generate.dynamicPrompts.resizeWildcardValues')}
           showLineNumbers
           showSyntaxHighlighting={showSyntaxHighlighting}
-          size="md"
           value={draft.valuesText}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
             setDraft({ ...draft, valuesText: event.currentTarget.value })
@@ -186,11 +184,11 @@ export const WildcardsPanel = ({
           </Text>
         ) : null}
         <HStack justify="end">
-          <Button size="md" variant="ghost" onClick={cancel}>
+          <Button variant="ghost" onClick={cancel}>
             <XIcon />
             {t('common.cancel')}
           </Button>
-          <Button disabled={nameError !== null || valuesError !== null} size="md" onClick={() => void save()}>
+          <Button disabled={nameError !== null || valuesError !== null} onClick={() => void save()}>
             <CheckIcon />
             {t('common.save')}
           </Button>
@@ -213,7 +211,6 @@ export const WildcardsPanel = ({
           <Input
             aria-label={t('widgets.generate.dynamicPrompts.searchWildcards')}
             placeholder={t('widgets.generate.dynamicPrompts.searchWildcards')}
-            size="md"
             value={searchTerm}
             onChange={handleSearchChange}
           />

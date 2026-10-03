@@ -38,7 +38,7 @@ export const NodeInstallLog = () => {
 
   return (
     <Scrollable h="full" label={t('nodes.installActivity')} minH="0">
-      <Table.Root css={INSTALL_LOG_TABLE_SX} minW="36rem" size="md">
+      <Table.Root css={INSTALL_LOG_TABLE_SX} minW="36rem">
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader borderColor="border.subtle" ps="3">

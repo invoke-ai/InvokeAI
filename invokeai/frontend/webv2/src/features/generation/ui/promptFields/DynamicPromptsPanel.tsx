@@ -128,7 +128,6 @@ export const DynamicPromptsPanel = ({
                 aria-labelledby={modeLabelledBy}
                 justifyContent="space-between"
                 minW="0"
-                size="md"
                 variant="outline"
                 w="full"
               >
@@ -160,7 +159,6 @@ export const DynamicPromptsPanel = ({
             allowMouseWheel
             max={DYNAMIC_PROMPTS_MAX_PROMPTS}
             min={DYNAMIC_PROMPTS_MIN_PROMPTS}
-            size="md"
             value={String(config.maxPrompts)}
             onValueChange={handleMaxPromptsChange}
           >
@@ -172,7 +170,6 @@ export const DynamicPromptsPanel = ({
         <Tooltip content={t('widgets.generate.dynamicPrompts.shuffle')}>
           <IconButton
             aria-label={t('widgets.generate.dynamicPrompts.shuffle')}
-            size="md"
             variant="ghost"
             visibility={config.combinatorial ? 'hidden' : 'visible'}
             onClick={handleShuffle}
@@ -186,7 +183,6 @@ export const DynamicPromptsPanel = ({
         checked={config.seedBehaviour === 'per-image'}
         disabled={config.isSeedFixed}
         ids={seedSwitchIds}
-        size="md"
         onCheckedChange={handleSeedBehaviourChange}
       >
         <Switch.HiddenInput aria-describedby={config.isSeedFixed ? seedHeldNoteId : undefined} />

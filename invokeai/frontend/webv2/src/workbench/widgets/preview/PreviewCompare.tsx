@@ -221,7 +221,7 @@ export const PreviewCompare = ({
         )}
       </PreviewStage>
       <HStack flexShrink={0} gap="1" justify="center">
-        <SegmentGroup.Root size="md" value={mode} onValueChange={handleModeChange}>
+        <SegmentGroup.Root value={mode} onValueChange={handleModeChange}>
           <SegmentGroup.Indicator />
           {COMPARISON_MODES.map((item) => (
             <SegmentGroup.Item key={item.value} value={item.value}>
@@ -367,10 +367,10 @@ const HoverCompareFrame = ({
 
 const ComparisonBadges = ({ compareLabel, viewingLabel }: { compareLabel: string; viewingLabel: string }) => (
   <>
-    <Badge left="2" pointerEvents="none" position="absolute" size="md" top="2" variant="solid">
+    <Badge left="2" pointerEvents="none" position="absolute" top="2" variant="solid">
       {compareLabel}
     </Badge>
-    <Badge pointerEvents="none" position="absolute" right="2" size="md" top="2" variant="solid">
+    <Badge pointerEvents="none" position="absolute" right="2" top="2" variant="solid">
       {viewingLabel}
     </Badge>
   </>
@@ -411,7 +411,7 @@ const CompareSidePane = ({
         style={BASE_IMAGE_STYLE}
         width={image.width}
       />
-      <Badge left="2" pointerEvents="none" position="absolute" size="md" top="2" variant="solid">
+      <Badge left="2" pointerEvents="none" position="absolute" top="2" variant="solid">
         {label}
       </Badge>
     </Box>

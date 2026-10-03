@@ -202,7 +202,6 @@ const AlignButton = ({
       <IconButton
         aria-label={t(ALIGN_LABEL_KEYS[value])}
         aria-pressed={active}
-        size="md"
         variant={active ? 'solid' : 'ghost'}
         onClick={onClick}
       >
@@ -477,7 +476,6 @@ const FontAxisSettings = ({
           collection={presetCollection}
           minW="0"
           positioning={SELECT_POSITIONING}
-          size="md"
           value={presetValue}
           valueText={presetCollection.items.find((item) => item.value === presetValue[0])?.label}
           onValueChange={onPreset}
@@ -532,7 +530,7 @@ const FontCatalogStatus = ({
     return (
       <PropertyControlRow>
         <HStack color="fg.muted" gap="1.5" gridColumn="2 / -1" role="status">
-          <Spinner size="md" />
+          <Spinner />
           <Text fontSize="xs">{t('common.loading')}</Text>
         </HStack>
       </PropertyControlRow>
@@ -800,7 +798,6 @@ export const TextFontSettings = ({ engine }: ToolFormProps) => {
           minW="0"
           positioning={SELECT_POSITIONING}
           renderGroupLabel={renderGroupLabel}
-          size="md"
           value={familyValue}
           valueText={familyLabel}
           onValueChange={onFamily}
@@ -825,7 +822,6 @@ export const TextFontSettings = ({ engine }: ToolFormProps) => {
               gridColumn={showWeight ? undefined : '2 / -1'}
               minW="0"
               positioning={SELECT_POSITIONING}
-              size="md"
               value={styleValue}
               valueText={styleCollection.items.find((item) => item.value === active.fontStyle)?.label}
               onValueChange={onStyle}
@@ -837,7 +833,6 @@ export const TextFontSettings = ({ engine }: ToolFormProps) => {
               collection={weightCollection}
               flexShrink={0}
               positioning={SELECT_POSITIONING}
-              size="md"
               triggerProps={WEIGHT_TRIGGER_PROPS}
               value={weightValue}
               valueText={String(active.fontWeight)}

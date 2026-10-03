@@ -323,7 +323,6 @@ const ReferenceModelSelector = ({
           filter={filterModel}
           modelTypes={modelTypes}
           placeholder={t('widgets.generate.selectModel')}
-          size="md"
           value={config.model?.key ?? null}
           onChange={selectReferenceModel}
         />

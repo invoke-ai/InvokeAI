@@ -84,7 +84,7 @@ export const OperationPanel = ({
 
   if (lookupError) {
     return (
-      <Alert.Root size="md" status="error" variant="surface">
+      <Alert.Root status="error" variant="surface">
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Title>{t('intermediates.operation.lookupFailed')}</Alert.Title>
@@ -121,7 +121,6 @@ export const OperationPanel = ({
 
   return (
     <Alert.Root
-      size="md"
       status={operation.status === 'failed' ? 'error' : operation.status === 'completed' ? 'success' : 'info'}
       variant="surface"
     >
@@ -136,7 +135,6 @@ export const OperationPanel = ({
                   aria-label={statusLabel}
                   colorPalette="accent"
                   max={Math.max(total, 1)}
-                  size="md"
                   value={processed}
                 >
                   <Progress.Track>

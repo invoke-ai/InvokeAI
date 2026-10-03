@@ -123,7 +123,7 @@ const UpscaleOutputPreflight = memo(
 
     return (
       <Stack bg="bg.subtle" gap="2" px="2.5" py="2" rounded="md">
-        <DataList.Root gap="1.5" orientation="horizontal" size="md">
+        <DataList.Root gap="1.5" orientation="horizontal">
           <DataList.Item>
             <DataList.ItemLabel color="fg.subtle" fontSize="xs">
               {t('widgets.upscale.inputSize')}
@@ -178,7 +178,7 @@ const UpscaleOutputPreflight = memo(
             >
               {MEGAPIXEL_FORMATTER.format(outputMegapixels)} MP
               {isLargeOutput ? (
-                <Badge colorPalette="orange" fontFamily="body" size="md" variant="surface">
+                <Badge colorPalette="orange" fontFamily="body" variant="surface">
                   {t('widgets.upscale.largeOutput')}
                 </Badge>
               ) : null}
@@ -440,14 +440,7 @@ export const UpscaleWidgetView = () => {
     [patch]
   );
 
-  const sharedBadge = useMemo(
-    () => (
-      <Badge fontFamily="mono" size="md">
-        {t('widgets.upscale.shared')}
-      </Badge>
-    ),
-    [t]
-  );
+  const sharedBadge = useMemo(() => <Badge fontFamily="mono">{t('widgets.upscale.shared')}</Badge>, [t]);
 
   return (
     <Stack gap={1} minW={0} p="1">
@@ -471,7 +464,6 @@ export const UpscaleWidgetView = () => {
               invalid={!values.upscaleModel}
               modelTypes={SPANDREL_MODEL_TYPES}
               placeholder={t('widgets.upscale.selectSpandrelModel')}
-              size="md"
               value={values.upscaleModel?.key ?? null}
               onChange={set.spandrelModel}
             />
@@ -491,7 +483,6 @@ export const UpscaleWidgetView = () => {
           />
           <SegmentGroup.Root
             aria-label={t('widgets.upscale.presetsLabel')}
-            size="md"
             value={activePresetId}
             w="full"
             onValueChange={applyPreset}
@@ -571,7 +562,6 @@ export const UpscaleWidgetView = () => {
               invalid={!values.model}
               modelTypes={MAIN_MODEL_TYPES}
               placeholder={t('widgets.upscale.selectMainModel')}
-              size="md"
               value={values.model?.key ?? null}
               onChange={selectMainModel}
             />
@@ -603,7 +593,6 @@ export const UpscaleWidgetView = () => {
             <Combobox
               aria-label={t('widgets.upscale.scheduler')}
               options={SCHEDULER_OPTIONS}
-              size="md"
               value={values.scheduler}
               onValueChange={set.scheduler}
             />
@@ -623,7 +612,6 @@ export const UpscaleWidgetView = () => {
               modelTypes={LORA_MODEL_TYPES}
               placeholder={t('widgets.upscale.searchCompatibleConcepts')}
               scopeLabel={t('models.scopeConcepts')}
-              size="md"
               value={null}
               onChange={addLora}
             />
@@ -658,7 +646,6 @@ export const UpscaleWidgetView = () => {
                 invalid={!values.tileControlnetModel}
                 modelTypes={CONTROLNET_MODEL_TYPES}
                 placeholder={t('widgets.upscale.selectTileControlNet')}
-                size="md"
                 value={values.tileControlnetModel?.key ?? null}
                 onChange={setTileControlNet}
               />
@@ -675,7 +662,6 @@ export const UpscaleWidgetView = () => {
                   invalid={!values.t5EncoderModel}
                   modelTypes={T5_ENCODER_MODEL_TYPES}
                   placeholder={t('widgets.upscale.selectT5Encoder')}
-                  size="md"
                   value={values.t5EncoderModel?.key ?? null}
                   onChange={setT5Encoder}
                 />
@@ -689,7 +675,6 @@ export const UpscaleWidgetView = () => {
                   invalid={!values.clipEmbedModel}
                   modelTypes={CLIP_EMBED_MODEL_TYPES}
                   placeholder={t('widgets.upscale.selectClipEmbed')}
-                  size="md"
                   value={values.clipEmbedModel?.key ?? null}
                   onChange={setClipEmbed}
                 />
@@ -732,7 +717,6 @@ export const UpscaleWidgetView = () => {
                 isClearable={!showComponentPickers}
                 modelTypes={VAE_MODEL_TYPES}
                 placeholder={showComponentPickers ? t('widgets.upscale.selectVae') : t('widgets.upscale.bundledVae')}
-                size="md"
                 value={values.vae?.key ?? null}
                 onChange={set.vae}
               />
@@ -741,7 +725,6 @@ export const UpscaleWidgetView = () => {
               <Select
                 aria-label={t('widgets.upscale.vaePrecision')}
                 collection={VAE_PRECISION_COLLECTION}
-                size="md"
                 value={vaePrecisionValue}
                 onValueChange={set.vaePrecision}
               />

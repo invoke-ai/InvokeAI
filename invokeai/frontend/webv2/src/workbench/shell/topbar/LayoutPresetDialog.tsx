@@ -222,7 +222,6 @@ export const LayoutPresetDialog = ({
                       collection={sourceCollection}
                       disabled={sourceOptions.length === 0}
                       renderItem={renderSourceOption}
-                      size="md"
                       triggerProps={sourceTriggerProps}
                       value={sourceValue}
                       valueText={
@@ -244,10 +243,10 @@ export const LayoutPresetDialog = ({
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button size="md" type="button" variant="ghost" onClick={onClose}>
+                <Button type="button" variant="ghost" onClick={onClose}>
                   {t('common.cancel')}
                 </Button>
-                <Button disabled={!canSubmit} size="md" type="submit">
+                <Button disabled={!canSubmit} type="submit">
                   {submitLabel}
                 </Button>
               </Dialog.Footer>

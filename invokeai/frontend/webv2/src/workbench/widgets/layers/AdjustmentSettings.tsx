@@ -318,7 +318,6 @@ const ScalarSlider = ({
         formatValue={formatValue}
         max={max}
         min={min}
-        size="md"
         step={step}
         value={sliderValue}
         withThumbTooltip
@@ -441,7 +440,6 @@ const LevelsEditor = ({
           aria-label={t('widgets.layers.adjustments.channel')}
           collection={channelCollection}
           positioning={SELECT_POSITIONING}
-          size="md"
           value={channelValue}
           valueText={t(`widgets.layers.adjustments.channels.${entry.channel ?? 'rgb'}`)}
           onValueChange={handleChannelChange}
@@ -453,7 +451,6 @@ const LevelsEditor = ({
           max={255}
           min={0}
           minStepsBetweenThumbs={1}
-          size="md"
           step={1}
           value={inputValue}
           withThumbTooltip
@@ -467,7 +464,6 @@ const LevelsEditor = ({
           formatValue={formatGamma}
           max={4}
           min={0.1}
-          size="md"
           step={0.01}
           value={gammaValue}
           withThumbTooltip
@@ -480,7 +476,6 @@ const LevelsEditor = ({
           aria-label={outputAria}
           max={255}
           min={0}
-          size="md"
           step={1}
           value={outputValue}
           withThumbTooltip
@@ -664,7 +659,6 @@ const CurvesEditor = ({
           aria-label={t('widgets.layers.adjustments.channel')}
           collection={channelCollection}
           positioning={SELECT_POSITIONING}
-          size="md"
           value={channelValue}
           valueText={t(`widgets.layers.adjustments.channels.${channel}`)}
           w="6rem"

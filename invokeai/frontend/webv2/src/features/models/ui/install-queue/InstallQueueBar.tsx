@@ -156,7 +156,6 @@ export const InstallQueueBar = () => {
           ms="-2"
           ps="2"
           pe="3"
-          size="md"
           variant="ghost"
           _hover={TOGGLE_HOVER}
           onClick={() => setQueueExpanded(!queueExpanded)}

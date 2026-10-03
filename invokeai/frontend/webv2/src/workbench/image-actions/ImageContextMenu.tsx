@@ -1123,7 +1123,7 @@ const ContextSubMenu = ({
       <Menu.Positioner>
         <MenuContent {...MENU_CONTENT_PROPS} maxH="18rem" overflowY={scrollArea ? undefined : 'auto'}>
           {scrollArea ? (
-            <ScrollArea.Root maxH="inherit" size="md" variant="hover" w="full">
+            <ScrollArea.Root maxH="inherit" variant="hover" w="full">
               <ScrollArea.Viewport maxH="inherit" w="full">
                 <ScrollArea.Content>{children}</ScrollArea.Content>
               </ScrollArea.Viewport>

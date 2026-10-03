@@ -98,7 +98,6 @@ export const ModelCacheFooter = () => {
           colorPalette="accent"
           max={1}
           role="progressbar"
-          size="md"
           value={ratio}
         >
           <Progress.Track bg="transparent">

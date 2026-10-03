@@ -36,7 +36,6 @@ export const BundleChips = ({
           label={t('modelManager.launchpad.starterBundles')}
           minW="0"
           orientation="horizontal"
-          size="md"
           variant="hover"
         >
           <HStack gap="1.5">
@@ -83,10 +82,10 @@ const BundleChip = ({
   onSelect: () => void;
   subLabel: string;
 }) => (
-  <Button flexShrink={0} size="md" variant={isSelected ? 'solid' : 'subtle'} onClick={onSelect}>
+  <Button flexShrink={0} variant={isSelected ? 'solid' : 'subtle'} onClick={onSelect}>
     <Icon as={isComplete ? CheckIcon : FolderIcon} boxSize="3" />
     {label}
-    <Badge variant="surface" size="md" ms="1" me="-1">
+    <Badge variant="surface" ms="1" me="-1">
       {subLabel}
     </Badge>
   </Button>

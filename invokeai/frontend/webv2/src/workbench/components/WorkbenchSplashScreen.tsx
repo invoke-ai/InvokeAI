@@ -31,7 +31,7 @@ export const WorkbenchSplashScreen = ({ messageKey = 'splash.loadingWorkspace' }
             <Text fontSize="xl">{t('splash.tagline')}</Text>
             <Text fontSize="md">{t('splash.artworkBy', { artist: 'Jonathan Pollack' })}</Text>
             <Flex alignItems="center" gap="2" mt="auto">
-              <Spinner size="md" />
+              <Spinner />
               <Text fontSize="md" flex="1">
                 {t(messageKey)}
               </Text>

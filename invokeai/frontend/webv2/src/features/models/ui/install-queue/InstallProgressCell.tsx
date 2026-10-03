@@ -32,7 +32,6 @@ export const InstallProgressBar = ({
       colorPalette={status === 'paused' ? 'gray' : 'accent'}
       max={1}
       minW="0"
-      size="md"
       value={value}
       w="full"
     >

@@ -92,7 +92,7 @@ const NotificationsPanel = () => {
                       {notification.titleKey ? t(notification.titleKey) : notification.title}
                     </Text>
                   </HStack>
-                  <Badge colorPalette={kindColorPalette[notification.kind]} size="md">
+                  <Badge colorPalette={kindColorPalette[notification.kind]}>
                     {t(`notifications.kind.${notification.kind}`)}
                   </Badge>
                 </HStack>

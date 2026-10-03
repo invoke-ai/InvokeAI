@@ -62,7 +62,7 @@ const OpenModelManagerButton = ({ modelType }: { modelType?: string }) => {
   );
 
   return (
-    <Button alignSelf="start" px="1.5" size="md" variant="plain" onClick={handleClick}>
+    <Button alignSelf="start" px="1.5" variant="plain" onClick={handleClick}>
       {t('widgets.generate.openModelManager')}
     </Button>
   );
@@ -347,7 +347,6 @@ export const PromptTriggerPopover = ({
                   <Input
                     aria-label={t('widgets.generate.searchPromptTriggers')}
                     placeholder={t('widgets.generate.searchPromptTriggers')}
-                    size="md"
                     value={searchTerm}
                     onChange={handleSearchChange}
                   />
@@ -416,7 +415,6 @@ const PromptTriggerOptionButton = ({
       justifyContent="start"
       px="2"
       py="1.5"
-      size="md"
       transitionDuration="faster"
       variant="ghost"
       onClick={handleClick}
@@ -593,7 +591,6 @@ const ExpandPromptButton = ({
                       isClearable={false}
                       modelTypes={TEXT_LLM_MODEL_TYPES}
                       placeholder={t('widgets.generate.selectTextLlm')}
-                      size="md"
                       value={selectedModel?.key ?? null}
                       onChange={handleModelChange}
                     />
@@ -630,7 +627,6 @@ const ExpandPromptButton = ({
                       // The request carries the system prompt's text, so it waits for the list.
                       disabled={!selectedModel || !positivePrompt.trim() || systemPrompts.isLoading}
                       loading={isLoading}
-                      size="md"
                       onClick={handleRunExpandPrompt}
                     >
                       {t('widgets.generate.expand')}
@@ -672,7 +668,7 @@ const ExpandPromptImageOption = ({
         src={galleryImageUrls.thumbnail(image.image_name)}
       />
       {canReadImages ? (
-        <Checkbox.Root checked={isIncluded} size="md" onCheckedChange={onIncludedChange}>
+        <Checkbox.Root checked={isIncluded} onCheckedChange={onIncludedChange}>
           <Checkbox.HiddenInput />
           <Checkbox.Control />
           <Checkbox.Label fontSize="md">{t('widgets.generate.expandFromFirstFrame')}</Checkbox.Label>
@@ -828,7 +824,6 @@ const ImageToPromptButton = ({
                       isClearable={false}
                       modelTypes={LLAVA_MODEL_TYPES}
                       placeholder={t('widgets.generate.selectVisionModel')}
-                      size="md"
                       value={selectedModel?.key ?? null}
                       onChange={handleModelChange}
                     />
@@ -850,12 +845,7 @@ const ImageToPromptButton = ({
                       </Text>
                     )}
                     <LLMTaskProgressDisplay taskId={taskId} />
-                    <Button
-                      disabled={!image || !selectedModel}
-                      loading={isLoading}
-                      size="md"
-                      onClick={handleRunImageToPrompt}
-                    >
+                    <Button disabled={!image || !selectedModel} loading={isLoading} onClick={handleRunImageToPrompt}>
                       {t('widgets.generate.generatePrompt')}
                     </Button>
                   </>
@@ -916,11 +906,10 @@ const PositivePromptHistoryButton = ({ onUsePrompt }: Pick<PositivePromptActions
                     aria-label={t('widgets.generate.searchPromptHistory')}
                     disabled={promptHistory.length === 0}
                     placeholder={t('widgets.generate.searchPromptHistory')}
-                    size="md"
                     value={searchTerm}
                     onChange={onChangeSearchTerm}
                   />
-                  <Button disabled={promptHistory.length === 0} size="md" variant="ghost" onClick={clearPromptHistory}>
+                  <Button disabled={promptHistory.length === 0} variant="ghost" onClick={clearPromptHistory}>
                     <Icon as={TrashIcon} boxSize="3" />
                     {t('common.clear')}
                   </Button>

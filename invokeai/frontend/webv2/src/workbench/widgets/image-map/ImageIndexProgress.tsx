@@ -88,7 +88,7 @@ export const ImageIndexProgressPanel = ({
         </Text>
       ) : null}
       {/* Refresh is the only control before map readiness and recovers counts missed while offline. */}
-      <Button mt={error ? '0' : '2'} onClick={onRetry} size="md" variant="outline">
+      <Button mt={error ? '0' : '2'} onClick={onRetry} variant="outline">
         {error ? 'Retry' : 'Check again'}
       </Button>
     </Stack>
@@ -124,7 +124,7 @@ export const ImageIndexActivityBadge = ({ counts, updatedAt }: ImageIndexProgres
         py="1"
         title={label}
       >
-        <Progress.Root flexShrink="0" max={100} size="md" value={progress.percent} w="10">
+        <Progress.Root flexShrink="0" max={100} value={progress.percent} w="10">
           <Progress.Track aria-label={`${PROGRESS_LABEL}: ${label}`} aria-valuenow={progress.percent}>
             <Progress.Range />
           </Progress.Track>
@@ -145,7 +145,7 @@ export const ImageIndexProgressInline = ({ counts, updatedAt }: ImageIndexProgre
     <Tooltip content={label}>
       {/* Use minW=0 and truncation so six-digit footer counts cannot cover refresh in narrow panels. */}
       <HStack gap="1.5" minW="0" overflow="hidden" title={label}>
-        <Progress.Root flexShrink="0" max={100} size="md" value={progress.percent} w="10">
+        <Progress.Root flexShrink="0" max={100} value={progress.percent} w="10">
           {/* The counts go in the name too: at the widget's minimum width the
               label beside it truncates to a couple of characters, and the
               tooltip carrying the full text is hover-only. */}

@@ -153,7 +153,7 @@ export const ProjectsBrowser = ({
     <Scrollable flex="1" h="full" label={t('launchpad.sections.projects')} minH="0" viewportRef={scrollRef}>
       <Box css={MEASURE_SX} pb="8" ref={measureRef}>
         {status === 'error' ? (
-          <Alert.Root borderRadius="md" mb="4" size="md" status="error">
+          <Alert.Root borderRadius="md" mb="4" status="error">
             <Alert.Indicator />
             <Alert.Title flex="1" fontSize="md">
               {error ?? t('projects.failedToLoad')}
@@ -278,7 +278,7 @@ const ProjectsEmptyState = ({
         icon={NO_MATCHES_ICON}
         title={t('projects.noSearchMatches', { search: searchTerm.trim() })}
       >
-        <Button size="md" variant="outline" onClick={onClearSearch}>
+        <Button variant="outline" onClick={onClearSearch}>
           {t('common.clearSearch')}
         </Button>
       </EmptyState>

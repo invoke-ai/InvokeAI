@@ -450,7 +450,6 @@ const HexField = ({ hex, onCommit }: { hex: string; onCommit: (hex: string) => v
       fontFamily="mono"
       fontSize="md"
       minW="24"
-      size="md"
       value={draft ?? hex}
       onBlur={commit}
       onChange={onChange}

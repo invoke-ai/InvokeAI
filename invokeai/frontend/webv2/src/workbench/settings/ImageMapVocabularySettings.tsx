@@ -135,7 +135,7 @@ export const ImageMapVocabularySettings = () => {
         <Text color="fg.error" fontSize="md">
           {t('settings.imageMapVocabulary.loadFailed')}
         </Text>
-        <Button size="md" variant="outline" onClick={() => void query.refetch()}>
+        <Button variant="outline" onClick={() => void query.refetch()}>
           {t('common.retry')}
         </Button>
       </Stack>
@@ -156,7 +156,6 @@ export const ImageMapVocabularySettings = () => {
             <Input
               aria-invalid={inputError || saveError ? true : undefined}
               placeholder={t('settings.imageMapVocabulary.addPlaceholder')}
-              size="md"
               value={draft}
               onChange={(event) => {
                 setDraft(event.currentTarget.value);
@@ -196,7 +195,6 @@ export const ImageMapVocabularySettings = () => {
             <Button
               disabled={draft.trim().length === 0}
               loading={isSaving}
-              size="md"
               variant="outline"
               onClick={() => {
                 void addTerms(vocab);
@@ -229,7 +227,7 @@ export const ImageMapVocabularySettings = () => {
                 {term}
               </RemovableTag>
             ) : (
-              <Tag.Root key={term} size="md" variant="surface">
+              <Tag.Root key={term} variant="surface">
                 <Tag.Label>{term}</Tag.Label>
               </Tag.Root>
             )
@@ -278,7 +276,7 @@ const VocabularyStatusLine = ({
       </Text>
       {vocab.state === 'building' ? (
         <HStack gap="1.5">
-          <Spinner size="md" />
+          <Spinner />
           <Text color="fg.muted" fontSize="xs">
             {progress
               ? t('settings.imageMapVocabulary.rebuildingQueued', { progress: progress.counts })

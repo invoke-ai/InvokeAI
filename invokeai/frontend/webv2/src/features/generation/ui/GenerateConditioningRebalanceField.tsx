@@ -195,7 +195,6 @@ export const GenerateConditioningRebalanceField = ({
             <Switch.Root
               checked={isEnabled}
               ids={{ hiddenInput: switchInputId, label: `${switchInputId}-label` }}
-              size="md"
               onCheckedChange={({ checked }) => onCommitImmediate({ krea2RebalanceEnabled: checked })}
             >
               <Switch.HiddenInput aria-label={t('widgets.generate.krea2Rebalance')} />
@@ -216,7 +215,6 @@ export const GenerateConditioningRebalanceField = ({
                 contentProps={SELECT_CONTENT_PROPS}
                 flex="1"
                 minW="0"
-                size="md"
                 value={activePresetId === null ? [] : [activePresetId]}
                 valueText={activePreset?.label ?? t('widgets.generate.krea2RebalancePresetCustom')}
                 onValueChange={({ value }) => handlePresetChange(value)}
@@ -330,7 +328,6 @@ export const GenerateConditioningRebalanceField = ({
               <Input
                 aria-label={t('widgets.generate.krea2RebalanceWeights')}
                 fontFamily="mono"
-                size="md"
                 value={
                   weightsDraft ??
                   (previewWeights ? serializeRebalanceWeights(previewWeights) : settings.krea2RebalanceWeights)

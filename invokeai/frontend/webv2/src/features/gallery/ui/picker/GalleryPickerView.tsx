@@ -357,7 +357,6 @@ export const GalleryPickerView = ({
           justifyContent="flex-start"
           minW="0"
           ps="1"
-          size="md"
           variant="ghost"
           onClick={togglePane}
         >
@@ -383,7 +382,6 @@ export const GalleryPickerView = ({
             aria-label={uploadTarget.label}
             color="fg.muted"
             disabled={!uploadTarget.isAvailable || isUploading}
-            size="md"
             variant="ghost"
             onClick={openUploadPicker}
           >
@@ -446,7 +444,7 @@ export const GalleryPickerView = ({
                 : t('widgets.gallery.picker.empty', { name: boardName })}
             </Text>
             {!isSearching && uploadTarget.isAvailable ? (
-              <Button disabled={isUploading} size="md" variant="outline" onClick={openUploadPicker}>
+              <Button disabled={isUploading} variant="outline" onClick={openUploadPicker}>
                 <Icon as={UploadIcon} boxSize="3.5" />
                 {t('widgets.gallery.picker.upload')}
               </Button>

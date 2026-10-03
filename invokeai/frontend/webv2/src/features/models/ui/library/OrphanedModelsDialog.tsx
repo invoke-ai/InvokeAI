@@ -145,7 +145,6 @@ export const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
                     }
                     colorPalette="accent"
                     ps="2"
-                    size="md"
                     onCheckedChange={() => {
                       setSelectedPaths(
                         selectedPaths.size === orphans.length
@@ -165,7 +164,6 @@ export const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
                       <Checkbox.Root
                         checked={selectedPaths.has(orphan.path)}
                         colorPalette="accent"
-                        size="md"
                         onCheckedChange={() => togglePath(orphan.path)}
                       >
                         <Checkbox.HiddenInput />
@@ -185,14 +183,13 @@ export const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
               )}
             </Dialog.Body>
             <Dialog.Footer>
-              <Button disabled={isDeleting} size="md" variant="ghost" onClick={onClose}>
+              <Button disabled={isDeleting} variant="ghost" onClick={onClose}>
                 {t('common.close')}
               </Button>
               <Button
                 colorPalette="red"
                 disabled={selectedPaths.size === 0 || !orphans || orphans.length === 0}
                 loading={isDeleting}
-                size="md"
                 variant="solid"
                 onClick={() => void handleDelete()}
               >

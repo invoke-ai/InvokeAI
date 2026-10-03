@@ -101,7 +101,6 @@ const BlendModeControl = ({
       itemsMaxH="16rem"
       minW="0"
       positioning={SELECT_POSITIONING}
-      size="md"
       triggerProps={BLEND_TRIGGER_PROPS}
       value={blendValue}
       valueText={t(`widgets.layers.blendModes.${blendMode}`)}

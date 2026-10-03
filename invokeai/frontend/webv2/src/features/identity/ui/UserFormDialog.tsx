@@ -227,7 +227,7 @@ const UserForm = ({
                   value={form.values.password}
                   onChange={handlePasswordChange}
                 />
-                <Button loading={isGenerating} size="md" variant="outline" onClick={handleGeneratedPasswordClick}>
+                <Button loading={isGenerating} variant="outline" onClick={handleGeneratedPasswordClick}>
                   <WandSparklesIcon />
                   {t('users.generate')}
                 </Button>
@@ -260,10 +260,10 @@ const UserForm = ({
         </Stack>
       </Dialog.Body>
       <Dialog.Footer>
-        <Button size="md" variant="ghost" onClick={onClose}>
+        <Button variant="ghost" onClick={onClose}>
           {t('common.cancel')}
         </Button>
-        <Button loading={form.isSubmitting} size="md" variant="solid" onClick={handleSubmitClick}>
+        <Button loading={form.isSubmitting} variant="solid" onClick={handleSubmitClick}>
           {isCreate ? t('users.createUser') : t('users.saveChanges')}
         </Button>
       </Dialog.Footer>

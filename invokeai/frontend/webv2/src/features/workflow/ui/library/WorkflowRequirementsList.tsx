@@ -160,7 +160,7 @@ const RequirementRow = ({
         {presentation.icon ? (
           <Icon aria-label={statusLabel} as={presentation.icon} boxSize="3" color={presentation.color} />
         ) : (
-          <Spinner aria-label={statusLabel} borderWidth="1.5px" color={presentation.color} size="md" />
+          <Spinner aria-label={statusLabel} borderWidth="1.5px" color={presentation.color} />
         )}
       </DataList.ItemLabel>
       <DataList.ItemValue color={presentation.color} fontSize="xs" minW="0">
@@ -217,7 +217,7 @@ export const WorkflowRequirementsList = ({ errorMessage, resolved, onFindModel }
           ))
         : null}
       {!errorMessage && resolved !== null && resolved.length > 0 ? (
-        <DataList.Root gap="1.5" orientation="horizontal" size="md">
+        <DataList.Root gap="1.5" orientation="horizontal">
           {resolved.map((requirement) => (
             <RequirementRow
               key={getRequirementKey(requirement.requirement)}

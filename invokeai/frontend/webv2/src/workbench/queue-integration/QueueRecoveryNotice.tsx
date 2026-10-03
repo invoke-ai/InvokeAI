@@ -160,7 +160,7 @@ export const QueueRecoveryNotice = ({
   if (query.isPending) {
     return (
       <HStack color="fg.muted" px="4" py="2">
-        <Spinner size="md" />
+        <Spinner />
         <Text fontSize="lg">{t('shell.queueRecovery.loading')}</Text>
       </HStack>
     );

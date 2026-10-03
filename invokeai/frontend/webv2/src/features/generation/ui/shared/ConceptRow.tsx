@@ -183,11 +183,11 @@ export const ConceptRow = memo(function ConceptRow({
           }
           badges={
             <>
-              <Badge colorPalette={models.getBaseColorPalette(lora.model.base)} size="md" variant="surface">
+              <Badge colorPalette={models.getBaseColorPalette(lora.model.base)} variant="surface">
                 {models.getBaseLabel(lora.model.base)}
               </Badge>
               {isCompatible ? null : (
-                <Badge colorPalette="orange" size="md" variant="surface">
+                <Badge colorPalette="orange" variant="surface">
                   {t('widgets.generate.incompatible')}
                 </Badge>
               )}

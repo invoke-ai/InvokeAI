@@ -262,7 +262,7 @@ const CanvasHeaderActionsInner = ({
               variant="ghost"
               onClick={() => void saveToGallery('canvas')}
             >
-              {isSaving ? <Spinner size="md" /> : <SaveIcon />}
+              {isSaving ? <Spinner /> : <SaveIcon />}
             </IconButton>
           </Tooltip>
           <Menu.Trigger asChild>
@@ -357,17 +357,16 @@ const CanvasSettingsActionsInner = ({ engine }: { engine: CanvasHeaderEngine }) 
       <Text color="fg.subtle" fontSize="xs" textTransform="uppercase">
         {t('widgets.canvas.settings.sections.debug')}
       </Text>
-      <Button size="md" variant="ghost" justifyContent="start" onClick={() => void engine.diagnostics.clearCaches()}>
+      <Button variant="ghost" justifyContent="start" onClick={() => void engine.diagnostics.clearCaches()}>
         <DatabaseIcon />
         {t('widgets.canvas.settings.clearCaches')}
       </Button>
-      <Button size="md" variant="ghost" justifyContent="start" onClick={() => engine.diagnostics.logDebugInfo()}>
+      <Button variant="ghost" justifyContent="start" onClick={() => engine.diagnostics.logDebugInfo()}>
         <BugIcon />
         {t('widgets.canvas.settings.logDebugInfo')}
       </Button>
       <Button
         disabled={editingLocked}
-        size="md"
         variant="ghost"
         justifyContent="start"
         onClick={() => engine.history.clearHistory()}

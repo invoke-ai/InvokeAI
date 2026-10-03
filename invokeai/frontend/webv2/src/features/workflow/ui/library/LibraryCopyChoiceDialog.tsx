@@ -175,7 +175,6 @@ const LibraryCopyChoiceContent = ({
               <Select
                 collection={copyCollection}
                 portalled={false}
-                size="md"
                 value={selectValue}
                 onValueChange={handleCopyChange}
               />
@@ -189,16 +188,15 @@ const LibraryCopyChoiceContent = ({
           disabled={isBusy}
           loading={pending === 'replace'}
           me="auto"
-          size="md"
           variant="outline"
           onClick={handleReplace}
         >
           {t('workflowLibrary.copyChoice.replace')}
         </Button>
-        <Button disabled={isBusy} loading={pending === 'add'} size="md" variant="outline" onClick={handleAdd}>
+        <Button disabled={isBusy} loading={pending === 'add'} variant="outline" onClick={handleAdd}>
           {t('workflowLibrary.copyChoice.addCopy')}
         </Button>
-        <Button ref={openButtonRef} disabled={isBusy} size="md" variant="solid" onClick={handleResume}>
+        <Button ref={openButtonRef} disabled={isBusy} variant="solid" onClick={handleResume}>
           {t('workflowLibrary.copyChoice.open')}
         </Button>
       </Dialog.Footer>

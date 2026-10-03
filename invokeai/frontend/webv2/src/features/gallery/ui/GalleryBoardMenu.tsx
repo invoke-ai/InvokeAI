@@ -186,10 +186,10 @@ export const GalleryBoardMenu = ({
                 />
               </Dialog.Body>
               <Dialog.Footer>
-                <Button size="md" variant="ghost" onClick={handleCancelRename}>
+                <Button variant="ghost" onClick={handleCancelRename}>
                   {t('common.cancel')}
                 </Button>
-                <Button disabled={renameValue.trim().length === 0} size="md" onClick={submitRename}>
+                <Button disabled={renameValue.trim().length === 0} onClick={submitRename}>
                   {t('common.rename')}
                 </Button>
               </Dialog.Footer>
@@ -222,13 +222,13 @@ export const GalleryBoardMenu = ({
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button size="md" variant="ghost" onClick={handleCancelDelete}>
+                <Button variant="ghost" onClick={handleCancelDelete}>
                   {t('common.cancel')}
                 </Button>
-                <Button colorPalette="red" size="md" variant="outline" onClick={handleDeleteBoardOnly}>
+                <Button colorPalette="red" variant="outline" onClick={handleDeleteBoardOnly}>
                   {t('widgets.gallery.deleteBoardOnly')}
                 </Button>
-                <Button colorPalette="red" size="md" onClick={handleDeleteBoardAndImages}>
+                <Button colorPalette="red" onClick={handleDeleteBoardAndImages}>
                   {t('widgets.gallery.deleteBoardAndMedia')}
                 </Button>
               </Dialog.Footer>

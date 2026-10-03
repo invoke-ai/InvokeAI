@@ -152,13 +152,13 @@ export const WhatsNewDialog = () => {
               </Stack>
             </Dialog.Body>
             <Dialog.Footer borderColor="border.subtle" borderTopWidth="1px" px="6" py="3">
-              <Button asChild size="md" variant="outline">
+              <Button asChild variant="outline">
                 <Link href={DOCS_URL} rel="noreferrer" target="_blank">
                   <BookOpenIcon aria-hidden />
                   {t('whatsNew.readTheDocs')}
                 </Link>
               </Button>
-              <Button asChild size="md" variant="solid">
+              <Button asChild variant="solid">
                 <Link href={getReleaseNotesUrl(version)} rel="noreferrer" target="_blank">
                   <ScrollTextIcon aria-hidden />
                   {t('whatsNew.readReleaseNotes')}

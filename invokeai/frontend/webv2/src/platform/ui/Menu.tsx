@@ -77,7 +77,7 @@ export const MenuActionItem = ({
       {hintParts && hintParts.length > 0 ? (
         <HStack flexShrink={0} gap="0.5">
           {hintParts.map((part) => (
-            <Kbd key={part} size="md" textTransform="lowercase">
+            <Kbd key={part} textTransform="lowercase">
               {part}
             </Kbd>
           ))}

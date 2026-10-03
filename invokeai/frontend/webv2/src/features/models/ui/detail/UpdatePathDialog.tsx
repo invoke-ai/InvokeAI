@@ -90,13 +90,12 @@ export const UpdatePathDialog = ({
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button disabled={isBusy} size="md" variant="ghost" onClick={onClose}>
+              <Button disabled={isBusy} variant="ghost" onClick={onClose}>
                 {t('common.cancel')}
               </Button>
               <Button
                 disabled={path.trim() === model.path}
                 loading={isBusy}
-                size="md"
                 variant="solid"
                 onClick={() => void handleSave()}
               >

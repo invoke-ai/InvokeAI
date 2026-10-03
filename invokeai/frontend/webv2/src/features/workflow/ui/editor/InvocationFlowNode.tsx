@@ -226,7 +226,6 @@ const InlineLabelInput = ({
         flex="1"
         fontSize={fontSize}
         minW="0"
-        size="md"
         value={draft}
         onBlur={() => {
           if (!isCancelled.current && draft.trim() !== initialValue) {

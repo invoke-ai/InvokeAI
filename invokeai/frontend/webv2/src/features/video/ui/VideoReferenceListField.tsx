@@ -256,24 +256,18 @@ const ReferenceCard = memo(function ReferenceCard({
           <HStack gap="1">
             {/* Render prompt tokens verbatim in LTR order; modality counters differ from card positions. */}
             {promptLabels.map((label) => (
-              <Badge key={label} dir="ltr" flexShrink={0} size="md" userSelect="text" variant="solid">
+              <Badge key={label} dir="ltr" flexShrink={0} userSelect="text" variant="solid">
                 {label}
               </Badge>
             ))}
             <MiddleTruncate flex="1" fontSize="md" text={name} />
             {reference.kind === 'video' && reference.fromSourceVideo === true ? (
-              <Badge flexShrink={0} size="md" variant="outline">
+              <Badge flexShrink={0} variant="outline">
                 {t('widgets.video.referenceFromInitialVideo')}
               </Badge>
             ) : null}
           </HStack>
-          <Select
-            collection={selectCollection}
-            disabled={disabled}
-            size="md"
-            value={selectValue}
-            onValueChange={handleSelect}
-          />
+          <Select collection={selectCollection} disabled={disabled} value={selectValue} onValueChange={handleSelect} />
           {imageCost ? (
             <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums">
               {t('widgets.video.referenceImageCost', {
@@ -740,18 +734,18 @@ export const VideoReferenceListField = memo(function VideoReferenceListField({
               selection={pickerSelection}
               onPick={handlePick}
             >
-              <Button disabled={isInert || (!canAddImage && !canAddVideo)} size="md" variant="outline" w="full">
-                {isLoading ? <Spinner size="md" /> : <Icon as={ImagePlusIcon} boxSize="3.5" />}
+              <Button disabled={isInert || (!canAddImage && !canAddVideo)} variant="outline" w="full">
+                {isLoading ? <Spinner /> : <Icon as={ImagePlusIcon} boxSize="3.5" />}
                 {t('widgets.video.chooseReference')}
                 <Icon as={ChevronDownIcon} boxSize="3" color="fg.subtle" />
               </Button>
             </GalleryPickerPopover>
             <HStack gap="1" justify="center">
-              <Button disabled={isInert || !canAddImage} size="md" variant="ghost" onClick={handlePickImage}>
+              <Button disabled={isInert || !canAddImage} variant="ghost" onClick={handlePickImage}>
                 <UploadIcon size={12} />
                 {t('widgets.video.uploadImageReference')}
               </Button>
-              <Button disabled={isInert || !canAddVideo} size="md" variant="ghost" onClick={handlePickVideo}>
+              <Button disabled={isInert || !canAddVideo} variant="ghost" onClick={handlePickVideo}>
                 <UploadIcon size={12} />
                 {t('widgets.video.uploadVideoReference')}
               </Button>

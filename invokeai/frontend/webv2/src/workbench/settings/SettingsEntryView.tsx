@@ -143,7 +143,7 @@ export const SettingsEntryView = ({
                 {t(scope === 'instance' ? 'settingsDialog.instanceUnavailable' : 'settingsDialog.projectUnavailable')}
               </Text>
             ) : (
-              <Button size="md" variant="outline" alignSelf="start" onClick={reveal}>
+              <Button variant="outline" alignSelf="start" onClick={reveal}>
                 {t('settingsDialog.openEditor')}
               </Button>
             )}

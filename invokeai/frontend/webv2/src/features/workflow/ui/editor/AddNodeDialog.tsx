@@ -240,7 +240,7 @@ const NodeResultRow = ({
           </Text>
         ) : null}
       </Stack>
-      <Badge size="md" variant="outline" fontFamily="mono">
+      <Badge variant="outline" fontFamily="mono">
         {row.nodePack}
       </Badge>
     </HStack>
@@ -735,7 +735,7 @@ const AddNodeDialogContent = ({
                   </Tooltip>
                 ) : null}
               </HStack>
-              <ScrollArea.Root flex="1" minH="0" size="md" variant="hover" w="full">
+              <ScrollArea.Root flex="1" minH="0" variant="hover" w="full">
                 <ScrollArea.Viewport ref={setScrollElement} h="full" w="full">
                   <ScrollArea.Content id={RESULT_LIST_ID} aria-label="Node search results" role="tree" w="full">
                     {body}

@@ -30,7 +30,7 @@ const BrowserIssueAlert = ({ issue }: { issue: DetectedBrowserIssue }) => {
   const { t } = useTranslation();
 
   return (
-    <Alert.Root borderRadius="md" role="alert" size="md" status={issue.severity} variant="surface">
+    <Alert.Root borderRadius="md" role="alert" status={issue.severity} variant="surface">
       <Alert.Indicator alignSelf="start" mt="0.5" />
       <Alert.Content gap="2" minW="0">
         <Stack gap="0.5">

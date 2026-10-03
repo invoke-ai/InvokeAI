@@ -143,7 +143,7 @@ const TargetedWidgetSettingsButton = ({
                     <SettingsActions {...props} />
                   </Box>
                 ) : null}
-                <Button size="md" variant="ghost" w="full" mt="2" onClick={openDialog}>
+                <Button variant="ghost" w="full" mt="2" onClick={openDialog}>
                   {t('settingsDialog.allWidgetSettings', { widget: label })}
                 </Button>
               </Popover.Body>

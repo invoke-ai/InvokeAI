@@ -101,7 +101,7 @@ const GraphSummary = ({
           {t('graphPreview.selectNode')}
         </Text>
       </Stack>
-      <DataList.Root gap="1.5" orientation="horizontal" size="md">
+      <DataList.Root gap="1.5" orientation="horizontal">
         <DataList.Item>
           <DataList.ItemLabel fontSize="xs">{t('graphPreview.nodes')}</DataList.ItemLabel>
           <DataList.ItemValue fontSize="xs" minW="0">
@@ -219,7 +219,7 @@ const NodeInspector = ({
           <ArrowLeftIcon />
         </IconButton>
         <Stack gap="0" minW="0">
-          <Badge fontFamily="mono" size="md" w="fit-content">
+          <Badge fontFamily="mono" w="fit-content">
             {node.type}
           </Badge>
           <Text color="fg.muted" fontSize="xs" truncate>
@@ -257,7 +257,7 @@ const NodeInspector = ({
         <Text color="fg.muted" fontSize="xs" fontWeight="semibold">
           {t('graphPreview.resolvedInputs')}
         </Text>
-        <DataList.Root gap="1.5" orientation="horizontal" size="md">
+        <DataList.Root gap="1.5" orientation="horizontal">
           {resolvedFields.map(({ field, value }) => {
             const { display, isTruncated } = truncateForDisplay(value);
 

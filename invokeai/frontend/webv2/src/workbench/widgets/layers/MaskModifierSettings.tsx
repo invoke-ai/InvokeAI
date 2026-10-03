@@ -99,7 +99,6 @@ export const MaskModifierSettings = ({
           formatValue={formatUnitPercent}
           max={1}
           min={0}
-          size="md"
           step={0.01}
           value={sliderValue}
           withThumbTooltip

@@ -265,7 +265,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
         </Field>
       )}
       {showNegativeControls && (
-        <Switch.Root checked={layer.autoNegative} size="md" onCheckedChange={handleAutoNegative}>
+        <Switch.Root checked={layer.autoNegative} onCheckedChange={handleAutoNegative}>
           <Switch.HiddenInput />
           <Switch.Control>
             <Switch.Thumb />
@@ -303,14 +303,13 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
             aria-label={t('widgets.layers.maskFill.style')}
             collection={styleCollection}
             positioning={SELECT_POSITIONING}
-            size="md"
             value={styleValue}
             valueText={t(`widgets.layers.maskFill.styles.${fill.style}`)}
             onValueChange={handleStyleChange}
           />
         </Field>
       </HStack>
-      <Button disabled={!engine} size="md" variant="outline" onClick={handleInvert}>
+      <Button disabled={!engine} variant="outline" onClick={handleInvert}>
         {t('widgets.layers.maskFill.invert')}
       </Button>
     </Stack>

@@ -77,7 +77,7 @@ const WhatsNewButton = () => {
   const { t } = useTranslation();
 
   return (
-    <Button color="fg.muted" css={WHATS_NEW_JUSTIFY} size="md" variant="ghost" w="full" onClick={openWhatsNew}>
+    <Button color="fg.muted" css={WHATS_NEW_JUSTIFY} variant="ghost" w="full" onClick={openWhatsNew}>
       <Icon as={LightbulbFilamentIcon} boxSize="3.5" />
       <Text flex="1" textAlign="start" truncate>
         {t('whatsNew.whatsNewInInvoke')}

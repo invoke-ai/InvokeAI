@@ -285,7 +285,6 @@ export const WorkflowLibraryThumbnail = ({
                   ref={chooseButtonRef}
                   aria-disabled={isBusy || undefined}
                   aria-label={t('workflowLibrary.thumbnailChoose')}
-                  size="md"
                   variant="outline"
                   onClickCapture={isBusy ? preventClick : undefined}
                 >
@@ -297,7 +296,6 @@ export const WorkflowLibraryThumbnail = ({
               <IconButton
                 aria-disabled={isBusy || !canSnapshot || undefined}
                 aria-label={t('workflowLibrary.thumbnailSnapshot')}
-                size="md"
                 variant="outline"
                 onClick={isBusy || !canSnapshot ? undefined : takeSnapshot}
               >
@@ -310,7 +308,6 @@ export const WorkflowLibraryThumbnail = ({
                   aria-disabled={isBusy || undefined}
                   aria-label={t('workflowLibrary.thumbnailRemove')}
                   data-thumbnail-remove
-                  size="md"
                   variant="outline"
                   onClick={isBusy ? undefined : handleRemove}
                 >

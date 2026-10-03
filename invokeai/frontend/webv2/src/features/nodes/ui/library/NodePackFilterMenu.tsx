@@ -41,7 +41,6 @@ export const NodePackFilterMenu = ({
         <IconButton
           aria-label={t('nodes.filterAndSort')}
           color={isActive ? 'accent.solid' : 'fg.muted'}
-          size="md"
           variant="outline"
         >
           <Icon as={SlidersHorizontalIcon} boxSize="4" />

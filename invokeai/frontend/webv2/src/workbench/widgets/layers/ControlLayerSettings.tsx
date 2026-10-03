@@ -402,7 +402,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
             aria-label={t('widgets.layers.control.kind')}
             collection={kindCollection}
             positioning={SELECT_POSITIONING}
-            size="md"
             value={kindValue}
             valueText={t(`widgets.layers.control.kinds.${adapter.kind}`)}
             onValueChange={handleKindChange}
@@ -414,7 +413,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           aria-label={t('widgets.layers.control.model')}
           collection={modelCollection}
           positioning={SELECT_POSITIONING}
-          size="md"
           value={modelValue}
           valueText={selectedModelName ?? t('widgets.layers.control.selectModel')}
           valueTextProps={adapter.model ? undefined : MISSING_MODEL_VALUE_TEXT_PROPS}
@@ -429,7 +427,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
             formatValue={formatWeight}
             max={CONTROL_WEIGHT_BOUNDS.sliderMax}
             min={CONTROL_WEIGHT_BOUNDS.sliderMin}
-            size="md"
             step={CONTROL_WEIGHT_BOUNDS.step}
             value={weightValue}
             withThumbTooltip
@@ -439,7 +436,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           <NumberInput.Root
             max={CONTROL_WEIGHT_BOUNDS.inputMax}
             min={weightInputMin}
-            size="md"
             step={CONTROL_WEIGHT_BOUNDS.step}
             value={weightInputValue}
             w="20"
@@ -456,7 +452,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           formatValue={formatUnitPercent}
           max={1}
           min={0}
-          size="md"
           step={0.01}
           value={rangeValue}
           withThumbTooltip
@@ -470,7 +465,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
             aria-label={t('widgets.layers.control.mode')}
             collection={controlModeCollection}
             positioning={SELECT_POSITIONING}
-            size="md"
             value={controlModeValue}
             valueText={t(`widgets.layers.control.modes.${adapter.controlMode ?? 'balanced'}`)}
             onValueChange={handleControlModeChange}
@@ -511,7 +505,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           <Button
             aria-busy={isRetryingCapabilities}
             aria-disabled={isRetryingCapabilities}
-            size="md"
             variant="outline"
             onClick={retryCapabilities}
           >

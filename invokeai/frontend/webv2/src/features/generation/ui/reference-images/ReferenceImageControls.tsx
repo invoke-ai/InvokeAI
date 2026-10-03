@@ -207,7 +207,7 @@ export const IPAdapterControls = ({
     <Stack gap="2">
       <Stack gap="1">
         <FieldHeader label={t('widgets.generate.mode')} />
-        <SegmentGroup.Root disabled={disabled} size="md" value={mode} w="full" onValueChange={handleModeChange}>
+        <SegmentGroup.Root disabled={disabled} value={mode} w="full" onValueChange={handleModeChange}>
           <SegmentGroup.Indicator />
           {MODE_SEGMENTS.map((segment) => (
             <SegmentGroup.Item key={segment.value} flex="1" justifyContent="center" value={segment.value}>
@@ -262,7 +262,6 @@ export const IPAdapterControls = ({
                   deselectable={false}
                   disabled={disabled}
                   renderItem={renderStyleVariantItem}
-                  size="md"
                   value={styleVariantValue}
                   w="full"
                   onValueChange={handleStyleVariantChange}
@@ -282,7 +281,6 @@ export const IPAdapterControls = ({
                 marks={BEGIN_END_MARKS}
                 max={1}
                 min={0}
-                size="md"
                 step={0.05}
                 value={beginEndStepPct}
                 onValueChange={handleStepsChange}
@@ -332,7 +330,6 @@ export const ClipVisionSelect = ({
       deselectable={false}
       disabled={disabled}
       flexShrink="0"
-      size="md"
       value={selectValue}
       w="24"
       onValueChange={handleValueChange}
@@ -374,7 +371,6 @@ export const FluxReduxControls = <T extends { imageInfluence: FluxReduxImageInfl
         collection={FLUX_REDUX_IMAGE_INFLUENCE_COLLECTION}
         deselectable={false}
         disabled={disabled}
-        size="md"
         value={imageInfluenceValue}
         w="full"
         onValueChange={handleValueChange}

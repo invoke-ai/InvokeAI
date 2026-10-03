@@ -150,7 +150,6 @@ export const Picker = <T,>({
               aria-label={searchPlaceholder}
               autoComplete="off"
               placeholder={searchPlaceholder}
-              size="md"
               value={searchTerm}
               onChange={handleSearchChange}
               onKeyDown={handleSearchKeyDown}
@@ -161,7 +160,7 @@ export const Picker = <T,>({
         {toolbarSlot}
       </Stack>
       <Box borderColor="border.subtle" borderTopWidth="1px" />
-      <ScrollArea.Root maxH="18rem" size="md" variant="hover" w="full">
+      <ScrollArea.Root maxH="18rem" variant="hover" w="full">
         <ScrollArea.Viewport ref={listRef} maxH="inherit" w="full">
           <ScrollArea.Content aria-label={listLabel} maxW="full" minW="0" py="1" role="listbox" w="full">
             {statusSlot ??

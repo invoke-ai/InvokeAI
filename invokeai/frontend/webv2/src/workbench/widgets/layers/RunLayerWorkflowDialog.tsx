@@ -520,10 +520,10 @@ export const RunLayerWorkflowDialog = ({
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button size="md" type="button" variant="ghost" onClick={close}>
+                <Button type="button" variant="ghost" onClick={close}>
                   {t('widgets.layers.runWorkflow.cancel')}
                 </Button>
-                <Button disabled={!canRun} loading={isRunning} size="md" type="submit" variant="solid">
+                <Button disabled={!canRun} loading={isRunning} type="submit" variant="solid">
                   {t('widgets.layers.runWorkflow.run')}
                 </Button>
               </Dialog.Footer>

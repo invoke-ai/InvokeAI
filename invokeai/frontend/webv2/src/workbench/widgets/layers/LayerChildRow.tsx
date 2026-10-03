@@ -284,7 +284,6 @@ const LayerChildRowComponent = ({
             defaultValue={name}
             flex="1"
             minW="0"
-            size="md"
             userSelect="text"
             onBlur={handleNameBlur}
             onClick={stopPropagation}

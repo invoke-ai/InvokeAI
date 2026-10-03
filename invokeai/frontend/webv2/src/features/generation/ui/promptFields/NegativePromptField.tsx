@@ -190,7 +190,6 @@ export const NegativePromptField = ({
         defaultHeightPx={heightPx}
         minHeightPx={56}
         resizeHandleAriaLabel={t('widgets.generate.resizeNegativePrompt')}
-        size="md"
         fontFamily="mono"
         readOnly={isViewingMerged}
         showSyntaxHighlighting={showSyntaxHighlighting}

@@ -241,7 +241,6 @@ const GalleryThumbnail = ({
           opacity={0}
           pointerEvents="none"
           position="absolute"
-          size="md"
           top="1"
           transition="opacity var(--wb-motion-duration-medium) ease"
           variant="solid"
@@ -253,15 +252,7 @@ const GalleryThumbnail = ({
         </Badge>
       ) : null}
       {compareRole && (
-        <Badge
-          insetInlineStart="1"
-          pointerEvents="none"
-          position="absolute"
-          size="md"
-          top="1"
-          variant="solid"
-          zIndex="1"
-        >
+        <Badge insetInlineStart="1" pointerEvents="none" position="absolute" top="1" variant="solid" zIndex="1">
           {compareRole}
         </Badge>
       )}

@@ -145,7 +145,7 @@ export const GalleryBoardsPanel = () => {
         onSearchChange={setSearchTerm}
         onSubmitSearch={handleSubmitSearch}
       />
-      <ScrollArea.Root flex="1" minH="0" size="md" variant="hover" w="full">
+      <ScrollArea.Root flex="1" minH="0" variant="hover" w="full">
         <ScrollArea.Viewport ref={boardsViewportRef} h="full" w="full">
           <ScrollArea.Content {...SCROLL_CONTENT_PROPS}>
             <GalleryBoardSection

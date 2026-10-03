@@ -393,16 +393,15 @@ export const ReferenceImageCropDialog = ({
             <Dialog.Footer>
               <Button
                 disabled={isApplying || isFullReferenceImageCropBox(cropBox)}
-                size="md"
                 variant="outline"
                 onClick={resetCrop}
               >
                 {t('common.reset')}
               </Button>
-              <Button disabled={isApplying} size="md" variant="ghost" onClick={close}>
+              <Button disabled={isApplying} variant="ghost" onClick={close}>
                 {t('common.cancel')}
               </Button>
-              <Button loading={isApplying} size="md" onClick={applyCrop}>
+              <Button loading={isApplying} onClick={applyCrop}>
                 {t('common.apply')}
               </Button>
             </Dialog.Footer>

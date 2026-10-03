@@ -74,7 +74,6 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, isMo
         alignItems="center"
         gap="4"
         w="full"
-        size="md"
         onCheckedChange={handleCheckedChange}
       >
         <Stack gap="1">
@@ -143,7 +142,6 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, isMo
             max={field.max}
             step={field.step ?? 1}
             flex="1"
-            size="md"
             onValueChange={handleSliderChange}
           >
             <Slider.Control>

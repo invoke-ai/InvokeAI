@@ -132,7 +132,6 @@ const DetailsTab = ({ node, template }: { node: WorkflowInvocationNode; template
           minH="3rem"
           placeholder={t('widgets.workflow.nodeNotesPlaceholder')}
           resize="vertical"
-          size="md"
           value={node.data.notes}
           onChange={onNotesChange}
         />

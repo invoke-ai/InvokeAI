@@ -120,7 +120,6 @@ export const VideoConditioningClipField = memo(
             <Select
               collection={roleCollection}
               disabled={disabled}
-              size="md"
               value={roleValue}
               onValueChange={handleRoleChange}
             />

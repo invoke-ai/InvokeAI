@@ -134,7 +134,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
         />
       ) : null}
       {relatedKeys === null ? (
-        <Spinner color="fg.subtle" size="md" />
+        <Spinner color="fg.subtle" />
       ) : relatedModels.length === 0 ? (
         <Text color="fg.subtle" fontSize="xs">
           {t('models.noRelatedModels')}

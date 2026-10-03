@@ -132,7 +132,6 @@ export const PromptTemplatesPanel = ({
       <Input
         aria-label={t('widgets.generate.promptTemplates.search')}
         placeholder={t('widgets.generate.promptTemplates.search')}
-        size="md"
         value={searchTerm}
         onChange={handleSearchChange}
       />

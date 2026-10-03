@@ -99,7 +99,7 @@ const UninstallButton = ({ onUninstalled, pack }: { onUninstalled: () => void; p
 
   return (
     <>
-      <Button colorPalette="red" flexShrink={0} size="md" variant="outline" onClick={() => setIsConfirmOpen(true)}>
+      <Button colorPalette="red" flexShrink={0} variant="outline" onClick={() => setIsConfirmOpen(true)}>
         <Icon as={Trash2Icon} boxSize="3" />
         {t('nodes.uninstall')}
       </Button>

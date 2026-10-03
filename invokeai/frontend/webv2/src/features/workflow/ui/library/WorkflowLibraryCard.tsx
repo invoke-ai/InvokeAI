@@ -175,7 +175,7 @@ export const WorkflowLibraryCard = ({
           <HStack gap="1.5" h={TITLE_ROW_HEIGHT} minW="0" pe="7">
             <MiddleTruncate fontSize="md" fontWeight="600" minW="0" text={item.name || t('workflowLibrary.untitled')} />
             {isActive ? (
-              <Badge data-active-workflow flexShrink={0} size="md" variant="solid">
+              <Badge data-active-workflow flexShrink={0} variant="solid">
                 {t('workflowLibrary.activeWorkflow')}
               </Badge>
             ) : null}
@@ -186,7 +186,7 @@ export const WorkflowLibraryCard = ({
               <Skeleton data-enrichment-placeholder h="3" rounded="sm" w="14" />
             ) : null}
             {primaryBase ? (
-              <Badge flexShrink={0} size="md" variant="subtle">
+              <Badge flexShrink={0} variant="subtle">
                 {getModelBaseLabel(primaryBase)}
               </Badge>
             ) : null}
@@ -196,7 +196,7 @@ export const WorkflowLibraryCard = ({
               </Text>
             ) : null}
             {missingCount > 0 ? (
-              <Badge bg="bg.warning" color="fg.warning" flexShrink={0} size="md" variant="subtle">
+              <Badge bg="bg.warning" color="fg.warning" flexShrink={0} variant="subtle">
                 {t('workflowLibrary.installModels', { count: missingCount })}
               </Badge>
             ) : null}

@@ -38,7 +38,7 @@ const GalleryPickerBoardRow = memo(function GalleryPickerBoardRow({
       label={getGalleryBoardLabel(board, t)}
       onSelect={handleSelect}
     >
-      <Badge flexShrink={0} fontVariantNumeric="tabular-nums" size="md" variant="subtle">
+      <Badge flexShrink={0} fontVariantNumeric="tabular-nums" variant="subtle">
         {getGalleryCountForView(board, galleryView)}
       </Badge>
     </GalleryBoardRowShell>

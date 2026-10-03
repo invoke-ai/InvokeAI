@@ -237,7 +237,7 @@ export const HotkeysSettingsSection = () => {
             {t('hotkeys.description')}
           </Text>
         </Stack>
-        <Button disabled={modifiedCount === 0} size="md" variant="outline" onClick={resetAll}>
+        <Button disabled={modifiedCount === 0} variant="outline" onClick={resetAll}>
           <RotateCcwIcon />
           {t('hotkeys.resetAll')}
         </Button>
@@ -247,7 +247,6 @@ export const HotkeysSettingsSection = () => {
         <Input
           aria-label={t('hotkeys.searchPlaceholder')}
           placeholder={t('hotkeys.searchPlaceholder')}
-          size="md"
           value={searchTerm}
           onChange={handleSearchChange}
         />
@@ -358,7 +357,7 @@ const HotkeyListRow = ({
             {getHotkeyTitle(hotkey)}
           </Text>
           {hotkey.implemented === false ? (
-            <Badge colorPalette="gray" size="md" variant="surface">
+            <Badge colorPalette="gray" variant="surface">
               {t('hotkeys.pending')}
             </Badge>
           ) : null}
@@ -397,34 +396,28 @@ const HotkeyListRow = ({
               {t('hotkeys.disabled')}
             </Text>
           )}
-          <IconButton aria-label={t('hotkeys.addHotkey')} size="md" variant="ghost" onClick={addDraftKey}>
+          <IconButton aria-label={t('hotkeys.addHotkey')} variant="ghost" onClick={addDraftKey}>
             <PlusIcon />
           </IconButton>
         </HStack>
         <HStack gap="1">
           {isEditing || isDirty ? (
             <>
-              <IconButton aria-label={t('hotkeys.cancelEdit')} size="md" variant="ghost" onClick={cancelEdit}>
+              <IconButton aria-label={t('hotkeys.cancelEdit')} variant="ghost" onClick={cancelEdit}>
                 <XIcon />
               </IconButton>
-              <IconButton
-                aria-label={t('hotkeys.saveEdit')}
-                disabled={!canSave}
-                size="md"
-                variant="ghost"
-                onClick={saveEdit}
-              >
+              <IconButton aria-label={t('hotkeys.saveEdit')} disabled={!canSave} variant="ghost" onClick={saveEdit}>
                 <CheckIcon />
               </IconButton>
             </>
           ) : null}
           {effectiveKeys.length > 0 ? (
-            <Button size="md" variant="ghost" onClick={disableHotkey}>
+            <Button variant="ghost" onClick={disableHotkey}>
               {t('hotkeys.disable')}
             </Button>
           ) : null}
           {isCustomized ? (
-            <IconButton aria-label={t('hotkeys.resetHotkey')} size="md" variant="ghost" onClick={resetThisHotkey}>
+            <IconButton aria-label={t('hotkeys.resetHotkey')} variant="ghost" onClick={resetThisHotkey}>
               <RotateCcwIcon />
             </IconButton>
           ) : null}
@@ -505,10 +498,10 @@ const HotkeyChip = ({
   }
 
   return (
-    <Button type="button" onClick={onEdit} variant="outline" size="md">
+    <Button type="button" onClick={onEdit} variant="outline">
       {formatHotkeyForPlatform(hotkey).map((part, index, parts) => (
         <Fragment key={`${part}:${index}`}>
-          <Kbd size="md" textTransform="lowercase">
+          <Kbd textTransform="lowercase">
             <ShortcutKeyGlyph fallback={part} part={part} />
           </Kbd>
           {index < parts.length - 1 ? (

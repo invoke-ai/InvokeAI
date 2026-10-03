@@ -121,7 +121,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
         </Box>
         {t('topbar.invoke.invoke')}
         {shortcutParts ? (
-          <Kbd css={HIDE_BELOW_HINT_WIDTH} variant="outline" borderColor={SHORTCUT_BORDER} color="inherit" size="md">
+          <Kbd css={HIDE_BELOW_HINT_WIDTH} variant="outline" borderColor={SHORTCUT_BORDER} color="inherit">
             <TopbarShortcutKeys parts={shortcutParts} />
           </Kbd>
         ) : null}
@@ -157,7 +157,7 @@ const InvokeTooltipContent = ({ shortcutParts, state }: { shortcutParts: string[
               : t('topbar.invoke.unableToQueue')}
         </Text>
         {shortcutParts ? (
-          <Kbd size="md" variant="subtle">
+          <Kbd variant="subtle">
             <TopbarShortcutKeys parts={shortcutParts} />
           </Kbd>
         ) : null}

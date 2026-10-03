@@ -248,7 +248,7 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
           <Text color="fg.muted" fontSize="lg">
             Computing your image map…
           </Text>
-          <Button onClick={handleRefresh} size="md" variant="outline">
+          <Button onClick={handleRefresh} variant="outline">
             Check again
           </Button>
         </Stack>
@@ -300,7 +300,7 @@ const CenteredMessage = ({
         </Text>
       ) : null}
       {actionLabel && onAction ? (
-        <Button mt="2" onClick={onAction} size="md" variant="outline">
+        <Button mt="2" onClick={onAction} variant="outline">
           {actionLabel}
         </Button>
       ) : null}

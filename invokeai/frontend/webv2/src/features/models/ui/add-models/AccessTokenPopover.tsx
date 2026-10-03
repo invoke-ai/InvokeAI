@@ -39,7 +39,6 @@ export const AccessTokenPopover = ({
                 <Input
                   aria-label={t('models.accessToken')}
                   placeholder={t('models.accessTokenPlaceholder')}
-                  size="md"
                   type="password"
                   value={value}
                   onChange={(event) => onChange(event.currentTarget.value)}

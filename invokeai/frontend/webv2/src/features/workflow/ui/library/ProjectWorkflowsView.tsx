@@ -148,7 +148,7 @@ export const ProjectWorkflowsView = ({
             {t('workflowLibrary.projectWorkflowCount', { count: workflows.length })}
           </Text>
           <HStack flexShrink={0} gap="1">
-            <Button size="md" variant="outline" onClick={handleNewWorkflow}>
+            <Button variant="outline" onClick={handleNewWorkflow}>
               <PlusIcon />
               {t('workflowLibrary.newWorkflow')}
             </Button>
@@ -419,7 +419,7 @@ const ProjectWorkflowDetailPanel = ({
               {name}
             </Text>
             {isActive ? (
-              <Badge flexShrink={0} size="md" variant="solid">
+              <Badge flexShrink={0} variant="solid">
                 {t('workflowLibrary.activeWorkflow')}
               </Badge>
             ) : null}
@@ -444,7 +444,7 @@ const ProjectWorkflowDetailPanel = ({
           {libraryEntry.tags.length > 0 ? (
             <HStack flexWrap="wrap" gap="1" minW="0">
               {libraryEntry.tags.map((tag) => (
-                <Badge key={tag} size="md" variant="subtle">
+                <Badge key={tag} variant="subtle">
                   {tag}
                 </Badge>
               ))}

@@ -94,10 +94,10 @@ export const RenameDialog = ({
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button disabled={isPending} size="md" type="button" variant="ghost" onClick={onClose}>
+                <Button disabled={isPending} type="button" variant="ghost" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button loading={isPending} size="md" type="submit" variant="solid">
+                <Button loading={isPending} type="submit" variant="solid">
                   {submitLabel}
                 </Button>
               </Dialog.Footer>

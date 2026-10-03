@@ -347,7 +347,7 @@ export const AddModelsView = () => {
 
           {canScan && isScanning ? (
             <Button size="lg" variant="outline" onClick={handleStopScan}>
-              <Spinner size="md" />
+              <Spinner />
               {t('models.stopScan')}
             </Button>
           ) : canScan ? (

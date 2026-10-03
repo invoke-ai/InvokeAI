@@ -69,14 +69,7 @@ export const HelpMenu = () => {
   return (
     <Menu.Root positioning={MENU_POSITIONING}>
       <Menu.Trigger asChild>
-        <Button
-          aria-label={t('launchpad.help.label')}
-          color="fg.muted"
-          css={TRIGGER_JUSTIFY}
-          size="md"
-          variant="ghost"
-          w="full"
-        >
+        <Button aria-label={t('launchpad.help.label')} color="fg.muted" css={TRIGGER_JUSTIFY} variant="ghost" w="full">
           <Icon as={CircleQuestionMarkIcon} boxSize="3.5" />
           <Text flex="1" textAlign="start" truncate>
             {t('launchpad.help.label')}

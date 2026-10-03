@@ -78,7 +78,6 @@ export const CpuOnlySetting = ({
         checked={model.cpu_only === true}
         colorPalette="accent"
         disabled={isPending}
-        size="md"
         onCheckedChange={handleCheckedChange}
       >
         <Switch.HiddenInput />

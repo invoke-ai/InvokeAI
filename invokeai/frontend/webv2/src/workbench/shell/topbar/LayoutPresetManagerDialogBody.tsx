@@ -102,7 +102,7 @@ export const LayoutPresetManagerDialogBody = () => {
               </DndContext>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button size="md" variant="ghost" onClick={closeLayoutPresetManager}>
+              <Button variant="ghost" onClick={closeLayoutPresetManager}>
                 {t('common.done')}
               </Button>
             </Dialog.Footer>

@@ -128,7 +128,7 @@ export const NodeFieldControl = ({
 
   if (!invocationNode || !template) {
     return (
-      <Alert.Root status="error" size="md" variant="surface">
+      <Alert.Root status="error" variant="surface">
         <Alert.Indicator />
         <Alert.Title>This field no longer exists in the project graph.</Alert.Title>
       </Alert.Root>
@@ -163,7 +163,6 @@ export const NodeFieldControl = ({
               h="5"
               id={labelInputId}
               placeholder={template.title}
-              size="md"
               value={draftLabel ?? label}
               variant="flushed"
               w="full"
@@ -213,7 +212,6 @@ export const NodeFieldControl = ({
                   aria-label={`${t('common.shuffle')} ${label}`}
                   color="fg.muted"
                   flexShrink={0}
-                  size="md"
                   variant="outline"
                   onClick={onShuffleClick}
                 >

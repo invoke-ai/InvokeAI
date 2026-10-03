@@ -87,7 +87,7 @@ export const LoginScreen = () => {
             onChange={handlePasswordChange}
           />
         </Field>
-        <Checkbox.Root checked={form.values.rememberMe} size="md" onCheckedChange={handleRememberMeChange}>
+        <Checkbox.Root checked={form.values.rememberMe} onCheckedChange={handleRememberMeChange}>
           <Checkbox.HiddenInput />
           <Checkbox.Control />
           <Checkbox.Label color="fg.muted" fontWeight="400">

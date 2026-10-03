@@ -161,24 +161,18 @@ export const GalleryBoardRow = ({
       >
         {isAutoAddTarget ? (
           <Tooltip content={t('widgets.gallery.autoAddBadgeTooltip')}>
-            <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} size="md" variant="subtle">
+            <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} variant="subtle">
               {t('widgets.gallery.autoAddBadge')}
             </Badge>
           </Tooltip>
         ) : null}
         {board.projectId !== null ? (
-          <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} size="md" variant="subtle">
+          <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} variant="subtle">
             {t('common.project')}
           </Badge>
         ) : null}
         <Tooltip content={countsBreakdown}>
-          <Badge
-            aria-label={countsBreakdown}
-            flexShrink={0}
-            fontVariantNumeric="tabular-nums"
-            size="md"
-            variant="subtle"
-          >
+          <Badge aria-label={countsBreakdown} flexShrink={0} fontVariantNumeric="tabular-nums" variant="subtle">
             {mediaCount} | {counts.assetCount}
           </Badge>
         </Tooltip>

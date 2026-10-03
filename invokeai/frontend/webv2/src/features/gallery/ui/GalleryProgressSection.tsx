@@ -276,7 +276,7 @@ const GalleryProgressTile = ({
         display="flex"
       >
         {session.state === 'running' ? (
-          <ProgressCircle.Root aria-label={status} size="md" value={percentage}>
+          <ProgressCircle.Root aria-label={status} value={percentage}>
             <ProgressCircle.Circle>
               <ProgressCircle.Track />
               <ProgressCircle.Range />

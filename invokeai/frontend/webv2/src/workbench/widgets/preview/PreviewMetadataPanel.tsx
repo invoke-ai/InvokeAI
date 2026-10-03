@@ -206,7 +206,7 @@ const ImageDetails = ({
             {t('widgets.preview.loadingMetadata')}
           </Text>
         ) : (
-          <DataList.Root gap="1.5" orientation="horizontal" size="md">
+          <DataList.Root gap="1.5" orientation="horizontal">
             {entries.map((entry) => {
               const recall = ENTRY_RECALL_KINDS[entry.key];
 

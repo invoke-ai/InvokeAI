@@ -342,7 +342,6 @@ export const WorkflowLibraryDialog = ({
                         flex="1"
                         minW="0"
                         placeholder={t('workflowLibrary.searchPlaceholder')}
-                        size="md"
                         type="search"
                         value={searchInput}
                         onChange={handleSearchChange}

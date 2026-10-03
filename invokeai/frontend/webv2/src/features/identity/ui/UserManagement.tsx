@@ -123,7 +123,7 @@ const UsersDirectory = ({
                 {users ? t('users.accountCount', { count: users.length }) : t('users.description')}
               </Text>
             </Stack>
-            <Button size="md" variant="solid" onClick={openCreateForm}>
+            <Button variant="solid" onClick={openCreateForm}>
               <UserPlusIcon />
               {t('users.addUser')}
             </Button>
@@ -136,7 +136,7 @@ const UsersDirectory = ({
                     <Text color="fg.error" fontSize="md" textAlign="center">
                       {loadError}
                     </Text>
-                    <Button size="md" variant="outline" onClick={retryLoad}>
+                    <Button variant="outline" onClick={retryLoad}>
                       {t('common.retry')}
                     </Button>
                   </Stack>
@@ -145,7 +145,7 @@ const UsersDirectory = ({
                 )}
               </Center>
             ) : (
-              <Table.Root minW="42rem" size="md">
+              <Table.Root minW="42rem">
                 <Table.Header>
                   <Table.Row bg="bg.muted">
                     <Table.ColumnHeader borderColor="border.subtle" color="fg.muted" ps="4">
@@ -273,7 +273,6 @@ const UserRow = ({
             aria-label={t('users.activeLabel', { name: getUserLabel(user) })}
             checked={user.is_active}
             disabled={isSelf}
-            size="md"
             onCheckedChange={handleSetActive}
           >
             <Switch.HiddenInput />

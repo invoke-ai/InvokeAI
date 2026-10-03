@@ -223,13 +223,7 @@ export const DefaultSettingsSection = ({
             {t('models.defaultSettingsHelp')}
           </Text>
         </Stack>
-        <Button
-          disabled={!isDirty}
-          loading={visibleIsSaving}
-          size="md"
-          variant="solid"
-          onClick={() => void handleSave()}
-        >
+        <Button disabled={!isDirty} loading={visibleIsSaving} variant="solid" onClick={() => void handleSave()}>
           {t('models.saveDefaults')}
         </Button>
       </HStack>

@@ -50,7 +50,7 @@ export const OperationStatusSlot = ({
           </span>
           {detail && detail !== errorText ? (
             <Tooltip content={detail}>
-              <IconButton aria-label={technicalDetailsLabel} flexShrink="0" size="md" tabIndex={0} variant="ghost">
+              <IconButton aria-label={technicalDetailsLabel} flexShrink="0" tabIndex={0} variant="ghost">
                 <InfoIcon />
               </IconButton>
             </Tooltip>
@@ -60,7 +60,7 @@ export const OperationStatusSlot = ({
         <Flex align="center" aria-live="polite" gap="2" minW="0" role="status">
           {isBusy ? (
             <>
-              <Spinner flexShrink="0" size="md" />
+              <Spinner flexShrink="0" />
               <span>{statusText}</span>
             </>
           ) : null}

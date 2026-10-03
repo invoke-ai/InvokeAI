@@ -105,7 +105,6 @@ export const GalleryBoardFilters = ({
           ref={ref}
           aria-label={t('widgets.gallery.searchOrCreateBoards')}
           placeholder={t('widgets.gallery.searchOrCreateBoards')}
-          size="md"
           value={searchTerm}
           onChange={handleSearchChange}
           onKeyDown={handleSearchKeyDown}
@@ -117,7 +116,6 @@ export const GalleryBoardFilters = ({
             <IconButton
               aria-label={t('widgets.gallery.filterAndSortBoards')}
               color={isVisibilityFiltered ? 'fg' : 'fg.muted'}
-              size="md"
               variant="ghost"
             >
               <Icon as={SlidersHorizontalIcon} boxSize="3.5" />

@@ -40,7 +40,7 @@ export const QueueItemDetails = ({ item }: { item: QueueItemReadModel }) => {
   const deviceLabel = useDeviceLabel(item.device);
 
   return (
-    <DataList.Root gap="1.5" orientation="horizontal" size="md">
+    <DataList.Root gap="1.5" orientation="horizontal">
       <DetailRow label={t('common.prompt')}>{meta.positivePrompt ?? '—'}</DetailRow>
       <DetailRow label={t('common.negative')}>{meta.negativePrompt ?? '—'}</DetailRow>
       <DetailRow label={t('common.seed')}>

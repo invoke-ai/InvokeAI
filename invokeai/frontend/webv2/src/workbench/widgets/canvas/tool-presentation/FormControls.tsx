@@ -100,7 +100,6 @@ export const FormNumberField = ({
       flexShrink={0}
       max={max}
       min={min}
-      size="md"
       step={step}
       value={live ? value : (draft ?? value)}
       w={`${FORM_NUMBER_FIELD_WIDTH_PX}px`}
@@ -199,7 +198,6 @@ export const FormSlider = ({
       max={max}
       min={min}
       minW="0"
-      size="md"
       step={step}
       value={values}
       onKeyDownCapture={onKeyDownCapture}
@@ -273,20 +271,12 @@ export const ApplyCancelBar = ({
         disabled={applyDisabled}
         flexShrink={0}
         loading={applyLoading}
-        size="md"
         variant="solid"
         onClick={onApply}
       >
         {t('common.apply')}
       </Button>
-      <Button
-        data-pane-action="cancel"
-        disabled={cancelDisabled}
-        flexShrink={0}
-        size="md"
-        variant="ghost"
-        onClick={onCancel}
-      >
+      <Button data-pane-action="cancel" disabled={cancelDisabled} flexShrink={0} variant="ghost" onClick={onCancel}>
         {t('common.cancel')}
       </Button>
     </Flex>

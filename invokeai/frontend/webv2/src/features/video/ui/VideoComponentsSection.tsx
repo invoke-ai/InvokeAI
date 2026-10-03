@@ -76,7 +76,6 @@ const ComponentSlotRow = memo(function ComponentSlotRow({
         isClearable
         modelTypes={slot.modelTypes}
         placeholder={t('widgets.video.selectComponent')}
-        size="md"
         value={value?.key ?? null}
         onChange={handleChange}
       />

@@ -293,7 +293,6 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
           flex="1 1 13rem"
           minW="0"
           positioning={SELECT_POSITIONING}
-          size="md"
           value={scopeValue}
           valueText={currentScopeLabel}
           onValueChange={changeScope}
@@ -304,7 +303,6 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
           flex="1 1 9rem"
           minW="0"
           positioning={SELECT_POSITIONING}
-          size="md"
           value={severityValue}
           valueText={severityCollection.items.find((item) => item.value === filters.severity)?.label}
           onValueChange={changeSeverity}
@@ -315,7 +313,6 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
           flex="1 1 9rem"
           minW="0"
           positioning={SELECT_POSITIONING}
-          size="md"
           value={namespaceValue}
           valueText={namespaceCollection.items.find((item) => item.value === filters.namespace)?.label}
           onValueChange={changeNamespace}
@@ -324,7 +321,6 @@ export const DiagnosticsPanel = ({ projectId }: { projectId: string | null }) =>
           <Input
             aria-label={t('widgets.diagnostics.search')}
             placeholder={t('widgets.diagnostics.search')}
-            size="md"
             value={filters.query}
             onChange={changeQuery}
           />
@@ -425,7 +421,7 @@ const RecordingStatus = ({ config, snapshot }: { config: LoggingConfig; snapshot
   return (
     <HStack flexWrap="wrap" gap="1.5">
       {config.enabled ? (
-        <Badge colorPalette="green" size="md">
+        <Badge colorPalette="green">
           {t('widgets.diagnostics.recordingStatus', {
             count: config.namespaces.length,
             level: t(`settings.catalog.options.${config.level}`),
@@ -433,20 +429,12 @@ const RecordingStatus = ({ config, snapshot }: { config: LoggingConfig; snapshot
           })}
         </Badge>
       ) : (
-        <Badge colorPalette="gray" size="md">
-          {t('widgets.diagnostics.recordingOff')}
-        </Badge>
+        <Badge colorPalette="gray">{t('widgets.diagnostics.recordingOff')}</Badge>
       )}
       {config.performanceTimingsEnabled ? (
-        <Badge colorPalette="purple" size="md">
-          {t('widgets.diagnostics.timingsOn')}
-        </Badge>
+        <Badge colorPalette="purple">{t('widgets.diagnostics.timingsOn')}</Badge>
       ) : null}
-      {config.consoleOutputEnabled ? (
-        <Badge colorPalette="blue" size="md">
-          {t('widgets.diagnostics.consoleOn')}
-        </Badge>
-      ) : null}
+      {config.consoleOutputEnabled ? <Badge colorPalette="blue">{t('widgets.diagnostics.consoleOn')}</Badge> : null}
       <Text color="fg.muted" fontSize="xs">
         {t('widgets.diagnostics.retention', {
           problemLimit: retention.problems.limit,
@@ -457,15 +445,9 @@ const RecordingStatus = ({ config, snapshot }: { config: LoggingConfig; snapshot
           verboseLimit: retention.verbose.limit,
         })}
       </Text>
-      {evicted > 0 ? (
-        <Badge colorPalette="orange" size="md">
-          {t('widgets.diagnostics.evicted', { count: evicted })}
-        </Badge>
-      ) : null}
+      {evicted > 0 ? <Badge colorPalette="orange">{t('widgets.diagnostics.evicted', { count: evicted })}</Badge> : null}
       {truncatedCount > 0 ? (
-        <Badge colorPalette="orange" size="md">
-          {t('widgets.diagnostics.truncated', { count: truncatedCount })}
-        </Badge>
+        <Badge colorPalette="orange">{t('widgets.diagnostics.truncated', { count: truncatedCount })}</Badge>
       ) : null}
     </HStack>
   );
@@ -488,19 +470,13 @@ const DiagnosticsEntryRow = memo(({ entry, showProject }: { entry: LogEntry; sho
         <HStack align="start" gap="2" justify="space-between">
           <Stack flex="1" gap="1" minW="0">
             <HStack flexWrap="wrap" gap="1.5">
-              <Badge colorPalette={LEVEL_COLOR_PALETTE[entry.level]} size="md">
+              <Badge colorPalette={LEVEL_COLOR_PALETTE[entry.level]}>
                 {t(`settings.catalog.options.${entry.level}`)}
               </Badge>
               {entry.durationMs !== undefined ? (
-                <Badge colorPalette="purple" size="md">
-                  {entry.durationMs.toFixed(1)}ms
-                </Badge>
+                <Badge colorPalette="purple">{entry.durationMs.toFixed(1)}ms</Badge>
               ) : null}
-              {entry.truncated ? (
-                <Badge colorPalette="orange" size="md">
-                  {t('widgets.diagnostics.entryTruncated')}
-                </Badge>
-              ) : null}
+              {entry.truncated ? <Badge colorPalette="orange">{t('widgets.diagnostics.entryTruncated')}</Badge> : null}
               <Text color="fg.muted" fontFamily="mono" fontSize="xs" minW="0" wordBreak="break-all">
                 {formatSource(entry, showProject)}
               </Text>

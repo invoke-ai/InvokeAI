@@ -36,7 +36,7 @@ export class RetryBoundary extends Component<
         <Text fontSize="md" color="fg.error">
           {this.props.message}
         </Text>
-        <Button size="md" loading={this.state.retrying} onClick={this.handleRetry}>
+        <Button loading={this.state.retrying} onClick={this.handleRetry}>
           {this.props.retryLabel}
         </Button>
       </Stack>

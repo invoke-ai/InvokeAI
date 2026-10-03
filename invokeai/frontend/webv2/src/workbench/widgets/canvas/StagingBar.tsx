@@ -152,7 +152,6 @@ export const StagingBar = ({
           h={areThumbnailsVisible ? THUMBNAIL_STRIP_HEIGHT : '0'}
           opacity={areThumbnailsVisible ? 1 : 0}
           pointerEvents={areThumbnailsVisible ? 'auto' : 'none'}
-          size="md"
           transition="height var(--wb-motion-duration-slow) ease, opacity var(--wb-motion-duration-slow) ease"
           variant="hover"
           w="full"
@@ -205,7 +204,7 @@ export const StagingBar = ({
       <CanvasOptionsBar>
         {isGenerating ? (
           <HStack color="fg.muted" gap="1.5" px="1">
-            <Spinner size="md" />
+            <Spinner />
             <Text fontSize="md" fontWeight="600">
               {t('widgets.canvas.staging.generating')}
             </Text>
@@ -220,7 +219,6 @@ export const StagingBar = ({
                   ? t('widgets.canvas.hideStagingThumbnails')
                   : t('widgets.canvas.showStagingThumbnails')
               }
-              size="md"
               variant="ghost"
               onClick={onToggleThumbnails}
             >
@@ -231,7 +229,6 @@ export const StagingBar = ({
               <IconButton
                 aria-label={t('widgets.canvas.previousStagedCandidate')}
                 disabled={!hasMultipleSlots}
-                size="md"
                 variant="ghost"
                 onClick={() => onCycle(-1)}
               >
@@ -246,7 +243,6 @@ export const StagingBar = ({
               <IconButton
                 aria-label={t('widgets.canvas.nextStagedCandidate')}
                 disabled={!hasMultipleSlots}
-                size="md"
                 variant="ghost"
                 onClick={() => onCycle(1)}
               >
@@ -259,7 +255,7 @@ export const StagingBar = ({
             <AutoSwitchMenu mode={autoSwitchMode} onSelect={onSetAutoSwitch} />
 
             {cancelableQueueItemId ? (
-              <Button size="md" variant="ghost" onClick={() => onCancelQueueItem(cancelableQueueItemId)}>
+              <Button variant="ghost" onClick={() => onCancelQueueItem(cancelableQueueItemId)}>
                 <XIcon />
                 {t('common.cancel')}
               </Button>
@@ -280,7 +276,6 @@ export const StagingBar = ({
                         ? t('widgets.canvas.hideStagedResultPreview')
                         : t('widgets.canvas.showStagedResultPreview')
                     }
-                    size="md"
                     variant="ghost"
                     onClick={onToggleVisibility}
                   >
@@ -292,30 +287,29 @@ export const StagingBar = ({
                   <IconButton
                     aria-label={t('widgets.canvas.staging.saveToGallery')}
                     disabled={isSaving}
-                    size="md"
                     variant="ghost"
                     onClick={handleSaveToGallery}
                   >
-                    {isSaving ? <Spinner size="md" /> : <SaveIcon />}
+                    {isSaving ? <Spinner /> : <SaveIcon />}
                   </IconButton>
                 </Tooltip>
 
                 <Tooltip content={t('common.discard')}>
-                  <IconButton aria-label={t('common.discard')} size="md" variant="ghost" onClick={onDiscardSelected}>
+                  <IconButton aria-label={t('common.discard')} variant="ghost" onClick={onDiscardSelected}>
                     <XIcon />
                   </IconButton>
                 </Tooltip>
 
                 <CanvasFloatingBarDivider />
 
-                <Button size="md" variant="ghost" onClick={onDiscardAll}>
+                <Button variant="ghost" onClick={onDiscardAll}>
                   <Trash2Icon />
                   {t('common.discardAll')}
                 </Button>
 
                 <Menu.Root positioning={MENU_POSITIONING}>
                   <Group attached>
-                    <Button disabled={!canAccept} size="md" onClick={onAccept}>
+                    <Button disabled={!canAccept} onClick={onAccept}>
                       <CheckIcon />
                       {t('widgets.canvas.acceptToLayer')}
                     </Button>
@@ -324,7 +318,6 @@ export const StagingBar = ({
                         aria-label={t('widgets.canvas.staging.moreAcceptOptions')}
                         disabled={!canAccept}
                         minW="0"
-                        size="md"
                         w="6"
                       >
                         <ChevronDownIcon />
@@ -367,7 +360,7 @@ const AutoSwitchMenu = ({ mode, onSelect }: { mode: AutoSwitchMode; onSelect: (m
       <Tooltip content={t('widgets.canvas.staging.autoSwitch')}>
         <span style={{ display: 'inline-flex' }}>
           <Menu.Trigger asChild>
-            <Button minW="unset" px="2" size="md" variant="ghost">
+            <Button minW="unset" px="2" variant="ghost">
               <SparklesIcon size={13} />
               <Text fontSize="md">{label(mode)}</Text>
             </Button>
@@ -519,7 +512,6 @@ const StagingPlaceholderProgress = ({ percentage }: { percentage: number | null 
         borderWidth={1}
         p={0.5}
         rounded="full"
-        size="md"
         value={percentage}
       >
         <ProgressCircle.Circle>

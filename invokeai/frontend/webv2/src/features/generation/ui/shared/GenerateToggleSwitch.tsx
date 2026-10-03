@@ -26,7 +26,6 @@ export const GenerateToggleSwitch = ({
       checked={checked}
       disabled={disabled}
       ids={{ hiddenInput: id, label: `${id}-label` }}
-      size="md"
       onCheckedChange={(event) => onCheckedChange(event.checked)}
     >
       <Switch.HiddenInput />

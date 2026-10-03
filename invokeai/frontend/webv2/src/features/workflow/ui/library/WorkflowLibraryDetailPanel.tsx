@@ -467,7 +467,7 @@ export const WorkflowLibraryDetailPanel = ({
           {tags.length > 0 ? (
             <HStack flexWrap="wrap" gap="1" minW="0">
               {tags.map((tag) => (
-                <Badge key={tag} size="md" variant="subtle">
+                <Badge key={tag} variant="subtle">
                   {tag}
                 </Badge>
               ))}

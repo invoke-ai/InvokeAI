@@ -48,7 +48,7 @@ export const QueueStatusBand = () => {
     >
       {/* Animate only running work; waiting-only queues use a static glyph. */}
       {inProgress > 0 ? (
-        <Spinner color="fg.muted" size="md" />
+        <Spinner color="fg.muted" />
       ) : (
         <Icon aria-hidden as={HourglassIcon} boxSize="3.5" color="fg.muted" />
       )}

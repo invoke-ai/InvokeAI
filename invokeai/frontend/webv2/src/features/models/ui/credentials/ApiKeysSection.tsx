@@ -99,7 +99,6 @@ const ApiKeyCard = ({
           aria-label={t('models.apiKeyFor', { title })}
           disabled={isLoading}
           placeholder={placeholder}
-          size="md"
           type="password"
           value={draft}
           onChange={(event) => setDraft(event.currentTarget.value)}
@@ -113,7 +112,6 @@ const ApiKeyCard = ({
         <Button
           disabled={draft.trim().length === 0 || isLoading}
           loading={isBusy && draft.trim().length > 0}
-          size="md"
           variant="solid"
           onClick={handleSave}
         >

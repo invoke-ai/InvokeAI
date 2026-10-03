@@ -195,7 +195,7 @@ export const GeneratePromptFields = ({
 
       {settings.promptTemplate ? (
         <HStack>
-          <Tag.Root size="md" variant="surface">
+          <Tag.Root variant="surface">
             <Tag.Label>{settings.promptTemplate.name}</Tag.Label>
             <Tag.EndElement>
               <Tag.CloseTrigger

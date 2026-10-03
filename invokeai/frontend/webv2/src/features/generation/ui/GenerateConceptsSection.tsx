@@ -98,7 +98,6 @@ export const GenerateConceptsContent = ({
           placeholder={
             selectedModel ? t('widgets.generate.searchCompatibleConcepts') : t('widgets.generate.selectModelFirst')
           }
-          size="md"
           value={null}
           onChange={addLora}
         />

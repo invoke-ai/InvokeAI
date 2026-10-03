@@ -188,7 +188,6 @@ export const SamModeToggle = ({
     <Button
       aria-pressed={mode === 'visual'}
       disabled={disabled}
-      size="md"
       variant={mode === 'visual' ? 'solid' : 'ghost'}
       onClick={onVisual}
     >
@@ -197,7 +196,6 @@ export const SamModeToggle = ({
     <Button
       aria-pressed={mode === 'prompt'}
       disabled={disabled}
-      size="md"
       variant={mode === 'prompt' ? 'solid' : 'ghost'}
       onClick={onPrompt}
     >
@@ -237,7 +235,6 @@ export const SamVisualInput = ({
           aria-pressed={pointLabel === 'include'}
           disabled={disabled}
           px="1.5"
-          size="md"
           variant={pointLabel === 'include' ? 'solid' : 'outline'}
           onClick={onInclude}
         >
@@ -253,7 +250,6 @@ export const SamVisualInput = ({
           aria-pressed={pointLabel === 'exclude'}
           disabled={disabled}
           px="1.5"
-          size="md"
           variant={pointLabel === 'exclude' ? 'solid' : 'outline'}
           onClick={onExclude}
         >
@@ -299,7 +295,6 @@ export const SamPromptBody = ({
         disabled={disabled}
         flexShrink={0}
         placeholder={t('widgets.layers.selectObject.promptGuidance')}
-        size="md"
         value={prompt}
         w="7.5rem"
         onChange={onChange}
@@ -324,7 +319,6 @@ const SamSettingsSwitch = ({
     checked={checked}
     disabled={disabled}
     justifyContent="space-between"
-    size="md"
     w="full"
     onCheckedChange={({ checked: next }) => onChange(next)}
   >
@@ -372,7 +366,6 @@ export const SamSettings = ({
           collection={modelCollection}
           disabled={isProcessing || !eligibility.canEditInputs}
           ids={{ trigger: 'sam-model' }}
-          size="md"
           value={modelValue}
           onValueChange={({ value }) => {
             const model = value[0];
@@ -520,16 +513,10 @@ const SamFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => 
           title={t('widgets.layers.selectObject.title')}
         />
       </Box>
-      <Button disabled={!eligibility.canReset} flexShrink={0} size="md" variant="ghost" onClick={actions.reset}>
+      <Button disabled={!eligibility.canReset} flexShrink={0} variant="ghost" onClick={actions.reset}>
         {t('widgets.layers.selectObject.reset')}
       </Button>
-      <Button
-        disabled={!eligibility.canProcess}
-        flexShrink={0}
-        loading={isProcessing}
-        size="md"
-        onClick={actions.process}
-      >
+      <Button disabled={!eligibility.canProcess} flexShrink={0} loading={isProcessing} onClick={actions.process}>
         {t('widgets.layers.selectObject.process')}
       </Button>
       <Flex flexShrink={0}>
@@ -538,7 +525,6 @@ const SamFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => 
           disabled={!eligibility.canApply}
           loading={session.status === 'committing'}
           roundedRight="none"
-          size="md"
           variant="solid"
           onClick={actions.apply}
         >
@@ -551,7 +537,6 @@ const SamFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => 
               disabled={!eligibility.canSave}
               px="1"
               roundedLeft="none"
-              size="md"
               variant="solid"
             >
               <Icon as={ChevronDownIcon} boxSize="3.5" />
@@ -578,7 +563,6 @@ const SamFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => 
         data-pane-action="cancel"
         disabled={!eligibility.canCancel}
         flexShrink={0}
-        size="md"
         variant="ghost"
         onClick={actions.cancel}
       >

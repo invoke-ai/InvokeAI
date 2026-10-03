@@ -232,7 +232,6 @@ export const ToolFamilyButton = ({
           aria-label={label}
           aria-pressed={isActive}
           disabled={disabled}
-          size="md"
           variant={isActive ? 'solid' : 'ghost'}
           onContextMenu={onContextMenu}
           onKeyDown={onKeyDown}
@@ -301,7 +300,6 @@ const FlyoutItem = ({
         aria-label={item.label}
         data-subtool-id={item.id}
         role="menuitemradio"
-        size="md"
         variant={checked ? 'solid' : 'ghost'}
         onClick={onClick}
       >

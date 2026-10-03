@@ -81,7 +81,6 @@ export const GenerateModelCard = ({
           modelTypes={MAIN_MODEL_TYPES}
           placeholder={t('widgets.generate.selectModel')}
           value={selectedModel?.key ?? null}
-          size="md"
           onChange={(model) => {
             if (isGenerateModelConfig(model) && isGenerateModelSelectable(model)) {
               selectModel(model);

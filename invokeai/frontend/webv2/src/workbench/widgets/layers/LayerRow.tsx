@@ -419,7 +419,6 @@ const LayerRowComponent = ({
               ref={focusOnMount}
               aria-label={t('widgets.layers.actions.rename')}
               defaultValue={node.name}
-              size="md"
               userSelect="text"
               onBlur={handleNameBlur}
               onClick={stopPropagation}
@@ -580,7 +579,7 @@ export const LayerDragGhost = ({ count, vm }: { count: number; vm: SemanticNode 
       {vm.node.name}
     </Text>
     {count > 1 ? (
-      <Badge colorPalette="accent" size="md" variant="solid">
+      <Badge colorPalette="accent" variant="solid">
         {count}
       </Badge>
     ) : null}

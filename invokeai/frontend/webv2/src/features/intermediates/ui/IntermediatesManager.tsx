@@ -239,11 +239,10 @@ export const IntermediatesManager = ({
             aria-busy={isRefreshing || undefined}
             aria-label={t('intermediates.refresh')}
             flexShrink={0}
-            size="md"
             variant="outline"
             onClick={handleRefresh}
           >
-            {isRefreshing ? <Spinner size="md" /> : <RefreshCwIcon />}
+            {isRefreshing ? <Spinner /> : <RefreshCwIcon />}
           </IconButton>
         </Tooltip>
       </HStack>
@@ -257,7 +256,6 @@ export const IntermediatesManager = ({
                 ? t('intermediates.searchPlaceholderAdmin')
                 : t('intermediates.searchPlaceholder')
             }
-            size="md"
             value={search}
             onChange={(event) => handleSearchChange(event.currentTarget.value)}
           />
@@ -337,7 +335,7 @@ export const IntermediatesManager = ({
         >
           {query.data?.measuring ? (
             <Tooltip content={t('intermediates.stats.measuringNote')}>
-              <Spinner aria-label={t('intermediates.stats.measuringNote')} color="fg.muted" size="md" />
+              <Spinner aria-label={t('intermediates.stats.measuringNote')} color="fg.muted" />
             </Tooltip>
           ) : null}
           {/* `aria-disabled` keeps it focusable, so the reason it waits is announced on focus. */}
@@ -376,7 +374,7 @@ export const IntermediatesManager = ({
               title={hasSearch ? t('intermediates.empty.noMatches') : t('intermediates.empty.title')}
             >
               {hasSearch ? (
-                <Button size="md" variant="outline" onClick={clearSearch}>
+                <Button variant="outline" onClick={clearSearch}>
                   {t('common.clearSearch')}
                 </Button>
               ) : null}
@@ -390,7 +388,7 @@ export const IntermediatesManager = ({
               }
               title={t('intermediates.errors.couldNotLoad')}
             >
-              <Button size="md" variant="outline" onClick={() => void query.refetch()}>
+              <Button variant="outline" onClick={() => void query.refetch()}>
                 {t('common.retry')}
               </Button>
             </EmptyState>

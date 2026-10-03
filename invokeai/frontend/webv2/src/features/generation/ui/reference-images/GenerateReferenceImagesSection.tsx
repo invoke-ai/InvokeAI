@@ -206,7 +206,7 @@ export const GenerateReferenceImagesContent = ({
         <Text color="fg.muted" fontSize="xs" minW="0">
           {t('widgets.generate.referenceImagesUnsupported')}
         </Text>
-        <Button colorPalette="red" flexShrink="0" size="md" variant="outline" onClick={clearReferenceImages}>
+        <Button colorPalette="red" flexShrink="0" variant="outline" onClick={clearReferenceImages}>
           {t('widgets.generate.clearReferenceImages')}
         </Button>
       </HStack>

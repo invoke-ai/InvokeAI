@@ -90,7 +90,7 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
   return (
     <Menu.Root closeOnSelect={false} positioning={ROOT_POSITIONING}>
       <Menu.Trigger asChild>
-        <IconButton aria-label={ariaLabel} color={isActive ? 'accent.solid' : 'fg.muted'} size="md" variant="outline">
+        <IconButton aria-label={ariaLabel} color={isActive ? 'accent.solid' : 'fg.muted'} variant="outline">
           <Icon as={SlidersHorizontalIcon} boxSize="4" />
         </IconButton>
       </Menu.Trigger>

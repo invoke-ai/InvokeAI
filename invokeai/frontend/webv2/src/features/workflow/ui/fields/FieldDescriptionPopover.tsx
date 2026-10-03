@@ -61,7 +61,6 @@ export const FieldDescriptionPopover = ({
                   minH="4rem"
                   placeholder={templateDescription || 'Describe this field…'}
                   resize="vertical"
-                  size="md"
                   value={description ?? ''}
                   onChange={onDescriptionChange}
                 />

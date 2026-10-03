@@ -64,7 +64,6 @@ export const ModelFilterBar = ({
         <Input
           aria-label={t('models.searchModels')}
           placeholder={t('models.searchModelsPlaceholder')}
-          size="md"
           value={filters.searchTerm}
           onChange={(event) => handleSearchChange(event.currentTarget.value)}
         />

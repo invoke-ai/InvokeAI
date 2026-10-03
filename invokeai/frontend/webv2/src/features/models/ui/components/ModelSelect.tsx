@@ -403,14 +403,7 @@ const CompactViewToggle = ({ isCompact, pickerId }: { isCompact: boolean; picker
 
   return (
     <Tooltip content={label} showArrow>
-      <IconButton
-        aria-label={label}
-        aria-pressed={isCompact}
-        flexShrink={0}
-        size="md"
-        variant="ghost"
-        onClick={handleClick}
-      >
+      <IconButton aria-label={label} aria-pressed={isCompact} flexShrink={0} variant="ghost" onClick={handleClick}>
         <Icon as={isCompact ? ChevronsUpDownIcon : ChevronsDownUpIcon} boxSize="3.5" />
       </IconButton>
     </Tooltip>
@@ -424,7 +417,7 @@ const ModelManagerLinkButton = () => {
 
   return (
     <Tooltip content={t('models.manageModels')} showArrow>
-      <IconButton aria-label={t('models.manageModels')} asChild flexShrink={0} size="md" variant="ghost">
+      <IconButton aria-label={t('models.manageModels')} asChild flexShrink={0} variant="ghost">
         <Link search={search} to="/models">
           <BoxIcon />
         </Link>
@@ -521,7 +514,7 @@ const ModelOptionContent = ({
           ) : null}
           <MiddleTruncate fontSize="md" minW="0" text={model.name} />
           {showType ? (
-            <Badge colorPalette="gray" flexShrink={0} fontSize="xs" size="md" variant="surface">
+            <Badge colorPalette="gray" flexShrink={0} fontSize="xs" variant="surface">
               {getModelTypeLabel(model.type)}
             </Badge>
           ) : null}

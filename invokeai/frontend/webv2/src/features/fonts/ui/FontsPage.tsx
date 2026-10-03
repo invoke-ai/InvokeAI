@@ -154,7 +154,7 @@ const FontPreview = ({ font, compact = false }: { font: FontRecord; compact?: bo
       </Text>
       {loadState === 'loading' ? (
         <HStack color="fg.muted" gap="1.5" mt="2">
-          <Spinner size="md" />
+          <Spinner />
           <Text fontSize="xs">{t('fonts.loadingPreview')}</Text>
         </HStack>
       ) : loadState === 'error' ? (
@@ -279,7 +279,7 @@ const UploadStatusList = ({ items }: { items: readonly UploadItem[] }) => {
       {items.map((item) => (
         <HStack key={item.id} color={item.status === 'error' ? 'fg.error' : 'fg.muted'} gap="2">
           {item.status === 'uploading' ? (
-            <Spinner size="md" />
+            <Spinner />
           ) : (
             <Icon as={item.status === 'error' ? CircleAlertIcon : FileTypeIcon} />
           )}
@@ -521,7 +521,6 @@ const FontLibrary = () => {
             <Input
               aria-label={t('fonts.searchLabel')}
               placeholder={t('fonts.searchPlaceholder')}
-              size="md"
               value={search}
               onChange={(event) => {
                 setSearch(event.currentTarget.value);
@@ -534,7 +533,6 @@ const FontLibrary = () => {
               <IconButton
                 aria-label={t('fonts.filterMenu')}
                 color={filter !== 'all' ? 'accent.solid' : 'fg.muted'}
-                size="md"
                 variant="outline"
               >
                 <Icon as={SlidersHorizontalIcon} boxSize="4" />
@@ -577,7 +575,6 @@ const FontLibrary = () => {
             >
               {search.trim() ? (
                 <Button
-                  size="md"
                   variant="outline"
                   onClick={() => {
                     setSearch('');
@@ -601,7 +598,7 @@ const FontLibrary = () => {
               icon={ERROR_ICON}
               title={t('fonts.couldNotLoad')}
             >
-              <Button size="md" variant="outline" onClick={handleRetry}>
+              <Button variant="outline" onClick={handleRetry}>
                 {t('common.retry')}
               </Button>
             </EmptyState>
@@ -704,7 +701,7 @@ const FontLibrary = () => {
                       onChange={(value) => setUploadScope(value as FontScope)}
                     />
                   ) : null}
-                  <Button size="md" onClick={() => inputRef.current?.click()}>
+                  <Button onClick={() => inputRef.current?.click()}>
                     <UploadIcon />
                     {effectiveUploadScope === 'shared' ? t('fonts.uploadShared') : t('fonts.upload')}
                   </Button>

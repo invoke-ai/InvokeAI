@@ -52,7 +52,7 @@ export const InstallQueueTable = ({
   if (status === 'error') {
     return (
       <EmptyState danger description={error ?? undefined} h="full" title={t('models.couldNotLoadInstallQueue')}>
-        <Button size="md" variant="outline" onClick={() => void refreshInstalls()}>
+        <Button variant="outline" onClick={() => void refreshInstalls()}>
           {t('common.retry')}
         </Button>
       </EmptyState>
@@ -72,7 +72,7 @@ export const InstallQueueTable = ({
 
   return (
     <Scrollable h="full" label={t('models.installJobs')} minH="0">
-      <Table.Root css={TABLE_SX} minW="32rem" size="md" tableLayout="fixed" w="full">
+      <Table.Root css={TABLE_SX} minW="32rem" tableLayout="fixed" w="full">
         <Table.ColumnGroup>
           <Table.Column w="2.25rem" />
           <Table.Column />

@@ -153,7 +153,7 @@ export const MapHoverCard = ({
       </HStack>
       <HStack alignItems="flex-start" gap="1.5">
         {videoDuration !== null ? (
-          <Badge display="flex" flexShrink={0} fontVariantNumeric="tabular-nums" gap="1" size="md" variant="solid">
+          <Badge display="flex" flexShrink={0} fontVariantNumeric="tabular-nums" gap="1" variant="solid">
             <PlayIcon aria-hidden="true" fill="currentColor" />
             {videoDuration}
           </Badge>

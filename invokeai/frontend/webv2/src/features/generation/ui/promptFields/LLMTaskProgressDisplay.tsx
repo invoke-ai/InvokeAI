@@ -21,7 +21,7 @@ export const LLMTaskProgressDisplay = ({ taskId }: { taskId: string | null }) =>
 
   return (
     <Stack gap="1.5" w="full">
-      <Progress.Root colorPalette="accent" max={1} size="md" value={progress.percentage} w="full">
+      <Progress.Root colorPalette="accent" max={1} value={progress.percentage} w="full">
         <Progress.Track aria-label={t('widgets.generate.llmTaskProgress')} rounded="full">
           <Progress.Range rounded="full" transition="width var(--wb-motion-duration-fast) ease" />
         </Progress.Track>

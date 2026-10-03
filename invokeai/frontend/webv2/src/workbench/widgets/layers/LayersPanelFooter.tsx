@@ -31,7 +31,6 @@ const LayersPanelFooterComponent = ({ commands, degraded, filter, onFilterChange
         flex="1"
         minW="0"
         placeholder={t('widgets.layers.footer.filter')}
-        size="md"
         value={filter}
         onChange={handleFilter}
       />

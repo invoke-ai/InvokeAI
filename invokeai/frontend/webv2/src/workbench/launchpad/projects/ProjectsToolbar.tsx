@@ -111,7 +111,6 @@ export const ProjectsToolbar = ({
         <Input
           aria-label={t('projects.searchLabel')}
           placeholder={t('projects.searchPlaceholder')}
-          size="md"
           type="search"
           value={searchTerm}
           onChange={handleSearchInput}
@@ -120,7 +119,7 @@ export const ProjectsToolbar = ({
 
       <Menu.Root positioning={MENU_POSITIONING} onSelect={handleSortSelect}>
         <Menu.Trigger asChild>
-          <Button ms="auto" size="md" variant="outline">
+          <Button ms="auto" variant="outline">
             <Icon as={ArrowUpDownIcon} boxSize="3.5" />
             {t(SORT_LABEL_KEY[sort])}
           </Button>
@@ -144,7 +143,7 @@ export const ProjectsToolbar = ({
         </Portal>
       </Menu.Root>
 
-      <SegmentGroup.Root aria-label={t('projects.viewLabel')} size="md" value={view} onValueChange={handleViewChange}>
+      <SegmentGroup.Root aria-label={t('projects.viewLabel')} value={view} onValueChange={handleViewChange}>
         <SegmentGroup.Indicator />
         {PROJECTS_VIEW_IDS.map((id) => (
           <ViewSegment key={id} id={id} />

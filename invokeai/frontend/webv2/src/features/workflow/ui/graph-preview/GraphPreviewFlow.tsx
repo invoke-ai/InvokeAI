@@ -87,7 +87,7 @@ const PreviewNode = ({ data }: NodeProps<PreviewFlowNode>) => {
       <Handle position={Position.Left} style={handleStyle} type="target" />
       <Handle position={Position.Right} style={handleStyle} type="source" />
       <Stack gap="0.5" px="3" py="2">
-        <Badge fontFamily="mono" size="md" w="fit-content">
+        <Badge fontFamily="mono" w="fit-content">
           {data.nodeType}
         </Badge>
         <Text color="fg.subtle" fontSize="xs" truncate>

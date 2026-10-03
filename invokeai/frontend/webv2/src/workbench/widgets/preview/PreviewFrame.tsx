@@ -877,7 +877,6 @@ const PreviewVideo = ({
             // is the native control bar.
             insetInlineStart="50%"
             position="absolute"
-            size="md"
             title={t('widgets.preview.dragVideo')}
             top="2"
             touchAction="none"

@@ -254,7 +254,7 @@ export const GalleryMediaSlot = ({
         </IconButton>
       </Tooltip>
     ) : (
-      <Button disabled={isBusy} size="md" variant="ghost" onClick={handleClear}>
+      <Button disabled={isBusy} variant="ghost" onClick={handleClear}>
         <Icon as={XIcon} boxSize="3" />
         {labels.remove}
       </Button>
@@ -275,7 +275,7 @@ export const GalleryMediaSlot = ({
           </IconButton>
         </Tooltip>
       ) : (
-        <Button disabled={isBusy} size="md" variant="ghost" onClick={openUploadPicker}>
+        <Button disabled={isBusy} variant="ghost" onClick={openUploadPicker}>
           <Icon as={UploadIcon} boxSize="3" />
           {t('widgets.gallery.picker.upload')}
         </Button>
@@ -347,7 +347,7 @@ export const GalleryMediaSlot = ({
                     </Text>
                   ) : null}
                   <HStack color="fg.muted" gap="1">
-                    {isBusy ? <Spinner size="md" /> : <Icon as={RefreshCwIcon} boxSize="2.5" />}
+                    {isBusy ? <Spinner /> : <Icon as={RefreshCwIcon} boxSize="2.5" />}
                     <Text fontSize="xs">{valueHint}</Text>
                   </HStack>
                 </Stack>

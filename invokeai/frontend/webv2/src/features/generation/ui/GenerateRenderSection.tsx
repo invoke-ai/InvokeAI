@@ -73,7 +73,6 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: Pick<GenerateRenderSect
         <Select
           aria-label={t('widgets.generate.ideogram4SamplerPreset')}
           collection={IDEOGRAM4_PRESET_COLLECTION}
-          size="md"
           value={[settings.ideogram4SamplerPreset]}
           onValueChange={({ value }) => {
             const preset = value[0];
@@ -144,7 +143,6 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: Pick<GenerateRenderSect
       </Field>
       <Field label={t('widgets.generate.ideogram4ColorPalette')} helpText={t('widgets.generate.ideogram4ColorHelp')}>
         <Input
-          size="md"
           value={settings.ideogram4ColorPalette.join(', ')}
           onChange={(event) =>
             onCommit({
@@ -309,11 +307,11 @@ export const GenerateRenderSection = ({
 
   const badges = (
     <>
-      <Badge size="md">
+      <Badge>
         {settings.steps} · {policy.ui.guidanceLabel} {settings.cfgScale}
       </Badge>
       {policy.ui.seedVisible ? (
-        <Badge size="md">
+        <Badge>
           {settings.seedMode === 'random'
             ? t('common.seedMode.random')
             : settings.seedMode === 'fixed'
@@ -392,7 +390,6 @@ export const GenerateRenderSection = ({
                   aria-label={t('widgets.generate.scheduler')}
                   flex="1"
                   options={policy.scheduler.options}
-                  size="md"
                   value={settings.scheduler}
                   onValueChange={(scheduler) => onCommit({ scheduler })}
                 />

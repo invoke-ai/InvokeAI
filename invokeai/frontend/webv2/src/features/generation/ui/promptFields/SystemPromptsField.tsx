@@ -273,7 +273,6 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
           <Input
             id={nameFieldId}
             placeholder={t('widgets.generate.systemPrompts.namePlaceholder')}
-            size="md"
             value={draft.name}
             onChange={handleNameChange}
           />
@@ -282,7 +281,6 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
           aria-label={t('widgets.generate.systemPrompts.content')}
           minH="6rem"
           placeholder={t('widgets.generate.systemPrompts.contentPlaceholder')}
-          size="md"
           value={draft.content}
           onChange={handleContentChange}
         />
@@ -297,7 +295,6 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
             // Use inputMode instead of number input so empty-means-default drafts survive.
             inputMode="numeric"
             placeholder={String(SYSTEM_PROMPT_MAX_TOKENS_DEFAULT)}
-            size="md"
             value={draft.maxTokens}
             onChange={handleMaxTokensChange}
           />
@@ -308,13 +305,12 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
           </Text>
         ) : null}
         <HStack justify="flex-end">
-          <Button size="md" variant="ghost" onClick={closeEditor}>
+          <Button variant="ghost" onClick={closeEditor}>
             {t('common.cancel')}
           </Button>
           <Button
             disabled={!draft.name.trim() || !draft.content.trim() || isMaxTokensInvalid}
             loading={isSaving}
-            size="md"
             onClick={handleSave}
           >
             {t('common.save')}
@@ -358,7 +354,7 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
             {error}
           </Text>
         ) : null}
-        <Button size="md" variant="ghost" onClick={toggleManaging}>
+        <Button variant="ghost" onClick={toggleManaging}>
           {t('common.done')}
         </Button>
         <ConfirmDialog
@@ -382,7 +378,6 @@ export const SystemPromptsField = ({ catalog, onSelect, selectedId }: SystemProm
           disabled={prompts.length === 0}
           flex="1"
           id={selectId}
-          size="md"
           value={selectValue}
           valueText={selectedName ?? t('widgets.generate.systemPrompts.none')}
           onValueChange={handleSelectChange}

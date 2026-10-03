@@ -52,12 +52,11 @@ export const ResultsListHeader = ({
           <Input
             aria-label={resolvedSearchPlaceholder}
             placeholder={resolvedSearchPlaceholder}
-            size="md"
             value={searchValue}
             onChange={handleSearchChange}
           />
         </InputGroup>
-        <Button disabled={installAllDisabled} flexShrink={0} size="md" variant="outline" onClick={onInstallAll}>
+        <Button disabled={installAllDisabled} flexShrink={0} variant="outline" onClick={onInstallAll}>
           <Icon as={DownloadIcon} boxSize="3" />
           {installAllLabel}
         </Button>

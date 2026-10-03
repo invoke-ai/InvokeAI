@@ -285,10 +285,10 @@ export const ModelEditForm = ({
         </Text>
       ) : null}
       <HStack gap="2" justify="flex-end">
-        <Button disabled={form.isSubmitting} size="md" variant="ghost" onClick={onCancel}>
+        <Button disabled={form.isSubmitting} variant="ghost" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
-        <Button loading={form.isSubmitting} size="md" variant="solid" onClick={() => void handleSave()}>
+        <Button loading={form.isSubmitting} variant="solid" onClick={() => void handleSave()}>
           {t('users.saveChanges')}
         </Button>
       </HStack>

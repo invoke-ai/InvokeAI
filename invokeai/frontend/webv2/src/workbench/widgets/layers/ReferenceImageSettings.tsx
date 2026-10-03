@@ -396,7 +396,7 @@ const ReferenceImageEditor = ({
           <Text color="fg.muted" fontSize="xs">
             {t('widgets.layers.regionalGuidance.referenceImageHelp')}
           </Text>
-          <Button size="md" variant="ghost" onClick={openUpload}>
+          <Button variant="ghost" onClick={openUpload}>
             <UploadIcon size="12" />
             {t('widgets.gallery.picker.upload')}
           </Button>
@@ -409,7 +409,6 @@ const ReferenceImageEditor = ({
           aria-label={t('widgets.layers.regionalGuidance.model')}
           collection={modelCollection}
           positioning={SELECT_POSITIONING}
-          size="md"
           value={modelValue}
           valueText={modelName}
           onValueChange={handleModel}
@@ -423,7 +422,6 @@ const ReferenceImageEditor = ({
               aria-label={t('widgets.layers.regionalGuidance.method')}
               collection={collections.method}
               positioning={SELECT_POSITIONING}
-              size="md"
               value={methodValue}
               valueText={t(`widgets.layers.regionalGuidance.methods.${config.method}`)}
               onValueChange={handleMethod}
@@ -435,7 +433,6 @@ const ReferenceImageEditor = ({
               formatValue={formatWeight}
               max={2}
               min={-1}
-              size="md"
               step={0.01}
               value={weightValue}
               withThumbTooltip

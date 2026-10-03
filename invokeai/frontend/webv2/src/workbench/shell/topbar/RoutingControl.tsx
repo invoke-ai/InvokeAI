@@ -128,7 +128,6 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
                 pointerEvents="none"
                 position="absolute"
                 right="-1px"
-                size="md"
                 top="-1px"
                 zIndex="1"
               >

@@ -288,18 +288,18 @@ const ModelDetailActions = ({
   return (
     <HStack flexShrink={0} gap="1" wrap="wrap">
       {isConvertibleToDiffusers(model) ? (
-        <Button size="md" variant="outline" onClick={() => setPendingAction({ kind: 'convert', model })}>
+        <Button variant="outline" onClick={() => setPendingAction({ kind: 'convert', model })}>
           <Icon as={HuggingFaceIcon} boxSize="3" />
           {t('models.convertToDiffusers')}
         </Button>
       ) : null}
-      <Button size="md" variant={isEditing ? 'solid' : 'outline'} onClick={onToggleEditing}>
+      <Button variant={isEditing ? 'solid' : 'outline'} onClick={onToggleEditing}>
         <Icon as={PencilIcon} boxSize="3" />
         {isEditing ? t('models.editing') : t('common.edit')}
       </Button>
       <Menu.Root positioning={{ placement: 'bottom-end' }}>
         <Menu.Trigger asChild>
-          <IconButton aria-label={t('models.actions')} loading={isActionBusy} size="md" variant="ghost">
+          <IconButton aria-label={t('models.actions')} loading={isActionBusy} variant="ghost">
             <Icon as={MoreHorizontalIcon} boxSize="4" />
           </IconButton>
         </Menu.Trigger>
@@ -466,7 +466,7 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
 
   return (
     <>
-      <DataList.Root gap="2.5" orientation="horizontal" size="md" variant="subtle">
+      <DataList.Root gap="2.5" orientation="horizontal" variant="subtle">
         {attributes.map((attribute) => (
           <DataList.Item key={attribute.label}>
             <DataList.ItemLabel color="fg.subtle" fontSize="xs" minW="8rem" textTransform="uppercase">

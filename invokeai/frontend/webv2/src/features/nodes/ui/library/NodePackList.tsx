@@ -90,7 +90,6 @@ export const NodePackList = ({
           <Input
             aria-label={t('nodes.searchPacks')}
             placeholder={t('nodes.searchPacksPlaceholder')}
-            size="md"
             value={filters.searchTerm}
             onChange={(event) => onFiltersChange({ ...filters, searchTerm: event.currentTarget.value })}
           />

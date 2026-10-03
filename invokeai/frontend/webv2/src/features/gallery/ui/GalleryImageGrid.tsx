@@ -636,7 +636,7 @@ export const GalleryImageGrid = () => {
             </Button>
           </Flex>
         ) : null}
-        <ScrollArea.Root h="full" minH="0" size="md" variant="hover" w="full">
+        <ScrollArea.Root h="full" minH="0" variant="hover" w="full">
           <ScrollArea.Viewport ref={viewportRef} data-dnd-auto-scroll="false" h="full" outline="none" w="full">
             <ScrollArea.Content display="flex" flexDirection="column" minH="full">
               {pinnedHeight > 0 ? (
@@ -741,7 +741,7 @@ export const GalleryImageGrid = () => {
                   </Box>
                   {paginationMode === 'infinite' && gallery.isLoading && gallery.items.length > 0 && (
                     <Flex align="center" justify="center" py="2">
-                      <Spinner color="fg.subtle" size="md" />
+                      <Spinner color="fg.subtle" />
                     </Flex>
                   )}
                   {paginationMode === 'infinite' && !gallery.isLoading && isWindowTruncated && (

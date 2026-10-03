@@ -129,7 +129,7 @@ const DeveloperNamespaceCheckbox = ({
   );
 
   return (
-    <Checkbox.Root checked={checked} size="md" onCheckedChange={handleCheckedChange}>
+    <Checkbox.Root checked={checked} onCheckedChange={handleCheckedChange}>
       <Checkbox.HiddenInput />
       <Checkbox.Control />
       <Checkbox.Label color="fg.muted" fontSize="md">

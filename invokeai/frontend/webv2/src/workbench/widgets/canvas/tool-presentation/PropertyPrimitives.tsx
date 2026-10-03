@@ -45,7 +45,6 @@ export const PropertySwitchRow = ({
       disabled={disabled}
       justifyContent="space-between"
       minH="7"
-      size="md"
       w="full"
       onCheckedChange={handleChange}
     >
