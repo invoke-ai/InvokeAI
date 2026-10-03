@@ -79,7 +79,7 @@ def should_pretile_vae_decode(
 # its score matrix is the dominant term for a large untiled image, exactly as it is for FLUX.2;
 # `_vae_mid_block_score_matrix_bytes` prices it for those estimators the same way. The video VAEs
 # (Wan, Qwen-Image) need no such term: the Qwen-Image ROCm constants below were measured with math
-# attention. The Wan video-decode constant was measured on CUDA only; ROCm is unmeasured there.
+# attention. The Wan video-decode constant was measured on CUDA and on an RX 9060 XT (see there).
 _CLASSIC_VAE_MID_BLOCK_HEADS = 1
 _CLASSIC_VAE_MID_BLOCK_HEAD_DIM = 512
 
@@ -727,6 +727,9 @@ def estimate_vae_working_memory_wan(
     # and at 121 frames), so the clip bytes are budget on top of it rather than part of it. Both
     # VAEs reserved exactly the same 6666 MiB at 832x480x49 standalone, so one constant covers
     # both: the highest measurement, the server's 480p full decode, plus ~5%.
+    # ROCm (RX 9060 XT, gfx1200, torch 2.13+rocm10, with the app's conv3d decomposition, SDPA guard
+    # and expandable segments): 7973-8813 standalone across both VAEs, full and streaming up to
+    # 832x480x81, and 7719-8297 for TI2V 832x480x49 in a server -- covered as well.
     #
     # The same estimate decides auto-tiling (`should_pretile_vae_decode`): with it, 832x480 clips
     # tile on 8 GB cards and 720p clips on 16 GB cards, where their untiled decodes reserve about as

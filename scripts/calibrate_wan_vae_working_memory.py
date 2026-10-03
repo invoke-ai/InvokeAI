@@ -20,20 +20,31 @@ the constant sits above what this script reports.
 from __future__ import annotations
 
 import argparse
+import logging
+import os
 import sys
 from pathlib import Path
-
-import torch
-from diffusers.models.autoencoders import AutoencoderKLWan
 
 # Direct script execution puts ``scripts/`` on sys.path, not the repository root.
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
+from invokeai.app.util.torch_cuda_allocator import apply_rocm_windows_allocator_default  # noqa: E402
+
+# The server's ROCm runtime, so a ROCm measurement is what Invoke would see: both must be set before torch is
+# imported (see `invokeai.app.run_app` and `apply_rocm_windows_allocator_default`). Inert on CUDA.
+os.environ.setdefault("MIOPEN_FIND_MODE", "FAST")
+apply_rocm_windows_allocator_default(logging.getLogger(__name__))
+
+import torch  # noqa: E402
+from diffusers.models.autoencoders import AutoencoderKLWan  # noqa: E402
+
 from invokeai.backend.model_manager.load.model_loaders.vae import _wan_vae_init_kwargs_for  # noqa: E402
+from invokeai.backend.util.attention import install_rocm_sdpa_guard  # noqa: E402
 from invokeai.backend.util.vae_working_memory import (  # noqa: E402
     estimate_vae_working_memory_wan,
     wan_vae_clip_bytes,
 )
+from invokeai.backend.wan.rocm_causal_conv3d import patch_wan_causal_conv3d_for_rocm  # noqa: E402
 from invokeai.backend.wan.vae_decode import iter_wan_vae_decode_chunks  # noqa: E402
 
 DTYPES = {"float16": torch.float16, "bfloat16": torch.bfloat16, "float32": torch.float32}
@@ -205,6 +216,9 @@ def main() -> None:
 
     if not torch.cuda.is_available():
         raise SystemExit("CUDA or ROCm device required")
+    # What the Wan VAE loader and the app's startup apply on ROCm; no-ops on CUDA.
+    patch_wan_causal_conv3d_for_rocm()
+    install_rocm_sdpa_guard()
     vae = _load_vae(args.vae, DTYPES[args.dtype])
     try:
         result = _measure(
