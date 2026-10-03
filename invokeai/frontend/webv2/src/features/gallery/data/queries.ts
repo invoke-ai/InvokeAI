@@ -1,4 +1,4 @@
-import type { GalleryItem, GalleryItemsPage } from '@features/gallery/core/items';
+import type { GalleryItem, GalleryItemRef, GalleryItemsPage } from '@features/gallery/core/items';
 import type { GallerySemanticQuery, GallerySemanticReference } from '@features/gallery/core/semanticImageQuery';
 import type { GallerySettings } from '@features/gallery/core/settings';
 import type { GalleryBoardOrderBy, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
@@ -18,13 +18,16 @@ import {
   infiniteQueryOptions,
   queryOptions,
   type InfiniteData,
+  type Query,
   type QueryClient,
   type QueryKey,
 } from '@tanstack/react-query';
 
 import {
+  type GalleryItemLocation,
   type GalleryItemNames,
   fetchImageIndexAvailability,
+  getGalleryItemLocation,
   hydrateGalleryDateBoardItemPage,
   isDateBoardId,
   listGalleryBoards,
@@ -103,12 +106,15 @@ type GalleryItemsInfiniteQueryKey = readonly [
 
 type GalleryItemsAnchorQueryKey = readonly [...GalleryItemsInfiniteQueryKey, 'anchor' | 'infinite', number];
 
+export type GalleryItemsPageQueryKey = readonly [...GalleryItemsInfiniteQueryKey, 'page', number];
+
 /** The bounded starred strip: one `GalleryItemsPage`, not an infinite window. */
 type GalleryItemsStripQueryKey = readonly [...GalleryItemsInfiniteQueryKey, 'strip'];
 
 export type GalleryItemsListQueryKey =
   | GalleryItemsAnchorQueryKey
   | GalleryItemsInfiniteQueryKey
+  | GalleryItemsPageQueryKey
   | GalleryItemsStripQueryKey;
 
 const canonicalizeBoardsQuery = (query: GalleryBoardsQuery): CanonicalGalleryBoardsQuery => ({
@@ -180,6 +186,8 @@ export const galleryKeys = {
     window: GalleryItemsWindow = { kind: 'infinite' }
   ): GalleryItemsListQueryKey =>
     [...galleryKeys.itemListsForAccount(owner), filter, ...getWindowKey(window)] as GalleryItemsListQueryKey,
+  itemPage: (owner: AccountScope, filter: CanonicalGalleryItemsFilter, offset: number): GalleryItemsPageQueryKey =>
+    [...galleryKeys.itemListsForAccount(owner), filter, 'page', normalizePageOffset(offset)] as const,
   starredStrip: (owner: AccountScope, filter: CanonicalGalleryItemsFilter): GalleryItemsStripQueryKey =>
     [...galleryKeys.itemListsForAccount(owner), filter, 'strip'] as const,
   itemNamesRoot: () => [...galleryKeys.itemsRoot(), 'names'] as const,
@@ -216,6 +224,506 @@ export const galleryItemNamesOptions = (inputFilter: GalleryItemsFilter) => {
   const owner = captureAccountScope();
 
   return galleryItemNamesOptionsForOwner(owner, canonicalizeGalleryItemsFilter(inputFilter));
+};
+
+const MAX_INACTIVE_PAGES_PER_LISTING = 10;
+const MAX_CONCURRENT_PAGE_FETCHES = 4;
+
+interface PendingPageFetch<T> {
+  signal: AbortSignal;
+  run: () => Promise<T>;
+  resolve: (result: T) => void;
+  reject: (error: unknown) => void;
+  onAbort: () => void;
+  started: boolean;
+}
+
+interface GalleryPageLifecycle {
+  lastUse: WeakMap<Query, number>;
+  nextUse: number;
+  queue: PendingPageFetch<unknown>[];
+  activeFetches: number;
+  unsubscribe: () => void;
+}
+
+const lifecycles = new WeakMap<QueryClient, GalleryPageLifecycle>();
+
+const getSparsePageIdentity = (queryKey: QueryKey): { listingKey: QueryKey; listingHash: string } | null => {
+  if (
+    queryKey.length !== 7 ||
+    queryKey[0] !== 'gallery' ||
+    queryKey[1] !== 'items' ||
+    queryKey[2] !== 'list' ||
+    !queryKey[3] ||
+    typeof queryKey[3] !== 'object' ||
+    !queryKey[4] ||
+    typeof queryKey[4] !== 'object' ||
+    queryKey[5] !== 'page' ||
+    typeof queryKey[6] !== 'number'
+  ) {
+    return null;
+  }
+
+  const listingKey = queryKey.slice(0, 5);
+
+  return { listingKey, listingHash: hashKey(listingKey) };
+};
+
+const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
+  const existing = lifecycles.get(client);
+
+  if (existing) {
+    return existing;
+  }
+
+  const lifecycle: GalleryPageLifecycle = {
+    lastUse: new WeakMap(),
+    nextUse: 0,
+    queue: [],
+    activeFetches: 0,
+    unsubscribe: () => undefined,
+  };
+
+  const touch = (query: Query) => lifecycle.lastUse.set(query, ++lifecycle.nextUse);
+
+  const pruneListing = (listingKey: QueryKey) => {
+    const candidates = client
+      .getQueryCache()
+      .findAll({ queryKey: listingKey })
+      .filter((query) => {
+        const identity = getSparsePageIdentity(query.queryKey);
+
+        if (!identity || identity.listingHash !== hashKey(listingKey)) {
+          return false;
+        }
+
+        return query.state.data !== undefined && query.state.fetchStatus === 'idle' && query.getObserversCount() === 0;
+      });
+
+    if (candidates.length <= MAX_INACTIVE_PAGES_PER_LISTING) {
+      return;
+    }
+
+    candidates.sort((left, right) => {
+      const leftUse = lifecycle.lastUse.get(left) ?? left.state.dataUpdatedAt;
+      const rightUse = lifecycle.lastUse.get(right) ?? right.state.dataUpdatedAt;
+
+      return leftUse - rightUse || Number(left.queryKey[6]) - Number(right.queryKey[6]);
+    });
+
+    for (const query of candidates.slice(0, candidates.length - MAX_INACTIVE_PAGES_PER_LISTING)) {
+      client.removeQueries({ exact: true, queryKey: query.queryKey });
+    }
+  };
+
+  const seedExistingPages = () => {
+    const existingPages = client
+      .getQueryCache()
+      .findAll({ queryKey: ['gallery', 'items', 'list'] })
+      .filter((query) => getSparsePageIdentity(query.queryKey))
+      .sort((left, right) => left.state.dataUpdatedAt - right.state.dataUpdatedAt);
+
+    for (const query of existingPages) {
+      if (!lifecycle.lastUse.has(query)) {
+        touch(query);
+      }
+    }
+  };
+
+  seedExistingPages();
+  lifecycle.unsubscribe = client.getQueryCache().subscribe((event) => {
+    if (event.type === 'removed') {
+      return;
+    }
+
+    const identity = getSparsePageIdentity(event.query.queryKey);
+
+    if (!identity) {
+      return;
+    }
+
+    if (
+      event.type === 'added' ||
+      event.type === 'observerAdded' ||
+      event.type === 'observerRemoved' ||
+      (event.type === 'updated' && event.action.type === 'success')
+    ) {
+      touch(event.query);
+    }
+
+    pruneListing(identity.listingKey);
+  });
+
+  lifecycles.set(client, lifecycle);
+
+  return lifecycle;
+};
+
+const schedulePageFetch = <T>(
+  lifecycle: GalleryPageLifecycle,
+  signal: AbortSignal,
+  run: () => Promise<T>
+): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    if (signal.aborted) {
+      reject(signal.reason ?? new DOMException('The operation was aborted.', 'AbortError'));
+      return;
+    }
+
+    const task: PendingPageFetch<T> = {
+      signal,
+      run,
+      resolve,
+      reject,
+      started: false,
+      onAbort: () => {
+        if (task.started) {
+          return;
+        }
+
+        const index = lifecycle.queue.indexOf(task as PendingPageFetch<unknown>);
+
+        if (index !== -1) {
+          lifecycle.queue.splice(index, 1);
+        }
+
+        signal.removeEventListener('abort', task.onAbort);
+        reject(signal.reason ?? new DOMException('The operation was aborted.', 'AbortError'));
+      },
+    };
+
+    signal.addEventListener('abort', task.onAbort, { once: true });
+    lifecycle.queue.push(task as PendingPageFetch<unknown>);
+
+    const pump = () => {
+      while (lifecycle.activeFetches < MAX_CONCURRENT_PAGE_FETCHES && lifecycle.queue.length > 0) {
+        const next = lifecycle.queue.shift();
+
+        if (!next) {
+          return;
+        }
+
+        if (next.signal.aborted) {
+          next.onAbort();
+          continue;
+        }
+
+        next.started = true;
+        lifecycle.activeFetches += 1;
+        void next
+          .run()
+          .then(
+            (result) => {
+              next.signal.removeEventListener('abort', next.onAbort);
+              if (next.signal.aborted) {
+                next.reject(next.signal.reason ?? new DOMException('The operation was aborted.', 'AbortError'));
+              } else {
+                next.resolve(result);
+              }
+            },
+            (error: unknown) => {
+              next.signal.removeEventListener('abort', next.onAbort);
+              next.reject(error);
+            }
+          )
+          .finally(() => {
+            lifecycle.activeFetches -= 1;
+            pump();
+          });
+      }
+    };
+
+    pump();
+  });
+
+/** Query deduplicates same-key calls before they enter this per-client bounded scheduler. */
+const fetchGalleryPageWithLifecycle = <T>(
+  client: QueryClient,
+  signal: AbortSignal,
+  run: () => Promise<T>
+): Promise<T> => schedulePageFetch(ensureLifecycle(client), signal, run);
+
+/** One Query-owned page at an absolute offset. Shared by every consumer of the same account/listing/page. */
+export const galleryItemsPageOptions = (inputFilter: GalleryItemsFilter, offset: number) => {
+  const owner = captureAccountScope();
+  const filter = canonicalizeGalleryItemsFilter(inputFilter);
+  const pageOffset = normalizePageOffset(offset);
+
+  return queryOptions({
+    queryFn: ({ client, signal }) => {
+      const requestSignal = AbortSignal.any([signal, owner.signal]);
+
+      return fetchGalleryPageWithLifecycle(client, requestSignal, () =>
+        fetchGalleryItemsRange(client, owner, filter, {
+          limit: GALLERY_PAGE_SIZE,
+          offset: pageOffset,
+          signal: requestSignal,
+          includeAbsolutePositions: true,
+        })
+      );
+    },
+    queryKey: galleryKeys.itemPage(owner, filter, pageOffset),
+    staleTime: 60_000,
+  });
+};
+
+const galleryItemLocationKey = (
+  owner: AccountScope,
+  filter: ReturnType<typeof canonicalizeGalleryItemsFilter>,
+  ref: GalleryItemRef
+) => ['gallery', 'item-location', getAccountKey(owner), filter, ref] as const;
+
+const sharedQueryConsumers = new WeakMap<QueryClient, Map<string, number>>();
+
+/** Stop one caller's wait immediately; cancel the Query only after its final caller leaves. */
+const fetchSharedQuery = <T>(
+  client: QueryClient,
+  queryKey: QueryKey,
+  signal: AbortSignal | undefined,
+  cancelQueryWhenUnused: boolean,
+  fetch: () => Promise<T>
+): Promise<T> => {
+  if (signal?.aborted) {
+    return Promise.reject(signal.reason ?? new DOMException('The operation was aborted.', 'AbortError'));
+  }
+
+  const queryHash = hashKey(queryKey);
+  const consumers = sharedQueryConsumers.get(client) ?? new Map<string, number>();
+
+  sharedQueryConsumers.set(client, consumers);
+  consumers.set(queryHash, (consumers.get(queryHash) ?? 0) + 1);
+
+  return new Promise((resolve, reject) => {
+    let settled = false;
+    const release = (cancelIfLast: boolean) => {
+      const remainingConsumers = Math.max(0, (consumers.get(queryHash) ?? 1) - 1);
+
+      if (remainingConsumers === 0) {
+        consumers.delete(queryHash);
+        const query = client.getQueryCache().find({ exact: true, queryKey });
+
+        if (cancelIfLast && cancelQueryWhenUnused && (query?.getObserversCount() ?? 0) === 0) {
+          void client.cancelQueries({ exact: true, queryKey });
+        }
+        if (consumers.size === 0) {
+          sharedQueryConsumers.delete(client);
+        }
+      } else {
+        consumers.set(queryHash, remainingConsumers);
+      }
+    };
+    const onAbort = () => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      signal?.removeEventListener('abort', onAbort);
+      release(true);
+      reject(signal?.reason ?? new DOMException('The operation was aborted.', 'AbortError'));
+    };
+    const settle = (complete: () => void) => {
+      if (settled) {
+        return;
+      }
+
+      settled = true;
+      signal?.removeEventListener('abort', onAbort);
+      release(false);
+      complete();
+    };
+
+    signal?.addEventListener('abort', onAbort, { once: true });
+    if (signal?.aborted) {
+      onAbort();
+      return;
+    }
+
+    let request: Promise<T>;
+
+    try {
+      request = fetch();
+    } catch (error: unknown) {
+      settle(() => reject(error));
+      return;
+    }
+
+    void request.then(
+      (value) => settle(() => resolve(value)),
+      (error: unknown) => settle(() => reject(error))
+    );
+  });
+};
+
+/** Fetch one shared page while tracking every imperative consumer that cannot be seen by Query observers. */
+export const fetchGalleryItemsPage = (
+  queryClient: QueryClient,
+  inputFilter: GalleryItemsFilter,
+  offset: number,
+  { signal, staleTime }: { signal?: AbortSignal; staleTime?: number } = {}
+): Promise<GalleryItemsPage> => {
+  const pageOptions = galleryItemsPageOptions(inputFilter, offset);
+
+  return fetchSharedQuery(queryClient, pageOptions.queryKey, signal, true, () =>
+    queryClient.fetchQuery(staleTime === undefined ? pageOptions : { ...pageOptions, staleTime })
+  );
+};
+
+const galleryItemLocationOptionsForOwner = (
+  owner: AccountScope,
+  inputFilter: GalleryItemsFilter,
+  ref: GalleryItemRef
+) => {
+  const filter = canonicalizeGalleryItemsFilter(inputFilter);
+
+  if (filter.semantic) {
+    throw new TypeError('Semantic gallery results do not have an ordinary listing location.');
+  }
+
+  return queryOptions({
+    queryFn: async ({ signal }) => {
+      const requestSignal = AbortSignal.any([signal, owner.signal]);
+      const location = await getGalleryItemLocation({ ...filter, ...ref, signal: requestSignal });
+
+      assertAccountScopeCurrent(owner);
+      requestSignal.throwIfAborted();
+
+      return location;
+    },
+    queryKey: galleryItemLocationKey(owner, filter, ref),
+    retry: false,
+    staleTime: 0,
+  });
+};
+
+/** Account-fenced location for one item in an ordinary, fully filtered gallery listing. */
+export const galleryItemLocationOptions = (inputFilter: GalleryItemsFilter, ref: GalleryItemRef) =>
+  galleryItemLocationOptionsForOwner(captureAccountScope(), inputFilter, ref);
+
+export interface VerifiedGalleryItemPage {
+  index: number;
+  offset: number;
+  page: GalleryItemsPage;
+  total: number;
+}
+
+const isOwnerKey = (key: unknown, owner: AccountScope): boolean =>
+  Boolean(
+    key &&
+    typeof key === 'object' &&
+    'accountId' in key &&
+    'epoch' in key &&
+    key.accountId === owner.accountId &&
+    key.epoch === owner.epoch
+  );
+
+const pageContainsLocation = (
+  page: GalleryItemsPage,
+  requestedOffset: number,
+  location: GalleryItemLocation,
+  ref: GalleryItemRef
+): boolean => {
+  if (
+    !Number.isSafeInteger(location.index) ||
+    !Number.isSafeInteger(location.total) ||
+    location.index < 0 ||
+    location.index >= location.total ||
+    location.total !== page.total ||
+    (page.offset !== undefined && page.offset !== requestedOffset) ||
+    location.kind !== ref.kind ||
+    location.name !== ref.name
+  ) {
+    return false;
+  }
+
+  const indices = page.itemIndices ?? page.items.map((_, index) => (page.offset ?? requestedOffset) + index);
+  const localIndex = indices.indexOf(location.index);
+  const item: GalleryItem | undefined = localIndex >= 0 ? page.items[localIndex] : undefined;
+
+  return item?.kind === ref.kind && item.name === ref.name;
+};
+
+const isValidLocation = (location: GalleryItemLocation, ref: GalleryItemRef): boolean =>
+  location.kind === ref.kind &&
+  location.name === ref.name &&
+  Number.isSafeInteger(location.index) &&
+  Number.isSafeInteger(location.total) &&
+  location.index >= 0 &&
+  location.index < location.total;
+
+/**
+ * Resolve the target's current rank and fetch only its aligned page. A mismatch means the listing shifted between
+ * the rank and page reads; refresh both once, then leave failure to the caller without changing Gallery state.
+ */
+export const fetchVerifiedGalleryItemPage = async (
+  queryClient: QueryClient,
+  inputFilter: GalleryItemsFilter,
+  ref: GalleryItemRef,
+  owner: AccountScope = captureAccountScope(),
+  signal: AbortSignal = owner.signal
+): Promise<VerifiedGalleryItemPage | null> => {
+  const filter = canonicalizeGalleryItemsFilter(inputFilter);
+  const requestSignal = AbortSignal.any([signal, owner.signal]);
+
+  if (filter.semantic) {
+    throw new TypeError('Semantic gallery results do not have an ordinary listing location.');
+  }
+
+  const fenceError = <T>(request: Promise<T>): Promise<T> =>
+    request.catch((error: unknown) => {
+      // Account lifetime errors remain authoritative even though the owner signal also cancels Query work.
+      assertAccountScopeCurrent(owner);
+      requestSignal.throwIfAborted();
+      throw error;
+    });
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    assertAccountScopeCurrent(owner);
+    requestSignal.throwIfAborted();
+    const locationOptions = galleryItemLocationOptionsForOwner(owner, filter, ref);
+
+    const location = await fenceError(
+      fetchSharedQuery(queryClient, locationOptions.queryKey, requestSignal, true, () =>
+        queryClient.fetchQuery({ ...locationOptions, staleTime: 0 })
+      )
+    );
+
+    assertAccountScopeCurrent(owner);
+    requestSignal.throwIfAborted();
+
+    if (!isValidLocation(location, ref)) {
+      continue;
+    }
+
+    const offset = Math.floor(location.index / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+    const pageOptions = galleryItemsPageOptions(filter, offset);
+
+    if (!isOwnerKey(pageOptions.queryKey[3], owner)) {
+      throw new Error('Gallery account changed before the target page could be fetched.');
+    }
+
+    // A cached page can have a fresh staleTime while an external insert/delete has shifted its offsets. Always read
+    // the one resolved page from the backend before treating a locator result as verified.
+    const page = await fenceError(
+      fetchGalleryItemsPage(queryClient, filter, offset, {
+        signal: requestSignal,
+        staleTime: 0,
+      })
+    );
+
+    assertAccountScopeCurrent(owner);
+    requestSignal.throwIfAborted();
+
+    if (pageContainsLocation(page, offset, location, ref)) {
+      return { index: location.index, offset, page, total: location.total };
+    }
+
+    if (attempt === 0) {
+      await queryClient.invalidateQueries({ exact: true, queryKey: pageOptions.queryKey, refetchType: 'none' });
+    }
+  }
+
+  return null;
 };
 
 const dateBoardNamesConsumers = new WeakMap<QueryClient, Map<string, number>>();
@@ -303,7 +811,12 @@ export const fetchGalleryItemsRange = async (
   client: QueryClient,
   owner: AccountScope,
   filter: CanonicalGalleryItemsFilter,
-  { limit, offset, signal }: { limit: number; offset: number; signal: AbortSignal }
+  {
+    limit,
+    offset,
+    signal,
+    includeAbsolutePositions = false,
+  }: { limit: number; offset: number; signal: AbortSignal; includeAbsolutePositions?: boolean }
 ): Promise<GalleryItemsPage> => {
   let result: GalleryItemsPage;
 
@@ -323,7 +836,24 @@ export const fetchGalleryItemsRange = async (
   assertAccountScopeCurrent(owner);
   signal.throwIfAborted();
 
-  return result.items.length <= limit ? result : { ...result, items: result.items.slice(0, limit) };
+  if (!includeAbsolutePositions) {
+    return { items: result.items.slice(0, limit), total: result.total };
+  }
+
+  const itemIndices = result.itemIndices ?? result.items.map((_, index) => offset + index);
+
+  if (itemIndices.length !== result.items.length) {
+    throw new TypeError('Gallery page item indices must stay aligned with its items.');
+  }
+
+  const items = result.items.slice(0, limit);
+  const truncatedIndices = itemIndices.slice(0, limit);
+
+  if (truncatedIndices.some((index) => !Number.isSafeInteger(index) || index < offset || index >= offset + limit)) {
+    throw new RangeError('Gallery page item indices must stay within the requested range.');
+  }
+
+  return { ...result, items, itemIndices: truncatedIndices, offset };
 };
 
 /**
@@ -466,6 +996,9 @@ export const galleryStarredStripOptions = (inputFilter: GalleryItemsFilter) => {
 };
 
 export const isGalleryStarredStripQueryKey = (queryKey: QueryKey): boolean => queryKey[5] === 'strip';
+
+export const isGallerySinglePageQueryKey = (queryKey: QueryKey): boolean =>
+  queryKey[5] === 'page' || isGalleryStarredStripQueryKey(queryKey);
 
 export const flattenGalleryItemsData = (data: InfiniteData<GalleryItemsPage, number> | undefined): GalleryItem[] => {
   if (!data) {

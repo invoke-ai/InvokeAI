@@ -51,6 +51,11 @@ vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
     queryKey: ['test-slot-items'],
     staleTime: Infinity,
   }),
+  galleryItemsPageOptions: (filter: unknown, offset: number) => ({
+    queryFn: () => Promise.resolve({ items: [image('a.png')], itemIndices: [offset], offset, total: 1 }),
+    queryKey: ['gallery', 'items', 'list', { accountId: 'test-account', epoch: 0 }, filter, 'page', offset],
+    staleTime: Infinity,
+  }),
 }));
 
 vi.mock('@features/gallery/data/backend', async (importOriginal) => ({

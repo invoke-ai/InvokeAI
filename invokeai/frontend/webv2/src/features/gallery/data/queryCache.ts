@@ -22,7 +22,7 @@ import {
   galleryKeys,
   getGalleryItemListQueries,
   getGalleryItemsFilterFromKey,
-  isGalleryStarredStripQueryKey,
+  isGallerySinglePageQueryKey,
   type CanonicalGalleryItemsFilter,
 } from './queries';
 
@@ -31,7 +31,7 @@ export type GalleryItemCachePatch =
   | { boardId: string; kind: 'move'; result: GalleryItemMutationResult }
   | { kind: 'star'; result: GalleryItemMutationResult; starred: boolean };
 
-/** A list window's pages, or the starred strip's single page. */
+/** A list window's pages, or one sparse/strip page. */
 type GalleryItemsCacheData = InfiniteData<GalleryItemsPage, number> | GalleryItemsPage;
 
 interface ItemCacheRollbackEntry {
@@ -64,7 +64,7 @@ const getCachedPages = (query: Query): GalleryItemsPage[] => {
     return data.pages;
   }
 
-  return isGalleryStarredStripQueryKey(query.queryKey) && isGalleryItemsPage(data) ? [data] : [];
+  return isGallerySinglePageQueryKey(query.queryKey) && isGalleryItemsPage(data) ? [data] : [];
 };
 
 const mapPageItems = (
@@ -74,8 +74,9 @@ const mapPageItems = (
 ): GalleryItemsPage => {
   let changed = false;
   const items: GalleryItem[] = [];
+  const itemIndices: number[] | undefined = page.itemIndices ? [] : undefined;
 
-  for (const item of page.items) {
+  for (const [index, item] of page.items.entries()) {
     const nextItem = mapItem(item);
 
     if (nextItem !== item) {
@@ -83,6 +84,7 @@ const mapPageItems = (
     }
     if (nextItem) {
       items.push(nextItem);
+      itemIndices?.push(page.itemIndices?.[index] ?? (page.offset ?? 0) + index);
     }
   }
 
@@ -93,6 +95,7 @@ const mapPageItems = (
   return {
     ...page,
     items: changed ? items : page.items,
+    ...(changed && itemIndices ? { itemIndices } : {}),
     total: Math.max(0, page.total - totalDelta),
   };
 };
@@ -189,9 +192,8 @@ const patchItemsCacheData = (
     return { after: patchItemsInfiniteData(before, filter, patch, itemKeys), before };
   }
 
-  // A newly starred item is left to the trailing refetch, which knows where
-  // it belongs chronologically in the strip.
-  if (isGalleryStarredStripQueryKey(query.queryKey) && isGalleryItemsPage(before)) {
+  // New items are left to the trailing refetch so their server ordering is preserved.
+  if (isGallerySinglePageQueryKey(query.queryKey) && isGalleryItemsPage(before)) {
     return { after: patchItemPage(before, filter, patch, itemKeys, countRemovedItems(before, itemKeys)), before };
   }
 
@@ -408,6 +410,7 @@ const rebuildGalleryItemWindow = async (client: QueryClient, owner: AccountScope
       limit: span.rowCount,
       offset: span.offset,
       signal: owner.signal,
+      includeAbsolutePositions: true,
     });
   } catch {
     return false;
@@ -421,11 +424,25 @@ const rebuildGalleryItemWindow = async (client: QueryClient, owner: AccountScope
     return false;
   }
 
-  const pages: GalleryItemsPage[] = [];
+  const loadedRangeCount = Math.min(span.rowCount, Math.max(0, result.total - span.offset));
+  const pageCount = Math.max(1, Math.ceil(loadedRangeCount / GALLERY_PAGE_SIZE));
+  const pages: GalleryItemsPage[] = Array.from({ length: pageCount }, (_, pageIndex) => {
+    const pageOffset = span.offset + pageIndex * GALLERY_PAGE_SIZE;
+    const pageEnd = pageOffset + GALLERY_PAGE_SIZE;
+    const items: GalleryItem[] = [];
+    const itemIndices: number[] | undefined = result.itemIndices ? [] : undefined;
 
-  for (let index = 0; index < result.items.length; index += GALLERY_PAGE_SIZE) {
-    pages.push({ items: result.items.slice(index, index + GALLERY_PAGE_SIZE), total: result.total });
-  }
+    result.items.forEach((item, index) => {
+      const itemIndex = result.itemIndices?.[index] ?? (result.offset ?? span.offset) + index;
+
+      if (itemIndex >= pageOffset && itemIndex < pageEnd) {
+        items.push(item);
+        itemIndices?.push(itemIndex);
+      }
+    });
+
+    return { items, ...(itemIndices ? { itemIndices } : {}), offset: pageOffset, total: result.total };
+  });
 
   // TanStack never stores zero pages; an emptied span keeps one empty page.
   if (pages.length === 0) {

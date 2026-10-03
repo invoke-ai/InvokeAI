@@ -234,6 +234,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     getSelectionPage,
     handleNavigationKeyDown,
     isLoadingBoard,
+    loadOrderedRefs,
     navigate,
     navigationCursor,
     navigationQueryKey,
@@ -267,13 +268,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       filterIdentity: navigationQueryKey,
       getItemSelectionPage: getSelectionPage,
       items: boardItems,
-      loadOrderedRefs: (signal: AbortSignal) => {
-        signal.throwIfAborted();
-        return Promise.resolve(boardItems.map(toGalleryItemRef));
-      },
+      loadOrderedRefs,
       selectedItemKey,
     }),
-    [boardItems, getSelectionPage, navigationQueryKey, selectedItemKey]
+    [boardItems, getSelectionPage, loadOrderedRefs, navigationQueryKey, selectedItemKey]
   );
   const projectId = useActiveProjectId();
   const { dialog: deletionConfirmationDialog, requestDeletionConfirmation } = useDeletionConfirmation();

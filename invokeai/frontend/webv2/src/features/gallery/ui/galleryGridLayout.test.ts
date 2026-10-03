@@ -1,9 +1,11 @@
 import type { GalleryImageItem } from '@features/gallery/core/items';
 
+import { GALLERY_PAGE_SIZE } from '@features/gallery/core/paging';
 import { describe, expect, it } from 'vitest';
 
 import {
   buildGalleryGridRows,
+  buildSparseGalleryNavigationEntries,
   GALLERY_GRID_GAP_PX,
   GALLERY_PINNED_FOOTER_PX,
   GALLERY_STARRED_HEADER_HEIGHT_PX,
@@ -11,9 +13,13 @@ import {
   getGalleryColumnCount,
   getGalleryColumnCountForCell,
   getGalleryGridRowIndexForItemKey,
+  getGallerySparseRowIndexForItemKey,
+  getGallerySparseRowKey,
+  getGallerySparseSlotKey,
   getGalleryPinnedHeightPx,
   getGalleryStarredLayout,
   getGalleryStarredStripItems,
+  planGalleryPageOffsets,
 } from './galleryGridLayout';
 
 const createImageItem = (name: string, starred = false): GalleryImageItem => ({
@@ -31,6 +37,36 @@ const createImageItem = (name: string, starred = false): GalleryImageItem => ({
 });
 
 const buildRows = (items: GalleryImageItem[]) => buildGalleryGridRows(items, 2);
+
+describe('planGalleryPageOffsets', () => {
+  it.each([
+    { endIndexExclusive: 0, expected: [], startIndex: 0, total: 0 },
+    { endIndexExclusive: 59, expected: [0], startIndex: 2, total: 120 },
+    { endIndexExclusive: GALLERY_PAGE_SIZE, expected: [0], startIndex: 0, total: 120 },
+    { endIndexExclusive: GALLERY_PAGE_SIZE + 1, expected: [0, GALLERY_PAGE_SIZE], startIndex: 59, total: 120 },
+    { endIndexExclusive: 1_000, expected: [0, GALLERY_PAGE_SIZE], startIndex: 58, total: 61 },
+    { endIndexExclusive: 100, expected: [], startIndex: 90, total: 61 },
+    {
+      endIndexExclusive: 721,
+      expected: Array.from({ length: 13 }, (_, index) => index * GALLERY_PAGE_SIZE),
+      startIndex: 0,
+      total: null,
+    },
+  ])(
+    'plans offsets for range [$startIndex, $endIndexExclusive) with total $total',
+    ({ endIndexExclusive, expected, startIndex, total }) => {
+      expect(planGalleryPageOffsets({ endIndexExclusive, startIndex, total })).toEqual(expected);
+    }
+  );
+
+  it('returns no offsets for empty or non-finite ranges', () => {
+    expect(planGalleryPageOffsets({ endIndexExclusive: 10, startIndex: 10, total: null })).toEqual([]);
+    expect(planGalleryPageOffsets({ endIndexExclusive: Number.POSITIVE_INFINITY, startIndex: 0, total: null })).toEqual(
+      []
+    );
+    expect(planGalleryPageOffsets({ endIndexExclusive: 4, startIndex: 5, total: null })).toEqual([]);
+  });
+});
 
 describe('getGalleryColumnCountForCell', () => {
   it('rounds to the nearest whole cell and clamps to the caller bounds', () => {
@@ -153,5 +189,40 @@ describe('getGalleryGridRowIndexForItemKey', () => {
     expect(getGalleryGridRowIndexForItemKey(items, 'image:starred-1', 2)).toBe(-1);
     expect(getGalleryGridRowIndexForItemKey(items, 'image:regular-1', 2)).toBe(0);
     expect(getGalleryGridRowIndexForItemKey(items, 'image:regular-3', 2)).toBe(1);
+  });
+});
+
+describe('sparse gallery geometry', () => {
+  it('maps distant item positions to absolute rows and uses position-stable identities', () => {
+    const first = createImageItem('first');
+    const third = createImageItem('third');
+    const slots = new Map([
+      [120, first],
+      [122, third],
+    ]);
+
+    expect(getGallerySparseRowIndexForItemKey(slots, 'image:first', 2, 3)).toBe(63);
+    expect(getGallerySparseRowIndexForItemKey(slots, 'image:third', 2, 3)).toBe(64);
+    expect(getGallerySparseRowIndexForItemKey(slots, 'image:missing', 2, 3)).toBe(-1);
+    expect(getGallerySparseRowKey(60)).toBe('listing-row:60');
+    expect(getGallerySparseSlotKey(122)).toBe('listing-slot:122');
+  });
+
+  it('keeps keyboard row positions across page-local hydration holes', () => {
+    const first = createImageItem('first');
+    const third = createImageItem('third');
+    const entries = buildSparseGalleryNavigationEntries({
+      itemSlots: new Map([
+        [120, first],
+        [122, third],
+      ]),
+      pageOffsets: [120],
+      total: 130,
+    });
+
+    expect(entries).toHaveLength(10);
+    expect(entries[0]).toEqual({ item: first, kind: 'item' });
+    expect(entries[1]).toEqual({ id: 'gallery-loading-slot:121', kind: 'session', navigable: false });
+    expect(entries[2]).toEqual({ item: third, kind: 'item' });
   });
 });

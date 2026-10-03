@@ -1,8 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { getGalleryRevealRequest, requestGalleryItemReveal, subscribeGalleryRevealRequests } from './selection';
 
 describe('gallery reveal requests', () => {
+  beforeEach(() => {
+    accountLifecycle.activate('gallery-reveal-request-test');
+  });
+
+  afterEach(() => {
+    accountLifecycle.invalidate();
+  });
+
   it('notifies subscribers with a fresh token per request, even for the same item', () => {
     const listener = vi.fn();
     const unsubscribe = subscribeGalleryRevealRequests(listener);
@@ -23,5 +32,36 @@ describe('gallery reveal requests', () => {
     unsubscribe();
     requestGalleryItemReveal('image:b.png');
     expect(listener).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves an optional absolute index for a verified deep reveal', () => {
+    requestGalleryItemReveal('image:deep.png', 6073);
+
+    expect(getGalleryRevealRequest()).toMatchObject({ absoluteIndex: 6073, itemKey: 'image:deep.png' });
+  });
+
+  it('hides an account-owned request when Gallery reads it after an account rotation', () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeGalleryRevealRequests(listener);
+
+    const accountA = accountLifecycle.activate('gallery-reveal-request-owner');
+    requestGalleryItemReveal('image:account-a.png');
+    const request = getGalleryRevealRequest();
+
+    accountLifecycle.activate('gallery-reveal-request-next-owner');
+
+    expect(request).toMatchObject({ accountEpoch: accountA.epoch, itemKey: 'image:account-a.png' });
+    expect(getGalleryRevealRequest()).toBeNull();
+
+    requestGalleryItemReveal('image:account-b.png');
+
+    expect(getGalleryRevealRequest()).toMatchObject({
+      accountEpoch: accountLifecycle.capture().epoch,
+      itemKey: 'image:account-b.png',
+    });
+    expect(getGalleryRevealRequest()?.token).toBeGreaterThan(request?.token ?? 0);
+    expect(listener).toHaveBeenCalledTimes(2);
+
+    unsubscribe();
   });
 });

@@ -1,5 +1,5 @@
 /* oxlint-disable react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-object-as-prop */
-import type { GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
+import type { GalleryItem, GalleryItemRef, GalleryItemsPage } from '@features/gallery/contracts';
 import type { ImageIndexAvailability } from '@features/gallery/data/backend';
 import type { GalleryItemsFilter } from '@features/gallery/data/queries';
 import type { QueueProgressSession } from '@features/queue/contracts';
@@ -19,6 +19,12 @@ import {
 import { sortableKeyboardCoordinates } from '@dnd-kit/sortable';
 import { requestGalleryItemReveal } from '@features/gallery/core/selection';
 import { getGallerySettings } from '@features/gallery/core/settings';
+import {
+  galleryBoardsOptions,
+  galleryItemsPageOptions,
+  getGalleryListingBoardsQuery,
+} from '@features/gallery/data/queries';
+import { invalidateGalleryItems, patchGalleryItemCaches } from '@features/gallery/data/queryCache';
 import { GalleryUiProvider, type GalleryUiAdapter } from '@features/gallery/react';
 import { GALLERY_PINNED_FOOTER_PX } from '@features/gallery/ui/galleryGridLayout';
 import { isGalleryImageDragData } from '@features/gallery/utility';
@@ -40,16 +46,19 @@ import { page, userEvent } from 'vitest/browser';
 
 import type { GalleryStateView } from './galleryStateView';
 import type { GalleryActions, GalleryStarredStrip, GalleryWidgetContextValue } from './GalleryWidgetContext';
+import type { GallerySparseListing } from './useGalleryData';
 
 import { mergeGalleryLoadedItems } from './galleryGridLayout';
 import { GalleryImageGrid } from './GalleryImageGrid';
 import { GalleryWidgetContext } from './GalleryWidgetContext';
+import { useGalleryData } from './useGalleryData';
 import { EMPTY_GALLERY_STARRED_STRIP } from './useGalleryStarredStrip';
 
 const mocks = vi.hoisted(() => ({
   itemProgress: null as { percentage: number; message: string } | null,
   progressFrame: null as { dataUrl: string; width: number; height: number } | null,
   fetchNames: vi.fn(),
+  fetchSparsePage: vi.fn<(filter: GalleryItemsFilter, offset: number) => Promise<GalleryItemsPage>>(),
   getItemLabel: vi.fn<GalleryUiAdapter['getItemLabel']>(),
   indexAvailability: { modelName: null, state: 'disabled' } as ImageIndexAvailability,
   measure: vi.fn(),
@@ -59,24 +68,37 @@ const mocks = vi.hoisted(() => ({
     count: number;
     estimateSize: (index: number) => number;
     getScrollElement: () => Element | null;
+    onChange?: (instance: { getVirtualItems: () => readonly { index: number }[] }) => void;
     overscan: number;
   }>,
 }));
 
 const getNamesKey = (filter: unknown) => ['test-gallery-item-names', JSON.stringify(filter)] as const;
 
-vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
-  ...(await importOriginal<Record<string, unknown>>()),
-  imageIndexAvailabilityOptions: () => ({
-    queryFn: () => mocks.indexAvailability,
-    queryKey: ['test-image-index-availability'],
-  }),
-  galleryItemNamesOptions: (filter: unknown) => ({
-    queryFn: () => mocks.fetchNames(filter),
-    queryKey: getNamesKey(filter),
-    staleTime: Infinity,
-  }),
-}));
+vi.mock('@features/gallery/data/queries', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  const getPageOptions = actual.galleryItemsPageOptions as (
+    filter: GalleryItemsFilter,
+    offset: number
+  ) => Record<string, unknown>;
+
+  return {
+    ...actual,
+    galleryItemsPageOptions: (filter: GalleryItemsFilter, offset: number) => ({
+      ...getPageOptions(filter, offset),
+      queryFn: () => mocks.fetchSparsePage(filter, offset),
+    }),
+    imageIndexAvailabilityOptions: () => ({
+      queryFn: () => mocks.indexAvailability,
+      queryKey: ['test-image-index-availability'],
+    }),
+    galleryItemNamesOptions: (filter: unknown) => ({
+      queryFn: () => mocks.fetchNames(filter),
+      queryKey: getNamesKey(filter),
+      staleTime: Infinity,
+    }),
+  };
+});
 
 vi.mock('react-hook-tanstack-virtual', async (importOriginal) => {
   const actual = await importOriginal<typeof VirtualModule>();
@@ -87,6 +109,7 @@ vi.mock('react-hook-tanstack-virtual', async (importOriginal) => {
       scrollMargin?: number;
       estimateSize: (index: number) => number;
       getScrollElement: () => Element | null;
+      onChange?: (instance: { getVirtualItems: () => readonly { index: number }[] }) => void;
       overscan: number;
     }) => {
       if (options.overscan === 2) {
@@ -127,7 +150,7 @@ void i18n.use(initReactI18next).init({
   resources: {
     en: {
       translation: {
-        common: { generating: 'Generating' },
+        common: { generating: 'Generating', retry: 'Retry' },
         widgets: {
           gallery: {
             inProgress: 'In progress',
@@ -400,6 +423,8 @@ let currentPinnedSessionId: string | null = null;
 let currentProgressSessions: QueueProgressSession[] = [];
 const followProgressSession = vi.fn();
 let currentStrip: GalleryStarredStrip = EMPTY_GALLERY_STARRED_STRIP;
+let currentSparseListing: GallerySparseListing | undefined;
+const setVisibleRange = vi.fn();
 let onDragStart = vi.fn();
 
 /** The strip the next renders show; `total` defaults to the item count. */
@@ -445,6 +470,8 @@ const Harness = ({
     projectName: 'Project',
     region: 'right',
     runtime,
+    setVisibleRange,
+    sparseListing: currentSparseListing,
     starredStrip: currentStrip,
   } as unknown as GalleryWidgetContextValue;
 
@@ -487,6 +514,62 @@ const Harness = ({
   );
 };
 
+const QueryBackedGalleryHarness = ({
+  gallery,
+  liveFollowEnabled,
+  pinnedSessionId,
+  progressSessions,
+}: {
+  gallery: GalleryStateView;
+  liveFollowEnabled: boolean;
+  pinnedSessionId: string | null;
+  progressSessions: QueueProgressSession[];
+}) => {
+  const sparseData = useGalleryData({
+    galleryView: gallery.galleryView,
+    page: gallery.page,
+    projectBoardId: gallery.projectBoardId,
+    recentImages: [],
+    searchTerm: gallery.searchTerm,
+    selectedBoardId: gallery.selectedBoardId,
+    semanticQuery: gallery.semanticImageQuery,
+    settings: gallery.settings,
+    starred: gallery.starredOnly ? true : undefined,
+    sparseViewport: true,
+  });
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates })
+  );
+  const contextValue: GalleryWidgetContextValue = {
+    actions: createActions(),
+    filter: sparseData.filter,
+    gallery,
+    itemActions: imageActionMocks,
+    isWindowTruncated: false,
+    loadedItems: mergeGalleryLoadedItems(currentStrip.items, sparseData.items ?? []),
+    projectName: 'Project',
+    region: 'right',
+    runtime,
+    setVisibleRange: sparseData.setVisibleRange,
+    sparseListing: sparseData.sparseListing,
+    starredStrip: currentStrip,
+  } as unknown as GalleryWidgetContextValue;
+
+  return (
+    <GalleryUiProvider adapter={createAdapter(progressSessions, liveFollowEnabled, pinnedSessionId)}>
+      <GalleryWidgetContext value={contextValue}>
+        <DndContext autoScroll={workbenchAutoScroll} sensors={sensors}>
+          <DragMonitor />
+          <Box data-testid="gallery-surface" h="full">
+            <GalleryImageGrid />
+          </Box>
+        </DndContext>
+      </GalleryWidgetContext>
+    </GalleryUiProvider>
+  );
+};
+
 const interact = (action: () => void, delay = 0): Promise<void> =>
   act(async () => {
     action();
@@ -515,6 +598,26 @@ const renderGallery = async (
   );
 };
 
+const renderQueryBackedGallery = async (gallery: GalleryStateView) => {
+  currentGallery = gallery;
+  await interact(() =>
+    root?.render(
+      <I18nextProvider i18n={i18n}>
+        <ChakraProvider value={system}>
+          <QueryClientProvider client={queryClient!}>
+            <QueryBackedGalleryHarness
+              gallery={gallery}
+              liveFollowEnabled={currentLiveFollowEnabled}
+              pinnedSessionId={currentPinnedSessionId}
+              progressSessions={currentProgressSessions}
+            />
+          </QueryClientProvider>
+        </ChakraProvider>
+      </I18nextProvider>
+    )
+  );
+};
+
 const getButton = (label: string): HTMLButtonElement => {
   const button = host?.querySelector<HTMLButtonElement>(`button[aria-label="${label}"]`);
 
@@ -539,6 +642,7 @@ beforeEach(() => {
   requestGalleryItemReveal('image:__drained__');
   accountLifecycle.activate('grid-user');
   vi.clearAllMocks();
+  mocks.fetchSparsePage.mockReset();
   registeredCommands.clear();
   currentGallery = createGallery();
   mocks.itemProgress = null;
@@ -549,6 +653,7 @@ beforeEach(() => {
   currentPinnedSessionId = null;
   mocks.progressFrame = null;
   currentStrip = EMPTY_GALLERY_STARRED_STRIP;
+  currentSparseListing = undefined;
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   host = document.createElement('div');
   host.style.cssText = 'height:480px;left:20px;position:fixed;top:20px;width:600px;';
@@ -1409,6 +1514,60 @@ describe('GalleryImageGrid reveal requests', () => {
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
   });
 
+  it('ignores an absolute-index reveal from the previous account before this grid mounts', async () => {
+    accountLifecycle.activate('grid-user-a');
+    await interact(() => requestGalleryItemReveal('image:account-a-deep.png', 70));
+    accountLifecycle.activate('grid-user-b');
+
+    await renderGallery(
+      createGallery({
+        items: [],
+        selectedItemKey: null,
+        selectedItemKeys: [],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+
+    expect(setVisibleRange).not.toHaveBeenCalled();
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+  });
+
+  it('retires an already-pending reveal when the mounted grid changes accounts', async () => {
+    const firstPageItem = createItem('image', 'account-a-first.png');
+    currentSparseListing = {
+      itemSlots: new Map([[0, firstPageItem]]),
+      pageStates: new Map([[0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 120,
+    };
+    const gallery = createGallery({
+      items: [firstPageItem],
+      selectedItemKey: null,
+      selectedItemKeys: [],
+      settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+    });
+    await renderGallery(gallery);
+    await interact(() => requestGalleryItemReveal('image:account-a-deep.png', 70));
+    expect(setVisibleRange).toHaveBeenCalled();
+    expect(mocks.scrollToIndex).toHaveBeenCalled();
+
+    setVisibleRange.mockClear();
+    mocks.scrollToIndex.mockClear();
+    accountLifecycle.activate('grid-user-b');
+    const accountBItem = createItem('image', 'account-b-deep.png');
+    currentSparseListing = {
+      itemSlots: new Map([[70, accountBItem]]),
+      pageStates: new Map([[60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 120,
+    };
+
+    await renderGallery({ ...gallery, items: [accountBItem] });
+
+    expect(setVisibleRange).not.toHaveBeenCalled();
+    expect(mocks.scrollToIndex).not.toHaveBeenCalled();
+  });
+
   it('reveals a starred item in the strip, and keeps the reveal pending while the strip is collapsed', async () => {
     const starred = createItem('image', 'starred.png', { starred: true });
     setStrip([starred]);
@@ -1532,6 +1691,459 @@ describe('GalleryImageGrid reveal requests', () => {
 });
 
 describe('GalleryImageGrid virtualization', () => {
+  it('keeps hydration gaps inside the selected paginated page', async () => {
+    const first = createItem('image', 'page-2-first.png');
+    const third = createItem('image', 'page-2-third.png');
+    currentSparseListing = {
+      itemSlots: new Map([
+        [0, first],
+        [2, third],
+      ]),
+      pageStates: new Map([[120, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 130,
+    };
+
+    await renderGallery(
+      createGallery({
+        items: [first, third],
+        page: 2,
+        selectedItemKey: 'image:page-2-first.png',
+        selectedItemKeys: ['image:page-2-first.png'],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'paginated' },
+      })
+    );
+
+    expect(host?.querySelector('img[alt="page-2-first.png"]')).not.toBeNull();
+    expect(host?.querySelector('img[alt="page-2-third.png"]')).not.toBeNull();
+    expect(host?.querySelectorAll('[data-gallery-slot-state="empty"]')).toHaveLength(8);
+    expect(mocks.virtualizerOptions.at(-1)?.count).toBe(4);
+  });
+
+  it('keeps page zero active while ascending recent-only rows need count discovery', async () => {
+    const recent = createItem('image', 'recent.png');
+    currentSparseListing = {
+      itemSlots: new Map(),
+      pageStates: new Map([[0, { error: null, isLoading: true, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [recent],
+      total: null,
+    };
+
+    await renderGallery(
+      createGallery({
+        items: [recent],
+        settings: { ...DENSE_SETTINGS, imageOrderDir: 'ASC', paginationMode: 'infinite' },
+      })
+    );
+
+    const options = mocks.virtualizerOptions.at(-1);
+    expect(options?.onChange).toBeDefined();
+
+    await interact(() => options?.onChange?.({ getVirtualItems: () => [{ index: 0 }] }));
+
+    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 60, startIndex: 0 });
+  });
+
+  it('renders absolute sparse slots, page-local retry, and recent overlays at the sort edge', async () => {
+    const first = createItem('image', 'sparse-120.png');
+    const third = createItem('image', 'sparse-122.png');
+    const recent = createItem('image', 'recent.png');
+    const retry = vi.fn(() => Promise.resolve());
+    const pageError = new Error('Page unavailable');
+    currentSparseListing = {
+      itemSlots: new Map([
+        [120, first],
+        [122, third],
+      ]),
+      pageStates: new Map([[120, { error: pageError, isLoading: false, retry }]]),
+      recentItems: [recent],
+      total: 130,
+    };
+
+    await renderGallery(
+      createGallery({
+        items: [first, third, recent],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite', imageOrderDir: 'DESC' },
+      })
+    );
+
+    const descendingSections = [...(host?.querySelectorAll<HTMLElement>('[data-gallery-section]') ?? [])];
+    expect(descendingSections[0]?.dataset.gallerySection).toBe('recent');
+    expect(descendingSections.at(-1)?.dataset.gallerySection).toBe('regular');
+    expect(host?.querySelector('img[alt="sparse-120.png"]')).not.toBeNull();
+    expect(host?.querySelector('img[alt="sparse-122.png"]')).not.toBeNull();
+    expect(host?.querySelectorAll('[data-gallery-slot-state="error"]')).toHaveLength(8);
+    expect(host?.querySelectorAll('[data-gallery-page-error] button')).toHaveLength(1);
+
+    await click(host!.querySelector<HTMLButtonElement>('[data-gallery-page-error="120"] button')!);
+    expect(retry).toHaveBeenCalledTimes(1);
+
+    await renderGallery(
+      createGallery({
+        items: [first, third, recent],
+        settings: { ...DENSE_SETTINGS, imageOrderDir: 'ASC', paginationMode: 'infinite' },
+      })
+    );
+    const ascendingSections = [...(host?.querySelectorAll<HTMLElement>('[data-gallery-section]') ?? [])];
+    expect(ascendingSections[0]?.dataset.gallerySection).toBe('regular');
+    expect(ascendingSections.at(-1)?.dataset.gallerySection).toBe('recent');
+  });
+
+  it('reconciles ascending recent overlays by requesting the backend tail page', async () => {
+    const recent = createItem('image', 'recent-tail.png');
+    currentSparseListing = {
+      itemSlots: new Map(),
+      pageStates: new Map([[0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [recent],
+      total: 120,
+    };
+
+    await renderGallery(
+      createGallery({
+        items: [recent],
+        settings: { ...DENSE_SETTINGS, imageOrderDir: 'ASC', paginationMode: 'infinite' },
+      })
+    );
+    expect(host?.querySelectorAll('img[alt="recent-tail.png"]')).toHaveLength(1);
+
+    const options = mocks.virtualizerOptions.at(-1)!;
+    await interact(() => options.onChange?.({ getVirtualItems: () => [{ index: options.count - 1 }] }));
+    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 60 });
+
+    currentSparseListing = {
+      itemSlots: new Map([[119, recent]]),
+      pageStates: new Map([[60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery(currentGallery);
+    expect(host?.querySelectorAll('img[alt="recent-tail.png"]')).toHaveLength(1);
+  });
+
+  it('loads and selects the next absolute slot on keyboard navigation, while select-all excludes gaps', async () => {
+    const lastInPage = createItem('image', 'page-0-last.png');
+    const firstNextPage = createItem('image', 'page-1-first.png');
+    currentSparseListing = {
+      itemSlots: new Map([[59, lastInPage]]),
+      pageStates: new Map([[0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 120,
+    };
+
+    await renderGallery(
+      createGallery({
+        items: [lastInPage],
+        selectedItemKey: 'image:page-0-last.png',
+        selectedItemKeys: ['image:page-0-last.png'],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+
+    registeredCommands.get('gallery.galleryNavRight')?.();
+    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 60 });
+    expect(mocks.scrollToIndex).toHaveBeenCalled();
+
+    currentSparseListing = {
+      itemSlots: new Map([
+        [59, lastInPage],
+        [60, firstNextPage],
+      ]),
+      pageStates: new Map([
+        [0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+        [60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+      ]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery({ ...currentGallery, items: [lastInPage, firstNextPage] });
+    expect(actionMocks.selectItem).toHaveBeenLastCalledWith(firstNextPage);
+
+    registeredCommands.get('gallery.selectAllOnPage')?.();
+    expect(actionMocks.selectItemRange).toHaveBeenLastCalledWith(
+      [
+        { kind: 'image', name: 'page-0-last.png' },
+        { kind: 'image', name: 'page-1-first.png' },
+      ],
+      lastInPage
+    );
+  });
+
+  it('uses an indexed reveal to request and scroll to only the located page', async () => {
+    currentSparseListing = {
+      itemSlots: new Map([[0, createItem('image', 'page-zero.png')]]),
+      pageStates: new Map([[0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 120,
+    };
+    await renderGallery(
+      createGallery({
+        selectedItemKey: 'image:deep.png',
+        selectedItemKeys: ['image:deep.png'],
+        settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+      })
+    );
+
+    await interact(() => requestGalleryItemReveal('image:deep.png', 70));
+
+    expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 60 });
+    expect(mocks.scrollToIndex).toHaveBeenCalled();
+  });
+
+  it('captures a narrow sparse viewport with loaded and page-error slots', async () => {
+    await page.viewport(800, 680);
+    const thumbnailUrl = `data:image/svg+xml,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="128" height="128"><rect width="128" height="128" fill="#587074"/><circle cx="64" cy="52" r="28" fill="#b7cbc8"/></svg>')}`;
+    const loaded = createItem('image', 'loaded-sparse.png', { fullUrl: thumbnailUrl, thumbnailUrl });
+    currentSparseListing = {
+      itemSlots: new Map([[0, loaded]]),
+      pageStates: new Map([
+        [0, { error: new Error('Page unavailable'), isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+      ]),
+      recentItems: [],
+      total: 12,
+    };
+    host!.style.width = '380px';
+
+    await renderGallery(
+      createGallery({ items: [loaded], settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' } })
+    );
+    expect(host?.querySelector('img[alt="loaded-sparse.png"]')).not.toBeNull();
+    expect(host?.querySelector('[data-gallery-slot-state="error"]')).not.toBeNull();
+    const retryButton = host!.querySelector<HTMLButtonElement>('[data-gallery-page-error="0"] button')!;
+    const retryStyle = getComputedStyle(retryButton);
+    const surface = host!.querySelector<HTMLElement>('[data-testid="gallery-surface"]')!;
+    const retryContrast = getContrastRatio(
+      retryStyle.color,
+      getComputedStyle(surface).backgroundColor,
+      Number(retryStyle.opacity)
+    );
+    expect(retryContrast).toBeGreaterThanOrEqual(4.5);
+    host?.querySelector('[data-testid="context-target"]')?.setAttribute('hidden', '');
+    await page.screenshot({ path: '../../../../artifacts/gallery-progress/sparse-grid.png' });
+  });
+
+  it('shows one retry control when a fully populated sparse page refetch fails', async () => {
+    const items = Array.from({ length: 12 }, (_, index) => createItem('image', `failed-page-${index}.png`));
+    const retry = vi.fn(() => Promise.resolve());
+    currentSparseListing = {
+      itemSlots: new Map(items.map((item, index) => [index, item])),
+      pageStates: new Map([[0, { error: new Error('Refresh failed'), isLoading: false, retry }]]),
+      recentItems: [],
+      total: items.length,
+    };
+
+    await renderGallery(createGallery({ items, settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' } }));
+
+    expect(host?.querySelectorAll('[data-gallery-page-error="0"] button')).toHaveLength(1);
+    expect(
+      [...host!.querySelectorAll('button')].filter((button) => button.textContent?.trim() === 'Retry')
+    ).toHaveLength(1);
+    expect(host?.querySelectorAll('[data-gallery-slot-state="error"] button')).toHaveLength(0);
+
+    await click(host!.querySelector<HTMLButtonElement>('[data-gallery-page-error="0"] button')!);
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it('repairs offsets after a partial delete and keeps the visible item anchored through a failed page retry', async () => {
+    const items = Array.from({ length: 36 }, (_, index) => createItem('image', `mutation-item-${index}.png`));
+    const gallery = createGallery({
+      items,
+      selectedItemKey: 'image:mutation-item-12.png',
+      selectedItemKeys: ['image:mutation-item-12.png'],
+      settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
+    });
+    const filter = createFilter(gallery);
+    const pageOptions = galleryItemsPageOptions(filter, 0);
+    const boardOptions = galleryBoardsOptions(getGalleryListingBoardsQuery(gallery.settings));
+    const successfulDelete = { kind: 'image' as const, name: items[3]!.name };
+    const failedDelete = { kind: 'image' as const, name: items[8]!.name };
+    const repairedItems = items.filter((item) => item.name !== successfulDelete.name);
+    queryClient!.setQueryData(boardOptions.queryKey, [board]);
+    queryClient!.setQueryData<GalleryItemsPage>(pageOptions.queryKey, {
+      items,
+      itemIndices: items.map((_, index) => index),
+      offset: 0,
+      total: items.length,
+    });
+    mocks.fetchSparsePage
+      .mockRejectedValueOnce(new Error('Page repair unavailable'))
+      .mockResolvedValueOnce({ items: repairedItems, offset: 0, total: repairedItems.length });
+
+    await renderQueryBackedGallery(gallery);
+
+    const viewport = host!.querySelector<HTMLElement>('[data-part="viewport"]')!;
+    viewport.scrollTop = 1_000;
+    const initialOptions = mocks.virtualizerOptions.at(-1)!;
+    await interact(() => initialOptions.onChange?.({ getVirtualItems: () => [{ index: 4 }, { index: 5 }] }));
+    const anchor = host!.querySelector<HTMLButtonElement>(
+      'button[aria-label="Select mutation-item-12.png for preview"]'
+    )!;
+    const beforeOffset = anchor.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    let rollback: () => void = () => undefined;
+
+    await interact(() => {
+      rollback = patchGalleryItemCaches(queryClient!, {
+        kind: 'delete',
+        result: { failed: [], succeeded: [successfulDelete, failedDelete] },
+      });
+    });
+    expect(queryClient!.getQueryData<GalleryItemsPage>(pageOptions.queryKey)?.total).toBe(34);
+    expect(host?.querySelector('img[alt="mutation-item-3.png"]')).toBeNull();
+    expect(host?.querySelector('img[alt="mutation-item-8.png"]')).toBeNull();
+
+    // Match the production partial-failure path: roll the optimistic batch back, then apply only confirmed refs.
+    await interact(() => {
+      rollback();
+      patchGalleryItemCaches(queryClient!, {
+        kind: 'delete',
+        result: { failed: [failedDelete], succeeded: [successfulDelete] },
+      });
+    });
+    expect(queryClient!.getQueryData<GalleryItemsPage>(pageOptions.queryKey)?.total).toBe(35);
+    expect(host?.querySelector('img[alt="mutation-item-3.png"]')).toBeNull();
+    expect(host?.querySelector('img[alt="mutation-item-8.png"]')).not.toBeNull();
+
+    await act(async () => {
+      await invalidateGalleryItems(queryClient!);
+    });
+    expect(mocks.fetchSparsePage).toHaveBeenCalledTimes(1);
+    expect(mocks.fetchSparsePage.mock.calls.map(([, offset]) => offset)).toEqual([0]);
+    await vi.waitFor(() => expect(host?.querySelectorAll('[data-gallery-page-error="0"] button')).toHaveLength(1));
+    const retryOffset =
+      host!
+        .querySelector<HTMLButtonElement>('button[aria-label="Select mutation-item-12.png for preview"]')!
+        .getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    expect(Math.abs(retryOffset - beforeOffset)).toBeLessThan(1);
+
+    await click(host!.querySelector<HTMLButtonElement>('[data-gallery-page-error="0"] button')!);
+    await vi.waitFor(() => {
+      expect(mocks.fetchSparsePage).toHaveBeenCalledTimes(2);
+      expect(host?.querySelector('[data-gallery-page-error="0"]')).toBeNull();
+    });
+
+    const repairedAnchor = host!.querySelector<HTMLButtonElement>(
+      'button[aria-label="Select mutation-item-12.png for preview"]'
+    )!;
+    const repairedOffset = repairedAnchor.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    expect(Math.abs(repairedOffset - beforeOffset)).toBeLessThan(1);
+    expect(viewport.scrollTop).toBeLessThan(1_000);
+    expect(host?.querySelector('img[alt="mutation-item-8.png"]')).not.toBeNull();
+    expect(queryClient!.getQueryData<GalleryItemsPage>(pageOptions.queryKey)?.total).toBe(35);
+    expect(mocks.fetchSparsePage.mock.calls.map(([, offset]) => offset)).toEqual([0, 0]);
+  });
+
+  it('preserves a loaded item viewport anchor when the responsive column count changes', async () => {
+    const items = Array.from({ length: 120 }, (_, index) => createItem('image', `anchor-${index}.png`));
+    currentSparseListing = {
+      itemSlots: new Map(items.map((item, index) => [index, item])),
+      pageStates: new Map([
+        [0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+        [60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+      ]),
+      recentItems: [],
+      total: items.length,
+    };
+    await renderGallery(
+      createGallery({ items: [items[0]!], settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' } })
+    );
+
+    const viewport = host!.querySelector<HTMLElement>('[data-part="viewport"]')!;
+    viewport.scrollTop = 1_000;
+    const initialOptions = mocks.virtualizerOptions.at(-1)!;
+    await interact(() => initialOptions.onChange?.({ getVirtualItems: () => [{ index: 4 }, { index: 5 }] }));
+    const anchor = host!.querySelector<HTMLButtonElement>('button[aria-label="Select anchor-12.png for preview"]')!;
+    const beforeOffset = anchor.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+
+    host!.style.width = '900px';
+    await vi.waitFor(() =>
+      expect(mocks.virtualizerOptions.at(-1)?.estimateSize(0)).not.toBe(initialOptions.estimateSize(0))
+    );
+
+    const resizedAnchor = host!.querySelector<HTMLButtonElement>(
+      'button[aria-label="Select anchor-12.png for preview"]'
+    )!;
+    const afterOffset = resizedAnchor.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    expect(afterOffset).toBeCloseTo(beforeOffset, 0);
+  });
+
+  it('preserves a sparse viewport anchor when page updates move its absolute position', async () => {
+    const items = Array.from({ length: 120 }, (_, index) => createItem('image', `moving-anchor-${index}.png`));
+    const pageStates = new Map([
+      [0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+      [60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+    ]);
+    currentSparseListing = {
+      itemSlots: new Map(items.map((item, index) => [index, item])),
+      pageStates,
+      recentItems: [],
+      total: items.length,
+    };
+    await renderGallery(createGallery({ items, settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' } }));
+
+    const viewport = host!.querySelector<HTMLElement>('[data-part="viewport"]')!;
+    viewport.scrollTop = 1_000;
+    const initialOptions = mocks.virtualizerOptions.at(-1)!;
+    await interact(() => initialOptions.onChange?.({ getVirtualItems: () => [{ index: 4 }, { index: 5 }] }));
+    const anchor = host!.querySelector<HTMLButtonElement>(
+      'button[aria-label="Select moving-anchor-12.png for preview"]'
+    )!;
+    const beforeOffset = anchor.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    const beforeScrollTop = viewport.scrollTop;
+    const inserted = Array.from({ length: 3 }, (_, index) => createItem('image', `inserted-${index}.png`));
+    const updatedItems = [...items.slice(0, 12), ...inserted, ...items.slice(12)];
+    currentSparseListing = {
+      itemSlots: new Map(updatedItems.map((item, index) => [index, item])),
+      pageStates,
+      recentItems: [],
+      total: updatedItems.length,
+    };
+
+    await renderGallery({ ...currentGallery, items: updatedItems });
+
+    const movedAnchor = host!.querySelector<HTMLButtonElement>(
+      'button[aria-label="Select moving-anchor-12.png for preview"]'
+    )!;
+    const afterOffset = movedAnchor.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    expect(afterOffset).toBeCloseTo(beforeOffset, 0);
+    expect(viewport.scrollTop).toBeGreaterThan(beforeScrollTop);
+  });
+
+  it('chooses the nearest loaded item when a sparse viewport anchor is deleted', async () => {
+    const items = Array.from({ length: 13 }, (_, index) => createItem('image', `deleted-anchor-${index}.png`));
+    const pageStates = new Map([[0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }]]);
+    currentSparseListing = {
+      itemSlots: new Map(items.map((item, index) => [index, item])),
+      pageStates,
+      recentItems: [],
+      total: items.length,
+    };
+    await renderGallery(createGallery({ items, settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' } }));
+
+    const viewport = host!.querySelector<HTMLElement>('[data-part="viewport"]')!;
+    viewport.scrollTop = 1_000;
+    const initialOptions = mocks.virtualizerOptions.at(-1)!;
+    await interact(() => initialOptions.onChange?.({ getVirtualItems: () => [{ index: 4 }] }));
+    const anchor = host!.querySelector<HTMLButtonElement>(
+      'button[aria-label="Select deleted-anchor-12.png for preview"]'
+    )!;
+    const beforeOffset = anchor.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    const remainingItems = items.slice(0, -1);
+    currentSparseListing = {
+      itemSlots: new Map(remainingItems.map((item, index) => [index, item])),
+      pageStates,
+      recentItems: [],
+      total: remainingItems.length,
+    };
+
+    await renderGallery({ ...currentGallery, items: remainingItems });
+
+    const fallback = host!.querySelector<HTMLButtonElement>(
+      'button[aria-label="Select deleted-anchor-11.png for preview"]'
+    )!;
+    const afterOffset = fallback.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    expect(Math.abs(afterOffset - beforeOffset)).toBeLessThan(1);
+    expect(viewport.scrollTop).toBeLessThan(1_000);
+  });
+
   it('keeps external-store option callbacks stable across equivalent renders', async () => {
     const gallery = createGallery({ items: [createItem('video', 'clip.mp4')] });
 

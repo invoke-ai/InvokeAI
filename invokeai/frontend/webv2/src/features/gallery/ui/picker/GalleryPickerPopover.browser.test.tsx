@@ -20,6 +20,7 @@ import { GalleryPickerPopover } from './GalleryPickerPopover';
 const mocks = vi.hoisted(() => ({
   invalidateGallery: vi.fn(),
   listItems: vi.fn(),
+  listInfiniteItems: vi.fn(),
   uploadGalleryImage: vi.fn(),
   uploadGalleryVideo: vi.fn(),
 }));
@@ -47,8 +48,13 @@ vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
   galleryItemsInfiniteOptions: (filter: { boardId: string; galleryView: string; searchTerm: string }) => ({
     getNextPageParam: () => undefined,
     initialPageParam: 0,
-    queryFn: () => Promise.resolve(mocks.listItems(filter)),
+    queryFn: () => Promise.resolve(mocks.listInfiniteItems(filter)),
     queryKey: ['test-picker-items', filter.boardId, filter.galleryView, filter.searchTerm],
+    staleTime: Infinity,
+  }),
+  galleryItemsPageOptions: (filter: { boardId: string; galleryView: string; searchTerm: string }, offset: number) => ({
+    queryFn: () => Promise.resolve(mocks.listItems({ ...filter, offset })),
+    queryKey: ['gallery', 'items', 'list', { accountId: 'test-account', epoch: 0 }, filter, 'page', offset],
     staleTime: Infinity,
   }),
 }));
@@ -241,8 +247,12 @@ const getBoardRow = (dialog: HTMLElement, text: string) =>
   [...(getBoardsRegion(dialog)?.querySelectorAll<HTMLButtonElement>('button') ?? [])].find((row) =>
     row.textContent?.includes(text)
   );
-const getColumnCount = (dialog: HTMLElement) =>
-  getComputedStyle(dialog.querySelector('[role="listbox"]')!).gridTemplateColumns.split(' ').length;
+const getColumnCount = (dialog: HTMLElement) => {
+  const listbox = dialog.querySelector('[role="listbox"]');
+  const firstVirtualRow = listbox?.firstElementChild;
+
+  return getComputedStyle(firstVirtualRow ?? listbox!).gridTemplateColumns.split(' ').length;
+};
 
 const pressKey = async (target: HTMLElement, key: string) => {
   await act(() => target.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key })));
@@ -261,11 +271,17 @@ const typeSearch = async (input: HTMLInputElement, value: string) => {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mocks.listItems.mockImplementation((filter: { boardId: string; searchTerm: string }) => {
+  mocks.listItems.mockImplementation((filter: { boardId: string; offset: number; searchTerm: string }) => {
     const items = filter.boardId === 'none' ? uncategorizedItems : dogItems;
     const matching = items.filter((item) => item.name.includes(filter.searchTerm));
+    const pageItems = matching.slice(filter.offset, filter.offset + 60);
 
-    return { items: matching, total: matching.length };
+    return {
+      itemIndices: pageItems.map((_, index) => filter.offset + index),
+      items: pageItems,
+      offset: filter.offset,
+      total: matching.length,
+    };
   });
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -333,6 +349,37 @@ describe('GalleryPickerPopover', () => {
     expect(document.querySelector(OPEN_DIALOG)).toBeNull();
   });
 
+  it('requests a distant keyboard target by page offset without fetching intervening pages', async () => {
+    const total = 2_400;
+    const lastPageOffset = Math.floor((total - 1) / 60) * 60;
+
+    mocks.listItems.mockImplementation((filter: { offset: number }) => {
+      const items = Array.from({ length: Math.min(60, total - filter.offset) }, (_, index) =>
+        image(`distant-${filter.offset + index}.png`)
+      );
+
+      return {
+        itemIndices: items.map((_, index) => filter.offset + index),
+        items,
+        offset: filter.offset,
+        total,
+      };
+    });
+
+    const { dialog } = await openPicker();
+    const input = getSearchInput(dialog);
+
+    await pressKey(input, 'End');
+    await vi.waitFor(() => expect(getActiveOption(dialog)?.getAttribute('aria-posinset')).toBe(String(total)));
+
+    const requestedOffsets = mocks.listItems.mock.calls.map(([filter]) => filter.offset as number);
+
+    expect(requestedOffsets).toContain(0);
+    expect(requestedOffsets).toContain(lastPageOffset);
+    expect(requestedOffsets.every((offset) => offset === 0 || offset >= lastPageOffset - 60)).toBe(true);
+    expect(mocks.listInfiniteItems).not.toHaveBeenCalled();
+  });
+
   it('closes on Escape and returns focus to the trigger', async () => {
     const { dialog, trigger } = await openPicker();
 
@@ -375,6 +422,44 @@ describe('GalleryPickerPopover', () => {
     await act(() => getSearchInput(dialog).dispatchEvent(leftKey));
     expect(leftKey.defaultPrevented).toBe(false);
     expect(getActiveOption(dialog)).toBe(getOption(dialog, 'image:cat.png'));
+  });
+
+  it('does not let Enter pick stale slots while a different board page is loading', async () => {
+    let resolveCats:
+      | ((page: { items: GalleryItem[]; itemIndices: number[]; offset: number; total: number }) => void)
+      | null = null;
+
+    mocks.listItems.mockImplementation((filter: { boardId: string; offset: number; searchTerm: string }) => {
+      if (filter.boardId === 'cats') {
+        return new Promise((resolve) => {
+          resolveCats = resolve;
+        });
+      }
+
+      return {
+        itemIndices: dogItems.map((_, index) => index),
+        items: dogItems,
+        offset: filter.offset,
+        total: dogItems.length,
+      };
+    });
+
+    const { dialog } = await openPicker();
+    const input = getSearchInput(dialog);
+
+    await act(() => dialog.querySelector<HTMLButtonElement>('[aria-expanded]')?.click());
+    await settle();
+    await act(() => getBoardRow(dialog, 'Cats')?.click());
+    await vi.waitFor(() => expect(mocks.listItems).toHaveBeenCalledWith(expect.objectContaining({ boardId: 'cats' })));
+
+    await pressKey(input, 'Enter');
+
+    expect(onPick).not.toHaveBeenCalled();
+    expect(getOptions(dialog).some((option) => option.dataset.itemKey === 'image:b.png')).toBe(true);
+
+    await act(() => resolveCats?.({ items: [image('cat.png', 'cats')], itemIndices: [0], offset: 0, total: 1 }));
+    await settle();
+    await vi.waitFor(() => expect(getOption(dialog, 'image:cat.png')).toBeDefined());
   });
 
   it('switches to the Assets view from the tabs', async () => {

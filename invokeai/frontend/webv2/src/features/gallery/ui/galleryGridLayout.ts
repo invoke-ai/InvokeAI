@@ -1,6 +1,47 @@
 import type { GalleryItem, GalleryItemKey } from '@features/gallery/core/items';
+import type { GalleryNavigationEntry } from '@features/gallery/core/selection';
 
 import { toGalleryItemKey } from '@features/gallery/core/items';
+import { GALLERY_PAGE_SIZE } from '@features/gallery/core/paging';
+
+/** Plans aligned pages intersecting a half-open item range. A null total means listing size is not known yet. */
+export const planGalleryPageOffsets = ({
+  endIndexExclusive,
+  startIndex,
+  total,
+}: {
+  endIndexExclusive: number;
+  startIndex: number;
+  total: number | null;
+}): number[] => {
+  if (!Number.isFinite(startIndex) || !Number.isFinite(endIndexExclusive)) {
+    return [];
+  }
+
+  let firstIndex = Math.max(0, Math.floor(startIndex));
+  let afterLastIndex = Math.max(0, Math.ceil(endIndexExclusive));
+
+  if (total !== null) {
+    const boundedTotal = Math.max(0, Math.floor(total));
+
+    firstIndex = Math.min(firstIndex, boundedTotal);
+    afterLastIndex = Math.min(afterLastIndex, boundedTotal);
+  }
+
+  if (afterLastIndex <= firstIndex) {
+    return [];
+  }
+
+  const firstOffset = Math.floor(firstIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+  const lastOffset = Math.floor((afterLastIndex - 1) / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+  const offsets: number[] = [];
+
+  for (let offset = firstOffset; offset <= lastOffset; offset += GALLERY_PAGE_SIZE) {
+    offsets.push(offset);
+  }
+
+  return offsets;
+};
 
 export const GALLERY_GRID_GAP_PX = 4;
 /** The disclosure row of a pinned section (in progress, starred). */
@@ -116,6 +157,74 @@ export const getGalleryGridRowIndexForItemKey = (
   const index = items.findIndex((item) => toGalleryItemKey(item) === itemKey);
 
   return index < 0 ? -1 : Math.floor(index / columnCount);
+};
+
+/** Absolute backend slot to row; recent pseudo-rows are a separate prefix only for descending order. */
+export const getGallerySparseRowIndexForItemKey = (
+  itemSlots: ReadonlyMap<number, GalleryItem>,
+  itemKey: GalleryItemKey,
+  columnCount: number,
+  leadingRows: number
+): number => {
+  for (const [index, item] of itemSlots) {
+    if (toGalleryItemKey(item) === itemKey) {
+      return leadingRows + Math.floor(index / columnCount);
+    }
+  }
+
+  return -1;
+};
+
+/** Stable identities follow absolute listing positions while a page moves between loading, error, and ready. */
+export const getGallerySparseRowKey = (rowIndex: number): string => `listing-row:${rowIndex}`;
+export const getGallerySparseSlotKey = (itemIndex: number): string => `listing-slot:${itemIndex}`;
+
+/**
+ * Include empty positions from active pages so arrow navigation retains real row and column geometry across
+ * hydration gaps. The number of placeholders is bounded by the currently subscribed page range.
+ */
+export const buildSparseGalleryNavigationEntries = ({
+  columnCount = 1,
+  includeUnloadedBoundaries = true,
+  itemSlots,
+  pageOffsets,
+  total,
+}: {
+  columnCount?: number;
+  includeUnloadedBoundaries?: boolean;
+  itemSlots: ReadonlyMap<number, GalleryItem>;
+  pageOffsets: readonly number[];
+  total: number | null;
+}): GalleryNavigationEntry[] => {
+  if (pageOffsets.length === 0) {
+    return [];
+  }
+
+  const activePages = new Set(pageOffsets);
+  const firstPageOffset = pageOffsets.reduce((first, offset) => Math.min(first, offset), Number.POSITIVE_INFINITY);
+  const lastPageOffset = Math.max(...pageOffsets);
+  const activeStartIndex = Math.floor(firstPageOffset / columnCount) * columnCount;
+  const activeEndIndex = Math.min(total ?? Number.POSITIVE_INFINITY, lastPageOffset + GALLERY_PAGE_SIZE);
+  const endIndex =
+    includeUnloadedBoundaries && total !== null
+      ? Math.min(total, Math.ceil(activeEndIndex / columnCount) * columnCount + columnCount)
+      : activeEndIndex;
+  const entries: GalleryNavigationEntry[] = [];
+
+  for (let index = activeStartIndex; index < endIndex; index += 1) {
+    const item = itemSlots.get(index);
+    const isActivePage = activePages.has(Math.floor(index / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE);
+
+    entries.push(
+      item
+        ? { item, kind: 'item' }
+        : isActivePage
+          ? { id: `gallery-loading-slot:${index}`, kind: 'session', navigable: false }
+          : { id: `gallery-unloaded-slot:${index}`, kind: 'session', navigable: true }
+    );
+  }
+
+  return entries;
 };
 
 export const getGalleryProgressLayout = ({

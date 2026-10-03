@@ -12,13 +12,15 @@ import {
   GALLERY_PAGE_SIZE,
   galleryBoardsOptions,
   galleryItemsInfiniteOptions,
+  galleryItemsPageOptions,
   getGalleryListingBoardsQuery,
   type GalleryItemsFilter,
 } from '@features/gallery/data/queries';
 import { parseDateTokens } from '@platform/search/dateTokens';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { useCallback, useMemo } from 'react';
+import { useInfiniteQuery, useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 
+import { planGalleryPageOffsets } from './galleryGridLayout';
 import { resolveGallerySelectedBoardId } from './galleryStateView';
 
 export interface GalleryData {
@@ -35,7 +37,63 @@ export interface GalleryData {
   /** The current query's failure, or null while it is healthy. */
   queryError: Error | null;
   total: number | null;
+  /** Absolute backend positions for the currently subscribed pages in the main Gallery and picker. */
+  sparseListing?: GallerySparseListing;
+  setVisibleRange?: (range: { endIndexExclusive: number; startIndex: number }) => void;
 }
+
+export interface GallerySparsePageState {
+  error: Error | null;
+  isLoading: boolean;
+  retry: () => Promise<unknown>;
+}
+
+export interface GallerySparseListing {
+  itemSlots: ReadonlyMap<number, GalleryItem>;
+  pageStates: ReadonlyMap<number, GallerySparsePageState>;
+  /** Project-local outputs stay in separate virtual rows and never change backend item indexes. */
+  recentItems: GalleryItem[];
+  total: number | null;
+}
+
+/** Rebuild absolute slots without filling hydration gaps or assuming returned-item position equals requested index. */
+export const mapGalleryItemPageSlots = ({
+  pageLocalOffset,
+  pageOffsets,
+  pages,
+}: {
+  pageLocalOffset?: number;
+  pageOffsets: readonly number[];
+  pages: readonly (
+    | {
+        itemIndices?: readonly number[];
+        items: readonly GalleryItem[];
+        offset?: number;
+      }
+    | undefined
+  )[];
+}): Map<number, GalleryItem> => {
+  const slots = new Map<number, GalleryItem>();
+
+  pages.forEach((page, pageIndex) => {
+    if (!page) {
+      return;
+    }
+
+    const pageOffset = page.offset ?? pageOffsets[pageIndex] ?? 0;
+
+    page.items.forEach((item, itemIndex) => {
+      const absoluteIndex = page.itemIndices?.[itemIndex] ?? pageOffset + itemIndex;
+      const slotIndex = pageLocalOffset === undefined ? absoluteIndex : absoluteIndex - pageLocalOffset;
+
+      if (Number.isInteger(slotIndex) && slotIndex >= 0) {
+        slots.set(slotIndex, item);
+      }
+    });
+  });
+
+  return slots;
+};
 
 const EMPTY_BOARDS: GalleryBoard[] = [];
 
@@ -79,11 +137,7 @@ export const mergeGalleryItemWindow = ({
   maxRows: number;
   recentImages: readonly GeneratedImageContract[];
 }): GalleryItem[] => {
-  const backendItemKeys = new Set(backendItems.map(toGalleryItemKey));
-  const missingRecentItems = recentImages
-    .slice(0, GALLERY_RECENT_IMAGE_LIMIT)
-    .map(legacyGeneratedImageToGalleryItem)
-    .filter((item) => !backendItemKeys.has(toGalleryItemKey(item)) && isRecentItemVisible(item, filter));
+  const missingRecentItems = getGalleryRecentItems({ backendItems, filter, recentImages });
   const seenItemKeys = new Set<string>();
 
   const mergedItems = [...missingRecentItems, ...backendItems].filter((item) => {
@@ -105,6 +159,29 @@ export const mergeGalleryItemWindow = ({
   }
 
   return mergedItems.slice(0, maxRows);
+};
+
+/** Returns the bounded local recent overlay without assigning it a backend position. */
+export const getGalleryRecentItems = ({
+  backendItems,
+  filter,
+  recentImages,
+}: {
+  backendItems: readonly GalleryItem[];
+  filter: GalleryItemsFilter;
+  recentImages: readonly GeneratedImageContract[];
+}): GalleryItem[] => {
+  const backendItemKeys = new Set(backendItems.map(toGalleryItemKey));
+  const recentItems = recentImages
+    .slice(0, GALLERY_RECENT_IMAGE_LIMIT)
+    .map(legacyGeneratedImageToGalleryItem)
+    .filter((item) => !backendItemKeys.has(toGalleryItemKey(item)) && isRecentItemVisible(item, filter));
+
+  if (!filter.semanticQuery) {
+    recentItems.sort((a, b) => compareGalleryItems(a, b, { orderDir: filter.orderDir }));
+  }
+
+  return recentItems;
 };
 
 /** A false hasNextPage can mean either completion or truncation. Paginated mode remains fully reachable. */
@@ -132,6 +209,7 @@ export const useGalleryData = ({
   semanticQuery = null,
   settings,
   starred,
+  sparseViewport = false,
 }: {
   galleryView: GalleryView;
   page: number;
@@ -148,9 +226,12 @@ export const useGalleryData = ({
    * see everything.
    */
   starred?: boolean;
+  /** Main Gallery and picker opt into page-sized viewport subscriptions; other consumers may keep the bounded window. */
+  sparseViewport?: boolean;
 }): GalleryData => {
   const { boards } = useGalleryBoards({ settings });
   const boardId = resolveGallerySelectedBoardId({ projectBoardId, selectedBoardId }, boards);
+  const queryClient = useQueryClient();
   const isPaginated = settings.paginationMode === 'paginated';
   const dateParse = useMemo(() => parseDateTokens(searchTerm), [searchTerm]);
   const filter = useMemo<GalleryItemsFilter>(
@@ -175,6 +256,140 @@ export const useGalleryData = ({
       starred,
     ]
   );
+  // Query keys include the captured account epoch, so range and total state cannot survive an account switch.
+  const firstPageOptions = galleryItemsPageOptions(filter, 0);
+  const { accountId, epoch } = firstPageOptions.queryKey[3];
+  const filterIdentity = JSON.stringify([accountId, epoch, filter]);
+  const filterIdentityRef = useRef(filterIdentity);
+  useLayoutEffect(() => {
+    filterIdentityRef.current = filterIdentity;
+  }, [filterIdentity]);
+  const [requestedRange, setRequestedRange] = useState<{
+    endIndexExclusive: number;
+    filterIdentity: string;
+    startIndex: number;
+  } | null>(null);
+  const hasRequestedRange = requestedRange?.filterIdentity === filterIdentity;
+  const visibleStartIndex = hasRequestedRange ? requestedRange.startIndex : 0;
+  const visibleEndIndexExclusive = hasRequestedRange ? requestedRange.endIndexExclusive : GALLERY_PAGE_SIZE;
+  const setVisibleRange = useCallback(
+    ({ endIndexExclusive, startIndex }: { endIndexExclusive: number; startIndex: number }) => {
+      const activeFilterIdentity = filterIdentityRef.current;
+      const nextStart = Math.max(0, Math.floor(startIndex));
+      const nextEnd = Math.max(nextStart, Math.ceil(endIndexExclusive));
+
+      setRequestedRange((current) =>
+        current?.filterIdentity === activeFilterIdentity &&
+        current.startIndex === nextStart &&
+        current.endIndexExclusive === nextEnd
+          ? current
+          : { endIndexExclusive: nextEnd, filterIdentity: activeFilterIdentity, startIndex: nextStart }
+      );
+    },
+    []
+  );
+  const [knownTotalSnapshot, setKnownTotalSnapshot] = useState<{ filterIdentity: string; total: number } | null>(null);
+  const retainedTotal = knownTotalSnapshot?.filterIdentity === filterIdentity ? knownTotalSnapshot.total : null;
+  const cachedFirstPage = queryClient.getQueryData<{ items: GalleryItem[]; total: number }>(firstPageOptions.queryKey);
+  const stableTotal = retainedTotal ?? cachedFirstPage?.total ?? null;
+  const knownTotal = stableTotal;
+  const maxPaginatedPage =
+    knownTotal === null || !Number.isFinite(knownTotal)
+      ? null
+      : Math.max(0, Math.ceil(Math.max(0, knownTotal) / GALLERY_PAGE_SIZE) - 1);
+  const selectedPageOffset =
+    (maxPaginatedPage === null ? Math.max(0, page) : Math.min(Math.max(0, page), maxPaginatedPage)) * GALLERY_PAGE_SIZE;
+  const pageOffsets = useMemo(() => {
+    if (!sparseViewport) {
+      return [];
+    }
+
+    if (isPaginated) {
+      return [selectedPageOffset];
+    }
+
+    // Page zero is the count-discovery request. Once its count is cached, subscriptions follow only the virtual
+    // range and its virtualizer overscan, even when it is far from the start of the listing.
+    if (knownTotal === null && !hasRequestedRange) {
+      return [0];
+    }
+
+    return planGalleryPageOffsets({
+      endIndexExclusive: visibleEndIndexExclusive,
+      startIndex: visibleStartIndex,
+      total: knownTotal,
+    });
+  }, [
+    hasRequestedRange,
+    isPaginated,
+    knownTotal,
+    selectedPageOffset,
+    sparseViewport,
+    visibleEndIndexExclusive,
+    visibleStartIndex,
+  ]);
+  const pageOptions = sparseViewport ? pageOffsets.map((offset) => galleryItemsPageOptions(filter, offset)) : [];
+  const pageResults = useQueries({ queries: pageOptions });
+  const loadedPageTotals = pageResults.flatMap((result) => (result.data ? [result.data.total] : []));
+  const hasConflictingPageTotals = new Set(loadedPageTotals).size > 1;
+  const pageResultsSettled = pageResults.every((result) => !result.isFetching);
+  const observedTotal =
+    sparseViewport && pageResultsSettled && !hasConflictingPageTotals ? loadedPageTotals[0] : undefined;
+  const [pageTotalReconciliation, setPageTotalReconciliation] = useState({
+    conflictObserved: false,
+    filterIdentity,
+    generation: 0,
+  });
+  const currentPageTotalReconciliation =
+    pageTotalReconciliation.filterIdentity === filterIdentity
+      ? pageTotalReconciliation
+      : { conflictObserved: false, filterIdentity, generation: 0 };
+
+  // A settled agreement ends the current conflict generation. The next conflict can then reconcile even when its
+  // filter, total, and active page offsets match an earlier generation.
+  if (sparseViewport && !isPaginated && pageResultsSettled && loadedPageTotals.length > 0) {
+    if (hasConflictingPageTotals && !currentPageTotalReconciliation.conflictObserved) {
+      setPageTotalReconciliation({ ...currentPageTotalReconciliation, conflictObserved: true });
+    } else if (!hasConflictingPageTotals && currentPageTotalReconciliation.conflictObserved) {
+      setPageTotalReconciliation({
+        ...currentPageTotalReconciliation,
+        conflictObserved: false,
+        generation: currentPageTotalReconciliation.generation + 1,
+      });
+    }
+  }
+
+  useQuery({
+    enabled: sparseViewport && !isPaginated && pageResultsSettled && hasConflictingPageTotals,
+    gcTime: 0,
+    queryFn: async ({ client }) => {
+      await Promise.all(pageOptions.map(({ queryKey }) => client.invalidateQueries({ exact: true, queryKey })));
+
+      return true;
+    },
+    // One active-range reconciliation per listing, retained total, and range. A persistent disagreement therefore
+    // cannot trigger an invalidation loop. Agreement advances the generation so a later same-total conflict can retry.
+    queryKey: [
+      'gallery',
+      'items',
+      'page-total-reconciliation',
+      filterIdentity,
+      stableTotal,
+      currentPageTotalReconciliation.generation,
+      pageOffsets,
+    ],
+    staleTime: Infinity,
+  });
+
+  // Keep the backend count for this filter lifetime after page zero leaves the active virtual range and its Query
+  // cache entry is eventually collected. Adopt a total only after active pages settle and agree.
+  if (
+    sparseViewport &&
+    observedTotal !== undefined &&
+    (knownTotalSnapshot?.filterIdentity !== filterIdentity || knownTotalSnapshot.total !== observedTotal)
+  ) {
+    setKnownTotalSnapshot({ filterIdentity, total: observedTotal });
+  }
   const {
     data: queryData,
     error: queryError,
@@ -182,51 +397,94 @@ export const useGalleryData = ({
     hasNextPage,
     isFetching,
     isFetchingNextPage,
-  } = useInfiniteQuery(
-    galleryItemsInfiniteOptions(
+  } = useInfiniteQuery({
+    ...galleryItemsInfiniteOptions(
       filter,
-      // Infinite page values anchor deep reveals; board/search/view changes reset them to zero.
+      // The picker still uses this bounded window. Main Gallery uses independent sparse page queries.
       isPaginated
         ? { kind: 'anchor', offset: page * GALLERY_PAGE_SIZE }
         : { kind: 'infinite', offset: page * GALLERY_PAGE_SIZE }
-    )
+    ),
+    enabled: !sparseViewport,
+  });
+  const pageItemsByOffset = useMemo(
+    () => new Map(pageOffsets.map((offset, index) => [offset, pageResults[index]?.data?.items ?? []])),
+    [pageOffsets, pageResults]
   );
   const backendItems = useMemo(() => {
-    if (!isPaginated) {
+    if (!sparseViewport) {
       return flattenGalleryItemsData(queryData);
     }
 
-    const pageOffset = page * GALLERY_PAGE_SIZE;
-    const pageIndex = queryData?.pageParams.indexOf(pageOffset) ?? -1;
+    if (isPaginated) {
+      return pageItemsByOffset.get(selectedPageOffset) ?? [];
+    }
 
-    return pageIndex === -1 ? [] : (queryData?.pages[pageIndex]?.items ?? []).slice(0, GALLERY_PAGE_SIZE);
-  }, [isPaginated, page, queryData]);
+    return [...pageItemsByOffset.entries()].sort(([left], [right]) => left - right).flatMap(([, items]) => items);
+  }, [isPaginated, pageItemsByOffset, queryData, selectedPageOffset, sparseViewport]);
+  const itemSlots = useMemo(
+    () =>
+      sparseViewport
+        ? mapGalleryItemPageSlots({
+            pageLocalOffset: isPaginated ? selectedPageOffset : undefined,
+            pageOffsets,
+            pages: pageResults.map((result) => result.data),
+          })
+        : new Map<number, GalleryItem>(),
+    [isPaginated, pageOffsets, pageResults, selectedPageOffset, sparseViewport]
+  );
   // Recents belong at the top of the listing; overlaying them onto a window
   // anchored mid-board would sort them into a part of the list they are
   // nowhere near.
   const shouldOverlayRecentItems = !isPaginated && page === 0;
   const maxRows = isPaginated ? GALLERY_PAGE_SIZE : GALLERY_MAX_ROWS;
+  const recentItems = useMemo(
+    () =>
+      sparseViewport && shouldOverlayRecentItems ? getGalleryRecentItems({ backendItems, filter, recentImages }) : [],
+    [backendItems, filter, recentImages, shouldOverlayRecentItems, sparseViewport]
+  );
   const items = useMemo(
     () =>
-      queryData || (shouldOverlayRecentItems && recentImages.length > 0)
-        ? mergeGalleryItemWindow({
-            backendItems,
-            filter,
-            maxRows,
-            recentImages: shouldOverlayRecentItems ? recentImages : [],
-          })
-        : null,
-    [backendItems, filter, maxRows, queryData, recentImages, shouldOverlayRecentItems]
+      sparseViewport
+        ? pageResults.some((result) => result.data) || recentItems.length > 0
+          ? mergeGalleryItemWindow({
+              backendItems,
+              filter,
+              maxRows: Math.max(GALLERY_MAX_ROWS, backendItems.length + GALLERY_RECENT_IMAGE_LIMIT),
+              recentImages: shouldOverlayRecentItems ? recentImages : [],
+            })
+          : null
+        : queryData || (shouldOverlayRecentItems && recentImages.length > 0)
+          ? mergeGalleryItemWindow({
+              backendItems,
+              filter,
+              maxRows,
+              recentImages: shouldOverlayRecentItems ? recentImages : [],
+            })
+          : null,
+    [
+      backendItems,
+      filter,
+      maxRows,
+      pageResults,
+      queryData,
+      recentItems.length,
+      recentImages,
+      shouldOverlayRecentItems,
+      sparseViewport,
+    ]
   );
-  const total = queryData?.pages[0]?.total ?? null;
-  const hasMore = !isPaginated && Boolean(hasNextPage);
-  const isWindowTruncated = isGalleryWindowTruncated({
-    hasNextPage: Boolean(hasNextPage),
-    isPaginated,
-    loadedRowCount: backendItems.length,
-    maxRows,
-    total,
-  });
+  const total = sparseViewport ? (observedTotal ?? stableTotal) : (queryData?.pages[0]?.total ?? null);
+  const hasMore = !sparseViewport && !isPaginated && Boolean(hasNextPage);
+  const isWindowTruncated =
+    !sparseViewport &&
+    isGalleryWindowTruncated({
+      hasNextPage: Boolean(hasNextPage),
+      isPaginated,
+      loadedRowCount: backendItems.length,
+      maxRows,
+      total,
+    });
   const loadMore = useCallback(() => {
     if (!hasMore || isFetchingNextPage) {
       return;
@@ -234,17 +492,43 @@ export const useGalleryData = ({
 
     void fetchNextPage();
   }, [fetchNextPage, hasMore, isFetchingNextPage]);
+  const sparseListing = useMemo<GallerySparseListing | undefined>(() => {
+    if (!sparseViewport) {
+      return undefined;
+    }
+
+    const pageStates = new Map<number, GallerySparsePageState>();
+
+    pageOffsets.forEach((offset, index) => {
+      const result = pageResults[index];
+
+      if (result) {
+        pageStates.set(offset, {
+          error: result.error,
+          isLoading: result.isFetching,
+          retry: () => result.refetch(),
+        });
+      }
+    });
+
+    return { itemSlots, pageStates, recentItems, total };
+  }, [itemSlots, pageOffsets, pageResults, recentItems, sparseViewport, total]);
+  const firstPageError = sparseListing?.pageStates.get(0)?.error ?? null;
+  const pageError = pageResults.find((result) => result.error)?.error ?? null;
+  const activePageLoading = pageResults.some((result) => result.isFetching);
 
   return {
     boards,
     filter,
     hasMore,
-    isLoadingItems: isFetching,
+    isLoadingItems: sparseViewport ? activePageLoading : isFetching,
     isWindowTruncated,
     items,
     loadMore,
-    queryError,
+    queryError: sparseViewport ? (pageError ?? firstPageError) : queryError,
     selectedBoardId: boardId,
+    setVisibleRange: sparseViewport ? setVisibleRange : undefined,
+    sparseListing,
     total,
   };
 };

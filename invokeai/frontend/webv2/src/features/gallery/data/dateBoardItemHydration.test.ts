@@ -166,7 +166,7 @@ describe('Gallery item names and date hydration', () => {
     expect(mocks.apiFetchJson.mock.calls.filter(([url]) => url === '/api/v1/images/images_by_names')).toHaveLength(1);
   });
 
-  it('omits only 404 video refs while preserving surrounding order', async () => {
+  it('preserves absolute ref slots when video and image hydration omit missing refs', async () => {
     mocks.apiFetchJson.mockImplementation((url: string) => {
       if (url === '/api/v1/images/images_by_names') {
         return Promise.resolve([imageDto('still')]);
@@ -179,18 +179,23 @@ describe('Gallery item names and date hydration', () => {
 
     const page = await hydrateGalleryDateBoardItemPage({
       items: [
+        { kind: 'image', name: 'outside-0' },
+        { kind: 'image', name: 'outside-1' },
+        { kind: 'video', name: 'outside-2' },
+        { kind: 'video', name: 'outside-3' },
         { kind: 'video', name: 'first' },
         { kind: 'video', name: 'missing' },
+        { kind: 'image', name: 'missing-image' },
         { kind: 'image', name: 'still' },
         { kind: 'video', name: 'last' },
       ],
-      limit: 4,
-      offset: 0,
-      total: 4,
+      limit: 5,
+      offset: 4,
+      total: 9,
     });
 
     expect(page.items.map(({ kind, name }) => `${kind}:${name}`)).toEqual(['video:first', 'image:still', 'video:last']);
-    expect(page.total).toBe(4);
+    expect(page).toMatchObject({ itemIndices: [4, 7, 8], offset: 4, total: 9 });
   });
 
   it.each([

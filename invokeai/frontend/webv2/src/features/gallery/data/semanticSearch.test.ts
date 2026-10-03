@@ -181,9 +181,11 @@ describe('semantic page hydration', () => {
     mocks.apiFetchJson
       .mockResolvedValueOnce({
         results: [
+          { image_name: 'outside-before.png', score: 1 },
           { image_name: 'first.png', score: 0.9 },
-          { image_name: 'second.png', score: 0.8 },
-          { image_name: 'deleted.png', score: 0.7 },
+          { image_name: 'deleted.png', score: 0.8 },
+          { image_name: 'second.png', score: 0.7 },
+          { image_name: 'outside-after.png', score: 0.6 },
         ],
       })
       // by-names returns DTOs in arbitrary order; rank order must win, and a
@@ -191,10 +193,11 @@ describe('semantic page hydration', () => {
       .mockResolvedValueOnce([backendImage('second.png'), backendImage('first.png')]);
 
     const names = await listSemanticGalleryItemNames({ query: { kind: 'text', query: 'boats' } });
-    const page = await hydrateGalleryDateBoardItemPage({ ...names, limit: 3, offset: 0 });
+    const page = await hydrateGalleryDateBoardItemPage({ ...names, limit: 3, offset: 1 });
 
-    expect(page.total).toBe(3);
+    expect(page.total).toBe(5);
     expect(page.items.map((item) => item.name)).toEqual(['first.png', 'second.png']);
+    expect(page).toMatchObject({ itemIndices: [1, 3], offset: 1 });
     expect(page.items.every((item) => item.kind === 'image')).toBe(true);
   });
 });

@@ -1,3 +1,4 @@
+import type { components } from '@api/schema';
 import type {
   GalleryImageItem,
   GalleryItem,
@@ -545,6 +546,8 @@ export interface GalleryItemNames {
   total: number;
 }
 
+export type GalleryItemLocation = components['schemas']['GalleryItemLocation'];
+
 interface GalleryItemNamesRequest {
   boardId: string;
   createdFrom?: string;
@@ -591,6 +594,37 @@ export const listGalleryItemNames = async ({
   );
 
   return mapGalleryItemNames(body);
+};
+
+/** Resolve one ordinary listing position without downloading every name in the listing. */
+export const getGalleryItemLocation = ({
+  boardId,
+  createdFrom,
+  createdTo,
+  galleryView,
+  kind,
+  name,
+  orderDir,
+  searchTerm,
+  signal,
+  starred,
+}: GalleryItemNamesRequest & GalleryItemRef): Promise<GalleryItemLocation> => {
+  const query = toSearchParams({
+    board_id: boardId,
+    categories: galleryView === 'assets' ? assetCategories : imageCategories,
+    created_from: createdFrom,
+    created_to: createdTo,
+    is_intermediate: false,
+    kind,
+    order_dir: orderDir,
+    name,
+    search_term: searchTerm.trim() || undefined,
+    starred,
+    // Match the Gallery's chronological page query, which never uses the API's default starred-first ordering.
+    starred_first: false,
+  });
+
+  return apiFetchJson<GalleryItemLocation>(`/api/v1/gallery/items/location?${query}`, { signal });
 };
 
 export const listGalleryDateBoardItemNames = async ({
@@ -675,13 +709,19 @@ export const hydrateGalleryDateBoardItemPage = async ({
     hydrateVideoRefs(refs, signal),
   ]);
   const imagesByName = new Map(images.map((image) => [image.name, image]));
-  const hydrated = refs.flatMap((ref, index) => {
+  const hydrated: GalleryItem[] = [];
+  const itemIndices: number[] = [];
+
+  refs.forEach((ref, index) => {
     const item = ref.kind === 'image' ? imagesByName.get(ref.name) : videosByIndex.get(index);
 
-    return item ? [item] : [];
+    if (item) {
+      hydrated.push(item);
+      itemIndices.push(offset + index);
+    }
   });
 
-  return { items: hydrated, total };
+  return { items: hydrated, itemIndices, offset, total };
 };
 
 const hydratePaletteDateBoardImagePage = async ({

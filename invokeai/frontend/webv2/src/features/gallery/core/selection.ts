@@ -1,3 +1,5 @@
+import { captureAccountScope } from '@platform/state/accountLifecycle';
+
 import type { GalleryImage, GeneratedImageContract } from './types';
 
 import {
@@ -136,6 +138,8 @@ export const getGalleryDeletionSuccessor = (
  */
 
 export interface GalleryRevealRequest {
+  accountEpoch: number;
+  absoluteIndex?: number;
   itemKey: GalleryItemKey;
   token: number;
 }
@@ -145,15 +149,20 @@ let nextToken = 0;
 
 const listeners = new Set<() => void>();
 
-export const requestGalleryItemReveal = (itemKey: GalleryItemKey): void => {
+export const requestGalleryItemReveal = (itemKey: GalleryItemKey, absoluteIndex?: number): void => {
   nextToken += 1;
-  currentRequest = { itemKey, token: nextToken };
+  currentRequest = { accountEpoch: captureAccountScope().epoch, absoluteIndex, itemKey, token: nextToken };
   for (const listener of listeners) {
     listener();
   }
 };
 
-export const getGalleryRevealRequest = (): GalleryRevealRequest | null => currentRequest;
+/** Ignore a pending intent after its account lifetime changes, including when Gallery mounts later. */
+export const getGalleryRevealRequest = (): GalleryRevealRequest | null => {
+  const request = currentRequest;
+
+  return request?.accountEpoch === captureAccountScope().epoch ? request : null;
+};
 
 export const subscribeGalleryRevealRequests = (listener: () => void): (() => void) => {
   listeners.add(listener);

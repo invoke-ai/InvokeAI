@@ -35,6 +35,7 @@ export const useGalleryGridHotkeys = ({
   cursorKey,
   loadedItems,
   navigationSections,
+  navigateToUnloadedSlot,
   scrollToEntry,
 }: {
   actionSelectionRefs: GalleryItemRef[];
@@ -45,6 +46,8 @@ export const useGalleryGridHotkeys = ({
   loadedItems: readonly GalleryItem[];
   /** The arrow-key sections in visual order: the starred strip, in progress, the listing. */
   navigationSections: readonly (readonly GalleryNavigationEntry[])[];
+  /** Loads a sparse absolute slot; it becomes selectable after its page hydrates. */
+  navigateToUnloadedSlot?: (absoluteIndex: number) => void;
   scrollToEntry: (entry: GalleryNavigationEntry) => void;
 }) => {
   const { t } = useTranslation();
@@ -55,6 +58,13 @@ export const useGalleryGridHotkeys = ({
     const entry = getGalleryNavigationStep(navigationSections, cursorKey, direction, columnCount);
 
     if (!entry) {
+      return;
+    }
+
+    const unloadedSlotMatch = entry.kind === 'session' ? /^gallery-unloaded-slot:(\d+)$/.exec(entry.id) : null;
+
+    if (unloadedSlotMatch) {
+      navigateToUnloadedSlot?.(Number(unloadedSlotMatch[1]));
       return;
     }
 

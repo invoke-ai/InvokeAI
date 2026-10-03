@@ -1,9 +1,11 @@
-import type { GalleryItem, GalleryItemKey } from '@features/gallery/core/items';
+import type { GalleryItem } from '@features/gallery/core/items';
+import type { GallerySparseListing } from '@features/gallery/ui/useGalleryData';
 import type { KeyboardEvent, RefObject } from 'react';
 
 import { Box, HStack, Icon, Stack, Text } from '@chakra-ui/react';
 import { getGalleryBoardLabel } from '@features/gallery/core/boardLabels';
 import { getGalleryUploadAccept, toGalleryItemKey } from '@features/gallery/core/items';
+import { GALLERY_PAGE_SIZE, galleryItemsPageOptions } from '@features/gallery/data/queries';
 import { BoardCover, BoardCoverIcon } from '@features/gallery/ui/GalleryBoardCover';
 import { getGalleryBoardGroups } from '@features/gallery/ui/galleryBoardGroups';
 import { GallerySearchField } from '@features/gallery/ui/GallerySearchField';
@@ -24,7 +26,6 @@ import { useTranslation } from 'react-i18next';
 
 import {
   GALLERY_PICKER_MIN_COLUMNS,
-  getGalleryPickerDefaultIndex,
   getGalleryPickerNeighborIndex,
   getGalleryPickerRemaining,
   getGalleryPickerSelectionAfterPick,
@@ -42,8 +43,22 @@ import { useGalleryPickerScope } from './useGalleryPickerScope';
 
 const BOARD_BUTTON_EXPANDED_PROPS = { bg: 'bg.emphasized' } as const;
 
-/** Unseeded until the first page loads; then the Gallery's selection if it is on that page, else nothing. */
-type ActiveKeyState = GalleryItemKey | null | undefined;
+const EMPTY_SLOTS: ReadonlyMap<number, GalleryItem> = new Map();
+const EMPTY_PAGE_STATES: GallerySparseListing['pageStates'] = new Map();
+
+const haveSameSlots = (left: GallerySparseListing | null, right: GallerySparseListing): boolean => {
+  if (left?.total !== right.total || left.itemSlots.size !== right.itemSlots.size) {
+    return false;
+  }
+
+  for (const [index, item] of right.itemSlots) {
+    if (left.itemSlots.get(index) !== item) {
+      return false;
+    }
+  }
+
+  return true;
+};
 
 export const GalleryPickerView = ({
   accept,
@@ -70,42 +85,56 @@ export const GalleryPickerView = ({
   const currentKey = gallerySelectedItem ? toGalleryItemKey(gallerySelectedItem) : null;
   const seedKey = gallerySelectedItem && accept.includes(gallerySelectedItem.kind) ? currentKey : null;
 
-  const [activeKey, setActiveKey] = useState<ActiveKeyState>(undefined);
+  const [activeCursor, setActiveCursor] = useState<{ filterIdentity: string; index: number } | null>(null);
   const [columnCount, setColumnCount] = useState(GALLERY_PICKER_MIN_COLUMNS);
   const [isUploading, setIsUploading] = useState(false);
-  // Async uploads need current selection capacity; the sentinel needs a stable callback across page fetches.
+  // Async uploads need current selection capacity.
   const selectionRef = useRef(selection);
-  const loadMoreRef = useRef(data.loadMore);
-  // Keep prior items dimmed during scope changes; show skeletons only before the first result.
-  const [lastItems, setLastItems] = useState<GalleryItem[] | null>(null);
+  // Keep prior absolute slots dimmed during scope changes; a new scope starts at its own page zero.
+  const [lastListing, setLastListing] = useState<GallerySparseListing | null>(null);
 
   // eslint-disable-next-line react/refs
   selectionRef.current = selection;
-  // eslint-disable-next-line react/refs
-  loadMoreRef.current = data.loadMore;
 
-  if (data.items !== null && data.items !== lastItems) {
-    setLastItems(data.items);
+  if (data.items !== null && data.sparseListing && !haveSameSlots(lastListing, data.sparseListing)) {
+    setLastListing(data.sparseListing);
   }
 
-  const isStale = data.items === null && lastItems !== null;
-  const items = data.items ?? lastItems;
+  const knownTotal = data.total;
+  const isStale = data.items === null && lastListing !== null && knownTotal !== 0;
+  const listing = isStale ? lastListing : data.sparseListing;
+  const itemSlots = listing?.itemSlots ?? EMPTY_SLOTS;
+  const pageStates = isStale ? EMPTY_PAGE_STATES : (listing?.pageStates ?? EMPTY_PAGE_STATES);
+  const total = listing?.total ?? knownTotal;
+  const totalSlots = total ?? GALLERY_PAGE_SIZE;
+  const filterIdentity = JSON.stringify(galleryItemsPageOptions(data.filter, 0).queryKey.slice(3, 5));
+  const activeFilterCursor = activeCursor?.filterIdentity === filterIdentity ? activeCursor.index : null;
+  const setVisibleRange = data.setVisibleRange;
 
-  // Seed once the first page is in, so a selection past it never yanks the
-  // highlight (and the scroll) when a later page happens to contain it.
-  if (activeKey === undefined && data.items !== null) {
-    setActiveKey(seedKey && data.items.some((item) => toGalleryItemKey(item) === seedKey) ? seedKey : null);
+  const defaultActiveIndex = useMemo(() => {
+    const slots = [...itemSlots].sort(([left], [right]) => left - right);
+    const firstPickable = slots.find(([, item]) => getGalleryPickerTileState(item, accept, selection) === 'pickable');
+
+    return firstPickable?.[0] ?? slots[0]?.[0] ?? -1;
+  }, [accept, itemSlots, selection]);
+
+  // Seed once page zero lands. A selection elsewhere in the listing must not pull the picker away from its start.
+  if (activeFilterCursor === null && data.items !== null) {
+    const seededIndex = seedKey
+      ? [...itemSlots].find(([index, item]) => index < GALLERY_PAGE_SIZE && toGalleryItemKey(item) === seedKey)?.[0]
+      : undefined;
+
+    setActiveCursor({ filterIdentity, index: seededIndex ?? defaultActiveIndex });
   }
 
-  const activeIndex = activeKey && items ? items.findIndex((item) => toGalleryItemKey(item) === activeKey) : -1;
-  const resolvedActiveIndex =
-    activeIndex >= 0 ? activeIndex : items ? getGalleryPickerDefaultIndex(items, accept, selection) : -1;
-  const activeItem = resolvedActiveIndex >= 0 ? items?.[resolvedActiveIndex] : undefined;
-  const resolvedActiveKey = activeItem ? toGalleryItemKey(activeItem) : null;
+  const resolvedActiveIndex = activeFilterCursor !== null ? activeFilterCursor : defaultActiveIndex;
+  const activeItem = resolvedActiveIndex >= 0 ? itemSlots.get(resolvedActiveIndex) : undefined;
+  const activePageOffset = Math.floor(Math.max(0, resolvedActiveIndex) / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+  const activePageState = pageStates.get(activePageOffset);
   const selectedBoard = data.boards.find((board) => board.id === data.selectedBoardId);
   const boardName = selectedBoard ? getGalleryBoardLabel(selectedBoard, t) : t('widgets.gallery.selectedBoardFallback');
   const uploadTarget = getGalleryUploadTargetLabel(data.boards, data.selectedBoardId, t);
-  const showsGrid = scope.pane === 'items' && (items === null || items.length > 0);
+  const showsGrid = scope.pane === 'items' && (total === null || total > 0);
 
   const getTileState = useCallback(
     (item: GalleryItem) => getGalleryPickerTileState(item, accept, selection),
@@ -244,18 +273,24 @@ export const GalleryPickerView = ({
         return;
       }
 
-      if (!items) {
+      if (isStale) {
+        if (event.key === 'Enter' || isGalleryPickerNavKey(event.key)) {
+          event.preventDefault();
+          event.stopPropagation();
+        }
+
         return;
       }
 
       if (isGalleryPickerNavKey(event.key) && isGalleryPickerNavKeyForField(event.key, event.currentTarget.value)) {
-        const next = items[getGalleryPickerNeighborIndex(resolvedActiveIndex, items.length, columnCount, event.key)];
+        const nextIndex = getGalleryPickerNeighborIndex(resolvedActiveIndex, totalSlots, columnCount, event.key);
 
         event.preventDefault();
         event.stopPropagation();
 
-        if (next) {
-          setActiveKey(toGalleryItemKey(next));
+        if (nextIndex >= 0) {
+          setActiveCursor({ filterIdentity, index: nextIndex });
+          setVisibleRange?.({ endIndexExclusive: nextIndex + 1, startIndex: nextIndex });
         }
       } else if (event.key === 'Enter') {
         event.preventDefault();
@@ -263,31 +298,45 @@ export const GalleryPickerView = ({
 
         if (activeItem) {
           pickItem(activeItem);
+        } else if (activePageState?.error) {
+          void activePageState.retry();
         }
       }
     },
     [
+      activePageState,
       activeItem,
       boardGroups,
       boardsId,
       columnCount,
       handleSelectBoard,
       isSearching,
-      items,
+      isStale,
+      filterIdentity,
       pickItem,
       resolvedActiveIndex,
+      setVisibleRange,
       scope.pane,
+      totalSlots,
     ]
   );
 
   const handleActivate = useCallback(
     (item: GalleryItem) => {
-      setActiveKey(toGalleryItemKey(item));
+      const entry = [...itemSlots].find(([, slotItem]) => toGalleryItemKey(slotItem) === toGalleryItemKey(item));
+
+      if (entry) {
+        setActiveCursor({ filterIdentity, index: entry[0] });
+      }
+
       pickItem(item);
     },
-    [pickItem]
+    [filterIdentity, itemSlots, pickItem]
   );
-  const handleLoadMore = useCallback(() => loadMoreRef.current(), []);
+  const handleVisibleRangeChange = useCallback(
+    (range: { endIndexExclusive: number; startIndex: number }) => setVisibleRange?.(range),
+    [setVisibleRange]
+  );
   const handleClearSearch = useCallback(() => setSearchTerm(''), [setSearchTerm]);
 
   const openGallery = useCallback(() => {
@@ -303,11 +352,11 @@ export const GalleryPickerView = ({
     accept,
     activeItem,
     isSearching,
-    isWindowTruncated: data.isWindowTruncated,
-    loadedCount: items?.length ?? 0,
+    isWindowTruncated: false,
+    loadedCount: itemSlots.size,
     pane: scope.pane,
     remaining: getGalleryPickerRemaining(accept, selection),
-    total: data.total,
+    total,
     visibleBoardCount,
   })
     .map((part) => t(`widgets.gallery.picker.${part.kind}`, 'count' in part ? { count: part.count } : undefined))
@@ -330,13 +379,12 @@ export const GalleryPickerView = ({
         ? { 'aria-controls': boardsId }
         : showsGrid
           ? {
-              'aria-activedescendant': resolvedActiveKey
-                ? galleryPickerOptionId(listboxId, resolvedActiveKey)
-                : undefined,
+              'aria-activedescendant':
+                resolvedActiveIndex >= 0 ? galleryPickerOptionId(listboxId, resolvedActiveIndex) : undefined,
               'aria-controls': listboxId,
             }
           : undefined,
-    [boardsId, listboxId, resolvedActiveKey, scope.pane, showsGrid]
+    [boardsId, listboxId, resolvedActiveIndex, scope.pane, showsGrid]
   );
   const searchLabel =
     scope.pane === 'boards'
@@ -424,18 +472,20 @@ export const GalleryPickerView = ({
           />
         ) : showsGrid ? (
           <GalleryPickerGrid
-            activeKey={resolvedActiveKey}
+            activeIndex={resolvedActiveIndex}
             columnCount={columnCount}
             currentKey={currentKey}
             getTileState={getTileState}
             idBase={listboxId}
             isMultiple={isMultiple}
             isStale={isStale}
-            items={items}
+            itemSlots={itemSlots}
             label={t('widgets.gallery.picker.itemsLabel')}
             onActivate={handleActivate}
             onColumnCountChange={setColumnCount}
-            onLoadMore={handleLoadMore}
+            onVisibleRangeChange={handleVisibleRangeChange}
+            pageStates={pageStates}
+            total={total}
           />
         ) : (
           <Stack align="center" color="fg.muted" gap="2" justify="center" minH="7rem" px="4" py="6">

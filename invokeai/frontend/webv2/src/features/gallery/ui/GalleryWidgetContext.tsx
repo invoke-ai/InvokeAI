@@ -8,6 +8,7 @@ import { createContext, use } from 'react';
 
 import type { GalleryStateView } from './galleryStateView';
 import type { GalleryItemActions, GalleryWidgetProps, GalleryWidgetRuntime } from './GalleryUiContext';
+import type { GallerySparseListing } from './useGalleryData';
 
 /**
  * The provider maps widget intents to workbench/backend actions; shared ImageActions owns cross-widget item
@@ -68,6 +69,10 @@ export interface GalleryWidgetContextValue {
   isWindowTruncated: boolean;
   /** Everything on hand — strip first, then the listing, without repeats — for lookups by key. */
   loadedItems: GalleryItem[];
+  /** Main Gallery's absolute page slots. Other Gallery surfaces continue to use a dense loaded projection. */
+  sparseListing?: GallerySparseListing;
+  /** Reports the grid's virtual item range so only intersecting page queries stay subscribed. */
+  setVisibleRange?: (range: { endIndexExclusive: number; startIndex: number }) => void;
   starredStrip: GalleryStarredStrip;
   projectName: string;
   /** Placement, used only to scope cached viewport measurements. */

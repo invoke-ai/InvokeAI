@@ -42,7 +42,7 @@ import {
   type GalleryWidgetContextValue,
 } from './GalleryWidgetContext';
 import { useGalleryActions } from './useGalleryActions';
-import { useGalleryData } from './useGalleryData';
+import { useGalleryData, type GalleryData } from './useGalleryData';
 import { useGalleryStarredStrip } from './useGalleryStarredStrip';
 
 export const shouldPublishGalleryTotal = ({
@@ -102,6 +102,7 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
     settings,
     // The grid partitions: starred items live in the strip above it.
     starred: starredOnly,
+    sparseViewport: true,
   });
 
   // Report semantic failures separately so failed searches cannot masquerade as empty results.
@@ -228,6 +229,8 @@ export const GalleryWidgetView = ({ presentation, region, runtime }: GalleryWidg
         projectName={projectName}
         region={region}
         runtime={runtime}
+        setVisibleRange={data.setVisibleRange}
+        sparseListing={data.sparseListing}
         starredStrip={starredStrip}
       />
     </ItemActionsProvider>
@@ -243,6 +246,8 @@ const GalleryWidgetContent = ({
   projectName,
   region,
   runtime,
+  setVisibleRange,
+  sparseListing,
   starredStrip,
 }: {
   actions: GalleryActions;
@@ -253,6 +258,8 @@ const GalleryWidgetContent = ({
   projectName: string;
   region: GalleryWidgetProps['region'];
   runtime: GalleryWidgetRuntime;
+  setVisibleRange: ((range: { endIndexExclusive: number; startIndex: number }) => void) | undefined;
+  sparseListing: GalleryData['sparseListing'];
   starredStrip: GalleryStarredStrip;
 }) => {
   const itemActions = useGalleryItemActions();
@@ -267,9 +274,24 @@ const GalleryWidgetContent = ({
       projectName,
       region,
       runtime,
+      setVisibleRange,
+      sparseListing,
       starredStrip,
     }),
-    [actions, filter, gallery, isWindowTruncated, itemActions, loadedItems, projectName, region, runtime, starredStrip]
+    [
+      actions,
+      filter,
+      gallery,
+      isWindowTruncated,
+      itemActions,
+      loadedItems,
+      projectName,
+      region,
+      runtime,
+      setVisibleRange,
+      sparseListing,
+      starredStrip,
+    ]
   );
 
   return (

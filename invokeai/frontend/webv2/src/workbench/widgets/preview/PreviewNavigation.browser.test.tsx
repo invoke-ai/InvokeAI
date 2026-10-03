@@ -117,8 +117,10 @@ const mocks = vi.hoisted(() => {
     galleryStripFetches: [] as Array<{ boardId: string; starred?: boolean }>,
     galleryStripItems: [] as Array<GalleryImageItem | GalleryVideoItem>,
     galleryItemPageOffsets: [] as number[],
-    galleryItemWindowOffsets: [] as number[],
+    galleryPageFetchSignals: [] as AbortSignal[],
     galleryItemPages: [] as GalleryItemsPage[],
+    galleryItemNames: [] as Array<{ kind: 'image' | 'video'; name: string }>,
+    galleryItemNamesOptionCalls: 0,
     imageActionOptions: null as null | {
       getItemActionContext?: () => {
         getItemSelectionPage?: (item: GalleryImageItem | GalleryVideoItem) => number;
@@ -199,7 +201,9 @@ vi.mock('@features/gallery/queries', () => ({
   ) => {
     mocks.galleryItemFilters.push(query);
     const pages = mocks.galleryItemPages.map((page) => {
-      const items = page.items.filter((item) => item.boardId === query.boardId);
+      const items = page.items.filter(
+        (item) => item.boardId === query.boardId && (query.starred === undefined || item.starred === query.starred)
+      );
 
       return {
         ...page,
@@ -208,8 +212,6 @@ vi.mock('@features/gallery/queries', () => ({
     });
     const initialOffset = window.offset ?? 0;
     const initialPage = pages[initialOffset / 60] ?? { items: [], total: 0 };
-
-    mocks.galleryItemWindowOffsets.push(initialOffset);
 
     return {
       getNextPageParam: (_lastPage: GalleryItemsPage, _allPages: GalleryItemsPage[], lastPageParam: number) =>
@@ -226,6 +228,71 @@ vi.mock('@features/gallery/queries', () => ({
         return Promise.resolve(pages[pageParam / 60] ?? { items: [], total: 0 });
       },
       queryKey: ['test-items', query.boardId, query.orderDir, window.kind, initialOffset],
+      staleTime: Infinity,
+    };
+  },
+  galleryItemsPageOptions: (
+    query: { boardId: string; orderDir?: 'ASC' | 'DESC'; starred?: boolean },
+    offset: number
+  ) => {
+    mocks.galleryItemFilters.push(query);
+    const storedPage = mocks.galleryItemPages[offset / 60];
+    const items =
+      storedPage?.items.filter(
+        (item) => item.boardId === query.boardId && (query.starred === undefined || item.starred === query.starred)
+      ) ?? [];
+    const orderedItems = query.orderDir === 'ASC' ? [...items].reverse() : items;
+
+    return {
+      queryKey: ['test-items-page', query, offset],
+      queryFn: () => {
+        mocks.galleryItemPageOffsets.push(offset);
+        return Promise.resolve({
+          ...storedPage,
+          items: orderedItems,
+          offset,
+          total: Math.max(storedPage?.total ?? 0, offset + orderedItems.length),
+        });
+      },
+      staleTime: Infinity,
+    };
+  },
+  fetchGalleryItemsPage: (
+    queryClient: QueryClient,
+    query: { boardId: string; orderDir?: 'ASC' | 'DESC'; starred?: boolean },
+    offset: number,
+    { signal }: { signal?: AbortSignal }
+  ) => {
+    if (signal) {
+      mocks.galleryPageFetchSignals.push(signal);
+    }
+    const storedPage = mocks.galleryItemPages[offset / 60];
+    const items =
+      storedPage?.items.filter(
+        (item) => item.boardId === query.boardId && (query.starred === undefined || item.starred === query.starred)
+      ) ?? [];
+    const orderedItems = query.orderDir === 'ASC' ? [...items].reverse() : items;
+
+    return queryClient.fetchQuery({
+      queryKey: ['test-items-page', query, offset],
+      queryFn: () => {
+        mocks.galleryItemPageOffsets.push(offset);
+        return Promise.resolve({
+          ...storedPage,
+          items: orderedItems,
+          offset,
+          total: Math.max(storedPage?.total ?? 0, offset + orderedItems.length),
+        });
+      },
+      staleTime: Infinity,
+    });
+  },
+  galleryItemNamesOptions: (query: { boardId: string; starred?: boolean }) => {
+    mocks.galleryItemNamesOptionCalls++;
+
+    return {
+      queryKey: ['test-item-names', query],
+      queryFn: () => Promise.resolve({ items: mocks.galleryItemNames, total: mocks.galleryItemNames.length }),
       staleTime: Infinity,
     };
   },
@@ -454,12 +521,12 @@ const legacyImage = (name: string, queuedAt: string, sourceQueueItemId = `queue-
 const deepBoardPages = (deep: GalleryImageItem[], next: GalleryImageItem[] = []) =>
   Array.from({ length: 32 }, (_unused, index) => {
     if (index === 30) {
-      return { items: deep, total: deep.length + next.length };
+      return { items: deep, total: 31 * 60 + deep.length + next.length };
     }
 
     return index === 31
-      ? { items: next, total: deep.length + next.length }
-      : { items: [], total: deep.length + next.length };
+      ? { items: next, total: 31 * 60 + deep.length + next.length }
+      : { items: [], total: 31 * 60 + deep.length + next.length };
   });
 
 const getBoundary = (): HTMLElement => {
@@ -546,7 +613,9 @@ beforeEach(() => {
   mocks.galleryStripFetches.length = 0;
   mocks.galleryStripItems = [];
   mocks.galleryItemPageOffsets.length = 0;
-  mocks.galleryItemWindowOffsets.length = 0;
+  mocks.galleryPageFetchSignals.length = 0;
+  mocks.galleryItemNames = [];
+  mocks.galleryItemNamesOptionCalls = 0;
   mocks.imageActionOptions = null;
   mocks.galleryItemPages = [
     {
@@ -916,9 +985,7 @@ describe('preview keyboard navigation boundary', () => {
     );
   });
 
-  it('holds a deep window still while the cursor walks across a page boundary and back', async () => {
-    // Preserve the original infinite-window anchor across boundary steps so earlier traversed pages remain
-    // reachable.
+  it('loads only selected and adjacent absolute pages while the cursor crosses a deep page boundary', async () => {
     const deepA = createImageItem('deep-a', '2026-07-20T00:00:04.000Z');
     const deepB = createImageItem('deep-b', '2026-07-20T00:00:03.000Z');
     const deepC = createImageItem('deep-c', '2026-07-20T00:00:02.000Z');
@@ -949,13 +1016,12 @@ describe('preview keyboard navigation boundary', () => {
     ]);
 
     expect(selected).toEqual([
-      ['deep-c', 30],
-      ['deep-d', 30],
-      ['deep-c', 30],
+      ['deep-c', 31],
+      ['deep-d', 31],
+      ['deep-c', 31],
       ['deep-b', 30],
     ]);
-    expect(mocks.galleryItemWindowOffsets).not.toContain(1860);
-    expect(mocks.galleryItemWindowOffsets).not.toContain(0);
+    expect(mocks.galleryItemPageOffsets.sort((a, b) => a - b)).toEqual([1740, 1800, 1860]);
   });
 
   it('moves to the top of the listing when a selection is made there from outside Preview', async () => {
@@ -976,9 +1042,9 @@ describe('preview keyboard navigation boundary', () => {
 
     await render();
 
-    expect(mocks.galleryItemWindowOffsets).toContain(1800);
+    expect(mocks.galleryItemPageOffsets).toContain(1800);
 
-    mocks.galleryItemWindowOffsets.length = 0;
+    mocks.galleryItemPageOffsets.length = 0;
     setGalleryValues({
       selectedImage: legacyImage('top-newer', '2026-07-22T00:00:02.000Z'),
       selectedImageName: 'top-newer',
@@ -987,7 +1053,7 @@ describe('preview keyboard navigation boundary', () => {
     await rerender();
     await pressArrow('ArrowRight');
 
-    expect(mocks.galleryItemWindowOffsets).not.toContain(1800);
+    expect(mocks.galleryItemPageOffsets).not.toContain(1800);
     expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
       expect.objectContaining({ kind: 'image', name: 'top-older' }),
       undefined,
@@ -1012,6 +1078,9 @@ describe('preview keyboard navigation boundary', () => {
 
     await render();
 
+    await expect
+      .poll(() => mocks.imageActionOptions?.getItemActionContext?.().items.map((item) => item.name))
+      .toContain('deep-older');
     const context = mocks.imageActionOptions?.getItemActionContext?.();
 
     expect(context?.getItemSelectionPage?.(deepOlder)).toBe(30);
@@ -1137,10 +1206,7 @@ describe('preview keyboard navigation boundary', () => {
     );
   });
 
-  it('hands image actions the window anchor for an item on a later page of the window', async () => {
-    // The stamp is the anchor of the window holding the item, not the page
-    // the item happens to sit on: a successor from page 31 of a window
-    // anchored at page 30 is stamped 30.
+  it('hands image actions the selected item absolute page', async () => {
     const deepA = createImageItem('deep-a', '2026-07-20T00:00:04.000Z');
     const deepB = createImageItem('deep-b', '2026-07-20T00:00:03.000Z');
     const deepC = createImageItem('deep-c', '2026-07-20T00:00:02.000Z');
@@ -1155,14 +1221,14 @@ describe('preview keyboard navigation boundary', () => {
     mocks.galleryItemPages = deepBoardPages([deepA, deepB], [deepC]);
 
     await render();
-    // Cross the boundary so page 31 is part of the window.
+    // Cross the boundary so page 31 is in the shared page cache.
     await pressArrow('ArrowRight');
     await commitLastSelection();
 
     const context = mocks.imageActionOptions?.getItemActionContext?.();
 
     expect(context?.items.map((item) => item.name)).toContain('deep-c');
-    expect(context?.getItemSelectionPage?.(deepC)).toBe(30);
+    expect(context?.getItemSelectionPage?.(deepC)).toBe(31);
   });
 
   it('does not restore a remembered page for an item since moved to another board', async () => {
@@ -1236,7 +1302,7 @@ describe('preview keyboard navigation boundary', () => {
             width: newest.width,
           },
         ],
-        total: 2,
+        total: 61,
       },
       {
         items: [
@@ -1255,7 +1321,7 @@ describe('preview keyboard navigation boundary', () => {
             width: oldest.width,
           },
         ],
-        total: 2,
+        total: 61,
       },
     ];
 
@@ -1270,7 +1336,7 @@ describe('preview keyboard navigation boundary', () => {
         true
       );
     });
-    expect(mocks.galleryItemPageOffsets).toEqual([60]);
+    expect(mocks.galleryItemPageOffsets.sort((a, b) => a - b)).toEqual([0, 60]);
     expect(mocks.commands.gallery.selectItem).toHaveBeenCalledTimes(1);
   });
 
@@ -1351,7 +1417,7 @@ describe('preview keyboard navigation boundary', () => {
     );
   });
 
-  it('walks the flat chronological order on paginated pages instead of lifting starred items', async () => {
+  it('keeps paginated Preview inside the unstarred listing', async () => {
     const galleryValues = mocks.project.widgetInstances.gallery.state.values as Record<string, unknown>;
     const selected = {
       ...mocks.recentImages[0],
@@ -1381,9 +1447,9 @@ describe('preview keyboard navigation boundary', () => {
     await render();
     await pressArrow('ArrowRight');
 
-    // Under starred-first the step would land on oldest; flat pages win.
+    // The regular Gallery page query excludes starred items; the strip is not merged into this paginated result.
     expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: 'image', name: 'starred-mid' }),
+      expect.objectContaining({ kind: 'image', name: 'oldest' }),
       undefined,
       0,
       true
@@ -2118,11 +2184,10 @@ describe('preview keyboard navigation boundary', () => {
     await render();
 
     const video = host?.querySelector<HTMLVideoElement>('video');
-    const filmstripPosters = host?.querySelectorAll<HTMLImageElement>('button img');
 
     expect(video?.getAttribute('src')).toBe(sameNameVideo.fullUrl);
     expect(video?.getAttribute('poster')).toBe(sameNameVideo.thumbnailUrl);
-    expect(filmstripPosters).toHaveLength(3);
+    await expect.poll(() => host?.querySelectorAll<HTMLImageElement>('button img').length).toBe(3);
     expect(host?.textContent).not.toContain('Drop to compare');
 
     await pressArrow('ArrowLeft');
@@ -2179,16 +2244,58 @@ describe('preview keyboard navigation boundary', () => {
     galleryValues.selectedImage = sameNameVideo;
     galleryValues.selectedImageName = 'video:shared';
     mocks.galleryItemPages = [{ items: [sameNameImage, sameNameVideo], total: 2 }];
+    mocks.galleryItemNames = [sameNameImage, sameNameVideo].map(({ kind, name }) => ({ kind, name }));
 
     await render();
 
     expect(mocks.imageActionOptions?.onImagesDeleted).toBeUndefined();
+    await expect
+      .poll(() => mocks.imageActionOptions?.getItemActionContext?.().items)
+      .toEqual([sameNameImage, sameNameVideo]);
     const context = mocks.imageActionOptions?.getItemActionContext?.();
     expect(context?.selectedItemKey).toBe('video:shared');
-    expect(context?.items).toEqual([sameNameImage, sameNameVideo]);
     await expect(context?.loadOrderedRefs(new AbortController().signal)).resolves.toEqual([
       { kind: 'image', name: 'shared' },
       { kind: 'video', name: 'shared' },
+    ]);
+  });
+
+  it('lazily loads full ordered refs for a range extending past the sparse adjacent-page window', async () => {
+    const orderedItems = Array.from({ length: 240 }, (_unused, index) =>
+      createImageItem(
+        `range-${String(index).padStart(3, '0')}`,
+        new Date(Date.UTC(2026, 6, 30, 0, 0, 240 - index)).toISOString()
+      )
+    );
+
+    mocks.galleryItemPages = Array.from({ length: 4 }, (_unused, page) => ({
+      items: orderedItems.slice(page * 60, (page + 1) * 60),
+      total: orderedItems.length,
+    }));
+    mocks.galleryItemNames = orderedItems.map(({ kind, name }) => ({ kind, name }));
+    setGalleryValues({
+      recentImages: [],
+      selectedImage: legacyImage('range-060', orderedItems[60].createdAt),
+      selectedImageName: 'range-060',
+      selectedImageQuery: { ...deepQuery, page: 1 },
+    });
+
+    await render();
+
+    await expect.poll(() => mocks.imageActionOptions?.getItemActionContext?.().items.length).toBe(180);
+    const context = mocks.imageActionOptions?.getItemActionContext?.();
+
+    expect(mocks.galleryItemNamesOptionCalls).toBe(0);
+    await expect(context?.loadOrderedRefs(new AbortController().signal)).resolves.toHaveLength(240);
+    expect(mocks.galleryItemNamesOptionCalls).toBe(1);
+
+    const refs = await context?.loadOrderedRefs(new AbortController().signal);
+
+    expect(refs?.slice(178, 182)).toEqual([
+      { kind: 'image', name: 'range-178' },
+      { kind: 'image', name: 'range-179' },
+      { kind: 'image', name: 'range-180' },
+      { kind: 'image', name: 'range-181' },
     ]);
   });
 
@@ -2216,7 +2323,7 @@ describe('preview keyboard navigation boundary', () => {
 
       await render();
 
-      expect(preloadedSources).toContain(previousImage.fullUrl);
+      await expect.poll(() => preloadedSources).toContain(previousImage.fullUrl);
       expect(preloadedSources).not.toContain(nextVideo.fullUrl);
     } finally {
       Object.defineProperty(globalThis, 'Image', { configurable: true, value: NativeImage, writable: true });

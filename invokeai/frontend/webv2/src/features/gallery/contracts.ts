@@ -81,3 +81,5 @@ export {
   type GalleryNavigationDirection,
   type GalleryNavigationEntry,
 } from './core/selection';
+export { abortGalleryLocatorRequests, createGalleryLocatorRequest } from './core/locatorCancellation';
+export type { GalleryLocatorRequest } from './core/locatorCancellation';

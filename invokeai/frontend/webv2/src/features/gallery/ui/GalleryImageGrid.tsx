@@ -10,6 +10,7 @@ import {
 } from '@features/gallery/core/selection';
 import { isDateBoardId } from '@features/gallery/data/backend';
 import { GALLERY_PAGE_SIZE, imageIndexAvailabilityOptions } from '@features/gallery/data/queries';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { Button, DropZone } from '@platform/ui';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRightIcon, StarIcon, UploadIcon } from 'lucide-react';
@@ -29,8 +30,11 @@ import {
 import { useVirtualizer } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
 
+import type { GallerySparsePageState } from './useGalleryData';
+
 import {
   buildGalleryGridRows,
+  buildSparseGalleryNavigationEntries,
   chunkGalleryCellsIntoRows,
   GALLERY_GRID_GAP_PX,
   GALLERY_PINNED_FOOTER_PX,
@@ -38,6 +42,9 @@ import {
   getGalleryCellSizePx,
   getGalleryColumnCount,
   getGalleryGridRowIndexForItemKey,
+  getGallerySparseRowIndexForItemKey,
+  getGallerySparseRowKey,
+  getGallerySparseSlotKey,
   getGalleryPinnedHeightPx,
   getGalleryProgressLayout,
   getGalleryStarredLayout,
@@ -58,11 +65,56 @@ import { useGalleryUploadInput } from './useGalleryUploadInput';
  */
 const viewportWidthCache = new Map<string, number>();
 const STARRED_TRIGGER_HOVER_STYLES = { color: 'fg' } as const;
+const EMPTY_GALLERY_ITEMS: GalleryItem[] = [];
 
 // Module-scoped so a grid remount cannot replay an already-followed reveal.
 let lastPageFollowedRevealToken = 0;
 
 const dragEventContainsFiles = (event: DragEvent): boolean => Array.from(event.dataTransfer.types).includes('Files');
+
+const GalleryPageError = ({ pageState }: { pageState: GallerySparsePageState }) => {
+  const { t } = useTranslation();
+  const handleRetry = useCallback(() => void pageState.retry(), [pageState]);
+
+  return (
+    <Stack align="center" gap="1" maxW="full" px="1">
+      <Text color="fg.muted" fontSize="2xs" lineClamp={2} textAlign="center">
+        {pageState.error?.message}
+      </Text>
+      <Button color="fg" size="2xs" variant="ghost" onClick={handleRetry}>
+        {t('common.retry')}
+      </Button>
+    </Stack>
+  );
+};
+
+const GallerySparseSlot = ({
+  cellSizePx,
+  pageState,
+}: {
+  cellSizePx: number;
+  pageState: GallerySparsePageState | undefined;
+}) => {
+  const error = pageState?.error;
+  const state = error ? 'error' : pageState?.isLoading ? 'loading' : 'empty';
+
+  return (
+    <Box
+      aria-busy={state === 'loading' || undefined}
+      aspectRatio="1"
+      bg={state === 'loading' ? 'bg.subtle' : undefined}
+      data-gallery-slot-state={state}
+      display="flex"
+      h={`${cellSizePx}px`}
+      alignItems="center"
+      justifyContent="center"
+      minW="0"
+      overflow="hidden"
+      role="listitem"
+      rounded="sm"
+    />
+  );
+};
 
 /** Show all appears only when starred items exceed the strip and activates the starred-only listing. */
 const GalleryStarredSectionHeader = ({
@@ -198,7 +250,17 @@ const GalleryStarredSection = ({
 /** Measure viewport width for columns so both layouts share the same grid. */
 export const GalleryImageGrid = () => {
   const { t } = useTranslation();
-  const { actions, gallery, isWindowTruncated, itemActions, region, starredStrip } = useGalleryWidget();
+  const {
+    actions,
+    filter,
+    gallery,
+    isWindowTruncated,
+    itemActions,
+    region,
+    setVisibleRange,
+    sparseListing,
+    starredStrip,
+  } = useGalleryWidget();
   const {
     gallery: galleryCommands,
     getItemLabel,
@@ -222,6 +284,9 @@ export const GalleryImageGrid = () => {
     thumbnailFit,
   } = gallery.settings;
   const isStarredOpen = !starredSectionCollapsed;
+  const usesSparseListing = sparseListing !== undefined;
+  const isSparsePaginated = usesSparseListing && paginationMode === 'paginated';
+  const sparsePageOffset = isSparsePaginated ? gallery.page * GALLERY_PAGE_SIZE : 0;
 
   const {
     actionSelectionRefs,
@@ -236,6 +301,23 @@ export const GalleryImageGrid = () => {
   } = useGalleryGridSelection();
 
   const columnCount = getGalleryColumnCount({ imageDensityPercent, widthPx: viewportWidth });
+  const sparseRecentItems = usesSparseListing ? sparseListing.recentItems : EMPTY_GALLERY_ITEMS;
+  const sparseRecentRowCount = Math.ceil(sparseRecentItems.length / columnCount);
+  const sparseRecentAtTop = usesSparseListing && !isSparsePaginated && gallery.settings.imageOrderDir === 'DESC';
+  const sparseFilterIdentity = JSON.stringify(filter);
+  const leadingRecentRows = sparseRecentAtTop ? sparseRecentRowCount : 0;
+  const sparseBackendItemCount = usesSparseListing
+    ? isSparsePaginated
+      ? Math.min(GALLERY_PAGE_SIZE, Math.max(0, (sparseListing.total ?? 0) - sparsePageOffset))
+      : (sparseListing.total ?? 0)
+    : 0;
+  const sparsePageErrors = useMemo(
+    () =>
+      [...(sparseListing?.pageStates ?? [])].flatMap(([pageOffset, pageState]) =>
+        pageState.error ? [{ pageOffset, pageState }] : []
+      ),
+    [sparseListing?.pageStates]
+  );
   const isFollowingLive = followedProgressSessionId !== null;
   const isComparisonActive = gallery.isComparisonActive && !isFollowingLive;
   const selectedBoard = gallery.boards.find((board) => board.id === gallery.selectedBoardId);
@@ -244,7 +326,9 @@ export const GalleryImageGrid = () => {
     : t('widgets.gallery.selectedBoardFallback');
   // The listing is unstarred-only, so a board whose items are all starred
   // still has the strip to show.
-  const isEmpty = gallery.items.length === 0 && starredStrip.items.length === 0;
+  const isEmpty =
+    (usesSparseListing ? sparseBackendItemCount === 0 && sparseRecentItems.length === 0 : gallery.items.length === 0) &&
+    starredStrip.items.length === 0;
   // A ranking that matched nothing is still a search result, never an empty
   // board inviting an upload.
   const hasActiveSearch = gallery.searchTerm.trim() !== '' || gallery.semanticImageQuery !== null;
@@ -272,6 +356,18 @@ export const GalleryImageGrid = () => {
       stripEntries.push({ item: hiddenStripSelection, kind: 'item' });
     }
 
+    const listingEntries =
+      usesSparseListing && sparseListing
+        ? buildSparseGalleryNavigationEntries({
+            columnCount,
+            includeUnloadedBoundaries: !isSparsePaginated,
+            itemSlots: sparseListing.itemSlots,
+            pageOffsets: isSparsePaginated ? [0] : [...sparseListing.pageStates.keys()],
+            total: isSparsePaginated ? sparseBackendItemCount : sparseListing.total,
+          })
+        : gallery.items.map((item) => ({ item, kind: 'item' }) as const);
+    const recentEntries = sparseRecentItems.map((item) => ({ item, kind: 'item' }) as const);
+
     return [
       stripEntries,
       isProgressOpen
@@ -281,27 +377,67 @@ export const GalleryImageGrid = () => {
             navigable: session.state === 'running',
           }))
         : [],
-      gallery.items.map((item) => ({ item, kind: 'item' })),
+      ...(sparseRecentAtTop ? [recentEntries, listingEntries] : [listingEntries, recentEntries]),
     ];
   }, [
     gallery.items,
     gallery.selectedItemKey,
+    columnCount,
     isProgressOpen,
     isStarredOpen,
     progressSessions,
+    sparseListing,
+    isSparsePaginated,
+    sparseBackendItemCount,
+    sparseRecentAtTop,
+    sparseRecentItems,
     starredCells,
     starredStrip.items,
+    usesSparseListing,
   ]);
   const cursorKey =
     followedProgressSessionId !== null
       ? getGallerySessionNavigationKey(followedProgressSessionId)
       : gallery.selectedItemKey;
 
-  const rowCount = rows.length;
+  const backendRowCount = usesSparseListing ? Math.ceil(sparseBackendItemCount / columnCount) : rows.length;
+  const rowCount = usesSparseListing ? backendRowCount + sparseRecentRowCount : rows.length;
   const cellSizePx = getGalleryCellSizePx({ columnCount, widthPx: viewportWidth });
   const rowHeightPx = cellSizePx + GALLERY_GRID_GAP_PX;
   const estimateRowSize = useCallback(() => rowHeightPx, [rowHeightPx]);
-  const getRowKey = useCallback((index: number) => rows[index]?.key ?? index, [rows]);
+  const getRowKey = useCallback(
+    (index: number) => {
+      if (!usesSparseListing || !sparseListing) {
+        return rows[index]?.key ?? index;
+      }
+
+      const isRecentRow = sparseRecentAtTop ? index < sparseRecentRowCount : index >= backendRowCount;
+
+      if (isRecentRow) {
+        const recentRow = sparseRecentAtTop ? index : index - backendRowCount;
+        const firstRecentItem = sparseRecentItems[recentRow * columnCount];
+
+        return `recent-row:${firstRecentItem ? toGalleryItemKey(firstRecentItem) : recentRow}`;
+      }
+
+      const backendRow = index - leadingRecentRows;
+      const absoluteBackendRow = Math.floor(sparsePageOffset / columnCount) + backendRow;
+
+      return getGallerySparseRowKey(absoluteBackendRow);
+    },
+    [
+      backendRowCount,
+      columnCount,
+      leadingRecentRows,
+      rows,
+      sparsePageOffset,
+      sparseListing,
+      sparseRecentAtTop,
+      sparseRecentItems,
+      sparseRecentRowCount,
+      usesSparseListing,
+    ]
+  );
   const getScrollElement = useCallback(() => viewportRef.current, []);
 
   const progressLayout = getGalleryProgressLayout({
@@ -318,14 +454,166 @@ export const GalleryImageGrid = () => {
     tileSize: cellSizePx,
   });
   const pinnedHeight = getGalleryPinnedHeightPx(progressLayout.height, starredLayout.height);
+  const currentSparseGeometry = { columnCount, leadingRecentRows, pinnedHeight, rowHeightPx };
+  const lastMeasuredSparseGeometryRef = useRef(currentSparseGeometry);
+  const sparseScrollAnchorRef = useRef<{
+    absoluteIndex: number;
+    itemKey: GalleryItemKey;
+    viewportOffsetPx: number;
+  } | null>(null);
+  const sparsePositionSnapshotRef = useRef<{
+    filterIdentity: string;
+    itemKeys: ReadonlyMap<number, GalleryItemKey>;
+    pageOffset: number;
+    total: number | null;
+  } | null>(null);
+  const handleVirtualizerChange = useCallback(
+    (instance: { getVirtualItems: () => readonly { index: number }[] }) => {
+      if (!usesSparseListing || !sparseListing) {
+        return;
+      }
+
+      const visibleItems = instance.getVirtualItems();
+      const viewport = viewportRef.current;
+      const previousGeometry = lastMeasuredSparseGeometryRef.current;
+      const canCaptureAnchor =
+        previousGeometry.columnCount === columnCount &&
+        previousGeometry.leadingRecentRows === leadingRecentRows &&
+        previousGeometry.pinnedHeight === pinnedHeight &&
+        previousGeometry.rowHeightPx === rowHeightPx;
+
+      if (viewport && canCaptureAnchor) {
+        for (const visibleRow of visibleItems) {
+          const rowTop = pinnedHeight + visibleRow.index * rowHeightPx;
+
+          if (rowTop + rowHeightPx <= viewport.scrollTop) {
+            continue;
+          }
+
+          const isRecentRow = sparseRecentAtTop
+            ? visibleRow.index < sparseRecentRowCount
+            : visibleRow.index >= backendRowCount;
+
+          if (isRecentRow) {
+            continue;
+          }
+
+          const backendRow = visibleRow.index - leadingRecentRows;
+          const firstLocalIndex = backendRow * columnCount;
+          let capturedAnchor = false;
+
+          for (let column = 0; column < columnCount; column += 1) {
+            const localIndex = firstLocalIndex + column;
+            const item = sparseListing.itemSlots.get(localIndex);
+
+            if (item) {
+              sparseScrollAnchorRef.current = {
+                absoluteIndex: sparsePageOffset + localIndex,
+                itemKey: toGalleryItemKey(item),
+                viewportOffsetPx: rowTop - viewport.scrollTop,
+              };
+              capturedAnchor = true;
+              break;
+            }
+          }
+
+          if (capturedAnchor) {
+            break;
+          }
+        }
+      }
+
+      if (isSparsePaginated || !setVisibleRange) {
+        return;
+      }
+
+      const firstRow = visibleItems[0]?.index;
+      const lastRow = visibleItems[visibleItems.length - 1]?.index;
+
+      if (firstRow === undefined || lastRow === undefined) {
+        return;
+      }
+
+      const firstBackendRow = Math.min(backendRowCount, Math.max(0, firstRow - leadingRecentRows));
+      const afterLastBackendRow = Math.min(backendRowCount, Math.max(0, lastRow - leadingRecentRows + 1));
+
+      if (afterLastBackendRow <= firstBackendRow) {
+        // Descending recents precede backend slot zero. Before count discovery, ascending recents keep page zero
+        // active; afterward the backend tail page reconciles ascending recent overlays with the authoritative list.
+        if (sparseRecentAtTop || sparseListing.total === null) {
+          setVisibleRange({ endIndexExclusive: GALLERY_PAGE_SIZE, startIndex: 0 });
+        } else {
+          const total = sparseListing.total ?? 0;
+          const tailPageOffset = total > 0 ? Math.floor((total - 1) / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE : total;
+          setVisibleRange({ endIndexExclusive: total, startIndex: tailPageOffset });
+        }
+        return;
+      }
+
+      const startIndex = Math.min(sparseListing.total ?? 0, firstBackendRow * columnCount);
+      const endIndexExclusive = Math.min(sparseListing.total ?? 0, afterLastBackendRow * columnCount);
+
+      setVisibleRange({ endIndexExclusive, startIndex });
+    },
+    [
+      backendRowCount,
+      columnCount,
+      leadingRecentRows,
+      isSparsePaginated,
+      pinnedHeight,
+      rowHeightPx,
+      setVisibleRange,
+      sparseListing,
+      sparsePageOffset,
+      sparseRecentAtTop,
+      sparseRecentRowCount,
+      usesSparseListing,
+    ]
+  );
   const virtualizer = useVirtualizer({
     count: rowCount,
     scrollMargin: pinnedHeight,
     estimateSize: estimateRowSize,
     getItemKey: getRowKey,
     getScrollElement,
+    onChange: handleVirtualizerChange,
     overscan: 4,
   });
+  const pendingSparseNavigationRef = useRef<{
+    filterIdentity: string;
+    index: number;
+    originItemKey: string | null;
+  } | null>(null);
+  const requestSparseAbsoluteIndex = useCallback(
+    (absoluteIndex: number) => {
+      if (!sparseListing || isSparsePaginated || !setVisibleRange) {
+        return;
+      }
+
+      if (absoluteIndex < 0 || (sparseListing.total !== null && absoluteIndex >= sparseListing.total)) {
+        return;
+      }
+
+      const pageOffset = Math.floor(absoluteIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+      setVisibleRange({
+        endIndexExclusive: Math.min(sparseListing.total ?? Number.POSITIVE_INFINITY, pageOffset + GALLERY_PAGE_SIZE),
+        startIndex: pageOffset,
+      });
+      virtualizer.scrollToIndex(leadingRecentRows + Math.floor(absoluteIndex / columnCount));
+    },
+    [columnCount, isSparsePaginated, leadingRecentRows, setVisibleRange, sparseListing, virtualizer]
+  );
+  const handleNavigateToUnloadedSlot = useCallback(
+    (index: number) => {
+      pendingSparseNavigationRef.current = {
+        filterIdentity: sparseFilterIdentity,
+        index,
+        originItemKey: cursorKey,
+      };
+      requestSparseAbsoluteIndex(index);
+    },
+    [cursorKey, requestSparseAbsoluteIndex, sparseFilterIdentity]
+  );
 
   const measureVirtualizer = useEffectEvent(() => {
     virtualizer.measure();
@@ -335,11 +623,36 @@ export const GalleryImageGrid = () => {
   // with compiler memoization.
   /** Returns whether the item had somewhere to scroll to — a collapsed strip has none. */
   const scrollToItemKey = (itemKey: GalleryItemKey): boolean => {
-    const rowIndex = getGalleryGridRowIndexForItemKey(gallery.items, itemKey, columnCount);
+    if (usesSparseListing && sparseListing) {
+      const recentIndex = sparseRecentItems.findIndex((item) => toGalleryItemKey(item) === itemKey);
 
-    if (rowIndex >= 0) {
-      virtualizer.scrollToIndex(rowIndex);
-      return true;
+      if (recentIndex >= 0) {
+        const recentRow = Math.floor(recentIndex / columnCount);
+        virtualizer.scrollToIndex(sparseRecentAtTop ? recentRow : backendRowCount + recentRow);
+
+        return true;
+      }
+
+      const rowIndex = getGallerySparseRowIndexForItemKey(
+        sparseListing.itemSlots,
+        itemKey,
+        columnCount,
+        leadingRecentRows
+      );
+
+      if (rowIndex >= 0) {
+        virtualizer.scrollToIndex(rowIndex);
+        return true;
+      }
+    }
+
+    if (!usesSparseListing) {
+      const rowIndex = getGalleryGridRowIndexForItemKey(gallery.items, itemKey, columnCount);
+
+      if (rowIndex >= 0) {
+        virtualizer.scrollToIndex(rowIndex);
+        return true;
+      }
     }
 
     // Strip cells sit in the pinned block at the top of the scroll content.
@@ -380,8 +693,33 @@ export const GalleryImageGrid = () => {
     cursorKey,
     loadedItems,
     navigationSections,
+    navigateToUnloadedSlot: handleNavigateToUnloadedSlot,
     scrollToEntry,
   });
+
+  const settlePendingSparseNavigation = useEffectEvent(() => {
+    const pending = pendingSparseNavigationRef.current;
+
+    if (!pending) {
+      return;
+    }
+
+    if (pending.filterIdentity !== sparseFilterIdentity || pending.originItemKey !== cursorKey) {
+      pendingSparseNavigationRef.current = null;
+      return;
+    }
+
+    const item = sparseListing?.itemSlots.get(pending.index);
+
+    if (item) {
+      pendingSparseNavigationRef.current = null;
+      actions.selectItem(item);
+    }
+  });
+
+  useEffect(() => {
+    settlePendingSparseNavigation();
+  }, [cursorKey, sparseFilterIdentity, sparseListing?.itemSlots]);
 
   // Only explicit reveals scroll. Retry while the item loads; retire the request when another selection supersedes
   // it.
@@ -393,6 +731,12 @@ export const GalleryImageGrid = () => {
     const pending = pendingRevealRef.current;
 
     if (!pending) {
+      return;
+    }
+
+    if (pending.accountEpoch !== captureAccountScope().epoch) {
+      pendingRevealRef.current = null;
+
       return;
     }
 
@@ -430,13 +774,25 @@ export const GalleryImageGrid = () => {
   });
 
   useEffect(() => {
-    if (revealRequest && revealRequest.token !== consumedRevealTokenRef.current) {
+    if (revealRequest && revealRequest.accountEpoch !== captureAccountScope().epoch) {
+      if (pendingRevealRef.current?.token === revealRequest.token) {
+        pendingRevealRef.current = null;
+      }
+    } else if (revealRequest && revealRequest.token !== consumedRevealTokenRef.current) {
       consumedRevealTokenRef.current = revealRequest.token;
       pendingRevealRef.current = revealRequest;
+
+      if (revealRequest.absoluteIndex !== undefined && sparseListing && !isSparsePaginated) {
+        const indexedItem = sparseListing.itemSlots.get(revealRequest.absoluteIndex);
+
+        if (!indexedItem || toGalleryItemKey(indexedItem) !== revealRequest.itemKey) {
+          requestSparseAbsoluteIndex(revealRequest.absoluteIndex);
+        }
+      }
     }
 
     settlePendingReveal();
-  }, [revealRequest, navigationSections]);
+  }, [isSparsePaginated, navigationSections, requestSparseAbsoluteIndex, revealRequest, sparseListing]);
 
   useLayoutEffect(() => {
     const viewport = viewportRef.current;
@@ -470,18 +826,127 @@ export const GalleryImageGrid = () => {
 
   // Measure before paint after row-model changes: unchanged visible indices otherwise leave stale offsets despite
   // new row estimates.
-  useLayoutEffect(() => {
+  const restoreSparseScrollAnchor = useEffectEvent(() => {
+    const viewport = viewportRef.current;
+    const previousGeometry = lastMeasuredSparseGeometryRef.current;
+    const geometryChanged =
+      previousGeometry.columnCount !== columnCount ||
+      previousGeometry.leadingRecentRows !== leadingRecentRows ||
+      previousGeometry.pinnedHeight !== pinnedHeight ||
+      previousGeometry.rowHeightPx !== rowHeightPx;
+
     measureVirtualizer();
-  }, [rowHeightPx, rows, pinnedHeight]);
+
+    if (usesSparseListing && sparseListing) {
+      const pageOffset = isSparsePaginated ? sparsePageOffset : 0;
+      const itemKeys = new Map(
+        [...sparseListing.itemSlots.entries()].map(([index, item]) => [index, toGalleryItemKey(item)])
+      );
+      const currentSnapshot = {
+        filterIdentity: sparseFilterIdentity,
+        itemKeys,
+        pageOffset,
+        total: sparseListing.total,
+      };
+      const previousSnapshot = sparsePositionSnapshotRef.current;
+      const listingIdentityChanged =
+        previousSnapshot !== null &&
+        (previousSnapshot.filterIdentity !== currentSnapshot.filterIdentity ||
+          previousSnapshot.pageOffset !== currentSnapshot.pageOffset);
+      const positionsChanged =
+        previousSnapshot !== null &&
+        (previousSnapshot.total !== currentSnapshot.total ||
+          previousSnapshot.itemKeys.size !== itemKeys.size ||
+          [...previousSnapshot.itemKeys].some(([index, itemKey]) => itemKeys.get(index) !== itemKey));
+
+      if (listingIdentityChanged) {
+        // Search and page navigation deliberately choose a new viewport. Do not carry an anchor across them.
+        sparseScrollAnchorRef.current = null;
+      } else if ((geometryChanged || positionsChanged) && viewport) {
+        const anchor = sparseScrollAnchorRef.current;
+
+        if (anchor) {
+          const loadedMatch = [...sparseListing.itemSlots.entries()].find(
+            ([, item]) => toGalleryItemKey(item) === anchor.itemKey
+          );
+          const anchorPageOffset = isSparsePaginated
+            ? sparsePageOffset
+            : Math.floor(anchor.absoluteIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+          const anchorPageState = sparseListing.pageStates.get(anchorPageOffset);
+          const nearbyMatch =
+            !loadedMatch && positionsChanged && anchorPageState && !anchorPageState.error && !anchorPageState.isLoading
+              ? [...sparseListing.itemSlots.entries()]
+                  .map(([index, item]) => ({
+                    absoluteIndex: isSparsePaginated ? sparsePageOffset + index : index,
+                    item,
+                    localIndex: index,
+                  }))
+                  .sort(
+                    (left, right) =>
+                      Math.abs(left.absoluteIndex - anchor.absoluteIndex) -
+                        Math.abs(right.absoluteIndex - anchor.absoluteIndex) || left.absoluteIndex - right.absoluteIndex
+                  )[0]
+              : undefined;
+          const target = loadedMatch
+            ? {
+                absoluteIndex: isSparsePaginated ? sparsePageOffset + loadedMatch[0] : loadedMatch[0],
+                item: loadedMatch[1],
+                localIndex: loadedMatch[0],
+              }
+            : nearbyMatch;
+
+          // A missing anchor is meaningful only after its own page has settled successfully. A page that left the
+          // active sparse range, is still loading, or failed a refetch may simply have been temporarily evicted.
+          if (target) {
+            const rowIndex = leadingRecentRows + Math.floor(target.localIndex / columnCount);
+            const rowTop = pinnedHeight + rowIndex * rowHeightPx;
+            const nextScrollTop = Math.max(0, rowTop - anchor.viewportOffsetPx);
+
+            if (target.absoluteIndex !== anchor.absoluteIndex || geometryChanged) {
+              viewport.scrollTop = nextScrollTop;
+            }
+            sparseScrollAnchorRef.current = {
+              absoluteIndex: target.absoluteIndex,
+              itemKey: toGalleryItemKey(target.item),
+              viewportOffsetPx: rowTop - viewport.scrollTop,
+            };
+          }
+        }
+      }
+
+      sparsePositionSnapshotRef.current = currentSnapshot;
+    } else {
+      sparsePositionSnapshotRef.current = null;
+    }
+
+    lastMeasuredSparseGeometryRef.current = { columnCount, leadingRecentRows, pinnedHeight, rowHeightPx };
+  });
+
+  useLayoutEffect(() => {
+    restoreSparseScrollAnchor();
+  }, [
+    columnCount,
+    isSparsePaginated,
+    leadingRecentRows,
+    pinnedHeight,
+    rowHeightPx,
+    rows,
+    sparseFilterIdentity,
+    sparseListing?.itemSlots,
+    sparseListing?.pageStates,
+    sparseListing?.total,
+    sparsePageOffset,
+    usesSparseListing,
+  ]);
 
   const virtualRows = virtualizer.virtualItems;
   const lastVisibleRowIndex = virtualRows[virtualRows.length - 1]?.index ?? 0;
 
   useEffect(() => {
-    if (paginationMode === 'infinite' && rowCount > 0 && lastVisibleRowIndex >= rowCount - 2) {
+    if (!usesSparseListing && paginationMode === 'infinite' && rowCount > 0 && lastVisibleRowIndex >= rowCount - 2) {
       actions.loadMore();
     }
-  }, [actions, lastVisibleRowIndex, paginationMode, rowCount]);
+  }, [actions, lastVisibleRowIndex, paginationMode, rowCount, usesSparseListing]);
 
   const handleDragEnter = useCallback((event: DragEvent) => {
     if (!dragEventContainsFiles(event)) {
@@ -563,12 +1028,12 @@ export const GalleryImageGrid = () => {
   const handleReturnToBoardTop = useCallback(() => galleryCommands.setPage(0), [galleryCommands]);
 
   const renderCell = useCallback(
-    (item: GalleryItem) => {
+    (item: GalleryItem, slotKey: string = toGalleryItemKey(item)) => {
       const itemKey = toGalleryItemKey(item);
 
       return (
         <GalleryThumbnailCell
-          key={itemKey}
+          key={slotKey}
           alwaysShowDimensions={showImageDimensions}
           dragScope={region}
           compareRole={
@@ -609,9 +1074,19 @@ export const GalleryImageGrid = () => {
   );
 
   const anchoredWindowFirstItem = gallery.anchoredWindowPage * GALLERY_PAGE_SIZE + 1;
+  const initialSparsePageState = sparseListing?.pageStates.get(isSparsePaginated ? sparsePageOffset : 0);
 
   return (
     <Stack flex="1" gap="0" h="full" minH="0" minW="0" w="full">
+      {sparsePageErrors.length > 0 ? (
+        <Stack borderBottomWidth="1px" borderColor="border.subtle" flexShrink="0" gap="1" px="2" py="1">
+          {sparsePageErrors.map(({ pageOffset, pageState }) => (
+            <Box key={pageOffset} data-gallery-page-error={pageOffset}>
+              <GalleryPageError pageState={pageState} />
+            </Box>
+          ))}
+        </Stack>
+      ) : null}
       <Box
         ref={syncRangeInteractionContext}
         flex="1"
@@ -626,7 +1101,7 @@ export const GalleryImageGrid = () => {
         onDragOver={handleDragOver}
         onDrop={handleDrop}
       >
-        {gallery.anchoredWindowPage > 0 ? (
+        {gallery.anchoredWindowPage > 0 && !usesSparseListing ? (
           <Flex align="center" bg="bg.panel" gap="2" justify="space-between" px="2" py="1">
             <Text color="fg.muted" fontSize="2xs" truncate>
               {t('widgets.gallery.windowAnchored', { index: anchoredWindowFirstItem })}
@@ -668,15 +1143,21 @@ export const GalleryImageGrid = () => {
                 </Box>
               ) : null}
               {isEmpty ? (
-                gallery.isLoading || hasActiveSearch || isVirtualBoard || gallery.starredOnly ? (
+                gallery.isLoading ||
+                hasActiveSearch ||
+                isVirtualBoard ||
+                gallery.starredOnly ||
+                initialSparsePageState?.error ? (
                   <Flex align="center" color="fg.muted" flex="1" justify="center" minH="8rem">
-                    <Text fontSize="xs">
-                      {gallery.isLoading
-                        ? t('widgets.gallery.loadingBackendGallery')
-                        : gallery.starredOnly && gallery.semanticImageQuery === null
-                          ? t('widgets.gallery.noStarredItemsMatch')
-                          : t('widgets.gallery.noImagesMatch')}
-                    </Text>
+                    {initialSparsePageState?.error ? null : (
+                      <Text fontSize="xs">
+                        {gallery.isLoading
+                          ? t('widgets.gallery.loadingBackendGallery')
+                          : gallery.starredOnly && gallery.semanticImageQuery === null
+                            ? t('widgets.gallery.noStarredItemsMatch')
+                            : t('widgets.gallery.noImagesMatch')}
+                      </Text>
+                    )}
                   </Flex>
                 ) : (
                   // No inset: the zone shares the thumbnails' outer edges.
@@ -713,6 +1194,84 @@ export const GalleryImageGrid = () => {
                       w="full"
                     >
                       {virtualRows.map((virtualRow) => {
+                        if (usesSparseListing && sparseListing) {
+                          const recentRow = sparseRecentAtTop ? virtualRow.index : virtualRow.index - backendRowCount;
+                          const isRecentRow = sparseRecentAtTop
+                            ? virtualRow.index < sparseRecentRowCount
+                            : virtualRow.index >= backendRowCount;
+
+                          if (isRecentRow) {
+                            const firstRecentIndex = recentRow * columnCount;
+                            const recentRowItems = sparseRecentItems.slice(
+                              firstRecentIndex,
+                              firstRecentIndex + columnCount
+                            );
+
+                            return (
+                              <Box
+                                key={virtualRow.key}
+                                data-gallery-section="recent"
+                                display="grid"
+                                gap={`${GALLERY_GRID_GAP_PX}px`}
+                                gridTemplateColumns={`repeat(${columnCount}, minmax(0, 1fr))`}
+                                h={`${cellSizePx}px`}
+                                left="0"
+                                position="absolute"
+                                role="presentation"
+                                top="0"
+                                transform={`translateY(${virtualRow.start - pinnedHeight}px)`}
+                                w="full"
+                              >
+                                {recentRowItems.map((item) =>
+                                  renderCell(item, `recent-slot:${toGalleryItemKey(item)}`)
+                                )}
+                              </Box>
+                            );
+                          }
+
+                          const backendRow = virtualRow.index - leadingRecentRows;
+                          const firstItemIndex = backendRow * columnCount;
+                          const itemCount = Math.max(0, Math.min(columnCount, sparseBackendItemCount - firstItemIndex));
+                          const cells = Array.from({ length: itemCount }, (_, column) => {
+                            const itemIndex = firstItemIndex + column;
+                            const item = sparseListing.itemSlots.get(itemIndex);
+                            const absoluteItemIndex = sparsePageOffset + itemIndex;
+
+                            if (item) {
+                              return renderCell(item, getGallerySparseSlotKey(absoluteItemIndex));
+                            }
+
+                            const pageOffset = Math.floor(absoluteItemIndex / GALLERY_PAGE_SIZE) * GALLERY_PAGE_SIZE;
+
+                            return (
+                              <GallerySparseSlot
+                                key={getGallerySparseSlotKey(absoluteItemIndex)}
+                                cellSizePx={cellSizePx}
+                                pageState={sparseListing.pageStates.get(pageOffset)}
+                              />
+                            );
+                          });
+
+                          return (
+                            <Box
+                              key={virtualRow.key}
+                              data-gallery-section="regular"
+                              display="grid"
+                              gap={`${GALLERY_GRID_GAP_PX}px`}
+                              gridTemplateColumns={`repeat(${columnCount}, minmax(0, 1fr))`}
+                              h={`${cellSizePx}px`}
+                              left="0"
+                              position="absolute"
+                              role="presentation"
+                              top="0"
+                              transform={`translateY(${virtualRow.start - pinnedHeight}px)`}
+                              w="full"
+                            >
+                              {cells}
+                            </Box>
+                          );
+                        }
+
                         const row = rows[virtualRow.index];
 
                         if (!row) {
@@ -733,18 +1292,21 @@ export const GalleryImageGrid = () => {
                             transform={`translateY(${virtualRow.start - pinnedHeight}px)`}
                             w="full"
                           >
-                            {row.cells.map(renderCell)}
+                            {row.cells.map((item) => renderCell(item))}
                           </Box>
                         );
                       })}
                     </Box>
                   </Box>
-                  {paginationMode === 'infinite' && gallery.isLoading && gallery.items.length > 0 && (
-                    <Flex align="center" justify="center" py="2">
-                      <Spinner color="fg.subtle" size="xs" />
-                    </Flex>
-                  )}
-                  {paginationMode === 'infinite' && !gallery.isLoading && isWindowTruncated && (
+                  {!usesSparseListing &&
+                    paginationMode === 'infinite' &&
+                    gallery.isLoading &&
+                    gallery.items.length > 0 && (
+                      <Flex align="center" justify="center" py="2">
+                        <Spinner color="fg.subtle" size="xs" />
+                      </Flex>
+                    )}
+                  {!usesSparseListing && paginationMode === 'infinite' && !gallery.isLoading && isWindowTruncated && (
                     <Flex align="center" justify="center" py="3">
                       <Text color="fg.subtle" fontSize="xs" textAlign="center">
                         {gallery.anchoredWindowPage > 0

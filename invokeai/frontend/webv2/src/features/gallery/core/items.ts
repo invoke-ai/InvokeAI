@@ -43,6 +43,10 @@ export type GalleryItem = GalleryImageItem | GalleryVideoItem;
 
 export interface GalleryItemsPage {
   items: GalleryItem[];
+  /** Absolute list offset requested for this page. Omitted only by legacy fixtures/cache entries. */
+  offset?: number;
+  /** Absolute slot for each item, kept aligned with `items`; sparse hydration leaves index gaps. */
+  itemIndices?: number[];
   total: number;
 }
 
