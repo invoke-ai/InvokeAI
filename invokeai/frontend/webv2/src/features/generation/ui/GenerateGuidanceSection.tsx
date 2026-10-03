@@ -58,7 +58,9 @@ export const GenerateGuidanceSection = ({
       ) : null}
       {activeCount > 0 ? (
         <Badge size="xs" variant="surface">
-          {t('widgets.generate.activeCount', { count: activeCount })}
+          {activeCount === totalCount
+            ? t('widgets.generate.activeCount', { count: activeCount })
+            : t('widgets.generate.activeOfTotal', { active: activeCount, total: totalCount })}
         </Badge>
       ) : totalCount > 0 ? (
         <Badge size="xs" variant="surface">

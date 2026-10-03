@@ -2186,6 +2186,7 @@
     "generate": {
       "activeCount_one": "{{count}} active",
       "activeCount_other": "{{count}} active",
+      "activeOfTotal": "{{active}}/{{total}} active",
       "activeSteps": "Active steps",
       "addConcept": "Add concept",
       "addConceptsHelp": "Add LoRAs/concepts here to blend them into this generation.",
