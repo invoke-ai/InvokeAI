@@ -123,14 +123,14 @@ const UpscaleOutputPreflight = memo(
 
     return (
       <Stack bg="bg.subtle" gap="2" px="2.5" py="2" rounded="md">
-        <DataList.Root gap="1.5" orientation="horizontal" size="sm">
+        <DataList.Root gap="1.5" orientation="horizontal" size="md">
           <DataList.Item>
-            <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
+            <DataList.ItemLabel color="fg.subtle" fontSize="xs">
               {t('widgets.upscale.inputSize')}
             </DataList.ItemLabel>
             <DataList.ItemValue
               fontFamily="mono"
-              fontSize="xs"
+              fontSize="md"
               fontVariantNumeric="tabular-nums"
               justifyContent="flex-end"
             >
@@ -138,12 +138,12 @@ const UpscaleOutputPreflight = memo(
             </DataList.ItemValue>
           </DataList.Item>
           <DataList.Item>
-            <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
+            <DataList.ItemLabel color="fg.subtle" fontSize="xs">
               {t('widgets.upscale.scale')}
             </DataList.ItemLabel>
             <DataList.ItemValue
               fontFamily="mono"
-              fontSize="xs"
+              fontSize="md"
               fontVariantNumeric="tabular-nums"
               justifyContent="flex-end"
             >
@@ -151,12 +151,12 @@ const UpscaleOutputPreflight = memo(
             </DataList.ItemValue>
           </DataList.Item>
           <DataList.Item>
-            <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
+            <DataList.ItemLabel color="fg.subtle" fontSize="xs">
               {t('widgets.upscale.outputSize')}
             </DataList.ItemLabel>
             <DataList.ItemValue
               fontFamily="mono"
-              fontSize="xs"
+              fontSize="md"
               fontVariantNumeric="tabular-nums"
               fontWeight="semibold"
               justifyContent="flex-end"
@@ -165,12 +165,12 @@ const UpscaleOutputPreflight = memo(
             </DataList.ItemValue>
           </DataList.Item>
           <DataList.Item>
-            <DataList.ItemLabel color="fg.subtle" fontSize="2xs">
+            <DataList.ItemLabel color="fg.subtle" fontSize="xs">
               {t('widgets.upscale.outputMegapixels')}
             </DataList.ItemLabel>
             <DataList.ItemValue
               fontFamily="mono"
-              fontSize="xs"
+              fontSize="md"
               fontVariantNumeric="tabular-nums"
               fontWeight="semibold"
               gap="1.5"
@@ -178,7 +178,7 @@ const UpscaleOutputPreflight = memo(
             >
               {MEGAPIXEL_FORMATTER.format(outputMegapixels)} MP
               {isLargeOutput ? (
-                <Badge colorPalette="orange" fontFamily="body" size="xs" variant="surface">
+                <Badge colorPalette="orange" fontFamily="body" size="md" variant="surface">
                   {t('widgets.upscale.largeOutput')}
                 </Badge>
               ) : null}
@@ -190,7 +190,7 @@ const UpscaleOutputPreflight = memo(
             borderTopWidth="1px"
             borderColor="border.subtle"
             color="fg.warning"
-            fontSize="2xs"
+            fontSize="xs"
             pt="2"
             textWrap="pretty"
           >
@@ -442,7 +442,7 @@ export const UpscaleWidgetView = () => {
 
   const sharedBadge = useMemo(
     () => (
-      <Badge fontFamily="mono" size="xs">
+      <Badge fontFamily="mono" size="md">
         {t('widgets.upscale.shared')}
       </Badge>
     ),
@@ -471,7 +471,7 @@ export const UpscaleWidgetView = () => {
               invalid={!values.upscaleModel}
               modelTypes={SPANDREL_MODEL_TYPES}
               placeholder={t('widgets.upscale.selectSpandrelModel')}
-              size="xs"
+              size="md"
               value={values.upscaleModel?.key ?? null}
               onChange={set.spandrelModel}
             />
@@ -491,7 +491,7 @@ export const UpscaleWidgetView = () => {
           />
           <SegmentGroup.Root
             aria-label={t('widgets.upscale.presetsLabel')}
-            size="xs"
+            size="md"
             value={activePresetId}
             w="full"
             onValueChange={applyPreset}
@@ -510,7 +510,7 @@ export const UpscaleWidgetView = () => {
                 <SegmentGroup.Item key={id} flex="1" minW="0" value={id}>
                   <SegmentGroup.ItemHiddenInput />
                   <Tooltip content={tooltipContent}>
-                    <SegmentGroup.ItemText fontSize="xs">{t(`widgets.upscale.presets.${id}`)}</SegmentGroup.ItemText>
+                    <SegmentGroup.ItemText fontSize="md">{t(`widgets.upscale.presets.${id}`)}</SegmentGroup.ItemText>
                   </Tooltip>
                 </SegmentGroup.Item>
               );
@@ -571,7 +571,7 @@ export const UpscaleWidgetView = () => {
               invalid={!values.model}
               modelTypes={MAIN_MODEL_TYPES}
               placeholder={t('widgets.upscale.selectMainModel')}
-              size="xs"
+              size="md"
               value={values.model?.key ?? null}
               onChange={selectMainModel}
             />
@@ -603,7 +603,7 @@ export const UpscaleWidgetView = () => {
             <Combobox
               aria-label={t('widgets.upscale.scheduler')}
               options={SCHEDULER_OPTIONS}
-              size="xs"
+              size="md"
               value={values.scheduler}
               onValueChange={set.scheduler}
             />
@@ -623,7 +623,7 @@ export const UpscaleWidgetView = () => {
               modelTypes={LORA_MODEL_TYPES}
               placeholder={t('widgets.upscale.searchCompatibleConcepts')}
               scopeLabel={t('models.scopeConcepts')}
-              size="xs"
+              size="md"
               value={null}
               onChange={addLora}
             />
@@ -658,7 +658,7 @@ export const UpscaleWidgetView = () => {
                 invalid={!values.tileControlnetModel}
                 modelTypes={CONTROLNET_MODEL_TYPES}
                 placeholder={t('widgets.upscale.selectTileControlNet')}
-                size="xs"
+                size="md"
                 value={values.tileControlnetModel?.key ?? null}
                 onChange={setTileControlNet}
               />
@@ -675,7 +675,7 @@ export const UpscaleWidgetView = () => {
                   invalid={!values.t5EncoderModel}
                   modelTypes={T5_ENCODER_MODEL_TYPES}
                   placeholder={t('widgets.upscale.selectT5Encoder')}
-                  size="xs"
+                  size="md"
                   value={values.t5EncoderModel?.key ?? null}
                   onChange={setT5Encoder}
                 />
@@ -689,7 +689,7 @@ export const UpscaleWidgetView = () => {
                   invalid={!values.clipEmbedModel}
                   modelTypes={CLIP_EMBED_MODEL_TYPES}
                   placeholder={t('widgets.upscale.selectClipEmbed')}
-                  size="xs"
+                  size="md"
                   value={values.clipEmbedModel?.key ?? null}
                   onChange={setClipEmbed}
                 />
@@ -732,7 +732,7 @@ export const UpscaleWidgetView = () => {
                 isClearable={!showComponentPickers}
                 modelTypes={VAE_MODEL_TYPES}
                 placeholder={showComponentPickers ? t('widgets.upscale.selectVae') : t('widgets.upscale.bundledVae')}
-                size="xs"
+                size="md"
                 value={values.vae?.key ?? null}
                 onChange={set.vae}
               />
@@ -741,7 +741,7 @@ export const UpscaleWidgetView = () => {
               <Select
                 aria-label={t('widgets.upscale.vaePrecision')}
                 collection={VAE_PRECISION_COLLECTION}
-                size="xs"
+                size="md"
                 value={vaePrecisionValue}
                 onValueChange={set.vaePrecision}
               />

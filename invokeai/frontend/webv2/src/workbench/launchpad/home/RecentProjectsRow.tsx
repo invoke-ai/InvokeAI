@@ -27,10 +27,10 @@ export const RecentProjectsRow = ({
   return (
     <Flex direction="column" gap="3">
       <Flex align="center" justify="space-between">
-        <Text fontSize="xs" fontWeight="700">
+        <Text fontSize="md" fontWeight="700">
           {t('launchpad.home.recentProjects')}
         </Text>
-        <Button asChild size="xs" variant="ghost">
+        <Button asChild size="md" variant="ghost">
           <Link to="/projects">
             {t('launchpad.home.viewAllProjects')}
             <ArrowRightIcon />

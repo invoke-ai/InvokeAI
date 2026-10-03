@@ -22,7 +22,7 @@ const ConnectionChip = () => {
   }
 
   return (
-    <Badge aria-live="polite" colorPalette={status === 'disconnected' ? 'red' : 'gray'} size="md" variant="subtle">
+    <Badge aria-live="polite" colorPalette={status === 'disconnected' ? 'red' : 'gray'} size="xl" variant="subtle">
       <Box aria-hidden bg="currentColor" boxSize="1.5" rounded="full" />
       {t(CONNECTION_LABEL_KEY[status])}
     </Badge>
@@ -42,7 +42,7 @@ export const LaunchpadTopBar = () => (
   >
     <HStack gap="3">
       <InvokeMark size={20} />
-      <Text fontSize="sm" fontWeight="700">
+      <Text fontSize="lg" fontWeight="700">
         Invoke
       </Text>
     </HStack>

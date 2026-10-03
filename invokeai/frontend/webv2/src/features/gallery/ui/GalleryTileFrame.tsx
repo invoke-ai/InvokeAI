@@ -74,7 +74,7 @@ export const GalleryTileFrame = ({
           opacity={alwaysShowDimensions ? 1 : 0}
           pointerEvents="none"
           position="absolute"
-          size="xs"
+          size="md"
           transition={BADGE_TRANSITION}
           variant="solid"
           zIndex="1"
@@ -91,7 +91,7 @@ export const GalleryTileFrame = ({
           insetInlineStart="1"
           pointerEvents="none"
           position="absolute"
-          size="xs"
+          size="md"
           variant="solid"
           zIndex="1"
         >

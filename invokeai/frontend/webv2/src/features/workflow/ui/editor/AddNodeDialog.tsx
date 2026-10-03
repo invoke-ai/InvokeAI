@@ -232,15 +232,15 @@ const NodeResultRow = ({
               <Icon as={HammerIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
             </Tooltip>
           ) : null}
-          <MiddleTruncate fontSize="xs" fontWeight="600" text={row.title} />
+          <MiddleTruncate fontSize="md" fontWeight="600" text={row.title} />
         </HStack>
         {row.description ? (
-          <Text color="fg.subtle" fontSize="2xs" lineClamp={2} lineHeight="1.4">
+          <Text color="fg.subtle" fontSize="xs" lineClamp={2} lineHeight="1.4">
             {row.description}
           </Text>
         ) : null}
       </Stack>
-      <Badge size="xs" variant="outline" fontFamily="mono">
+      <Badge size="md" variant="outline" fontFamily="mono">
         {row.nodePack}
       </Badge>
     </HStack>
@@ -293,10 +293,10 @@ const CategoryHeaderRow = ({
           transform={isExpanded ? 'rotate(0deg)' : 'rotate(-90deg)'}
           transition="transform var(--wb-motion-duration-fast) ease-out"
         />
-        <Text flex="1" fontSize="xs" fontWeight="700">
+        <Text flex="1" fontSize="md" fontWeight="700">
           {group.label}
         </Text>
-        <Badge size="sm" variant="surface" fontFamily="mono">
+        <Badge size="lg" variant="surface" fontFamily="mono">
           {group.rows.length}
         </Badge>
       </HStack>
@@ -663,13 +663,13 @@ const AddNodeDialogContent = ({
 
   if (status !== 'loaded') {
     body = (
-      <Text color={status === 'error' ? 'fg.error' : 'fg.subtle'} fontSize="xs" px="1" py="4">
+      <Text color={status === 'error' ? 'fg.error' : 'fg.subtle'} fontSize="md" px="1" py="4">
         {status === 'error' ? (error ?? 'Failed to load node definitions.') : 'Loading node definitions…'}
       </Text>
     );
   } else if (totalCount === 0) {
     body = (
-      <Text color="fg.subtle" fontSize="xs" px="1" py="4" textAlign="center">
+      <Text color="fg.subtle" fontSize="md" px="1" py="4" textAlign="center">
         {connectionFilter
           ? `No compatible ${getConnectionFilterName(connectionFilter)} nodes.`
           : 'No nodes match your search.'}
@@ -717,7 +717,7 @@ const AddNodeDialogContent = ({
                       : 'Search for nodes…'
                   }
                   role="combobox"
-                  size="sm"
+                  size="lg"
                   value={searchTerm}
                   onChange={onSearchChange}
                   onKeyDown={onSearchKeyDown}
@@ -726,7 +726,7 @@ const AddNodeDialogContent = ({
                   <Tooltip content={isAllExpanded ? 'Collapse All' : 'Expand All'}>
                     <IconButton
                       aria-label={isAllExpanded ? 'Collapse all categories' : 'Expand all categories'}
-                      size="sm"
+                      size="lg"
                       variant="ghost"
                       onClick={toggleAllCategories}
                     >
@@ -735,7 +735,7 @@ const AddNodeDialogContent = ({
                   </Tooltip>
                 ) : null}
               </HStack>
-              <ScrollArea.Root flex="1" minH="0" size="xs" variant="hover" w="full">
+              <ScrollArea.Root flex="1" minH="0" size="md" variant="hover" w="full">
                 <ScrollArea.Viewport ref={setScrollElement} h="full" w="full">
                   <ScrollArea.Content id={RESULT_LIST_ID} aria-label="Node search results" role="tree" w="full">
                     {body}

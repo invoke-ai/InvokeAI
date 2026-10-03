@@ -264,7 +264,7 @@ export const LayerGroupContextMenu = ({
             <Menu.TriggerItem aria-label={t('widgets.layers.menu.addAdjustment')}>
               <HStack gap="2" minW="0" w="full">
                 <Icon as={SlidersHorizontalIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-                <Text flex="1" fontSize="xs">
+                <Text flex="1" fontSize="md">
                   {t('widgets.layers.menu.addAdjustment')}
                 </Text>
                 <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
@@ -317,7 +317,7 @@ export const LayerGroupContextMenu = ({
           <Menu.TriggerItem aria-label={t('widgets.layers.menu.colorLabel')}>
             <HStack gap="2" minW="0" w="full">
               <Icon as={PaletteIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-              <Text flex="1" fontSize="xs">
+              <Text flex="1" fontSize="md">
                 {t('widgets.layers.menu.colorLabel')}
               </Text>
               <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />

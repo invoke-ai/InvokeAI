@@ -77,11 +77,11 @@ export const GallerySelectionBar = () => {
       aria-label={t('widgets.gallery.selectionActions')}
       w="full"
     >
-      <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums" me="auto">
+      <Text color="fg.muted" fontSize="md" fontVariantNumeric="tabular-nums" me="auto">
         {t('widgets.gallery.selectionCount', { count: selectionCount })}
       </Text>
       <Tooltip content={starLabel}>
-        <IconButton aria-label={starLabel} size="2xs" variant="ghost" onClick={handleToggleStarred}>
+        <IconButton aria-label={starLabel} size="sm" variant="ghost" onClick={handleToggleStarred}>
           <Icon as={StarIcon} boxSize="3.5" fill={shouldStar ? 'none' : 'currentColor'} />
         </IconButton>
       </Tooltip>
@@ -91,7 +91,7 @@ export const GallerySelectionBar = () => {
             <IconButton
               aria-label={t('widgets.gallery.moveSelectionToBoard')}
               disabled={moveTargets.length === 0}
-              size="2xs"
+              size="sm"
               variant="ghost"
             >
               <Icon as={FolderInputIcon} boxSize="3.5" />
@@ -111,7 +111,7 @@ export const GallerySelectionBar = () => {
       <Tooltip content={t('widgets.gallery.downloadSelection')}>
         <IconButton
           aria-label={t('widgets.gallery.downloadSelection')}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={handleDownload}
         >
@@ -122,7 +122,7 @@ export const GallerySelectionBar = () => {
         <IconButton
           aria-label={t('widgets.gallery.deleteSelection')}
           colorPalette="red"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={handleDelete}
         >

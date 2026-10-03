@@ -34,9 +34,9 @@ export const GalleryItemSortMenu = () => {
             aria-label={t('widgets.gallery.imageSort')}
             color="fg.muted"
             flexShrink={0}
-            fontSize="xs"
+            fontSize="md"
             gap="1"
-            size="xs"
+            size="md"
             variant="ghost"
           >
             {imageOrderDir === 'DESC' ? t('widgets.gallery.newest') : t('widgets.gallery.oldest')}

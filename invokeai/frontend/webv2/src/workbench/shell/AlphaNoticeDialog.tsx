@@ -50,8 +50,8 @@ export const AlphaNoticeDialog = () => {
             </Dialog.Header>
             <Dialog.Body>
               <Stack gap="2">
-                <Text fontSize="xs">{t('alphaNotice.body')}</Text>
-                <Text fontSize="xs">
+                <Text fontSize="md">{t('alphaNotice.body')}</Text>
+                <Text fontSize="md">
                   {t('alphaNotice.reportPrefix')}{' '}
                   <Link color="accent.fg" href={ISSUES_URL} rel="noreferrer" target="_blank">
                     {t('alphaNotice.reportLink')}
@@ -61,7 +61,7 @@ export const AlphaNoticeDialog = () => {
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button ref={dismissRef} colorPalette="accent" size="xs" variant="solid" onClick={acknowledge}>
+              <Button ref={dismissRef} colorPalette="accent" size="md" variant="solid" onClick={acknowledge}>
                 {t('alphaNotice.dismiss')}
               </Button>
             </Dialog.Footer>

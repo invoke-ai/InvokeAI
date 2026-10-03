@@ -140,7 +140,7 @@ export const ModelDetail = ({ modelKey, onDeleted }: { modelKey: string; onDelet
   if (!model) {
     return (
       <Stack align="start" gap="2" p="1">
-        <Text color="fg.subtle" fontSize="xs">
+        <Text color="fg.subtle" fontSize="md">
           {t('models.modelNoLongerInLibrary')}
         </Text>
       </Stack>
@@ -225,7 +225,7 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
           onUpdated={() => notify.success(t('models.modelImageUpdated'))}
         />
         <Stack flex="1" gap="1" minW="0">
-          <Text fontSize="sm" fontWeight="700" lineClamp={2}>
+          <Text fontSize="lg" fontWeight="700" lineClamp={2}>
             {model.name}
           </Text>
           <HStack gap="1" minW="0" wrap="wrap">
@@ -235,13 +235,13 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
           {isMissing ? (
             <HStack gap="1.5">
               <MissingFileBadge />
-              <Text color="fg.subtle" fontSize="2xs">
+              <Text color="fg.subtle" fontSize="xs">
                 {t('models.fileNotFoundOnDisk')}
               </Text>
             </HStack>
           ) : null}
           {model.description ? (
-            <Text color="fg.muted" fontSize="2xs" lineClamp={3}>
+            <Text color="fg.muted" fontSize="xs" lineClamp={3}>
               {model.description}
             </Text>
           ) : null}
@@ -288,18 +288,18 @@ const ModelDetailActions = ({
   return (
     <HStack flexShrink={0} gap="1" wrap="wrap">
       {isConvertibleToDiffusers(model) ? (
-        <Button size="xs" variant="outline" onClick={() => setPendingAction({ kind: 'convert', model })}>
+        <Button size="md" variant="outline" onClick={() => setPendingAction({ kind: 'convert', model })}>
           <Icon as={HuggingFaceIcon} boxSize="3" />
           {t('models.convertToDiffusers')}
         </Button>
       ) : null}
-      <Button size="xs" variant={isEditing ? 'solid' : 'outline'} onClick={onToggleEditing}>
+      <Button size="md" variant={isEditing ? 'solid' : 'outline'} onClick={onToggleEditing}>
         <Icon as={PencilIcon} boxSize="3" />
         {isEditing ? t('models.editing') : t('common.edit')}
       </Button>
       <Menu.Root positioning={{ placement: 'bottom-end' }}>
         <Menu.Trigger asChild>
-          <IconButton aria-label={t('models.actions')} loading={isActionBusy} size="xs" variant="ghost">
+          <IconButton aria-label={t('models.actions')} loading={isActionBusy} size="md" variant="ghost">
             <Icon as={MoreHorizontalIcon} boxSize="4" />
           </IconButton>
         </Menu.Trigger>
@@ -425,7 +425,7 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
       action: canUpdatePath ? (
         <IconButton
           aria-label={t('models.updatePath')}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={() => setIsPathDialogOpen(true)}
         >
@@ -466,13 +466,13 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
 
   return (
     <>
-      <DataList.Root gap="2.5" orientation="horizontal" size="sm" variant="subtle">
+      <DataList.Root gap="2.5" orientation="horizontal" size="md" variant="subtle">
         {attributes.map((attribute) => (
           <DataList.Item key={attribute.label}>
-            <DataList.ItemLabel color="fg.subtle" fontSize="2xs" minW="8rem" textTransform="uppercase">
+            <DataList.ItemLabel color="fg.subtle" fontSize="xs" minW="8rem" textTransform="uppercase">
               {attribute.label}
             </DataList.ItemLabel>
-            <DataList.ItemValue alignItems="center" display="flex" fontSize="2xs" gap="1" overflowWrap="anywhere">
+            <DataList.ItemValue alignItems="center" display="flex" fontSize="xs" gap="1" overflowWrap="anywhere">
               {attribute.href ? (
                 <chakra.a
                   alignItems="center"

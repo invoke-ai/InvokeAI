@@ -33,11 +33,11 @@ export const InstallSourceButton = ({
   if (isInstalled || installedModelKey !== null) {
     return (
       <HStack flexShrink={0} gap="1.5">
-        <Badge colorPalette="green" fontSize="2xs" size="sm" variant="surface">
+        <Badge colorPalette="green" fontSize="xs" size="lg" variant="surface">
           {t('models.installed')}
         </Badge>
         {installedModelKey !== null ? (
-          <Button size="2xs" variant="ghost" onClick={() => openModelDetail(installedModelKey)}>
+          <Button size="sm" variant="ghost" onClick={() => openModelDetail(installedModelKey)}>
             {t('models.viewModel')}
           </Button>
         ) : null}
@@ -48,11 +48,11 @@ export const InstallSourceButton = ({
   if (isInstalling) {
     return (
       <HStack flexShrink={0} gap="1.5">
-        <Badge colorPalette="blue" fontSize="2xs" size="sm" variant="surface">
+        <Badge colorPalette="blue" fontSize="xs" size="lg" variant="surface">
           <Spinner borderWidth="1.5px" boxSize="2.5" />
           {t('models.installing')}
         </Badge>
-        <Button size="2xs" variant="ghost" onClick={openInstallQueue}>
+        <Button size="sm" variant="ghost" onClick={openInstallQueue}>
           {t('models.viewQueue')}
         </Button>
       </HStack>
@@ -60,7 +60,7 @@ export const InstallSourceButton = ({
   }
 
   return (
-    <Button aria-label={t('models.installNamed', { name })} size="2xs" variant="outline" onClick={onInstall}>
+    <Button aria-label={t('models.installNamed', { name })} size="sm" variant="outline" onClick={onInstall}>
       <Icon as={DownloadIcon} boxSize="3" />
       {t('models.install')}
     </Button>

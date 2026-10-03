@@ -20,7 +20,7 @@ export interface GenerationModelSelectProps {
   placeholder?: string;
   scopeLabel?: string;
   showManagerButton?: boolean;
-  size?: 'xs' | 'sm' | 'md';
+  size?: 'md' | 'lg' | 'xl';
   value: string | null;
 }
 

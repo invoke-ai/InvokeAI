@@ -68,7 +68,7 @@ const ComponentPicker = ({
         isClearable
         modelTypes={modelTypes}
         placeholder={slot.placeholder ?? 'Model default'}
-        size="xs"
+        size="md"
         value={selectedValue}
         onChange={onChange}
       />

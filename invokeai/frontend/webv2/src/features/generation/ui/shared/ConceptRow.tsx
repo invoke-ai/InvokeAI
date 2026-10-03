@@ -172,7 +172,7 @@ export const ConceptRow = memo(function ConceptRow({
                 <IconButton
                   aria-label={t('widgets.generate.removeConceptNamed', { name })}
                   color="fg.muted"
-                  size="2xs"
+                  size="sm"
                   variant="ghost"
                   onClick={handleRemoveClick}
                 >
@@ -183,11 +183,11 @@ export const ConceptRow = memo(function ConceptRow({
           }
           badges={
             <>
-              <Badge colorPalette={models.getBaseColorPalette(lora.model.base)} size="xs" variant="surface">
+              <Badge colorPalette={models.getBaseColorPalette(lora.model.base)} size="md" variant="surface">
                 {models.getBaseLabel(lora.model.base)}
               </Badge>
               {isCompatible ? null : (
-                <Badge colorPalette="orange" size="xs" variant="surface">
+                <Badge colorPalette="orange" size="md" variant="surface">
                   {t('widgets.generate.incompatible')}
                 </Badge>
               )}
@@ -228,7 +228,7 @@ export const ConceptRow = memo(function ConceptRow({
               color="fg.subtle"
               flexShrink={0}
               shape="rounded"
-              size="sm"
+              size="xl"
             >
               {/* The fallback also covers a cover image that fails to load. */}
               <Avatar.Fallback>

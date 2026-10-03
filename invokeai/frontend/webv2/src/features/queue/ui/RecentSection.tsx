@@ -53,7 +53,7 @@ export const RecentSection = ({
       ) : null}
       <ListSectionHeader count={filtered.length} label={t('common.recent')} />
       {filtered.length === 0 ? (
-        <Text color={loadState === 'error' ? 'fg.error' : 'fg.subtle'} fontSize="2xs" px="2">
+        <Text color={loadState === 'error' ? 'fg.error' : 'fg.subtle'} fontSize="xs" px="2">
           {loadState === 'loading'
             ? t('widgets.queue.loading')
             : loadState === 'error'

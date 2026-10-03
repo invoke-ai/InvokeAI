@@ -77,12 +77,12 @@ export const VideoConceptsSection = memo(
             modelTypes={LORA_MODEL_TYPES}
             placeholder={t('widgets.video.addLora')}
             scopeLabel={t('models.scopeConcepts')}
-            size="xs"
+            size="md"
             value={null}
             onChange={addLora}
           />
           {loras.length === 0 ? (
-            <Text color="fg.muted" fontSize="2xs">
+            <Text color="fg.muted" fontSize="xs">
               {t('widgets.video.noLoras')}
             </Text>
           ) : (

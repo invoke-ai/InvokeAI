@@ -40,24 +40,24 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
         <Stack flex="1" gap="1.5" minW="0">
           <HStack gap="2" minW="0">
             <Icon as={BlocksIcon} boxSize="4" color="fg.muted" flexShrink={0} />
-            <MiddleTruncate fontSize="sm" fontWeight="700" minW="0" text={pack.name} />
+            <MiddleTruncate fontSize="lg" fontWeight="700" minW="0" text={pack.name} />
           </HStack>
-          <Text color="fg.muted" fontFamily="mono" fontSize="2xs" overflowWrap="anywhere">
+          <Text color="fg.muted" fontFamily="mono" fontSize="xs" overflowWrap="anywhere">
             {pack.path}
           </Text>
           <HStack gap="1.5" wrap="wrap">
             {isProblemPack(pack) ? (
-              <Badge colorPalette="orange" fontSize="2xs" variant="surface">
+              <Badge colorPalette="orange" fontSize="xs" variant="surface">
                 {t('nodes.noNodesRegistered')}
               </Badge>
             ) : (
-              <Badge colorPalette="blue" fontSize="2xs" variant="surface">
+              <Badge colorPalette="blue" fontSize="xs" variant="surface">
                 {t('nodes.nodeCount', { count: pack.nodeCount })}
               </Badge>
             )}
           </HStack>
           {isProblemPack(pack) ? (
-            <Text color="fg.muted" fontSize="2xs">
+            <Text color="fg.muted" fontSize="xs">
               {t('nodes.noNodesRegisteredHint')}
             </Text>
           ) : null}
@@ -66,12 +66,12 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
       </HStack>
 
       <Stack gap="2">
-        <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+        <Text color="fg.muted" fontSize="xs" fontWeight="600" textTransform="uppercase">
           {t('nodes.nodesInPack')}
         </Text>
         {isLoadingTemplates ? (
           <Flex align="center" justify="center" py="10">
-            <Spinner color="fg.subtle" size="sm" />
+            <Spinner color="fg.subtle" size="lg" />
           </Flex>
         ) : packTemplates.length === 0 ? (
           <EmptyState
@@ -99,7 +99,7 @@ const UninstallButton = ({ onUninstalled, pack }: { onUninstalled: () => void; p
 
   return (
     <>
-      <Button colorPalette="red" flexShrink={0} size="xs" variant="outline" onClick={() => setIsConfirmOpen(true)}>
+      <Button colorPalette="red" flexShrink={0} size="md" variant="outline" onClick={() => setIsConfirmOpen(true)}>
         <Icon as={Trash2Icon} boxSize="3" />
         {t('nodes.uninstall')}
       </Button>

@@ -25,7 +25,7 @@ export const CanvasSaveToGallerySubmenu = ({
         <button disabled={disabled} type="button">
           <HStack gap="2" minW="0" w="full">
             <Icon as={SaveIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-            <Text flex="1" fontSize="xs">
+            <Text flex="1" fontSize="md">
               {t('widgets.canvas.contextMenu.saveToGallery')}
             </Text>
             <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
@@ -38,7 +38,7 @@ export const CanvasSaveToGallerySubmenu = ({
             <Menu.Item disabled={disabled} value="save-canvas" onSelect={onSaveCanvas}>
               <HStack gap="2" minW="0" w="full">
                 <Icon as={SaveIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-                <Text flex="1" fontSize="xs">
+                <Text flex="1" fontSize="md">
                   {t('widgets.canvas.contextMenu.saveCanvasToGallery')}
                 </Text>
               </HStack>
@@ -46,7 +46,7 @@ export const CanvasSaveToGallerySubmenu = ({
             <Menu.Item disabled={disabled} value="save-bbox" onSelect={onSaveBbox}>
               <HStack gap="2" minW="0" w="full">
                 <Icon as={SaveIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-                <Text flex="1" fontSize="xs">
+                <Text flex="1" fontSize="md">
                   {t('widgets.canvas.contextMenu.saveBboxToGallery')}
                 </Text>
               </HStack>

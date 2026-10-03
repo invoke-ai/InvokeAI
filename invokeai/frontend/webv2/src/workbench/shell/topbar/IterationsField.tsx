@@ -63,7 +63,7 @@ export const IterationsField = () => {
         flexShrink={0}
         min={MIN_BATCH_COUNT}
         rounded="control"
-        size="sm"
+        size="lg"
         value={String(batchCount)}
         w="14"
         onValueChange={handleValueChange}

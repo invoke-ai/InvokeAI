@@ -54,10 +54,10 @@ export const StarterList = ({
   if (status === 'error' && loadError) {
     return (
       <Stack align="center" gap="1" py="8">
-        <Text color="fg.error" fontSize="xs" fontWeight="600">
+        <Text color="fg.error" fontSize="md" fontWeight="600">
           {t('models.couldNotLoadStarterModels')}
         </Text>
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {loadError}
         </Text>
       </Stack>
@@ -67,14 +67,14 @@ export const StarterList = ({
   if (!response) {
     return (
       <Flex align="center" justify="center" py="10">
-        <Spinner color="fg.subtle" size="sm" />
+        <Spinner color="fg.subtle" size="lg" />
       </Flex>
     );
   }
 
   if (models.length === 0) {
     return (
-      <Text color="fg.muted" fontSize="2xs" py="6" textAlign="center">
+      <Text color="fg.muted" fontSize="xs" py="6" textAlign="center">
         {isInstallable ? t('models.noStarterModelsPull') : t('models.noStarterModelsSearch')}
       </Text>
     );
@@ -89,11 +89,11 @@ export const StarterList = ({
         ).length;
         const trailing = externalProviderId ? (
           configuredExternalProviders.has(externalProviderId) ? (
-            <Badge colorPalette="green" fontSize="2xs" size="sm" variant="surface">
+            <Badge colorPalette="green" fontSize="xs" size="lg" variant="surface">
               {t('models.installed')}
             </Badge>
           ) : (
-            <Button size="2xs" variant="outline" onClick={() => onConfigureExternalProvider(externalProviderId)}>
+            <Button size="sm" variant="outline" onClick={() => onConfigureExternalProvider(externalProviderId)}>
               <Icon as={KeyRoundIcon} boxSize="3" />
               {t('common.configure')}
             </Button>
@@ -115,10 +115,10 @@ export const StarterList = ({
             actions={trailing}
             badges={
               <>
-                <Badge colorPalette={getModelBaseColorPalette(model.base)} fontSize="2xs" size="sm" variant="surface">
+                <Badge colorPalette={getModelBaseColorPalette(model.base)} fontSize="xs" size="lg" variant="surface">
                   {getModelBaseLabel(model.base)}
                 </Badge>
-                <Badge colorPalette="gray" fontSize="2xs" size="sm" variant="surface">
+                <Badge colorPalette="gray" fontSize="xs" size="lg" variant="surface">
                   {getModelTypeLabel(model.type)}
                 </Badge>
               </>

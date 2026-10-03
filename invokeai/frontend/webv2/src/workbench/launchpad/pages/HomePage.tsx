@@ -76,7 +76,7 @@ export const HomePage = () => {
     <PageShell
       actions={
         <>
-          <Button size="xs" variant="outline" onClick={handleImportClick}>
+          <Button size="md" variant="outline" onClick={handleImportClick}>
             <FileUpIcon />
             {t('projects.importWithEllipsis')}
           </Button>
@@ -114,7 +114,7 @@ export const HomePage = () => {
         </Box>
 
         <Stack gap="3">
-          <Text fontSize="xs" fontWeight="700">
+          <Text fontSize="md" fontWeight="700">
             {t('launchpad.home.intents.heading')}
           </Text>
           <IntentTiles />

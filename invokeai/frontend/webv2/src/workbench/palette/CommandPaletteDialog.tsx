@@ -28,7 +28,7 @@ const TAB_HINT_KEYS = ['tab'];
 const FooterHint = ({ children, keys, shrink = false }: { children: string; keys: string[]; shrink?: boolean }) => (
   <HStack flexShrink={shrink ? 1 : 0} gap="1" minW="0">
     {keys.map((key) => (
-      <Kbd key={key} flexShrink={0} size="sm" textTransform="lowercase">
+      <Kbd key={key} flexShrink={0} size="md" textTransform="lowercase">
         {key}
       </Kbd>
     ))}
@@ -123,7 +123,7 @@ const CommandPaletteContent = ({
           py="6"
           title={t('commandPalette.states.couldNotSearch', { label: controller.scopeLabel })}
         >
-          <Button size="xs" variant="subtle" onClick={controller.onRetry}>
+          <Button size="md" variant="subtle" onClick={controller.onRetry}>
             {t('common.retry')}
           </Button>
         </EmptyState>
@@ -176,7 +176,7 @@ const CommandPaletteContent = ({
                 color="fg"
                 display="inline-flex"
                 flexShrink={0}
-                fontSize="xs"
+                fontSize="md"
                 fontWeight="600"
                 gap="1"
                 px="1.5"
@@ -207,7 +207,7 @@ const CommandPaletteContent = ({
               bg="transparent"
               color="fg"
               flex="1"
-              fontSize="sm"
+              fontSize="lg"
               outline="none"
               placeholder={controller.placeholder}
               role="combobox"
@@ -218,7 +218,7 @@ const CommandPaletteContent = ({
               onKeyDown={onSearchKeyDown}
             />
             {controller.dateInvalidHint ? (
-              <Text color="fg.error" flexShrink={0} fontSize="xs" id={DATE_HINT_ID} maxW="45%" role="status" truncate>
+              <Text color="fg.error" flexShrink={0} fontSize="md" id={DATE_HINT_ID} maxW="45%" role="status" truncate>
                 {controller.dateInvalidHint}
               </Text>
             ) : controller.dateSummary ? (
@@ -227,7 +227,7 @@ const CommandPaletteContent = ({
                 borderRadius="sm"
                 color="fg.muted"
                 flexShrink={0}
-                fontSize="xs"
+                fontSize="md"
                 id={DATE_HINT_ID}
                 px="1.5"
                 py="0.5"
@@ -257,7 +257,7 @@ const CommandPaletteContent = ({
             borderTopWidth="1px"
             color="fg.subtle"
             flexShrink={0}
-            fontSize="xs"
+            fontSize="md"
             gap="4"
             h="8"
             hideBelow="sm"

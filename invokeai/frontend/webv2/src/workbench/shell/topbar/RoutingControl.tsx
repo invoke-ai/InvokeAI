@@ -88,7 +88,7 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
             overflow="visible"
             p="0"
             position="relative"
-            size="sm"
+            size="lg"
             variant="outline"
             w="34px"
             display="grid"
@@ -128,7 +128,7 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
                 pointerEvents="none"
                 position="absolute"
                 right="-1px"
-                size="sm"
+                size="md"
                 top="-1px"
                 zIndex="1"
               >
@@ -161,7 +161,7 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
 };
 
 const RoutingSectionHeader = ({ label }: { label: string }) => (
-  <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="3" pt="2" pb="1" textTransform="uppercase">
+  <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="3" pt="2" pb="1" textTransform="uppercase">
     {label}
   </Text>
 );

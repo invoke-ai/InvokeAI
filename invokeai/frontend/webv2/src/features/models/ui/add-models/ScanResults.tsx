@@ -56,10 +56,10 @@ export const ScanResults = ({
   if (scan.results.length === 0) {
     return (
       <HStack justify="space-between">
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('models.noModelFilesFound', { path: scan.path })}
         </Text>
-        <IconButton aria-label={t('models.dismissScanResults')} size="2xs" variant="ghost" onClick={onClear}>
+        <IconButton aria-label={t('models.dismissScanResults')} size="sm" variant="ghost" onClick={onClear}>
           <Icon as={XIcon} boxSize="3" />
         </IconButton>
       </HStack>

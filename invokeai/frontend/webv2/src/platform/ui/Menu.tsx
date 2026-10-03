@@ -64,20 +64,20 @@ export const MenuActionItem = ({
       ) : null}
       {hint ? (
         <Stack flex="1" gap="0" minW="0">
-          <Text fontSize="xs">{label}</Text>
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text fontSize="md">{label}</Text>
+          <Text color="fg.subtle" fontSize="xs">
             {hint}
           </Text>
         </Stack>
       ) : (
-        <Text flex="1" fontSize="xs">
+        <Text flex="1" fontSize="md">
           {label}
         </Text>
       )}
       {hintParts && hintParts.length > 0 ? (
         <HStack flexShrink={0} gap="0.5">
           {hintParts.map((part) => (
-            <Kbd key={part} size="sm" textTransform="lowercase">
+            <Kbd key={part} size="md" textTransform="lowercase">
               {part}
             </Kbd>
           ))}
@@ -87,7 +87,7 @@ export const MenuActionItem = ({
   </Menu.Item>
 );
 
-const ICON_ITEM_TOOLTIP_CONTENT_PROPS = { fontSize: '2xs' } as const;
+const ICON_ITEM_TOOLTIP_CONTENT_PROPS = { fontSize: 'xs' } as const;
 const ICON_ITEM_TOOLTIP_POSITIONING_PROPS = { placement: 'top' } as const;
 
 export interface MenuIconItemProps {

@@ -68,7 +68,7 @@ export const ProjectsPage = () => {
     <PageShell
       actions={
         <>
-          <Button size="xs" variant="outline" onClick={handleImportClick}>
+          <Button size="md" variant="outline" onClick={handleImportClick}>
             <FileUpIcon />
             {t('projects.importWithEllipsis')}
           </Button>

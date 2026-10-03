@@ -414,7 +414,7 @@ export const List = <T,>({
   if (status === 'loading') {
     content = (
       <Flex align="center" aria-label={t('common.loading')} h="full" justify="center" py="8" role="status" w="full">
-        <Spinner color="fg.subtle" size="sm" />
+        <Spinner color="fg.subtle" size="lg" />
       </Flex>
     );
   } else if (status === 'error') {

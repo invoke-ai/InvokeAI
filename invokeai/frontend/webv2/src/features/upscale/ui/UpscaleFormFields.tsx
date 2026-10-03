@@ -71,7 +71,7 @@ export const UpscalePromptFields = memo(
 
     return (
       <Stack gap="2" p="2">
-        <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+        <Text color="fg.muted" fontSize="xs" textWrap="pretty">
           {t('widgets.upscale.sharedPromptDescription')}
         </Text>
         <PositivePromptField

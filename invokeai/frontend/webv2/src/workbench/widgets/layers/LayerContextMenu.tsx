@@ -923,7 +923,7 @@ const LayerMenu = ({
             <IconButton
               aria-label={t('widgets.layers.options')}
               color="fg.muted"
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={stopPropagation}
             >
@@ -937,7 +937,7 @@ const LayerMenu = ({
               {groupLayout ? (
                 <>
                   <Menu.ItemGroup>
-                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                    <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                       {t(getLayerContextMenuLayerLabelKey(layer.type))}
                     </Menu.ItemGroupLabel>
                     {renderLayerMenuEntries({ entries: groupLayout.layerEntries, runAction, t })}
@@ -946,7 +946,7 @@ const LayerMenu = ({
                     <>
                       <Menu.Separator borderColor="border.subtle" />
                       <Menu.ItemGroup>
-                        <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                        <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                           {t('widgets.labels.canvas')}
                         </Menu.ItemGroupLabel>
                         {beforeDangerItems}
@@ -1100,7 +1100,7 @@ const SUBMENU_META: Record<LayerContextSubmenuId, { defaultLabel: string; icon: 
 };
 
 const SUBMENU_POSITIONING = { placement: 'right-start' } as const;
-const QUICK_MENU_TOOLTIP_CONTENT_PROPS = { fontSize: '2xs' } as const;
+const QUICK_MENU_TOOLTIP_CONTENT_PROPS = { fontSize: 'xs' } as const;
 const QUICK_MENU_TOOLTIP_POSITIONING_PROPS = { placement: 'top' } as const;
 
 const renderLayerMenuEntries = ({
@@ -1212,7 +1212,7 @@ const LayerMenuSubmenu = ({
         ) : (
           <HStack gap="2" minW="0" w="full">
             <Icon as={meta.icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-            <Text flex="1" fontSize="xs">
+            <Text flex="1" fontSize="md">
               {label}
             </Text>
             <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />

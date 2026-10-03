@@ -246,14 +246,14 @@ export const WorkflowLibraryThumbnail = ({
       ) : (
         <Flex align="center" direction="column" gap="1" h="full" justify="center" w="full">
           <Icon aria-hidden as={ImageOffIcon} boxSize="5" color="fg.subtle" opacity={0.6} />
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {t('workflowLibrary.notRunYet')}
           </Text>
         </Flex>
       )}
       {isBusy ? (
         <Flex align="center" bg="bg.muted/90" inset="0" justify="center" position="absolute">
-          <Spinner size="sm" />
+          <Spinner size="lg" />
         </Flex>
       ) : null}
     </>
@@ -285,7 +285,7 @@ export const WorkflowLibraryThumbnail = ({
                   ref={chooseButtonRef}
                   aria-disabled={isBusy || undefined}
                   aria-label={t('workflowLibrary.thumbnailChoose')}
-                  size="xs"
+                  size="md"
                   variant="outline"
                   onClickCapture={isBusy ? preventClick : undefined}
                 >
@@ -297,7 +297,7 @@ export const WorkflowLibraryThumbnail = ({
               <IconButton
                 aria-disabled={isBusy || !canSnapshot || undefined}
                 aria-label={t('workflowLibrary.thumbnailSnapshot')}
-                size="xs"
+                size="md"
                 variant="outline"
                 onClick={isBusy || !canSnapshot ? undefined : takeSnapshot}
               >
@@ -310,7 +310,7 @@ export const WorkflowLibraryThumbnail = ({
                   aria-disabled={isBusy || undefined}
                   aria-label={t('workflowLibrary.thumbnailRemove')}
                   data-thumbnail-remove
-                  size="xs"
+                  size="md"
                   variant="outline"
                   onClick={isBusy ? undefined : handleRemove}
                 >
@@ -335,7 +335,7 @@ export const WorkflowLibraryThumbnail = ({
         {announcement}
       </Text>
       {caption ? (
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {caption}
         </Text>
       ) : null}

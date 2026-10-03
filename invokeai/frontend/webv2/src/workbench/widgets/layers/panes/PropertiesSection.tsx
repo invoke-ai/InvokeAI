@@ -38,7 +38,7 @@ export const PropertiesSection = ({
         <Flex align="baseline" gap="2" minW="0">
           <FieldLabel>{title}</FieldLabel>
           {subtitle ? (
-            <Text color="fg.muted" fontSize="xs" minW="0" truncate>
+            <Text color="fg.muted" fontSize="md" minW="0" truncate>
               {subtitle}
             </Text>
           ) : null}

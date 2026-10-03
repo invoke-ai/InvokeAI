@@ -59,7 +59,7 @@ export const SwatchesPane = () => {
           aria-label={t('widgets.layers.colorPane.addToPalette')}
           color="fg.muted"
           disabled={!canAddToPalette}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={addToPalette}
         >
@@ -117,7 +117,7 @@ const SwatchShelf = ({
 }) => (
   <Stack gap="1.5">
     <HStack justify="space-between" minH="5">
-      <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+      <Text color="fg.muted" fontSize="xs" fontWeight="600" textTransform="uppercase">
         {label}
       </Text>
       {trailing}

@@ -85,14 +85,14 @@ export const LoginScreen = () => {
             onChange={handlePasswordChange}
           />
         </Field>
-        <Checkbox.Root checked={form.values.rememberMe} size="sm" onCheckedChange={handleRememberMeChange}>
+        <Checkbox.Root checked={form.values.rememberMe} size="md" onCheckedChange={handleRememberMeChange}>
           <Checkbox.HiddenInput />
           <Checkbox.Control />
           <Checkbox.Label color="fg.muted" fontWeight="400">
             {t('auth.keepSignedIn')}
           </Checkbox.Label>
         </Checkbox.Root>
-        <Button loading={form.isSubmitting} size="sm" type="submit" variant="solid">
+        <Button loading={form.isSubmitting} size="lg" type="submit" variant="solid">
           {t('auth.signIn')}
         </Button>
       </chakra.form>

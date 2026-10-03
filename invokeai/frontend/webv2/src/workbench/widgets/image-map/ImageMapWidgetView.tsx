@@ -58,7 +58,7 @@ const selectStarterModels = (snapshot: {
 
 const plotLoadingFallback = (
   <Center h="full">
-    <Spinner size="lg" />
+    <Spinner size="2xl" />
   </Center>
 );
 
@@ -197,7 +197,7 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
   if (loadState === 'idle' || loadState === 'loading') {
     return (
       <Center h="full">
-        <Spinner size="lg" />
+        <Spinner size="2xl" />
       </Center>
     );
   }
@@ -244,11 +244,11 @@ export const ImageMapWidgetView = ({ runtime }: WidgetViewProps) => {
     return (
       <Center h="full">
         <Stack align="center" gap="3">
-          <Spinner size="lg" />
-          <Text color="fg.muted" fontSize="sm">
+          <Spinner size="2xl" />
+          <Text color="fg.muted" fontSize="lg">
             Computing your image map…
           </Text>
-          <Button onClick={handleRefresh} size="xs" variant="outline">
+          <Button onClick={handleRefresh} size="md" variant="outline">
             Check again
           </Button>
         </Stack>
@@ -291,16 +291,16 @@ const CenteredMessage = ({
   <Center h="full" p="6">
     <Stack align="center" gap="2" maxW="sm" textAlign="center">
       <Text fontWeight="semibold">{title}</Text>
-      <Text color="fg.muted" fontSize="sm">
+      <Text color="fg.muted" fontSize="lg">
         {detail}
       </Text>
       {errorDetail ? (
-        <Text color="fg.error" fontSize="sm" maxW="full" minW="0" overflowWrap="anywhere" role="alert">
+        <Text color="fg.error" fontSize="lg" maxW="full" minW="0" overflowWrap="anywhere" role="alert">
           {errorDetail}
         </Text>
       ) : null}
       {actionLabel && onAction ? (
-        <Button mt="2" onClick={onAction} size="xs" variant="outline">
+        <Button mt="2" onClick={onAction} size="md" variant="outline">
           {actionLabel}
         </Button>
       ) : null}

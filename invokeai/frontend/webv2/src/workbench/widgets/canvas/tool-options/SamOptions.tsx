@@ -188,7 +188,7 @@ export const SamModeToggle = ({
     <Button
       aria-pressed={mode === 'visual'}
       disabled={disabled}
-      size="xs"
+      size="md"
       variant={mode === 'visual' ? 'solid' : 'ghost'}
       onClick={onVisual}
     >
@@ -197,7 +197,7 @@ export const SamModeToggle = ({
     <Button
       aria-pressed={mode === 'prompt'}
       disabled={disabled}
-      size="xs"
+      size="md"
       variant={mode === 'prompt' ? 'solid' : 'ghost'}
       onClick={onPrompt}
     >
@@ -237,7 +237,7 @@ export const SamVisualInput = ({
           aria-pressed={pointLabel === 'include'}
           disabled={disabled}
           px="1.5"
-          size="xs"
+          size="md"
           variant={pointLabel === 'include' ? 'solid' : 'outline'}
           onClick={onInclude}
         >
@@ -253,7 +253,7 @@ export const SamVisualInput = ({
           aria-pressed={pointLabel === 'exclude'}
           disabled={disabled}
           px="1.5"
-          size="xs"
+          size="md"
           variant={pointLabel === 'exclude' ? 'solid' : 'outline'}
           onClick={onExclude}
         >
@@ -274,7 +274,7 @@ export const SamBboxIndicator = ({ viewModel }: { viewModel: SamPanelViewModel }
     ? t('widgets.layers.selectObject.bboxActive')
     : t('widgets.layers.selectObject.bboxInactive');
   return (
-    <Text color={viewModel.bboxActive ? 'fg' : 'fg.subtle'} fontSize="xs" fontWeight="medium">
+    <Text color={viewModel.bboxActive ? 'fg' : 'fg.subtle'} fontSize="md" fontWeight="medium">
       {bboxText}
     </Text>
   );
@@ -299,7 +299,7 @@ export const SamPromptBody = ({
         disabled={disabled}
         flexShrink={0}
         placeholder={t('widgets.layers.selectObject.promptGuidance')}
-        size="xs"
+        size="md"
         value={prompt}
         w="7.5rem"
         onChange={onChange}
@@ -324,11 +324,11 @@ const SamSettingsSwitch = ({
     checked={checked}
     disabled={disabled}
     justifyContent="space-between"
-    size="sm"
+    size="md"
     w="full"
     onCheckedChange={({ checked: next }) => onChange(next)}
   >
-    <Switch.Label fontSize="xs">{label}</Switch.Label>
+    <Switch.Label fontSize="md">{label}</Switch.Label>
     <Switch.HiddenInput />
     <Switch.Control>
       <Switch.Thumb />
@@ -365,14 +365,14 @@ export const SamSettings = ({
   return (
     <Stack aria-label={t('widgets.layers.selectObject.settings')} gap="2" role="group" w="full">
       <Stack gap="1">
-        <Text asChild fontSize="xs" fontWeight="semibold">
+        <Text asChild fontSize="md" fontWeight="semibold">
           <label htmlFor="sam-model">{t('widgets.layers.selectObject.model')}</label>
         </Text>
         <Select
           collection={modelCollection}
           disabled={isProcessing || !eligibility.canEditInputs}
           ids={{ trigger: 'sam-model' }}
-          size="xs"
+          size="md"
           value={modelValue}
           onValueChange={({ value }) => {
             const model = value[0];
@@ -520,14 +520,14 @@ const SamFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => 
           title={t('widgets.layers.selectObject.title')}
         />
       </Box>
-      <Button disabled={!eligibility.canReset} flexShrink={0} size="xs" variant="ghost" onClick={actions.reset}>
+      <Button disabled={!eligibility.canReset} flexShrink={0} size="md" variant="ghost" onClick={actions.reset}>
         {t('widgets.layers.selectObject.reset')}
       </Button>
       <Button
         disabled={!eligibility.canProcess}
         flexShrink={0}
         loading={isProcessing}
-        size="xs"
+        size="md"
         onClick={actions.process}
       >
         {t('widgets.layers.selectObject.process')}
@@ -538,7 +538,7 @@ const SamFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => 
           disabled={!eligibility.canApply}
           loading={session.status === 'committing'}
           roundedRight="none"
-          size="xs"
+          size="md"
           variant="solid"
           onClick={actions.apply}
         >
@@ -551,7 +551,7 @@ const SamFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => 
               disabled={!eligibility.canSave}
               px="1"
               roundedLeft="none"
-              size="xs"
+              size="md"
               variant="solid"
             >
               <Icon as={ChevronDownIcon} boxSize="3.5" />
@@ -578,7 +578,7 @@ const SamFooter = ({ engine, isExternalInteractionLocked }: ToolFooterProps) => 
         data-pane-action="cancel"
         disabled={!eligibility.canCancel}
         flexShrink={0}
-        size="xs"
+        size="md"
         variant="ghost"
         onClick={actions.cancel}
       >

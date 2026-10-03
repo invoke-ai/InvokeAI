@@ -65,7 +65,7 @@ describe('wheelScrollsHorizontally', () => {
     await act(() =>
       root!.render(
         <ChakraProvider value={system}>
-          <ScrollArea.Root size="xs" w="200px">
+          <ScrollArea.Root size="md" w="200px">
             <ScrollArea.Viewport ref={wheelScrollsHorizontally} data-testid="viewport">
               <ScrollArea.Content>
                 <div style={{ height: 20, width: 1000 }} />

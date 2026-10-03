@@ -1,5 +1,6 @@
-import { createSystem, defaultConfig, defineConfig } from '@chakra-ui/react';
+import { createSystem, defineConfig } from '@chakra-ui/react';
 
+import { baseConfig } from './rebase';
 import {
   buttonRecipe,
   colorPickerSlotRecipe,
@@ -22,6 +23,7 @@ import {
   textareaRecipe,
   tooltipSlotRecipe,
 } from './recipes';
+import { CONTROL_HEIGHT_PX } from './scale';
 import { DEFAULT_THEME, DEFAULT_THEME_ID, type NeutralStep, THEMES, type ThemeDefinition } from './themes';
 
 /**
@@ -339,6 +341,11 @@ const config = defineConfig({
       radii: {
         control: { value: '0.3125rem' },
       },
+      sizes: {
+        control: Object.fromEntries(
+          Object.entries(CONTROL_HEIGHT_PX).map(([size, px]) => [size, { value: `${px / 16}rem` }])
+        ),
+      },
       fonts: {
         body: {
           value: "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
@@ -393,7 +400,7 @@ const config = defineConfig({
   },
 });
 
-export const system = createSystem(defaultConfig, config);
+export const system = createSystem(baseConfig, config);
 
 /** Theme metadata re-exported so UI can import a single module. */
 export { THEMES, THEMES_BY_ID, DEFAULT_THEME, DEFAULT_THEME_ID, previewSwatches } from './themes';

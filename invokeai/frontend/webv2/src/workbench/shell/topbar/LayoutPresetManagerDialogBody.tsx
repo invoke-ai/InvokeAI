@@ -102,7 +102,7 @@ export const LayoutPresetManagerDialogBody = () => {
               </DndContext>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button size="xs" variant="ghost" onClick={closeLayoutPresetManager}>
+              <Button size="md" variant="ghost" onClick={closeLayoutPresetManager}>
                 {t('common.done')}
               </Button>
             </Dialog.Footer>
@@ -155,14 +155,14 @@ const PresetRow = ({ isOverridden, preset }: { isOverridden: boolean; preset: La
         aria-label={t('topbar.presets.reorderNamed', { name: preset.label })}
         color="fg.subtle"
         cursor={isDragging ? 'grabbing' : 'grab'}
-        size="2xs"
+        size="sm"
         touchAction="none"
         variant="ghost"
       >
         <Icon as={GripVerticalIcon} boxSize="3.5" />
       </IconButton>
       <Icon as={icon} boxSize="4" color="fg.muted" flexShrink={0} />
-      <MiddleTruncate flex="1" fontSize="xs" fontWeight="600" minW="0" text={preset.label} />
+      <MiddleTruncate flex="1" fontSize="md" fontWeight="600" minW="0" text={preset.label} />
       {isOverridden ? (
         <Box
           aria-label={t('topbar.presets.edited')}
@@ -175,7 +175,7 @@ const PresetRow = ({ isOverridden, preset }: { isOverridden: boolean; preset: La
       ) : null}
       <IconButton
         aria-label={t('topbar.presets.editNamed', { name: preset.label })}
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={edit}
       >
@@ -185,7 +185,7 @@ const PresetRow = ({ isOverridden, preset }: { isOverridden: boolean; preset: La
         <Tooltip content={t('topbar.presets.restore')} showArrow>
           <IconButton
             aria-label={t('topbar.presets.restoreNamed', { name: preset.label })}
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={restoreDefault}
           >
@@ -197,7 +197,7 @@ const PresetRow = ({ isOverridden, preset }: { isOverridden: boolean; preset: La
         <IconButton
           aria-label={t('topbar.presets.deleteNamed', { name: preset.label })}
           color="fg.error"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={deletePreset}
         >

@@ -107,7 +107,7 @@ export const GenerateAdvancedFields = ({
 
   const badges =
     overrideCount > 0 ? (
-      <Badge size="xs">{t('widgets.generate.overridesCount', { count: overrideCount })}</Badge>
+      <Badge size="md">{t('widgets.generate.overridesCount', { count: overrideCount })}</Badge>
     ) : null;
 
   return (
@@ -130,7 +130,7 @@ export const GenerateAdvancedFields = ({
                 <ModelSelect
                   filter={(model) => model.base === modelBase}
                   modelTypes={['vae']}
-                  size="xs"
+                  size="md"
                   placeholder={t('widgets.generate.modelDefault')}
                   value={settings.vae?.key ?? null}
                   onChange={(model) => onCommitImmediate({ vae: isVaeModelConfig(model) ? model : null })}
@@ -151,7 +151,7 @@ export const GenerateAdvancedFields = ({
                   aria-label={t('widgets.generate.vaePrecision')}
                   collection={VAE_PRECISION_COLLECTION}
                   flex="1"
-                  size="xs"
+                  size="md"
                   value={[settings.vaePrecision]}
                   onValueChange={({ value }) => {
                     const vaePrecision = value[0];
@@ -298,7 +298,7 @@ export const GenerateAdvancedFields = ({
             <Select
               aria-label={t('widgets.generate.pid')}
               collection={pidModeCollection}
-              size="xs"
+              size="md"
               value={[settings.pidMode]}
               onValueChange={({ value }) => {
                 const mode = value[0];

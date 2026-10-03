@@ -128,14 +128,14 @@ export const LayerRegionSettings = ({ engine, layer }: LayerRegionSettingsProps)
             aria-label={t('widgets.layers.maskFill.style')}
             collection={styleCollection}
             positioning={SELECT_POSITIONING}
-            size="xs"
+            size="md"
             value={styleValue}
             valueText={t(`widgets.layers.maskFill.styles.${fill.style}`)}
             onValueChange={handleStyleChange}
           />
         </Field>
       </HStack>
-      <Text color="fg.muted" fontSize="xs">
+      <Text color="fg.muted" fontSize="md">
         {t('widgets.layers.modifiers.regionHint')}
       </Text>
     </Stack>

@@ -95,7 +95,7 @@ const PresetRow = ({
       >
         <button type="button" onClick={handleApply}>
           <Icon as={BookmarkIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-          <Text flex="1" fontSize="xs" fontWeight={isActive ? '600' : undefined} minW="0" textAlign="start" truncate>
+          <Text flex="1" fontSize="md" fontWeight={isActive ? '600' : undefined} minW="0" textAlign="start" truncate>
             {preset.label}
           </Text>
 
@@ -105,7 +105,7 @@ const PresetRow = ({
       <Tooltip content={t('common.rename')}>
         <IconButton
           aria-label={t('widgets.generate.renamePresetNamed', { name: preset.label })}
-          size="xs"
+          size="md"
           variant="ghost"
           onClick={handleRename}
         >
@@ -116,7 +116,7 @@ const PresetRow = ({
         <IconButton
           aria-label={t('widgets.generate.deletePresetNamed', { name: preset.label })}
           colorPalette="red"
-          size="xs"
+          size="md"
           variant="ghost"
           onClick={handleDelete}
         >
@@ -273,13 +273,13 @@ export const GeneratePresetsPopover = () => {
               aria-label={triggerLabel}
               color="fg.muted"
               px={activePreset ? '1' : '0'}
-              size="2xs"
+              size="sm"
               variant="ghost"
               w={activePreset ? 'auto' : '6'}
             >
               <Icon as={BookmarkIcon} boxSize="3.5" />
               {activePreset ? (
-                <Text as="span" fontSize="2xs" maxW="8rem" truncate>
+                <Text as="span" fontSize="xs" maxW="8rem" truncate>
                   {activePreset.label}
                 </Text>
               ) : null}
@@ -295,7 +295,7 @@ export const GeneratePresetsPopover = () => {
                     <Button
                       disabled={!canSave}
                       h={PANEL_HEADER_CONTROL_HEIGHT}
-                      size="2xs"
+                      size="sm"
                       variant="ghost"
                       onClick={openSaveDialog}
                     >
@@ -308,18 +308,18 @@ export const GeneratePresetsPopover = () => {
                       <Input
                         aria-label={t('widgets.generate.searchPresets')}
                         placeholder={t('widgets.generate.searchPresets')}
-                        size="xs"
+                        size="md"
                         value={searchTerm}
                         onChange={handleSearchChange}
                       />
                     </InputGroup>
                   ) : null}
                   {presets.length === 0 ? (
-                    <Text color="fg.subtle" fontSize="xs">
+                    <Text color="fg.subtle" fontSize="md">
                       {t('widgets.generate.presetsEmpty')}
                     </Text>
                   ) : filteredPresets.length === 0 ? (
-                    <Text color="fg.subtle" fontSize="xs">
+                    <Text color="fg.subtle" fontSize="md">
                       {t('widgets.generate.presetsNoMatches')}
                     </Text>
                   ) : (

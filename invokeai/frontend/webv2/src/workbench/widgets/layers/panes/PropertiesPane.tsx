@@ -45,7 +45,7 @@ const PropertiesTitle = ({ operationName }: { operationName: string | null }) =>
       top="0"
       zIndex="1"
     >
-      <Heading as="h2" fontSize="sm" fontWeight="semibold" lineClamp={2} minW="0" wordBreak="break-word">
+      <Heading as="h2" fontSize="lg" fontWeight="semibold" lineClamp={2} minW="0" wordBreak="break-word">
         {title}
       </Heading>
     </Flex>
@@ -62,7 +62,7 @@ export const PropertiesPane = () => {
 
   if (!engine) {
     return (
-      <Flex align="center" color="fg.muted" fontSize="xs" h="full" justify="center" p="4">
+      <Flex align="center" color="fg.muted" fontSize="md" h="full" justify="center" p="4">
         {t('widgets.properties.noCanvas')}
       </Flex>
     );

@@ -91,7 +91,7 @@ export const PromptTriggerAutocomplete = ({
         <Stack gap="1">
           {groups.map((group) => (
             <Stack gap="0" key={group.group}>
-              <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="2" textTransform="uppercase" truncate>
+              <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="2" textTransform="uppercase" truncate>
                 {group.group}
               </Text>
               {group.options.map((option, position) => {
@@ -143,7 +143,7 @@ const AutocompleteOption = ({
       aria-selected={isActive}
       bg={isActive ? 'bg.emphasized' : undefined}
       color="fg"
-      fontSize="xs"
+      fontSize="md"
       id={id}
       px="2"
       py="1"

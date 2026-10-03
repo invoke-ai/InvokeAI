@@ -94,7 +94,7 @@ const ROOT_CSS = {
   minW: '0',
   overflow: 'hidden',
   position: 'relative',
-  textStyle: 'xs',
+  textStyle: 'md',
   touchAction: 'pan-y',
   userSelect: 'none',
   w: 'full',
@@ -627,7 +627,7 @@ export const ScrubberField = ({
         )}
       </Box>
       {message ? (
-        <Text color={error ? 'fg.error' : 'fg.muted'} fontSize="2xs" id={messageId} role={error ? 'alert' : undefined}>
+        <Text color={error ? 'fg.error' : 'fg.muted'} fontSize="xs" id={messageId} role={error ? 'alert' : undefined}>
           {message}
         </Text>
       ) : null}

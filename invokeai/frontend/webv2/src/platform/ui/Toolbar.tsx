@@ -40,7 +40,7 @@ export const ToolbarButton = ({
     <IconButton
       aria-label={label}
       aria-pressed={isActive}
-      size="xs"
+      size="md"
       variant={isActive ? 'solid' : 'ghost'}
       {...buttonProps}
     >

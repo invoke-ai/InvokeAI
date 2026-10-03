@@ -283,12 +283,12 @@ const CenterViewMenu = ({
           overflow="hidden"
           position="relative"
           px="2"
-          size="2xs"
+          size="sm"
           variant="ghost"
         >
           <HStack gap="2" minW="0" position="relative" zIndex="1">
             {activeItem ? <CenterViewIcon widget={activeItem.widget} /> : null}
-            <Text fontSize="xs" fontWeight="700" truncate>
+            <Text fontSize="md" fontWeight="700" truncate>
               {label}
             </Text>
             <ChevronDownIcon size={12} />
@@ -299,7 +299,7 @@ const CenterViewMenu = ({
         <Menu.Positioner>
           <MenuContent minW="14rem">
             <Menu.ItemGroup>
-              <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+              <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                 {t('widgets.centerViews')}
               </Menu.ItemGroupLabel>
               {items.map((item) => (
@@ -316,7 +316,7 @@ const CenterViewMenu = ({
               <>
                 <Menu.Separator borderColor="border.subtle" />
                 <Menu.ItemGroup>
-                  <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                  <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                     {t('widgets.centerViewsAdd')}
                   </Menu.ItemGroupLabel>
                   {availableItems.map((item) => (
@@ -331,7 +331,7 @@ const CenterViewMenu = ({
                 <Menu.Separator borderColor="border.subtle" />
                 <Menu.Item disabled={isCloseDisabled} value="close-center-view" onClick={onClose}>
                   <Icon as={XIcon} boxSize="3.5" color="fg.subtle" />
-                  <Menu.ItemText fontSize="xs">
+                  <Menu.ItemText fontSize="md">
                     {t('widgets.centerViewClose', { label: activeItem.label })}
                   </Menu.ItemText>
                 </Menu.Item>
@@ -395,7 +395,7 @@ const CenterViewMenuRow = ({
     >
       <Icon as={CheckIcon} boxSize="3" opacity={isActive ? 1 : 0} />
       <WidgetIcon icon={item.icon} boxSize="3.5" />
-      <Menu.ItemText fontSize="xs">{item.label}</Menu.ItemText>
+      <Menu.ItemText fontSize="md">{item.label}</Menu.ItemText>
     </Menu.Item>
   );
 };
@@ -417,7 +417,7 @@ const KeptCenterViewSlot = ({ instanceId }: { instanceId: string }) => {
 
 const FallbackCenterView = ({ label }: { label: string }) => (
   <Flex align="center" h="full" justify="center" w="full">
-    <Text color="fg.subtle" fontSize="sm" textTransform="capitalize">
+    <Text color="fg.subtle" fontSize="lg" textTransform="capitalize">
       {label} view
     </Text>
   </Flex>

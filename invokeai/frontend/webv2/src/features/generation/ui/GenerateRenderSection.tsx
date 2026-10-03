@@ -73,7 +73,7 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: Pick<GenerateRenderSect
         <Select
           aria-label={t('widgets.generate.ideogram4SamplerPreset')}
           collection={IDEOGRAM4_PRESET_COLLECTION}
-          size="xs"
+          size="md"
           value={[settings.ideogram4SamplerPreset]}
           onValueChange={({ value }) => {
             const preset = value[0];
@@ -144,7 +144,7 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: Pick<GenerateRenderSect
       </Field>
       <Field label={t('widgets.generate.ideogram4ColorPalette')} helpText={t('widgets.generate.ideogram4ColorHelp')}>
         <Input
-          size="xs"
+          size="md"
           value={settings.ideogram4ColorPalette.join(', ')}
           onChange={(event) =>
             onCommit({
@@ -252,7 +252,7 @@ const SeedField = ({ onCommit, settings }: Pick<GenerateRenderSectionProps, 'onC
     >
       {seedHistory.length > 0 ? (
         <HStack gap="1" pt="0.5">
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {t('widgets.generate.recentSeeds')}
           </Text>
           {seedHistory.map((item) => (
@@ -309,11 +309,11 @@ export const GenerateRenderSection = ({
 
   const badges = (
     <>
-      <Badge size="xs">
+      <Badge size="md">
         {settings.steps} · {policy.ui.guidanceLabel} {settings.cfgScale}
       </Badge>
       {policy.ui.seedVisible ? (
-        <Badge size="xs">
+        <Badge size="md">
           {settings.seedMode === 'random'
             ? t('common.seedMode.random')
             : settings.seedMode === 'fixed'
@@ -392,7 +392,7 @@ export const GenerateRenderSection = ({
                   aria-label={t('widgets.generate.scheduler')}
                   flex="1"
                   options={policy.scheduler.options}
-                  size="xs"
+                  size="md"
                   value={settings.scheduler}
                   onValueChange={(scheduler) => onCommit({ scheduler })}
                 />

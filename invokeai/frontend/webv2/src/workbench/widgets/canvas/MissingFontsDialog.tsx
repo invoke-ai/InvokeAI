@@ -40,7 +40,7 @@ export const MissingFontsDialog = ({ engine, groups }: { engine: CanvasEngine; g
   return (
     <>
       <Box position="absolute" top="2" left="50%" transform="translateX(-50%)" zIndex="2">
-        <Button colorPalette="orange" size="xs" onClick={reopen}>
+        <Button colorPalette="orange" size="md" onClick={reopen}>
           {t('fonts.missing.warning', { count: unavailable.length })}
         </Button>
       </Box>
@@ -83,7 +83,7 @@ const RecoveryDialog = ({
             </Dialog.Header>
             <Dialog.Body>
               <Stack gap="4">
-                <Text color="fg.muted" fontSize="sm">
+                <Text color="fg.muted" fontSize="lg">
                   {t('fonts.missing.description')}
                 </Text>
                 {groups.map((group) => (
@@ -184,17 +184,17 @@ const RecoveryRow = ({ group, engine }: { group: FontGroup; engine: CanvasEngine
   return (
     <Stack borderWidth="1px" borderRadius="md" p="3" gap="2">
       <Text fontWeight="medium">{group.fontRef.label}</Text>
-      <Text color="fg.muted" fontSize="xs">
+      <Text color="fg.muted" fontSize="md">
         {t('fonts.missing.layers', { count: group.count })}
       </Text>
       <Input
         aria-label={t('fonts.missing.search')}
         placeholder={t('fonts.missing.search')}
-        size="sm"
+        size="lg"
         value={search}
         onChange={searchChanged}
       />
-      <NativeSelect.Root size="sm">
+      <NativeSelect.Root size="xl">
         <NativeSelect.Field
           aria-label={t('fonts.missing.replacement')}
           value={selected?.id ?? ''}
@@ -212,7 +212,7 @@ const RecoveryRow = ({ group, engine }: { group: FontGroup; engine: CanvasEngine
       {offset > 0 || (catalog.data?.total ?? 0) > 50 ? (
         <Flex gap="2" justify="flex-end">
           <Button
-            size="xs"
+            size="md"
             variant="outline"
             color="fg"
             disabled={offset === 0 || catalog.isFetching}
@@ -221,7 +221,7 @@ const RecoveryRow = ({ group, engine }: { group: FontGroup; engine: CanvasEngine
             {t('common.previousPage')}
           </Button>
           <Button
-            size="xs"
+            size="md"
             variant="outline"
             color="fg"
             disabled={catalog.isFetching || offset + 50 >= (catalog.data?.total ?? 0)}
@@ -231,31 +231,31 @@ const RecoveryRow = ({ group, engine }: { group: FontGroup; engine: CanvasEngine
           </Button>
         </Flex>
       ) : null}
-      {catalog.isPending ? <Text fontSize="xs">{t('common.loading')}</Text> : null}
+      {catalog.isPending ? <Text fontSize="md">{t('common.loading')}</Text> : null}
       {catalog.isError ? (
-        <Text role="alert" color="fg.error" fontSize="xs">
+        <Text role="alert" color="fg.error" fontSize="md">
           {t('fonts.missing.catalogError')}
-          <Button size="xs" color="fg" variant="outline" ml="2" onClick={retryCatalog}>
+          <Button size="md" color="fg" variant="outline" ml="2" onClick={retryCatalog}>
             {t('common.retry')}
           </Button>
         </Text>
       ) : null}
       {selected ? (
-        <Text fontSize="xs" color="fg.muted">
+        <Text fontSize="md" color="fg.muted">
           {t('fonts.missing.axesNotice')}
         </Text>
       ) : null}
       {error ? (
-        <Text role="alert" color="fg.error" fontSize="xs">
+        <Text role="alert" color="fg.error" fontSize="md">
           {error}
         </Text>
       ) : null}
       <Flex gap="2" justify="flex-end">
         <input ref={inputRef} type="file" accept=".ttf,.otf,.woff,.woff2" hidden onChange={uploaded} />
-        <Button color="fg" variant="outline" size="sm" loading={busy} onClick={chooseFile}>
+        <Button color="fg" variant="outline" size="lg" loading={busy} onClick={chooseFile}>
           {t('fonts.missing.upload')}
         </Button>
-        <Button colorPalette="accent" size="sm" disabled={!selected || busy} onClick={replace}>
+        <Button colorPalette="accent" size="lg" disabled={!selected || busy} onClick={replace}>
           {t('fonts.missing.replaceAll')}
         </Button>
       </Flex>

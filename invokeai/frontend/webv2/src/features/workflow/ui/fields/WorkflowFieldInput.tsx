@@ -122,12 +122,12 @@ import { useTranslation } from 'react-i18next';
 
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
 const MODEL_SELECT_FALLBACK = (
-  <Button disabled size="xs" w="full">
+  <Button disabled size="md" w="full">
     Loading models…
   </Button>
 );
 const RECORD_PICKER_FALLBACK = (
-  <Button disabled size="xs" w="full">
+  <Button disabled size="md" w="full">
     Loading…
   </Button>
 );
@@ -192,7 +192,7 @@ const StringInput = ({ ariaLabel, id, invalid, onChange, template, value }: Scal
         id={id ? `${id}-textarea` : undefined}
         minHeightPx={56}
         resizeHandleAriaLabel={`Resize ${template.title}`}
-        size="xs"
+        size="md"
         value={text}
         w="full"
         {...invalidProps(invalid)}
@@ -207,7 +207,7 @@ const StringInput = ({ ariaLabel, id, invalid, onChange, template, value }: Scal
       aria-label={ariaLabel ?? template.title}
       className="nodrag"
       id={id ? `${id}-input` : undefined}
-      size="xs"
+      size="md"
       value={text}
       w="full"
       {...invalidProps(invalid)}
@@ -287,7 +287,7 @@ const BooleanInput = ({ id, invalid, onChange, template, value }: WorkflowFieldI
       className="nodrag"
       ids={switchIds}
       invalid={invalid}
-      size="sm"
+      size="md"
       onCheckedChange={onCheckedChange}
     >
       <Switch.HiddenInput aria-label={template.title} {...invalidProps(invalid)} />
@@ -340,7 +340,7 @@ const SelectInput = ({
       collection={collection}
       ids={selectIds}
       invalid={invalid}
-      size="xs"
+      size="md"
       value={selectedValue}
       valueTextProps={SELECT_VALUE_TEXT_PROPS}
       w="full"
@@ -374,7 +374,7 @@ const EnumInput = ({ id, invalid, onChange, template, value }: WorkflowFieldInpu
         id={id ? `${id}-scheduler-combobox` : undefined}
         invalid={invalid}
         options={options}
-        size="xs"
+        size="md"
         value={typeof value === 'string' ? value : null}
         onValueChange={onOptionChange}
       />
@@ -427,7 +427,7 @@ const ModelIdentifierInput = ({ id, invalid, onChange, template, value }: Workfl
         invalid={invalid}
         isClearable={false}
         modelTypes={modelTypes}
-        size="xs"
+        size="md"
         value={selectedKey}
         onChange={onModelChange}
       />
@@ -442,7 +442,7 @@ const SchedulerInput = ({ id, invalid, onChange, template, value }: WorkflowFiel
     id={id ? `${id}-scheduler-combobox` : undefined}
     invalid={invalid}
     options={SCHEDULER_OPTIONS}
-    size="xs"
+    size="md"
     value={typeof value === 'string' ? value : null}
     onValueChange={onChange}
   />
@@ -713,7 +713,7 @@ const ImageCollectionTile = ({
         insetInlineEnd="0.5"
         opacity={0}
         position="absolute"
-        size="2xs"
+        size="sm"
         top="0.5"
         transition="opacity var(--wb-motion-duration-fast) ease"
         variant="subtle"
@@ -882,10 +882,10 @@ const ImageCollectionInput = ({
                 w="full"
                 {...(invalid ? MEDIA_WELL_INVALID_PROPS : MEDIA_WELL_PROPS)}
               >
-                <Text as="span" color="fg" fontSize="xs" fontWeight="600">
+                <Text as="span" color="fg" fontSize="md" fontWeight="600">
                   {pickerLabel}
                 </Text>
-                <Text as="span" color="fg.subtle" fontSize="2xs">
+                <Text as="span" color="fg.subtle" fontSize="xs">
                   {t('widgets.gallery.picker.dropHint')}
                 </Text>
               </Flex>
@@ -896,21 +896,21 @@ const ImageCollectionInput = ({
       </Box>
       <HStack gap="1.5" mt="1" w="full">
         <GalleryPickerPopover accept={IMAGE_ONLY} label={pickerLabel} selection={pickerSelection} onPick={onPick}>
-          <Button className="nodrag" size="2xs" variant="outline">
+          <Button className="nodrag" size="sm" variant="outline">
             <Icon as={ImagePlusIcon} boxSize="3" />
             {t('common.add')}
           </Button>
         </GalleryPickerPopover>
-        <Button className="nodrag" disabled={isUploading} size="2xs" variant="outline" onClick={onUploadClick}>
+        <Button className="nodrag" disabled={isUploading} size="sm" variant="outline" onClick={onUploadClick}>
           {isUploading ? 'Uploading…' : 'Upload'}
         </Button>
         {names.length > 0 ? (
-          <Button className="nodrag" size="2xs" variant="ghost" onClick={onClearClick}>
+          <Button className="nodrag" size="sm" variant="ghost" onClick={onClearClick}>
             Clear
           </Button>
         ) : null}
         {names.length > 0 ? (
-          <Text color="fg.subtle" fontSize="2xs" ms="auto">
+          <Text color="fg.subtle" fontSize="xs" ms="auto">
             {t('nodes.imageCollectionCount', { count: names.length })}
           </Text>
         ) : null}
@@ -1045,10 +1045,10 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
                 w="full"
                 {...(invalid ? MEDIA_WELL_INVALID_PROPS : MEDIA_WELL_PROPS)}
               >
-                <Text as="span" color="fg" fontSize="xs" fontWeight="600">
+                <Text as="span" color="fg" fontSize="md" fontWeight="600">
                   {pickerLabel}
                 </Text>
-                <Text as="span" color="fg.subtle" fontSize="2xs">
+                <Text as="span" color="fg.subtle" fontSize="xs">
                   {t('widgets.gallery.picker.dropHint')}
                 </Text>
               </Flex>
@@ -1062,7 +1062,7 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
             insetInlineEnd="1"
             pointerEvents="none"
             position="absolute"
-            size="xs"
+            size="md"
             variant="solid"
           >
             {badge}
@@ -1078,7 +1078,7 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
         <Button
           className="nodrag"
           disabled={isUploading}
-          size="2xs"
+          size="sm"
           title={`Upload a ${config.noun} and use it here`}
           variant="outline"
           onClick={onUploadClick}
@@ -1086,7 +1086,7 @@ const MediaInput = ({ id, invalid, kind, onChange, value }: WorkflowFieldInputPr
           {isUploading ? 'Uploading…' : 'Upload'}
         </Button>
         {mediaName ? (
-          <Button className="nodrag" size="2xs" variant="ghost" onClick={onClearClick}>
+          <Button className="nodrag" size="sm" variant="ghost" onClick={onClearClick}>
             Clear
           </Button>
         ) : null}
@@ -1181,7 +1181,7 @@ const VideoFrameIndexInput = (props: WorkflowFieldInputProps) => {
         />
       ) : (
         <Flex borderStyle="dashed" borderWidth="1px" justifyContent="center" px="2" py="2" rounded="sm">
-          <Text color="fg.subtle" fontSize="xs" textAlign="center">
+          <Text color="fg.subtle" fontSize="md" textAlign="center">
             {isVideoConnected
               ? 'Frame preview unavailable while the video comes from a graph connection.'
               : videoName === null
@@ -1262,7 +1262,7 @@ const FrameScrubber = ({
           insetInlineEnd="1"
           pointerEvents="none"
           position="absolute"
-          size="xs"
+          size="md"
           variant="solid"
         >
           {`${resolvedIndex} / ${frameCount - 1}`}
@@ -1274,7 +1274,7 @@ const FrameScrubber = ({
           aria-label={FRAME_SLIDER_ARIA_LABEL}
           max={frameCount - 1}
           min={0}
-          size="sm"
+          size="md"
           step={1}
           value={sliderValue}
           withThumbTooltip
@@ -1384,7 +1384,7 @@ const LoRACollectionInput = ({ id, invalid, onChange, template, value }: Workflo
           invalid={invalid}
           modelTypes={(template.uiModelType as ModelTaxonomyType[] | null) ?? LORA_MODEL_TYPES}
           placeholder="Add LoRA…"
-          size="xs"
+          size="md"
           value={null}
           onChange={onAdd}
         />
@@ -1457,7 +1457,7 @@ const LoRACollectionRow = ({
   return (
     <HStack gap="1" minW="0" w="full">
       <Tooltip content={entry ? label : 'This entry is not a readable LoRA and will block invoking.'}>
-        <MiddleTruncate color={entry ? undefined : 'fg.error'} flex="1" fontSize="2xs" minW="0" text={label} />
+        <MiddleTruncate color={entry ? undefined : 'fg.error'} flex="1" fontSize="xs" minW="0" text={label} />
       </Tooltip>
       {entry ? (
         <Field.Root flexShrink="0" invalid={!isLoraFieldWeightValid(entry.weight)} w="16">
@@ -1477,7 +1477,7 @@ const LoRACollectionRow = ({
         className="nodrag"
         color="fg.muted"
         flexShrink="0"
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={onRemoveClick}
       >
@@ -1562,17 +1562,17 @@ const ScalarCollectionInput = ({ id, invalid, onChange, template, value }: Workf
         </Stack>
       ) : null}
       <HStack gap="1.5" w="full">
-        <Button ref={addButtonRef} className="nodrag" size="2xs" variant="outline" onClick={onAdd}>
+        <Button ref={addButtonRef} className="nodrag" size="sm" variant="outline" onClick={onAdd}>
           <Icon as={PlusIcon} boxSize="3" />
           {t('nodes.addItem')}
         </Button>
         {items.length > 0 ? (
-          <Button className="nodrag" size="2xs" variant="ghost" onClick={onClear}>
+          <Button className="nodrag" size="sm" variant="ghost" onClick={onClear}>
             {t('common.clear')}
           </Button>
         ) : null}
         {items.length > 0 ? (
-          <Text color="fg.subtle" fontSize="2xs" ms="auto">
+          <Text color="fg.subtle" fontSize="xs" ms="auto">
             {t('nodes.collectionItemCount', { count: items.length })}
           </Text>
         ) : null}
@@ -1605,7 +1605,7 @@ const ScalarCollectionRow = ({
 
   return (
     <HStack gap="1" w="full">
-      <Text color="fg.subtle" flexShrink="0" fontSize="2xs" fontVariantNumeric="tabular-nums" minW="4" textAlign="end">
+      <Text color="fg.subtle" flexShrink="0" fontSize="xs" fontVariantNumeric="tabular-nums" minW="4" textAlign="end">
         {index + 1}.
       </Text>
       {/* The host's Field.Root marks every control inside it invalid; a row scopes its own validity instead. */}
@@ -1626,7 +1626,7 @@ const ScalarCollectionRow = ({
           color="fg.muted"
           data-collection-remove=""
           flexShrink="0"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={onRemoveClick}
         >
@@ -1638,7 +1638,7 @@ const ScalarCollectionRow = ({
 };
 
 const CONNECTION_ONLY_FALLBACK = (
-  <Text color="fg.subtle" fontSize="2xs">
+  <Text color="fg.subtle" fontSize="xs">
     Connection only
   </Text>
 );
@@ -1737,7 +1737,7 @@ const SavedWorkflowInput = ({ nodeId, onChange, template, value }: WorkflowField
           <IconButton
             aria-label={t('common.retry')}
             className="nodrag"
-            size="xs"
+            size="md"
             variant="ghost"
             onClick={retrySelection}
           >
@@ -1748,7 +1748,7 @@ const SavedWorkflowInput = ({ nodeId, onChange, template, value }: WorkflowField
           <IconButton
             aria-label={t('nodes.savedWorkflowClear')}
             className="nodrag"
-            size="xs"
+            size="md"
             variant="ghost"
             onClick={clearSelection}
           >
@@ -1758,31 +1758,31 @@ const SavedWorkflowInput = ({ nodeId, onChange, template, value }: WorkflowField
       </HStack>
       {selectionState.status === 'selected' ? (
         <HStack flexWrap="wrap" gap="1" minW="0">
-          <Text color="fg.muted" fontSize="2xs" minW="0" truncate>
+          <Text color="fg.muted" fontSize="xs" minW="0" truncate>
             {selectionState.workflow.name}
           </Text>
           {displayState.badges.includes('unsupported') ? (
-            <Badge fontSize="2xs">{t('nodes.savedWorkflowUnsupported')}</Badge>
+            <Badge fontSize="xs">{t('nodes.savedWorkflowUnsupported')}</Badge>
           ) : null}
           {displayState.badges.includes('default') ? (
-            <Badge fontSize="2xs">{t('nodes.savedWorkflowDefaultBadge')}</Badge>
+            <Badge fontSize="xs">{t('nodes.savedWorkflowDefaultBadge')}</Badge>
           ) : null}
           {displayState.badges.includes('shared') ? (
-            <Badge fontSize="2xs">{t('nodes.savedWorkflowShared')}</Badge>
+            <Badge fontSize="xs">{t('nodes.savedWorkflowShared')}</Badge>
           ) : null}
         </HStack>
       ) : (
-        <Badge alignSelf="flex-start" fontSize="2xs">
+        <Badge alignSelf="flex-start" fontSize="xs">
           {statusText}
         </Badge>
       )}
       {displayState.compatibility?.message ? (
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {displayState.compatibility.message}
         </Text>
       ) : null}
       {isFetching ? (
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('nodes.savedWorkflowUpdating')}
         </Text>
       ) : null}
@@ -1944,7 +1944,7 @@ const formatSnapshotValue = (value: unknown, template: FieldInputTemplate): stri
 
 const SNAPSHOT_VALUE_TEXT_PROPS = {
   color: 'fg.muted',
-  fontSize: '2xs',
+  fontSize: 'xs',
   lineHeight: 'short',
   mt: '0.5',
   overflowWrap: 'anywhere',
@@ -2072,7 +2072,7 @@ export const WorkflowFieldSnapshot = ({
         overflowWrap="anywhere"
         px="2"
         py="1"
-        textStyle="xs"
+        textStyle="md"
         w="full"
         whiteSpace="pre-wrap"
       >

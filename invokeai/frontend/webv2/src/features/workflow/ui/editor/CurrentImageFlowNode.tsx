@@ -42,7 +42,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       <Flex {...getWorkflowNodeHeaderProps()}>
         <Text fontWeight="700">{node.data.label || 'Current Image'}</Text>
         {progressImage ? (
-          <Text color="brand.solid" data-node-status-indicator="true" fontSize="2xs" ms="auto">
+          <Text color="brand.solid" data-node-status-indicator="true" fontSize="xs" ms="auto">
             generating…
           </Text>
         ) : null}
@@ -60,7 +60,7 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
         liveImage={progressImageToStreamingSource(progressImage)}
         w="full"
       >
-        <Flex align="center" color="fg.subtle" fontSize="2xs" h="full" justify="center" px="4" textAlign="center">
+        <Flex align="center" color="fg.subtle" fontSize="xs" h="full" justify="center" px="4" textAlign="center">
           No image yet — the latest generation will appear here.
         </Flex>
       </StreamingImageFrame>

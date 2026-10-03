@@ -186,7 +186,7 @@ export const LayoutPresetDialog = ({
                       ref={nameRef}
                       autoComplete="off"
                       name="layout-preset-name"
-                      size="sm"
+                      size="lg"
                       value={name}
                       onChange={handleNameChange}
                     />
@@ -198,7 +198,7 @@ export const LayoutPresetDialog = ({
                     tabIndex={-1}
                     onKeyDown={handleIconKeyDown}
                   >
-                    <Text color="fg.subtle" fontSize="2xs" fontWeight="700" textTransform="uppercase">
+                    <Text color="fg.subtle" fontSize="xs" fontWeight="700" textTransform="uppercase">
                       {t('topbar.presets.icon')}
                     </Text>
                     <SimpleGrid columns={8} gap="1">
@@ -222,7 +222,7 @@ export const LayoutPresetDialog = ({
                       collection={sourceCollection}
                       disabled={sourceOptions.length === 0}
                       renderItem={renderSourceOption}
-                      size="xs"
+                      size="md"
                       triggerProps={sourceTriggerProps}
                       value={sourceValue}
                       valueText={
@@ -244,10 +244,10 @@ export const LayoutPresetDialog = ({
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button size="xs" type="button" variant="ghost" onClick={onClose}>
+                <Button size="md" type="button" variant="ghost" onClick={onClose}>
                   {t('common.cancel')}
                 </Button>
-                <Button disabled={!canSubmit} size="xs" type="submit">
+                <Button disabled={!canSubmit} size="md" type="submit">
                   {submitLabel}
                 </Button>
               </Dialog.Footer>
@@ -282,7 +282,7 @@ const IconOption = ({
         colorPalette={isSelected ? 'accent' : undefined}
         data-icon-id={iconId}
         role="radio"
-        size="sm"
+        size="lg"
         tabIndex={isSelected ? 0 : -1}
         type="button"
         variant={isSelected ? 'solid' : 'ghost'}

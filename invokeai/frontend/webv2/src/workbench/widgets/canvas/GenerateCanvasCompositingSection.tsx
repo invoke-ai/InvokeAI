@@ -136,8 +136,8 @@ export const GenerateCanvasCompositingSection = () => {
 
   const badges = (
     <>
-      <Badge size="xs">{t(`widgets.generate.compositingOptions.infillMethods.${settings.infillMethod}`)}</Badge>
-      <Badge size="xs">{settings.maskBlur}px</Badge>
+      <Badge size="md">{t(`widgets.generate.compositingOptions.infillMethods.${settings.infillMethod}`)}</Badge>
+      <Badge size="md">{settings.maskBlur}px</Badge>
     </>
   );
 
@@ -154,7 +154,7 @@ export const GenerateCanvasCompositingSection = () => {
             aria-label={opt('infillMethod')}
             collection={infillCollection}
             positioning={SELECT_POSITIONING}
-            size="xs"
+            size="md"
             value={infillValue}
             valueText={opt(`infillMethods.${settings.infillMethod}`)}
             onValueChange={handleInfillChange}
@@ -176,7 +176,7 @@ export const GenerateCanvasCompositingSection = () => {
             aria-label={opt('coherenceMode')}
             collection={coherenceCollection}
             positioning={SELECT_POSITIONING}
-            size="xs"
+            size="md"
             value={coherenceValue}
             valueText={opt(`coherenceModes.${settings.coherenceMode}`)}
             onValueChange={handleCoherenceModeChange}
@@ -186,7 +186,7 @@ export const GenerateCanvasCompositingSection = () => {
           <NumberInput.Root
             max={CANVAS_COHERENCE_EDGE_SIZE_MAX}
             min={0}
-            size="xs"
+            size="md"
             step={1}
             value={String(settings.coherenceEdgeSize)}
             onValueChange={handleEdgeSizeChange}
@@ -199,7 +199,7 @@ export const GenerateCanvasCompositingSection = () => {
           <NumberInput.Root
             max={1}
             min={0}
-            size="xs"
+            size="md"
             step={0.01}
             value={settings.coherenceMinDenoise.toFixed(2)}
             onValueChange={handleMinDenoiseChange}
@@ -212,7 +212,7 @@ export const GenerateCanvasCompositingSection = () => {
           <NumberInput.Root
             max={CANVAS_MASK_BLUR_MAX}
             min={0}
-            size="xs"
+            size="md"
             step={1}
             value={String(settings.maskBlur)}
             onValueChange={handleMaskBlurChange}

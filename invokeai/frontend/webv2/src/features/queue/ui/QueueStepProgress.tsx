@@ -13,7 +13,7 @@ export const QueueStepProgress = ({ message, percentage }: { message: string; pe
         aria-label={t('widgets.queue.itemProgress')}
         colorPalette="accent"
         max={1}
-        size="xs"
+        size="md"
         value={percentage}
         w="full"
       >
@@ -22,7 +22,7 @@ export const QueueStepProgress = ({ message, percentage }: { message: string; pe
         </Progress.Track>
       </Progress.Root>
       {caption ? (
-        <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums">
+        <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums">
           {caption}
         </Text>
       ) : null}

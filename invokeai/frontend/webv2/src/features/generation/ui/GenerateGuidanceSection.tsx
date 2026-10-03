@@ -52,18 +52,18 @@ export const GenerateGuidanceSection = ({
   const badges = (
     <>
       {hasIncompatible ? (
-        <Badge colorPalette="orange" size="xs" variant="surface">
+        <Badge colorPalette="orange" size="md" variant="surface">
           {t('widgets.generate.incompatible')}
         </Badge>
       ) : null}
       {activeCount > 0 ? (
-        <Badge size="xs" variant="surface">
+        <Badge size="md" variant="surface">
           {activeCount === totalCount
             ? t('widgets.generate.activeCount', { count: activeCount })
             : t('widgets.generate.activeOfTotal', { active: activeCount, total: totalCount })}
         </Badge>
       ) : totalCount > 0 ? (
-        <Badge size="xs" variant="surface">
+        <Badge size="md" variant="surface">
           {t('widgets.generate.offCount', { count: totalCount })}
         </Badge>
       ) : null}

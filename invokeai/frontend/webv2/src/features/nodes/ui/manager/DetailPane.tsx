@@ -26,7 +26,7 @@ export const DetailPane = () => {
     <Tabs.Root
       asChild
       lazyMount
-      size="sm"
+      size="xl"
       unmountOnExit
       value={activeTab}
       onValueChange={(event) => updateNodesUi({ activeTab: event.value as NodesManagerTab })}
@@ -67,10 +67,10 @@ const DetailTab = ({ activePack }: { activePack: NodePackInfo | null }) => {
     return (
       <Flex align="center" direction="column" gap="2" h="full" justify="center" p="6">
         <Icon as={BlocksIcon} boxSize="8" color="fg.subtle" />
-        <Text color="fg.muted" fontSize="sm" fontWeight="600">
+        <Text color="fg.muted" fontSize="lg" fontWeight="600">
           {t('nodes.selectPack')}
         </Text>
-        <Text color="fg.muted" fontSize="xs" maxW="22rem" textAlign="center">
+        <Text color="fg.muted" fontSize="md" maxW="22rem" textAlign="center">
           {t('nodes.selectPackDescription')}
         </Text>
       </Flex>

@@ -16,7 +16,7 @@ const GROUP_HEADER_HOVER = { color: 'fg' } as const;
  */
 export const PropertyControlRow = ({ children, label }: { children: ReactNode; label?: string }) => (
   <Grid alignItems="center" columnGap="2" gridTemplateColumns="4.5rem minmax(0, 1fr) auto" minH="7" w="full">
-    <Text color="fg.muted" fontSize="xs" minW="0" title={label} truncate>
+    <Text color="fg.muted" fontSize="md" minW="0" title={label} truncate>
       {label}
     </Text>
     {children}
@@ -45,11 +45,11 @@ export const PropertySwitchRow = ({
       disabled={disabled}
       justifyContent="space-between"
       minH="7"
-      size="sm"
+      size="md"
       w="full"
       onCheckedChange={handleChange}
     >
-      <Switch.Label color="fg.muted" fontSize="xs">
+      <Switch.Label color="fg.muted" fontSize="md">
         {label}
       </Switch.Label>
       <Switch.HiddenInput />
@@ -102,12 +102,12 @@ export const PropertyGroup = ({
             transitionDuration="fast"
             transitionProperty="transform"
           />
-          <Text fontSize="xs" fontWeight="600">
+          <Text fontSize="md" fontWeight="600">
             {label}
           </Text>
         </chakra.button>
       ) : (
-        <Text color="fg.muted" fontSize="xs" fontWeight="600">
+        <Text color="fg.muted" fontSize="md" fontWeight="600">
           {label}
         </Text>
       )}
@@ -160,7 +160,7 @@ export const EditTargetChip = ({ layerName }: { layerName: string | null }) => {
       <Badge
         colorPalette={layerName === null ? 'gray' : 'blue'}
         maxW="full"
-        size="sm"
+        size="lg"
         title={layerName === null ? undefined : layerName}
         variant="surface"
       >
@@ -178,10 +178,10 @@ export const HintCard = ({ rows }: { rows: readonly { gesture: string; effect: s
   <Stack gap="1">
     {rows.map((row) => (
       <Grid key={row.gesture} alignItems="baseline" columnGap="2" gridTemplateColumns="auto minmax(0, 1fr)">
-        <Badge colorPalette="gray" fontFamily="mono" size="sm" variant="surface">
+        <Badge colorPalette="gray" fontFamily="mono" size="lg" variant="surface">
           {row.gesture}
         </Badge>
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {row.effect}
         </Text>
       </Grid>

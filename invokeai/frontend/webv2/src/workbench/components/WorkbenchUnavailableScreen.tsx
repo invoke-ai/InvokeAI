@@ -102,7 +102,7 @@ export const WorkbenchUnavailableScreen = ({
       <Box borderColor="border.subtle" borderRadius="xl" borderWidth="1px" maxW="2xl" p="6" shadow="sm" w="full">
         <Stack gap="5">
           <Stack gap="2">
-            <Heading size="xl">{t('shell.backendUnavailable.title')}</Heading>
+            <Heading size="3xl">{t('shell.backendUnavailable.title')}</Heading>
             <Text color="fg.muted">{t('shell.backendUnavailable.description')}</Text>
           </Stack>
           <Alert.Root status="error" variant="surface">
@@ -116,7 +116,7 @@ export const WorkbenchUnavailableScreen = ({
             {t('shell.backendUnavailable.retry')}
           </Button>
           <Stack gap="3">
-            <Heading size="md">{t('shell.backendUnavailable.draftsTitle')}</Heading>
+            <Heading size="xl">{t('shell.backendUnavailable.draftsTitle')}</Heading>
             {draftError ? (
               <Alert.Root status="error" variant="surface">
                 <Alert.Indicator />
@@ -127,7 +127,7 @@ export const WorkbenchUnavailableScreen = ({
             ) : null}
             {drafts === null ? (
               <HStack color="fg.muted">
-                <Spinner size="xs" />
+                <Spinner size="md" />
                 <Text>{t('shell.backendUnavailable.loadingDrafts')}</Text>
               </HStack>
             ) : drafts === 'unavailable' ? (
@@ -145,7 +145,7 @@ export const WorkbenchUnavailableScreen = ({
               ))
             )}
             {nextCursor ? (
-              <Button alignSelf="start" loading={isLoadingMore} onClick={handleLoadMore} size="sm" variant="ghost">
+              <Button alignSelf="start" loading={isLoadingMore} onClick={handleLoadMore} size="lg" variant="ghost">
                 {t('shell.backendUnavailable.loadMore')}
               </Button>
             ) : null}
@@ -174,11 +174,11 @@ const RecoverableDraftRow = ({
         <Text fontWeight="semibold" truncate>
           {draft.projectId}
         </Text>
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {new Date(draft.updatedAt).toLocaleString()}
         </Text>
       </Stack>
-      <Button loading={isExporting} onClick={handleExport} size="sm" variant="outline">
+      <Button loading={isExporting} onClick={handleExport} size="lg" variant="outline">
         {t('shell.backendUnavailable.exportDraft')}
       </Button>
     </HStack>

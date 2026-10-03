@@ -64,14 +64,14 @@ export const NodePackList = ({
         isProblemPack(pack) ? (
           // Zero registered nodes indicates import failure or pending reload/restart.
           <Tooltip content={t('nodes.noNodesRegisteredHint')}>
-            <Badge colorPalette="orange" fontSize="2xs" variant="surface">
+            <Badge colorPalette="orange" fontSize="xs" variant="surface">
               {pack.nodeCount}
             </Badge>
           </Tooltip>
         ) : (
           <Badge
             colorPalette={rowProps.isActive ? undefined : 'gray'}
-            fontSize="2xs"
+            fontSize="xs"
             variant={rowProps.isActive ? 'solid' : 'surface'}
           >
             {pack.nodeCount}
@@ -90,7 +90,7 @@ export const NodePackList = ({
           <Input
             aria-label={t('nodes.searchPacks')}
             placeholder={t('nodes.searchPacksPlaceholder')}
-            size="xs"
+            size="md"
             value={filters.searchTerm}
             onChange={(event) => onFiltersChange({ ...filters, searchTerm: event.currentTarget.value })}
           />
@@ -107,7 +107,7 @@ export const NodePackList = ({
               icon={<Icon as={PackageOpenIcon} />}
               title={t('nodes.noPacks')}
             >
-              <Button size="sm" onClick={() => openNodesManagerTab('add')}>
+              <Button size="lg" onClick={() => openNodesManagerTab('add')}>
                 {t('nodes.addNodes')}
                 <Icon as={ArrowRightIcon} />
               </Button>
@@ -118,7 +118,7 @@ export const NodePackList = ({
               icon={<Icon as={SearchIcon} />}
               title={t('nodes.noPacksMatch')}
             >
-              <Button size="sm" variant="outline" onClick={() => openNodesManagerTab('add')}>
+              <Button size="lg" variant="outline" onClick={() => openNodesManagerTab('add')}>
                 {t('nodes.addNodes')}
                 <Icon as={ArrowRightIcon} />
               </Button>
@@ -132,7 +132,7 @@ export const NodePackList = ({
             icon={<Icon as={TriangleAlertIcon} />}
             title={t('nodes.couldNotLoadPacks')}
           >
-            <Button size="sm" variant="outline" onClick={() => void refreshCustomNodePacks()}>
+            <Button size="lg" variant="outline" onClick={() => void refreshCustomNodePacks()}>
               {t('common.retry')}
             </Button>
           </EmptyState>

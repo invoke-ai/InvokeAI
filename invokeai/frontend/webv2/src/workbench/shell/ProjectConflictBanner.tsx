@@ -221,7 +221,7 @@ export const ProjectConflictBanner = () => {
                     <Button
                       disabled={pendingAction !== null || selectedRecoverableDraftIndex === 0}
                       onClick={selectPreviousRecoverableDraft}
-                      size="sm"
+                      size="lg"
                       variant="ghost"
                     >
                       {t('shell.projectConflict.previousDraft')}
@@ -231,7 +231,7 @@ export const ProjectConflictBanner = () => {
                         pendingAction !== null || selectedRecoverableDraftIndex === recoverableDrafts.length - 1
                       }
                       onClick={selectNextRecoverableDraft}
-                      size="sm"
+                      size="lg"
                       variant="ghost"
                     >
                       {t('shell.projectConflict.nextDraft')}
@@ -242,7 +242,7 @@ export const ProjectConflictBanner = () => {
                   disabled={pendingAction !== null}
                   loading={pendingAction === 'export-recoverable'}
                   onClick={handleExportRecoverable}
-                  size="sm"
+                  size="lg"
                   variant="outline"
                 >
                   {t('shell.projectConflict.export')}
@@ -250,7 +250,7 @@ export const ProjectConflictBanner = () => {
                 <Button
                   disabled={pendingAction !== null}
                   onClick={openDeleteRecoverableConfirmation}
-                  size="sm"
+                  size="lg"
                   variant="ghost"
                 >
                   {t('shell.projectConflict.deleteDraft')}
@@ -275,7 +275,7 @@ export const ProjectConflictBanner = () => {
                     disabled={pendingAction !== null}
                     loading={pendingAction === 'save-as-new'}
                     onClick={handleSaveAsNew}
-                    size="sm"
+                    size="lg"
                   >
                     {t('shell.projectConflict.saveAsNew')}
                   </Button>
@@ -284,7 +284,7 @@ export const ProjectConflictBanner = () => {
                   <Button
                     disabled={pendingAction !== null}
                     onClick={openUseServerConfirmation}
-                    size="sm"
+                    size="lg"
                     variant="outline"
                   >
                     {t('shell.projectConflict.useServer')}
@@ -294,7 +294,7 @@ export const ProjectConflictBanner = () => {
                   <Button
                     disabled={pendingAction !== null}
                     onClick={openDiscardConfirmation}
-                    size="sm"
+                    size="lg"
                     variant="outline"
                   >
                     {t('shell.projectConflict.discard')}
@@ -305,7 +305,7 @@ export const ProjectConflictBanner = () => {
                     disabled={pendingAction !== null}
                     loading={pendingAction === 'export'}
                     onClick={handleExport}
-                    size="sm"
+                    size="lg"
                     variant="ghost"
                   >
                     {t('shell.projectConflict.export')}

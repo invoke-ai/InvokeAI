@@ -93,7 +93,7 @@ export const ModelSelect = ({
   placeholder,
   scopeLabel: scopeLabelOverride,
   showManagerButton = true,
-  size = 'sm',
+  size = 'lg',
   value,
 }: {
   className?: string;
@@ -109,7 +109,7 @@ export const ModelSelect = ({
   /** Plural noun for the offered models in empty/search copy; defaults to the model type's plural label. */
   scopeLabel?: string;
   showManagerButton?: boolean;
-  size?: 'xs' | 'sm' | 'md';
+  size?: 'md' | 'lg' | 'xl';
   value: string | null;
 }) => {
   const { t } = useTranslation();
@@ -276,7 +276,7 @@ export const ModelSelect = ({
               {selectedModel ? (
                 <ModelButtonContent model={selectedModel} />
               ) : (
-                <Text as="span" color="fg.muted" fontSize="xs" minW="0" truncate>
+                <Text as="span" color="fg.muted" fontSize="md" minW="0" truncate>
                   {isEmpty ? emptyMessage : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel }))}
                 </Text>
               )}
@@ -289,7 +289,7 @@ export const ModelSelect = ({
               disabled={disabled}
               insetEnd="1"
               position="absolute"
-              size="2xs"
+              size="sm"
               top="50%"
               transform="translateY(-50%)"
               zIndex="1"
@@ -340,20 +340,20 @@ export const ModelSelect = ({
                 selectedId={value}
                 statusSlot={
                   loadStatus === 'idle' || loadStatus === 'loading' ? (
-                    <Text color="fg.subtle" fontSize="2xs" p="2">
+                    <Text color="fg.subtle" fontSize="xs" p="2">
                       {t('models.loadingModels')}
                     </Text>
                   ) : loadStatus === 'error' ? (
                     <Stack alignItems="start" gap="1.5" p="2">
-                      <Text color="fg.error" fontSize="2xs">
+                      <Text color="fg.error" fontSize="xs">
                         {loadError ?? t('models.failedToLoadModels')}
                       </Text>
-                      <Button size="2xs" variant="outline" onClick={() => void ensureModelsLoaded()}>
+                      <Button size="sm" variant="outline" onClick={() => void ensureModelsLoaded()}>
                         {t('common.retry')}
                       </Button>
                     </Stack>
                   ) : candidates.length === 0 ? (
-                    <Text color="fg.subtle" fontSize="2xs" p="2">
+                    <Text color="fg.subtle" fontSize="xs" p="2">
                       {emptyMessage}
                     </Text>
                   ) : undefined
@@ -370,7 +370,7 @@ export const ModelSelect = ({
                         flexShrink={0}
                         opacity={selectedBases.size === 0 ? 0.5 : undefined}
                         pointerEvents={selectedBases.size === 0 ? 'none' : undefined}
-                        size="2xs"
+                        size="sm"
                         variant="ghost"
                         onClick={() => setSelectedBases(EMPTY_BASES)}
                       >
@@ -407,7 +407,7 @@ const CompactViewToggle = ({ isCompact, pickerId }: { isCompact: boolean; picker
         aria-label={label}
         aria-pressed={isCompact}
         flexShrink={0}
-        size="xs"
+        size="md"
         variant="ghost"
         onClick={handleClick}
       >
@@ -424,7 +424,7 @@ const ModelManagerLinkButton = () => {
 
   return (
     <Tooltip content={t('models.manageModels')} showArrow>
-      <IconButton aria-label={t('models.manageModels')} asChild flexShrink={0} size="xs" variant="ghost">
+      <IconButton aria-label={t('models.manageModels')} asChild flexShrink={0} size="md" variant="ghost">
         <Link search={search} to="/models">
           <BoxIcon />
         </Link>
@@ -445,9 +445,9 @@ const BaseChip = ({
   <Badge
     aria-pressed={isSelected}
     colorPalette={getModelBaseColorPalette(base)}
-    fontSize="2xs"
+    fontSize="xs"
     role="button"
-    size="sm"
+    size="lg"
     tabIndex={0}
     userSelect="none"
     variant={isSelected ? 'solid' : 'surface'}
@@ -470,14 +470,8 @@ const BaseChip = ({
 
 const ModelButtonContent = ({ model }: { model: ModelConfig }) => (
   <HStack as="span" flex="1" gap="2" minW="0">
-    <MiddleTruncate as="span" fontSize="xs" minW="0" text={model.name} />
-    <Badge
-      colorPalette={getModelBaseColorPalette(model.base)}
-      flexShrink={0}
-      fontSize="2xs"
-      size="sm"
-      variant="surface"
-    >
+    <MiddleTruncate as="span" fontSize="md" minW="0" text={model.name} />
+    <Badge colorPalette={getModelBaseColorPalette(model.base)} flexShrink={0} fontSize="xs" size="lg" variant="surface">
       {getModelBaseLabel(model.base)}
     </Badge>
   </HStack>
@@ -525,20 +519,20 @@ const ModelOptionContent = ({
               />
             </Tooltip>
           ) : null}
-          <MiddleTruncate fontSize="xs" minW="0" text={model.name} />
+          <MiddleTruncate fontSize="md" minW="0" text={model.name} />
           {showType ? (
-            <Badge colorPalette="gray" flexShrink={0} fontSize="2xs" size="xs" variant="surface">
+            <Badge colorPalette="gray" flexShrink={0} fontSize="xs" size="md" variant="surface">
               {getModelTypeLabel(model.type)}
             </Badge>
           ) : null}
         </HStack>
         {showDetail && enableDescription && model.description ? (
-          <Text color="fg.subtle" fontSize="2xs" lineClamp={2}>
+          <Text color="fg.subtle" fontSize="xs" lineClamp={2}>
             {model.description}
           </Text>
         ) : null}
       </Stack>
-      <Text color="fg.subtle" flexShrink={0} fontSize="2xs" fontStyle="italic">
+      <Text color="fg.subtle" flexShrink={0} fontSize="xs" fontStyle="italic">
         {formatBytes(model.file_size)}
       </Text>
     </HStack>

@@ -120,13 +120,13 @@ export const VideoConditioningClipField = memo(
             <Select
               collection={roleCollection}
               disabled={disabled}
-              size="xs"
+              size="md"
               value={roleValue}
               onValueChange={handleRoleChange}
             />
           </Field>
         ) : (
-          <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+          <Text color="fg.muted" fontSize="xs" textWrap="pretty">
             {t('widgets.video.conditioningClipHelp')}
           </Text>
         )}

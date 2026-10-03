@@ -160,8 +160,8 @@ export const QueueRecoveryNotice = ({
   if (query.isPending) {
     return (
       <HStack color="fg.muted" px="4" py="2">
-        <Spinner size="xs" />
-        <Text fontSize="sm">{t('shell.queueRecovery.loading')}</Text>
+        <Spinner size="md" />
+        <Text fontSize="lg">{t('shell.queueRecovery.loading')}</Text>
       </HStack>
     );
   }
@@ -202,13 +202,13 @@ export const QueueRecoveryNotice = ({
             <HStack flexShrink="0" flexWrap="wrap">
               {projectIds.length > 1 ? (
                 <>
-                  <Button disabled={isBusy || visibleIndex === 0} onClick={selectPrevious} size="sm" variant="ghost">
+                  <Button disabled={isBusy || visibleIndex === 0} onClick={selectPrevious} size="lg" variant="ghost">
                     {t('shell.queueRecovery.previous')}
                   </Button>
                   <Button
                     disabled={isBusy || visibleIndex === projectIds.length - 1}
                     onClick={selectNext}
-                    size="sm"
+                    size="lg"
                     variant="ghost"
                   >
                     {t('shell.queueRecovery.next')}
@@ -216,7 +216,7 @@ export const QueueRecoveryNotice = ({
                 </>
               ) : null}
               {onOpen ? (
-                <Button disabled={isBusy} loading={pendingAction === 'open'} onClick={handleOpen} size="sm">
+                <Button disabled={isBusy} loading={pendingAction === 'open'} onClick={handleOpen} size="lg">
                   {t('shell.queueRecovery.open')}
                 </Button>
               ) : null}
@@ -224,12 +224,12 @@ export const QueueRecoveryNotice = ({
                 disabled={isBusy}
                 loading={pendingAction === 'export'}
                 onClick={handleExport}
-                size="sm"
+                size="lg"
                 variant="outline"
               >
                 {t('shell.queueRecovery.export')}
               </Button>
-              <Button disabled={isBusy} onClick={openDiscardConfirmation} size="sm" variant="ghost">
+              <Button disabled={isBusy} onClick={openDiscardConfirmation} size="lg" variant="ghost">
                 {t('shell.queueRecovery.discard')}
               </Button>
             </HStack>

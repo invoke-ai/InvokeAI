@@ -135,7 +135,7 @@ const ReferenceImageCardBase = ({
         {isCollapsed ? (
           <HStack as="button" flex="1" gap="2" minW="0" textAlign="left" onClick={expand}>
             <MiniThumbnail image={config.image} />
-            <Text color="fg.muted" fontSize="xs" minW="0" truncate>
+            <Text color="fg.muted" fontSize="md" minW="0" truncate>
               <Text as="span" color={isEnabled ? 'fg' : 'fg.muted'} fontWeight="medium">
                 {title}
               </Text>
@@ -151,7 +151,7 @@ const ReferenceImageCardBase = ({
             </Text>
           </HStack>
         ) : (
-          <Text color={isEnabled ? 'fg' : 'fg.muted'} flex="1" fontSize="xs" fontWeight="medium" minW="0" truncate>
+          <Text color={isEnabled ? 'fg' : 'fg.muted'} flex="1" fontSize="md" fontWeight="medium" minW="0" truncate>
             {title}
           </Text>
         )}
@@ -164,7 +164,7 @@ const ReferenceImageCardBase = ({
               aria-label={t('widgets.generate.moveReferenceImageUp')}
               color="fg.muted"
               disabled={!canMoveUp}
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={handleMoveUp}
             >
@@ -177,7 +177,7 @@ const ReferenceImageCardBase = ({
               aria-label={t('widgets.generate.moveReferenceImageDown')}
               color="fg.muted"
               disabled={!canMoveDown}
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={handleMoveDown}
             >
@@ -189,7 +189,7 @@ const ReferenceImageCardBase = ({
               isCollapsed ? t('widgets.generate.expandReferenceImage') : t('widgets.generate.collapseReferenceImage')
             }
             color="fg.muted"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={toggleCollapsed}
           >
@@ -205,7 +205,7 @@ const ReferenceImageCardBase = ({
             <IconButton
               aria-label={t('widgets.generate.removeReferenceImage')}
               color="fg.muted"
-              size="2xs"
+              size="sm"
               variant="ghost"
               colorPalette="red"
               onClick={handleRemove}
@@ -323,7 +323,7 @@ const ReferenceModelSelector = ({
           filter={filterModel}
           modelTypes={modelTypes}
           placeholder={t('widgets.generate.selectModel')}
-          size="xs"
+          size="md"
           value={config.model?.key ?? null}
           onChange={selectReferenceModel}
         />
@@ -432,7 +432,7 @@ const ReferenceImageThumbnail = ({
               <IconButton
                 aria-label={t('common.crop')}
                 disabled={disabled}
-                size="2xs"
+                size="sm"
                 variant="ghost"
                 onClick={openCrop}
               >
@@ -443,7 +443,7 @@ const ReferenceImageThumbnail = ({
               <IconButton
                 aria-label={t('widgets.generate.useSize')}
                 disabled={disabled}
-                size="2xs"
+                size="sm"
                 variant="ghost"
                 onClick={handleUseSize}
               >

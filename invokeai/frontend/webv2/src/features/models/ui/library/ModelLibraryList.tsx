@@ -121,7 +121,7 @@ export const ModelLibraryList = ({
             }
             icon={<Icon as={CircleAlert} />}
           >
-            <Button onClick={openAddModels} size="sm">
+            <Button onClick={openAddModels} size="lg">
               {t('models.addModels')}
               <Icon as={ArrowRightIcon} />
             </Button>

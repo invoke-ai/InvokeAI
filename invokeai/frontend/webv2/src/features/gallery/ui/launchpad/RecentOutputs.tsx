@@ -45,7 +45,7 @@ export const RecentOutputs = () => {
 
   return (
     <Flex direction="column" gap="3">
-      <Text fontSize="xs" fontWeight="700">
+      <Text fontSize="md" fontWeight="700">
         {t('launchpad.home.recentOutputs')}
       </Text>
       <SimpleGrid columns={GRID_COLUMNS} gap="2">

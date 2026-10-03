@@ -98,14 +98,14 @@ export const GenerateConceptsContent = ({
           placeholder={
             selectedModel ? t('widgets.generate.searchCompatibleConcepts') : t('widgets.generate.selectModelFirst')
           }
-          size="xs"
+          size="md"
           value={null}
           onChange={addLora}
         />
       </Field>
 
       {loras.length === 0 ? (
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {t('widgets.generate.addConceptsHelp')}
         </Text>
       ) : (

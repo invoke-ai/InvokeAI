@@ -204,13 +204,13 @@ const RasterLayerSettings = ({
 
   return (
     <Stack gap="2">
-      <Switch.Root checked={isLocked} size="sm" onCheckedChange={handleTransparencyLock}>
+      <Switch.Root checked={isLocked} size="md" onCheckedChange={handleTransparencyLock}>
         <Switch.HiddenInput />
         <Switch.Control>
           <Switch.Thumb />
         </Switch.Control>
         <Switch.Label>
-          <Text fontSize="xs">{t('widgets.layers.adjustments.transparencyLock')}</Text>
+          <Text fontSize="md">{t('widgets.layers.adjustments.transparencyLock')}</Text>
         </Switch.Label>
       </Switch.Root>
       <RasterLayerFilterSection engine={engine} layer={layer} onOperationStarted={noop} />

@@ -186,7 +186,7 @@ export const LayoutPresetStrip = () => {
           >
             <Tabs.Root
               minW="max-content"
-              size="xs"
+              size="lg"
               value={selectedPresetId}
               variant="subtle"
               onValueChange={handleValueChange}
@@ -220,7 +220,7 @@ export const LayoutPresetStrip = () => {
         <Tooltip content={t('topbar.presets.saveAsTooltip')} showArrow>
           <IconButton
             aria-label={t('topbar.presets.saveAsTooltip')}
-            size="sm"
+            size="lg"
             variant="ghost"
             onClick={openSaveAsDialog}
           >
@@ -487,9 +487,9 @@ const PresetMenu = ({
         <Menu.Positioner>
           <MenuContent minW="16rem">
             <HStack justify="space-between" px="3" py="2">
-              <MiddleTruncate fontSize="xs" fontWeight="700" text={preset.label} />
+              <MiddleTruncate fontSize="md" fontWeight="700" text={preset.label} />
               {showDrift ? (
-                <Text color="fg.muted" fontSize="2xs" flexShrink={0}>
+                <Text color="fg.muted" fontSize="xs" flexShrink={0}>
                   {t('topbar.presets.unsaved')}
                 </Text>
               ) : null}
@@ -515,7 +515,7 @@ const PresetMenu = ({
                   <Icon as={SaveIcon} boxSize="3.5" />
                   <Menu.ItemText>{t('topbar.presets.saveChanges')}</Menu.ItemText>
                   {saveShortcut ? (
-                    <Text color="fg.subtle" fontSize="2xs" ms="auto">
+                    <Text color="fg.subtle" fontSize="xs" ms="auto">
                       {saveShortcut}
                     </Text>
                   ) : null}

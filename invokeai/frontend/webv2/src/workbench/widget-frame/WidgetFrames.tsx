@@ -184,7 +184,7 @@ export const WidgetFloatButton = ({
       <IconButton
         aria-label={t('widgets.floating.floatWindow')}
         color="fg.muted"
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={handleFloat}
       >
@@ -265,7 +265,7 @@ export const WidgetHeader = ({
         {HeaderLabel && !instance.title ? (
           <HeaderLabel region={region} />
         ) : (
-          <Text data-widget-identity-label="" fontSize="xs" fontWeight="700">
+          <Text data-widget-identity-label="" fontSize="md" fontWeight="700">
             {label}
           </Text>
         )}
@@ -301,7 +301,7 @@ export const WidgetTooltipFrame = ({
 
 export const FieldPlaceholder = ({ label, h }: { label: string; h: string }) => (
   <Stack gap="1">
-    <Text color="fg.muted" fontSize="2xs" fontWeight="600" textTransform="uppercase">
+    <Text color="fg.muted" fontSize="xs" fontWeight="600" textTransform="uppercase">
       {label}
     </Text>
     <Box bg="bg.subtle" borderWidth="1px" borderColor="border.subtle" h={h} rounded="md" w="full" />

@@ -211,7 +211,7 @@ export const ListItem = ({
             checked={isChecked}
             colorPalette="accent"
             disabled={isBusy}
-            size="xs"
+            size="sm"
             onCheckedChange={handleCheckedChange}
           >
             <Checkbox.HiddenInput />

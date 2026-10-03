@@ -89,15 +89,15 @@ export const RenameDialog = ({
               <Dialog.Body>
                 <Stack gap="2">
                   <Field label={label}>
-                    <Input autoFocus defaultValue={initialName} name="renameValue" size="sm" />
+                    <Input autoFocus defaultValue={initialName} name="renameValue" size="lg" />
                   </Field>
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button disabled={isPending} size="xs" type="button" variant="ghost" onClick={onClose}>
+                <Button disabled={isPending} size="md" type="button" variant="ghost" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button loading={isPending} size="xs" type="submit" variant="solid">
+                <Button loading={isPending} size="md" type="submit" variant="solid">
                   {submitLabel}
                 </Button>
               </Dialog.Footer>

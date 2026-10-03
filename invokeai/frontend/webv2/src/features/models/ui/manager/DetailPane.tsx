@@ -39,7 +39,7 @@ export const DetailPane = () => {
         flexDirection="column"
         minH="0"
         minW="0"
-        size="sm"
+        size="xl"
         value={activeTab}
         onValueChange={(event) => updateModelsUi({ activeTab: event.value as ModelManagerTab })}
       >
@@ -90,10 +90,10 @@ const DetailTab = ({ modelKey }: { modelKey: string | null }) => {
     return (
       <Flex align="center" direction="column" gap="2" h="full" justify="center" p="6">
         <Icon as={BoxIcon} boxSize="8" color="fg.subtle" />
-        <Text color="fg.muted" fontSize="sm" fontWeight="600">
+        <Text color="fg.muted" fontSize="lg" fontWeight="600">
           {t('models.selectModel')}
         </Text>
-        <Text color="fg.subtle" fontSize="xs" maxW="22rem" textAlign="center">
+        <Text color="fg.subtle" fontSize="md" maxW="22rem" textAlign="center">
           {t('models.selectModelDescription')}
         </Text>
       </Flex>

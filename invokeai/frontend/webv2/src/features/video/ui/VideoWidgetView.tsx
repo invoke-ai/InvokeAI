@@ -87,10 +87,10 @@ const StaleMediaStub = ({ label, onClear }: { label: string; onClear: () => void
 
   return (
     <HStack bg="bg.subtle" gap="2" justify="space-between" p="2" rounded="md">
-      <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+      <Text color="fg.muted" fontSize="xs" textWrap="pretty">
         {label}
       </Text>
-      <Button flexShrink="0" size="2xs" variant="outline" onClick={onClear}>
+      <Button flexShrink="0" size="sm" variant="outline" onClick={onClear}>
         {t('widgets.video.clearStaleMedia')}
       </Button>
     </HStack>
@@ -478,7 +478,7 @@ export const VideoWidgetView = () => {
   const derivedSourceValueText = useMemo(
     () =>
       dimensionSource && dimensionSource !== 'aspect-ratio' ? (
-        <Text as="span" fontSize="xs" truncate>
+        <Text as="span" fontSize="md" truncate>
           {t(`widgets.video.dimensionSourceValue.${dimensionSource}`)}
         </Text>
       ) : undefined,
@@ -515,7 +515,7 @@ export const VideoWidgetView = () => {
             invalid={!values.model}
             modelTypes={MAIN_MODEL_TYPES}
             placeholder={t('widgets.video.selectModel')}
-            size="xs"
+            size="md"
             value={values.model?.key ?? null}
             onChange={selectMainModel}
           />
@@ -609,7 +609,7 @@ export const VideoWidgetView = () => {
         <GenerationSettingsSection label={t('widgets.video.initialVideo')} sectionId="video-source" defaultOpen>
           <Stack gap="3" p="2">
             {referenceExtend ? (
-              <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+              <Text color="fg.muted" fontSize="xs" textWrap="pretty">
                 {t('widgets.video.referenceExtendHelp')}
               </Text>
             ) : null}
@@ -673,7 +673,7 @@ export const VideoWidgetView = () => {
                 collection={ASPECT_RATIO_COLLECTION}
                 disabled={hasConditioningMedia}
                 flex="1"
-                size="xs"
+                size="md"
                 value={aspectRatioValue}
                 valueText={derivedSourceValueText}
                 onValueChange={set.aspectRatio}
@@ -681,7 +681,7 @@ export const VideoWidgetView = () => {
               <IconButton
                 aria-label={t('widgets.video.swapAspectRatio')}
                 disabled={hasConditioningMedia}
-                size="xs"
+                size="md"
                 variant="ghost"
                 onClick={swapAspectRatio}
               >
@@ -692,7 +692,7 @@ export const VideoWidgetView = () => {
           <Field helpText={twoStageHelpText} label={t('widgets.video.targetResolution')}>
             <Select
               collection={targetResolutionCollection}
-              size="xs"
+              size="md"
               value={targetResolutionValue}
               onValueChange={set.targetResolution}
             />
@@ -729,7 +729,7 @@ export const VideoWidgetView = () => {
               onChange={set.fps}
             />
           ) : (
-            <Text color="fg.muted" fontSize="2xs">
+            <Text color="fg.muted" fontSize="xs">
               {t('widgets.video.fixedFps', { fps: policy.fps.defaultValue })}
             </Text>
           )}
@@ -747,7 +747,7 @@ export const VideoWidgetView = () => {
               })}
               label={t('widgets.video.accelerator', { label: policy.ui.accelerator.label })}
             >
-              <Switch.Root checked={values.acceleratorEnabled} size="sm" onCheckedChange={toggleAccelerator}>
+              <Switch.Root checked={values.acceleratorEnabled} size="md" onCheckedChange={toggleAccelerator}>
                 <Switch.HiddenInput />
                 <Switch.Control _checked={SWITCH_CHECKED_PROPS}>
                   <Switch.Thumb />
@@ -768,7 +768,7 @@ export const VideoWidgetView = () => {
               onChange={set.steps}
             />
           ) : (
-            <Text color="fg.muted" fontSize="2xs">
+            <Text color="fg.muted" fontSize="xs">
               {t('widgets.video.stepsFixed', { steps: policy.defaults.steps })}
             </Text>
           )}

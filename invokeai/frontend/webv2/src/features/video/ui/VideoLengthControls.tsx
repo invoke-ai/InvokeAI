@@ -76,7 +76,7 @@ export const VideoLengthControls = ({
           <Switch.Root
             checked={autoDuration && autoDurationSupported}
             disabled={!autoDurationSupported}
-            size="sm"
+            size="md"
             onCheckedChange={onAutoDurationChange}
           >
             <Switch.HiddenInput />

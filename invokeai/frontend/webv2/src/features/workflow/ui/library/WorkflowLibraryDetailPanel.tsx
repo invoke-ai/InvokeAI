@@ -454,12 +454,12 @@ export const WorkflowLibraryDetailPanel = ({
            * Wrap full names, including delimiter-free strings, in the detail rail; zero content min-width permits
            * containment without truncation.
            */}
-          <Text fontSize="sm" fontWeight="600" minW="0" overflowWrap="anywhere">
+          <Text fontSize="lg" fontWeight="600" minW="0" overflowWrap="anywhere">
             {name}
           </Text>
 
           {item.description ? (
-            <Text color="fg.muted" fontSize="2xs" lineClamp={4}>
+            <Text color="fg.muted" fontSize="xs" lineClamp={4}>
               {item.description}
             </Text>
           ) : null}
@@ -467,7 +467,7 @@ export const WorkflowLibraryDetailPanel = ({
           {tags.length > 0 ? (
             <HStack flexWrap="wrap" gap="1" minW="0">
               {tags.map((tag) => (
-                <Badge key={tag} size="xs" variant="subtle">
+                <Badge key={tag} size="md" variant="subtle">
                   {tag}
                 </Badge>
               ))}
@@ -490,14 +490,14 @@ export const WorkflowLibraryDetailPanel = ({
               color="fg.warning"
               flex="1"
               minW="0"
-              size="sm"
+              size="lg"
               _hover={INSTALL_HOVER}
               onClick={handleInstall}
             >
               {t('workflowLibrary.installModels', { count: installableCount })}
             </Button>
           ) : (
-            <Button flex="1" minW="0" size="sm" onClick={handleOpen}>
+            <Button flex="1" minW="0" size="lg" onClick={handleOpen}>
               {openLabel}
             </Button>
           )}
@@ -506,7 +506,7 @@ export const WorkflowLibraryDetailPanel = ({
                 menu never takes focus and the first pointer move onto it closes it. */}
             <Menu.Trigger asChild>
               <Tooltip content={t('workflowLibrary.moreActions')} ids={moreActionsIds}>
-                <IconButton aria-label={t('workflowLibrary.moreActions')} size="sm" variant="outline">
+                <IconButton aria-label={t('workflowLibrary.moreActions')} size="lg" variant="outline">
                   <EllipsisIcon />
                 </IconButton>
               </Tooltip>
@@ -518,7 +518,7 @@ export const WorkflowLibraryDetailPanel = ({
             </Portal>
           </Menu.Root>
         </HStack>
-        <Button disabled={enrichment?.status !== 'ready'} size="sm" variant="outline" w="full" onClick={handlePreview}>
+        <Button disabled={enrichment?.status !== 'ready'} size="lg" variant="outline" w="full" onClick={handlePreview}>
           <WorkflowIcon />
           {t('workflowLibrary.previewGraph')}
         </Button>

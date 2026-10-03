@@ -99,7 +99,7 @@ export const MaskModifierSettings = ({
           formatValue={formatUnitPercent}
           max={1}
           min={0}
-          size="sm"
+          size="md"
           step={0.01}
           value={sliderValue}
           withThumbTooltip
@@ -107,7 +107,7 @@ export const MaskModifierSettings = ({
           onValueChangeEnd={handleChangeEnd}
         />
       </Field>
-      <Text color="fg.muted" fontSize="2xs">
+      <Text color="fg.muted" fontSize="xs">
         {t(HELP_OF[kind])}
       </Text>
     </Stack>

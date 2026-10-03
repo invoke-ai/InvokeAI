@@ -138,7 +138,7 @@ export const GenerateCanvasScalingSection = () => {
 
   const badges = useMemo(
     () => (
-      <Badge size="xs">
+      <Badge size="md">
         {scaling.method === 'none' || !processingSize
           ? opt(`methods.${scaling.method}`)
           : `${processingSize.width}x${processingSize.height}`}
@@ -160,7 +160,7 @@ export const GenerateCanvasScalingSection = () => {
             aria-label={opt('method')}
             collection={methodCollection}
             positioning={SELECT_POSITIONING}
-            size="xs"
+            size="md"
             value={methodValue}
             valueText={opt(`methods.${scaling.method}`)}
             onValueChange={handleMethodChange}
@@ -172,7 +172,7 @@ export const GenerateCanvasScalingSection = () => {
               <NumberInput.Root
                 max={dimensions.max}
                 min={dimensions.min}
-                size="xs"
+                size="md"
                 step={dimensions.grid}
                 value={String(scaling.width ?? context.bbox.width)}
                 {...widthHandlers}
@@ -185,7 +185,7 @@ export const GenerateCanvasScalingSection = () => {
               <NumberInput.Root
                 max={dimensions.max}
                 min={dimensions.min}
-                size="xs"
+                size="md"
                 step={dimensions.grid}
                 value={String(scaling.height ?? context.bbox.height)}
                 {...heightHandlers}
@@ -197,7 +197,7 @@ export const GenerateCanvasScalingSection = () => {
           </HStack>
         ) : null}
         {scaling.method !== 'none' && processingSize ? (
-          <Text color="fg.muted" fontSize="2xs">
+          <Text color="fg.muted" fontSize="xs">
             {resizes
               ? t('widgets.generate.scalingOptions.processingSize', {
                   height: processingSize.height,

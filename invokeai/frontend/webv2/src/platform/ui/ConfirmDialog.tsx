@@ -81,17 +81,17 @@ export const ConfirmDialog = ({
               <Dialog.Title>{title}</Dialog.Title>
             </Dialog.Header>
             <Dialog.Body>
-              <Stack gap="2">{typeof body === 'string' ? <Text fontSize="xs">{body}</Text> : body}</Stack>
+              <Stack gap="2">{typeof body === 'string' ? <Text fontSize="md">{body}</Text> : body}</Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button disabled={isPending} size="xs" variant="ghost" onClick={handleClose}>
+              <Button disabled={isPending} size="md" variant="ghost" onClick={handleClose}>
                 Cancel
               </Button>
               <Button
                 colorPalette={isDestructive ? 'red' : 'accent'}
                 disabled={isPending}
                 loading={isPending}
-                size="xs"
+                size="md"
                 variant="solid"
                 onClick={handleConfirmClick}
               >

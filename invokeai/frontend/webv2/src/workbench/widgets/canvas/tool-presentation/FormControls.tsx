@@ -28,8 +28,8 @@ interface FormNumberFieldProps {
   onValueCommit?: (details: ChakraNumberInput.ValueChangeDetails) => void;
 }
 
-const AFFIX_PROPS = { color: 'fg.muted', fontSize: '2xs', lineHeight: '1' } as const;
-// InputGroup pads the input by `--input-height` (28px at size xs) minus the offset; the text must clear the affix.
+const AFFIX_PROPS = { color: 'fg.muted', fontSize: 'xs', lineHeight: '1' } as const;
+// InputGroup pads the input by `--input-height` (28px at size md) minus the offset; the text must clear the affix.
 const INPUT_HEIGHT_PX = 28;
 const AFFIX_CHAR_PX = 6;
 const AFFIX_GUTTER_PX = 8;
@@ -100,7 +100,7 @@ export const FormNumberField = ({
       flexShrink={0}
       max={max}
       min={min}
-      size="xs"
+      size="md"
       step={step}
       value={live ? value : (draft ?? value)}
       w={`${FORM_NUMBER_FIELD_WIDTH_PX}px`}
@@ -119,7 +119,7 @@ export const FormNumberField = ({
         startElementProps={START_ELEMENT_PROPS}
         startOffset={label ? affixOffset(label.length) : affixOffset(2)}
       >
-        <NumberInput.Input aria-label={ariaLabel} fontSize="xs" fontVariantNumeric="tabular-nums" textAlign="end" />
+        <NumberInput.Input aria-label={ariaLabel} fontSize="md" fontVariantNumeric="tabular-nums" textAlign="end" />
       </InputGroup>
     </NumberInput.Root>
   );
@@ -199,7 +199,7 @@ export const FormSlider = ({
       max={max}
       min={min}
       minW="0"
-      size="sm"
+      size="md"
       step={step}
       value={values}
       onKeyDownCapture={onKeyDownCapture}
@@ -273,7 +273,7 @@ export const ApplyCancelBar = ({
         disabled={applyDisabled}
         flexShrink={0}
         loading={applyLoading}
-        size="xs"
+        size="md"
         variant="solid"
         onClick={onApply}
       >
@@ -283,7 +283,7 @@ export const ApplyCancelBar = ({
         data-pane-action="cancel"
         disabled={cancelDisabled}
         flexShrink={0}
-        size="xs"
+        size="md"
         variant="ghost"
         onClick={onCancel}
       >

@@ -106,7 +106,7 @@ export const SetupScreen = () => {
             onChange={handleConfirmPasswordChange}
           />
         </Field>
-        <Button loading={form.isSubmitting} size="sm" type="submit" variant="solid">
+        <Button loading={form.isSubmitting} size="lg" type="submit" variant="solid">
           {t('auth.createAdminAccount')}
         </Button>
       </chakra.form>

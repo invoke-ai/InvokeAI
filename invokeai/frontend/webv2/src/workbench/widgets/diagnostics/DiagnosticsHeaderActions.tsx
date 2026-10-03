@@ -13,7 +13,7 @@ export const DiagnosticsHeaderActions = () => {
   }
 
   return (
-    <Badge colorPalette="red" size="xs">
+    <Badge colorPalette="red" size="md">
       <BugIcon />
       <span aria-hidden>{problemCount}</span>
       <VisuallyHidden>{t('widgets.diagnostics.chipProblems', { count: problemCount })}</VisuallyHidden>

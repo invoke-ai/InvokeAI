@@ -449,10 +449,10 @@ const FooterSlot = memo(function FooterSlot({
 export const MissingWidgetFrame = ({ label, region }: { label: string; region: Exclude<WidgetRegion, 'center'> }) => (
   <WidgetPanelFrame region={region}>
     <Box p="3">
-      <Text fontSize="xs" fontWeight="700">
+      <Text fontSize="md" fontWeight="700">
         {label}
       </Text>
-      <Text color="fg.subtle" fontSize="2xs">
+      <Text color="fg.subtle" fontSize="xs">
         Widget view unavailable.
       </Text>
     </Box>

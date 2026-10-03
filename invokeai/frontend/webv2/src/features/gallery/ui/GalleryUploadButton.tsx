@@ -53,7 +53,7 @@ export const GalleryUploadButton = ({
           aria-label={label}
           color="fg.muted"
           disabled={!isAvailable}
-          size="xs"
+          size="md"
           variant="ghost"
           onClick={openPicker}
         >

@@ -203,7 +203,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
     <HStack gap="0.5">
       <Menu.Root onSelect={handleImportSelect}>
         <Menu.Trigger asChild>
-          <Button disabled={isBusy} size="2xs" variant="ghost">
+          <Button disabled={isBusy} size="sm" variant="ghost">
             <UploadIcon />
             {t('widgets.generate.dynamicPrompts.import')}
           </Button>
@@ -213,7 +213,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
             <MenuContent minW="10rem">
               {IMPORT_SOURCES.map((source) => (
                 <Menu.Item key={source} value={source}>
-                  <Menu.ItemText fontSize="xs">
+                  <Menu.ItemText fontSize="md">
                     {t(`widgets.generate.dynamicPrompts.import${source === 'folder' ? 'Folder' : 'Files'}`)}
                   </Menu.ItemText>
                 </Menu.Item>
@@ -224,7 +224,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
       </Menu.Root>
       <Menu.Root onSelect={handleExportSelect}>
         <Menu.Trigger asChild>
-          <Button disabled={isBusy || catalog.wildcards.length === 0} size="2xs" variant="ghost">
+          <Button disabled={isBusy || catalog.wildcards.length === 0} size="sm" variant="ghost">
             <DownloadIcon />
             {t('widgets.generate.dynamicPrompts.export')}
           </Button>
@@ -234,7 +234,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
             <MenuContent minW="10rem">
               {WILDCARD_COLLECTION_FORMATS.map((format) => (
                 <Menu.Item key={format.id} value={format.id}>
-                  <Menu.ItemText fontSize="xs">{t(format.labelKey)}</Menu.ItemText>
+                  <Menu.ItemText fontSize="md">{t(format.labelKey)}</Menu.ItemText>
                 </Menu.Item>
               ))}
             </MenuContent>

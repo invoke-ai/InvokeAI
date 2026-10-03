@@ -71,7 +71,7 @@ export const UpdatePathDialog = ({
             <Dialog.Body>
               <Stack gap="3">
                 <Field label={t('models.currentPath')}>
-                  <Text color="fg.muted" fontSize="2xs" overflowWrap="anywhere">
+                  <Text color="fg.muted" fontSize="xs" overflowWrap="anywhere">
                     {model.path}
                   </Text>
                 </Field>
@@ -79,7 +79,7 @@ export const UpdatePathDialog = ({
                   <Input
                     aria-invalid={validationError ? true : undefined}
                     placeholder={t('models.newPathPlaceholder')}
-                    size="sm"
+                    size="lg"
                     value={path}
                     onChange={(event) => {
                       setPath(event.currentTarget.value);
@@ -90,13 +90,13 @@ export const UpdatePathDialog = ({
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button disabled={isBusy} size="xs" variant="ghost" onClick={onClose}>
+              <Button disabled={isBusy} size="md" variant="ghost" onClick={onClose}>
                 {t('common.cancel')}
               </Button>
               <Button
                 disabled={path.trim() === model.path}
                 loading={isBusy}
-                size="xs"
+                size="md"
                 variant="solid"
                 onClick={() => void handleSave()}
               >

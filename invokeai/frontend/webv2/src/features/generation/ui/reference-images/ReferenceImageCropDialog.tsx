@@ -311,7 +311,7 @@ export const ReferenceImageCropDialog = ({
             </Dialog.CloseTrigger>
             <Dialog.Body>
               <Stack gap="3">
-                <Text color="fg.muted" fontSize="xs">
+                <Text color="fg.muted" fontSize="md">
                   {t('widgets.generate.cropReferenceImageHelp')}
                 </Text>
                 <Box
@@ -385,7 +385,7 @@ export const ReferenceImageCropDialog = ({
                     ))}
                   </Box>
                 </Box>
-                <Text color="fg.muted" fontFamily="mono" fontSize="2xs">
+                <Text color="fg.muted" fontFamily="mono" fontSize="xs">
                   {cropWidthPx} × {cropHeightPx} px
                 </Text>
               </Stack>
@@ -393,16 +393,16 @@ export const ReferenceImageCropDialog = ({
             <Dialog.Footer>
               <Button
                 disabled={isApplying || isFullReferenceImageCropBox(cropBox)}
-                size="xs"
+                size="md"
                 variant="outline"
                 onClick={resetCrop}
               >
                 {t('common.reset')}
               </Button>
-              <Button disabled={isApplying} size="xs" variant="ghost" onClick={close}>
+              <Button disabled={isApplying} size="md" variant="ghost" onClick={close}>
                 {t('common.cancel')}
               </Button>
-              <Button loading={isApplying} size="xs" onClick={applyCrop}>
+              <Button loading={isApplying} size="md" onClick={applyCrop}>
                 {t('common.apply')}
               </Button>
             </Dialog.Footer>

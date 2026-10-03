@@ -27,16 +27,16 @@ export const WorkbenchSplashScreen = ({ messageKey = 'splash.loadingWorkspace' }
             <InvokeMark size={164} />
           </Box>
           <VStack align="start" flex="1" minH="full" minW="80" textAlign="start" py="2">
-            <Heading size="2xl">{t('app.nameWithVersion', { name: t('app.name'), version: APP_VERSION })}</Heading>
-            <Text fontSize="md">{t('splash.tagline')}</Text>
-            <Text fontSize="xs">{t('splash.artworkBy', { artist: 'Jonathan Pollack' })}</Text>
+            <Heading size="4xl">{t('app.nameWithVersion', { name: t('app.name'), version: APP_VERSION })}</Heading>
+            <Text fontSize="xl">{t('splash.tagline')}</Text>
+            <Text fontSize="md">{t('splash.artworkBy', { artist: 'Jonathan Pollack' })}</Text>
             <Flex alignItems="center" gap="2" mt="auto">
-              <Spinner size="xs" />
-              <Text fontSize="xs" flex="1">
+              <Spinner size="md" />
+              <Text fontSize="md" flex="1">
                 {t(messageKey)}
               </Text>
             </Flex>
-            <Text fontSize="2xs" mt="auto" fontFamily="mono">
+            <Text fontSize="xs" mt="auto" fontFamily="mono">
               {t('splash.copyright', { year: new Date().getFullYear() })}
             </Text>
           </VStack>

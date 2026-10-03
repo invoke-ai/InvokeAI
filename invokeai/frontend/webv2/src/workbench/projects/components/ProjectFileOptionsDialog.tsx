@@ -53,13 +53,13 @@ export const ProjectFileOptionsDialog = ({ request }: { request: ProjectFileOpti
                       </Checkbox.Control>
                       <Checkbox.Label>{t('projects.fonts.includeFiles')}</Checkbox.Label>
                     </Checkbox.Root>
-                    <Text color="fg.muted" fontSize="sm">
+                    <Text color="fg.muted" fontSize="lg">
                       {t('projects.fonts.exportDescription')}
                     </Text>
-                    {includeFonts ? <Text fontSize="sm">{t('projects.fonts.rightsReminder')}</Text> : null}
+                    {includeFonts ? <Text fontSize="lg">{t('projects.fonts.rightsReminder')}</Text> : null}
                   </>
                 ) : (
-                  <Text fontSize="sm">{t('projects.fonts.quotaDescription')}</Text>
+                  <Text fontSize="lg">{t('projects.fonts.quotaDescription')}</Text>
                 )}
               </Stack>
             </Dialog.Body>

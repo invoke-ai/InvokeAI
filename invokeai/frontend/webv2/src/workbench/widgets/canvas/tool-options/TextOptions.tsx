@@ -202,7 +202,7 @@ const AlignButton = ({
       <IconButton
         aria-label={t(ALIGN_LABEL_KEYS[value])}
         aria-pressed={active}
-        size="xs"
+        size="md"
         variant={active ? 'solid' : 'ghost'}
         onClick={onClick}
       >
@@ -477,7 +477,7 @@ const FontAxisSettings = ({
           collection={presetCollection}
           minW="0"
           positioning={SELECT_POSITIONING}
-          size="xs"
+          size="md"
           value={presetValue}
           valueText={presetCollection.items.find((item) => item.value === presetValue[0])?.label}
           onValueChange={onPreset}
@@ -486,7 +486,7 @@ const FontAxisSettings = ({
           <Tooltip content={t('widgets.canvas.toolOptions.textFontResetAxes')}>
             <IconButton
               aria-label={t('widgets.canvas.toolOptions.textFontResetAxes')}
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={resetAxes}
             >
@@ -532,8 +532,8 @@ const FontCatalogStatus = ({
     return (
       <PropertyControlRow>
         <HStack color="fg.muted" gap="1.5" gridColumn="2 / -1" role="status">
-          <Spinner size="xs" />
-          <Text fontSize="2xs">{t('common.loading')}</Text>
+          <Spinner size="md" />
+          <Text fontSize="xs">{t('common.loading')}</Text>
         </HStack>
       </PropertyControlRow>
     );
@@ -542,14 +542,14 @@ const FontCatalogStatus = ({
     return (
       <PropertyControlRow>
         <HStack color="fg.error" gap="1" gridColumn="2 / -1" role="alert">
-          <Text fontSize="2xs" minW="0" truncate>
+          <Text fontSize="xs" minW="0" truncate>
             {tFonts('fonts.couldNotLoad')}
           </Text>
           <Button
             aria-label={t('common.retry')}
             disabled={isFetchingNextPage}
             flexShrink="0"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={onRetry}
           >
@@ -566,7 +566,7 @@ const FontCatalogStatus = ({
           <Button
             aria-label={tFonts('fonts.loadMore', { defaultValue: 'Load more fonts' })}
             disabled={isFetchingNextPage}
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={onLoadMore}
           >
@@ -800,7 +800,7 @@ export const TextFontSettings = ({ engine }: ToolFormProps) => {
           minW="0"
           positioning={SELECT_POSITIONING}
           renderGroupLabel={renderGroupLabel}
-          size="xs"
+          size="md"
           value={familyValue}
           valueText={familyLabel}
           onValueChange={onFamily}
@@ -825,7 +825,7 @@ export const TextFontSettings = ({ engine }: ToolFormProps) => {
               gridColumn={showWeight ? undefined : '2 / -1'}
               minW="0"
               positioning={SELECT_POSITIONING}
-              size="xs"
+              size="md"
               value={styleValue}
               valueText={styleCollection.items.find((item) => item.value === active.fontStyle)?.label}
               onValueChange={onStyle}
@@ -837,7 +837,7 @@ export const TextFontSettings = ({ engine }: ToolFormProps) => {
               collection={weightCollection}
               flexShrink={0}
               positioning={SELECT_POSITIONING}
-              size="xs"
+              size="md"
               triggerProps={WEIGHT_TRIGGER_PROPS}
               value={weightValue}
               valueText={String(active.fontWeight)}
