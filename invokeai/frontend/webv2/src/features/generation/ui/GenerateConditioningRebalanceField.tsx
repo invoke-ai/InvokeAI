@@ -184,8 +184,6 @@ export const GenerateConditioningRebalanceField = ({
   return (
     <>
       <Field
-        borderColor="border.subtle"
-        borderTopWidth="1px"
         helpText={isEnabled ? undefined : t('widgets.generate.krea2RebalanceHelp')}
         hint="conditioningRebalance"
         label={t('widgets.generate.krea2Rebalance')}
@@ -204,7 +202,6 @@ export const GenerateConditioningRebalanceField = ({
             </Switch.Root>
           </HStack>
         }
-        pt="2"
       >
         {isEnabled ? (
           <Stack gap="2" w="full">

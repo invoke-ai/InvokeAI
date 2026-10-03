@@ -1,7 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
 import type { GenerateModelConfig, GenerateSettings, Ideogram4SamplerPreset } from '@features/generation/core/types';
 
-import { Badge, Box, createListCollection, HStack, Image, Input, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, createListCollection, HStack, Image, Input, Separator, Stack, Text } from '@chakra-ui/react';
 import {
   getDefaultGenerateSettings,
   getGenerationModelPolicy,
@@ -371,11 +371,14 @@ export const GenerateRenderSection = ({
           />
         </GenerateFieldContextMenu>
         {familyBase === 'krea-2' ? (
-          <GenerateConditioningRebalanceField
-            settings={settings}
-            onCommit={onCommit}
-            onCommitImmediate={onCommitImmediate}
-          />
+          <>
+            <Separator borderColor="border.subtle" />
+            <GenerateConditioningRebalanceField
+              settings={settings}
+              onCommit={onCommit}
+              onCommitImmediate={onCommitImmediate}
+            />
+          </>
         ) : null}
         {familyBase === 'wan' ? <WanLowNoiseGuidanceField settings={settings} onCommit={onCommit} /> : null}
         {policy.ui.schedulerVisible ? (
@@ -404,8 +407,14 @@ export const GenerateRenderSection = ({
           </GenerateFieldContextMenu>
         ) : null}
         {familyBase === 'ideogram-4' ? <Ideogram4SamplingFields settings={settings} onCommit={onCommit} /> : null}
+        <Separator borderColor="border.subtle" />
         {policy.ui.seedVisible ? <SeedField settings={settings} onCommit={onCommit} /> : null}
-        {familyBase === 'krea-2' ? <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} /> : null}
+        {familyBase === 'krea-2' ? (
+          <>
+            <Separator borderColor="border.subtle" />
+            <Krea2SeedVarianceFields settings={settings} onCommit={onCommit} />
+          </>
+        ) : null}
       </Stack>
     </GenerateCollapsibleSection>
   );
