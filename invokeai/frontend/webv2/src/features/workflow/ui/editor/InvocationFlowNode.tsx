@@ -275,6 +275,7 @@ const NodeTitle = ({
       <MiddleTruncate
         data-workflow-export-node-title="true"
         data-workflow-export-static-node-content="true"
+        fontSize="lg"
         fontWeight="700"
         minW="0"
         text={title}
@@ -296,6 +297,7 @@ const NodeTitle = ({
 
   return (
     <MiddleTruncate
+      fontSize="lg"
       fontWeight="700"
       minW="0"
       text={title}
@@ -965,12 +967,15 @@ const ExpandedInvocationNode = ({ data, selected }: NodeProps<InvocationFlowNode
               <MiddleTruncate
                 data-workflow-export-node-title="true"
                 data-workflow-export-static-node-content="true"
+                fontSize="lg"
                 fontWeight="700"
                 minW="0"
                 text={node.data.label || node.data.type}
               />
             ) : (
-              <Text fontWeight="700">{node.data.label || node.data.type}</Text>
+              <Text fontSize="lg" fontWeight="700">
+                {node.data.label || node.data.type}
+              </Text>
             )}
             {!isWorkflowImageExport ? (
               <Text color="fg.subtle" fontSize="xs">

@@ -99,7 +99,16 @@ export const WorkbenchUnavailableScreen = ({
 
   return (
     <Flex align="center" bg="bg" color="fg" h="100vh" justify="center" p="6" w="100vw">
-      <Box borderColor="border.subtle" borderRadius="xl" borderWidth="1px" maxW="2xl" p="6" shadow="sm" w="full">
+      <Box
+        borderColor="border.subtle"
+        borderRadius="xl"
+        borderWidth="1px"
+        maxW="2xl"
+        p="6"
+        shadow="sm"
+        textStyle="xl"
+        w="full"
+      >
         <Stack gap="5">
           <Stack gap="2">
             <Heading size="3xl">{t('shell.backendUnavailable.title')}</Heading>

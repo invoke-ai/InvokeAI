@@ -290,7 +290,9 @@ const CenteredMessage = ({
 }) => (
   <Center h="full" p="6">
     <Stack align="center" gap="2" maxW="sm" textAlign="center">
-      <Text fontWeight="semibold">{title}</Text>
+      <Text fontSize="xl" fontWeight="semibold">
+        {title}
+      </Text>
       <Text color="fg.muted" fontSize="lg">
         {detail}
       </Text>

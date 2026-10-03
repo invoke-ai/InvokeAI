@@ -40,7 +40,9 @@ const CurrentImageEditorNode = ({ data, selected }: NodeProps<CurrentImageFlowNo
       {...getWorkflowNodeShellProps({ selected })}
     >
       <Flex {...getWorkflowNodeHeaderProps()}>
-        <Text fontWeight="700">{node.data.label || 'Current Image'}</Text>
+        <Text fontSize="lg" fontWeight="700">
+          {node.data.label || 'Current Image'}
+        </Text>
         {progressImage ? (
           <Text color="brand.solid" data-node-status-indicator="true" fontSize="xs" ms="auto">
             generating…
@@ -83,6 +85,7 @@ const CurrentImageSnapshotNode = ({ data, selected }: NodeProps<CurrentImageFlow
           data-workflow-export-node-title="true"
           data-workflow-export-static-node-content="true"
           flex="1"
+          fontSize="lg"
           fontWeight="700"
           minW="0"
           text={node.data.label || 'Current Image'}

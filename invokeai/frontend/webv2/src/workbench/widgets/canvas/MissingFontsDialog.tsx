@@ -183,7 +183,9 @@ const RecoveryRow = ({ group, engine }: { group: FontGroup; engine: CanvasEngine
       : (catalog.data?.items ?? []);
   return (
     <Stack borderWidth="1px" borderRadius="md" p="3" gap="2">
-      <Text fontWeight="medium">{group.fontRef.label}</Text>
+      <Text fontSize="lg" fontWeight="medium">
+        {group.fontRef.label}
+      </Text>
       <Text color="fg.muted" fontSize="md">
         {t('fonts.missing.layers', { count: group.count })}
       </Text>

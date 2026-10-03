@@ -49,7 +49,9 @@ export const ImageIndexProgressPanel = ({
 
   return (
     <Stack align="center" gap="2" maxW="sm" textAlign="center" w="full">
-      <Text fontWeight="semibold">Indexing gallery</Text>
+      <Text fontSize="xl" fontWeight="semibold">
+        Indexing gallery
+      </Text>
       <Text color="fg.muted" fontSize="lg">
         Images and videos are being embedded so they can be mapped. The map appears here on its own once enough of them
         are done — you can keep working in the meantime.

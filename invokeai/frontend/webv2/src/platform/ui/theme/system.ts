@@ -268,6 +268,9 @@ const config = defineConfig({
       fontFamily: 'body',
       margin: 0,
       overflow: 'hidden',
+      // Text that names no size reads at the workbench's working size, as controls do. Only the size: the md text
+      // style's line height is absolute and would be inherited as-is by larger text, while html's unitless 1.5 scales.
+      fontSize: 'md',
     },
     // Exclude editable comboboxes from arrow cursors. Keep role values unquoted while SamOptions assertions match
     // quoted markup.
