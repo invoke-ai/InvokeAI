@@ -2603,6 +2603,23 @@ export type paths = {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app/frontend_config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Frontend Config */
+        get: operations["get_frontend_config"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/app/version": {
         parameters: {
             query?: never;
@@ -15993,6 +16010,17 @@ export type components = {
             type: "freeu";
         };
         /**
+         * FrontendConfig
+         * @description Presentation settings any signed-in user may read; never include private runtime configuration here.
+         */
+        FrontendConfig: {
+            /**
+             * Show Donation Link
+             * @description Whether to show the Donate to InvokeAI menu link
+             */
+            show_donation_link: boolean;
+        };
+        /**
          * GalleryItem
          * @description A gallery item — either an image or a video, with shared fields and a discriminator.
          *
@@ -22194,6 +22222,7 @@ export type components = {
          *         allow_headers: Headers allowed for CORS.
          *         ssl_certfile: SSL certificate file for HTTPS. See https://www.uvicorn.dev/settings/#https.
          *         ssl_keyfile: SSL key file for HTTPS. See https://www.uvicorn.dev/settings/#https.
+         *         show_donation_link: Show the Donate to InvokeAI link in the frontend menus.
          *         log_tokenization: Enable logging of parsed prompt tokens.
          *         patchmatch: Enable patchmatch inpaint code.
          *         models_dir: Path to the models directory.
@@ -22352,6 +22381,12 @@ export type components = {
              * @default 9
              */
             http_compression_level?: number;
+            /**
+             * Show Donation Link
+             * @description Show the Donate to InvokeAI link in the frontend menus.
+             * @default true
+             */
+            show_donation_link?: boolean;
             /**
              * Log Tokenization
              * @description Enable logging of parsed prompt tokens.
@@ -56570,6 +56605,26 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    get_frontend_config: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["FrontendConfig"];
+                };
             };
         };
     };
