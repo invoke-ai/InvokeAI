@@ -35,7 +35,7 @@ const loraModel = {
   type: 'lora',
 } as ModelConfig;
 const secondSdxlModel = { ...model, key: 'sdxl-other', name: 'Another SDXL' } as ModelConfig;
-const MODELS_UI_ADAPTER = { enableModelDescriptions: true, managerProjectId: null };
+const MODELS_UI_ADAPTER = { canManageModels: true, enableModelDescriptions: true, managerProjectId: null };
 const MAIN_MODEL_TYPES: ['main'] = ['main'];
 const CROSS_TYPE_MODEL_TYPES: ['main', 'lora'] = ['main', 'lora'];
 
