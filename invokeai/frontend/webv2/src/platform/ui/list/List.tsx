@@ -10,7 +10,7 @@ import { useTranslation } from 'react-i18next';
 import type { ListDensity } from './ListItem';
 import type { ListRow } from './listRows';
 
-import { ListDivider } from './ListDivider';
+import { IN_SLOT_DIVIDER_HIDING_CSS, ListDivider } from './ListDivider';
 import { LIST_ROW_GAP_PX as ROW_GAP_PX, LIST_ROW_INSET as INSET } from './listLayout';
 import { LIST_SECTION_HEADER_HEIGHT_PX, ListSectionHeader } from './ListSectionHeader';
 
@@ -432,7 +432,13 @@ export const List = <T,>({
   } else {
     content = (
       <Scrollable h="full" viewportProps={viewportProps} viewportRef={attachViewport}>
-        <div aria-busy={isBusy || undefined} aria-label={label} role="list" style={containerStyle}>
+        <Box
+          aria-busy={isBusy || undefined}
+          aria-label={label}
+          css={dividers ? IN_SLOT_DIVIDER_HIDING_CSS : undefined}
+          role="list"
+          style={containerStyle}
+        >
           {virtualItems.map((virtualRow) => {
             const row = rows[virtualRow.index];
 
@@ -482,7 +488,7 @@ export const List = <T,>({
               </div>
             );
           })}
-        </div>
+        </Box>
       </Scrollable>
     );
   }

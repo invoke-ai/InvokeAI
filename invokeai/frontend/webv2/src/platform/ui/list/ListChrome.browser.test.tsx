@@ -4,6 +4,7 @@ import { system } from '@theme/system';
 import { act, type ReactElement } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 import { List, type ListRowProps } from './List';
 import { ListItem } from './ListItem';
@@ -215,5 +216,68 @@ describe('list dividers', () => {
     expect(line.top - rowA.bottom).toBeCloseTo((LIST_ROW_GAP_PX - 1) / 2, 0);
     expect(line.left - rowA.left).toBeCloseTo(8, 0);
     expect(rowA.right - line.right).toBeCloseTo(8, 0);
+  });
+
+  it('hides the hairlines either side of a pointed row, stacked or virtualized', async () => {
+    const opacities = () =>
+      [...host.querySelectorAll<HTMLElement>('[data-list-divider]')].map((line) => getComputedStyle(line).opacity);
+
+    await render(
+      <ListStack dividers label="subjects">
+        <ListItem title="one" />
+        <ListItem title="two" />
+        <ListItem title="three" />
+        <ListItem title="four" />
+      </ListStack>
+    );
+    const stacked = host.querySelectorAll<HTMLElement>('[role="listitem"]');
+
+    await userEvent.hover(stacked[1]!);
+    await expect.poll(opacities).toEqual(['0', '0', '1']);
+    await render(
+      <ListStack dividers label="subjects">
+        <ListItem isMenuOpen title="one" />
+        <ListItem title="two" />
+        <ListItem title="three" />
+        <ListItem title="four" />
+      </ListStack>
+    );
+    await userEvent.unhover(host);
+    await expect.poll(opacities).toEqual(['0', '1', '1']);
+
+    // A caller-wrapped row (its own list item around the row) holding an open menu.
+    await render(
+      <ListStack dividers label="subjects">
+        <ListItem title="one" />
+        <div role="listitem">
+          <ListItem isMenuOpen role="presentation" title="two" />
+        </div>
+        <ListItem title="three" />
+        <ListItem title="four" />
+      </ListStack>
+    );
+    await expect.poll(opacities).toEqual(['0', '0', '1']);
+
+    const rows = listRowsFromSections(
+      [{ items: [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }], key: 'one', label: 'One' }],
+      (item) => item.id
+    );
+
+    await render(
+      <List
+        dividers
+        label="subjects"
+        renderItem={(item: { id: string }, rowProps: ListRowProps) => <ListItem {...rowProps} title={item.id} />}
+        rows={rows}
+      />
+    );
+    await act(async () => {
+      await new Promise((resolve) => {
+        requestAnimationFrame(() => resolve(undefined));
+      });
+    });
+
+    await userEvent.hover(host.querySelector<HTMLElement>('[data-list-row="c"]')!);
+    await expect.poll(opacities).toEqual(['1', '0', '0']);
   });
 });
