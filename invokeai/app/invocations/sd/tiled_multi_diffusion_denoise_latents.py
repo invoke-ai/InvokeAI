@@ -1,5 +1,5 @@
 import copy
-from contextlib import ExitStack
+from contextlib import ExitStack, nullcontext
 from typing import Iterator
 
 import torch
@@ -22,6 +22,7 @@ from invokeai.app.invocations.primitives import LatentsOutput
 from invokeai.app.invocations.sd.controlnet import ControlField
 from invokeai.app.invocations.sd.denoise_latents import DenoiseLatentsInvocation, get_scheduler
 from invokeai.app.services.shared.invocation_context import InvocationContext
+from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.patches.layer_patcher import LayerPatcher, PatchSpec
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.stable_diffusion.diffusers_pipeline import ControlNetData, PipelineIntermediateState
@@ -36,6 +37,7 @@ from invokeai.backend.tiles.tiles import (
 from invokeai.backend.tiles.utils import TBLR
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import get_model_compute_dtype
+from invokeai.backend.util.sage_attention import sage_attention_scope
 
 
 def crop_controlnet_data(control_data: ControlNetData, latent_region: TBLR) -> ControlNetData:
@@ -279,16 +281,18 @@ class TiledMultiDiffusionDenoiseLatents(BaseInvocation):
             )
 
             # Run Multi-Diffusion denoising.
-            result_latents = pipeline.multi_diffusion_denoise(
-                multi_diffusion_conditioning=multi_diffusion_conditioning,
-                target_overlap=latent_tile_overlap,
-                latents=latents,
-                scheduler_step_kwargs=scheduler_step_kwargs,
-                noise=noise,
-                timesteps=timesteps,
-                init_timestep=init_timestep,
-                callback=step_callback,
-            )
+            # SageAttention is validated on SDXL only; SD1.5's head sizes never qualify, SD2 is unmeasured.
+            with sage_attention_scope() if self.unet.unet.base == BaseModelType.StableDiffusionXL else nullcontext():
+                result_latents = pipeline.multi_diffusion_denoise(
+                    multi_diffusion_conditioning=multi_diffusion_conditioning,
+                    target_overlap=latent_tile_overlap,
+                    latents=latents,
+                    scheduler_step_kwargs=scheduler_step_kwargs,
+                    noise=noise,
+                    timesteps=timesteps,
+                    init_timestep=init_timestep,
+                    callback=step_callback,
+                )
 
         result_latents = result_latents.to("cpu")
         # TODO(ryand): I copied this from DenoiseLatentsInvocation. I'm not sure if it's actually important.
