@@ -2248,6 +2248,7 @@
       },
       "conceptWeight": "{{name}} weight",
       "concepts": "Concepts",
+      "conceptsUnsupported": "Concepts are not supported by the selected model.",
       "copyValue": "Copy value",
       "couldNotExpandPrompt": "Could not expand the prompt.",
       "couldNotGeneratePromptFromImage": "Could not generate a prompt from the selected image.",
@@ -3928,6 +3929,20 @@
           "partial": "{{succeeded}} of {{count}} items moved to {{board}}; {{failed}} failed.",
           "success_one": "Moved {{count}} item to {{board}}.",
           "success_other": "Moved {{count}} items to {{board}}."
+        },
+        "recall": {
+          "conceptsNotRestored": "Concepts not restored: {{concepts}}.",
+          "nothingRecalled": "No recallable image data",
+          "partiallyRecalled": "Some image data was not recalled",
+          "unnamedConcept": "unnamed concept",
+          "skippedConcept": {
+            "ambiguous": "{{name}} (matches more than one installed model)",
+            "duplicate": "{{name}} (listed more than once)",
+            "incompatible": "{{name}} (incompatible with the selected model)",
+            "invalid": "{{name}} (unreadable metadata)",
+            "modelUnavailable": "{{name}} (the image's model is not available)",
+            "unresolved": "{{name}} (not installed)"
+          }
         },
         "star": {
           "failure_one": "Could not star {{count}} item.",

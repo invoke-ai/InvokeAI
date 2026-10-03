@@ -6,6 +6,7 @@ import type {
 } from '@features/generation/core/types';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
 import { flushGenerateDrafts } from '@features/generation/react';
 import { system } from '@theme/system';
@@ -18,16 +19,22 @@ import type { GenerateSettingsUpdate } from './generateDebounce';
 import { GenerateConceptsContent } from './GenerateConceptsSection';
 import { GenerationUiProvider, type GenerationUiAdapter } from './GenerationUiContext';
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => {
+  const t = (key: string) => key;
+  return { useTranslation: () => ({ i18n: { resolvedLanguage: 'en' }, t }) };
+});
+
+seedArchitectureCapabilities();
 
 const LORA_MODEL: LoraModelConfig = { base: 'sdxl', key: 'lora-1', name: 'Ink Wash', type: 'lora' };
-const MAIN_MODEL = { base: 'sdxl', key: 'main-1', name: 'Base', type: 'main' } as GenerateModelConfig;
+const MAIN_MODEL: GenerateModelConfig = { base: 'sdxl', key: 'main-1', name: 'Base', type: 'main' };
+const SD3_MODEL: GenerateModelConfig = { base: 'sd-3', key: 'sd3', name: 'SD3', type: 'main' };
 const LORA_MODELS = [LORA_MODEL];
 const LORA: GenerateLora = { isEnabled: true, model: LORA_MODEL, weight: 0.75 };
 const SETTINGS: GenerateSettings = { ...getDefaultGenerateSettings(), loras: [LORA] };
 const ADAPTER = {
   models: {
-    ModelSelect: () => null,
+    ModelSelect: () => <div data-testid="concept-picker" />,
     getBaseColorPalette: () => 'gray',
     getBaseLabel: (base: string) => base,
     getImageUrl: () => '',
@@ -38,7 +45,7 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
-const render = async () => {
+const render = async (selectedModel: GenerateModelConfig = MAIN_MODEL, settings = SETTINGS) => {
   const onCommit = vi.fn<(update: GenerateSettingsUpdate) => void>();
   const onCommitImmediate = vi.fn();
 
@@ -53,8 +60,8 @@ const render = async () => {
             <GenerateConceptsContent
               loraModels={LORA_MODELS}
               projectId={projectId}
-              selectedModel={MAIN_MODEL}
-              settings={SETTINGS}
+              selectedModel={selectedModel}
+              settings={settings}
               onCommit={onCommit}
               onCommitImmediate={onCommitImmediate}
             />
@@ -135,5 +142,47 @@ describe('GenerateConceptsContent', () => {
 
     expect(onCommit).toHaveBeenCalledTimes(1);
     expect(applied(onCommit.mock.calls[0]?.[0])).toMatchObject({ isEnabled: false, weight: 0.75 });
+  });
+
+  it('offers the concept picker for a model family that loads LoRAs', async () => {
+    const { row } = await render(MAIN_MODEL, { ...SETTINGS, loras: [] });
+
+    expect(row.querySelector('[data-testid="concept-picker"]')).not.toBeNull();
+    expect(row.textContent).toContain('widgets.generate.addConceptsHelp');
+    expect(row.textContent).not.toContain('widgets.generate.conceptsUnsupported');
+  });
+
+  it('explains instead of offering an always-empty picker when the model cannot use concepts', async () => {
+    const { row } = await render(SD3_MODEL, { ...SETTINGS, loras: [] });
+
+    expect(row.querySelector('[data-testid="concept-picker"]')).toBeNull();
+    expect(row.textContent).toContain('widgets.generate.conceptsUnsupported');
+    expect(row.textContent).not.toContain('widgets.generate.addConceptsHelp');
+  });
+
+  it('keeps concepts from another model removable when the model cannot use concepts', async () => {
+    const { row, onCommitImmediate } = await render(SD3_MODEL);
+
+    expect(row.textContent).toContain('Ink Wash');
+    expect(row.textContent).toContain('widgets.generate.incompatible');
+
+    const remove = row.querySelector<HTMLButtonElement>('button[aria-label="widgets.generate.removeConceptNamed"]');
+
+    expect(remove).not.toBeNull();
+    await act(() => {
+      remove?.click();
+    });
+
+    expect(onCommitImmediate).toHaveBeenCalledWith({ loras: [] });
+  });
+
+  it('marks a same-family concept incompatible when the model cannot use concepts', async () => {
+    const sd3Lora: LoraModelConfig = { base: 'sd-3', key: 'sd3-lora', name: 'Glow', type: 'lora' };
+    const { row } = await render(SD3_MODEL, {
+      ...SETTINGS,
+      loras: [{ isEnabled: true, model: sd3Lora, weight: 0.8 }],
+    });
+
+    expect(row.textContent).toContain('widgets.generate.incompatible');
   });
 });

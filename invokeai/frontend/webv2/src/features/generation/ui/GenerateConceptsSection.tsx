@@ -8,6 +8,7 @@ import type {
 } from '@features/generation/core/types';
 
 import { Box, Stack, Text } from '@chakra-ui/react';
+import { isLoraSupported } from '@features/generation/core/baseGenerationPolicies';
 import {
   getDefaultLoraWeight,
   isLoraCompatibleWithModel,
@@ -36,8 +37,9 @@ interface GenerateConceptsContentProps {
 
 const LORA_WEIGHT_DEBOUNCE_MS = 250;
 
-const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateModelConfig | undefined): boolean =>
-  Boolean(selectedModel && isLoraCompatibleWithModel(lora.model, selectedModel));
+/** Whether the selected model's graph will load this concept: its family must take LoRAs and match the LoRA. */
+export const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateModelConfig | undefined): boolean =>
+  Boolean(selectedModel && isLoraSupported(selectedModel) && isLoraCompatibleWithModel(lora.model, selectedModel));
 
 export const GenerateConceptsContent = ({
   loraModels,
@@ -81,6 +83,36 @@ export const GenerateConceptsContent = ({
     onCommitImmediate({ loras: loras.filter((lora) => lora.model.key !== modelKey) });
   };
 
+  const rows =
+    loras.length > 0 ? (
+      <Box mx={-1}>
+        <ConceptList label={t('widgets.generate.concepts')} projectId={projectId}>
+          {loras.map((lora) => (
+            <GenerateConceptRow
+              key={lora.model.key}
+              isCompatible={isCompatibleLora(lora, selectedModel)}
+              lora={lora}
+              projectId={projectId}
+              onRemove={removeLora}
+              onUpdate={updateLora}
+            />
+          ))}
+        </ConceptList>
+      </Box>
+    ) : null;
+
+  if (selectedModel && !isLoraSupported(selectedModel)) {
+    // Rows left from another model stay listed, marked incompatible, so they can still be removed.
+    return (
+      <Stack gap="2">
+        <Text color="fg.muted" fontSize="xs">
+          {t('widgets.generate.conceptsUnsupported')}
+        </Text>
+        {rows}
+      </Stack>
+    );
+  }
+
   return (
     <Stack gap="2">
       <Field
@@ -103,25 +135,10 @@ export const GenerateConceptsContent = ({
         />
       </Field>
 
-      {loras.length === 0 ? (
+      {rows ?? (
         <Text color="fg.muted" fontSize="xs">
           {t('widgets.generate.addConceptsHelp')}
         </Text>
-      ) : (
-        <Box mx={-1}>
-          <ConceptList label={t('widgets.generate.concepts')} projectId={projectId}>
-            {loras.map((lora) => (
-              <GenerateConceptRow
-                key={lora.model.key}
-                isCompatible={isCompatibleLora(lora, selectedModel)}
-                lora={lora}
-                projectId={projectId}
-                onRemove={removeLora}
-                onUpdate={updateLora}
-              />
-            ))}
-          </ConceptList>
-        </Box>
       )}
     </Stack>
   );
