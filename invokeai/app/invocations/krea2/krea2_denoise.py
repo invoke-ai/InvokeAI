@@ -63,6 +63,7 @@ from invokeai.backend.util import sdpa_scope
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.sage_attention import sage_attention_scope
 
 # Krea-2 latent channels (Qwen-Image VAE z_dim). The packed transformer in_channels is 16 * patch_size**2 = 64.
 KREA2_LATENT_CHANNELS = 16
@@ -624,6 +625,11 @@ class Krea2DenoiseInvocation(BaseInvocation, WithMetadata, WithBoard):
                 # Built after the LoRA patcher so the reference trajectory is anchored to the same weights
                 # the sampler will use.
                 style_extension.prepare([sigma.item() for sigma in sigmas_sched[:total_steps]])
+
+            # An INVOKE_KREA2_SDPA_BACKEND override pins one PyTorch kernel to measure it; SageAttention must not
+            # serve those calls instead.
+            if resolve_krea2_sdpa_backends().override is None:
+                exit_stack.enter_context(sage_attention_scope())
 
             benchmark = _Krea2StepBenchmark.create(device)
 
