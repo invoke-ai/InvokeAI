@@ -42,6 +42,7 @@ from invokeai.backend.patches.layer_patcher import PatchSpec
 from invokeai.backend.stable_diffusion.diffusers_pipeline import PipelineIntermediateState
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import WanConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.sage_attention import sage_attention_scope
 from invokeai.backend.wan.memory_optimization import wan_memory_optimization
 from invokeai.backend.wan.sampling_utils import (
     get_default_latent_channels,
@@ -311,6 +312,7 @@ class WanVideoDenoiseInvocation(BaseInvocation):
                 ),
             )
             exit_stack.callback(swapper.close)
+            exit_stack.enter_context(sage_attention_scope())
 
             for step_idx, t in enumerate(
                 tqdm(timesteps, desc=f"Denoising Wan 2.2 video ({self.num_frames} frames)", total=total_steps)
