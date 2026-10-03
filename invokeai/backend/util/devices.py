@@ -28,6 +28,42 @@ def _xpu_is_available() -> bool:
     return hasattr(torch, "xpu") and torch.xpu.is_available()
 
 
+def device_is_integrated(device: torch.device) -> Optional[bool]:
+    """Return True/False if ``device`` is an integrated GPU, or None if it cannot be determined.
+
+    XPU asks Level Zero. A CUDA device answers through its properties, which on ROCm also report AMD's integrated
+    graphics: HIP enumerates the Radeon iGPU of a Ryzen desktop CPU next to a discrete card (measured: gfx1036 beside
+    an RX 9060 XT on Windows, ``is_integrated=1``). CPU and MPS are not GPUs that could be paired with a discrete
+    card, so they answer False.
+    """
+    if device.type == "xpu":
+        return xpu_device_is_integrated(device)
+    if device.type != "cuda":
+        return False
+    try:
+        index = device.index if device.index is not None else torch.cuda.current_device()
+        flag = getattr(torch.cuda.get_device_properties(index), "is_integrated", None)
+    except Exception:
+        return None
+    return None if flag is None else bool(flag)
+
+
+def _default_cuda_device() -> torch.device:
+    """The CUDA device ``device: auto`` means: the current one, unless it is an integrated GPU and a discrete one exists.
+
+    HIP may enumerate an APU's integrated graphics before the discrete card, and the current device is the first one
+    until something pins another, so without this an iGPU could become the default device.
+    """
+    current = torch.device("cuda", torch.cuda.current_device())
+    if device_is_integrated(current) is not True:
+        return CUDA_DEVICE
+    for index in range(torch.cuda.device_count()):
+        candidate = torch.device("cuda", index)
+        if device_is_integrated(candidate) is False:
+            return candidate
+    return CUDA_DEVICE
+
+
 @deprecated("Use TorchDevice.choose_torch_dtype() instead.")  # type: ignore
 def choose_precision(device: torch.device) -> TorchPrecisionNames:
     """Return the string representation of the recommended torch device."""
@@ -119,7 +155,7 @@ class TorchDevice:
         if app_config.device != "auto":
             device = torch.device(app_config.device)
         elif torch.cuda.is_available():
-            device = CUDA_DEVICE
+            device = _default_cuda_device()
         elif _xpu_is_available():
             device = XPU_DEVICE
         elif torch.backends.mps.is_available():
@@ -260,19 +296,20 @@ class TorchDevice:
     def _auto_generation_devices(cls) -> list[torch.device]:
         """The device list `generation_devices: auto` expands to.
 
-        Unlike CUDA, Level Zero enumerates the CPU's integrated GPU alongside any discrete card,
-        so on the mainstream Arc configuration (iGPU + discrete Arc) `auto` would dispatch half
-        the queue to the iGPU and make it a text-encoder borrow target. Drop integrated GPUs here.
+        Level Zero and ROCm enumerate the CPU's integrated GPU alongside any discrete card, so on
+        the mainstream configurations (iGPU + discrete Arc, Ryzen iGPU + discrete Radeon) `auto`
+        would dispatch half the queue to the iGPU and make it a text-encoder borrow target. Drop
+        integrated GPUs here.
 
-        Two deliberate limits: a device whose type cannot be determined is kept (the Level Zero
-        probe returns None, and narrowing on a guess is worse than the status quo), and a machine
-        whose only GPU is integrated keeps it -- otherwise there would be nothing to generate on.
-        An explicit `generation_devices` list is unaffected, so an iGPU can still be opted into.
+        Two deliberate limits: a device whose type cannot be determined is kept (the probe returns
+        None, and narrowing on a guess is worse than the status quo), and a machine whose only GPU
+        is integrated keeps it -- otherwise there would be nothing to generate on. An explicit
+        `generation_devices` list is unaffected, so an iGPU can still be opted into.
         """
         integrated: list[torch.device] = []
         remaining: list[torch.device] = []
         for device in cls._all_available_devices():
-            (integrated if xpu_device_is_integrated(device) is True else remaining).append(device)
+            (integrated if device_is_integrated(device) is True else remaining).append(device)
         if not integrated or not remaining:
             return integrated + remaining
         InvokeAILogger.get_logger(__name__).info(
@@ -288,7 +325,8 @@ class TorchDevice:
         - ``"auto"`` (the default) defers to an explicitly pinned legacy ``device:`` setting (an
           upgraded install that pinned e.g. ``device: cuda:1`` to avoid its display GPU must not
           silently start generating on every GPU); otherwise it expands to every visible CUDA
-          device, or the single best available device (mps/cpu) when CUDA is unavailable.
+          device except integrated GPUs next to a discrete one (see `_auto_generation_devices`),
+          or the single best available device (mps/cpu) when CUDA is unavailable.
         - An explicit list is normalized and deduplicated, with order preserved, and overrides the
           legacy ``device:`` setting.
         - ``None`` or an empty list yields an empty list; the caller decides the single-device fallback.

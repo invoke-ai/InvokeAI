@@ -136,9 +136,9 @@ def test_rocm_url_regression_is_reported(repo_copy: Path, capsys: pytest.Capture
 
 
 def test_unsupported_backend_fails(repo_copy: Path):
-    """ROCm on Windows has no wheels; pinning an index for it must be rejected."""
+    """Legacy installs do not support ROCm on Windows; pinning an index for it must be rejected."""
     pins = _read_pins(repo_copy)
-    pins["torchIndexUrl"]["win32"]["rocm"] = "https://download.pytorch.org/whl/rocm7.1"
+    pins["torchIndexUrl"]["win32"]["rocm"] = "https://stable.repo.amd.com/rocm/whl-next/"
     _write_pins(repo_copy, pins)
 
     assert check_pins.main(repo_copy) == 1
