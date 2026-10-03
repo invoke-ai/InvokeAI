@@ -1,4 +1,5 @@
-import type { FloatingWidgetState, WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
+import type { FloatingWidgetPlacement } from '@workbench/floatingWindows';
+import type { WidgetRegion, WidgetRegionState } from '@workbench/layoutContracts';
 import type {
   NormalizedWidgetManifest,
   RegisteredWidget,
@@ -7,6 +8,8 @@ import type {
   WidgetInstanceId,
   WidgetTypeId,
 } from '@workbench/widgetContracts';
+
+import { getRegionOrder } from '@workbench/floatingWindows';
 
 export interface WidgetPlacementInstanceMeta {
   id: WidgetInstanceId;
@@ -36,9 +39,6 @@ export interface PlacedWidgetRegionItem<
   isFloating?: true;
 }
 
-/** Only the placement half of a window: the slot this region keeps for it. */
-export type FloatingWidgetPlacement = Pick<FloatingWidgetState, 'returnIndex' | 'returnRegion'>;
-
 export interface AvailableWidgetTypeItem extends BaseWidgetRegionItem {
   instance?: undefined;
   isEnabled: false;
@@ -56,33 +56,6 @@ export interface WidgetRegionViewModel<Instance extends WidgetPlacementInstanceM
   activeItem?: PlacedWidgetRegionItem<Instance>;
   sortableInstanceIds: WidgetInstanceId[];
 }
-
-/**
- * Keep floated widgets reachable from their original rail slots; insert by ascending dock index to preserve
- * ordering.
- */
-const withFloatingSlots = (
-  instanceIds: WidgetInstanceId[],
-  region: WidgetRegion,
-  floatingWidgets: Record<WidgetInstanceId, FloatingWidgetPlacement> | undefined
-): { instanceId: WidgetInstanceId; isFloating: boolean }[] => {
-  const slots = instanceIds.map((instanceId) => ({ instanceId, isFloating: false }));
-
-  if (!floatingWidgets) {
-    return slots;
-  }
-
-  const floating = (Object.entries(floatingWidgets) as [WidgetInstanceId, FloatingWidgetPlacement][])
-    .filter(([instanceId, state]) => state.returnRegion === region && !instanceIds.includes(instanceId))
-    .map(([instanceId, state]) => ({ index: state.returnIndex ?? Number.POSITIVE_INFINITY, instanceId }))
-    .sort((left, right) => left.index - right.index);
-
-  for (const { index, instanceId } of floating) {
-    slots.splice(Math.min(Math.max(0, Math.floor(index)), slots.length), 0, { instanceId, isFloating: true });
-  }
-
-  return slots;
-};
 
 export const createWidgetRegionViewModel = <Instance extends WidgetPlacementInstanceMeta>({
   activeInstanceId,
@@ -103,7 +76,8 @@ export const createWidgetRegionViewModel = <Instance extends WidgetPlacementInst
   getWidgetLabel?: (manifest: NormalizedWidgetManifest) => string;
 }): WidgetRegionViewModel<Instance> => {
   const widgetsByType = new Map(widgets.map((widget) => [widget.manifest.id, widget]));
-  const placedItems = withFloatingSlots(instanceIds, region, floatingWidgets).flatMap(
+  // The order reducers dock by, so a marker sits exactly where its window returns.
+  const placedItems = getRegionOrder(region, instanceIds, floatingWidgets).flatMap(
     ({ instanceId, isFloating }): PlacedWidgetRegionItem<Instance>[] => {
       const instance = widgetInstances[instanceId];
       const widget = instance ? widgetsByType.get(instance.typeId) : undefined;
