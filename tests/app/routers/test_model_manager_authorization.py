@@ -221,10 +221,8 @@ def test_create_image_upload_entry_requires_auth_before_the_501_stub(
 #   video media routes now authenticate via the path-scoped media cookie (get_current_media_user_or_default);
 #   the workflow-thumbnail and model-image routes remain open pending the same treatment (see PR #9367)
 # - version: intentionally public
-# - frontend_config: deployment-wide menu visibility only; no account data or private runtime settings
 # - docs/redoc: API documentation
 PUBLIC_ROUTES = {
-    ("GET", "/api/v1/app/frontend_config"),
     ("GET", "/api/v1/app/version"),
     ("POST", "/api/v1/auth/login"),
     ("POST", "/api/v1/auth/setup"),

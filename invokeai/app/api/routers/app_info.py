@@ -53,13 +53,13 @@ class AppVersion(BaseModel):
 
 
 class FrontendConfig(BaseModel):
-    """Public presentation settings; never include private runtime configuration here."""
+    """Presentation settings any signed-in user may read; never include private runtime configuration here."""
 
     show_donation_link: bool = Field(description="Whether to show the Donate to InvokeAI menu link")
 
 
 @app_router.get("/frontend_config", operation_id="get_frontend_config", response_model=FrontendConfig)
-def get_frontend_config() -> FrontendConfig:
+def get_frontend_config(current_user: CurrentUserOrDefault) -> FrontendConfig:
     return FrontendConfig(show_donation_link=get_config().show_donation_link)
 
 

@@ -44,12 +44,13 @@ def _non_admin_user() -> Mock:
 @pytest.mark.parametrize(
     ("setting", "visible"), [("", True), ("show_donation_link: true", True), ("show_donation_link: false", False)]
 )
-def test_frontend_config_exposes_only_public_yaml_settings(
+def test_frontend_config_exposes_only_presentation_settings_to_signed_in_users(
     setting: str,
     visible: bool,
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
     client: TestClient,
+    mock_invoker: Invoker,
     enable_multiuser: Any,
 ) -> None:
     config_path = tmp_path / "invokeai.yaml"
@@ -59,9 +60,17 @@ def test_frontend_config_exposes_only_public_yaml_settings(
     config = load_and_migrate_config(config_path)
     monkeypatch.setattr(app_info, "get_config", lambda: config)
 
-    assert client.get("/api/v1/app/runtime_config").status_code == 401
-    # Public UI presentation does not require an administrator or expose the runtime config.
-    response = client.get("/api/v1/app/frontend_config")
+    assert client.get("/api/v1/app/frontend_config").status_code == 401
+
+    monkeypatch.setattr(
+        "invokeai.app.api.auth_dependencies.verify_token",
+        lambda _: TokenData(user_id="user-1", email="user@example.com", is_admin=False),
+    )
+    monkeypatch.setattr(mock_invoker.services.users, "get", Mock(return_value=_non_admin_user()))
+    # Non-admin users read menu presentation without gaining access to the runtime config.
+    headers = {"Authorization": "Bearer non-admin-token"}
+    assert client.get("/api/v1/app/runtime_config", headers=headers).status_code == 403
+    response = client.get("/api/v1/app/frontend_config", headers=headers)
 
     assert response.status_code == 200
     assert response.json() == {"show_donation_link": visible}
