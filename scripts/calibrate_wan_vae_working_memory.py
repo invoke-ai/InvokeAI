@@ -8,8 +8,13 @@ single Wan ``.safetensors`` checkpoint:
 The default shape matches the 12 GiB-card calibration point. Use ``--no-streaming``
 to measure the full-frame decode path, or ``--tiling`` to measure the spatially
 tiled path used as a low-VRAM fallback. Tiling overrides streaming. The script
-reports allocated and reserved deltas; the implied scaling constant uses allocated
-memory to match the shipped estimator, while reserved memory shows allocator headroom.
+reports allocated and reserved deltas; the implied scaling constant uses reserved
+memory, which the shipped estimator is calibrated on: the model cache keeps the estimate
+free for the decode, and what the decode takes from the device is what the allocator
+reserves, about 1.5x its peak of live tensors. The table behind the shipped constant
+(in ``estimate_vae_working_memory_wan``) was measured with ``--dtype bfloat16``, both
+with and without ``--no-streaming``; its highest point came from a running server, so
+the constant sits above what this script reports.
 """
 
 from __future__ import annotations
@@ -25,7 +30,10 @@ from diffusers.models.autoencoders import AutoencoderKLWan
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from invokeai.backend.model_manager.load.model_loaders.vae import _wan_vae_init_kwargs_for  # noqa: E402
-from invokeai.backend.util.vae_working_memory import estimate_vae_working_memory_wan  # noqa: E402
+from invokeai.backend.util.vae_working_memory import (  # noqa: E402
+    estimate_vae_working_memory_wan,
+    wan_vae_clip_bytes,
+)
 from invokeai.backend.wan.vae_decode import iter_wan_vae_decode_chunks  # noqa: E402
 
 DTYPES = {"float16": torch.float16, "bfloat16": torch.bfloat16, "float32": torch.float32}
@@ -110,13 +118,15 @@ def _measure(
         tile_size=tile_size,
         streaming=streaming,
     )
-    if streaming:
-        resident_frames = min(pixel_frames, temporal_scale)
-        clip_copies = 1
-    else:
-        resident_frames = pixel_frames
-        clip_copies = 2
-    clip_bytes = clip_copies * 3 * resident_frames * pixel_height * pixel_width * element_size
+    clip_bytes = wan_vae_clip_bytes(
+        operation="decode",
+        vae=vae,
+        pixel_height=pixel_height,
+        pixel_width=pixel_width,
+        pixel_frames=pixel_frames,
+        tile_size=tile_size,
+        streaming=streaming,
+    )
 
     torch.cuda.synchronize()
     torch.cuda.empty_cache()
@@ -142,7 +152,7 @@ def _measure(
     peak_reserved = torch.cuda.max_memory_reserved(device)
     measured_allocated_delta = peak_allocated - baseline_allocated
     measured_reserved_delta = peak_reserved - baseline_reserved
-    implied_constant = (measured_allocated_delta - clip_bytes) / scaling_basis_bytes
+    implied_constant = (measured_reserved_delta - clip_bytes) / scaling_basis_bytes
     return {
         "device": torch.cuda.get_device_name(device),
         "backend": "ROCm" if torch.version.hip is not None else "CUDA",
@@ -218,7 +228,10 @@ def main() -> None:
     print(f"estimate: {result['estimate_bytes'] / gib:.3f} GiB")
     print(f"measured allocated delta: {result['measured_allocated_delta_bytes'] / gib:.3f} GiB")
     print(f"measured reserved delta: {result['measured_reserved_delta_bytes'] / gib:.3f} GiB")
-    print(f"implied scaling constant (allocated): {result['implied_scaling_constant']:.1f}")
+    print(f"implied scaling constant (reserved): {result['implied_scaling_constant']:.1f}")
+    # With --tiling the clip copies can exceed the whole measurement, leaving a negative constant: the coverage is the
+    # figure that says whether the estimate holds.
+    print(f"estimate covers: {result['estimate_bytes'] / result['measured_reserved_delta_bytes']:.2f}x of reserved")
 
 
 if __name__ == "__main__":
