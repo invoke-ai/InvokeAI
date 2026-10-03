@@ -937,6 +937,195 @@ const runLayersPanesJourney = async (browser) => {
   }
 };
 
+/**
+ * Floating a rail panel that is also the center's only view: the rail keeps a marker, the center says where the
+ * view went, and removing or docking the window gives the center its view — and keyboard focus — back.
+ */
+const runFloatingWindowJourney = async (browser) => {
+  const { context, page, pageErrors } = await openRepresentativePage(browser, representativeProjectPath);
+  const id = 'workbench-floating-window';
+
+  try {
+    await waitForWorkbench(page);
+    await selectLayoutPreset(page, 'Video', 'Preview');
+
+    const rail = page.getByRole('navigation', { exact: true, name: 'Inspect widget visibility' });
+    const center = centerRegion(page);
+    const floatingWindow = page.locator('[data-hotkey-widget-region="floating"]');
+    const marker = rail.getByRole('button', { exact: true, name: 'Preview, floating window' });
+    const floatPreviewFromRail = async () => {
+      await rail.getByRole('button', { exact: true, name: 'Inspect widgets' }).click();
+      await page.getByRole('menuitemcheckbox', { exact: true, name: 'Preview' }).click();
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
+      await floatingWindow.waitFor();
+      await marker.waitFor();
+    };
+    const focusedRegion = () =>
+      page.evaluate(() => document.activeElement?.closest('[data-focus-region]')?.getAttribute('data-focus-region'));
+    // Focus, the accent outline, and the top of the stack all name the same window.
+    const waitForActiveWindow = () =>
+      page.waitForFunction(() => {
+        const active = document.activeElement?.closest('[data-floating-window]');
+
+        return active !== null && active !== undefined && active.getAttribute('data-highlighted') === 'true';
+      });
+    const waitForFocusedRegion = (region) =>
+      page.waitForFunction(
+        (expected) =>
+          document.activeElement?.closest('[data-focus-region]')?.getAttribute('data-focus-region') === expected,
+        region
+      );
+
+    await floatPreviewFromRail();
+    await waitForActiveWindow();
+    await center.getByText('Preview is in a floating window', { exact: true }).waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:floating`);
+
+    // The window is operable from the keyboard: the one labelled grip resizes it, and the title bar moves it.
+    const width = async () => Math.round((await floatingWindow.boundingBox()).width);
+    const left = async () => Math.round((await floatingWindow.boundingBox()).x);
+    const windowedWidth = await width();
+    await floatingWindow.getByRole('separator', { exact: true, name: 'Resize window' }).focus();
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(
+      ([selector, expected]) => Math.round(document.querySelector(selector).getBoundingClientRect().width) === expected,
+      ['[data-hotkey-widget-region="floating"]', windowedWidth + 16]
+    );
+    const windowedLeft = await left();
+    await floatingWindow.getByLabel('Move Preview window', { exact: true }).focus();
+    await page.keyboard.press('ArrowRight');
+    await page.waitForFunction(
+      ([selector, expected]) => Math.round(document.querySelector(selector).getBoundingClientRect().left) === expected,
+      ['[data-hotkey-widget-region="floating"]', windowedLeft + 16]
+    );
+
+    // Maximize and collapse are explicit, labelled controls; each state is scanned.
+    await floatingWindow.getByRole('button', { exact: true, name: 'Maximize' }).click();
+    await floatingWindow.getByRole('button', { exact: true, name: 'Restore' }).waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:maximized`);
+    await floatingWindow.getByRole('button', { exact: true, name: 'Restore' }).click();
+    assert.equal(await width(), windowedWidth + 16, 'Restore must return to the windowed size.');
+    await floatingWindow.getByRole('button', { exact: true, name: 'Collapse' }).click();
+    await floatingWindow.getByRole('button', { exact: true, name: 'Expand' }).waitFor();
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:collapsed`);
+    await floatingWindow.getByRole('button', { exact: true, name: 'Expand' }).click();
+    await floatingWindow.getByRole('button', { exact: true, name: 'Collapse' }).waitFor();
+
+    // The marker is a keyboard stop, and it shows the window rather than docking it.
+    await marker.focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await floatingWindow.count(), 1, 'Activating the marker must keep the window floating.');
+    await waitForActiveWindow();
+
+    await marker.click({ button: 'right' });
+    assert.deepEqual(await page.getByRole('menuitem').allInnerTexts(), ['Dock to right panel', 'Remove Preview']);
+    await page.getByRole('menuitem', { exact: true, name: 'Remove Preview' }).click();
+    await centerViewTrigger(page, 'Preview').waitFor();
+    await floatingWindow.waitFor({ state: 'detached' });
+    assert.equal(await marker.count(), 0, 'Removing the window must free its rail slot.');
+    await waitForFocusedRegion('center');
+
+    await floatPreviewFromRail();
+    await waitForActiveWindow();
+    await center.getByRole('button', { exact: true, name: 'Dock to right panel' }).click();
+    await centerViewTrigger(page, 'Preview').waitFor();
+    await floatingWindow.waitFor({ state: 'detached' });
+    await rail.getByRole('button', { exact: true, name: 'Preview' }).waitFor();
+    await waitForFocusedRegion('center');
+    assert.equal(await focusedRegion(), 'center');
+
+    // Docking brought Preview to the front of the right panel. Float it again: docking from the window's own
+    // control returns focus to that panel.
+    await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
+    await floatingWindow.waitFor();
+    await waitForActiveWindow();
+    await floatingWindow.getByRole('button', { exact: true, name: 'Dock to right panel' }).click();
+    await floatingWindow.waitFor({ state: 'detached' });
+    await waitForFocusedRegion('right');
+
+    // The rail's own dock path: the marker's menu, reached from the keyboard, with focus following the panel.
+    await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
+    await floatingWindow.waitFor();
+    await waitForActiveWindow();
+    await marker.focus();
+    await page.keyboard.press('Shift+F10');
+    await page.getByRole('menuitem', { exact: true, name: 'Dock to right panel' }).click();
+    await floatingWindow.waitFor({ state: 'detached' });
+    await waitForFocusedRegion('right');
+    await waitForSettledDocument(page);
+    await assertNoAxeViolations(page, `${id}:docked`);
+
+    // Removing a window from its marker's menu takes the menu and the marker with it. Focus goes to the panel the
+    // window's rail is showing, or to the center when that rail shows none: collapsed, or emptied by the float.
+    const floatImageMapFrom = async (widgetRail, menuName) => {
+      await widgetRail.getByRole('button', { exact: true, name: menuName }).click();
+      await page.getByRole('menuitemcheckbox', { exact: true, name: 'Image Map' }).click();
+      await page.keyboard.press('Escape');
+      await page.getByRole('button', { exact: true, name: 'Float Window' }).click();
+      await floatingWindow.waitFor();
+      await waitForActiveWindow();
+    };
+    // From the keyboard, where losing focus costs the most: Remove is the menu's last item.
+    const removeImageMapFrom = async (widgetRail, focusedRegionAfter) => {
+      await widgetRail.getByRole('button', { exact: true, name: 'Image Map, floating window' }).focus();
+      await page.keyboard.press('Shift+F10');
+      await page.waitForFunction(() => Boolean(document.activeElement?.closest('[role="menu"]')));
+      await page.keyboard.press('End');
+      await page.keyboard.press('Enter');
+      await floatingWindow.waitFor({ state: 'detached' });
+      await waitForFocusedRegion(focusedRegionAfter);
+    };
+
+    await floatImageMapFrom(rail, 'Inspect widgets');
+    await removeImageMapFrom(rail, 'right');
+
+    await floatImageMapFrom(rail, 'Inspect widgets');
+    await rail.getByRole('button', { pressed: true }).click();
+    await page.getByRole('complementary', { exact: true, name: 'right widget panel' }).waitFor({ state: 'detached' });
+    await removeImageMapFrom(rail, 'center');
+
+    const leftRail = page.getByRole('navigation', { exact: true, name: 'Create widget visibility' });
+    for (const name of ['Video', 'Upscale']) {
+      await leftRail.getByRole('button', { exact: true, name }).click({ button: 'right' });
+      await page.getByRole('menuitem', { exact: true, name: `Remove ${name}` }).click();
+    }
+    await floatImageMapFrom(leftRail, 'Create widgets');
+    await page.getByRole('complementary', { exact: true, name: 'left widget panel' }).waitFor({ state: 'detached' });
+    await removeImageMapFrom(leftRail, 'center');
+
+    // The enable menu stays open across a toggle and keeps focus; removing a window from it moves none.
+    await floatImageMapFrom(leftRail, 'Create widgets');
+    await leftRail.getByRole('button', { exact: true, name: 'Create widgets' }).click();
+    await page.getByRole('menuitemcheckbox', { exact: true, name: 'Image Map' }).click();
+    await floatingWindow.waitFor({ state: 'detached' });
+    // A focus move would have landed within a frame of the removal.
+    await page.evaluate(
+      () =>
+        new Promise((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        })
+    );
+    assert.equal(
+      await page.evaluate(() => Boolean(document.activeElement?.closest('[role="menu"]'))),
+      true,
+      'Removing a window from the enable menu must leave focus in that menu.'
+    );
+    await page.keyboard.press('Escape');
+
+    if (pageErrors.length > 0) {
+      throw new AggregateError(pageErrors, `${id} raised uncaught browser errors.`);
+    }
+
+    return { id, status: 'passed' };
+  } finally {
+    await context.close();
+  }
+};
+
 const SETTINGS_DIALOG_SCOPE = { include: ['[data-scope="dialog"][data-part="content"]'] };
 
 const runSettingsJourney = async (browser) => {
@@ -1046,6 +1235,9 @@ try {
   }
   if (!requestedJourney || requestedJourney === 'workbench-layers-panes') {
     reports.push(await runLayersPanesJourney(browser));
+  }
+  if (!requestedJourney || requestedJourney === 'workbench-floating-window') {
+    reports.push(await runFloatingWindowJourney(browser));
   }
   if (!requestedJourney || requestedJourney === 'workbench-settings') {
     reports.push(await runSettingsJourney(browser));
