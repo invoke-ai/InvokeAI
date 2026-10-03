@@ -5,7 +5,7 @@ import { Fragment, useCallback } from 'react';
 
 import { Tooltip } from './Tooltip';
 
-const TAB_HOVER_PROPS = { bg: 'gray.hoverTint/8', color: 'fg' };
+const TAB_HOVER_PROPS = { bg: 'bg.hover', color: 'fg' };
 const TAB_SHOWN_BG = 'gray.hoverTint/15';
 
 /** The strip's fixed height; collapsed blocks and drag snaps size against it. */

@@ -910,7 +910,7 @@ const rowSurface = {
   transition: 'background var(--wb-motion-duration-fast) ease, color var(--wb-motion-duration-fast) ease',
   w: 'full',
   // Keep the pointed fill below selected emphasis so pointing does not resemble selection.
-  [ROW_POINTED]: { bg: 'bg.muted/60' },
+  [ROW_POINTED]: { bg: 'bg.hover' },
   _disabled: { cursor: 'not-allowed', opacity: 0.5 },
 } as const;
 

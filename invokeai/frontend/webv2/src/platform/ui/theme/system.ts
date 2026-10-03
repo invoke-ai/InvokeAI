@@ -101,6 +101,11 @@ const brandFg: Compute = (theme) =>
     ? `color-mix(in oklab, ${theme.colors.brand.solid} 50%, ${theme.colors.neutral[950]})`
     : theme.colors.brand.solid;
 const accentSolid: Compute = (theme) => theme.colors.accent.solid;
+/** Foreground pulled toward accent: the hue of interaction fills, which apply it at low alpha. */
+const hoverTint: Compute = (theme) =>
+  `color-mix(in oklab, ${theme.colors.accent.solid} 40%, ${
+    theme.colorScheme === 'light' ? theme.colors.neutral[950] : theme.colors.neutral[50]
+  })`;
 
 /** The neutral ramp, emitted as `neutral.50…neutral.950`, one value per theme. */
 const neutralRamp = Object.fromEntries(STEPS.map((step) => [step, colorToken((theme) => theme.colors.neutral[step])]));
@@ -152,6 +157,8 @@ const semanticColors = {
   'bg.panel': stepRef(800, 100),
   'bg.emphasized': colorToken((theme) => theme.colors.control),
   'bg.inset': colorToken((theme) => theme.colors.inset),
+  /** The pointed fill for rows and tabs: a faint accent-tinted foreground, translucent so it reads on any surface. */
+  'bg.hover': mix(hoverTint, 8, () => 'transparent'),
   // Soft status fills for alerts/banners, mixed into the panel surface.
   'bg.error': mix(danger, 14, surface),
   'bg.success': mix(success, 14, surface),
@@ -198,12 +205,7 @@ const semanticColors = {
       600
     ),
     /** Mix foreground toward accent for low-alpha interaction fills. */
-    hoverTint: grayToken(
-      (theme) =>
-        `color-mix(in oklab, ${theme.colors.accent.solid} 40%, ${
-          theme.colorScheme === 'light' ? theme.colors.neutral[950] : theme.colors.neutral[50]
-        })`
-    ),
+    hoverTint: grayToken(hoverTint),
   },
   // Palette-tinted interaction fills for the non-default palettes buttons use.
   red: { hoverTint: { value: '{colors.red.fg}' } },
