@@ -68,7 +68,8 @@ Unknown fields, and values outside the bounds below, are rejected with `422`.
 Media fields in one request are read in the Video panel's precedence, highest first:
 
 1. `ltx2_conditioning_video` — a whole-generation conditioning clip excludes every
-   other medium.
+   other medium, except that in the `audio` role `first_frame_image` and
+   `last_frame_image` ride alongside it to anchor the generated picture.
 2. `minimax_h3_references` (non-empty) — references replace the frame slots; a
    `source_video` rides alongside them.
 3. `source_video` — an initial video replaces `first_frame_image`, which extend
@@ -145,10 +146,12 @@ in a text field; the notification still reports the change.
   otherwise video and audio from a short sample of the clip. It is declined when
   the panel's model takes no reference videos or all its video slots are taken.
 - **Use as Conditioning Clip** sets the panel's *Conditioning Clip* in the requested
-  role; the whole clip is used. A conditioning clip excludes every other medium, so
-  where the panel's own field waits for you to clear them, this action clears the
-  first and last frames, the initial video and the references itself, and the
-  notification says so when there were any. It replaces a conditioning clip the
+  role; the whole clip is used. A conditioning clip excludes the initial video and
+  the references, and in the `video` role the first and last frames as well, so
+  where the panel's own field waits for you to clear them, this action clears them
+  itself, and the notification says so when there were any. In the `audio` role the
+  first and last frames are kept: they anchor the picture generated for the
+  soundtrack. It replaces a conditioning clip the
   panel already holds. It is declined, leaving the panel alone, when the panel's
   model cannot generate in that role, and in the `video` role for an uploaded audio
   file, whose picture is only a placeholder. Other settings are not changed to fit

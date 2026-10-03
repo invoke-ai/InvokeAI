@@ -65,6 +65,7 @@ import {
 import {
   applyReferenceExtendSourceVideo,
   applyReferenceExtendNumFrames,
+  isConditioningClipExcludingFrames,
   MIN_VIDEO_TRIM_FRAMES,
   MINIMAX_H3_HYBRID_BLOCK_RANGE,
   resolveVideoMode,
@@ -2223,15 +2224,19 @@ export const getVideoValidationReasons = (model: MainModelConfig, settings: Vide
     reasons.push('A first frame and an initial video cannot be combined. Clear one of them.');
   }
 
+  if (settings.conditioningClip && (settings.sourceVideo || settings.references.length > 0)) {
+    // Both claim the run's conditioning wholesale, and `resolveVideoMode` would silently drop one
+    // rather than run something it cannot express.
+    reasons.push('A conditioning clip cannot be combined with an initial video or references. Clear one side.');
+  }
+
   if (
-    settings.conditioningClip &&
-    (settings.firstFrameImage || settings.lastFrameImage || settings.sourceVideo || settings.references.length > 0)
+    isConditioningClipExcludingFrames(settings.conditioningClip) &&
+    (settings.firstFrameImage || settings.lastFrameImage)
   ) {
-    // Every one of these writes into the same conditioning mask the clip fills wholesale, and
-    // `resolveVideoMode` would silently drop the clip rather than run something it cannot express.
-    reasons.push(
-      'A conditioning clip cannot be combined with first/last frames, an initial video or references. Clear one side.'
-    );
+    // A clip's picture already fills every frame these would hold. Its soundtrack does not, which is
+    // why the frames stay available in that role.
+    reasons.push("A conditioning clip's picture cannot be combined with first/last frames. Clear one side.");
   }
 
   if (settings.references.length > 0 && (settings.firstFrameImage || settings.lastFrameImage)) {

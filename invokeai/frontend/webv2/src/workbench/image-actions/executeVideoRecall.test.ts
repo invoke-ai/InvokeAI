@@ -153,11 +153,15 @@ const ltx2ConditioningMetadata = (role: unknown, videoName: unknown | null = 'so
 /** Recalls an LTX-2 conditioned run onto a panel that starts with `startingValues`. */
 const recallConditioningClip = async (
   role: unknown,
-  { startingValues, videoName }: { startingValues?: Record<string, unknown>; videoName?: unknown | null } = {}
+  {
+    recorded,
+    startingValues,
+    videoName,
+  }: { recorded?: Record<string, unknown>; startingValues?: Record<string, unknown>; videoName?: unknown | null } = {}
 ) => {
   recallSeq += 1;
 
-  galleryApi.galleryVideos.metadata.mockResolvedValue(ltx2ConditioningMetadata(role, videoName));
+  galleryApi.galleryVideos.metadata.mockResolvedValue({ ...ltx2ConditioningMetadata(role, videoName), ...recorded });
   // An ordinary gallery clip: `getDefaultConditioningRole` would take it for the VIDEO role, so a
   // recalled `audio` role can only come from the metadata.
   galleryApi.galleryItems.resolve.mockResolvedValue({ ...item, durationSeconds: 4, fps: 24, name: 'song.mp4' });
@@ -307,6 +311,7 @@ describe('the LTX-2 conditioning clip on recall', () => {
     accountLifecycle.activate('test-account');
     galleryApi.galleryVideos.metadata.mockReset();
     galleryApi.galleryItems.resolve.mockReset();
+    galleryApi.galleryImages.resolveMany.mockReset();
   });
 
   // The role IS the mode: recalling an audio-to-video run as video-to-audio reproduces the
@@ -338,6 +343,29 @@ describe('the LTX-2 conditioning clip on recall', () => {
     });
 
     expect(written).toMatchObject({ firstFrameImage: null, references: [], sourceVideo: null });
+  });
+
+  it("restores the frames that anchored a soundtrack's picture, and only for a soundtrack", async () => {
+    const recorded = {
+      first_frame_image: { image_name: 'first.png' },
+      last_frame_image: { image_name: 'last.png' },
+    };
+    galleryApi.galleryImages.resolveMany.mockResolvedValue([
+      { height: 704, imageName: 'first.png', width: 1248 },
+      { height: 704, imageName: 'last.png', width: 1248 },
+    ]);
+
+    expect(await recallConditioningClip('audio', { recorded })).toMatchObject({
+      conditioningClip: { role: 'audio' },
+      firstFrameImage: { image_name: 'first.png' },
+      lastFrameImage: { image_name: 'last.png' },
+    });
+    // A picture-role run cannot have held frames; a record claiming both keeps the clip, not them.
+    expect(await recallConditioningClip('video', { recorded })).toMatchObject({
+      conditioningClip: { role: 'video' },
+      firstFrameImage: null,
+      lastFrameImage: null,
+    });
   });
 
   it('clears a clip the panel is holding when the recalled run used none', async () => {

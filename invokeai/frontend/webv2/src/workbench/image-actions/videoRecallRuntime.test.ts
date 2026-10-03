@@ -185,6 +185,49 @@ describe('createVideoRecallRuntime', () => {
     runtime.dispose();
   });
 
+  describe('frames beside an LTX-2 conditioning clip', () => {
+    const pictureClip = {
+      clip: { fps: 24, height: 480, numFrames: 96, video_name: 'held.mp4', width: 832 },
+      fpsKnown: true,
+      role: 'video',
+    };
+    const recalledClip = (role: 'audio' | 'video') => ({
+      ltx2_conditioning_role: role,
+      ltx2_conditioning_video: { video_name: 'song.mp4' },
+    });
+
+    it('lets a recalled frame displace a clip the panel holds for its picture, as setting it would', async () => {
+      const { projectId, runtime, socket, store, videoValues } = setup(LTX2);
+      store.commands.widgets.patchValues('video', { conditioningClip: pictureClip }, projectId);
+      // The record's own clip is gone, so only its frame lands.
+      galleryApi.galleryItems.resolve.mockRejectedValue(new Error('gone'));
+
+      socket.emit(parametersEvent({ last_frame_image: { image_name: 'last.png' }, ...recalledClip('audio') }));
+      await flush();
+
+      expect(videoValues()).toMatchObject({ conditioningClip: null, lastFrameImage: { image_name: 'last.png' } });
+
+      runtime.dispose();
+    });
+
+    it("keeps the panel's frames beside a recalled soundtrack and clears them for a recalled picture", async () => {
+      for (const [role, frame] of [
+        ['audio', heldFrame],
+        ['video', null],
+      ] as const) {
+        const { projectId, runtime, socket, store, videoValues } = setup(LTX2);
+        store.commands.widgets.patchValues('video', { firstFrameImage: heldFrame }, projectId);
+
+        socket.emit(parametersEvent(recalledClip(role)));
+        await flush();
+
+        expect(videoValues(), role).toMatchObject({ conditioningClip: { role }, firstFrameImage: frame });
+
+        runtime.dispose();
+      }
+    });
+  });
+
   it('clears media a strict recall does not name', async () => {
     const { runtime, socket, videoValues } = setup();
 
@@ -490,11 +533,11 @@ describe('createVideoRecallRuntime', () => {
       const { lastNotice, projectId, runtime, socket, store, videoShown, videoValues } = setup(LTX2);
       store.commands.widgets.patchValues('video', { firstFrameImage: heldFrame }, projectId);
 
-      socket.emit({ ...placementEvent('conditioning_video'), conditioning_role: 'audio' });
+      socket.emit({ ...placementEvent('conditioning_video'), conditioning_role: 'video' });
       await flush();
 
       expect(videoValues()).toMatchObject({
-        conditioningClip: { clip: { video_name: 'clip.mp4' }, fpsKnown: true, role: 'audio' },
+        conditioningClip: { clip: { video_name: 'clip.mp4' }, fpsKnown: true, role: 'video' },
         firstFrameImage: null,
       });
       expect(lastNotice()).toEqual(
@@ -505,6 +548,19 @@ describe('createVideoRecallRuntime', () => {
         })
       );
       expect(videoShown()).toBe(true);
+
+      runtime.dispose();
+    });
+
+    it('keeps the first frame beside a soundtrack, which it anchors the picture of', async () => {
+      const { lastNotice, projectId, runtime, socket, store, videoValues } = setup(LTX2);
+      store.commands.widgets.patchValues('video', { firstFrameImage: heldFrame }, projectId);
+
+      socket.emit({ ...placementEvent('conditioning_video'), conditioning_role: 'audio' });
+      await flush();
+
+      expect(videoValues()).toMatchObject({ conditioningClip: { role: 'audio' }, firstFrameImage: heldFrame });
+      expect(lastNotice()).toMatchObject({ kind: 'success', title: 'widgets.video.placement.conditioningClipSet' });
 
       runtime.dispose();
     });

@@ -161,23 +161,19 @@ describe('appendReferenceVideo', () => {
 });
 
 describe('placeConditioningClip', () => {
-  it('sets the clip in the requested role and clears every other conditioning slot', () => {
-    const placement = placeConditioningClip({
-      models: [LTX2],
-      role: 'audio',
-      video: clip,
-      videoValues: panel(LTX2, {
-        firstFrameImage: { height: 480, image_name: 'first.png', width: 832 },
-        sourceVideo: { ...videoReference('source.mp4').clip },
-      }),
+  it('sets the clip in the requested role and clears the conditioning slots that role conflicts with', () => {
+    const framed = panel(LTX2, {
+      firstFrameImage: { height: 480, image_name: 'first.png', width: 832 },
+      lastFrameImage: { height: 480, image_name: 'last.png', width: 832 },
     });
 
-    expect(placement).toEqual({
+    // The picture role holds every frame, so the start and end images go.
+    expect(placeConditioningClip({ models: [LTX2], role: 'video', video: clip, videoValues: framed })).toEqual({
       displaced: true,
       patch: {
         conditioningClip: expect.objectContaining({
           clip: expect.objectContaining({ video_name: 'clip.mp4' }),
-          role: 'audio',
+          role: 'video',
         }),
         firstFrameImage: null,
         lastFrameImage: null,
@@ -186,6 +182,25 @@ describe('placeConditioningClip', () => {
       },
       status: 'placed',
     });
+    // A soundtrack leaves them to anchor the picture generated for it.
+    expect(placeConditioningClip({ models: [LTX2], role: 'audio', video: clip, videoValues: framed })).toEqual({
+      displaced: false,
+      patch: {
+        conditioningClip: expect.objectContaining({ role: 'audio' }),
+        references: [],
+        sourceVideo: null,
+      },
+      status: 'placed',
+    });
+    // An initial video conflicts with either role.
+    expect(
+      placeConditioningClip({
+        models: [LTX2],
+        role: 'audio',
+        video: clip,
+        videoValues: panel(LTX2, { sourceVideo: { ...videoReference('source.mp4').clip } }),
+      })
+    ).toMatchObject({ displaced: true, patch: { sourceVideo: null }, status: 'placed' });
   });
 
   it('replacing a clip on an otherwise empty panel displaces nothing', () => {

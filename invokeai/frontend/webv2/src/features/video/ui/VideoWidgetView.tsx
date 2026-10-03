@@ -23,8 +23,10 @@ import {
   applyReferenceExtendNumFrames,
   canPlaceReferenceExtendAnchor,
   getConditioningClipPatch,
+  getFrameImagePatch,
   getInitialVideoPatch,
   getReferencesPatch,
+  isConditioningClipExcludingFrames,
   isVideoTargetResolution,
   normalizeVideoWidgetValues,
   resolveVideoMode,
@@ -280,19 +282,24 @@ export const VideoWidgetView = () => {
   // extension also keeps the linked tail reference synchronized.
   const referenceExtend = Boolean(policy.references?.extend);
   const maxVideoReferences = policy.references?.maxVideos ?? 3;
+  const conditioningClip = values.conditioningClip;
   const setFirstFrame = useCallback(
     (firstFrameImage: ImageWithDims | null) =>
-      patch({ firstFrameImage, ...(firstFrameImage ? { conditioningClip: null, sourceVideo: null } : {}) }),
-    [patch]
+      patch(getFrameImagePatch('firstFrameImage', firstFrameImage, conditioningClip)),
+    [conditioningClip, patch]
   );
   const setLastFrame = useCallback(
     (lastFrameImage: ImageWithDims | null) =>
-      patch({ lastFrameImage, ...(lastFrameImage ? { conditioningClip: null } : {}) }),
-    [patch]
+      patch(getFrameImagePatch('lastFrameImage', lastFrameImage, conditioningClip)),
+    [conditioningClip, patch]
   );
-  // A conditioning clip claims a whole modality, so it excludes every other conditioning slot --
-  // and each of those clears it in turn. The role a dropped clip arrives in comes from the gallery
-  // record: an uploaded soundtrack has no picture to condition on.
+  // Setting a frame is what clears a clip held for its picture, so the frame fields say so beforehand.
+  const frameClearsClipText = isConditioningClipExcludingFrames(conditioningClip)
+    ? t('widgets.video.frameClearsConditioningClip')
+    : undefined;
+  // A conditioning clip claims a whole modality, so it excludes the initial video and references, and in the picture
+  // role the frames too -- and each of those clears it in turn. The role a dropped clip arrives in comes from the
+  // gallery record: an uploaded soundtrack has no picture to condition on.
   const setConditioningClip = useCallback(
     (conditioningClip: VideoConditioningClip | null) => patch(getConditioningClipPatch(conditioningClip)),
     [patch]
@@ -460,9 +467,9 @@ export const VideoWidgetView = () => {
   const hasConditioningMedia = Boolean(
     values.firstFrameImage || values.lastFrameImage || values.sourceVideo || values.conditioningClip?.role === 'video'
   );
-  const otherMediaSet = Boolean(
-    values.firstFrameImage || values.lastFrameImage || values.sourceVideo || values.references.length > 0
-  );
+  const otherMediaSet = Boolean(values.sourceVideo || values.references.length > 0);
+  // Frames block only the clip's picture role; its soundtrack is what they can be combined with.
+  const framesSet = Boolean(values.firstFrameImage || values.lastFrameImage);
   const conditioningDerivedText = values.conditioningClip
     ? t(
         values.conditioningClip.role === 'audio'
@@ -543,7 +550,11 @@ export const VideoWidgetView = () => {
           <Stack gap="3" p="2">
             {supportsFirstFrame ? (
               <Field
-                helpText={values.sourceVideo ? undefined : t('widgets.video.firstFrameHelp')}
+                helpText={
+                  values.sourceVideo
+                    ? undefined
+                    : [t('widgets.video.firstFrameHelp'), frameClearsClipText].filter(Boolean).join(' ')
+                }
                 label={t('widgets.video.firstFrame')}
               >
                 <VideoFrameImageField
@@ -558,9 +569,12 @@ export const VideoWidgetView = () => {
             ) : null}
             {supportsLastFrame ? (
               <Field
-                helpText={
-                  values.sourceVideo ? t('widgets.video.lastFrameExtendHelp') : t('widgets.video.lastFrameHelp')
-                }
+                helpText={[
+                  values.sourceVideo ? t('widgets.video.lastFrameExtendHelp') : t('widgets.video.lastFrameHelp'),
+                  frameClearsClipText,
+                ]
+                  .filter(Boolean)
+                  .join(' ')}
                 label={t('widgets.video.lastFrame')}
               >
                 <VideoFrameImageField
@@ -659,6 +673,7 @@ export const VideoWidgetView = () => {
               derivedText={conditioningDerivedText}
               disabled={otherMediaSet}
               disabledReason={otherMediaSet ? t('widgets.video.conditioningClipBlocked') : undefined}
+              pictureRoleDisabledReason={framesSet ? t('widgets.video.conditioningRoleVideoBlocked') : undefined}
               onChange={setConditioningClip}
             />
           </Stack>
