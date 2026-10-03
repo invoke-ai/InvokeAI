@@ -2048,7 +2048,7 @@ export const WorkflowFieldSnapshot = ({
         borderWidth="1px"
         data-workflow-export-field-value="true"
         fontFamily={template.uiComponent === 'textarea' ? 'mono' : undefined}
-        minH="7"
+        minH="control.md"
         minW="0"
         mt="0.5"
         overflowWrap="anywhere"

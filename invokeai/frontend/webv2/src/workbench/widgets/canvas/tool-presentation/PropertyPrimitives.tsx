@@ -15,7 +15,7 @@ const GROUP_HEADER_HOVER = { color: 'fg' } as const;
  * preserve continuation alignment.
  */
 export const PropertyControlRow = ({ children, label }: { children: ReactNode; label?: string }) => (
-  <Grid alignItems="center" columnGap="2" gridTemplateColumns="4.5rem minmax(0, 1fr) auto" minH="7" w="full">
+  <Grid alignItems="center" columnGap="2" gridTemplateColumns="4.5rem minmax(0, 1fr) auto" minH="control.md" w="full">
     <Text color="fg.muted" minW="0" title={label} truncate>
       {label}
     </Text>
@@ -44,7 +44,7 @@ export const PropertySwitchRow = ({
       checked={checked}
       disabled={disabled}
       justifyContent="space-between"
-      minH="7"
+      minH="control.md"
       w="full"
       onCheckedChange={handleChange}
     >

@@ -5,6 +5,7 @@ import type { KeyboardEvent, ReactNode } from 'react';
 import { Box, Flex, Icon, InputGroup, NumberInput } from '@chakra-ui/react';
 import { Button } from '@platform/ui/Button';
 import { Slider } from '@platform/ui/Slider';
+import { CONTROL_HEIGHT_PX } from '@theme/scale';
 import { MoveHorizontalIcon } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -29,8 +30,8 @@ interface FormNumberFieldProps {
 }
 
 const AFFIX_PROPS = { color: 'fg.muted', fontSize: 'xs', lineHeight: '1' } as const;
-// InputGroup pads the input by `--input-height` (28px at size md) minus the offset; the text must clear the affix.
-const INPUT_HEIGHT_PX = 28;
+// InputGroup pads the input by `--input-height` minus the offset; the text must clear the affix.
+const INPUT_HEIGHT_PX = CONTROL_HEIGHT_PX.md;
 const AFFIX_CHAR_PX = 6;
 const AFFIX_GUTTER_PX = 8;
 const affixOffset = (chars: number): string => `${INPUT_HEIGHT_PX - AFFIX_GUTTER_PX - chars * AFFIX_CHAR_PX}px`;

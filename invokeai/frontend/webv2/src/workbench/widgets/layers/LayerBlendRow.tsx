@@ -15,8 +15,8 @@ import { useTranslation } from 'react-i18next';
 type LayerBlendRowEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'interaction' | 'layers' | 'projectId'>;
 
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
-const BLEND_TRIGGER_PROPS = { fontSize: 'md', h: '7', minH: '7' } as const;
-const OPACITY_INPUT_PROPS = { fontSize: 'md', h: '7' } as const;
+const BLEND_TRIGGER_PROPS = { fontSize: 'md', h: 'control.md', minH: 'control.md' } as const;
+const OPACITY_INPUT_PROPS = { fontSize: 'md', h: 'control.md' } as const;
 
 const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 

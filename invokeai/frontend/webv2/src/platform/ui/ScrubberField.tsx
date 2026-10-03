@@ -90,7 +90,7 @@ const ROOT_CSS = {
   borderWidth: '1px',
   cursor: 'ew-resize',
   display: 'flex',
-  h: '7',
+  h: 'control.md',
   minW: '0',
   overflow: 'hidden',
   position: 'relative',

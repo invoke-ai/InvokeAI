@@ -187,11 +187,11 @@ const SettingsMenuAction = ({ onClick }: { onClick: () => void }) => {
 const FOOTER_ITEM_PROPS = {
   alignItems: 'center',
   flex: '0 0 auto',
-  h: '7',
+  h: 'control.md',
   justifyContent: 'center',
-  minW: '7',
+  minW: 'control.md',
   p: '0',
-  w: '7',
+  w: 'control.md',
 } as const;
 
 const AppMenuAction = ({
