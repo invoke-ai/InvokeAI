@@ -31,6 +31,7 @@ compared with PyTorch's default attention there:
 | Z-Image (FP8) | 10.4 s → 10.0 s (−5 %) | 33.7 s → 25.9 s (−23 %) | Z-Image Control masks its attention and keeps PyTorch's. |
 | Qwen-Image 2512 (GGUF Q4_K_M) | 78.8 s → 73.5 s (−7 %) | 208.9 s → 150.3 s (−28 %) | One block reaches about 17 % error per call; images were still judged equivalent. |
 | Krea-2 Turbo (GGUF Q4_K_M) | 11.5 s → 11.0 s (−4 %) | 42.7 s → 36.2 s (−15 %) | Off while `INVOKE_KREA2_SDPA_BACKEND` pins a PyTorch kernel. |
+| SDXL | 4.4 s → 4.2 s (−5 %) | 19.6 s → 16.1 s (−18 %) | Text cross-attention stays on PyTorch (too short to gain). Also serves ControlNets. |
 
 At 1024×1024 most of a step is spent outside attention, so the gain is small; at high resolutions and for video,
 attention dominates. GGUF models spend much of each step dequantizing weights, which SageAttention does not touch.
@@ -119,6 +120,7 @@ Everything else keeps PyTorch's attention:
 - **Short sequences** — fewer than 1536 query or 512 key tokens. There the cost of quantizing the inputs outweighs the
   faster kernel.
 - **Head sizes other than 64 and 128.**
+- **SDXL with `attention_type: sliced`** — sliced attention does not go through PyTorch's attention kernel.
 - **Models not listed under Supported models**, such as SD 1.5 and SD 2.
 
 Pinning a PyTorch kernel through diffusers' `DIFFUSERS_ATTN_BACKEND` does not stop SageAttention; set
