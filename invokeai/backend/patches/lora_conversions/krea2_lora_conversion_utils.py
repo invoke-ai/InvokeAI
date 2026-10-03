@@ -276,6 +276,13 @@ _SUFFIX_TO_VALUE_KEY = {
     ".lora_magnitude_vector.weight": "dora_magnitude",
     ".magnitude": "dora_magnitude",
     ".alpha": "alpha",
+    ".lokr_w1": "lokr_w1",
+    ".lokr_w2": "lokr_w2",
+    ".lokr_w1_a": "lokr_w1_a",
+    ".lokr_w1_b": "lokr_w1_b",
+    ".lokr_w2_a": "lokr_w2_a",
+    ".lokr_w2_b": "lokr_w2_b",
+    ".lokr_t2": "lokr_t2",
 }
 
 

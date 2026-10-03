@@ -483,3 +483,121 @@ def test_native_krea2_top_level_linear_keys_are_remapped() -> None:
         f"{KREA2_LORA_TRANSFORMER_PREFIX}{diffusers_module}" for diffusers_module in native_to_diffusers.values()
     }
     assert expected_keys < set(model.layers)
+
+def test_native_lokr_keys_produce_lokr_layer() -> None:
+    # Native (ComfyUI) LoKr keys must be remapped by _maybe_convert_native_krea2_state_dict and
+    # then grouped correctly by _group_by_layer, producing a LoKRLayer instance.
+    from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
+
+    state_dict = {
+        # native layout: blocks→transformer_blocks, attn.gate→attn.to_gate
+        "diffusion_model.blocks.0.attn.gate.lokr_w1": torch.zeros(4, 4, dtype=torch.bfloat16),
+        "diffusion_model.blocks.0.attn.gate.lokr_w2": torch.zeros(1536, 1536, dtype=torch.bfloat16),
+        "diffusion_model.blocks.0.attn.gate.alpha": torch.tensor(1.0, dtype=torch.bfloat16),
+        # second native key so _has_krea2_lora_keys identifies this as Krea-2
+        "diffusion_model.blocks.0.attn.wq.lokr_w1": torch.zeros(4, 4, dtype=torch.bfloat16),
+        "diffusion_model.blocks.0.attn.wq.lokr_w2": torch.zeros(1536, 1536, dtype=torch.bfloat16),
+        "diffusion_model.blocks.0.attn.wq.alpha": torch.tensor(1.0, dtype=torch.bfloat16),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    expected_gate = f"{KREA2_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_gate"
+    expected_wq = f"{KREA2_LORA_TRANSFORMER_PREFIX}transformer_blocks.0.attn.to_q"
+    assert expected_gate in model.layers, (
+        f"Expected '{expected_gate}' not found. Keys: {list(model.layers.keys())}"
+    )
+    assert expected_wq in model.layers
+    assert isinstance(model.layers[expected_gate], LoKRLayer)
+    assert isinstance(model.layers[expected_wq], LoKRLayer)
+    # w1 and w2 must be populated
+    layer = model.layers[expected_gate]
+    assert layer.w1 is not None
+    assert layer.w2 is not None
+
+
+def test_diffusers_lokr_keys_produce_lokr_layer() -> None:
+    # Diffusers-layout LoKr keys (transformer. prefix, already diffusers names) must group
+    # correctly without going through the native remapper.
+    from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
+
+    state_dict = {
+        "transformer.text_fusion.0.attn.to_q.lokr_w1": torch.zeros(4, 4, dtype=torch.bfloat16),
+        "transformer.text_fusion.0.attn.to_q.lokr_w2": torch.zeros(256, 256, dtype=torch.bfloat16),
+        "transformer.text_fusion.0.attn.to_q.alpha": torch.tensor(1.0, dtype=torch.bfloat16),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    expected_key = f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.0.attn.to_q"
+    assert expected_key in model.layers, (
+        f"Expected '{expected_key}' not found. Keys: {list(model.layers.keys())}"
+    )
+    assert isinstance(model.layers[expected_key], LoKRLayer)
+
+
+def test_factored_lokr_w1_a_b_produces_lokr_layer() -> None:
+    # The factored form (lokr_w1_a + lokr_w1_b) is a valid LoKr variant; all four suffixes
+    # must be grouped into one LoKRLayer with w1=None and w1_a/w1_b populated.
+    from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
+
+    state_dict = {
+        "transformer.text_fusion.0.attn.to_q.lokr_w1_a": torch.zeros(4, 2, dtype=torch.bfloat16),
+        "transformer.text_fusion.0.attn.to_q.lokr_w1_b": torch.zeros(2, 4, dtype=torch.bfloat16),
+        "transformer.text_fusion.0.attn.to_q.lokr_w2": torch.zeros(256, 256, dtype=torch.bfloat16),
+        "transformer.text_fusion.0.attn.to_q.alpha": torch.tensor(1.0, dtype=torch.bfloat16),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    expected_key = f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.0.attn.to_q"
+    assert expected_key in model.layers
+    layer = model.layers[expected_key]
+    assert isinstance(layer, LoKRLayer)
+    assert layer.w1 is None       # direct w1 absent — factored form
+    assert layer.w1_a is not None
+    assert layer.w1_b is not None
+    assert layer.w2 is not None
+
+
+def test_mixed_lora_and_lokr_in_same_file() -> None:
+    # A file that mixes standard lora_A/B modules with LoKr modules must produce the
+    # correct layer type for each module independently.
+    from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
+
+    state_dict = {
+        # standard lora_A/B layer
+        "transformer.text_fusion.0.attn.to_q.lora_A.weight": torch.zeros(32, 256, dtype=torch.bfloat16),
+        "transformer.text_fusion.0.attn.to_q.lora_B.weight": torch.zeros(256, 32, dtype=torch.bfloat16),
+        # LoKr layer on a different module
+        "transformer.text_fusion.0.attn.to_k.lokr_w1": torch.zeros(4, 4, dtype=torch.bfloat16),
+        "transformer.text_fusion.0.attn.to_k.lokr_w2": torch.zeros(256, 256, dtype=torch.bfloat16),
+        "transformer.text_fusion.0.attn.to_k.alpha": torch.tensor(1.0, dtype=torch.bfloat16),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    p = KREA2_LORA_TRANSFORMER_PREFIX
+    lora_key = f"{p}text_fusion.0.attn.to_q"
+    lokr_key = f"{p}text_fusion.0.attn.to_k"
+    assert lora_key in model.layers
+    assert lokr_key in model.layers
+    assert isinstance(model.layers[lora_key], LoRALayer)
+    assert isinstance(model.layers[lokr_key], LoKRLayer)
+
+
+def test_lokr_alpha_is_preserved() -> None:
+    # The alpha scalar must survive grouping and be stored on the LoKRLayer.
+    from invokeai.backend.patches.layers.lokr_layer import LoKRLayer
+
+    state_dict = {
+        "transformer.text_fusion.0.attn.to_q.lokr_w1": torch.zeros(4, 4, dtype=torch.bfloat16),
+        "transformer.text_fusion.0.attn.to_q.lokr_w2": torch.zeros(256, 256, dtype=torch.bfloat16),
+        "transformer.text_fusion.0.attn.to_q.alpha": torch.tensor(4.0, dtype=torch.bfloat16),
+    }
+
+    model = lora_model_from_krea2_state_dict(state_dict)
+
+    layer = model.layers[f"{KREA2_LORA_TRANSFORMER_PREFIX}text_fusion.0.attn.to_q"]
+    assert isinstance(layer, LoKRLayer)
+    assert layer._alpha == pytest.approx(4.0)
