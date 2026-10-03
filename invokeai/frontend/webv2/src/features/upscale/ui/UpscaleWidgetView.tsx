@@ -691,7 +691,6 @@ export const UpscaleWidgetView = () => {
               error={showComponentPickers && !values.vae ? t('widgets.upscale.vaeRequired') : undefined}
               hint="vae"
               label={t('widgets.upscale.vae')}
-              helpText={values.vae || showComponentPickers ? undefined : t('widgets.upscale.bundledVae')}
             >
               <ModelSelect
                 filter={vaeFilter}
