@@ -13,6 +13,7 @@ import { useTranslation } from 'react-i18next';
 import type { InvocationState } from './useInvocationState';
 
 import { getInvokeIconMode } from './invokeButtonModel';
+import { INVOKE_BUTTON_CSS } from './invokeClusterCss';
 import { HIDE_BELOW_HINT_WIDTH } from './topbarBreakpoints';
 import { TopbarShortcutKeys } from './TopbarShortcutKeys';
 import { useTopbarShortcutBinding } from './useTopbarShortcut';
@@ -89,6 +90,7 @@ export const InvokeButton = ({ state }: { state: InvocationState }) => {
                 })
         }
         colorPalette="brand"
+        css={INVOKE_BUTTON_CSS}
         cursor={canInvoke ? undefined : 'not-allowed'}
         flexShrink={0}
         opacity={canInvoke ? undefined : 0.55}
