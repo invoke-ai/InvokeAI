@@ -14,7 +14,7 @@ import { IN_SLOT_DIVIDER_HIDING_CSS, ListDivider } from './ListDivider';
 import { LIST_ROW_GAP_PX as ROW_GAP_PX, LIST_ROW_INSET as INSET } from './listLayout';
 import { LIST_SECTION_HEADER_HEIGHT_PX, ListSectionHeader } from './ListSectionHeader';
 
-const ITEM_HEIGHT_PX: Record<ListDensity, number> = { comfortable: 52, compact: 28, regular: 40 };
+const ITEM_HEIGHT_PX: Record<ListDensity, number> = { comfortable: 52, compact: 28, regular: 40, snug: 48 };
 const OVERSCAN_ROWS = 8;
 const PRIMARY_SELECTOR = '[data-list-primary]';
 

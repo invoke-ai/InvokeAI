@@ -3,7 +3,7 @@ import type { GenerateLora } from '@features/generation/core/types';
 import type { ListContextMenuAnchor } from '@platform/ui/list/ListItem';
 import type { MouseEvent, ReactNode } from 'react';
 
-import { Avatar, Badge, Box, Icon, Menu, Portal } from '@chakra-ui/react';
+import { Avatar, Badge, Box, Flex, Icon, Menu, Portal } from '@chakra-ui/react';
 import { DEFAULT_LORA_WEIGHT_CONFIG, getDefaultLoraWeight } from '@features/generation/core/settings';
 import { IconButton } from '@platform/ui/Button';
 import { ListItem } from '@platform/ui/list/ListItem';
@@ -157,7 +157,7 @@ export const ConceptRow = memo(function ConceptRow({
       <Box aria-label={name} opacity={isCompatible ? 1 : 0.68} role="group">
         <ListItem
           actions={
-            <>
+            <Flex gap={1}>
               <GenerateToggleSwitch
                 checked={isActive}
                 disabled={!isCompatible}
@@ -179,7 +179,7 @@ export const ConceptRow = memo(function ConceptRow({
                   <Trash2Icon />
                 </IconButton>
               </Tooltip>
-            </>
+            </Flex>
           }
           badges={
             <>
@@ -219,7 +219,7 @@ export const ConceptRow = memo(function ConceptRow({
               </GenerateFieldContextMenu>
             </Box>
           }
-          density="comfortable"
+          density="snug"
           leading={
             <Avatar.Root
               bg="bg.muted"

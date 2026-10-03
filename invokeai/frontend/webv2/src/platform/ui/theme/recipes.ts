@@ -1059,6 +1059,12 @@ export const listItemSlotRecipe = defineSlotRecipe({
         root: { minH: '13' },
         primary: { gap: '2.5', px: '2', py: '1.5' },
       },
+      // Comfortable's media one step tighter, for rows whose detail line already adds height.
+      snug: {
+        root: { minH: '12' },
+        primary: { gap: '2.5', px: '1.5', py: '1.5' },
+        detail: { pb: '1.5', px: '1.5' },
+      },
     },
   },
   defaultVariants: { active: 'none', density: 'regular' },

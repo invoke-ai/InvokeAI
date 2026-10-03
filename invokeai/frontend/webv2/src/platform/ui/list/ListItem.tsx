@@ -6,7 +6,7 @@ import { listItemSlotRecipe } from '@theme/recipes';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
-export type ListDensity = 'compact' | 'regular' | 'comfortable';
+export type ListDensity = 'compact' | 'regular' | 'comfortable' | 'snug';
 
 export interface ListContextMenuAnchor {
   x: number;
@@ -24,7 +24,7 @@ export interface ListItemProps {
   title: string;
   /** Identifiers keep their tail visible; prose keeps its start. */
   titleTruncate?: 'middle' | 'end';
-  /** Media or icon before the text; size it for the density (36px at comfortable). */
+  /** Media or icon before the text; size it for the density (36px at comfortable and snug). */
   leading?: ReactNode;
   /** Inline after the title, e.g. a status badge; keep it short so the title keeps its room. */
   badges?: ReactNode;
