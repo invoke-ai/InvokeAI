@@ -15,6 +15,10 @@ reserves, about 1.5x its peak of live tensors. The table behind the shipped cons
 (in ``estimate_vae_working_memory_wan``) was measured with ``--dtype bfloat16``, both
 with and without ``--no-streaming``; its highest point came from a running server, so
 the constant sits above what this script reports.
+
+The allocator is configured from the environment only: the script does not read
+``pytorch_cuda_alloc_conf`` from ``invokeai.yaml``. To measure the allocator a server
+configures there, export the same value as ``PYTORCH_CUDA_ALLOC_CONF`` first.
 """
 
 from __future__ import annotations
@@ -31,15 +35,21 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from invokeai.app.util.torch_cuda_allocator import apply_rocm_windows_allocator_default  # noqa: E402
 
 # The server's ROCm runtime, so a ROCm measurement is what Invoke would see: both must be set before torch is
-# imported (see `invokeai.app.run_app` and `apply_rocm_windows_allocator_default`). Inert on CUDA.
-os.environ.setdefault("MIOPEN_FIND_MODE", "FAST")
-apply_rocm_windows_allocator_default(logging.getLogger(__name__))
+# imported (see `invokeai.app.run_app` and `apply_rocm_windows_allocator_default`). Inert on CUDA. Only when run as a
+# script, so importing the module, as its tests do, leaves the process environment alone.
+if __name__ == "__main__":
+    os.environ.setdefault("MIOPEN_FIND_MODE", "FAST")
+    apply_rocm_windows_allocator_default(logging.getLogger(__name__))
 
 import torch  # noqa: E402
 from diffusers.models.autoencoders import AutoencoderKLWan  # noqa: E402
 
 from invokeai.backend.model_manager.load.model_loaders.vae import _wan_vae_init_kwargs_for  # noqa: E402
 from invokeai.backend.util.attention import install_rocm_sdpa_guard  # noqa: E402
+from invokeai.backend.util.qwen_image_vae import (  # noqa: E402
+    patch_qwen_image_vae_tiling,
+    resolve_qwen_image_vae_tile_size,
+)
 from invokeai.backend.util.vae_working_memory import (  # noqa: E402
     estimate_vae_working_memory_wan,
     wan_vae_clip_bytes,
@@ -99,13 +109,14 @@ def _measure(
     if tiling:
         streaming = False
         if tile_size is None:
-            tile_size = int(getattr(vae, "tile_sample_min_height", 256))
-        if tile_size < spatial_scale or tile_size % spatial_scale:
-            raise ValueError(f"tile_size must be a positive multiple of {spatial_scale}")
-        vae.enable_tiling(tile_sample_min_height=tile_size, tile_sample_min_width=tile_size)
+            tile_size = resolve_qwen_image_vae_tile_size(0)  # the video node's tile
+        # The node pairs a tile with a stride of 3/4 of it, rounded down to 8 px. A tile on this grid keeps that stride
+        # on the latent grid (16 px for TI2V), so the decode steps through tiles the way it crops them.
+        tile_grid = 4 * spatial_scale
+        if tile_size < tile_grid or tile_size % tile_grid:
+            raise ValueError(f"tile_size must be a positive multiple of {tile_grid}")
     else:
         tile_size = None
-        vae.disable_tiling()
     element_size = next(vae.parameters()).element_size()
     latent_frames = (pixel_frames - 1) // temporal_scale + 1
     latent_height = pixel_height // spatial_scale
@@ -149,15 +160,14 @@ def _measure(
         scaling_basis_bytes = tile_size**2 * element_size * 1.25
     else:
         scaling_basis_bytes = pixel_height * pixel_width * element_size
-    try:
+    # The node's tiling geometry: a stride that follows the tile size, which `enable_tiling` would otherwise leave at
+    # the default 192 px, dropping bands of the frame under a smaller tile.
+    with patch_qwen_image_vae_tiling(vae, tile_size):
         if streaming:
             for chunk in iter_wan_vae_decode_chunks(vae, latents):
                 chunk = chunk[0].cpu()
         else:
             vae.decode(latents, return_dict=False)[0].cpu()
-    finally:
-        if tiling:
-            vae.disable_tiling()
     torch.cuda.synchronize()
     peak_allocated = torch.cuda.max_memory_allocated(device)
     peak_reserved = torch.cuda.max_memory_reserved(device)
@@ -205,7 +215,7 @@ def main() -> None:
         "--tile-size",
         type=int,
         default=None,
-        help="Spatial tile size in pixels. Requires --tiling; defaults to the VAE tile size.",
+        help="Spatial tile size in pixels. Requires --tiling; defaults to the video node's 256.",
     )
     args = parser.parse_args()
 
