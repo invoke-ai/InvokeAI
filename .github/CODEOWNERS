@@ -1,10 +1,13 @@
-# continuous integration - just maintainers
-/.github/workflows/  @lstein @blessedcoolant @joshistoast
+# The last matching pattern takes precedence.
 
-# dependencies - just maintainers
-/pyproject.toml @lstein @blessedcoolant @joshistoast
+# Critical infrastructure - requires a maintainer review. The catch-all covers
+# .github/ and every file in the repository root (pyproject.toml, uv.lock,
+# .gitattributes, .gitmodules, etc.), plus any path not opened up below.
+*  @lstein @blessedcoolant @joshistoast
 
-# version - just maintainers
-/invokeai/version @lstein @blessedcoolant @joshistoast
-
-
+# Anyone with write access can review.
+/invokeai/
+/scripts/
+/tests/
+/docker/
+/docs/
