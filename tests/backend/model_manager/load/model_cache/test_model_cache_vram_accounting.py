@@ -274,9 +274,23 @@ class TestReserveRelease:
     def _windows(self, monkeypatch):
         monkeypatch.setattr(sys, "platform", "win32")
 
-    def _release(self, monkeypatch, *, driver_free_mb: int, releasable_mb: int, working_mb, device="cuda") -> list:
-        cache = _make_cache()  # 0.1 GB default reserve
+    @staticmethod
+    def _cache(device: str) -> ModelCache:
+        """A cache with the 0.1 GB default reserve, built for the CPU: a CUDA cache reads the card's properties."""
+        cache = ModelCache(
+            execution_device_working_mem_gb=0.1,
+            enable_partial_loading=True,
+            keep_ram_copy_of_weights=True,
+            execution_device="cpu",
+            storage_device="cpu",
+            logger=MagicMock(),
+            shared_cpu_weights=None,
+        )
         cache._execution_device = torch.device(device)
+        return cache
+
+    def _release(self, monkeypatch, *, driver_free_mb: int, releasable_mb: int, working_mb, device="cuda") -> list:
+        cache = self._cache(device)
         calls: list = []
         monkeypatch.setattr(
             TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, d: (driver_free_mb * MB, 24 * GB))
@@ -315,8 +329,7 @@ class TestReserveRelease:
     def test_under_expandable_segments_the_unused_reserved_pages_count(self, monkeypatch):
         """The allocator's reclaimable figure is 0 there, but empty_cache() unmaps freed pages inside segments
         (the default on ROCm under Windows)."""
-        cache = _make_cache()
-        cache._execution_device = torch.device("cuda")
+        cache = self._cache("cuda")
         calls: list = []
         monkeypatch.setattr(TorchDevice, "cuda_mem_get_info", classmethod(lambda cls, d: (2 * GB, 24 * GB)))
         monkeypatch.setattr(model_cache_module, "_expandable_segments_enabled", lambda: True)
@@ -339,6 +352,8 @@ def test_lock_hands_cached_blocks_back_when_the_reserve_is_not_driver_free():
     """
     torch.cuda.empty_cache()
     device = torch.device("cuda:0")
+    # Slack in segments that other live tensors keep, which no release can return.
+    baseline_unused = torch.cuda.memory_reserved(device) - torch.cuda.memory_allocated(device)
     free, _total = torch.cuda.mem_get_info(device)
     if free < 4 * GB:
         pytest.skip("needs at least 4 GiB of free VRAM")
@@ -353,8 +368,10 @@ def test_lock_hands_cached_blocks_back_when_the_reserve_is_not_driver_free():
 
     cache.lock(record, driver_free + held_unused // 2)
     try:
-        # Process-local, so another program on the card cannot decide the outcome.
-        assert cache._get_reclaimable_allocator_bytes() < 256 * MB
+        # Process-local, so another program on the card cannot decide the outcome. Read from the allocator itself: the
+        # cache's reclaimable figure is 0 under expandable segments whether or not anything was released.
+        unused = torch.cuda.memory_reserved(device) - torch.cuda.memory_allocated(device)
+        assert unused - baseline_unused < 256 * MB
     finally:
         cache.unlock(record)
         torch.cuda.empty_cache()
