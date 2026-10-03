@@ -2,7 +2,6 @@ import splashImageUrl from '@assets/SplashImage.webp';
 import { Box, Flex, Heading, HStack, Spinner, Text, VStack } from '@chakra-ui/react';
 import { APP_VERSION } from '@platform/runtime/appMetadata';
 import { InvokeMark } from '@platform/ui/InvokeMark';
-import { previewGridCss } from '@workbench/widgets/preview/PreviewStage';
 import { useTranslation } from 'react-i18next';
 
 const splashImageStyle = { backgroundPosition: 'center', backgroundSize: 'cover' } as const;
@@ -11,17 +10,7 @@ export const WorkbenchSplashScreen = ({ messageKey = 'splash.loadingWorkspace' }
   const { t } = useTranslation();
 
   return (
-    <Flex
-      align="center"
-      aria-busy="true"
-      backgroundColor="bg.inset"
-      color="fg.grid"
-      css={previewGridCss}
-      h="100vh"
-      justify="center"
-      role="status"
-      w="100vw"
-    >
+    <Flex align="center" aria-busy="true" h="100vh" justify="center" layerStyle="dotGrid" role="status" w="100vw">
       <Box
         position="relative"
         bg="bg"

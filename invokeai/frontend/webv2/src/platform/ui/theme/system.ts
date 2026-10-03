@@ -315,6 +315,19 @@ const config = defineConfig({
         to: { transform: 'translateX(300%)' },
       },
     },
+    layerStyles: {
+      // The inset dot-grid surface behind previews and the loading splash.
+      dotGrid: {
+        value: {
+          backgroundColor: 'bg.inset',
+          backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1.5px)',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'repeat',
+          backgroundSize: '24px 24px',
+          color: 'fg.grid',
+        },
+      },
+    },
     tokens: {
       // Use arrow cursors for controls and pointer for links.
       cursor: {
