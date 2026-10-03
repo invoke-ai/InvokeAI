@@ -168,6 +168,23 @@ Invoke has the option of keeping a RAM copy of all model weights, even when they
 keep_ram_copy_of_weights: false
 ```
 
+### Switching between model architectures
+
+When a generation uses main models of another architecture than the previous one on the same GPU (say, FLUX.1 after SDXL), Invoke first moves every model the new generation does not use from VRAM to RAM. Models both generations use, such as a shared VAE or text encoder, stay in VRAM. Moving models back from RAM costs a few seconds per switch, more with `keep_ram_copy_of_weights: false`, so if you alternate between architectures that would fit in VRAM together, you can turn this off:
+
+```yaml
+# Keep other architectures' models in VRAM until a load needs the room.
+offload_on_architecture_switch: false
+```
+
+### Clearing VRAM after every generation
+
+If a generation runs fine the first time but runs out of memory when you repeat it, or slows down sharply because Windows moves part of it into shared GPU memory, you can have Invoke move the models it holds in VRAM to RAM after every queue item (every image of a batch) and hand the freed memory back to the GPU driver. The models stay cached in RAM, so each queue item then costs a few seconds for reloading them, not a full load from disk, and with `keep_ram_copy_of_weights: false` also the time to copy them back to RAM. On a machine with several GPUs, handing the memory back briefly holds up a generation running on another GPU. On CPU, Apple Silicon and integrated GPUs, whose VRAM is system memory, the setting changes nothing:
+
+```yaml
+clear_vram_after_session: true
+```
+
 ### Tiled VAE decode and encode
 
 Without tiling, the memory a VAE needs grows with the square of the image size. For FLUX.1, an untiled 3072² encode peaks at about 18.8 GiB on an RTX 4090, and a tiled one at 0.8 GiB, while tiled memory stays roughly flat as the image grows. Tiling costs some speed on smaller images.
