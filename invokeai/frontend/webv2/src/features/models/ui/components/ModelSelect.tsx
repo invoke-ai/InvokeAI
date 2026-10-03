@@ -91,6 +91,7 @@ export const ModelSelect = ({
   modelTypes,
   onChange,
   placeholder,
+  scopeLabel: scopeLabelOverride,
   showManagerButton = true,
   size = 'sm',
   value,
@@ -105,6 +106,8 @@ export const ModelSelect = ({
   modelTypes: readonly ModelTaxonomyType[];
   onChange: (model: ModelConfig | null) => void;
   placeholder?: string;
+  /** Plural noun for the offered models in empty/search copy; defaults to the model type's plural label. */
+  scopeLabel?: string;
   showManagerButton?: boolean;
   size?: 'xs' | 'sm' | 'md';
   value: string | null;
@@ -141,6 +144,11 @@ export const ModelSelect = ({
     [excludeKeys, filter, loadStatus, modelTypes, models]
   );
   const isEmpty = !hasCandidates && !value;
+  // Every compatible model is already chosen elsewhere, which is not the same as none being installed.
+  const isAllExcluded = useMemo(
+    () => isEmpty && Boolean(excludeKeys?.size) && hasModelPickerCandidates(models, { filter, modelTypes }),
+    [excludeKeys, filter, isEmpty, modelTypes, models]
+  );
   const isInert = disabled || isEmpty;
 
   if (isInert !== lastDisabled) {
@@ -168,7 +176,13 @@ export const ModelSelect = ({
   const selectedModel = useModelsSelector((snapshot) => (value ? (snapshot.modelsByKey.get(value) ?? null) : null));
   const hasMixedTypes = useMemo(() => new Set(candidates.map((model) => model.type)).size > 1, [candidates]);
   const scopeLabel =
-    modelTypes.length === 1 ? getModelTypePluralLabel(modelTypes[0] ?? 'main').toLowerCase() : t('models.scopeModels');
+    scopeLabelOverride ??
+    (modelTypes.length === 1
+      ? getModelTypePluralLabel(modelTypes[0] ?? 'main').toLowerCase()
+      : t('models.scopeModels'));
+  const emptyMessage = isAllExcluded
+    ? t('models.scopeAllAdded', { scope: scopeLabel })
+    : t('models.scopeNoCompatibleInstalled', { scope: scopeLabel });
 
   const pickerGroups = useMemo<PickerGroup<ModelConfig>[]>(
     () =>
@@ -263,9 +277,7 @@ export const ModelSelect = ({
                 <ModelButtonContent model={selectedModel} />
               ) : (
                 <Text as="span" color="fg.muted" fontSize="xs" minW="0" truncate>
-                  {isEmpty
-                    ? t('models.scopeNoCompatibleInstalled', { scope: scopeLabel })
-                    : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel }))}
+                  {isEmpty ? emptyMessage : (placeholder ?? t('models.scopeSelect', { scope: scopeLabel }))}
                 </Text>
               )}
               {canClear || isEmpty ? null : <Icon as={ChevronDownIcon} boxSize="3" flexShrink={0} />}
@@ -306,7 +318,7 @@ export const ModelSelect = ({
               showArrow={false}
             >
               <Picker<ModelConfig>
-                emptyMessage={t('models.scopeNoCompatibleInstalled', { scope: scopeLabel })}
+                emptyMessage={emptyMessage}
                 getOptionId={getOptionId}
                 groups={pickerGroups}
                 isCompact={isCompact}
@@ -342,7 +354,7 @@ export const ModelSelect = ({
                     </Stack>
                   ) : candidates.length === 0 ? (
                     <Text color="fg.subtle" fontSize="2xs" p="2">
-                      {t('models.scopeNoCompatibleInstalled', { scope: scopeLabel })}
+                      {emptyMessage}
                     </Text>
                   ) : undefined
                 }

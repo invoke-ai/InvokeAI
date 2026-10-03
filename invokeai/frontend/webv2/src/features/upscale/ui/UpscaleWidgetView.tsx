@@ -616,6 +616,7 @@ export const UpscaleWidgetView = () => {
               filter={loraFilter}
               modelTypes={LORA_MODEL_TYPES}
               placeholder={t('widgets.upscale.searchCompatibleConcepts')}
+              scopeLabel={t('models.scopeConcepts')}
               size="xs"
               value={null}
               onChange={addLora}

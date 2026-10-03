@@ -71,6 +71,7 @@ export const VideoConceptsSection = memo(
             filter={loraFilter}
             modelTypes={LORA_MODEL_TYPES}
             placeholder={t('widgets.video.addLora')}
+            scopeLabel={t('models.scopeConcepts')}
             size="xs"
             value={null}
             onChange={addLora}

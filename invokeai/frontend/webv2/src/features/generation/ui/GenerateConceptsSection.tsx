@@ -94,6 +94,7 @@ export const GenerateConceptsContent = ({
             Boolean(selectedModel && isLoraModelConfig(model) && isLoraCompatibleWithModel(model, selectedModel))
           }
           modelTypes={['lora']}
+          scopeLabel={t('models.scopeConcepts')}
           placeholder={
             selectedModel ? t('widgets.generate.searchCompatibleConcepts') : t('widgets.generate.selectModelFirst')
           }

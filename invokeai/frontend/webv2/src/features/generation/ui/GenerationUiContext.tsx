@@ -18,6 +18,7 @@ export interface GenerationModelSelectProps {
   modelTypes: string[];
   onChange: (model: GenerationModelCatalogItem | null) => void;
   placeholder?: string;
+  scopeLabel?: string;
   showManagerButton?: boolean;
   size?: 'xs' | 'sm' | 'md';
   value: string | null;
