@@ -7,6 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { List, type ListRowProps } from './List';
 import { ListItem } from './ListItem';
+import { LIST_ROW_GAP_PX } from './listLayout';
 import { ListPager } from './ListPager';
 import { listRowsFromItems, listRowsFromSections } from './listRows';
 import { ListSelectionBar } from './ListSelectionBar';
@@ -164,8 +165,8 @@ describe('list dividers', () => {
     const line = lines[0]!.getBoundingClientRect();
 
     // The row gap is unchanged by the divider, which sits in its middle.
-    expect(second.top - first.bottom).toBeCloseTo(4, 0);
-    expect(line.top - first.bottom).toBeCloseTo(1.5, 0);
+    expect(second.top - first.bottom).toBeCloseTo(LIST_ROW_GAP_PX, 0);
+    expect(line.top - first.bottom).toBeCloseTo((LIST_ROW_GAP_PX - 1) / 2, 0);
     // Inset from both edges so rounded row corners never touch it.
     expect(line.left - first.left).toBeCloseTo(8, 0);
     expect(first.right - line.right).toBeCloseTo(8, 0);
@@ -210,8 +211,8 @@ describe('list dividers', () => {
     const line = hairlines()[0]!.getBoundingClientRect();
 
     // Same geometry as stacked rows: centred in the gap, inset from both row edges.
-    expect(rowB.top - rowA.bottom).toBeCloseTo(4, 0);
-    expect(line.top - rowA.bottom).toBeCloseTo(1.5, 0);
+    expect(rowB.top - rowA.bottom).toBeCloseTo(LIST_ROW_GAP_PX, 0);
+    expect(line.top - rowA.bottom).toBeCloseTo((LIST_ROW_GAP_PX - 1) / 2, 0);
     expect(line.left - rowA.left).toBeCloseTo(8, 0);
     expect(rowA.right - line.right).toBeCloseTo(8, 0);
   });
