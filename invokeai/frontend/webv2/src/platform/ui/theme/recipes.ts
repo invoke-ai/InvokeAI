@@ -948,12 +948,26 @@ export const rowRecipe = defineRecipe({
  * the button has focus; the accent tone recolors muted text so it stays legible on the solid fill.
  */
 export const listItemSlotRecipe = defineSlotRecipe({
-  slots: ['root', 'check', 'primary', 'body', 'titleLine', 'title', 'badges', 'description', 'trailing', 'actions'],
+  slots: [
+    'root',
+    'check',
+    'primary',
+    'body',
+    'titleLine',
+    'title',
+    'badges',
+    'description',
+    'trailing',
+    'actions',
+    'detail',
+  ],
   base: {
     root: {
       ...rowSurface,
       alignItems: 'stretch',
       display: 'flex',
+      // Lets `detail` take its own line under the row.
+      flexWrap: 'wrap',
       minW: 0,
       position: 'relative',
       '&:has([data-list-primary]:focus-visible)': rowFocusRing,
@@ -1027,6 +1041,13 @@ export const listItemSlotRecipe = defineSlotRecipe({
       flexShrink: 0,
       gap: '0.5',
       pe: '1',
+    },
+    // Row-owned content on its own line, inset to the primary button's text.
+    detail: {
+      flexBasis: '100%',
+      minW: 0,
+      pb: '2',
+      px: '2',
     },
   },
   variants: {

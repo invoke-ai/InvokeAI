@@ -34,6 +34,11 @@ export interface ListItemProps {
   trailing?: ReactNode;
   /** Controls that act on the row, rendered beside the primary button so they never nest inside it. */
   actions?: ReactNode;
+  /**
+   * Content under the row that belongs to it, such as a control tuning the item; it shares the row's surface but sits
+   * outside the primary button, so it may hold controls. A context menu it handles itself takes precedence.
+   */
+  detail?: ReactNode;
   density?: ListDensity;
   /** The one row whose detail is open; announced with aria-current and filled with the accent tone. */
   isActive?: boolean;
@@ -75,6 +80,7 @@ export const ListItem = ({
   checkLabel,
   density = 'regular',
   description,
+  detail,
   isActive = false,
   isBusy = false,
   isChecked = false,
@@ -102,7 +108,8 @@ export const ListItem = ({
 
   const handleContextMenu = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
-      if (!onContextMenu) {
+      // A nested control (e.g. a field in `detail`) that opened its own menu already claimed the gesture.
+      if (!onContextMenu || event.defaultPrevented) {
         return;
       }
 
@@ -231,6 +238,7 @@ export const ListItem = ({
         </chakra.div>
       )}
       {actions !== undefined && actions !== null ? <chakra.div css={styles.actions}>{actions}</chakra.div> : null}
+      {detail !== undefined && detail !== null ? <chakra.div css={styles.detail}>{detail}</chakra.div> : null}
     </chakra.div>
   );
 };
