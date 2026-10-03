@@ -34,6 +34,11 @@ export interface WorkbenchFocusController {
    * widget, focus moves into the region as it stands.
    */
   focusRegion(region: WidgetRegion, typeId?: string): void;
+  /**
+   * Forget a window target whose window has docked or closed. It already reads as null; forgetting it keeps the
+   * same instance from taking focus back without being focused, should a preset or undo float it again.
+   */
+  forgetClosedWindow(): void;
   /** The focus target, or null once it no longer describes something on screen in this project and account. */
   getTarget(): WorkbenchFocusTarget | null;
   subscribe(listener: () => void): () => void;
@@ -74,8 +79,8 @@ export const createWorkbenchFocusController = ({
     }
   };
   // The one place a target is judged. The owner clears eagerly on project and account changes, which is what
-  // notifies subscribers and stops moves; this read-time check covers the instant between such a change and that
-  // clear, and a window that docked or closed without anything else taking focus.
+  // notifies subscribers and stops moves, and forgets a closed window on the next workbench change; this read-time
+  // check covers the instant between such a change and the owner's response.
   const getTarget = (): WorkbenchFocusTarget | null =>
     entry &&
     entry.projectId === getProjectId() &&
@@ -184,6 +189,11 @@ export const createWorkbenchFocusController = ({
 
         return null;
       }),
+    forgetClosedWindow: () => {
+      if (entry?.target.kind === 'floating' && !isFloating(entry.target.instanceId)) {
+        entry = null;
+      }
+    },
     getTarget,
     subscribe: (listener) => {
       listeners.add(listener);

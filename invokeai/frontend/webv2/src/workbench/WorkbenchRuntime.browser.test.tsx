@@ -166,6 +166,20 @@ describe('WorkbenchFocusProvider', () => {
     expect(api.getTarget()).toBeNull();
   });
 
+  it('does not hand focus back to a window that floats again without being focused', async () => {
+    const { commands } = runtimeMocks.store;
+    await render(true);
+    await press('window');
+
+    // The focused window leaves — as a preset applied in the same project can make it — and a later change floats
+    // the same instance again.
+    await act(() => commands.widgets.dockFloating('image-map'));
+    await act(() => commands.widgets.float('image-map'));
+
+    expect(runtimeMocks.store.getSnapshot().activeProject.floatingWidgets?.['image-map']).toBeDefined();
+    expect(api.getTarget()).toBeNull();
+  });
+
   it('abandons a pending move when the workbench unmounts', async () => {
     await render(false);
     const move = api.focusFloating;

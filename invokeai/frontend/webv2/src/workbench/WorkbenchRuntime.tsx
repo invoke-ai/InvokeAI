@@ -26,7 +26,7 @@ export const WorkbenchRuntime = () => {
 /**
  * Owns workbench focus for everything below it — the shell and the hotkey runtime read the same target. Focus is
  * transient: it is forgotten, along with any focus move still in flight, when the project on screen changes, the
- * account changes, or the workbench unmounts.
+ * account changes, or the workbench unmounts, and a window's focus is forgotten once it docks or closes.
  *
  * It lives in this module, beside the other workbench lifecycle adapter, because the editor's startup module set
  * is pinned by the architecture performance gate; a module of its own would have to be added to that baseline.
@@ -49,6 +49,8 @@ export const WorkbenchFocusProvider = ({ children }: { children: ReactNode }) =>
       if (nextProjectId !== projectId) {
         projectId = nextProjectId;
         controller.clear();
+      } else {
+        controller.forgetClosedWindow();
       }
     });
     const unregister = registerAccountOwnedResource({ clear: controller.clear, name: 'workbench-focus' });
