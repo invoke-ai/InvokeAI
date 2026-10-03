@@ -1,6 +1,6 @@
 import type { KeyboardEvent as ReactKeyboardEvent, MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 
-import { chakra, Flex, HStack, Stack, Text } from '@chakra-ui/react';
+import { chakra, Flex, HStack, Separator, Stack, Text } from '@chakra-ui/react';
 import { IconButton } from '@platform/ui/Button';
 import { formatHexColor, normalizeHex, parseHexColor } from '@platform/ui/color';
 import { DEFAULT_COLOR_SWATCHES, recordRecentColor, useRecentColors } from '@platform/ui/colorPickerStore';
@@ -18,6 +18,8 @@ import { useMaskTintEditor } from '@workbench/widgets/canvas/color-system/useMas
 import { PlusIcon } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
+
+const SHELF_SEPARATOR = <Separator borderColor="border.subtle" />;
 
 /** Share default, account-recent, and project swatches; picks update the same active pair as Color. */
 export const SwatchesPane = () => {
@@ -72,7 +74,7 @@ export const SwatchesPane = () => {
 
   return (
     <Scrollable h="full">
-      <Stack gap="2.5" p="2">
+      <Stack gap="2.5" p="2" separator={SHELF_SEPARATOR}>
         <SwatchShelf
           activeHex={activeHex}
           colors={DEFAULT_COLOR_SWATCHES}
