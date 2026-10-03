@@ -610,12 +610,12 @@ export const UpscaleWidgetView = () => {
             seedMode={values.seedMode}
             onCommit={patch}
           />
-          <Field hint="concepts" label={t('widgets.upscale.addLora')}>
+          <Field hint="concepts" label={t('widgets.upscale.concepts')}>
             <ModelSelect
               excludeKeys={selectedLoraKeys}
               filter={loraFilter}
               modelTypes={LORA_MODEL_TYPES}
-              placeholder={t('widgets.upscale.selectLora')}
+              placeholder={t('widgets.upscale.searchCompatibleConcepts')}
               size="xs"
               value={null}
               onChange={addLora}

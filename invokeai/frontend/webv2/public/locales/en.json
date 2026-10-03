@@ -2576,7 +2576,7 @@
       "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it."
     },
     "upscale": {
-      "addLora": "LoRAs",
+      "concepts": "Concepts",
       "advanced": "Advanced",
       "bundledVae": "Bundled VAE",
       "cfgScale": "CFG scale",
@@ -2591,7 +2591,7 @@
       "inputSize": "Input",
       "largeOutput": "Large output",
       "largeOutputDescription": "This output may take substantially longer and require more VRAM. Check tile settings before queueing.",
-      "lorasRemoved": "Removed {{count}} incompatible LoRA model(s).",
+      "lorasRemoved": "Removed {{count}} incompatible concept(s).",
       "mainModel": "Main model",
       "mainModelRequired": "Select a supported main model.",
       "negativePrompt": "Negative prompt",
@@ -2622,7 +2622,7 @@
       "scaleHelp": "Output dimensions are the source dimensions multiplied by this value.",
       "scheduler": "Scheduler",
       "seed": "Seed",
-      "selectLora": "Select a compatible LoRA…",
+      "searchCompatibleConcepts": "Search compatible concepts…",
       "selectMainModel": "Select a supported model…",
       "selectSpandrelModel": "Select a Spandrel model…",
       "selectTileControlNet": "Select a Tile or Union ControlNet…",
