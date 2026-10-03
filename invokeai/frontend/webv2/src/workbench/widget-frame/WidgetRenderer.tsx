@@ -3,8 +3,10 @@ import type {
   RegisteredWidget,
   WidgetImplementation,
   WidgetInstanceContract,
+  WidgetInstanceId,
   WidgetInstanceRuntimeMeta,
   WidgetRuntimeApi,
+  WidgetTypeId,
   WidgetViewProps,
   WorkbenchRegion,
 } from '@workbench/widgetContracts';
@@ -446,8 +448,23 @@ const FooterSlot = memo(function FooterSlot({
   );
 }, areSlotPropsEqual);
 
-export const MissingWidgetFrame = ({ label, region }: { label: string; region: Exclude<WidgetRegion, 'center'> }) => (
-  <WidgetPanelFrame region={region}>
+/**
+ * Stands in for a widget whose view cannot render. It carries the instance's identity like any other frame, so focus
+ * moves and hotkeys that look for the instance find it here.
+ */
+export const MissingWidgetFrame = ({
+  instanceId,
+  label,
+  region,
+  typeId,
+}: {
+  instanceId: WidgetInstanceId;
+  label: string;
+  region: Exclude<WidgetRegion, 'center'>;
+  /** Unknown when the instance itself is gone. */
+  typeId: WidgetTypeId | undefined;
+}) => (
+  <WidgetPanelFrame instanceId={instanceId} region={region} typeId={typeId}>
     <Box p="3">
       <Text fontSize="xs" fontWeight="700">
         {label}

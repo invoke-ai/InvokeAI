@@ -1259,6 +1259,26 @@ const isFluxKontextModel = (model: GenerateModelConfig | undefined): model is Ma
     model.name.toLowerCase().includes('kontext')
   );
 
+/**
+ * Families whose Generate graph loads LoRAs. The backend installs no LoRAs for the others, so their concept picker
+ * could only ever be empty; graph coverage holds the builders to this list.
+ */
+const LORA_SUPPORTED_BASES: ReadonlySet<string> = new Set<SupportedGenerateBase>([
+  'anima',
+  'flux',
+  'flux2',
+  'krea-2',
+  'qwen-image',
+  'sd-1',
+  'sd-2',
+  'sdxl',
+  'wan',
+  'z-image',
+]);
+
+export const isLoraSupported = (model: GenerateModelConfig | undefined): boolean =>
+  Boolean(model && model.type !== 'external_image_generator' && LORA_SUPPORTED_BASES.has(model.base));
+
 /** Picker and validation must agree on compatibility, including required variants. */
 export const isReferenceImageSupported = (model: GenerateModelConfig | undefined): boolean => {
   if (!model) {
