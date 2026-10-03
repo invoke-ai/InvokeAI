@@ -371,3 +371,45 @@ def test_explicit_krea2_override_accepts_single_module_native_lora(_raise_if_not
     config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2})
 
     assert config.base is BaseModelType.Krea2
+
+
+def _native_lokr_lora() -> MagicMock:
+    # LyCORIS LoKr adapter targeting the Krea-2 text-fusion stage (the layout ai-toolkit emits). It carries
+    # Kronecker factors instead of a lora_A/lora_B pair.
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lokr_w1": object(),
+        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.lokr_w2": object(),
+        "diffusion_model.txtfusion.layerwise_blocks.0.attn.wq.alpha": object(),
+    }
+    return mod
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_automatic_probe_accepts_lokr_lora(_raise_if_not_file) -> None:
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(_native_lokr_lora(), {**_REQUIRED_FIELDS})
+
+    assert config.base is BaseModelType.Krea2
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_explicit_krea2_override_accepts_lokr_lora(_raise_if_not_file) -> None:
+    config = LoRA_LyCORIS_Krea2_Config.from_model_on_disk(
+        _native_lokr_lora(), {**_REQUIRED_FIELDS, "base": BaseModelType.Krea2}
+    )
+
+    assert config.base is BaseModelType.Krea2
+
+
+@patch("invokeai.backend.model_manager.configs.lora.raise_if_not_file")
+def test_automatic_probe_rejects_lokr_without_krea2_modules(_raise_if_not_file) -> None:
+    # A LoKr that does not touch the Krea-2 signature modules belongs to another base and must not be
+    # claimed here just because it is a LoKr.
+    mod = MagicMock()
+    mod.load_state_dict.return_value = {
+        "transformer.transformer_blocks.0.attn.to_q.lokr_w1": object(),
+        "transformer.transformer_blocks.0.attn.to_q.lokr_w2": object(),
+    }
+
+    with pytest.raises(NotAMatchError):
+        LoRA_LyCORIS_Krea2_Config.from_model_on_disk(mod, {**_REQUIRED_FIELDS})
