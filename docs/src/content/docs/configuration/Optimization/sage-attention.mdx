@@ -36,6 +36,7 @@ compared with PyTorch's default attention there:
 | Video model (as measured) | Resolution | Generation | Notes |
 | --- | --- | --- | --- |
 | LTX-2.5 distilled (int8) | 1248×704, 121 frames | 72.0 s → 63.4 s (−12 %) | Video self-attention only; text cross-attention and the audio streams stay on PyTorch. |
+| Wan 2.2 TI2V-5B (GGUF Q8) | 1280×704, 121 frames | 380.9 s → 247.9 s (−35 %) | |
 
 At 1024×1024 most of a step is spent outside attention, so the gain is small; at high resolutions and for video,
 attention dominates. GGUF models spend much of each step dequantizing weights, which SageAttention does not touch.
