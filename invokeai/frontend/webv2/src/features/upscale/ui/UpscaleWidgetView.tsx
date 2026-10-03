@@ -3,7 +3,17 @@ import type { ProjectPromptDraftPatch } from '@features/generation/settings';
 import type { ModelConfig, ModelTaxonomyType } from '@features/models';
 import type { UpscaleWidgetValues } from '@features/upscale/core/types';
 
-import { Badge, createListCollection, DataList, SegmentGroup, SimpleGrid, Stack, Text } from '@chakra-ui/react';
+import {
+  Badge,
+  Box,
+  createListCollection,
+  DataList,
+  SegmentGroup,
+  Separator,
+  SimpleGrid,
+  Stack,
+  Text,
+} from '@chakra-ui/react';
 import {
   ConceptList,
   type ConceptModelPort,
@@ -566,6 +576,7 @@ export const UpscaleWidgetView = () => {
               onChange={selectMainModel}
             />
           </Field>
+          <Separator borderColor="border.subtle" />
           {/* Iterations live in the top bar's invoke cluster, which edits this widget's batch count directly. */}
           <ScrubberField
             error={errors.steps}
@@ -597,6 +608,7 @@ export const UpscaleWidgetView = () => {
               onValueChange={set.scheduler}
             />
           </Field>
+          <Separator borderColor="border.subtle" />
           <SeedField
             batchCount={values.batchCount}
             error={errors.seed}
@@ -605,6 +617,7 @@ export const UpscaleWidgetView = () => {
             seedMode={values.seedMode}
             onCommit={patch}
           />
+          <Separator borderColor="border.subtle" />
           <Field hint="concepts" label={t('widgets.upscale.concepts')}>
             <ModelSelect
               excludeKeys={selectedLoraKeys}
@@ -617,17 +630,19 @@ export const UpscaleWidgetView = () => {
             />
           </Field>
           {values.loras.length > 0 ? (
-            <ConceptList label={t('widgets.upscale.concepts')}>
-              {values.loras.map((lora) => (
-                <ConceptRow
-                  key={lora.model.key}
-                  models={conceptModels}
-                  lora={lora}
-                  onRemove={removeLora}
-                  onUpdate={updateLora}
-                />
-              ))}
-            </ConceptList>
+            <Box mx={-1}>
+              <ConceptList label={t('widgets.upscale.concepts')}>
+                {values.loras.map((lora) => (
+                  <ConceptRow
+                    key={lora.model.key}
+                    models={conceptModels}
+                    lora={lora}
+                    onRemove={removeLora}
+                    onUpdate={updateLora}
+                  />
+                ))}
+              </ConceptList>
+            </Box>
           ) : null}
         </Stack>
       </GenerationSettingsSection>
