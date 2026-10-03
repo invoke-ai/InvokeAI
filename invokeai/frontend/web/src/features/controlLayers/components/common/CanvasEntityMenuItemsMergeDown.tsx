@@ -1,6 +1,7 @@
 import { MenuItem } from '@invoke-ai/ui-library';
 import { useCanvasManager } from 'features/controlLayers/contexts/CanvasManagerProviderGate';
 import { useEntityIdentifierContext } from 'features/controlLayers/contexts/EntityIdentifierContext';
+import { getIsCanvasMergeDownSupported } from 'features/controlLayers/hooks/canvasMergeHotkeyUtils';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import { useEntityIdentifierBelowThisOne } from 'features/controlLayers/hooks/useNextRenderableEntityIdentifier';
 import type { CanvasEntityType } from 'features/controlLayers/store/types';
@@ -14,18 +15,19 @@ export const CanvasEntityMenuItemsMergeDown = memo(() => {
   const isBusy = useCanvasIsBusy();
   const entityIdentifier = useEntityIdentifierContext<CanvasEntityType>();
   const entityIdentifierBelowThisOne = useEntityIdentifierBelowThisOne(entityIdentifier);
+  const isSupported = getIsCanvasMergeDownSupported(entityIdentifier, entityIdentifierBelowThisOne);
   const mergeDown = useCallback(() => {
-    if (entityIdentifierBelowThisOne === null) {
+    if (entityIdentifierBelowThisOne === null || !isSupported) {
       return;
     }
-    canvasManager.compositor.mergeByEntityIdentifiers([entityIdentifierBelowThisOne, entityIdentifier], true);
-  }, [canvasManager.compositor, entityIdentifier, entityIdentifierBelowThisOne]);
+    void canvasManager.compositor.mergeDown(entityIdentifierBelowThisOne, entityIdentifier);
+  }, [canvasManager.compositor, entityIdentifier, entityIdentifierBelowThisOne, isSupported]);
 
   return (
     <MenuItem
       onClick={mergeDown}
       icon={<PiStackSimpleBold />}
-      isDisabled={isBusy || entityIdentifierBelowThisOne === null}
+      isDisabled={isBusy || entityIdentifierBelowThisOne === null || !isSupported}
     >
       {t('controlLayers.mergeDown')}
     </MenuItem>

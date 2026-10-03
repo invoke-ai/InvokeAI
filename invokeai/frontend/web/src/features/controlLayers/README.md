@@ -33,6 +33,7 @@ Modules can do anything, they are simply plain-JS classes to encapsulate some fu
 Canvas has a number of layer types:
 
 - Raster layers: Traditional raster/pixel layers, much like layers in Photoshop
+- Vector layers: Serializable open or closed cubic Bezier paths that remain editable until explicitly traced or filled
 - Control layers: Internally a raster layer, but designated to hold control data (e.g. depth maps, segmentation masks, etc.) and have special rendering rules
 - Regional guidance layers: A mask-like layer (i.e. it has arbitrary shapes but they have no color or texture, it's just a mask region) plus conditioning data like prompts or ref images. The conditioning is applied only to the masked regions
 - Inpaint mask layers: Another mask-like layer that indicate regions to inpaint/regenerate
@@ -40,6 +41,11 @@ Canvas has a number of layer types:
 Instances of layers are called "entities" in the codebase. Each entity has a type (one of the above), a number of properties (e.g. visibility, opacity, etc.), objects (e.g. brush strokes, shapes, images) and possibly other data.
 
 Each layer type has a corresponding "adapter" module that handles rendering the layer and its objects, applying filters, etc. The adapter modules are non-singleton modules that are instantiated once per layer entity.
+
+Vector layers use `CanvasEntityAdapterVectorLayer` and `CanvasEntityVectorLayerRenderer`. Persistent path geometry lives
+in Redux, while `CanvasPathToolModule` owns transient edit-session state such as the active path, selected points,
+handles, and edit history. Vector paths do not enter normal raster compositing until an explicit Trace, Fill, or Create
+Inpaint Mask operation materializes them.
 
 Using the raster layer type as an example, it has a number of sub-modules:
 

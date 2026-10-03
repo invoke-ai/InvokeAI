@@ -12,6 +12,9 @@ export const CanvasContextMenuItemsCropCanvasToBbox = memo(() => {
   const cropCanvasToBbox = useCallback(async () => {
     const adapters = canvasManager.getAllAdapters();
     for (const adapter of adapters) {
+      if (adapter.state.type === 'vector_layer') {
+        continue;
+      }
       await adapter.cropToBbox();
     }
   }, [canvasManager]);

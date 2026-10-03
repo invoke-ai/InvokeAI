@@ -66,6 +66,10 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
       return;
     }
 
+    if (this.parent.tools.path.hasActiveEditSession()) {
+      return;
+    }
+
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
     if (!selectedEntity) {

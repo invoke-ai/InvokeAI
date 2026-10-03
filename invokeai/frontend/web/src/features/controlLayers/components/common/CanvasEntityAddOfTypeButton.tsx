@@ -5,6 +5,7 @@ import {
   useAddInpaintMask,
   useAddRasterLayer,
   useAddRegionalGuidance,
+  useAddVectorLayer,
 } from 'features/controlLayers/hooks/addLayerHooks';
 import { useCanvasIsBusy } from 'features/controlLayers/hooks/useCanvasIsBusy';
 import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
@@ -22,6 +23,7 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
   const addRegionalGuidance = useAddRegionalGuidance();
   const addRasterLayer = useAddRasterLayer();
   const addControlLayer = useAddControlLayer();
+  const addVectorLayer = useAddVectorLayer();
 
   const onClick = useCallback(() => {
     switch (type) {
@@ -37,8 +39,11 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
       case 'control_layer':
         addControlLayer();
         break;
+      case 'vector_layer':
+        addVectorLayer();
+        break;
     }
-  }, [addControlLayer, addInpaintMask, addRasterLayer, addRegionalGuidance, type]);
+  }, [addControlLayer, addInpaintMask, addRasterLayer, addRegionalGuidance, addVectorLayer, type]);
 
   const label = useMemo(() => {
     switch (type) {
@@ -50,6 +55,8 @@ export const CanvasEntityAddOfTypeButton = memo(({ type }: Props) => {
         return t('controlLayers.addRasterLayer');
       case 'control_layer':
         return t('controlLayers.addControlLayer');
+      case 'vector_layer':
+        return t('controlLayers.addVectorLayer');
     }
   }, [type, t]);
 

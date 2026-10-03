@@ -1,15 +1,16 @@
-import type { MenuItemProps } from '@invoke-ai/ui-library';
+import type { MenuItemProps, TooltipProps } from '@invoke-ai/ui-library';
 import { Flex, MenuItem, Tooltip } from '@invoke-ai/ui-library';
 import type { ReactNode } from 'react';
 
 type Props = MenuItemProps & {
   tooltip?: ReactNode;
+  tooltipPlacement?: TooltipProps['placement'];
   icon: ReactNode;
 };
 
-export const IconMenuItem = ({ tooltip, icon, ...props }: Props) => {
+export const IconMenuItem = ({ tooltip, tooltipPlacement = 'top', icon, ...props }: Props) => {
   return (
-    <Tooltip label={tooltip} placement="top" gutter={12}>
+    <Tooltip label={tooltip} placement={tooltipPlacement} gutter={12}>
       <MenuItem
         display="flex"
         alignItems="center"

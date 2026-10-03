@@ -13,6 +13,8 @@ export const useEntityTypeCount = (type: CanvasEntityIdentifier['type']): number
             return canvas.controlLayers.entities.length;
           case 'raster_layer':
             return canvas.rasterLayers.entities.length;
+          case 'vector_layer':
+            return canvas.vectorLayers.entities.length;
           case 'inpaint_mask':
             return canvas.inpaintMasks.entities.length;
           case 'regional_guidance':

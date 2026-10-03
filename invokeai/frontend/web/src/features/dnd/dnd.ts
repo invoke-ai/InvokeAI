@@ -3,7 +3,7 @@ import type { AppDispatch, AppGetState } from 'app/store/store';
 import { getDefaultRefImageConfig } from 'features/controlLayers/hooks/addLayerHooks';
 import { getPrefixedId } from 'features/controlLayers/konva/util';
 import { refImageAdded } from 'features/controlLayers/store/refImagesSlice';
-import type { CanvasEntityIdentifier, CanvasEntityType } from 'features/controlLayers/store/types';
+import type { CanvasEntityIdentifier } from 'features/controlLayers/store/types';
 import { imageDTOToCroppableImage } from 'features/controlLayers/store/util';
 import { selectComparisonImages } from 'features/gallery/components/ImageViewer/common';
 import type { BoardId } from 'features/gallery/store/types';
@@ -23,6 +23,7 @@ import {
   setNodeVideoFieldVideo,
   setRegionalGuidanceReferenceImage,
   setUpscaleInitialImage,
+  type SupportedCanvasImageEntityType,
 } from 'features/imageActions/actions';
 import { fieldImageCollectionValueChanged } from 'features/nodes/store/nodesSlice';
 import { selectFieldInputInstanceSafe, selectNodesSlice } from 'features/nodes/store/selectors';
@@ -423,7 +424,7 @@ type NewCanvasEntityFromImageDndTargetData = DndData<
   typeof _newCanvasEntity.type,
   typeof _newCanvasEntity.key,
   {
-    type: CanvasEntityType | 'regional_guidance_with_reference_image';
+    type: SupportedCanvasImageEntityType | 'regional_guidance_with_reference_image';
     withResize?: boolean;
   }
 >;
@@ -454,7 +455,7 @@ type NewCanvasFromImageDndTargetData = DndData<
   typeof _newCanvas.type,
   typeof _newCanvas.key,
   {
-    type: CanvasEntityType | 'regional_guidance_with_reference_image';
+    type: SupportedCanvasImageEntityType | 'regional_guidance_with_reference_image';
     withResize?: boolean;
     withInpaintMask?: boolean;
   }
