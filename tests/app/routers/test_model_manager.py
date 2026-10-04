@@ -442,6 +442,112 @@ def test_convert_model_releases_the_lock_when_the_conversion_fails() -> None:
     assert exc_info.value.status_code == 424
 
 
+def test_convert_model_retains_recovery_source_and_restores_model_name(monkeypatch: Any, tmp_path: Path) -> None:
+    from types import SimpleNamespace
+    from unittest.mock import MagicMock
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.app.services.model_install.model_install_common import InstallRecoveryRequiredError
+    from invokeai.app.services.model_records import ModelRecordChanges
+    from invokeai.backend.model_manager.configs.main import Main_Checkpoint_SD1_Config
+    from invokeai.backend.model_manager.taxonomy import (
+        BaseModelType,
+        ModelFormat,
+        ModelSourceType,
+        ModelType,
+        ModelVariantType,
+        SchedulerPredictionType,
+    )
+
+    model_config = Main_Checkpoint_SD1_Config(
+        key="model-key",
+        path="/models/original.safetensors",
+        name="Original Model",
+        format=ModelFormat.Checkpoint,
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.Main,
+        config_path="/configs/model.yaml",
+        variant=ModelVariantType.Normal,
+        hash="111222333444",
+        file_size=8192,
+        source="/models/original.safetensors",
+        source_type=ModelSourceType.Path,
+        prediction_type=SchedulerPredictionType.Epsilon,
+    )
+
+    class Store:
+        def get_model(self, key: str) -> Main_Checkpoint_SD1_Config:
+            assert key == model_config.key
+            return model_config
+
+        def update_model(self, key: str, changes: ModelRecordChanges) -> None:
+            assert key == model_config.key
+            if changes.name is not None:
+                model_config.name = changes.name
+
+    def save_pretrained(path: Path) -> None:
+        path.mkdir()
+        (path / "weights.safetensors").write_text("converted")
+
+    def reject_recovery_source(path: Path, *, config: ModelRecordChanges) -> str:
+        raise InstallRecoveryRequiredError(f"Install recovery required. Source: {path}; destination: /models/recovery")
+
+    services = SimpleNamespace(
+        model_manager=SimpleNamespace(
+            store=Store(),
+            load=SimpleNamespace(
+                load_model=lambda *_args, **_kwargs: SimpleNamespace(
+                    model=SimpleNamespace(save_pretrained=save_pretrained)
+                )
+            ),
+            install=SimpleNamespace(install_path=reject_recovery_source),
+        ),
+        configuration=SimpleNamespace(models_path=tmp_path),
+        logger=MagicMock(),
+    )
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        model_manager_router.convert_model(
+            current_admin=SimpleNamespace(user_id="test-user"),
+            key=model_config.key,
+        )
+
+    assert exc_info.value.status_code == 409
+    assert "Source:" in exc_info.value.detail
+    recovery_path = Path(exc_info.value.detail.rsplit("retained at ", 1)[1].rstrip("."))
+    assert recovery_path.is_dir()
+    assert (recovery_path / "original" / "weights.safetensors").read_text() == "converted"
+    assert model_config.name == "Original Model"
+
+
+def test_cancel_recovery_required_install_returns_conflict(monkeypatch: Any) -> None:
+    from types import SimpleNamespace
+
+    from starlette.exceptions import HTTPException
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+
+    class Installer:
+        def get_job_by_id(self, job_id: int) -> object:
+            assert job_id == 42
+            return object()
+
+        def cancel_job(self, _job: object) -> None:
+            raise ValueError("Cannot cancel an install that requires recovery")
+
+    services = SimpleNamespace(model_manager=SimpleNamespace(install=Installer()))
+    monkeypatch.setattr(model_manager_router, "ApiDependencies", MockApiDependencies(DummyInvoker(services)))
+
+    with pytest.raises(HTTPException) as exc_info:
+        model_manager_router.cancel_model_install_job(current_admin=None, id=42)
+
+    assert exc_info.value.status_code == 409
+    assert "requires recovery" in exc_info.value.detail
+
+
 def test_delete_is_refused_while_the_same_model_is_being_converted() -> None:
     """A delete landing mid-conversion must not pull the source out from under it.
 

@@ -21,6 +21,10 @@ class InvalidModelConfigException(Exception):
     pass
 
 
+class InstallRecoveryRequiredError(RuntimeError):
+    """Install transfer could not be safely rolled back; preserve both recovery roots."""
+
+
 class InstallStatus(str, Enum):
     """State of an install job running in the background."""
 

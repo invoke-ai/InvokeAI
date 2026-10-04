@@ -568,7 +568,9 @@ These methods bypass the download queue and directly register or install the mod
 
 Both methods accept a Path object corresponding to a checkpoint or diffusers folder, and an optional dict of config attributes to use to override the values derived from model probing.
 
-The difference between `register_path()` and `install_path()` is that the former creates a model configuration record without changing the location of the model in the filesystem. The latter makes a copy of the model inside the InvokeAI models directory before registering it.
+The difference between `register_path()` and `install_path()` is that the former creates a model configuration record without changing the location of the model in the filesystem. The latter moves the model into the InvokeAI models directory before registering it.
+
+When an install transfer cannot be rolled back without risking data loss, the installer raises a recovery-required error and retains both transfer roots for manual recovery. Sibling sentinels keep recovery roots across restart, including when JSON marker writes fail, and prevent cancellation from deleting them. Ordinary markerless staging directories and terminal-state staging directories may be cleaned up at startup. Conversion writes its intermediate model under `models/.convert_tmp`, which the orphan scan skips while the conversion is active. If installation needs recovery, the conversion endpoint reports and retains that source directory; successful conversions and ordinary failures remove their scratch directory.
 
 #### installer.unregister(key)
 

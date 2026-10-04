@@ -280,6 +280,42 @@ def test_directory_install_preserves_collision_during_rollback(
     assert preserved_item.is_dir() == first_item_is_dir
 
 
+def test_directory_install_rollback_race_preserves_both_source_artifacts(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    items = list(diffusers_dir.iterdir())
+    locked_item = items[-1]
+    first_item = next(path for path in items[:-1] if path.is_file())
+    original_bytes = first_item.read_bytes()
+    real_move = shutil.move
+    real_rename_noreplace = ModelInstallService._rename_noreplace
+
+    def fail_later_move(src: Path, dst: Path):
+        if src == locked_item:
+            raise PermissionError("later source remains locked")
+        return real_move(src, dst)
+
+    def recreate_after_absence_check(src: Path, dst: Path) -> None:
+        if dst == first_item:
+            dst.write_bytes(b"new user bytes")
+        real_rename_noreplace(src, dst)
+
+    monkeypatch.setattr(model_install_default, "move", fail_later_move)
+    monkeypatch.setattr(ModelInstallService, "_rename_noreplace", staticmethod(recreate_after_absence_check))
+
+    with pytest.raises(model_install_default.InstallRecoveryRequiredError, match="recovery required"):
+        mm2_installer.install_path(diffusers_dir)
+
+    assert first_item.read_bytes() == b"new user bytes"
+    recovery_dirs = [path for path in mm2_app_config.models_path.iterdir() if path.is_dir() and path.name != "tmp"]
+    preserved = [path / first_item.name for path in recovery_dirs if (path / first_item.name).exists()]
+    assert len(preserved) == 1
+    assert preserved[0].read_bytes() == original_bytes
+
+
 def test_directory_install_does_not_retry_partial_copy(
     mm2_installer: ModelInstallServiceBase,
     diffusers_dir: Path,
@@ -338,40 +374,81 @@ def test_directory_install_retains_unowned_destination_artifact_after_rollback(
 
 def test_remote_install_recovery_survives_cleanup_and_restart(
     mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
     mm2_app_config: InvokeAIAppConfig,
     mm2_download_queue,
     mm2_session,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     assert isinstance(mm2_installer, ModelInstallService)
+    existing_paths = set(mm2_app_config.models_path.iterdir())
     tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}recovery-{uuid.uuid4().hex}"
     tmpdir.mkdir()
-    downloaded_file = tmpdir / "model.bin"
-    downloaded_file.write_bytes(b"downloaded model")
+    shutil.copytree(diffusers_dir, tmpdir, dirs_exist_ok=True)
+    failure_file = tmpdir / "zz_partial_failure.txt"
+    failure_file.write_bytes(b"source bytes")
+    source_files = {path.name: path.read_bytes() for path in tmpdir.iterdir() if path.is_file()}
     source = URLModelSource(url=Url("https://example.com/model.bin"))
     job = ModelInstallJob(
         id=991,
         source=source,
-        config_in=ModelRecordChanges(),
+        config_in=ModelRecordChanges(key="tmpinstall_recovery"),
         local_path=tmpdir,
         status=InstallStatus.DOWNLOADS_DONE,
     )
     job._install_tmpdir = tmpdir
     mm2_installer._write_install_marker(job, status=InstallStatus.DOWNLOADS_DONE)
 
-    def fail_install(*_args, **_kwargs):
-        raise model_install_default.InstallRecoveryRequiredError(
-            f"Install recovery required. Source: {tmpdir.resolve()}; destination: {mm2_app_config.models_path.resolve()}"
-        )
+    def fail_after_partial_transfer(src: Path, dst: Path):
+        if src == failure_file:
+            dst.write_bytes(b"unrecognized partial destination bytes")
+            raise PermissionError("simulated transfer failure after partial destination creation")
+        return shutil.move(src, dst)
 
-    monkeypatch.setattr(mm2_installer, "install_path", fail_install)
+    real_iterdir = Path.iterdir
+
+    def sorted_source_files(path: Path):
+        entries = list(real_iterdir(path))
+        return iter(sorted(entries, key=lambda entry: entry.name)) if path == tmpdir else iter(entries)
+
+    monkeypatch.setattr(Path, "iterdir", sorted_source_files)
+    monkeypatch.setattr(model_install_default, "move", fail_after_partial_transfer)
+    real_write_install_marker = mm2_installer._write_install_marker
+
+    def fail_recovery_marker(job_arg, *args, **kwargs):
+        if job_arg._recovery_required:
+            raise OSError("simulated marker write failure")
+        return real_write_install_marker(job_arg, *args, **kwargs)
+
+    real_delete_install_marker = mm2_installer._delete_install_marker
+
+    def assert_recovery_before_marker_delete(tmpdir_arg: Path) -> None:
+        assert mm2_installer._has_recovery_sentinel(tmpdir_arg)
+        real_delete_install_marker(tmpdir_arg)
+
+    monkeypatch.setattr(mm2_installer, "_write_install_marker", fail_recovery_marker)
+    monkeypatch.setattr(mm2_installer, "_delete_install_marker", assert_recovery_before_marker_delete)
     mm2_installer._put_in_queue(job)
     mm2_installer.wait_for_job(job, timeout=10)
 
-    marker = mm2_installer._read_install_marker(tmpdir)
     assert job.errored
-    assert marker is not None and marker.get("recovery_required") is True
-    assert downloaded_file.read_bytes() == b"downloaded model"
+    assert mm2_installer._has_recovery_sentinel(tmpdir)
+    assert model_install_default.INSTALL_RECOVERY_SENTINEL not in {path.name for path in real_iterdir(tmpdir)}
+    assert {path.name: path.read_bytes() for path in real_iterdir(tmpdir) if path.is_file()} == source_files
+    recovery_files = [
+        path
+        for path in set(mm2_app_config.models_path.iterdir()) - existing_paths
+        if path != tmpdir and path.is_dir() and (path / failure_file.name).exists()
+    ]
+    assert len(recovery_files) == 1
+    recovery_dir = recovery_files[0]
+    assert recovery_dir.name == "tmpinstall_recovery"
+    assert mm2_installer._has_recovery_sentinel(recovery_dir)
+    assert (recovery_dir / failure_file.name).read_bytes() == b"unrecognized partial destination bytes"
+
+    dangling_tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}dangling-{uuid.uuid4().hex}"
+    dangling_tmpdir.mkdir()
+    (dangling_tmpdir / "ordinary.tmp").write_bytes(b"discard me")
 
     restarted_installer = ModelInstallService(
         app_config=mm2_app_config,
@@ -383,9 +460,40 @@ def test_remote_install_recovery_survives_cleanup_and_restart(
     restarted_installer._restore_incomplete_installs()
 
     assert tmpdir.exists()
-    assert downloaded_file.read_bytes() == b"downloaded model"
+    assert {path.name: path.read_bytes() for path in real_iterdir(tmpdir) if path.is_file()} == source_files
+    assert recovery_dir.exists()
+    assert (recovery_dir / failure_file.name).read_bytes() == b"unrecognized partial destination bytes"
+    assert dangling_tmpdir.exists() is False
     assert restarted_installer.list_jobs() == []
     shutil.rmtree(tmpdir)
+
+
+def test_cancel_recovery_required_install_preserves_recovery_data(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}recovery-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    downloaded_file = tmpdir / "model.safetensors"
+    downloaded_file.write_bytes(b"recoverable source")
+    job = ModelInstallJob(
+        id=992,
+        source=URLModelSource(url=Url("https://example.com/model.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=downloaded_file,
+        status=InstallStatus.ERROR,
+    )
+    job._install_tmpdir = tmpdir
+    job._recovery_required = True
+    mm2_installer._write_recovery_sentinel(tmpdir)
+
+    with pytest.raises(ValueError, match="requires recovery"):
+        mm2_installer.cancel_job(job)
+
+    assert not job.cancelled
+    assert downloaded_file.read_bytes() == b"recoverable source"
+    assert mm2_installer._has_recovery_sentinel(tmpdir)
 
 
 def test_install_registration_failure_preserves_complete_recoverable_files(

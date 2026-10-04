@@ -1,5 +1,6 @@
 """Model installation class."""
 
+import ctypes
 import gc
 import json
 import locale
@@ -30,6 +31,7 @@ from invokeai.app.services.model_install.model_install_common import (
     MODEL_SOURCE_TO_TYPE_MAP,
     ExternalModelSource,
     HFModelSource,
+    InstallRecoveryRequiredError,
     InstallStatus,
     InvalidModelConfigException,
     LocalModelSource,
@@ -83,11 +85,7 @@ TMPDIR_PREFIX = "tmpinstall_"
 # Marker file used to resume or pause remote model installs across restarts.
 INSTALL_MARKER_FILENAME = ".invokeai_install.json"
 INSTALL_MARKER_VERSION = 1
-
-
-class InstallRecoveryRequiredError(RuntimeError):
-    """Install transfer could not be safely rolled back; preserve both recovery roots."""
-
+INSTALL_RECOVERY_SENTINEL = ".invokeai_install_recovery_required"
 
 # Filesystems cap a single path component at 255 bytes. A source that lists many explicit files
 # (an LTX-2 component folder names eight) would otherwise produce a folder name that cannot be
@@ -160,6 +158,51 @@ class ModelInstallService(ModelInstallServiceBase):
     def _marker_path(self, tmpdir: Path) -> Path:
         return tmpdir / INSTALL_MARKER_FILENAME
 
+    def _recovery_sentinel_path(self, tmpdir: Path) -> Path:
+        return tmpdir.parent / f".{tmpdir.name}{INSTALL_RECOVERY_SENTINEL}"
+
+    def _has_recovery_sentinel(self, tmpdir: Path) -> bool:
+        return self._recovery_sentinel_path(tmpdir).exists()
+
+    def _write_recovery_sentinel(self, tmpdir: Path) -> None:
+        # Keep recovery state outside the tree being transferred into the managed model directory.
+        path = self._recovery_sentinel_path(tmpdir)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        with open(path, "xb") as f:
+            f.write(b"Install transfer recovery required. Preserve this directory.\n")
+            f.flush()
+            os.fsync(f.fileno())
+        # Persist the directory entry before moving any source data where directory fsync is supported.
+        if os.name != "nt":
+            fd = os.open(path.parent, os.O_RDONLY)
+            try:
+                os.fsync(fd)
+            finally:
+                os.close(fd)
+
+    def _delete_recovery_sentinel(self, tmpdir: Path) -> None:
+        try:
+            self._recovery_sentinel_path(tmpdir).unlink()
+            if os.name != "nt":
+                fd = os.open(tmpdir.parent, os.O_RDONLY)
+                try:
+                    os.fsync(fd)
+                finally:
+                    os.close(fd)
+        except FileNotFoundError:
+            pass
+        except OSError as e:
+            self._logger.warning(f"Failed to remove install recovery sentinel in {tmpdir}: {e}")
+
+    def _retain_recovery_destination(self, dest_dir: Path) -> None:
+        if not dest_dir.name.startswith(TMPDIR_PREFIX):
+            return
+        try:
+            if dest_dir.exists():
+                self._write_recovery_sentinel(dest_dir)
+        except Exception as sentinel_error:
+            self._logger.error(f"Failed to persist destination recovery sentinel in {dest_dir}: {sentinel_error}")
+
     def _write_install_marker(self, job: ModelInstallJob, status: Optional[InstallStatus] = None) -> None:
         if job._install_tmpdir is None:
             return
@@ -224,6 +267,8 @@ class ModelInstallService(ModelInstallServiceBase):
         source_str = str(source)
         candidates: list[tuple[str, Path]] = []
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            if self._has_recovery_sentinel(tmpdir):
+                continue
             marker = self._read_install_marker(tmpdir)
             if not marker:
                 continue
@@ -249,6 +294,9 @@ class ModelInstallService(ModelInstallServiceBase):
             active_sources = {str(j.source) for j in self._install_jobs if not j.in_terminal_state}
             active_sources.update(str(j.source) for j in self._download_cache.values() if not j.in_terminal_state)
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            if self._has_recovery_sentinel(tmpdir):
+                self._logger.warning(f"Preserving install recovery data in {tmpdir}")
+                continue
             marker = self._read_install_marker(tmpdir)
             if not marker:
                 continue
@@ -498,6 +546,45 @@ class ModelInstallService(ModelInstallServiceBase):
                 time.sleep(delay)
                 delay *= 2  # Exponential backoff
 
+    @staticmethod
+    def _rename_noreplace(src: Path, dst: Path) -> None:
+        """Atomically restore a path only if its destination is still absent."""
+        if sys.platform.startswith("linux"):
+            libc = ctypes.CDLL(None, use_errno=True)
+            renameat2 = getattr(libc, "renameat2", None)
+            if renameat2 is None:
+                raise OSError("atomic no-replace rename is unavailable")
+            renameat2.argtypes = [ctypes.c_int, ctypes.c_char_p, ctypes.c_int, ctypes.c_char_p, ctypes.c_uint]
+            renameat2.restype = ctypes.c_int
+            result = renameat2(-100, os.fsencode(src), -100, os.fsencode(dst), 1)  # AT_FDCWD, RENAME_NOREPLACE
+            if result != 0:
+                error = ctypes.get_errno()
+                raise OSError(error, os.strerror(error), str(dst))
+            return
+        if sys.platform == "darwin":
+            libc = ctypes.CDLL(None, use_errno=True)
+            renamex_np = getattr(libc, "renamex_np", None)
+            if renamex_np is None:
+                raise OSError("atomic no-replace rename is unavailable")
+            renamex_np.argtypes = [ctypes.c_char_p, ctypes.c_char_p, ctypes.c_uint]
+            renamex_np.restype = ctypes.c_int
+            result = renamex_np(os.fsencode(src), os.fsencode(dst), 0x00000004)  # RENAME_EXCL
+            if result != 0:
+                error = ctypes.get_errno()
+                raise OSError(error, os.strerror(error), str(dst))
+            return
+        if os.name == "nt":
+            # Windows rename fails when the destination already exists.
+            os.rename(src, dst)
+            return
+        raise OSError("atomic no-replace rename is unavailable on this platform")
+
+    @classmethod
+    def _restore_moved_path(cls, src: Path, dst: Path) -> None:
+        if dst.exists() or dst.is_symlink():
+            raise FileExistsError(f"Refusing to overwrite recreated source {dst}")
+        cls._rename_noreplace(src, dst)
+
     def install_path(
         self,
         model_path: Union[Path, str],
@@ -544,6 +631,9 @@ class ModelInstallService(ModelInstallServiceBase):
                     moved.append((item, item_dest))
                     pending_dest = None
         except InstallRecoveryRequiredError:
+            # Recovery destinations can share TMPDIR_PREFIX with remote staging dirs. Keep their artifacts out of
+            # startup's dangling-install cleanup even when the configured model key uses that prefix.
+            self._retain_recovery_destination(dest_dir)
             raise
         except Exception as transfer_error:
             if not destination_created:
@@ -560,13 +650,14 @@ class ModelInstallService(ModelInstallServiceBase):
                     try:
                         if moved_source.exists() or moved_source.is_symlink():
                             raise FileExistsError(f"Refusing to overwrite recreated source {moved_source}")
-                        self._move_with_retries(moved_dest, moved_source)
+                        self._restore_moved_path(moved_dest, moved_source)
                     except Exception as rollback_error:
                         rollback_errors.append(
                             f"could not restore {moved_dest.resolve()} to {moved_source.resolve()}: {rollback_error}"
                         )
                 if rollback_errors:
                     details = "; ".join(rollback_errors)
+                    self._retain_recovery_destination(dest_dir)
                     raise InstallRecoveryRequiredError(
                         f"Install recovery required after {transfer_error}. Source: {model_path.resolve()}; "
                         f"destination: {dest_dir.resolve()}. {details}"
@@ -579,6 +670,7 @@ class ModelInstallService(ModelInstallServiceBase):
                         raise OSError(f"unexpected destination artifacts remain: {leftovers}")
                     dest_dir.rmdir()
                 except Exception as cleanup_error:
+                    self._retain_recovery_destination(dest_dir)
                     raise InstallRecoveryRequiredError(
                         f"Install recovery required after {transfer_error}. Source: {model_path.resolve()}; "
                         f"destination: {dest_dir.resolve()}. Could not remove owned empty destination: "
@@ -593,6 +685,7 @@ class ModelInstallService(ModelInstallServiceBase):
                         raise OSError(f"unexpected destination artifacts remain: {leftovers}")
                     dest_dir.rmdir()
                 except Exception as cleanup_error:
+                    self._retain_recovery_destination(dest_dir)
                     raise InstallRecoveryRequiredError(
                         f"Install recovery required after {transfer_error}. Source: {model_path.resolve()}; "
                         f"destination: {dest_dir.resolve()}. Could not remove owned empty destination: "
@@ -719,6 +812,8 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def cancel_job(self, job: ModelInstallJob) -> None:
         """Cancel the indicated job."""
+        if job._recovery_required:
+            raise ValueError("Cannot cancel an install that requires recovery; preserve its files for manual recovery.")
         job.cancel()
         self._logger.warning(f"Cancelling {job.source}")
         if dj := job._multifile_job:
@@ -1086,7 +1181,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 # gracefully handle _any_ error here.
                 self._set_error(job, e)
                 if job._recovery_required:
-                    self._write_install_marker(job, status=InstallStatus.ERROR)
+                    try:
+                        self._write_install_marker(job, status=InstallStatus.ERROR)
+                    except Exception as marker_error:
+                        self._logger.error(
+                            f"Failed to persist install recovery marker in {job._install_tmpdir}: {marker_error}"
+                        )
 
             finally:
                 # if this is an install of a remote file, then clean up the temporary directory
@@ -1111,6 +1211,8 @@ class ModelInstallService(ModelInstallServiceBase):
             job.config_in.source_api_response = job.source_metadata.api_response
 
         if job._install_tmpdir is not None:
+            if not job.inplace:
+                self._write_recovery_sentinel(job._install_tmpdir)
             self._delete_install_marker(job._install_tmpdir)
 
         if job.inplace:
@@ -1121,8 +1223,19 @@ class ModelInstallService(ModelInstallServiceBase):
             except InstallRecoveryRequiredError:
                 job._recovery_required = job._install_tmpdir is not None
                 if job._recovery_required:
-                    self._write_install_marker(job, status=job.status)
+                    try:
+                        self._write_install_marker(job, status=job.status)
+                    except Exception as marker_error:
+                        self._logger.error(
+                            f"Failed to persist install recovery marker in {job._install_tmpdir}: {marker_error}"
+                        )
                 raise
+            except Exception:
+                if job._install_tmpdir is not None:
+                    self._delete_recovery_sentinel(job._install_tmpdir)
+                raise
+            if job._install_tmpdir is not None:
+                self._delete_recovery_sentinel(job._install_tmpdir)
         job.config_out = self.record_store.get_model(key)
         self._signal_job_completed(job)
 
@@ -1215,6 +1328,9 @@ class ModelInstallService(ModelInstallServiceBase):
         """Remove leftover tmpdirs from aborted installs."""
         path = self._app_config.models_path
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            if self._has_recovery_sentinel(tmpdir):
+                self._logger.warning(f"Preserving install recovery data in {tmpdir}")
+                continue
             marker = self._read_install_marker(tmpdir)
             if marker is None:
                 self._logger.info(f"Removing dangling temporary directory {tmpdir}")

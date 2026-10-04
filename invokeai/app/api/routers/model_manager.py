@@ -4,13 +4,14 @@ import asyncio
 import contextlib
 import io
 import pathlib
+import shutil
 import threading
 import traceback
 import unicodedata
 from collections.abc import Generator
 from copy import deepcopy
 from enum import Enum
-from tempfile import TemporaryDirectory
+from tempfile import mkdtemp
 from typing import Any, List, Optional, Type
 
 import huggingface_hub
@@ -28,7 +29,7 @@ from invokeai.app.services.model_images.model_images_common import (
     ModelImageFileDeleteException,
     ModelImageFileNotFoundException,
 )
-from invokeai.app.services.model_install.model_install_common import ModelInstallJob
+from invokeai.app.services.model_install.model_install_common import InstallRecoveryRequiredError, ModelInstallJob
 from invokeai.app.services.model_records import (
     InvalidModelException,
     ModelRecordChanges,
@@ -1264,6 +1265,7 @@ def get_model_install_job(
     responses={
         201: {"description": "The job was cancelled successfully"},
         415: {"description": "No such job"},
+        409: {"description": "The job has recovery data that must be preserved"},
     },
     status_code=201,
 )
@@ -1277,7 +1279,10 @@ def cancel_model_install_job(
         job = installer.get_job_by_id(id)
     except ValueError as e:
         raise HTTPException(status_code=415, detail=str(e))
-    installer.cancel_job(job)
+    try:
+        installer.cancel_job(job)
+    except ValueError as e:
+        raise HTTPException(status_code=409, detail=str(e)) from e
 
 
 @model_manager_router.post(
@@ -1455,8 +1460,10 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
     scratch_dir = ApiDependencies.invoker.services.configuration.models_path / CONVERSION_SCRATCH_DIRNAME
     scratch_dir.mkdir(parents=True, exist_ok=True)
 
-    with TemporaryDirectory(dir=scratch_dir) as tmpdir:
-        convert_path = pathlib.Path(tmpdir) / pathlib.Path(model_config.path).stem
+    tmpdir = pathlib.Path(mkdtemp(dir=scratch_dir))
+    preserve_scratch = False
+    try:
+        convert_path = tmpdir / pathlib.Path(model_config.path).stem
         converted_model = loader.load_model(model_config, user_id=user_id)
         # write the converted file to the convert path
         raw_model = converted_model.model
@@ -1485,6 +1492,14 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
                         ),
                     )
                 )
+            except InstallRecoveryRequiredError as e:
+                preserve_scratch = True
+                logger.error(str(e))
+                store.update_model(key, changes=ModelRecordChanges(name=original_name))
+                raise HTTPException(
+                    status_code=409,
+                    detail=f"{e} Conversion recovery source retained at {tmpdir.resolve()}.",
+                ) from e
             except Exception as e:
                 logger.error(str(e))
                 store.update_model(key, changes=ModelRecordChanges(name=original_name))
@@ -1505,6 +1520,9 @@ def _convert_model(key: str, user_id: str) -> AnyModelConfig:
             new_config = store.get_model(new_key)
             new_config = prepare_model_config_for_response(new_config, ApiDependencies)
             return new_config
+    finally:
+        if not preserve_scratch:
+            shutil.rmtree(tmpdir, ignore_errors=True)
 
 
 class StarterModelResponse(BaseModel):
