@@ -699,6 +699,7 @@ async def update_model_record(
 
 
 _LOAD_AFFECTING_SETTINGS: tuple[str, ...] = ("fp8_storage", "cpu_only")
+_LOAD_AFFECTING_MODEL_FIELDS: tuple[str, ...] = ("path", "base", "type", "format", "variant")
 
 
 def _load_settings_changed(previous: AnyModelConfig, updated: AnyModelConfig) -> bool:
@@ -708,6 +709,8 @@ def _load_settings_changed(previous: AnyModelConfig, updated: AnyModelConfig) ->
     nn.Module, so a cached entry built under the old value must be evicted for the change
     to take effect.
     """
+    if any(getattr(previous, field, None) != getattr(updated, field, None) for field in _LOAD_AFFECTING_MODEL_FIELDS):
+        return True
     if getattr(previous, "cpu_only", None) != getattr(updated, "cpu_only", None):
         return True
     previous_settings = getattr(previous, "default_settings", None)

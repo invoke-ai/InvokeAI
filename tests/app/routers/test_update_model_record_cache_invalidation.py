@@ -100,3 +100,63 @@ def test_update_only_evicts_caches_for_load_affecting_changes(field: str, monkey
             cache.drop_model.assert_not_called()
         else:
             cache.drop_model.assert_called_once_with("model-key")
+
+
+@pytest.mark.parametrize(("field", "expected_eviction"), [("path", True), ("name", False), ("description", False)])
+def test_record_update_handles_real_cpu_cache_entries(
+    field: str, expected_eviction: bool, monkeypatch: pytest.MonkeyPatch
+):
+    """Load-affecting edits drop all model entries; metadata edits retain cached entries."""
+    import logging
+
+    import torch
+
+    from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
+
+    previous = _config(**{field: "old"})
+    updated = _config(**{field: "new"})
+    record_store = SimpleNamespace(
+        get_model=MagicMock(return_value=previous),
+        update_model=MagicMock(return_value=updated),
+    )
+    caches = [
+        ModelCache(
+            execution_device_working_mem_gb=1,
+            enable_partial_loading=False,
+            keep_ram_copy_of_weights=True,
+            execution_device="cpu",
+            storage_device="cpu",
+            logger=logging.getLogger("test.model_manager_cache_invalidation"),
+        )
+        for _ in range(2)
+    ]
+    try:
+        for cache in caches:
+            cache.put("model-key", torch.ones(2))
+            cache.put("model-key:unet", torch.ones(2))
+            cache.put("other-model", torch.ones(2))
+
+        services = SimpleNamespace(
+            logger=MagicMock(),
+            model_manager=SimpleNamespace(
+                store=record_store,
+                load=SimpleNamespace(ram_caches={"cpu": caches[0], "cpu:1": caches[1]}),
+            ),
+        )
+        monkeypatch.setattr(
+            model_manager_router.ApiDependencies,
+            "invoker",
+            SimpleNamespace(services=services),
+            raising=False,
+        )
+        monkeypatch.setattr(model_manager_router, "prepare_model_config_for_response", lambda config, _deps: config)
+
+        assert model_manager_router._update_model_record(key="model-key", changes=ModelRecordChanges()) is updated
+
+        for cache in caches:
+            assert ("model-key" not in cache._cached_models) is expected_eviction
+            assert ("model-key:unet" not in cache._cached_models) is expected_eviction
+            assert "other-model" in cache._cached_models
+    finally:
+        for cache in caches:
+            cache.shutdown()
