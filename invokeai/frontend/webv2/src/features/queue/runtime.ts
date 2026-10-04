@@ -865,23 +865,28 @@ export const createQueueRuntime = ({
       scheduleResultReadFlush();
     });
 
-  // An image a node saved to its own board stays there; only unassigned images land on the active board.
-  const addImagesToDestination = async (queueItem: QueueItem, images: QueueResultImage[]): Promise<void> => {
-    if (!isActive() || queueItem.snapshot.destination !== 'gallery') {
-      return;
-    }
-
+  /**
+   * The board that result images and videos unassigned on the backend land on. A result already on a board keeps it,
+   * whether a node saved it there or an earlier settlement or the user put it there.
+   */
+  const getResultDestinationBoardId = (queueItem: QueueItem): string | null => {
     const boardId = queueItem.snapshot.galleryBoardId;
+
+    return queueItem.snapshot.destination === 'gallery' && boardId && boardId !== 'none' ? boardId : null;
+  };
+
+  const addImagesToDestination = async (queueItem: QueueItem, images: QueueResultImage[]): Promise<void> => {
+    const boardId = getResultDestinationBoardId(queueItem);
     const imageNames = images.filter((image) => !image.boardId).map((image) => image.imageName);
 
-    if (boardId && boardId !== 'none' && imageNames.length > 0) {
+    if (isActive() && boardId && imageNames.length > 0) {
       await destinations.addImagesToGalleryBoard(boardId, imageNames);
     }
   };
 
   /**
-   * Attach generated videos to the destination board (repeat attachment is idempotent) and hydrate them for display.
-   * Failures are recorded but never turn successful generation into failure.
+   * Hydrate generated videos for display and attach the unassigned ones to the destination board. Failures are
+   * recorded but never turn successful generation into failure.
    */
   const deliverResultVideos = async (
     projectId: string,
@@ -898,7 +903,6 @@ export const createQueueRuntime = ({
       return [];
     }
 
-    const boardId = queueItem.snapshot.galleryBoardId;
     const recordError = (error: unknown): void => {
       if (isActive()) {
         commands.recordError({
@@ -932,26 +936,55 @@ export const createQueueRuntime = ({
       return [];
     }
 
-    if (boardId && boardId !== 'none') {
-      try {
-        await destinations.addVideosToGalleryBoard(boardId, videoNames);
-      } catch (error) {
-        // A board-attach failure must not keep a finished video out of view.
-        recordError(error);
-      }
+    const readVideos = (names: string[]): Promise<QueueResultVideo[]> =>
+      runResultRead(() => backend.getResultVideos(names, queueItem.id, queueItem.snapshot.submittedAt));
+    let videos: QueueResultVideo[];
+
+    try {
+      videos = await readVideos(videoNames);
+    } catch (error) {
+      recordError(error);
+      return [];
     }
 
     if (!isActive()) {
       return [];
     }
 
+    const boardId = getResultDestinationBoardId(queueItem);
+    const unassignedNames = videos.filter((video) => !video.boardId).map((video) => video.videoName);
+
+    // Hydration drops unreadable videos; their board is unknown, so they are neither shown nor attached.
+    if (videos.length < videoNames.length) {
+      const unreadCount = videoNames.length - videos.length;
+      const consequence = boardId ? '; they were not added to the board' : '';
+      recordError(new Error(`${unreadCount} of ${videoNames.length} result video(s) could not be read${consequence}.`));
+    }
+
+    if (!boardId || unassignedNames.length === 0) {
+      return videos;
+    }
+
     try {
-      return await runResultRead(() =>
-        backend.getResultVideos(videoNames, queueItem.id, queueItem.snapshot.submittedAt)
-      );
+      await destinations.addVideosToGalleryBoard(boardId, unassignedNames);
+    } catch (error) {
+      // A board-attach failure must not keep a finished video out of view.
+      recordError(error);
+    }
+
+    if (!isActive()) {
+      return [];
+    }
+
+    // Re-read only the attach candidates so each reports the board it reached: the destination port skips virtual
+    // boards, and a partial failure attaches only some videos.
+    try {
+      const attached = new Map((await readVideos(unassignedNames)).map((video) => [video.videoName, video]));
+
+      return videos.map((video) => attached.get(video.videoName) ?? video);
     } catch (error) {
       recordError(error);
-      return [];
+      return videos;
     }
   };
 
