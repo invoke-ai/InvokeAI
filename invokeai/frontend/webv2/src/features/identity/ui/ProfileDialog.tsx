@@ -156,7 +156,7 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
           <Stack gap="3">
             <HStack justify="space-between">
               <FieldLabel>{t('auth.changePassword')}</FieldLabel>
-              <Button loading={isGenerating} size="2xs" variant="outline" onClick={handleGeneratePassword}>
+              <Button loading={isGenerating} size="sm" variant="outline" onClick={handleGeneratePassword}>
                 <WandSparklesIcon />
                 {t('users.generate')}
               </Button>
@@ -196,10 +196,10 @@ const ProfileForm = ({ onClose, user }: { onClose: () => void; user: UserDTO }) 
         </Stack>
       </Dialog.Body>
       <Dialog.Footer>
-        <Button size="xs" variant="ghost" onClick={onClose}>
+        <Button variant="ghost" onClick={onClose}>
           {t('common.cancel')}
         </Button>
-        <Button loading={form.isSubmitting} size="xs" variant="solid" onClick={handleSave}>
+        <Button loading={form.isSubmitting} variant="solid" onClick={handleSave}>
           {t('users.saveChanges')}
         </Button>
       </Dialog.Footer>

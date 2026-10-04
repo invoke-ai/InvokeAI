@@ -44,16 +44,40 @@ vi.mock('@platform/state/accountLifecycle', () => ({
   captureAccountScope: () => harness.owner,
   isAccountScopeCurrent: () => harness.accountCurrent,
 }));
+// Exposes whether the host keeps the dialog mounted (the real one needs that to animate out); like the real dialog,
+// it closes after confirming even when the confirmation fails.
 vi.mock('@platform/ui/ConfirmDialog', () => ({
-  ConfirmDialog: ({ body, isOpen, onConfirm }: { body: string; isOpen: boolean; onConfirm(): Promise<void> | void }) =>
-    isOpen ? (
-      <div>
-        <span>{body}</span>
-        <button data-testid="confirm-discard" onClick={() => void onConfirm()}>
-          confirm
-        </button>
-      </div>
-    ) : null,
+  ConfirmDialog: ({
+    body,
+    isOpen,
+    onClose,
+    onConfirm,
+  }: {
+    body: string;
+    isOpen: boolean;
+    onClose(): void;
+    onConfirm(): Promise<void> | void;
+  }) => (
+    <div data-open={String(isOpen)} data-testid="discard-dialog">
+      {isOpen ? (
+        <>
+          <span>{body}</span>
+          <button
+            data-testid="confirm-discard"
+            onClick={async () => {
+              try {
+                await onConfirm();
+              } finally {
+                onClose();
+              }
+            }}
+          >
+            confirm
+          </button>
+        </>
+      ) : null}
+    </div>
+  ),
 }));
 vi.mock('@workbench/projects/projectLifecycleLocks', () => ({
   acquireProjectMutationLock: vi.fn(() => Promise.resolve(harness.lockResult)),
@@ -193,6 +217,22 @@ describe('QueueRecoveryNotice', () => {
 
     expect(harness.deleteForProject).toHaveBeenCalledWith('closed-2');
     expect(harness.lockResult.kind === 'acquired' ? harness.lockResult.release : undefined).toHaveBeenCalledOnce();
+  });
+
+  it('keeps the discard confirmation mounted to animate out when the last project is discarded', async () => {
+    let remaining = ['closed-1'];
+    harness.listProjectIds.mockImplementation(() => Promise.resolve({ kind: 'available', projectIds: [...remaining] }));
+    harness.deleteForProject.mockImplementation(() => {
+      remaining = [];
+      return Promise.resolve({ kind: 'removed' });
+    });
+    await renderNotice();
+    await clickButton('shell.queueRecovery.discard');
+    await act(() => userEvent.click(document.querySelector<HTMLButtonElement>('[data-testid="confirm-discard"]')!));
+    await vi.waitFor(() => expect(document.body.textContent).not.toContain('shell.queueRecovery.title'));
+
+    // The notice is gone, but the dialog closes rather than being unmounted mid-animation.
+    expect(document.querySelector('[data-testid="discard-dialog"]')).toHaveAttribute('data-open', 'false');
   });
 
   it('opens the selected existing project without reading its journal payload', async () => {

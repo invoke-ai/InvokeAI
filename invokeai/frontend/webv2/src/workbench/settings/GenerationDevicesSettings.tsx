@@ -70,12 +70,12 @@ export const GenerationDevicesSettings = () => {
   );
 
   if (loadState === 'loading' || loadState === 'idle') {
-    return <Spinner size="sm" />;
+    return <Spinner size="lg" />;
   }
 
   if (error) {
     return (
-      <Text color="fg.error" fontSize="xs">
+      <Text color="fg.error" fontSize="md">
         {error}
       </Text>
     );
@@ -84,7 +84,7 @@ export const GenerationDevicesSettings = () => {
   if (options.length <= 1) {
     return (
       <HStack align="start" gap="2">
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {options.length === 1
             ? `Generation runs on ${labels[options[0].device] ?? options[0].device}. Parallel generation needs more than one accelerator.`
             : 'No accelerators were detected, so generation runs on a single device.'}
@@ -98,14 +98,14 @@ export const GenerationDevicesSettings = () => {
     return (
       <Stack gap="1">
         <HStack gap="2">
-          <Text color="fg" fontSize="xs">
+          <Text color="fg" fontSize="md">
             {isAuto
               ? 'Every available accelerator is used for generation.'
               : selectedDevices.map((device) => labels[device] ?? device).join(', ')}
           </Text>
           {!isAuto ? <ModifiedSettingIndicator label="Generation devices" /> : null}
         </HStack>
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           Only an administrator can change which accelerators are used.
         </Text>
       </Stack>
@@ -135,12 +135,12 @@ export const GenerationDevicesSettings = () => {
         </Stack>
       )}
       {saveError ? (
-        <Text color="fg.error" fontSize="xs">
+        <Text color="fg.error" fontSize="md">
           {saveError}
         </Text>
       ) : null}
       {didChange ? (
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           Restart InvokeAI for changes to take effect.
         </Text>
       ) : null}
@@ -199,13 +199,13 @@ const DeviceSwitch = ({
     >
       <Stack gap="0.5">
         <HStack gap="2">
-          <Switch.Label color="fg" fontSize="sm" fontWeight="500">
+          <Switch.Label color="fg" fontSize="lg" fontWeight="500">
             {label}
           </Switch.Label>
           {isModified ? <ModifiedSettingIndicator label={label} /> : null}
         </HStack>
         {description ? (
-          <Text color="fg.muted" fontSize="xs">
+          <Text color="fg.muted" fontSize="md">
             {description}
           </Text>
         ) : null}

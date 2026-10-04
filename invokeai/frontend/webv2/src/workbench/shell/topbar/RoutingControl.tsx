@@ -17,6 +17,30 @@ import type { InvocationState } from './useInvocationState';
 
 import { RoutingDestinationSegments } from './RoutingDestinationSegments';
 
+/**
+ * Invoke's rounded corners overlap this button, so its edge facing Invoke stays a transparent 1px border (keeping the
+ * content box centred) and a tail continues the frame beneath them. The tail inherits the surface so hover and active
+ * states carry under the corners; it covers the edge column with its border rows but clips its fill off that column,
+ * where the button's translucent fill would double.
+ */
+const TAIL_UNDER_INVOKE_BEFORE_CSS = {
+  borderInlineStartColor: 'transparent',
+  '&::before': {
+    borderBlockWidth: '1px',
+    content: '""',
+    pointerEvents: 'none',
+    position: 'absolute',
+    backgroundClip: 'content-box',
+    backgroundColor: 'inherit',
+    borderBlockColor: 'inherit',
+    // Offsets resolve inside the button's border; step out so the tail continues its rows and spans its edge column.
+    insetBlock: '-1px',
+    insetInlineEnd: '100%',
+    paddingInlineEnd: '1px',
+    width: 'calc({radii.control} + 2px)',
+  },
+} as const;
+
 const MENU_POSITIONING = { placement: 'bottom-end' } as const;
 
 export const RoutingControl = ({ state }: { state: InvocationState }) => {
@@ -56,6 +80,7 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
         <Menu.Trigger asChild>
           <Button
             aria-label={accessibleName}
+            css={TAIL_UNDER_INVOKE_BEFORE_CSS}
             data-routing-control=""
             flexShrink={0}
             maxW="36px"
@@ -63,7 +88,7 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
             overflow="visible"
             p="0"
             position="relative"
-            size="sm"
+            size="lg"
             variant="outline"
             w="34px"
             display="grid"
@@ -103,7 +128,6 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
                 pointerEvents="none"
                 position="absolute"
                 right="-1px"
-                size="sm"
                 top="-1px"
                 zIndex="1"
               >
@@ -136,7 +160,7 @@ export const RoutingControl = ({ state }: { state: InvocationState }) => {
 };
 
 const RoutingSectionHeader = ({ label }: { label: string }) => (
-  <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="3" pt="2" pb="1" textTransform="uppercase">
+  <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="3" pt="2" pb="1" textTransform="uppercase">
     {label}
   </Text>
 );

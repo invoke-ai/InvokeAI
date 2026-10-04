@@ -6,9 +6,9 @@ describe('getLayerFilterControlPolicy', () => {
   it('renders compact vertical fields with steppers and downward-opening selects', () => {
     expect(getLayerFilterControlPolicy()).toEqual({
       controlMinH: undefined,
-      controlSize: 'xs',
+      controlSize: 'md',
       fieldOrientation: 'vertical',
-      modelSize: 'xs',
+      modelSize: 'md',
       positioning: { placement: 'bottom-end', sameWidth: false },
       showFilterLabel: true,
       showNumberStepper: true,

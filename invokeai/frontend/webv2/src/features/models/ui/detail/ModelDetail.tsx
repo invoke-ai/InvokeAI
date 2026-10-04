@@ -8,13 +8,10 @@ import { isLinkableType } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
 import { getModelSourceHref } from '@features/models/core/taxonomy';
 import { useModelsSelector, type ModelsSnapshot } from '@features/models/data/modelsStore';
-import {
-  ModelActionConfirmDialog,
-  ModelActionMenuItems,
-  type PendingModelAction,
-} from '@features/models/ui/shared/ModelActionsMenu';
+import { ModelActionMenuItems, type PendingModelAction } from '@features/models/ui/shared/ModelActionsMenu';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { formatBytes } from '@platform/i18n/languages';
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { areArraysEqual } from '@platform/state/selectors';
 import { Button, IconButton, MenuContent } from '@platform/ui';
 import { HuggingFaceIcon } from '@platform/ui/VendoredIcon';
@@ -132,15 +129,26 @@ const selectCpuOnlyModel = (snapshot: ModelsSnapshot, modelKey: string): CpuOnly
 const areTriggerPhrasesModelsEqual = (left: TriggerPhrasesModel | null, right: TriggerPhrasesModel | null): boolean =>
   left?.key === right?.key && areArraysEqual(left?.trigger_phrases ?? [], right?.trigger_phrases ?? []);
 
-/** Mount keyed by model key so detail forms cannot leak state between models. */
-export const ModelDetail = ({ modelKey, onDeleted }: { modelKey: string; onDeleted: () => void }) => {
+type RequestModelActionConfirm = (pending: NonNullable<PendingModelAction>) => void;
+
+/**
+ * Mount keyed by model key so detail forms cannot leak state between models. The host owns the confirmation dialog
+ * because a delete unmounts this detail before the dialog finishes closing.
+ */
+export const ModelDetail = ({
+  modelKey,
+  onRequestConfirm,
+}: {
+  modelKey: string;
+  onRequestConfirm: RequestModelActionConfirm;
+}) => {
   const { t } = useTranslation();
   const model = useModelsSelector((snapshot) => selectModelShell(snapshot, modelKey));
 
   if (!model) {
     return (
       <Stack align="start" gap="2" p="1">
-        <Text color="fg.subtle" fontSize="xs">
+        <Text color="fg.subtle" fontSize="md">
           {t('models.modelNoLongerInLibrary')}
         </Text>
       </Stack>
@@ -149,7 +157,7 @@ export const ModelDetail = ({ modelKey, onDeleted }: { modelKey: string; onDelet
 
   return (
     <Stack gap="4" pb="4">
-      <ModelIdentitySectionContainer modelKey={model.key} onDeleted={onDeleted} />
+      <ModelIdentitySectionContainer modelKey={model.key} onRequestConfirm={onRequestConfirm} />
 
       {supportsCpuOnlySetting(model) ? (
         <>
@@ -185,15 +193,15 @@ export const ModelDetail = ({ modelKey, onDeleted }: { modelKey: string; onDelet
 interface ModelIdentitySectionProps {
   isMissing: boolean;
   model: ModelIdentityModel;
-  onDeleted: () => void;
+  onRequestConfirm: RequestModelActionConfirm;
 }
 
 const ModelIdentitySectionContainer = memo(function ModelIdentitySectionContainer({
   modelKey,
-  onDeleted,
+  onRequestConfirm,
 }: {
   modelKey: string;
-  onDeleted: () => void;
+  onRequestConfirm: RequestModelActionConfirm;
 }) {
   const model = useModelsSelector((snapshot) => selectModelIdentity(snapshot, modelKey));
   const isMissing = useModelsSelector((snapshot) => snapshot.missingModelKeys.has(modelKey));
@@ -202,13 +210,13 @@ const ModelIdentitySectionContainer = memo(function ModelIdentitySectionContaine
     return null;
   }
 
-  return <ModelIdentitySection isMissing={isMissing} model={model} onDeleted={onDeleted} />;
+  return <ModelIdentitySection isMissing={isMissing} model={model} onRequestConfirm={onRequestConfirm} />;
 });
 
 const ModelIdentitySection = memo(function ModelIdentitySection({
   isMissing,
   model,
-  onDeleted,
+  onRequestConfirm,
 }: ModelIdentitySectionProps) {
   const notify = useNotify();
   const { t } = useTranslation();
@@ -225,7 +233,7 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
           onUpdated={() => notify.success(t('models.modelImageUpdated'))}
         />
         <Stack flex="1" gap="1" minW="0">
-          <Text fontSize="sm" fontWeight="700" lineClamp={2}>
+          <Text fontSize="lg" fontWeight="700" lineClamp={2}>
             {model.name}
           </Text>
           <HStack gap="1" minW="0" wrap="wrap">
@@ -235,13 +243,13 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
           {isMissing ? (
             <HStack gap="1.5">
               <MissingFileBadge />
-              <Text color="fg.subtle" fontSize="2xs">
+              <Text color="fg.subtle" fontSize="xs">
                 {t('models.fileNotFoundOnDisk')}
               </Text>
             </HStack>
           ) : null}
           {model.description ? (
-            <Text color="fg.muted" fontSize="2xs" lineClamp={3}>
+            <Text color="fg.muted" fontSize="xs" lineClamp={3}>
               {model.description}
             </Text>
           ) : null}
@@ -249,7 +257,7 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
         <ModelDetailActions
           isEditing={isEditing}
           model={model}
-          onDeleted={onDeleted}
+          onRequestConfirm={onRequestConfirm}
           onToggleEditing={() => setEditingModelKey((key) => (key === model.key ? null : model.key))}
         />
       </HStack>
@@ -273,33 +281,32 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
 const ModelDetailActions = ({
   isEditing,
   model,
-  onDeleted,
+  onRequestConfirm,
   onToggleEditing,
 }: {
   isEditing: boolean;
   model: ModelIdentityModel;
-  onDeleted: () => void;
+  onRequestConfirm: RequestModelActionConfirm;
   onToggleEditing: () => void;
 }) => {
   const { t } = useTranslation();
-  const [pendingAction, setPendingAction] = useState<PendingModelAction>(null);
   const [isActionBusy, setIsActionBusy] = useState(false);
 
   return (
     <HStack flexShrink={0} gap="1" wrap="wrap">
       {isConvertibleToDiffusers(model) ? (
-        <Button size="xs" variant="outline" onClick={() => setPendingAction({ kind: 'convert', model })}>
+        <Button variant="outline" onClick={() => onRequestConfirm({ kind: 'convert', model })}>
           <Icon as={HuggingFaceIcon} boxSize="3" />
           {t('models.convertToDiffusers')}
         </Button>
       ) : null}
-      <Button size="xs" variant={isEditing ? 'solid' : 'outline'} onClick={onToggleEditing}>
+      <Button variant={isEditing ? 'solid' : 'outline'} onClick={onToggleEditing}>
         <Icon as={PencilIcon} boxSize="3" />
         {isEditing ? t('models.editing') : t('common.edit')}
       </Button>
       <Menu.Root positioning={{ placement: 'bottom-end' }}>
         <Menu.Trigger asChild>
-          <IconButton aria-label={t('models.actions')} loading={isActionBusy} size="xs" variant="ghost">
+          <IconButton aria-label={t('models.actions')} loading={isActionBusy} variant="ghost">
             <Icon as={MoreHorizontalIcon} boxSize="4" />
           </IconButton>
         </Menu.Trigger>
@@ -310,13 +317,12 @@ const ModelDetailActions = ({
                 extraItems={<ModelSettingsMenuItems modelKey={model.key} />}
                 model={model}
                 onBusyChange={setIsActionBusy}
-                onRequestConfirm={setPendingAction}
+                onRequestConfirm={onRequestConfirm}
               />
             </MenuContent>
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      <ModelActionConfirmDialog pending={pendingAction} onClose={() => setPendingAction(null)} onDeleted={onDeleted} />
     </HStack>
   );
 };
@@ -410,6 +416,7 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
   const { t } = useTranslation();
   const modelsDir = useModelsSelector((snapshot) => snapshot.modelsDir);
   const [isPathDialogOpen, setIsPathDialogOpen] = useState(false);
+  const pathDialog = useExitPresence(isPathDialogOpen);
   // Managed models store paths relative to the models directory; show the
   // resolved absolute path so it can be found on disk.
   const fullPath = resolveModelAbsolutePath(model.path, modelsDir);
@@ -425,7 +432,7 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
       action: canUpdatePath ? (
         <IconButton
           aria-label={t('models.updatePath')}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={() => setIsPathDialogOpen(true)}
         >
@@ -466,13 +473,13 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
 
   return (
     <>
-      <DataList.Root gap="2.5" orientation="horizontal" size="sm" variant="subtle">
+      <DataList.Root gap="2.5" orientation="horizontal" variant="subtle">
         {attributes.map((attribute) => (
           <DataList.Item key={attribute.label}>
-            <DataList.ItemLabel color="fg.subtle" fontSize="2xs" minW="8rem" textTransform="uppercase">
+            <DataList.ItemLabel color="fg.subtle" fontSize="xs" minW="8rem" textTransform="uppercase">
               {attribute.label}
             </DataList.ItemLabel>
-            <DataList.ItemValue alignItems="center" display="flex" fontSize="2xs" gap="1" overflowWrap="anywhere">
+            <DataList.ItemValue alignItems="center" display="flex" fontSize="xs" gap="1" overflowWrap="anywhere">
               {attribute.href ? (
                 <chakra.a
                   alignItems="center"
@@ -496,7 +503,15 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
           </DataList.Item>
         ))}
       </DataList.Root>
-      {isPathDialogOpen ? <UpdatePathDialog model={model} onClose={() => setIsPathDialogOpen(false)} /> : null}
+      {pathDialog.isMounted ? (
+        <UpdatePathDialog
+          key={pathDialog.generation}
+          isOpen={pathDialog.isOpen}
+          model={model}
+          onClose={() => setIsPathDialogOpen(false)}
+          onExitComplete={pathDialog.release}
+        />
+      ) : null}
     </>
   );
 };

@@ -269,7 +269,6 @@ export const PositivePromptField = ({
           defaultHeightPx={heightPx}
           minHeightPx={96}
           resizeHandleAriaLabel={t('widgets.generate.resizePositivePrompt')}
-          size="xs"
           fontFamily="mono"
           highlightDynamicPrompts={dynamicPrompts !== null}
           knownWildcards={knownWildcards}
@@ -298,7 +297,7 @@ export const PositivePromptField = ({
             variant="overlay"
             zIndex="2"
           >
-            <Text color="fg" fontSize="sm" fontWeight="700" textAlign="center">
+            <Text color="fg" fontSize="lg" fontWeight="700" textAlign="center">
               {t('widgets.generate.dropImageToPrompt')}
             </Text>
           </DropZone>

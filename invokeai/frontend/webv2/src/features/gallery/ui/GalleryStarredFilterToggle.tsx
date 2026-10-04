@@ -31,7 +31,7 @@ export const GalleryStarredFilterToggle = () => {
       flexShrink={0}
       icon={StarIcon}
       label={t('widgets.gallery.starredOnly')}
-      size="xs"
+      size="md"
       tooltip={t(isRanked ? 'widgets.gallery.starredOnlyUnavailable' : 'widgets.gallery.starredOnlyTooltip')}
       onCheckedChange={handleCheckedChange}
     />

@@ -115,7 +115,7 @@ export const VideoSourceClipField = memo(
           <Stack gap="2">
             {/* Show the disabled reason even when a clip is already set. */}
             {disabled && disabledReason ? (
-              <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+              <Text color="fg.muted" fontSize="xs" textWrap="pretty">
                 {disabledReason}
               </Text>
             ) : null}

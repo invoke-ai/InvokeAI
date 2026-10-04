@@ -20,7 +20,7 @@ export interface PickerOptionState {
   isSelected: boolean;
 }
 
-const SEARCH_ICON = <Icon as={SearchIcon} size="xs" />;
+const SEARCH_ICON = <Icon as={SearchIcon} size="md" />;
 
 const flattenGroups = <T,>(groups: PickerGroup<T>[]): T[] => groups.flatMap((group) => group.options);
 
@@ -150,7 +150,6 @@ export const Picker = <T,>({
               aria-label={searchPlaceholder}
               autoComplete="off"
               placeholder={searchPlaceholder}
-              size="xs"
               value={searchTerm}
               onChange={handleSearchChange}
               onKeyDown={handleSearchKeyDown}
@@ -161,16 +160,16 @@ export const Picker = <T,>({
         {toolbarSlot}
       </Stack>
       <Box borderColor="border.subtle" borderTopWidth="1px" />
-      <ScrollArea.Root maxH="18rem" size="xs" variant="hover" w="full">
+      <ScrollArea.Root maxH="18rem" variant="hover" w="full">
         <ScrollArea.Viewport ref={listRef} maxH="inherit" w="full">
           <ScrollArea.Content aria-label={listLabel} maxW="full" minW="0" py="1" role="listbox" w="full">
             {statusSlot ??
               (!hasAnyOption ? (
-                <Text color="fg.subtle" fontSize="2xs" p="2">
+                <Text color="fg.subtle" fontSize="xs" p="2">
                   {emptyMessage}
                 </Text>
               ) : visibleGroups.length === 0 ? (
-                <Text color="fg.subtle" fontSize="2xs" p="2">
+                <Text color="fg.subtle" fontSize="xs" p="2">
                   {noMatchesMessage}
                 </Text>
               ) : (
@@ -241,7 +240,7 @@ const PickerGroupSection = <T,>({
           </Text>
           <Spacer />
           {countLabel ? (
-            <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
+            <Text color="fg.subtle" flexShrink={0} fontSize="xs">
               {countLabel}
             </Text>
           ) : null}
@@ -306,7 +305,7 @@ const PickerOptionRow = <T,>({
     <Box
       aria-disabled={isDisabled || undefined}
       aria-selected={isSelected}
-      bg={isActive && !isDisabled ? 'bg.emphasized' : undefined}
+      bg={isActive && !isDisabled ? 'bg.hover' : undefined}
       cursor={isDisabled ? 'not-allowed' : undefined}
       data-active={isActive ? '' : undefined}
       data-picker-option-id={id}

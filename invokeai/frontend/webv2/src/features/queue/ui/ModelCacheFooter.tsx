@@ -20,7 +20,7 @@ const INDICATOR_OPEN = { transform: 'rotate(180deg)' } as const;
 const TRIGGER_HOVER = { color: 'fg' } as const;
 
 const CacheStat = ({ label, value }: { label: string; value: number }) => (
-  <Text color="fg.muted" fontSize="2xs">
+  <Text color="fg.muted" fontSize="xs">
     {label}{' '}
     <Text as="span" color="fg" fontVariantNumeric="tabular-nums" fontWeight="600">
       {value}
@@ -77,7 +77,7 @@ export const ModelCacheFooter = () => {
             <CacheStat label={t('widgets.queue.modelCache.loaded')} value={stats?.in_cache ?? 0} />
           </HStack>
           <HStack>
-            <Button loading={busy} size="2xs" variant="surface" onClick={handleClear}>
+            <Button loading={busy} size="sm" variant="surface" onClick={handleClear}>
               <Icon as={Trash2Icon} boxSize="3" />
               {t('widgets.queue.modelCache.clear')}
             </Button>
@@ -98,7 +98,6 @@ export const ModelCacheFooter = () => {
           colorPalette="accent"
           max={1}
           role="progressbar"
-          size="xs"
           value={ratio}
         >
           <Progress.Track bg="transparent">
@@ -121,14 +120,14 @@ export const ModelCacheFooter = () => {
           <Text
             color="fg.muted"
             flex="1"
-            fontSize="2xs"
+            fontSize="xs"
             fontWeight="700"
             letterSpacing="0.06em"
             textTransform="uppercase"
           >
             {t('widgets.queue.modelCache.label')}
           </Text>
-          <Text color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums">
+          <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums">
             {formatModelCacheBytes(used)} / {formatModelCacheBytes(total)}
           </Text>
           <Collapsible.Indicator _open={INDICATOR_OPEN} transition="transform var(--wb-motion-duration-slow)">

@@ -1,8 +1,13 @@
 import type { Node, SourceFile, Statement } from 'typescript/unstable/ast';
 
 import {
+  isArrayLiteralExpression,
+  isAsExpression,
+  isBinaryExpression,
   isCallExpression,
   isClassDeclaration,
+  isComputedPropertyName,
+  isConditionalExpression,
   isEmptyStatement,
   isEnumDeclaration,
   isExportAssignment,
@@ -13,14 +18,24 @@ import {
   isImportEqualsDeclaration,
   isImportTypeNode,
   isInterfaceDeclaration,
+  isJsxAttribute,
+  isJsxExpression,
   isLiteralTypeNode,
   isModuleDeclaration,
   isNamedExports,
   isNamedImports,
   isNamespaceExport,
   isNamespaceImport,
+  isNonNullExpression,
+  isObjectLiteralExpression,
+  isParenthesizedExpression,
+  isPropertyAssignment,
+  isSatisfiesExpression,
+  isSpreadAssignment,
+  isSpreadElement,
   isStringLiteralLikeNode,
   isTypeAliasDeclaration,
+  isTypeAssertion,
   isVariableStatement,
   ModifierFlags,
   SyntaxKind,
@@ -49,6 +64,13 @@ export interface SourceAnalysis {
   moduleReferences: readonly SourceModuleReference[];
   publicExports: readonly string[];
   typeOnly: boolean;
+}
+
+export interface SourceTypographyLiteral {
+  column: number;
+  line: number;
+  property: 'fontSize' | 'textStyle';
+  value: string;
 }
 
 const PARSE_ROOT = '/architecture-sources';
@@ -126,6 +148,12 @@ const read = (virtualPath: string, fileName: string): SourceFile => {
   }
 
   return sourceFile;
+};
+
+const parseSource = (fileName: string, text: string, { jsx }: SourceAnalysisOptions): SourceFile => {
+  const virtualPath = stage(fileName, text, resolveJsx(fileName, jsx));
+  flush();
+  return read(virtualPath, fileName);
 };
 
 const hasExportModifier = (statement: Statement): boolean => {
@@ -279,16 +307,86 @@ export const primeSourceAnalysis = (
   flush();
 };
 
-export const analyzeSource = (fileName: string, text: string, { jsx }: SourceAnalysisOptions = {}): SourceAnalysis => {
-  const virtualPath = stage(fileName, text, resolveJsx(fileName, jsx));
-  flush();
-  const sourceFile = read(virtualPath, fileName);
+export const analyzeSource = (fileName: string, text: string, options: SourceAnalysisOptions = {}): SourceAnalysis => {
+  const sourceFile = parseSource(fileName, text, options);
 
   return {
     moduleReferences: collectModuleReferences(sourceFile),
     publicExports: collectPublicExports(sourceFile),
     typeOnly: isTypeOnlyModule(sourceFile),
   };
+};
+
+/** Collects literal typography values without interpreting identifiers, calls, or condition tests as CSS values. */
+export const collectTypographyLiterals = (
+  fileName: string,
+  text: string,
+  options: SourceAnalysisOptions = {}
+): SourceTypographyLiteral[] => {
+  const sourceFile = parseSource(fileName, text, options);
+  const literals: SourceTypographyLiteral[] = [];
+
+  const collectValue = (node: Node, property: SourceTypographyLiteral['property']): void => {
+    if (isStringLiteralLikeNode(node)) {
+      const { line, character } = sourceFile.getLineAndCharacterOfPosition(node.getStart(sourceFile));
+      literals.push({ column: character + 1, line: line + 1, property, value: node.text });
+    } else if (
+      isParenthesizedExpression(node) ||
+      isAsExpression(node) ||
+      isSatisfiesExpression(node) ||
+      isTypeAssertion(node) ||
+      isNonNullExpression(node) ||
+      isSpreadElement(node) ||
+      isSpreadAssignment(node)
+    ) {
+      collectValue(node.expression, property);
+    } else if (isJsxExpression(node) && node.expression) {
+      collectValue(node.expression, property);
+    } else if (isConditionalExpression(node)) {
+      collectValue(node.whenTrue, property);
+      collectValue(node.whenFalse, property);
+    } else if (isBinaryExpression(node)) {
+      if (
+        node.operatorToken.kind === SyntaxKind.BarBarToken ||
+        node.operatorToken.kind === SyntaxKind.QuestionQuestionToken
+      ) {
+        collectValue(node.left, property);
+        collectValue(node.right, property);
+      } else if (node.operatorToken.kind === SyntaxKind.AmpersandAmpersandToken) {
+        collectValue(node.right, property);
+      }
+    } else if (isArrayLiteralExpression(node)) {
+      node.elements.forEach((element) => collectValue(element, property));
+    } else if (isObjectLiteralExpression(node)) {
+      for (const entry of node.properties) {
+        if (isPropertyAssignment(entry)) {
+          collectValue(entry.initializer, property);
+        } else if (isSpreadAssignment(entry)) {
+          collectValue(entry.expression, property);
+        }
+      }
+    }
+  };
+
+  const visit = (node: Node): void => {
+    if ((isJsxAttribute(node) || isPropertyAssignment(node)) && node.initializer) {
+      const name = node.name;
+      const property =
+        isComputedPropertyName(name) && isStringLiteralLikeNode(name.expression)
+          ? name.expression.text
+          : isIdentifier(name) || isStringLiteralLikeNode(name)
+            ? name.text
+            : undefined;
+      if (property === 'fontSize' || property === 'textStyle') {
+        collectValue(node.initializer, property);
+        return;
+      }
+    }
+    node.forEachChild(visit);
+  };
+
+  visit(sourceFile);
+  return literals;
 };
 
 export const closeSourceAnalysis = (): void => {

@@ -82,7 +82,6 @@ const RecordPickerInput = ({
               aria-label={t('common.retry')}
               className="nodrag"
               disabled={isFetching}
-              size="xs"
               variant="ghost"
               onClick={onRetry}
             >
@@ -92,14 +91,14 @@ const RecordPickerInput = ({
         ) : null}
         {selectedId !== null ? (
           <Tooltip content={labels.clear}>
-            <IconButton aria-label={labels.clear} className="nodrag" size="xs" variant="ghost" onClick={onClear}>
+            <IconButton aria-label={labels.clear} className="nodrag" variant="ghost" onClick={onClear}>
               <XIcon />
             </IconButton>
           </Tooltip>
         ) : null}
       </HStack>
       {message !== null ? (
-        <Text color="fg.error" fontSize="2xs" id={messageId}>
+        <Text color="fg.error" fontSize="xs" id={messageId}>
           {message}
         </Text>
       ) : null}

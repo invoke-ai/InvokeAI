@@ -81,7 +81,6 @@ export const GenerateModelCard = ({
           modelTypes={MAIN_MODEL_TYPES}
           placeholder={t('widgets.generate.selectModel')}
           value={selectedModel?.key ?? null}
-          size="xs"
           onChange={(model) => {
             if (isGenerateModelConfig(model) && isGenerateModelSelectable(model)) {
               selectModel(model);
@@ -91,19 +90,19 @@ export const GenerateModelCard = ({
       </Field>
 
       {selectedModel ? null : isLoadingModels ? (
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {t('widgets.generate.loadingModels')}
         </Text>
       ) : loadError ? (
-        <Text color="fg.error" fontSize="2xs">
+        <Text color="fg.error" fontSize="xs">
           {loadError}
         </Text>
       ) : hasNoSupportedModels ? (
         <Stack gap="1.5">
-          <Text color="fg.error" fontSize="2xs">
+          <Text color="fg.error" fontSize="xs">
             {t('widgets.generate.noSupportedModels')}
           </Text>
-          <Button alignSelf="flex-start" size="2xs" variant="outline" onClick={openManagerForMainModels}>
+          <Button alignSelf="flex-start" size="sm" variant="outline" onClick={openManagerForMainModels}>
             {t('widgets.generate.openModelManager')}
           </Button>
         </Stack>
@@ -111,7 +110,7 @@ export const GenerateModelCard = ({
 
       <ConfirmDialog
         body={
-          <Text fontSize="sm">
+          <Text fontSize="lg">
             {t('widgets.generate.switchModelBody', {
               labels: new Intl.ListFormat(i18n.resolvedLanguage, { style: 'long', type: 'conjunction' }).format(
                 pendingSwitchClearedLabels

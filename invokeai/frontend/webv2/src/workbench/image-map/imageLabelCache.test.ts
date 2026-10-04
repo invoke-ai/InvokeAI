@@ -15,6 +15,7 @@ import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { ApiError } from '@platform/transport/http';
 
 import { clearImageLabels, getImageLabels } from './imageLabelCache';
+import { imageMapStore, refreshImageIndexStatus, refreshImageMapPoints } from './imageMapStore';
 
 describe('image map image-label cache', () => {
   beforeEach(() => {
@@ -200,6 +201,112 @@ describe('image map image-label cache', () => {
     });
     expect(mocks.apiFetchJson).toHaveBeenCalledTimes(2);
   });
+
+  it.each(['points', 'status'] as const)(
+    'discards cached and in-flight labels when %s reports a missing encoder',
+    async (source) => {
+      const cachedItem = { kind: 'image', name: 'cached.png' } as const;
+      const pendingItem = { kind: 'image', name: 'pending.png' } as const;
+      mocks.apiFetchJson.mockResolvedValueOnce({ alternates: [], label: 'old cached label' });
+      await getImageLabels(cachedItem);
+
+      let resolveOld: (labels: { alternates: string[]; label: string }) => void = () => {};
+      mocks.apiFetchJson.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveOld = resolve;
+          })
+      );
+      const stale = getImageLabels(pendingItem);
+      const missingResponse =
+        source === 'points'
+          ? { model_name: 'encoder', point_count: 0, points: [], stale: false, state: 'model_missing' }
+          : { enabled: false, index: null, model_name: 'encoder', projection: { state: 'model_missing' } };
+      mocks.apiFetchJson.mockResolvedValueOnce(missingResponse);
+
+      if (source === 'points') {
+        await refreshImageMapPoints();
+      } else {
+        refreshImageIndexStatus();
+        await vi.waitFor(() => expect(imageMapStore.getSnapshot().data?.state).toBe('model_missing'));
+      }
+
+      mocks.apiFetchJson.mockResolvedValue({ alternates: [], label: 'fresh label' });
+      const fresh = getImageLabels(pendingItem);
+      resolveOld({ alternates: [], label: 'retired label' });
+      await expect(stale).resolves.toBeNull();
+      await expect(fresh).resolves.toEqual({ alternates: [], label: 'fresh label' });
+      await expect(getImageLabels(cachedItem)).resolves.toEqual({ alternates: [], label: 'fresh label' });
+
+      // Progress and repeated missing-state snapshots must not repeatedly clear the cache.
+      imageMapStore.patchSnapshot({ indexUpdatedAt: 1_000 });
+      await expect(getImageLabels(pendingItem)).resolves.toEqual({ alternates: [], label: 'fresh label' });
+      expect(mocks.apiFetchJson).toHaveBeenCalledTimes(5);
+    }
+  );
+
+  it.each(['points', 'status'] as const)(
+    'invalidates old labels when %s observes a different encoder without a missing state',
+    async (source) => {
+      const response = {
+        model_id: 'encoder-a',
+        point_count: 0,
+        points: [],
+        stale: false,
+        state: 'empty',
+        updated_at: null,
+      };
+      mocks.apiFetchJson.mockResolvedValueOnce(response);
+      await refreshImageMapPoints();
+
+      const cachedItem = { kind: 'image', name: 'cached.png' } as const;
+      const pendingItem = { kind: 'image', name: 'pending.png' } as const;
+      mocks.apiFetchJson.mockResolvedValueOnce({ alternates: [], label: 'encoder A label' });
+      await getImageLabels(cachedItem);
+      let resolveOld: (value: { alternates: string[]; label: string }) => void = () => {};
+      mocks.apiFetchJson.mockImplementationOnce(
+        () =>
+          new Promise((resolve) => {
+            resolveOld = resolve;
+          })
+      );
+      const stale = getImageLabels(pendingItem);
+
+      // Removal and reinstallation happened while the map was closed. Neither
+      // endpoint needs to return model_missing for the cached labels to be stale.
+      const replacement = { ...response, model_id: 'encoder-b' };
+      const labelRequest = vi.fn().mockResolvedValue({ alternates: [], label: 'encoder B label' });
+      mocks.apiFetchJson.mockImplementation((url: string) => {
+        if (url.startsWith('/api/v1/image_map/status')) {
+          return Promise.resolve({ enabled: true, model_id: 'encoder-b', projection: { state: 'empty' } });
+        }
+        if (url.startsWith('/api/v1/image_map/points')) {
+          return Promise.resolve(replacement);
+        }
+        return labelRequest();
+      });
+      if (source === 'points') {
+        await refreshImageMapPoints();
+      } else {
+        refreshImageIndexStatus();
+        await vi.waitFor(() => {
+          expect(imageMapStore.getSnapshot().data?.modelId).toBe('encoder-b');
+          expect(imageMapStore.getSnapshot().loadState).toBe('loaded');
+        });
+      }
+
+      resolveOld({ alternates: [], label: 'late encoder A label' });
+      await expect(stale).resolves.toBeNull();
+      await expect(getImageLabels(cachedItem)).resolves.toEqual({ alternates: [], label: 'encoder B label' });
+      await expect(getImageLabels(pendingItem)).resolves.toEqual({ alternates: [], label: 'encoder B label' });
+      expect(labelRequest).toHaveBeenCalledTimes(2);
+
+      // Normal progress/projection refreshes from the same encoder keep cached labels.
+      await refreshImageMapPoints();
+      await getImageLabels(cachedItem);
+      expect(labelRequest).toHaveBeenCalledTimes(2);
+    }
+  );
 
   it('clears the cooldown on account switch', async () => {
     mocks.apiFetchJson.mockRejectedValue(new ApiError('index disabled', 409));

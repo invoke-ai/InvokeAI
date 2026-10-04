@@ -110,7 +110,7 @@ export const WidgetInstanceContextMenu = ({
                 <Icon as={XIcon} boxSize="3.5" />
                 <Menu.ItemText>{t('widgets.removeWidget', { label: target.item.label })}</Menu.ItemText>
                 {isDisabled ? (
-                  <Text color="fg.subtle" fontSize="2xs" ms="auto">
+                  <Text color="fg.subtle" fontSize="xs" ms="auto">
                     {removeDisabledLabel}
                   </Text>
                 ) : null}

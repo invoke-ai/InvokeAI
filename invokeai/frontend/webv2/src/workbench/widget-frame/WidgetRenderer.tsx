@@ -466,10 +466,10 @@ export const MissingWidgetFrame = ({
 }) => (
   <WidgetPanelFrame instanceId={instanceId} region={region} typeId={typeId}>
     <Box p="3">
-      <Text fontSize="xs" fontWeight="700">
+      <Text fontSize="md" fontWeight="700">
         {label}
       </Text>
-      <Text color="fg.subtle" fontSize="2xs">
+      <Text color="fg.subtle" fontSize="xs">
         Widget view unavailable.
       </Text>
     </Box>

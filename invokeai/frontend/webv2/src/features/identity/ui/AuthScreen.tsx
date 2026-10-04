@@ -20,10 +20,10 @@ export const AuthScreen = ({
       <Stack align="center" gap="4">
         <InvokeMark />
         <Stack align="center" gap="1">
-          <Heading fontSize="lg" fontWeight="700">
+          <Heading fontSize="2xl" fontWeight="700">
             {title}
           </Heading>
-          <Text color="fg.muted" fontSize="sm" textAlign="center">
+          <Text color="fg.muted" fontSize="lg" textAlign="center">
             {subtitle}
           </Text>
         </Stack>
@@ -32,7 +32,7 @@ export const AuthScreen = ({
         {children}
       </Stack>
       {footer ? (
-        <Text color="fg.subtle" fontSize="xs" textAlign="center">
+        <Text color="fg.subtle" fontSize="md" textAlign="center">
           {footer}
         </Text>
       ) : null}
@@ -42,8 +42,8 @@ export const AuthScreen = ({
 
 /** Inline alert used for form-level failures on the auth screens. */
 export const AuthFormAlert = ({ message, tone }: { message: string; tone: 'error' | 'warning' }) => (
-  <Alert.Root borderRadius="md" size="sm" status={tone}>
+  <Alert.Root borderRadius="md" status={tone}>
     <Alert.Indicator />
-    <Alert.Title fontSize="xs">{message}</Alert.Title>
+    <Alert.Title fontSize="md">{message}</Alert.Title>
   </Alert.Root>
 );

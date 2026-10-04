@@ -73,7 +73,7 @@ const TargetedWidgetSettingsButton = ({
   const getReturnFocus = useCallback(() => trigger.current, []);
   const loading = useMemo(
     () => (
-      <Text role="status" fontSize="xs" color="fg.muted">
+      <Text role="status" fontSize="md" color="fg.muted">
         {t('common.loading')}
       </Text>
     ),
@@ -91,7 +91,7 @@ const TargetedWidgetSettingsButton = ({
           ref={trigger}
           aria-label={t('widgets.settingsLabel', { label })}
           color="fg.muted"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={openDialog}
         >
@@ -115,7 +115,7 @@ const TargetedWidgetSettingsButton = ({
           ref={trigger}
           aria-label={t('widgets.settingsLabel', { label })}
           color="fg.muted"
-          size="2xs"
+          size="sm"
           variant="ghost"
         >
           <Icon as={SettingsIcon} boxSize="3.5" />
@@ -126,7 +126,7 @@ const TargetedWidgetSettingsButton = ({
           <PopoverContent w="18rem">
             <Scrollable maxH="min(38rem, calc(100dvh - 4rem))">
               <Popover.Body p="2.5">
-                <Popover.Title fontSize="xs" fontWeight="600" mb="1">
+                <Popover.Title fontSize="md" fontWeight="600" mb="1">
                   {t('widgets.settingsLabel', { label })}
                 </Popover.Title>
                 <RetryBoundary
@@ -143,7 +143,7 @@ const TargetedWidgetSettingsButton = ({
                     <SettingsActions {...props} />
                   </Box>
                 ) : null}
-                <Button size="xs" variant="ghost" w="full" mt="2" onClick={openDialog}>
+                <Button variant="ghost" w="full" mt="2" onClick={openDialog}>
                   {t('settingsDialog.allWidgetSettings', { widget: label })}
                 </Button>
               </Popover.Body>

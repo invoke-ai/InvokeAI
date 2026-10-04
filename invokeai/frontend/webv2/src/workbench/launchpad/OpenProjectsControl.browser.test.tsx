@@ -51,7 +51,7 @@ const renderedOrder = async () => {
   await act(() =>
     root.render(
       <ChakraProvider value={system}>
-        <OpenProjectsNavSection headingCss={{}} itemProps={{ justifyContent: 'start', size: 'sm', w: 'full' }} />
+        <OpenProjectsNavSection headingCss={{}} itemProps={{ justifyContent: 'start', size: 'lg', w: 'full' }} />
       </ChakraProvider>
     )
   );

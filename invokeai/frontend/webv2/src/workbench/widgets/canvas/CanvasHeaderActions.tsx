@@ -160,11 +160,9 @@ const CanvasHeaderActionsInner = ({
     <HStack gap="0.5">
       <Menu.Root positioning={MENU_POSITIONING}>
         <Menu.Trigger asChild>
-          <IconButton aria-label={t('widgets.canvas.controls.zoomLevel')} minW="4rem" px="2" size="2xs" variant="ghost">
+          <IconButton aria-label={t('widgets.canvas.controls.zoomLevel')} minW="4rem" px="2" size="sm" variant="ghost">
             <HStack gap="1">
-              <Text fontSize="xs" fontVariantNumeric="tabular-nums">
-                {formatZoomPercent(zoom)}
-              </Text>
+              <Text fontVariantNumeric="tabular-nums">{formatZoomPercent(zoom)}</Text>
               <ChevronDownIcon size={12} />
             </HStack>
           </IconButton>
@@ -175,7 +173,7 @@ const CanvasHeaderActionsInner = ({
               {ZOOM_OPTIONS.map((option) => (
                 <Menu.Item key={option.value} value={option.label} onClick={() => setZoom(option.value)}>
                   <CheckIcon size={12} opacity={formatZoomPercent(zoom) === option.label ? 1 : 0} />
-                  <Menu.ItemText fontSize="xs">{option.label}</Menu.ItemText>
+                  <Menu.ItemText>{option.label}</Menu.ItemText>
                 </Menu.Item>
               ))}
             </MenuContent>
@@ -187,7 +185,7 @@ const CanvasHeaderActionsInner = ({
         <IconButton
           aria-label={t('widgets.canvas.controls.fitToView')}
           color="fg.muted"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={() => engine.viewport.fitToView()}
         >
@@ -200,7 +198,7 @@ const CanvasHeaderActionsInner = ({
           aria-label={t('widgets.canvas.controls.fitBboxToLayers')}
           color="fg.muted"
           disabled={editingLocked || !fitLayersRect}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={() => applyFit(fitLayersRect, true)}
         >
@@ -213,7 +211,7 @@ const CanvasHeaderActionsInner = ({
           aria-label={t('widgets.canvas.controls.fitBboxToMasks')}
           color="fg.muted"
           disabled={editingLocked || !fitMasksRect}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={() => applyFit(fitMasksRect, false)}
         >
@@ -228,7 +226,7 @@ const CanvasHeaderActionsInner = ({
           aria-label={t('widgets.canvas.commands.undo')}
           color="fg.muted"
           disabled={editingLocked || !canUndo}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={() => engine.history.undo()}
         >
@@ -241,7 +239,7 @@ const CanvasHeaderActionsInner = ({
           aria-label={t('widgets.canvas.commands.redo')}
           color="fg.muted"
           disabled={editingLocked || !canRedo}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={() => engine.history.redo()}
         >
@@ -258,11 +256,11 @@ const CanvasHeaderActionsInner = ({
               aria-label={t('widgets.canvas.contextMenu.saveCanvasToGallery')}
               color="fg.muted"
               disabled={editingLocked || isSaving}
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={() => void saveToGallery('canvas')}
             >
-              {isSaving ? <Spinner size="xs" /> : <SaveIcon />}
+              {isSaving ? <Spinner /> : <SaveIcon />}
             </IconButton>
           </Tooltip>
           <Menu.Trigger asChild>
@@ -271,7 +269,7 @@ const CanvasHeaderActionsInner = ({
               color="fg.muted"
               disabled={editingLocked || isSaving}
               minW="0"
-              size="2xs"
+              size="sm"
               variant="ghost"
               w="6"
             >
@@ -284,7 +282,7 @@ const CanvasHeaderActionsInner = ({
             <MenuContent minW="11rem" py="1">
               <Menu.Item value="save-bbox" onClick={() => void saveToGallery('bbox')}>
                 <Icon as={SaveIcon} boxSize="3.5" color="fg.subtle" />
-                <Menu.ItemText fontSize="xs">{t('widgets.canvas.contextMenu.saveBboxToGallery')}</Menu.ItemText>
+                <Menu.ItemText>{t('widgets.canvas.contextMenu.saveBboxToGallery')}</Menu.ItemText>
               </Menu.Item>
             </MenuContent>
           </Menu.Positioner>
@@ -299,7 +297,7 @@ const CanvasHeaderActionsInner = ({
                 aria-label={t('widgets.canvas.controls.newSession')}
                 color="fg.muted"
                 disabled={editingLocked}
-                size="2xs"
+                size="sm"
                 variant="ghost"
               >
                 <FilePlusIcon />
@@ -312,7 +310,7 @@ const CanvasHeaderActionsInner = ({
             <MenuContent minW="11rem" py="1">
               <Menu.Item value="new-canvas" onClick={openNewCanvas}>
                 <Icon as={FilePlusIcon} boxSize="3.5" color="fg.subtle" />
-                <Menu.ItemText fontSize="xs">{t('widgets.canvas.controls.newCanvas')}</Menu.ItemText>
+                <Menu.ItemText>{t('widgets.canvas.controls.newCanvas')}</Menu.ItemText>
               </Menu.Item>
             </MenuContent>
           </Menu.Positioner>
@@ -354,20 +352,19 @@ const CanvasSettingsActionsInner = ({ engine }: { engine: CanvasHeaderEngine }) 
   }
   return (
     <Stack borderTopWidth="1px" borderColor="border.subtle" gap="1" pt="2">
-      <Text color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+      <Text color="fg.subtle" fontSize="xs" textTransform="uppercase">
         {t('widgets.canvas.settings.sections.debug')}
       </Text>
-      <Button size="xs" variant="ghost" justifyContent="start" onClick={() => void engine.diagnostics.clearCaches()}>
+      <Button variant="ghost" justifyContent="start" onClick={() => void engine.diagnostics.clearCaches()}>
         <DatabaseIcon />
         {t('widgets.canvas.settings.clearCaches')}
       </Button>
-      <Button size="xs" variant="ghost" justifyContent="start" onClick={() => engine.diagnostics.logDebugInfo()}>
+      <Button variant="ghost" justifyContent="start" onClick={() => engine.diagnostics.logDebugInfo()}>
         <BugIcon />
         {t('widgets.canvas.settings.logDebugInfo')}
       </Button>
       <Button
         disabled={editingLocked}
-        size="xs"
         variant="ghost"
         justifyContent="start"
         onClick={() => engine.history.clearHistory()}

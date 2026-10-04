@@ -239,7 +239,7 @@ export const QueueMenuItems = ({ actions, label }: { actions: QueueMenuAction[];
     <>
       <Menu.ItemGroup>
         {label ? (
-          <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+          <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
             {label}
           </Menu.ItemGroupLabel>
         ) : null}
