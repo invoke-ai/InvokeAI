@@ -22,6 +22,7 @@ from invokeai.backend.model_manager.configs.external_api import (
     ExternalImageSize,
     ExternalModelCapabilities,
 )
+from invokeai.backend.model_manager.starter_models import STARTER_MODELS
 
 
 class DummyProvider(ExternalProvider):
@@ -288,3 +289,75 @@ def test_generate_snaps_unlisted_ratio_when_model_has_no_bucket_sizes() -> None:
 
     assert provider.last_request is not None
     assert (provider.last_request.width, provider.last_request.height) == (1360, 765)
+
+
+def _starter_sizes() -> list[tuple[str, str, int, int]]:
+    """Every fixed size a txt2img external starter model offers: its resolution presets and ratio buckets."""
+    cases: list[tuple[str, str, int, int]] = []
+    for starter in STARTER_MODELS:
+        capabilities = starter.capabilities
+        if capabilities is None or "txt2img" not in capabilities.modes:
+            continue
+        cases.extend(
+            (starter.source, preset.label, preset.width, preset.height)
+            for preset in capabilities.resolution_presets or []
+        )
+        cases.extend(
+            (starter.source, ratio, size.width, size.height)
+            for ratio, size in (capabilities.aspect_ratio_sizes or {}).items()
+        )
+    return cases
+
+
+@pytest.mark.parametrize("source, label, width, height", _starter_sizes())
+def test_starter_model_offered_sizes_are_accepted(source: str, label: str, width: int, height: int) -> None:
+    """A size a model offers in its own presets must be accepted at (nearly) that size, even when its declared ratio
+    is not in lowest terms ("21:9") and the preset is only approximately that ratio (1024x439)."""
+    starter = next(model for model in STARTER_MODELS if model.source == source)
+    assert starter.capabilities is not None
+    provider_id, provider_model_id = source.removeprefix("external://").split("/", 1)
+    model = ExternalApiModelConfig(
+        key=source,
+        name=starter.name,
+        provider_id=provider_id,
+        provider_model_id=provider_model_id,
+        capabilities=starter.capabilities,
+    )
+    provider = DummyProvider(provider_id, configured=True, result=ExternalGenerationResult(images=[]))
+    service = ExternalGenerationService({provider_id: provider}, logging.getLogger("test"))
+
+    service.generate(_build_request(model=model, width=width, height=height))
+
+    assert provider.last_request is not None
+    # Snapping to an exact 21:9 moves in 21x9 px steps, so a small preset (512x219 -> 504x216) can shift ~2%.
+    assert provider.last_request.width == pytest.approx(width, rel=0.02)
+    assert provider.last_request.height == pytest.approx(height, rel=0.02)
+
+
+def test_generate_matches_declared_ratio_not_in_lowest_terms() -> None:
+    model = _build_model(ExternalModelCapabilities(modes=["txt2img"], allowed_aspect_ratios=["1:1", "21:9"]))
+    request = _build_request(model=model, width=2100, height=900)
+    provider = DummyProvider("openai", configured=True, result=ExternalGenerationResult(images=[]))
+    service = ExternalGenerationService({"openai": provider}, logging.getLogger("test"))
+
+    service.generate(request)
+
+    assert provider.last_request == request
+
+
+def test_generate_snapped_size_stays_within_max_image_size() -> None:
+    model = _build_model(
+        ExternalModelCapabilities(
+            modes=["txt2img"],
+            allowed_aspect_ratios=["1:1", "16:9"],
+            max_image_size=ExternalImageSize(width=4096, height=4096),
+        )
+    )
+    request = _build_request(model=model, width=4096, height=2400)
+    provider = DummyProvider("openai", configured=True, result=ExternalGenerationResult(images=[]))
+    service = ExternalGenerationService({"openai": provider}, logging.getLogger("test"))
+
+    service.generate(request)
+
+    assert provider.last_request is not None
+    assert (provider.last_request.width, provider.last_request.height) == (4096, 2304)
