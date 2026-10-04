@@ -87,9 +87,15 @@ def encode_hidden_states(
 
 
 @torch.no_grad()
-def apply_connectors(connectors, hidden_states: torch.Tensor, attention_mask: torch.Tensor) -> LTX2ConditioningInfo:
-    """Project the packed per-layer states into the video and audio prompt streams."""
-    device = next(connectors.parameters()).device
+def apply_connectors(
+    connectors, hidden_states: torch.Tensor, attention_mask: torch.Tensor, device: torch.device
+) -> LTX2ConditioningInfo:
+    """Project the packed per-layer states into the video and audio prompt streams.
+
+    ``device`` is the cache's compute device, not one read off the weights: when the connectors are
+    only partially loaded, most weights stay in RAM and are streamed per forward, while the
+    registers the forward mixes into the states are on the device.
+    """
     dtype = next(connectors.parameters()).dtype
     video_embeds, audio_embeds, mask = connectors(
         hidden_states.to(device=device, dtype=dtype),
