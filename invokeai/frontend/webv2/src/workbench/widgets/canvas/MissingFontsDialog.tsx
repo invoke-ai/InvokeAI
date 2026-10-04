@@ -2,65 +2,92 @@ import type { CanvasEngine, CanvasFontCapability } from '@workbench/canvas-engin
 
 import { Box, Dialog, Flex, Input, NativeSelect, Portal, Stack, Text } from '@chakra-ui/react';
 import { fontKeys, fontsQueryOptions, getFont, uploadFont, type FontRecord } from '@features/fonts';
+import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { Button, CloseButton } from '@platform/ui';
-import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useQueries, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
 import { useCallback, useDeferredValue, useMemo, useRef, useState, type ChangeEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 type FontGroup = ReturnType<CanvasFontCapability['collectReferences']>[number];
 
+/** Per font: `undefined` while checking, `null` when it cannot be fetched, else the stored content hash. */
+const storedContentHashes = (queries: readonly UseQueryResult<FontRecord>[]) =>
+  queries.map((query) => (query.isPending ? undefined : query.isError ? null : query.data.contentHash));
+
 export const MissingFontsDialog = ({ engine, groups }: { engine: CanvasEngine; groups: readonly FontGroup[] }) => {
   const { t } = useTranslation('fonts');
-  const queries = useQueries({
+  // Combined results are structurally shared, so `unavailable` keeps its identity until a check's outcome changes.
+  const storedHashes = useQueries({
     queries: groups.map(({ fontRef }) => ({
       queryKey: fontKeys.detail(fontRef.id),
       queryFn: ({ signal }: { signal: AbortSignal }) => getFont(fontRef.id, signal),
       retry: false,
       staleTime: 30_000,
     })),
+    combine: storedContentHashes,
   });
   const unavailable = useMemo(
     () =>
       groups.filter((group, index) => {
-        const query = queries[index];
-        return query && !query.isPending && (query.isError || query.data?.contentHash !== group.fontRef.contentHash);
+        const stored = storedHashes[index];
+        return stored !== undefined && stored !== group.fontRef.contentHash;
       }),
-    [groups, queries]
+    [groups, storedHashes]
   );
   const signature = JSON.stringify(unavailable.map(({ fontRef }) => [fontRef.id, fontRef.contentHash]));
   const [dismissed, setDismissed] = useState<string | null>(null);
   const close = useCallback(() => setDismissed(signature), [signature]);
   const reopen = useCallback(() => setDismissed(null), []);
-  if (!unavailable.length) {
-    return null;
-  }
+  const isOpen = unavailable.length > 0 && dismissed !== signature;
+  // Resolving the last font closes the dialog; its exit keeps the rows it last showed instead of collapsing.
+  const recovery = useExitRetainedValue(isOpen ? unavailable : null);
   return (
     <>
-      <Box position="absolute" top="2" left="50%" transform="translateX(-50%)" zIndex="2">
-        <Button colorPalette="orange" onClick={reopen}>
-          {t('fonts.missing.warning', { count: unavailable.length })}
-        </Button>
-      </Box>
-      {dismissed !== signature ? <RecoveryDialog groups={unavailable} engine={engine} onClose={close} /> : null}
+      {unavailable.length ? (
+        <Box position="absolute" top="2" left="50%" transform="translateX(-50%)" zIndex="2">
+          <Button colorPalette="orange" onClick={reopen}>
+            {t('fonts.missing.warning', { count: unavailable.length })}
+          </Button>
+        </Box>
+      ) : null}
+      {recovery.value ? (
+        <RecoveryDialog
+          key={recovery.generation}
+          groups={recovery.value}
+          engine={engine}
+          isOpen={recovery.isOpen}
+          onClose={close}
+          onExitComplete={recovery.release}
+        />
+      ) : null}
     </>
   );
+};
+
+/** Mounted only while recovery is open, so workbench hotkeys return as soon as it starts closing. */
+const RecoveryModalLayer = () => {
+  useMountEffect(() => registerHotkeyModalLayer('missing-fonts'));
+  return null;
 };
 
 const RecoveryDialog = ({
   groups,
   engine,
+  isOpen,
   onClose,
+  onExitComplete,
 }: {
-  groups: FontGroup[];
+  groups: readonly FontGroup[];
   engine: CanvasEngine;
+  isOpen: boolean;
   onClose: () => void;
+  onExitComplete: () => void;
 }) => {
   const { t } = useTranslation('fonts');
   const queryClient = useQueryClient();
-  useMountEffect(() => registerHotkeyModalLayer('missing-fonts'));
   const onOpenChange = useCallback(
     ({ open }: { open: boolean }) => {
       if (!open) {
@@ -73,7 +100,15 @@ const RecoveryDialog = ({
     void queryClient.invalidateQueries({ queryKey: fontKeys.all });
   }, [queryClient]);
   return (
-    <Dialog.Root open placement="center" size="lg" scrollBehavior="inside" onOpenChange={onOpenChange}>
+    <Dialog.Root
+      open={isOpen}
+      placement="center"
+      size="lg"
+      scrollBehavior="inside"
+      onExitComplete={onExitComplete}
+      onOpenChange={onOpenChange}
+    >
+      {isOpen ? <RecoveryModalLayer /> : null}
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

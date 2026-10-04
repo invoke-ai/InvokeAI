@@ -47,12 +47,15 @@ export const CommandPaletteDialog = ({
   isOpen,
   modifierKeyLabel,
   onClose,
+  onExitComplete,
   providers = NO_PROVIDERS,
 }: {
   entries: PaletteEntry[];
   isOpen: boolean;
   modifierKeyLabel: string;
   onClose: () => void;
+  /** After the close animation; hosts that keep the palette mounted while it closes unmount it here. */
+  onExitComplete?: () => void;
   providers?: PaletteSearchProvider[];
 }) => {
   const onDialogOpenChange = useCallback(
@@ -74,16 +77,16 @@ export const CommandPaletteDialog = ({
       restoreFocus
       scrollBehavior="inside"
       unmountOnExit
+      onExitComplete={onExitComplete}
       onOpenChange={onDialogOpenChange}
     >
-      {isOpen ? (
-        <CommandPaletteContent
-          entries={entries}
-          modifierKeyLabel={modifierKeyLabel}
-          providers={providers}
-          onClose={onClose}
-        />
-      ) : null}
+      <CommandPaletteContent
+        entries={entries}
+        isOpen={isOpen}
+        modifierKeyLabel={modifierKeyLabel}
+        providers={providers}
+        onClose={onClose}
+      />
     </Dialog.Root>
   );
 };
@@ -92,11 +95,13 @@ export default CommandPaletteDialog;
 
 const CommandPaletteContent = ({
   entries,
+  isOpen,
   modifierKeyLabel,
   onClose,
   providers,
 }: {
   entries: PaletteEntry[];
+  isOpen: boolean;
   modifierKeyLabel: string;
   onClose: () => void;
   providers: PaletteSearchProvider[];
@@ -143,7 +148,8 @@ const CommandPaletteContent = ({
 
   return (
     <Portal>
-      {controller.stage?.clearPreview ? <StagePreviewLifetime stage={controller.stage} /> : null}
+      {/* A preview ends when the palette closes, not when its exit animation finishes. */}
+      {isOpen && controller.stage?.clearPreview ? <StagePreviewLifetime stage={controller.stage} /> : null}
       <Dialog.Backdrop bg="blackAlpha.300" />
       <Dialog.Positioner alignItems="flex-start" pt="15vh">
         <Dialog.Content

@@ -68,6 +68,7 @@ export const LayoutPresetDialog = ({
   isOpen,
   name: initialName,
   onClose,
+  onExitComplete,
   onSubmit,
   sourceOptions,
   submitLabel,
@@ -78,6 +79,8 @@ export const LayoutPresetDialog = ({
   isOpen: boolean;
   name: string;
   onClose: () => void;
+  /** Called once the close animation finishes; hosts release the retained dialog here. */
+  onExitComplete?: () => void;
   onSubmit: (value: LayoutPresetDialogValue) => void;
   sourceOptions: readonly GraphWidgetSource[];
   submitLabel: string;
@@ -167,7 +170,14 @@ export const LayoutPresetDialog = ({
   }, []);
 
   return (
-    <Dialog.Root initialFocusEl={initialFocusEl} open={isOpen} lazyMount unmountOnExit onOpenChange={handleOpenChange}>
+    <Dialog.Root
+      initialFocusEl={initialFocusEl}
+      open={isOpen}
+      lazyMount
+      unmountOnExit
+      onExitComplete={onExitComplete}
+      onOpenChange={handleOpenChange}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

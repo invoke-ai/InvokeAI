@@ -21,7 +21,16 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** Rescan after partial orphan deletion and keep the dialog open for retrying remaining paths. */
-export const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
+export const OrphanedModelsDialog = ({
+  isOpen,
+  onClose,
+  onExitComplete,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  /** After the close animation; the host releases the retained dialog here. */
+  onExitComplete: () => void;
+}) => {
   const { t } = useTranslation();
   const notify = useNotify();
   const [orphans, setOrphans] = useState<OrphanedModelInfo[] | null>(null);
@@ -105,9 +114,10 @@ export const OrphanedModelsDialog = ({ onClose }: { onClose: () => void }) => {
 
   return (
     <Dialog.Root
-      open
+      open={isOpen}
       scrollBehavior="inside"
       size="md"
+      onExitComplete={onExitComplete}
       onOpenChange={(event) => {
         if (!event.open) {
           onClose();

@@ -33,7 +33,13 @@ const KEYBOARD_SENSOR_OPTIONS = {
 } satisfies KeyboardSensorOptions;
 
 /** The account-wide layout preset editor, rendered lazily from the top bar. */
-export const LayoutPresetManagerDialogBody = () => {
+export const LayoutPresetManagerDialogBody = ({
+  isOpen,
+  onExitComplete,
+}: {
+  isOpen: boolean;
+  onExitComplete: () => void;
+}) => {
   const { t } = useTranslation();
   const { layout } = useWorkbenchCommands();
   const account = useWorkbenchSelector((snapshot) => snapshot.account);
@@ -70,7 +76,7 @@ export const LayoutPresetManagerDialogBody = () => {
   );
 
   return (
-    <Dialog.Root open lazyMount unmountOnExit onOpenChange={handleOpenChange}>
+    <Dialog.Root lazyMount open={isOpen} unmountOnExit onExitComplete={onExitComplete} onOpenChange={handleOpenChange}>
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

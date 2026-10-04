@@ -12,6 +12,7 @@ import { FindInGalleryButton } from '@features/gallery/mediaSlot';
 import { getEffectiveReferenceImage } from '@features/generation/core/referenceImage';
 import { getReferenceImageUrls } from '@features/generation/data/referenceImageUrls';
 import { GenerationModelSelect as ModelSelect } from '@features/generation/ui/GenerationUiContext';
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { IconButton, ToggleDot, Tooltip } from '@platform/ui';
 import { ArrowDownIcon, ArrowUpIcon, ChevronDownIcon, CropIcon, ImageIcon, RulerIcon, Trash2Icon } from 'lucide-react';
 import { memo, useCallback, useRef, useState } from 'react';
@@ -371,6 +372,7 @@ const ReferenceImageThumbnail = ({
 }) => {
   const { t } = useTranslation();
   const [isCropOpen, setIsCropOpen] = useState(false);
+  const cropDialog = useExitPresence(isCropOpen);
   const effectiveImage = image ? getEffectiveReferenceImage(image) : null;
   const urls = image ? getReferenceImageUrls(image) : null;
 
@@ -452,8 +454,15 @@ const ReferenceImageThumbnail = ({
           </HStack>
         ) : null}
       </Box>
-      {image && isCropOpen ? (
-        <ReferenceImageCropDialog image={image} isOpen={isCropOpen} onApply={onCrop} onClose={closeCrop} />
+      {image && cropDialog.isMounted ? (
+        <ReferenceImageCropDialog
+          key={cropDialog.generation}
+          image={image}
+          isOpen={cropDialog.isOpen}
+          onApply={onCrop}
+          onClose={closeCrop}
+          onExitComplete={cropDialog.release}
+        />
       ) : null}
     </>
   );

@@ -31,12 +31,17 @@ const REJECTION_KEY: Record<WildcardImportRejection, string> = {
 /** Default conflicts to skip and show explicit rejection reasons. */
 export const WildcardImportDialog = ({
   entries,
+  isOpen,
   onCancel,
   onConfirm,
+  onExitComplete,
 }: {
   entries: readonly WildcardImportEntry[];
+  isOpen: boolean;
   onCancel: () => void;
   onConfirm: (resolutions: Record<string, WildcardImportResolution>) => Promise<void>;
+  /** After the close animation; the host releases the retained import here. */
+  onExitComplete?: () => void;
 }) => {
   const { t } = useTranslation();
   const [resolutions, setResolutions] = useState<Record<string, WildcardImportResolution>>({});
@@ -137,10 +142,11 @@ export const WildcardImportDialog = ({
       body={body}
       confirmLabel={t('widgets.generate.dynamicPrompts.import')}
       isDestructive={false}
-      isOpen
+      isOpen={isOpen}
       title={t('widgets.generate.dynamicPrompts.importWildcards')}
       onClose={onCancel}
       onConfirm={handleConfirm}
+      onExitComplete={onExitComplete}
     />
   );
 };

@@ -92,13 +92,26 @@ const CanvasDestinationButton = ({
   );
 };
 
+const PasteMediaModalLayer = () => {
+  useMountEffect(() => registerHotkeyModalLayer('paste-media'));
+
+  return null;
+};
+
 /**
  * Upload pasted media to the current board before forwarding it to canvas/reference actions so assets remain
  * findable.
  */
-export const PasteMediaDialog = ({ request }: { request: PasteMediaRequest }) => {
+export const PasteMediaDialog = ({
+  isOpen,
+  onExitComplete,
+  request,
+}: {
+  isOpen: boolean;
+  onExitComplete: () => void;
+  request: PasteMediaRequest;
+}) => {
   const { t } = useTranslation();
-  useMountEffect(() => registerHotkeyModalLayer('paste-media'));
   const projectId = useActiveProjectId();
   const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
   const generateValues = useWidgetValuesSelector('generate', selectGenerateValues);
@@ -191,13 +204,15 @@ export const PasteMediaDialog = ({ request }: { request: PasteMediaRequest }) =>
   return (
     <>
       <Dialog.Root
-        open
+        open={isOpen}
         finalFocusEl={returnFocus}
         initialFocusEl={getInitialFocusEl}
         placement="center"
         size="sm"
+        onExitComplete={onExitComplete}
         onOpenChange={handleOpenChange}
       >
+        {isOpen ? <PasteMediaModalLayer /> : null}
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>

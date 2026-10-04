@@ -54,7 +54,7 @@ const WhatsNewModalLayer = () => {
  */
 const keepOpenOnFocusOutside = (event: { preventDefault: () => void }) => event.preventDefault();
 
-export const WhatsNewDialog = () => {
+export const WhatsNewDialog = ({ onExitComplete }: { onExitComplete?: () => void }) => {
   const { t } = useTranslation();
   const { isOpen, isUnseen, version } = useWhatsNew();
   const items = readItems(t('whatsNew.items', { returnObjects: true }));
@@ -86,6 +86,7 @@ export const WhatsNewDialog = () => {
       placement="center"
       scrollBehavior="inside"
       size="lg"
+      onExitComplete={onExitComplete}
       onFocusOutside={keepOpenOnFocusOutside}
       onOpenChange={handleOpenChange}
     >

@@ -4,7 +4,7 @@ import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
 import { useQueryClient } from '@tanstack/react-query';
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -165,8 +165,12 @@ export const QueueRecoveryNotice = ({
       </HStack>
     );
   }
+
+  // The discard confirmation renders beside whichever notice applies, so the refetch that follows a discard can
+  // remove the notice while the dialog animates closed.
+  let notice: ReactNode = null;
   if (query.data?.kind === 'unavailable' || query.isError) {
-    return (
+    notice = (
       <Alert.Root borderRadius="none" size="lg" status="warning" variant="surface">
         <Alert.Indicator />
         <Alert.Content>
@@ -175,13 +179,8 @@ export const QueueRecoveryNotice = ({
         </Alert.Content>
       </Alert.Root>
     );
-  }
-  if (!projectId) {
-    return null;
-  }
-
-  return (
-    <>
+  } else if (projectId) {
+    notice = (
       <Alert.Root borderRadius="none" size="lg" status="warning" variant="surface">
         <Alert.Indicator />
         <Alert.Content>
@@ -236,6 +235,12 @@ export const QueueRecoveryNotice = ({
           </HStack>
         </Alert.Content>
       </Alert.Root>
+    );
+  }
+
+  return (
+    <>
+      {notice}
       <ConfirmDialog
         body={t('shell.queueRecovery.discardConfirmBody')}
         confirmLabel={t('shell.queueRecovery.discard')}

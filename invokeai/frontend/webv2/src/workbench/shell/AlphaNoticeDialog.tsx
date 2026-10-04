@@ -18,7 +18,7 @@ const AlphaNoticeModalLayer = () => {
 };
 
 /** Wait for account preferences before showing the notice; dismissal follows the account. */
-export const AlphaNoticeDialog = () => {
+export const AlphaNoticeDialog = ({ onExitComplete }: { onExitComplete?: () => void }) => {
   const { t } = useTranslation();
   const isOpen = useWorkbenchSettingsSelector(
     (snapshot) => snapshot.status === 'ready' && !snapshot.preferences.alphaNoticeAcknowledged
@@ -38,6 +38,7 @@ export const AlphaNoticeDialog = () => {
       open={isOpen}
       role="alertdialog"
       size="sm"
+      onExitComplete={onExitComplete}
       onOpenChange={handleOpenChange}
     >
       {isOpen ? <AlphaNoticeModalLayer /> : null}

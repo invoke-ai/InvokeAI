@@ -17,6 +17,7 @@ import {
   WILDCARD_IMPORT_ACCEPT,
   WildcardFileError,
 } from '@features/generation/ui/wildcardFiles';
+import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -45,6 +46,7 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
     entries: WildcardImportEntry[];
     owner: AccountScope;
   } | null>(null);
+  const importDialog = useExitRetainedValue(pendingImport);
 
   const reportError = useCallback(
     (area: string, caught: unknown, fallback: string) =>
@@ -252,8 +254,15 @@ export const WildcardTransferActions = ({ catalog }: { catalog: WildcardCatalog 
       />
       {/* Use a separate directory input to preserve relative wildcard paths. */}
       <input {...DIRECTORY_INPUT_PROPS} hidden ref={directoryInputRef} type="file" onChange={handleDirectoryChange} />
-      {pendingImport ? (
-        <WildcardImportDialog entries={pendingImport.entries} onCancel={cancelImport} onConfirm={confirmImport} />
+      {importDialog.value ? (
+        <WildcardImportDialog
+          key={importDialog.generation}
+          entries={importDialog.value.entries}
+          isOpen={importDialog.isOpen}
+          onCancel={cancelImport}
+          onConfirm={confirmImport}
+          onExitComplete={importDialog.release}
+        />
       ) : null}
     </HStack>
   );

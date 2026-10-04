@@ -11,6 +11,7 @@ import {
   LOOP_LINKAGE_FIELD,
   resolveConnectorSource,
 } from '@features/workflow/utility';
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { IconButton, Tooltip } from '@platform/ui';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
@@ -321,6 +322,15 @@ export const AddNodeDialog = ({
   onAddNote: () => void;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
+  // The content stays mounted through the exit animation; a fresh mount per open resets search and expansion.
+  const content = useExitPresence(isOpen);
+  // The store clears the connection on close; keep filtering by it while the dialog animates out.
+  const [shownConnectionFilter, setShownConnectionFilter] = useState(connectionFilter);
+
+  if (isOpen && shownConnectionFilter !== connectionFilter) {
+    setShownConnectionFilter(connectionFilter);
+  }
+
   const onDialogOpenChange = useCallback(
     (event: { open: boolean }) => {
       if (!event.open) {
@@ -337,11 +347,14 @@ export const AddNodeDialog = ({
       scrollBehavior="inside"
       size="md"
       unmountOnExit
+      onExitComplete={content.release}
       onOpenChange={onDialogOpenChange}
     >
-      {isOpen ? (
+      {isOpen ? <AddNodeModalLayer /> : null}
+      {content.isMounted ? (
         <AddNodeDialogContent
-          connectionFilter={connectionFilter}
+          key={content.generation}
+          connectionFilter={shownConnectionFilter}
           onAddCurrentImage={onAddCurrentImage}
           onAddConnector={onAddConnector}
           onAddNode={onAddNode}
@@ -351,6 +364,15 @@ export const AddNodeDialog = ({
       ) : null}
     </Dialog.Root>
   );
+};
+
+/** Blocks workbench hotkeys only while open; the content outlives the open state through its exit animation. */
+const AddNodeModalLayer = () => {
+  const { registerModalHotkeyLayer } = useWorkflowUi();
+
+  useMountEffect(() => registerModalHotkeyLayer('workflow-add-node'));
+
+  return null;
 };
 
 const AddNodeDialogContent = ({
@@ -368,7 +390,7 @@ const AddNodeDialogContent = ({
   onAddNote: () => void;
   onOpenChange: (isOpen: boolean) => void;
 }) => {
-  const { getProjectGraph, registerModalHotkeyLayer } = useWorkflowUi();
+  const { getProjectGraph } = useWorkflowUi();
   const error = useInvocationTemplatesSelector((snapshot) => snapshot.error);
   const status = useInvocationTemplatesSelector((snapshot) => snapshot.status);
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
@@ -377,20 +399,10 @@ const AddNodeDialogContent = ({
   const [activeIndex, setActiveIndex] = useState<number | null>(null);
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null);
   const groupByCategory = useWorkflowPreferencesSelector((preferences) => preferences.workflowGroupNodesByCategory);
-
-  useMountEffect(() => registerModalHotkeyLayer('workflow-add-node'));
   const isSearching = searchTerm.trim().length > 0;
 
-  const close = useCallback(
-    (added: boolean) => {
-      onOpenChange(false);
-
-      if (added) {
-        setSearchTerm('');
-      }
-    },
-    [onOpenChange]
-  );
+  // Each open mounts fresh content, so the search needs no reset here; clearing it would reflow the closing list.
+  const close = useCallback(() => onOpenChange(false), [onOpenChange]);
 
   const groups = useMemo<CategoryGroup[]>(() => {
     const query = parseSearchQuery(searchTerm);
@@ -409,7 +421,7 @@ const AddNodeDialogContent = ({
         nodePack: 'invokeai',
         onAdd: () => {
           onAddConnector();
-          close(true);
+          close();
         },
         title: 'Connector',
       },
@@ -423,7 +435,7 @@ const AddNodeDialogContent = ({
               nodePack: 'invokeai',
               onAdd: () => {
                 onAddNote();
-                close(true);
+                close();
               },
               title: 'Notes',
             },
@@ -434,7 +446,7 @@ const AddNodeDialogContent = ({
               nodePack: 'invokeai',
               onAdd: () => {
                 onAddCurrentImage();
-                close(true);
+                close();
               },
               title: 'Current Image',
             },
@@ -467,7 +479,7 @@ const AddNodeDialogContent = ({
         nodePack: template.nodePack,
         onAdd: () => {
           onAddNode(template);
-          close(true);
+          close();
         },
         rank,
         title: template.title,

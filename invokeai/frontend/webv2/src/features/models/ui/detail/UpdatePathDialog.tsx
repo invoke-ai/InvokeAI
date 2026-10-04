@@ -14,11 +14,16 @@ import { useTranslation } from 'react-i18next';
 
 /** Update only the record's absolute path; never move files or repoint managed relative paths. */
 export const UpdatePathDialog = ({
+  isOpen,
   model,
   onClose,
+  onExitComplete,
 }: {
+  isOpen: boolean;
   model: Pick<ModelConfig, 'key' | 'name' | 'path'>;
   onClose: () => void;
+  /** After the close animation; the host releases the retained dialog here. */
+  onExitComplete: () => void;
 }) => {
   const { t } = useTranslation();
   const notify = useNotify();
@@ -50,8 +55,9 @@ export const UpdatePathDialog = ({
 
   return (
     <Dialog.Root
-      open
+      open={isOpen}
       size="md"
+      onExitComplete={onExitComplete}
       onOpenChange={(event) => {
         if (!event.open) {
           onClose();

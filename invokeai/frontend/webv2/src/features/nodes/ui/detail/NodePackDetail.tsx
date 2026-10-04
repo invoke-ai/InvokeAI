@@ -3,22 +3,28 @@ import type { NodePackInfo } from '@features/nodes/core/catalog';
 
 import { Badge, Box, Flex, HStack, Icon, Spinner, Stack, Text } from '@chakra-ui/react';
 import { isProblemPack } from '@features/nodes/core/library';
-import { UninstallPackDialog } from '@features/nodes/ui/shared/UninstallPackDialog';
 import { ensureInvocationTemplatesLoaded, useInvocationTemplatesSelector } from '@features/workflow/react';
 import { Button } from '@platform/ui';
 import { EmptyState } from '@platform/ui/EmptyState';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BlocksIcon, TriangleAlertIcon, Trash2Icon } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { NodePreviewCard } from './NodePreviewCard';
 
 /**
  * Build previews from backend invocation templates; nodeTypes are invocation keys and nodePack identifies their
- * owning pack.
+ * owning pack. The host owns the uninstall confirmation because an uninstall unmounts this detail before the dialog
+ * finishes closing.
  */
-export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => void; pack: NodePackInfo }) => {
+export const NodePackDetail = ({
+  onRequestUninstall,
+  pack,
+}: {
+  onRequestUninstall: (pack: NodePackInfo) => void;
+  pack: NodePackInfo;
+}) => {
   const { t } = useTranslation();
   const status = useInvocationTemplatesSelector((snapshot) => snapshot.status);
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
@@ -62,7 +68,10 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
             </Text>
           ) : null}
         </Stack>
-        <UninstallButton onUninstalled={onUninstalled} pack={pack} />
+        <Button colorPalette="red" flexShrink={0} variant="outline" onClick={() => onRequestUninstall(pack)}>
+          <Icon as={Trash2Icon} boxSize="3" />
+          {t('nodes.uninstall')}
+        </Button>
       </HStack>
 
       <Stack gap="2">
@@ -90,24 +99,5 @@ export const NodePackDetail = ({ onUninstalled, pack }: { onUninstalled: () => v
         )}
       </Stack>
     </Stack>
-  );
-};
-
-const UninstallButton = ({ onUninstalled, pack }: { onUninstalled: () => void; pack: NodePackInfo }) => {
-  const { t } = useTranslation();
-  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-
-  return (
-    <>
-      <Button colorPalette="red" flexShrink={0} variant="outline" onClick={() => setIsConfirmOpen(true)}>
-        <Icon as={Trash2Icon} boxSize="3" />
-        {t('nodes.uninstall')}
-      </Button>
-      <UninstallPackDialog
-        pack={isConfirmOpen ? pack : null}
-        onClose={() => setIsConfirmOpen(false)}
-        onUninstalled={onUninstalled}
-      />
-    </>
   );
 };

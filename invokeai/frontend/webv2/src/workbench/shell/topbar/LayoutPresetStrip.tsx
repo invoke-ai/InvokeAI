@@ -21,6 +21,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
@@ -78,6 +79,7 @@ export const LayoutPresetStrip = () => {
   const { t } = useTranslation();
   const { layout } = useWorkbenchCommands();
   const [isSaveAsOpen, setIsSaveAsOpen] = useState(false);
+  const saveAsDialog = useExitPresence(isSaveAsOpen);
   const [menuTarget, setMenuTarget] = useState<PresetMenuTarget | null>(null);
   const menuTicket = useRef(0);
 
@@ -242,15 +244,17 @@ export const LayoutPresetStrip = () => {
         />
       ) : null}
 
-      {isSaveAsOpen ? (
+      {saveAsDialog.isMounted ? (
         <LayoutPresetDialog
+          key={saveAsDialog.generation}
           defaultRoute={saveAsDefaultRoute}
-          isOpen
+          isOpen={saveAsDialog.isOpen}
           name={`${activePreset.label} copy`}
           sourceOptions={sourceOptions}
           submitLabel={t('topbar.presets.save')}
           title={t('topbar.presets.saveAs')}
           onClose={closeSaveAsDialog}
+          onExitComplete={saveAsDialog.release}
           onSubmit={saveAsNewPreset}
         />
       ) : null}

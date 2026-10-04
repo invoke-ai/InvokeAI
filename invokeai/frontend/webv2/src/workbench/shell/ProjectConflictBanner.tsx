@@ -177,10 +177,6 @@ export const ProjectConflictBanner = () => {
   const conflict = sync?.conflict;
   const schemaRefusal = sync?.schemaRefusal;
   const hasProjectAlert = Boolean(conflict || schemaRefusal || localDraftStatus !== 'ok');
-  if (!hasProjectAlert && !recoverableDraft) {
-    return null;
-  }
-
   const title = schemaRefusal
     ? t('shell.projectConflict.schemaTitle')
     : conflict?.kind === 'deleted'
@@ -321,33 +317,32 @@ export const ProjectConflictBanner = () => {
           </Alert.Content>
         </Alert.Root>
       ) : null}
-      {hasProjectAlert || recoverableDraft ? (
-        <ConfirmDialog
-          body={t(
-            resolutionAction === 'delete-recoverable'
-              ? 'shell.projectConflict.deleteDraftConfirmBody'
-              : resolutionAction === 'save-as-new'
-                ? 'shell.projectConflict.saveAsNewConfirmBody'
-                : resolutionAction === 'use-server'
-                  ? 'shell.projectConflict.useServerConfirmBody'
-                  : 'shell.projectConflict.discardConfirmBody'
-          )}
-          confirmLabel={t(
-            resolutionAction === 'delete-recoverable'
-              ? 'shell.projectConflict.deleteDraft'
-              : resolutionAction === 'save-as-new'
-                ? 'shell.projectConflict.saveAsNew'
-                : resolutionAction === 'use-server'
-                  ? 'shell.projectConflict.useServer'
-                  : 'shell.projectConflict.discard'
-          )}
-          isDestructive={resolutionAction !== 'save-as-new'}
-          isOpen={resolutionAction !== null}
-          title={t('shell.projectConflict.confirmTitle')}
-          onClose={closeConfirmation}
-          onConfirm={confirmResolution}
-        />
-      ) : null}
+      {/* Always mounted: resolving a conflict can clear both alerts while the confirmation animates out. */}
+      <ConfirmDialog
+        body={t(
+          resolutionAction === 'delete-recoverable'
+            ? 'shell.projectConflict.deleteDraftConfirmBody'
+            : resolutionAction === 'save-as-new'
+              ? 'shell.projectConflict.saveAsNewConfirmBody'
+              : resolutionAction === 'use-server'
+                ? 'shell.projectConflict.useServerConfirmBody'
+                : 'shell.projectConflict.discardConfirmBody'
+        )}
+        confirmLabel={t(
+          resolutionAction === 'delete-recoverable'
+            ? 'shell.projectConflict.deleteDraft'
+            : resolutionAction === 'save-as-new'
+              ? 'shell.projectConflict.saveAsNew'
+              : resolutionAction === 'use-server'
+                ? 'shell.projectConflict.useServer'
+                : 'shell.projectConflict.discard'
+        )}
+        isDestructive={resolutionAction !== 'save-as-new'}
+        isOpen={resolutionAction !== null}
+        title={t('shell.projectConflict.confirmTitle')}
+        onClose={closeConfirmation}
+        onConfirm={confirmResolution}
+      />
     </>
   );
 };

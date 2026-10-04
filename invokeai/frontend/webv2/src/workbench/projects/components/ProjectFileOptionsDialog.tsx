@@ -7,10 +7,23 @@ import { useTranslation } from 'react-i18next';
 
 import type { ProjectFileOptionsRequest } from './ProjectFileOptionsProvider';
 
-export const ProjectFileOptionsDialog = ({ request }: { request: ProjectFileOptionsRequest }) => {
+const ProjectFileOptionsModalLayer = () => {
+  useMountEffect(() => registerHotkeyModalLayer('project-file-options'));
+
+  return null;
+};
+
+export const ProjectFileOptionsDialog = ({
+  isOpen,
+  onExitComplete,
+  request,
+}: {
+  isOpen: boolean;
+  onExitComplete: () => void;
+  request: ProjectFileOptionsRequest;
+}) => {
   const { t } = useTranslation();
   const [includeFonts, setIncludeFonts] = useState(false);
-  useMountEffect(() => registerHotkeyModalLayer('project-file-options'));
   const close = useCallback(() => request.settle(null), [request]);
   const isExport = request.kind === 'export';
   const returnFocus = useCallback(
@@ -32,7 +45,15 @@ export const ProjectFileOptionsDialog = ({ request }: { request: ProjectFileOpti
   const confirm = useCallback(() => request.settle({ includeFonts }), [includeFonts, request]);
 
   return (
-    <Dialog.Root open placement="center" size="sm" finalFocusEl={returnFocus} onOpenChange={handleOpenChange}>
+    <Dialog.Root
+      open={isOpen}
+      placement="center"
+      size="sm"
+      finalFocusEl={returnFocus}
+      onExitComplete={onExitComplete}
+      onOpenChange={handleOpenChange}
+    >
+      {isOpen ? <ProjectFileOptionsModalLayer /> : null}
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

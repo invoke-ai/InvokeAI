@@ -124,6 +124,8 @@ interface RunLayerWorkflowDialogProps {
   isOpen: boolean;
   layerId: string;
   onClose(): void;
+  /** After the close animation; a host may remount the dialog here so its next open starts fresh. */
+  onExitComplete?(): void;
 }
 
 interface SelectionState {
@@ -193,6 +195,7 @@ export const RunLayerWorkflowDialog = ({
   isOpen,
   layerId,
   onClose,
+  onExitComplete,
 }: RunLayerWorkflowDialogProps) => {
   const { t } = useTranslation();
   const notify = useNotify();
@@ -458,7 +461,14 @@ export const RunLayerWorkflowDialog = ({
   const canRun = engine !== null && !isRunning && readinessMessage === null;
 
   return (
-    <Dialog.Root lazyMount open={isOpen} size="sm" unmountOnExit onOpenChange={handleOpenChange}>
+    <Dialog.Root
+      lazyMount
+      open={isOpen}
+      size="sm"
+      unmountOnExit
+      onExitComplete={onExitComplete}
+      onOpenChange={handleOpenChange}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

@@ -170,11 +170,14 @@ export const ReferenceImageCropDialog = ({
   isOpen,
   onApply,
   onClose,
+  onExitComplete,
 }: {
   image: GenerateReferenceImageAsset;
   isOpen: boolean;
   onApply: (image: GenerateReferenceImageAsset) => void;
   onClose: () => void;
+  /** After the close animation; the host releases the retained dialog here. */
+  onExitComplete?: () => void;
 }) => {
   const { t } = useTranslation();
   const { gallery, notifications } = useGenerationUi();
@@ -298,7 +301,14 @@ export const ReferenceImageCropDialog = ({
   }, [close, cropBox, gallery, image, notifications, onApply, onClose]);
 
   return (
-    <Dialog.Root lazyMount open={isOpen} size="lg" unmountOnExit onOpenChange={handleOpenChange}>
+    <Dialog.Root
+      lazyMount
+      open={isOpen}
+      size="lg"
+      unmountOnExit
+      onExitComplete={onExitComplete}
+      onOpenChange={handleOpenChange}
+    >
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

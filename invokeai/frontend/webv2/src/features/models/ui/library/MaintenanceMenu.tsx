@@ -4,6 +4,7 @@ import { emptyModelCache } from '@features/models/data/api';
 import { getModelsSnapshot, refreshModels } from '@features/models/data/modelsStore';
 import { OrphanedModelsDialog } from '@features/models/ui/library/OrphanedModelsDialog';
 import { useNotify } from '@features/models/ui/useModelsNotify';
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { useScopedAction } from '@platform/react/useScopedAction';
 import { assertAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { ConfirmDialog, IconButton, MenuContent } from '@platform/ui';
@@ -15,6 +16,7 @@ export const MaintenanceMenu = () => {
   const { t } = useTranslation();
   const notify = useNotify();
   const [isSyncDialogOpen, setIsSyncDialogOpen] = useState(false);
+  const syncDialog = useExitPresence(isSyncDialogOpen);
   const [isEmptyCacheConfirmOpen, setIsEmptyCacheConfirmOpen] = useState(false);
   // Separate instances: run ignores re-entry, and a slow cache emptying must
   // not swallow a refresh (or vice versa).
@@ -77,7 +79,14 @@ export const MaintenanceMenu = () => {
           </Menu.Positioner>
         </Portal>
       </Menu.Root>
-      {isSyncDialogOpen ? <OrphanedModelsDialog onClose={() => setIsSyncDialogOpen(false)} /> : null}
+      {syncDialog.isMounted ? (
+        <OrphanedModelsDialog
+          key={syncDialog.generation}
+          isOpen={syncDialog.isOpen}
+          onClose={() => setIsSyncDialogOpen(false)}
+          onExitComplete={syncDialog.release}
+        />
+      ) : null}
       <ConfirmDialog
         body={t('models.emptyCacheConfirmBody')}
         confirmLabel={t('models.emptyCache')}

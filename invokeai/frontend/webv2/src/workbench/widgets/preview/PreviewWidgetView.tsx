@@ -648,11 +648,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               target={contextMenuTarget}
               onClose={closeContextMenu}
             />
-            {deletionConfirmationDialog}
           </>
         ) : (
           <EmptyPreview />
         )}
+        {/* Outside the branches: deleting the shown item or a live session taking over must not unmount a pending
+            confirmation, nor cut its exit animation short. */}
+        {deletionConfirmationDialog}
       </Stack>
     </Box>
   );
