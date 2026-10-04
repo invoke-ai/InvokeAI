@@ -360,6 +360,10 @@ export const VideoWidgetView = () => {
       let notice: Parameters<typeof toaster.create>[0] | undefined;
       patchValues((current) => {
         const loras = update(current.loras);
+
+        if (loras === current.loras) {
+          return {};
+        }
         // While enabled, follow a replacement accelerator set or restore model sampling defaults if none remains.
         // Preserve the edit and notify; never enable acceleration from a list edit.
         if (!current.model) {

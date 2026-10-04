@@ -361,9 +361,12 @@ export const UpscaleWidgetView = () => {
   );
   const updateLora = useCallback(
     (key: string, update: Partial<GenerateLora>) =>
-      patchValues((current) => ({
-        loras: current.loras.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora)),
-      })),
+      // A row removed mid-edit still flushes its draft; that must not write an unchanged list.
+      patchValues((current) =>
+        current.loras.some((lora) => lora.model.key === key)
+          ? { loras: current.loras.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora)) }
+          : {}
+      ),
     [patchValues]
   );
   const removeLora = useCallback(

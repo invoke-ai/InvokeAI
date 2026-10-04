@@ -64,7 +64,12 @@ export const VideoConceptsSection = memo(
     );
     const updateLora = useCallback(
       (key: string, update: Partial<GenerateLora>) =>
-        onChangeLoras((current) => current.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora))),
+        // A row removed mid-edit still flushes its draft; returning the list unchanged makes that a no-op.
+        onChangeLoras((current) =>
+          current.some((lora) => lora.model.key === key)
+            ? current.map((lora) => (lora.model.key === key ? { ...lora, ...update } : lora))
+            : current
+        ),
       [onChangeLoras]
     );
     const removeLora = useCallback(

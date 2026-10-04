@@ -225,4 +225,23 @@ describe('concept drafts through widget adapters', () => {
       }
     }
   );
+
+  it.each(['upscale', 'video'] as const)(
+    'writes only the removal when a %s row is removed with its own pending weight',
+    async (widget) => {
+      const rows = await render(widget);
+      await act(() => step(rows[0]!));
+      const projects = new Set<Project>();
+      const unsubscribe = store.subscribe(() => projects.add(store.getSnapshot().activeProject));
+
+      await act(() => {
+        rows[0]!.querySelector<HTMLButtonElement>('[aria-label="widgets.generate.removeConceptNamed"]')?.click();
+      });
+      await act(() => flushWorkbenchDrafts());
+      unsubscribe();
+
+      expect(projects.size).toBe(1);
+      expect(currentLoras(widget).map((lora) => lora.model.key)).toEqual([`${widget}-second`]);
+    }
+  );
 });
