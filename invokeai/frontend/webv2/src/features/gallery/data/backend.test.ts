@@ -21,6 +21,7 @@ import {
   deleteGalleryBoard,
   deleteGalleryImages,
   downloadGalleryArchive,
+  fetchImageIndexAvailability,
   getGalleryImageByName,
   getGalleryImagesByNames,
   getGalleryVideoMetadata,
@@ -909,5 +910,35 @@ describe('gallery uploads', () => {
 
     const url = mocks.apiFetchJson.mock.calls[0]?.[0] as string;
     expect(new URLSearchParams(url.split('?')[1]).has('board_id')).toBe(false);
+  });
+});
+
+describe('fetchImageIndexAvailability', () => {
+  beforeEach(() => {
+    mocks.apiFetchJson.mockReset();
+  });
+
+  it.each([
+    [
+      { enabled: true, projection: { state: 'ready' } },
+      { modelName: null, state: 'ready' },
+    ],
+    [
+      { enabled: false, model_name: 'clip', projection: { state: 'model_missing' } },
+      { modelName: 'clip', state: 'model_missing' },
+    ],
+    // A draining replacement must keep search offered and polled, not read as indexing turned off.
+    [
+      { enabled: false, model_name: null, projection: { state: 'computing' } },
+      { modelName: null, state: 'switching' },
+    ],
+    [
+      { enabled: false, model_name: null, projection: { state: 'disabled' } },
+      { modelName: null, state: 'disabled' },
+    ],
+  ])('reads %o as %o', async (body, availability) => {
+    mocks.apiFetchJson.mockResolvedValue(body);
+
+    await expect(fetchImageIndexAvailability(new AbortController().signal)).resolves.toEqual(availability);
   });
 });

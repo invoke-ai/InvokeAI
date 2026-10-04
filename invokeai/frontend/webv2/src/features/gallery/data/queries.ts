@@ -346,7 +346,9 @@ export const imageIndexAvailabilityOptions = () => {
     },
     queryKey: galleryKeys.imageIndexAvailability(owner),
     refetchInterval: (query) =>
-      query.state.status === 'error' || query.state.data?.state === 'model_missing'
+      query.state.status === 'error' ||
+      query.state.data?.state === 'model_missing' ||
+      query.state.data?.state === 'switching'
         ? IMAGE_INDEX_UNAVAILABLE_POLL_MS
         : false,
     staleTime: IMAGE_INDEX_STALE_MS,
