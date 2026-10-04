@@ -67,7 +67,9 @@ class RegionalIPDataNew:
 
     def build_masks(self):
         if self.seq_masks is None:
-            self.seq_masks = RegionalIPData._prepare_masks(self.masks, self.max_downscale_factor, self.device, self.dtype)
+            self.seq_masks = RegionalIPData._prepare_masks(
+                self.masks, self.max_downscale_factor, self.device, self.dtype
+            )
             self.masks = None
 
     def get_masks(self, query_seq_len: int) -> torch.Tensor:
@@ -256,7 +258,7 @@ class IPAdapterExt(ExtensionBase):
                 if not attn_processor._ip_adapter_attention_weights[ipa_index].skip:
                     # apply the IP-Adapter weights to the negative embeds
                     if attn_processor._ip_adapter_attention_weights[ipa_index].negative:
-                        ipa_embed = torch.cat([ipa_embed[1], ipa_embed[0] * 0], dim=0)
+                        ipa_embed = torch.cat([ipa_embed[1:2], ipa_embed[0:1] * 0], dim=0)
 
                     if regional_ip_data.cond_mode == ConditioningMode.Positive:
                         ip_hidden_states = ipa_embed[1:2]  # [1]
