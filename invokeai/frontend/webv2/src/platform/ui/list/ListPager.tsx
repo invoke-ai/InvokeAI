@@ -26,16 +26,16 @@ export const ListPager = ({ hasNext, hasPrevious, isBusy = false, page, onNext, 
     <HStack borderColor="border.subtle" borderTopWidth="1px" flexShrink={0} justify="center" minH="8">
       <Button
         aria-disabled={previousUnavailable}
-        size="2xs"
+        size="sm"
         variant="ghost"
         onClick={previousUnavailable ? undefined : onPrevious}
       >
         {t('common.previousPage')}
       </Button>
-      <Text aria-live="polite" color="fg.muted" fontSize="2xs" fontVariantNumeric="tabular-nums">
+      <Text aria-live="polite" color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums">
         {t('common.pageNumber', { page })}
       </Text>
-      <Button aria-disabled={nextUnavailable} size="2xs" variant="ghost" onClick={nextUnavailable ? undefined : onNext}>
+      <Button aria-disabled={nextUnavailable} size="sm" variant="ghost" onClick={nextUnavailable ? undefined : onNext}>
         {t('common.nextPage')}
       </Button>
     </HStack>

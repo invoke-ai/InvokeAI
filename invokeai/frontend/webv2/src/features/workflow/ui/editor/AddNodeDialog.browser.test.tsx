@@ -4,6 +4,7 @@ import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext'
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
+import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -106,7 +107,11 @@ describe('AddNodeDialog search', () => {
     host.remove();
   });
 
-  const renderOpen = async ({ groupByCategory = true } = {}) => {
+  const renderOpen = async ({
+    groupByCategory = true,
+    isOpen = true,
+    registerModalHotkeyLayer = (): (() => void) => () => {},
+  } = {}) => {
     const onAddNode = vi.fn();
     const adapter = {
       getProjectGraph: () => ({ edges: [], nodes: [] }),
@@ -114,7 +119,7 @@ describe('AddNodeDialog search', () => {
         getSnapshot: () => ({ workflowGroupNodesByCategory: groupByCategory }),
         subscribe: () => () => {},
       },
-      registerModalHotkeyLayer: () => () => {},
+      registerModalHotkeyLayer,
     } as unknown as WorkflowUiAdapter;
 
     await act(() => {
@@ -123,7 +128,7 @@ describe('AddNodeDialog search', () => {
           <WorkflowUiProvider adapter={adapter}>
             <AddNodeDialog
               connectionFilter={null}
-              isOpen
+              isOpen={isOpen}
               onAddConnector={vi.fn()}
               onAddCurrentImage={vi.fn()}
               onAddNode={onAddNode}
@@ -161,6 +166,33 @@ describe('AddNodeDialog search', () => {
     // A name prefix leads, the utility row leads its tie, and a tag-only match ranks below every name match.
     expect(listedRows()).toEqual(['Image to Latents', 'Current Image', 'Resize Image', 'Latents to Pixels']);
     expect(document.querySelector('[aria-label="Expand all categories"]')).toBeNull();
+  });
+
+  it('animates out on close, then starts the next open with an empty search', async () => {
+    const { search } = await renderOpen();
+    await act(() => userEvent.type(search, 'integer'));
+    const dialog = document.querySelector('[role="dialog"]')!;
+
+    const frames = closingFrames(await recordDialogExit(dialog, () => renderOpen({ isOpen: false })));
+    await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+
+    expect(frames).not.toHaveLength(0);
+    expect((await renderOpen()).search.value).toBe('');
+  });
+
+  it('gives hotkeys back to the workbench as it closes, not after it animates out', async () => {
+    let isDialogShownAtRelease: boolean | null = null;
+    const registerModalHotkeyLayer = vi.fn(
+      () => () => (isDialogShownAtRelease = document.querySelector('[role="dialog"]') !== null)
+    );
+    await renderOpen({ registerModalHotkeyLayer });
+    expect(registerModalHotkeyLayer).toHaveBeenCalledExactlyOnceWith('workflow-add-node');
+
+    await renderOpen({ isOpen: false, registerModalHotkeyLayer });
+    await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+
+    expect(isDialogShownAtRelease).toBe(true);
+    expect(registerModalHotkeyLayer).toHaveBeenCalledOnce();
   });
 
   it('adds the best match on Enter instead of toggling its category', async () => {

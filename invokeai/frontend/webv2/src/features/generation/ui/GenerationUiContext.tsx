@@ -18,8 +18,9 @@ export interface GenerationModelSelectProps {
   modelTypes: string[];
   onChange: (model: GenerationModelCatalogItem | null) => void;
   placeholder?: string;
+  scopeLabel?: string;
   showManagerButton?: boolean;
-  size?: 'xs' | 'sm' | 'md';
+  size?: 'md' | 'lg' | 'xl';
   value: string | null;
 }
 
@@ -68,6 +69,9 @@ export interface GenerationUiAdapter {
     error: string | null;
     getBaseColorPalette(base: string): string;
     getBaseLabel(base: string): string;
+    getImageUrl(key: string): string;
+    /** Absent when this session may not manage models. */
+    openInModelManager?: (key: string) => void;
     /** Apply the optional model-type filter when opening Add Models. */
     openManager(options?: { modelType?: string }): void;
     status: 'error' | 'idle' | 'loaded' | 'loading';

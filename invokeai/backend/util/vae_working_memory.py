@@ -78,7 +78,8 @@ def should_pretile_vae_decode(
 # 8x-downsampled grid. Where that attention runs on the math kernel (see `sdpa_score_matrix_bytes`)
 # its score matrix is the dominant term for a large untiled image, exactly as it is for FLUX.2;
 # `_vae_mid_block_score_matrix_bytes` prices it for those estimators the same way. The video VAEs
-# (Wan, Qwen-Image) need no such term: their ROCm constants below were measured with math attention.
+# (Wan, Qwen-Image) need no such term: the Qwen-Image ROCm constants below were measured with math
+# attention. The Wan video-decode constant was measured on CUDA and on an RX 9060 XT (see there).
 _CLASSIC_VAE_MID_BLOCK_HEADS = 1
 _CLASSIC_VAE_MID_BLOCK_HEAD_DIM = 512
 
@@ -93,8 +94,7 @@ _LTX2_VAE_ENCODE_BYTES_PER_TILE_ELEMENT = 700
 _LTX2_VAE_TILED_ENCODE_BYTES_PER_TILE_ELEMENT = 360
 
 _WAN_VAE_SINGLE_FRAME_DECODE_SCALING_CONSTANT = 2900
-_WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_A14B = 6500
-_WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_TI2V = 7000
+_WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT = 10000
 
 
 def _vae_mid_block_score_matrix_bytes(
@@ -694,8 +694,8 @@ def estimate_vae_working_memory_wan(
 
     Callers pass pixel-space dimensions, so the VAE's spatial scale factor is already
     applied. Single-frame decode and encode use the original Wan 2.1 calibration;
-    multi-frame decode uses conservative, VAE-variant-specific calibrations because
-    causal-convolution state makes the single-frame value unsafe at video resolutions.
+    multi-frame decode uses a calibration of peak reserved memory because causal-convolution
+    state makes the single-frame value unsafe at video resolutions.
     The Wan VAE processes the clip causally, one latent frame at a time with cached
     features. In streaming mode, only one temporal-upscale chunk of the RGB output is
     kept on the execution device; otherwise the full output clip and its transient copy
@@ -705,18 +705,40 @@ def estimate_vae_working_memory_wan(
 
     # The original 2900-byte calibration covers a single Wan 2.1 frame. Multi-frame video
     # decodes retain causal-convolution state that makes that constant unsafe at video
-    # resolutions. These conservative constants are based on measured allocated-memory
-    # peaks with allocator headroom: 6500 for the z_dim=16 A14B VAE and 7000 for the
-    # larger z_dim=48 TI2V VAE. Keep the single-frame value for image decode and the
-    # existing encode calibration.
+    # resolutions. The video constant is calibrated on peak *reserved* growth, which is what the
+    # cache's `free >= estimate` check has to cover: the decode's live tensors peak at only about
+    # two thirds of what the allocator reserves. The earlier constants (6500 A14B, 7000 TI2V)
+    # covered the live tensors; in a server faking a 16 GB card the 832x480x49 decode then overran
+    # the card by 1.3-1.9 GB, and with sysmem fallback such a decode stalled for minutes.
+    #
+    # Implied constant = (reserved - clip bytes) / (h * w * element_size), with the clip bytes this
+    # function budgets for the mode (`wan_vae_clip_bytes`: two full clips, or one 4-frame chunk when
+    # streaming); bf16,
+    # RTX 4090, `scripts/calibrate_wan_vae_working_memory.py --dtype bfloat16 [--no-streaming]`, and
+    # "server" = torch's peak stats around the decode inside a running server:
+    #                       640x352x49  832x480x49  832x480x81  1280x704x49  1280x704x81  1280x704x121
+    #   A14B full              7512        8457        7751         7557                     8073
+    #   A14B streaming                     7773                                 8601
+    #   TI2V full              8903        8457        8557         8943                     8511
+    #   TI2V full, server                  9505                     8944
+    #   TI2V streaming                     9004                                 9230
+    #   TI2V streaming, server             9081                     9235
+    # The reserved peak barely grows with the frame count (TI2V 1280x704 reserved 15876 MiB at 49
+    # and at 121 frames), so the clip bytes are budget on top of it rather than part of it. Both
+    # VAEs reserved exactly the same 6666 MiB at 832x480x49 standalone, so one constant covers
+    # both: the highest measurement, the server's 480p full decode, plus ~5%.
+    # ROCm (RX 9060 XT, gfx1200, torch 2.13+rocm10, with the app's conv3d decomposition, SDPA guard
+    # and expandable segments): 7973-8813 standalone across both VAEs, full and streaming up to
+    # 832x480x81, and 7719-8297 for TI2V 832x480x49 in a server -- covered as well.
+    #
+    # The same estimate decides auto-tiling (`should_pretile_vae_decode`): with it, 832x480 clips
+    # tile on 8 GB cards and 720p clips on 16 GB cards, where their untiled decodes reserve about as
+    # much as the card holds or more. A14B's 1280x720x81 sits right at the line on 20 GB cards: one
+    # constant for both VAEs gives A14B 16-24% over its own standalone maxima at 720p, kept because
+    # its in-server 480p peak was not measured.
+    # Keep the single-frame value for image decode and the existing encode calibration.
     if operation == "decode" and pixel_frames > 1:
-        try:
-            z_dim = int(getattr(vae.config, "z_dim", 16))
-        except (TypeError, ValueError):
-            z_dim = 48
-        scaling_constant = (
-            _WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_TI2V if z_dim >= 32 else _WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_A14B
-        )
+        scaling_constant = _WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT
     else:
         scaling_constant = _WAN_VAE_SINGLE_FRAME_DECODE_SCALING_CONSTANT if operation == "decode" else 1450
     if tile_size is not None:
@@ -725,6 +747,26 @@ def estimate_vae_working_memory_wan(
     else:
         per_frame = pixel_height * pixel_width * element_size * scaling_constant
 
+    return int(
+        per_frame + wan_vae_clip_bytes(operation, vae, pixel_height, pixel_width, pixel_frames, tile_size, streaming)
+    )
+
+
+def wan_vae_clip_bytes(
+    operation: Literal["encode", "decode"],
+    vae: AutoencoderKLWan,
+    pixel_height: int,
+    pixel_width: int,
+    pixel_frames: int,
+    tile_size: int | None = None,
+    streaming: bool = False,
+) -> int:
+    """The RGB clip bytes `estimate_vae_working_memory_wan` budgets on top of the VAE's own working set.
+
+    Shared with `scripts/calibrate_wan_vae_working_memory.py`, which subtracts exactly this from a measurement to
+    report the implied constant.
+    """
+    element_size = next(vae.parameters()).element_size()
     # Streaming decode moves each causal decoder chunk to CPU immediately. Only one
     # temporal-upscale chunk remains on the execution device, instead of the full RGB
     # clip plus the transient copy created by torch.cat.
@@ -732,12 +774,16 @@ def estimate_vae_working_memory_wan(
         temporal_scale = int(getattr(vae.config, "scale_factor_temporal", None) or 4)
         resident_frames = min(pixel_frames, temporal_scale)
         clip_copies = 1
+    elif operation == "decode" and tile_size is not None:
+        # diffusers' tiled_decode keeps every row of decoded tiles, the blended rows, their concatenation and the
+        # clamped result alive together, and the tile's own working set is small next to them: reserved memory grew
+        # by 5.2 (A14B) and 5.6 (TI2V) clip copies per frame (1280x704 at 81 vs 121 frames, bf16).
+        resident_frames = pixel_frames
+        clip_copies = 6
     else:
         resident_frames = pixel_frames
         clip_copies = 2 if operation == "decode" else 1
-    clip_bytes = clip_copies * 3 * resident_frames * pixel_height * pixel_width * element_size
-
-    return int(per_frame + clip_bytes)
+    return clip_copies * 3 * resident_frames * pixel_height * pixel_width * element_size
 
 
 # What a full-frame Qwen-Image VAE decode was actually measured to peak at, per output pixel-byte, against the output

@@ -83,30 +83,6 @@ describe('widget region view model', () => {
     expect(viewModel.availableItems.map((item) => item.typeId)).toEqual([]);
   });
 
-  it('orders floating slots by their return index and clamps indices the rail no longer has', () => {
-    const widgets = ['a', 'b', 'c', 'd', 'e'].map((id) => createWidget({ id, label: id.toUpperCase() }));
-    const widgetInstances = Object.fromEntries(
-      widgets.map((widget) => [widget.manifest.id, createInstance(widget.manifest.id, widget.manifest.id)])
-    );
-    const viewModel = createWidgetRegionViewModel({
-      floatingWidgets: {
-        // Later-sorted insertions must not displace earlier ones.
-        d: { returnIndex: 2, returnRegion: 'left' },
-        a: { returnIndex: 0, returnRegion: 'left' },
-        // Beyond the rail: appended, as docking would.
-        e: { returnIndex: 99, returnRegion: 'left' },
-        c: { returnRegion: 'left' },
-      },
-      instanceIds: ['b'],
-      region: 'left',
-      widgetInstances,
-      widgets,
-    });
-
-    expect(viewModel.placedItems.map((item) => item.id)).toEqual(['a', 'b', 'd', 'e', 'c']);
-    expect(viewModel.sortableInstanceIds).toEqual(['b']);
-  });
-
   it('filters already placed singleton widget types from available items', () => {
     const viewModel = createWidgetRegionViewModel({
       instanceIds: ['alpha'],

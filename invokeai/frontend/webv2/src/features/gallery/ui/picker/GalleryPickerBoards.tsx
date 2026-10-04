@@ -38,7 +38,7 @@ const GalleryPickerBoardRow = memo(function GalleryPickerBoardRow({
       label={getGalleryBoardLabel(board, t)}
       onSelect={handleSelect}
     >
-      <Badge flexShrink={0} fontVariantNumeric="tabular-nums" size="xs" variant="subtle">
+      <Badge flexShrink={0} fontVariantNumeric="tabular-nums" variant="subtle">
         {getGalleryCountForView(board, galleryView)}
       </Badge>
     </GalleryBoardRowShell>
@@ -97,7 +97,7 @@ export const GalleryPickerBoards = ({
     <Scrollable flex="1" label={label} minH="0" viewportProps={viewportProps}>
       <Box px="1" py="1" onKeyDown={handleKeyDown}>
         {groups.length === 0 ? (
-          <Text color="fg.muted" fontSize="2xs" px="2" py="3" textAlign="center">
+          <Text color="fg.muted" fontSize="xs" px="2" py="3" textAlign="center">
             {emptyMessage}
           </Text>
         ) : (

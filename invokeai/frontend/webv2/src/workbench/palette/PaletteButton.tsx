@@ -22,7 +22,7 @@ export const PaletteButton = () => {
 
   return (
     <Tooltip content={tooltip}>
-      <IconButton aria-label={t('commandPalette.buttonLabel')} size="sm" variant="ghost" onClick={openCommandPalette}>
+      <IconButton aria-label={t('commandPalette.buttonLabel')} size="lg" variant="ghost" onClick={openCommandPalette}>
         <Icon as={SearchIcon} />
       </IconButton>
     </Tooltip>

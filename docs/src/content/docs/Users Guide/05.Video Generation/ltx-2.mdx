@@ -1,6 +1,6 @@
 ---
 title: LTX-2
-lastUpdated: 2026-09-29
+lastUpdated: 2026-10-03
 alsoListedIn:
   - users-guide/models/local-models
 sidebar:
@@ -113,7 +113,7 @@ Both run on the single-pass canvases only. Guidance applies as usual on Dev; in 
 
 #### License
 
-LTX-2.5 is released under the **LTX-2.x Community License**: free for commercial and production use by entities with less than $10M in annual revenue, above which a paid commercial agreement is needed. The optional Duration Head comes from Lightricks' gated repository (see [Installing LTX-2](#installing-ltx-2)). The Gemma-4 E2B prompt enhancer is Apache 2.0.
+LTX-2.5 is released under the **LTX-2.x Community License**: free for commercial and production use by entities with less than $10M in annual revenue, above which a paid commercial agreement is needed. The optional Duration Head and NVFP4 Distilled transformer come from Lightricks' gated repositories (see [Installing LTX-2](#installing-ltx-2)). The Gemma-4 E2B prompt enhancer is Apache 2.0.
 
 This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
 
@@ -129,6 +129,7 @@ Available separately in the starter models list:
 
 * **LTX-2.5 Distilled LoRA** (~8.9 GB) — the [fast path](#the-distilled-lora-fast-path-on-dev) for the Dev transformer. Not needed if you use the Distilled transformer.
 * **LTX-2.5 Dev Transformer (bf16)** (~38 GB) and **LTX-2.5 Text Encoder (Gemma-4 12B, bf16)** (~24 GB) — unquantized builds, for a 48 GB+ card or partial loading.
+* **LTX-2.5 Distilled Transformer (NVFP4)** (~18.7 GB) — Lightricks' official 4-bit build of the Distilled transformer, an alternative to the int8 one with the same eight-step schedule. It is barely smaller on disk than the int8 build (the last six transformer blocks and some projections are kept in bf16), so on a 16 GB card it still runs partially loaded — but a larger share of it fits on the card, which makes it the faster choice there: on an RTX 5060 Ti (16 GB) at 512×512×161 frames it ran at 6.5 s/step against 9.8 s/step for the int8 build. The 4-bit weights are unpacked layer by layer, so any GPU can run it; with enough VRAM to hold either build entirely, expect no speed advantage. License-gated: needs a Hugging Face token whose account has accepted the LTX-2.5 license. There is no NVFP4 build of the Dev transformer.
 * **LTX-2.5 Duration Head** (3.6 MB) — enables [Auto duration](#auto-duration). License-gated: needs a Hugging Face token whose account has accepted the LTX-2.5 license.
 * **LTX-2.5 Prompt Enhancer (Gemma-4 E2B) (~10 GB) - Enables prompt enhancement.
 

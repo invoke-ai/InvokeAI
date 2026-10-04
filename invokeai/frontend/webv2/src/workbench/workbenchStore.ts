@@ -23,6 +23,7 @@ import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
 import { createBlankWorkflowDocument, findProjectWorkflow } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
 import { areWidgetsLoaded } from './widgetRegistry';
+import { getProjectWidgetValues } from './widgetState';
 import {
   createInitialWorkbenchState,
   __workbenchReducerInternal,
@@ -426,10 +427,15 @@ const createCommands = (
     widgets: {
       dockFloating: command('dockFloatingWidget', (instanceId: string) => ({ instanceId })),
       closeFloating: command('closeFloatingWidget', (instanceId: string) => ({ instanceId })),
-      float: command('floatWidget', (instanceId: string, region?: ActionPayload<'floatWidget'>['region']) =>
-        region ? { instanceId, region } : { instanceId }
+      float: command(
+        'floatWidget',
+        (
+          instanceId: string,
+          region?: ActionPayload<'floatWidget'>['region'],
+          viewport?: ActionPayload<'floatWidget'>['viewport']
+        ) => ({ instanceId, ...(region ? { region } : {}), ...(viewport ? { viewport } : {}) })
       ),
-      focusFloating: command('focusFloatingWidget', (instanceId: string) => ({ instanceId })),
+      raiseFloating: command('raiseFloatingWidget', (instanceId: string) => ({ instanceId })),
       move: command('moveWidgetInstance'),
       open: command('openRegionWidget'),
       patchInstanceValues: command(
@@ -440,21 +446,30 @@ const createCommands = (
           values,
         })
       ),
-      patchValues: command(
-        'patchWidgetValues',
-        (
-          widgetId: ActionPayload<'patchWidgetValues'>['widgetId'],
-          values: Record<string, unknown>,
-          projectId?: string,
-          origin?: ActionPayload<'patchWidgetValues'>['origin']
-        ) => ({
+      patchValues: (
+        widgetId: ActionPayload<'patchWidgetValues'>['widgetId'],
+        values: Record<string, unknown> | ((current: Record<string, unknown>) => Record<string, unknown>),
+        projectId?: string,
+        origin?: ActionPayload<'patchWidgetValues'>['origin']
+      ): void => {
+        const state = getState();
+        const project = state.projects.find((candidate) => candidate.id === (projectId ?? state.activeProjectId));
+
+        if (!project) {
+          return;
+        }
+
+        // Resolve before dispatch so same-turn draft commits compose, without storing callbacks in reducer actions.
+        dispatch({
           origin,
-          projectId,
-          values,
+          projectId: project.id,
+          type: 'patchWidgetValues',
+          values: typeof values === 'function' ? values(getProjectWidgetValues(project, widgetId)) : values,
           widgetId,
-        })
-      ),
+        });
+      },
       reorder: command('reorderWidgetInstances'),
+      revealFloating: command('revealFloatingWidget', (instanceId: string) => ({ instanceId })),
       setAlignment: command('setWidgetInstanceAlignment'),
       select: command('selectRegionWidget'),
       setFloatingGeometry: command(

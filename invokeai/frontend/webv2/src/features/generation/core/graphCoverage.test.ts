@@ -11,6 +11,7 @@ import type { ModelIdentifierConfig, VaeModelConfig } from './types';
 import {
   getComponentSectionPolicy,
   getGenerationValidationReasons,
+  isLoraSupported,
   SUPPORTED_GENERATE_BASES,
 } from './baseGenerationPolicies';
 import { compileGenerateGraph, GRAPH_BUILDERS } from './graph';
@@ -116,6 +117,39 @@ describe('generate graph coverage', () => {
         'z-image/standalone-components:flux/undefined',
       ])
     );
+  });
+
+  // An image's metadata is what recall restores, so it must name exactly the LoRAs that reached inference.
+  it.each(generateGraphCases)('$label loads concepts as policy says, and records only those', ({ base, shape }) => {
+    const { model, settings } = satisfiedSettingsFor(base, shape);
+    const lora = (key: string) => ({ base, key, name: key, type: 'lora' as const });
+    const { backendGraph } = compileGenerateGraph(
+      {
+        ...settings,
+        loras: [
+          { isEnabled: true, model: lora('first'), weight: 0.4 },
+          { isEnabled: false, model: lora('disabled'), weight: 1 },
+          { isEnabled: true, model: lora('second'), weight: -0.8 },
+        ],
+      },
+      model,
+      'gallery',
+      { useCpuNoise: true }
+    );
+    const nodes = Object.values(backendGraph.nodes);
+    const loaded = nodes
+      .filter((node) => node.type === 'lora_selector')
+      .map((node) => [(node.lora as { key: string }).key, node.weight]);
+    const recorded = (nodes.find((node) => node.type === 'core_metadata')?.loras ?? []) as {
+      model: { key: string };
+      weight: number;
+    }[];
+
+    // The concept picker trusts this policy, so a builder that gains or loses a LoRA loader must update it.
+    expect(loaded.length > 0, `${base}/${shape.label} LoRA support disagrees with isLoraSupported`).toBe(
+      isLoraSupported(model)
+    );
+    expect(recorded.map((entry) => [entry.model.key, entry.weight])).toEqual(loaded);
   });
 
   it('emits the node types and fields the backend has to provide', async () => {

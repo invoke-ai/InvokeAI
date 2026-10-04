@@ -158,7 +158,7 @@ const GalleryStarredSectionHeader = ({
         <HStack gap="1" minW="0">
           <Text
             as="span"
-            fontSize="2xs"
+            fontSize="xs"
             fontWeight="600"
             letterSpacing="wide"
             lineHeight="1"
@@ -167,7 +167,7 @@ const GalleryStarredSectionHeader = ({
           >
             {t('widgets.gallery.starredItems')}
           </Text>
-          <Text as="span" color="currentColor" fontSize="2xs" fontVariantNumeric="tabular-nums" lineHeight="1">
+          <Text as="span" color="currentColor" fontSize="xs" fontVariantNumeric="tabular-nums" lineHeight="1">
             {total}
           </Text>
         </HStack>
@@ -177,7 +177,7 @@ const GalleryStarredSectionHeader = ({
           aria-label={t('widgets.gallery.showAllStarredItems')}
           color="fg.muted"
           flexShrink={0}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={onShowAll}
         >
@@ -1103,15 +1103,15 @@ export const GalleryImageGrid = () => {
       >
         {gallery.anchoredWindowPage > 0 && !usesSparseListing ? (
           <Flex align="center" bg="bg.panel" gap="2" justify="space-between" px="2" py="1">
-            <Text color="fg.muted" fontSize="2xs" truncate>
+            <Text color="fg.muted" fontSize="xs" truncate>
               {t('widgets.gallery.windowAnchored', { index: anchoredWindowFirstItem })}
             </Text>
-            <Button flexShrink={0} size="2xs" variant="ghost" onClick={handleReturnToBoardTop}>
+            <Button flexShrink={0} size="sm" variant="ghost" onClick={handleReturnToBoardTop}>
               {t('widgets.gallery.backToBoardTop')}
             </Button>
           </Flex>
         ) : null}
-        <ScrollArea.Root h="full" minH="0" size="xs" variant="hover" w="full">
+        <ScrollArea.Root h="full" minH="0" variant="hover" w="full">
           <ScrollArea.Viewport ref={viewportRef} data-dnd-auto-scroll="false" h="full" outline="none" w="full">
             <ScrollArea.Content display="flex" flexDirection="column" minH="full">
               {pinnedHeight > 0 ? (
@@ -1150,7 +1150,7 @@ export const GalleryImageGrid = () => {
                 initialSparsePageState?.error ? (
                   <Flex align="center" color="fg.muted" flex="1" justify="center" minH="8rem">
                     {initialSparsePageState?.error ? null : (
-                      <Text fontSize="xs">
+                      <Text>
                         {gallery.isLoading
                           ? t('widgets.gallery.loadingBackendGallery')
                           : gallery.starredOnly && gallery.semanticImageQuery === null
@@ -1167,7 +1167,6 @@ export const GalleryImageGrid = () => {
                       alignItems="center"
                       display="flex"
                       flex="1"
-                      fontSize="xs"
                       isOver={isDropActive}
                       justifyContent="center"
                       role="button"
@@ -1303,12 +1302,12 @@ export const GalleryImageGrid = () => {
                     gallery.isLoading &&
                     gallery.items.length > 0 && (
                       <Flex align="center" justify="center" py="2">
-                        <Spinner color="fg.subtle" size="xs" />
+                        <Spinner color="fg.subtle" />
                       </Flex>
                     )}
                   {!usesSparseListing && paginationMode === 'infinite' && !gallery.isLoading && isWindowTruncated && (
                     <Flex align="center" justify="center" py="3">
-                      <Text color="fg.subtle" fontSize="xs" textAlign="center">
+                      <Text color="fg.subtle" fontSize="md" textAlign="center">
                         {gallery.anchoredWindowPage > 0
                           ? t('widgets.gallery.windowLimitFrom', {
                               count: gallery.items.length,
@@ -1341,7 +1340,7 @@ export const GalleryImageGrid = () => {
             zIndex="1"
           >
             <UploadIcon size="20" />
-            <Text fontSize="xs" fontWeight="600">
+            <Text fontSize="md" fontWeight="600">
               {t('widgets.gallery.dropMediaToUploadToBoard', { name: selectedBoardName })}
             </Text>
           </DropZone>

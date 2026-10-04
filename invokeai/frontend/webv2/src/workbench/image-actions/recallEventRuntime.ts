@@ -163,11 +163,7 @@ export const bringRecallWidgetToFront = ({
   const floating = Object.keys(project.floatingWidgets ?? {}).find(isTarget);
 
   if (floating) {
-    // A shaded window is rolled up to its title bar; raising it alone would still hide the change.
-    if (project.floatingWidgets?.[floating]?.mode === 'shaded') {
-      commands.widgets.setFloatingMode(floating, 'windowed');
-    }
-    commands.widgets.focusFloating(floating);
+    commands.widgets.revealFloating(floating);
     return;
   }
 

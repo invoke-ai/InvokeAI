@@ -37,12 +37,12 @@ export const ResultsListHeader = ({
   return (
     <Stack gap="1.5">
       <HStack gap="2" justify="space-between" wrap="wrap">
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {summary}
         </Text>
         <HStack gap="3">
           {extra}
-          <IconButton aria-label={t('models.dismissResults')} size="2xs" variant="ghost" onClick={onClear}>
+          <IconButton aria-label={t('models.dismissResults')} size="sm" variant="ghost" onClick={onClear}>
             <Icon as={XIcon} boxSize="3" />
           </IconButton>
         </HStack>
@@ -52,12 +52,11 @@ export const ResultsListHeader = ({
           <Input
             aria-label={resolvedSearchPlaceholder}
             placeholder={resolvedSearchPlaceholder}
-            size="xs"
             value={searchValue}
             onChange={handleSearchChange}
           />
         </InputGroup>
-        <Button disabled={installAllDisabled} flexShrink={0} size="xs" variant="outline" onClick={onInstallAll}>
+        <Button disabled={installAllDisabled} flexShrink={0} variant="outline" onClick={onInstallAll}>
           <Icon as={DownloadIcon} boxSize="3" />
           {installAllLabel}
         </Button>

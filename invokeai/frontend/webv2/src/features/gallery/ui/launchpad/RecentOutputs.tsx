@@ -45,9 +45,7 @@ export const RecentOutputs = () => {
 
   return (
     <Flex direction="column" gap="3">
-      <Text fontSize="xs" fontWeight="700">
-        {t('launchpad.home.recentOutputs')}
-      </Text>
+      <Text fontWeight="700">{t('launchpad.home.recentOutputs')}</Text>
       <SimpleGrid columns={GRID_COLUMNS} gap="2">
         {images === null
           ? Array.from({ length: OUTPUT_COUNT }, (_value, index) => (

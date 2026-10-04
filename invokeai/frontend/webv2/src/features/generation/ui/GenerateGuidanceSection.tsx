@@ -4,10 +4,9 @@ import type { GenerateSettingsUpdate } from '@features/generation/ui/generateDeb
 
 import { Badge, Separator, Stack } from '@chakra-ui/react';
 import { isReferenceImageSupported } from '@features/generation/core/baseGenerationPolicies';
-import { isLoraCompatibleWithModel } from '@features/generation/core/settings';
 import { useTranslation } from 'react-i18next';
 
-import { GenerateConceptsContent } from './GenerateConceptsSection';
+import { GenerateConceptsContent, isCompatibleLora } from './GenerateConceptsSection';
 import { GenerateReferenceImagesContent } from './reference-images/GenerateReferenceImagesSection';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 
@@ -40,30 +39,30 @@ export const GenerateGuidanceSection = ({
   const activeReferenceImages = referenceImagesSupported
     ? settings.referenceImages.filter((image) => image.isEnabled).length
     : 0;
-  const activeConcepts = selectedModel
-    ? settings.loras.filter((lora) => lora.isEnabled && isLoraCompatibleWithModel(lora.model, selectedModel)).length
-    : 0;
+  const activeConcepts = settings.loras.filter(
+    (lora) => lora.isEnabled && isCompatibleLora(lora, selectedModel)
+  ).length;
   const hasIncompatible =
     (!referenceImagesSupported && referenceImageCount > 0) ||
-    settings.loras.some((lora) => selectedModel && !isLoraCompatibleWithModel(lora.model, selectedModel));
+    Boolean(selectedModel && settings.loras.some((lora) => !isCompatibleLora(lora, selectedModel)));
   const activeCount = activeReferenceImages + activeConcepts;
   const totalCount = referenceImageCount + settings.loras.length;
 
   const badges = (
     <>
       {hasIncompatible ? (
-        <Badge colorPalette="orange" size="xs" variant="surface">
+        <Badge colorPalette="orange" variant="surface">
           {t('widgets.generate.incompatible')}
         </Badge>
       ) : null}
       {activeCount > 0 ? (
-        <Badge size="xs" variant="surface">
-          {t('widgets.generate.activeCount', { count: activeCount })}
+        <Badge variant="surface">
+          {activeCount === totalCount
+            ? t('widgets.generate.activeCount', { count: activeCount })
+            : t('widgets.generate.activeOfTotal', { active: activeCount, total: totalCount })}
         </Badge>
       ) : totalCount > 0 ? (
-        <Badge size="xs" variant="surface">
-          {t('widgets.generate.offCount', { count: totalCount })}
-        </Badge>
+        <Badge variant="surface">{t('widgets.generate.offCount', { count: totalCount })}</Badge>
       ) : null}
     </>
   );
@@ -85,7 +84,6 @@ export const GenerateGuidanceSection = ({
           selectedModel={selectedModel}
           settings={settings}
           onCommit={onConceptCommit}
-          onCommitImmediate={onCommitImmediate}
         />
       </Stack>
     </GenerateCollapsibleSection>

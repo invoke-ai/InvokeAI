@@ -58,14 +58,15 @@ const createDispatch = () => {
     closeFloating: (instanceId) => dispatch({ instanceId, type: 'closeFloatingWidget' }),
     float: (instanceId, region) =>
       dispatch(region ? { instanceId, region, type: 'floatWidget' } : { instanceId, type: 'floatWidget' }),
-    focusFloating: (instanceId) => dispatch({ instanceId, type: 'focusFloatingWidget' }),
+    raiseFloating: (instanceId) => dispatch({ instanceId, type: 'raiseFloatingWidget' }),
     move: (options) => dispatch({ ...options, type: 'moveWidgetInstance' }),
     setAlignment: (options) => dispatch({ ...options, type: 'setWidgetInstanceAlignment' }),
     open: (options) => dispatch({ ...options, type: 'openRegionWidget' }),
     patchInstanceValues: (instanceId, values, projectId) =>
       dispatch({ instanceId, projectId, type: 'patchWidgetInstanceValues', values }),
-    patchValues: (widgetId, values, projectId) => dispatch({ projectId, type: 'patchWidgetValues', values, widgetId }),
+    patchValues: vi.fn(),
     reorder: (options) => dispatch({ ...options, type: 'reorderWidgetInstances' }),
+    revealFloating: (instanceId) => dispatch({ instanceId, type: 'revealFloatingWidget' }),
     select: (options) => dispatch({ ...options, type: 'selectRegionWidget' }),
     setFloatingGeometry: (instanceId, geometry) =>
       dispatch({ instanceId, type: 'setFloatingWidgetGeometry', ...geometry }),

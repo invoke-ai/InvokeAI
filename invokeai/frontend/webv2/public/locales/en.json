@@ -181,9 +181,9 @@
     "clearSearch": "Clear search",
     "dontShowMeThese": "Don't show me these",
     "learnMore": "Learn more",
-    "noSchedulersFound": "No schedulers found",
+    "noOptionsFound": "No matches",
     "openSelector": "Open selector",
-    "searchSchedulers": "Search schedulers…",
+    "searchOptions": "Search…",
     "close": "Close",
     "colorPicker": {
       "format": "Color format",
@@ -1381,7 +1381,9 @@
     "scanFolderTooltip": "Scan this folder for model files",
     "scanSummary_one": "{{count}} file in {{path}} · {{notInstalled}} not installed",
     "scanSummary_other": "{{count}} files in {{path}} · {{notInstalled}} not installed",
+    "scopeAllAdded": "All compatible {{scope}} added.",
     "scopeAvailable": "Available {{scope}}",
+    "scopeConcepts": "concepts",
     "scopeModels": "models",
     "scopeNoCompatibleInstalled": "No compatible {{scope}} installed.",
     "scopeNoMatchBases": "No {{scope}} match the selected bases.",
@@ -1895,7 +1897,15 @@
         "label": "Connection style",
         "description": "How connections between nodes are drawn."
       },
+      "promptFontSize": {
+        "label": "Prompt text size",
+        "description": "Size of the text in prompt fields."
+      },
       "options": {
+        "small": "Small",
+        "default": "Default",
+        "large": "Large",
+        "larger": "Larger",
         "curved": "Curved",
         "square": "Square",
         "activeProject": "Active project",
@@ -2046,14 +2056,24 @@
       "title": "{{label}} failed"
     },
     "floating": {
-      "dock": "Dock to panel",
+      "centerFloating": "{{label}} is in a floating window",
+      "destinations": {
+        "bottom": "bottom panel",
+        "center": "center",
+        "left": "left panel",
+        "right": "right panel"
+      },
+      "dockTo": "Dock to {{destination}}",
       "floatWindow": "Float Window",
       "maximize": "Maximize",
       "move": "Move {{label}} window",
-      "railSlot": "{{label}} (floating — click to dock)",
+      "railMarker": "{{label}}, floating window",
+      "railMarkerHint": "{{label}} is floating — click to show the window",
       "resize": "Resize window",
+      "resizeValue": "{{width}} by {{height}} pixels",
       "restore": "Restore",
       "shade": "Collapse",
+      "showWindow": "Show window",
       "unshade": "Expand"
     },
     "loadingLabel": "Loading {{label}}",
@@ -2112,11 +2132,6 @@
           "clickPoint": "Remove that point.",
           "drag": "Draw or adjust the search box."
         }
-      },
-      "title": {
-        "group": "Group: {{name}}",
-        "layer": "Layer: {{name}}",
-        "operation": "Operation: {{name}}"
       },
       "target": {
         "defaults": "Defaults",
@@ -2184,6 +2199,7 @@
     "generate": {
       "activeCount_one": "{{count}} active",
       "activeCount_other": "{{count}} active",
+      "activeOfTotal": "{{active}}/{{total}} active",
       "activeSteps": "Active steps",
       "addConcept": "Add concept",
       "addConceptsHelp": "Add LoRAs/concepts here to blend them into this generation.",
@@ -2224,8 +2240,15 @@
         "coherenceMinDenoise": "Coherence min denoise",
         "maskBlur": "Mask blur"
       },
+      "conceptMenu": {
+        "disable": "Disable",
+        "enable": "Enable",
+        "openInModelManager": "Open in Model Manager",
+        "remove": "Remove"
+      },
       "conceptWeight": "{{name}} weight",
       "concepts": "Concepts",
+      "conceptsUnsupported": "Concepts are not supported by the selected model.",
       "copyValue": "Copy value",
       "couldNotExpandPrompt": "Could not expand the prompt.",
       "couldNotGeneratePromptFromImage": "Could not generate a prompt from the selected image.",
@@ -2576,7 +2599,7 @@
       "pidNativeHelp": "The requested size is the 4x target; generation runs at a quarter of it."
     },
     "upscale": {
-      "addLora": "LoRAs",
+      "concepts": "Concepts",
       "advanced": "Advanced",
       "bundledVae": "Bundled VAE",
       "cfgScale": "CFG scale",
@@ -2591,8 +2614,7 @@
       "inputSize": "Input",
       "largeOutput": "Large output",
       "largeOutputDescription": "This output may take substantially longer and require more VRAM. Check tile settings before queueing.",
-      "lorasRemoved": "Removed {{count}} incompatible LoRA model(s).",
-      "loraWeight": "{{name}} weight",
+      "lorasRemoved": "Removed {{count}} incompatible concept(s).",
       "mainModel": "Main model",
       "mainModelRequired": "Select a supported main model.",
       "negativePrompt": "Negative prompt",
@@ -2619,12 +2641,11 @@
       "prompts": "Prompts",
       "ready": "Ready",
       "readyDescription": "The upscale graph is ready to queue.",
-      "removeLora": "Remove {{name}}",
       "scale": "Scale",
       "scaleHelp": "Output dimensions are the source dimensions multiplied by this value.",
       "scheduler": "Scheduler",
       "seed": "Seed",
-      "selectLora": "Select a compatible LoRA…",
+      "searchCompatibleConcepts": "Search compatible concepts…",
       "selectMainModel": "Select a supported model…",
       "selectSpandrelModel": "Select a Spandrel model…",
       "selectTileControlNet": "Select a Tile or Union ControlNet…",
@@ -3909,6 +3930,20 @@
           "success_one": "Moved {{count}} item to {{board}}.",
           "success_other": "Moved {{count}} items to {{board}}."
         },
+        "recall": {
+          "conceptsNotRestored": "Concepts not restored: {{concepts}}.",
+          "nothingRecalled": "No recallable image data",
+          "partiallyRecalled": "Some image data was not recalled",
+          "unnamedConcept": "unnamed concept",
+          "skippedConcept": {
+            "ambiguous": "{{name}} (matches more than one installed model)",
+            "duplicate": "{{name}} (listed more than once)",
+            "incompatible": "{{name}} (incompatible with the selected model)",
+            "invalid": "{{name}} (unreadable metadata)",
+            "modelUnavailable": "{{name}} (the image's model is not available)",
+            "unresolved": "{{name}} (not installed)"
+          }
+        },
         "star": {
           "failure_one": "Could not star {{count}} item.",
           "failure_other": "Could not star {{count}} items.",
@@ -4155,9 +4190,7 @@
       },
       "negativeCfgHelp": "Used only when CFG is greater than 1.",
       "concepts": "Concepts",
-      "loraWeight": "Weight for {{name}}",
       "noLoras": "No concepts added. Compatible LoRAs adjust style and motion.",
-      "removeLora": "Remove {{name}}",
       "selectComponent": "Select a component model…",
       "hybridStartBlock": "Ref2VA AdaLN from block",
       "hybridStartBlockHelp": "Blocks from here through 49 keep this Ref2VA model’s AdaLN projections; earlier blocks use the FL2VA base. Lower values follow references more closely at more of Ref2VA’s quality cost; 25 is the recommended balance.",

@@ -65,7 +65,7 @@ export const LayerFilterOperationButton = ({
       disabled={disabledReason === null}
     >
       <Box w="full">
-        <Button disabled={disabledReason !== null} size="xs" variant="outline" w="full" onClick={start}>
+        <Button disabled={disabledReason !== null} variant="outline" w="full" onClick={start}>
           {t('widgets.layers.control.filter')}
         </Button>
       </Box>

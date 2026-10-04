@@ -402,7 +402,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
             aria-label={t('widgets.layers.control.kind')}
             collection={kindCollection}
             positioning={SELECT_POSITIONING}
-            size="xs"
             value={kindValue}
             valueText={t(`widgets.layers.control.kinds.${adapter.kind}`)}
             onValueChange={handleKindChange}
@@ -414,7 +413,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           aria-label={t('widgets.layers.control.model')}
           collection={modelCollection}
           positioning={SELECT_POSITIONING}
-          size="xs"
           value={modelValue}
           valueText={selectedModelName ?? t('widgets.layers.control.selectModel')}
           valueTextProps={adapter.model ? undefined : MISSING_MODEL_VALUE_TEXT_PROPS}
@@ -429,7 +427,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
             formatValue={formatWeight}
             max={CONTROL_WEIGHT_BOUNDS.sliderMax}
             min={CONTROL_WEIGHT_BOUNDS.sliderMin}
-            size="sm"
             step={CONTROL_WEIGHT_BOUNDS.step}
             value={weightValue}
             withThumbTooltip
@@ -439,7 +436,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           <NumberInput.Root
             max={CONTROL_WEIGHT_BOUNDS.inputMax}
             min={weightInputMin}
-            size="xs"
             step={CONTROL_WEIGHT_BOUNDS.step}
             value={weightInputValue}
             w="20"
@@ -456,7 +452,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           formatValue={formatUnitPercent}
           max={1}
           min={0}
-          size="sm"
           step={0.01}
           value={rangeValue}
           withThumbTooltip
@@ -470,7 +465,6 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
             aria-label={t('widgets.layers.control.mode')}
             collection={controlModeCollection}
             positioning={SELECT_POSITIONING}
-            size="xs"
             value={controlModeValue}
             valueText={t(`widgets.layers.control.modes.${adapter.controlMode ?? 'balanced'}`)}
             onValueChange={handleControlModeChange}
@@ -480,7 +474,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
       <Switch.Root
         checked={layer.withTransparencyEffect}
         colorPalette="accent"
-        size="xs"
+        size="sm"
         onCheckedChange={handleTransparencyToggle}
       >
         <Switch.HiddenInput />
@@ -488,7 +482,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           <Switch.Thumb />
         </Switch.Control>
         <Switch.Label>
-          <Text fontSize="xs">{t('widgets.layers.control.transparencyEffect')}</Text>
+          <Text fontSize="md">{t('widgets.layers.control.transparencyEffect')}</Text>
         </Switch.Label>
       </Switch.Root>
       <LayerFilterOperationButton
@@ -498,20 +492,19 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         operations={engine ? getCanvasOperations(engine) : null}
       />
       {visibleValidationReason ? (
-        <Text color="fg.warning" fontSize="2xs" role="alert">
+        <Text color="fg.warning" fontSize="xs" role="alert">
           {t(`widgets.layers.control.validation.${visibleValidationReason}`)}
         </Text>
       ) : null}
       {showCapabilitiesFailure ? (
         <HStack ref={handOverFocusOnLoad} aria-busy={isRetryingCapabilities} gap="2" role="alert">
-          <Text color="fg.warning" flex="1" fontSize="2xs">
+          <Text color="fg.warning" flex="1" fontSize="xs">
             {t('widgets.layers.control.capabilitiesLoadFailed')}
           </Text>
           {/* `aria-disabled` rather than `disabled`: a disabled button drops the focus it holds. */}
           <Button
             aria-busy={isRetryingCapabilities}
             aria-disabled={isRetryingCapabilities}
-            size="xs"
             variant="outline"
             onClick={retryCapabilities}
           >
@@ -520,7 +513,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         </HStack>
       ) : null}
       {capabilitiesUnavailable && !showCapabilitiesFailure ? (
-        <Text color="fg.muted" fontSize="2xs" role="status">
+        <Text color="fg.muted" fontSize="xs" role="status">
           {t('widgets.layers.control.capabilitiesLoading')}
         </Text>
       ) : null}

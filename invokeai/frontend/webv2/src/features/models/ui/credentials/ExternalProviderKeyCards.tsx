@@ -56,7 +56,7 @@ export const ExternalProviderKeyCards = ({ onError }: { onError: (title: string,
   // remount shows nothing rather than the previous attempt's stale message.
   if (status === 'error') {
     return (
-      <Text color="fg.error" fontSize="2xs">
+      <Text color="fg.error" fontSize="xs">
         {t('models.externalProvidersUnavailable', { error: loadError ?? t('models.failedToLoadExternalProviders') })}
       </Text>
     );
@@ -65,7 +65,7 @@ export const ExternalProviderKeyCards = ({ onError }: { onError: (title: string,
   // Show an explicit no-provider state after loading; suppress loading flicker.
   if (status === 'loaded' && (configs ?? []).length === 0) {
     return (
-      <Text color="fg.subtle" fontSize="2xs">
+      <Text color="fg.subtle" fontSize="xs">
         {t('models.noExternalProviders')}
       </Text>
     );
@@ -214,7 +214,6 @@ const ExternalProviderKeyCard = ({
             aria-label={t('models.apiKeyFor', { title })}
             disabled={isBusy}
             placeholder={config.api_key_configured ? t('models.apiKeyConfigured') : placeholder}
-            size="xs"
             type="password"
             value={apiKeyDraft}
             onChange={(event) => setApiKeyDraft(event.currentTarget.value)}
@@ -229,7 +228,6 @@ const ExternalProviderKeyCard = ({
         <Switch.Root
           checked={overrideBaseUrl}
           disabled={isBusy}
-          size="sm"
           onCheckedChange={(event) => {
             const checked = event.checked === true;
 
@@ -244,7 +242,7 @@ const ExternalProviderKeyCard = ({
           <Switch.Control _checked={{ bg: 'accent.solid' }}>
             <Switch.Thumb />
           </Switch.Control>
-          <Switch.Label color="fg.muted" fontSize="2xs">
+          <Switch.Label color="fg.muted" fontSize="xs">
             {t('models.overrideBaseUrl')}
           </Switch.Label>
         </Switch.Root>
@@ -253,7 +251,6 @@ const ExternalProviderKeyCard = ({
             aria-label={t('models.baseUrlFor', { title })}
             disabled={isBusy}
             placeholder="https://api.example.com"
-            size="xs"
             value={baseUrlDraft}
             onChange={(event) => setBaseUrlDraft(event.currentTarget.value)}
             onKeyDown={(event) => {
@@ -270,7 +267,6 @@ const ExternalProviderKeyCard = ({
         <Button
           disabled={(!hasApiKeyDraft && !hasBaseUrlChange) || isBusy}
           loading={isBusy}
-          size="xs"
           variant="solid"
           onClick={() => void handleSave()}
         >
@@ -279,7 +275,7 @@ const ExternalProviderKeyCard = ({
         {canClear ? (
           <Button
             disabled={isBusy}
-            size="sm"
+            size="lg"
             variant="ghost"
             onClick={() => void runProviderAction(() => clearExternalProviderConfig(config.provider_id))}
           >

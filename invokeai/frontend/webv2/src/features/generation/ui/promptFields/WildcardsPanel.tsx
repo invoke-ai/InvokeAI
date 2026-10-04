@@ -156,7 +156,6 @@ export const WildcardsPanel = ({
           <Input
             aria-invalid={nameError !== null && nameError !== 'empty' ? true : undefined}
             placeholder={t('widgets.generate.dynamicPrompts.wildcardNamePlaceholder')}
-            size="xs"
             value={draft.name}
             onChange={(event: ChangeEvent<HTMLInputElement>) => setDraft({ ...draft, name: event.currentTarget.value })}
           />
@@ -174,23 +173,22 @@ export const WildcardsPanel = ({
           resizeHandleAriaLabel={t('widgets.generate.dynamicPrompts.resizeWildcardValues')}
           showLineNumbers
           showSyntaxHighlighting={showSyntaxHighlighting}
-          size="xs"
           value={draft.valuesText}
           onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
             setDraft({ ...draft, valuesText: event.currentTarget.value })
           }
         />
         {draftError ? (
-          <Text color="fg.error" fontSize="2xs" wordBreak="break-word">
+          <Text color="fg.error" fontSize="xs" wordBreak="break-word">
             {draftError}
           </Text>
         ) : null}
         <HStack justify="end">
-          <Button size="xs" variant="ghost" onClick={cancel}>
+          <Button variant="ghost" onClick={cancel}>
             <XIcon />
             {t('common.cancel')}
           </Button>
-          <Button disabled={nameError !== null || valuesError !== null} size="xs" onClick={() => void save()}>
+          <Button disabled={nameError !== null || valuesError !== null} onClick={() => void save()}>
             <CheckIcon />
             {t('common.save')}
           </Button>
@@ -202,7 +200,7 @@ export const WildcardsPanel = ({
   return (
     <Stack gap="2">
       <PromptPanelHeader label={t('widgets.generate.dynamicPrompts.wildcards')}>
-        <Button h={PANEL_HEADER_CONTROL_HEIGHT} size="2xs" variant="ghost" onClick={startCreate}>
+        <Button h={PANEL_HEADER_CONTROL_HEIGHT} size="sm" variant="ghost" onClick={startCreate}>
           <PlusIcon />
           {t('widgets.generate.dynamicPrompts.newWildcard')}
         </Button>
@@ -213,7 +211,6 @@ export const WildcardsPanel = ({
           <Input
             aria-label={t('widgets.generate.dynamicPrompts.searchWildcards')}
             placeholder={t('widgets.generate.dynamicPrompts.searchWildcards')}
-            size="xs"
             value={searchTerm}
             onChange={handleSearchChange}
           />
@@ -223,7 +220,7 @@ export const WildcardsPanel = ({
 
       <Scrollable h="14rem" label={t('widgets.generate.dynamicPrompts.wildcards')}>
         {groups.length === 0 ? (
-          <Text color="fg.subtle" fontSize="2xs" px="2" py="1.5">
+          <Text color="fg.subtle" fontSize="xs" px="2" py="1.5">
             {catalog.wildcards.length === 0
               ? t('widgets.generate.dynamicPrompts.noWildcardsYet')
               : t('widgets.generate.dynamicPrompts.noMatchingWildcards')}
@@ -233,7 +230,7 @@ export const WildcardsPanel = ({
             {groups.map((group) => (
               <Stack gap="0" key={group.label ?? ''}>
                 {group.label === null ? null : (
-                  <Text color="fg.subtle" fontSize="2xs" fontWeight="700" px="2" textTransform="uppercase">
+                  <Text color="fg.subtle" fontSize="xs" fontWeight="700" px="2" textTransform="uppercase">
                     {group.label}
                   </Text>
                 )}
@@ -296,7 +293,7 @@ const WildcardRow = ({
         minW="0"
         px="2"
         py="1.5"
-        textStyle="xs"
+        textStyle="md"
         title={t('widgets.generate.dynamicPrompts.insertWildcard')}
         whiteSpace="nowrap"
       >
@@ -309,7 +306,7 @@ const WildcardRow = ({
             <Text as="span" color="fg" fontFamily="mono" fontSize="0.72rem">
               __{wildcard.name}__
             </Text>
-            <Text as="span" color="fg.subtle" fontSize="2xs" truncate>
+            <Text as="span" color="fg.subtle" fontSize="xs" truncate>
               {wildcard.values.length > 0
                 ? wildcard.values.join(', ')
                 : t('widgets.generate.dynamicPrompts.wildcardHasNoValues')}
@@ -318,7 +315,7 @@ const WildcardRow = ({
         </button>
       </Row>
       <Tooltip content={t('common.edit')}>
-        <IconButton aria-label={t('common.edit')} size="2xs" variant="ghost" onClick={() => onEdit(wildcard)}>
+        <IconButton aria-label={t('common.edit')} size="sm" variant="ghost" onClick={() => onEdit(wildcard)}>
           <PencilIcon />
         </IconButton>
       </Tooltip>
@@ -326,7 +323,7 @@ const WildcardRow = ({
         <IconButton
           aria-label={t('common.delete')}
           colorPalette="red"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={() => onDelete(wildcard)}
         >

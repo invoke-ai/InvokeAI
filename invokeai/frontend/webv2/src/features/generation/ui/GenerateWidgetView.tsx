@@ -99,11 +99,11 @@ export const GenerateWidgetView = () => {
     if (capabilitiesStatus === 'error' || isRetrying) {
       return (
         <Stack aria-busy={isRetrying} aria-live="polite" gap="2" justify="center" minH="8rem" p="1" role="alert">
-          <Text color="fg.error" fontSize="2xs" textWrap="pretty">
+          <Text color="fg.error" fontSize="xs" textWrap="pretty">
             {t('widgets.generate.capabilitiesLoadFailed')}
           </Text>
           {capabilitiesError ? (
-            <Text color="fg.muted" fontSize="2xs" textWrap="pretty">
+            <Text color="fg.muted" fontSize="xs" textWrap="pretty">
               {capabilitiesError}
             </Text>
           ) : null}
@@ -112,11 +112,10 @@ export const GenerateWidgetView = () => {
             alignSelf="flex-start"
             aria-busy={isRetrying}
             aria-disabled={isRetrying}
-            size="xs"
             variant="outline"
             onClick={retryCapabilities}
           >
-            {isRetrying ? <Spinner size="xs" /> : null}
+            {isRetrying ? <Spinner /> : null}
             {t('widgets.generate.retry')}
           </Button>
         </Stack>
@@ -136,8 +135,8 @@ export const GenerateWidgetView = () => {
         p="1"
         role="status"
       >
-        <Spinner size="xs" />
-        <Text fontSize="2xs">{t('widgets.generate.loadingCapabilities')}</Text>
+        <Spinner />
+        <Text fontSize="xs">{t('widgets.generate.loadingCapabilities')}</Text>
       </HStack>
     );
   }

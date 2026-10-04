@@ -912,3 +912,25 @@ def test_disable_conv_benchmark_empty_cache_flips_torch_flag():
         assert getter() is False
     finally:
         setter(original)
+
+
+def test_a_forced_empty_cache_runs_past_a_busy_peer_and_its_wrapper(monkeypatch):
+    """The peer-aware wrapper on torch.cuda.empty_cache would defer a forced call again; it must reach torch."""
+    calls: list[str] = []
+
+    def original() -> None:
+        calls.append("torch")
+
+    def wrapper() -> None:
+        calls.append("deferred")
+
+    wrapper.__wrapped__ = original  # type: ignore[attr-defined]
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "empty_cache", wrapper)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(TorchDevice, "_another_generation_device_busy", classmethod(lambda cls: True))
+
+    assert TorchDevice.empty_cache() is False
+    assert calls == []
+    assert TorchDevice.empty_cache(force=True) is True
+    assert calls == ["torch"]

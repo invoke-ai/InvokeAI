@@ -64,7 +64,7 @@ const GraphSurfaceMenuItems = ({
 
   return (
     <Menu.ItemGroup>
-      <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+      <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
         {t('common.graph')}
       </Menu.ItemGroupLabel>
       <Menu.Item
@@ -76,7 +76,7 @@ const GraphSurfaceMenuItems = ({
         <Icon as={TargetIcon} boxSize="3.5" />
         <Menu.ItemText>{t('widgets.graph.setSource')}</Menu.ItemText>
         {isActiveSource ? (
-          <Text color="fg.subtle" fontSize="2xs" ms="auto">
+          <Text color="fg.subtle" fontSize="xs" ms="auto">
             {t('common.active')}
           </Text>
         ) : null}
@@ -141,7 +141,7 @@ export const WidgetActionsMenu = ({
     <>
       <Menu.Root positioning={MENU_POSITIONING}>
         <Menu.Trigger asChild>
-          <IconButton aria-label={t('widgets.actionsLabel', { label })} color="fg.muted" size="2xs" variant="ghost">
+          <IconButton aria-label={t('widgets.actionsLabel', { label })} color="fg.muted" size="sm" variant="ghost">
             <MoreHorizontalIcon />
           </IconButton>
         </Menu.Trigger>

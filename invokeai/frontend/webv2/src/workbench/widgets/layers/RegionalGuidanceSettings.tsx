@@ -228,7 +228,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
   return (
     <Stack gap="2">
       {unsupportedModel ? (
-        <Text color="fg.warning" fontSize="2xs" role="alert">
+        <Text color="fg.warning" fontSize="xs" role="alert">
           {t('widgets.layers.regionalGuidance.unsupportedModel')}
         </Text>
       ) : null}
@@ -241,7 +241,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
           placeholder={t('widgets.layers.regionalGuidance.positivePromptPlaceholder')}
           resizeHandleAriaLabel={t('widgets.layers.regionalGuidance.positivePrompt')}
           showSyntaxHighlighting={showSyntaxHighlighting}
-          size="sm"
+          size="lg"
           value={positivePrompt}
           onBlur={handlePositiveBlur}
           onChange={handlePositiveChange}
@@ -257,7 +257,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
             placeholder={t('widgets.layers.regionalGuidance.negativePromptPlaceholder')}
             resizeHandleAriaLabel={t('widgets.layers.regionalGuidance.negativePrompt')}
             showSyntaxHighlighting={showSyntaxHighlighting}
-            size="sm"
+            size="lg"
             value={negativePrompt}
             onBlur={handleNegativeBlur}
             onChange={handleNegativeChange}
@@ -265,13 +265,13 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
         </Field>
       )}
       {showNegativeControls && (
-        <Switch.Root checked={layer.autoNegative} size="sm" onCheckedChange={handleAutoNegative}>
+        <Switch.Root checked={layer.autoNegative} onCheckedChange={handleAutoNegative}>
           <Switch.HiddenInput />
           <Switch.Control>
             <Switch.Thumb />
           </Switch.Control>
           <Switch.Label>
-            <Text fontSize="xs">{t('widgets.layers.regionalGuidance.autoNegative')}</Text>
+            <Text fontSize="md">{t('widgets.layers.regionalGuidance.autoNegative')}</Text>
           </Switch.Label>
         </Switch.Root>
       )}
@@ -291,7 +291,7 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
             aria-label={t('widgets.layers.maskFill.editInColorPane')}
             alignSelf="flex-end"
             color="fg.muted"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={handleArmTint}
           >
@@ -303,14 +303,13 @@ export const RegionalGuidanceSettings = ({ engine, layer }: RegionalGuidanceSett
             aria-label={t('widgets.layers.maskFill.style')}
             collection={styleCollection}
             positioning={SELECT_POSITIONING}
-            size="xs"
             value={styleValue}
             valueText={t(`widgets.layers.maskFill.styles.${fill.style}`)}
             onValueChange={handleStyleChange}
           />
         </Field>
       </HStack>
-      <Button disabled={!engine} size="xs" variant="outline" onClick={handleInvert}>
+      <Button disabled={!engine} variant="outline" onClick={handleInvert}>
         {t('widgets.layers.maskFill.invert')}
       </Button>
     </Stack>
