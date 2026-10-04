@@ -22,6 +22,8 @@ export {
   createVideoSourceClip,
   getDefaultConditioningRole,
   getDefaultReferenceConditioning,
+  areFrameImagesHeld,
+  createFrameImageSetter,
   getConditioningClipPatch,
   getFrameImagePatch,
   getInitialVideoPatch,

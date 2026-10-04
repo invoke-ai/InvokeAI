@@ -992,6 +992,38 @@ export const getFrameImagePatch = (
 });
 
 /**
+ * A first- or last-frame setter that decides what the frame displaces from the panel as it is when called, not as it
+ * was when the setter was made. Gallery drops resolve asynchronously and commit through the setter captured at drop
+ * time; the clip's role can change in between, and a stale reading would keep a picture-role clip beside the frame.
+ *
+ * The stored clip, not the normalized one: normalization hides a picture-role clip behind a first frame, and a frame
+ * that left it stored would let it resurface beside the last frame once the first is cleared.
+ */
+export const createFrameImageSetter =
+  (
+    slot: 'firstFrameImage' | 'lastFrameImage',
+    readValues: () => unknown,
+    patch: (values: Partial<VideoWidgetValues>) => void
+  ) =>
+  (image: ImageWithDims | null): void => {
+    const values = readValues();
+    const storedClip =
+      isRecord(values) && isVideoConditioningClip(values.conditioningClip) ? values.conditioningClip : null;
+
+    patch(getFrameImagePatch(slot, image, storedClip));
+  };
+
+/**
+ * Whether the panel holds a first or last frame right now. A clip dropped while either is held takes the soundtrack
+ * role; the drop resolves asynchronously, so this is read when it lands rather than when it began.
+ */
+export const areFrameImagesHeld = (values: unknown): boolean => {
+  const normalized = normalizeVideoWidgetValues(values);
+
+  return Boolean(normalized?.firstFrameImage || normalized?.lastFrameImage);
+};
+
+/**
  * The panel patch that sets the conditioning clip, or clears it. A clip claims a whole modality, so it displaces the
  * initial video and the references, and in the picture role the frames as well.
  */

@@ -25,6 +25,8 @@ import {
   getInitialVideoPatch,
   getReferencesPatch,
   isVideoSettings,
+  areFrameImagesHeld,
+  createFrameImageSetter,
   createVideoConditioningClip,
   getFrameImagePatch,
   isVideoSourceClip,
@@ -535,6 +537,57 @@ describe('getFrameImagePatch', () => {
 
   it('clears only its own slot', () => {
     expect(getFrameImagePatch('firstFrameImage', null, picture)).toEqual({ firstFrameImage: null });
+  });
+});
+
+describe('createFrameImageSetter', () => {
+  const soundtrack = { clip: CONDITIONING_CLIP, fpsKnown: true, role: 'audio' as const };
+  const picture = { ...soundtrack, role: 'video' as const };
+
+  /** A panel whose clip role changes while a frame drop is still resolving, as the gallery drop's await allows. */
+  const racePanel = (startRole: typeof soundtrack | typeof picture, endRole: typeof soundtrack | typeof picture) => {
+    let raw: Record<string, unknown> = { ...createSettings(), conditioningClip: startRole };
+    const patches: Partial<VideoWidgetValues>[] = [];
+    // Made once, when the drop begins, exactly as GalleryMediaSlot captures its onChange.
+    const setLastFrame = createFrameImageSetter(
+      'lastFrameImage',
+      () => raw,
+      (values) => patches.push(values)
+    );
+
+    raw = { ...raw, conditioningClip: endRole };
+    setLastFrame(FIRST_FRAME);
+
+    return patches;
+  };
+
+  it('displaces a clip switched to its picture while the frame was resolving', () => {
+    expect(racePanel(soundtrack, picture)).toEqual([{ conditioningClip: null, lastFrameImage: FIRST_FRAME }]);
+  });
+
+  it('keeps a clip switched to its soundtrack while the frame was resolving', () => {
+    expect(racePanel(picture, soundtrack)).toEqual([{ lastFrameImage: FIRST_FRAME }]);
+  });
+
+  it('displaces a picture-role clip the first frame hides, so it cannot resurface beside the last frame', () => {
+    const raw = { ...createSettings({ firstFrameImage: FIRST_FRAME }), conditioningClip: picture };
+    const patches: Partial<VideoWidgetValues>[] = [];
+
+    createFrameImageSetter(
+      'lastFrameImage',
+      () => raw,
+      (values) => patches.push(values)
+    )(FIRST_FRAME);
+
+    expect(patches).toEqual([{ conditioningClip: null, lastFrameImage: FIRST_FRAME }]);
+  });
+});
+
+describe('areFrameImagesHeld', () => {
+  it('reports either frame, so a clip dropped beside one takes the soundtrack role', () => {
+    expect(areFrameImagesHeld(createSettings())).toBe(false);
+    expect(areFrameImagesHeld(createSettings({ firstFrameImage: FIRST_FRAME }))).toBe(true);
+    expect(areFrameImagesHeld(createSettings({ lastFrameImage: FIRST_FRAME }))).toBe(true);
   });
 });
 

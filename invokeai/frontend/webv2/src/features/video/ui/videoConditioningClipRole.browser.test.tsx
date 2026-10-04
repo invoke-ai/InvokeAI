@@ -58,6 +58,7 @@ const videoAdapter = {
   playVideoSpanInPreview: () => null,
   projectId: 'project-1',
   rawValues: {},
+  readValues: () => ({}),
   reportError: noop,
   showPromptSyntaxHighlighting: false,
   touchGalleryImages: noop,

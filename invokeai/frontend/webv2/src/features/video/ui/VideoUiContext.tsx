@@ -18,6 +18,8 @@ export interface VideoUiAdapter {
   playVideoSpanInPreview(span: { endSeconds: number; item: GalleryVideoItem; startSeconds: number }): number | null;
   projectId: string;
   rawValues: Record<string, unknown>;
+  /** Read this project's raw panel values at call time without subscribing, for writes that complete asynchronously. */
+  readValues(): Record<string, unknown>;
   reportError(message: string): void;
   showPromptSyntaxHighlighting: boolean;
   touchGalleryImages(): void;
@@ -47,6 +49,7 @@ export type VideoUiActions = Pick<
   | 'getUploadBoardId'
   | 'patchValues'
   | 'playVideoSpanInPreview'
+  | 'readValues'
   | 'reportError'
   | 'touchGalleryImages'
   | 'videoSpanPlayback'
@@ -62,6 +65,7 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
     getUploadBoardId,
     patchValues,
     playVideoSpanInPreview,
+    readValues,
     reportError,
     touchGalleryImages,
     videoSpanPlayback,
@@ -72,6 +76,7 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
       getUploadBoardId,
       patchValues,
       playVideoSpanInPreview,
+      readValues,
       reportError,
       touchGalleryImages,
       videoSpanPlayback,
@@ -81,6 +86,7 @@ export const VideoUiProvider = ({ adapter, children }: { adapter: VideoUiAdapter
       getUploadBoardId,
       patchValues,
       playVideoSpanInPreview,
+      readValues,
       reportError,
       touchGalleryImages,
       videoSpanPlayback,

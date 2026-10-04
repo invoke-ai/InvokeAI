@@ -3,7 +3,7 @@ import type { VideoConditioningClip, VideoConditioningRole } from '@features/vid
 
 import { createListCollection, Stack, Text } from '@chakra-ui/react';
 import { GalleryMediaSlot, type GalleryMediaSlotLabels, type GalleryMediaSlotValue } from '@features/gallery/mediaSlot';
-import { createVideoConditioningClip } from '@features/video/core/settings';
+import { areFrameImagesHeld, createVideoConditioningClip } from '@features/video/core/settings';
 import { Field, Select } from '@platform/ui';
 import { memo, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -37,12 +37,12 @@ export const VideoConditioningClipField = memo(
     disabledReason?: string;
     /** What the clip works out to — length, and the rate it will run at. */
     derivedText?: string;
-    /** Set while the picture role is unavailable; a dropped clip then arrives in the soundtrack role. */
+    /** Set while the picture role is unavailable because frames are held. */
     pictureRoleDisabledReason?: string;
     onChange: (conditioning: VideoConditioningClip | null) => void;
   }) {
     const { t } = useTranslation();
-    const { findInGallery } = useVideoUiActions();
+    const { findInGallery, readValues } = useVideoUiActions();
     const slotLabels = useMemo<Partial<GalleryMediaSlotLabels>>(
       () => ({ drop: t('widgets.video.dropConditioningClip') }),
       [t]
@@ -80,10 +80,11 @@ export const VideoConditioningClipField = memo(
         if (item === null) {
           onChange(null);
         } else if (item.kind === 'video') {
-          onChange(createVideoConditioningClip(item, { framesHeld: pictureRoleDisabledReason !== undefined }));
+          // Read when the drop lands, not when it began: a frame picked meanwhile must not be cleared by a picture role.
+          onChange(createVideoConditioningClip(item, { framesHeld: areFrameImagesHeld(readValues()) }));
         }
       },
-      [onChange, pictureRoleDisabledReason]
+      [onChange, readValues]
     );
     // The whole premise of this field is what is inside the clip, so it gets the same way back to
     // the gallery record that every other media slot has.

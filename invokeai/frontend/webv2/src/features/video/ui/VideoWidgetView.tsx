@@ -1,4 +1,3 @@
-import type { ImageWithDims } from '@features/generation/contracts';
 import type { ModelConfig, ModelTaxonomyType } from '@features/models';
 import type {
   VideoConditioningClip,
@@ -22,8 +21,8 @@ import {
 import {
   applyReferenceExtendNumFrames,
   canPlaceReferenceExtendAnchor,
+  createFrameImageSetter,
   getConditioningClipPatch,
-  getFrameImagePatch,
   getInitialVideoPatch,
   getReferencesPatch,
   isConditioningClipExcludingFrames,
@@ -129,7 +128,7 @@ export const VideoWidgetView = () => {
   const selection = useVideoUi();
   const models = useModelsSelector((snapshot) => snapshot.models);
   const modelsStatus = useModelsSelector((snapshot) => snapshot.status);
-  const { patchValues, projectId, rawValues } = selection;
+  const { patchValues, projectId, rawValues, readValues } = selection;
   // Reconcile only when inputs change; it is expensive and fresh values rerender every section.
   const values = useMemo(() => {
     const normalized =
@@ -283,16 +282,12 @@ export const VideoWidgetView = () => {
   const referenceExtend = Boolean(policy.references?.extend);
   const maxVideoReferences = policy.references?.maxVideos ?? 3;
   const conditioningClip = values.conditioningClip;
-  const setFirstFrame = useCallback(
-    (firstFrameImage: ImageWithDims | null) =>
-      patch(getFrameImagePatch('firstFrameImage', firstFrameImage, conditioningClip)),
-    [conditioningClip, patch]
+  // A drop commits through the setter captured when it began, so what the frame displaces is read at commit time.
+  const setFirstFrame = useMemo(
+    () => createFrameImageSetter('firstFrameImage', readValues, patch),
+    [patch, readValues]
   );
-  const setLastFrame = useCallback(
-    (lastFrameImage: ImageWithDims | null) =>
-      patch(getFrameImagePatch('lastFrameImage', lastFrameImage, conditioningClip)),
-    [conditioningClip, patch]
-  );
+  const setLastFrame = useMemo(() => createFrameImageSetter('lastFrameImage', readValues, patch), [patch, readValues]);
   // Setting a frame is what clears a clip held for its picture, so the frame fields say so beforehand.
   const frameClearsClipText = isConditioningClipExcludingFrames(conditioningClip)
     ? t('widgets.video.frameClearsConditioningClip')
