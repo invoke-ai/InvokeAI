@@ -20,7 +20,11 @@ import { getApiErrorMessage } from '@platform/transport/http';
 import type { WorkflowLibraryCategory, WorkflowLibraryListItem, WorkflowLibraryPage } from './api';
 
 import { getAllWorkflowTags, getWorkflowTagCounts, listLibraryWorkflows } from './api';
-import { getLibraryWorkflowCached, onWorkflowLibraryCacheInvalidated } from './libraryCache';
+import {
+  getLibraryWorkflowCached,
+  onWorkflowLibraryCacheInvalidated,
+  WorkflowLibraryChangedDuringReadError,
+} from './libraryCache';
 import { getInvocationTemplatesSnapshot, refreshInvocationTemplates } from './templates';
 
 const libraryLogger = createLogger({ area: 'library', namespace: 'workflows' });
@@ -236,8 +240,8 @@ const enrichmentQueue: string[] = [];
 const queuedWorkflowIds = new Set<string>();
 let activeEnrichmentWorkers = 0;
 
-const findEntryIndex = (workflowId: string): number =>
-  store.getSnapshot().entries.findIndex((entry) => entry.item.workflow_id === workflowId);
+const findEntry = (workflowId: string): WorkflowLibraryEntry | undefined =>
+  store.getSnapshot().entries.find((entry) => entry.item.workflow_id === workflowId);
 
 /** Publishes one entry's enrichment, reusing every other entry object as-is. */
 const applyEnrichment = (workflowId: string, enrichment: WorkflowLibraryEntryEnrichment, owner: AccountScope): void => {
@@ -260,10 +264,13 @@ const applyEnrichment = (workflowId: string, enrichment: WorkflowLibraryEntryEnr
   store.patchSnapshot({ entries: next });
 };
 
-const enrichEntry = async (workflowId: string, owner: AccountScope): Promise<void> => {
+const enrichEntry = async (
+  { revision, workflow_id: workflowId }: WorkflowLibraryListItem,
+  owner: AccountScope
+): Promise<void> => {
   try {
     const templates = await loadTemplates();
-    const raw = await getLibraryWorkflowCached(workflowId, owner.signal);
+    const raw = await getLibraryWorkflowCached(workflowId, { expectedRevision: revision, signal: owner.signal });
     const { document } = parseWorkflowJson(raw);
 
     applyEnrichment(
@@ -277,6 +284,15 @@ const enrichEntry = async (workflowId: string, owner: AccountScope): Promise<voi
       owner
     );
   } catch (error) {
+    // The library, not this row, kept changing mid-read: the row stays pending and is read again. This recurs only
+    // while invalidations keep landing.
+    if (error instanceof WorkflowLibraryChangedDuringReadError) {
+      if (isAccountScopeCurrent(owner)) {
+        pumpEnrichment();
+      }
+      return;
+    }
+
     // One unreadable workflow marks its own card and never fails the pool.
     libraryLogger.warn({
       context: { workflowId },
@@ -297,10 +313,12 @@ const runEnrichmentWorker = async (): Promise<void> => {
     for (let workflowId = enrichmentQueue.shift(); workflowId !== undefined; workflowId = enrichmentQueue.shift()) {
       queuedWorkflowIds.delete(workflowId);
 
+      const entry = findEntry(workflowId);
+
       // Each item captures the scope it starts under, so a worker that outlives
       // an account switch drops its result instead of writing it.
-      if (findEntryIndex(workflowId) !== -1) {
-        await enrichEntry(workflowId, captureAccountScope());
+      if (entry) {
+        await enrichEntry(entry.item, captureAccountScope());
       }
     }
   } finally {

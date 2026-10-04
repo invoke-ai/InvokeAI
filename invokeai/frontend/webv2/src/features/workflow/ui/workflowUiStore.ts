@@ -52,6 +52,8 @@ export interface WorkflowUiSnapshot {
 export interface LibraryOpenItem {
   name: string;
   workflow_id: string;
+  /** The revision the library list showed; absent when the request named only an id. */
+  revision?: number;
 }
 
 export interface LibraryCopyChoiceRequest {
@@ -126,7 +128,7 @@ export const requestLibraryCopyChoice = (projectId: string, item: LibraryOpenIte
   nextLibraryCopyChoiceRequestId += 1;
   workflowUiStore.patchSnapshot({
     libraryCopyChoice: {
-      item: { name: item.name, workflow_id: item.workflow_id },
+      item: { name: item.name, revision: item.revision, workflow_id: item.workflow_id },
       projectId,
       requestId: nextLibraryCopyChoiceRequestId,
     },

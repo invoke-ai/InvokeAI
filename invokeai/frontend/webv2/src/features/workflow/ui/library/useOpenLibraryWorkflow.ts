@@ -89,7 +89,10 @@ export const useOpenLibraryWorkflow = (onOpened: () => void): OpenLibraryWorkflo
       try {
         setLoadPhase('fetching');
 
-        const record = await getLibraryWorkflowRecordCached(item.workflow_id, owner.signal);
+        const record = await getLibraryWorkflowRecordCached(item.workflow_id, {
+          expectedRevision: item.revision,
+          signal: owner.signal,
+        });
 
         assertAccountScopeCurrent(owner);
         const { document: parsed, warnings: parseWarnings } = parseWorkflowJson({
