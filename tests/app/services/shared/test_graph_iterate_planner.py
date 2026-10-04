@@ -76,6 +76,38 @@ def test_execution_copy_preserves_graph_uuid_seam_and_iteration_metadata(monkeyp
     assert state._prepared_registry().get_iteration_path(copied.id) == (3, 1)
 
 
+@pytest.mark.parametrize(
+    ("parent_paths", "parent_axes", "expected"),
+    [
+        (((0,), (0, 1)), (("outer",), ("outer", "inner")), (0, 1)),
+        (((0,), (1,)), (("left",), ("right",)), None),
+    ],
+    ids=["nested-axes", "sibling-axes"],
+)
+def test_execution_node_path_requires_compatible_nested_axes(
+    parent_paths: tuple[tuple[int, ...], tuple[int, ...]],
+    parent_axes: tuple[tuple[str, ...], tuple[str, ...]],
+    expected: tuple[int, ...] | None,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.shared import graph_materializer
+    from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+
+    state = GraphExecutionState(graph=Graph())
+    state.prepared_source_mapping.update({"outer_exec": "outer", "inner_exec": "inner"})
+    state.prepared_iteration_paths.update({"outer_exec": parent_paths[0], "inner_exec": parent_paths[1]})
+    builder = graph_materializer._ExecutionNodeBuilder(state)
+    axes_by_source = {"outer": parent_axes[0], "inner": parent_axes[1]}
+    monkeypatch.setattr(builder, "_get_iteration_axes", lambda source_id: axes_by_source[source_id])
+
+    result = builder._get_known_iteration_path(
+        -1,
+        [("outer", "outer_exec"), ("inner", "inner_exec")],
+    )
+
+    assert result == expected
+
+
 def test_planner_accepts_equivalent_generic_scheduler_instance() -> None:
     from invokeai.app.invocations.math import AddInvocation
     from invokeai.app.services.shared import graph
