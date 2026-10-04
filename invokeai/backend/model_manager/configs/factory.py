@@ -862,9 +862,17 @@ class ModelConfigFactory:
         for candidate_class in filter(lambda x: x is not Unknown_Config, Config_Base.CONFIG_CLASSES):
             candidate_name = candidate_class.__name__
             try:
+                candidate_fields = fields
+                # This config value comes from metadata, but its explicit override must reach its own probe.
+                if (
+                    override_fields is not None
+                    and "image_encoder_model_id" in override_fields
+                    and "image_encoder_model_id" in candidate_class.model_fields
+                ):
+                    candidate_fields = {**fields, "image_encoder_model_id": override_fields["image_encoder_model_id"]}
                 # Technically, from_model_on_disk returns a Config_Base, but in practice it will always be a member of
                 # the AnyModelConfig union.
-                details[candidate_name] = candidate_class.from_model_on_disk(mod, fields)  # type: ignore
+                details[candidate_name] = candidate_class.from_model_on_disk(mod, candidate_fields)  # type: ignore
             except NotAMatchError as e:
                 # This means the model didn't match this config class. It's not an error, just no match.
                 details[candidate_name] = ModelConfigFactory._detach_traceback(e)
