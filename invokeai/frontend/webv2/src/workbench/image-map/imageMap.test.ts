@@ -941,6 +941,7 @@ describe('image index progress', () => {
 
   it('polls only for the mounted view lifetime, without overlapping requests or surviving account changes', async () => {
     vi.useFakeTimers();
+    vi.stubGlobal('document', Object.assign(new EventTarget(), { visibilityState: 'visible' }));
     try {
       let resolveStatus: (value: unknown) => void = () => {};
       mocks.apiFetchJson.mockImplementation(
@@ -966,6 +967,32 @@ describe('image index progress', () => {
       expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
       detachNext();
     } finally {
+      vi.unstubAllGlobals();
+      vi.useRealTimers();
+    }
+  });
+
+  it('pauses polling while the page is hidden and checks at once when it returns', async () => {
+    vi.useFakeTimers();
+    const page = Object.assign(new EventTarget(), { visibilityState: 'hidden' });
+    vi.stubGlobal('document', page);
+    try {
+      mocks.apiFetchJson.mockResolvedValue({ enabled: true, index: null, projection: { state: 'ready' } });
+      const detach = attachImageMapStatusPolling();
+      await vi.advanceTimersByTimeAsync(15_000);
+      expect(mocks.apiFetchJson).not.toHaveBeenCalled();
+
+      page.visibilityState = 'visible';
+      page.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(0);
+      expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+
+      detach();
+      page.dispatchEvent(new Event('visibilitychange'));
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(mocks.apiFetchJson).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.unstubAllGlobals();
       vi.useRealTimers();
     }
   });
@@ -1015,6 +1042,43 @@ describe('image index progress', () => {
 
     expect(imageMapStore.getSnapshot().data?.state).toBe('model_missing');
     expect(imageMapStore.getSnapshot().clusterLabels).toBeNull();
+  });
+
+  it('lets Check again land while polls repeat the same missing encoder', async () => {
+    imageMapStore.patchSnapshot({
+      data: { ...LOADED_POINTS, modelName: 'encoder', state: 'model_missing' },
+      loadState: 'loaded',
+    });
+    const diagnosis = imageMapStore.getSnapshot().data;
+    let resolvePoints: (value: unknown) => void = () => {};
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url.startsWith('/api/v1/image_map/status')) {
+        return Promise.resolve({
+          enabled: false,
+          index: null,
+          model_name: 'encoder',
+          projection: { state: 'model_missing' },
+        });
+      }
+      if (url.startsWith('/api/v1/image_map/cluster_labels')) {
+        return Promise.resolve(FOREIGN_LABELS_RESPONSE);
+      }
+      return new Promise((resolve) => {
+        resolvePoints = resolve;
+      });
+    });
+
+    refreshImageIndexStatus();
+    await drainMacrotask();
+    expect(imageMapStore.getSnapshot().data).toBe(diagnosis);
+
+    const checkAgain = refreshImageMapPoints();
+    refreshImageIndexStatus();
+    await drainMacrotask();
+    resolvePoints(BACKEND_RESPONSE);
+    await checkAgain;
+
+    expect(imageMapStore.getSnapshot().data).toMatchObject({ pointCount: 3, state: 'ready' });
   });
 
   it('reloads points when status discovers the encoder reinstalled', async () => {

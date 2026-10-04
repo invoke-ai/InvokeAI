@@ -365,10 +365,12 @@ export const refreshImageIndexStatus = (): void => {
       if (revision === mapRevision) {
         const { data } = imageMapStore.getSnapshot();
         const missing = status.state === 'model_missing';
+        // A repeated diagnosis must not bump the revision: that would discard an in-flight Check again.
+        const unchanged = missing && data?.state === 'model_missing' && data.modelName === status.modelName;
         const replaced = data !== null && status.modelId !== null && data.modelId !== status.modelId;
-        const recovered = data?.state === 'model_missing' && status.state !== 'disabled';
+        const recovered = data?.state === 'model_missing' && !missing && status.state !== 'disabled';
 
-        if (missing || replaced || recovered) {
+        if ((missing && !unchanged) || replaced || recovered) {
           mapRevision += 1;
           labelsSequence += 1;
           imageMapStore.patchSnapshot({
@@ -433,14 +435,25 @@ export const ensureImageMapLoaded = (): void => {
   refreshImageIndexStatus();
 };
 
-/** Poll only while a map view is mounted; missing encoders produce no index events. */
+/**
+ * Poll only while a map view is mounted and its page is visible; missing encoders produce no index events. A page
+ * returning to view checks at once instead of waiting out the interval.
+ */
 export const attachImageMapStatusPolling = (): (() => void) => {
   const owner = captureAccountScope();
-  const timer = setInterval(refreshImageIndexStatus, 5_000);
+  const poll = () => {
+    if (document.visibilityState === 'visible') {
+      refreshImageIndexStatus();
+    }
+  };
+  const timer = setInterval(poll, 5_000);
   const dispose = () => {
     clearInterval(timer);
+    document.removeEventListener('visibilitychange', poll);
     owner.signal.removeEventListener('abort', dispose);
   };
+
+  document.addEventListener('visibilitychange', poll);
 
   owner.signal.addEventListener('abort', dispose, { once: true });
 
