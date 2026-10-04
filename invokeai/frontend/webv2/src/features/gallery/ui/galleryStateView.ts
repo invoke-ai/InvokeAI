@@ -1,13 +1,6 @@
 import type { GalleryBoard, GalleryImage, GalleryOrderDir, GalleryView } from '@features/gallery/core/types';
 
-import {
-  isDateBoardId,
-  legacyGeneratedImageToGalleryItem,
-  toGalleryItemKey,
-  type GalleryItem,
-  type GalleryItemKey,
-} from '@features/gallery/core/items';
-import { getBoundedRecentImages } from '@features/gallery/core/recentImages';
+import { isDateBoardId, toGalleryItemKey, type GalleryItem, type GalleryItemKey } from '@features/gallery/core/items';
 import {
   getPersistedSelectedGalleryItemKeys,
   getSelectedGalleryImageFromValues,
@@ -43,8 +36,8 @@ export interface GalleryStateView {
   galleryView: GalleryView;
   /** A compare image is set and differs from the visible image selection. */
   isComparisonActive: boolean;
+  /** The current scope's listing only; how it stands (loading, failed, ...) is the listing read state's to say. */
   items: GalleryItem[];
-  isLoading: boolean;
   /** The grid's current page in paginated mode; the window anchor otherwise. */
   page: number;
   projectBoardId: string | null;
@@ -211,16 +204,85 @@ export const getGalleryAnchoredWindowPage = (values: Record<string, unknown>): n
   return getGallerySettings(values).paginationMode === 'infinite' && page > 0 ? page : 0;
 };
 
+/**
+ * How one Gallery read model stands for the scope its query is keyed on (board, search, view, page). Derived from
+ * Query state on every render, never stored.
+ *
+ * - `loading`: nothing for this scope yet, and no failure on record.
+ * - `ready` / `empty`: this scope's latest request succeeded, with or without items.
+ * - `error`: this scope has nothing to show and its latest request failed. A retry in flight stays here, so the
+ *   Retry control keeps focus instead of flashing back to a loading state.
+ * - `stale-error`: this scope's earlier results are shown; refreshing them failed.
+ * - `more-error`: this scope's earlier pages are shown; the next page failed.
+ */
+export type GalleryReadStatus = 'empty' | 'error' | 'loading' | 'more-error' | 'ready' | 'stale-error';
+
+/** A read model's standing plus its Query-backed recovery. */
+export interface GalleryReadState {
+  status: GalleryReadStatus;
+  /** The failure behind a failed status, for its detail line; null while a retry is in flight. */
+  error: Error | null;
+  /** A failed scope is being fetched again; Retry shows busy without unmounting. */
+  isRetrying: boolean;
+  /** Re-runs this scope's failed request through Query. */
+  retry: () => Promise<void>;
+}
+
+/** The Query facts a read status derives from, for the query keyed on the current scope. */
+export interface GalleryQueryFacts {
+  /** Data for this exact scope. Placeholder data carried over from another scope does not count. */
+  hasData: boolean;
+  isError: boolean;
+  /** Survives the reset a refetch applies to a query without data, so a retrying failure still reads as failed. */
+  errorUpdateCount: number;
+  isFetchNextPageError?: boolean;
+}
+
+const isFailedWithoutData = (facts: GalleryQueryFacts): boolean => facts.isError || facts.errorUpdateCount > 0;
+
+export const getGalleryReadStatus = (facts: GalleryQueryFacts, itemCount: number): GalleryReadStatus => {
+  if (!facts.hasData) {
+    return isFailedWithoutData(facts) ? 'error' : 'loading';
+  }
+
+  if (facts.isFetchNextPageError) {
+    return 'more-error';
+  }
+
+  if (facts.isError) {
+    return 'stale-error';
+  }
+
+  return itemCount === 0 ? 'empty' : 'ready';
+};
+
+/**
+ * The listing for the current scope. `scopedItems` is the backend window merged with recents already filtered to
+ * this scope (only the recents while nothing has loaded); they may ride along while the scope loads or has data,
+ * but never stand in for a failed load.
+ */
+export const getGalleryListing = (
+  facts: GalleryQueryFacts,
+  scopedItems: GalleryItem[]
+): { items: GalleryItem[] | null; status: GalleryReadStatus } => {
+  const status = getGalleryReadStatus(facts, scopedItems.length);
+
+  if (status === 'error' || (status === 'loading' && scopedItems.length === 0)) {
+    return { items: null, status };
+  }
+
+  return { items: scopedItems, status };
+};
+
 /** Starred selections remain visible in the pinned strip rather than the unstarred listing. */
 export const getGalleryStateView = (
   values: Record<string, unknown>,
   backendBoards: GalleryBoard[],
   backendItems: GalleryItem[] | null,
-  isLoading: boolean,
   starredStripItems: readonly GalleryItem[] = []
 ): GalleryStateView => {
-  const localItems = getBoundedRecentImages(values.recentImages).map(legacyGeneratedImageToGalleryItem);
-  const items = backendItems ?? (isLoading ? [] : localItems);
+  // Nothing stands in for a listing the current scope does not have: unfiltered recents would read as this board's.
+  const items = backendItems ?? [];
   const selectedItem = getSelectedGalleryItemFromValues(values);
   const persistedSelectedItemKey =
     typeof values.selectedImageName === 'string'
@@ -281,7 +343,6 @@ export const getGalleryStateView = (
     galleryView,
     isComparisonActive,
     items,
-    isLoading,
     page,
     projectBoardId: getGalleryProjectBoardId(values),
     revealTargetPage,

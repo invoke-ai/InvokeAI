@@ -190,6 +190,7 @@ const GALLERY_PICKER_MODULES = [
   '/features/gallery/picker.ts',
   '/features/gallery/ui/GalleryBoardCover.tsx',
   '/features/gallery/ui/GalleryBoardRowShell.tsx',
+  '/features/gallery/ui/GalleryLoadError.tsx',
   '/features/gallery/ui/GallerySearchField.tsx',
   '/features/gallery/ui/GalleryTileFrame.tsx',
   '/features/gallery/ui/GalleryUploadButton.tsx',

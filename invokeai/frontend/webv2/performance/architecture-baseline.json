@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 789849,
+        "brotliBytes": 789772,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 789100,
+        "gzipBytes": 789098,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2028188,
+        "initialRawBytes": 2028240,
         "largestAssetRawBytes": 749011,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 95730,
+        "ownedRawBytes": 95741,
         "requestCount": 36,
         "scriptRequestCount": 20,
         "sourceOwners": [
@@ -343,15 +343,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1151063,
+        "brotliBytes": 1152838,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1145114,
+        "gzipBytes": 1146903,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3146418,
+        "initialRawBytes": 3151860,
         "largestAssetRawBytes": 749011,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 147706,
+        "ownedRawBytes": 147689,
         "requestCount": 73,
         "scriptRequestCount": 57,
         "sourceOwners": [
@@ -519,6 +519,7 @@
           "source:src/features/gallery/ui/GalleryBoardRowShell.tsx",
           "source:src/features/gallery/ui/GalleryDragCursor.tsx",
           "source:src/features/gallery/ui/GalleryItemSearch.tsx",
+          "source:src/features/gallery/ui/GalleryLoadError.tsx",
           "source:src/features/gallery/ui/GallerySearchField.tsx",
           "source:src/features/gallery/ui/GallerySearchHelp.tsx",
           "source:src/features/gallery/ui/GalleryTileFrame.tsx",

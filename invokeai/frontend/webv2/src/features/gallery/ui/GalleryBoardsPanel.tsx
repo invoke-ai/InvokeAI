@@ -18,6 +18,7 @@ import { GalleryBoardMenu, type GalleryBoardMenuTarget } from './GalleryBoardMen
 import { GalleryBoardRow } from './GalleryBoardRow';
 import { GalleryBoardRowShell } from './GalleryBoardRowShell';
 import { GalleryBoardSection } from './GalleryBoardSection';
+import { focusVisibleOperable, GalleryLoadNotice } from './GalleryLoadError';
 import { useGalleryWidget } from './GalleryWidgetContext';
 
 const SCROLL_CONTENT_PROPS = { py: '1' } as const;
@@ -25,7 +26,7 @@ const CREATE_ROW_COVER = <BoardCoverIcon icon={PlusIcon} />;
 
 export const GalleryBoardsPanel = () => {
   const { t } = useTranslation();
-  const { actions, gallery, projectName } = useGalleryWidget();
+  const { actions, boardsState, gallery, projectName } = useGalleryWidget();
   const [searchTerm, setSearchTerm] = useState('');
   const [boardMenuTarget, setBoardMenuTarget] = useState<GalleryBoardMenuTarget | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -119,6 +120,10 @@ export const GalleryBoardsPanel = () => {
   );
 
   const isSectionOpen = (sectionId: GalleryBoardSectionId) => !collapsedBoardSections.includes(sectionId);
+  // Without the backend's list, the placeholder Uncategorized row (and "no matches") would claim there is nothing
+  // else; the failure takes the rows' place instead.
+  const isBoardListUnavailable = boardsState.status === 'error';
+  const focusBoardList = useCallback(() => focusVisibleOperable(boardsViewportRef.current), []);
 
   const addBoardAction = useMemo(
     () => (
@@ -155,7 +160,19 @@ export const GalleryBoardsPanel = () => {
               sectionId="boards"
               onToggle={handleToggleSection}
             >
-              {groups.yourBoards.map((board) => (
+              {boardsState.status === 'error' || boardsState.status === 'stale-error' ? (
+                <GalleryLoadNotice
+                  message={t(
+                    isBoardListUnavailable ? 'widgets.gallery.boardsLoadFailed' : 'widgets.gallery.boardsRefreshFailed'
+                  )}
+                  pe="1"
+                  ps="2"
+                  read={boardsState}
+                  retryLabel={t('widgets.gallery.retryLoadingBoards')}
+                  onFocusLost={focusBoardList}
+                />
+              ) : null}
+              {(isBoardListUnavailable ? [] : groups.yourBoards).map((board) => (
                 <GalleryBoardRow
                   key={board.id}
                   board={board}
@@ -177,7 +194,7 @@ export const GalleryBoardsPanel = () => {
               ) : null}
             </GalleryBoardSection>
 
-            {groups.dateBoards.length > 0 ? (
+            {!isBoardListUnavailable && groups.dateBoards.length > 0 ? (
               <GalleryBoardSection
                 isOpen={isSectionOpen('dates')}
                 label={t('widgets.gallery.boardGroups.byDate')}
@@ -197,7 +214,7 @@ export const GalleryBoardsPanel = () => {
               </GalleryBoardSection>
             ) : null}
 
-            {groups.archivedBoards.length > 0 ? (
+            {!isBoardListUnavailable && groups.archivedBoards.length > 0 ? (
               <GalleryBoardSection
                 isOpen={isSectionOpen('archived')}
                 label={t('common.archived')}
@@ -219,7 +236,7 @@ export const GalleryBoardsPanel = () => {
               </GalleryBoardSection>
             ) : null}
 
-            {!groups.hasAnyMatch && !groups.canCreateFromSearch ? (
+            {!isBoardListUnavailable && !groups.hasAnyMatch && !groups.canCreateFromSearch ? (
               <HStack justify="center" py="3">
                 <Text color="fg.muted" fontSize="xs">
                   {t('widgets.gallery.noBoardsMatchSearch')}

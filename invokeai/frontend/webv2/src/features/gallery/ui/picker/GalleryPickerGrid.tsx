@@ -224,6 +224,11 @@ export const GalleryPickerGrid = ({
 
   const handleClick = useCallback(
     (event: MouseEvent<HTMLDivElement>) => {
+      // Placeholder tiles from the previous scope are shown, not offered.
+      if (isStale) {
+        return;
+      }
+
       const key = (event.target as HTMLElement).closest<HTMLElement>('[data-item-key]')?.dataset.itemKey;
       const item = key ? itemsByKey.get(key as GalleryItemKey) : undefined;
 
@@ -231,7 +236,7 @@ export const GalleryPickerGrid = ({
         onActivate(item);
       }
     },
-    [itemsByKey, onActivate]
+    [isStale, itemsByKey, onActivate]
   );
 
   return (

@@ -10,7 +10,10 @@ import {
   getGallerySelectedBoardId,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,
+  getGalleryListing,
+  getGalleryReadStatus,
   getGalleryStateView,
+  type GalleryQueryFacts,
 } from './galleryStateView';
 
 const boards: GalleryBoard[] = [
@@ -76,14 +79,14 @@ describe('gallery state view', () => {
     const values = { selectedBoardId: 'board-1' };
 
     expect(getGallerySelectedBoardId(values, [])).toBe('board-1');
-    expect(getGalleryStateView(values, [], null, false).selectedBoardId).toBe('board-1');
+    expect(getGalleryStateView(values, [], null).selectedBoardId).toBe('board-1');
   });
 
   it('falls back to uncategorized after loaded boards do not contain the selected board', () => {
     const values = { selectedBoardId: 'missing-board' };
 
     expect(getGallerySelectedBoardId(values, boards)).toBe('none');
-    expect(getGalleryStateView(values, boards, [], false).selectedBoardId).toBe('none');
+    expect(getGalleryStateView(values, boards, []).selectedBoardId).toBe('none');
   });
 
   /**
@@ -95,7 +98,7 @@ describe('gallery state view', () => {
     const values = { projectBoardId: 'project-board', selectedBoardId: 'missing-board' };
 
     expect(getGallerySelectedBoardId(values, projectBoards)).toBe('project-board');
-    expect(getGalleryStateView(values, projectBoards, [], false).selectedBoardId).toBe('project-board');
+    expect(getGalleryStateView(values, projectBoards, []).selectedBoardId).toBe('project-board');
   });
 
   it('keeps a still-resolvable selection rather than reverting to the project board', () => {
@@ -119,12 +122,18 @@ describe('gallery state view', () => {
     expect(getGallerySelectedBoardId({}, projectBoards)).toBe('none');
   });
 
-  it('does not render local fallback images while backend images are loading', () => {
-    const values = { recentImages: [createImage('local-fallback.png')], selectedBoardId: 'none' };
-    const gallery = getGalleryStateView(values, boards, null, true);
+  it('never substitutes unfiltered recents for a listing the current scope does not have', () => {
+    // Recents from another board, an anchored window or a failed page are not this scope's items.
+    const values = {
+      galleryPage: 3,
+      recentImages: [createImage('elsewhere.png')],
+      selectedBoardId: 'board-1',
+      selectedImageName: 'image:elsewhere.png',
+    };
+    const gallery = getGalleryStateView(values, boards, null);
 
-    expect((gallery as typeof gallery & { items?: GalleryItem[] }).items).toEqual([]);
-    expect(gallery.isLoading).toBe(true);
+    expect(gallery.items).toEqual([]);
+    expect(gallery.selectedItemKey).toBeNull();
   });
 
   it('exposes image, video, and asset counts for board labels', () => {
@@ -137,12 +146,7 @@ describe('gallery state view', () => {
   });
 
   it('parses persisted gallery settings with safe defaults', () => {
-    const gallery = getGalleryStateView(
-      { boardOrderBy: 'board_name', starredSectionCollapsed: 'yes' },
-      boards,
-      [],
-      false
-    );
+    const gallery = getGalleryStateView({ boardOrderBy: 'board_name', starredSectionCollapsed: 'yes' }, boards, []);
 
     expect(gallery.settings).toEqual({
       autoAddBoardId: 'follow',
@@ -164,9 +168,9 @@ describe('gallery state view', () => {
       starredSectionCollapsed: false,
       thumbnailFit: 'square',
     });
-    expect(
-      getGalleryStateView({ starredSectionCollapsed: true }, boards, [], false).settings.starredSectionCollapsed
-    ).toBe(true);
+    expect(getGalleryStateView({ starredSectionCollapsed: true }, boards, []).settings.starredSectionCollapsed).toBe(
+      true
+    );
   });
 
   it('exposes comparison state only while an image selection differs from the compare image', () => {
@@ -177,16 +181,16 @@ describe('gallery state view', () => {
       selectedImageName: 'image:selected.png',
     };
 
-    expect(getGalleryStateView(values, boards, [selected], false).isComparisonActive).toBe(true);
-    expect(
-      getGalleryStateView({ ...values, compareImage: selected }, boards, [selected], false).isComparisonActive
-    ).toBe(false);
-    expect(getGalleryStateView(values, boards, [], false).isComparisonActive).toBe(false);
+    expect(getGalleryStateView(values, boards, [selected]).isComparisonActive).toBe(true);
+    expect(getGalleryStateView({ ...values, compareImage: selected }, boards, [selected]).isComparisonActive).toBe(
+      false
+    );
+    expect(getGalleryStateView(values, boards, []).isComparisonActive).toBe(false);
 
     const video = createVideoItem('clip');
 
     expect(
-      getGalleryStateView({ ...values, selectedImageName: 'video:clip' }, boards, [video], false).isComparisonActive
+      getGalleryStateView({ ...values, selectedImageName: 'video:clip' }, boards, [video]).isComparisonActive
     ).toBe(false);
   });
 
@@ -209,12 +213,11 @@ describe('gallery state view', () => {
       getGalleryStateView(
         { ...stamped, ...values, selectedImageQuery: { ...stamped.selectedImageQuery, ...stamp } },
         boards,
-        [],
-        false
+        []
       ).revealTargetPage;
 
     expect(pageOf({})).toBe(2);
-    expect(getGalleryStateView(stamped, boards, [], false).page).toBe(0);
+    expect(getGalleryStateView(stamped, boards, []).page).toBe(0);
     expect(pageOf({ selectedBoardId: 'board-1' })).toBeNull();
     expect(pageOf({ paginationMode: 'infinite' })).toBeNull();
     expect(pageOf({}, { galleryView: 'assets' })).toBeNull();
@@ -235,9 +238,9 @@ describe('gallery state view', () => {
   });
 
   it('reads the starred-only filter as a strict boolean and stamps it on the selection query', () => {
-    expect(getGalleryStateView({ starredOnly: true }, boards, [], false).starredOnly).toBe(true);
-    expect(getGalleryStateView({ starredOnly: 'true' }, boards, [], false).starredOnly).toBe(false);
-    expect(getGalleryStateView({}, boards, [], false).starredOnly).toBe(false);
+    expect(getGalleryStateView({ starredOnly: true }, boards, []).starredOnly).toBe(true);
+    expect(getGalleryStateView({ starredOnly: 'true' }, boards, []).starredOnly).toBe(false);
+    expect(getGalleryStateView({}, boards, []).starredOnly).toBe(false);
 
     // The stamp wins over the live value: navigation walks the listing the
     // selection was made in, not the one the grid has since switched to.
@@ -251,28 +254,24 @@ describe('gallery state view', () => {
     const gallery = getGalleryStateView(
       { selectedImageNames: ['a.png', 'video:shared', 'image:shared', 7] },
       boards,
-      [],
-      false
+      []
     ) as ReturnType<typeof getGalleryStateView> & { selectedItemKeys?: string[] };
 
     expect(gallery.selectedItemKeys).toEqual(['image:a.png', 'video:shared', 'image:shared']);
     expect(
       (
-        getGalleryStateView({ selectedImageName: 'a.png' }, boards, [], false) as ReturnType<
-          typeof getGalleryStateView
-        > & { selectedItemKeys?: string[] }
+        getGalleryStateView({ selectedImageName: 'a.png' }, boards, []) as ReturnType<typeof getGalleryStateView> & {
+          selectedItemKeys?: string[];
+        }
       ).selectedItemKeys
     ).toEqual(['image:a.png']);
   });
 
   it('restores the selection set from a visible primary item after tab switches clear it', () => {
     const image = createImageItem('selected.png');
-    const gallery = getGalleryStateView(
-      { selectedImageName: 'image:selected.png', selectedImageNames: [] },
-      boards,
-      [image],
-      false
-    ) as ReturnType<typeof getGalleryStateView> & {
+    const gallery = getGalleryStateView({ selectedImageName: 'image:selected.png', selectedImageNames: [] }, boards, [
+      image,
+    ]) as ReturnType<typeof getGalleryStateView> & {
       selectedItemKey?: string | null;
       selectedItemKeys?: string[];
     };
@@ -285,10 +284,10 @@ describe('gallery state view', () => {
     const starred = { ...createImageItem('starred.png'), starred: true };
     const values = { selectedImageName: 'image:starred.png' };
 
-    expect(getGalleryStateView(values, boards, [createImageItem('regular.png')], false).selectedItemKey).toBeNull();
-    expect(
-      getGalleryStateView(values, boards, [createImageItem('regular.png')], false, [starred]).selectedItemKey
-    ).toBe('image:starred.png');
+    expect(getGalleryStateView(values, boards, [createImageItem('regular.png')]).selectedItemKey).toBeNull();
+    expect(getGalleryStateView(values, boards, [createImageItem('regular.png')], [starred]).selectedItemKey).toBe(
+      'image:starred.png'
+    );
   });
 
   it('projects same-name images and videos independently by qualified key', () => {
@@ -302,8 +301,7 @@ describe('gallery state view', () => {
         selectedImageNames: ['image:shared', 'video:shared'],
       },
       boards,
-      [image, video],
-      false
+      [image, video]
     ) as ReturnType<typeof getGalleryStateView> & {
       compareImageKey?: string | null;
       items?: GalleryItem[];
@@ -330,14 +328,80 @@ describe('gallery state view', () => {
     });
   });
   it('threads persisted semantic references into the board view', () => {
-    const ranked = getGalleryStateView(
-      { selectedBoardId: 'board-1', semanticImageQuery: 'ref.png' },
-      boards,
-      [],
-      false
-    );
+    const ranked = getGalleryStateView({ selectedBoardId: 'board-1', semanticImageQuery: 'ref.png' }, boards, []);
     expect(ranked.semanticImageQuery).toEqual({ imageName: 'ref.png', kind: 'image' });
-    expect(getGalleryStateView({ selectedBoardId: 'board-1' }, boards, [], false).semanticImageQuery).toBeNull();
+    expect(getGalleryStateView({ selectedBoardId: 'board-1' }, boards, []).semanticImageQuery).toBeNull();
+  });
+});
+
+describe('gallery read status', () => {
+  const pending: GalleryQueryFacts = { errorUpdateCount: 0, hasData: false, isError: false };
+  const failed: GalleryQueryFacts = { errorUpdateCount: 1, hasData: false, isError: true };
+  const loaded: GalleryQueryFacts = { errorUpdateCount: 0, hasData: true, isError: false };
+
+  it('tells a first load, an empty success and a failure apart', () => {
+    expect(getGalleryReadStatus(pending, 0)).toBe('loading');
+    expect(getGalleryReadStatus(loaded, 0)).toBe('empty');
+    expect(getGalleryReadStatus(loaded, 3)).toBe('ready');
+    expect(getGalleryReadStatus(failed, 0)).toBe('error');
+  });
+
+  it('keeps a failed scope failed while its retry is in flight', () => {
+    // A refetch resets a dataless query to pending with no error; the failure count survives that reset.
+    expect(getGalleryReadStatus({ errorUpdateCount: 1, hasData: false, isError: false }, 0)).toBe('error');
+  });
+
+  it("distinguishes a failed refresh from a failed next page of this scope's data", () => {
+    const refreshFailed = { ...loaded, errorUpdateCount: 1, isError: true };
+
+    expect(getGalleryReadStatus(refreshFailed, 3)).toBe('stale-error');
+    expect(getGalleryReadStatus({ ...refreshFailed, isFetchNextPageError: true }, 3)).toBe('more-error');
+    // A once-failed scope that has since loaded is healthy again.
+    expect(getGalleryReadStatus({ ...loaded, errorUpdateCount: 2 }, 3)).toBe('ready');
+  });
+});
+
+describe('getGalleryListing', () => {
+  const recent = createImageItem('just-generated.png');
+  const backend = createImageItem('backend.png');
+
+  it('lets scope-filtered recents ride along while the scope loads or has data', () => {
+    expect(getGalleryListing({ errorUpdateCount: 0, hasData: false, isError: false }, [recent])).toEqual({
+      items: [recent],
+      status: 'loading',
+    });
+    expect(getGalleryListing({ errorUpdateCount: 0, hasData: true, isError: false }, [recent, backend])).toEqual({
+      items: [recent, backend],
+      status: 'ready',
+    });
+  });
+
+  it('reports nothing to show before the first result when no recents apply', () => {
+    expect(getGalleryListing({ errorUpdateCount: 0, hasData: false, isError: false }, [])).toEqual({
+      items: null,
+      status: 'loading',
+    });
+  });
+
+  it('never lets recents stand in for a scope that failed without data, even mid-retry', () => {
+    expect(getGalleryListing({ errorUpdateCount: 1, hasData: false, isError: true }, [recent])).toEqual({
+      items: null,
+      status: 'error',
+    });
+    expect(getGalleryListing({ errorUpdateCount: 1, hasData: false, isError: false }, [recent])).toEqual({
+      items: null,
+      status: 'error',
+    });
+  });
+
+  it("keeps this scope's earlier items through a failed refresh or next page", () => {
+    const facts = { errorUpdateCount: 1, hasData: true, isError: true };
+
+    expect(getGalleryListing(facts, [backend])).toEqual({ items: [backend], status: 'stale-error' });
+    expect(getGalleryListing({ ...facts, isFetchNextPageError: true }, [backend])).toEqual({
+      items: [backend],
+      status: 'more-error',
+    });
   });
 });
 

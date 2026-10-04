@@ -40,6 +40,7 @@ import { page, userEvent } from 'vitest/browser';
 
 import type { GalleryStateView } from './galleryStateView';
 import type { GalleryActions, GalleryStarredStrip, GalleryWidgetContextValue } from './GalleryWidgetContext';
+import type { GalleryListingState } from './useGalleryData';
 
 import { mergeGalleryLoadedItems } from './galleryGridLayout';
 import { GalleryImageGrid } from './GalleryImageGrid';
@@ -253,7 +254,6 @@ const createGallery = (overrides: Partial<GalleryStateView> = {}): GalleryStateV
     compareImageKey: null,
     galleryView: 'images',
     isComparisonActive: false,
-    isLoading: false,
     items,
     page: 0,
     revealTargetPage: null,
@@ -400,11 +400,19 @@ let currentPinnedSessionId: string | null = null;
 let currentProgressSessions: QueueProgressSession[] = [];
 const followProgressSession = vi.fn();
 let currentStrip: GalleryStarredStrip = EMPTY_GALLERY_STARRED_STRIP;
+const READY_LISTING: GalleryListingState = {
+  error: null,
+  isFetchingMore: false,
+  isRetrying: false,
+  retry: () => Promise.resolve(),
+  status: 'ready',
+};
+let currentListing = READY_LISTING;
 let onDragStart = vi.fn();
 
 /** The strip the next renders show; `total` defaults to the item count. */
 const setStrip = (items: GalleryItem[], total = items.length) => {
-  currentStrip = { items, total };
+  currentStrip = { items, state: { ...READY_LISTING, status: items.length > 0 ? 'ready' : 'empty' }, total };
 };
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
@@ -437,10 +445,12 @@ const Harness = ({
   );
   const contextValue: GalleryWidgetContextValue = {
     actions: createActions(),
+    boardsState: READY_LISTING,
     filter: createFilter(gallery),
     gallery,
     itemActions: imageActionMocks,
     isWindowTruncated: false,
+    listing: currentListing,
     loadedItems: mergeGalleryLoadedItems(currentStrip.items, gallery.items),
     projectName: 'Project',
     region: 'right',
@@ -549,6 +559,7 @@ beforeEach(() => {
   currentPinnedSessionId = null;
   mocks.progressFrame = null;
   currentStrip = EMPTY_GALLERY_STARRED_STRIP;
+  currentListing = READY_LISTING;
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   host = document.createElement('div');
   host.style.cssText = 'height:480px;left:20px;position:fixed;top:20px;width:600px;';
@@ -1343,7 +1354,8 @@ describe('GalleryImageGrid reveal requests', () => {
   });
 
   it('keeps the loading message while an empty board is still loading', async () => {
-    await renderGallery(createGallery({ isLoading: true, items: [] }));
+    currentListing = { ...READY_LISTING, status: 'loading' };
+    await renderGallery(createGallery({ items: [] }));
 
     expect(host?.textContent).toContain('Loading gallery');
     expect(host?.querySelector('[role="button"]')).toBeNull();
@@ -1606,13 +1618,17 @@ describe('shared gallery progress section', () => {
   };
   it('stays visible above empty and filtered boards and follows the clicked session', async () => {
     currentProgressSessions = [session];
-    for (const boardState of [
-      { selectedBoardId: 'board-other', items: [] },
-      { searchTerm: 'unmatched', items: [] },
-      { starredOnly: true, items: [] },
-      { galleryView: 'assets' as const, items: [], isLoading: true },
-      { page: 5, anchoredWindowPage: 5 },
-    ]) {
+    const cases: [Partial<GalleryStateView>, GalleryListingState['status']][] = [
+      [{ selectedBoardId: 'board-other', items: [] }, 'empty'],
+      [{ searchTerm: 'unmatched', items: [] }, 'empty'],
+      [{ starredOnly: true, items: [] }, 'empty'],
+      [{ galleryView: 'assets', items: [] }, 'loading'],
+      [{ items: [] }, 'error'],
+      [{ page: 5, anchoredWindowPage: 5 }, 'ready'],
+    ];
+
+    for (const [boardState, status] of cases) {
+      currentListing = { ...READY_LISTING, status };
       await renderGallery(createGallery(boardState));
       expect(host?.querySelector('button[title^="Workflow A ·"]')).not.toBeNull();
     }

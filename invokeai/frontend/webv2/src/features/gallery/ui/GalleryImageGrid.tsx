@@ -43,10 +43,11 @@ import {
   getGalleryStarredLayout,
   getGalleryStarredStripItems,
 } from './galleryGridLayout';
+import { focusVisibleOperable, GalleryLoadErrorState, GalleryLoadNotice, GalleryRetryButton } from './GalleryLoadError';
 import { GalleryProgressSection } from './GalleryProgressSection';
 import { GalleryThumbnailCell } from './GalleryThumbnail';
 import { useGalleryUi } from './GalleryUiContext';
-import { useGalleryWidget } from './GalleryWidgetContext';
+import { useGalleryWidget, type GalleryStarredStrip } from './GalleryWidgetContext';
 import { useGalleryGridHotkeys } from './useGalleryGridHotkeys';
 import { useGalleryGridSelection } from './useGalleryGridSelection';
 import { useGalleryUploadInput } from './useGalleryUploadInput';
@@ -67,15 +68,19 @@ const dragEventContainsFiles = (event: DragEvent): boolean => Array.from(event.d
 /** Show all appears only when starred items exceed the strip and activates the starred-only listing. */
 const GalleryStarredSectionHeader = ({
   isOpen,
+  onFocusLost,
   onShowAll,
   onToggle,
   shownCount,
+  state,
   total,
 }: {
   isOpen: boolean;
+  onFocusLost: () => void;
   onShowAll: () => void;
   onToggle: () => void;
   shownCount: number;
+  state: GalleryStarredStrip['state'];
   total: number;
 }) => {
   const { t } = useTranslation();
@@ -120,6 +125,18 @@ const GalleryStarredSectionHeader = ({
           </Text>
         </HStack>
       </chakra.button>
+      {state.status === 'stale-error' ? (
+        // The strip keeps its earlier cells; the header carries the failed refresh and its recovery.
+        <GalleryRetryButton
+          aria-label={t('widgets.gallery.retryRefreshingStarredItems')}
+          color="fg.error"
+          flagsFailure
+          read={state}
+          size="xs"
+          variant="ghost"
+          onFocusLost={onFocusLost}
+        />
+      ) : null}
       {total > shownCount ? (
         <Button
           aria-label={t('widgets.gallery.showAllStarredItems')}
@@ -146,7 +163,9 @@ const GalleryStarredSection = ({
   columnCount,
   isOpen,
   renderCell,
+  state,
   total,
+  onFocusLost,
   onShowAll,
   onToggle,
 }: {
@@ -156,7 +175,9 @@ const GalleryStarredSection = ({
   columnCount: number;
   isOpen: boolean;
   renderCell: (item: GalleryItem) => ReactNode;
+  state: GalleryStarredStrip['state'];
   total: number;
+  onFocusLost: () => void;
   onShowAll: () => void;
   onToggle: () => void;
 }) => {
@@ -168,7 +189,9 @@ const GalleryStarredSection = ({
       <GalleryStarredSectionHeader
         isOpen={isOpen}
         shownCount={isOpen ? cells.length : 0}
+        state={state}
         total={total}
+        onFocusLost={onFocusLost}
         onShowAll={onShowAll}
         onToggle={onToggle}
       />
@@ -195,10 +218,20 @@ const GalleryStarredSection = ({
   );
 };
 
+/** A tile's own select button, not the star toggle layered over it. */
+const TILE_BUTTON_SELECTOR = '[role="listitem"] button[aria-pressed]';
+
+/** Prefers a visible tile; an empty grid offers whatever else it shows (its upload target, the strip header). */
+const focusVisibleGridContent = (viewport: HTMLElement | null, edge: 'first' | 'last') => {
+  if (!focusVisibleOperable(viewport, { edge, selector: TILE_BUTTON_SELECTOR })) {
+    focusVisibleOperable(viewport, { edge });
+  }
+};
+
 /** Measure viewport width for columns so both layouts share the same grid. */
 export const GalleryImageGrid = () => {
   const { t } = useTranslation();
-  const { actions, gallery, isWindowTruncated, itemActions, region, starredStrip } = useGalleryWidget();
+  const { actions, gallery, isWindowTruncated, itemActions, listing, region, starredStrip } = useGalleryWidget();
   const {
     gallery: galleryCommands,
     getItemLabel,
@@ -245,6 +278,10 @@ export const GalleryImageGrid = () => {
   // The listing is unstarred-only, so a board whose items are all starred
   // still has the strip to show.
   const isEmpty = gallery.items.length === 0 && starredStrip.items.length === 0;
+  // A failed strip with no cells to show (none loaded, or an empty earlier result) reports in the header's place.
+  const isStarredFailedEmpty =
+    (starredStrip.state.status === 'error' || starredStrip.state.status === 'stale-error') &&
+    starredStrip.items.length === 0;
   // A ranking that matched nothing is still a search result, never an empty
   // board inviting an upload.
   const hasActiveSearch = gallery.searchTerm.trim() !== '' || gallery.semanticImageQuery !== null;
@@ -314,6 +351,7 @@ export const GalleryImageGrid = () => {
   const starredLayout = getGalleryStarredLayout({
     collapsed: !isStarredOpen,
     columns: columnCount,
+    failed: isStarredFailedEmpty,
     shownCount: starredCells.length,
     tileSize: cellSizePx,
   });
@@ -562,6 +600,11 @@ export const GalleryImageGrid = () => {
   // Releasing the anchor puts the window back over the top of the listing.
   const handleReturnToBoardTop = useCallback(() => galleryCommands.setPage(0), [galleryCommands]);
 
+  // A successful retry unmounts the Retry that held focus; content the user can already see takes it instead,
+  // without scrolling. After more items load at the end, that is the bottom of the visible grid, beside the new items.
+  const focusGridContent = useCallback(() => focusVisibleGridContent(viewportRef.current, 'first'), []);
+  const focusGridEnd = useCallback(() => focusVisibleGridContent(viewportRef.current, 'last'), []);
+
   const renderCell = useCallback(
     (item: GalleryItem) => {
       const itemKey = toGalleryItemKey(item);
@@ -612,6 +655,18 @@ export const GalleryImageGrid = () => {
 
   return (
     <Stack flex="1" gap="0" h="full" minH="0" minW="0" w="full">
+      {listing.status === 'stale-error' ? (
+        <GalleryLoadNotice
+          bg="bg.panel"
+          flexShrink={0}
+          message={t('widgets.gallery.listingRefreshFailed')}
+          px="2"
+          py="1"
+          read={listing}
+          retryLabel={t('widgets.gallery.retryLoadingItems')}
+          onFocusLost={focusGridContent}
+        />
+      ) : null}
       <Box
         ref={syncRangeInteractionContext}
         flex="1"
@@ -655,9 +710,29 @@ export const GalleryImageGrid = () => {
                       columnCount={columnCount}
                       isOpen={isStarredOpen}
                       renderCell={renderCell}
+                      state={starredStrip.state}
                       total={starredStrip.total}
+                      onFocusLost={focusGridContent}
                       onShowAll={handleShowAllStarred}
                       onToggle={handleToggleStarredSection}
+                    />
+                  ) : isStarredFailedEmpty ? (
+                    // Never an absent strip: a failed one says so where it would sit, without holding up the grid.
+                    <GalleryLoadNotice
+                      h={`${GALLERY_STARRED_HEADER_HEIGHT_PX}px`}
+                      message={t(
+                        starredStrip.state.status === 'error'
+                          ? 'widgets.gallery.starredLoadFailed'
+                          : 'widgets.gallery.starredRefreshFailed'
+                      )}
+                      px="1"
+                      read={starredStrip.state}
+                      retryLabel={t(
+                        starredStrip.state.status === 'error'
+                          ? 'widgets.gallery.retryLoadingStarredItems'
+                          : 'widgets.gallery.retryRefreshingStarredItems'
+                      )}
+                      onFocusLost={focusGridContent}
                     />
                   ) : null}
                   <GalleryProgressSection
@@ -667,11 +742,25 @@ export const GalleryImageGrid = () => {
                   />
                 </Box>
               ) : null}
-              {isEmpty ? (
-                gallery.isLoading || hasActiveSearch || isVirtualBoard || gallery.starredOnly ? (
+              {listing.status === 'error' ? (
+                // A failed scope never reads as an empty board, a search with no matches, or another scope's items.
+                <Flex flex="1" minH="8rem">
+                  <GalleryLoadErrorState
+                    read={listing}
+                    retryLabel={t('widgets.gallery.retryLoadingItems')}
+                    title={t('widgets.gallery.listingLoadFailed')}
+                    onFocusLost={focusGridContent}
+                  />
+                </Flex>
+              ) : isEmpty && isStarredFailedEmpty && listing.status !== 'loading' ? (
+                // The unstarred listing is empty, but the board's starred items are unknown: neither "empty board"
+                // nor "no matches" would be true, so only the strip's failure speaks.
+                <Box flex="1" minH="8rem" />
+              ) : isEmpty ? (
+                listing.status === 'loading' || hasActiveSearch || isVirtualBoard || gallery.starredOnly ? (
                   <Flex align="center" color="fg.muted" flex="1" justify="center" minH="8rem">
                     <Text>
-                      {gallery.isLoading
+                      {listing.status === 'loading'
                         ? t('widgets.gallery.loadingBackendGallery')
                         : gallery.starredOnly && gallery.semanticImageQuery === null
                           ? t('widgets.gallery.noStarredItemsMatch')
@@ -738,12 +827,25 @@ export const GalleryImageGrid = () => {
                       })}
                     </Box>
                   </Box>
-                  {paginationMode === 'infinite' && gallery.isLoading && gallery.items.length > 0 && (
+                  {listing.status === 'more-error' ? (
+                    // Loaded pages stay; only the page that failed waits on Retry.
+                    <GalleryLoadNotice
+                      justify="center"
+                      message={t('widgets.gallery.listingLoadMoreFailed')}
+                      px="2"
+                      py="2"
+                      read={listing}
+                      retryLabel={t('widgets.gallery.retryLoadingMoreItems')}
+                      onFocusLost={focusGridEnd}
+                    />
+                  ) : paginationMode === 'infinite' &&
+                    (listing.isFetchingMore || listing.status === 'loading') &&
+                    gallery.items.length > 0 ? (
                     <Flex align="center" justify="center" py="2">
                       <Spinner color="fg.subtle" />
                     </Flex>
-                  )}
-                  {paginationMode === 'infinite' && !gallery.isLoading && isWindowTruncated && (
+                  ) : null}
+                  {paginationMode === 'infinite' && !listing.isFetchingMore && isWindowTruncated && (
                     <Flex align="center" justify="center" py="3">
                       <Text color="fg.subtle" fontSize="md" textAlign="center">
                         {gallery.anchoredWindowPage > 0
