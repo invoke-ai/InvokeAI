@@ -6,6 +6,7 @@ from typing import Any, Callable, Optional, Union
 import torch
 from typing_extensions import TypeAlias
 
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningMode
 from invokeai.app.services.config.config_default import get_config
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
     IPAdapterData,
@@ -288,7 +289,12 @@ class InvokeAIDiffuserComponent:
             scales = [ipa.scale_for_step(step_index, total_step_count) for ipa in ip_adapter_data]
             ip_masks = [ipa.mask for ipa in ip_adapter_data]
             regional_ip_data = RegionalIPData(
-                image_prompt_embeds=image_prompt_embeds, scales=scales, masks=ip_masks, dtype=x.dtype, device=x.device, cond_mode="both"
+                image_prompt_embeds=image_prompt_embeds,
+                scales=scales,
+                masks=ip_masks,
+                dtype=x.dtype,
+                device=x.device,
+                cond_mode=ConditioningMode.Both,
             )
             cross_attention_kwargs["regional_ip_data"] = regional_ip_data
 
@@ -405,7 +411,12 @@ class InvokeAIDiffuserComponent:
             scales = [ipa.scale_for_step(step_index, total_step_count) for ipa in ip_adapter_data]
             ip_masks = [ipa.mask for ipa in ip_adapter_data]
             regional_ip_data = RegionalIPData(
-                image_prompt_embeds=image_prompt_embeds, scales=scales, masks=ip_masks, dtype=x.dtype, device=x.device, cond_mode="both"
+                image_prompt_embeds=image_prompt_embeds,
+                scales=scales,
+                masks=ip_masks,
+                dtype=x.dtype,
+                device=x.device,
+                cond_mode=ConditioningMode.Both,
             )
 
         #####################
@@ -414,7 +425,7 @@ class InvokeAIDiffuserComponent:
 
         cross_attention_kwargs = {}
         if regional_ip_data is not None:
-            regional_ip_data.cond_mode = "neg"
+            regional_ip_data.cond_mode = ConditioningMode.Negative
             cross_attention_kwargs["regional_ip_data"] = regional_ip_data
 
         # Prepare SDXL conditioning kwargs for the unconditioned pass.
@@ -450,7 +461,7 @@ class InvokeAIDiffuserComponent:
 
         cross_attention_kwargs = {}
         if regional_ip_data is not None:
-            regional_ip_data.cond_mode = "pos"
+            regional_ip_data.cond_mode = ConditioningMode.Positive
             cross_attention_kwargs["regional_ip_data"] = regional_ip_data
 
         # Prepare SDXL conditioning kwargs for the conditioned pass.

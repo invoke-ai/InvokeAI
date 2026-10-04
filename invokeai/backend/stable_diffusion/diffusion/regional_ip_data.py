@@ -1,4 +1,10 @@
+from __future__ import annotations
+
 import torch
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningMode
 
 
 class RegionalIPData:
@@ -11,7 +17,7 @@ class RegionalIPData:
         masks: list[torch.Tensor],
         dtype: torch.dtype,
         device: torch.device,
-        cond_mode: str, # TODO: attention kwargs
+        cond_mode: ConditioningMode,  # TODO: attention kwargs
         max_downscale_factor: int = 8,
     ):
         """Initialize a `IPAdapterConditioningData` object."""
@@ -33,8 +39,9 @@ class RegionalIPData:
         # regions and 0.0 for excluded regions.
         self._masks_by_seq_len = self._prepare_masks(masks, max_downscale_factor, device, dtype)
 
+    @staticmethod
     def _prepare_masks(
-        self, masks: list[torch.Tensor], max_downscale_factor: int, device: torch.device, dtype: torch.dtype
+        masks: list[torch.Tensor], max_downscale_factor: int, device: torch.device, dtype: torch.dtype
     ) -> dict[int, torch.Tensor]:
         """Prepare the masks for the IP-Adapter attention."""
         # Concatenate the masks so that they can be processed more efficiently.

@@ -1,20 +1,18 @@
-from dataclasses import dataclass
-from typing import List, Optional, cast
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, List, Optional, cast
 
 import torch
 import torch.nn.functional as F
 from diffusers.models.attention_processor import Attention, AttnProcessor2_0
 
-from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionProcessorWeights
-from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
-from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
+from invokeai.backend.stable_diffusion.extensions.ip_adapter import IPAdapterExt
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningMode
 
-
-@dataclass
-class IPAdapterAttentionWeights:
-    ip_adapter_weights: IPAttentionProcessorWeights
-    skip: bool
-    negative: bool
+if TYPE_CHECKING:
+    from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
+    from invokeai.backend.stable_diffusion.diffusion.regional_prompt_data import RegionalPromptData
+    from invokeai.backend.stable_diffusion.extensions.ip_adapter import IPAdapterAttentionWeights
 
 
 class CustomAttnProcessor2_0(AttnProcessor2_0):
@@ -39,6 +37,14 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         """
         super().__init__()
         self._ip_adapter_attention_weights = ip_adapter_attention_weights
+
+    def add_ip_adapter(self, ip_adapter_attention_weight: IPAdapterAttentionWeights):
+        if self._ip_adapter_attention_weights is None:
+            self._ip_adapter_attention_weights = []
+        self._ip_adapter_attention_weights.append(ip_adapter_attention_weight)
+
+    def remove_ip_adapter(self, weight: IPAdapterAttentionWeights):
+        self._ip_adapter_attention_weights.remove(weight)
 
     def __call__(
         self,
@@ -133,7 +139,9 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
 
         # Apply IP-Adapter conditioning.
         if is_cross_attention:
-            hidden_states = self.run_ip_adapters(attn, query, hidden_states, encoder_hidden_states, regional_ip_data)
+            hidden_states = IPAdapterExt.run_adapters(
+                self, attn, query, hidden_states, encoder_hidden_states, regional_ip_data
+            )
 
         # Start unmodified block from AttnProcessor2_0.
         # vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv
@@ -177,75 +185,3 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
             attention_mask = prompt_region_attention_mask + attention_mask
 
         return attention_mask
-
-    def run_ip_adapters(self, attn, query, hidden_states, encoder_hidden_states, regional_ip_data) -> torch.Tensor:
-        batch_size, _, query_seq_len, head_dim = query.shape
-        token_len = encoder_hidden_states.shape[-1]
-
-        if self._ip_adapter_attention_weights:
-            assert regional_ip_data is not None
-            ip_masks = regional_ip_data.get_masks(query_seq_len=query_seq_len)
-
-            assert (
-                len(regional_ip_data.image_prompt_embeds)
-                == len(self._ip_adapter_attention_weights)
-                == len(regional_ip_data.scales)
-                == ip_masks.shape[1]
-            )
-
-            for ipa_index, ipa_embed in enumerate(regional_ip_data.image_prompt_embeds):
-                ipa_weights = self._ip_adapter_attention_weights[ipa_index].ip_adapter_weights
-                ipa_scale = regional_ip_data.scales[ipa_index]
-                ip_mask = ip_masks[0, ipa_index, ...]
-
-                # The batch dimensions should match.
-                # assert ipa_embed.shape[0] == encoder_hidden_states.shape[0]
-                assert ipa_embed.shape[0] == 2
-                # The token_len dimensions should match.
-                assert ipa_embed.shape[-1] == token_len
-
-                # Expected ip_hidden_state shape: (batch_size, num_ip_images, ip_seq_len, ip_image_embedding)
-
-                if not self._ip_adapter_attention_weights[ipa_index].skip:
-                    # apply the IP-Adapter weights to the negative embeds
-                    # ipa_embed[0] - neg
-                    # ipa_embed[1] - pos
-                    if self._ip_adapter_attention_weights[ipa_index].negative:
-                        ipa_embed = torch.cat([ipa_embed[1], ipa_embed[0] * 0], dim=0)
-
-                    if regional_ip_data.cond_mode == "pos":
-                        ip_hidden_states = ipa_embed[1:2]  # [1]
-                    elif regional_ip_data.cond_mode == "neg":
-                        ip_hidden_states = ipa_embed[0:1]  # [0]
-                    else:
-                        ip_hidden_states = ipa_embed
-
-                    ip_key = ipa_weights.to_k_ip(ip_hidden_states)
-                    ip_value = ipa_weights.to_v_ip(ip_hidden_states)
-
-                    # Expected ip_key and ip_value shape:
-                    # (batch_size, num_ip_images, ip_seq_len, head_dim * num_heads)
-
-                    ip_key = ip_key.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
-                    ip_value = ip_value.view(batch_size, -1, attn.heads, head_dim).transpose(1, 2)
-
-                    # Expected ip_key and ip_value shape:
-                    # (batch_size, num_heads, num_ip_images * ip_seq_len, head_dim)
-
-                    # TODO: add support for attn.scale when we move to Torch 2.1
-                    ip_hidden_states = F.scaled_dot_product_attention(
-                        query, ip_key, ip_value, attn_mask=None, dropout_p=0.0, is_causal=False
-                    )
-
-                    # Expected ip_hidden_states shape: (batch_size, num_heads, query_seq_len, head_dim)
-                    ip_hidden_states = ip_hidden_states.transpose(1, 2).reshape(batch_size, -1, attn.heads * head_dim)
-
-                    ip_hidden_states = ip_hidden_states.to(query.dtype)
-
-                    # Expected ip_hidden_states shape: (batch_size, query_seq_len, num_heads * head_dim)
-                    hidden_states = hidden_states + ipa_scale * ip_hidden_states * ip_mask
-        else:
-            # If IP-Adapter is not enabled, then regional_ip_data should not be passed in.
-            assert regional_ip_data is None
-
-        return hidden_states
