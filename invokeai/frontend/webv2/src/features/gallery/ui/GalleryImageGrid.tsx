@@ -874,7 +874,10 @@ export const GalleryImageGrid = () => {
             w="full"
             onFocus={handleGridFocus}
           >
-            <ScrollArea.Content display="flex" flexDirection="column" minH="full">
+            {/* The viewport is a flex column, and `minH` replaces the content's automatic minimum: without
+                `flexShrink={0}` the content would be squeezed to the viewport's height, shrinking the virtual rows'
+                sizer (it holds nothing in flow) so the rows overflow it and whatever follows sits mid-list. */}
+            <ScrollArea.Content display="flex" flexDirection="column" flexShrink={0} minH="full">
               {pinnedHeight > 0 ? (
                 <Box
                   borderBottomWidth="1px"
@@ -972,7 +975,10 @@ export const GalleryImageGrid = () => {
                 )
               ) : (
                 <>
-                  <Box h={`${virtualizer.totalSize}px`} position="relative" w="full">
+                  {/* Rows have a fixed pitch, so the row model sizes the grid in the same render. The virtualizer's
+                      total trails a row-count change by a commit, long enough for the notice after the rows to
+                      leave first and the browser to clamp a scroll position resting at the bottom. */}
+                  <Box h={`${rowCount * rowHeightPx}px`} position="relative" w="full">
                     <Box
                       aria-label={t('widgets.gallery.itemsAriaLabel')}
                       h="full"

@@ -86,11 +86,13 @@ describe('Picker', () => {
     count: number,
     {
       groups = FRUIT_GROUPS,
+      isCompact,
       onSelect = vi.fn(),
       selectedId = null,
       status,
     }: {
       groups?: PickerGroup<Fruit>[];
+      isCompact?: boolean;
       onSelect?: (fruit: Fruit) => void;
       selectedId?: string | null;
       status?: PickerStatus;
@@ -106,6 +108,7 @@ describe('Picker', () => {
               getIsOptionDisabled={getIsOptionDisabled}
               getOptionId={getOptionId}
               groups={groups}
+              isCompact={isCompact}
               isMatch={isMatch}
               listLabel={`Fruit ${index}`}
               noMatchesMessage="No fruit matches"
@@ -310,6 +313,45 @@ describe('Picker', () => {
     // Far outside the rendered window, yet still the mounted target of aria-activedescendant.
     expect(activeOption()?.textContent).toContain('Plum 101');
     expect(isInView(activeOption())).toBe(false);
+  });
+
+  it('opens with the selected option fully in view wherever it sits, once rows are measured', async () => {
+    // Every Sedum carries a description, so rows outgrow the estimates the opening offset starts from. With 28px
+    // headers and 36px rows estimated, "sedum-6" is the last option the estimates place above the 288px fold.
+    const groups: PickerGroup<Fruit>[] = ['Sedum', 'Fern', 'Moss'].map((name, groupIndex) => ({
+      id: name,
+      name,
+      options: Array.from({ length: 9 }, (_, index) => ({
+        detail: groupIndex === 0 || index % 2 === 1 ? `${name} detail ${index}` : undefined,
+        id: `${name.toLowerCase()}-${index}`,
+        name: `${name} ${index}`,
+      })),
+    }));
+    const viewport = () => host.querySelector<HTMLElement>('[data-part="viewport"]')!;
+    const nextFrame = () =>
+      new Promise<void>((resolve) => {
+        requestAnimationFrame(() => resolve());
+      });
+    // Settled: the scroll offset held across two frames.
+    const settledInView = async () => {
+      const before = viewport().scrollTop;
+      await nextFrame();
+      await nextFrame();
+
+      return viewport().scrollTop === before && isInView(activeOption());
+    };
+
+    for (const isCompact of [false, true]) {
+      for (const selectedId of ['sedum-0', 'sedum-6', 'fern-4', 'moss-7', 'moss-8']) {
+        await act(() => root.render(null));
+        await renderPickers(1, { groups, isCompact, selectedId });
+
+        expect(activeOption()?.id.endsWith(selectedId)).toBe(true);
+        await expect
+          .poll(settledInView, { message: `${selectedId}${isCompact ? ', compact' : ''}`, timeout: 2000 })
+          .toBe(true);
+      }
+    }
   });
 
   it('shows the first result after filtering a list scrolled far down', async () => {

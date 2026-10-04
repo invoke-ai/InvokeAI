@@ -101,7 +101,7 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
         >
           <Icon as={MoveHorizontalIcon} boxSize="3" color="fg.subtle" />
         </NumberInput.Scrubber>
-        <NumberInput.Input ps="7" />
+        <NumberInput.Input aria-label={label} ps="7" />
       </NumberInput.Root>
     );
   }

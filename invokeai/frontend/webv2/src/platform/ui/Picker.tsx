@@ -5,7 +5,17 @@ import { Box, createRecipeContext, HStack, Icon, InputGroup, ScrollArea, Spacer,
 import { isImeComposing } from '@platform/browser/imeComposition';
 import { dropdownGroupLabel } from '@theme/recipes';
 import { SearchIcon } from 'lucide-react';
-import { Fragment, useCallback, useDeferredValue, useId, useImperativeHandle, useMemo, useRef, useState } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useDeferredValue,
+  useId,
+  useImperativeHandle,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useVirtualizer, type Range, type VirtualItem } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
 
@@ -358,8 +368,8 @@ export const Picker = <T,>({
 
 /**
  * One result set's virtualized listbox. It is keyed by the result set, so each mount opens with the active option
- * in view without an effect: the virtualizer's initial offset reveals it, as Platform List's `revealActiveOnMount`
- * does. Keyboard moves within the set scroll through the handle.
+ * in view: the virtualizer's initial offset places it from estimates, as Platform List's `revealActiveOnMount` does,
+ * and a pre-paint reveal corrects for measured row heights. Keyboard moves within the set scroll through the handle.
  */
 const PickerListbox = <T,>({
   activeIndex,
@@ -428,6 +438,17 @@ const PickerListbox = <T,>({
     useFlushSync: false,
   });
   const { measureElement, scrollToIndex, virtualItems } = virtualizer;
+  // The option active when this result set mounted; later keyboard moves scroll through the handle.
+  const [revealIndex] = useState(activeIndex);
+
+  // The initial offset comes from estimates, and the rows above, at or below the active option may measure taller or
+  // shorter, leaving it partly hidden. The first commit's rows are measured before layout effects run, so this nudges
+  // it fully into view before paint; the virtualizer then keeps the alignment exact while newly shown rows measure.
+  useLayoutEffect(() => {
+    if (revealIndex >= 0) {
+      scrollToIndex(revealIndex, { align: 'auto' });
+    }
+  }, [revealIndex, scrollToIndex]);
 
   useImperativeHandle(ref, () => ({ scrollToIndex: (index) => scrollToIndex(index, { align: 'auto' }) }), [
     scrollToIndex,

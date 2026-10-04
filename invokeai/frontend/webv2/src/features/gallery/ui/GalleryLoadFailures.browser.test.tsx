@@ -1,6 +1,7 @@
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop */
 import type { GalleryItem, GalleryItemsPage } from '@features/gallery/core/items';
 import type { GalleryBoard, GeneratedImageContract } from '@features/gallery/core/types';
+import type { QueueProgressSession } from '@features/queue/contracts';
 
 import { Box, ChakraProvider } from '@chakra-ui/react';
 import { DndContext } from '@dnd-kit/core';
@@ -124,9 +125,11 @@ const ItemActionsProvider = ({ children }: { children: ReactNode }) => (
 /** The workbench side: Gallery commands patch the values the widget reads back, as the real store does. */
 const Harness = ({
   initialValues,
+  progressSessions,
   region,
 }: {
   initialValues: Record<string, unknown>;
+  progressSessions: QueueProgressSession[];
   region: 'bottom' | 'center';
 }) => {
   const [galleryValues, setGalleryValues] = useState(initialValues);
@@ -167,12 +170,12 @@ const Harness = ({
       liveFollowEnabled: false,
       notifications: { add: noop, reportError: noop },
       pinnedProgressSessionId: null,
-      progressSessions: [],
+      progressSessions,
       projectId: 'project-1',
       projectName: 'Project',
       widgets: { openGallery: () => true, patchGalleryValues: patch },
     };
-  }, [galleryValues]);
+  }, [galleryValues, progressSessions]);
 
   return (
     <GalleryUiProvider adapter={adapter}>
@@ -189,13 +192,35 @@ let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 let queryClient: QueryClient | null = null;
 
-const renderGallery = async (values: Record<string, unknown> = {}, region: 'bottom' | 'center' = 'center') => {
+const NO_SESSIONS: QueueProgressSession[] = [];
+const PROGRESS_SESSION: QueueProgressSession = {
+  backendItemId: 10,
+  height: 768,
+  id: 'running',
+  itemCount: 1,
+  itemIndex: 1,
+  label: 'Run running',
+  queueItemId: 'running',
+  sourceId: 'generate',
+  state: 'running',
+  width: 512,
+};
+
+const renderGallery = async (
+  values: Record<string, unknown> = {},
+  region: 'bottom' | 'center' = 'center',
+  progressSessions = NO_SESSIONS
+) => {
   await act(() =>
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
           <QueryClientProvider client={queryClient!}>
-            <Harness initialValues={{ selectedBoardId: 'dogs', ...values }} region={region} />
+            <Harness
+              initialValues={{ selectedBoardId: 'dogs', ...values }}
+              progressSessions={progressSessions}
+              region={region}
+            />
           </QueryClientProvider>
         </ChakraProvider>
       </I18nextProvider>
@@ -227,8 +252,56 @@ const settleFrames = async (frames = 8) => {
     );
   }
 };
+/** Each a minute older than the last, so the grid shows them in this order, page after page. */
 const dogs = (count: number, from = 0) =>
-  Array.from({ length: count }, (_, index) => image(`dog-${String(from + index).padStart(3, '0')}.png`, 'dogs'));
+  Array.from({ length: count }, (_, index) => ({
+    ...image(`dog-${String(from + index).padStart(3, '0')}.png`, 'dogs'),
+    createdAt: new Date(Date.UTC(2026, 8, 30) - (from + index) * 60_000).toISOString(),
+  }));
+
+/**
+ * Scrolls the grid to its end, which requests the next page; once that has failed, settles at the new end and
+ * measures the failure notice against the viewport and the loaded tiles.
+ */
+const scrollToLoadMoreFailure = async () => {
+  const viewport = gridViewport()!;
+  const scrollToEnd = () => {
+    viewport.scrollTop = viewport.scrollHeight;
+    viewport.dispatchEvent(new Event('scroll'));
+  };
+
+  await act(scrollToEnd);
+  await waitFor(() => expect(findButton('Retry loading more items')).not.toBeNull());
+  await act(scrollToEnd);
+  // Outlast the virtualizer's 150ms scrolling state, as a user reading the notice would.
+  await act(
+    () =>
+      new Promise<void>((resolve) => {
+        setTimeout(resolve, 200);
+      })
+  );
+  expect(viewport.scrollTop + viewport.clientHeight).toBeGreaterThanOrEqual(viewport.scrollHeight - 1);
+
+  const rect = findButton('Retry loading more items')!.parentElement!.getBoundingClientRect();
+  const viewportRect = viewport.getBoundingClientRect();
+  const tiles = [...listing()!.querySelectorAll<HTMLElement>('[role="listitem"]')];
+  // The end of the bottom row; tiles of one row may differ by a subpixel.
+  const lastTile = tiles.reduce((last, tile) =>
+    tile.getBoundingClientRect().bottom > last.getBoundingClientRect().bottom - 1 ? tile : last
+  );
+
+  return {
+    inViewport: rect.top >= viewportRect.top - 1 && rect.bottom <= viewportRect.bottom + 1,
+    lastTileBottom: lastTile.getBoundingClientRect().bottom,
+    lastTileName: lastTile.querySelector('button[aria-pressed]')?.getAttribute('aria-label'),
+    overlappingTiles: tiles.filter((tile) => {
+      const tileRect = tile.getBoundingClientRect();
+
+      return tileRect.top < rect.bottom && tileRect.bottom > rect.top;
+    }).length,
+    rect,
+  };
+};
 
 beforeEach(() => {
   accountLifecycle.activate('gallery-load-failures');
@@ -387,6 +460,70 @@ describe('Gallery listing failures', () => {
     expect(findButton('Retry loading more items')?.getAttribute('aria-busy')).toBeNull();
   });
 
+  it('shows the load-more failure after the last loaded row, in view at the end of the grid', async () => {
+    transport.listItems.mockImplementation(({ offset }) => (offset === 0 ? page(dogs(60), 500) : fail()));
+    await renderGallery();
+    await waitFor(() => expect(thumbnailNames().length).toBeGreaterThan(0));
+
+    const viewport = gridViewport()!;
+    const notice = await scrollToLoadMoreFailure();
+
+    expect(notice.inViewport).toBe(true);
+    expect(notice.overlappingTiles).toBe(0);
+    // The last of the 60 loaded tiles sits directly above it.
+    expect(notice.lastTileName).toBe('Select dog-059.png for preview');
+    expect(notice.rect.top).toBeGreaterThanOrEqual(notice.lastTileBottom);
+    // The listing's box spans its rows, so whatever follows it in flow cannot land among them.
+    expect(listing()!.getBoundingClientRect().bottom).toBeGreaterThanOrEqual(notice.lastTileBottom);
+
+    // Keyboard users reach Retry from the last tile.
+    const lastTile = listing()!.querySelector<HTMLElement>('button[aria-label="Select dog-059.png for preview"]')!;
+
+    lastTile.focus({ preventScroll: true });
+    await userEvent.tab();
+    expect(document.activeElement?.getAttribute('aria-label')).toBe('Retry loading more items');
+
+    transport.listItems.mockImplementation(({ offset }) => page(dogs(60, offset), 500));
+    await userEvent.keyboard('{Enter}');
+    await waitFor(() => expect(findButton('Retry loading more items')).toBeNull());
+    await settleFrames(2);
+
+    // The next page's first tiles take the notice's place, where the user is looking.
+    const viewportRect = viewport.getBoundingClientRect();
+    const tileInPlace = [...listing()!.querySelectorAll<HTMLElement>('[role="listitem"]')].find((tile) => {
+      const tileRect = tile.getBoundingClientRect();
+
+      return tileRect.top < notice.rect.bottom && tileRect.bottom > notice.rect.top;
+    });
+
+    expect(tileInPlace?.querySelector('button[aria-pressed]')?.getAttribute('aria-label')).toMatch(
+      /^Select dog-0(6\d)\.png for preview$/
+    );
+    expect(tileInPlace!.getBoundingClientRect().top).toBeLessThan(viewportRect.bottom);
+  });
+
+  it('places the load-more failure after the rows below the starred strip and progress tiles, at any density', async () => {
+    for (const imageDensityPercent of [0, 100]) {
+      transport.listItems.mockImplementation(({ offset }) => (offset === 0 ? page(dogs(60), 500) : fail()));
+      transport.listStarred.mockImplementation(() =>
+        page(Array.from({ length: 4 }, (_, index) => ({ ...image(`fav-${index}.png`, 'dogs', 9), starred: true })))
+      );
+      await renderGallery({ imageDensityPercent }, 'center', [PROGRESS_SESSION]);
+      await waitFor(() => expect(host?.querySelector('[role="list"][aria-label="Starred"]')).not.toBeNull());
+      expect(host?.querySelector('[data-gallery-session-id]')).not.toBeNull();
+
+      const notice = await scrollToLoadMoreFailure();
+
+      expect(notice.inViewport, `density ${imageDensityPercent}`).toBe(true);
+      expect(notice.overlappingTiles, `density ${imageDensityPercent}`).toBe(0);
+      expect(notice.lastTileName, `density ${imageDensityPercent}`).toBe('Select dog-059.png for preview');
+      expect(notice.rect.top, `density ${imageDensityPercent}`).toBeGreaterThanOrEqual(notice.lastTileBottom);
+
+      await act(() => root?.render(null));
+      queryClient?.clear();
+    }
+  });
+
   it('hands focus to the grid beside the new items after a load-more Retry, without scrolling', async () => {
     transport.listItems.mockImplementation(({ offset }) => (offset === 0 ? page(dogs(60), 500) : fail()));
     await renderGallery();
@@ -394,18 +531,9 @@ describe('Gallery listing failures', () => {
 
     const viewport = gridViewport()!;
 
-    // Scrolling to the end of the loaded page asks for the next one, which fails.
-    await act(() => {
-      viewport.scrollTop = viewport.scrollHeight;
-      viewport.dispatchEvent(new Event('scroll'));
-    });
-    await waitFor(() => expect(findButton('Retry loading more items')).not.toBeNull());
+    await scrollToLoadMoreFailure();
 
     const retry = findButton('Retry loading more items')!;
-
-    retry.scrollIntoView({ block: 'nearest' });
-    await settleFrames(2);
-
     const scrollTop = viewport.scrollTop;
 
     expect(scrollTop).toBeGreaterThan(0);

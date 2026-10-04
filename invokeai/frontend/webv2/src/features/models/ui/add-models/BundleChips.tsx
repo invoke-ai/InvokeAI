@@ -33,7 +33,7 @@ export const BundleChips = ({
       {bundles.length > 0 ? (
         <Scrollable
           flex="1"
-          label={t('modelManager.launchpad.starterBundles')}
+          label={t('models.launchpad.starterBundles')}
           minW="0"
           orientation="horizontal"
           variant="hover"
