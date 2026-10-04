@@ -12,8 +12,7 @@ import { useTranslation } from 'react-i18next';
 
 import { BoardCover } from './GalleryBoardCover';
 import { useMenuTriggerIds } from './galleryMenuIds';
-import { useGalleryWidget } from './GalleryWidgetContext';
-import { useGallerySelectionStarred } from './useGallerySelectionStar';
+import { useGallerySelectionStarred, useGalleryWidget } from './GalleryWidgetContext';
 
 const MOVE_MENU_POSITIONING = { placement: 'top-end' } as const;
 

@@ -7,8 +7,7 @@ import { useEffect, useEffectEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useGalleryUi } from './GalleryUiContext';
-import { useGalleryWidget } from './GalleryWidgetContext';
-import { useGallerySelectionStarred } from './useGallerySelectionStar';
+import { useGallerySelectionStarred, useGalleryWidget } from './GalleryWidgetContext';
 
 const GALLERY_HOTKEYS = [
   ['gallery.selectAllOnPage', 'widgets.gallery.commands.selectAllOnPage', null, ['mod+a']],
