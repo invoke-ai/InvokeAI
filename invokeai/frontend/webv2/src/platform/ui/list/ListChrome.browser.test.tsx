@@ -237,6 +237,47 @@ describe('list dividers', () => {
     expect(hairlines().map((line) => getComputedStyle(line).opacity)).toEqual(['1', '1']);
   });
 
+  it('opens a menu-only row from keyboard, assistive-tech, and touch activation, but not a mouse click', async () => {
+    const onContextMenu = vi.fn();
+    await render(
+      <ListStack label="subjects">
+        <ListItem title="one" onContextMenu={onContextMenu} />
+      </ListStack>
+    );
+    const primary = host.querySelector<HTMLButtonElement>('[data-list-primary]')!;
+    const tap = (pointerType: string) => {
+      primary.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerType }));
+      primary.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 }));
+    };
+
+    await act(() => tap('mouse'));
+    expect(onContextMenu).not.toHaveBeenCalled();
+
+    // NVDA/JAWS in Firefox click with detail 1 and no pointer press.
+    await act(() => primary.dispatchEvent(new MouseEvent('click', { bubbles: true, detail: 1 })));
+    await act(() => tap('touch'));
+    await act(() => tap('pen'));
+    expect(onContextMenu).toHaveBeenCalledTimes(3);
+  });
+
+  it('points a row whose only interaction is its actions', async () => {
+    await render(
+      <ListStack dividers label="subjects">
+        <ListItem title="one" />
+        <ListItem actions={<button type="button">Install</button>} title="two" />
+        <ListItem title="three" />
+      </ListStack>
+    );
+    const row = host.querySelectorAll<HTMLElement>('[data-list-surface]')[1]!;
+    const background = getComputedStyle(row).backgroundColor;
+
+    await userEvent.hover(row);
+    // Still not a button itself: the install button is the row's only control.
+    expect(row.querySelector('[data-list-primary]')?.tagName).toBe('DIV');
+    await expect.poll(() => getComputedStyle(row).backgroundColor).not.toBe(background);
+    await expect.poll(() => hairlines().map((line) => getComputedStyle(line).opacity)).toEqual(['0', '0']);
+  });
+
   it('hides the hairlines either side of a pointed row, stacked or virtualized', async () => {
     const opacities = () =>
       [...host.querySelectorAll<HTMLElement>('[data-list-divider]')].map((line) => getComputedStyle(line).opacity);

@@ -1,9 +1,9 @@
-import type { MouseEvent, ReactNode } from 'react';
+import type { MouseEvent, PointerEvent, ReactNode } from 'react';
 
 import { Checkbox, chakra, useSlotRecipe } from '@chakra-ui/react';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { listItemSlotRecipe } from '@theme/recipes';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useMemo, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
 export type ListDensity = 'compact' | 'regular' | 'comfortable' | 'snug';
@@ -66,7 +66,10 @@ export interface ListItemProps {
   onIntent?: () => void;
   /** Renders the leading checkbox. */
   onCheckedChange?: (checked: boolean) => void;
-  /** Without onPress, activating the primary button also opens this menu. */
+  /**
+   * Without onPress, activating the primary button also opens this menu, except from a mouse click, where
+   * right-click is the path; keyboard, assistive-technology, touch, and pen activation all open it.
+   */
   onContextMenu?: (anchor: ListContextMenuAnchor) => void;
 }
 
@@ -109,6 +112,9 @@ export const ListItem = ({
   const styles = useMemo(() => recipe({ active: tone, density }), [density, recipe, tone]);
   // Inside a List every row is a keyboard stop; a standalone row is a button only when pressing it does something.
   const isInteractive = onPress !== undefined || onContextMenu !== undefined || itemKey !== undefined;
+  // A row with actions is pointed like an interactive one, so its buttons read as belonging to it; only a row with
+  // nothing to act on stays static.
+  const isStatic = !isInteractive && (actions === undefined || actions === null);
 
   const openContextMenu = useCallback(
     (row: HTMLElement, point?: { x: number; y: number }) => {
@@ -163,14 +169,24 @@ export const ListItem = ({
     (details: { checked: boolean | 'indeterminate' }) => onCheckedChange?.(details.checked === true),
     [onCheckedChange]
   );
+  // Detect a mouse press positively: screen readers synthesize clicks that look like pointer clicks (detail 1), and
+  // touch has no right-click, so only a click that a mouse pressed skips the menu.
+  const pressPointerType = useRef<string | null>(null);
+  const handlePointerDown = useCallback((event: PointerEvent<HTMLButtonElement>) => {
+    pressPointerType.current = event.pointerType;
+  }, []);
   const handlePress = useCallback(
     (event: MouseEvent<HTMLButtonElement>) => {
+      // Firefox marks screen-reader activation as a virtual input source even when it fires pointer events for it.
+      const isVirtualClick = (event.nativeEvent as { mozInputSource?: number }).mozInputSource === 0;
+      const isMouseClick = pressPointerType.current === 'mouse' && event.detail > 0 && !isVirtualClick;
+      pressPointerType.current = null;
       if (isBusy) {
         return;
       }
       if (onPress) {
         onPress(event);
-      } else if (event.currentTarget.parentElement) {
+      } else if (!isMouseClick && event.currentTarget.parentElement) {
         openContextMenu(event.currentTarget.parentElement);
       }
     },
@@ -216,7 +232,7 @@ export const ListItem = ({
       data-list-row={itemKey}
       data-list-surface=""
       data-menu-open={isMenuOpen || undefined}
-      data-static={!isInteractive || undefined}
+      data-static={isStatic || undefined}
       role={role}
       onContextMenu={onContextMenu ? handleContextMenu : undefined}
     >
@@ -247,6 +263,7 @@ export const ListItem = ({
           type="button"
           onClick={handlePress}
           onFocus={onIntent}
+          onPointerDown={onPress ? undefined : handlePointerDown}
           onPointerEnter={onIntent}
         >
           {content}

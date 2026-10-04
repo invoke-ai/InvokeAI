@@ -238,6 +238,15 @@ describe('ConceptRow', () => {
     expect(onRemove).toHaveBeenCalledWith('lora-1');
   });
 
+  it('does not open row actions on a pointer click', async () => {
+    const row = await render(makeLora());
+
+    await act(() => userEvent.click(row.querySelector<HTMLElement>('[data-list-primary]')!));
+
+    expect(document.querySelector('[role="menu"][data-state="open"]')).toBeNull();
+    expect(row.querySelector('[data-list-primary]')?.getAttribute('aria-expanded')).toBe('false');
+  });
+
   it.each(['{Enter}', ' '])('opens row actions on %s and restores focus on Escape', async (key) => {
     const row = await render(makeLora());
     const primary = row.querySelector<HTMLElement>('[data-list-primary]')!;
