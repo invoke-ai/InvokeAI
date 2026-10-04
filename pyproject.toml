@@ -85,6 +85,9 @@ dependencies = [
   "pydantic-settings",
   "pydantic",
   "python-socketio",
+  # The database layer compiles every query through SQLAlchemy Core. Keep the minor-version bound: dialect
+  # compilation and the pysqlite transaction handling it relies on are exactly what changes between minors.
+  "sqlalchemy>=2.1,<2.2",
   "uvicorn[standard]",
 
   # Auxiliary dependencies, pinned only if necessary.
@@ -184,6 +187,8 @@ dependencies = [
   "torchvision==0.22.1; sys_platform == 'darwin' or (sys_platform == 'linux' and platform_machine == 'aarch64')",
 ]
 
+# Driver for running the application database on MySQL or MariaDB instead of SQLite.
+"mysql" = ["pymysql>=1.2.3,<2"]
 "onnx" = ["onnxruntime"]
 "onnx-cuda" = ["onnxruntime-gpu"]
 "onnx-directml" = ["onnxruntime-directml"]
@@ -363,7 +368,11 @@ addopts = "--strict-markers --dist loadfile -m \"not slow\""
 markers = [
   "slow: Marks tests as slow. Disabled by default. To run all tests, use -m \"\". To run only slow tests, use -m \"slow\".",
   "timeout: Marks the timeout override.",
+  "uses_database: Runs on the `empty_database` fixture, which targets INVOKEAI_TEST_DB_URL when it is set and SQLite otherwise. Applied by the collection hook in tests/conftest.py.",
+  "sqlite_only: Depends on SQLite internals (query plans, PRAGMAs, the single connection); skipped when INVOKEAI_TEST_DB_URL targets another backend.",
 ]
+# A cache-key or other SQLAlchemy warning is a bug in the query layer, not noise.
+filterwarnings = ["error::sqlalchemy.exc.SAWarning"]
 [tool.coverage.run]
 branch = true
 source = ["invokeai"]

@@ -18,10 +18,9 @@ class ImageIndexRecordsBase(ABC):
     board access are answered from that kind's own tables.
 
     Every method here is its own unit of work and must not be called from inside another
-    service's open transaction. `SqliteDatabase.transaction()` commits and rolls back the whole
-    shared connection rather than using savepoints, so a nested call either commits the outer
-    transaction's work early (on success) or discards it (on failure). No caller in the tree
-    nests these today; keep it that way.
+    service's open transaction: a nested `SqliteDatabase.transaction()` joins the outer one, so the
+    method's work would commit or roll back with that transaction instead of on its own. No caller
+    in the tree nests these today; keep it that way.
     """
 
     @abstractmethod

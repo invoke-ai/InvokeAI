@@ -186,10 +186,11 @@ def test_delete_user_drops_references_only_of_documents_that_cascade(user_servic
     user = user_service.create(
         UserCreateRequest(email="test@example.com", display_name="T", password="TestPassword123")
     )
-    db._conn.executemany(
-        "INSERT INTO media_references VALUES (?, ?, 'owner', 'image', 'a.png');",
-        [(kind, user.user_id) for kind in ("project", "client_state", "workflow", "quarantined_project")],
-    )
+    with db.transaction() as cursor:
+        cursor.executemany(
+            "INSERT INTO media_references VALUES (?, ?, 'owner', 'image', 'a.png');",
+            [(kind, user.user_id) for kind in ("project", "client_state", "workflow", "quarantined_project")],
+        )
 
     user_service.delete(user.user_id)
 

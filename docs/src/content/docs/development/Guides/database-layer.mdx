@@ -1,0 +1,91 @@
+---
+title: Database Layer
+lastUpdated: 2026-10-04
+---
+
+Every SQL statement of the application belongs in `invokeai/app/services/shared/database/`. Services reach the database through `Database.queries`, never through a connection, a cursor or SQL text of their own. `tests/app/test_database_access_guard.py` fails when code elsewhere imports a database driver or SQLAlchemy, executes a statement or carries SQL.
+
+Queries are written with SQLAlchemy Core, which compiles each statement for the backend in use. SQLite is the default backend. The layer and its tests also run on MySQL 8.4 and MariaDB 10.11; configuring InvokeAI itself to use one of them is not available yet.
+
+:::note
+The layer is being introduced service by service. Services not yet ported still use the transitional cursor facade, `SqliteDatabase.transaction()`, and are listed in the guard test's `NOT_YET_PORTED`. Do not add SQL to them; that list only shrinks.
+:::
+
+## Query modules
+
+Each domain gets a query module as it is ported: a `QueryModule` subclass, attached to `Queries`, whose methods take the connection right after `self` and are decorated with `@read` or `@write`. The decorators supply the connection, so callers never see one.
+
+```py
+from sqlalchemy import Connection, select
+
+from invokeai.app.services.shared.database.queries import QueryModule, read
+
+
+class BoardQueries(QueryModule):
+    @read
+    def get_name(self, conn: Connection, board_id: str) -> str | None:
+        return conn.execute(select(boards.c.board_name).where(boards.c.board_id == board_id)).scalar_one_or_none()
+```
+
+A query method returns plain values or DTOs, read completely before its transaction ends. It does not call other query modules and has no effects outside the database, because a call that loses a race is run again from the start. It passes execution options per statement, never to the connection: on SQLite every transaction shares one connection object.
+
+## Transactions
+
+A call on `db.queries` runs in a transaction of its own:
+
+```py
+name = db.queries.boards.get_name(board_id)
+```
+
+Work that must succeed or fail as a whole runs in one transaction, which commits when the block exits and rolls back when it raises:
+
+```py
+with db.queries.transaction() as q:
+    q.boards.insert(board)
+    q.projects.insert(project)
+```
+
+- A thread has at most one transaction open per database. Opening another one, including a call on `db.queries` inside a transaction, raises `NestedTransactionError`. Pass `q` to helpers instead. (A nested cursor transaction of the transitional facade joins the outer one.)
+- `transaction(read_only=True)` reads one consistent snapshot and refuses writes.
+- A single call that loses a race (`ConflictError`: a deadlock) is run again from the start, three attempts in all. A transaction is not retried. A lock held too long elsewhere (`LockTimeoutError`) is never retried, because the call has already waited for it.
+
+Errors are raised as backend-neutral types from `invokeai.app.services.shared.database.errors`, classified by the driver's error code, so code that catches them works on every backend:
+
+- `UniqueViolation`, `ForeignKeyViolation`, `CheckViolation` and `NotNullViolation`, all `IntegrityViolation`s. Inside a transaction they can be caught where they happen, to raise a domain error instead.
+- `ConflictError` and `LockTimeoutError`, both `TransientDatabaseError`s. The transaction is rolled back and may be run again.
+
+A transaction does not continue past a failed statement, because backends disagree on what such a statement leaves behind. Further calls on it raise `TransactionFailedError`, and if the block is left without raising, it rolls back and raises `TransactionFailedError` instead of committing.
+
+## Backends
+
+| | SQLite | MySQL 8.4 / MariaDB 10.11 |
+|---|---|---|
+| Connections | One, behind a process-wide lock held for each transaction | A pool |
+| Readers | `BEGIN`, one snapshot | `REPEATABLE READ`, one snapshot |
+| Writers | `BEGIN IMMEDIATE`: the write lock is taken up front, so a transaction cannot fail to upgrade when another process wrote meanwhile | `READ COMMITTED`: no gap locks, and guards see current rows |
+| Session | Foreign keys on, WAL, 5 s busy timeout | Strict SQL mode with `ONLY_FULL_GROUP_BY`, UTC, 10 s row-lock timeout |
+| Text comparison | Byte for byte (`BINARY`) | Byte for byte, trailing spaces significant, in a database created with `utf8mb4_0900_bin` (MySQL) / `utf8mb4_nopad_bin` (MariaDB) |
+
+On SQLite the lock serialises all database work, so correctness can lean on it; on MySQL and MariaDB it cannot. Write invariants such as "only if still pending" into the statement itself (a conditional `UPDATE` whose row count is checked), not into a read followed by a write.
+
+## Testing
+
+Tests of the database layer use the `empty_database` fixture from `tests/fixtures/database.py`, and are marked `uses_database` for it. It is an in-memory SQLite database by default. When `INVOKEAI_TEST_DB_URL` names a MySQL or MariaDB server, it is instead a schema on that server of its own per test run and worker. Mark a test that depends on SQLite internals (query plans, PRAGMAs, the single connection) `sqlite_only`.
+
+To run the tests against a server, start one and point the variable at it. The account needs the privilege to create and drop databases:
+
+```sh
+docker run -d --name invokeai-test-mysql -e MYSQL_ROOT_PASSWORD=invokeai -p 127.0.0.1:33084:3306 mysql:8.4.11
+docker run -d --name invokeai-test-mariadb -e MARIADB_ROOT_PASSWORD=invokeai -p 127.0.0.1:33011:3306 mariadb:10.11.19
+
+# Your usual sync with the `mysql` extra added; keep your accelerator extra (here `cuda`).
+uv sync --extra cuda --extra test --extra mysql
+INVOKEAI_TEST_DB_URL=mysql+pymysql://root:invokeai@127.0.0.1:33084 \
+  uv run --no-sync pytest -m "uses_database and not sqlite_only and not slow"
+INVOKEAI_TEST_DB_URL=mariadb+pymysql://root:invokeai@127.0.0.1:33011 \
+  uv run --no-sync pytest -m "uses_database and not sqlite_only and not slow"
+```
+
+CI runs the same selection against both servers in the `external-database` job of the python tests workflow.
+
+`scripts/benchmark_database.py` times representative operations through the services on a seeded SQLite file. Run it for the base and the head of a change and compare the results with `--compare`.

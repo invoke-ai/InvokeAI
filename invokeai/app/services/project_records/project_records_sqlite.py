@@ -62,9 +62,8 @@ class ProjectRecordsSqlite(ProjectRecordsStorageBase):
     `self._db.transaction()`.
 
     That transaction is why this class talks to `boards` in raw SQL rather than through
-    `BoardService`. `SqliteDatabase.transaction()` guards a re-entrant lock and commits on the way
-    out of *every* level, so calling another service from inside an open transaction would commit
-    this one's half-finished work — including `self.get()`.
+    `BoardService`: every statement runs on this transaction's cursor, so the board and the project
+    commit or roll back together.
     """
 
     def __init__(self, db: SqliteDatabase) -> None:

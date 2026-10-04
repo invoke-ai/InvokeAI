@@ -1117,6 +1117,7 @@ dependencies = [
     { name = "semver" },
     { name = "sentencepiece" },
     { name = "spandrel" },
+    { name = "sqlalchemy" },
     { name = "torch", version = "2.7.1", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine != 'x86_64' and sys_platform == 'linux') or (sys_platform != 'linux' and sys_platform != 'win32') or (sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-xpu') or (sys_platform == 'linux' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'linux' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-xpu') or (sys_platform == 'linux' and extra == 'extra-8-invokeai-rocm' and extra == 'extra-8-invokeai-xpu') or (sys_platform == 'win32' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform == 'win32' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'win32' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-xpu') or (sys_platform == 'win32' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'win32' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-xpu') or (sys_platform == 'win32' and extra == 'extra-8-invokeai-rocm' and extra == 'extra-8-invokeai-xpu')" },
     { name = "torch", version = "2.13.0", source = { registry = "https://pypi.org/simple" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra != 'extra-8-invokeai-cpu' and extra != 'extra-8-invokeai-cuda' and extra != 'extra-8-invokeai-rocm' and extra != 'extra-8-invokeai-xpu') or (sys_platform == 'win32' and extra == 'extra-8-invokeai-rocm') or (sys_platform == 'win32' and extra != 'extra-8-invokeai-cpu' and extra != 'extra-8-invokeai-cuda' and extra != 'extra-8-invokeai-xpu') or (extra == 'extra-8-invokeai-rocm' and extra == 'extra-8-invokeai-xpu') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-xpu') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-xpu')" },
     { name = "torch", version = "2.13.0+cpu", source = { registry = "https://download.pytorch.org/whl/cpu" }, marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'extra-8-invokeai-cpu') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-xpu') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-xpu') or (platform_machine != 'x86_64' and extra == 'extra-8-invokeai-rocm' and extra == 'extra-8-invokeai-xpu') or (sys_platform == 'win32' and extra == 'extra-8-invokeai-cpu') or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-xpu') or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (sys_platform != 'linux' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-xpu') or (sys_platform != 'linux' and extra == 'extra-8-invokeai-rocm' and extra == 'extra-8-invokeai-xpu') or (extra != 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (extra != 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-xpu') or (extra != 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm' and extra == 'extra-8-invokeai-xpu')" },
@@ -1158,6 +1159,9 @@ dist = [
     { name = "pip-tools" },
     { name = "pipdeptree" },
     { name = "twine" },
+]
+mysql = [
+    { name = "pymysql" },
 ]
 onnx = [
     { name = "onnxruntime" },
@@ -1249,6 +1253,7 @@ requires-dist = [
     { name = "pudb", marker = "extra == 'dev'" },
     { name = "pydantic" },
     { name = "pydantic-settings" },
+    { name = "pymysql", marker = "extra == 'mysql'", specifier = ">=1.2.3,<2" },
     { name = "pypatchmatch" },
     { name = "pytest", marker = "extra == 'test'", specifier = ">6.0.0" },
     { name = "pytest-cov", marker = "extra == 'test'" },
@@ -1269,6 +1274,7 @@ requires-dist = [
     { name = "sentencepiece", specifier = "==0.2.0" },
     { name = "snakeviz", marker = "extra == 'dev'" },
     { name = "spandrel" },
+    { name = "sqlalchemy", specifier = ">=2.1,<2.2" },
     { name = "torch", marker = "(platform_machine != 'aarch64' and sys_platform == 'linux') or (sys_platform != 'darwin' and sys_platform != 'linux')", specifier = ">=2.7.0,<3.0" },
     { name = "torch", marker = "sys_platform == 'darwin'", specifier = ">=2.7.0,<2.8.0" },
     { name = "torch", marker = "sys_platform == 'darwin' and extra == 'cpu'", specifier = "==2.7.1" },
@@ -1306,7 +1312,7 @@ requires-dist = [
     { name = "xformers", marker = "(platform_machine != 'x86_64' and sys_platform == 'linux' and extra == 'xformers') or (sys_platform != 'darwin' and sys_platform != 'linux' and sys_platform != 'win32' and extra == 'xformers')", specifier = ">=0.0.28.post1" },
     { name = "xformers", marker = "(platform_machine == 'x86_64' and sys_platform == 'linux' and extra == 'xformers') or (sys_platform == 'win32' and extra == 'xformers')", specifier = ">=0.0.28.post1", index = "https://download.pytorch.org/whl/cu130" },
 ]
-provides-extras = ["xformers", "cpu", "cuda", "rocm", "xpu", "onnx", "onnx-cuda", "onnx-directml", "dist", "dev", "test"]
+provides-extras = ["xformers", "cpu", "cuda", "rocm", "xpu", "mysql", "onnx", "onnx-cuda", "onnx-directml", "dist", "dev", "test"]
 
 [[package]]
 name = "jaraco-classes"
@@ -2528,6 +2534,15 @@ wheels = [
 ]
 
 [[package]]
+name = "pymysql"
+version = "1.2.3"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/b1/d4/c15b459e25a23767d2f4065ef40968920320f04e302889574310c21c96a3/pymysql-1.2.3.tar.gz", hash = "sha256:d5b288529782e536ae171866df3ca9dc4f6cbfb3cc2f18e6f837fbb90dbc262b", size = 50629, upload-time = "2026-09-17T12:22:49.146Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/a9/4b/0a906d8184f011ff8dbd4722743783867589b33269d2c5fff238d636fdcb/pymysql-1.2.3-py3-none-any.whl", hash = "sha256:14f1c68e2ed859243ae5ca41ffbe677027fc46bc136a9f0be8a4e928e5e7415a", size = 46740, upload-time = "2026-09-17T12:22:47.826Z" },
+]
+
+[[package]]
 name = "pynndescent"
 version = "0.6.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3147,6 +3162,26 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/2a/8f/ab4565c23dd67a036ab72101a830cebd7ca026b2fddf5771bbf6284f6228/spandrel-0.4.2.tar.gz", hash = "sha256:fefa4ea966c6a5b7721dcf24f3e2062a5a96a395c8bedcb570fb55971fdcbccb", size = 247544, upload-time = "2026-02-21T01:52:26.342Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/74/31/411ea965835534c43d4b98d451968354876e0e867ea1fd42669e4cca0732/spandrel-0.4.2-py3-none-any.whl", hash = "sha256:6c93e3ecbeb0e548fd2df45a605472b34c1614287c56b51bb33cdef7ae5235b5", size = 320811, upload-time = "2026-02-21T01:52:25.015Z" },
+]
+
+[[package]]
+name = "sqlalchemy"
+version = "2.1.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/02/4b/81d972a46c9f1d978af1795e2abc988855c711453552cb45d75f6e4abbf5/sqlalchemy-2.1.3.tar.gz", hash = "sha256:ade5281df06038c6394f532590d592d3381ee5d11b9e0006a2570aef41145118", size = 10525778, upload-time = "2026-10-02T22:57:00.308Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/1a/5f/4dddd8758e6725419c2a21319cd5615ec37c0e7abb54c05ec09839ffbaa0/sqlalchemy-2.1.3-cp312-cp312-macosx_11_0_arm64.whl", hash = "sha256:7089cd2408cdae671c0775991e91349532d44f91fccc3248aada4b2243600da8", size = 2463500, upload-time = "2026-10-03T02:41:04.332Z" },
+    { url = "https://files.pythonhosted.org/packages/4e/96/6bcb70507e44bf48e790181809daa86f3d6813738e3d2bca7e50c671d2f7/sqlalchemy-2.1.3-cp312-cp312-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:565da0a28051cc4ac6f3ae6e9f33cae707ac6b102eac077ebdaada05226f8e3d", size = 4657690, upload-time = "2026-10-02T23:14:48.579Z" },
+    { url = "https://files.pythonhosted.org/packages/ab/1c/d306dbb3bcb7d529099fbcc7e4a4bdf99059622ca53311831ac6349b5b31/sqlalchemy-2.1.3-cp312-cp312-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:f68fb01c2bea9d6e362f37f8109974d285718880ee59eefff1c9a11e5e5df6a9", size = 4706298, upload-time = "2026-10-03T02:31:47.825Z" },
+    { url = "https://files.pythonhosted.org/packages/40/c0/815e27b5e2a27c118c4cbe90188bb9aa09292fb58867dc14a17bbad0c776/sqlalchemy-2.1.3-cp312-cp312-musllinux_1_2_aarch64.whl", hash = "sha256:314407ce02091e80ec295c2392ad04573a08fa9517359a99b63bdfdb041e6c55", size = 4581573, upload-time = "2026-10-02T23:14:50.575Z" },
+    { url = "https://files.pythonhosted.org/packages/d5/ea/1f670e25011ccf022baeaa86476295f8a0c603957175a4b4c7ed57062dfc/sqlalchemy-2.1.3-cp312-cp312-musllinux_1_2_x86_64.whl", hash = "sha256:2b7c7d6db0d967a9feedda37d1bbbbea2415e6d5e8e6ff7ef6e52990f33ae414", size = 4654995, upload-time = "2026-10-03T02:31:49.947Z" },
+    { url = "https://files.pythonhosted.org/packages/4d/1f/983b1b961a6fd5d9c7630ccf80f44cc63da4fddb0ac7d125f5720278550b/sqlalchemy-2.1.3-cp312-cp312-win32.whl", hash = "sha256:c663d71a0dbac51085074ad779d555a69af18f5ef01690c8206a92603df46cc9", size = 2374254, upload-time = "2026-10-03T02:53:56.996Z" },
+    { url = "https://files.pythonhosted.org/packages/8f/de/7cd2083ad8b6c6a905a9c70663588090fd23a3ecbda5d15bf558df7715fa/sqlalchemy-2.1.3-cp312-cp312-win_amd64.whl", hash = "sha256:f097f4efb9ba48f3069b17998abd8bbe2131b7f5d3c00ab7b69101d68bd976f4", size = 2426552, upload-time = "2026-10-03T02:53:59.061Z" },
+    { url = "https://files.pythonhosted.org/packages/ae/d0/b09299052f0f0f7366f46d63056a2e20399976e670bf8f399cfb59b83adb/sqlalchemy-2.1.3-cp312-cp312-win_arm64.whl", hash = "sha256:7cdc5952525055fcddbbd4ca6c53812e228b6478cc95bdd7bbb24708ed045740", size = 2386139, upload-time = "2026-10-03T02:45:04.83Z" },
+    { url = "https://files.pythonhosted.org/packages/e5/12/23d8fb7ed90e5b674006ace415ede1c60cdfc38ace50968b59ef42c22754/sqlalchemy-2.1.3-py3-none-any.whl", hash = "sha256:6f0cf4debd86cb5623a50310784bd005c215761ca7f618d0d4f46193d033675a", size = 2052603, upload-time = "2026-10-03T02:34:19.115Z" },
 ]
 
 [[package]]

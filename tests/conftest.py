@@ -40,8 +40,23 @@ from invokeai.app.services.wildcard_records.wildcard_records_sqlite import Sqlit
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
+from tests.fixtures.database import _external_test_schema, empty_database, external_test_db_url  # noqa: F401
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService
+
+# Fixtures that put a test on the backend under test, which `-m uses_database` selects.
+_DATABASE_FIXTURES = {"empty_database"}
+
+
+@pytest.hookimpl(tryfirst=True)
+def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
+    # tryfirst: the marks must exist before `-m` deselects by them.
+    external = external_test_db_url() is not None
+    for item in items:
+        if _DATABASE_FIXTURES & set(getattr(item, "fixturenames", ())):
+            item.add_marker(pytest.mark.uses_database)
+        if external and item.get_closest_marker("sqlite_only") is not None:
+            item.add_marker(pytest.mark.skip(reason="needs SQLite, but INVOKEAI_TEST_DB_URL names another backend"))
 
 
 @pytest.fixture(autouse=True)

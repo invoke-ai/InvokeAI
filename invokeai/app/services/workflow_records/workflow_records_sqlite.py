@@ -54,7 +54,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
     @staticmethod
     def _get_on_cursor(cursor: sqlite3.Cursor, workflow_id: str) -> WorkflowRecordDTO:
-        """Reads one record on the caller's transaction; `get()` on an open transaction would commit it early."""
+        """Reads one record on the caller's transaction."""
         cursor.execute(
             f"SELECT {_RECORD_COLUMNS} FROM workflow_library WHERE workflow_id = ?;",
             (workflow_id,),
@@ -634,7 +634,7 @@ class SqliteWorkflowRecordsStorage(WorkflowRecordsStorageBase):
 
                 workflows_from_file.append(workflow_from_file)
 
-                # Read on this cursor: `get()` would open a nested transaction and commit this one early.
+                # Read on this cursor, inside the sync's transaction.
                 cursor.execute("SELECT workflow FROM workflow_library WHERE workflow_id = ?;", (workflow_from_file.id,))
                 row = cursor.fetchone()
                 if row is None:
