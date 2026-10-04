@@ -1,6 +1,9 @@
 """LTX-2 node contracts that do not need a model: what each node refuses, and why."""
 
+import gc
 import wave
+import weakref
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
@@ -14,6 +17,7 @@ from pydantic import ValidationError
 import invokeai.app.invocations.ltx2.ltx2_audio_conditioning as ltx2_audio_conditioning
 import invokeai.app.invocations.ltx2.ltx2_extend_conditioning as ltx2_extend_conditioning
 import invokeai.app.invocations.ltx2.ltx2_video_conditioning as ltx2_video_conditioning
+import invokeai.app.invocations.text_encoder.ltx2_text_encoder as ltx2_text_encoder
 import invokeai.app.invocations.vae.ltx2_latents_to_video as ltx2_latents_to_video
 from invokeai.app.invocations.fields import (
     LatentsField,
@@ -1503,3 +1507,55 @@ def _denoise_state_stub(keyframe_rows: int):
 
 class _StopAfterState(Exception):
     """Ends the invocation once the state has been built, before any model is loaded."""
+
+
+class _LoadedModel:
+    """The part of ``LoadedModel`` the prompt node uses: the model, its device and a lock."""
+
+    def __init__(self, model: object) -> None:
+        self.model = model
+        self.compute_device = torch.device("cpu")
+
+    @contextmanager
+    def model_on_device(self, working_mem_bytes: int | None = None):
+        yield None, self.model
+
+
+def test_the_prompt_node_lets_go_of_the_tower_before_it_loads_the_connectors(monkeypatch) -> None:
+    """Loading the connectors can evict the tower from a small RAM cache while its weights are still on the
+    device; a reference the node still holds then pins them in VRAM, where the cache no longer counts them."""
+    from invokeai.app.invocations.model import LTX2TextEncoderField
+
+    tower_alive_at_connector_load: list[bool] = []
+    tower_ref: list[weakref.ref] = []
+
+    def load(identifier: ModelIdentifierField) -> _LoadedModel:
+        if identifier.key == "text_encoder":
+            tower = torch.nn.Linear(1, 1)
+            tower_ref.append(weakref.ref(tower))
+            return _LoadedModel(tower)
+        if identifier.key == "connectors":
+            gc.collect()
+            tower_alive_at_connector_load.append(tower_ref[0]() is not None)
+        return _LoadedModel(object())
+
+    monkeypatch.setattr(
+        ltx2_text_encoder, "encode_hidden_states", lambda *_a, **_k: (torch.zeros(1, 4, 8), torch.ones(1, 4))
+    )
+    monkeypatch.setattr(ltx2_text_encoder, "apply_connectors", lambda *_a, **_k: MagicMock())
+    context = _context()
+    context.models.load.side_effect = load
+    context.conditioning.save.return_value = "conditioning"
+
+    node = ltx2_text_encoder.LTX2TextEncoderInvocation(
+        id="prompt",
+        prompt="a cat",
+        text_encoder=LTX2TextEncoderField(
+            tokenizer=_identifier("tokenizer"),
+            text_encoder=_identifier("text_encoder"),
+            connectors=_identifier("connectors"),
+        ),
+    )
+    node.invoke(context)
+
+    assert tower_alive_at_connector_load == [False]
