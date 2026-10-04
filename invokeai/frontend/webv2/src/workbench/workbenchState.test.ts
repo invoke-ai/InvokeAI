@@ -5908,7 +5908,21 @@ describe('workbench backend connection recovery', () => {
       state = workbenchReducer(state, {
         projectId: project.id,
         type: 'patchWidgetValues',
-        values: { compareImage: image, recentImages: [image], selectedImage: image },
+        values: {
+          compareImage: image,
+          recentImages: [image],
+          selectedImage: image,
+          selectedImagePage: 8,
+          selectedImageQuery: {
+            boardId: 'board-1',
+            galleryView: 'images',
+            imageOrderDir: 'DESC',
+            page: 8,
+            paginationMode: 'paginated',
+            searchTerm: 'sunset',
+            starredOnly: true,
+          },
+        },
         widgetId: 'gallery',
       });
     }
@@ -5925,6 +5939,16 @@ describe('workbench backend connection recovery', () => {
       expect(values.recentImages).toEqual([patchedImage]);
       expect(values.selectedImage).toEqual(legacyGeneratedImageToGalleryItem(patchedImage));
       expect(values.compareImage).toEqual(legacyGeneratedImageToGalleryItem(patchedImage));
+      expect(values.selectedImagePage).toBe(0);
+      expect(values.selectedImageQuery).toEqual({
+        boardId: 'board-2',
+        galleryView: 'images',
+        imageOrderDir: 'DESC',
+        page: 0,
+        paginationMode: 'infinite',
+        searchTerm: '',
+        starredOnly: true,
+      });
     }
   });
 

@@ -29,6 +29,7 @@ import {
 } from '@features/gallery/queries';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { parseDateTokens } from '@platform/search/dateTokens';
+import { captureAccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
 
@@ -193,6 +194,7 @@ export const usePreviewNavigation = ({
   /** The gallery's active similarity search, or null for the board listing. */
   semanticQuery: GallerySemanticReference | null;
 }): PreviewNavigationState => {
+  const accountScope = captureAccountScope();
   const selectedImageSearch = useMemo(
     () => parseDateTokens(selectedImageQuery.searchTerm),
     [selectedImageQuery.searchTerm]
@@ -212,8 +214,8 @@ export const usePreviewNavigation = ({
   const selectedPage = navigationSemanticQuery === null ? selectedImageQuery.page : galleryPage;
   // Following live has a cursor too, so the listing loads for the step off it.
   const hasNavigationContext = selectedItem !== null || followedSessionId !== null;
-  const navigationContextKey = `${followedSessionId ?? ''}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationPaginationMode}:${selectedPage}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
-  const navigationQueryKey = `${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationPaginationMode}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
+  const navigationContextKey = `${accountScope.epoch}:${followedSessionId ?? ''}:${selectedItemKey ?? ''}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationPaginationMode}:${selectedPage}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
+  const navigationQueryKey = `${accountScope.epoch}:${navigationBoardId}:${navigationGalleryView}:${navigationOrderDir}:${navigationPaginationMode}:${selectedImageQuery.searchTerm}:${navigationStarredOnly}:${navigationSemanticKey}`;
   const queryClient = useQueryClient();
 
   // Publish navigation context in layout effect so boundary-fetch continuations cannot observe new UI with a stale
@@ -339,8 +341,12 @@ export const usePreviewNavigation = ({
     [isDeepPageWindow, isPaginatedWindow, navigationSemanticQuery, selectedPage]
   );
   const stampSelection = useCallback(
-    (item: GalleryItem, pages: typeof boardPageResults) => selectGalleryItem(item, getSelectionPageIn(item, pages)),
-    [getSelectionPageIn, selectGalleryItem]
+    (item: GalleryItem, pages: typeof boardPageResults) => {
+      if (isAccountScopeCurrent(accountScope)) {
+        selectGalleryItem(item, getSelectionPageIn(item, pages));
+      }
+    },
+    [accountScope, getSelectionPageIn, selectGalleryItem]
   );
   const getSelectionPage = useCallback(
     (item: GalleryItem) => getSelectionPageIn(item, boardPageResults),
@@ -436,7 +442,8 @@ export const usePreviewNavigation = ({
   );
   const loadOrderedRefs = useCallback(
     async (signal: AbortSignal): Promise<GalleryItemRef[]> => {
-      signal.throwIfAborted();
+      const requestSignal = AbortSignal.any([signal, accountScope.signal]);
+      requestSignal.throwIfAborted();
       const namesPromise = queryClient.fetchQuery(galleryItemNamesOptions(listingFilterWithStarred));
       let abortListener: (() => void) | undefined;
 
@@ -444,27 +451,28 @@ export const usePreviewNavigation = ({
         const names = await Promise.race([
           namesPromise,
           new Promise<never>((_resolve, reject) => {
-            abortListener = () => reject(signal.reason ?? new DOMException('The operation was aborted.', 'AbortError'));
-            signal.addEventListener('abort', abortListener, { once: true });
-            if (signal.aborted) {
+            abortListener = () =>
+              reject(requestSignal.reason ?? new DOMException('The operation was aborted.', 'AbortError'));
+            requestSignal.addEventListener('abort', abortListener, { once: true });
+            if (requestSignal.aborted) {
               abortListener();
             }
           }),
         ]);
 
-        signal.throwIfAborted();
-        if (navigationContextKeyRef.current !== navigationContextKey) {
+        requestSignal.throwIfAborted();
+        if (!isAccountScopeCurrent(accountScope) || navigationContextKeyRef.current !== navigationContextKey) {
           throw new DOMException('The Preview listing changed.', 'AbortError');
         }
 
         return [...stripItems.map(toGalleryItemRef), ...names.items];
       } finally {
         if (abortListener) {
-          signal.removeEventListener('abort', abortListener);
+          requestSignal.removeEventListener('abort', abortListener);
         }
       }
     },
-    [listingFilterWithStarred, navigationContextKey, queryClient, stripItems]
+    [accountScope, listingFilterWithStarred, navigationContextKey, queryClient, stripItems]
   );
   const isLoadingBoard = hasNavigationContext && isFetchingBoardItems;
   const sessionEntries = useMemo(
@@ -509,11 +517,13 @@ export const usePreviewNavigation = ({
   // Share navigation between keyboard, footer, and swipe; comparison does not step saved images.
   const navigate = useCallback(
     (offset: -1 | 1): Promise<boolean> => {
-      if (isComparing) {
+      if (isComparing || !isAccountScopeCurrent(accountScope)) {
         return Promise.resolve(false);
       }
 
       const direction = offset === 1 ? 'right' : 'left';
+      const isCurrentNavigation = (): boolean =>
+        isAccountScopeCurrent(accountScope) && navigationContextKeyRef.current === navigationContextKey;
       const stepTo = (entry: GalleryNavigationEntry | null, pages: typeof boardPageResults): boolean => {
         if (entry?.kind === 'session') {
           followSession(entry.id);
@@ -539,6 +549,7 @@ export const usePreviewNavigation = ({
 
       pendingNavigationContextRef.current = navigationContextKey;
       const controller = new AbortController();
+      const requestSignal = AbortSignal.any([controller.signal, accountScope.signal]);
       pageFetchRequestRef.current = { contextKey: navigationContextKey, controller };
 
       const pages = [...boardPageResults];
@@ -552,11 +563,11 @@ export const usePreviewNavigation = ({
               queryClient,
               listingFilterWithStarred,
               toGalleryItemRef(selectedItem),
-              undefined,
-              controller.signal
+              accountScope,
+              requestSignal
             );
 
-            if (navigationContextKeyRef.current !== navigationContextKey) {
+            if (!isCurrentNavigation()) {
               return false;
             }
 
@@ -587,10 +598,10 @@ export const usePreviewNavigation = ({
 
           if (total === undefined) {
             const currentPage = await fetchGalleryItemsPage(queryClient, listingFilterWithStarred, selectedPageOffset, {
-              signal: controller.signal,
+              signal: requestSignal,
             });
 
-            if (navigationContextKeyRef.current !== navigationContextKey) {
+            if (!isCurrentNavigation()) {
               return false;
             }
 
@@ -619,21 +630,17 @@ export const usePreviewNavigation = ({
           while (true) {
             pageOffset += offset * GALLERY_PAGE_SIZE;
 
-            if (
-              pageOffset < 0 ||
-              pageOffset >= (total ?? 0) ||
-              navigationContextKeyRef.current !== navigationContextKey
-            ) {
+            if (pageOffset < 0 || pageOffset >= (total ?? 0) || !isCurrentNavigation()) {
               return false;
             }
 
             try {
               // Query deduplicates with the adjacent observer if it is already loading this page.
               const page = await fetchGalleryItemsPage(queryClient, listingFilterWithStarred, pageOffset, {
-                signal: controller.signal,
+                signal: requestSignal,
               });
 
-              if (navigationContextKeyRef.current !== navigationContextKey) {
+              if (!isCurrentNavigation()) {
                 return false;
               }
 
@@ -676,6 +683,7 @@ export const usePreviewNavigation = ({
       cursorKey,
       followSession,
       isComparing,
+      accountScope,
       listingFilterWithStarred,
       listingTotal,
       navigationContextKey,

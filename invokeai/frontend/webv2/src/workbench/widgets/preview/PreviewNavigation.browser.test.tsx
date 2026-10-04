@@ -8,6 +8,7 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { DndContext, useSensor, useSensors, type DndContextProps } from '@dnd-kit/core';
 import { requestGalleryItemReveal } from '@features/gallery/contracts';
 import { createQueueCoordinator, type QueueCoordinatorBackendPort } from '@features/queue/runtime/coordinator';
+import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { QueryClient, QueryClientProvider, type InfiniteData } from '@tanstack/react-query';
 import { system } from '@theme/system';
@@ -123,7 +124,7 @@ const mocks = vi.hoisted(() => {
     galleryPageFetchSignals: [] as AbortSignal[],
     deferredPageFetches: new Map<
       number,
-      { promise: Promise<GalleryItemsPage>; resolve: (page: GalleryItemsPage) => void }
+      { ignoreAbort?: boolean; promise: Promise<GalleryItemsPage>; resolve: (page: GalleryItemsPage) => void }
     >(),
     verifiedGalleryPage: null as null | { index: number; offset: number; page: GalleryItemsPage; total: number },
     verifiedGalleryPageFetches: [] as Array<{ ref: { kind: 'image' | 'video'; name: string }; signal: AbortSignal }>,
@@ -290,6 +291,10 @@ vi.mock('@features/gallery/queries', () => ({
         mocks.galleryItemPageOffsets.push(offset);
         const deferred = mocks.deferredPageFetches.get(offset);
         if (deferred && signal) {
+          if (deferred.ignoreAbort) {
+            return deferred.promise;
+          }
+
           return Promise.race([
             deferred.promise,
             new Promise<never>((_resolve, reject) => {
@@ -899,6 +904,53 @@ describe('preview keyboard navigation boundary', () => {
     await act(() => Promise.resolve());
 
     expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
+  });
+
+  it('ignores an already-resolved boundary result after the account scope changes', async () => {
+    const firstScope = accountLifecycle.activate('preview-navigation-account-a');
+    const selected = createImageItem('account-selected', '2026-07-20T00:00:01.000Z');
+    let resolve!: (page: GalleryItemsPage) => void;
+    const promise = new Promise<GalleryItemsPage>((done) => {
+      resolve = done;
+    });
+    setGalleryValues({
+      galleryPage: 0,
+      recentImages: [],
+      selectedImage: legacyImage('account-selected', selected.createdAt),
+      selectedImageName: 'account-selected',
+      selectedImageQuery: { ...deepQuery, page: 0 },
+    });
+    mocks.galleryItemPages = Array.from({ length: 3 }, (_unused, index) => ({
+      items: index === 0 ? [selected] : [],
+      total: 180,
+    }));
+    mocks.deferredPageFetches.set(120, { ignoreAbort: true, promise, resolve });
+
+    await render();
+    await act(() => {
+      getBoundary().dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'ArrowRight' }));
+    });
+    await expect.poll(() => mocks.galleryPageFetchSignals.length > 0).toBe(true);
+    const signal = mocks.galleryPageFetchSignals.at(-1)!;
+    expect(signal.aborted).toBe(false);
+
+    await act(async () => {
+      // Resolve the request first, then rotate the account before the awaiting Preview continuation runs.
+      resolve({
+        items: [createImageItem('late-account-boundary', '2026-07-19T00:00:00.000Z')],
+        offset: 120,
+        total: 180,
+      });
+      accountLifecycle.activate('preview-navigation-account-b');
+      await new Promise<void>((done) => {
+        setTimeout(() => done(), 0);
+      });
+    });
+
+    expect(firstScope.signal.aborted).toBe(true);
+    expect(signal.aborted).toBe(true);
+    expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
+    accountLifecycle.invalidate();
   });
 
   it('walks the starred strip into the unstarred listing and back, as the grid lays them out', async () => {
