@@ -57,7 +57,7 @@ This reserves VRAM so partial-load Wan transformer weights target about 2 GiB re
 
 The optimized BF16 transformer path can produce small numerical differences because chunked matrix operations accumulate in a different order. Same-seed output is not guaranteed to be bit-identical; set `wan_memory_optimization: false` for the baseline path.
 
-Developers with a CUDA or ROCm device can validate Wan VAE memory estimates with `python scripts/calibrate_wan_vae_working_memory.py --vae <directory-or-safetensors-file>`. The script reports allocated and reserved memory deltas; its implied scaling constant uses allocated memory to match the shipped estimator, while reserved memory shows allocator headroom. Use `--tiling` to measure the spatially tiled full-decode fallback; it overrides streaming mode. Use `--tile-size <pixels>` to override the VAE's default tile size.
+Developers with a CUDA or ROCm device can validate Wan VAE memory estimates with `python scripts/calibrate_wan_vae_working_memory.py --vae <directory-or-safetensors-file>`. The script reports allocated and reserved memory deltas; its implied scaling constant uses reserved memory, which is what the shipped estimator covers, because reserved memory is what the decode takes from the GPU. Pass `--no-streaming` to measure the default full decode. The shipped constant sits above what the script reports for most sizes, because it has to cover the highest measurement, an 832x480 decode inside a running server; `estimate covers` in the output says whether the estimate holds. Use `--tiling` to measure the spatially tiled full-decode fallback; it overrides streaming mode. Use `--tile-size <pixels>` to override the VAE's default tile size.
 
 Direct MP4 streaming keeps the VAE cache lock while chunks are decoded and written. Wan's causal decoder state and weights must remain live for the sequence; releasing the lock would require a separate bounded decode and encode queue.
 
@@ -168,11 +168,28 @@ Invoke has the option of keeping a RAM copy of all model weights, even when they
 keep_ram_copy_of_weights: false
 ```
 
+### Switching between model architectures
+
+When a generation uses main models of another architecture than the previous one on the same GPU (say, FLUX.1 after SDXL), Invoke first moves every model the new generation does not use from VRAM to RAM. Models both generations use, such as a shared VAE or text encoder, stay in VRAM. Moving models back from RAM costs a few seconds per switch, more with `keep_ram_copy_of_weights: false`, so if you alternate between architectures that would fit in VRAM together, you can turn this off:
+
+```yaml
+# Keep other architectures' models in VRAM until a load needs the room.
+offload_on_architecture_switch: false
+```
+
+### Clearing VRAM after every generation
+
+If a generation runs fine the first time but runs out of memory when you repeat it, or slows down sharply because Windows moves part of it into shared GPU memory, you can have Invoke move the models it holds in VRAM to RAM after every queue item (every image of a batch) and hand the freed memory back to the GPU driver. The models stay cached in RAM, so each queue item then costs a few seconds for reloading them, not a full load from disk, and with `keep_ram_copy_of_weights: false` also the time to copy them back to RAM. On a machine with several GPUs, handing the memory back briefly holds up a generation running on another GPU. On CPU, Apple Silicon and integrated GPUs, whose VRAM is system memory, the setting changes nothing:
+
+```yaml
+clear_vram_after_session: true
+```
+
 ### Tiled VAE decode and encode
 
 Without tiling, the memory a VAE needs grows with the square of the image size. For FLUX.1, an untiled 3072² encode peaks at about 18.8 GiB on an RTX 4090, and a tiled one at 0.8 GiB, while tiled memory stays roughly flat as the image grows. Tiling costs some speed on smaller images.
 
-Invoke tiles large decodes by itself: when an untiled decode would claim most of the memory the GPU keeps resident, it decodes in tiles instead, for the FLUX.1, Z-Image, Qwen-Image, Krea-2, Anima and Wan decodes. Because a tiled decode is not pixel-identical to an untiled one, this only kicks in for images too large for the card: for Z-Image on a 16GB GPU, for example, from about 1850x1850 on Nvidia and from about 1500x1500 on AMD, whose convolution library needs more memory. On a ROCm build under Windows the comparison uses the video-memory budget Windows grants Invoke, which is lower than the card's total and lower again while another program uses the GPU. Anima tiles a little earlier, because its untiled decode pushes the Anima model itself out of VRAM on 8GB cards.
+Invoke tiles large decodes by itself: when an untiled decode would claim most of the memory the GPU keeps resident, it decodes in tiles instead, for the FLUX.1, Z-Image, Qwen-Image, Krea-2, Anima and Wan decodes. Because a tiled decode is not pixel-identical to an untiled one, this only kicks in for images too large for the card: for Z-Image on a 16GB GPU, for example, from about 1850x1850 on Nvidia and from about 1500x1500 on AMD, whose convolution library needs more memory. On a ROCm build under Windows the comparison uses the video-memory budget Windows grants Invoke, which is lower than the card's total and lower again while another program uses the GPU. Anima tiles a little earlier, because its untiled decode pushes the Anima model itself out of VRAM on 8GB cards. Wan videos are tiled from 832x480 on 8GB cards and from 720p on 16GB cards, where their untiled decodes need about as much memory as the card holds, or more.
 
 To always decode untiled unless you ask for tiling, turn this off. A decode too large for the card then runs out of memory: the FLUX.1 and Z-Image decodes retry in tiles, the others fail, and on Windows the driver may move the decode into system memory and run it very slowly instead. Anima is not affected by this setting: there, tiling a large decode is what keeps the Anima model in VRAM, and turning it off would only make those decodes slower.
 

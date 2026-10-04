@@ -62,7 +62,7 @@ def _start_worker(device: torch.device) -> tuple[threading.Thread, Event, list[s
             session_queue=_Queue(),
             logger=MagicMock(),
             image_moves=None,
-            configuration=SimpleNamespace(multiuser=False),
+            configuration=SimpleNamespace(multiuser=False, clear_vram_after_session=False),
         )
     )
     processor._polling_interval = 5  # long enough that only the release listener can wake it in time
