@@ -1,8 +1,9 @@
 # The last matching pattern takes precedence.
 
 # Critical infrastructure - requires a maintainer review. The catch-all covers
-# .github/ and every file in the repository root (pyproject.toml, uv.lock,
-# .gitattributes, .gitmodules, etc.), plus any path not opened up below.
+# .github/ (including this file) and every file in the repository root
+# (pyproject.toml, uv.lock, .gitattributes, .gitmodules, etc.), plus any path
+# not opened up below.
 *  @lstein @blessedcoolant @joshistoast
 
 # Anyone with write access can review.
@@ -11,3 +12,15 @@
 /tests/
 /docker/
 /docs/
+
+# Exceptions inside the opened-up paths - requires a maintainer review.
+# Frontend and docs dependencies (webv2's lockfile is installed into the wheel and the container).
+package.json         @lstein @blessedcoolant @joshistoast
+pnpm-lock.yaml       @lstein @blessedcoolant @joshistoast
+pnpm-workspace.yaml  @lstein @blessedcoolant @joshistoast
+# Release version and the files that build and publish release artifacts.
+/invokeai/version/          @lstein @blessedcoolant @joshistoast
+/scripts/build_wheel.sh     @lstein @blessedcoolant @joshistoast
+/scripts/tag_release.sh     @lstein @blessedcoolant @joshistoast
+/docker/Dockerfile          @lstein @blessedcoolant @joshistoast
+/docker/docker-entrypoint.sh  @lstein @blessedcoolant @joshistoast
