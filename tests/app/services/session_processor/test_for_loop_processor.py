@@ -257,6 +257,7 @@ def _build_processor(
         multiuser=False,
         node_cache_size=0,
         offload_text_encoders_to_idle_gpus=False,
+        clear_vram_after_session=False,
     )
     services = SimpleNamespace(
         configuration=config,
