@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import math
 import time
 from dataclasses import dataclass
 from math import gcd
@@ -27,6 +28,8 @@ _POLL_INTERVAL = 3.0
 _POLL_TIMEOUT = 300.0
 _DOWNLOAD_TIMEOUT = 60
 _DOWNLOAD_MAX_BYTES = 32 * 1024 * 1024
+# Nominal pixel area of each Nano Banana resolution tier (about 1, 4 and 16 megapixels).
+_RESOLUTION_TIERS = ((1024 * 1024, "1K"), (2048 * 2048, "2K"), (4096 * 4096, "4K"))
 _SUCCESS_STATUSES = {"completed", "succeeded"}
 _FAILURE_STATUSES = {"canceled", "cancelled", "failed"}
 
@@ -174,9 +177,11 @@ class AtlasCloudProvider(ExternalProvider):
             if aspect_ratio is not None:
                 payload["aspect_ratio"] = aspect_ratio
 
-        # Resolution presets are named "1K"/"2K"/"4K" in Invoke and lowercase upstream.
-        if schema.resolution_field is not None and request.image_size is not None:
-            payload[schema.resolution_field] = request.image_size.lower()
+        # Resolution presets are named "1K"/"2K"/"4K" in Invoke and lowercase upstream. Clients
+        # that send plain dimensions without a preset still get the tier those dimensions need.
+        if schema.resolution_field is not None:
+            image_size = request.image_size or _resolution_for_dimensions(request.width, request.height)
+            payload[schema.resolution_field] = image_size.lower()
 
         if schema.num_images_field is not None:
             payload[schema.num_images_field] = request.num_images
@@ -304,6 +309,13 @@ def _parse_retry_after(value: str | None) -> float | None:
         return float(value)
     except ValueError:
         return None
+
+
+def _resolution_for_dimensions(width: int, height: int) -> str:
+    """The resolution tier nearest the requested pixel area on a log scale, so a non-square
+    ~1 MP request stays 1K even when its long edge exceeds 1024 px."""
+    area = max(1, width * height)
+    return min(_RESOLUTION_TIERS, key=lambda tier: abs(math.log(area / tier[0])))[1]
 
 
 def _select_size_preset(width: int, height: int, presets: tuple[str, ...]) -> str:

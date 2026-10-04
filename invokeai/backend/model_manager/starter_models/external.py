@@ -359,6 +359,19 @@ def _atlascloud_resolution_presets(
     return presets
 
 
+# MAI-Image-2.5 rejects any side under 768 px or above 1360 px, and any image over 1,049,088
+# pixels, so no single max size describes it (16:9 cannot fit at all). Each bucket is the
+# largest exact ratio on the 16 px grid that satisfies all three limits.
+ATLASCLOUD_MAI_IMAGE_SIZES = {
+    "1:1": ExternalImageSize(width=1024, height=1024),
+    "5:4": ExternalImageSize(width=1120, height=896),
+    "4:5": ExternalImageSize(width=896, height=1120),
+    "4:3": ExternalImageSize(width=1152, height=864),
+    "3:4": ExternalImageSize(width=864, height=1152),
+    "3:2": ExternalImageSize(width=1248, height=832),
+    "2:3": ExternalImageSize(width=832, height=1248),
+}
+
 ATLASCLOUD_NANO_BANANA_RESOLUTION_PRESETS = _atlascloud_resolution_presets(
     ["1K", "2K", "4K"], ATLASCLOUD_NANO_BANANA_ASPECT_RATIOS
 )
@@ -454,7 +467,7 @@ atlascloud_mai_image_2_5 = StarterModel(
     name="Atlas Cloud MAI-Image-2.5",
     base=BaseModelType.External,
     source="external://atlascloud/microsoft/mai-image-2.5/text-to-image",
-    description="Microsoft MAI-Image-2.5 text-to-image generation through the Atlas Cloud asynchronous media API. Supports sizes from 768 to 1360 pixels per side. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
+    description="Microsoft MAI-Image-2.5 text-to-image generation through the Atlas Cloud asynchronous media API. Dimensions are mapped to the closest supported aspect ratio, up to about one megapixel. Requires a configured Atlas Cloud API key and may incur provider usage costs.",
     type=ModelType.ExternalImageGenerator,
     format=ModelFormat.ExternalApi,
     capabilities=ExternalModelCapabilities(
@@ -462,7 +475,8 @@ atlascloud_mai_image_2_5 = StarterModel(
         supports_negative_prompt=False,
         supports_seed=False,
         max_images_per_request=1,
-        max_image_size=ExternalImageSize(width=1360, height=1360),
+        allowed_aspect_ratios=list(ATLASCLOUD_MAI_IMAGE_SIZES),
+        aspect_ratio_sizes=ATLASCLOUD_MAI_IMAGE_SIZES,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),
     panel_schema=ExternalModelPanelSchema(image=[{"name": "dimensions"}]),
@@ -576,7 +590,6 @@ atlascloud_nano_banana_2 = StarterModel(
         supports_seed=True,
         max_images_per_request=1,
         allowed_aspect_ratios=ATLASCLOUD_NANO_BANANA_ASPECT_RATIOS,
-        aspect_ratio_sizes=_atlascloud_aspect_ratio_sizes(ATLASCLOUD_NANO_BANANA_ASPECT_RATIOS),
         resolution_presets=ATLASCLOUD_NANO_BANANA_RESOLUTION_PRESETS,
     ),
     default_settings=ExternalApiModelDefaultSettings(width=1024, height=1024, num_images=1),

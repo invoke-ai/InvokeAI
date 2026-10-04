@@ -10,7 +10,11 @@ from invokeai.app.services.external_generation.errors import (
     ExternalProviderRateLimitError,
     ExternalProviderRequestError,
 )
-from invokeai.app.services.external_generation.external_generation_common import ExternalGenerationRequest
+from invokeai.app.services.external_generation.external_generation_common import (
+    ExternalGenerationRequest,
+    ExternalGenerationResult,
+)
+from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.app.services.external_generation.providers.atlascloud import AtlasCloudProvider
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig, ExternalModelCapabilities
 from invokeai.backend.model_manager.starter_models import STARTER_MODELS
@@ -281,7 +285,7 @@ def test_atlascloud_starter_models_cover_multiple_models() -> None:
         ("hidream-o1-1.5/text-to-image", 1, {"image_size": "landscape_4_3"}),
         # "aspect_ratio" string
         ("xai/grok-imagine-image-2.0/text-to-image", 2, {"aspect_ratio": "4:3", "num_images": 2}),
-        ("google/nano-banana-2/text-to-image", 1, {"aspect_ratio": "4:3", "seed": 42}),
+        ("google/nano-banana-2/text-to-image", 1, {"aspect_ratio": "4:3", "resolution": "1k", "seed": 42}),
     ],
 )
 def test_atlascloud_payload_matches_model_request_schema(
@@ -332,6 +336,84 @@ def test_atlascloud_resolution_preset_is_forwarded_lowercase() -> None:
 
     assert payload["aspect_ratio"] == "1:1"
     assert payload["resolution"] == "2k"
+
+
+def _submitted_payload(
+    monkeypatch: pytest.MonkeyPatch,
+    provider_model_id: str,
+    width: int,
+    height: int,
+    image_size: str | None = None,
+) -> dict[str, object]:
+    """Run a request through the generation service and return the payload Atlas Cloud would receive,
+    so the service's bucketing and validation are applied to the starter model's capabilities."""
+    provider = AtlasCloudProvider(InvokeAIAppConfig(external_atlascloud_api_key="atlas-key"), logging.getLogger("test"))
+    submitted: list[dict[str, object]] = []
+
+    def fake_generate(request: ExternalGenerationRequest) -> ExternalGenerationResult:
+        submitted.append(provider._build_payload(request))
+        return ExternalGenerationResult(images=[])
+
+    monkeypatch.setattr(provider, "generate", fake_generate)
+    service = ExternalGenerationService({"atlascloud": provider}, logging.getLogger("test"))
+    service.generate(
+        ExternalGenerationRequest(
+            model=_starter_config(provider_model_id),
+            mode="txt2img",
+            prompt="a blue square",
+            seed=None,
+            num_images=1,
+            width=width,
+            height=height,
+            image_size=image_size,
+            init_image=None,
+            mask_image=None,
+            reference_images=[],
+            metadata=None,
+        )
+    )
+    return submitted[0]
+
+
+@pytest.mark.parametrize(
+    "width, height, image_size, expected",
+    [
+        # Plain dimensions with no preset (the default UI) pick the tier nearest their pixel area.
+        (1024, 1024, None, {"aspect_ratio": "1:1", "resolution": "1k"}),
+        (1184, 888, None, {"aspect_ratio": "4:3", "resolution": "1k"}),
+        (2048, 1152, None, {"aspect_ratio": "16:9", "resolution": "2k"}),
+        (3072, 4096, None, {"aspect_ratio": "3:4", "resolution": "4k"}),
+        # The default UI's ratio presets land near, not on, an exact ratio.
+        (1368, 768, None, {"aspect_ratio": "16:9", "resolution": "1k"}),
+        (840, 1256, None, {"aspect_ratio": "2:3", "resolution": "1k"}),
+        (1000, 700, None, {"aspect_ratio": "3:2", "resolution": "1k"}),
+        # An explicit preset wins over the dimensions.
+        (1024, 1024, "4K", {"aspect_ratio": "1:1", "resolution": "4k"}),
+    ],
+)
+def test_atlascloud_nano_banana_keeps_requested_resolution(
+    monkeypatch: pytest.MonkeyPatch,
+    width: int,
+    height: int,
+    image_size: str | None,
+    expected: dict[str, object],
+) -> None:
+    payload = _submitted_payload(monkeypatch, "google/nano-banana-2/text-to-image", width, height, image_size)
+
+    assert {key: payload[key] for key in expected} == expected
+
+
+# Upstream MAI-Image-2.5 limits: each side 768-1360 px and width * height <= 1,049,088.
+@pytest.mark.parametrize("width, height", [(1024, 1024), (1360, 1360), (1920, 1080), (768, 1360), (512, 512)])
+def test_atlascloud_mai_requests_fit_upstream_size_limits(
+    monkeypatch: pytest.MonkeyPatch, width: int, height: int
+) -> None:
+    payload = _submitted_payload(monkeypatch, "microsoft/mai-image-2.5/text-to-image", width, height)
+
+    submitted_width, submitted_height = (int(side) for side in str(payload["size"]).split("*"))
+    assert 768 <= submitted_width <= 1360
+    assert 768 <= submitted_height <= 1360
+    assert submitted_width * submitted_height <= 1_049_088
 
 
 @pytest.mark.parametrize(
