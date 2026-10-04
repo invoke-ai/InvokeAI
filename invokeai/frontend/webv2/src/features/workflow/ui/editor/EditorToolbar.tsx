@@ -19,6 +19,7 @@ import {
   ZoomOutIcon,
 } from 'lucide-react';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { useTranslation } from 'react-i18next';
 
 /**
@@ -80,6 +81,7 @@ export const EditorToolbar = ({
   const notifications = useWorkflowNotifications();
   const opacityTriggerId = useId();
   const isExportingWorkflowRef = useRef(false);
+  const exportButtonRef = useRef<HTMLButtonElement>(null);
   const [isExportingWorkflow, setIsExportingWorkflow] = useState(false);
   const fitViewDuration = reduceMotion ? 0 : 300;
   const fallbackWorkflowName = t('widgets.workflow.untitled');
@@ -95,24 +97,42 @@ export const EditorToolbar = ({
     }
 
     isExportingWorkflowRef.current = true;
+    const hadFocus = document.activeElement === exportButtonRef.current;
     setIsExportingWorkflow(true);
     void (async () => {
       try {
-        const flowElement = await onExportPrepare();
-        await waitForExportFrame();
-        await waitForExportFrame();
-        const { exportWorkflowAsPng } = await import('./workflowImageExport');
-        await exportWorkflowAsPng({
-          bounds: getNodesBounds(getNodes()),
-          fallbackWorkflowName,
-          flowElement,
-          workflowName,
-        });
+        const { exportWorkflowAsPng, preflightWorkflowImageExport } = await import('./workflowImageExport');
+        const bounds = getNodesBounds(getNodes());
+        // Refuse from the live editor's bounds before mounting the whole graph a second time.
+        let outcome = preflightWorkflowImageExport(bounds);
+        if (!outcome) {
+          const flowElement = await onExportPrepare();
+          await waitForExportFrame();
+          await waitForExportFrame();
+          outcome = await exportWorkflowAsPng({ bounds, fallbackWorkflowName, flowElement, workflowName });
+        }
+        if (outcome.status === 'busy') {
+          notifications.info(t('widgets.workflow.exportImageBusy'));
+        } else if (outcome.status === 'too-large') {
+          notifications.error(
+            t('widgets.workflow.exportImageTooLarge'),
+            t('widgets.workflow.exportImageTooLargeDetail')
+          );
+        } else if (outcome.status === 'exported' && outcome.reduced) {
+          notifications.info(
+            t('widgets.workflow.exportImageReduced'),
+            t('widgets.workflow.exportImageReducedDetail', { height: outcome.height, width: outcome.width })
+          );
+        }
       } catch {
         notifications.error(exportFailedLabel);
       } finally {
         isExportingWorkflowRef.current = false;
-        setIsExportingWorkflow(false);
+        flushSync(() => setIsExportingWorkflow(false));
+        // The busy camera is disabled, which drops its focus; return it unless focus has moved on since.
+        if (hadFocus && document.activeElement === document.body) {
+          exportButtonRef.current?.focus();
+        }
         onExportComplete();
       }
     })();
@@ -124,6 +144,7 @@ export const EditorToolbar = ({
     notifications,
     onExportPrepare,
     onExportComplete,
+    t,
     workflowName,
   ]);
   const fitViewRef = useRef<HTMLButtonElement>(null);
@@ -155,6 +176,8 @@ export const EditorToolbar = ({
         <ToolbarButton icon={ZoomOutIcon} label="Zoom out" onClick={onZoomOutClick} />
         <ToolbarButton ref={fitViewRef} icon={MaximizeIcon} label="Fit view" onClick={onFitViewClick} />
         <ToolbarButton
+          ref={exportButtonRef}
+          aria-busy={isExportingWorkflow}
           disabled={isExportingWorkflow}
           icon={CameraIcon}
           label={t('widgets.workflow.exportAsPng')}
