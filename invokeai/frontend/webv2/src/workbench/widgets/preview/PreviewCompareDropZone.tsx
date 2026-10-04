@@ -40,9 +40,7 @@ export const PreviewCompareDropZone = ({ currentImageName }: { currentImageName:
       variant="overlay"
       zIndex="2"
     >
-      <Badge size="xs" variant="subtle">
-        {t('widgets.preview.dropToCompare')}
-      </Badge>
+      <Badge variant="subtle">{t('widgets.preview.dropToCompare')}</Badge>
     </DropZone>
   );
 };

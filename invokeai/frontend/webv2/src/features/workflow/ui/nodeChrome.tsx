@@ -84,7 +84,7 @@ export const getWorkflowNodeChromeProps = (state: WorkflowNodeChromeState): BoxP
 /** The node surface itself: chrome plus background, radius, and base type size. */
 export const getWorkflowNodeShellProps = (state: WorkflowNodeChromeState): BoxProps => ({
   bg: 'bg',
-  fontSize: 'xs',
+  fontSize: 'md',
   rounded: 'lg',
   ...getWorkflowNodeChromeProps(state),
 });

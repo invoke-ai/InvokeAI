@@ -648,11 +648,13 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
               target={contextMenuTarget}
               onClose={closeContextMenu}
             />
-            {deletionConfirmationDialog}
           </>
         ) : (
           <EmptyPreview />
         )}
+        {/* Outside the branches: deleting the shown item or a live session taking over must not unmount a pending
+            confirmation, nor cut its exit animation short. */}
+        {deletionConfirmationDialog}
       </Stack>
     </Box>
   );
@@ -874,10 +876,10 @@ const EmptyPreview = () => {
   return (
     <PreviewFrame frameHeight={1} frameWidth={1} isLive={false} shouldAntialiasLiveImage source={null} variant="inset">
       <Stack align="center" color="fg" gap="2" maxW="18rem" textAlign="center">
-        <Text fontSize="sm" fontWeight="800">
+        <Text fontSize="lg" fontWeight="800">
           {t('widgets.preview.noGallerySelection')}
         </Text>
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {t('widgets.preview.emptyDescription')}
         </Text>
       </Stack>

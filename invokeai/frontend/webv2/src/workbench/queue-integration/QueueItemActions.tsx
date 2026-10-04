@@ -23,7 +23,7 @@ export const QueueItemActions = ({ item }: { item: QueueItemReadModel }) => {
 
   return (
     <>
-      <ButtonGroup flexWrap="wrap" minW="0" rowGap="1" size="2xs" variant="subtle" w="full">
+      <ButtonGroup flexWrap="wrap" minW="0" rowGap="1" size="sm" variant="subtle" w="full">
         <Button disabled variant="ghost" onClick={onSendToCanvas}>
           <Icon as={WandSparklesIcon} boxSize="3" />
           {t('widgets.queue.sendToCanvas')}

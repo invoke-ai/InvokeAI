@@ -62,7 +62,7 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
         max={control.max}
         min={control.min}
         position="relative"
-        size="sm"
+        size="lg"
         step={control.step ?? 1}
         value={typeof value === 'number' ? String(value) : ''}
         w="full"
@@ -99,7 +99,7 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
         aria-label={label}
         collection={selectCollection}
         disabled={disabled}
-        size="sm"
+        size="lg"
         value={typeof value === 'string' ? [value] : []}
         onValueChange={({ value: next }) => {
           const nextValue = next[0];
@@ -118,7 +118,7 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
         aria-label={label}
         disabled={disabled}
         options={comboboxOptions}
-        size="sm"
+        size="lg"
         value={typeof value === 'string' ? value : null}
         onValueChange={setValue}
       />
@@ -134,7 +134,7 @@ const FieldControl = ({ control, disabled, label, modelBase, setValue, value }: 
         modelTypes={control.modelTypes}
         placeholder={t(control.placeholderKey)}
         showManagerButton={false}
-        size="sm"
+        size="lg"
         // The 'default' sentinel renders as the placeholder: the toggle is on
         // but no specific model is pinned.
         value={typeof value === 'string' && value !== 'default' ? value : null}
@@ -219,22 +219,16 @@ export const DefaultSettingsSection = ({
       <HStack justify="space-between">
         <Stack gap="0.5">
           <FieldLabel>{t('models.defaultSettings')}</FieldLabel>
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {t('models.defaultSettingsHelp')}
           </Text>
         </Stack>
-        <Button
-          disabled={!isDirty}
-          loading={visibleIsSaving}
-          size="xs"
-          variant="solid"
-          onClick={() => void handleSave()}
-        >
+        <Button disabled={!isDirty} loading={visibleIsSaving} variant="solid" onClick={() => void handleSave()}>
           {t('models.saveDefaults')}
         </Button>
       </HStack>
       {visibleError ? (
-        <Text color="fg.error" fontSize="2xs" role="alert">
+        <Text color="fg.error" fontSize="xs" role="alert">
           {visibleError}
         </Text>
       ) : null}
@@ -246,13 +240,13 @@ export const DefaultSettingsSection = ({
           return (
             <Panel key={field.key} gap="2" p="2.5" tone="surface">
               <HStack justify="space-between">
-                <Text fontSize="2xs" fontWeight="600" textTransform="uppercase">
+                <Text fontSize="xs" fontWeight="600" textTransform="uppercase">
                   {t(field.labelKey)}
                 </Text>
                 <Switch.Root
                   checked={isEnabled}
                   colorPalette="accent"
-                  size="xs"
+                  size="sm"
                   onCheckedChange={(event) => setFieldValue(field.key, event.checked ? field.defaultValue : null)}
                 >
                   <Switch.HiddenInput />
@@ -272,7 +266,7 @@ export const DefaultSettingsSection = ({
                   value={isEnabled ? value : field.defaultValue}
                 />
               ) : null}
-              <Text color="fg.subtle" fontSize="2xs">
+              <Text color="fg.subtle" fontSize="xs">
                 {isEnabled ? t('models.customizedForThisModel') : t(field.inheritLabelKey)}
               </Text>
             </Panel>

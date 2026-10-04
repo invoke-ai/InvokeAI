@@ -7,14 +7,12 @@ const getProgressValuePercent = (state: QueueProgressBarState): number | null =>
   state.kind === 'determinate' ? state.value * 100 : state.value;
 
 type ProgressCircleRootProps = ComponentProps<typeof ProgressCircle.Root>;
-type QueueCircularProgressSize = NonNullable<ProgressCircleRootProps['size']> | '2xs';
 
 export const QueueCircularProgress = ({
-  size = '2xs',
+  size = 'sm',
   state,
   ...props
-}: Omit<ProgressCircleRootProps, 'size' | 'value'> & {
-  size?: QueueCircularProgressSize;
+}: Omit<ProgressCircleRootProps, 'value'> & {
   state: QueueProgressBarState;
 }) => {
   if (state.kind === 'idle') {
@@ -26,7 +24,7 @@ export const QueueCircularProgress = ({
       aria-label="Project queue progress"
       colorPalette="accent"
       flexShrink="0"
-      size={size as ProgressCircleRootProps['size']}
+      size={size}
       value={getProgressValuePercent(state)}
       {...props}
     >

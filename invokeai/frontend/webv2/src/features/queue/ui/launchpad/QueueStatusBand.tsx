@@ -48,13 +48,11 @@ export const QueueStatusBand = () => {
     >
       {/* Animate only running work; waiting-only queues use a static glyph. */}
       {inProgress > 0 ? (
-        <Spinner color="fg.muted" size="xs" />
+        <Spinner color="fg.muted" />
       ) : (
         <Icon aria-hidden as={HourglassIcon} boxSize="3.5" color="fg.muted" />
       )}
-      <Text fontSize="xs" fontWeight="600">
-        {t('launchpad.home.queue.summary', { inProgress, pending })}
-      </Text>
+      <Text fontWeight="600">{t('launchpad.home.queue.summary', { inProgress, pending })}</Text>
     </Flex>
   );
 };

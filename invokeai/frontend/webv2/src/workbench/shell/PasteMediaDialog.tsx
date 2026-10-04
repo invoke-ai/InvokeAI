@@ -86,19 +86,32 @@ const CanvasDestinationButton = ({
   const handleClick = useCallback(() => onChoose(destination), [destination, onChoose]);
 
   return (
-    <Button justifyContent="flex-start" size="sm" variant="outline" onClick={handleClick}>
+    <Button justifyContent="flex-start" size="lg" variant="outline" onClick={handleClick}>
       {label}
     </Button>
   );
+};
+
+const PasteMediaModalLayer = () => {
+  useMountEffect(() => registerHotkeyModalLayer('paste-media'));
+
+  return null;
 };
 
 /**
  * Upload pasted media to the current board before forwarding it to canvas/reference actions so assets remain
  * findable.
  */
-export const PasteMediaDialog = ({ request }: { request: PasteMediaRequest }) => {
+export const PasteMediaDialog = ({
+  isOpen,
+  onExitComplete,
+  request,
+}: {
+  isOpen: boolean;
+  onExitComplete: () => void;
+  request: PasteMediaRequest;
+}) => {
   const { t } = useTranslation();
-  useMountEffect(() => registerHotkeyModalLayer('paste-media'));
   const projectId = useActiveProjectId();
   const galleryValues = useActiveProjectSelector((project) => getProjectWidgetValues(project, 'gallery'));
   const generateValues = useWidgetValuesSelector('generate', selectGenerateValues);
@@ -191,13 +204,15 @@ export const PasteMediaDialog = ({ request }: { request: PasteMediaRequest }) =>
   return (
     <>
       <Dialog.Root
-        open
+        open={isOpen}
         finalFocusEl={returnFocus}
         initialFocusEl={getInitialFocusEl}
         placement="center"
         size="sm"
+        onExitComplete={onExitComplete}
         onOpenChange={handleOpenChange}
       >
+        {isOpen ? <PasteMediaModalLayer /> : null}
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>
@@ -233,19 +248,19 @@ export const PasteMediaDialog = ({ request }: { request: PasteMediaRequest }) =>
                       </Box>
                     ))}
                     {request.files.length > PREVIEW_LIMIT ? (
-                      <Flex align="center" color="fg.muted" fontSize="sm" h="64px" px="2">
+                      <Flex align="center" color="fg.muted" fontSize="lg" h="64px" px="2">
                         {t('shell.pasteMedia.morePreviews', { count: request.files.length - PREVIEW_LIMIT })}
                       </Flex>
                     ) : null}
                   </Flex>
-                  <Text color="fg.muted" fontSize="sm">
+                  <Text color="fg.muted" fontSize="lg">
                     {t('shell.pasteMedia.description', { count: request.files.length })}
                   </Text>
                   <Stack gap="2">
                     <Button
                       ref={galleryButtonRef}
                       justifyContent="flex-start"
-                      size="sm"
+                      size="lg"
                       variant="outline"
                       onClick={chooseGallery}
                     >
@@ -259,7 +274,7 @@ export const PasteMediaDialog = ({ request }: { request: PasteMediaRequest }) =>
                     </Button>
                     {hasImages ? (
                       <>
-                        <Text id={canvasHeadingId} color="fg.muted" fontSize="xs" mt="1">
+                        <Text id={canvasHeadingId} color="fg.muted" fontSize="md" mt="1">
                           {t('shell.pasteMedia.canvasHeading')}
                         </Text>
                         <SimpleGrid aria-labelledby={canvasHeadingId} columns={2} gap="2" role="group">
@@ -276,7 +291,7 @@ export const PasteMediaDialog = ({ request }: { request: PasteMediaRequest }) =>
                           <Button
                             justifyContent="flex-start"
                             mt="1"
-                            size="sm"
+                            size="lg"
                             variant="outline"
                             onClick={chooseReference}
                           >
@@ -287,7 +302,7 @@ export const PasteMediaDialog = ({ request }: { request: PasteMediaRequest }) =>
                       </>
                     ) : null}
                     {hasImages && hasVideos ? (
-                      <Text color="fg.muted" fontSize="xs">
+                      <Text color="fg.muted" fontSize="md">
                         {t('shell.pasteMedia.videosGalleryOnly')}
                       </Text>
                     ) : null}
@@ -295,7 +310,7 @@ export const PasteMediaDialog = ({ request }: { request: PasteMediaRequest }) =>
                 </Stack>
               </Dialog.Body>
               <Dialog.Footer>
-                <Button color="fg" size="sm" variant="ghost" onClick={close}>
+                <Button color="fg" size="lg" variant="ghost" onClick={close}>
                   {t('common.cancel')}
                 </Button>
               </Dialog.Footer>

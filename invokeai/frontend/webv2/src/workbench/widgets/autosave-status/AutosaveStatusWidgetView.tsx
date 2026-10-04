@@ -25,19 +25,19 @@ export const AutosaveStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   if (presentation === 'tooltip') {
     return (
       <Stack gap="2">
-        <Text fontSize="xs" fontWeight="700">
+        <Text fontSize="md" fontWeight="700">
           {t('widgets.autosaveStatus.label')}
         </Text>
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('widgets.autosaveStatus.status', { status: label })}
         </Text>
         {autosave.lastSavedAt ? (
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {t('widgets.autosaveStatus.lastSaved', { time: autosave.lastSavedAt })}
           </Text>
         ) : null}
         {autosave.error ? (
-          <Text color="fg.error" fontSize="2xs">
+          <Text color="fg.error" fontSize="xs">
             {autosave.error}
           </Text>
         ) : null}

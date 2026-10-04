@@ -98,7 +98,7 @@ export const ProjectsToolbar = ({
       <InputGroup
         endElement={
           searchTerm ? (
-            <IconButton aria-label={t('common.clearSearch')} size="2xs" variant="ghost" onClick={handleClearSearch}>
+            <IconButton aria-label={t('common.clearSearch')} size="sm" variant="ghost" onClick={handleClearSearch}>
               <Icon as={XIcon} boxSize="3" />
             </IconButton>
           ) : undefined
@@ -111,7 +111,6 @@ export const ProjectsToolbar = ({
         <Input
           aria-label={t('projects.searchLabel')}
           placeholder={t('projects.searchPlaceholder')}
-          size="xs"
           type="search"
           value={searchTerm}
           onChange={handleSearchInput}
@@ -120,7 +119,7 @@ export const ProjectsToolbar = ({
 
       <Menu.Root positioning={MENU_POSITIONING} onSelect={handleSortSelect}>
         <Menu.Trigger asChild>
-          <Button ms="auto" size="xs" variant="outline">
+          <Button ms="auto" variant="outline">
             <Icon as={ArrowUpDownIcon} boxSize="3.5" />
             {t(SORT_LABEL_KEY[sort])}
           </Button>
@@ -129,7 +128,7 @@ export const ProjectsToolbar = ({
           <Menu.Positioner>
             <MenuContent minW="44">
               <Menu.ItemGroup>
-                <Menu.ItemGroupLabel color="fg.subtle" fontSize="2xs" textTransform="uppercase">
+                <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
                   {t('projects.sort.label')}
                 </Menu.ItemGroupLabel>
                 {PROJECT_SORT_IDS.map((id) => (
@@ -144,7 +143,7 @@ export const ProjectsToolbar = ({
         </Portal>
       </Menu.Root>
 
-      <SegmentGroup.Root aria-label={t('projects.viewLabel')} size="xs" value={view} onValueChange={handleViewChange}>
+      <SegmentGroup.Root aria-label={t('projects.viewLabel')} value={view} onValueChange={handleViewChange}>
         <SegmentGroup.Indicator />
         {PROJECTS_VIEW_IDS.map((id) => (
           <ViewSegment key={id} id={id} />

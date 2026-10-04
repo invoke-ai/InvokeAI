@@ -73,7 +73,7 @@ export const GenerateHeaderActions = () => {
           aria-label={resetLabel}
           color="fg.muted"
           disabled={!hasSelectedModel || isAtModelDefaults}
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={resetToModelDefaults}
         >

@@ -22,13 +22,13 @@ const ViewElement = ({ element, projectGraph }: { element: WorkflowFormElement; 
       return <NodeFieldControl element={element} projectGraph={projectGraph} />;
     case 'heading':
       return (
-        <Text fontSize="sm" fontWeight="700">
+        <Text fontSize="lg" fontWeight="700">
           {element.data.content}
         </Text>
       );
     case 'text':
       return (
-        <Text color="fg.muted" fontSize="2xs" whiteSpace="pre-wrap">
+        <Text color="fg.muted" fontSize="xs" whiteSpace="pre-wrap">
           {element.data.content}
         </Text>
       );
@@ -49,11 +49,11 @@ export const LinearFormView = ({ projectGraph }: { projectGraph: ProjectGraphSta
     return (
       // Same inset and color as the Edit tab's empty state and as this view once it has fields.
       <Stack gap="2" p="3">
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           No fields are exposed yet. Pin fields in the Workflow editor, or switch to Edit mode to build this form — it
           maps the project graph to simple controls, like the legacy Linear UI.
         </Text>
-        <Button size="2xs" variant="outline" w="fit-content" onClick={onOpenWorkflowEditorClick}>
+        <Button size="sm" variant="outline" w="fit-content" onClick={onOpenWorkflowEditorClick}>
           Open Workflow Editor
         </Button>
       </Stack>

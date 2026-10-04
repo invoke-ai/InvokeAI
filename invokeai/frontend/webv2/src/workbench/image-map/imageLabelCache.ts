@@ -11,10 +11,10 @@ import { ApiError } from '@platform/transport/http';
 import type { ImageMapImageLabels } from './api';
 
 import { fetchImageMapImageLabels } from './api';
+import { imageMapStore } from './imageMapStore';
 
 /**
- * Caches per-item vocabulary labels, including empty results, until vocabulary rebuild. Embeddings are stable;
- * editable vocabulary determines invalidation.
+ * Caches per-item vocabulary labels, including empty results, until vocabulary rebuild or encoder change.
  */
 const labels = new Map<string, ImageMapImageLabels | null>();
 const inflight = new Map<string, Promise<ImageMapImageLabels | null>>();
@@ -52,6 +52,23 @@ export const clearImageLabels = (): void => {
   inflight.clear();
   unavailableUntil = 0;
 };
+
+// One subscription lives with this lazy, account-fenced cache. The eagerly
+// loaded map read model never needs to import hover-label code to invalidate it.
+let modelMissing = imageMapStore.getSnapshot().data?.state === 'model_missing';
+let modelId = imageMapStore.getSnapshot().data?.modelId ?? null;
+imageMapStore.subscribe(() => {
+  const { data } = imageMapStore.getSnapshot();
+  const missing = data?.state === 'model_missing';
+  const nextModelId = data?.modelId ?? null;
+  // A replacement may become ready while the map is closed or its tab is
+  // suspended, so availability transitions alone cannot retire old labels.
+  if ((missing && !modelMissing) || nextModelId !== modelId) {
+    clearImageLabels();
+  }
+  modelMissing = missing;
+  modelId = nextModelId;
+});
 
 export const getImageLabels = (item: GalleryItemRef): Promise<ImageMapImageLabels | null> => {
   const key = toGalleryItemKey(item);

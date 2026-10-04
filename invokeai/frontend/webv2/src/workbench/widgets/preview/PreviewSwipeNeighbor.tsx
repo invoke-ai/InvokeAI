@@ -62,7 +62,7 @@ const PreviewSwipeNeighbor = ({
     top="0"
     w="full"
   >
-    {neighbor?.kind === 'more' ? <Spinner color="fg.muted" size="md" /> : null}
+    {neighbor?.kind === 'more' ? <Spinner color="fg.muted" size="xl" /> : null}
     {neighbor?.kind === 'item' ? (
       // Keyed by URL: every layer is a new element per neighbor, so none can keep painting the previous picture while
       // its own loads.

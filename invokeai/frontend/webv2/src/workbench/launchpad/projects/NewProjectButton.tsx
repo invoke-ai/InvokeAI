@@ -20,7 +20,7 @@ export const NewProjectButton = ({ variant = 'solid' }: { variant?: 'outline' | 
 
   return (
     <Group attached>
-      <Button asChild size="xs" variant={variant}>
+      <Button asChild variant={variant}>
         <Link search={NEW_PROJECT_SEARCH} to="/app">
           <Icon as={PlusIcon} boxSize="3.5" />
           {t('projects.newProject')}
@@ -28,7 +28,7 @@ export const NewProjectButton = ({ variant = 'solid' }: { variant?: 'outline' | 
       </Button>
       <Menu.Root positioning={MENU_POSITIONING}>
         <Menu.Trigger asChild>
-          <IconButton aria-label={t('projects.newProjectStart')} size="xs" variant={variant}>
+          <IconButton aria-label={t('projects.newProjectStart')} variant={variant}>
             <Icon as={ChevronDownIcon} boxSize="3.5" />
           </IconButton>
         </Menu.Trigger>

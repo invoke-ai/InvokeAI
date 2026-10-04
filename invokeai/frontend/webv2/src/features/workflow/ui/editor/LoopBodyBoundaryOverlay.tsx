@@ -115,7 +115,7 @@ export const LoopBodyBoundaryOverlay = ({ nodes, edges }: { nodes: WorkflowNode[
               px={1}
               bg="bg.canvas"
               color={colors.text}
-              fontSize="xs"
+              fontSize="md"
               lineHeight="short"
               whiteSpace="nowrap"
             >

@@ -7,10 +7,12 @@ import { NodeActivityBar } from '@features/nodes/ui/activity/NodeActivityBar';
 import { AddNodesView } from '@features/nodes/ui/add-nodes/AddNodesView';
 import { NodePackDetail } from '@features/nodes/ui/detail/NodePackDetail';
 import { updateNodesUi, useNodesUiSelector, type NodesManagerTab } from '@features/nodes/ui/nodesUiStore';
+import { UninstallPackDialog } from '@features/nodes/ui/shared/UninstallPackDialog';
 import { Scrollable, Tabs } from '@platform/ui';
 import { ManagerDetailHeader } from '@platform/ui/ManagerLayout';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { BlocksIcon, PlusIcon } from 'lucide-react';
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** Right side of the nodes manager: selected pack details, Add Nodes, and activity footer. */
@@ -26,7 +28,7 @@ export const DetailPane = () => {
     <Tabs.Root
       asChild
       lazyMount
-      size="sm"
+      size="xl"
       unmountOnExit
       value={activeTab}
       onValueChange={(event) => updateNodesUi({ activeTab: event.value as NodesManagerTab })}
@@ -62,24 +64,31 @@ export const DetailPane = () => {
 
 const DetailTab = ({ activePack }: { activePack: NodePackInfo | null }) => {
   const { t } = useTranslation();
-
-  if (!activePack) {
-    return (
-      <Flex align="center" direction="column" gap="2" h="full" justify="center" p="6">
-        <Icon as={BlocksIcon} boxSize="8" color="fg.subtle" />
-        <Text color="fg.muted" fontSize="sm" fontWeight="600">
-          {t('nodes.selectPack')}
-        </Text>
-        <Text color="fg.muted" fontSize="xs" maxW="22rem" textAlign="center">
-          {t('nodes.selectPackDescription')}
-        </Text>
-      </Flex>
-    );
-  }
+  // Owned above the detail: an uninstall unmounts it while this dialog is still animating out.
+  const [pendingUninstall, setPendingUninstall] = useState<NodePackInfo | null>(null);
 
   return (
-    <Scrollable h="full" label={t('nodes.details')} minH="0" p="3">
-      <NodePackDetail pack={activePack} onUninstalled={() => updateNodesUi({ activePackName: null })} />
-    </Scrollable>
+    <>
+      {activePack ? (
+        <Scrollable h="full" label={t('nodes.details')} minH="0" p="3">
+          <NodePackDetail pack={activePack} onRequestUninstall={setPendingUninstall} />
+        </Scrollable>
+      ) : (
+        <Flex align="center" direction="column" gap="2" h="full" justify="center" p="6">
+          <Icon as={BlocksIcon} boxSize="8" color="fg.subtle" />
+          <Text color="fg.muted" fontSize="lg" fontWeight="600">
+            {t('nodes.selectPack')}
+          </Text>
+          <Text color="fg.muted" fontSize="md" maxW="22rem" textAlign="center">
+            {t('nodes.selectPackDescription')}
+          </Text>
+        </Flex>
+      )}
+      <UninstallPackDialog
+        pack={pendingUninstall}
+        onClose={() => setPendingUninstall(null)}
+        onUninstalled={() => updateNodesUi({ activePackName: null })}
+      />
+    </>
   );
 };

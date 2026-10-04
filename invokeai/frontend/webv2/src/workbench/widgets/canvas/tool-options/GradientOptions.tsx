@@ -471,7 +471,7 @@ const GradientStopsSettings = ({ engine }: ToolFormProps) => {
           <Flex gap="0.5">
             <ChakraIconButton
               aria-label={t('widgets.canvas.toolOptions.gradientAddStop')}
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={onAdd}
             >
@@ -480,7 +480,7 @@ const GradientStopsSettings = ({ engine }: ToolFormProps) => {
             <ChakraIconButton
               aria-label={t('widgets.canvas.toolOptions.gradientRemoveStop')}
               disabled={stopCount <= 2}
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={onRemove}
             >

@@ -59,7 +59,7 @@ const OutputRow = ({ template }: { template: FieldOutputTemplate }) => (
       <Flex justify="flex-end">
         <MiddleTruncate
           color="fg.muted"
-          fontSize="2xs"
+          fontSize="xs"
           justifyContent="flex-end"
           lineHeight="shorter"
           maxW="full"
@@ -77,7 +77,7 @@ const InputRow = ({ template }: { template: FieldInputTemplate }) => (
       content={<FieldTooltip description={template.description} direction="input" template={template} />}
       positioning={{ placement: 'top-start' }}
     >
-      <Text color="fg" fontSize="2xs" lineHeight="shorter" minW="0" truncate>
+      <Text color="fg" fontSize="xs" lineHeight="shorter" minW="0" truncate>
         {template.title}
         {template.required ? (
           <Text as="span" color="fg.error">
@@ -131,7 +131,7 @@ export const NodePreviewCard = ({ template }: { template: InvocationTemplate }) 
             ))}
           </>
         ) : (
-          <Text color="fg.muted" fontSize="2xs" px="3" py="1">
+          <Text color="fg.muted" fontSize="xs" px="3" py="1">
             {t('nodes.noExposedFields')}
           </Text>
         )}

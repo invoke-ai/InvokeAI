@@ -403,11 +403,11 @@ export const GenerateDimensionFields = ({
 
   const badges = (
     <>
-      <Badge size="xs">
+      <Badge>
         {displayDimensions.width}x{displayDimensions.height}
       </Badge>
       {isRatioConstrained && (
-        <Badge size="xs">
+        <Badge>
           <Icon as={LockIcon} boxSize="3" />
         </Badge>
       )}
@@ -461,7 +461,7 @@ export const GenerateDimensionFields = ({
                   <svg aria-hidden="true" data-part="bracket" viewBox="0 0 28 64">
                     <path d={LOCK_BRACKET_PATH} />
                   </svg>
-                  <AspectRatioLockButton isLocked={isRatioConstrained} size="2xs" onToggle={toggleLock} />
+                  <AspectRatioLockButton isLocked={isRatioConstrained} size="sm" onToggle={toggleLock} />
                 </Box>
               </HStack>
             </GenerateFieldContextMenu>
@@ -476,7 +476,7 @@ export const GenerateDimensionFields = ({
                 <Tooltip content={t('widgets.generate.swapWidthAndHeight')}>
                   <IconButton
                     aria-label={t('widgets.generate.swapWidthAndHeight')}
-                    size="2xs"
+                    size="sm"
                     variant="outline"
                     onClick={swapDimensions}
                   >
@@ -486,7 +486,7 @@ export const GenerateDimensionFields = ({
               </Box>
             </HStack>
             <HStack gap="2" justify="space-between" minH="5" mt="auto">
-              <Text color="fg.muted" fontSize="2xs">
+              <Text color="fg.muted" fontSize="xs">
                 {t('widgets.generate.megapixelsValue', { value: megapixels.toFixed(2) })}
                 {isAtRecommendedSize ? ` · ${t('widgets.generate.sizeRecommended')}` : ''}
                 {/* Grounded in this project's recent completed runs, never a guess. */}
@@ -496,7 +496,7 @@ export const GenerateDimensionFields = ({
               </Text>
               {isAtRecommendedSize ? null : (
                 <Tooltip content={t('widgets.generate.setOptimalSizeDescription')}>
-                  <Button color="fg.muted" size="2xs" variant="ghost" onClick={optimizeSize}>
+                  <Button color="fg.muted" size="sm" variant="ghost" onClick={optimizeSize}>
                     {t('widgets.generate.setOptimalSize')}
                   </Button>
                 </Tooltip>

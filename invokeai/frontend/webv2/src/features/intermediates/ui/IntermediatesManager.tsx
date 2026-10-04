@@ -227,10 +227,10 @@ export const IntermediatesManager = ({
     <Stack gap="3" h="full" minH="0">
       <HStack align="flex-start" gap="3" justify="space-between">
         <Stack gap="0.5" minW="0">
-          <Text fontSize="sm" fontWeight="600">
+          <Text fontSize="lg" fontWeight="600">
             {t('intermediates.title')}
           </Text>
-          <Text color="fg.muted" fontSize="xs">
+          <Text color="fg.muted" fontSize="md">
             {t('intermediates.description')}
           </Text>
         </Stack>
@@ -239,11 +239,10 @@ export const IntermediatesManager = ({
             aria-busy={isRefreshing || undefined}
             aria-label={t('intermediates.refresh')}
             flexShrink={0}
-            size="xs"
             variant="outline"
             onClick={handleRefresh}
           >
-            {isRefreshing ? <Spinner size="xs" /> : <RefreshCwIcon />}
+            {isRefreshing ? <Spinner /> : <RefreshCwIcon />}
           </IconButton>
         </Tooltip>
       </HStack>
@@ -257,7 +256,6 @@ export const IntermediatesManager = ({
                 ? t('intermediates.searchPlaceholderAdmin')
                 : t('intermediates.searchPlaceholder')
             }
-            size="xs"
             value={search}
             onChange={(event) => handleSearchChange(event.currentTarget.value)}
           />
@@ -268,7 +266,7 @@ export const IntermediatesManager = ({
           </RemovableTag>
         ) : null}
         {canClearOthersIntermediates && !ownerFilter && currentUserId ? (
-          <Button size="2xs" variant="outline" onClick={showOwnAccount}>
+          <Button size="sm" variant="outline" onClick={showOwnAccount}>
             {t('intermediates.owner.showMine')}
           </Button>
         ) : null}
@@ -337,7 +335,7 @@ export const IntermediatesManager = ({
         >
           {query.data?.measuring ? (
             <Tooltip content={t('intermediates.stats.measuringNote')}>
-              <Spinner aria-label={t('intermediates.stats.measuringNote')} color="fg.muted" size="xs" />
+              <Spinner aria-label={t('intermediates.stats.measuringNote')} color="fg.muted" />
             </Tooltip>
           ) : null}
           {/* `aria-disabled` keeps it focusable, so the reason it waits is announced on focus. */}
@@ -345,7 +343,7 @@ export const IntermediatesManager = ({
             aria-describedby={isOperationActive && selection.hasSelection ? deleteReasonId : undefined}
             aria-disabled={isDeleteUnavailable}
             colorPalette="red"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={(event) => {
               if (isDeleteUnavailable) {
@@ -376,7 +374,7 @@ export const IntermediatesManager = ({
               title={hasSearch ? t('intermediates.empty.noMatches') : t('intermediates.empty.title')}
             >
               {hasSearch ? (
-                <Button size="xs" variant="outline" onClick={clearSearch}>
+                <Button variant="outline" onClick={clearSearch}>
                   {t('common.clearSearch')}
                 </Button>
               ) : null}
@@ -390,7 +388,7 @@ export const IntermediatesManager = ({
               }
               title={t('intermediates.errors.couldNotLoad')}
             >
-              <Button size="xs" variant="outline" onClick={() => void query.refetch()}>
+              <Button variant="outline" onClick={() => void query.refetch()}>
                 {t('common.retry')}
               </Button>
             </EmptyState>

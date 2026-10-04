@@ -51,7 +51,7 @@ export const WorkflowDetailsTab = ({ metadata }: { metadata: WorkflowMetadata })
     onChange: (event: ChangeEvent<HTMLInputElement>) => void
   ) => (
     <Field label={label}>
-      <Input size="xs" value={metadata[key]} onChange={onChange} />
+      <Input value={metadata[key]} onChange={onChange} />
     </Field>
   );
 
@@ -59,13 +59,7 @@ export const WorkflowDetailsTab = ({ metadata }: { metadata: WorkflowMetadata })
     <Stack gap="3" p="3">
       {textField(t('common.name'), 'name', onNameChange)}
       <Field label={t('widgets.workflow.description')}>
-        <Textarea
-          minH="3.5rem"
-          resize="vertical"
-          size="xs"
-          value={metadata.description}
-          onChange={onDescriptionChange}
-        />
+        <Textarea minH="3.5rem" resize="vertical" value={metadata.description} onChange={onDescriptionChange} />
       </Field>
       <HStack align="start" gap="2">
         {textField(t('widgets.workflow.author'), 'author', onAuthorChange)}
@@ -76,7 +70,7 @@ export const WorkflowDetailsTab = ({ metadata }: { metadata: WorkflowMetadata })
         {textField(t('widgets.workflow.contact'), 'contact', onContactChange)}
       </HStack>
       <Field label={t('widgets.workflow.notes')}>
-        <Textarea minH="3.5rem" resize="vertical" size="xs" value={metadata.notes} onChange={onNotesChange} />
+        <Textarea minH="3.5rem" resize="vertical" value={metadata.notes} onChange={onNotesChange} />
       </Field>
     </Stack>
   );

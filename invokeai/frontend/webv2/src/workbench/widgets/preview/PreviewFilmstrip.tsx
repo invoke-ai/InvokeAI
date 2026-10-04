@@ -239,7 +239,7 @@ const FilmstripLiveThumb = ({
         {isPinned ? (
           <Icon aria-hidden as={PinIcon} boxSize="3" />
         ) : isRunning ? (
-          <ProgressCircle.Root aria-hidden size="xs" value={percentage}>
+          <ProgressCircle.Root aria-hidden value={percentage}>
             <ProgressCircle.Circle>
               <ProgressCircle.Track />
               <ProgressCircle.Range />

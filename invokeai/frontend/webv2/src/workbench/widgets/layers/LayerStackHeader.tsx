@@ -124,7 +124,7 @@ const LayerStackHeaderComponent = ({
           <IconButton
             aria-label={t(collapsed ? 'widgets.layers.groupActions.expand' : 'widgets.layers.groupActions.collapse')}
             color="fg.muted"
-            size="2xs"
+            size="sm"
             tabIndex={-1}
             variant="ghost"
             onClick={handleToggle}
@@ -141,7 +141,7 @@ const LayerStackHeaderComponent = ({
           <Text
             color="fg.muted"
             flex="1"
-            fontSize="2xs"
+            fontSize="xs"
             fontWeight="700"
             textTransform="uppercase"
             truncate
@@ -157,7 +157,7 @@ const LayerStackHeaderComponent = ({
                     aria-label={action.label}
                     color="fg.muted"
                     disabled={action.disabled}
-                    size="2xs"
+                    size="sm"
                     tabIndex={-1}
                     variant="ghost"
                     onClick={action.run}
