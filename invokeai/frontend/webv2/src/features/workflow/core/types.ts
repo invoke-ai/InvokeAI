@@ -286,6 +286,7 @@ export interface ProjectWorkflowEntry {
 
 export interface InvocationTemplatesSnapshot {
   status: 'idle' | 'loading' | 'loaded' | 'error';
+  /** The server's or network's own message for a failed load; null when there is none to show. */
   error: string | null;
   templates: InvocationTemplates;
 }

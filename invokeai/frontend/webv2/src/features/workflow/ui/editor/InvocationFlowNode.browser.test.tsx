@@ -496,8 +496,8 @@ describe('InvocationFlowNode chrome and export', () => {
       workflowName: 'Image output',
     });
 
-    expect(capturedClone?.textContent).not.toContain('Use Cache');
-    expect(capturedClone?.textContent).not.toContain('Save to Gallery');
+    expect(capturedClone?.textContent).not.toContain(i18n.t('nodes.useCache'));
+    expect(capturedClone?.textContent).not.toContain(i18n.t('nodes.saveToGallery'));
     expect(capturedClone?.querySelector('input[type="checkbox"]')).toBeNull();
   });
 
@@ -2167,7 +2167,7 @@ describe('InvocationFlowNode batch nodes', () => {
     expect(host.querySelector<HTMLElement>('.react-flow__handle[data-handleid="floats"]')?.style.transform).toContain(
       'rotate(45deg)'
     );
-    expect(host.textContent).not.toContain('Use Cache');
+    expect(host.textContent).not.toContain(i18n.t('nodes.useCache'));
 
     await render('None');
     expect(header().textContent).toContain('(no group)');

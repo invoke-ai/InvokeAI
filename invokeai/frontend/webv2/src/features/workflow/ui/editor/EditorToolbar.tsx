@@ -28,11 +28,11 @@ import { useTranslation } from 'react-i18next';
  */
 export type EditorTool = 'pan' | 'box-select' | 'lasso' | 'eraser';
 
-const TOOLS: { icon: typeof HandIcon; id: EditorTool; label: string }[] = [
-  { icon: HandIcon, id: 'pan', label: 'Pan (drag to move the viewport)' },
-  { icon: BoxSelectIcon, id: 'box-select', label: 'Box select (drag to select nodes)' },
-  { icon: LassoIcon, id: 'lasso', label: 'Lasso select (draw around nodes)' },
-  { icon: EraserIcon, id: 'eraser', label: 'Eraser (click nodes or edges to delete)' },
+const TOOLS: { icon: typeof HandIcon; id: EditorTool; labelKey: string }[] = [
+  { icon: HandIcon, id: 'pan', labelKey: 'widgets.workflow.toolbar.pan' },
+  { icon: BoxSelectIcon, id: 'box-select', labelKey: 'widgets.workflow.toolbar.boxSelect' },
+  { icon: LassoIcon, id: 'lasso', labelKey: 'widgets.workflow.toolbar.lasso' },
+  { icon: EraserIcon, id: 'eraser', labelKey: 'widgets.workflow.toolbar.eraser' },
 ];
 
 const POPOVER_POSITIONING = { placement: 'right' } as const;
@@ -161,20 +161,25 @@ export const EditorToolbar = ({
   return (
     <Box data-workflow-export-control="true" left="2" position="absolute" top={EDITOR_TOOLBAR_TOP} zIndex="5">
       <Toolbar>
-        {TOOLS.map(({ icon, id, label }) => (
+        {TOOLS.map(({ icon, id, labelKey }) => (
           <EditorToolButton
             key={id}
             icon={icon}
             id={id}
             isActive={tool === id}
-            label={label}
+            label={t(labelKey)}
             onToolChange={onToolChange}
           />
         ))}
         <ToolbarSeparator />
-        <ToolbarButton icon={ZoomInIcon} label="Zoom in" onClick={onZoomInClick} />
-        <ToolbarButton icon={ZoomOutIcon} label="Zoom out" onClick={onZoomOutClick} />
-        <ToolbarButton ref={fitViewRef} icon={MaximizeIcon} label="Fit view" onClick={onFitViewClick} />
+        <ToolbarButton icon={ZoomInIcon} label={t('widgets.workflow.toolbar.zoomIn')} onClick={onZoomInClick} />
+        <ToolbarButton icon={ZoomOutIcon} label={t('widgets.workflow.toolbar.zoomOut')} onClick={onZoomOutClick} />
+        <ToolbarButton
+          ref={fitViewRef}
+          icon={MaximizeIcon}
+          label={t('widgets.workflow.toolbar.fitView')}
+          onClick={onFitViewClick}
+        />
         <ToolbarButton
           ref={exportButtonRef}
           aria-busy={isExportingWorkflow}
@@ -197,14 +202,18 @@ export const EditorToolbar = ({
         ) : null}
         <ToolbarSeparator />
         <Popover.Root ids={opacityIds} positioning={POPOVER_POSITIONING}>
-          <Tooltip content="Node opacity" ids={opacityIds} positioning={TOOLTIP_POSITIONING}>
+          <Tooltip
+            content={t('widgets.workflow.toolbar.nodeOpacity')}
+            ids={opacityIds}
+            positioning={TOOLTIP_POSITIONING}
+          >
             <Popover.Trigger asChild>
               {/*
                * Render a plain button because asChild would clone ToolbarButton's Tooltip wrapper. Match xs sizing
                * so one child cannot stretch the column.
                */}
               <IconButton
-                aria-label="Node opacity"
+                aria-label={t('widgets.workflow.toolbar.nodeOpacity')}
                 aria-pressed={nodeOpacity < 1}
                 variant={nodeOpacity < 1 ? 'solid' : 'ghost'}
               >
@@ -218,7 +227,7 @@ export const EditorToolbar = ({
                 <Popover.Body p="3">
                   <Stack gap="1.5">
                     <Text color="fg.muted" fontSize="xs" fontWeight="600">
-                      Node opacity · {Math.round(nodeOpacity * 100)}%
+                      {t('widgets.workflow.toolbar.nodeOpacityValue', { value: opacityValue[0] })}
                     </Text>
                     <Slider.Root max={100} min={20} step={5} value={opacityValue} onValueChange={onSliderValueChange}>
                       <Slider.Control>

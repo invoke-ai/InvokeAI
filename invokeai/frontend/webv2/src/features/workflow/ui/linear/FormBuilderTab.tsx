@@ -39,7 +39,7 @@ import {
   getWorkflowFieldInvalidReason,
   isShuffleableField,
 } from '@features/workflow/utility';
-import { Button, DropZone, IconButton } from '@platform/ui';
+import { Button, DropZone, IconButton, Tooltip } from '@platform/ui';
 import { MenuContent } from '@platform/ui/Menu';
 import {
   Columns2Icon,
@@ -62,6 +62,7 @@ import {
   type ChangeEvent,
   type ReactNode,
 } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import {
   formEdgeDroppableId,
@@ -76,7 +77,7 @@ import {
 import {
   ADDABLE_FORM_ELEMENT_KEYS,
   FORM_ELEMENT_META,
-  getFormElementTitle,
+  getFormElementTitleKey,
   type AddableFormElementKey,
 } from './formElementMeta';
 import { NodeFieldControl, useNodeFieldBinding } from './NodeFieldControl';
@@ -100,25 +101,29 @@ const BuilderDndContext = createContext<BuilderDndContextValue>({
 const BuilderDropTargetContext = createContext<FormDropTarget | null>(null);
 
 /** The dragged card's `DragOverlay` ghost: a compact title bar following the pointer. */
-const BuilderDragGhost = ({ element }: { element: WorkflowFormElement }) => (
-  <HStack
-    bg="bg.muted"
-    borderColor="border.subtle"
-    borderWidth="1px"
-    cursor="grabbing"
-    gap="1"
-    opacity={0.85}
-    px="1.5"
-    py="0.5"
-    rounded="md"
-    shadow="md"
-  >
-    <Icon as={GripVerticalIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
-    <Text color="fg.muted" fontSize="xs" fontWeight="600" minW="0" truncate>
-      {getFormElementTitle(element)}
-    </Text>
-  </HStack>
-);
+const BuilderDragGhost = ({ element }: { element: WorkflowFormElement }) => {
+  const { t } = useTranslation();
+
+  return (
+    <HStack
+      bg="bg.muted"
+      borderColor="border.subtle"
+      borderWidth="1px"
+      cursor="grabbing"
+      gap="1"
+      opacity={0.85}
+      px="1.5"
+      py="0.5"
+      rounded="md"
+      shadow="md"
+    >
+      <Icon as={GripVerticalIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+      <Text color="fg.muted" fontSize="xs" fontWeight="600" minW="0" truncate>
+        {t(getFormElementTitleKey(element))}
+      </Text>
+    </HStack>
+  );
+};
 
 /** Isolate edge indicators as the card's only per-move drop-target consumers. */
 const CardDropEdgeIndicator = ({ elementId }: { elementId: string }) => {
@@ -162,6 +167,7 @@ const BuilderCardBase = ({
   isSelected?: boolean;
   title: string;
 }) => {
+  const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
   const { activeElementId, form } = use(BuilderDndContext);
   const { attributes, listeners, setActivatorNodeRef, setNodeRef: setDragRef } = useDraggable({ id: element.id });
@@ -210,14 +216,16 @@ const BuilderCardBase = ({
           <Box flex="1" />
           <HStack flexShrink={0} gap="0" onPointerDown={(event) => event.stopPropagation()}>
             {extraActions}
-            <IconButton
-              aria-label="Remove from form"
-              size="sm"
-              variant="ghost"
-              onClick={() => editGraph({ elementId: element.id, type: 'removeFormElement' })}
-            >
-              <Icon as={XIcon} boxSize="3" />
-            </IconButton>
+            <Tooltip content={t('widgets.workflow.formBuilder.remove')}>
+              <IconButton
+                aria-label={t('widgets.workflow.formBuilder.remove')}
+                size="sm"
+                variant="ghost"
+                onClick={() => editGraph({ elementId: element.id, type: 'removeFormElement' })}
+              >
+                <Icon as={XIcon} boxSize="3" />
+              </IconButton>
+            </Tooltip>
           </HStack>
         </HStack>
         <Box p="2" position="relative" zIndex="2">
@@ -243,6 +251,7 @@ const ContainerDropZoneBody = ({
   isEmpty: boolean;
   setNodeRef: (node: HTMLElement | null) => void;
 }) => {
+  const { t } = useTranslation();
   const dropTarget = use(BuilderDropTargetContext);
   const isActive = dropTarget?.kind === 'into' && dropTarget.containerId === containerId;
 
@@ -257,7 +266,7 @@ const ContainerDropZoneBody = ({
       py="1.5"
       textAlign="center"
     >
-      {canDrop ? 'Drop here' : 'Empty container — drag elements here'}
+      {canDrop ? t('widgets.workflow.formBuilder.dropHere') : t('widgets.workflow.formBuilder.containerEmpty')}
     </DropZone>
   );
 };
@@ -291,6 +300,7 @@ const ShuffleToggleAction = ({
   element: NodeFieldFormElement;
   projectGraph: ProjectGraphState;
 }) => {
+  const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
   const { template } = useNodeFieldBinding(element, projectGraph);
 
@@ -301,17 +311,22 @@ const ShuffleToggleAction = ({
   const { showShuffle } = element.data;
 
   return (
-    <IconButton
-      aria-label="Show shuffle button"
-      aria-pressed={showShuffle}
-      color={showShuffle ? 'accent.solid' : undefined}
-      size="sm"
-      title={showShuffle ? 'Hide shuffle button' : 'Show shuffle button'}
-      variant="ghost"
-      onClick={() => editGraph({ elementId: element.id, showShuffle: !showShuffle, type: 'setNodeFieldShowShuffle' })}
+    <Tooltip
+      content={
+        showShuffle ? t('widgets.workflow.formBuilder.hideShuffle') : t('widgets.workflow.formBuilder.showShuffle')
+      }
     >
-      <Icon as={DicesIcon} boxSize="3" />
-    </IconButton>
+      <IconButton
+        aria-label={t('widgets.workflow.formBuilder.showShuffle')}
+        aria-pressed={showShuffle}
+        color={showShuffle ? 'accent.solid' : undefined}
+        size="sm"
+        variant="ghost"
+        onClick={() => editGraph({ elementId: element.id, showShuffle: !showShuffle, type: 'setNodeFieldShowShuffle' })}
+      >
+        <Icon as={DicesIcon} boxSize="3" />
+      </IconButton>
+    </Tooltip>
   );
 };
 
@@ -351,30 +366,36 @@ const BuilderElementBase = ({
   projectGraph: ProjectGraphState;
   selectedNodeIds: Set<string>;
 }) => {
+  const { t } = useTranslation();
   const { widgets } = useWorkflowHostCommands();
   const { editGraph } = useProjectGraphCommands();
+  const title = t(getFormElementTitleKey(element));
 
   switch (element.type) {
     case 'container': {
       const isRow = element.data.layout === 'row';
+      const switchLayoutLabel = isRow
+        ? t('widgets.workflow.formBuilder.switchToColumn')
+        : t('widgets.workflow.formBuilder.switchToRow');
 
       return (
         <BuilderCard
           element={element}
           extraActions={
-            <IconButton
-              aria-label={isRow ? 'Switch container to column layout' : 'Switch container to row layout'}
-              size="sm"
-              title={isRow ? 'Switch to column layout' : 'Switch to row layout'}
-              variant="ghost"
-              onClick={() =>
-                editGraph({ elementId: element.id, layout: isRow ? 'column' : 'row', type: 'setContainerLayout' })
-              }
-            >
-              <Icon as={isRow ? Rows2Icon : Columns2Icon} boxSize="3" />
-            </IconButton>
+            <Tooltip content={switchLayoutLabel}>
+              <IconButton
+                aria-label={switchLayoutLabel}
+                size="sm"
+                variant="ghost"
+                onClick={() =>
+                  editGraph({ elementId: element.id, layout: isRow ? 'column' : 'row', type: 'setContainerLayout' })
+                }
+              >
+                <Icon as={isRow ? Rows2Icon : Columns2Icon} boxSize="3" />
+              </IconButton>
+            </Tooltip>
           }
-          title={getFormElementTitle(element)}
+          title={title}
         >
           <Stack align={isRow ? 'stretch' : undefined} direction={isRow ? 'row' : 'column'} gap="2" w="full">
             {getFormChildren(projectGraph.form, element.id).map((child) => (
@@ -398,43 +419,51 @@ const BuilderElementBase = ({
           element={element}
           extraActions={
             <>
-              <IconButton
-                aria-label="Zoom to node in editor"
-                size="sm"
-                title="Zoom to node in the Workflow editor"
-                variant="ghost"
-                onClick={() => {
-                  widgets.open({ region: 'center', widgetId: 'workflow' });
-                  requestNodeSelection([element.data.fieldIdentifier.nodeId]);
-                }}
-              >
-                <Icon as={CrosshairIcon} boxSize="3" />
-              </IconButton>
+              <Tooltip content={t('widgets.workflow.formBuilder.zoomToNode')}>
+                <IconButton
+                  aria-label={t('widgets.workflow.formBuilder.zoomToNode')}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => {
+                    widgets.open({ region: 'center', widgetId: 'workflow' });
+                    requestNodeSelection([element.data.fieldIdentifier.nodeId]);
+                  }}
+                >
+                  <Icon as={CrosshairIcon} boxSize="3" />
+                </IconButton>
+              </Tooltip>
               <FieldDescriptionAction element={element} projectGraph={projectGraph} />
               <ShuffleToggleAction element={element} projectGraph={projectGraph} />
-              <IconButton
-                aria-label="Show field description"
-                aria-pressed={element.data.showDescription}
-                color={element.data.showDescription ? 'accent.solid' : undefined}
-                size="sm"
-                title={element.data.showDescription ? 'Hide field description' : 'Show field description'}
-                variant="ghost"
-                onClick={() =>
-                  editGraph({
-                    elementId: element.id,
-                    showDescription: !element.data.showDescription,
-                    type: 'setNodeFieldShowDescription',
-                  })
+              <Tooltip
+                content={
+                  element.data.showDescription
+                    ? t('widgets.workflow.formBuilder.hideDescription')
+                    : t('widgets.workflow.formBuilder.showDescription')
                 }
               >
-                <Icon as={InfoIcon} boxSize="3" />
-              </IconButton>
+                <IconButton
+                  aria-label={t('widgets.workflow.formBuilder.showDescription')}
+                  aria-pressed={element.data.showDescription}
+                  color={element.data.showDescription ? 'accent.solid' : undefined}
+                  size="sm"
+                  variant="ghost"
+                  onClick={() =>
+                    editGraph({
+                      elementId: element.id,
+                      showDescription: !element.data.showDescription,
+                      type: 'setNodeFieldShowDescription',
+                    })
+                  }
+                >
+                  <Icon as={InfoIcon} boxSize="3" />
+                </IconButton>
+              </Tooltip>
             </>
           }
           isHovered={element.data.fieldIdentifier.nodeId === hoveredNodeId}
           isInvalid={invalidElementIds.has(element.id)}
           isSelected={selectedNodeIds.has(element.data.fieldIdentifier.nodeId)}
-          title={getFormElementTitle(element)}
+          title={title}
         >
           <NodeFieldControl element={element} isLabelEditable projectGraph={projectGraph} />
         </BuilderCard>
@@ -442,12 +471,12 @@ const BuilderElementBase = ({
     }
     case 'heading': {
       return (
-        <BuilderCard element={element} title={getFormElementTitle(element)}>
+        <BuilderCard element={element} title={title}>
           <Input
-            aria-label="Form heading"
+            aria-label={t('widgets.workflow.formBuilder.headingLabel')}
             fontSize="lg"
             fontWeight="700"
-            placeholder="Heading"
+            placeholder={t('widgets.workflow.formBuilder.headingPlaceholder')}
             value={element.data.content}
             variant="flushed"
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
@@ -459,13 +488,13 @@ const BuilderElementBase = ({
     }
     case 'text': {
       return (
-        <BuilderCard element={element} title={getFormElementTitle(element)}>
+        <BuilderCard element={element} title={title}>
           <Textarea
-            aria-label="Form text"
+            aria-label={t('widgets.workflow.formBuilder.textLabel')}
             color="fg.muted"
             fontSize="xs"
             minH="2.5rem"
-            placeholder="Text"
+            placeholder={t('widgets.workflow.formBuilder.textPlaceholder')}
             resize="vertical"
             value={element.data.content}
             variant="flushed"
@@ -478,7 +507,7 @@ const BuilderElementBase = ({
     }
     case 'divider': {
       return (
-        <BuilderCard element={element} title={getFormElementTitle(element)}>
+        <BuilderCard element={element} title={title}>
           <Separator borderColor="border.subtle" />
         </BuilderCard>
       );
@@ -493,6 +522,7 @@ const BuilderElementBase = ({
 const BuilderElement = memo(BuilderElementBase);
 
 const AddElementMenu = () => {
+  const { t } = useTranslation();
   const { editGraph } = useProjectGraphCommands();
   const add = (key: AddableFormElementKey) =>
     editGraph(
@@ -506,7 +536,7 @@ const AddElementMenu = () => {
       <Menu.Trigger asChild>
         <Button size="sm" variant="ghost">
           <Icon as={PlusIcon} boxSize="3" />
-          Add form element
+          {t('widgets.workflow.formBuilder.addElement')}
         </Button>
       </Menu.Trigger>
       <Portal>
@@ -515,7 +545,7 @@ const AddElementMenu = () => {
             {ADDABLE_FORM_ELEMENT_KEYS.map((key) => (
               <Menu.Item key={key} value={key} onClick={() => add(key)}>
                 <Icon as={FORM_ELEMENT_META[key].icon} boxSize="3" />
-                {FORM_ELEMENT_META[key].label}
+                {t(FORM_ELEMENT_META[key].labelKey)}
               </Menu.Item>
             ))}
           </MenuContent>
@@ -573,6 +603,7 @@ export const getInvalidNodeFieldElementIds = (
 };
 
 export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphState }) => {
+  const { t } = useTranslation();
   const templatesStatus = useInvocationTemplatesSelector((snapshot) => snapshot.status);
   const templates = useInvocationTemplatesSelector((snapshot) => snapshot.templates);
   const hoveredNodeId = workflowSelectionStore.useSelector((snapshot) => snapshot.hoveredNodeId);
@@ -693,8 +724,7 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
           <Stack gap="2" p="3" w="full">
             {rootChildren.length === 0 ? (
               <Text color="fg.muted" fontSize="xs">
-                The form is empty. Pin fields from the Workflow editor's nodes, then arrange them here — drag card title
-                bars to reorder, drop them into containers, and add headings or dividers below.
+                {t('widgets.workflow.formBuilder.empty')}
               </Text>
             ) : null}
             {rootChildren.map((element) => (
