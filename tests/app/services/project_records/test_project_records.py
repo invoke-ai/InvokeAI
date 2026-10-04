@@ -38,7 +38,7 @@ def project_records(db: SqliteDatabase) -> ProjectRecordsSqlite:
 
 @pytest.fixture
 def other_user_id(db: SqliteDatabase) -> str:
-    users = UserService(db=db)
+    users = UserService(db.database)
     user = users.create(
         UserCreateRequest(email="other@example.com", display_name="Other", password="TestPass123", is_admin=False)
     )

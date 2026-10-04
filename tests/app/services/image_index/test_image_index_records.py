@@ -74,7 +74,7 @@ def index_records(db: SqliteDatabase) -> ImageIndexRecordsSqlite:
 
 @pytest.fixture
 def other_user_id(db: SqliteDatabase) -> str:
-    users = UserService(db=db)
+    users = UserService(db.database)
     user = users.create(
         UserCreateRequest(email="other@example.com", display_name="Other", password="TestPass123", is_admin=False)
     )
@@ -551,7 +551,7 @@ def test_accessible_images_includes_individually_shared_boards(
 
     assert index_records.list_accessible_embedded_items(other_user_id, MODEL_ID) == imgs("own-individually-shared.png")
     # A third party without the share still cannot see it.
-    users = UserService(db=db)
+    users = UserService(db.database)
     third_user = users.create(
         UserCreateRequest(email="third@example.com", display_name="Third", password="TestPass123", is_admin=False)
     )

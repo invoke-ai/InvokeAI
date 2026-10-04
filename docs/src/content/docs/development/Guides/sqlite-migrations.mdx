@@ -68,7 +68,7 @@ def _add_bananas(context: PortableMigrationContext) -> None:
 def build_migration() -> PortableMigration:
     return PortableMigration(
         id="2026_10_05_add_bananas",
-        depends_on="2026_10_01_add_anima_variant",
+        depends_on="2026_10_04_add_db_locks",
         callback=_add_bananas,
     )
 ```
@@ -149,7 +149,7 @@ At minimum, cover:
 - missing optional source tables or columns when the migration is expected to tolerate them
 - the builder's `id` and `depends_on`
 
-Tests that use the `empty_database` fixture run on SQLite and, with `INVOKEAI_TEST_DB_URL` set, on a MySQL or MariaDB server (see [Database Layer](/development/guides/database-layer/#testing)). Also run the migrator tests:
+Tests that use the `empty_database` fixture (no tables) or the `database` fixture (the newest schema) run on SQLite and, with `INVOKEAI_TEST_DB_URL` set, on a MySQL or MariaDB server (see [Database Layer](/development/guides/database-layer/#testing)). Also run the migrator tests:
 
 ```bash
 pytest tests/app/services/shared/sqlite_migrator tests/test_sqlite_migrator.py

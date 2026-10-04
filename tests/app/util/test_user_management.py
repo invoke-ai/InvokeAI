@@ -33,7 +33,7 @@ def deletion_fixture(tmp_path: Path):
         storage_dir=config.fonts_storage_path,
         logger=logger,
     )
-    users = UserService(db)
+    users = UserService(db.database)
     users.create(UserCreateRequest(email="delete-admin@test.com", password="AdminPass123", is_admin=True))
     owner = users.create(UserCreateRequest(email="delete-owner@test.com", password="OwnerPass123"))
     font_bytes = (

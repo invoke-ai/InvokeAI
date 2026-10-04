@@ -15,46 +15,20 @@ authentication path. Those tests keep running by default, without timing asserti
 
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from logging import Logger
 
 import pytest
 
 from invokeai.app.services.auth.password_utils import hash_password, verify_password
 from invokeai.app.services.auth.token_service import TokenData, create_access_token, verify_token
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
+from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
 
 
 @pytest.fixture
-def logger() -> Logger:
-    """Create a logger for testing."""
-    return Logger("test_performance")
-
-
-@pytest.fixture
-def user_service(logger: Logger) -> UserService:
-    """Create a user service with in-memory database for testing."""
-    db = SqliteDatabase(db_path=None, logger=logger, verbose=False)
-
-    # Create users table
-    db._conn.execute("""
-        CREATE TABLE users (
-            user_id TEXT NOT NULL PRIMARY KEY,
-            email TEXT NOT NULL UNIQUE,
-            display_name TEXT,
-            password_hash TEXT NOT NULL,
-            is_admin BOOLEAN NOT NULL DEFAULT FALSE,
-            is_active BOOLEAN NOT NULL DEFAULT TRUE,
-            created_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-            updated_at DATETIME NOT NULL DEFAULT(STRFTIME('%Y-%m-%d %H:%M:%f', 'NOW')),
-            last_login_at DATETIME,
-            token_epoch INTEGER NOT NULL DEFAULT 0
-        );
-    """)
-    db._conn.commit()
-
-    return UserService(db)
+def user_service(database: Database) -> UserService:
+    """Create a user service on a database at the newest schema."""
+    return UserService(database)
 
 
 @pytest.mark.slow

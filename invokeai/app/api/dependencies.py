@@ -11,7 +11,7 @@ from invokeai.app.services.board_records.board_records_sqlite import SqliteBoard
 from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
-from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
+from invokeai.app.services.client_state_persistence.client_state_persistence_default import ClientStatePersistence
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.download.download_default import DownloadQueueService
 from invokeai.app.services.events.events_fastapievents import FastAPIEventService
@@ -130,7 +130,7 @@ class ApiDependencies:
         db = init_db(config=config, logger=logger, image_files=image_files)
 
         # Initialize JWT secret from database
-        app_settings = AppSettingsService(db=db)
+        app_settings = AppSettingsService(db.database)
         jwt_secret = app_settings.get_jwt_secret()
         set_jwt_secret(jwt_secret)
         logger.info("JWT secret loaded from database")
@@ -203,9 +203,9 @@ class ApiDependencies:
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
         system_prompt_records = SqliteSystemPromptRecordsStorage(db=db)
         workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
-        client_state_persistence = ClientStatePersistenceSqlite(db=db)
+        client_state_persistence = ClientStatePersistence(db.database)
         project_records = ProjectRecordsSqlite(db=db)
-        users = UserService(db=db)
+        users = UserService(db.database)
         image_index_records = ImageIndexRecordsSqlite(db=db)
         image_index = ImageIndexService()
         intermediates = IntermediatesService(records=IntermediatesRecordsSqlite(db=db), logger=logger)

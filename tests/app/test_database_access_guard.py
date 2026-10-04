@@ -25,11 +25,9 @@ DATABASE_LAYER = (
 # Do not raise a number or add a file.
 NOT_YET_PORTED: dict[str, int] = {
     "invokeai/app/api/routers/model_manager.py": 2,
-    "invokeai/app/services/app_settings/app_settings_service.py": 4,
     "invokeai/app/services/board_image_records/board_image_records_sqlite.py": 22,
     "invokeai/app/services/board_records/board_records_sqlite.py": 35,
     "invokeai/app/services/board_video_records/board_video_records_sqlite.py": 13,
-    "invokeai/app/services/client_state_persistence/client_state_persistence_sqlite.py": 12,
     "invokeai/app/services/fonts/fonts_default.py": 32,
     "invokeai/app/services/gallery/gallery_default.py": 16,
     "invokeai/app/services/image_index/image_index_records_sqlite.py": 26,
@@ -47,7 +45,6 @@ NOT_YET_PORTED: dict[str, int] = {
     "invokeai/app/services/shared/sqlite/sqlite_database.py": 1,
     "invokeai/app/services/style_preset_records/style_preset_records_sqlite.py": 18,
     "invokeai/app/services/system_prompt_records/system_prompt_records_sqlite.py": 24,
-    "invokeai/app/services/users/users_default.py": 39,
     "invokeai/app/services/video_records/video_records_sqlite.py": 46,
     "invokeai/app/services/wildcard_records/wildcard_records_sqlite.py": 13,
     "invokeai/app/services/workflow_records/workflow_records_sqlite.py": 53,

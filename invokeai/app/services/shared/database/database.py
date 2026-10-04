@@ -255,11 +255,20 @@ class Database:
 
         `work` must have no effects outside the transaction, since a retry repeats it.
         """
+
+        def transaction() -> R:
+            with self.begin(write=write) as conn:
+                return work(conn)
+
+        return self.retry_conflicts(transaction)
+
+    def retry_conflicts(self, transaction: Callable[[], R]) -> R:
+        """Calls `transaction`, which runs one transaction, again when it loses a race (`ConflictError`): three
+        attempts in all, with a short random pause between them."""
         attempt = 1
         while True:
             try:
-                with self.begin(write=write) as conn:
-                    return work(conn)
+                return transaction()
             except ConflictError as error:
                 if attempt >= _CONFLICT_ATTEMPTS:
                     raise

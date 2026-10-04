@@ -38,8 +38,8 @@ def mock_services() -> InvocationServices:
     from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
     from invokeai.app.services.boards.boards_default import BoardService
     from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
-    from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import (
-        ClientStatePersistenceSqlite,
+    from invokeai.app.services.client_state_persistence.client_state_persistence_default import (
+        ClientStatePersistence,
     )
     from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
     from invokeai.app.services.images.images_default import ImageService
@@ -85,9 +85,9 @@ def mock_services() -> InvocationServices:
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
-        client_state_persistence=ClientStatePersistenceSqlite(db=db),
+        client_state_persistence=ClientStatePersistence(db.database),
         project_records=None,  # type: ignore
-        users=UserService(db),
+        users=UserService(db.database),
         wildcard_records=None,  # type: ignore
         external_generation=None,  # type: ignore
         videos=None,  # type: ignore

@@ -36,6 +36,9 @@ from unittest import mock
 BUDGET_FRACTION = 0.10
 BUDGET_FLOOR_MS = 0.05
 
+ACCOUNTS = 200
+CLIENT_STATE_KEYS = 200
+
 
 class _StatementCounter(logging.Handler):
     """Counts the statements SQLite reports through the trace callback a verbose database installs."""
@@ -55,13 +58,20 @@ class Services:
             SqliteBoardImageRecordStorage,
         )
         from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+        from invokeai.app.services.client_state_persistence.client_state_persistence_default import (
+            ClientStatePersistence,
+        )
         from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
         from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+        from invokeai.app.services.users.users_default import UserService
 
+        self.database = db.database
         self.image_records = SqliteImageRecordStorage(db=db)
         self.board_records = SqliteBoardRecordStorage(db=db)
         self.board_image_records = SqliteBoardImageRecordStorage(db=db)
         self.gallery = SqliteGalleryService(db=db)
+        self.users = UserService(db.database)
+        self.client_state = ClientStatePersistence(db.database)
         # Listing gallery items builds their URLs through the invoker's URL service.
         from invokeai.app.services.urls.urls_default import LocalUrlService
 
@@ -112,6 +122,18 @@ def _seed(services: Services, images: int, boards: int, rng: random.Random) -> l
         names.append(name)
         if i % 2 == 0:
             services.board_image_records.add_image_to_board(board_id=board_ids[i % boards], image_name=name)
+    # Accounts are inserted directly: the service would hash a password for each, which takes most of a second.
+    with services.database.queries.transaction() as q:
+        for i in range(ACCOUNTS):
+            q.users.insert(
+                user_id=f"user-{i}",
+                email=f"user{i}@example.com",
+                display_name=f"User {i}",
+                password_hash="-",
+                is_admin=False,
+            )
+    for i in range(CLIENT_STATE_KEYS):
+        services.client_state.set_by_key("system", f"canvas_snapshot:{i}", json.dumps({"imageName": names[i]}))
     return names
 
 
@@ -174,6 +196,17 @@ def _operations(
             50,
         ),
         "image_records.save": (save_image, 200),
+        # Every authenticated request reads its account.
+        "users.get": (lambda: services.users.get(f"user-{rng.randrange(ACCOUNTS)}"), 1000),
+        "users.list_users(page of 100)": (lambda: services.users.list_users(limit=100), 50),
+        "client_state.get_keys_by_prefix(all)": (
+            lambda: services.client_state.get_keys_by_prefix("system", "canvas_snapshot:"),
+            200,
+        ),
+        "client_state.set_by_key": (
+            lambda: services.client_state.set_by_key("system", "canvas", json.dumps({"imageName": next(sample)})),
+            200,
+        ),
     }
 
 

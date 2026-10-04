@@ -16,7 +16,7 @@ from invokeai.app.services.board_records.board_records_sqlite import SqliteBoard
 from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
-from invokeai.app.services.client_state_persistence.client_state_persistence_sqlite import ClientStatePersistenceSqlite
+from invokeai.app.services.client_state_persistence.client_state_persistence_default import ClientStatePersistence
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
@@ -40,12 +40,19 @@ from invokeai.app.services.wildcard_records.wildcard_records_sqlite import Sqlit
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
-from tests.fixtures.database import _external_test_schema, empty_database, external_test_db_url  # noqa: F401
+from tests.fixtures.database import (  # noqa: F401
+    _external_application_schema,
+    _external_test_schema,
+    _migrated_sqlite,
+    database,
+    empty_database,
+    external_test_db_url,
+)
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService
 
 # Fixtures that put a test on the backend under test, which `-m uses_database` selects.
-_DATABASE_FIXTURES = {"empty_database"}
+_DATABASE_FIXTURES = {"empty_database", "database"}
 
 
 @pytest.hookimpl(tryfirst=True)
@@ -111,9 +118,9 @@ def mock_services() -> InvocationServices:
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
-        client_state_persistence=ClientStatePersistenceSqlite(db=db),
+        client_state_persistence=ClientStatePersistence(db.database),
         project_records=ProjectRecordsSqlite(db=db),
-        users=UserService(db),
+        users=UserService(db.database),
         wildcard_records=SqliteWildcardRecordsStorage(db=db),
         videos=None,  # type: ignore
         video_files=None,  # type: ignore

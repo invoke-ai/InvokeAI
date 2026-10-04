@@ -8,7 +8,7 @@ from contextlib import contextmanager
 from typing import Any, Optional
 
 import pytest
-from sqlalchemy import URL
+from sqlalchemy import URL, Connection, Row, select
 from sqlalchemy.exc import DBAPIError, InvalidRequestError
 
 from invokeai.app.services.shared.database.database import Database
@@ -18,9 +18,10 @@ from invokeai.app.services.shared.database.errors import (
     NestedTransactionError,
     ReadOnlyTransactionError,
 )
+from invokeai.app.services.shared.database.queries.base import OwnTransaction, QueryModule, mapped, read
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.database import external_test_db_url
-from tests.fixtures.database_probe import ProbeQueries
+from tests.fixtures.database_probe import ProbeQueries, probe_items
 
 server_only = pytest.mark.skipif(
     external_test_db_url() is None, reason="needs a MySQL or MariaDB server (INVOKEAI_TEST_DB_URL)"
@@ -148,6 +149,31 @@ class TestReadOnlyTransactions:
         assert probe.items.count() == 2
 
 
+def test_a_mapper_runs_once_the_transaction_of_its_call_has_ended(
+    probe: ProbeQueries, empty_database: Database
+) -> None:
+    # On SQLite the transaction holds the process-wide lock, which building DTOs need not hold.
+    probe.items.add(1, "a")
+    in_a_transaction: list[bool] = []
+
+    def note_whether_in_a_transaction(rows: list[Row[Any]]) -> list[str]:
+        try:
+            with empty_database.begin(write=False):
+                in_a_transaction.append(False)
+        except NestedTransactionError:
+            in_a_transaction.append(True)
+        return [name for (name,) in rows]
+
+    class Names(QueryModule):
+        @mapped(note_whether_in_a_transaction)
+        @read
+        def names(self, conn: Connection) -> list[Row[Any]]:
+            return list(conn.execute(select(probe_items.c.name)).all())
+
+    assert Names(OwnTransaction(empty_database)).names() == ["a"]
+    assert in_a_transaction == [False]
+
+
 def test_queries_of_an_ended_transaction_are_refused(probe: ProbeQueries) -> None:
     with probe.transaction() as q:
         pass
@@ -231,6 +257,22 @@ class TestSqlite:
 
         with _retries(sqlite_file_database) as retries:
             queries.items.read_then_write(commit_elsewhere_once)
+
+        assert len(retries) == 1
+
+    def test_a_unit_run_by_run_that_loses_a_race_is_retried(
+        self, sqlite_file_database: Database, other_process: sqlite3.Connection
+    ) -> None:
+        queries = ProbeQueries(sqlite_file_database)
+        queries.items.add(1, "a")
+        first_attempt = iter([True])
+
+        def commit_elsewhere_once() -> None:
+            if next(first_attempt, False):
+                self._commit_elsewhere(other_process)
+
+        with _retries(sqlite_file_database) as retries:
+            queries.run(lambda q: q.items.read_then_write(commit_elsewhere_once), read_only=True)
 
         assert len(retries) == 1
 
@@ -381,6 +423,42 @@ class TestServerBackends:
         def resize(first: int, second: int) -> None:
             try:
                 probe.items.resize_both(first, second, meet_on_the_first_attempt)
+            except BaseException as error:
+                errors.append(error)
+
+        with _retries(empty_database) as retries:
+            workers = [threading.Thread(target=resize, args=(1, 2)), threading.Thread(target=resize, args=(2, 1))]
+            for worker in workers:
+                worker.start()
+            for worker in workers:
+                worker.join(30)
+
+        assert errors == []
+        assert len(retries) == 1
+
+    def test_a_unit_run_by_run_that_deadlocks_is_retried(self, probe: ProbeQueries, empty_database: Database) -> None:
+        probe.items.add(1, "a")
+        probe.items.add(2, "b")
+        first_rows_locked = threading.Barrier(2, timeout=10)
+        attempted = threading.local()
+
+        def resize_in_one_unit(first: int, second: int) -> Callable[[ProbeQueries], None]:
+            def work(q: ProbeQueries) -> None:
+                q.items.resize(first, 1)
+                # Both units hold their first row before either asks for its second: a deadlock. The retry of
+                # the unit that loses it runs straight through.
+                if not getattr(attempted, "once", False):
+                    attempted.once = True
+                    first_rows_locked.wait()
+                q.items.resize(second, 1)
+
+            return work
+
+        errors: list[BaseException] = []
+
+        def resize(first: int, second: int) -> None:
+            try:
+                probe.run(resize_in_one_unit(first, second))
             except BaseException as error:
                 errors.append(error)
 

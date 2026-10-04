@@ -20,7 +20,8 @@ from sqlalchemy import (
 )
 
 from invokeai.app.services.shared.database.database import Database
-from invokeai.app.services.shared.database.queries import Queries, QueryModule, QueryScope, read, write
+from invokeai.app.services.shared.database.queries import Queries
+from invokeai.app.services.shared.database.queries.base import QueryModule, QueryScope, read, write
 
 probe_metadata = MetaData()
 

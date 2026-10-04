@@ -1,14 +1,53 @@
 """SQL constructs that each backend spells differently, compiled for the backend in use."""
 
 import re
+from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import String
+from sqlalchemy import Boolean, Insert, String, Table, UniqueConstraint
+from sqlalchemy.dialects import mysql, postgresql, sqlite
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.compiler import SQLCompiler
 from sqlalchemy.sql.elements import ColumnElement
+from sqlalchemy.sql.functions import FunctionElement
+
+from invokeai.app.services.shared.database.engines import SERVER_DIALECTS
 
 _SIMPLE_JSON_PATH = re.compile(r"\$(\.[A-Za-z_][A-Za-z0-9_]*)+")
+_LIKE_ESCAPE = "\\"
+
+
+def upsert(dialect_name: str, table: Table, *, update: Sequence[str]) -> Insert:
+    """An INSERT into `table` that, where a row with the same primary key exists, sets that row's `update`
+    columns to the values it would have inserted instead.
+
+    Execute it with the row's values, keyed by column name. A column's `onupdate` does not apply to the update:
+    list `updated_at` in `update` and pass its value. The primary key must be the table's only unique key,
+    because MySQL and MariaDB update the row a conflict with any unique key finds, the others only on the key
+    named.
+    """
+    if not table.primary_key.columns:
+        raise ValueError(f"Table {table.name} has no primary key")
+    if any(isinstance(constraint, UniqueConstraint) for constraint in table.constraints) or any(
+        index.unique for index in table.indexes
+    ):
+        raise ValueError(f"Table {table.name} has a unique key besides its primary key")
+    if dialect_name in SERVER_DIALECTS:
+        on_server = mysql.insert(table)
+        return on_server.on_duplicate_key_update({name: on_server.inserted[name] for name in update})
+    if dialect_name == "sqlite":
+        on_sqlite = sqlite.insert(table)
+        return on_sqlite.on_conflict_do_update(
+            index_elements=list(table.primary_key.columns),
+            set_={name: on_sqlite.excluded[name] for name in update},
+        )
+    if dialect_name == "postgresql":
+        on_postgresql = postgresql.insert(table)
+        return on_postgresql.on_conflict_do_update(
+            index_elements=list(table.primary_key.columns),
+            set_={name: on_postgresql.excluded[name] for name in update},
+        )
+    raise ValueError(f"No upsert for the {dialect_name} dialect")
 
 
 class JsonValue(ColumnElement[Any]):
@@ -51,6 +90,45 @@ def _compile_json_value_postgresql(element: JsonValue, compiler: SQLCompiler, **
     members = "{" + ",".join(element.path.split(".")[1:]) + "}"
     value = f"(CAST({compiler.preparer.quote(element.document)} AS JSONB) #>> {_literal(compiler, members)})"
     return f"CAST({value} AS BIGINT)" if element.integer else value
+
+
+class CaseInsensitiveLike(FunctionElement[bool]):
+    """`expression LIKE pattern`, ignoring case, with backslash as the escape character in `pattern` (see
+    `like_prefix`).
+
+    SQLite's own LIKE, which ignores the case of ASCII letters, there; LOWER() on both sides elsewhere, which
+    folds the case of every letter. (Lowering on SQLite would cost as much as the scan it filters.)
+    """
+
+    inherit_cache = True
+    type = Boolean()
+    name = "case_insensitive_like"
+    # A condition as it stands: otherwise a WHERE clause compares it with 1, which keeps SQLite from turning a
+    # LIKE on an index with its collation into a range of that index.
+    _is_implicitly_boolean = True
+
+    def __init__(self, expression: ColumnElement[str], pattern: ColumnElement[str]) -> None:
+        super().__init__(expression, pattern)
+
+
+def like_prefix(prefix: str) -> str:
+    """The `CaseInsensitiveLike` pattern of the values that start with `prefix`; `%`, `_` and `\\` in it match
+    only themselves."""
+    escaped = prefix.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
+    escaped = escaped.replace("%", _LIKE_ESCAPE + "%").replace("_", _LIKE_ESCAPE + "_")
+    return escaped + "%"
+
+
+@compiles(CaseInsensitiveLike, "sqlite")
+def _compile_case_insensitive_like_sqlite(element: CaseInsensitiveLike, compiler: SQLCompiler, **kw: Any) -> str:
+    expression, pattern = (compiler.process(clause, **kw) for clause in element.clauses)
+    return f"{expression} LIKE {pattern} ESCAPE {_literal(compiler, _LIKE_ESCAPE)}"
+
+
+@compiles(CaseInsensitiveLike)
+def _compile_case_insensitive_like(element: CaseInsensitiveLike, compiler: SQLCompiler, **kw: Any) -> str:
+    expression, pattern = (compiler.process(clause, **kw) for clause in element.clauses)
+    return f"lower({expression}) LIKE lower({pattern}) ESCAPE {_literal(compiler, _LIKE_ESCAPE)}"
 
 
 def _literal(compiler: SQLCompiler, value: str) -> str:

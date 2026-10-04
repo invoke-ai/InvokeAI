@@ -49,7 +49,7 @@ def font_bytes() -> bytes:
 
 
 def _create_user(service: FontService, email: str) -> str:
-    users = UserService(service._db)
+    users = UserService(service._db.database)
     return users.create(UserCreateRequest(email=email, password="TestPass123", display_name=email)).user_id
 
 
@@ -123,7 +123,7 @@ def test_private_uploads_are_deduplicated_and_isolated(font_service: FontService
 def test_user_cleanup_removes_private_files_but_preserves_shared_files(
     font_service: FontService, font_bytes: bytes
 ) -> None:
-    users = UserService(font_service._db)
+    users = UserService(font_service._db.database)
     user_id = _create_user(font_service, "deleted-font-owner@test.com")
 
     private = font_service.upload(user_id=user_id, filename="Private.ttf", data=font_bytes).font

@@ -187,7 +187,7 @@ class TestUserDeletionLifecycle:
         return create_mock_sqlite_database(config, logger)
 
     def test_videos_survive_owner_deletion_and_remain_admin_only(self, migrated_db: SqliteDatabase) -> None:
-        users = UserService(migrated_db)
+        users = UserService(migrated_db.database)
         store = SqliteVideoRecordStorage(db=migrated_db)
 
         owner = users.create(

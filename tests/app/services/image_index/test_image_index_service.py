@@ -2095,7 +2095,7 @@ def test_search_similar_scopes_to_the_requesting_user(
     from invokeai.app.services.users.users_common import UserCreateRequest
     from invokeai.app.services.users.users_default import UserService
 
-    other_user = UserService(db=db).create(
+    other_user = UserService(db.database).create(
         UserCreateRequest(email="scoped@example.com", display_name="Scoped", password="TestPass123", is_admin=False)
     )
     service.start(_make_invoker(images_service, index_records))

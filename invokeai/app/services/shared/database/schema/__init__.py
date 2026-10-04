@@ -15,6 +15,7 @@ from invokeai.app.services.shared.database.schema import (  # noqa: F401
     image_moves,
     images,
     intermediates,
+    locks,
     media_references,
     migrator,
     models,
