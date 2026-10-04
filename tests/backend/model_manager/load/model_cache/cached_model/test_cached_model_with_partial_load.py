@@ -536,14 +536,17 @@ def test_partial_transfer_failure_invalidates_vram_accounting(operation: str, mo
 def test_transfer_failure_after_one_module_recounts_actual_residency(operation: str, monkeypatch: pytest.MonkeyPatch):
     """OOM/device errors can interrupt the module-by-module transfer after earlier modules changed devices."""
     model = torch.nn.Sequential(torch.nn.Linear(4, 4), torch.nn.Linear(4, 2))
+    apply_custom_layers_to_model(model)
     first_bytes = sum(param.numel() * param.element_size() for param in model[0].parameters())
     second_bytes = sum(param.numel() * param.element_size() for param in model[1].parameters())
     cached_model = CachedModelWithPartialLoad(
         model=model, compute_device=torch.device("meta"), keep_ram_copy=operation == "unload"
     )
     if operation == "unload":
-        # Retain genuine CPU weights before simulating initial accelerator residency.
-        model.to("meta")
+        # Start from fully loaded state so failure must re-enable custom autocast.
+        cached_model.full_load_to_vram()
+        assert not model[0].is_device_autocasting_enabled()
+        assert not model[1].is_device_autocasting_enabled()
         transfer = cached_model.partial_unload_from_vram
         assert cached_model.cur_vram_bytes() == first_bytes + second_bytes
         expected_devices = ("cpu", "meta")
@@ -564,3 +567,43 @@ def test_transfer_failure_after_one_module_recounts_actual_residency(operation: 
 
     assert tuple(module.weight.device.type for module in model) == expected_devices
     assert cached_model.cur_vram_bytes() == expected_bytes
+    assert model[0].is_device_autocasting_enabled()
+    assert model[1].is_device_autocasting_enabled()
+
+
+def test_partial_load_buffer_failure_invalidates_accounting_and_enables_autocast(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    model = DummyModule()
+    apply_custom_layers_to_model(model)
+    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device("meta"), keep_ram_copy=False)
+
+    def fail_buffer_move(device: torch.device) -> None:
+        raise RuntimeError("simulated buffer transfer failure")
+
+    monkeypatch.setattr(cached_model, "_move_non_persistent_buffers_to_device", fail_buffer_move)
+
+    with pytest.raises(RuntimeError, match="simulated buffer transfer failure"):
+        cached_model.full_load_to_vram()
+
+    assert cached_model._cur_vram_bytes is None
+    assert model.linear1.is_device_autocasting_enabled()
+    assert model.linear2.is_device_autocasting_enabled()
+
+
+def test_partial_load_retry_after_failure_accounts_actual_residency(monkeypatch: pytest.MonkeyPatch) -> None:
+    model = torch.nn.Sequential(torch.nn.Linear(4, 4), torch.nn.Linear(4, 2))
+    cached_model = CachedModelWithPartialLoad(model=model, compute_device=torch.device("meta"), keep_ram_copy=False)
+    original_load = model[1]._load_from_state_dict
+
+    def fail_second_module(*args, **kwargs):
+        raise RuntimeError("second module transfer failed")
+
+    monkeypatch.setattr(model[1], "_load_from_state_dict", fail_second_module)
+    with pytest.raises(RuntimeError, match="second module transfer failed"):
+        cached_model.full_load_to_vram()
+
+    monkeypatch.setattr(model[1], "_load_from_state_dict", original_load)
+    cached_model.full_load_to_vram()
+
+    assert cached_model.cur_vram_bytes() == cached_model.total_bytes()
