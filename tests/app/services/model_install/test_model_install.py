@@ -226,6 +226,168 @@ def test_directory_install_late_move_failure_restores_source_files(
     assert mm2_installer.record_store.all_models() == []
 
 
+def test_directory_install_preserves_collision_during_rollback(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing_paths = set(mm2_app_config.models_path.iterdir())
+    first_item, locked_item, *_ = list(diffusers_dir.iterdir())
+    first_item_is_dir = first_item.is_dir()
+    real_move = shutil.move
+    moved_first_item = False
+
+    def move_with_recreated_source(src: Path, dst: Path):
+        nonlocal moved_first_item
+        if src == locked_item:
+            recreated = diffusers_dir / first_item.name
+            if first_item_is_dir:
+                recreated.mkdir()
+                (recreated / "new-user-file").write_text("new user file")
+            else:
+                recreated.write_text("new user file")
+            raise PermissionError("later source remains locked")
+        if src == first_item:
+            if dst.exists():
+                raise FileExistsError(dst)
+            result = real_move(src, dst)
+            moved_first_item = True
+            return result
+        if dst == first_item and dst.exists():
+            raise FileExistsError(dst)
+        return real_move(src, dst)
+
+    monkeypatch.setattr(model_install_default, "move", move_with_recreated_source)
+
+    with pytest.raises(RuntimeError, match="recovery required") as exc_info:
+        mm2_installer.install_path(diffusers_dir)
+
+    assert moved_first_item
+    assert "test-diffusers-main" in str(exc_info.value)
+    recreated = diffusers_dir / first_item.name
+    assert recreated.exists()
+    if first_item_is_dir:
+        assert (recreated / "new-user-file").read_text() == "new user file"
+    else:
+        assert recreated.read_text() == "new user file"
+    assert str(mm2_app_config.models_path.resolve()) in str(exc_info.value)
+    recovery_paths = set(mm2_app_config.models_path.iterdir()) - existing_paths
+    assert len(recovery_paths) == 1
+    recovery_dest = recovery_paths.pop()
+    preserved_item = recovery_dest / first_item.name
+    assert preserved_item.exists()
+    assert preserved_item.is_dir() == first_item_is_dir
+
+
+def test_directory_install_does_not_retry_partial_copy(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    first_item = next(diffusers_dir.iterdir())
+    calls = 0
+
+    def partial_copy_then_fail(src: Path, dst: Path):
+        nonlocal calls
+        calls += 1
+        if src == first_item:
+            dst.mkdir(parents=True)
+            (dst / "unknown-partial").write_text("partial")
+            raise PermissionError("copy failed after destination creation")
+        return shutil.move(src, dst)
+
+    monkeypatch.setattr(model_install_default, "move", partial_copy_then_fail)
+
+    with pytest.raises(RuntimeError, match="recovery required") as exc_info:
+        mm2_installer.install_path(diffusers_dir)
+
+    assert calls == 1
+    assert first_item.exists()
+    assert "recovery required" in str(exc_info.value)
+
+
+def test_directory_install_retains_unowned_destination_artifact_after_rollback(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing_paths = set(mm2_app_config.models_path.iterdir())
+    _, locked_item, *_ = list(diffusers_dir.iterdir())
+
+    def fail_after_unowned_destination_artifact(src: Path, dst: Path):
+        if src == locked_item:
+            (dst.parent / "unowned-artifact").write_text("created concurrently")
+            raise PermissionError("later source remains locked")
+        return shutil.move(src, dst)
+
+    monkeypatch.setattr(model_install_default, "move", fail_after_unowned_destination_artifact)
+
+    with pytest.raises(RuntimeError, match="recovery required") as exc_info:
+        mm2_installer.install_path(diffusers_dir)
+
+    recovery_paths = set(mm2_app_config.models_path.iterdir()) - existing_paths
+    assert len(recovery_paths) == 1
+    recovery_dest = recovery_paths.pop()
+    assert (recovery_dest / "unowned-artifact").read_text() == "created concurrently"
+    assert str(diffusers_dir.resolve()) in str(exc_info.value)
+    assert str(recovery_dest.resolve()) in str(exc_info.value)
+    assert locked_item.exists()
+
+
+def test_remote_install_recovery_survives_cleanup_and_restart(
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    mm2_download_queue,
+    mm2_session,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}recovery-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    downloaded_file = tmpdir / "model.bin"
+    downloaded_file.write_bytes(b"downloaded model")
+    source = URLModelSource(url=Url("https://example.com/model.bin"))
+    job = ModelInstallJob(
+        id=991,
+        source=source,
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.DOWNLOADS_DONE,
+    )
+    job._install_tmpdir = tmpdir
+    mm2_installer._write_install_marker(job, status=InstallStatus.DOWNLOADS_DONE)
+
+    def fail_install(*_args, **_kwargs):
+        raise model_install_default.InstallRecoveryRequiredError(
+            f"Install recovery required. Source: {tmpdir.resolve()}; destination: {mm2_app_config.models_path.resolve()}"
+        )
+
+    monkeypatch.setattr(mm2_installer, "install_path", fail_install)
+    mm2_installer._put_in_queue(job)
+    mm2_installer.wait_for_job(job, timeout=10)
+
+    marker = mm2_installer._read_install_marker(tmpdir)
+    assert job.errored
+    assert marker is not None and marker.get("recovery_required") is True
+    assert downloaded_file.read_bytes() == b"downloaded model"
+
+    restarted_installer = ModelInstallService(
+        app_config=mm2_app_config,
+        record_store=mm2_installer.record_store,
+        download_queue=mm2_download_queue,
+        session=mm2_session,
+    )
+    restarted_installer._remove_dangling_install_dirs()
+    restarted_installer._restore_incomplete_installs()
+
+    assert tmpdir.exists()
+    assert downloaded_file.read_bytes() == b"downloaded model"
+    assert restarted_installer.list_jobs() == []
+    shutil.rmtree(tmpdir)
+
+
 def test_install_registration_failure_preserves_complete_recoverable_files(
     mm2_installer: ModelInstallServiceBase,
     diffusers_dir: Path,

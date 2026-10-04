@@ -85,6 +85,10 @@ INSTALL_MARKER_FILENAME = ".invokeai_install.json"
 INSTALL_MARKER_VERSION = 1
 
 
+class InstallRecoveryRequiredError(RuntimeError):
+    """Install transfer could not be safely rolled back; preserve both recovery roots."""
+
+
 # Filesystems cap a single path component at 255 bytes. A source that lists many explicit files
 # (an LTX-2 component folder names eight) would otherwise produce a folder name that cannot be
 # created; the combined name is only a label, so it is shortened past this point with a count.
@@ -186,6 +190,8 @@ class ModelInstallService(ModelInstallServiceBase):
             "updated_at": get_iso_timestamp(),
             "files": files,
         }
+        if job._recovery_required:
+            marker["recovery_required"] = True
         path = self._marker_path(job._install_tmpdir)
         path.parent.mkdir(parents=True, exist_ok=True)
         with open(path, "wt", encoding="utf-8") as f:
@@ -224,6 +230,8 @@ class ModelInstallService(ModelInstallServiceBase):
             if marker.get("source") != source_str:
                 continue
             status = marker.get("status")
+            if marker.get("recovery_required") is True:
+                continue
             if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
                 continue
             candidates.append((marker.get("updated_at", ""), tmpdir))
@@ -245,6 +253,9 @@ class ModelInstallService(ModelInstallServiceBase):
             if not marker:
                 continue
             status = marker.get("status")
+            if marker.get("recovery_required") is True:
+                self._logger.warning(f"Preserving install recovery data in {tmpdir}")
+                continue
             if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
                 continue
 
@@ -477,6 +488,10 @@ class ModelInstallService(ModelInstallServiceBase):
                 move(src, dst)
                 return
             except PermissionError:
+                # shutil.move can leave a partial destination after a cross-filesystem copy. Its contents
+                # are unknown, so never retry or remove it.
+                if dst.exists() or dst.is_symlink():
+                    raise
                 gc.collect()
                 if tries_left == 1:
                     raise
@@ -497,23 +512,93 @@ class ModelInstallService(ModelInstallServiceBase):
         if not is_plain_filename(info.key):
             raise ValueError(f"Invalid model key {info.key!r}: it must be a plain filename")
         dest_dir = self.app_config.models_path / info.key
+        moved: list[tuple[Path, Path]] = []
+        source_is_directory = model_path.is_dir()
+        destination_created = False
+        pending_dest: Optional[Path] = None
         try:
             if dest_dir.exists():
-                raise FileExistsError(
+                raise DuplicateModelException(
                     f"Cannot install model {model_path.name} to {dest_dir}: destination already exists"
                 )
             dest_dir.mkdir(parents=True)
+            destination_created = True
             dest_path = dest_dir / model_path.name if model_path.is_file() else dest_dir
             if model_path.is_file():
-                self._move_with_retries(model_path, dest_path)  # Windows workaround TODO: fix root cause
+                try:
+                    self._move_with_retries(model_path, dest_path)
+                except Exception as move_error:
+                    if dest_path.exists() or dest_path.is_symlink():
+                        raise InstallRecoveryRequiredError(
+                            f"Install recovery required after {move_error}. Source: {model_path.resolve()}; "
+                            f"destination: {dest_dir.resolve()}. Unrecognized destination artifact: "
+                            f"{dest_path.resolve()}"
+                        ) from move_error
+                    raise
             elif model_path.is_dir():
                 # Move the contents of the directory, not the directory itself
                 for item in model_path.iterdir():
-                    move(item, dest_dir / item.name)
-        except FileExistsError as e:
-            raise DuplicateModelException(
-                f"A model named {model_path.name} is already installed at {dest_dir.as_posix()}"
-            ) from e
+                    item_dest = dest_dir / item.name
+                    pending_dest = item_dest
+                    self._move_with_retries(item, item_dest)
+                    moved.append((item, item_dest))
+                    pending_dest = None
+        except InstallRecoveryRequiredError:
+            raise
+        except Exception as transfer_error:
+            if not destination_created:
+                if isinstance(transfer_error, FileExistsError):
+                    raise DuplicateModelException(
+                        f"A model named {model_path.name} is already installed at {dest_dir.as_posix()}"
+                    ) from transfer_error
+                raise
+            if source_is_directory:
+                rollback_errors: list[str] = []
+                if pending_dest is not None and (pending_dest.exists() or pending_dest.is_symlink()):
+                    rollback_errors.append(f"unrecognized destination artifact: {pending_dest.resolve()}")
+                for moved_source, moved_dest in reversed(moved):
+                    try:
+                        if moved_source.exists() or moved_source.is_symlink():
+                            raise FileExistsError(f"Refusing to overwrite recreated source {moved_source}")
+                        self._move_with_retries(moved_dest, moved_source)
+                    except Exception as rollback_error:
+                        rollback_errors.append(
+                            f"could not restore {moved_dest.resolve()} to {moved_source.resolve()}: {rollback_error}"
+                        )
+                if rollback_errors:
+                    details = "; ".join(rollback_errors)
+                    raise InstallRecoveryRequiredError(
+                        f"Install recovery required after {transfer_error}. Source: {model_path.resolve()}; "
+                        f"destination: {dest_dir.resolve()}. {details}"
+                    ) from transfer_error
+                moved.clear()
+                try:
+                    remaining = list(dest_dir.iterdir())
+                    if remaining:
+                        leftovers = ", ".join(str(path.resolve()) for path in remaining)
+                        raise OSError(f"unexpected destination artifacts remain: {leftovers}")
+                    dest_dir.rmdir()
+                except Exception as cleanup_error:
+                    raise InstallRecoveryRequiredError(
+                        f"Install recovery required after {transfer_error}. Source: {model_path.resolve()}; "
+                        f"destination: {dest_dir.resolve()}. Could not remove owned empty destination: "
+                        f"{cleanup_error}"
+                    ) from transfer_error
+                raise
+            if dest_dir.exists():
+                try:
+                    remaining = list(dest_dir.iterdir())
+                    if remaining:
+                        leftovers = ", ".join(str(path.resolve()) for path in remaining)
+                        raise OSError(f"unexpected destination artifacts remain: {leftovers}")
+                    dest_dir.rmdir()
+                except Exception as cleanup_error:
+                    raise InstallRecoveryRequiredError(
+                        f"Install recovery required after {transfer_error}. Source: {model_path.resolve()}; "
+                        f"destination: {dest_dir.resolve()}. Could not remove owned empty destination: "
+                        f"{cleanup_error}"
+                    ) from transfer_error
+            raise
 
         return self._register(
             dest_path,
@@ -1000,10 +1085,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 # Expected errors include InvalidModelConfigException, DuplicateModelException, OSError, but we must
                 # gracefully handle _any_ error here.
                 self._set_error(job, e)
+                if job._recovery_required:
+                    self._write_install_marker(job, status=InstallStatus.ERROR)
 
             finally:
                 # if this is an install of a remote file, then clean up the temporary directory
-                if job._install_tmpdir is not None:
+                if job._install_tmpdir is not None and not job._recovery_required:
                     self._safe_rmtree(job._install_tmpdir, self._logger)
                 self._install_completed_event.set()
                 self._install_queue.task_done()
@@ -1029,7 +1116,13 @@ class ModelInstallService(ModelInstallServiceBase):
         if job.inplace:
             key = self.register_path(job.local_path, job.config_in)
         else:
-            key = self.install_path(job.local_path, job.config_in)
+            try:
+                key = self.install_path(job.local_path, job.config_in)
+            except InstallRecoveryRequiredError:
+                job._recovery_required = job._install_tmpdir is not None
+                if job._recovery_required:
+                    self._write_install_marker(job, status=job.status)
+                raise
         job.config_out = self.record_store.get_model(key)
         self._signal_job_completed(job)
 
@@ -1128,6 +1221,9 @@ class ModelInstallService(ModelInstallServiceBase):
                 self._safe_rmtree(tmpdir, self._logger)
                 continue
             status = marker.get("status")
+            if marker.get("recovery_required") is True:
+                self._logger.warning(f"Preserving install recovery data in {tmpdir}")
+                continue
             if status in {InstallStatus.COMPLETED.value, InstallStatus.ERROR.value, InstallStatus.CANCELLED.value}:
                 self._logger.info(f"Removing completed/errored temporary directory {tmpdir}")
                 self._safe_rmtree(tmpdir, self._logger)
