@@ -4,7 +4,7 @@ import time
 from contextlib import contextmanager
 from pathlib import Path
 from queue import Empty, Queue
-from typing import TYPE_CHECKING, AbstractSet, Any, Callable, Iterator, Optional
+from typing import TYPE_CHECKING, AbstractSet, Any, Callable, Iterable, Iterator, Optional
 
 import numpy as np
 import torch
@@ -287,7 +287,7 @@ class ImageIndexService(ImageIndexServiceBase):
         self._activation_lock = threading.Lock()
         # Request threads may still be using an encoder after it is removed.
         # Retirement publishes unavailability immediately; replacement waits
-        # for these users and the worker without blocking a polling request.
+        # for these users and the worker without a polling request joining them.
         self._model_users = 0
         self._users_drained = threading.Condition(self._activation_lock)
         # A retired model whose configured name now resolves to another
@@ -855,10 +855,10 @@ class ImageIndexService(ImageIndexServiceBase):
 
         Called off the event loop by map and search requests and by the
         worker. Rechecks are throttled in both the running and missing states.
-        No join or encoder lock is taken here: a deleted model becomes
-        unavailable at once, while its in-flight users keep their stable
-        resources until the exiting worker, or a later request, can safely
-        replace them.
+        No join is taken here: a deleted model becomes unavailable at once,
+        while its in-flight users keep their stable resources until the
+        exiting worker, or a later request, can safely replace them. Only that
+        swap waits, for the model-load lock (_drop_cached_models).
         """
         invoker = self._invoker
         if invoker is None or not invoker.services.configuration.image_index_enabled:
@@ -906,6 +906,7 @@ class ImageIndexService(ImageIndexServiceBase):
     def _swap_model(self, invoker: "Invoker", model_config: Optional["AnyModelConfig"]) -> bool:
         """Retire the drained model and start `model_config`, if any. Called under _activation_lock."""
         config = invoker.services.configuration
+        self._drop_cached_models(invoker, (self._model_config, model_config))
         self._reset_model_resources()
         self._replacement_pending = False
         self._model_config = None
@@ -963,6 +964,26 @@ class ImageIndexService(ImageIndexServiceBase):
                 invoker.services.logger.warning("Image index: could not resolve the embedding model", exc_info=True)
                 return
             self._swap_model(invoker, model_config)
+
+    def _drop_cached_models(self, invoker: "Invoker", configs: Iterable[Optional["AnyModelConfig"]]) -> None:
+        """Evict the retired and replacement encoders from every per-device model cache.
+
+        The shared cache is keyed by model key alone, so an encoder that keeps its key across a
+        reinstall would be served from the retired weights while its embeddings are stored under
+        the replacement's hash, and those survive a restart. The write lock keeps a concurrent
+        load from re-registering the old shared CPU weights around the drop. It is taken under
+        _activation_lock, so map polls, searches and stop() wait out any model load or VRAM move
+        in flight; that cannot deadlock, because the worker and request users have drained and
+        nothing takes _activation_lock while holding the load lock.
+        """
+        keys = {config.key for config in configs if config is not None}
+        if not keys:
+            # Still missing: this runs on every throttled recheck, and must not queue behind a load.
+            return
+        with MODEL_LOAD_LOCK.write_lock():
+            for cache in set(invoker.services.model_manager.load.ram_caches.values()):
+                for key in keys:
+                    cache.drop_model(key)
 
     def _reset_model_resources(self) -> None:
         """Retire caches only after the worker and request users have drained.

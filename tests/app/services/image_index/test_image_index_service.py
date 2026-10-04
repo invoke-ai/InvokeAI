@@ -30,6 +30,7 @@ from invokeai.app.services.image_records.image_records_common import ImageCatego
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_common import image_record_to_dto
 from invokeai.app.services.images.images_default import ImageService
+from invokeai.app.services.model_load.model_load_default import ModelLoadService
 from invokeai.app.services.model_records.model_records_sql import ModelRecordServiceSQL
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
@@ -37,6 +38,7 @@ from invokeai.app.services.videos.videos_common import VideoDTO, video_record_to
 from invokeai.app.services.videos.videos_default import VideoService
 from invokeai.backend.model_manager.configs.clip_vision import CLIPVision_Diffusers_Config
 from invokeai.backend.model_manager.configs.siglip import SigLIP_Diffusers_Config
+from invokeai.backend.model_manager.load.model_cache.model_cache import ModelCache
 from invokeai.backend.model_manager.taxonomy import ModelRepoVariant, ModelSourceType
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.logging import InvokeAILogger
@@ -45,6 +47,8 @@ from tests.test_nodes import TestEventService
 
 MODEL_ID = "test-model-hash"
 DIM = 8
+# An encoder swap evicts the retired model from every per-device cache; most tests have none.
+_NO_MODEL_CACHES = SimpleNamespace(ram_caches={})
 
 
 def _wait_until(predicate: Callable[[], bool], timeout: float = 10.0) -> None:
@@ -178,7 +182,7 @@ def _make_invoker(
         image_index_records=index_records,
         events=TestEventService(),
         session_queue=session_queue,
-        model_manager=model_manager,
+        model_manager=model_manager if model_manager is not None else SimpleNamespace(load=_NO_MODEL_CACHES),
     )
     return SimpleNamespace(services=services)
 
@@ -500,7 +504,9 @@ def test_try_activate_picks_up_a_model_installed_after_startup(
 
     monkeypatch.setattr(ImageIndexService, "_resolve_model_config", resolve)
     store = SimpleNamespace(search_by_attr=lambda **kwargs: [])
-    invoker = _make_invoker(images_service, index_records, model_manager=SimpleNamespace(store=store))
+    invoker = _make_invoker(
+        images_service, index_records, model_manager=SimpleNamespace(store=store, load=_NO_MODEL_CACHES)
+    )
     service = ImageIndexService()
     try:
         service.start(invoker)
@@ -558,7 +564,9 @@ def test_failed_late_activation_rolls_back_rather_than_wedging_the_service(
 
     original_launch = ImageIndexService._launch_worker
     store = SimpleNamespace(search_by_attr=lambda **kwargs: [])
-    invoker = _make_invoker(images_service, index_records, model_manager=SimpleNamespace(store=store))
+    invoker = _make_invoker(
+        images_service, index_records, model_manager=SimpleNamespace(store=store, load=_NO_MODEL_CACHES)
+    )
     service = ImageIndexService()
     try:
         # Inert at start: the encoder was not installed yet.
@@ -600,7 +608,10 @@ def test_encoder_metadata_edits_keep_worker_indexing_without_map_requests(
     store = ModelRecordServiceSQL(db, InvokeAILogger.get_logger())
     store.add_model(encoder_config)
     invoker = _make_invoker(
-        images_service, index_records, image_records=image_records, model_manager=SimpleNamespace(store=store)
+        images_service,
+        index_records,
+        image_records=image_records,
+        model_manager=SimpleNamespace(store=store, load=_NO_MODEL_CACHES),
     )
     invoker.services.configuration.image_index_model = encoder_config.name
     invoker.services.configuration.models_dir = models_dir
@@ -791,6 +802,91 @@ def test_encoder_replacement_waits_for_inflight_embedding_and_discards_retired_b
         service.stop()
 
 
+def _write_clip_vision_weights(path: Path, seed: int) -> None:
+    from transformers import CLIPVisionConfig, CLIPVisionModelWithProjection
+
+    config = CLIPVisionConfig(
+        hidden_size=8,
+        intermediate_size=16,
+        num_hidden_layers=1,
+        num_attention_heads=2,
+        image_size=224,
+        patch_size=112,
+        projection_dim=DIM,
+    )
+    with torch.random.fork_rng(devices=[]):
+        torch.manual_seed(seed)
+        CLIPVisionModelWithProjection(config).save_pretrained(path)
+
+
+def test_reinstalled_encoder_keeping_its_key_embeds_with_the_new_weights(
+    tmp_path: Path,
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # The shared model cache is keyed by model key alone. Reinstalling the encoder in place changes
+    # its hash but not its key, and embeddings computed by the cached, retired weights would be
+    # stored under the replacement's hash and survive a restart.
+    from transformers import CLIPImageProcessor, CLIPVisionModelWithProjection
+
+    encoder_path = tmp_path / "encoder"
+    _write_clip_vision_weights(encoder_path, seed=1)
+    retired = CLIPVision_Diffusers_Config(
+        key="encoder-key",
+        hash="retired-hash",
+        path=str(encoder_path),
+        file_size=1,
+        name="encoder",
+        source=str(encoder_path),
+        source_type=ModelSourceType.Path,
+    )
+    installed = [retired]
+    monkeypatch.setattr(ImageIndexService, "_resolve_model_config", lambda self, name: installed[0])
+    # Embed through the shared cache, as an accelerator host does, but on CPU tensors.
+    monkeypatch.setattr(TorchDevice, "choose_torch_device", staticmethod(lambda: torch.device("cpu")))
+    monkeypatch.setattr(ImageIndexService, "_cpu_mode", lambda self: False)
+    invoker = _make_invoker(images_service, index_records, image_records=image_records, device=None)
+    cache = ModelCache(
+        execution_device_working_mem_gb=1,
+        enable_partial_loading=False,
+        keep_ram_copy_of_weights=True,
+        execution_device=torch.device("cpu"),
+        logger=invoker.services.logger,
+        # The default store is process-global; keep this encoder's weights out of it.
+        shared_cpu_weights=None,
+    )
+    invoker.services.model_manager = SimpleNamespace(
+        load=ModelLoadService(app_config=invoker.services.configuration, ram_cache=cache)
+    )
+    item = IndexedItem("image", "a.png")
+    service = ImageIndexService()
+    try:
+        _save_image(image_records, item.name)
+        service.start(invoker)
+        _wait_until(lambda: index_records.count_index_status(retired.hash).embedded == 1)
+        retired_embedding = index_records.get_embeddings([item], retired.hash)[1][0]
+
+        _write_clip_vision_weights(encoder_path, seed=2)
+        replacement = retired.model_copy(update={"hash": "replacement-hash"})
+        with service._activation_lock:
+            installed[0] = replacement
+            service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+        _wait_until(lambda: index_records.count_index_status(replacement.hash).embedded == 1)
+
+        with torch.no_grad():
+            pixel_values = CLIPImageProcessor()(images=images_service.get_pil_image(item.name), return_tensors="pt")
+            expected = CLIPVisionModelWithProjection.from_pretrained(encoder_path)(**pixel_values).image_embeds[0]
+        expected = (expected / expected.norm()).numpy()
+        stored = index_records.get_embeddings([item], replacement.hash)[1][0]
+        assert not np.allclose(expected, retired_embedding, atol=1e-3), "the two encoders must disagree"
+        np.testing.assert_allclose(stored, expected, atol=1e-5)
+    finally:
+        service.stop()
+        cache.shutdown()
+
+
 def test_worker_detected_replacement_resumes_indexing_without_requests(
     encoder_config: CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config,
     image_records: SqliteImageRecordStorage,
@@ -906,7 +1002,9 @@ def test_late_activation_survives_a_model_store_failure(
         raise RuntimeError("model store unavailable")
 
     store = SimpleNamespace(search_by_attr=lambda **kwargs: [])
-    invoker = _make_invoker(images_service, index_records, model_manager=SimpleNamespace(store=store))
+    invoker = _make_invoker(
+        images_service, index_records, model_manager=SimpleNamespace(store=store, load=_NO_MODEL_CACHES)
+    )
     service = ImageIndexService()
     monkeypatch.setattr(ImageIndexService, "_resolve_model_config", lambda self, model_name: None)
     service.start(invoker)
@@ -1339,7 +1437,7 @@ def test_empty_model_name_does_not_resolve_to_an_arbitrary_model(
     """
     installed = SimpleNamespace(key="some-key", name="clip-vit-large-patch14", hash="some-hash")
     store = SimpleNamespace(search_by_attr=lambda model_name, model_type: [installed])
-    model_manager = SimpleNamespace(store=store)
+    model_manager = SimpleNamespace(store=store, load=_NO_MODEL_CACHES)
 
     service = ImageIndexService()
     service._invoker = _make_invoker(images_service, index_records, model_manager=model_manager)
@@ -1366,7 +1464,9 @@ def test_duplicate_model_names_resolve_deterministically(
     def resolve(order: list[SimpleNamespace]) -> SimpleNamespace:
         store = SimpleNamespace(search_by_attr=lambda model_name, model_type: list(order))
         service = ImageIndexService()
-        service._invoker = _make_invoker(images_service, index_records, model_manager=SimpleNamespace(store=store))
+        service._invoker = _make_invoker(
+            images_service, index_records, model_manager=SimpleNamespace(store=store, load=_NO_MODEL_CACHES)
+        )
         return service._resolve_model_config("clip-vit-large-patch14")
 
     # Same set, either insertion order — the winner must not move.
