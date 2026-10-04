@@ -66,8 +66,9 @@ class RegionalIPDataNew:
         self.scales[id] = value
 
     def build_masks(self):
-        self.seq_masks = RegionalIPData._prepare_masks(self.masks, self.max_downscale_factor, self.device, self.dtype)
-        self.masks = None
+        if self.seq_masks is None:
+            self.seq_masks = RegionalIPData._prepare_masks(self.masks, self.max_downscale_factor, self.device, self.dtype)
+            self.masks = None
 
     def get_masks(self, query_seq_len: int) -> torch.Tensor:
         """Get the mask for the given query sequence length."""
