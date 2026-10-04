@@ -50,6 +50,16 @@ class MockApiDependencies(ApiDependencies):
         self.invoker = invoker
 
 
+def _png_bytes() -> bytes:
+    from io import BytesIO
+
+    from PIL import Image
+
+    buffer = BytesIO()
+    Image.new("RGB", (8, 8), color=(200, 30, 30)).save(buffer, format="PNG")
+    return buffer.getvalue()
+
+
 class FakeImageIndexService(ImageIndexServiceBase):
     """Records projection/search requests instead of running a worker."""
 
@@ -67,10 +77,15 @@ class FakeImageIndexService(ImageIndexServiceBase):
         self.embedded_images: list = []
         self.vocab_invalidations = 0
         self.vocab_state: tuple[str, str | None] = ("idle", None)
+        self.replacing = False
 
     @property
     def model_id(self) -> str | None:
         return self._model_id
+
+    @property
+    def replacing_model(self) -> bool:
+        return self.replacing
 
     def get_status(self) -> ImageIndexStatus | None:
         if self._model_id is None:
@@ -472,6 +487,14 @@ def test_status_model_missing_when_enabled_without_model(
         pytest.param(lambda client: client.get("/api/v1/image_map/points"), id="points"),
         pytest.param(lambda client: client.get("/api/v1/image_map/status"), id="status"),
         pytest.param(lambda client: client.post("/api/v1/image_map/refresh"), id="refresh"),
+        # Gallery search runs without the map open, so it must recover on its own.
+        pytest.param(lambda client: client.get("/api/v1/image_map/search", params={"q": "a cat"}), id="search"),
+        pytest.param(
+            lambda client: client.post(
+                "/api/v1/image_map/search_by_image", files={"image": ("ref.png", _png_bytes(), "image/png")}
+            ),
+            id="search_by_image",
+        ),
     ],
 )
 def test_endpoints_activate_a_model_installed_since_startup(
@@ -535,6 +558,37 @@ def test_reads_revalidate_an_encoder_deleted_after_activation(
     if endpoint == "status":
         assert body["enabled"] is False
         assert body["index"] is None
+
+
+@pytest.mark.parametrize("endpoint", ["points", "status"])
+def test_reads_report_a_draining_replacement_as_computing_rather_than_missing(
+    endpoint: str, mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    # The replacement is installed; offering to install it again would invite a
+    # duplicate install while the retired encoder's work drains.
+    mock_invoker.services.configuration.image_index_enabled = True
+    image_index_service._model_id = None
+    image_index_service.replacing = True
+    body = client.get(f"/api/v1/image_map/{endpoint}").json()
+    projection = body["projection"] if endpoint == "status" else body
+    assert projection["state"] == "computing"
+    assert body["model_id"] is None
+    assert body["model_name"] is None
+
+    mock_invoker.services.configuration.image_index_enabled = False
+    body = client.get(f"/api/v1/image_map/{endpoint}").json()
+    assert (body["projection"] if endpoint == "status" else body)["state"] == "disabled"
+
+
+def test_search_during_a_replacement_says_the_model_is_switching(
+    mock_invoker: Invoker, image_index_service: FakeImageIndexService, client: TestClient
+) -> None:
+    mock_invoker.services.configuration.image_index_enabled = True
+    image_index_service._model_id = None
+    image_index_service.replacing = True
+    response = client.get("/api/v1/image_map/search", params={"q": "a cat"})
+    assert response.status_code == 409
+    assert "switching" in response.json()["detail"]
 
 
 @pytest.mark.parametrize("endpoint", ["points", "status"])
@@ -1227,18 +1281,12 @@ def test_cluster_labels_skips_the_embedding_gather_when_nothing_clustered(
 def test_search_by_image_upload_returns_ranked_results(
     image_index_service: FakeImageIndexService, client: TestClient
 ) -> None:
-    from io import BytesIO
-
-    from PIL import Image
-
-    buffer = BytesIO()
-    Image.new("RGB", (8, 8), color=(200, 30, 30)).save(buffer, format="PNG")
     image_index_service.search_results = [(IndexedItem("image", "a.png"), 0.9), (IndexedItem("image", "b.png"), 0.4)]
 
     response = client.post(
         "/api/v1/image_map/search_by_image",
         params={"limit": 5},
-        files={"image": ("ref.png", buffer.getvalue(), "image/png")},
+        files={"image": ("ref.png", _png_bytes(), "image/png")},
     )
 
     assert response.status_code == 200

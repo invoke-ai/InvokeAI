@@ -289,6 +289,10 @@ class ImageIndexService(ImageIndexServiceBase):
         # Retirement publishes unavailability immediately; replacement waits
         # for these users and the worker without blocking a polling request.
         self._model_users = 0
+        self._users_drained = threading.Condition(self._activation_lock)
+        # A retired model whose configured name now resolves to another
+        # installation; cleared once the replacement starts or is missing.
+        self._replacement_pending = False
         self._callbacks_registered = False
         self._last_activation_attempt: float = 0.0
         # Set by stop() so a request that raced shutdown cannot start a worker
@@ -351,6 +355,10 @@ class ImageIndexService(ImageIndexServiceBase):
     def model_id(self) -> str | None:
         return None if self._stop_event.is_set() else self._model_id
 
+    @property
+    def replacing_model(self) -> bool:
+        return self._replacement_pending and self._stop_event.is_set() and not self._stopped
+
     @contextmanager
     def use_model(self) -> Iterator[None]:
         with self._activation_lock:
@@ -360,6 +368,8 @@ class ImageIndexService(ImageIndexServiceBase):
         finally:
             with self._activation_lock:
                 self._model_users -= 1
+                if not self._model_users:
+                    self._users_drained.notify_all()
 
     def get_status(self) -> ImageIndexStatus | None:
         model_id = self.model_id
@@ -843,11 +853,12 @@ class ImageIndexService(ImageIndexServiceBase):
     def try_activate(self) -> bool:
         """Reconcile encoder installation, draining retired work before replacement.
 
-        Called off the event loop by map reads and by the worker. Rechecks
-        are throttled in both the running and missing states. No join or
-        encoder lock is taken here: a deleted model becomes unavailable at
-        once, while its in-flight users keep their stable resources until a
-        later poll can safely replace them.
+        Called off the event loop by map and search requests and by the
+        worker. Rechecks are throttled in both the running and missing states.
+        No join or encoder lock is taken here: a deleted model becomes
+        unavailable at once, while its in-flight users keep their stable
+        resources until the exiting worker, or a later request, can safely
+        replace them.
         """
         invoker = self._invoker
         if invoker is None or not invoker.services.configuration.image_index_enabled:
@@ -886,48 +897,82 @@ class ImageIndexService(ImageIndexServiceBase):
                 ):
                     return True
             self._stop_event.set()
+            self._replacement_pending = model_config is not None
             if self._model_users or (self._worker is not None and self._worker.is_alive()):
+                # A live worker finishes the swap as it exits (_finish_retirement).
                 return False
+            return self._swap_model(invoker, model_config)
 
-            self._reset_model_resources()
+    def _swap_model(self, invoker: "Invoker", model_config: Optional["AnyModelConfig"]) -> bool:
+        """Retire the drained model and start `model_config`, if any. Called under _activation_lock."""
+        config = invoker.services.configuration
+        self._reset_model_resources()
+        self._replacement_pending = False
+        self._model_config = None
+        self._encode_fn = None
+        self._model_id = None
+        if model_config is None:
+            return False
+
+        invoker.services.logger.info(
+            f"Image index: embedding model '{config.image_index_model}' is now installed; starting the indexer"
+        )
+        # `_model_id` last, and rolled back as a set: it is the flag every
+        # other thread reads as "the indexer is running". Published before
+        # the worker exists, a failed launch would wedge the service there
+        # permanently — try_activate would treat it as running while
+        # nothing consumed the queue, and no later request would retry.
+        self._model_config = model_config
+        self._encode_fn = self._encode_with_model
+        self._model_id = model_config.hash
+        try:
+            self._launch_worker(invoker)
+        except Exception:
+            self._stop_event.set()
             self._model_config = None
             self._encode_fn = None
             self._model_id = None
-            if model_config is None:
-                return False
-
-            invoker.services.logger.info(
-                f"Image index: embedding model '{config.image_index_model}' is now installed; starting the indexer"
+            invoker.services.logger.warning(
+                "Image index: could not start the indexer after the model became available; "
+                "the next image map or search request will retry",
+                exc_info=True,
             )
-            # `_model_id` last, and rolled back as a set: it is the flag every
-            # other thread reads as "the indexer is running". Published before
-            # the worker exists, a failed launch would wedge the service there
-            # permanently — the fast path above would answer True forever while
-            # nothing consumed the queue, and no later request would retry.
-            self._model_config = model_config
-            self._encode_fn = self._encode_with_model
-            self._model_id = model_config.hash
+            return False
+        return True
+
+    def _finish_retirement(self) -> None:
+        """Complete a retirement as the worker exits, once request users have drained.
+
+        Replacement must not wait for an image map request: with the map closed,
+        semantic search and new-image indexing would stay down indefinitely.
+        """
+        invoker = self._invoker
+        assert invoker is not None
+        with self._activation_lock:
+            while self._model_users and not self._stopped:
+                self._users_drained.wait()
+            if self._stopped or not self._stop_event.is_set():
+                return
+            self._last_activation_attempt = time.monotonic()
             try:
-                self._launch_worker(invoker)
+                model_config = self._resolve_model_config(invoker.services.configuration.image_index_model)
             except Exception:
-                self._stop_event.set()
-                self._model_config = None
-                self._encode_fn = None
-                self._model_id = None
-                invoker.services.logger.warning(
-                    "Image index: could not start the indexer after the model became available; "
-                    "the next image map request will retry",
-                    exc_info=True,
-                )
-                return False
-            return True
+                # Stay retired; the next request's try_activate swaps once the catalog reads again. Without a
+                # resolved replacement, reads must not report one as starting.
+                self._replacement_pending = False
+                invoker.services.logger.warning("Image index: could not resolve the embedding model", exc_info=True)
+                return
+            self._swap_model(invoker, model_config)
 
     def _reset_model_resources(self) -> None:
         """Retire caches only after the worker and request users have drained.
 
         Called under _activation_lock. Same-hash reinstalls must also discard
         lazy encoders and load failures: their path or installation may have
-        changed even though stored image embeddings remain valid.
+        changed even though stored image embeddings remain valid. Taking
+        _vocab_lock here reverses the worker's vocab-build order
+        (_vocab_lock, then use_model); that is safe only because no build can
+        be running once the worker has left its loop and request users drained.
         """
         self._processor = None
         self._cpu_model = None
@@ -974,6 +1019,8 @@ class ImageIndexService(ImageIndexServiceBase):
         # worker that this stop would then never see.
         with self._activation_lock:
             self._stopped = True
+            # Release a retiring worker waiting for request users in _finish_retirement.
+            self._users_drained.notify_all()
         self._stop_event.set()
         if self._worker is not None and self._worker.is_alive():
             self._worker.join(timeout=10)
@@ -1177,6 +1224,10 @@ class ImageIndexService(ImageIndexServiceBase):
                 self._backfill_pending.set()
                 self._status_dirty.set()
                 self._stop_event.wait(_POLL_SECONDS)
+        try:
+            self._finish_retirement()
+        except Exception:
+            logger.exception("Image index: could not finish retiring the embedding model")
 
     def _next_batch(self) -> Optional[list[IndexedItem]]:
         """Get the next batch of items, preferring backfill work.

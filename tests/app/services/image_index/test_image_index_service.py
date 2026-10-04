@@ -673,14 +673,15 @@ def test_deleted_encoder_becomes_unavailable_and_reinstall_resumes_without_dupli
         service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
         assert service.try_activate() is False
         assert service.model_id is None
+        assert not service.replacing_model
         assert service.get_status() is None
         assert service.get_vocab_build_state() == ("unavailable", None)
         assert service.request_projection("system") is False
+        # The exiting worker releases the deleted encoder's resources itself.
         _wait_until(lambda: not service._worker.is_alive())
-        service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
-        assert service.try_activate() is False
         assert service._processor is None
         assert service._cpu_model is None
+        assert service._vocab_cache is None
 
         _save_image(image_records, "during.png")
         images_service._on_changed(_dto_for(image_records, "during.png"))
@@ -763,23 +764,22 @@ def test_encoder_replacement_waits_for_inflight_embedding_and_discards_retired_b
         service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
         assert service.try_activate() is False
         assert service.model_id is None
-        if not background_batch:
-            _wait_until(lambda: not service._worker.is_alive())
+        assert service.replacing_model is (replacement_kind != "reinstall")
         installed[:] = [replacement]
         service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
         assert service.try_activate() is False
+        assert service.replacing_model
         assert service._model_config is encoder_config
 
         release.set()
         if query is not None:
             query.join(timeout=10)
             assert not query.is_alive()
-        _wait_until(lambda: not service._worker.is_alive())
-        assert index_records.count_index_status(MODEL_ID).embedded == 0
-        service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
-        assert service.try_activate() is True
-        assert service.model_id == replacement.hash
+        # No further request: the retiring worker completes the swap once its users drain.
+        _wait_until(lambda: service.model_id == replacement.hash)
+        assert not service.replacing_model
         if background_batch:
+            # Re-encoded by the replacement: the retired encoder's batch was not stored.
             _wait_until(lambda: index_records.count_index_status(replacement.hash).embedded == 1)
         else:
             service.embed_image(Image.new("RGB", (16, 16)))
@@ -789,6 +789,71 @@ def test_encoder_replacement_waits_for_inflight_embedding_and_discards_retired_b
         if query is not None:
             query.join(timeout=10)
         service.stop()
+
+
+def test_worker_detected_replacement_resumes_indexing_without_requests(
+    encoder_config: CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config,
+    image_records: SqliteImageRecordStorage,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Deleting and re-adding the encoder gives it a new key. With the image map
+    # closed, nothing but the worker notices, and gallery search and new-image
+    # indexing must not stay down until someone opens the map.
+    installed = [encoder_config]
+    monkeypatch.setattr(ImageIndexService, "_resolve_model_config", lambda self, name: installed[0])
+    monkeypatch.setattr(ImageIndexService, "_encode_with_model", lambda self, images: _fake_encode(images))
+    service = ImageIndexService()
+    try:
+        _save_image(image_records, "before.png")
+        service.start(_make_invoker(images_service, index_records, image_records=image_records))
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 1)
+        retired = service._worker
+
+        replacement = encoder_config.model_copy(update={"key": "re-added-key"})
+        with service._activation_lock:
+            installed[0] = replacement
+            service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+
+        _wait_until(lambda: service._model_config is replacement and service.model_id == MODEL_ID)
+        assert retired is not None
+        _wait_until(lambda: not retired.is_alive())
+        assert service._worker is not retired and service._worker.is_alive()
+
+        _save_image(image_records, "after.png")
+        images_service._on_changed(_dto_for(image_records, "after.png"))
+        _wait_until(lambda: index_records.count_index_status(MODEL_ID).embedded == 2)
+        assert len(images_service._on_changed_callbacks) == 1
+    finally:
+        service.stop()
+
+
+def test_stop_releases_a_worker_waiting_for_request_users_to_drain(
+    encoder_config: CLIPVision_Diffusers_Config | SigLIP_Diffusers_Config,
+    images_service: ImageService,
+    index_records: ImageIndexRecordsSqlite,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    installed = [encoder_config]
+    monkeypatch.setattr(ImageIndexService, "_resolve_model_config", lambda self, name: installed[0])
+    monkeypatch.setattr(ImageIndexService, "_encode_with_model", lambda self, images: _fake_encode(images))
+    service = ImageIndexService()
+    service.start(_make_invoker(images_service, index_records))
+    worker = service._worker
+    assert worker is not None
+    with service.use_model():
+        installed[0] = encoder_config.model_copy(update={"key": "replacement-key"})
+        service._last_activation_attempt = time.monotonic() - _ACTIVATION_RETRY_INTERVAL_S - 1
+        assert service.try_activate() is False
+        assert service.replacing_model
+
+        # Shutdown must not wait out the request, nor start the replacement.
+        service.stop()
+        assert not worker.is_alive()
+        assert service._worker is worker
+        assert not service.replacing_model
+        assert service.model_id is None
 
 
 def test_projection_finishing_after_encoder_removal_does_not_publish(

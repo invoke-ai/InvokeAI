@@ -38,6 +38,11 @@ class ImageIndexServiceBase(ABC):
         """Content hash of the active embedding model, or None if the indexer is not running."""
         pass
 
+    @property
+    def replacing_model(self) -> bool:
+        """True while a retired model waits to drain before its installed replacement starts."""
+        return False
+
     def try_activate(self) -> bool:
         """Reconcile whether the configured embedding model is still installed.
 

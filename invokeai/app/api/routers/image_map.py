@@ -68,7 +68,8 @@ class ImageMapPointsResponse(BaseModel):
     points: list[ImageMapPoint] = Field(description="The projected points")
     state: ImageMapState = Field(
         description="disabled: indexing is off; model_missing: indexing is enabled but the configured embedding "
-        "model is not installed; empty: nothing to show; computing: a projection is being built; ready: points are served"
+        "model is not installed; empty: nothing to show; computing: a projection is being built, or the index is "
+        "switching to a replacement embedding model; ready: points are served"
     )
     model_id: Optional[str] = Field(
         default=None, description="Active encoder fingerprint; clients must discard cached labels when it changes"
@@ -286,6 +287,26 @@ def _active_model_id(services) -> Optional[str]:
     return services.image_index.model_id
 
 
+def _inactive_state(services) -> ImageMapState:
+    """Why there is no active model: an installed replacement still draining is not a missing model."""
+    if not services.configuration.image_index_enabled:
+        return "disabled"
+    return "computing" if services.image_index.replacing_model else "model_missing"
+
+
+async def _search_model_id(services) -> str:
+    """The active model for a search; reconciled here too, so gallery search recovers without the map open."""
+    model_id = await asyncio.to_thread(_active_model_id, services)
+    if model_id is None:
+        detail = (
+            "The image index is switching embedding models; try again shortly"
+            if _inactive_state(services) == "computing"
+            else "The image index is not enabled; semantic search is unavailable"
+        )
+        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=detail)
+    return model_id
+
+
 _T = TypeVar("_T")
 
 
@@ -402,15 +423,14 @@ async def get_image_map_points(
         # The service is also inert when indexing is enabled but the
         # configured model is not installed; tell the client which case
         # this is so it can show an actionable message.
-        if services.configuration.image_index_enabled:
-            return ImageMapPointsResponse(
-                points=[],
-                state="model_missing",
-                model_name=services.configuration.image_index_model,
-                stale=False,
-                point_count=0,
-            )
-        return ImageMapPointsResponse(points=[], state="disabled", stale=False, point_count=0)
+        state = _inactive_state(services)
+        return ImageMapPointsResponse(
+            points=[],
+            state=state,
+            model_name=services.configuration.image_index_model if state == "model_missing" else None,
+            stale=False,
+            point_count=0,
+        )
 
     user_id, is_admin = _scope(current_user)
     kinds = _served_kinds(include_videos)
@@ -603,12 +623,7 @@ async def search_image_map(
             detail="Provide exactly one of q, image_name or video_name",
         )
 
-    model_id = services.image_index.model_id
-    if model_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="The image index is not enabled; semantic search is unavailable",
-        )
+    model_id = await _search_model_id(services)
 
     user_id, is_admin = _scope(current_user)
     scope_user = None if is_admin else user_id
@@ -833,12 +848,7 @@ async def search_image_map_by_image(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Provide exactly one of image or image_url"
         )
 
-    model_id = services.image_index.model_id
-    if model_id is None:
-        raise HTTPException(
-            status_code=status.HTTP_409_CONFLICT,
-            detail="The image index is not enabled; semantic search is unavailable",
-        )
+    model_id = await _search_model_id(services)
 
     user_id, is_admin = _scope(current_user)
     scope_user = None if is_admin else user_id
@@ -1247,13 +1257,11 @@ def get_image_map_status(
     services = ApiDependencies.invoker.services
     model_id = _active_model_id(services)
     if model_id is None:
-        model_missing = services.configuration.image_index_enabled
+        state = _inactive_state(services)
         return ImageMapStatusResponse(
             enabled=False,
-            model_name=services.configuration.image_index_model if model_missing else None,
-            projection=ImageMapProjectionStatus(
-                state="model_missing" if model_missing else "disabled", stale=False, point_count=0
-            ),
+            model_name=services.configuration.image_index_model if state == "model_missing" else None,
+            projection=ImageMapProjectionStatus(state=state, stale=False, point_count=0),
         )
 
     user_id, is_admin = _scope(current_user)
