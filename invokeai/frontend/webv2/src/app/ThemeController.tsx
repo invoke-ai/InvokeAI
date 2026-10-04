@@ -1,7 +1,8 @@
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { shallowEqual } from '@platform/state/selectors';
-import { applyThemeToRoot } from '@theme/applyTheme';
+import { applyPromptFontSizeToRoot, applyThemeToRoot } from '@theme/applyTheme';
 import { DEFAULT_THEME, THEMES_BY_ID } from '@theme/system';
-import { useWorkbenchSettingsSelector } from '@workbench/settings/store';
+import { subscribeWorkbenchPreferences, useWorkbenchSettingsSelector } from '@workbench/settings/store';
 import { useLayoutEffect } from 'react';
 
 /** Root data attributes drive theme and motion CSS without React rerenders. */
@@ -69,6 +70,11 @@ export const ThemeController = () => {
       applyRootFlag('highContrast', HIGH_CONTRAST_HINT_STORAGE_KEY, highContrast);
     }
   }, [hasResolved, highContrast]);
+
+  // No pre-paint hint: prompt fields are not on screen before settings resolve.
+  useMountEffect(() =>
+    subscribeWorkbenchPreferences(({ promptFontSize }) => applyPromptFontSizeToRoot(promptFontSize))
+  );
 
   return null;
 };

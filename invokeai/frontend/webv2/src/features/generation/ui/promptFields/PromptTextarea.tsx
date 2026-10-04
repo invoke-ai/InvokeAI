@@ -5,6 +5,7 @@ import { Box } from '@chakra-ui/react';
 import { HighlightedPrompt, MAX_HIGHLIGHTED_PROMPT_LENGTH } from '@features/generation/ui/promptFields/PromptHighlight';
 import { getLineNumberGutterCh, PromptLineNumbers } from '@features/generation/ui/promptFields/PromptLineNumbers';
 import { ResizableTextarea } from '@platform/ui';
+import { PROMPT_FONT_SIZE } from '@theme/scale';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 const PROMPT_TEXTAREA_LINE_HEIGHT = '1.6';
 // Use literal lengths; fractional Chakra spacing variables fail inside calc.
@@ -68,7 +69,7 @@ export const PromptTextarea = ({
   const isWithinHighlightBudget = value.length > 0 && value.length <= MAX_HIGHLIGHTED_PROMPT_LENGTH;
   // Template chunk emphasis is independent of the syntax-highlighting preference.
   const shouldHighlight = (showSyntaxHighlighting || templateChunks !== null) && isWithinHighlightBudget;
-  const effectiveFontSize = fontSize ?? '0.82rem';
+  const effectiveFontSize = fontSize ?? PROMPT_FONT_SIZE;
   const effectiveLineHeight = lineHeight ?? PROMPT_TEXTAREA_LINE_HEIGHT;
   // The gutter widens with the line count, and the text has to start clear of it.
   const gutterCh = showLineNumbers ? getLineNumberGutterCh(value.split('\n').length) : 0;

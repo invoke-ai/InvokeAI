@@ -177,17 +177,17 @@ export const LibraryColumn = () => {
       >
         {hasSelection ? (
           <>
-            <Button size="2xs" variant="ghost" onClick={() => setIsBulkReidentifyOpen(true)}>
+            <Button size="sm" variant="ghost" onClick={() => setIsBulkReidentifyOpen(true)}>
               <Icon as={RefreshCcwIcon} boxSize="3" />
               {t('models.reidentifySelected')}
             </Button>
-            <Button colorPalette="red" size="2xs" variant="ghost" onClick={() => setIsBulkDeleteOpen(true)}>
+            <Button colorPalette="red" size="sm" variant="ghost" onClick={() => setIsBulkDeleteOpen(true)}>
               <Icon as={Trash2Icon} boxSize="3" />
               {t('common.delete')}
             </Button>
             <IconButton
               aria-label={t('models.clearSelection')}
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={() => updateModelsUi({ selectedKeys: new Set() })}
             >

@@ -21,6 +21,7 @@ import {
   useSortable,
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
@@ -78,6 +79,7 @@ export const LayoutPresetStrip = () => {
   const { t } = useTranslation();
   const { layout } = useWorkbenchCommands();
   const [isSaveAsOpen, setIsSaveAsOpen] = useState(false);
+  const saveAsDialog = useExitPresence(isSaveAsOpen);
   const [menuTarget, setMenuTarget] = useState<PresetMenuTarget | null>(null);
   const menuTicket = useRef(0);
 
@@ -186,7 +188,7 @@ export const LayoutPresetStrip = () => {
           >
             <Tabs.Root
               minW="max-content"
-              size="xs"
+              size="lg"
               value={selectedPresetId}
               variant="subtle"
               onValueChange={handleValueChange}
@@ -220,7 +222,7 @@ export const LayoutPresetStrip = () => {
         <Tooltip content={t('topbar.presets.saveAsTooltip')} showArrow>
           <IconButton
             aria-label={t('topbar.presets.saveAsTooltip')}
-            size="sm"
+            size="lg"
             variant="ghost"
             onClick={openSaveAsDialog}
           >
@@ -242,15 +244,17 @@ export const LayoutPresetStrip = () => {
         />
       ) : null}
 
-      {isSaveAsOpen ? (
+      {saveAsDialog.isMounted ? (
         <LayoutPresetDialog
+          key={saveAsDialog.generation}
           defaultRoute={saveAsDefaultRoute}
-          isOpen
+          isOpen={saveAsDialog.isOpen}
           name={`${activePreset.label} copy`}
           sourceOptions={sourceOptions}
           submitLabel={t('topbar.presets.save')}
           title={t('topbar.presets.saveAs')}
           onClose={closeSaveAsDialog}
+          onExitComplete={saveAsDialog.release}
           onSubmit={saveAsNewPreset}
         />
       ) : null}
@@ -400,10 +404,10 @@ const PresetTab = ({
   );
 };
 
-const MENU_AFFORDANCE_HOVER_PROPS = { bg: 'bg.emphasized', color: 'fg' } as const;
+const MENU_AFFORDANCE_HOVER_PROPS = { bg: 'bg.hover', color: 'fg' } as const;
 
-// Same fills as the widget rail's hover and active items (`WIDGET_ITEM_SX`).
-const PRESET_TAB_HOVER_PROPS = { bg: 'bg.emphasized', color: 'fg' } as const;
+// A pointed inactive preset takes the shared tinted hover; the active one keeps the widget rail's active fill.
+const PRESET_TAB_HOVER_PROPS = { '&:not([data-selected])': { bg: 'bg.hover', color: 'fg' } } as const;
 const PRESET_TAB_SELECTED_PROPS = { bg: 'bg.emphasized', color: 'fg' } as const;
 
 const DriftDot = () => <Box aria-hidden="true" bg="accent.solid" boxSize="1.5" flexShrink={0} rounded="full" />;
@@ -487,9 +491,9 @@ const PresetMenu = ({
         <Menu.Positioner>
           <MenuContent minW="16rem">
             <HStack justify="space-between" px="3" py="2">
-              <MiddleTruncate fontSize="xs" fontWeight="700" text={preset.label} />
+              <MiddleTruncate fontSize="md" fontWeight="700" text={preset.label} />
               {showDrift ? (
-                <Text color="fg.muted" fontSize="2xs" flexShrink={0}>
+                <Text color="fg.muted" fontSize="xs" flexShrink={0}>
                   {t('topbar.presets.unsaved')}
                 </Text>
               ) : null}
@@ -515,7 +519,7 @@ const PresetMenu = ({
                   <Icon as={SaveIcon} boxSize="3.5" />
                   <Menu.ItemText>{t('topbar.presets.saveChanges')}</Menu.ItemText>
                   {saveShortcut ? (
-                    <Text color="fg.subtle" fontSize="2xs" ms="auto">
+                    <Text color="fg.subtle" fontSize="xs" ms="auto">
                       {saveShortcut}
                     </Text>
                   ) : null}

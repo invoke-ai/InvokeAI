@@ -74,18 +74,17 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, isMo
         alignItems="center"
         gap="4"
         w="full"
-        size="sm"
         onCheckedChange={handleCheckedChange}
       >
         <Stack gap="1">
           <HStack gap="2">
-            <Switch.Label fontSize={surface === 'quick' ? 'xs' : 'sm'} fontWeight="500">
+            <Switch.Label fontSize={surface === 'quick' ? 'md' : 'lg'} fontWeight="500">
               {label}
             </Switch.Label>
             {isModified ? <ModifiedSettingIndicator label={label} /> : null}
           </HStack>
           {description ? (
-            <Text id={descriptionId} color="fg.muted" fontSize="xs">
+            <Text id={descriptionId} color="fg.muted" fontSize="md">
               {description}
             </Text>
           ) : null}
@@ -109,23 +108,19 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, isMo
     >
       <Stack gap="1" flex="1">
         <HStack gap="2">
-          <Field.Label fontSize={surface === 'quick' ? 'xs' : 'sm'} fontWeight="500">
+          <Field.Label fontSize={surface === 'quick' ? 'md' : 'lg'} fontWeight="500">
             {label}
           </Field.Label>
           {isModified ? <ModifiedSettingIndicator label={label} /> : null}
         </HStack>
-        {description ? (
-          <Field.HelperText color="fg.muted" fontSize="xs">
-            {description}
-          </Field.HelperText>
-        ) : null}
+        {description ? <Field.HelperText color="fg.muted">{description}</Field.HelperText> : null}
       </Stack>
       {field.kind === 'select' ? (
         <Select
           collection={collection}
           value={selectValue}
           disabled={disabled}
-          size={surface === 'quick' ? 'xs' : 'sm'}
+          size={surface === 'quick' ? 'md' : 'lg'}
           w={surface === 'quick' ? 'full' : DIALOG_CONTROL_WIDTH}
           flexShrink={0}
           portalled={false}
@@ -143,7 +138,6 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, isMo
             max={field.max}
             step={field.step ?? 1}
             flex="1"
-            size="sm"
             onValueChange={handleSliderChange}
           >
             <Slider.Control>
@@ -153,7 +147,7 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, isMo
               <Slider.Thumbs />
             </Slider.Control>
           </Slider.Root>
-          <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums" minW="6" textAlign="end">
+          <Text color="fg.muted" fontSize="md" fontVariantNumeric="tabular-nums" minW="6" textAlign="end">
             {value}
           </Text>
         </HStack>
@@ -166,7 +160,7 @@ export const SettingControl = ({ field, surface, value, onChange, disabled, isMo
           step={field.step ?? 1}
           value={String(value)}
           disabled={disabled}
-          size="sm"
+          size="lg"
           w="24"
           onChange={handleNumberChange}
         />

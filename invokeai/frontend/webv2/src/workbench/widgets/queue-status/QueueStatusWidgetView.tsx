@@ -28,14 +28,14 @@ export const QueueStatusWidgetView = ({ presentation }: WidgetViewProps) => {
   if (presentation === 'tooltip') {
     return (
       <Stack gap="2">
-        <Text fontSize="xs" fontWeight="700">
+        <Text fontSize="md" fontWeight="700">
           {t('widgets.labels.queueStatus')}
         </Text>
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {showPercent ? `${label} · ${percent}%` : label}
         </Text>
         {detail ? (
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {detail}
           </Text>
         ) : null}

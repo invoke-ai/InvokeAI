@@ -81,7 +81,7 @@ const RowAction = ({
       aria-label={label}
       colorPalette={tone === 'danger' ? 'danger' : undefined}
       disabled={disabled}
-      size="2xs"
+      size="sm"
       variant="ghost"
       onClick={onClick}
     >
@@ -120,33 +120,33 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
         <Stack gap="0" minW="0">
           <MiddleTruncate
             color={status === 'installed' ? 'fg.muted' : 'fg'}
-            fontSize="xs"
+            fontSize="md"
             fontWeight="600"
             lineHeight="short"
             text={displayName}
           />
           {sourceLabel !== displayName ? (
-            <MiddleTruncate color="fg.muted" fontFamily="mono" fontSize="2xs" text={sourceLabel} />
+            <MiddleTruncate color="fg.muted" fontFamily="mono" fontSize="xs" text={sourceLabel} />
           ) : null}
           {status === 'failed' && job.error ? (
             <HStack align="baseline" flexWrap="wrap" gap="1.5" pt="0.5">
               {job.error_reason ? (
-                <Badge colorPalette="red" fontFamily="mono" size="sm" variant="surface">
+                <Badge colorPalette="red" fontFamily="mono" size="lg" variant="surface">
                   {job.error_reason}
                 </Badge>
               ) : null}
-              <Text color="fg" fontSize="2xs" lineClamp={2} overflowWrap="anywhere">
+              <Text color="fg" fontSize="xs" lineClamp={2} overflowWrap="anywhere">
                 {job.error}
               </Text>
             </HStack>
           ) : null}
           {status === 'unauthorized' ? (
             <HStack align="baseline" flexWrap="wrap" gap="1.5" pt="0.5">
-              <Text color="fg" fontSize="2xs">
+              <Text color="fg" fontSize="xs">
                 {t(isHuggingFaceSource(job) ? 'models.gatedRepoMessage' : 'models.accessTokenRequiredMessage')}
               </Text>
               <Button
-                fontSize="2xs"
+                fontSize="xs"
                 h="auto"
                 minW="0"
                 p="0"
@@ -166,8 +166,8 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
                 color={part.resumeRequired ? 'fg.warning' : 'fg.error'}
                 flexShrink={0}
               />
-              <MiddleTruncate color="fg" fontFamily="mono" fontSize="2xs" minW="0" text={part.fileName} />
-              <Text color="fg.muted" fontSize="2xs" whiteSpace="nowrap">
+              <MiddleTruncate color="fg" fontFamily="mono" fontSize="xs" minW="0" text={part.fileName} />
+              <Text color="fg.muted" fontSize="xs" whiteSpace="nowrap">
                 {part.message ?? (part.resumeRequired ? t('models.resumeRequired') : t('common.failed'))}
               </Text>
               {part.url ? (
@@ -191,10 +191,10 @@ export const InstallJobRow = ({ row }: { row: InstallQueueRow }) => {
         <HStack gap="1.5">
           <Badge
             colorPalette={presentation.palette}
-            fontSize="2xs"
+            fontSize="xs"
             fontWeight="700"
             letterSpacing="wider"
-            size="sm"
+            size="lg"
             textTransform="uppercase"
             variant="surface"
           >

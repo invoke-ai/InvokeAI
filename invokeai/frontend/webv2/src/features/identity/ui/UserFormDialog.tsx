@@ -221,7 +221,7 @@ const UserForm = ({
                   value={form.values.password}
                   onChange={handlePasswordChange}
                 />
-                <Button loading={isGenerating} size="xs" variant="outline" onClick={handleGeneratedPasswordClick}>
+                <Button loading={isGenerating} variant="outline" onClick={handleGeneratedPasswordClick}>
                   <WandSparklesIcon />
                   {t('users.generate')}
                 </Button>
@@ -239,10 +239,10 @@ const UserForm = ({
             onCheckedChange={handleAdminCheckedChange}
           >
             <Stack gap="0.5">
-              <Switch.Label color="fg" fontSize="sm" fontWeight="500" m="0">
+              <Switch.Label color="fg" fontSize="lg" fontWeight="500" m="0">
                 {t('users.administrator')}
               </Switch.Label>
-              <Text color="fg.subtle" fontSize="xs">
+              <Text color="fg.subtle" fontSize="md">
                 {isSelf ? t('users.cannotChangeSelfRole') : t('users.administratorHelp')}
               </Text>
             </Stack>
@@ -254,10 +254,10 @@ const UserForm = ({
         </Stack>
       </Dialog.Body>
       <Dialog.Footer>
-        <Button size="xs" variant="ghost" onClick={onClose}>
+        <Button variant="ghost" onClick={onClose}>
           {t('common.cancel')}
         </Button>
-        <Button loading={form.isSubmitting} size="xs" variant="solid" onClick={handleSubmitClick}>
+        <Button loading={form.isSubmitting} variant="solid" onClick={handleSubmitClick}>
           {isCreate ? t('users.createUser') : t('users.saveChanges')}
         </Button>
       </Dialog.Footer>

@@ -122,7 +122,7 @@ const LayerPaneBlock = ({
           aria-expanded={!isCollapsed}
           aria-label={collapseLabel}
           color="fg.muted"
-          size="2xs"
+          size="sm"
           variant="ghost"
           onClick={toggle}
         >

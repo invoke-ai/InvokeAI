@@ -66,7 +66,7 @@ const NameSection = ({ project }: { project: ProjectPanelViewModel }) => {
       <Input
         defaultValue={project.name}
         key={`${project.id}:${project.name}`}
-        size="sm"
+        size="lg"
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
       />
@@ -127,11 +127,11 @@ const DetailsSection = ({ project }: { project: ProjectPanelViewModel }) => {
       <Panel gap="1.5" p="2.5">
         <DetailRow label={t('common.id')}>
           <HStack gap="1" minW="0">
-            <MiddleTruncate fontFamily="mono" fontSize="2xs" text={project.id} />
+            <MiddleTruncate fontFamily="mono" fontSize="xs" text={project.id} />
             <IconButton
               aria-label={t('widgets.project.copyId')}
               color="fg.muted"
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={handleCopyId}
             >
@@ -158,11 +158,11 @@ const DetailsSection = ({ project }: { project: ProjectPanelViewModel }) => {
 
 const DetailRow = ({ children, label }: { children: ReactNode; label: string }) => (
   <HStack gap="3" justify="space-between" minH="5">
-    <Text color="fg.subtle" flexShrink={0} fontSize="2xs">
+    <Text color="fg.subtle" flexShrink={0} fontSize="xs">
       {label}
     </Text>
     {typeof children === 'string' || typeof children === 'number' ? (
-      <Text fontSize="2xs" textAlign="end">
+      <Text fontSize="xs" textAlign="end">
         {children}
       </Text>
     ) : (

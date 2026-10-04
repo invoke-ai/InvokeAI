@@ -1,4 +1,5 @@
 import { requestQueueItemReveal } from '@features/queue/reveal';
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { firstPartyHotkeyCatalog } from '@workbench/hotkeys/catalog';
 import { formatHotkeyForPlatform, MOD_KEY_LABEL } from '@workbench/hotkeys/keys';
@@ -15,17 +16,33 @@ export const loadWorkbenchCommandPaletteDialog = () => import('./WorkbenchComman
 
 const LazyWorkbenchCommandPaletteDialog = lazy(loadWorkbenchCommandPaletteDialog);
 
-/** Lightweight route host; the palette implementation is loaded only while open. */
+/** Lightweight route host; the palette implementation is loaded only while open or animating closed. */
 export const WorkbenchCommandPalette = () => {
   const isOpen = useIsCommandPaletteOpen();
+  const dialog = useExitPresence(isOpen);
 
-  return isOpen ? <OpenWorkbenchCommandPalette /> : null;
+  return dialog.isMounted ? (
+    <>
+      {isOpen ? <CommandPaletteModalLayer /> : null}
+      <MountedWorkbenchCommandPalette key={dialog.generation} isOpen={isOpen} onExitComplete={dialog.release} />
+    </>
+  ) : null;
 };
 
-const OpenWorkbenchCommandPalette = () => {
-  const preferences = useWorkbenchPreferences();
-
+const CommandPaletteModalLayer = () => {
   useMountEffect(() => registerHotkeyModalLayer('command-palette'));
+
+  return null;
+};
+
+const MountedWorkbenchCommandPalette = ({
+  isOpen,
+  onExitComplete,
+}: {
+  isOpen: boolean;
+  onExitComplete: () => void;
+}) => {
+  const preferences = useWorkbenchPreferences();
 
   return (
     <Suspense fallback={null}>
@@ -33,12 +50,14 @@ const OpenWorkbenchCommandPalette = () => {
         catalog={firstPartyHotkeyCatalog}
         formatHotkey={formatHotkeyForPlatform}
         getWidgetsForRegion={getWidgetsForRegion}
+        isOpen={isOpen}
         modifierKeyLabel={MOD_KEY_LABEL}
         openWidgetPlacement={openWidgetPlacement}
         preferences={preferences}
         requestQueueItemReveal={requestQueueItemReveal}
         settingsEntryDeps={SETTINGS_ENTRY_DEPS}
         onClose={closeCommandPalette}
+        onExitComplete={onExitComplete}
       />
     </Suspense>
   );

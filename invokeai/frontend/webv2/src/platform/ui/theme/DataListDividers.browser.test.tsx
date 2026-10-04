@@ -24,7 +24,7 @@ const renderDataList = async (): Promise<{ reference: HTMLElement; rows: HTMLEle
     root?.render(
       <ChakraProvider value={system}>
         <Box borderColor="border.subtle" borderWidth="1px" data-testid="reference" />
-        <DataList.Root gap="1.5" orientation="horizontal" size="sm">
+        <DataList.Root gap="1.5" orientation="horizontal">
           {['Seed', 'Steps', 'Prompt'].map((label) => (
             <DataList.Item key={label} data-testid="row">
               <DataList.ItemLabel>{label}</DataList.ItemLabel>

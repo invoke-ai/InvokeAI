@@ -153,12 +153,12 @@ export const ProjectsBrowser = ({
     <Scrollable flex="1" h="full" label={t('launchpad.sections.projects')} minH="0" viewportRef={scrollRef}>
       <Box css={MEASURE_SX} pb="8" ref={measureRef}>
         {status === 'error' ? (
-          <Alert.Root borderRadius="md" mb="4" size="sm" status="error">
+          <Alert.Root borderRadius="md" mb="4" status="error">
             <Alert.Indicator />
-            <Alert.Title flex="1" fontSize="xs">
+            <Alert.Title flex="1" fontSize="md">
               {error ?? t('projects.failedToLoad')}
             </Alert.Title>
-            <Button size="2xs" variant="outline" onClick={handleRetry}>
+            <Button size="sm" variant="outline" onClick={handleRetry}>
               {t('common.retry')}
             </Button>
           </Alert.Root>
@@ -223,11 +223,9 @@ const VirtualProjectsRow = ({
   if (row.kind === 'header') {
     return (
       <Flex align="baseline" css={ABSOLUTE_ROW_SX} gap="2" pb="2" pt="3" transform={transform}>
-        <Text fontSize="xs" fontWeight="700">
-          {t(GROUP_LABEL_KEY[row.group])}
-        </Text>
+        <Text fontWeight="700">{t(GROUP_LABEL_KEY[row.group])}</Text>
         {/* `fg.subtle` only reaches 4.11:1 at this size — `fg.muted` clears 4.5:1. */}
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {row.count}
         </Text>
       </Flex>
@@ -278,7 +276,7 @@ const ProjectsEmptyState = ({
         icon={NO_MATCHES_ICON}
         title={t('projects.noSearchMatches', { search: searchTerm.trim() })}
       >
-        <Button size="xs" variant="outline" onClick={onClearSearch}>
+        <Button variant="outline" onClick={onClearSearch}>
           {t('common.clearSearch')}
         </Button>
       </EmptyState>

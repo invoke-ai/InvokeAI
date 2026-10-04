@@ -37,7 +37,7 @@ export const UsersManagementPanel = ({
   if (!session.multiuserEnabled || session.user?.is_admin !== true) {
     return (
       <Center h="full" w="full">
-        <Text color="fg.subtle" fontSize="sm">
+        <Text color="fg.subtle" fontSize="lg">
           {t('users.adminOnly')}
         </Text>
       </Center>
@@ -116,14 +116,14 @@ const UsersDirectory = ({
         <Stack gap="4" w="full">
           <HStack align="flex-start" justify="space-between">
             <Stack gap="0.5">
-              <Text fontSize="md" fontWeight="700">
+              <Text fontSize="xl" fontWeight="700">
                 {t('users.title')}
               </Text>
-              <Text color="fg.subtle" fontSize="xs">
+              <Text color="fg.subtle" fontSize="md">
                 {users ? t('users.accountCount', { count: users.length }) : t('users.description')}
               </Text>
             </Stack>
-            <Button size="xs" variant="solid" onClick={openCreateForm}>
+            <Button variant="solid" onClick={openCreateForm}>
               <UserPlusIcon />
               {t('users.addUser')}
             </Button>
@@ -133,19 +133,19 @@ const UsersDirectory = ({
               <Center minH="40">
                 {loadError ? (
                   <Stack align="center" gap="2" p="4">
-                    <Text color="fg.error" fontSize="xs" textAlign="center">
+                    <Text color="fg.error" fontSize="md" textAlign="center">
                       {loadError}
                     </Text>
-                    <Button size="xs" variant="outline" onClick={retryLoad}>
+                    <Button variant="outline" onClick={retryLoad}>
                       {t('common.retry')}
                     </Button>
                   </Stack>
                 ) : (
-                  <Spinner color="fg.muted" size="sm" />
+                  <Spinner color="fg.muted" size="lg" />
                 )}
               </Center>
             ) : (
-              <Table.Root minW="42rem" size="sm">
+              <Table.Root minW="42rem">
                 <Table.Header>
                   <Table.Row bg="bg.muted">
                     <Table.ColumnHeader borderColor="border.subtle" color="fg.muted" ps="4">
@@ -237,33 +237,33 @@ const UserRow = ({
     <Table.Row bg="transparent" _hover={ROW_HOVER_STYLES}>
       <Table.Cell borderColor="border.subtle" ps="4">
         <HStack gap="2.5">
-          <Avatar.Root bg="accent.subtle" color="fg" size="2xs">
-            <Avatar.Fallback fontSize="2xs" name={getUserLabel(user)} />
+          <Avatar.Root bg="accent.subtle" color="fg" size="sm">
+            <Avatar.Fallback fontSize="xs" name={getUserLabel(user)} />
           </Avatar.Root>
           <Stack gap="0">
             <HStack gap="1.5">
-              <Text fontSize="xs" fontWeight="600">
+              <Text fontSize="md" fontWeight="600">
                 {getUserLabel(user)}
               </Text>
               {isSelf ? (
-                <Badge fontSize="2xs" variant="surface">
+                <Badge fontSize="xs" variant="surface">
                   {t('users.you')}
                 </Badge>
               ) : null}
             </HStack>
-            <Text color="fg.muted" fontSize="2xs">
+            <Text color="fg.muted" fontSize="xs">
               {user.email}
             </Text>
           </Stack>
         </HStack>
       </Table.Cell>
       <Table.Cell borderColor="border.subtle">
-        <Badge colorPalette={user.is_admin ? 'purple' : 'gray'} fontSize="2xs" variant="surface">
+        <Badge colorPalette={user.is_admin ? 'purple' : 'gray'} fontSize="xs" variant="surface">
           {user.is_admin ? t('users.admin') : t('users.user')}
         </Badge>
       </Table.Cell>
       <Table.Cell borderColor="border.subtle">
-        <Text color="fg.muted" fontSize="2xs">
+        <Text color="fg.muted" fontSize="xs">
           {formatLastSignIn(user.last_login_at, t('users.never'))}
         </Text>
       </Table.Cell>
@@ -273,7 +273,6 @@ const UserRow = ({
             aria-label={t('users.activeLabel', { name: getUserLabel(user) })}
             checked={user.is_active}
             disabled={isSelf}
-            size="sm"
             onCheckedChange={handleSetActive}
           >
             <Switch.HiddenInput />
@@ -290,7 +289,7 @@ const UserRow = ({
               <IconButton
                 aria-label={t('users.manageIntermediatesNamed', { name: getUserLabel(user) })}
                 color="fg.muted"
-                size="2xs"
+                size="sm"
                 variant="ghost"
                 onClick={handleIntermediates}
               >
@@ -301,7 +300,7 @@ const UserRow = ({
           <IconButton
             aria-label={t('users.editUserNamed', { name: getUserLabel(user) })}
             color="fg.muted"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={handleEdit}
           >
@@ -312,7 +311,7 @@ const UserRow = ({
               aria-label={t('users.deleteUserNamed', { name: getUserLabel(user) })}
               color="fg.muted"
               disabled={isSelf}
-              size="2xs"
+              size="sm"
               variant="ghost"
               _hover={DELETE_BUTTON_HOVER_STYLES}
               onClick={handleDelete}

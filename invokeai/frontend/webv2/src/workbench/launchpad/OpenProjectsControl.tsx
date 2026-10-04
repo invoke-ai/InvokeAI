@@ -122,7 +122,7 @@ const OpenProjectEntry = ({
         <Icon as={FolderOpenIcon} boxSize="3.5" flexShrink={0} />
         <MiddleTruncate flex="1" minW="0" text={name ?? id} textAlign="start" />
         {isActive ? (
-          <Badge flexShrink={0} size="xs" variant="subtle">
+          <Badge flexShrink={0} variant="subtle">
             {t('launchpad.openProjects.current')}
           </Badge>
         ) : null}

@@ -97,7 +97,7 @@ export const SettingsEntryView = ({
   const reveal = useCallback(() => onReveal?.(section.id, entry.field.id), [onReveal, section.id, entry.field.id]);
   const loading = useMemo(
     () => (
-      <Text role="status" fontSize="xs" color="fg.muted">
+      <Text role="status" fontSize="md" color="fg.muted">
         {t('common.loading')}
       </Text>
     ),
@@ -115,7 +115,7 @@ export const SettingsEntryView = ({
           pt={surface === 'quick' ? '2' : '5'}
           pb="1"
           fontWeight="600"
-          fontSize={surface === 'quick' ? '2xs' : 'xs'}
+          fontSize={surface === 'quick' ? 'xs' : 'md'}
           color="fg.muted"
         >
           {resolveSettingsText(entry.field.group, t)}
@@ -130,20 +130,20 @@ export const SettingsEntryView = ({
       >
         {unavailable || isDestination ? (
           <Stack gap="2">
-            <Text fontSize="sm" fontWeight="500">
+            <Text fontSize="lg" fontWeight="500">
               {resolveSettingsText(entry.field.label, t)}
             </Text>
             {entry.field.description ? (
-              <Text fontSize="xs" color="fg.muted">
+              <Text fontSize="md" color="fg.muted">
                 {resolveSettingsText(entry.field.description, t)}
               </Text>
             ) : null}
             {unavailable ? (
-              <Text fontSize="xs" color="fg.muted">
+              <Text fontSize="md" color="fg.muted">
                 {t(scope === 'instance' ? 'settingsDialog.instanceUnavailable' : 'settingsDialog.projectUnavailable')}
               </Text>
             ) : (
-              <Button size="xs" variant="outline" alignSelf="start" onClick={reveal}>
+              <Button variant="outline" alignSelf="start" onClick={reveal}>
                 {t('settingsDialog.openEditor')}
               </Button>
             )}
@@ -174,7 +174,7 @@ export const SettingsEntryView = ({
           </Box>
         ) : null}
         {search && !isDestination ? (
-          <Button size="2xs" variant="ghost" mt="1" onClick={reveal}>
+          <Button size="sm" variant="ghost" mt="1" onClick={reveal}>
             {t('settingsDialog.showInSection')}
           </Button>
         ) : null}

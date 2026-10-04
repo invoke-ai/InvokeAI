@@ -73,6 +73,7 @@ export const SetupScreen = () => {
             autoComplete="email"
             autoFocus
             placeholder="admin@example.com"
+            size="lg"
             value={form.values.email}
             onChange={handleEmailChange}
           />
@@ -81,6 +82,7 @@ export const SetupScreen = () => {
           <Input
             autoComplete="name"
             placeholder={t('auth.administrator')}
+            size="lg"
             value={form.values.displayName}
             onChange={handleDisplayNameChange}
           />
@@ -94,6 +96,7 @@ export const SetupScreen = () => {
             <PasswordInput
               aria-invalid={form.errors.password ? true : undefined}
               autoComplete="new-password"
+              size="lg"
               value={form.values.password}
               onChange={handlePasswordChange}
             />
@@ -104,11 +107,12 @@ export const SetupScreen = () => {
           <PasswordInput
             aria-invalid={form.errors.confirmPassword ? true : undefined}
             autoComplete="new-password"
+            size="lg"
             value={form.values.confirmPassword}
             onChange={handleConfirmPasswordChange}
           />
         </Field>
-        <Button loading={form.isSubmitting} size="sm" type="submit" variant="solid">
+        <Button loading={form.isSubmitting} size="lg" type="submit" variant="solid">
           {t('auth.createAdminAccount')}
         </Button>
       </chakra.form>

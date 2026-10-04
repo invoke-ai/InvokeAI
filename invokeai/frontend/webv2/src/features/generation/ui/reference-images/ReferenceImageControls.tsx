@@ -56,10 +56,10 @@ const isFluxReduxImageInfluence = (value: unknown): value is FluxReduxImageInflu
 
 const renderStyleVariantItem = (option: StyleVariantOption) => (
   <Stack as="span" gap="0.5" py="0.5">
-    <Text as="span" fontSize="xs">
+    <Text as="span" fontSize="md">
       {option.label}
     </Text>
-    <Text as="span" color="fg.muted" fontSize="2xs" lineHeight="short">
+    <Text as="span" color="fg.muted" fontSize="xs" lineHeight="short">
       {option.description}
     </Text>
   </Stack>
@@ -91,7 +91,7 @@ export const FieldHeader = ({
   label: string;
 }) => {
   const labelText = (
-    <Text color="fg.muted" fontSize="2xs" fontWeight="medium">
+    <Text color="fg.muted" fontSize="xs" fontWeight="medium">
       {label}
     </Text>
   );
@@ -207,11 +207,11 @@ export const IPAdapterControls = ({
     <Stack gap="2">
       <Stack gap="1">
         <FieldHeader label={t('widgets.generate.mode')} />
-        <SegmentGroup.Root disabled={disabled} size="xs" value={mode} w="full" onValueChange={handleModeChange}>
+        <SegmentGroup.Root disabled={disabled} value={mode} w="full" onValueChange={handleModeChange}>
           <SegmentGroup.Indicator />
           {MODE_SEGMENTS.map((segment) => (
             <SegmentGroup.Item key={segment.value} flex="1" justifyContent="center" value={segment.value}>
-              <SegmentGroup.ItemText fontSize="2xs">{t(segment.labelKey)}</SegmentGroup.ItemText>
+              <SegmentGroup.ItemText fontSize="xs">{t(segment.labelKey)}</SegmentGroup.ItemText>
               <SegmentGroup.ItemHiddenInput />
             </SegmentGroup.Item>
           ))}
@@ -238,7 +238,7 @@ export const IPAdapterControls = ({
           alignItems="center"
           color="fg.muted"
           display="flex"
-          fontSize="2xs"
+          fontSize="xs"
           fontWeight="medium"
           gap="1"
           _hover={ADVANCED_TRIGGER_HOVER_STYLES}
@@ -262,7 +262,6 @@ export const IPAdapterControls = ({
                   deselectable={false}
                   disabled={disabled}
                   renderItem={renderStyleVariantItem}
-                  size="xs"
                   value={styleVariantValue}
                   w="full"
                   onValueChange={handleStyleVariantChange}
@@ -271,7 +270,7 @@ export const IPAdapterControls = ({
             ) : null}
             <Stack gap="1">
               <FieldHeader label={t('widgets.generate.activeSteps')}>
-                <Text color="fg.subtle" fontFamily="mono" fontSize="2xs">
+                <Text color="fg.subtle" fontFamily="mono" fontSize="xs">
                   {formatPct(beginEndStepPct[0])} – {formatPct(beginEndStepPct[1])}
                 </Text>
               </FieldHeader>
@@ -282,7 +281,6 @@ export const IPAdapterControls = ({
                 marks={BEGIN_END_MARKS}
                 max={1}
                 min={0}
-                size="sm"
                 step={0.05}
                 value={beginEndStepPct}
                 onValueChange={handleStepsChange}
@@ -332,7 +330,6 @@ export const ClipVisionSelect = ({
       deselectable={false}
       disabled={disabled}
       flexShrink="0"
-      size="xs"
       value={selectValue}
       w="24"
       onValueChange={handleValueChange}
@@ -374,7 +371,6 @@ export const FluxReduxControls = <T extends { imageInfluence: FluxReduxImageInfl
         collection={FLUX_REDUX_IMAGE_INFLUENCE_COLLECTION}
         deselectable={false}
         disabled={disabled}
-        size="xs"
         value={imageInfluenceValue}
         w="full"
         onValueChange={handleValueChange}

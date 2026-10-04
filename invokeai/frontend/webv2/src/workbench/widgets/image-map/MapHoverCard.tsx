@@ -36,7 +36,7 @@ export interface HoverCluster {
 
 /** "Label: a, b, c" with the first (primary) tag emphasized. */
 const HoverTagsRow = ({ prefix, tags }: { prefix: string; tags: string[] }) => (
-  <Text color="fg.muted" fontSize="xs">
+  <Text color="fg.muted" fontSize="md">
     <chakra.span color="fg.subtle">{prefix}</chakra.span>
     {tags.map((tag, index) => (
       <chakra.span key={tag} fontWeight={index === 0 ? '600' : undefined}>
@@ -145,7 +145,7 @@ export const MapHoverCard = ({
       />
       <HStack gap="1.5">
         <Box bg={clusterColor} boxSize="2" flexShrink={0} rounded="full" />
-        <Text fontSize="xs" fontWeight="600">
+        <Text fontSize="md" fontWeight="600">
           {hoverCluster.cluster < 0
             ? 'Unclustered'
             : `Cluster ${hoverCluster.cluster} · ${hoverCluster.clusterSize} items`}
@@ -153,12 +153,12 @@ export const MapHoverCard = ({
       </HStack>
       <HStack alignItems="flex-start" gap="1.5">
         {videoDuration !== null ? (
-          <Badge display="flex" flexShrink={0} fontVariantNumeric="tabular-nums" gap="1" size="xs" variant="solid">
+          <Badge display="flex" flexShrink={0} fontVariantNumeric="tabular-nums" gap="1" variant="solid">
             <PlayIcon aria-hidden="true" fill="currentColor" />
             {videoDuration}
           </Badge>
         ) : null}
-        <Text color="fg.muted" fontSize="xs" wordBreak="break-all">
+        <Text color="fg.muted" fontSize="md" wordBreak="break-all">
           {item.name}
         </Text>
       </HStack>

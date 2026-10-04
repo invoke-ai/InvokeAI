@@ -235,7 +235,7 @@ const AdjustmentEntryEditor = ({
       return <LevelsEditor entry={entry} onCommit={handleLevelsCommit} onLive={handleLevelsLive} />;
     case 'invert':
       return (
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {t('widgets.layers.adjustments.invertHint')}
         </Text>
       );
@@ -318,7 +318,6 @@ const ScalarSlider = ({
         formatValue={formatValue}
         max={max}
         min={min}
-        size="sm"
         step={step}
         value={sliderValue}
         withThumbTooltip
@@ -441,7 +440,6 @@ const LevelsEditor = ({
           aria-label={t('widgets.layers.adjustments.channel')}
           collection={channelCollection}
           positioning={SELECT_POSITIONING}
-          size="xs"
           value={channelValue}
           valueText={t(`widgets.layers.adjustments.channels.${entry.channel ?? 'rgb'}`)}
           onValueChange={handleChannelChange}
@@ -453,7 +451,6 @@ const LevelsEditor = ({
           max={255}
           min={0}
           minStepsBetweenThumbs={1}
-          size="sm"
           step={1}
           value={inputValue}
           withThumbTooltip
@@ -467,7 +464,6 @@ const LevelsEditor = ({
           formatValue={formatGamma}
           max={4}
           min={0.1}
-          size="sm"
           step={0.01}
           value={gammaValue}
           withThumbTooltip
@@ -480,7 +476,6 @@ const LevelsEditor = ({
           aria-label={outputAria}
           max={255}
           min={0}
-          size="sm"
           step={1}
           value={outputValue}
           withThumbTooltip
@@ -657,14 +652,13 @@ const CurvesEditor = ({
   return (
     <Stack css={CURVE_EDITOR_CSS} gap="2">
       <HStack justify="space-between">
-        <Text fontSize="xs" fontWeight="medium">
+        <Text fontSize="md" fontWeight="medium">
           {t('widgets.layers.adjustments.curves')}
         </Text>
         <Select
           aria-label={t('widgets.layers.adjustments.channel')}
           collection={channelCollection}
           positioning={SELECT_POSITIONING}
-          size="xs"
           value={channelValue}
           valueText={t(`widgets.layers.adjustments.channels.${channel}`)}
           w="6rem"
@@ -756,7 +750,7 @@ const CurvesEditor = ({
           );
         })}
       </CurveSvg>
-      <Text color="fg.muted" fontSize="2xs">
+      <Text color="fg.muted" fontSize="xs">
         {t('widgets.layers.adjustments.curvesHint')}
       </Text>
     </Stack>

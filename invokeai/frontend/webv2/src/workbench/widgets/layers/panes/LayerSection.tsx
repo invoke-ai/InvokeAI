@@ -37,7 +37,7 @@ type LayerSectionEngine = Pick<
 // Reference equality is exact: the document index hands back the same node
 // object until the node itself changes, and the section renders the whole
 // node, so a narrower comparison would serve stale views of it.
-export const selectSelectedNode = (project: {
+const selectSelectedNode = (project: {
   canvas: { document: Pick<CanvasDocumentContractV3, 'stacks' | 'selectedLayerId'> };
 }): CanvasNodeContract | null => getDocumentNode(project.canvas.document, project.canvas.document.selectedLayerId);
 
@@ -204,13 +204,13 @@ const RasterLayerSettings = ({
 
   return (
     <Stack gap="2">
-      <Switch.Root checked={isLocked} size="sm" onCheckedChange={handleTransparencyLock}>
+      <Switch.Root checked={isLocked} onCheckedChange={handleTransparencyLock}>
         <Switch.HiddenInput />
         <Switch.Control>
           <Switch.Thumb />
         </Switch.Control>
         <Switch.Label>
-          <Text fontSize="xs">{t('widgets.layers.adjustments.transparencyLock')}</Text>
+          <Text fontSize="md">{t('widgets.layers.adjustments.transparencyLock')}</Text>
         </Switch.Label>
       </Switch.Root>
       <RasterLayerFilterSection engine={engine} layer={layer} onOperationStarted={noop} />

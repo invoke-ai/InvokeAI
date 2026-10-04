@@ -32,7 +32,6 @@ export const InstallProgressBar = ({
       colorPalette={status === 'paused' ? 'gray' : 'accent'}
       max={1}
       minW="0"
-      size="xs"
       value={value}
       w="full"
     >
@@ -127,7 +126,7 @@ export const InstallProgressCell = ({
       {BAR_STATUSES.has(status) ? (
         <InstallProgressBar label={t('models.downloadProgress')} progress={progress} status={status} />
       ) : null}
-      <Text color="fg.muted" fontFamily="mono" fontSize="2xs" lineHeight="short" overflowWrap="anywhere">
+      <Text color="fg.muted" fontFamily="mono" fontSize="xs" lineHeight="short" overflowWrap="anywhere">
         {caption}
       </Text>
     </Stack>

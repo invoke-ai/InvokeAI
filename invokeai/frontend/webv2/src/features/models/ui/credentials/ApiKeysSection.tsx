@@ -33,7 +33,7 @@ export const ApiKeysSection = () => {
 
   return (
     <Stack gap="3">
-      <Text color="fg.subtle" fontSize="2xs">
+      <Text color="fg.subtle" fontSize="xs">
         {t('models.apiKeysDescription')}
       </Text>
       <Grid gap="2.5" templateColumns="repeat(auto-fill, minmax(19rem, 1fr))">
@@ -99,7 +99,6 @@ const ApiKeyCard = ({
           aria-label={t('models.apiKeyFor', { title })}
           disabled={isLoading}
           placeholder={placeholder}
-          size="xs"
           type="password"
           value={draft}
           onChange={(event) => setDraft(event.currentTarget.value)}
@@ -113,7 +112,6 @@ const ApiKeyCard = ({
         <Button
           disabled={draft.trim().length === 0 || isLoading}
           loading={isBusy && draft.trim().length > 0}
-          size="xs"
           variant="solid"
           onClick={handleSave}
         >
@@ -122,7 +120,7 @@ const ApiKeyCard = ({
         {onClear ? (
           <Button
             disabled={isBusy || isLoading}
-            size="sm"
+            size="lg"
             variant="ghost"
             onClick={() =>
               void run(async (owner) => {

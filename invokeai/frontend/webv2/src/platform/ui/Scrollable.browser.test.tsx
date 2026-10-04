@@ -121,7 +121,7 @@ describe('Scrollable', () => {
                 <PopoverContent w="22rem">
                   <Popover.Body p="2.5">
                     <Scrollable h="14rem" label="preview">
-                      <Text fontSize="xs">one short row</Text>
+                      <Text fontSize="md">one short row</Text>
                     </Scrollable>
                   </Popover.Body>
                 </PopoverContent>

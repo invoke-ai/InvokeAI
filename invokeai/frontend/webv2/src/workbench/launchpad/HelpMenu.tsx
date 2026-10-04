@@ -9,7 +9,7 @@ import { BookOpenTextIcon, ChevronRightIcon, ClapperboardIcon, CircleQuestionMar
 import { useTranslation } from 'react-i18next';
 
 const MENU_POSITIONING = { placement: 'right-end' } as const;
-const GROUP_LABEL_PROPS = { color: 'fg.subtle', fontSize: '2xs', textTransform: 'uppercase' } as const;
+const GROUP_LABEL_PROPS = { color: 'fg.subtle', fontSize: 'xs', textTransform: 'uppercase' } as const;
 const TRIGGER_JUSTIFY = { justifyContent: 'space-between' } as const;
 
 interface HelpLink {
@@ -69,14 +69,7 @@ export const HelpMenu = () => {
   return (
     <Menu.Root positioning={MENU_POSITIONING}>
       <Menu.Trigger asChild>
-        <Button
-          aria-label={t('launchpad.help.label')}
-          color="fg.muted"
-          css={TRIGGER_JUSTIFY}
-          size="xs"
-          variant="ghost"
-          w="full"
-        >
+        <Button aria-label={t('launchpad.help.label')} color="fg.muted" css={TRIGGER_JUSTIFY} variant="ghost" w="full">
           <Icon as={CircleQuestionMarkIcon} boxSize="3.5" />
           <Text flex="1" textAlign="start" truncate>
             {t('launchpad.help.label')}
@@ -102,10 +95,10 @@ export const HelpMenu = () => {
             </Menu.ItemGroup>
             <Menu.Separator />
             <HStack justify="space-between" px="3" py="1.5">
-              <Text fontSize="2xs" fontWeight="700">
+              <Text fontSize="xs" fontWeight="700">
                 Invoke
               </Text>
-              <Text color="fg.subtle" fontSize="2xs">
+              <Text color="fg.subtle" fontSize="xs">
                 {t('launchpad.help.version', { version: APP_VERSION })}
               </Text>
             </HStack>

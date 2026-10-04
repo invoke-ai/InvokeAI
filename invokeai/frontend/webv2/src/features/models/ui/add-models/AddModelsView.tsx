@@ -318,7 +318,7 @@ export const AddModelsView = () => {
             <Input
               aria-label={t('models.searchOrAdd')}
               placeholder={t('models.searchOrAddPlaceholder')}
-              size="sm"
+              size="lg"
               value={query}
               onChange={(event) => setQuery(event.currentTarget.value)}
               onKeyDown={(event) => {
@@ -346,13 +346,13 @@ export const AddModelsView = () => {
           ) : null}
 
           {canScan && isScanning ? (
-            <Button size="sm" variant="outline" onClick={handleStopScan}>
-              <Spinner size="xs" />
+            <Button size="lg" variant="outline" onClick={handleStopScan}>
+              <Spinner />
               {t('models.stopScan')}
             </Button>
           ) : canScan ? (
             <Tooltip content={t('models.scanFolderTooltip')}>
-              <Button size="sm" variant="solid" onClick={() => void handleScan()}>
+              <Button size="lg" variant="solid" onClick={() => void handleScan()}>
                 <Icon as={FolderSearchIcon} boxSize="3.5" />
                 {t('models.scan')}
               </Button>
@@ -360,7 +360,7 @@ export const AddModelsView = () => {
           ) : null}
 
           {canPull ? (
-            <Button loading={isPulling} size="sm" variant="solid" onClick={() => void handlePull()}>
+            <Button loading={isPulling} size="lg" variant="solid" onClick={() => void handlePull()}>
               <Icon as={DownloadIcon} boxSize="3.5" />
               {t('models.pull')}
             </Button>
@@ -368,7 +368,7 @@ export const AddModelsView = () => {
         </HStack>
 
         {kind.isInstallable && !hasResults ? (
-          <HStack color="fg.subtle" fontSize="2xs" gap="2" px="3" wrap="wrap">
+          <HStack color="fg.subtle" fontSize="xs" gap="2" px="3" wrap="wrap">
             {canScan ? (
               <Text>
                 {t('models.press')}{' '}

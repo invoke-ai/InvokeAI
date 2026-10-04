@@ -24,11 +24,11 @@ export const ManagerColumn = ({
 }) => (
   <Flex borderEndWidth="1px" direction="column" flexShrink={0} h="full" minH="0" position="relative" w={COLUMN_WIDTH}>
     <HStack borderBottomWidth="1px" flexShrink={0} gap="2" minH={HEADER_MIN_HEIGHT} px="3">
-      <Text as="h2" fontSize="sm" fontWeight="700">
+      <Text as="h2" fontSize="lg" fontWeight="700">
         {title}
       </Text>
       {count === undefined ? null : (
-        <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums">
+        <Text color="fg.muted" fontVariantNumeric="tabular-nums">
           {count}
         </Text>
       )}
