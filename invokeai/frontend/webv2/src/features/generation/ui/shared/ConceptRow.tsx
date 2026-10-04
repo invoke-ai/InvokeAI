@@ -60,6 +60,50 @@ const findNeighbourRow = (from: Element | null): HTMLElement | null => {
   return null;
 };
 
+interface ListSlot {
+  container: Element;
+  next: Element | null;
+}
+
+/** Where the list sat at each ancestor level, so focus can be placed after the last row unmounts it. */
+const captureListSlots = (from: Element | null): ListSlot[] => {
+  const slots: ListSlot[] = [];
+
+  for (let node = from?.closest('[role="list"]'); node?.parentElement; node = node.parentElement) {
+    slots.push({ container: node.parentElement, next: node.nextElementSibling });
+  }
+
+  return slots;
+};
+
+const TABBABLE = 'a[href], button, input:not([type="hidden"]), select, textarea, [tabindex], [contenteditable="true"]';
+
+/**
+ * The control before the removed list, read after the removal renders: the concept picker, which may only now be
+ * enabled once the removed concept is no longer excluded from it.
+ */
+const findControlBeforeList = (slots: ListSlot[]): HTMLElement | null => {
+  for (const { container, next } of slots) {
+    if (!container.isConnected) {
+      continue;
+    }
+
+    const preceding = [...container.querySelectorAll<HTMLElement>(TABBABLE)].filter(
+      (element) =>
+        element.tabIndex >= 0 &&
+        !element.matches(':disabled') &&
+        element.getClientRects().length > 0 &&
+        (!next?.isConnected || Boolean(next.compareDocumentPosition(element) & Node.DOCUMENT_POSITION_PRECEDING))
+    );
+
+    if (preceding.length > 0) {
+      return preceding.at(-1) ?? null;
+    }
+  }
+
+  return null;
+};
+
 const ConceptProjectContext = createContext<string | undefined>(undefined);
 
 /** A short concept list shares its project lifetime with the rows' drafts and menus. */
@@ -134,11 +178,10 @@ const ConceptRowContent = ({
   const removeFrom = useCallback(
     (origin: Element | null) => {
       const neighbour = findNeighbourRow(origin);
+      const slots = neighbour ? [] : captureListSlots(origin);
 
       onRemove(key);
-      if (neighbour) {
-        requestAnimationFrame(() => neighbour.focus());
-      }
+      requestAnimationFrame(() => (neighbour ?? findControlBeforeList(slots))?.focus());
     },
     [key, onRemove]
   );

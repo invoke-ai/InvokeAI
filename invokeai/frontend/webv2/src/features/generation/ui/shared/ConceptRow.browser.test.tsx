@@ -3,7 +3,7 @@ import type { GenerateLora } from '@features/generation/core/types';
 import { ChakraProvider } from '@chakra-ui/react';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { system } from '@theme/system';
-import { act, Profiler } from 'react';
+import { act, Profiler, useCallback, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { userEvent } from 'vitest/browser';
@@ -301,5 +301,49 @@ describe('ConceptRow', () => {
 
     expect(onRemove).toHaveBeenCalledWith('lora-1');
     await expect.poll(() => document.activeElement).toBe(second);
+  });
+
+  it('hands focus to the picker the last row was excluded from once that row is removed', async () => {
+    // A picker whose only candidate is applied is disabled until the removal renders, and the control before the
+    // whole section must not take focus in its place.
+    const Section = () => {
+      const [loras, setLoras] = useState([makeLora()]);
+      const removeAll = useCallback(() => setLoras([]), []);
+
+      return (
+        <ChakraProvider value={system}>
+          <button type="button">Before the section</button>
+          <div>
+            <button disabled={loras.length > 0} type="button">
+              Add concept
+            </button>
+            {loras.length > 0 ? (
+              <ConceptList label="Concepts" projectId="project-1">
+                {loras.map((lora) => (
+                  <ConceptRow
+                    key={lora.model.key}
+                    models={MODELS}
+                    lora={lora}
+                    onRemove={removeAll}
+                    onUpdate={vi.fn()}
+                  />
+                ))}
+              </ConceptList>
+            ) : null}
+            <button type="button">After the list</button>
+          </div>
+        </ChakraProvider>
+      );
+    };
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => root?.render(<Section />));
+    const remove = host.querySelector<HTMLElement>('[aria-label="widgets.generate.removeConceptNamed"]');
+
+    remove!.focus();
+    await act(() => userEvent.click(remove!));
+
+    await expect.poll(() => document.activeElement?.textContent).toBe('Add concept');
   });
 });
