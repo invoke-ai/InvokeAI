@@ -1,6 +1,7 @@
 """Model installation class."""
 
 import ctypes
+import filecmp
 import gc
 import json
 import locale
@@ -536,10 +537,23 @@ class ModelInstallService(ModelInstallServiceBase):
                 move(src, dst)
                 return
             except PermissionError:
-                # shutil.move can leave a partial destination after a cross-filesystem copy. Its contents
-                # are unknown, so never retry or remove it.
                 if dst.exists() or dst.is_symlink():
-                    raise
+                    # On Windows, shutil.move may copy a file successfully and then fail unlinking its
+                    # source. Accept that state only when both regular files have identical contents.
+                    if (
+                        src.is_file()
+                        and not src.is_symlink()
+                        and dst.is_file()
+                        and not dst.is_symlink()
+                        and filecmp.cmp(src, dst, shallow=False)
+                    ):
+                        try:
+                            src.unlink()
+                            return
+                        except PermissionError:
+                            pass
+                    else:
+                        raise
                 gc.collect()
                 if tries_left == 1:
                     raise

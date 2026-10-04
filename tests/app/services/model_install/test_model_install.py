@@ -134,6 +134,36 @@ def test_install(
     assert model_record.source == embedding_file.as_posix()
 
 
+def test_file_install_retries_copy_then_unlink_permission_error(
+    mm2_installer: ModelInstallServiceBase,
+    embedding_file: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Windows can finish shutil.move's copy before failing to unlink its source."""
+    original_bytes = embedding_file.read_bytes()
+    real_move = shutil.move
+    calls = 0
+
+    def copy_then_fail_unlink(src: Path, dst: Path):
+        nonlocal calls
+        calls += 1
+        if calls == 1:
+            shutil.copy2(src, dst)
+            raise PermissionError("simulated Windows source unlink failure")
+        return real_move(src, dst)
+
+    monkeypatch.setattr(model_install_default, "move", copy_then_fail_unlink)
+
+    key = mm2_installer.install_path(embedding_file)
+
+    installed = mm2_installer.record_store.get_model(key)
+    installed_path = mm2_app_config.models_path / installed.path
+    assert installed_path.read_bytes() == original_bytes
+    assert not embedding_file.exists()
+    assert calls == 1
+
+
 def test_directory_install_retries_windows_move_failures(
     mm2_installer: ModelInstallServiceBase,
     diffusers_dir: Path,
