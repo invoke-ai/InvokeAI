@@ -95,8 +95,16 @@ def default(value: str | int | float | bool) -> TextClause:
 
 
 def table(name: str, *items: SchemaItem, **options: Any) -> Table:
-    """A table of the application schema, with the server table options."""
-    created = Table(name, metadata, *items, **{**_SERVER_TABLE_OPTIONS, **options})
+    """A table of the application schema."""
+    return define_table(metadata, name, *items, **options)
+
+
+def define_table(target: MetaData, name: str, *items: SchemaItem, **options: Any) -> Table:
+    """A table in `target` that follows the schema's rules: the server table options, and on MariaDB a CHECK
+    for each generated column that may not be NULL. Migrations create tables with it too (see
+    `PortableMigrationContext.create_table`), so that a migrated server database matches a created one.
+    """
+    created = Table(name, target, *items, **{**_SERVER_TABLE_OPTIONS, **options})
     for column in created.columns:
         if column.computed is not None and not column.nullable:
             # MariaDB rejects NOT NULL on a generated column (see `_create_mariadb_column`).

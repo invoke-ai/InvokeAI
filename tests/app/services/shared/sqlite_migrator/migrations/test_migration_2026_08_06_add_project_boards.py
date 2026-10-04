@@ -14,7 +14,7 @@ from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2026_08_0
     AddProjectBoardsMigrationCallback,
     build_migration,
 )
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SqliteMigrator
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import Migrator
 
 MIGRATION_ID = "2026_08_06_add_project_boards"
 
@@ -533,7 +533,7 @@ def test_it_runs_once_through_the_real_migrator_and_is_not_reapplied(tmp_path: P
 
     db = SqliteDatabase(db_path=tmp_path / "projects.db", logger=logger, verbose=False)
 
-    before = SqliteMigrator(db=db)
+    before = Migrator(db.database)
     for migration in all_migrations:
         if migration.id == MIGRATION_ID:
             break
@@ -548,7 +548,7 @@ def test_it_runs_once_through_the_real_migrator_and_is_not_reapplied(tmp_path: P
     )
     db._conn.commit()
 
-    full = SqliteMigrator(db=db)
+    full = Migrator(db.database)
     for migration in all_migrations:
         full.register_migration(migration)
     assert full.run_migrations() is True
@@ -562,7 +562,7 @@ def test_it_runs_once_through_the_real_migrator_and_is_not_reapplied(tmp_path: P
     assert cursor.fetchall() == []
 
     # Migration tracking, not idempotent DDL, is what stops a second run rebuilding the table again.
-    again = SqliteMigrator(db=db)
+    again = Migrator(db.database)
     for migration in all_migrations:
         again.register_migration(migration)
     assert again.run_migrations() is False
@@ -577,7 +577,7 @@ def test_it_runs_through_the_real_migrator_on_a_database_with_no_projects(tmp_pa
     all_migrations = build_migrations(context)
 
     db = SqliteDatabase(db_path=tmp_path / "projects.db", logger=logger, verbose=False)
-    migrator = SqliteMigrator(db=db)
+    migrator = Migrator(db.database)
     for migration in all_migrations:
         migrator.register_migration(migration)
     assert migrator.run_migrations() is True

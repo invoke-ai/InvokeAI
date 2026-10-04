@@ -62,6 +62,21 @@ Some DDL differs between backends:
 - `orphaned_projects_2026_08_06`, which holds projects a migration could not keep, always exists on a server. On SQLite it exists only where that migration had such projects.
 - A MariaDB server must be reached through a `mariadb+pymysql://` URL. The dialect the URL names decides the collations and column definitions of the tables, and a `mysql+` URL to MariaDB is refused.
 
+## Migrations
+
+Migrations live in `shared/sqlite_migrator/migrations/`. The `Migrator` runs the ones a database has not had, in dependency order, and records each in `applied_migrations`. How to write one: [Database Migrations](/development/guides/sqlite-migrations/).
+
+- The migrations up to `PORTABLE_CUTOVER` (in `migration_loader.py`) run on SQLite only and get a cursor. They stay as written: they are the upgrade path of existing SQLite databases. `test_portable_migrations.py` fails when another one appears.
+- Every later migration is a `PortableMigration`: it changes the schema with Alembic's operations (`context.op`), and creates tables with `context.create_table()`, which applies the schema's rules for each backend as the metadata does. The same commit makes the same change to the schema metadata.
+- A portable migration is idempotent. On SQLite it runs in a transaction that a failure rolls back, DDL included. On MySQL and MariaDB every DDL statement commits as it runs, so a migration that failed halfway runs again from the start and finds part of its work done; it checks what is there before it changes it (`inspect(context.conn)`). Its id is recorded once it succeeds.
+- On SQLite a portable migration runs with foreign keys off, so that rebuilding a table (Alembic's batch mode) does not cascade into the tables that reference it. The foreign keys are checked before it commits: a migration that deletes rows others reference deletes those itself.
+
+A MySQL or MariaDB database starts at the newest schema. On an empty database the migrator creates the tables from the metadata, and copies in the rows the migrations seed: the system account, the token secret and the system prompts. Those come from a reference database that it builds in memory with the migration chain, in a temporary root and with no settings from the environment or a config file, so the migrations' clean-ups of old files touch nothing real. The migrator's own records go in last. An interrupted creation therefore leaves a database the next start refuses, rather than one that looks complete; start again from an empty database.
+
+Only one process at a time migrates a server database: a lock of the server's (`GET_LOCK`), held for the whole run, makes the others wait. It is per server, so Galera clusters and other setups with several writing servers are not supported. The migrator makes no backups of a server database; they are the operator's. `test_portable_migrations.py` takes a server database as it was at the cutover (`server_schema_at_cutover/`) through every portable migration, and compares the result with a database created from the metadata.
+
+`copy.py` copies rows between databases, in foreign key order. The target computes generated columns itself. Generated ids continue after the highest one copied, or, from a SQLite source, after the highest one it ever issued.
+
 ## Transactions
 
 A call on `db.queries` runs in a transaction of its own:

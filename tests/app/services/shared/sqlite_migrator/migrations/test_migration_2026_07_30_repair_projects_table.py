@@ -10,7 +10,7 @@ from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2026_07_3
     RepairProjectsTableMigrationCallback,
     build_migration,
 )
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SqliteMigrator
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import Migrator
 
 
 def _table_exists(cursor: sqlite3.Cursor, name: str) -> bool:
@@ -69,7 +69,7 @@ def test_repairs_a_database_that_came_from_an_upstream_build(tmp_path: Path) -> 
     db = SqliteDatabase(db_path=tmp_path / "upstream.db", logger=logger, verbose=False)
 
     # 1. Bring the database to legacy version 32 using only the migrations at or below 32.
-    to_v32 = SqliteMigrator(db=db)
+    to_v32 = Migrator(db.database)
     for migration in all_migrations:
         if migration.to_version is not None and migration.to_version <= 32:
             to_v32.register_migration(migration)
@@ -85,7 +85,7 @@ def test_repairs_a_database_that_came_from_an_upstream_build(tmp_path: Path) -> 
     assert not _table_exists(cursor, "projects")
 
     # 3. Open it with the full fork migrator, as the app does on startup.
-    full = SqliteMigrator(db=db)
+    full = Migrator(db.database)
     for migration in all_migrations:
         full.register_migration(migration)
     full.run_migrations()

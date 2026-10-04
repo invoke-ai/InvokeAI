@@ -172,7 +172,8 @@ class Database:
 
     @property
     def engine(self) -> Engine:
-        """The SQLAlchemy engine, for instrumentation (event listeners) in tests and benchmarks.
+        """The SQLAlchemy engine, for instrumentation (event listeners) in tests and benchmarks, and for a
+        connection of its own outside any transaction, as the migrator's lock needs on a server.
 
         On SQLite, connecting through it raises: the one connection is held by this database. Use `begin()`.
         """

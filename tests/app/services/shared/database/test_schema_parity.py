@@ -15,7 +15,7 @@ from typing import Any, Optional
 import pytest
 from sqlalchemy import create_engine
 
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig
 from invokeai.app.services.shared.database.schema import metadata
 from invokeai.app.services.shared.sqlite_migrator.migrations.migration_2026_08_06_add_project_boards import (
     AddProjectBoardsMigrationCallback,
@@ -51,8 +51,8 @@ LEGACY_TRIGGERS = {
 
 @pytest.fixture(scope="module")
 def migrated(tmp_path_factory: pytest.TempPathFactory) -> Iterator[sqlite3.Connection]:
-    config = InvokeAIAppConfig(use_memory_db=True)
-    # Migrations clean up legacy files under the root; it must not be the developer's.
+    # Migrations clean up legacy files under the root; it must be this temporary one, whatever the environment says.
+    config = DefaultInvokeAIAppConfig(use_memory_db=True)
     config._root = tmp_path_factory.mktemp("root")
     db = create_mock_sqlite_database(config, InvokeAILogger.get_logger("test_schema_parity"))
     conn = db.database.sqlite.conn

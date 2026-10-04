@@ -4,7 +4,7 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.shared.sqlite_migrator.migration_loader import MigrationBuildContext, build_migrations
-from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import SqliteMigrator
+from invokeai.app.services.shared.sqlite_migrator.sqlite_migrator_impl import Migrator
 
 
 def init_db(config: InvokeAIAppConfig, logger: Logger, image_files: ImageFileStorageBase) -> SqliteDatabase:
@@ -17,13 +17,13 @@ def init_db(config: InvokeAIAppConfig, logger: Logger, image_files: ImageFileSto
 
     This function:
     - Instantiates a :class:`SqliteDatabase`
-    - Instantiates a :class:`SqliteMigrator` and registers all migrations
+    - Instantiates a :class:`Migrator` and registers all migrations
     - Runs all migrations
     """
     db_path = None if config.use_memory_db else config.db_path
     db = SqliteDatabase(db_path=db_path, logger=logger, verbose=config.log_sql, synchronous=config.db_synchronous)
 
-    migrator = SqliteMigrator(db=db)
+    migrator = Migrator(db.database)
     migration_context = MigrationBuildContext(app_config=config, logger=logger, image_files=image_files)
     for migration in build_migrations(migration_context):
         migrator.register_migration(migration)

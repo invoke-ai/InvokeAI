@@ -85,6 +85,9 @@ dependencies = [
   "pydantic-settings",
   "pydantic",
   "python-socketio",
+  # Schema migrations that run on every database backend are written with Alembic's operations (no Alembic
+  # environment or revision scripts).
+  "alembic>=1.20,<2",
   # The database layer compiles every query through SQLAlchemy Core. Keep the minor-version bound: dialect
   # compilation and the pysqlite transaction handling it relies on are exactly what changes between minors.
   "sqlalchemy>=2.1,<2.2",

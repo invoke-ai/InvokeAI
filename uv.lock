@@ -70,6 +70,20 @@ wheels = [
 ]
 
 [[package]]
+name = "alembic"
+version = "1.20.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "mako" },
+    { name = "sqlalchemy" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/ed/aa/02910bdb8e2f1444f6654d5b296cd827d126f82209050ee7b1000f92ac4b/alembic-1.20.0.tar.gz", hash = "sha256:db505480647bc60386c5369402f4a57a506b7539c9e9ef5e270d45cbbe4939bf", size = 2093272, upload-time = "2026-09-11T19:09:11.126Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3f/27/78a89b55b0904d222183164e079b4ca56208e94eff1d35ad1f1ad5be9b06/alembic-1.20.0-py3-none-any.whl", hash = "sha256:77eb101048d95f982c0353e9233404889dcd7a6fc244c107836c0e2fc9cf7d9d", size = 268719, upload-time = "2026-09-11T19:09:12.88Z" },
+]
+
+[[package]]
 name = "annotated-doc"
 version = "0.0.4"
 source = { registry = "https://pypi.org/simple" }
@@ -1075,6 +1089,7 @@ name = "invokeai"
 source = { editable = "." }
 dependencies = [
     { name = "accelerate" },
+    { name = "alembic" },
     { name = "bcrypt" },
     { name = "bitsandbytes", marker = "sys_platform == 'linux' or sys_platform == 'win32' or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-cuda') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cpu' and extra == 'extra-8-invokeai-xpu') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-rocm') or (extra == 'extra-8-invokeai-cuda' and extra == 'extra-8-invokeai-xpu') or (extra == 'extra-8-invokeai-rocm' and extra == 'extra-8-invokeai-xpu')" },
     { name = "blake3" },
@@ -1209,6 +1224,7 @@ xpu = [
 [package.metadata]
 requires-dist = [
     { name = "accelerate" },
+    { name = "alembic", specifier = ">=1.20,<2" },
     { name = "bcrypt", specifier = "<4.0.0" },
     { name = "bitsandbytes", marker = "sys_platform != 'darwin'" },
     { name = "blake3" },
@@ -1554,6 +1570,18 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/e9/26/67b84e6ec1402f0e6764ef3d2a0aaf9a79522cc1d37738f4e5bb0b21521a/lsprotocol-2025.0.0.tar.gz", hash = "sha256:e879da2b9301e82cfc3e60d805630487ac2f7ab17492f4f5ba5aaba94fe56c29", size = 74896, upload-time = "2025-06-17T21:30:18.156Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/7b/f0/92f2d609d6642b5f30cb50a885d2bf1483301c69d5786286500d15651ef2/lsprotocol-2025.0.0-py3-none-any.whl", hash = "sha256:f9d78f25221f2a60eaa4a96d3b4ffae011b107537facee61d3da3313880995c7", size = 76250, upload-time = "2025-06-17T21:30:19.455Z" },
+]
+
+[[package]]
+name = "mako"
+version = "1.4.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "markupsafe" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/5a/09/e07c4b5579a79f4b16f8d4f29f6c54514ac787c4ad506b8c4f28a0e6b0bf/mako-1.4.3.tar.gz", hash = "sha256:cd6537fe88d5fec315c55c2f8529bc4ce7a9a352ad7db3eeaa6a66e2dd4ec37a", size = 412799, upload-time = "2026-09-22T20:54:31.509Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6d/a0/053d6af3e8f871e0073b4a36732d9e65be77a72e5434c31b94f6af78a6bb/mako-1.4.3-py3-none-any.whl", hash = "sha256:723296007c870bfd6b3f0c3230dba7198096e5269297ebf5e4eff9e7ffa39d4f", size = 80164, upload-time = "2026-09-22T20:54:33.128Z" },
 ]
 
 [[package]]

@@ -1,7 +1,16 @@
 import sqlite3
-from typing import Optional, Protocol, runtime_checkable
+from dataclasses import dataclass, field
+from logging import Logger
+from typing import Any, Optional, Protocol, runtime_checkable
 
+from alembic.operations import Operations
 from pydantic import BaseModel, ConfigDict, Field, model_validator
+from sqlalchemy import Connection, MetaData, Table
+from sqlalchemy.schema import SchemaItem
+from typing_extensions import Self
+
+from invokeai.app.services.shared.database.schema.metadata import define_table
+from invokeai.app.services.shared.database.schema.metadata import metadata as schema_metadata
 
 
 @runtime_checkable
@@ -20,6 +29,50 @@ class MigrateCallback(Protocol):
     def __call__(self, cursor: sqlite3.Cursor) -> None: ...
 
 
+@dataclass(frozen=True)
+class PortableMigrationContext:
+    """What a portable migration works with.
+
+    :param conn: The connection of the migration's transaction.
+    :param op: Alembic's operations (`op.add_column`, `op.create_index`, ...), bound to `conn`.
+    :param logger: The logger.
+    :param metadata: The tables this migration creates. A foreign key names a table here: one created earlier
+        in the migration, or an existing one loaded with `Table(name, context.metadata, autoload_with=conn)`.
+    """
+
+    conn: Connection
+    op: Operations
+    logger: Logger
+    metadata: MetaData = field(default_factory=lambda: MetaData(naming_convention=schema_metadata.naming_convention))
+
+    def create_table(self, name: str, *items: SchemaItem, **options: Any) -> Table:
+        """Creates a table the way the schema metadata creates its tables. Use it instead of `op.create_table`.
+
+        It gets the server table options (InnoDB, the binary collation, DYNAMIC rows, whatever the server's
+        defaults) and each backend's rules for defaults, generated columns and per-backend indexes, which
+        Alembic's operations know nothing of. Items are given as to `schema.metadata.table()`, with indexes
+        naming their columns.
+        """
+        created = define_table(self.metadata, name, *items, **options)
+        created.create(self.conn)
+        return created
+
+
+@runtime_checkable
+class PortableMigrateCallback(Protocol):
+    """A callback that performs a migration on any database backend, with Alembic's operations.
+
+    It runs in a transaction the migrator commits. On MySQL and MariaDB every DDL statement commits on its own,
+    though, so a portable migration must be idempotent: run again after it failed halfway, it finds part of its
+    work done and completes the rest. On SQLite it runs with foreign keys off, so that rebuilding a table
+    (Alembic's batch mode) does not cascade into the tables that reference it; they are checked before the
+    migration commits, so rows it orphans fail it. The schema metadata in `shared/database/schema/` gets the
+    same change in the same commit, because new server databases are created from it.
+    """
+
+    def __call__(self, context: PortableMigrationContext) -> None: ...
+
+
 class MigrationError(RuntimeError):
     """Raised when a migration fails."""
 
@@ -28,70 +81,18 @@ class MigrationVersionError(ValueError):
     """Raised when a migration version is invalid."""
 
 
-class Migration(BaseModel):
+class MigrationBase(BaseModel):
     """
-    Represents a migration for a SQLite database.
+    What every migration has: a stable ID, and the migration that must run first.
 
     :param from_version: The legacy database version on which this migration may be run
     :param to_version: The legacy database version that results from this migration
     :param id: The stable migration ID. Legacy migrations default to ``migration_{to_version}``.
     :param depends_on: The stable ID of the migration that must run first.
-    :param migrate_callback: The callback to run to perform the migration
 
     Migrations are executed according to their stable ID dependencies. Existing legacy migrations also keep
     ``from_version`` and ``to_version`` so older numeric migration state can be mapped to applied migration IDs.
-    New graph-only migrations may omit legacy versions, but must provide an explicit ``id``.
-
-    Migration callbacks will be provided an open cursor to the database. They should not commit their
-    transaction; this is handled by the migrator.
-
-    It is suggested to use a class to define the migration callback and a builder function to create
-    the :class:`Migration`. This allows the callback to be provided with additional dependencies and
-    keeps things tidy, as all migration logic is self-contained.
-
-    Example:
-    ```py
-    # Define the migration callback class
-    class Migration1Callback:
-        # This migration needs a logger, so we define a class that accepts a logger in its constructor.
-        def __init__(self, image_files: ImageFileStorageBase) -> None:
-            self._image_files = ImageFileStorageBase
-
-        # This dunder method allows the instance of the class to be called like a function.
-        def __call__(self, cursor: sqlite3.Cursor) -> None:
-            self._add_with_banana_column(cursor)
-            self._do_something_with_images(cursor)
-
-        def _add_with_banana_column(self, cursor: sqlite3.Cursor) -> None:
-            \"""Adds the with_banana column to the sushi table.\"""
-            # Execute SQL using the cursor, taking care to *not commit* a transaction
-            cursor.execute('ALTER TABLE sushi ADD COLUMN with_banana BOOLEAN DEFAULT TRUE;')
-
-        def _do_something_with_images(self, cursor: sqlite3.Cursor) -> None:
-            \"""Does something with the image files service.\"""
-            self._image_files.get(...)
-
-    # Define the migration builder function. This function creates an instance of the migration callback
-    # class and returns a Migration.
-    def build_migration_1(image_files: ImageFileStorageBase) -> Migration:
-        \"""Builds the migration from database version 0 to 1.
-        Requires the image files service to...
-        \"""
-
-        migration_1 = Migration(
-            from_version=0,
-            to_version=1,
-            migrate_callback=Migration1Callback(image_files=image_files),
-        )
-
-        return migration_1
-
-    # Register the migration after all dependencies have been initialized
-    db = SqliteDatabase(db_path, logger)
-    migrator = SqliteMigrator(db)
-    migrator.register_migration(build_migration_1(image_files))
-    migrator.run_migrations()
-    ```
+    New graph-only migrations omit legacy versions, and must provide an explicit ``id``.
     """
 
     from_version: Optional[int] = Field(
@@ -102,10 +103,9 @@ class Migration(BaseModel):
     )
     id: Optional[str] = Field(default=None, description="Stable migration ID")
     depends_on: Optional[str] = Field(default=None, description="Stable ID of the migration dependency")
-    callback: MigrateCallback = Field(description="The callback to run to perform the migration")
 
     @model_validator(mode="after")
-    def validate_versions_and_ids(self) -> "Migration":
+    def validate_versions_and_ids(self) -> Self:
         """Validates legacy versions and derives stable IDs for legacy migrations."""
         has_from_version = self.from_version is not None
         has_to_version = self.to_version is not None
@@ -139,6 +139,55 @@ class Migration(BaseModel):
     model_config = ConfigDict(arbitrary_types_allowed=True)
 
 
+class Migration(MigrationBase):
+    """
+    A migration that runs on SQLite only, given an open cursor. Every migration up to ``PORTABLE_CUTOVER`` is one;
+    new migrations are portable (:class:`PortableMigration`).
+
+    :param callback: The callback to run to perform the migration. It is provided an open cursor, and does not
+        commit; the migrator does.
+    """
+
+    callback: MigrateCallback = Field(description="The callback to run to perform the migration")
+
+
+class PortableMigration(MigrationBase):
+    """
+    A migration that runs on every database backend: a callback using Alembic's operations (see
+    :class:`PortableMigrateCallback`). Every migration after ``PORTABLE_CUTOVER`` is one.
+
+    Example:
+    ```py
+    def _add_bananas(context: PortableMigrationContext) -> None:
+        # Idempotent: on MySQL and MariaDB, a failed run may have created the table already.
+        if not inspect(context.conn).has_table("bananas"):
+            context.create_table(
+                "bananas",
+                Column("banana_id", Key(), primary_key=True),
+                Column("ripeness", BigInt(), nullable=False, server_default=default(0)),
+                inserted_at(),
+            )
+
+
+    def build_migration() -> PortableMigration:
+        return PortableMigration(
+            id="2026_10_05_add_bananas",
+            depends_on="2026_10_01_add_anima_variant",
+            callback=_add_bananas,
+        )
+    ```
+    """
+
+    callback: PortableMigrateCallback = Field(description="The callback to run to perform the migration")
+
+    @model_validator(mode="after")
+    def validate_no_legacy_version(self) -> Self:
+        """A portable migration is identified by its ID alone."""
+        if self.from_version is not None or self.to_version is not None:
+            raise MigrationVersionError("a portable migration has no legacy version")
+        return self
+
+
 class MigrationSet:
     """
     A set of Migrations. Performs validation during migration registration and provides utility methods.
@@ -149,9 +198,9 @@ class MigrationSet:
     """
 
     def __init__(self) -> None:
-        self._migrations: set[Migration] = set()
+        self._migrations: set[MigrationBase] = set()
 
-    def register(self, migration: Migration) -> None:
+    def register(self, migration: MigrationBase) -> None:
         """Registers a migration."""
         migration_from_already_registered = migration.from_version is not None and any(
             m.from_version == migration.from_version for m in self._migrations if m.from_version is not None
@@ -166,7 +215,7 @@ class MigrationSet:
             raise MigrationVersionError("Migration with id already registered")
         self._migrations.add(migration)
 
-    def get(self, from_version: int) -> Optional[Migration]:
+    def get(self, from_version: int) -> Optional[MigrationBase]:
         """Gets the migration that may be run on the given database version."""
         # register() ensures that there is only one migration with a given from_version, so this is safe.
         return next((m for m in self._migrations if m.from_version == from_version), None)
@@ -210,7 +259,7 @@ class MigrationSet:
         visiting: set[str] = set()
         visited: set[str] = set()
 
-        def visit(migration: Migration) -> None:
+        def visit(migration: MigrationBase) -> None:
             migration_id = migration.id
             if migration_id is None:
                 raise MigrationError("Migration is missing id")
@@ -227,7 +276,7 @@ class MigrationSet:
         for migration in self._migrations:
             visit(migration)
 
-    def get_migration_plan(self, applied_migration_ids: set[str]) -> list[Migration]:
+    def get_migration_plan(self, applied_migration_ids: set[str]) -> list[MigrationBase]:
         """Gets a deterministic migration plan from the set of applied migration IDs."""
         self.validate_dependency_graph()
         known_migration_ids = set(self.migrations_by_id)
@@ -236,7 +285,7 @@ class MigrationSet:
             unknown_ids = ", ".join(sorted(unknown_applied_ids))
             raise MigrationError(f"Database contains unknown applied migration IDs: {unknown_ids}")
 
-        plan: list[Migration] = []
+        plan: list[MigrationBase] = []
         planned_or_applied_ids = set(applied_migration_ids)
         remaining = {
             migration.id: migration for migration in self._migrations if migration.id not in applied_migration_ids
@@ -276,9 +325,9 @@ class MigrationSet:
         return latest_version or 0
 
     @property
-    def migrations(self) -> tuple[Migration, ...]:
+    def migrations(self) -> tuple[MigrationBase, ...]:
         return tuple(sorted(self._migrations, key=lambda migration: migration.sort_key))
 
     @property
-    def migrations_by_id(self) -> dict[str, Migration]:
+    def migrations_by_id(self) -> dict[str, MigrationBase]:
         return {migration.id or "": migration for migration in self._migrations}
