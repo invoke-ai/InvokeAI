@@ -47,4 +47,11 @@ describe('firstPartyHotkeyCatalog', () => {
 
     expect(saveLayout).toMatchObject({ allowInEditable: false, defaultKeys: [] });
   });
+
+  // Cmd+Space is Spotlight on macOS; a modified Space on the focused thumbnail toggles it without a hotkey.
+  it('ships the gallery focus toggle unbound but assignable', () => {
+    const toggle = firstPartyHotkeyCatalog.find((hotkey) => hotkey.id === 'gallery.toggleFocusedInSelection');
+
+    expect(toggle).toMatchObject({ defaultKeys: [], implemented: true });
+  });
 });

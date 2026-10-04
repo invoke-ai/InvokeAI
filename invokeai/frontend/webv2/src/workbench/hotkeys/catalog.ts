@@ -261,8 +261,9 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('gallery', 'galleryNavRightAlt', ['alt+right']),
   hotkey('gallery', 'galleryNavDownAlt', ['alt+down']),
   hotkey('gallery', 'galleryNavLeftAlt', ['alt+left']),
-  // Shift extends the selection; Ctrl (Cmd on macOS) moves focus alone, then toggles the focused item. Ctrl+Enter
-  // is not used: it invokes from anywhere, the gallery included.
+  // Shift extends the selection; Ctrl (Cmd on macOS) moves focus alone. Toggling the focused item has no default
+  // key: Cmd+Space is Spotlight on macOS, and Ctrl+Space already toggles by activating the focused thumbnail as a
+  // Ctrl+click. Ctrl+Enter is not used: it invokes from anywhere, the gallery included.
   hotkey('gallery', 'extendSelectionUp', ['shift+up']),
   hotkey('gallery', 'extendSelectionRight', ['shift+right']),
   hotkey('gallery', 'extendSelectionDown', ['shift+down']),
@@ -271,7 +272,7 @@ export const firstPartyHotkeyCatalog: HotkeyDefinition[] = [
   hotkey('gallery', 'moveFocusRight', ['mod+right']),
   hotkey('gallery', 'moveFocusDown', ['mod+down']),
   hotkey('gallery', 'moveFocusLeft', ['mod+left']),
-  hotkey('gallery', 'toggleFocusedInSelection', ['mod+space']),
+  hotkey('gallery', 'toggleFocusedInSelection', []),
   hotkey('gallery', 'deleteSelection', ['delete', 'backspace']),
   hotkey('gallery', 'remix', ['r']),
   hotkey('gallery', 'starImage', ['.']),

@@ -3,6 +3,7 @@ import type { GalleryItem, GalleryItemRef } from '@features/gallery/contracts';
 import type { QueueProgressSession } from '@features/queue/contracts';
 import type { ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import type { Project } from '@workbench/projectContracts';
+import type * as projectsApi from '@workbench/projects/api';
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
@@ -21,6 +22,7 @@ import {
   useDeletionConfirmation,
   type RequestDeletionConfirmation,
 } from '@workbench/image-actions/useDeletionConfirmation';
+import { DEFAULT_PREFERENCES, patchWorkbenchPreferences } from '@workbench/settings/store';
 import { WorkbenchFocusProvider } from '@workbench/WorkbenchRuntime';
 import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { createInstance } from 'i18next';
@@ -71,6 +73,11 @@ vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
     queryFn: () => ({ modelName: null, state: 'disabled' }),
     queryKey: ['test-image-index-availability'],
   }),
+}));
+// Hotkey preferences save as Settings saves them; the backend round trip is not under test.
+vi.mock('@workbench/projects/api', async (importOriginal) => ({
+  ...(await importOriginal<typeof projectsApi>()),
+  setClientStateValue: async () => {},
 }));
 vi.mock('@features/queue/react', () => ({
   useItemProgress: () => null,
@@ -466,6 +473,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await act(() => root?.unmount());
+  await patchWorkbenchPreferences(DEFAULT_PREFERENCES);
   host?.remove();
   queryClient?.clear();
   listeners.clear();
@@ -735,7 +743,7 @@ describe('Gallery grid keyboard focus', () => {
     expect(selectedKeys()).toEqual(byKeyboard);
   });
 
-  it('moves focus alone with the mod key, then toggles the focused tile into the selection', async () => {
+  it('moves focus alone with the mod key, then toggles the focused tile with a modified Space', async () => {
     const items = createItems(40);
     await renderGrid(items);
     await tabIntoGallery();
@@ -752,9 +760,9 @@ describe('Gallery grid keyboard focus', () => {
     expect(focusedThumbnail()).toBe('image-2.png');
     expect(selectedKeys()).toEqual(['image:image-0.png']);
 
+    // No hotkey is bound by default: the browser activates the focused button as a Ctrl+click, which toggles it.
     await press('{Control>} {/Control}');
 
-    // Toggled exactly once, though the focused button would also activate on Space.
     expect(selectedKeys()).toEqual(['image:image-0.png', 'image:image-2.png']);
     expect(focusedThumbnail()).toBe('image-2.png');
 
@@ -773,6 +781,27 @@ describe('Gallery grid keyboard focus', () => {
 
     expect(selectedKeys()).toEqual(['image:image-4.png']);
     expect(focusedThumbnail()).toBe('image-4.png');
+  });
+
+  it('toggles the focused tile with a key the user assigned to the toggle command', async () => {
+    const items = createItems(40);
+    await renderGrid(items);
+    await tabIntoGallery();
+
+    // Unbound by default, so the key does nothing until it is assigned as Settings assigns it.
+    await press('{Control>}{ArrowRight}{/Control}');
+    await press('x');
+    expect(selectedKeys()).toEqual(['image:image-0.png']);
+
+    await act(() => patchWorkbenchPreferences({ customHotkeys: { 'gallery.toggleFocusedInSelection': ['x'] } }));
+    await press('x');
+
+    expect(selectedKeys()).toEqual(['image:image-0.png', 'image:image-1.png']);
+    expect(focusedThumbnail()).toBe('image-1.png');
+
+    await press('x');
+
+    expect(selectedKeys()).toEqual(['image:image-0.png']);
   });
 
   it('follows the arrows between the starred strip, running sessions and the listing', async () => {

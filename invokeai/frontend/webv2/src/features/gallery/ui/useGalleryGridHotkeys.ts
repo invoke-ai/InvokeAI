@@ -49,7 +49,7 @@ const GALLERY_HOTKEYS = [
   ['gallery.moveFocusRight', 'widgets.gallery.commands.moveFocusRight', ['right', 'focus'], ['mod+arrowright']],
   ['gallery.moveFocusDown', 'widgets.gallery.commands.moveFocusDown', ['down', 'focus'], ['mod+arrowdown']],
   ['gallery.moveFocusLeft', 'widgets.gallery.commands.moveFocusLeft', ['left', 'focus'], ['mod+arrowleft']],
-  ['gallery.toggleFocusedInSelection', 'widgets.gallery.commands.toggleFocusedInSelection', null, ['mod+space']],
+  ['gallery.toggleFocusedInSelection', 'widgets.gallery.commands.toggleFocusedInSelection', null, []],
   ['gallery.deleteSelection', 'widgets.gallery.commands.deleteSelection', null, ['delete', 'backspace']],
   ['gallery.starImage', 'widgets.gallery.commands.toggleStarImage', null, ['.']],
   ['gallery.toggleStarredOnly', 'widgets.gallery.commands.toggleStarredOnly', null, []],
