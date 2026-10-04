@@ -7,26 +7,24 @@ export {
   ensureReadyAuthSession,
   getAuthSession,
   getUserStorageScope,
+  identityTransportAuthAdapter,
   isLoginAttemptSupersededError,
   LoginAttemptSupersededError,
   loginWithCredentials,
   logoutSession,
   refreshProtectedMediaCookie,
+  startIdentityCredentialSync,
   subscribeAuthSession,
   useAuthSession,
   type AuthSession,
   type ReadyAuthSession,
   type IdentityAccountLifecycle,
 } from './session';
-export type { IdentityTokenAdapter } from './core/tokenStorage';
-export * from './transportAdapter';
 export {
   createUser,
   deleteUser,
   generatePassword,
   listUsers,
-  updateCurrentUser,
-  updateUser,
   type ProfileUpdateRequest,
   type UserCreateRequest,
   type UserDTO,

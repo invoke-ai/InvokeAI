@@ -27,7 +27,10 @@ vi.mock('./library', () => ({
   deleteLibraryProject: harness.deleteLibraryProject,
   refreshProjectLibrary: vi.fn(),
 }));
-vi.mock('@tanstack/react-router', () => ({ useNavigate: () => harness.navigate }));
+vi.mock('@tanstack/react-router', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  useNavigate: () => harness.navigate,
+}));
 vi.mock('@workbench/useNotify', () => ({ useNotify: () => ({ error: harness.notifyError }) }));
 vi.mock('@workbench/WorkbenchContext', () => ({
   useWorkbenchLiveCanvasEngines: () => ({ flushPendingPixels: harness.flushCanvasPixels }),

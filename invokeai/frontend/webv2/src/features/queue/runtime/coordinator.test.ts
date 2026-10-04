@@ -41,6 +41,7 @@ const deferred = <T>(): { promise: Promise<T>; resolve: (value: T) => void } => 
 };
 
 class FakeSocket implements BackendSocket {
+  readonly active = true;
   readonly emitted: { event: string; payload: unknown }[] = [];
   private readonly handlers = new Map<string, ((payload: never) => void)[]>();
 

@@ -1,7 +1,8 @@
 import { createExternalStore } from '@platform/state/externalStore';
-import { ApiError } from '@platform/transport/http';
+import { ApiError, type HttpAuthAdapter, type HttpCredential } from '@platform/transport/http';
 
 import { shouldExpireUnauthorizedSession } from './core/sessionPolicy';
+import { classifyStoredCredential } from './core/storedCredential';
 import { browserIdentityTokenAdapter } from './core/tokenStorage';
 import {
   getAuthStatus,
@@ -10,8 +11,12 @@ import {
   logout,
   refreshMediaCookie,
   setupAdmin,
+  updateCurrentUser,
+  updateUser,
   type AuthStatus,
+  type ProfileUpdateRequest,
   type UserDTO,
+  type UserUpdateRequest,
 } from './data/api';
 
 /**
@@ -47,6 +52,8 @@ export interface IdentityAccountLifecycle {
   invalidate(): { readonly epoch: number };
 }
 
+type LifetimeScope = ReturnType<IdentityAccountLifecycle['capture']>;
+
 let accountLifecycle: IdentityAccountLifecycle | null = null;
 
 /** Selected once by the App composition root before session resolution. */
@@ -79,16 +86,6 @@ let activeUserScope = '';
 
 const setActiveUserScope = (user: UserDTO | null): void => {
   activeUserScope = user === null ? '' : `:user:${user.user_id}`;
-};
-
-const activateResolvedAccount = (multiuserEnabled: boolean, user: UserDTO | null): number => {
-  if (!multiuserEnabled) {
-    return getAccountLifecycle().activate('single-user').epoch;
-  }
-
-  return user
-    ? getAccountLifecycle().activate(user.user_id, `:user:${user.user_id}`).epoch
-    : getAccountLifecycle().invalidate().epoch;
 };
 
 /** Scope user-owned storage keys by account; single-user mode preserves existing unsuffixed keys. */
@@ -127,38 +124,284 @@ export class LoginAttemptSupersededError extends Error {
 export const isLoginAttemptSupersededError = (error: unknown): error is LoginAttemptSupersededError =>
   error instanceof LoginAttemptSupersededError;
 
-interface LoginAttempt {
+// ---------------------------------------------------------------------------------------------------------------
+// Credential. The in-memory token is authoritative for this tab and is bound to the identity lifetime it was issued
+// for: once that lifetime ends, no request can carry it. Browser storage persists it across reloads and carries other
+// tabs' changes; it is read when a session resolves and when reconciling with other tabs, never per request.
+// ---------------------------------------------------------------------------------------------------------------
+
+const tokenStore = browserIdentityTokenAdapter;
+
+let heldCredential: { readonly scope: LifetimeScope; readonly token: string } | null = null;
+
+/**
+ * The stored value this tab last wrote or adopted. Storage holding anything else was changed by another tab;
+ * `undefined` while nothing is known, so the next reconciliation acts on whatever storage holds.
+ */
+let observedStoredToken: string | null | undefined;
+
+const credentialListeners = new Set<() => void>();
+
+const captureCredential = (): HttpCredential => {
+  const scope = getAccountLifecycle().capture();
+
+  return { identity: scope, token: heldCredential?.scope === scope ? heldCredential.token : null };
+};
+
+const getHeldToken = (): string | null => captureCredential().token;
+
+/** True while `credential` is the token this tab currently holds for the current lifetime. */
+const isCredentialCurrent = (credential: HttpCredential): boolean => {
+  const current = captureCredential();
+
+  return credential.token !== null && credential.identity === current.identity && credential.token === current.token;
+};
+
+/** Bind `token` to the current lifetime, which must already be the lifetime it authenticates. */
+const bindHeldToken = (token: string | null): void => {
+  heldCredential = token === null ? null : { scope: getAccountLifecycle().capture(), token };
+};
+
+const persistToken = (token: string | null): void => {
+  if (token === null) {
+    tokenStore.clear();
+  } else {
+    tokenStore.write(token);
+  }
+
+  // A failed write leaves storage as it was; a concurrent foreign value is not this tab's to have observed.
+  if (tokenStore.read() === token) {
+    observedStoredToken = token;
+  }
+};
+
+/** A rejection removes only the rejected token, never a newer one another tab stored meanwhile. */
+const forgetStoredToken = (token: string | null): void => {
+  if (token !== null && tokenStore.read() === token) {
+    persistToken(null);
+  }
+};
+
+/** Replace the token within the current lifetime: no remount, no account-owned cleanup. */
+const replaceHeldToken = (token: string, persist: boolean): void => {
+  bindHeldToken(token);
+
+  if (persist) {
+    persistToken(token);
+  }
+
+  for (const listener of credentialListeners) {
+    listener();
+  }
+};
+
+/** Sliding renewals do not re-issue the media cookie, whose lifetime ends with the token it was issued from. */
+const MEDIA_COOKIE_RENEWAL_INTERVAL_MS = 5 * 60_000;
+
+let lastMediaCookieIssue: { readonly at: number; readonly scope: LifetimeScope } | null = null;
+
+const noteMediaCookieIssued = (): void => {
+  lastMediaCookieIssue = { at: Date.now(), scope: getAccountLifecycle().capture() };
+};
+
+const renewMediaCookie = (): void => {
+  const scope = getAccountLifecycle().capture();
+
+  if (
+    lastMediaCookieIssue?.scope === scope &&
+    Date.now() - lastMediaCookieIssue.at < MEDIA_COOKIE_RENEWAL_INTERVAL_MS
+  ) {
+    return;
+  }
+
+  noteMediaCookieIssued();
+  void refreshProtectedMediaCookie();
+};
+
+interface CredentialRotation {
+  deferredStorageSync: boolean;
+  deferredUnauthorized: HttpCredential | null;
+  readonly scope: LifetimeScope;
+}
+
+let rotation: CredentialRotation | null = null;
+let rotationQueue: Promise<unknown> = Promise.resolve();
+
+/** The own-credential rotation in flight for the current lifetime; one started by an ended lifetime no longer counts. */
+const getPendingRotation = (): CredentialRotation | null =>
+  rotation?.scope === getAccountLifecycle().capture() ? rotation : null;
+
+const acceptRefreshedToken = (credential: HttpCredential, token: string): void => {
+  // A rotation adopts only its own replacement; a renewal minted before it would carry the revoked epoch.
+  if (getPendingRotation() !== null || token === credential.token) {
+    return;
+  }
+
+  // Another tab may have replaced the shared token first; follow it rather than overwrite it.
+  syncStoredCredential();
+
+  if (!isCredentialCurrent(credential)) {
+    return;
+  }
+
+  replaceHeldToken(token, true);
+  renewMediaCookie();
+};
+
+const handleTransportUnauthorized = (credential: HttpCredential): void => {
+  if (!isCredentialCurrent(credential)) {
+    return;
+  }
+
+  const pendingRotation = getPendingRotation();
+
+  if (pendingRotation !== null) {
+    // The pending rotation decides: its replacement makes this token superseded, its failure leaves it current.
+    pendingRotation.deferredUnauthorized = credential;
+    return;
+  }
+
+  // The rejection may race another tab's replacement of the shared token.
+  syncStoredCredential();
+
+  if (isCredentialCurrent(credential)) {
+    handleUnauthorizedResponse();
+  }
+};
+
+const subscribeCredential = (listener: () => void): (() => void) => {
+  credentialListeners.add(listener);
+
+  return () => {
+    credentialListeners.delete(listener);
+  };
+};
+
+/** Selected by the App composition root as the HTTP transport's only source of credentials. */
+export const identityTransportAuthAdapter: HttpAuthAdapter = {
+  capture: captureCredential,
+  onRefreshedToken: acceptRefreshedToken,
+  onUnauthorized: handleTransportUnauthorized,
+  subscribe: subscribeCredential,
+};
+
+/**
+ * Run a request that rotates this tab's own credential: an own password change revokes every earlier token and
+ * returns the only replacement that survives. Until it settles, other replacements are ignored, and a 401 for the
+ * current token or another tab's renewal or sign-out waits for its outcome. The rotation belongs to the lifetime that
+ * started it and is aborted with it. Rotations run one at a time so each sends the credential its predecessor
+ * delivered.
+ */
+const rotateOwnCredential = <Result extends { refreshedToken: string | null }>(
+  request: (signal: AbortSignal) => Promise<Result>
+): Promise<Result> => {
+  const run = async (): Promise<Result> => {
+    const scope = getAccountLifecycle().capture();
+    const pending: CredentialRotation = { deferredStorageSync: false, deferredUnauthorized: null, scope };
+
+    rotation = pending;
+
+    try {
+      // The transport captures the same credential synchronously when `request` starts.
+      const credential = captureCredential();
+      const result = await request(scope.signal);
+
+      if (result.refreshedToken !== null) {
+        // Another tab switching accounts ends this lifetime first; its renewals and sign-outs stay deferred.
+        syncStoredCredential();
+
+        if (isCredentialCurrent(credential)) {
+          replaceHeldToken(result.refreshedToken, true);
+          // The response that delivered the replacement also set the media cookie for it.
+          noteMediaCookieIssued();
+        }
+      }
+
+      return result;
+    } finally {
+      rotation = null;
+
+      if (pending.deferredStorageSync) {
+        syncStoredCredential();
+      }
+
+      if (pending.deferredUnauthorized !== null) {
+        handleTransportUnauthorized(pending.deferredUnauthorized);
+      }
+    }
+  };
+  const result = rotationQueue.then(run);
+
+  rotationQueue = result.catch(() => undefined);
+
+  return result;
+};
+
+// ---------------------------------------------------------------------------------------------------------------
+// Identity transitions. Every transition invalidates the old lifetime before touching its credential, and at most
+// one asynchronous transition (a login or following another tab) is current at a time.
+// ---------------------------------------------------------------------------------------------------------------
+
+interface IdentityTransition {
   readonly controller: AbortController;
 }
 
-let activeLoginAttempt: LoginAttempt | null = null;
+let activeTransition: IdentityTransition | null = null;
 
-const beginLoginAttempt = (): LoginAttempt => {
-  activeLoginAttempt?.controller.abort();
+const beginTransition = (): IdentityTransition => {
+  activeTransition?.controller.abort();
 
-  const attempt: LoginAttempt = { controller: new AbortController() };
-  activeLoginAttempt = attempt;
+  const transition: IdentityTransition = { controller: new AbortController() };
+  activeTransition = transition;
 
-  return attempt;
+  return transition;
 };
 
-const cancelLoginAttempt = (): boolean => {
-  if (activeLoginAttempt === null) {
+const cancelTransition = (): boolean => {
+  if (activeTransition === null) {
     return false;
   }
 
-  const attempt = activeLoginAttempt;
-  activeLoginAttempt = null;
-  attempt.controller.abort();
+  const transition = activeTransition;
+  activeTransition = null;
+  transition.controller.abort();
 
   return true;
 };
 
-const isCurrentLoginAttempt = (attempt: LoginAttempt): boolean =>
-  activeLoginAttempt === attempt && !attempt.controller.signal.aborted;
+const isCurrentTransition = (transition: IdentityTransition): boolean =>
+  activeTransition === transition && !transition.controller.signal.aborted;
+
+const endTransition = (transition: IdentityTransition): void => {
+  if (activeTransition === transition) {
+    activeTransition = null;
+  }
+};
+
+const activateAccount = (user: UserDTO, token: string): number => {
+  const { epoch } = getAccountLifecycle().activate(user.user_id, `:user:${user.user_id}`);
+
+  bindHeldToken(token);
+  setActiveUserScope(user);
+  // Login and session resolution set the media cookie for this token.
+  noteMediaCookieIssued();
+
+  return epoch;
+};
+
+/** End the authenticated lifetime locally; `forget` decides what happens to the stored token. */
+const signOut = (sessionExpired: boolean, forget: (token: string | null) => void): void => {
+  const token = getHeldToken();
+  const accountEpoch = getAccountLifecycle().invalidate().epoch;
+
+  heldCredential = null;
+  forget(token);
+  setActiveUserScope(null);
+  store.patchSnapshot({ accountEpoch, sessionExpired, user: null });
+};
 
 const publishUnavailableSession = (): AuthSession => {
-  cancelLoginAttempt();
+  cancelTransition();
   setActiveUserScope(null);
   const accountEpoch = getAccountLifecycle().invalidate().epoch;
   store.patchSnapshot({
@@ -173,6 +416,23 @@ const publishUnavailableSession = (): AuthSession => {
   return store.getSnapshot();
 };
 
+type PrincipalResolution = { kind: 'user'; user: UserDTO } | { kind: 'rejected' } | { kind: 'unavailable' };
+
+/** Resolve who the held token belongs to, with the media cookie its media elements need. */
+const resolvePrincipal = async (signal?: AbortSignal): Promise<PrincipalResolution> => {
+  try {
+    const user = await getCurrentUser(signal);
+    // Await the media cookie before rendering. Refresh failure breaks media but must not invalidate the session.
+    await refreshMediaCookie(signal).catch(() => undefined);
+
+    return { kind: 'user', user };
+  } catch (error) {
+    return error instanceof ApiError && (error.status === 401 || error.status === 403)
+      ? { kind: 'rejected' }
+      : { kind: 'unavailable' };
+  }
+};
+
 const resolveSession = async (): Promise<AuthSession> => {
   let status: AuthStatus;
 
@@ -184,32 +444,50 @@ const resolveSession = async (): Promise<AuthSession> => {
     return publishUnavailableSession();
   }
 
+  const authenticates = status.multiuser_enabled && !status.setup_required;
   let user: UserDTO | null = null;
+  let token: string | null = null;
   let sessionExpired = false;
 
-  if (status.multiuser_enabled && !status.setup_required && browserIdentityTokenAdapter.get()) {
-    try {
-      user = await getCurrentUser();
-      // Await restored-session media cookies before rendering. Refresh failure breaks media but must not
-      // invalidate the authenticated session.
-      await refreshMediaCookie().catch(() => undefined);
-    } catch (error) {
-      if (error instanceof ApiError && (error.status === 401 || error.status === 403)) {
-        browserIdentityTokenAdapter.clear();
-        sessionExpired = true;
-      } else {
-        // Unknown principal remains unavailable rather than signed out, preventing access to unscoped storage.
-        return publishUnavailableSession();
-      }
+  if (status.multiuser_enabled) {
+    observedStoredToken = tokenStore.read();
+    token = authenticates ? (observedStoredToken ?? null) : null;
+  }
+
+  if (token !== null) {
+    bindHeldToken(token);
+    const principal = await resolvePrincipal();
+
+    if (principal.kind === 'unavailable') {
+      // Unknown principal remains unavailable rather than signed out, preventing access to unscoped storage.
+      return publishUnavailableSession();
     }
-  } else if (status.multiuser_enabled && !status.setup_required) {
+
+    if (principal.kind === 'user') {
+      user = principal.user;
+    } else {
+      heldCredential = null;
+      forgetStoredToken(token);
+      sessionExpired = true;
+    }
+  } else if (authenticates) {
     // Preserve an expiry raised while auth status was unavailable so recovery
     // can explain why the remembered session returned to the login screen.
     sessionExpired = store.getSnapshot().sessionExpired;
   }
 
-  setActiveUserScope(user);
-  const accountEpoch = activateResolvedAccount(status.multiuser_enabled, user);
+  let accountEpoch: number;
+
+  if (!status.multiuser_enabled) {
+    accountEpoch = getAccountLifecycle().activate('single-user').epoch;
+    setActiveUserScope(null);
+  } else if (user !== null && token !== null) {
+    accountEpoch = activateAccount(user, token);
+  } else {
+    accountEpoch = getAccountLifecycle().invalidate().epoch;
+    setActiveUserScope(null);
+  }
+
   store.patchSnapshot({
     accountEpoch,
     multiuserEnabled: status.multiuser_enabled,
@@ -219,6 +497,8 @@ const resolveSession = async (): Promise<AuthSession> => {
     strictPasswordChecking: status.strict_password_checking,
     user,
   });
+  // Another tab may have changed the stored token while this one resolved.
+  syncStoredCredential();
 
   return store.getSnapshot();
 };
@@ -240,8 +520,107 @@ export const ensureAuthSession = (): Promise<AuthSession> => {
   return pendingResolve;
 };
 
+/**
+ * Another tab stored a token for a different (or unreadable) principal. The old lifetime ends first, so nothing more
+ * is sent or accepted for it, then the new principal resolves and activates like a restored session.
+ */
+const followStoredPrincipal = async (token: string): Promise<void> => {
+  const transition = beginTransition();
+  const invalidatedEpoch = getAccountLifecycle().invalidate().epoch;
+
+  setActiveUserScope(null);
+  bindHeldToken(token);
+  store.patchSnapshot({ accountEpoch: invalidatedEpoch, sessionExpired: false, user: null });
+
+  const principal = await resolvePrincipal(transition.controller.signal);
+
+  if (!isCurrentTransition(transition)) {
+    return;
+  }
+
+  endTransition(transition);
+
+  if (principal.kind === 'user') {
+    const accountEpoch = activateAccount(principal.user, token);
+    store.patchSnapshot({ accountEpoch, sessionExpired: false, setupRequired: false, user: principal.user });
+  } else if (principal.kind === 'rejected') {
+    signOut(true, forgetStoredToken);
+  } else {
+    // The backend could not say who the token belongs to. Stay signed out with the token stored, and leave it
+    // unobserved so the next storage event, return to view or page restore tries again.
+    signOut(false, () => undefined);
+    observedStoredToken = undefined;
+  }
+};
+
+/**
+ * Reconcile this tab with the token another tab stored. Other tabs follow the shared credential through an explicit
+ * transition and never keep running one principal on another's token.
+ */
+const syncStoredCredential = (): void => {
+  const session = store.getSnapshot();
+
+  if (session.phase !== 'ready' || !session.multiuserEnabled) {
+    return;
+  }
+
+  const stored = tokenStore.read();
+
+  if (stored === undefined || stored === observedStoredToken) {
+    return;
+  }
+
+  const change = classifyStoredCredential(stored, getHeldToken(), session.user?.user_id ?? null);
+  const pendingRotation = getPendingRotation();
+
+  // A rotation's replacement supersedes another tab's renewal of the revoked token, and its sign-out after a 401
+  // that the rotation caused. Another account applies at once.
+  if ((change === 'renewed' || change === 'removed') && pendingRotation !== null) {
+    pendingRotation.deferredStorageSync = true;
+    return;
+  }
+
+  observedStoredToken = stored;
+
+  if (change === 'removed') {
+    cancelTransition();
+    signOut(false, () => undefined);
+  } else if (change === 'renewed' && stored !== null) {
+    replaceHeldToken(stored, false);
+  } else if (change === 'principal-changed' && stored !== null) {
+    void followStoredPrincipal(stored);
+  }
+};
+
+/**
+ * App starts this once. Storage events cover other tabs' changes; a page restored from the back/forward cache or a
+ * tab returning to view may have missed them.
+ */
+export const startIdentityCredentialSync = (): (() => void) => {
+  const onPageShow = (event: PageTransitionEvent): void => {
+    if (event.persisted) {
+      syncStoredCredential();
+    }
+  };
+  const onVisibilityChange = (): void => {
+    if (document.visibilityState === 'visible') {
+      syncStoredCredential();
+    }
+  };
+  const unsubscribeStorage = tokenStore.subscribe(syncStoredCredential);
+
+  window.addEventListener('pageshow', onPageShow);
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
+  return () => {
+    unsubscribeStorage();
+    window.removeEventListener('pageshow', onPageShow);
+    document.removeEventListener('visibilitychange', onVisibilityChange);
+  };
+};
+
 interface ProtectedMediaCookieRefresh {
-  scope: ReturnType<IdentityAccountLifecycle['capture']>;
+  scope: LifetimeScope;
   promise: Promise<boolean>;
 }
 
@@ -311,41 +690,39 @@ export const loginWithCredentials = async (email: string, password: string, reme
     throw new AuthSessionUnavailableError();
   }
 
-  const attempt = beginLoginAttempt();
+  const attempt = beginTransition();
 
   // Invalidate the old epoch before touching its token. This also protects a
   // same-user reauthentication from completions started by the prior login.
   const invalidatedEpoch = getAccountLifecycle().invalidate().epoch;
-  browserIdentityTokenAdapter.clear();
+  heldCredential = null;
+  persistToken(null);
   setActiveUserScope(null);
   store.patchSnapshot({ accountEpoch: invalidatedEpoch, sessionExpired: false, user: null });
 
   try {
     const result = await login({ email, password, remember_me: rememberMe }, attempt.controller.signal);
 
-    if (!isCurrentLoginAttempt(attempt)) {
+    if (!isCurrentTransition(attempt)) {
       throw new LoginAttemptSupersededError();
     }
 
-    browserIdentityTokenAdapter.set(result.token);
-    setActiveUserScope(result.user);
-    const accountEpoch = getAccountLifecycle().activate(result.user.user_id, `:user:${result.user.user_id}`).epoch;
+    persistToken(result.token);
+    const accountEpoch = activateAccount(result.user, result.token);
     store.patchSnapshot({ accountEpoch, sessionExpired: false, user: result.user });
   } catch (error) {
-    if (!isCurrentLoginAttempt(attempt)) {
+    if (!isCurrentTransition(attempt)) {
       throw new LoginAttemptSupersededError();
     }
 
     throw error;
   } finally {
-    if (activeLoginAttempt === attempt) {
-      activeLoginAttempt = null;
-    }
+    endTransition(attempt);
   }
 };
 
 export const logoutSession = (): Promise<void> => {
-  cancelLoginAttempt();
+  cancelTransition();
 
   // apiFetch captures the current token synchronously. Let the best-effort
   // request finish in the old account while local sign-out proceeds at once.
@@ -353,10 +730,7 @@ export const logoutSession = (): Promise<void> => {
     // Tokens are stateless on the backend; local sign-out always wins.
   });
 
-  const accountEpoch = getAccountLifecycle().invalidate().epoch;
-  browserIdentityTokenAdapter.clear();
-  setActiveUserScope(null);
-  store.patchSnapshot({ accountEpoch, sessionExpired: false, user: null });
+  signOut(false, () => persistToken(null));
 
   return Promise.resolve();
 };
@@ -373,7 +747,7 @@ export const completeAdminSetup = async (
 };
 
 /** Reflect a profile edit only into the authenticated lifetime that started it. */
-export const setSessionUser = (user: UserDTO, expectedAccountEpoch: number): void => {
+const setSessionUser = (user: UserDTO, expectedAccountEpoch: number): void => {
   const session = store.getSnapshot();
 
   if (session.accountEpoch !== expectedAccountEpoch || session.user?.user_id !== user.user_id) {
@@ -383,18 +757,38 @@ export const setSessionUser = (user: UserDTO, expectedAccountEpoch: number): voi
   store.patchSnapshot({ user });
 };
 
-// A 401 for the current stored credential invalidates its account lifetime.
-// Login requests carry no stored token, and known single-user mode stays inert.
-export const handleUnauthorizedResponse = (): void => {
-  const canceledLogin = cancelLoginAttempt();
+/** Update the signed-in user's profile; a password change keeps this tab signed in with the replacement token. */
+export const updateOwnProfile = async (changes: ProfileUpdateRequest): Promise<UserDTO> => {
+  const { accountEpoch } = store.getSnapshot();
+  const { user } =
+    changes.new_password === undefined
+      ? await updateCurrentUser(changes)
+      : await rotateOwnCredential((signal) => updateCurrentUser(changes, signal));
+
+  setSessionUser(user, accountEpoch);
+
+  return user;
+};
+
+/** Administrator edit of any user; resetting one's own password rotates this tab's credential like a profile change. */
+export const updateManagedUser = async (userId: string, changes: UserUpdateRequest): Promise<UserDTO> => {
+  const rotatesOwnCredential = changes.password !== undefined && store.getSnapshot().user?.user_id === userId;
+  const { user } = rotatesOwnCredential
+    ? await rotateOwnCredential((signal) => updateUser(userId, changes, signal))
+    : await updateUser(userId, changes);
+
+  return user;
+};
+
+// A 401 for the held credential invalidates its account lifetime. Login
+// requests carry no held token, and known single-user mode stays inert.
+const handleUnauthorizedResponse = (): void => {
+  const canceledTransition = cancelTransition();
   const session = store.getSnapshot();
 
-  if (!canceledLogin && !shouldExpireUnauthorizedSession(session)) {
+  if (!canceledTransition && !shouldExpireUnauthorizedSession(session)) {
     return;
   }
 
-  const accountEpoch = getAccountLifecycle().invalidate().epoch;
-  browserIdentityTokenAdapter.clear();
-  setActiveUserScope(null);
-  store.patchSnapshot({ accountEpoch, sessionExpired: true, user: null });
+  signOut(true, forgetStoredToken);
 };

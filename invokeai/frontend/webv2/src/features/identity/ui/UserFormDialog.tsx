@@ -1,13 +1,7 @@
 import { Dialog, HStack, Input, Portal, Stack, Switch, Text } from '@chakra-ui/react';
 import { createUserFormSchema, PASSWORD_RULES_HINT, type UserFormValues } from '@features/identity/core/schemas';
-import {
-  createUser,
-  generatePassword,
-  updateUser,
-  type UserDTO,
-  type UserUpdateRequest,
-} from '@features/identity/data/api';
-import { useAuthSession } from '@features/identity/session';
+import { createUser, generatePassword, type UserDTO, type UserUpdateRequest } from '@features/identity/data/api';
+import { updateManagedUser, useAuthSession } from '@features/identity/session';
 import { AuthFormAlert } from '@features/identity/ui/AuthScreen';
 import { PasswordInput, PasswordStrengthMeter } from '@features/identity/ui/PasswordInput';
 import { useIdentityNotify } from '@features/identity/ui/useIdentityNotify';
@@ -155,7 +149,7 @@ const UserForm = ({
               return;
             }
 
-            await updateUser(editedUser.user_id, changes);
+            await updateManagedUser(editedUser.user_id, changes);
           }
         } catch (error) {
           throw new Error(getApiErrorMessage(error, isCreate ? t('users.couldNotCreate') : t('users.couldNotUpdate')));

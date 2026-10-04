@@ -4,7 +4,7 @@ import { completeAdminSetup, isLoginAttemptSupersededError, useAuthSession } fro
 import { useZodForm } from '@platform/react/useZodForm';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, Field } from '@platform/ui';
-import { useNavigate } from '@tanstack/react-router';
+import { Navigate } from '@tanstack/react-router';
 import { useCallback, useMemo, type ChangeEvent, type FormEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -16,7 +16,6 @@ const INITIAL_VALUES: SetupFormValues = { confirmPassword: '', displayName: '', 
 export const SetupScreen = () => {
   const { t } = useTranslation();
   const session = useAuthSession();
-  const navigate = useNavigate();
   const schema = useMemo(() => createSetupSchema(session.strictPasswordChecking), [session.strictPasswordChecking]);
   const form = useZodForm(schema, INITIAL_VALUES);
 
@@ -32,10 +31,8 @@ export const SetupScreen = () => {
 
           throw new Error(getApiErrorMessage(error, t('auth.couldNotCreateAdmin')));
         }
-
-        await navigate({ to: '/' });
       }),
-    [form, navigate, t]
+    [form, t]
   );
   const handleSubmit = useCallback(
     (event: FormEvent<HTMLFormElement>) => {
@@ -60,6 +57,11 @@ export const SetupScreen = () => {
     (event: ChangeEvent<HTMLInputElement>) => form.setValue('confirmPassword', event.target.value),
     [form]
   );
+
+  // Leave once signed in, whether by this form or by following another tab that completed setup.
+  if (session.multiuserEnabled && session.user !== null) {
+    return <Navigate replace to="/" />;
+  }
 
   return (
     <AuthScreen footer={t('auth.setupFooter')} subtitle={t('auth.setupSubtitle')} title={t('auth.setupTitle')}>

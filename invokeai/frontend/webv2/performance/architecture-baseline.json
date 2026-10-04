@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 783834,
+        "brotliBytes": 785943,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 783016,
+        "gzipBytes": 785169,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2012114,
+        "initialRawBytes": 2018548,
         "largestAssetRawBytes": 749225,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 94155,
+        "ownedRawBytes": 94688,
         "requestCount": 36,
         "scriptRequestCount": 20,
         "sourceOwners": [
@@ -138,11 +138,11 @@
           "source:src/features/identity/capabilities.ts",
           "source:src/features/identity/core/schemas.ts",
           "source:src/features/identity/core/sessionPolicy.ts",
+          "source:src/features/identity/core/storedCredential.ts",
           "source:src/features/identity/core/tokenStorage.ts",
           "source:src/features/identity/data/api.ts",
           "source:src/features/identity/index.ts",
           "source:src/features/identity/session.ts",
-          "source:src/features/identity/transportAdapter.ts",
           "source:src/features/identity/ui/AccountMenu.tsx",
           "source:src/features/identity/ui/AccountMenuSection.tsx",
           "source:src/features/identity/ui/AuthScreen.tsx",
@@ -337,15 +337,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1139046,
+        "brotliBytes": 1145405,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1132999,
+        "gzipBytes": 1139549,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3111181,
+        "initialRawBytes": 3131769,
         "largestAssetRawBytes": 749225,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 143824,
+        "ownedRawBytes": 147045,
         "requestCount": 74,
         "scriptRequestCount": 58,
         "sourceOwners": [
@@ -580,11 +580,11 @@
           "source:src/features/identity/capabilities.ts",
           "source:src/features/identity/core/schemas.ts",
           "source:src/features/identity/core/sessionPolicy.ts",
+          "source:src/features/identity/core/storedCredential.ts",
           "source:src/features/identity/core/tokenStorage.ts",
           "source:src/features/identity/data/api.ts",
           "source:src/features/identity/index.ts",
           "source:src/features/identity/session.ts",
-          "source:src/features/identity/transportAdapter.ts",
           "source:src/features/identity/ui/AccountMenu.tsx",
           "source:src/features/identity/ui/AccountMenuSection.tsx",
           "source:src/features/identity/ui/AuthScreen.tsx",
@@ -1072,7 +1072,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-02",
+  "capturedAt": "2026-10-04",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",
