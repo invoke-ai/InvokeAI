@@ -1133,6 +1133,53 @@ describe('image index progress', () => {
     expect(imageMapStore.getSnapshot().data).toMatchObject({ modelId: 'encoder-b', pointCount: 3, state: 'ready' });
   });
 
+  it('shows Computing in place of the retired map while a replacement encoder drains', async () => {
+    const labels = { 0: { alternates: [], label: 'retired encoder label' } };
+    mocks.apiFetchJson.mockImplementation((url: string) =>
+      Promise.resolve(
+        url.startsWith('/api/v1/image_map/cluster_labels')
+          ? { labels, updated_at: BACKEND_RESPONSE.updated_at, visible_hash: BACKEND_RESPONSE.visible_hash }
+          : { ...BACKEND_RESPONSE, model_id: 'encoder-a' }
+      )
+    );
+    await refreshImageMapPoints();
+    await drainMacrotask();
+    expect(imageMapStore.getSnapshot()).toMatchObject({ clusterLabels: labels, data: { pointCount: 3 } });
+
+    // The retired encoder is still draining: a replacement is installed, but no model is active yet.
+    mocks.apiFetchJson.mockReset();
+    mocks.apiFetchJson.mockResolvedValue({ enabled: false, index: null, projection: { state: 'computing' } });
+    refreshImageIndexStatus();
+    await drainMacrotask();
+
+    const draining = imageMapStore.getSnapshot();
+    expect(draining.data).toMatchObject({ modelId: null, pointCount: 0, points: [], state: 'computing' });
+    expect(draining.clusterLabels).toBeNull();
+
+    refreshImageIndexStatus();
+    await drainMacrotask();
+    expect(imageMapStore.getSnapshot().data).toBe(draining.data);
+    expect(mocks.apiFetchJson.mock.calls.map(([url]) => String(url).split('?')[0])).toEqual([
+      '/api/v1/image_map/status',
+      '/api/v1/image_map/status',
+    ]);
+
+    mocks.apiFetchJson.mockImplementation((url: string) => {
+      if (url.startsWith('/api/v1/image_map/status')) {
+        return Promise.resolve({ enabled: true, model_id: 'encoder-b', projection: { state: 'ready' } });
+      }
+      return Promise.resolve(
+        url.startsWith('/api/v1/image_map/cluster_labels')
+          ? FOREIGN_LABELS_RESPONSE
+          : { ...BACKEND_RESPONSE, model_id: 'encoder-b' }
+      );
+    });
+    refreshImageIndexStatus();
+    await drainMacrotask();
+
+    expect(imageMapStore.getSnapshot().data).toMatchObject({ modelId: 'encoder-b', pointCount: 3, state: 'ready' });
+  });
+
   it('ignores an old account status response without clearing its newer request', async () => {
     const resolvers: Array<(value: unknown) => void> = [];
     mocks.apiFetchJson.mockImplementation(

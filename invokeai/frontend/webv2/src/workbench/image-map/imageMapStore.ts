@@ -365,12 +365,17 @@ export const refreshImageIndexStatus = (): void => {
       if (revision === mapRevision) {
         const { data } = imageMapStore.getSnapshot();
         const missing = status.state === 'model_missing';
+        // An installed replacement waiting for the retired encoder's work to drain: no model is active, so the
+        // loaded points and labels belong to an encoder that is already gone.
+        const draining = status.state === 'computing' && status.modelId === null;
         // A repeated diagnosis must not bump the revision: that would discard an in-flight Check again.
-        const unchanged = missing && data?.state === 'model_missing' && data.modelName === status.modelName;
+        const unchanged = missing
+          ? data?.state === 'model_missing' && data.modelName === status.modelName
+          : draining && data?.state === 'computing' && data.modelId === null;
         const replaced = data !== null && status.modelId !== null && data.modelId !== status.modelId;
         const recovered = data?.state === 'model_missing' && !missing && status.state !== 'disabled';
 
-        if ((missing && !unchanged) || replaced || recovered) {
+        if (((missing || draining) && !unchanged) || replaced || recovered) {
           mapRevision += 1;
           labelsSequence += 1;
           imageMapStore.patchSnapshot({
@@ -394,7 +399,8 @@ export const refreshImageIndexStatus = (): void => {
             loadState: 'loaded',
             renderError: null,
           });
-          if (missing) {
+          if (missing || draining) {
+            // Nothing to fetch until a model is active; the next poll that reports one reloads the points.
             return;
           }
           void refreshImageMapPoints();
