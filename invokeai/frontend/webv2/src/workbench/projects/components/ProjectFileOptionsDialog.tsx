@@ -1,17 +1,10 @@
-import { Checkbox, Dialog, Portal, Stack, Text } from '@chakra-ui/react';
-import { useMountEffect } from '@platform/react/useMountEffect';
+import { Checkbox, Portal, Stack, Text } from '@chakra-ui/react';
 import { Button, CloseButton } from '@platform/ui';
-import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
+import { Dialog } from '@platform/ui/Dialog';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ProjectFileOptionsRequest } from './ProjectFileOptionsProvider';
-
-const ProjectFileOptionsModalLayer = () => {
-  useMountEffect(() => registerHotkeyModalLayer('project-file-options'));
-
-  return null;
-};
 
 export const ProjectFileOptionsDialog = ({
   isOpen,
@@ -53,7 +46,6 @@ export const ProjectFileOptionsDialog = ({
       onExitComplete={onExitComplete}
       onOpenChange={handleOpenChange}
     >
-      {isOpen ? <ProjectFileOptionsModalLayer /> : null}
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

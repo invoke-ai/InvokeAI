@@ -1,7 +1,7 @@
 import type { GalleryBoard, GalleryImage, GalleryItem, GalleryItemKind } from '@features/gallery/contracts';
 import type { GalleryCanvasImportDestination } from '@workbench/canvas-operations/api';
 
-import { Box, Dialog, Flex, Image, Portal, SimpleGrid, Stack, Text } from '@chakra-ui/react';
+import { Box, Flex, Image, Portal, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import {
   classifyGalleryUpload,
   galleryImageItemToGalleryImage,
@@ -17,8 +17,8 @@ import { useGalleryUploadAction } from '@features/gallery/react';
 import { createGenerateFormValuesSelector } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, CloseButton } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { useQuery } from '@tanstack/react-query';
-import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
 import {
   getGalleryCanvasImportMenuItems,
   useDeletionConfirmation,
@@ -90,12 +90,6 @@ const CanvasDestinationButton = ({
       {label}
     </Button>
   );
-};
-
-const PasteMediaModalLayer = () => {
-  useMountEffect(() => registerHotkeyModalLayer('paste-media'));
-
-  return null;
 };
 
 /**
@@ -212,7 +206,6 @@ export const PasteMediaDialog = ({
         onExitComplete={onExitComplete}
         onOpenChange={handleOpenChange}
       >
-        {isOpen ? <PasteMediaModalLayer /> : null}
         <Portal>
           <Dialog.Backdrop />
           <Dialog.Positioner>

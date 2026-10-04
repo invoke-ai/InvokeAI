@@ -54,7 +54,7 @@ export const resolveHotkey = ({
     hotkeys
       .filter((hotkey) => hotkey.implemented !== false && hotkey.keys.includes(normalized))
       .filter((hotkey) => hotkey.allowInEditable || !isEditable)
-      .filter((hotkey) => hotkey.allowInModal || !context.isModalLayerActive)
+      .filter((hotkey) => hotkey.allowInModal || !context.isModalPresent)
       .map((hotkey) => ({ hotkey, priority: getScopePriority(hotkey, context) }))
       .filter(({ priority }) => priority >= 0)
       .sort((left, right) => right.priority - left.priority)[0]?.hotkey ?? null

@@ -1,11 +1,10 @@
 import type { LucideIcon } from 'lucide-react';
 
 import v7LogoUrl from '@assets/V7Logo.webp';
-import { Badge, Box, Dialog, Flex, Grid, Image, Link, List, Portal, Stack, Text, VStack } from '@chakra-ui/react';
-import { useMountEffect } from '@platform/react/useMountEffect';
+import { Badge, Box, Flex, Grid, Image, Link, List, Portal, Stack, Text, VStack } from '@chakra-ui/react';
 import { DOCS_URL, getReleaseNotesUrl } from '@platform/runtime/appMetadata';
 import { Button, CloseButton } from '@platform/ui';
-import { registerHotkeyModalLayer } from '@workbench/hotkeys/modalLayer';
+import { Dialog } from '@platform/ui/Dialog';
 import { patchWorkbenchPreferences } from '@workbench/settings/store';
 import { BookOpenIcon, BoxesIcon, BrushIcon, FolderIcon, PanelsTopLeftIcon, ScrollTextIcon } from 'lucide-react';
 import { useCallback, useRef } from 'react';
@@ -40,13 +39,6 @@ const HIGHLIGHTS: readonly { descriptionKey: string; icon: LucideIcon; titleKey:
 
 const readItems = (value: unknown): string[] =>
   Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === 'string') : [];
-
-/** Mounted only while the notes are open: workbench hotkeys stay quiet under them, as under the other dialogs. */
-const WhatsNewModalLayer = () => {
-  useMountEffect(() => registerHotkeyModalLayer('whats-new'));
-
-  return null;
-};
 
 /**
  * The modal traps focus, so focus outside it is never the user leaving. Under StrictMode the first, lazily loaded
@@ -90,7 +82,6 @@ export const WhatsNewDialog = ({ onExitComplete }: { onExitComplete?: () => void
       onFocusOutside={keepOpenOnFocusOutside}
       onOpenChange={handleOpenChange}
     >
-      {isOpen ? <WhatsNewModalLayer /> : null}
       <Portal>
         <Dialog.Backdrop />
         <Dialog.Positioner>

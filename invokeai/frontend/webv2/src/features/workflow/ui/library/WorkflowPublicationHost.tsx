@@ -2,7 +2,7 @@ import type { ProjectWorkflowEntry } from '@features/workflow/core/types';
 import type { WorkflowRecordDTO } from '@features/workflow/queries';
 import type { FormEvent } from 'react';
 
-import { chakra, Dialog, Input, Portal, Stack, Text } from '@chakra-ui/react';
+import { chakra, Input, Portal, Stack, Text } from '@chakra-ui/react';
 import { getLibraryWorkflowRecord } from '@features/workflow/queries';
 import { useInvocationTemplatesSnapshot } from '@features/workflow/react';
 import { useWorkflowProjectSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
@@ -17,6 +17,7 @@ import {
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton } from '@platform/ui/Button';
 import { ConfirmDialog } from '@platform/ui/ConfirmDialog';
+import { Dialog } from '@platform/ui/Dialog';
 import { Field } from '@platform/ui/Field';
 import { Suspense, useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';

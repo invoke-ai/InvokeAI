@@ -5,6 +5,7 @@ import type { WorkflowUiAdapter } from '@features/workflow/ui/WorkflowUiContext'
 import { ChakraProvider } from '@chakra-ui/react';
 import { WorkflowUiProvider } from '@features/workflow/ui/WorkflowUiContext';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { system } from '@theme/system';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -107,11 +108,7 @@ describe('AddNodeDialog search', () => {
     host.remove();
   });
 
-  const renderOpen = async ({
-    groupByCategory = true,
-    isOpen = true,
-    registerModalHotkeyLayer = (): (() => void) => () => {},
-  } = {}) => {
+  const renderOpen = async ({ groupByCategory = true, isOpen = true } = {}) => {
     const onAddNode = vi.fn();
     const adapter = {
       getProjectGraph: () => ({ edges: [], nodes: [] }),
@@ -119,7 +116,6 @@ describe('AddNodeDialog search', () => {
         getSnapshot: () => ({ workflowGroupNodesByCategory: groupByCategory }),
         subscribe: () => () => {},
       },
-      registerModalHotkeyLayer,
     } as unknown as WorkflowUiAdapter;
 
     await act(() => {
@@ -181,18 +177,17 @@ describe('AddNodeDialog search', () => {
   });
 
   it('gives hotkeys back to the workbench as it closes, not after it animates out', async () => {
-    let isDialogShownAtRelease: boolean | null = null;
-    const registerModalHotkeyLayer = vi.fn(
-      () => () => (isDialogShownAtRelease = document.querySelector('[role="dialog"]') !== null)
-    );
-    await renderOpen({ registerModalHotkeyLayer });
-    expect(registerModalHotkeyLayer).toHaveBeenCalledExactlyOnceWith('workflow-add-node');
+    await renderOpen();
+    expect(isModalPresent()).toBe(true);
+    const dialog = document.querySelector('[role="dialog"]')!;
+    // A close during the opening animation unmounts at once; settle it so the close animates out.
+    await expect.poll(() => dialog.getAnimations().length).toBe(0);
 
-    await renderOpen({ isOpen: false, registerModalHotkeyLayer });
-    await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+    await renderOpen({ isOpen: false });
+    await expect.poll(() => isModalPresent()).toBe(false);
 
-    expect(isDialogShownAtRelease).toBe(true);
-    expect(registerModalHotkeyLayer).toHaveBeenCalledOnce();
+    expect(dialog.isConnected).toBe(true);
+    expect(dialog.getAttribute('data-state')).toBe('closed');
   });
 
   it('adds the best match on Enter instead of toggling its category', async () => {

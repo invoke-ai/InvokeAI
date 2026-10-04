@@ -2,6 +2,7 @@ import type { PointerPipelineDeps } from '@workbench/canvas-engine/input/pointer
 import type { Tool, ToolContext } from '@workbench/canvas-engine/tools/tool';
 import type { PointerInput, ToolId } from '@workbench/canvas-engine/types';
 
+import { registerModalPresence } from '@platform/ui/modalPresence';
 import { createPointerPipeline } from '@workbench/canvas-engine/input/pointerPipeline';
 import { createViewport } from '@workbench/canvas-engine/viewport';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -552,6 +553,32 @@ describe('pointer pipeline: canvas keyboard ownership', () => {
       h.pipeline.onKeyDown(makeKeyEvent({ key: 'Enter', [modifier]: true, target: SURFACE_TARGET }));
     }
     expect(h.commands).toEqual(['apply', 'apply']);
+  });
+
+  it('takes no key beneath a modal dialog, even with focus left on the document body', () => {
+    const handleEscape = vi.fn();
+    const h = createHarness({ handleEscape });
+    const commands: string[] = [];
+    h.tool.onKeyCommand = (_ctx, command) => commands.push(command);
+    h.pipeline.onPointerEnter();
+    const body = { tagName: 'BODY' };
+    const release = registerModalPresence();
+
+    try {
+      h.pipeline.onKeyDown(makeKeyEvent({ key: 'Enter', target: body }));
+      h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape', target: body }));
+      h.pipeline.onKeyDown(makeKeyEvent({ code: 'Space', key: ' ', target: body }));
+    } finally {
+      release();
+    }
+    expect(commands).toEqual([]);
+    expect(handleEscape).not.toHaveBeenCalled();
+    expect(h.setTool).not.toHaveBeenCalled();
+
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Enter', target: body }));
+    h.pipeline.onKeyDown(makeKeyEvent({ key: 'Escape', target: body }));
+    expect(commands).toEqual(['apply']);
+    expect(handleEscape).toHaveBeenCalledOnce();
   });
 
   it('leaves Space to a focused control and to Ctrl/Meta/Alt chords', () => {

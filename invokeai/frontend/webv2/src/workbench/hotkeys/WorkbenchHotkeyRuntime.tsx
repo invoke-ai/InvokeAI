@@ -1,5 +1,6 @@
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
 
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { useWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
@@ -13,7 +14,6 @@ import { firstPartyHotkeyCatalog } from './catalog';
 import { useExtensionHotkeyDefinitions } from './extensionHotkeys';
 import { useRegisterFirstPartyCommands } from './firstPartyCommands';
 import { toTinykeysBinding } from './keys';
-import { useIsHotkeyModalLayerActive } from './modalLayer';
 import { applyCustomHotkeys, resolveHotkey } from './resolve';
 import { getHotkeyTargetWidget, resolveHotkeyTarget } from './targetWidget';
 
@@ -36,7 +36,6 @@ export const WorkbenchHotkeyRuntime = () => {
   const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
   const project = useActiveProjectSelector(getWidgetPlacementProject, areWidgetPlacementProjectsEqual);
   const extensionHotkeys = useExtensionHotkeyDefinitions();
-  const isModalLayerActive = useIsHotkeyModalLayerActive();
   const getFocusTarget = useWorkbenchFocusTarget();
 
   const registeredHotkeys = useMemo(() => {
@@ -61,7 +60,7 @@ export const WorkbenchHotkeyRuntime = () => {
       targetWidget: getHotkeyTargetWidget(event.target),
     });
     const hotkey = resolveHotkey({
-      context: { ...target, isModalLayerActive, projectId: project.projectId ?? '' },
+      context: { ...target, isModalPresent: isModalPresent(event), projectId: project.projectId ?? '' },
       event,
       hotkeys: registeredHotkeys,
       matchedKey,

@@ -62,6 +62,9 @@ const ROUTE_SHARED_MODULES = [
   '/platform/transport/connectionStore.ts',
   '/platform/transport/socketHub.ts',
   '/platform/ui/ConfirmDialog.tsx',
+  // Every dialog, eager or lazy, is built on these and the hotkey runtime reads the presence; alone they cost a startup request.
+  '/platform/ui/Dialog.tsx',
+  '/platform/ui/modalPresence.ts',
   // Confirm/Rename dialogs and the boot gates keep closing overlays mounted with it; alone it costs a startup request.
   '/platform/react/useExitRetainedValue.ts',
   '/platform/ui/MiddleTruncate.tsx',

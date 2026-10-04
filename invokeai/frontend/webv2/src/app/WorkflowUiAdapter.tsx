@@ -20,7 +20,6 @@ import { createProjectedExternalStore } from '@platform/state/projectedExternalS
 import { shallowEqual } from '@platform/state/selectors';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { resolveAndSubmitGraphPreviewInvocation } from '@workbench/graphPreviewInvocation';
-import { registerHotkeyModalLayer } from '@workbench/hotkeys';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
 import {
   createInvocationRouteInputSelector,
@@ -292,7 +291,6 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
       persistence,
       preferences,
       project,
-      registerModalHotkeyLayer: registerHotkeyModalLayer,
       widgets: {
         // Workflow opens widgets from its buttons: the opened widget takes focus and the region highlight.
         open: (options) => {

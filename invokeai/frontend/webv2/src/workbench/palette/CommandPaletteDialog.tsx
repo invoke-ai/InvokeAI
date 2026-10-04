@@ -1,8 +1,9 @@
 import type { ReactNode } from 'react';
 
-import { Dialog, HStack, Icon, Kbd, Portal, Spacer, Text, chakra } from '@chakra-ui/react';
+import { HStack, Icon, Kbd, Portal, Spacer, Text, chakra } from '@chakra-ui/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { EmptyState } from '@platform/ui/EmptyState';
 import { SearchIcon, XIcon } from 'lucide-react';
 import { useCallback, useMemo, useRef } from 'react';

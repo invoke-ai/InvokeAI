@@ -5,9 +5,10 @@ import type {
 } from '@features/intermediates/core/types';
 /* eslint-disable react-perf/jsx-no-new-function-as-prop */
 
-import { Alert, Box, chakra, Checkbox, Dialog, Input, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { Alert, Box, chakra, Checkbox, Input, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import { formatBytes } from '@platform/i18n/languages';
 import { Button, CloseButton } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { useCallback, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

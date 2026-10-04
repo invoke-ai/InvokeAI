@@ -3,7 +3,7 @@ import type { WorkflowLibraryBrowseSnapshot, WorkflowLibraryEntry } from '@featu
 import type { WorkflowLibraryListItem } from '@features/workflow/queries';
 import type { ChangeEvent } from 'react';
 
-import { Dialog, HStack, Input, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
+import { HStack, Input, Portal, Spinner, Stack, Text } from '@chakra-ui/react';
 import {
   ensureWorkflowLibraryBrowseLoaded,
   getWorkflowLibraryBrowseSnapshot,
@@ -21,6 +21,7 @@ import {
 } from '@features/workflow/ui/workflowUiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { CloseButton, SegmentTabs, segmentTabsPanelId, segmentTabsTabId } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { Suspense, useCallback, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 

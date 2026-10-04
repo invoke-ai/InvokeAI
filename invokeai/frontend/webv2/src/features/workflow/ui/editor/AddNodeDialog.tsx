@@ -2,7 +2,7 @@ import type { InvocationTemplate, InvocationTemplates } from '@features/workflow
 import type { WorkflowEdge, WorkflowNode } from '@features/workflow/core/types';
 import type { AddNodeConnectionFilter } from '@features/workflow/ui/workflowUiStore';
 
-import { Badge, Box, Dialog, HStack, Icon, Input, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
+import { Badge, Box, HStack, Icon, Input, Portal, ScrollArea, Stack, Text } from '@chakra-ui/react';
 import { useInvocationTemplatesSelector } from '@features/workflow/react';
 import { useWorkflowPreferencesSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import {
@@ -12,8 +12,8 @@ import {
   resolveConnectorSource,
 } from '@features/workflow/utility';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
-import { useMountEffect } from '@platform/react/useMountEffect';
 import { IconButton, Tooltip } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { ChevronDownIcon, ChevronsDownUpIcon, ChevronsUpDownIcon, HammerIcon } from 'lucide-react';
 import {
@@ -350,7 +350,6 @@ export const AddNodeDialog = ({
       onExitComplete={content.release}
       onOpenChange={onDialogOpenChange}
     >
-      {isOpen ? <AddNodeModalLayer /> : null}
       {content.isMounted ? (
         <AddNodeDialogContent
           key={content.generation}
@@ -364,15 +363,6 @@ export const AddNodeDialog = ({
       ) : null}
     </Dialog.Root>
   );
-};
-
-/** Blocks workbench hotkeys only while open; the content outlives the open state through its exit animation. */
-const AddNodeModalLayer = () => {
-  const { registerModalHotkeyLayer } = useWorkflowUi();
-
-  useMountEffect(() => registerModalHotkeyLayer('workflow-add-node'));
-
-  return null;
 };
 
 const AddNodeDialogContent = ({

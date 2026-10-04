@@ -337,7 +337,6 @@ const createWorkflowUiAdapter = (): WorkflowUiAdapter => {
       getSnapshot: () => projectSnapshot,
       subscribe: () => () => {},
     },
-    registerModalHotkeyLayer: vi.fn(() => vi.fn()),
     widgets: { open: vi.fn(), patchValues: vi.fn() },
   } as unknown as WorkflowUiAdapter;
 };

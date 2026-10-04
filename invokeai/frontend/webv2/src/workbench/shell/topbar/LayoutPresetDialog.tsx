@@ -3,19 +3,9 @@ import type { InvocationSourceId, ResultDestination } from '@workbench/invocatio
 import type { LayoutPresetRoute } from '@workbench/layoutContracts';
 import type { FormEvent, KeyboardEvent } from 'react';
 
-import {
-  chakra,
-  createListCollection,
-  Dialog,
-  HStack,
-  Icon,
-  Input,
-  Portal,
-  SimpleGrid,
-  Stack,
-  Text,
-} from '@chakra-ui/react';
+import { chakra, createListCollection, HStack, Icon, Input, Portal, SimpleGrid, Stack, Text } from '@chakra-ui/react';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { Field } from '@platform/ui/Field';
 import { Select } from '@platform/ui/Select';
 import { Tooltip } from '@platform/ui/Tooltip';

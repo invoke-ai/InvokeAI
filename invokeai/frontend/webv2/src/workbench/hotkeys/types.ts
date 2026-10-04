@@ -38,7 +38,8 @@ export interface HotkeyContext {
   focusedRegion: WidgetRegion | 'floating' | null;
   activeInstanceId: WidgetInstanceId | null;
   activeWidgetTypeId: WidgetTypeId | null;
-  isModalLayerActive: boolean;
+  /** An interactive modal is open; only hotkeys that opt in with `allowInModal` run beneath it. */
+  isModalPresent: boolean;
   projectId: string;
 }
 

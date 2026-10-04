@@ -1,8 +1,9 @@
-import { chakra, Dialog, Input, Portal, Stack } from '@chakra-ui/react';
+import { chakra, Input, Portal, Stack } from '@chakra-ui/react';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { useCallback, useMemo, useState, type FormEvent } from 'react';
 
 import { Button, CloseButton } from './Button';
+import { Dialog } from './Dialog';
 import { Field } from './Field';
 
 /** Submit only changed, nonempty names; async failures keep the dialog open and callers surface the error. */

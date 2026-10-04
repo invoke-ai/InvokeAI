@@ -1,4 +1,4 @@
-import { Dialog, HStack, Input, Portal, Stack, Switch, Text } from '@chakra-ui/react';
+import { HStack, Input, Portal, Stack, Switch, Text } from '@chakra-ui/react';
 import { createUserFormSchema, PASSWORD_RULES_HINT, type UserFormValues } from '@features/identity/core/schemas';
 import { createUser, generatePassword, type UserDTO, type UserUpdateRequest } from '@features/identity/data/api';
 import { updateManagedUser, useAuthSession } from '@features/identity/session';
@@ -8,6 +8,7 @@ import { useIdentityNotify } from '@features/identity/ui/useIdentityNotify';
 import { useZodForm } from '@platform/react/useZodForm';
 import { getApiErrorMessage } from '@platform/transport/http';
 import { Button, CloseButton, Field } from '@platform/ui';
+import { Dialog } from '@platform/ui/Dialog';
 import { WandSparklesIcon } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';

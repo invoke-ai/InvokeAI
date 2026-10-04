@@ -9,7 +9,7 @@ const context = {
   activeInstanceId: null,
   activeWidgetTypeId: null,
   focusedRegion: null,
-  isModalLayerActive: false,
+  isModalPresent: false,
   projectId: 'project-1',
 } as const;
 
@@ -161,7 +161,7 @@ describe('resolveHotkey', () => {
     // Modal suppression is unchanged by where focus is.
     expect(
       resolveHotkey({
-        context: { ...floating, isModalLayerActive: true },
+        context: { ...floating, isModalPresent: true },
         event,
         hotkeys: [global, anyRegion, widget, instance],
         matchedKey: 'x',
@@ -233,7 +233,7 @@ describe('resolveHotkey', () => {
 
     expect(
       resolveHotkey({
-        context: { ...context, isModalLayerActive: true },
+        context: { ...context, isModalPresent: true },
         event,
         hotkeys: [hotkey],
         matchedKey: 'x',
@@ -241,7 +241,7 @@ describe('resolveHotkey', () => {
     ).toBeNull();
     expect(
       resolveHotkey({
-        context: { ...context, isModalLayerActive: true },
+        context: { ...context, isModalPresent: true },
         event,
         hotkeys: [hotkey, modalHotkey],
         matchedKey: 'x',

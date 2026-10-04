@@ -92,7 +92,6 @@ export interface WorkflowUiAdapter {
   findInGallery(ref: GalleryItemRef): void;
   /** Leaves the editor for the model manager's Add Models section, searching for `query`. */
   openAddModels(query: string): void;
-  registerModalHotkeyLayer(id: string): () => void;
   nodeExecution: {
     get(nodeId: string): WorkflowNodeExecutionState | null;
     subscribe(nodeId: string, listener: () => void): () => void;

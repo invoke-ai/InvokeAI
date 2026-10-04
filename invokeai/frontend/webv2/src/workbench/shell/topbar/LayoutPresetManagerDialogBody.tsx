@@ -1,7 +1,7 @@
 import type { DragEndEvent, KeyboardSensorOptions } from '@dnd-kit/core';
 import type { LayoutPreset, LayoutPresetId } from '@workbench/layoutContracts';
 
-import { Box, Dialog, HStack, Icon, Portal, Stack } from '@chakra-ui/react';
+import { Box, HStack, Icon, Portal, Stack } from '@chakra-ui/react';
 import { closestCenter, DndContext, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { restrictToParentElement, restrictToVerticalAxis } from '@dnd-kit/modifiers';
 import {
@@ -12,6 +12,7 @@ import {
 } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { Tooltip } from '@platform/ui/Tooltip';
 import { getOrderedLayoutPresets } from '@workbench/layoutPresetCollection';

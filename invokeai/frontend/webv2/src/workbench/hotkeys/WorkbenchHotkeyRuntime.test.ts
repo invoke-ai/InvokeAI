@@ -75,7 +75,7 @@ describe('shouldPreventHotkeyDefault', () => {
       activeInstanceId: 'canvas',
       activeWidgetTypeId: 'canvas',
       focusedRegion: null,
-      isModalLayerActive: false,
+      isModalPresent: false,
       projectId: 'project-1',
     };
 

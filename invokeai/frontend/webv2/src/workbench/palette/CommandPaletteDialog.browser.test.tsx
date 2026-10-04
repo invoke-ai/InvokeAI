@@ -1,6 +1,7 @@
 import { ChakraProvider } from '@chakra-ui/react';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import i18n from 'i18next';
@@ -213,13 +214,17 @@ describe('CommandPaletteDialog interaction', () => {
     await waitFor(() => expect(document.activeElement).toBe(button));
   });
 
-  it('animates the palette out instead of unmounting it on close', async () => {
+  it('animates the palette out instead of unmounting it on close, suspending shortcuts only while open', async () => {
     const button = await renderStorePaletteHost();
     await act(() => userEvent.click(button));
     await waitFor(() => expect(document.querySelector('[role="dialog"]')?.getAttribute('data-state')).toBe('open'));
     const dialog = document.querySelector('[role="dialog"]')!;
+    expect(isModalPresent()).toBe(true);
 
-    const frames = await recordDialogExit(dialog, () => act(() => userEvent.keyboard('{Escape}')));
+    const frames = await recordDialogExit(dialog, async () => {
+      await act(() => userEvent.keyboard('{Escape}'));
+      expect(isModalPresent()).toBe(false);
+    });
 
     // An unmounted palette never reaches its closed state, so it cannot animate out; a retained one does, then leaves.
     expect(closingFrames(frames)).not.toHaveLength(0);

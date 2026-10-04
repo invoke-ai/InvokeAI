@@ -3,8 +3,8 @@ import { ChakraProvider } from '@chakra-ui/react';
 import { settleAnimations } from '@platform/browser/settleAnimations.testing';
 import { accountLifecycle, captureAccountScope } from '@platform/state/accountLifecycle';
 import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
+import { isModalPresent } from '@platform/ui/modalPresence';
 import { system } from '@theme/system';
-import { isHotkeyModalLayerActive } from '@workbench/hotkeys/modalLayer';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -104,7 +104,7 @@ it('animates the dialog out instead of unmounting it when the choice settles', a
     await act(() => page.getByRole('button', { name: 'Cancel', exact: true }).click());
     expect(results).toEqual([null]);
     // Workbench hotkeys resume at close, not after the exit animation.
-    expect(isHotkeyModalLayerActive()).toBe(false);
+    expect(isModalPresent()).toBe(false);
   });
 
   // An unmounted dialog never reaches its closed state, so it cannot animate out; a retained one does, then leaves.

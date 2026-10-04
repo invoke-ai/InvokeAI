@@ -1,10 +1,11 @@
 import type { LibraryCopyChoiceRequest } from '@features/workflow/ui/workflowUiStore';
 
-import { createListCollection, Dialog, Portal, Stack } from '@chakra-ui/react';
+import { createListCollection, Portal, Stack } from '@chakra-ui/react';
 import { useWorkflowProjectSelector, useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import { clearLibraryCopyChoice, setWorkflowLibraryOpen, workflowUiStore } from '@features/workflow/ui/workflowUiStore';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { Button, CloseButton } from '@platform/ui/Button';
+import { Dialog } from '@platform/ui/Dialog';
 import { Field } from '@platform/ui/Field';
 import { Select } from '@platform/ui/Select';
 import { useCallback, useMemo, useRef, useState, type RefObject } from 'react';

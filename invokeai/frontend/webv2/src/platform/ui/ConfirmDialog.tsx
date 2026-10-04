@@ -1,8 +1,9 @@
-import { Dialog, Portal, Stack, Text } from '@chakra-ui/react';
+import { Portal, Stack, Text } from '@chakra-ui/react';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 
 import { Button, CloseButton } from './Button';
+import { Dialog } from './Dialog';
 
 /** Closes after confirmation even on error; callers must report failures. */
 export const ConfirmDialog = ({
