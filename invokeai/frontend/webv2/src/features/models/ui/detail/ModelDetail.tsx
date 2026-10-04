@@ -8,6 +8,12 @@ import { isLinkableType } from '@features/models/core/relationships';
 import { isAbsoluteModelPath, resolveModelAbsolutePath } from '@features/models/core/schemas';
 import { getModelSourceHref } from '@features/models/core/taxonomy';
 import { useModelsSelector, type ModelsSnapshot } from '@features/models/data/modelsStore';
+import {
+  discardModelDraft,
+  openModelIdentityDraft,
+  useModelDraft,
+  type ModelDraft,
+} from '@features/models/ui/modelDraftsStore';
 import { ModelActionMenuItems, type PendingModelAction } from '@features/models/ui/shared/ModelActionsMenu';
 import { useNotify } from '@features/models/ui/useModelsNotify';
 import { formatBytes } from '@platform/i18n/languages';
@@ -59,6 +65,8 @@ type ModelIdentityModel = Pick<
   | 'type'
   | 'variant'
 >;
+
+const isIdentityEditorOpen = (draft: ModelDraft | undefined): boolean => draft?.identity !== undefined;
 
 const findModel = (snapshot: ModelsSnapshot, modelKey: string): ModelConfig | undefined =>
   snapshot.modelsByKey.get(modelKey);
@@ -220,8 +228,8 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
 }: ModelIdentitySectionProps) {
   const notify = useNotify();
   const { t } = useTranslation();
-  const [editingModelKey, setEditingModelKey] = useState<string | null>(null);
-  const isEditing = editingModelKey === model.key;
+  // The open editor lives with the model's retained draft, so it survives leaving the pane and coming back.
+  const isEditing = useModelDraft(model.key, isIdentityEditorOpen);
 
   return (
     <>
@@ -258,18 +266,18 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
           isEditing={isEditing}
           model={model}
           onRequestConfirm={onRequestConfirm}
-          onToggleEditing={() => setEditingModelKey((key) => (key === model.key ? null : model.key))}
+          onToggleEditing={() =>
+            isEditing ? discardModelDraft(model.key, 'identity') : openModelIdentityDraft(model.key)
+          }
         />
       </HStack>
 
       {isEditing ? (
         <ModelEditForm
           model={model}
-          onCancel={() => setEditingModelKey(null)}
-          onSaved={() => {
-            setEditingModelKey(null);
-            notify.success(t('models.modelUpdated'), model.name);
-          }}
+          onCancel={() => discardModelDraft(model.key, 'identity')}
+          // The draft store settles the save itself, closing the editor unless edits were made meanwhile.
+          onSaved={() => notify.success(t('models.modelUpdated'), model.name)}
         />
       ) : (
         <ModelAttributes isMissing={isMissing} model={model} />

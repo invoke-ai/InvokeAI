@@ -14,15 +14,31 @@ import {
 } from '@features/models/core/taxonomy';
 import { updateModel } from '@features/models/data/api';
 import { replaceModelInStore } from '@features/models/data/modelsStore';
+import {
+  applyModelDraftFields,
+  beginModelDraftSave,
+  clearModelIdentitySaveError,
+  failModelDraftSave,
+  finishModelDraftSave,
+  hasDraftFields,
+  hasModelDraftConflict,
+  recordModelDraftFields,
+  toModelIdentityValues,
+  useModelDraft,
+  type ModelDraft,
+} from '@features/models/ui/modelDraftsStore';
 import { useZodForm } from '@platform/react/useZodForm';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
   isAccountScopeCurrent,
 } from '@platform/state/accountLifecycle';
+import { shallowEqual } from '@platform/state/selectors';
 import { Button, Field, Select } from '@platform/ui';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+
+import { DraftConflictNotice, UnsavedChangesLabel } from './ModelDraftNotices';
 
 // `external` is the hosted-provider sentinel; assigning it to a local model
 // would misroute it across the app, so the edit form never offers it.
@@ -47,6 +63,12 @@ type ModelEditTarget = Pick<
   | 'variant'
 >;
 
+const selectIdentityDraft = (draft: ModelDraft | undefined) => draft?.identity;
+
+/**
+ * Edits write through to the model's retained draft, so the form reopens as it was left until saved or cancelled. The
+ * draft also carries a save in flight and its failure, which outlive this instance when the user navigates away.
+ */
 export const ModelEditForm = ({
   model,
   onCancel,
@@ -60,17 +82,23 @@ export const ModelEditForm = ({
   // `config_path` only exists on checkpoint-style config classes; its absence
   // (not emptiness) hides the field, since the PATCH would silently drop it.
   const hasConfigPath = model.config_path !== undefined;
-  const form = useZodForm(modelEditSchema, {
-    base: String(model.base),
-    configPath: model.config_path ?? '',
-    description: model.description ?? '',
-    format: String(model.format),
-    name: model.name,
-    predictionType: (model.prediction_type ?? '') as ModelEditFormValues['predictionType'],
-    sourceUrl: model.source_url ?? '',
-    type: String(model.type),
-    variant: model.variant ?? '',
-  });
+  const serverValues = useMemo(() => toModelIdentityValues(model), [model]);
+  const draft = useModelDraft(model.key, selectIdentityDraft);
+  const form = useZodForm(modelEditSchema, applyModelDraftFields(serverValues, draft));
+  const isSaving = draft?.submitted !== undefined;
+  const formError = form.formError ?? draft?.error ?? null;
+  // A server change rebases the form: edited fields keep the user's value, untouched fields take the new record.
+  const [rebasedFrom, setRebasedFrom] = useState(serverValues);
+
+  if (!shallowEqual(rebasedFrom, serverValues)) {
+    setRebasedFrom(serverValues);
+    form.setValues(applyModelDraftFields(serverValues, draft));
+  }
+
+  const setField = <Key extends keyof ModelEditFormValues>(key: Key, value: ModelEditFormValues[Key]) => {
+    form.setValue(key, value);
+    recordModelDraftFields(model.key, 'identity', { ...form.values, [key]: value }, serverValues);
+  };
 
   const baseCollection = useMemo(() => {
     const bases: readonly string[] = ASSIGNABLE_BASES.includes(String(model.base))
@@ -121,8 +149,16 @@ export const ModelEditForm = ({
     };
   }, [form.values.base, form.values.type, form.values.variant, t]);
 
-  const handleSave = () =>
-    form.handleSubmit(async (values) => {
+  const handleSave = () => {
+    clearModelIdentitySaveError(model.key);
+    // The raw values, not the parsed ones: the draft's fields are raw, and a later edit is told apart by comparison.
+    const submitted = form.values;
+
+    return form.handleSubmit(async (values) => {
+      if (!beginModelDraftSave(model.key, 'identity', submitted)) {
+        return;
+      }
+
       const owner = captureAccountScope();
 
       try {
@@ -144,15 +180,23 @@ export const ModelEditForm = ({
 
         assertAccountScopeCurrent(owner);
         replaceModelInStore(updated);
+        finishModelDraftSave(model.key, 'identity', toModelIdentityValues(updated));
         onSaved();
       } catch (error) {
         if (!isAccountScopeCurrent(owner)) {
           return;
         }
 
-        throw error;
+        // Held by the draft rather than this instance, so whichever form is mounted when it lands shows it.
+        failModelDraftSave(
+          model.key,
+          'identity',
+          serverValues,
+          error instanceof Error ? error.message : t('common.somethingWentWrong')
+        );
       }
     });
+  };
 
   return (
     <Stack gap="3">
@@ -161,7 +205,7 @@ export const ModelEditForm = ({
           aria-invalid={form.errors.name ? true : undefined}
           size="lg"
           value={form.values.name}
-          onChange={(event) => form.setValue('name', event.currentTarget.value)}
+          onChange={(event) => setField('name', event.currentTarget.value)}
         />
       </Field>
       <Field error={form.errors.description} label={t('models.description')}>
@@ -169,7 +213,7 @@ export const ModelEditForm = ({
           rows={2}
           size="lg"
           value={form.values.description}
-          onChange={(event) => form.setValue('description', event.currentTarget.value)}
+          onChange={(event) => setField('description', event.currentTarget.value)}
         />
       </Field>
       <HStack align="start" gap="2">
@@ -183,7 +227,7 @@ export const ModelEditForm = ({
               const base = value[0];
 
               if (base !== undefined) {
-                form.setValue('base', base);
+                setField('base', base);
               }
             }}
           />
@@ -198,7 +242,7 @@ export const ModelEditForm = ({
               const type = value[0];
 
               if (type !== undefined) {
-                form.setValue('type', type);
+                setField('type', type);
               }
             }}
           />
@@ -216,7 +260,7 @@ export const ModelEditForm = ({
                 const variant = value[0];
 
                 if (variant !== undefined) {
-                  form.setValue('variant', variant);
+                  setField('variant', variant);
                 }
               }}
             />
@@ -224,7 +268,7 @@ export const ModelEditForm = ({
             <Input
               size="lg"
               value={form.values.variant}
-              onChange={(event) => form.setValue('variant', event.currentTarget.value)}
+              onChange={(event) => setField('variant', event.currentTarget.value)}
             />
           )}
         </Field>
@@ -238,7 +282,7 @@ export const ModelEditForm = ({
               const predictionType = value[0];
 
               if (predictionType !== undefined) {
-                form.setValue('predictionType', predictionType as ModelEditFormValues['predictionType']);
+                setField('predictionType', predictionType as ModelEditFormValues['predictionType']);
               }
             }}
           />
@@ -255,7 +299,7 @@ export const ModelEditForm = ({
               const format = value[0];
 
               if (format !== undefined) {
-                form.setValue('format', format);
+                setField('format', format);
               }
             }}
           />
@@ -265,7 +309,7 @@ export const ModelEditForm = ({
             <Input
               size="lg"
               value={form.values.configPath}
-              onChange={(event) => form.setValue('configPath', event.currentTarget.value)}
+              onChange={(event) => setField('configPath', event.currentTarget.value)}
             />
           </Field>
         ) : null}
@@ -276,19 +320,21 @@ export const ModelEditForm = ({
           placeholder="https://…"
           size="lg"
           value={form.values.sourceUrl}
-          onChange={(event) => form.setValue('sourceUrl', event.currentTarget.value)}
+          onChange={(event) => setField('sourceUrl', event.currentTarget.value)}
         />
       </Field>
-      {form.formError ? (
+      {formError ? (
         <Text color="fg.error" fontSize="xs" role="alert">
-          {form.formError}
+          {formError}
         </Text>
       ) : null}
+      {hasModelDraftConflict(serverValues, draft) ? <DraftConflictNotice /> : null}
       <HStack gap="2" justify="flex-end">
-        <Button disabled={form.isSubmitting} variant="ghost" onClick={onCancel}>
+        {hasDraftFields(draft) ? <UnsavedChangesLabel /> : null}
+        <Button disabled={isSaving} variant="ghost" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
-        <Button loading={form.isSubmitting} variant="solid" onClick={() => void handleSave()}>
+        <Button loading={isSaving} variant="solid" onClick={() => void handleSave()}>
           {t('users.saveChanges')}
         </Button>
       </HStack>
