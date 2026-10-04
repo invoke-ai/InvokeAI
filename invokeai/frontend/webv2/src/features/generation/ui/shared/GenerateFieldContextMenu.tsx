@@ -24,7 +24,7 @@ export const GenerateFieldContextMenu = ({
   resetLabel,
 }: GenerateFieldContextMenuProps) => {
   const { t } = useTranslation();
-  const { anchor: point, close, open } = useContextMenu();
+  const { anchor: point, close, onRequestDismiss, open } = useContextMenu();
 
   return (
     <Box
@@ -46,6 +46,7 @@ export const GenerateFieldContextMenu = ({
             close();
           }
         }}
+        onRequestDismiss={onRequestDismiss}
       >
         <Portal>
           <Menu.Positioner>

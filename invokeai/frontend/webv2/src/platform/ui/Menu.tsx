@@ -143,6 +143,13 @@ const activeMenu = createExternalStore<{ owner: string | null; anchor: ContextMe
   anchor: null,
 });
 
+/**
+ * Menus sharing this ownership replace one another; none is a parent of the next. The layer stack dismisses every
+ * layer registered after one being torn down, so a menu that registers before its predecessor is gone (its content
+ * still mounted from an exit animation) would be closed as if nested. Pass this as the menu root's `onRequestDismiss`.
+ */
+const keepOpenThroughSiblingTeardown = (event: Event) => event.preventDefault();
+
 /** Row and field menus share ownership so a second right-click replaces the first menu. */
 export const useContextMenu = () => {
   const owner = useId();
@@ -163,5 +170,5 @@ export const useContextMenu = () => {
     }
   });
 
-  return { anchor, close, open };
+  return { anchor, close, onRequestDismiss: keepOpenThroughSiblingTeardown, open };
 };

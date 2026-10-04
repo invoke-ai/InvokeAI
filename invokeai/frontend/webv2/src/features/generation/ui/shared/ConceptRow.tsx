@@ -6,6 +6,7 @@ import { Avatar, Badge, Box, Flex, Icon, Menu, Portal } from '@chakra-ui/react';
 import { DEFAULT_LORA_WEIGHT_CONFIG, getDefaultLoraWeight } from '@features/generation/core/settings';
 import { useDebouncedDraftValue } from '@features/generation/ui/useDebouncedDraftValue';
 import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
+import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { IconButton } from '@platform/ui/Button';
 import { ListItem } from '@platform/ui/list/ListItem';
 import { ListStack } from '@platform/ui/list/ListStack';
@@ -173,6 +174,8 @@ const ConceptRowContent = ({
   const isActive = lora.isEnabled && isCompatible;
   const defaultWeight = getDefaultLoraWeight(lora.model);
   const menu = useContextMenu();
+  // Kept through the exit animation: the anchor clears the moment the menu closes.
+  const { release: releaseMenu, value: shownAnchor } = useExitRetainedValue(menu.anchor);
   const handleToggle = useCallback((isEnabled: boolean) => onUpdate(key, { isEnabled }), [key, onUpdate]);
   const handleWeightChange = useCallback((weight: number) => onUpdate(key, { weight }), [key, onUpdate]);
   const removeFrom = useCallback(
@@ -289,19 +292,21 @@ const ConceptRowContent = ({
         lazyMount
         open={menu.anchor !== null}
         positioning={{
-          getAnchorRect: () => (menu.anchor ? { height: 1, width: 1, x: menu.anchor.x, y: menu.anchor.y } : null),
+          getAnchorRect: () => (shownAnchor ? { height: 1, width: 1, x: shownAnchor.x, y: shownAnchor.y } : null),
           placement: 'bottom-start',
         }}
         unmountOnExit
+        onExitComplete={releaseMenu}
         onOpenChange={(event) => {
           if (!event.open) {
             menu.close();
           }
         }}
+        onRequestDismiss={menu.onRequestDismiss}
       >
         <Portal>
           <Menu.Positioner>
-            {menu.anchor ? (
+            {shownAnchor ? (
               <MenuContent minW="12rem">
                 {openInModelManager ? (
                   <MenuActionItem
@@ -333,7 +338,7 @@ const ConceptRowContent = ({
                   label={t('widgets.generate.conceptMenu.remove')}
                   tone="danger"
                   value="remove"
-                  onSelect={() => removeFrom(menu.anchor?.focusTarget?.() ?? null)}
+                  onSelect={() => removeFrom(shownAnchor.focusTarget?.() ?? null)}
                 />
               </MenuContent>
             ) : null}
