@@ -11,10 +11,12 @@ class RegionalIPData:
         masks: list[torch.Tensor],
         dtype: torch.dtype,
         device: torch.device,
+        cond_mode: str, # TODO: attention kwargs
         max_downscale_factor: int = 8,
     ):
         """Initialize a `IPAdapterConditioningData` object."""
         assert len(image_prompt_embeds) == len(scales) == len(masks)
+        self.cond_mode = cond_mode
 
         # The image prompt embeddings.
         # regional_ip_data[i] contains the image prompt embeddings for the i'th IP-Adapter. Each tensor

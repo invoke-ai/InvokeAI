@@ -153,19 +153,25 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
                     ipa_scale = regional_ip_data.scales[ipa_index]
                     ip_mask = ip_masks[0, ipa_index, ...]
 
-                    # The batch dimensions should match.
-                    assert ipa_embed.shape[0] == encoder_hidden_states.shape[0]
+                    assert ipa_embed.shape[0] == 2
                     # The token_len dimensions should match.
                     assert ipa_embed.shape[-1] == encoder_hidden_states.shape[-1]
-
-                    ip_hidden_states = ipa_embed
 
                     # Expected ip_hidden_state shape: (batch_size, num_ip_images, ip_seq_len, ip_image_embedding)
 
                     if not self._ip_adapter_attention_weights[ipa_index].skip:
                         # apply the IP-Adapter weights to the negative embeds
+                        # ipa_embed[0] - uncond (neg)
+                        # ipa_embed[1] - cond (pos)
                         if self._ip_adapter_attention_weights[ipa_index].negative:
-                            ip_hidden_states = torch.cat([ip_hidden_states[1], ip_hidden_states[0] * 0], dim=0)
+                            ipa_embed = torch.cat([ipa_embed[1], ipa_embed[0] * 0], dim=0)
+
+                        if regional_ip_data.cond_mode == "pos":
+                            ip_hidden_states = ipa_embed[1:2] # [1]
+                        elif regional_ip_data.cond_mode == "neg":
+                            ip_hidden_states = ipa_embed[0:1] # [0]
+                        else:
+                            ip_hidden_states = ipa_embed
 
                         ip_key = ipa_weights.to_k_ip(ip_hidden_states)
                         ip_value = ipa_weights.to_v_ip(ip_hidden_states)
