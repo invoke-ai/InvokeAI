@@ -35,6 +35,13 @@ export interface GenerationSeedHistoryItem {
   thumbnailUrl: string | null;
 }
 
+export interface GenerationQueueInsights {
+  /** Executed seeds of recent completed Generate runs for this project, newest first. */
+  seedHistory: readonly GenerationSeedHistoryItem[];
+  /** Mean seconds per completed recent Generate run; null with no history to ground it. */
+  secondsPerRun: number | null;
+}
+
 /** A named Generate settings snapshot; `values` is normalized by the feature on apply. */
 export interface GeneratePresetRecord {
   id: string;
@@ -97,12 +104,11 @@ export interface GenerationUiAdapter {
     rename(presetId: string, label: string): void;
     remove(presetId: string): void;
   };
-  queueInsights: {
-    /** Executed seeds of recent completed Generate runs for this project, newest first. */
-    seedHistory: readonly GenerationSeedHistoryItem[];
-    /** Mean seconds per completed recent Generate run; null with no history to ground it. */
-    secondsPerRun: number | null;
-  };
+  /**
+   * Insights from the project's recent queue runs. Subscribing keeps the backing queue read observed, so only the
+   * controls that display them read it, through `useGenerationQueueInsights`.
+   */
+  queueInsights: ReadableExternalStore<GenerationQueueInsights>;
   rebalancePresets: {
     /** User-saved conditioning rebalance curves; built-ins are not included. */
     presets: readonly RebalancePreset[];
@@ -151,6 +157,14 @@ export function useGenerateValues<Selected>(
   const { generateValues } = useGenerationUi();
   return useExternalStoreSelector(generateValues.subscribe, generateValues.getSnapshot, selector, isEqual);
 }
+
+export const useGenerationQueueInsights = <Selected,>(
+  selector: (insights: GenerationQueueInsights) => Selected,
+  isEqual: EqualityFn<Selected> = shallowEqual
+): Selected => {
+  const { queueInsights } = useGenerationUi();
+  return useExternalStoreSelector(queueInsights.subscribe, queueInsights.getSnapshot, selector, isEqual);
+};
 
 export const GenerationModelSelect = (props: GenerationModelSelectProps) => {
   const { ModelSelect } = useGenerationUi().models;

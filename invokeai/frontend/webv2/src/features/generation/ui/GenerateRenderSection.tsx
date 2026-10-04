@@ -29,7 +29,7 @@ import { Tooltip } from '@platform/ui/Tooltip';
 import { useTranslation } from 'react-i18next';
 
 import { GenerateConditioningRebalanceField } from './GenerateConditioningRebalanceField';
-import { useGenerationUi } from './GenerationUiContext';
+import { type GenerationQueueInsights, useGenerationQueueInsights } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 import { GenerateToggleSwitch } from './shared/GenerateToggleSwitch';
@@ -228,10 +228,12 @@ const Krea2SeedVarianceFields = ({ onCommit, settings }: Pick<GenerateRenderSect
   );
 };
 
+const selectSeedHistory = (insights: GenerationQueueInsights) => insights.seedHistory;
+
 /** Clicking an executed seed switches to fixed mode. */
 const SeedField = ({ onCommit, settings }: Pick<GenerateRenderSectionProps, 'onCommit' | 'settings'>) => {
   const { t } = useTranslation();
-  const { seedHistory } = useGenerationUi().queueInsights;
+  const seedHistory = useGenerationQueueInsights(selectSeedHistory);
   // Share expansion queries so seed counts match submission without duplicate fetches.
   const expansion = useDynamicPrompts(getEffectivePrompts(settings).positivePrompt, getDynamicPromptsConfig(settings));
 

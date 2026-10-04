@@ -13,8 +13,9 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { GenerateDimensionFields } from './GenerateDimensionFields';
 
 vi.mock('./GenerationUiContext', () => ({
+  useGenerationQueueInsights: (select: (insights: unknown) => unknown) =>
+    select({ secondsPerRun: null, seedHistory: [] }),
   useGenerationUi: () => ({
-    queueInsights: { secondsPerRun: null, seedHistory: [] },
     sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionOpen: vi.fn() },
   }),
 }));

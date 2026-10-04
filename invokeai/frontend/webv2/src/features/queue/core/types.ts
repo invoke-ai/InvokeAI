@@ -239,7 +239,6 @@ export interface QueueStatusReadModel {
 
 export interface QueueItemIdsReadModel {
   itemIds: number[];
-  totalCount: number;
 }
 
 export interface QueueItemProgress {

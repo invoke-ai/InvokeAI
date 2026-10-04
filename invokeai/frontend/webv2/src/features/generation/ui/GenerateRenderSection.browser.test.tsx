@@ -20,8 +20,8 @@ const seedHistory = [
 ];
 
 vi.mock('./GenerationUiContext', () => ({
+  useGenerationQueueInsights: (select: (insights: unknown) => unknown) => select({ secondsPerRun: null, seedHistory }),
   useGenerationUi: () => ({
-    queueInsights: { secondsPerRun: null, seedHistory },
     sectionPreferences: { sectionsOpen: { render: true }, setSectionOpen: vi.fn() },
   }),
 }));

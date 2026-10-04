@@ -109,6 +109,8 @@ const storedValues = (projectId = 'project-1') => {
   return values;
 };
 
+const NO_QUEUE_INSIGHTS = { secondsPerRun: null, seedHistory: [] };
+
 /** Groups shared by every adapter a test renders, as the app keeps them stable across renders. */
 const createStableGroups = () => ({
   CanvasGenerationSections: () => null,
@@ -128,6 +130,7 @@ const createStableGroups = () => ({
   notifications: { error: noop, info: noop, reportError: noop },
   presets: { presets: [], remove: noop, rename: noop, save: noop },
   promptHistory: { clear: noop, items: [], remove: noop },
+  queueInsights: { getSnapshot: () => NO_QUEUE_INSIGHTS, subscribe: () => noop },
   rebalancePresets: { presets: [], remove: noop, rename: noop, save: noop },
   sectionPreferences: { sectionsOpen: ALL_SECTIONS_OPEN, setSectionOpen: noop },
   settings: {
@@ -145,7 +148,6 @@ const buildAdapter = (activeProjectId = 'project-1'): GenerationUiAdapter =>
     ...stableGroups,
     generateValues: storedValues(activeProjectId),
     project: { activeProjectId, invocationSourceId: 'generate', showPromptSyntaxHighlighting: false },
-    queueInsights: { secondsPerRun: null, seedHistory: [] },
   }) as unknown as GenerationUiAdapter;
 
 const settle = (run: () => void = noop, ms = 0) =>

@@ -2134,7 +2134,7 @@ describe('queue runtime video board routing', () => {
       onConnectionChange: vi.fn(() => vi.fn()),
       pauseProcessor: vi.fn(),
       readCurrent: vi.fn().mockResolvedValue(null),
-      readItemIds: vi.fn().mockResolvedValue({ itemIds: [], totalCount: 0 }),
+      readItemIds: vi.fn().mockResolvedValue({ itemIds: [] }),
       readItemsById: vi.fn().mockResolvedValue([]),
       readNext: vi.fn().mockResolvedValue(null),
       readStatus: vi.fn().mockResolvedValue({

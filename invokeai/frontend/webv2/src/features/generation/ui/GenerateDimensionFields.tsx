@@ -17,7 +17,7 @@ import { ArrowLeftRightIcon, LockIcon } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useGenerationUi } from './GenerationUiContext';
+import { type GenerationQueueInsights, useGenerationQueueInsights } from './GenerationUiContext';
 import { AspectRatioLockButton, AspectRatioSelect } from './shared/AspectRatioSelect';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
@@ -234,6 +234,8 @@ const SizePreview = ({
   );
 };
 
+const selectSecondsPerRun = (insights: GenerationQueueInsights) => insights.secondsPerRun;
+
 export const GenerateDimensionFields = ({
   onCommit,
   projectId,
@@ -241,7 +243,7 @@ export const GenerateDimensionFields = ({
   settings,
 }: GenerateDimensionFieldsProps) => {
   const { t } = useTranslation();
-  const { secondsPerRun } = useGenerationUi().queueInsights;
+  const secondsPerRun = useGenerationQueueInsights(selectSecondsPerRun);
   const [draftDimensions, setDraftDimensions] = useState<Dimensions | null>(null);
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
   const dimensions = getGenerationDimensions(selectedModel);
