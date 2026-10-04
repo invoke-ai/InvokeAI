@@ -30,36 +30,109 @@ on:
         type: boolean
         default: true
 
-defaults:
-  run:
-    working-directory: invokeai/frontend/web
+# One run per pull request: a new push cancels the superseded run. The PR number is used rather
+# than the head branch, which two forks can share. Pushes to main and merge groups fall back to
+# the run id and never cancel each other. The group names the workflow literally
+# because `github.workflow` is the caller's name inside a reusable workflow, and release.yml calls
+# several of these at once.
+concurrency:
+  group: frontend-tests-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
-  frontend-tests:
+  frontend-webv2-tests:
     runs-on: ubuntu-latest
-    timeout-minutes: 10 # expected run time: <2 min
+    timeout-minutes: 20 # Includes browser suites, performance sampling, project files, and accessibility.
+    defaults:
+      run:
+        working-directory: invokeai/frontend/webv2
     steps:
       - uses: actions/checkout@v6
 
-      - name: check for changed frontend files
+      - name: check for changed webv2 files
         if: ${{ inputs.always_run != true }}
         id: changed-files
-        # Pinned to the _hash_ for v45.0.9 to prevent supply-chain attacks.
-        # See:
-        # - CVE-2025-30066
-        # - https://www.stepsecurity.io/blog/harden-runner-detection-tj-actions-changed-files-action-is-compromised
-        # - https://github.com/tj-actions/changed-files/issues/2463
         uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
         with:
           files_yaml: |
-            frontend:
-              - 'invokeai/frontend/web/**'
+            webv2:
+              - '.github/workflows/frontend-tests.yml'
+              - '.nvmrc'
+              - '.github/actions/install-frontend-deps/**'
+              - 'invokeai/frontend/webv2/**'
 
       - name: install dependencies
-        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
+        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
         uses: ./.github/actions/install-frontend-deps
+        with:
+          working-directory: invokeai/frontend/webv2
 
-      - name: vitest
-        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm test:no-watch'
+      - name: install Chromium
+        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
+        run: 'pnpm exec playwright install --with-deps chromium'
         shell: bash
+
+      # A pull request into main, or a merge group, is compared with the base branch's
+      # own measurements, restored from the cache every push to main fills below: the exact base
+      # commit when it has an entry, otherwise the most recent main entry (a main job that failed or
+      # is still running leaves no hole). Anything else compares against the committed baseline. The
+      # gate also honors deliberately re-recorded byte baselines. It logs which reference it used,
+      # and the restored key is passed through so reports can name it.
+      - name: restore performance reference
+        id: perf-ref
+        if: ${{ (steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true) && ((github.event_name == 'pull_request' && github.base_ref == 'main') || (github.event_name == 'merge_group' && github.event.merge_group.base_ref == 'refs/heads/main')) }}
+        uses: actions/cache/restore@v5
+        with:
+          path: invokeai/frontend/webv2/artifacts/perf-reference
+          key: webv2-perf-reference-${{ github.event.pull_request.base.sha || github.event.merge_group.base_sha }}
+          restore-keys: webv2-perf-reference-
+
+      - name: note a missing performance reference
+        if: ${{ steps.perf-ref.outcome == 'success' && steps.perf-ref.outputs.cache-matched-key == '' }}
+        run: 'echo "::warning::No performance reference was restored; byte budgets are compared against the committed baseline."'
+        shell: bash
+
+      - name: release completion gates
+        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
+        run: 'pnpm check:release'
+        shell: bash
+        env:
+          WEBV2_PERF_REFERENCE_DIR: ${{ steps.perf-ref.outputs.cache-matched-key != '' && 'artifacts/perf-reference' || '' }}
+          WEBV2_PERF_REFERENCE_LABEL: ${{ steps.perf-ref.outputs.cache-matched-key }}
+
+      # Recorded even when the gate failed: a main that has outgrown the committed baseline is
+      # still the right thing for a pull request to be compared with. A main job that ran the gate
+      # but produced no reference (a failure before the browser stage) records nothing and says so;
+      # one that left webv2 untouched has nothing to record. Pull requests based on either restore
+      # the most recent main entry instead.
+      - name: stage performance reference
+        id: perf-ref-stage
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && (steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true) }}
+        run: |
+          if [ -f artifacts/architecture-performance/build-reference.json ] && [ -f artifacts/architecture-performance/browser-reference.json ]; then
+            mkdir -p artifacts/perf-reference
+            cp artifacts/architecture-performance/build-reference.json artifacts/architecture-performance/browser-reference.json artifacts/perf-reference/
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+            echo "::warning::No performance reference recorded for ${{ github.sha }}; pull requests based on it fall back to the most recent main reference."
+          fi
+        shell: bash
+
+      - name: save performance reference
+        if: ${{ always() && github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.perf-ref-stage.outputs.ready == 'true' }}
+        uses: actions/cache/save@v5
+        with:
+          path: invokeai/frontend/webv2/artifacts/perf-reference
+          key: webv2-perf-reference-${{ github.sha }}
+
+      - name: upload architecture review artifacts
+        if: ${{ always() && (steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true) }}
+        uses: actions/upload-artifact@v6
+        with:
+          name: webv2-architecture-review
+          path: |
+            invokeai/frontend/webv2/artifacts/architecture
+            invokeai/frontend/webv2/artifacts/architecture-performance
+            invokeai/frontend/webv2/artifacts/accessibility
+          if-no-files-found: ignore

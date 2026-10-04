@@ -5,7 +5,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, WanTransformerField
-from invokeai.app.invocations.wan_lora_loader import (
+from invokeai.app.invocations.wan.wan_lora_loader import (
     WanLoRACollectionLoader,
     WanLoRALoaderInvocation,
     _resolve_target,

@@ -4,6 +4,7 @@ import subprocess
 import sys
 import textwrap
 from pathlib import Path
+from typing import Any
 
 import pytest
 from pydantic import TypeAdapter, ValidationError
@@ -16,12 +17,16 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
+from invokeai.app.invocations.fields import InputField, OutputField, OutputScope
+from invokeai.app.invocations.logic import IfInvocation
+from invokeai.app.invocations.loops import ForInvocation, ForReturnInvocation
 from invokeai.app.invocations.math import AddInvocation
 from invokeai.app.invocations.primitives import (
     ColorInvocation,
     FloatCollectionInvocation,
     FloatInvocation,
     IntegerInvocation,
+    StringCollectionInvocation,
     StringInvocation,
 )
 from invokeai.app.invocations.upscale import ESRGANInvocation
@@ -37,6 +42,7 @@ from invokeai.app.services.shared.graph import (
     NodeAlreadyInGraphError,
     NodeNotFoundError,
     are_connections_compatible,
+    get_output_field_scope,
 )
 from tests.test_nodes import (
     AnyTypeTestInvocation,
@@ -61,7 +67,51 @@ def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edg
     )
 
 
+def create_loop_linkage(from_id: str, to_id: str) -> Edge:
+    return Edge(
+        type="loop_linkage",
+        source=EdgeConnection(node_id=from_id, field="loop_linkage"),
+        destination=EdgeConnection(node_id=to_id, field="loop_linkage"),
+    )
+
+
+@invocation_output("test_scoped_output")
+class ScopedTestInvocationOutput(BaseInvocationOutput):
+    iteration_value: str = OutputField(output_scope=OutputScope.Iteration)
+    final_value: str = OutputField(output_scope=OutputScope.Final)
+    ordinary_value: str = OutputField()
+
+
+@invocation("test_scoped", version="1.0.0")
+class ScopedTestInvocation(BaseInvocation):
+    def invoke(self) -> ScopedTestInvocationOutput:
+        return ScopedTestInvocationOutput(iteration_value="iteration", final_value="final", ordinary_value="ordinary")
+
+
+@invocation_output("test_two_any_graph_output")
+class TwoAnyGraphTestInvocationOutput(BaseInvocationOutput):
+    value: Any = OutputField()
+
+
+@invocation("test_two_any_graph", version="1.0.0")
+class TwoAnyGraphTestInvocation(BaseInvocation):
+    first: Any = InputField(default=None)
+    second: Any = InputField(default=None)
+
+    def invoke(self) -> TwoAnyGraphTestInvocationOutput:
+        return TwoAnyGraphTestInvocationOutput(value=(self.first, self.second))
+
+
 # Tests
+def test_get_output_field_scope_reads_scoped_output_metadata():
+    node = ScopedTestInvocation(id="1")
+
+    assert get_output_field_scope(node, "iteration_value") == OutputScope.Iteration
+    assert get_output_field_scope(node, "final_value") == OutputScope.Final
+    assert get_output_field_scope(node, "ordinary_value") is None
+    assert get_output_field_scope(node, "missing_value") is None
+
+
 def test_connections_are_compatible():
     from_node = TextToImageTestInvocation(id="1", prompt="Banana sushi")
     from_field = "image"
@@ -71,6 +121,738 @@ def test_connections_are_compatible():
     result = are_connections_compatible(from_node, from_field, to_node, to_field)
 
     assert result is True
+
+
+def test_graph_validates_direct_for_boundary_pair():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(loop)
+    g.add_node(body_return)
+    g.add_edge(create_edge(loop.id, "item", body_return.id, "output"))
+    g.add_edge(create_loop_linkage(loop.id, body_return.id))
+
+    g.validate_self()
+
+
+def test_graph_validates_for_boundary_pair_with_loop_linkage():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(loop)
+    g.add_node(body_return)
+    g.add_edge(create_edge(loop.id, "item", body_return.id, "output"))
+    g.add_edge(
+        Edge(
+            type="loop_linkage",
+            source=EdgeConnection(node_id=loop.id, field="loop_linkage"),
+            destination=EdgeConnection(node_id=body_return.id, field="loop_linkage"),
+        )
+    )
+
+    g.validate_self()
+
+
+def test_graph_round_trips_for_loop_linkage():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(loop)
+    g.add_node(body_return)
+    g.add_edge(create_edge(loop.id, "item", body_return.id, "output"))
+    g.add_edge(create_loop_linkage(loop.id, body_return.id))
+
+    restored = Graph.model_validate_json(g.model_dump_json())
+
+    assert restored.edges[-1].type == "loop_linkage"
+    assert restored.edges[-1].source.node_id == loop.id
+    assert restored.edges[-1].destination.node_id == body_return.id
+
+
+def test_graph_rejects_invalid_loop_linkage_endpoints():
+    g = Graph()
+    source = ForInvocation(id="source", collection=["a"])
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(source)
+    g.add_node(body_return)
+    g.edges.append(
+        Edge(
+            type="loop_linkage",
+            source=EdgeConnection(node_id=source.id, field="item"),
+            destination=EdgeConnection(node_id=body_return.id, field="loop_linkage"),
+        )
+    )
+    with pytest.raises(InvalidEdgeError, match="Invalid loop linkage"):
+        g.validate_self()
+
+
+def test_graph_rejects_default_edges_using_loop_linkage_fields():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a"])
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(loop)
+    g.add_node(body_return)
+    g.edges.extend(
+        [
+            create_loop_linkage(loop.id, body_return.id),
+            create_edge(loop.id, "item", body_return.id, "loop_linkage"),
+        ]
+    )
+
+    with pytest.raises(InvalidEdgeError, match="must use a loop_linkage edge"):
+        g.validate_self()
+
+
+def test_graph_rejects_duplicate_loop_linkage():
+    g = Graph()
+    first_loop = ForInvocation(id="first", collection=["a"])
+    second_loop = ForInvocation(id="second", collection=["b"])
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(first_loop)
+    g.add_node(second_loop)
+    g.add_node(body_return)
+    g.edges.extend(
+        [
+            create_loop_linkage(first_loop.id, body_return.id),
+            create_loop_linkage(second_loop.id, body_return.id),
+        ]
+    )
+    with pytest.raises(InvalidEdgeError, match="exactly one loop linkage"):
+        g.validate_self()
+
+
+def test_graph_rejects_edge_to_for_scheduler_index():
+    g = Graph()
+    index_source = IntegerInvocation(id="index_source", value=99)
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(index_source)
+    g.add_node(loop)
+    g.add_node(body_return)
+    g.edges.extend(
+        [
+            create_edge(index_source.id, "value", loop.id, "index"),
+            create_edge(loop.id, "item", body_return.id, "output"),
+            create_loop_linkage(loop.id, body_return.id),
+        ]
+    )
+
+    with pytest.raises(InvalidEdgeError, match="direct input"):
+        g.validate_self()
+
+
+@pytest.mark.parametrize(
+    ("node_type", "destination_field", "expected_message"),
+    [
+        ("for", "collection", "For loop may have only one collection input edge"),
+        ("for", "state", "For loop may have only one state input edge"),
+        ("for_return", "output", "ForReturn may have only one input edge per field"),
+        ("for_return", "state", "ForReturn may have only one input edge per field"),
+        ("for_return", "continue_condition", "ForReturn may have only one input edge per field"),
+    ],
+)
+def test_graph_rejects_duplicate_loop_boundary_inputs(node_type, destination_field, expected_message):
+    g = Graph()
+    g.add_node(AnyTypeTestInvocation(id="first"))
+    g.add_node(AnyTypeTestInvocation(id="second"))
+    g.add_node(ForInvocation(id="for", collection=[1]))
+    g.add_node(ForReturnInvocation(id="return"))
+    g.edges.append(create_loop_linkage("for", "return"))
+    if node_type == "for_return":
+        g.edges.append(create_edge("for", "item", "return", "output"))
+        source_ids = ["first", "second"]
+        if destination_field == "state":
+            g.edges.append(create_edge("for", "state", "return", "state"))
+            source_ids = ["first", "second"]
+    else:
+        source_ids = ["first", "second"]
+    g.edges.extend(
+        create_edge(source_id, "value", "for" if node_type == "for" else "return", destination_field)
+        for source_id in source_ids
+    )
+
+    with pytest.raises(InvalidEdgeError, match=expected_message):
+        g.validate_self()
+
+
+def test_graph_validates_nested_for_boundary_pair():
+    g = Graph()
+    g.add_node(ForInvocation(id="outer", collection=[["a"]]))
+    g.add_node(AnyTypeTestInvocation(id="inner_collection"))
+    g.add_node(ForInvocation(id="inner"))
+    g.add_node(AnyTypeTestInvocation(id="inner_body"))
+    g.add_node(ForReturnInvocation(id="inner_return"))
+    g.add_node(ForReturnInvocation(id="outer_return"))
+    g.add_edge(create_edge("outer", "item", "inner_collection", "value"))
+    g.add_edge(create_edge("inner_collection", "value", "inner", "collection"))
+    g.add_edge(create_edge("inner", "item", "inner_body", "value"))
+    g.add_edge(create_edge("inner_body", "value", "inner_return", "output"))
+    g.add_edge(create_edge("inner", "output_collection", "outer_return", "output"))
+    g.add_edge(create_loop_linkage("inner", "inner_return"))
+    g.add_edge(create_loop_linkage("outer", "outer_return"))
+
+    g.validate_self()
+
+
+def test_for_body_path_resolution_uses_loop_linkage_for_ambiguous_reachable_returns():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a"])
+    matching_return = ForReturnInvocation(id="matching-return")
+    other_return = ForReturnInvocation(id="other-return")
+
+    g.add_node(loop)
+    g.add_node(matching_return)
+    g.add_node(other_return)
+    g.add_edge(create_edge(loop.id, "item", matching_return.id, "output"))
+    g.add_edge(create_edge(loop.id, "item", other_return.id, "output"))
+    g.add_edge(create_loop_linkage(loop.id, matching_return.id))
+
+    body_path_to_return = g._get_for_body_path_to_return(loop.id, g.nx_graph_flat())
+
+    assert body_path_to_return is not None
+    assert body_path_to_return[1] == matching_return.id
+
+
+def test_for_body_path_resolution_rejects_missing_loop_linkage():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a"])
+    first_return = ForReturnInvocation(id="first-return")
+    second_return = ForReturnInvocation(id="second-return")
+
+    g.add_node(loop)
+    g.add_node(first_return)
+    g.add_node(second_return)
+    g.add_edge(create_edge(loop.id, "item", first_return.id, "output"))
+    g.add_edge(create_edge(loop.id, "item", second_return.id, "output"))
+
+    assert g._get_for_body_path_to_return(loop.id, g.nx_graph_flat()) is None
+
+
+def test_graph_rejects_missing_for_loop_linkage():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(loop)
+    g.add_node(body_return)
+    g.add_edge(create_edge(loop.id, "item", body_return.id, "output"))
+
+    with pytest.raises(InvalidEdgeError, match="exactly one loop linkage"):
+        g.validate_self()
+
+
+def test_graph_rejects_missing_for_return_loop_linkage():
+    g = Graph()
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(body_return)
+
+    with pytest.raises(InvalidEdgeError, match="exactly one loop linkage"):
+        g.validate_self()
+
+
+def test_graph_validates_indirect_for_body():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    body = PromptTestInvocation(id="body")
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(loop)
+    g.add_node(body)
+    g.add_node(body_return)
+    g.add_edge(create_edge(body.id, "prompt", body_return.id, "output"))
+    g.add_edge(create_edge(loop.id, "item", body.id, "prompt"))
+    g.add_edge(create_loop_linkage(loop.id, body_return.id))
+
+    g.validate_self()
+
+
+def test_graph_validates_for_body_inputs_from_outside_body_boundary():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    external = PromptTestInvocation(id="external", prompt="outside")
+    body = TextToImageTestInvocation(id="body")
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(loop)
+    g.add_node(external)
+    g.add_node(body)
+    g.add_node(body_return)
+    g.add_edge(create_edge(loop.id, "item", body.id, "prompt"))
+    g.add_edge(create_edge(external.id, "prompt", body.id, "prompt2"))
+    g.add_edge(create_edge(body.id, "image", body_return.id, "output"))
+    g.add_edge(create_loop_linkage(loop.id, body_return.id))
+
+    g.validate_self()
+
+
+def test_graph_rejects_for_body_inputs_from_external_iterator_scope():
+    g = Graph()
+    external_values = StringCollectionInvocation(id="external_values", collection=["external-a", "external-b"])
+    external_iterate = IterateInvocation(id="external_iterate")
+    external_adapter = PromptTestInvocation(id="external_adapter")
+    loop = ForInvocation(id="for", collection=["loop-a", "loop-b"])
+    body = TextToImageTestInvocation(id="body")
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(external_values)
+    g.add_node(external_iterate)
+    g.add_node(external_adapter)
+    g.add_node(loop)
+    g.add_node(body)
+    g.add_node(body_return)
+    g.add_edge(create_edge(external_values.id, "collection", external_iterate.id, "collection"))
+    g.add_edge(create_edge(external_iterate.id, "item", external_adapter.id, "prompt"))
+    g.add_edge(create_edge(external_adapter.id, "prompt", body.id, "prompt2"))
+    g.add_edge(create_edge(loop.id, "item", body.id, "prompt"))
+    g.add_edge(create_edge(body.id, "image", body_return.id, "output"))
+    g.add_edge(create_loop_linkage(loop.id, body_return.id))
+
+    with pytest.raises(InvalidEdgeError, match="iterator-derived external inputs"):
+        g.validate_self()
+
+
+def test_graph_rejects_for_without_matching_return():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    body = PromptTestInvocation(id="body")
+
+    g.add_node(loop)
+    g.add_node(body)
+    g.add_edge(create_edge(loop.id, "item", body.id, "prompt"))
+
+    with pytest.raises(InvalidEdgeError, match="exactly one loop linkage"):
+        g.validate_self()
+
+
+def test_graph_rejects_nested_for_until_linkage_exists():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    nested_loop = ForInvocation(id="nested_for", collection=["c", "d"])
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(loop)
+    g.add_node(nested_loop)
+    g.add_node(body_return)
+    g.add_edge(create_edge(nested_loop.id, "item", body_return.id, "output"))
+    g.add_edge(create_edge(loop.id, "item", nested_loop.id, "collection"))
+
+    with pytest.raises(InvalidEdgeError, match="exactly one loop linkage"):
+        g.validate_self()
+
+
+def test_graph_validates_deeper_nested_for_loops_with_one_child_per_boundary():
+    g = Graph()
+    outer = ForInvocation(id="outer", collection=[[]])
+    outer_collection = AnyTypeTestInvocation(id="outer_collection")
+    inner = ForInvocation(id="inner")
+    inner_collection = AnyTypeTestInvocation(id="inner_collection")
+    leaf = ForInvocation(id="leaf")
+    leaf_body = AnyTypeTestInvocation(id="leaf_body")
+    leaf_return = ForReturnInvocation(id="leaf_return")
+    inner_return = ForReturnInvocation(id="inner_return")
+    outer_return = ForReturnInvocation(id="outer_return")
+
+    for node in (
+        outer,
+        outer_collection,
+        inner,
+        inner_collection,
+        leaf,
+        leaf_body,
+        leaf_return,
+        inner_return,
+        outer_return,
+    ):
+        g.add_node(node)
+    g.add_edge(create_edge("outer", "item", "outer_collection", "value"))
+    g.add_edge(create_edge("outer_collection", "value", "inner", "collection"))
+    g.add_edge(create_edge("inner", "item", "inner_collection", "value"))
+    g.add_edge(create_edge("inner_collection", "value", "leaf", "collection"))
+    g.add_edge(create_edge("leaf", "item", "leaf_body", "value"))
+    g.add_edge(create_edge("leaf_body", "value", "leaf_return", "output"))
+    g.add_edge(create_edge("leaf", "output_collection", "inner_return", "output"))
+    g.add_edge(create_edge("inner", "output_collection", "outer_return", "output"))
+    g.add_edge(create_loop_linkage("leaf", "leaf_return"))
+    g.add_edge(create_loop_linkage("inner", "inner_return"))
+    g.add_edge(create_loop_linkage("outer", "outer_return"))
+
+    g.validate_self()
+
+
+def test_graph_validates_nested_for_with_shared_outer_continuation_path():
+    g = Graph()
+    g.add_node(ForInvocation(id="outer", collection=[[]]))
+    g.add_node(AnyTypeTestInvocation(id="inner_collection"))
+    g.add_node(ForInvocation(id="inner"))
+    g.add_node(AnyTypeTestInvocation(id="inner_body"))
+    g.add_node(ForReturnInvocation(id="inner_return"))
+    g.add_node(AnyTypeTestInvocation(id="continuation"))
+    g.add_node(AnyTypeTestInvocation(id="continuation_tail"))
+    g.add_node(ForReturnInvocation(id="outer_return"))
+    g.add_edge(create_edge("outer", "item", "inner_collection", "value"))
+    g.add_edge(create_edge("inner_collection", "value", "inner", "collection"))
+    g.add_edge(create_edge("inner", "item", "inner_body", "value"))
+    g.add_edge(create_edge("inner_body", "value", "inner_return", "output"))
+    g.add_edge(create_edge("inner", "output_collection", "continuation", "value"))
+    g.add_edge(create_edge("continuation", "value", "continuation_tail", "value"))
+    g.add_edge(create_edge("continuation_tail", "value", "outer_return", "output"))
+    g.add_edge(create_edge("continuation_tail", "value", "outer_return", "continue_condition"))
+    g.add_edge(create_loop_linkage("inner", "inner_return"))
+    g.add_edge(create_loop_linkage("outer", "outer_return"))
+
+    g.validate_self()
+
+
+def test_graph_validates_nested_for_return_continue_condition():
+    g = Graph()
+    g.add_node(ForInvocation(id="outer", collection=[[]]))
+    g.add_node(AnyTypeTestInvocation(id="inner_collection"))
+    g.add_node(ForInvocation(id="inner"))
+    g.add_node(AnyTypeTestInvocation(id="inner_body"))
+    g.add_node(AnyTypeTestInvocation(id="inner_condition"))
+    g.add_node(ForReturnInvocation(id="inner_return"))
+    g.add_node(ForReturnInvocation(id="outer_return"))
+    g.add_edge(create_edge("outer", "item", "inner_collection", "value"))
+    g.add_edge(create_edge("inner_collection", "value", "inner", "collection"))
+    g.add_edge(create_edge("inner", "item", "inner_body", "value"))
+    g.add_edge(create_edge("inner", "item", "inner_condition", "value"))
+    g.add_edge(create_edge("inner_body", "value", "inner_return", "output"))
+    g.add_edge(create_edge("inner_condition", "value", "inner_return", "continue_condition"))
+    g.add_edge(create_edge("inner", "output_collection", "outer_return", "output"))
+    g.add_edge(create_loop_linkage("inner", "inner_return"))
+    g.add_edge(create_loop_linkage("outer", "outer_return"))
+
+    g.validate_self()
+
+
+def test_graph_rejects_nested_for_return_continue_condition_from_external_scope():
+    g = Graph()
+    g.add_node(ForInvocation(id="outer", collection=[[]]))
+    g.add_node(AnyTypeTestInvocation(id="inner_collection"))
+    g.add_node(ForInvocation(id="inner"))
+    g.add_node(AnyTypeTestInvocation(id="inner_body"))
+    g.add_node(ForReturnInvocation(id="inner_return"))
+    g.add_node(ForReturnInvocation(id="outer_return"))
+    g.add_node(AnyTypeTestInvocation(id="external_condition"))
+    g.add_edge(create_edge("outer", "item", "inner_collection", "value"))
+    g.add_edge(create_edge("inner_collection", "value", "inner", "collection"))
+    g.add_edge(create_edge("inner", "item", "inner_body", "value"))
+    g.add_edge(create_edge("inner_body", "value", "inner_return", "output"))
+    g.add_edge(create_edge("inner", "output_collection", "outer_return", "output"))
+    g.add_edge(create_edge("external_condition", "value", "outer_return", "continue_condition"))
+    g.add_edge(create_loop_linkage("inner", "inner_return"))
+    g.add_edge(create_loop_linkage("outer", "outer_return"))
+
+    with pytest.raises(InvalidEdgeError, match="Nested For loops"):
+        g.validate_self()
+
+
+def test_graph_rejects_nested_for_return_state_from_outer_scope():
+    g = Graph()
+    g.add_node(ForInvocation(id="outer", collection=[[]]))
+    g.add_node(AnyTypeTestInvocation(id="inner_collection"))
+    g.add_node(ForInvocation(id="inner"))
+    g.add_node(AnyTypeTestInvocation(id="inner_body"))
+    g.add_node(ForReturnInvocation(id="inner_return"))
+    g.add_node(ForReturnInvocation(id="outer_return"))
+    g.add_edge(create_edge("outer", "item", "inner_collection", "value"))
+    g.add_edge(create_edge("inner_collection", "value", "inner", "collection"))
+    g.add_edge(create_edge("inner", "item", "inner_body", "value"))
+    g.add_edge(create_edge("inner_body", "value", "inner_return", "output"))
+    g.add_edge(create_edge("outer", "state", "inner_return", "state"))
+    g.add_edge(create_edge("inner", "output_collection", "outer_return", "output"))
+    g.add_edge(create_loop_linkage("inner", "inner_return"))
+    g.add_edge(create_loop_linkage("outer", "outer_return"))
+
+    with pytest.raises(InvalidEdgeError, match="Nested For loops"):
+        g.validate_self()
+
+
+def test_graph_rejects_nested_for_continuation_branch_without_outer_return():
+    g = Graph()
+    g.add_node(ForInvocation(id="outer", collection=[[]]))
+    g.add_node(AnyTypeTestInvocation(id="inner_collection"))
+    g.add_node(ForInvocation(id="inner"))
+    g.add_node(AnyTypeTestInvocation(id="inner_body"))
+    g.add_node(ForReturnInvocation(id="inner_return"))
+    g.add_node(AnyTypeTestInvocation(id="continuation"))
+    g.add_node(AnyTypeTestInvocation(id="dead_branch"))
+    g.add_node(ForReturnInvocation(id="outer_return"))
+    g.add_edge(create_edge("outer", "item", "inner_collection", "value"))
+    g.add_edge(create_edge("inner_collection", "value", "inner", "collection"))
+    g.add_edge(create_edge("inner", "item", "inner_body", "value"))
+    g.add_edge(create_edge("inner_body", "value", "inner_return", "output"))
+    g.add_edge(create_edge("inner", "output_collection", "continuation", "value"))
+    g.add_edge(create_edge("continuation", "value", "outer_return", "output"))
+    g.add_edge(create_edge("continuation", "value", "dead_branch", "value"))
+    g.add_edge(create_loop_linkage("inner", "inner_return"))
+    g.add_edge(create_loop_linkage("outer", "outer_return"))
+
+    with pytest.raises(InvalidEdgeError, match="Nested For loops"):
+        g.validate_self()
+
+
+def test_graph_validates_independent_nested_for_children_with_explicit_fan_in():
+    g = Graph()
+    g.add_node(ForInvocation(id="outer", collection=[[]]))
+    g.add_node(ForInvocation(id="first"))
+    g.add_node(ForInvocation(id="second"))
+    g.add_node(AnyTypeTestInvocation(id="first_body"))
+    g.add_node(AnyTypeTestInvocation(id="second_body"))
+    g.add_node(ForReturnInvocation(id="first_return"))
+    g.add_node(ForReturnInvocation(id="second_return"))
+    g.add_node(TwoAnyGraphTestInvocation(id="fan_in"))
+    g.add_node(ForReturnInvocation(id="outer_return"))
+    g.add_edge(create_edge("outer", "item", "first", "collection"))
+    g.add_edge(create_edge("outer", "item", "second", "collection"))
+    g.add_edge(create_edge("first", "item", "first_body", "value"))
+    g.add_edge(create_edge("first_body", "value", "first_return", "output"))
+    g.add_edge(create_edge("second", "item", "second_body", "value"))
+    g.add_edge(create_edge("second_body", "value", "second_return", "output"))
+    g.add_edge(create_edge("first", "output_collection", "fan_in", "first"))
+    g.add_edge(create_edge("second", "output_collection", "fan_in", "second"))
+    g.add_edge(create_edge("fan_in", "value", "outer_return", "output"))
+    g.add_edge(create_loop_linkage("first", "first_return"))
+    g.add_edge(create_loop_linkage("second", "second_return"))
+    g.add_edge(create_loop_linkage("outer", "outer_return"))
+
+    g.validate_self()
+
+
+def test_graph_rejects_multiple_direct_nested_for_children():
+    g = Graph()
+    g.add_node(ForInvocation(id="outer", collection=[[]]))
+    g.add_node(ForInvocation(id="first"))
+    g.add_node(ForInvocation(id="second"))
+    g.add_node(ForReturnInvocation(id="first_return"))
+    g.add_node(ForReturnInvocation(id="second_return"))
+    g.add_node(ForReturnInvocation(id="outer_return"))
+    g.add_edge(create_edge("outer", "item", "first", "collection"))
+    g.add_edge(create_edge("outer", "item", "second", "collection"))
+    g.add_edge(create_edge("first", "item", "first_return", "output"))
+    g.add_edge(create_edge("second", "item", "second_return", "output"))
+    g.add_edge(create_edge("first", "output_collection", "outer_return", "output"))
+    g.add_edge(create_loop_linkage("first", "first_return"))
+    g.add_edge(create_loop_linkage("second", "second_return"))
+    g.add_edge(create_loop_linkage("outer", "outer_return"))
+
+    with pytest.raises(InvalidEdgeError, match="Nested For loops"):
+        g.validate_self()
+
+
+def test_graph_rejects_mixed_nested_for_and_iterate_body():
+    g = Graph()
+    outer = ForInvocation(id="outer", collection=[[]])
+    inner_collection = AnyTypeTestInvocation(id="inner_collection")
+    inner = ForInvocation(id="inner")
+    iterate_collection = PolymorphicStringTestInvocation(id="iterate_collection")
+    iterate = IterateInvocation(id="iterate")
+    body = AnyTypeTestInvocation(id="body")
+    collect = CollectInvocation(id="collect")
+    inner_return = ForReturnInvocation(id="inner_return")
+    outer_return = ForReturnInvocation(id="outer_return")
+
+    for node in (
+        outer,
+        inner_collection,
+        inner,
+        iterate_collection,
+        iterate,
+        body,
+        collect,
+        inner_return,
+        outer_return,
+    ):
+        g.add_node(node)
+    g.add_edge(create_edge("outer", "item", "inner_collection", "value"))
+    g.add_edge(create_edge("inner_collection", "value", "inner", "collection"))
+    g.add_edge(create_edge("inner", "item", "iterate_collection", "value"))
+    g.add_edge(create_edge("iterate_collection", "collection", "iterate", "collection"))
+    g.add_edge(create_edge("iterate", "item", "body", "value"))
+    g.add_edge(create_edge("body", "value", "collect", "item"))
+    g.add_edge(create_edge("collect", "collection", "inner_return", "output"))
+    g.add_edge(create_edge("inner", "output_collection", "outer_return", "output"))
+    g.add_edge(create_loop_linkage("inner", "inner_return"))
+    g.add_edge(create_loop_linkage("outer", "outer_return"))
+
+    with pytest.raises(InvalidEdgeError, match="Nested For loops"):
+        g.validate_self()
+
+
+def test_graph_rejects_for_return_shared_by_two_loops():
+    first = ForInvocation(id="first", collection=["a"])
+    second = ForInvocation(id="second", collection=["b"])
+    body_return = ForReturnInvocation(id="return")
+
+    g = Graph(
+        nodes={first.id: first, second.id: second, body_return.id: body_return},
+        edges=[
+            create_edge("first", "item", "return", "output"),
+            create_edge("second", "item", "return", "output"),
+            create_loop_linkage("first", "return"),
+            create_loop_linkage("second", "return"),
+        ],
+    )
+
+    with pytest.raises(InvalidEdgeError, match="exactly one loop linkage"):
+        g.validate_self()
+
+
+def test_graph_rejects_iterate_inside_for_body():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=[["a", "b"]])
+    collection_adapter = PolymorphicStringTestInvocation(id="collection_adapter")
+    nested_iterate = IterateInvocation(id="nested_iterate")
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(loop)
+    g.add_node(collection_adapter)
+    g.add_node(nested_iterate)
+    g.add_node(body_return)
+    g.add_edge(create_edge(loop.id, "item", collection_adapter.id, "value"))
+    g.add_edge(create_edge(collection_adapter.id, "collection", nested_iterate.id, "collection"))
+    g.add_edge(create_edge(nested_iterate.id, "item", body_return.id, "output"))
+    g.add_edge(create_loop_linkage(loop.id, body_return.id))
+
+    with pytest.raises(InvalidEdgeError, match="Iterate nodes inside For loop bodies"):
+        g.validate_self()
+
+
+def test_graph_rejects_iterate_collect_for_return_condition_without_scalar_aggregation():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=[["a", "b"], ["c", "d"]])
+    collection_adapter = PolymorphicStringTestInvocation(id="collection_adapter")
+    nested_iterate = IterateInvocation(id="nested_iterate")
+    body = AnyTypeTestInvocation(id="body")
+    condition = AnyTypeTestInvocation(id="condition")
+    collect = CollectInvocation(id="collect")
+    body_return = ForReturnInvocation(id="return")
+
+    for node in (loop, collection_adapter, nested_iterate, body, condition, collect, body_return):
+        g.add_node(node)
+    g.add_edge(create_edge(loop.id, "item", collection_adapter.id, "value"))
+    g.add_edge(create_edge(collection_adapter.id, "collection", nested_iterate.id, "collection"))
+    g.add_edge(create_edge(nested_iterate.id, "item", body.id, "value"))
+    g.add_edge(create_edge(nested_iterate.id, "item", condition.id, "value"))
+    g.add_edge(create_edge(body.id, "value", collect.id, "item"))
+    g.add_edge(create_edge(collect.id, "collection", body_return.id, "output"))
+    g.add_edge(create_edge(condition.id, "value", body_return.id, "continue_condition"))
+    g.add_edge(create_loop_linkage(loop.id, body_return.id))
+
+    with pytest.raises(InvalidEdgeError, match="Iterate nodes inside For loop bodies"):
+        g.validate_self()
+
+
+def test_graph_rejects_for_body_edges_that_escape_to_after_loop_nodes():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    body = PromptTestInvocation(id="body")
+    body_return = ForReturnInvocation(id="return")
+    after = AnyTypeTestInvocation(id="after")
+
+    g.add_node(loop)
+    g.add_node(body)
+    g.add_node(body_return)
+    g.add_node(after)
+    g.add_edge(create_edge(body.id, "prompt", body_return.id, "output"))
+    g.add_edge(create_edge(loop.id, "item", body.id, "prompt"))
+    g.add_edge(create_edge(body.id, "prompt", after.id, "value"))
+    g.add_edge(create_loop_linkage(loop.id, body_return.id))
+
+    with pytest.raises(InvalidEdgeError, match="escape"):
+        g.validate_self()
+
+
+def test_graph_rejects_for_iteration_branch_that_does_not_reach_return():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    body_return = ForReturnInvocation(id="return")
+    after = AnyTypeTestInvocation(id="after")
+
+    g.add_node(loop)
+    g.add_node(body_return)
+    g.add_node(after)
+    g.add_edge(create_edge(loop.id, "item", body_return.id, "output"))
+    g.add_edge(create_edge(loop.id, "index", after.id, "value"))
+    g.add_edge(create_loop_linkage(loop.id, body_return.id))
+
+    with pytest.raises(InvalidEdgeError, match="terminate"):
+        g.validate_self()
+
+
+def test_graph_rejects_for_return_outputs_to_after_loop_nodes():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    body_return = ForReturnInvocation(id="return")
+    after = AnyTypeTestInvocation(id="after")
+
+    g.add_node(loop)
+    g.add_node(body_return)
+    g.add_node(after)
+    g.add_edge(create_edge(loop.id, "item", body_return.id, "output"))
+    g.add_edge(create_edge(body_return.id, "output", after.id, "value"))
+    g.add_edge(create_loop_linkage(loop.id, body_return.id))
+
+    with pytest.raises(InvalidEdgeError, match="terminate"):
+        g.validate_self()
+
+
+def test_graph_rejects_final_scoped_for_output_into_body():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(loop)
+    g.add_node(body_return)
+    g.add_edge(create_edge(loop.id, "item", body_return.id, "output"))
+    g.add_edge(create_edge(loop.id, "final_state", body_return.id, "state"))
+    g.add_edge(create_loop_linkage(loop.id, body_return.id))
+
+    with pytest.raises(InvalidEdgeError, match="final-scoped"):
+        g.validate_self()
+
+
+def test_graph_rejects_final_scoped_for_output_through_branch_to_return():
+    g = Graph()
+    loop = ForInvocation(id="for", collection=["a", "b"])
+    body = AnyTypeTestInvocation(id="body")
+    body_return = ForReturnInvocation(id="return")
+    downstream = AnyTypeTestInvocation(id="downstream")
+    downstream_tail = AnyTypeTestInvocation(id="downstream_tail")
+
+    for node in (loop, body, body_return, downstream, downstream_tail):
+        g.add_node(node)
+    g.edges.extend(
+        [
+            create_edge(loop.id, "item", body.id, "value"),
+            create_edge(body.id, "value", body_return.id, "output"),
+            create_edge(loop.id, "final_state", downstream.id, "value"),
+            create_edge(downstream.id, "value", downstream_tail.id, "value"),
+            create_edge(downstream_tail.id, "value", body_return.id, "state"),
+            create_loop_linkage(loop.id, body_return.id),
+        ]
+    )
+
+    with pytest.raises(InvalidEdgeError, match="final-scoped"):
+        g.validate_self()
+
+
+def test_graph_rejects_orphan_for_return():
+    g = Graph()
+    body_return = ForReturnInvocation(id="return")
+
+    g.add_node(body_return)
+
+    with pytest.raises(InvalidEdgeError, match="exactly one loop linkage"):
+        g.validate_self()
 
 
 def test_connections_are_incompatible():
@@ -281,6 +1063,364 @@ def test_graph_connects_collector():
     g.add_edge(e1)
     g.add_edge(e2)
     g.add_edge(e3)
+
+
+def test_graph_collector_accepts_if_output_when_both_branches_have_matching_type():
+    graph = Graph()
+    true_value = StringInvocation(id="true", value="true")
+    false_value = StringInvocation(id="false", value="false")
+    if_node = IfInvocation(id="if")
+    collector = CollectInvocation(id="collect")
+    consumer = PromptCollectionTestInvocation(id="consumer", collection=[])
+    for node in (true_value, false_value, if_node, collector, consumer):
+        graph.add_node(node)
+
+    graph.add_edge(create_edge(true_value.id, "value", if_node.id, "true_input"))
+    graph.add_edge(create_edge(false_value.id, "value", if_node.id, "false_input"))
+    graph.add_edge(create_edge(if_node.id, "value", collector.id, "item"))
+    graph.add_edge(create_edge(collector.id, "collection", consumer.id, "collection"))
+
+
+def test_graph_collectors_accept_if_output_with_and_without_a_string_collection_seed():
+    graph = Graph()
+    true_value = StringInvocation(id="true", value="true")
+    false_value = StringInvocation(id="false", value="false")
+    if_node = IfInvocation(id="if")
+    unseeded_collector = CollectInvocation(id="unseeded_collect")
+    seeded_collector = CollectInvocation(id="seeded_collect")
+    seed = StringCollectionInvocation(id="seed", collection=["existing"])
+    unseeded_consumer = PromptCollectionTestInvocation(id="unseeded_consumer", collection=[])
+    seeded_consumer = PromptCollectionTestInvocation(id="seeded_consumer", collection=[])
+    for node in (
+        true_value,
+        false_value,
+        if_node,
+        unseeded_collector,
+        seeded_collector,
+        seed,
+        unseeded_consumer,
+        seeded_consumer,
+    ):
+        graph.add_node(node)
+
+    graph.add_edge(create_edge(true_value.id, "value", if_node.id, "true_input"))
+    graph.add_edge(create_edge(false_value.id, "value", if_node.id, "false_input"))
+    graph.add_edge(create_edge(if_node.id, "value", unseeded_collector.id, "item"))
+    graph.add_edge(create_edge(if_node.id, "value", seeded_collector.id, "item"))
+    graph.add_edge(create_edge(seed.id, "collection", seeded_collector.id, "collection"))
+    graph.add_edge(create_edge(unseeded_collector.id, "collection", unseeded_consumer.id, "collection"))
+    graph.add_edge(create_edge(seeded_collector.id, "collection", seeded_consumer.id, "collection"))
+
+
+def test_graph_rejects_if_output_when_its_branches_do_not_match_target_type():
+    graph = Graph()
+    true_value = StringInvocation(id="true", value="true")
+    false_value = StringInvocation(id="false", value="false")
+    if_node = IfInvocation(id="if")
+    consumer = ImageToImageTestInvocation(id="consumer")
+    for node in (true_value, false_value, if_node, consumer):
+        graph.add_node(node)
+
+    graph.add_edge(create_edge(true_value.id, "value", if_node.id, "true_input"))
+    graph.add_edge(create_edge(false_value.id, "value", if_node.id, "false_input"))
+
+    with pytest.raises(InvalidEdgeError, match="Field types are incompatible"):
+        graph.add_edge(create_edge(if_node.id, "value", consumer.id, "image"))
+
+
+def test_graph_rejects_if_branch_that_invalidates_existing_output_edge():
+    graph = Graph()
+    true_value = StringInvocation(id="true", value="true")
+    false_value = IntegerInvocation(id="false", value=1)
+    if_node = IfInvocation(id="if")
+    consumer = ImageToImageTestInvocation(id="consumer")
+    for node in (true_value, false_value, if_node, consumer):
+        graph.add_node(node)
+
+    graph.add_edge(create_edge(true_value.id, "value", if_node.id, "true_input"))
+    graph.add_edge(create_edge(if_node.id, "value", consumer.id, "image"))
+
+    false_branch_edge = create_edge(false_value.id, "value", if_node.id, "false_input")
+    with pytest.raises(InvalidEdgeError):
+        graph.add_edge(false_branch_edge)
+
+    assert false_branch_edge not in graph.edges
+    assert graph.is_valid()
+
+
+def test_graph_rejects_if_branch_that_makes_collector_items_incompatible():
+    graph = Graph()
+    true_value = StringInvocation(id="true", value="true")
+    false_value = IntegerInvocation(id="false", value=1)
+    if_node = IfInvocation(id="if")
+    collector = CollectInvocation(id="collect")
+    seed = StringCollectionInvocation(id="seed", collection=["existing"])
+    consumer = PromptCollectionTestInvocation(id="consumer", collection=[])
+    for node in (true_value, false_value, if_node, collector, seed, consumer):
+        graph.add_node(node)
+
+    graph.add_edge(create_edge(true_value.id, "value", if_node.id, "true_input"))
+    graph.add_edge(create_edge(if_node.id, "value", collector.id, "item"))
+    graph.add_edge(create_edge(seed.id, "collection", collector.id, "collection"))
+    graph.add_edge(create_edge(collector.id, "collection", consumer.id, "collection"))
+
+    false_branch_edge = create_edge(false_value.id, "value", if_node.id, "false_input")
+    with pytest.raises(InvalidEdgeError, match="Collector output type does not match collector input type"):
+        graph.add_edge(false_branch_edge)
+
+    assert false_branch_edge not in graph.edges
+    assert graph.is_valid()
+
+
+def test_graph_rejects_mixed_if_branch_types_for_collector_items():
+    graph = Graph()
+    string_value = StringInvocation(id="string", value="text")
+    integer_value = IntegerInvocation(id="integer", value=1)
+    if_node = IfInvocation(id="if")
+    collector = CollectInvocation(id="collect")
+    for node in (string_value, integer_value, if_node, collector):
+        graph.add_node(node)
+
+    graph.add_edge(create_edge(string_value.id, "value", if_node.id, "true_input"))
+    graph.add_edge(create_edge(integer_value.id, "value", if_node.id, "false_input"))
+
+    with pytest.raises(InvalidEdgeError, match="Collector input collection items must be of a single type"):
+        graph.add_edge(create_edge(if_node.id, "value", collector.id, "item"))
+
+
+@pytest.mark.parametrize("condition", [True, False])
+def test_graph_accepts_and_runs_mixed_numeric_if_branches_through_iterator(condition: bool):
+    graph = Graph()
+    integer_value = IntegerInvocation(id="integer", value=2)
+    float_value = FloatInvocation(id="float", value=3.5)
+    if_node = IfInvocation(id="if", condition=condition)
+    collector = CollectInvocation(id="collect")
+    iterator = IterateInvocation(id="iterate")
+    float_consumer = FloatInvocation(id="float_consumer")
+    for node in (integer_value, float_value, if_node, collector, iterator, float_consumer):
+        graph.add_node(node)
+
+    graph.add_edge(create_edge(integer_value.id, "value", if_node.id, "true_input"))
+    graph.add_edge(create_edge(float_value.id, "value", if_node.id, "false_input"))
+    graph.add_edge(create_edge(if_node.id, "value", collector.id, "item"))
+    graph.add_edge(create_edge(collector.id, "collection", iterator.id, "collection"))
+    graph.add_edge(create_edge(iterator.id, "item", float_consumer.id, "value"))
+
+    session = GraphExecutionState(graph=graph)
+    run_session_with_mock_context(session)
+    output = get_single_output_from_session(session, float_consumer.id)
+
+    assert output.value == (2.0 if condition else 3.5)
+    assert isinstance(output.value, float)
+
+
+@pytest.mark.parametrize("through_if", [False, True], ids=["direct collector", "If branches"])
+def test_graph_rejects_integer_iterator_output_for_mixed_numeric_collector(through_if: bool):
+    integer_value = IntegerInvocation(id="integer", value=2)
+    float_value = FloatInvocation(id="float", value=3.5)
+    collector = CollectInvocation(id="collect")
+    iterator = IterateInvocation(id="iterate")
+    integer_consumer = IntegerInvocation(id="integer_consumer")
+    nodes = [integer_value, float_value, collector, iterator, integer_consumer]
+    graph = Graph(nodes={node.id: node for node in nodes})
+
+    if through_if:
+        if_node = IfInvocation(id="if")
+        graph.add_node(if_node)
+        graph.add_edge(create_edge(integer_value.id, "value", if_node.id, "true_input"))
+        graph.add_edge(create_edge(float_value.id, "value", if_node.id, "false_input"))
+        graph.add_edge(create_edge(if_node.id, "value", collector.id, "item"))
+    else:
+        graph.add_edge(create_edge(integer_value.id, "value", collector.id, "item"))
+        graph.add_edge(create_edge(float_value.id, "value", collector.id, "item"))
+
+    graph.add_edge(create_edge(collector.id, "collection", iterator.id, "collection"))
+    invalid_output_edge = create_edge(iterator.id, "item", integer_consumer.id, "value")
+    with pytest.raises(InvalidEdgeError, match="Iterator collection type must match all iterator output types"):
+        graph.add_edge(invalid_output_edge)
+
+    assert invalid_output_edge not in graph.edges
+
+
+def test_graph_rejects_iterator_consumers_incompatible_with_if_collector_branches():
+    graph = Graph()
+    string_value = StringInvocation(id="string", value="text")
+    image_value = ImageToImageTestInvocation(id="image")
+    string_collector = CollectInvocation(id="string_collector")
+    image_collector = CollectInvocation(id="image_collector")
+    if_node = IfInvocation(id="if")
+    iterator = IterateInvocation(id="iterator")
+    string_sink = StringInvocation(id="string_sink")
+    for node in (string_value, image_value, string_collector, image_collector, if_node, iterator, string_sink):
+        graph.add_node(node)
+
+    graph.add_edge(create_edge(string_value.id, "value", string_collector.id, "item"))
+    graph.add_edge(create_edge(image_value.id, "image", image_collector.id, "item"))
+    graph.add_edge(create_edge(string_collector.id, "collection", if_node.id, "true_input"))
+    graph.add_edge(create_edge(image_collector.id, "collection", if_node.id, "false_input"))
+    graph.add_edge(create_edge(if_node.id, "value", iterator.id, "collection"))
+
+    with pytest.raises(InvalidEdgeError, match="Iterator output type does not match iterator input type"):
+        graph.add_edge(create_edge(iterator.id, "item", string_sink.id, "value"))
+
+
+@pytest.mark.parametrize("collector_count", [1, 3])
+def test_graph_rejects_if_branch_that_invalidates_iterator_through_collectors(collector_count: int):
+    true_value = StringInvocation(id="true", value="true")
+    false_value = StringInvocation(id="false", value="false")
+    if_node = IfInvocation(id="if")
+    collectors = [CollectInvocation(id=f"collect_{index}") for index in range(collector_count)]
+    iterator = IterateInvocation(id="iterator")
+    image_sink = ImageToImageTestInvocation(id="image_sink")
+    string_sink = StringInvocation(id="string_sink")
+    nodes = [true_value, false_value, if_node, *collectors, iterator, image_sink, string_sink]
+    image_edge = create_edge(iterator.id, "item", image_sink.id, "image")
+    graph = Graph(
+        nodes={node.id: node for node in nodes},
+        edges=[
+            create_edge(true_value.id, "value", if_node.id, "true_input"),
+            create_edge(if_node.id, "value", collectors[0].id, "item"),
+            *[
+                create_edge(source.id, "collection", target.id, "collection")
+                for source, target in zip(collectors, collectors[1:], strict=False)
+            ],
+            create_edge(collectors[-1].id, "collection", iterator.id, "collection"),
+            image_edge,
+        ],
+    )
+    graph.validate_self()
+    original_edges = list(graph.edges)
+    branch_edge = create_edge(false_value.id, "value", if_node.id, "false_input")
+
+    with pytest.raises(InvalidEdgeError, match="[Ii]terator.*type"):
+        graph.add_edge(branch_edge)
+
+    assert graph.edges == original_edges
+    graph.validate_self()
+
+    graph.delete_edge(image_edge)
+    graph.add_edge(create_edge(iterator.id, "item", string_sink.id, "value"))
+    graph.add_edge(branch_edge)
+    graph.validate_self()
+
+
+def test_graph_if_branch_revalidates_only_affected_iterators_once(monkeypatch: pytest.MonkeyPatch):
+    nodes = [
+        StringInvocation(id="true", value="true"),
+        StringInvocation(id="false", value="false"),
+        IfInvocation(id="if"),
+        CollectInvocation(id="first_collect"),
+        CollectInvocation(id="second_collect"),
+        IterateInvocation(id="affected_iterator"),
+        StringInvocation(id="sink"),
+        *[IterateInvocation(id=f"unrelated_{index}") for index in range(32)],
+    ]
+    graph = Graph(
+        nodes={node.id: node for node in nodes},
+        edges=[
+            create_edge("true", "value", "if", "true_input"),
+            create_edge("if", "value", "first_collect", "item"),
+            create_edge("if", "value", "second_collect", "item"),
+            create_edge("first_collect", "collection", "second_collect", "collection"),
+            create_edge("second_collect", "collection", "affected_iterator", "collection"),
+            create_edge("affected_iterator", "item", "sink", "value"),
+        ],
+    )
+    validated_iterators: list[str] = []
+    original_validate_iterator = Graph._is_iterator_connection_valid
+
+    def count_iterator_validations(graph: Graph, node_id: str, *args: Any, **kwargs: Any):
+        validated_iterators.append(node_id)
+        return original_validate_iterator(graph, node_id, *args, **kwargs)
+
+    monkeypatch.setattr(Graph, "_is_iterator_connection_valid", count_iterator_validations)
+    graph.add_edge(create_edge("false", "value", "if", "false_input"))
+
+    assert validated_iterators == ["affected_iterator"]
+
+
+def test_graph_collector_validation_avoids_ordinary_source_allocations(monkeypatch: pytest.MonkeyPatch):
+    item_sources = [StringInvocation(id=f"string_{index}", value="text") for index in range(16)]
+    seed = StringCollectionInvocation(id="seed", collection=["seed"])
+    collector = CollectInvocation(id="collect")
+    consumer = PromptCollectionTestInvocation(id="consumer", collection=[])
+    nodes = [*item_sources, seed, collector, consumer]
+    edges = [create_edge(source.id, "value", collector.id, "item") for source in item_sources]
+    edges.extend(
+        [
+            create_edge(seed.id, "collection", collector.id, "collection"),
+            create_edge(collector.id, "collection", consumer.id, "collection"),
+        ]
+    )
+    graph = Graph(nodes={node.id: node for node in nodes}, edges=edges)
+    original_connection_init = EdgeConnection.__init__
+    connection_allocations = 0
+
+    def count_connection_allocations(connection: EdgeConnection, **kwargs: Any):
+        nonlocal connection_allocations
+        connection_allocations += 1
+        original_connection_init(connection, **kwargs)
+
+    monkeypatch.setattr(EdgeConnection, "__init__", count_connection_allocations)
+
+    graph.validate_self()
+
+    assert graph.edges == edges
+    assert connection_allocations == 0
+
+
+def test_graph_validation_bounds_shared_if_branch_validation_work(monkeypatch: pytest.MonkeyPatch):
+    from invokeai.app.services.shared import graph as graph_facade
+
+    true_value = StringInvocation(id="true", value="true")
+    false_value = StringInvocation(id="false", value="false")
+    nodes = {true_value.id: true_value, false_value.id: false_value}
+    edges = []
+
+    previous_if_id = "if_0"
+    nodes[previous_if_id] = IfInvocation(id=previous_if_id)
+    edges.extend(
+        [
+            create_edge(true_value.id, "value", previous_if_id, "true_input"),
+            create_edge(false_value.id, "value", previous_if_id, "false_input"),
+        ]
+    )
+
+    for index in range(1, 12):
+        if_node_id = f"if_{index}"
+        nodes[if_node_id] = IfInvocation(id=if_node_id)
+        edges.extend(
+            [
+                create_edge(previous_if_id, "value", if_node_id, "true_input"),
+                create_edge(previous_if_id, "value", if_node_id, "false_input"),
+            ]
+        )
+        previous_if_id = if_node_id
+
+    graph = Graph(nodes=nodes, edges=edges)
+    compatibility_calls = 0
+    branch_input_lookups = 0
+    original_are_connections_compatible = graph_facade.are_connections_compatible
+    original_get_input_edges = Graph._get_input_edges
+
+    def count_compatibility_calls(*args, **kwargs):
+        nonlocal compatibility_calls
+        compatibility_calls += 1
+        return original_are_connections_compatible(*args, **kwargs)
+
+    def count_branch_input_lookups(graph: Graph, node_id: str, field: str | None = None, **kwargs: Any):
+        nonlocal branch_input_lookups
+        if field in ("true_input", "false_input"):
+            branch_input_lookups += 1
+        return original_get_input_edges(graph, node_id, field, **kwargs)
+
+    monkeypatch.setattr(graph_facade, "are_connections_compatible", count_compatibility_calls)
+    monkeypatch.setattr(Graph, "_get_input_edges", count_branch_input_lookups)
+    graph.validate_self()
+
+    if_node_count = sum(isinstance(node, IfInvocation) for node in nodes.values())
+    assert branch_input_lookups <= len(edges) * if_node_count * 2
+    assert compatibility_calls <= len(edges) * 2
 
 
 def test_graph_rejects_collector_output_edge_before_input_edge():

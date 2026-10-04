@@ -1,0 +1,2216 @@
+import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
+import { resolve } from 'node:path';
+
+import {
+  assertMockBackendFixture,
+  assertMockBackendProfileName,
+  collectCanvasLeaves,
+  createMockBackendFixture,
+  getFixtureProjectWorkflowDocument,
+  getMockBackendFixtureCounts,
+  MOCK_BACKEND_FIXED_EPOCH,
+} from './mock-backend-fixtures.mjs';
+
+/** The canvas schema every mock project declares; the real server keeps the same floor per record. */
+const DEFAULT_CANVAS_SCHEMA_VERSION = 3;
+
+/** The 412 the real router raises when a client's maximum is below a project's floor. */
+const schemaUnsupported = (minimum, maximum) =>
+  json(412, {
+    detail: {
+      code: 'canvas_schema_unsupported',
+      max_canvas_schema_version: maximum,
+      message: `Project requires canvas schema ${minimum}; client supports up to ${maximum}.`,
+      minimum_canvas_schema_version: minimum,
+    },
+  });
+
+const clientMaximum = (value) => (Number.isInteger(value) && value >= 1 ? value : DEFAULT_CANVAS_SCHEMA_VERSION);
+
+/** In-memory test backend; no Socket.IO. POST /__reset restores the startup profile unless ?profile= overrides it. */
+
+const FIXED_EPOCH_MS = Date.parse(MOCK_BACKEND_FIXED_EPOCH);
+const TINY_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M/wHwAF/gL+XcX1WQAAAABJRU5ErkJggg==',
+  'base64'
+);
+const FIXTURE_VIDEO = readFileSync(resolve(import.meta.dirname, 'mock-assets/fixture-video.mp4'));
+const FIXTURE_VIDEO_POSTER = readFileSync(resolve(import.meta.dirname, 'mock-assets/fixture-video.webp'));
+// Share the backend-pinned capabilities fixture to keep journey payloads aligned with the real API.
+const ARCHITECTURE_CAPABILITIES = JSON.parse(
+  readFileSync(
+    resolve(import.meta.dirname, '../src/features/generation/core/__fixtures__/architectureCapabilities.json'),
+    'utf8'
+  )
+);
+
+/**
+ * POST /__faults sets capabilities to error, empty, or ok, and `intermediatesCaller` to admin or user, until POST
+ * /__reset; independent of workload profile. `user` also turns on multi-user auth with a non-admin session: sign in
+ * with any email and password (or reload a page that already holds the token) to reach the non-admin UI.
+ */
+const CAPABILITY_FAULTS = new Set(['ok', 'error', 'empty']);
+const INTERMEDIATES_CALLERS = new Set(['admin', 'user']);
+
+const createFaults = () => ({ capabilities: 'ok', intermediatesCaller: 'admin' });
+
+const MOCK_USER_ID = 'fixture-user';
+
+/** The intermediates rows a summary shows under its filters; a `matching` preview scope resolves the same way. */
+const matchingIntermediates = (rows, { isAdmin, ownerFilter, projectId, search }) => {
+  const needle = (search ?? '').toLowerCase();
+  return rows
+    .filter((row) => ownerFilter === null || row.user_id === ownerFilter)
+    .filter((row) => projectId === null || row.project_id === projectId)
+    .filter(
+      (row) =>
+        !needle ||
+        [row.project_name, ...(isAdmin ? [row.user_display_name, row.user_email] : [])].some((value) =>
+          (value ?? '').toLowerCase().includes(needle)
+        )
+    );
+};
+const MOCK_USER_TOKEN = 'mock-user-token';
+
+const mockNonAdminUser = () => ({
+  created_at: '2026-01-01T00:00:00Z',
+  display_name: 'Fixture User',
+  email: 'fixture-user@example.com',
+  is_active: true,
+  is_admin: false,
+  last_login_at: null,
+  updated_at: '2026-01-01T00:00:00Z',
+  user_id: MOCK_USER_ID,
+});
+
+const clone = (value) => structuredClone(value);
+
+/** Starter bundles keep fresh-install onboarding reachable in journeys. */
+const STARTER_MODEL = {
+  base: 'sd-1',
+  description: 'Fixture starter model',
+  format: 'diffusers',
+  is_installed: false,
+  name: 'Fixture Starter',
+  source: 'https://example.invalid/fixture-starter.safetensors',
+  type: 'main',
+};
+
+const MOCK_APP_VERSION = 'fixture';
+
+const STARTER_MODELS_RESPONSE = {
+  starter_bundles: {
+    'sd-1': { models: [STARTER_MODEL], name: 'Stable Diffusion 1.5' },
+    sdxl: {
+      models: [{ ...STARTER_MODEL, base: 'sdxl', name: 'Fixture Starter XL' }],
+      name: 'SDXL',
+    },
+  },
+  starter_models: [STARTER_MODEL],
+};
+
+const createState = (profile) => {
+  const fixture = assertMockBackendFixture(createMockBackendFixture(profile));
+
+  return {
+    boards: new Map(fixture.boards.map((board) => [board.board_id, clone(board)])),
+    // Dismiss the alpha notice and What's New notes so journeys start on the requested page.
+    clientState: new Map([
+      [
+        'webv2:workbench-settings',
+        JSON.stringify({ alphaNoticeAcknowledged: true, whatsNewSeenVersion: MOCK_APP_VERSION }),
+      ],
+    ]),
+    images: new Map(fixture.images.map((image) => [image.image_name, clone(image)])),
+    models: new Map(fixture.models.map((model) => [model.key, clone(model)])),
+    mutationClock: 0,
+    nextBoardNumber: fixture.boards.length + 1,
+    nextImageNumber: fixture.images.length + 1,
+    nextProjectNumber: fixture.projects.length + 1,
+    nextVideoNumber: fixture.videos.length + 1,
+    nodeCatalog: clone(fixture.nodeCatalog),
+    openApiDocument: clone(fixture.openApiDocument),
+    profile,
+    projects: new Map(fixture.projects.map((project) => [project.project_id, clone(project)])),
+    intermediates: fixture.intermediates.map(clone),
+    intermediatesOperations: new Map(),
+    intermediatesPreviews: new Map(),
+    queueItems: new Map(fixture.queueItems.map((item) => [item.item_id, clone(item)])),
+    videos: new Map(fixture.videos.map((video) => [video.video_name, clone(video)])),
+    workflows: new Map(fixture.workflows.map((workflow) => [workflow.workflow_id, clone(workflow)])),
+    nextWorkflowNumber: fixture.workflows.length + 1,
+    /** Custom workflow thumbnails by workflow id; the version stands in for the server's cache-busting query. */
+    workflowThumbnails: new Map(),
+    nextWorkflowThumbnailVersion: 1,
+    /** Every workflow-library request since the last reset, so journeys can prove which writes happened. */
+    workflowRequests: [],
+  };
+};
+
+/** Seed unboarded name collisions to verify imports copy board media instead of adopting existing items. */
+const seedCollisionMedia = (state, names) => {
+  const source = createMockBackendFixture('representative');
+  const requested = new Set(names);
+
+  for (const image of source.images) {
+    if (requested.has(image.image_name)) {
+      state.images.set(image.image_name, { ...clone(image), board_id: null, is_intermediate: false });
+    }
+  }
+
+  for (const video of source.videos) {
+    if (requested.has(video.video_name)) {
+      state.videos.set(video.video_name, { ...clone(video), board_id: null, is_intermediate: false });
+    }
+  }
+};
+
+const timestamp = (state) => {
+  const value = new Date(FIXED_EPOCH_MS + state.mutationClock * 1_000).toISOString();
+
+  state.mutationClock += 1;
+
+  return value;
+};
+
+/** Keep both map endpoints on one fixed projection timestamp; timestamp(state) advances on every call. */
+const IMAGE_MAP_UPDATED_AT = '2026-01-01 00:00:00.000';
+
+/** Use deterministic coordinates and round-robin cluster IDs; this fixture does not run clustering. */
+const imageMapPoints = (state, includeVideos) => {
+  const items = [
+    ...[...state.images.keys()].map((name) => ({ kind: 'image', name })),
+    ...(includeVideos ? [...state.videos.keys()].map((name) => ({ kind: 'video', name })) : []),
+  ];
+
+  return items.map((item, index) => {
+    const angle = index * 2.399;
+    const cluster = index % 3 === 2 ? -1 : index % 2;
+
+    return {
+      cluster,
+      image_name: item.name,
+      kind: item.kind,
+      x: Math.cos(angle) * (2 + cluster) + cluster * 6,
+      y: Math.sin(angle) * (2 + cluster),
+    };
+  });
+};
+
+const summaryOf = (project) => ({
+  board_id: project.board_id,
+  created_at: project.created_at,
+  minimum_canvas_schema_version: project.minimum_canvas_schema_version ?? DEFAULT_CANVAS_SCHEMA_VERSION,
+  name: project.name,
+  project_id: project.project_id,
+  revision: project.revision,
+  updated_at: project.updated_at,
+});
+
+const readBody = (request) =>
+  new Promise((resolve, reject) => {
+    const chunks = [];
+
+    request.on('data', (chunk) => chunks.push(chunk));
+    request.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+    request.on('error', reject);
+  });
+
+const readRawBody = (request) =>
+  new Promise((resolve, reject) => {
+    const chunks = [];
+
+    request.on('data', (chunk) => chunks.push(chunk));
+    request.on('end', () => resolve(Buffer.concat(chunks)));
+    request.on('error', reject);
+  });
+
+/** The bytes and declared type of one named part of a multipart/form-data body, or null. */
+const readMultipartFile = async (request, fieldName) => {
+  const boundary = /boundary=(?:"([^"]+)"|([^;]+))/.exec(request.headers['content-type'] ?? '');
+
+  if (!boundary) {
+    return null;
+  }
+
+  const body = await readRawBody(request);
+  const delimiter = Buffer.from(`--${boundary[1] ?? boundary[2]}`);
+  let start = body.indexOf(delimiter);
+
+  while (start !== -1) {
+    const next = body.indexOf(delimiter, start + delimiter.length);
+    const headerEnd = body.indexOf('\r\n\r\n', start);
+
+    if (next === -1 || headerEnd === -1 || headerEnd > next) {
+      return null;
+    }
+
+    const headers = body.subarray(start + delimiter.length, headerEnd).toString('utf8');
+
+    if (new RegExp(`;\\s*name="${fieldName.replaceAll(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`).test(headers)) {
+      return {
+        contentType: /content-type:\s*([^\r\n]+)/i.exec(headers)?.[1]?.trim() ?? '',
+        // The part's data ends at the CRLF that precedes the next delimiter.
+        data: body.subarray(headerEnd + 4, next - 2),
+      };
+    }
+
+    start = next;
+  }
+
+  return null;
+};
+
+const readJsonBody = async (request, fallback = {}) => {
+  const body = await readBody(request);
+
+  return body ? JSON.parse(body) : fallback;
+};
+
+const invocationNodeCount = (state) =>
+  Object.values(state.openApiDocument.components?.schemas ?? {}).filter((schema) => schema?.class === 'invocation')
+    .length;
+
+const getStateCounts = (state) => ({
+  images: state.images.size,
+  layers: collectCanvasLeaves(state.projects.values().next().value?.data?.canvas?.document).length,
+  models: state.models.size,
+  nodes: invocationNodeCount(state),
+  projects: state.projects.size,
+  queueItems: state.queueItems.size,
+  workflowNodes: getFixtureProjectWorkflowDocument(state.projects.values().next().value?.data)?.nodes?.length ?? 0,
+});
+
+const getProfileInfo = (state) => ({
+  counts: getStateCounts(state),
+  profile: state.profile,
+});
+
+const queueItemsForScope = (state, url) => {
+  const originPrefix = url.searchParams.get('origin_prefix');
+  const items = [...state.queueItems.values()];
+
+  return originPrefix ? items.filter((item) => item.origin?.startsWith(originPrefix)) : items;
+};
+
+const queueStatus = (items) => {
+  const count = (status) => items.filter((item) => item.status === status).length;
+
+  return {
+    canceled: count('canceled'),
+    completed: count('completed'),
+    failed: count('failed'),
+    in_progress: count('in_progress'),
+    pending: count('pending'),
+    queue_id: 'default',
+    total: items.length,
+    waiting: count('waiting'),
+  };
+};
+
+const getRequestedCategories = (url) => {
+  const values = url.searchParams.getAll('categories');
+
+  return values.flatMap((value) => value.split(',')).filter(Boolean);
+};
+
+const getOptionalBoolean = (url, name) => {
+  const value = url.searchParams.get(name);
+
+  return value === null ? undefined : value === 'true';
+};
+
+// Only media_origin belongs in the DTO; other metadata is served by /metadata.
+const toVideoDto = (video) => ({
+  board_id: video.board_id,
+  created_at: video.created_at,
+  duration: video.duration,
+  fps: video.fps,
+  height: video.height,
+  is_intermediate: video.is_intermediate,
+  media_origin: video.metadata?.media_origin ?? null,
+  starred: video.starred,
+  thumbnail_url: video.thumbnail_url,
+  video_category: video.video_category,
+  video_name: video.video_name,
+  video_url: video.video_url,
+  width: video.width,
+});
+
+const toGalleryItem = (kind, value) =>
+  kind === 'image'
+    ? {
+        board_id: value.board_id,
+        category: value.image_category,
+        created_at: value.created_at,
+        full_url: value.image_url,
+        height: value.height,
+        is_intermediate: value.is_intermediate,
+        kind,
+        name: value.image_name,
+        starred: value.starred ?? false,
+        thumbnail_url: value.thumbnail_url,
+        width: value.width,
+      }
+    : {
+        board_id: value.board_id,
+        category: value.video_category,
+        created_at: value.created_at,
+        duration: value.duration,
+        fps: value.fps,
+        full_url: value.video_url,
+        height: value.height,
+        is_intermediate: value.is_intermediate,
+        kind,
+        media_origin: value.metadata?.media_origin ?? null,
+        name: value.video_name,
+        starred: value.starred,
+        thumbnail_url: value.thumbnail_url,
+        width: value.width,
+      };
+
+const getGalleryCandidates = (state) => [
+  ...[...state.images.values()].map((image) => ({ item: toGalleryItem('image', image), searchable: image.metadata })),
+  ...[...state.videos.values()]
+    .filter((video) => video.owner_user_id === MOCK_USER_ID)
+    .map((video) => ({ item: toGalleryItem('video', video), searchable: video.metadata })),
+];
+
+const compareGalleryItems = (left, right, orderDir, starredFirst) => {
+  if (starredFirst && left.starred !== right.starred) {
+    return left.starred ? -1 : 1;
+  }
+
+  const direction = orderDir === 'ASC' ? 1 : -1;
+
+  return (
+    direction * left.created_at.localeCompare(right.created_at) ||
+    direction * left.kind.localeCompare(right.kind) ||
+    direction * left.name.localeCompare(right.name)
+  );
+};
+
+const filterGalleryItems = (state, url, { createdDate } = {}) => {
+  const boardId = url.searchParams.get('board_id');
+  const categories = getRequestedCategories(url);
+  const createdFrom = url.searchParams.get('created_from');
+  const createdTo = url.searchParams.get('created_to');
+  const intermediate = getOptionalBoolean(url, 'is_intermediate');
+  const starred = getOptionalBoolean(url, 'starred');
+  const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
+
+  return getGalleryCandidates(state)
+    .filter(({ item, searchable }) => {
+      if (boardId && (boardId === 'none' ? item.board_id !== null : item.board_id !== boardId)) {
+        return false;
+      }
+      if (categories.length > 0 && !categories.includes(item.category)) {
+        return false;
+      }
+      if (intermediate !== undefined && item.is_intermediate !== intermediate) {
+        return false;
+      }
+      if (starred !== undefined && Boolean(item.starred) !== starred) {
+        return false;
+      }
+      if (createdDate && item.created_at.slice(0, 10) !== createdDate) {
+        return false;
+      }
+      if (createdFrom && item.created_at < createdFrom) {
+        return false;
+      }
+      if (createdTo && item.created_at >= `${createdTo}T24:00:00`) {
+        return false;
+      }
+      if (searchTerm) {
+        const document = `${JSON.stringify(searchable ?? {})} ${item.created_at}`.toLocaleLowerCase();
+
+        if (!document.includes(searchTerm)) {
+          return false;
+        }
+      }
+
+      return true;
+    })
+    .map(({ item }) => item)
+    .sort((left, right) =>
+      compareGalleryItems(
+        left,
+        right,
+        url.searchParams.get('order_dir')?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC',
+        url.searchParams.get('starred_first') !== 'false'
+      )
+    );
+};
+
+const listGalleryItems = (state, url) => {
+  const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0);
+  const limit = Math.max(0, Number(url.searchParams.get('limit') ?? 10) || 0);
+  const filtered = filterGalleryItems(state, url);
+
+  return {
+    items: limit === 0 ? [] : filtered.slice(offset, offset + limit),
+    limit,
+    offset,
+    total: filtered.length,
+  };
+};
+
+const listGalleryItemNames = (state, url, options) => {
+  const items = filterGalleryItems(state, url, options);
+
+  return {
+    items: items.map(({ kind, name }) => ({ kind, name })),
+    starred_count: url.searchParams.get('starred_first') !== 'false' ? items.filter((item) => item.starred).length : 0,
+    total_count: items.length,
+  };
+};
+
+const listVideos = (state, url) => {
+  const boardId = url.searchParams.get('board_id');
+  const categories = getRequestedCategories(url);
+  const intermediate = getOptionalBoolean(url, 'is_intermediate');
+  const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
+  const orderDir = url.searchParams.get('order_dir')?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+  const starredFirst = url.searchParams.get('starred_first') !== 'false';
+  const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0);
+  const limit = Math.max(0, Number(url.searchParams.get('limit') ?? 10) || 0);
+  const filtered = [...state.videos.values()]
+    .filter((video) => {
+      if (video.owner_user_id !== MOCK_USER_ID) {
+        return false;
+      }
+      if (boardId && (boardId === 'none' ? video.board_id !== null : video.board_id !== boardId)) {
+        return false;
+      }
+      if (categories.length > 0 && !categories.includes(video.video_category)) {
+        return false;
+      }
+      if (intermediate !== undefined && video.is_intermediate !== intermediate) {
+        return false;
+      }
+
+      return (
+        !searchTerm ||
+        `${JSON.stringify(video.metadata ?? {})} ${video.created_at}`.toLocaleLowerCase().includes(searchTerm)
+      );
+    })
+    .map(toVideoDto)
+    .sort((left, right) =>
+      compareGalleryItems(
+        {
+          created_at: left.created_at,
+          kind: 'video',
+          name: left.video_name,
+          starred: left.starred,
+        },
+        {
+          created_at: right.created_at,
+          kind: 'video',
+          name: right.video_name,
+          starred: right.starred,
+        },
+        orderDir,
+        starredFirst
+      )
+    );
+
+  return {
+    items: limit === 0 ? [] : filtered.slice(offset, offset + limit),
+    limit,
+    offset,
+    total: filtered.length,
+  };
+};
+
+/** The project that owns this board, if any. Derived, exactly as the backend derives it. */
+const projectIdForBoard = (state, boardId) =>
+  [...state.projects.values()].find((project) => project.board_id === boardId)?.project_id ?? null;
+
+/** Match /board-snapshot visibility and ordering: exclude intermediate/other items, sort by kind then name. */
+const boardSnapshotItems = (state, boardId) => {
+  const visible = (category) => ['general', 'control', 'mask', 'user'].includes(category);
+  const items = [
+    ...[...state.images.values()]
+      .filter((image) => image.board_id === boardId && !image.is_intermediate && visible(image.image_category))
+      .map((image) => ({
+        category: image.image_category,
+        kind: 'image',
+        name: image.image_name,
+        starred: Boolean(image.starred),
+      })),
+    ...[...state.videos.values()]
+      .filter(
+        (video) =>
+          video.board_id === boardId &&
+          video.owner_user_id === MOCK_USER_ID &&
+          !video.is_intermediate &&
+          visible(video.video_category)
+      )
+      .map((video) => ({
+        category: video.video_category,
+        kind: 'video',
+        name: video.video_name,
+        starred: Boolean(video.starred),
+      })),
+  ];
+
+  return items.sort((left, right) => left.kind.localeCompare(right.kind) || left.name.localeCompare(right.name));
+};
+
+const boardDto = (state, board) => {
+  const images = [...state.images.values()].filter((image) => image.board_id === board.board_id);
+  const videos = [...state.videos.values()].filter(
+    (video) => video.board_id === board.board_id && video.owner_user_id === MOCK_USER_ID
+  );
+  const cover = [
+    ...images.map((image) => ({
+      createdAt: image.created_at,
+      kind: 'image',
+      name: image.image_name,
+      starred: image.starred,
+    })),
+    ...videos.map((video) => ({
+      createdAt: video.created_at,
+      kind: 'video',
+      name: video.video_name,
+      starred: video.starred,
+    })),
+  ].sort(
+    (left, right) =>
+      Number(right.starred) - Number(left.starred) ||
+      right.createdAt.localeCompare(left.createdAt) ||
+      right.kind.localeCompare(left.kind) ||
+      right.name.localeCompare(left.name)
+  )[0];
+
+  const projectId = projectIdForBoard(state, board.board_id);
+
+  return {
+    ...board,
+    asset_count: images.filter((image) => image.image_category !== 'general').length,
+    cover_image_name: cover?.kind === 'image' ? cover.name : null,
+    cover_video_name: cover?.kind === 'video' ? cover.name : null,
+    image_count: images.filter((image) => image.image_category === 'general').length,
+    // The backend's BoardRecord excludes nulls, so an unclaimed board omits the key entirely.
+    ...(projectId === null ? {} : { project_id: projectId }),
+    video_count: videos.length,
+  };
+};
+
+const listImages = (state, url) => {
+  const boardId = url.searchParams.get('board_id');
+  const categories = getRequestedCategories(url);
+  const createdFrom = url.searchParams.get('created_from');
+  const createdTo = url.searchParams.get('created_to');
+  const orderDir = url.searchParams.get('order_dir')?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC';
+  const searchTerm = url.searchParams.get('search_term')?.trim().toLocaleLowerCase() ?? '';
+  const starredFirst = url.searchParams.get('starred_first') === 'true';
+  const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0) || 0);
+  const limit = Math.max(0, Number(url.searchParams.get('limit') ?? 100) || 0);
+  let items = [...state.images.values()].filter((image) => {
+    if (image.is_intermediate) {
+      return false;
+    }
+    if (boardId && boardId !== 'all') {
+      if (boardId === 'none' ? image.board_id !== null : image.board_id !== boardId) {
+        return false;
+      }
+    }
+    if (categories.length > 0 && !categories.includes(image.image_category)) {
+      return false;
+    }
+    if (createdFrom && image.created_at.slice(0, 10) < createdFrom) {
+      return false;
+    }
+    if (createdTo && image.created_at.slice(0, 10) > createdTo) {
+      return false;
+    }
+
+    return !searchTerm || image.image_name.toLocaleLowerCase().includes(searchTerm);
+  });
+
+  items.sort((left, right) => {
+    if (starredFirst && Boolean(left.starred) !== Boolean(right.starred)) {
+      return left.starred ? -1 : 1;
+    }
+
+    return orderDir === 'ASC'
+      ? left.created_at.localeCompare(right.created_at)
+      : right.created_at.localeCompare(left.created_at);
+  });
+
+  const total = items.length;
+  items = limit === 0 ? [] : items.slice(offset, offset + limit);
+
+  return { items, limit, offset, total };
+};
+
+const listVirtualDateBoards = (state) => {
+  const groups = new Map();
+
+  for (const item of getGalleryCandidates(state).map(({ item }) => item)) {
+    if (item.is_intermediate) {
+      continue;
+    }
+    const date = item.created_at.slice(0, 10);
+    const group = groups.get(date) ?? [];
+
+    group.push(item);
+    groups.set(date, group);
+  }
+
+  return [...groups.entries()]
+    .sort(([left], [right]) => right.localeCompare(left))
+    .map(([date, items]) => {
+      const ordered = [...items].sort((left, right) => compareGalleryItems(left, right, 'DESC', false));
+      const cover = ordered[0];
+
+      return {
+        asset_count: items.filter((item) => item.kind === 'image' && item.category !== 'general').length,
+        board_name: date,
+        cover_image_name: cover?.kind === 'image' ? cover.name : null,
+        cover_video_name: cover?.kind === 'video' ? cover.name : null,
+        date,
+        image_count: items.filter((item) => item.kind === 'image' && item.category === 'general').length,
+        video_count: items.filter((item) => item.kind === 'video').length,
+        virtual_board_id: `by_date:${date}`,
+      };
+    });
+};
+
+const writeJson = (response, status, value) => {
+  const body = JSON.stringify(value ?? null);
+
+  response.writeHead(status, {
+    'cache-control': 'no-store',
+    'content-length': Buffer.byteLength(body),
+    'content-type': 'application/json',
+  });
+  response.end(body);
+};
+
+const writePng = (response) => {
+  response.writeHead(200, {
+    'cache-control': 'public, max-age=3600',
+    'content-length': TINY_PNG.length,
+    'content-type': 'image/png',
+  });
+  response.end(TINY_PNG);
+};
+
+const writeBinary = (response, status, body, headers) => {
+  response.writeHead(status, {
+    'cache-control': 'public, max-age=3600',
+    'content-length': body.length,
+    ...headers,
+  });
+  response.end(body);
+};
+
+const parseByteRange = (value, size) => {
+  const match = /^bytes=(\d*)-(\d*)$/.exec(value.trim());
+
+  if (!match || size <= 0 || (!match[1] && !match[2])) {
+    return null;
+  }
+  if (!match[1]) {
+    const suffixLength = Number(match[2]);
+
+    return suffixLength > 0 ? [Math.max(size - suffixLength, 0), size - 1] : null;
+  }
+
+  const start = Number(match[1]);
+  const end = match[2] ? Number(match[2]) : size - 1;
+
+  return Number.isSafeInteger(start) && Number.isSafeInteger(end) && start <= end && start < size
+    ? [start, Math.min(end, size - 1)]
+    : null;
+};
+
+export const startMockBackend = async (port, { profile = 'empty' } = {}) => {
+  const initialProfile = assertMockBackendProfileName(profile);
+  let state = createState(initialProfile);
+  let faults = createFaults();
+
+  const server = createServer(async (request, response) => {
+    const url = new URL(request.url, `http://127.0.0.1:${String(port)}`);
+    const path = url.pathname;
+    const method = request.method ?? 'GET';
+    const json = (status, value) => writeJson(response, status, value);
+
+    try {
+      if (method === 'GET' && (path === '/__health' || path === '/__profile')) {
+        return json(200, { ok: true, ...getProfileInfo(state) });
+      }
+
+      if (method === 'POST' && path === '/__reset') {
+        const body = await readJsonBody(request);
+        const requestedProfile = url.searchParams.get('profile') ?? body.profile ?? initialProfile;
+
+        try {
+          state = createState(assertMockBackendProfileName(requestedProfile));
+        } catch (error) {
+          return json(400, { detail: error instanceof Error ? error.message : String(error) });
+        }
+
+        faults = createFaults();
+
+        const collisions = [...url.searchParams.getAll('collide'), ...(body.collide ?? [])]
+          .flatMap((value) => String(value).split(','))
+          .map((value) => value.trim())
+          .filter(Boolean);
+
+        if (collisions.length > 0) {
+          seedCollisionMedia(state, collisions);
+        }
+
+        return json(200, { ok: true, ...getProfileInfo(state) });
+      }
+
+      if (path === '/__faults') {
+        if (method === 'POST') {
+          const body = await readJsonBody(request);
+          const requested = url.searchParams.get('capabilities') ?? body.capabilities;
+          const caller = url.searchParams.get('intermediatesCaller') ?? body.intermediatesCaller;
+
+          if (requested !== undefined && requested !== null) {
+            if (!CAPABILITY_FAULTS.has(requested)) {
+              return json(400, { detail: `Unknown capabilities fault: ${String(requested)}` });
+            }
+
+            faults.capabilities = requested;
+          }
+
+          if (caller !== undefined && caller !== null) {
+            if (!INTERMEDIATES_CALLERS.has(caller)) {
+              return json(400, { detail: `Unknown intermediates caller: ${String(caller)}` });
+            }
+
+            faults.intermediatesCaller = caller;
+          }
+        }
+
+        return json(200, { ok: true, faults: { ...faults } });
+      }
+
+      if (method === 'GET' && path === '/openapi.json') {
+        return json(200, state.openApiDocument);
+      }
+
+      if (method === 'GET' && path === '/api/v1/auth/status') {
+        return json(200, {
+          admin_email: null,
+          multiuser_enabled: faults.intermediatesCaller === 'user',
+          setup_required: false,
+          strict_password_checking: false,
+        });
+      }
+
+      if (faults.intermediatesCaller === 'user' && path.startsWith('/api/v1/auth/')) {
+        if (method === 'POST' && path === '/api/v1/auth/login') {
+          return json(200, { expires_in: 86_400, token: MOCK_USER_TOKEN, user: mockNonAdminUser() });
+        }
+        if (method === 'GET' && path === '/api/v1/auth/me') {
+          return request.headers.authorization === `Bearer ${MOCK_USER_TOKEN}`
+            ? json(200, mockNonAdminUser())
+            : json(401, { detail: 'Not authenticated' });
+        }
+        if (method === 'POST' && (path === '/api/v1/auth/media-cookie' || path === '/api/v1/auth/logout')) {
+          return json(200, { success: true });
+        }
+      }
+
+      if (method === 'GET' && path === '/api/v1/image_map/points') {
+        const includeVideos = url.searchParams.get('include_videos') === 'true';
+        const points = imageMapPoints(state, includeVideos);
+
+        return json(200, {
+          cluster_eps: 0.5,
+          point_count: points.length,
+          points,
+          stale: false,
+          state: 'ready',
+          updated_at: IMAGE_MAP_UPDATED_AT,
+          visible_hash: `visible-${String(includeVideos)}`,
+        });
+      }
+
+      if (method === 'GET' && path === '/api/v1/image_map/cluster_labels') {
+        return json(200, {
+          labels: { 0: { alternates: ['sunset', 'coastline'], label: 'beaches' } },
+          // Labels must match /points on both projection timestamp and visible set.
+          updated_at: IMAGE_MAP_UPDATED_AT,
+          visible_hash: `visible-${String(url.searchParams.get('include_videos') === 'true')}`,
+        });
+      }
+
+      if (method === 'GET' && path === '/api/v1/image_map/image_labels') {
+        const name = url.searchParams.get('image_name') ?? '';
+        const isVideo = url.searchParams.get('kind') === 'video';
+        const exists = isVideo ? state.videos.has(name) : state.images.has(name);
+
+        // Match the real route's 404 so tests can exercise definitive label-cache misses.
+        if (!exists) {
+          return json(404, { detail: 'This item has no stored embedding to label' });
+        }
+
+        return json(200, { alternates: ['surf', 'shoreline'], label: isVideo ? 'clip' : 'photo' });
+      }
+
+      if (method === 'GET' && path === '/api/v1/image_map/status') {
+        const total = state.images.size + state.videos.size;
+
+        return json(200, {
+          enabled: true,
+          index: { embedded: total, failed: 0, total },
+          projection: { point_count: total, stale: false, state: 'ready', updated_at: IMAGE_MAP_UPDATED_AT },
+        });
+      }
+
+      if (method === 'POST' && path === '/api/v1/image_map/refresh') {
+        return json(200, { enqueued: true });
+      }
+
+      if (method === 'GET' && path === '/api/v1/app/version') {
+        return json(200, { version: MOCK_APP_VERSION });
+      }
+
+      if (method === 'GET' && path === '/api/v1/app/generation_device_options') {
+        return json(200, [{ device: 'cpu', name: 'CPU' }]);
+      }
+
+      if (method === 'GET' && path === '/api/v1/app/runtime_config') {
+        return json(200, { config: { generation_devices: 'auto' }, set_fields: [] });
+      }
+
+      if (path.startsWith('/api/v1/app/external_providers')) {
+        return json(200, []);
+      }
+
+      if (path === '/api/v1/projects/' || path === '/api/v1/projects') {
+        if (method === 'GET') {
+          return json(200, [...state.projects.values()].map(summaryOf));
+        }
+        if (method === 'POST') {
+          const requested = await readJsonBody(request);
+
+          if (requested.project_id && state.projects.has(requested.project_id)) {
+            return json(409, { detail: 'Project already exists' });
+          }
+
+          const now = timestamp(state);
+          const projectNumber = state.nextProjectNumber;
+          const name = requested.name ?? `Project Name #${projectNumber}`;
+
+          // Adopting a prepopulated board makes project creation the import commit point.
+          let boardId = requested.board_id ?? null;
+          if (boardId === null) {
+            boardId = `mock-project-board-${projectNumber}`;
+            state.boards.set(boardId, {
+              archived: false,
+              board_id: boardId,
+              board_name: name,
+              board_visibility: 'private',
+              created_at: now,
+              deleted_at: null,
+              owner_username: null,
+              updated_at: now,
+              user_id: MOCK_USER_ID,
+            });
+          } else {
+            const board = state.boards.get(boardId);
+            if (!board) {
+              return json(404, { detail: 'Board not found' });
+            }
+            if (board.board_visibility !== 'private' || projectIdForBoard(state, boardId) !== null) {
+              return json(409, { detail: 'Board is not available to be claimed by a project' });
+            }
+            board.board_name = name;
+            board.updated_at = now;
+          }
+
+          const minimum = requested.minimum_canvas_schema_version ?? DEFAULT_CANVAS_SCHEMA_VERSION;
+          const maximum = clientMaximum(requested.max_canvas_schema_version);
+          if (minimum > maximum) {
+            return schemaUnsupported(minimum, maximum);
+          }
+
+          const project = {
+            board_id: boardId,
+            created_at: now,
+            data: requested.data ?? {},
+            minimum_canvas_schema_version: minimum,
+            name,
+            project_id: requested.project_id ?? `mock-project-${projectNumber}`,
+            revision: 1,
+            updated_at: now,
+          };
+
+          state.nextProjectNumber += 1;
+          state.projects.set(project.project_id, project);
+
+          return json(200, project);
+        }
+      }
+
+      const projectMatch = /^\/api\/v1\/projects\/([^/]+)$/.exec(path);
+      if (projectMatch) {
+        const projectId = decodeURIComponent(projectMatch[1]);
+        const project = state.projects.get(projectId);
+
+        if (method === 'GET') {
+          if (!project) {
+            return json(404, { detail: 'Project not found' });
+          }
+          const maximum = clientMaximum(
+            Number(url.searchParams.get('max_canvas_schema_version') ?? DEFAULT_CANVAS_SCHEMA_VERSION)
+          );
+          return project.minimum_canvas_schema_version > maximum
+            ? schemaUnsupported(project.minimum_canvas_schema_version, maximum)
+            : json(200, project);
+        }
+        if (method === 'PUT') {
+          if (!project) {
+            return json(404, { detail: 'Project not found' });
+          }
+
+          const requested = await readJsonBody(request);
+
+          if (requested.expected_revision !== undefined && requested.expected_revision !== project.revision) {
+            return json(409, { detail: 'Revision conflict' });
+          }
+          const maximum = clientMaximum(requested.max_canvas_schema_version);
+          if (project.minimum_canvas_schema_version > maximum) {
+            return schemaUnsupported(project.minimum_canvas_schema_version, maximum);
+          }
+          const requestedMinimum = requested.minimum_canvas_schema_version;
+          if (requestedMinimum !== undefined && requestedMinimum < project.minimum_canvas_schema_version) {
+            return json(400, {
+              detail: {
+                code: 'canvas_schema_downgrade',
+                current_minimum_canvas_schema_version: project.minimum_canvas_schema_version,
+                message: 'A project never lowers its canvas schema floor.',
+                requested_minimum_canvas_schema_version: requestedMinimum,
+              },
+            });
+          }
+          if (requestedMinimum !== undefined && requestedMinimum > maximum) {
+            return schemaUnsupported(requestedMinimum, maximum);
+          }
+
+          project.data = requested.data ?? project.data;
+          project.name = requested.name ?? project.name;
+          project.minimum_canvas_schema_version = requestedMinimum ?? project.minimum_canvas_schema_version;
+          project.revision += 1;
+          project.updated_at = timestamp(state);
+
+          // The board's name tracks the project's; the two commit together.
+          const board = state.boards.get(project.board_id);
+          if (board) {
+            board.board_name = project.name;
+            board.updated_at = project.updated_at;
+          }
+
+          return json(200, project);
+        }
+        if (method === 'DELETE') {
+          if (project) {
+            state.projects.delete(projectId);
+            // The board goes with the project; its media survives as uncategorized.
+            state.boards.delete(project.board_id);
+            for (const image of state.images.values()) {
+              if (image.board_id === project.board_id) {
+                image.board_id = null;
+              }
+            }
+            for (const video of state.videos.values()) {
+              if (video.board_id === project.board_id) {
+                video.board_id = null;
+              }
+            }
+          }
+          return json(200, { ok: true });
+        }
+      }
+
+      const boardSnapshotMatch = /^\/api\/v1\/projects\/([^/]+)\/board-snapshot$/.exec(path);
+      if (method === 'GET' && boardSnapshotMatch) {
+        const project = state.projects.get(decodeURIComponent(boardSnapshotMatch[1]));
+
+        return project
+          ? json(200, { items: boardSnapshotItems(state, project.board_id) })
+          : json(404, { detail: 'Project not found' });
+      }
+
+      if (path.startsWith('/api/v1/client_state/')) {
+        const key = url.searchParams.get('key') ?? '';
+
+        if (path.endsWith('/get_by_key')) {
+          return json(200, state.clientState.get(key) ?? null);
+        }
+        if (path.endsWith('/set_by_key')) {
+          const value = await readJsonBody(request, null);
+
+          state.clientState.set(key, value);
+          return json(200, value);
+        }
+        if (path.endsWith('/delete_by_key')) {
+          state.clientState.delete(key);
+          return json(200, { ok: true });
+        }
+      }
+
+      const queueItemMatch = /^\/api\/v1\/queue\/[^/]+\/i\/(\d+)$/.exec(path);
+      if (queueItemMatch) {
+        const itemId = Number(queueItemMatch[1]);
+        const item = state.queueItems.get(itemId);
+
+        if (method === 'GET') {
+          return item ? json(200, item) : json(404, { detail: 'Queue item not found' });
+        }
+        if (method === 'DELETE') {
+          state.queueItems.delete(itemId);
+          return json(200, { ok: true });
+        }
+      }
+
+      const queueMatch = /^\/api\/v1\/queue\/[^/]+\/(.+)$/.exec(path);
+      if (queueMatch) {
+        const action = queueMatch[1];
+        const scopedItems = queueItemsForScope(state, url);
+
+        if (action === 'status') {
+          return json(200, {
+            processor: { is_processing: scopedItems.some((item) => item.status === 'in_progress'), is_started: true },
+            queue: queueStatus(scopedItems),
+          });
+        }
+        if (action === 'current') {
+          return json(200, scopedItems.find((item) => item.status === 'in_progress') ?? null);
+        }
+        if (action === 'next') {
+          return json(200, scopedItems.find((item) => item.status === 'pending' || item.status === 'waiting') ?? null);
+        }
+        if (action === 'list_all') {
+          return json(200, scopedItems);
+        }
+        if (action === 'items_by_ids') {
+          const body = await readJsonBody(request);
+          const ids = Array.isArray(body.item_ids) ? new Set(body.item_ids) : new Set();
+
+          return json(
+            200,
+            scopedItems.filter((item) => ids.has(item.item_id))
+          );
+        }
+        if (action === 'item_ids' || action === 'list') {
+          const descending = url.searchParams.get('order_dir')?.toUpperCase() !== 'ASC';
+          const itemIds = scopedItems.map((item) => item.item_id).sort((left, right) => left - right);
+
+          if (descending) {
+            itemIds.reverse();
+          }
+
+          return json(200, { item_ids: itemIds, total_count: itemIds.length });
+        }
+        if (action === 'clear' && method === 'PUT') {
+          state.queueItems.clear();
+          return json(200, { deleted: true });
+        }
+        if (action === 'prune' && method === 'PUT') {
+          for (const item of state.queueItems.values()) {
+            if (item.status === 'completed' || item.status === 'failed' || item.status === 'canceled') {
+              state.queueItems.delete(item.item_id);
+            }
+          }
+          return json(200, { deleted: true });
+        }
+
+        return json(200, null);
+      }
+
+      if (method === 'GET' && path === '/api/v2/models/stats') {
+        return json(200, null);
+      }
+      if (method === 'GET' && path === '/api/v2/models/missing') {
+        return json(200, { models: [] });
+      }
+      if (method === 'GET' && path === '/api/v2/models/models_dir') {
+        return json(200, '/opt/invokeai/models');
+      }
+      if (method === 'GET' && path === '/api/v2/models/install') {
+        return json(200, []);
+      }
+      if (method === 'GET' && path === '/api/v2/models/capabilities') {
+        if (faults.capabilities === 'error') {
+          return json(500, { detail: 'Fixture capability outage.' });
+        }
+
+        return json(200, faults.capabilities === 'empty' ? [] : ARCHITECTURE_CAPABILITIES);
+      }
+      if (method === 'GET' && path === '/api/v2/models/starter_models') {
+        return json(200, STARTER_MODELS_RESPONSE);
+      }
+      if (method === 'GET' && path === '/api/v2/models/hf_login') {
+        return json(200, 'unknown');
+      }
+      if (method === 'GET' && path === '/api/v2/models/sync/orphaned') {
+        return json(200, []);
+      }
+
+      const modelMatch = /^\/api\/v2\/models\/i\/([^/]+)$/.exec(path);
+      if (modelMatch) {
+        const key = decodeURIComponent(modelMatch[1]);
+        const model = state.models.get(key);
+
+        return model ? json(200, model) : json(404, { detail: 'Model not found' });
+      }
+
+      if (method === 'GET' && (path === '/api/v2/models' || path === '/api/v2/models/')) {
+        return json(200, { models: [...state.models.values()] });
+      }
+
+      if (path.startsWith('/api/v1/model_relationships')) {
+        return json(200, []);
+      }
+
+      if (method === 'GET' && (path === '/api/v1/wildcards' || path === '/api/v1/wildcards/')) {
+        return json(200, []);
+      }
+
+      if ((method === 'PUT' || method === 'DELETE') && /^\/api\/v1\/intermediates\/holds\/[^/]+$/.test(path)) {
+        response.writeHead(204);
+        return response.end();
+      }
+
+      if (method === 'GET' && path === '/api/v1/intermediates/summary') {
+        // Mirrors IntermediatesService.get_summary: non-admins see only their rows and may not name another owner.
+        const isAdmin = faults.intermediatesCaller === 'admin';
+        const ownerId = url.searchParams.get('owner_id');
+        if (!isAdmin && ownerId !== null && ownerId !== MOCK_USER_ID) {
+          return json(403, { detail: 'Only administrators can inspect other accounts' });
+        }
+        const ownerFilter = isAdmin ? ownerId : MOCK_USER_ID;
+        const sort = url.searchParams.get('sort') ?? 'reclaimable_bytes';
+        const descending = (url.searchParams.get('order') ?? 'desc') === 'desc';
+        const offset = Math.max(0, Number(url.searchParams.get('offset') ?? 0));
+        const limit = Math.max(1, Number(url.searchParams.get('limit') ?? 50));
+        const rows = matchingIntermediates(state.intermediates, {
+          isAdmin,
+          ownerFilter,
+          projectId: url.searchParams.get('project_id'),
+          search: url.searchParams.get('search'),
+        }).sort((left, right) =>
+          (left.project_name ?? '').toLowerCase().localeCompare((right.project_name ?? '').toLowerCase())
+        );
+        if (sort === 'reclaimable_bytes') {
+          rows.sort((left, right) => (right.reclaimable_bytes - left.reclaimable_bytes) * (descending ? 1 : -1));
+        } else if (descending) {
+          rows.reverse();
+        }
+        const totals = rows.reduce(
+          (acc, row) => ({
+            rows: acc.rows + 1,
+            safe_images: acc.safe_images + row.images.safe,
+            safe_videos: acc.safe_videos + row.videos.safe,
+            in_use_images: acc.in_use_images + row.images.referenced + row.images.active + row.images.recent,
+            in_use_videos: acc.in_use_videos + row.videos.referenced + row.videos.active + row.videos.recent,
+            reclaimable_bytes: acc.reclaimable_bytes + row.reclaimable_bytes,
+            unknown_size_count: acc.unknown_size_count + row.unknown_size_count,
+          }),
+          {
+            rows: 0,
+            safe_images: 0,
+            safe_videos: 0,
+            in_use_images: 0,
+            in_use_videos: 0,
+            reclaimable_bytes: 0,
+            unknown_size_count: 0,
+          }
+        );
+        return json(200, {
+          items: rows.slice(offset, offset + limit),
+          total: rows.length,
+          offset,
+          limit,
+          totals,
+          recent_grace_seconds: 1800,
+          measuring: false,
+          can_manage_everyone: isAdmin,
+        });
+      }
+
+      if (method === 'POST' && path === '/api/v1/intermediates/previews') {
+        const requested = await readJsonBody(request);
+        // Mirrors IntermediatesService._authorize_scope.
+        const isAdmin = faults.intermediatesCaller === 'admin';
+        const scope = requested?.scope ?? {};
+        if (scope.kind === 'everyone' && !isAdmin) {
+          return json(403, { detail: "Only administrators can clear everyone's intermediates" });
+        }
+        if (scope.kind === 'owner' && !scope.user_id) {
+          return json(422, { detail: 'An owner scope names the account to clear' });
+        }
+        if (scope.kind === 'owner' && scope.user_id !== MOCK_USER_ID && !isAdmin) {
+          return json(403, { detail: "Only administrators can clear another account's intermediates" });
+        }
+        if (scope.kind === 'selection' && !(scope.targets?.length > 0)) {
+          return json(422, { detail: 'A selection scope names at least one row' });
+        }
+        if (scope.kind === 'selection' && !isAdmin && scope.targets.some((target) => target.user_id !== MOCK_USER_ID)) {
+          return json(403, { detail: "Only administrators can clear another account's intermediates" });
+        }
+        if (scope.kind === 'matching' && !isAdmin && scope.user_id && scope.user_id !== MOCK_USER_ID) {
+          return json(403, { detail: "Only administrators can delete another account's intermediates" });
+        }
+        if (scope.kind === 'matching' && (scope.excluded?.length ?? 0) > 1000) {
+          return json(422, { detail: 'Too many excluded rows' });
+        }
+        const previewId = `preview-${state.intermediatesPreviews.size + 1}`;
+        const targets =
+          scope.kind === 'selection'
+            ? state.intermediates.filter((row) =>
+                scope.targets.some(
+                  (target) => target.user_id === row.user_id && (target.project_id ?? null) === row.project_id
+                )
+              )
+            : scope.kind === 'owner'
+              ? state.intermediates.filter((row) => row.user_id === scope.user_id)
+              : scope.kind === 'matching'
+                ? // Mirrors IntermediatesService._resolve_scope: the summary's filters minus the excluded rows.
+                  matchingIntermediates(state.intermediates, {
+                    isAdmin,
+                    ownerFilter: isAdmin ? (scope.user_id ?? null) : MOCK_USER_ID,
+                    projectId: scope.project_id ?? null,
+                    search: scope.search ?? null,
+                  }).filter(
+                    (row) =>
+                      !(scope.excluded ?? []).some(
+                        (target) => target.user_id === row.user_id && (target.project_id ?? null) === row.project_id
+                      )
+                  )
+                : state.intermediates;
+        if (scope.kind === 'matching' && targets.length === 0) {
+          return json(422, { detail: 'No rows match the filter' });
+        }
+        const force = requested?.mode === 'force';
+        const affectedDocuments = force
+          ? targets
+              .filter((row) => row.images.referenced + row.videos.referenced > 0)
+              .map((row) => ({
+                kind: 'project',
+                user_id: row.user_id,
+                user_display_name: row.user_display_name,
+                user_email: row.user_email,
+                owner_id: row.project_id ?? 'unassigned',
+                name: row.project_name,
+                references: row.images.referenced + row.videos.referenced,
+              }))
+          : [];
+        const impact = targets.reduce(
+          (acc, row) => ({
+            delete_images: acc.delete_images + row.images.safe + (force ? row.images.referenced : 0),
+            delete_videos: acc.delete_videos + row.videos.safe + (force ? row.videos.referenced : 0),
+            keep_referenced_images: acc.keep_referenced_images + (force ? 0 : row.images.referenced),
+            keep_referenced_videos: acc.keep_referenced_videos + (force ? 0 : row.videos.referenced),
+            keep_active_images: acc.keep_active_images + row.images.active,
+            keep_active_videos: acc.keep_active_videos + row.videos.active,
+            keep_recent_images: acc.keep_recent_images + row.images.recent,
+            keep_recent_videos: acc.keep_recent_videos + row.videos.recent,
+            reclaimable_bytes: acc.reclaimable_bytes + row.reclaimable_bytes + (force ? row.referenced_bytes : 0),
+            unknown_size_count: acc.unknown_size_count + row.unknown_size_count,
+          }),
+          {
+            delete_images: 0,
+            delete_videos: 0,
+            keep_referenced_images: 0,
+            keep_referenced_videos: 0,
+            keep_active_images: 0,
+            keep_active_videos: 0,
+            keep_recent_images: 0,
+            keep_recent_videos: 0,
+            reclaimable_bytes: 0,
+            unknown_size_count: 0,
+          }
+        );
+        if (force && affectedDocuments.length > 10_000) {
+          return json(422, { detail: 'This force delete would break more than 10000 documents; narrow the scope' });
+        }
+        const preview = {
+          preview_id: previewId,
+          mode: requested?.mode ?? 'safe',
+          scope: {
+            kind: scope.kind ?? 'owner',
+            targets: scope.targets ?? [],
+            user_id: scope.user_id ?? null,
+            project_id: scope.project_id ?? null,
+            search: scope.search ?? null,
+            excluded: scope.excluded ?? [],
+          },
+          created_at: new Date().toISOString(),
+          expires_at: new Date(Date.now() + 600_000).toISOString(),
+          target_rows: targets.length,
+          impact,
+          affected_documents: affectedDocuments.slice(0, 200),
+          affected_documents_total: affectedDocuments.length,
+        };
+        state.intermediatesPreviews.set(previewId, { preview, targets });
+        return json(201, preview);
+      }
+
+      if (method === 'GET' && path === '/api/v1/intermediates/operations') {
+        // Newest first; the real server retains a handful of settled operations per account.
+        return json(200, { items: [...state.intermediatesOperations.values()].reverse().slice(0, 5) });
+      }
+
+      if (method === 'POST' && path === '/api/v1/intermediates/operations') {
+        const requested = await readJsonBody(request);
+        // Mirrors IntermediatesService.start_operation: a preview is confirmed once.
+        const frozen = state.intermediatesPreviews.get(requested?.preview_id);
+        if (!frozen) {
+          return json(404, { detail: 'Preview expired or unknown; request a new one' });
+        }
+        state.intermediatesPreviews.delete(requested.preview_id);
+        const operationId = `operation-${state.intermediatesOperations.size + 1}`;
+        const { impact } = frozen.preview;
+        const operation = {
+          operation_id: operationId,
+          user_id: MOCK_USER_ID,
+          mode: frozen.preview.mode,
+          scope: frozen.preview.scope,
+          status: 'completed',
+          created_at: new Date().toISOString(),
+          started_at: new Date().toISOString(),
+          completed_at: new Date().toISOString(),
+          error: null,
+          target_images: impact.delete_images,
+          target_videos: impact.delete_videos,
+          progress: {
+            processed_images: impact.delete_images,
+            processed_videos: impact.delete_videos,
+            deleted_images: impact.delete_images,
+            deleted_videos: impact.delete_videos,
+            retained_images: 0,
+            retained_videos: 0,
+            failed_images: 0,
+            failed_videos: 0,
+            reclaimed_bytes: impact.reclaimable_bytes,
+            unknown_size_count: impact.unknown_size_count,
+            pending_disk_cleanup: 0,
+          },
+        };
+        for (const row of frozen.targets) {
+          row.images = {
+            ...row.images,
+            safe: 0,
+            referenced: frozen.preview.mode === 'force' ? 0 : row.images.referenced,
+          };
+          row.videos = {
+            ...row.videos,
+            safe: 0,
+            referenced: frozen.preview.mode === 'force' ? 0 : row.videos.referenced,
+          };
+          row.reclaimable_bytes = 0;
+          row.unknown_size_count = 0;
+        }
+        state.intermediatesOperations.set(operationId, operation);
+        return json(202, operation);
+      }
+
+      {
+        const operationMatch = /^\/api\/v1\/intermediates\/operations\/([^/]+)$/.exec(path);
+        if (method === 'GET' && operationMatch) {
+          const operation = state.intermediatesOperations.get(decodeURIComponent(operationMatch[1]));
+          return operation ? json(200, operation) : json(404, { detail: 'Not found' });
+        }
+      }
+
+      if (method === 'GET' && path === '/api/v1/fonts') {
+        return json(200, {
+          items: [],
+          total: 0,
+          offset: Math.max(0, Number(url.searchParams.get('offset') ?? 0)),
+          limit: Number(url.searchParams.get('limit') ?? 100),
+        });
+      }
+
+      // Implements only the {a|b} subset needed by journeys.
+      if (method === 'POST' && path === '/api/v1/utilities/dynamicprompts') {
+        const requested = await readJsonBody(request);
+        const prompt = typeof requested?.prompt === 'string' ? requested.prompt : '';
+        const maxPrompts = typeof requested?.max_prompts === 'number' ? requested.max_prompts : 100;
+        const match = /\{([^{}]*)\}/.exec(prompt);
+        const prompts = match ? match[1].split('|').map((value) => prompt.replace(match[0], value.trim())) : [prompt];
+
+        return json(200, { error: null, prompts: prompts.slice(0, Math.max(1, maxPrompts)) });
+      }
+
+      if (method === 'GET' && (path === '/api/v2/custom_nodes' || path === '/api/v2/custom_nodes/')) {
+        return json(200, state.nodeCatalog);
+      }
+
+      if (path === '/api/v1/boards' || path === '/api/v1/boards/') {
+        if (method === 'GET') {
+          return json(
+            200,
+            [...state.boards.values()].map((board) => boardDto(state, board))
+          );
+        }
+        if (method === 'POST') {
+          const now = timestamp(state);
+          const boardId = `mock-board-${state.nextBoardNumber}`;
+          const board = {
+            archived: false,
+            board_id: boardId,
+            board_name: url.searchParams.get('board_name') ?? `Board ${state.nextBoardNumber}`,
+            board_visibility: 'private',
+            created_at: now,
+            deleted_at: null,
+            owner_username: null,
+            updated_at: now,
+            user_id: MOCK_USER_ID,
+          };
+
+          state.nextBoardNumber += 1;
+          state.boards.set(boardId, board);
+
+          return json(201, boardDto(state, board));
+        }
+      }
+
+      const boardMatch = /^\/api\/v1\/boards\/([^/]+)$/.exec(path);
+      if (boardMatch) {
+        const boardId = decodeURIComponent(boardMatch[1]);
+        const board = state.boards.get(boardId);
+
+        if (!board) {
+          return json(404, { detail: 'Board not found' });
+        }
+        if (method === 'GET') {
+          return json(200, boardDto(state, board));
+        }
+        if (method === 'PATCH') {
+          const changes = await readJsonBody(request);
+
+          // A project's board takes its name, archived state and visibility from the project.
+          if (
+            projectIdForBoard(state, boardId) !== null &&
+            (changes.board_name !== undefined ||
+              changes.archived !== undefined ||
+              changes.board_visibility !== undefined)
+          ) {
+            return json(409, { detail: 'This board belongs to a project' });
+          }
+
+          for (const key of ['archived', 'board_name', 'board_visibility', 'cover_image_name']) {
+            if (changes[key] !== undefined) {
+              board[key] = changes[key];
+            }
+          }
+          board.updated_at = timestamp(state);
+
+          return json(201, boardDto(state, board));
+        }
+        if (method === 'DELETE') {
+          if (projectIdForBoard(state, boardId) !== null) {
+            // Refused before any media is touched — the whole point of the ordering.
+            return json(409, { detail: 'This board belongs to a project' });
+          }
+
+          const includeImages = url.searchParams.get('include_images') === 'true';
+          const boardImages = [...state.images.values()].filter((image) => image.board_id === boardId);
+          const boardVideos = [...state.videos.values()].filter(
+            (video) => video.board_id === boardId && video.owner_user_id === MOCK_USER_ID
+          );
+          const imageNames = boardImages.map((image) => image.image_name);
+          const videoNames = boardVideos.map((video) => video.video_name);
+
+          state.boards.delete(boardId);
+          if (includeImages) {
+            for (const imageName of imageNames) {
+              state.images.delete(imageName);
+            }
+            for (const videoName of videoNames) {
+              state.videos.delete(videoName);
+            }
+
+            return json(200, {
+              board_id: boardId,
+              deleted_board_images: [],
+              deleted_board_videos: [],
+              deleted_images: imageNames,
+              deleted_videos: videoNames,
+              failed_images: [],
+              failed_videos: [],
+            });
+          }
+
+          for (const image of boardImages) {
+            image.board_id = null;
+          }
+          for (const video of boardVideos) {
+            video.board_id = null;
+          }
+
+          return json(200, {
+            board_id: boardId,
+            deleted_board_images: imageNames,
+            deleted_board_videos: videoNames,
+            deleted_images: [],
+            deleted_videos: [],
+            failed_images: [],
+            failed_videos: [],
+          });
+        }
+      }
+
+      if (method === 'GET' && path === '/api/v1/virtual_boards/by_date') {
+        return json(200, listVirtualDateBoards(state));
+      }
+
+      const virtualBoardItemNamesMatch = /^\/api\/v1\/virtual_boards\/by_date\/([^/]+)\/item_names$/.exec(path);
+      if (method === 'GET' && virtualBoardItemNamesMatch) {
+        const date = decodeURIComponent(virtualBoardItemNamesMatch[1]);
+
+        return json(200, listGalleryItemNames(state, url, { createdDate: date }));
+      }
+
+      const virtualBoardNamesMatch = /^\/api\/v1\/virtual_boards\/by_date\/([^/]+)\/image_names$/.exec(path);
+      if (method === 'GET' && virtualBoardNamesMatch) {
+        const date = decodeURIComponent(virtualBoardNamesMatch[1]);
+        const imageNames = [...state.images.values()]
+          .filter((image) => image.created_at.startsWith(date))
+          .map((image) => image.image_name);
+
+        return json(200, { image_names: imageNames, total_count: imageNames.length });
+      }
+
+      if (method === 'POST' && path === '/api/v1/images/images_by_names') {
+        const body = await readJsonBody(request);
+        const names = Array.isArray(body.image_names) ? body.image_names : [];
+
+        return json(
+          200,
+          names.flatMap((name) => (state.images.has(name) ? [state.images.get(name)] : []))
+        );
+      }
+
+      if (method === 'POST' && path === '/api/v1/images/upload') {
+        const multipartBody = await readBody(request);
+        const requestedName = /filename="([^"]+)"/.exec(multipartBody)?.[1] ?? 'uploaded-fixture';
+        const suffix = String(state.nextImageNumber).padStart(3, '0');
+        const imageName = `fixture-upload-${suffix}-${requestedName.replaceAll(/[^a-zA-Z0-9._-]/g, '-')}.png`;
+        const boardId = url.searchParams.get('board_id');
+        const now = timestamp(state);
+        const image = {
+          board_id: boardId && state.boards.has(boardId) ? boardId : null,
+          created_at: now,
+          deleted_at: null,
+          has_workflow: false,
+          height: 1,
+          image_category: url.searchParams.get('image_category') ?? 'general',
+          image_name: imageName,
+          image_origin: 'external',
+          image_subfolder: '',
+          image_url: `/api/v1/images/i/${imageName}/full`,
+          is_intermediate: url.searchParams.get('is_intermediate') === 'true',
+          node_id: null,
+          session_id: null,
+          starred: false,
+          thumbnail_url: `/api/v1/images/i/${imageName}/thumbnail`,
+          updated_at: now,
+          width: 1,
+        };
+
+        state.nextImageNumber += 1;
+        state.images.set(imageName, image);
+        response.setHeader('location', image.image_url);
+        return json(201, image);
+      }
+
+      if (method === 'POST' && (path === '/api/v1/images/star' || path === '/api/v1/images/unstar')) {
+        const body = await readJsonBody(request);
+        const names = Array.isArray(body.image_names) ? [...new Set(body.image_names)] : [];
+        const succeeded = [];
+        const affectedBoards = [];
+        const starred = path.endsWith('/star');
+
+        for (const name of names) {
+          const image = state.images.get(name);
+
+          if (!image) {
+            continue;
+          }
+          image.starred = starred;
+          succeeded.push(name);
+          affectedBoards.push(image.board_id ?? 'none');
+        }
+
+        return json(200, {
+          affected_boards: [...new Set(affectedBoards)],
+          ...(starred ? { starred_images: succeeded } : { unstarred_images: succeeded }),
+        });
+      }
+
+      if (method === 'POST' && path === '/api/v1/images/copy') {
+        const body = await readJsonBody(request);
+        const names = Array.isArray(body.image_names) ? body.image_names : [];
+        const boardId = body.board_id ?? null;
+
+        if (boardId !== null && !state.boards.has(boardId)) {
+          return json(404, { detail: 'Board not found' });
+        }
+
+        const copied = [];
+        const failed = [];
+
+        for (const name of names) {
+          const source = state.images.get(name);
+
+          if (!source) {
+            failed.push(name);
+            continue;
+          }
+
+          const suffix = String(state.nextImageNumber).padStart(3, '0');
+          const imageName = `fixture-copy-${suffix}.png`;
+          const now = timestamp(state);
+
+          state.nextImageNumber += 1;
+          // Copies need a new board_images key; retain category/provenance, but set starring separately.
+          state.images.set(imageName, {
+            ...clone(source),
+            board_id: boardId,
+            created_at: now,
+            image_name: imageName,
+            image_url: `/api/v1/images/i/${imageName}/full`,
+            is_intermediate: false,
+            starred: false,
+            thumbnail_url: `/api/v1/images/i/${imageName}/thumbnail`,
+            updated_at: now,
+          });
+          copied.push({ image_name: imageName, source_image_name: name });
+        }
+
+        return json(200, { copied, failed });
+      }
+
+      if (method === 'POST' && path === '/api/v1/videos/copy') {
+        const body = await readJsonBody(request);
+        const names = Array.isArray(body.video_names) ? body.video_names : [];
+        const boardId = body.board_id ?? null;
+
+        if (boardId !== null && !state.boards.has(boardId)) {
+          return json(404, { detail: 'Board not found' });
+        }
+
+        const copied = [];
+        const failed = [];
+
+        for (const name of names) {
+          const source = state.videos.get(name);
+
+          if (!source || source.owner_user_id !== MOCK_USER_ID) {
+            failed.push(name);
+            continue;
+          }
+
+          const suffix = String(state.nextVideoNumber).padStart(3, '0');
+          const videoName = `fixture-copy-${suffix}.mp4`;
+          const now = timestamp(state);
+
+          state.nextVideoNumber += 1;
+          state.videos.set(videoName, {
+            ...clone(source),
+            board_id: boardId,
+            created_at: now,
+            is_intermediate: false,
+            starred: false,
+            updated_at: now,
+            video_name: videoName,
+          });
+          copied.push({ source_video_name: name, video_name: videoName });
+        }
+
+        return json(200, { copied, failed });
+      }
+
+      if (method === 'GET' && (path === '/api/v1/images' || path === '/api/v1/images/')) {
+        return json(200, listImages(state, url));
+      }
+
+      if (method === 'GET' && path === '/api/v1/gallery/items/') {
+        return json(200, listGalleryItems(state, url));
+      }
+
+      if (method === 'GET' && path === '/api/v1/gallery/items/names') {
+        return json(200, listGalleryItemNames(state, url));
+      }
+
+      const imageAssetMatch = /^\/api\/v1\/images\/i\/([^/]+)\/(full|thumbnail)$/.exec(path);
+      if (method === 'GET' && imageAssetMatch) {
+        const imageName = decodeURIComponent(imageAssetMatch[1]);
+
+        return state.images.has(imageName) ? writePng(response) : json(404, { detail: 'Image not found' });
+      }
+
+      const imageWorkflowMatch = /^\/api\/v1\/images\/i\/([^/]+)\/workflow$/.exec(path);
+      if (method === 'GET' && imageWorkflowMatch) {
+        const image = state.images.get(decodeURIComponent(imageWorkflowMatch[1]));
+
+        return image
+          ? json(200, { graph: image.graph ?? null, workflow: image.workflow ?? null })
+          : json(404, { detail: 'Image not found' });
+      }
+
+      const imageMetadataMatch = /^\/api\/v1\/images\/i\/([^/]+)\/metadata$/.exec(path);
+      if (method === 'GET' && imageMetadataMatch) {
+        return json(200, {});
+      }
+
+      const imageMatch = /^\/api\/v1\/images\/i\/([^/]+)$/.exec(path);
+      if (imageMatch) {
+        const imageName = decodeURIComponent(imageMatch[1]);
+        const image = state.images.get(imageName);
+
+        return image ? json(200, image) : json(404, { detail: 'Image not found' });
+      }
+
+      if (method === 'POST' && path === '/api/v1/videos/upload') {
+        const multipartBody = await readBody(request);
+        const requestedName = /filename="([^"]+)"/.exec(multipartBody)?.[1] ?? 'uploaded-fixture.mp4';
+        const suffix = String(state.nextVideoNumber).padStart(3, '0');
+        const videoName = `fixture-upload-${suffix}-${requestedName.replaceAll(/[^a-zA-Z0-9._-]/g, '-')}`;
+        const boardId = url.searchParams.get('board_id');
+        const video = {
+          board_id: boardId && state.boards.has(boardId) ? boardId : null,
+          created_at: timestamp(state),
+          duration: 1,
+          fps: 10,
+          graph: null,
+          height: 64,
+          is_intermediate: url.searchParams.get('is_intermediate') === 'true',
+          metadata: null,
+          owner_user_id: MOCK_USER_ID,
+          starred: false,
+          thumbnail_url: `/api/v1/videos/i/${videoName}/thumbnail`,
+          video_category: url.searchParams.get('video_category') ?? 'general',
+          video_name: videoName,
+          video_origin: 'external',
+          video_url: `/api/v1/videos/i/${videoName}/full`,
+          width: 64,
+          workflow: null,
+        };
+
+        state.nextVideoNumber += 1;
+        state.videos.set(videoName, video);
+        response.setHeader('location', video.video_url);
+        return json(201, toVideoDto(video));
+      }
+
+      if (method === 'GET' && (path === '/api/v1/videos' || path === '/api/v1/videos/')) {
+        return json(200, listVideos(state, url));
+      }
+
+      if (method === 'POST' && (path === '/api/v1/videos/star' || path === '/api/v1/videos/unstar')) {
+        const body = await readJsonBody(request);
+        const names = Array.isArray(body.video_names) ? [...new Set(body.video_names)] : [];
+        const succeeded = [];
+        const affectedBoards = [];
+        const starred = path.endsWith('/star');
+
+        for (const name of names) {
+          const video = state.videos.get(name);
+
+          if (!video || video.owner_user_id !== MOCK_USER_ID) {
+            continue;
+          }
+          video.starred = starred;
+          succeeded.push(name);
+          affectedBoards.push(video.board_id ?? 'none');
+        }
+
+        return json(200, {
+          affected_boards: [...new Set(affectedBoards)],
+          failed_videos: [],
+          [starred ? 'starred_videos' : 'unstarred_videos']: succeeded,
+        });
+      }
+
+      if (method === 'POST' && path === '/api/v1/videos/delete') {
+        const body = await readJsonBody(request);
+        const names = Array.isArray(body.video_names) ? [...new Set(body.video_names)] : [];
+        const deletedVideos = [];
+        const affectedBoards = [];
+
+        for (const name of names) {
+          const video = state.videos.get(name);
+
+          if (!video || video.owner_user_id !== MOCK_USER_ID) {
+            continue;
+          }
+          state.videos.delete(name);
+          deletedVideos.push(name);
+          affectedBoards.push(video.board_id ?? 'none');
+        }
+
+        return json(200, {
+          affected_boards: [...new Set(affectedBoards)],
+          deleted_videos: deletedVideos,
+          failed_videos: [],
+        });
+      }
+
+      if (path === '/api/v1/videos/board' && (method === 'POST' || method === 'DELETE')) {
+        const body = await readJsonBody(request);
+        const video = state.videos.get(body.video_name);
+
+        if (!video || video.owner_user_id !== MOCK_USER_ID) {
+          return json(404, { detail: 'Video not found' });
+        }
+
+        const oldBoardId = video.board_id ?? 'none';
+
+        if (method === 'POST') {
+          if (!body.board_id || !state.boards.has(body.board_id)) {
+            return json(404, { detail: 'Board not found' });
+          }
+          video.board_id = body.board_id;
+          return json(200, {
+            added_videos: [video.video_name],
+            affected_boards: [...new Set([oldBoardId, body.board_id])],
+          });
+        }
+
+        video.board_id = null;
+        return json(200, {
+          affected_boards: [...new Set([oldBoardId, 'none'])],
+          removed_videos: [video.video_name],
+        });
+      }
+
+      const videoMetadataMatch = /^\/api\/v1\/videos\/i\/([^/]+)\/metadata$/.exec(path);
+      if (method === 'GET' && videoMetadataMatch) {
+        const video = state.videos.get(decodeURIComponent(videoMetadataMatch[1]));
+
+        return video && video.owner_user_id === MOCK_USER_ID
+          ? json(200, video.metadata)
+          : json(404, { detail: 'Video not found' });
+      }
+
+      const videoWorkflowMatch = /^\/api\/v1\/videos\/i\/([^/]+)\/workflow$/.exec(path);
+      if (method === 'GET' && videoWorkflowMatch) {
+        const video = state.videos.get(decodeURIComponent(videoWorkflowMatch[1]));
+
+        return video && video.owner_user_id === MOCK_USER_ID
+          ? json(200, { graph: video.graph, workflow: video.workflow })
+          : json(404, { detail: 'Video not found' });
+      }
+
+      const videoThumbnailMatch = /^\/api\/v1\/videos\/i\/([^/]+)\/thumbnail$/.exec(path);
+      if (method === 'GET' && videoThumbnailMatch) {
+        const video = state.videos.get(decodeURIComponent(videoThumbnailMatch[1]));
+
+        return video && video.owner_user_id === MOCK_USER_ID
+          ? writeBinary(response, 200, FIXTURE_VIDEO_POSTER, { 'content-type': 'image/webp' })
+          : json(404, { detail: 'Video not found' });
+      }
+
+      const videoFullMatch = /^\/api\/v1\/videos\/i\/([^/]+)\/full$/.exec(path);
+      if ((method === 'GET' || method === 'HEAD') && videoFullMatch) {
+        const video = state.videos.get(decodeURIComponent(videoFullMatch[1]));
+
+        if (!video || video.owner_user_id !== MOCK_USER_ID) {
+          return json(404, { detail: 'Video not found' });
+        }
+
+        const commonHeaders = {
+          'accept-ranges': 'bytes',
+          'content-type': 'video/mp4',
+        };
+
+        if (method === 'HEAD') {
+          response.writeHead(200, { ...commonHeaders, 'content-length': FIXTURE_VIDEO.length });
+          return response.end();
+        }
+
+        const rangeHeader = request.headers.range;
+
+        if (!rangeHeader) {
+          return writeBinary(response, 200, FIXTURE_VIDEO, commonHeaders);
+        }
+
+        const range = parseByteRange(rangeHeader, FIXTURE_VIDEO.length);
+
+        if (!range) {
+          response.writeHead(416, {
+            ...commonHeaders,
+            'content-length': 0,
+            'content-range': `bytes */${String(FIXTURE_VIDEO.length)}`,
+          });
+          return response.end();
+        }
+
+        const [start, end] = range;
+        const body = FIXTURE_VIDEO.subarray(start, end + 1);
+
+        return writeBinary(response, 206, body, {
+          ...commonHeaders,
+          'content-range': `bytes ${String(start)}-${String(end)}/${String(FIXTURE_VIDEO.length)}`,
+        });
+      }
+
+      const videoMatch = /^\/api\/v1\/videos\/i\/([^/]+)$/.exec(path);
+      if (method === 'GET' && videoMatch) {
+        const video = state.videos.get(decodeURIComponent(videoMatch[1]));
+
+        return video && video.owner_user_id === MOCK_USER_ID
+          ? json(200, toVideoDto(video))
+          : json(404, { detail: 'Video not found' });
+      }
+
+      if (path.startsWith('/api/v1/workflows')) {
+        state.workflowRequests.push({ method, path });
+      }
+
+      if (method === 'GET' && path === '/__workflow-requests') {
+        return json(200, { requests: state.workflowRequests });
+      }
+
+      const workflowRecord = (workflow) => {
+        const thumbnail = state.workflowThumbnails.get(workflow.workflow_id);
+
+        return {
+          ...workflow,
+          thumbnail_url: thumbnail
+            ? `/api/v1/workflows/i/${encodeURIComponent(workflow.workflow_id)}/thumbnail?v=${String(thumbnail.version)}`
+            : (workflow.thumbnail_url ?? null),
+        };
+      };
+      const workflowListItem = ({ workflow: _workflow, ...item }) => workflowRecord(item);
+      const workflowTags = (workflow) =>
+        String(workflow.tags ?? '')
+          .split(',')
+          .map((tag) => tag.trim())
+          .filter(Boolean);
+
+      if (path === '/api/v1/workflows/tags') {
+        const categories = url.searchParams.getAll('categories');
+        const tags = new Set();
+
+        for (const workflow of state.workflows.values()) {
+          if (categories.length === 0 || categories.includes(workflow.category)) {
+            workflowTags(workflow).forEach((tag) => tags.add(tag));
+          }
+        }
+
+        return json(200, [...tags].sort());
+      }
+
+      if (path === '/api/v1/workflows/counts_by_tag') {
+        const categories = url.searchParams.getAll('categories');
+        const counts = {};
+
+        for (const tag of url.searchParams.getAll('tags')) {
+          counts[tag] = [...state.workflows.values()].filter(
+            (workflow) =>
+              (categories.length === 0 || categories.includes(workflow.category)) &&
+              workflowTags(workflow).includes(tag)
+          ).length;
+        }
+
+        return json(200, counts);
+      }
+
+      const workflowMatch = /^\/api\/v1\/workflows\/i\/([^/]+)(\/opened_at|\/thumbnail)?$/.exec(path);
+      if (workflowMatch) {
+        const workflowId = decodeURIComponent(workflowMatch[1]);
+        const suffix = workflowMatch[2] ?? '';
+        const workflow = state.workflows.get(workflowId);
+
+        if (!workflow) {
+          return json(404, { detail: 'Workflow not found' });
+        }
+
+        if (suffix === '/opened_at' && method === 'PUT') {
+          workflow.opened_at = timestamp(state);
+          return json(200, null);
+        }
+
+        if (suffix === '/thumbnail') {
+          const thumbnail = state.workflowThumbnails.get(workflowId);
+
+          if (method === 'GET') {
+            return thumbnail
+              ? writeBinary(response, 200, thumbnail.data, { 'content-type': thumbnail.contentType })
+              : json(404, { detail: 'Workflow thumbnail not found' });
+          }
+          if (workflow.category === 'default') {
+            return json(403, { detail: 'Bundled workflows cannot be modified' });
+          }
+          if (method === 'PUT') {
+            const file = await readMultipartFile(request, 'image');
+
+            if (!file?.contentType.startsWith('image') || file.data.length === 0) {
+              return json(415, { detail: 'Not an image' });
+            }
+
+            state.workflowThumbnails.set(workflowId, {
+              contentType: file.contentType,
+              data: file.data,
+              version: state.nextWorkflowThumbnailVersion++,
+            });
+            return json(200, null);
+          }
+          if (method === 'DELETE') {
+            // Fixture workflows can carry a seeded thumbnail URL without stored bytes; removing clears either.
+            const removedUpload = state.workflowThumbnails.delete(workflowId);
+            const removedFixture = Boolean(workflow.thumbnail_url);
+
+            workflow.thumbnail_url = null;
+            return removedUpload || removedFixture
+              ? json(200, null)
+              : json(404, { detail: 'Workflow thumbnail not found' });
+          }
+
+          return json(405, { detail: `No mock for ${method} ${path}` });
+        }
+
+        if (method === 'GET') {
+          return json(200, workflowRecord(workflow));
+        }
+
+        if (method === 'DELETE') {
+          if (workflow.category === 'default') {
+            return json(403, { detail: 'Bundled workflows cannot be deleted' });
+          }
+          state.workflows.delete(workflowId);
+          state.workflowThumbnails.delete(workflowId);
+          return json(200, null);
+        }
+
+        if (method === 'PATCH') {
+          const body = await readJsonBody(request);
+          const submitted = body.workflow ?? {};
+
+          if (submitted.id !== workflowId) {
+            return json(400, { detail: 'The workflow id in the body does not match the URL' });
+          }
+          if (workflow.category === 'default') {
+            return json(403, { detail: 'Bundled workflows cannot be modified' });
+          }
+          if (body.expected_revision !== undefined && body.expected_revision !== workflow.revision) {
+            return json(409, {
+              detail: {
+                current_revision: workflow.revision,
+                expected_revision: body.expected_revision,
+                message: `Workflow ${workflowId} is at revision ${String(workflow.revision)}`,
+                reason: 'revision-conflict',
+              },
+            });
+          }
+
+          const { id: _id, ...content } = submitted;
+
+          workflow.workflow = { ...content, meta: { ...content.meta, category: 'user' } };
+          workflow.name = content.name ?? workflow.name;
+          workflow.description = content.description ?? workflow.description;
+          workflow.tags = content.tags ?? workflow.tags;
+          workflow.revision += 1;
+          workflow.updated_at = timestamp(state);
+
+          return json(200, workflowRecord(workflow));
+        }
+      }
+
+      if (method === 'POST' && (path === '/api/v1/workflows' || path === '/api/v1/workflows/')) {
+        const body = await readJsonBody(request);
+        const { id: _id, ...content } = body.workflow ?? {};
+        const reservedId = typeof body.workflow_id === 'string' ? body.workflow_id : null;
+
+        if (reservedId !== null && !/^[0-9a-f-]{36}$/i.test(reservedId)) {
+          return json(400, { detail: 'A reserved workflow id must be a UUID' });
+        }
+
+        const existing = reservedId === null ? null : state.workflows.get(reservedId);
+
+        if (existing) {
+          // A retried creation is accepted only for the same content; anything else under the id is a conflict.
+          return JSON.stringify(existing.workflow) ===
+            JSON.stringify({ ...content, meta: { ...content.meta, category: 'user' } })
+            ? json(200, workflowRecord(existing))
+            : json(409, { detail: { message: 'The workflow id is already in use', reason: 'id-conflict' } });
+        }
+
+        const workflowId = reservedId ?? `mock-workflow-${String(state.nextWorkflowNumber++).padStart(4, '0')}`;
+        const created = {
+          category: 'user',
+          created_at: timestamp(state),
+          description: content.description ?? '',
+          is_public: true,
+          name: content.name ?? '',
+          opened_at: null,
+          revision: 1,
+          tags: content.tags ?? '',
+          thumbnail_url: null,
+          updated_at: null,
+          user_id: MOCK_USER_ID,
+          workflow: { ...content, meta: { ...content.meta, category: 'user' } },
+          workflow_id: workflowId,
+        };
+
+        created.updated_at = created.created_at;
+        state.workflows.set(workflowId, created);
+
+        return json(200, workflowRecord(created));
+      }
+
+      if (method === 'GET' && (path === '/api/v1/workflows' || path === '/api/v1/workflows/')) {
+        const categories = url.searchParams.getAll('categories');
+        const query = url.searchParams.get('query')?.trim().toLocaleLowerCase() ?? '';
+        const tags = url.searchParams.getAll('tags');
+        // The API pages from 0; the client asks for page 0 first.
+        const page = Math.max(0, Number(url.searchParams.get('page') ?? 0) || 0);
+        const perPage = Math.max(1, Number(url.searchParams.get('per_page') ?? 20) || 20);
+        const items = [...state.workflows.values()].filter(
+          (workflow) =>
+            (categories.length === 0 || categories.includes(workflow.category)) &&
+            (!query || `${workflow.name} ${workflow.description}`.toLocaleLowerCase().includes(query)) &&
+            (tags.length === 0 || tags.some((tag) => workflowTags(workflow).includes(tag)))
+        );
+        const pages = Math.max(1, Math.ceil(items.length / perPage));
+        const pageItems = items.slice(page * perPage, (page + 1) * perPage).map(workflowListItem);
+
+        return json(200, { items: pageItems, page, pages, total: items.length });
+      }
+
+      return json(404, { detail: `No mock for ${method} ${path}` });
+    } catch (error) {
+      return json(500, { detail: error instanceof Error ? error.message : String(error) });
+    }
+  });
+
+  await new Promise((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', resolve);
+  });
+
+  const address = server.address();
+  const actualPort = typeof address === 'object' && address ? address.port : port;
+
+  return {
+    close: () =>
+      new Promise((resolve) => {
+        server.close(resolve);
+        server.closeAllConnections?.();
+      }),
+    counts: () => getStateCounts(state),
+    origin: `http://127.0.0.1:${String(actualPort)}`,
+    port: actualPort,
+    profile: () => state.profile,
+  };
+};
+
+export { getMockBackendFixtureCounts };

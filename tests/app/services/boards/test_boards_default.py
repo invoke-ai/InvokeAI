@@ -28,6 +28,7 @@ def test_board_listing_fetches_media_summaries_once(mock_invoker: Invoker) -> No
             image_count=1,
             video_count=2,
             asset_count=3,
+            asset_video_count=1,
         )
         for board_id in board_ids
     }
@@ -74,6 +75,7 @@ def test_admin_board_listing_batches_owner_lookup(mock_invoker: Invoker) -> None
             image_count=0,
             video_count=0,
             asset_count=0,
+            asset_video_count=0,
         )
         for board_id in board_ids
     }
@@ -105,7 +107,12 @@ def test_non_admin_board_listing_skips_owner_lookup(mock_invoker: Invoker) -> No
     mock_invoker.services.gallery.get_board_media_summaries = MagicMock(  # type: ignore[attr-defined]
         return_value={
             board_id: SimpleNamespace(
-                cover_image_name=None, cover_video_name=None, image_count=0, video_count=0, asset_count=0
+                cover_image_name=None,
+                cover_video_name=None,
+                image_count=0,
+                video_count=0,
+                asset_count=0,
+                asset_video_count=0,
             )
         }
     )

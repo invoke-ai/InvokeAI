@@ -3,6 +3,7 @@
 import os
 from pathlib import Path
 from typing import Any
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -279,6 +280,39 @@ def test_setup_admin_first_time(monkeypatch: Any, mock_invoker: Invoker, client:
     assert json_response["success"] is True
     assert json_response["user"]["email"] == "admin@example.com"
     assert json_response["user"]["is_admin"] is True
+
+
+def test_delete_user_emits_revocation_when_font_cleanup_fails(
+    monkeypatch: Any, mock_invoker: Invoker, client: TestClient
+) -> None:
+    """A cleanup failure cannot leave the deleted user's live sessions authorized."""
+    dependencies = MockApiDependencies(mock_invoker)
+    monkeypatch.setattr("invokeai.app.api.routers.auth.ApiDependencies", dependencies)
+    monkeypatch.setattr("invokeai.app.api.auth_dependencies.ApiDependencies", dependencies)
+
+    setup_test_admin(mock_invoker, "delete-admin@example.com", "AdminPass123")
+    deleted_user_id = setup_test_user(mock_invoker, "delete-target@example.com", "TestPass123")
+    admin_token = client.post(
+        "/api/v1/auth/login",
+        json={"email": "delete-admin@example.com", "password": "AdminPass123", "remember_me": False},
+    ).json()["token"]
+
+    fonts = MagicMock()
+    fonts.prepare_user_cleanup.return_value = ()
+    fonts.cleanup_user.side_effect = OSError("storage unavailable")
+    mock_invoker.services.fonts = fonts
+    events = mock_invoker.services.events
+    events.emit_user_access_changed = MagicMock()
+
+    response = client.delete(
+        f"/api/v1/auth/users/{deleted_user_id}", headers={"Authorization": f"Bearer {admin_token}"}
+    )
+
+    assert response.status_code == 204
+    assert mock_invoker.services.users.get(deleted_user_id) is None
+    events.emit_user_access_changed.assert_called_once_with(user_id=deleted_user_id, is_admin=False, is_active=False)
+    fonts.prepare_user_cleanup.assert_called_once_with(deleted_user_id)
+    fonts.cleanup_user.assert_called_once_with(deleted_user_id, ())
 
 
 def test_setup_admin_already_exists(monkeypatch: Any, mock_invoker: Invoker, client: TestClient) -> None:

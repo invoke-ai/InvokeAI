@@ -17,12 +17,25 @@ import torch
 from invokeai.backend.model_manager.load.model_loaders.krea2 import (
     KREA2_TRANSFORMER_CONFIG,
     _convert_krea2_native_to_diffusers,
-    _dequantize_scaled_fp8,
+    _drop_discarded_native_final_layers,
     _is_native_krea2_format,
     _normalize_qwen3vl_rope_config,
     _reject_incomplete_load,
+    _remap_native_layer_paths,
     _remap_qwen3vl_singlefile_keys,
-    _strip_comfyui_prefix,
+)
+from invokeai.backend.quantization.fp8_scaled import (
+    FP8_DTYPE,
+    detach_layer_sidechannel,
+    extract_fp8_scaled_layers,
+    reattach_layer_sidechannel,
+)
+from invokeai.backend.quantization.int8_convrot import (
+    CONVROT_GROUP_SIZE,
+    build_regular_hadamard,
+    drop_unconsumed_quantization_sidecars,
+    extract_int8_convrot_markers,
+    resolve_quantized_module_paths,
 )
 
 
@@ -49,25 +62,6 @@ class TestNormalizeQwen3vlRopeConfig:
         assert _normalize_qwen3vl_rope_config(config) is config
 
 
-class TestStripComfyuiPrefix:
-    @pytest.mark.parametrize("prefix", ["model.diffusion_model.", "diffusion_model."])
-    def test_strips_known_prefixes(self, prefix: str) -> None:
-        sd = {f"{prefix}blocks.0.weight": torch.zeros(1), f"{prefix}first.weight": torch.zeros(1)}
-        out = _strip_comfyui_prefix(sd)
-        assert set(out.keys()) == {"blocks.0.weight", "first.weight"}
-
-    def test_noop_when_no_prefix(self) -> None:
-        sd = {"blocks.0.weight": torch.zeros(1), "img_in.weight": torch.zeros(1)}
-        out = _strip_comfyui_prefix(sd)
-        assert set(out.keys()) == set(sd.keys())
-
-    def test_only_the_first_matching_prefix_is_used(self) -> None:
-        # "model.diffusion_model." is checked before "diffusion_model.", so both strip to the same tail.
-        sd = {"model.diffusion_model.blocks.0.weight": torch.zeros(1)}
-        out = _strip_comfyui_prefix(sd)
-        assert list(out.keys()) == ["blocks.0.weight"]
-
-
 class TestIsNativeKrea2Format:
     @pytest.mark.parametrize(
         "key",
@@ -82,48 +76,6 @@ class TestIsNativeKrea2Format:
     )
     def test_false_for_diffusers_keys(self, key: str) -> None:
         assert _is_native_krea2_format({key: torch.zeros(1)}) is False
-
-
-class TestDequantizeScaledFp8:
-    def test_folds_scale_into_weight_and_drops_scale_key(self) -> None:
-        sd = {
-            "layer.weight": torch.tensor([2.0, 4.0]),
-            "layer.weight_scale": torch.tensor(0.5),
-        }
-        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
-        assert "layer.weight_scale" not in out
-        assert torch.allclose(out["layer.weight"].float(), torch.tensor([1.0, 2.0]))
-
-    def test_result_is_stored_in_the_compute_dtype_not_float32(self) -> None:
-        """The whole model must never be materialized in float32.
-
-        The multiply runs in float32 for precision, but holding every dequantized weight there
-        costs 4 bytes per parameter: Krea-2's ~12 GB fp8 checkpoint peaked at ~50 GB of RAM before
-        the caller's later bf16 cast, which swaps a 32 GB machine during a cold load.
-        """
-        sd = {
-            "layer.weight": torch.tensor([2.0, 4.0]),
-            "layer.weight_scale": torch.tensor(0.5),
-        }
-        assert _dequantize_scaled_fp8(dict(sd), torch.bfloat16)["layer.weight"].dtype is torch.bfloat16
-        assert _dequantize_scaled_fp8(dict(sd), torch.float16)["layer.weight"].dtype is torch.float16
-
-    def test_dtype_is_required(self) -> None:
-        """No implicit bfloat16 fallback: on a float16-only device that would cost an extra rounding step."""
-        with pytest.raises(TypeError):
-            _dequantize_scaled_fp8({"layer.weight": torch.tensor([2.0])})  # type: ignore[call-arg]
-
-    def test_noop_without_scale_keys(self) -> None:
-        sd = {"layer.weight": torch.tensor([2.0, 4.0])}
-        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
-        assert out is sd
-
-    def test_orphan_scale_key_is_dropped(self) -> None:
-        # A scale key with no matching weight is simply removed (nothing to multiply).
-        sd = {"other.weight": torch.tensor([1.0]), "layer.weight_scale": torch.tensor(0.5)}
-        out = _dequantize_scaled_fp8(sd, torch.bfloat16)
-        assert "layer.weight_scale" not in out
-        assert "other.weight" in out
 
 
 class TestConvertKrea2NativeToDiffusers:
@@ -376,3 +328,210 @@ class TestConvertedShapesMatchRealKrea2Transformer:
         for name in table_keys:
             if name.startswith(("transformer_blocks.", "text_fusion.")):
                 assert expected[name][0] == 6, f"{name} expected 6 modulation rows, got {expected[name]}"
+
+
+def _quantized_int8_layer(path: str, weight: torch.Tensor) -> dict:
+    """A convrot-rotated int8 layer in the native key spelling, as Comfy-Org ships it."""
+    import json
+
+    out_f, in_f = weight.shape
+    h = build_regular_hadamard(CONVROT_GROUP_SIZE, dtype=weight.dtype)
+    rotated = (weight.view(out_f, in_f // CONVROT_GROUP_SIZE, CONVROT_GROUP_SIZE) @ h.T).view(out_f, in_f)
+    scale = rotated.abs().amax(dim=1, keepdim=True) / 127.0
+    marker = json.dumps({"format": "int8_tensorwise", "convrot": True, "convrot_groupsize": CONVROT_GROUP_SIZE})
+    return {
+        f"{path}.weight": torch.clamp(torch.round(rotated / scale), -128, 127).to(torch.int8),
+        f"{path}.weight_scale": scale.to(torch.float32),
+        f"{path}.comfy_quant": torch.frombuffer(bytearray(marker.encode("utf-8")), dtype=torch.uint8),
+    }
+
+
+class TestInt8LayersSurviveTheLoaderPipeline:
+    """Two steps between the file and the model would quietly ruin an int8 layer.
+
+    Neither fails loudly if it is broken - both produce a state dict that loads cleanly and
+    generates noise - so each is pinned by a test that shows the damage.
+    """
+
+    def test_the_key_conversion_renames_the_scale_but_orphans_the_marker(self) -> None:
+        """Why the module paths are resolved by following the weight's own rename rather than the
+        marker's key: the within-block renames are substring replacements of `.attn.wq.weight`,
+        which `.weight_scale` contains and `.comfy_quant` does not."""
+        torch.manual_seed(1)
+        sd = _quantized_int8_layer("blocks.0.attn.wq", torch.randn(32, CONVROT_GROUP_SIZE))
+
+        converted = _convert_krea2_native_to_diffusers(sd)
+
+        assert "transformer_blocks.0.attn.to_q.weight" in converted
+        assert "transformer_blocks.0.attn.to_q.weight_scale" in converted
+        assert "transformer_blocks.0.attn.wq.comfy_quant" in converted
+        assert "transformer_blocks.0.attn.to_q.comfy_quant" not in converted
+
+    def test_the_marker_is_re_keyed_onto_the_module_the_weight_landed_on(self) -> None:
+        torch.manual_seed(2)
+        sd = _quantized_int8_layer("blocks.0.attn.wq", torch.randn(32, CONVROT_GROUP_SIZE))
+        markers = extract_int8_convrot_markers(sd)
+
+        key_map: dict[str, str] = {}
+        _convert_krea2_native_to_diffusers(sd, key_map=key_map)
+
+        assert resolve_quantized_module_paths(markers, key_map) == {
+            "transformer_blocks.0.attn.to_q": markers["blocks.0.attn.wq"]
+        }
+
+    def test_a_diffusers_named_checkpoint_needs_no_re_keying(self) -> None:
+        """No conversion runs, so the empty map has to resolve to the paths as they are."""
+        markers = {"transformer_blocks.0.attn.to_q": {"format": "int8_tensorwise"}}
+        assert resolve_quantized_module_paths(markers, {}) == markers
+
+
+class TestUnconsumedQuantizationSidecars:
+    def test_markers_and_activation_scales_are_dropped(self) -> None:
+        """`input_scale` is an activation scale for W8A8 inference; this code dequantizes the
+        weight and computes in bf16, so there is nothing to apply it to. One Qwen3-VL repack
+        ships 337 of them, under a spelling the previous filter did not match."""
+        sd = {
+            "layer.weight": torch.ones(2, 2),
+            "layer.comfy_quant": torch.zeros(4, dtype=torch.uint8),
+            "layer.input_scale": torch.ones(1),
+            "other.scale_input": torch.ones(1),
+        }
+        assert set(drop_unconsumed_quantization_sidecars(sd)) == {"layer.weight"}
+
+    def test_a_clean_state_dict_is_unchanged(self) -> None:
+        sd = {"layer.weight": torch.ones(2, 2), "layer.bias": torch.zeros(2)}
+        assert set(drop_unconsumed_quantization_sidecars(sd)) == set(sd)
+
+
+class TestDiscardedFinalProjections:
+    def test_the_dropped_projections_take_their_quantization_metadata_with_them(self) -> None:
+        """`last.down`/`last.up` have no diffusers counterpart, and one real repack quantizes
+        `last.up` with a scale layout the decode refuses. Dropping them before the decode keeps a
+        tensor that is on its way to the bin from failing the load."""
+        sd = {
+            "last.up.weight": torch.zeros(4, 4, dtype=torch.int8),
+            "last.up.weight_scale": torch.ones(2, 2),
+            "last.up.comfy_quant": torch.zeros(8, dtype=torch.uint8),
+            "last.down.weight": torch.zeros(4, 4),
+            "last.linear.weight": torch.ones(4, 4),
+        }
+        out = _drop_discarded_native_final_layers(sd)
+        assert set(out) == {"last.linear.weight"}
+
+    def test_a_state_dict_without_them_is_returned_unchanged(self) -> None:
+        sd = {"last.linear.weight": torch.ones(2, 2)}
+        assert _drop_discarded_native_final_layers(sd) is sd
+
+
+class TestEverySuffixSurvivesTheKeyConversion:
+    """A quantized layer travels as three keys, and the converter has to move all of them.
+
+    The within-block renames are substring replacements of `.attn.wq.weight`, so `.weight_scale`
+    rides along by construction. The top-level renames are prefix slices, so they carry any
+    suffix. `last.linear` used to be neither -- an exact match per suffix, which silently left
+    `last.linear.weight_scale` under its old name.
+    """
+
+    @pytest.mark.parametrize(
+        ("native", "diffusers"),
+        [
+            ("blocks.0.attn.wq", "transformer_blocks.0.attn.to_q"),
+            ("blocks.3.mlp.down", "transformer_blocks.3.ff.down"),
+            ("txtfusion.refiner_blocks.1.attn.wv", "text_fusion.refiner_blocks.1.attn.to_v"),
+            ("first", "img_in"),
+            ("tmlp.0", "time_embed.linear_1"),
+            ("tmlp.2", "time_embed.linear_2"),
+            ("tproj.1", "time_mod_proj"),
+            ("txtmlp.1", "txt_in.linear_1"),
+            ("txtmlp.3", "txt_in.linear_2"),
+            ("last.linear", "final_layer.linear"),
+        ],
+    )
+    def test_the_weight_and_its_scale_land_on_the_same_module(self, native: str, diffusers: str) -> None:
+        sd = {f"{native}.weight": torch.zeros(4, 4, dtype=torch.int8), f"{native}.weight_scale": torch.ones(4, 1)}
+        key_map: dict[str, str] = {}
+        out = _convert_krea2_native_to_diffusers(sd, key_map=key_map)
+
+        assert f"{diffusers}.weight" in out
+        assert f"{diffusers}.weight_scale" in out, "the scale was left behind under its old name"
+        assert key_map[f"{native}.weight"] == f"{diffusers}.weight"
+
+
+class TestNativeConversionCarriesTheQuantizationSideChannel:
+    """Regression guard for scales orphaned by the native -> diffusers rename.
+
+    `_convert_krea2_native_to_diffusers` renames `.weight` keys by substring *and* renames five
+    more by whole-key equality. Neither carries a sibling scale: `.scale_weight` and `.input_scale`
+    do not contain `.weight`, and `last.linear.weight_scale` is not equal to `last.linear.weight`.
+    An orphaned scale is then dropped by `extract_fp8_scaled_layers` (no fp8 weight sits at the old
+    path any more) and the weight is left quantized but unscaled - off by exactly 1/weight_scale,
+    with nothing logged, because the layer never enters `fp8_layers` for
+    `warn_on_unattached_scales` to see.
+    """
+
+    @staticmethod
+    def _convert(sd: dict) -> dict:
+        detached = detach_layer_sidechannel(sd)
+        converted = _convert_krea2_native_to_diffusers(sd)
+        orphaned = reattach_layer_sidechannel(converted, detached, _remap_native_layer_paths(set(detached)))
+        return converted, orphaned
+
+    def test_every_spelling_and_rename_style_survives(self) -> None:
+        fp8 = torch.ones(4, 4).to(FP8_DTYPE)
+        sd = {
+            # substring rename, `.weight_scale` spelling
+            "blocks.0.attn.wq.weight": fp8.clone(),
+            "blocks.0.attn.wq.weight_scale": torch.tensor(0.5),
+            "blocks.0.attn.wq.input_scale": torch.tensor(0.25),
+            # substring rename, `.scale_weight` spelling
+            "blocks.0.attn.wk.weight": fp8.clone(),
+            "blocks.0.attn.wk.scale_weight": torch.tensor(0.5),
+            # whole-key-equality rename
+            "last.linear.weight": fp8.clone(),
+            "last.linear.weight_scale": torch.tensor(0.5),
+        }
+
+        converted, orphaned = self._convert(sd)
+        layers = extract_fp8_scaled_layers(converted)
+
+        assert set(layers) == {
+            "transformer_blocks.0.attn.to_q",
+            "transformer_blocks.0.attn.to_k",
+            "final_layer.linear",
+        }
+        assert orphaned == []
+        # The calibrated activation scale must come across too, or every forward pays an amax pass.
+        assert layers["transformer_blocks.0.attn.to_q"].input_scale is not None
+
+    def test_no_fp8_weight_is_left_without_its_scale(self) -> None:
+        """The property that actually matters, stated directly."""
+        fp8 = torch.ones(4, 4).to(FP8_DTYPE)
+        sd = {
+            "blocks.0.attn.wk.weight": fp8.clone(),
+            "blocks.0.attn.wk.scale_weight": torch.tensor(0.5),
+            "last.linear.weight": fp8.clone(),
+            "last.linear.weight_scale": torch.tensor(0.5),
+        }
+
+        converted, _ = self._convert(sd)
+        layers = extract_fp8_scaled_layers(converted)
+
+        unscaled = [
+            key
+            for key, value in converted.items()
+            if key.endswith(".weight")
+            and getattr(value, "dtype", None) is FP8_DTYPE
+            and key[: -len(".weight")] not in layers
+        ]
+        assert unscaled == []
+
+    def test_a_scale_on_a_dropped_module_is_reported(self) -> None:
+        """`last.down`/`last.up` have no diffusers counterpart, so their scales go too - loudly."""
+        sd = {
+            "last.down.weight": torch.ones(4, 4).to(FP8_DTYPE),
+            "last.down.weight_scale": torch.tensor(0.5),
+        }
+
+        _, orphaned = self._convert(sd)
+
+        assert orphaned == ["last.down"]

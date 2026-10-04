@@ -16,7 +16,7 @@ from types import SimpleNamespace
 import pytest
 import torch
 
-from invokeai.app.invocations.ernie_image_denoise import ErnieImageDenoiseInvocation
+from invokeai.app.invocations.ernie_image.ernie_image_denoise import ErnieImageDenoiseInvocation
 from invokeai.app.invocations.fields import LatentsField
 
 

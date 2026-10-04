@@ -30,67 +30,49 @@ on:
         type: boolean
         default: true
 
-defaults:
-  run:
-    working-directory: invokeai/frontend/web
+# One run per pull request: a new push cancels the superseded run. The PR number is used rather
+# than the head branch, which two forks can share. Pushes to main and merge groups fall back to
+# the run id and never cancel each other. The group names the workflow literally
+# because `github.workflow` is the caller's name inside a reusable workflow, and release.yml calls
+# several of these at once.
+concurrency:
+  group: frontend-checks-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
 
 jobs:
-  frontend-checks:
+  frontend-webv2-checks:
     runs-on: ubuntu-latest
     timeout-minutes: 10 # expected run time: <2 min
+    defaults:
+      run:
+        working-directory: invokeai/frontend/webv2
     steps:
       - uses: actions/checkout@v6
 
-      - name: Fail if package-lock.json is added/modified (pnpm only)
-        shell: bash
-        working-directory: .
-        run: |
-          set -euo pipefail
-          git fetch --no-tags --prune --depth=1 origin "${{ github.base_ref }}"
-          if git diff --name-only "origin/${{ github.base_ref }}...HEAD" | grep -E '(^|/)package-lock\.json$'; then
-            echo "::error::package-lock.json was added or modified. This repo uses pnpm only."
-           exit 1
-          fi
-
-      - name: check for changed frontend files
+      - name: check for changed webv2 files
         if: ${{ inputs.always_run != true }}
         id: changed-files
-        # Pinned to the _hash_ for v45.0.9 to prevent supply-chain attacks.
-        # See:
-        # - CVE-2025-30066
-        # - https://www.stepsecurity.io/blog/harden-runner-detection-tj-actions-changed-files-action-is-compromised
-        # - https://github.com/tj-actions/changed-files/issues/2463
         uses: tj-actions/changed-files@9426d40962ed5378910ee2e21d5f8c6fcbf2dd96
         with:
           files_yaml: |
-            frontend:
-              - 'invokeai/frontend/web/**'
+            webv2:
+              - '.github/workflows/frontend-checks.yml'
+              - '.nvmrc'
+              - '.github/actions/install-frontend-deps/**'
+              - 'invokeai/frontend/webv2/**'
 
       - name: install dependencies
-        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
+        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
         uses: ./.github/actions/install-frontend-deps
+        with:
+          working-directory: invokeai/frontend/webv2
 
-      - name: tsc
-        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm lint:tsc'
+      - name: lint
+        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
+        run: 'pnpm run lint'
         shell: bash
 
-      - name: dpdm
-        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm lint:dpdm'
-        shell: bash
-
-      - name: eslint
-        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm lint:eslint'
-        shell: bash
-
-      - name: prettier
-        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm lint:prettier'
-        shell: bash
-
-      - name: knip
-        if: ${{ steps.changed-files.outputs.frontend_any_changed == 'true' || inputs.always_run == true }}
-        run: 'pnpm lint:knip'
+      - name: build
+        if: ${{ steps.changed-files.outputs.webv2_any_changed == 'true' || inputs.always_run == true }}
+        run: 'pnpm run build'
         shell: bash

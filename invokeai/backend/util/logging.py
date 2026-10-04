@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and The InvokeAI Development Team
-
 """
 Logging class for InvokeAI that produces console messages.
 

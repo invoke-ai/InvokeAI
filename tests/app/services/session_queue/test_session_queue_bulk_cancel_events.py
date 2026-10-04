@@ -33,6 +33,7 @@ def _insert_queue_item(
     user_id: str,
     batch_id: str | None = None,
     destination: str | None = None,
+    origin: str | None = None,
 ) -> int:
     """Directly insert a minimal pending queue item for the given user and return its item_id."""
     session_id = str(uuid.uuid4())
@@ -43,7 +44,7 @@ def _insert_queue_item(
             INSERT INTO session_queue (queue_id, session, session_id, batch_id, field_values, priority, workflow, origin, destination, retried_from_item_id, user_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            (queue_id, "{}", session_id, batch_id, None, 0, None, None, destination, None, user_id),
+            (queue_id, "{}", session_id, batch_id, None, 0, None, origin, destination, None, user_id),
         )
         assert cursor.lastrowid is not None
         return cursor.lastrowid
@@ -71,6 +72,13 @@ def _insert_dequeueable_queue_item(
         )
         assert cursor.lastrowid is not None
         return cursor.lastrowid
+
+
+def _status_of(session_queue: SqliteSessionQueue, item_id: int) -> str:
+    """Reads an item's status directly; the minimal inserted rows carry no parseable session."""
+    with session_queue._db.transaction() as cursor:
+        cursor.execute("SELECT status FROM session_queue WHERE item_id = ?", (item_id,))
+        return str(cursor.fetchone()[0])
 
 
 def _canceled_events(mock_invoker: Invoker) -> list[QueueItemsCanceledEvent]:
@@ -112,6 +120,47 @@ def test_cancel_all_except_current_scoped_to_user_only_names_their_items(
     events = _canceled_events(mock_invoker)
     assert len(events) == 1
     assert events[0].canceled_item_ids_by_user == {"user_a": [a1]}
+
+
+def test_cancel_all_except_current_scoped_to_origin_prefix_leaves_other_origins(
+    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+) -> None:
+    """A project-scoped cancel-all (the webv2 queue widget's default scope) must only sweep items whose
+    origin carries that project's prefix; the prefix is a plain prefix, not a pattern."""
+    a1 = _insert_queue_item(session_queue, "default", "user_a", origin="webv2:p:a:1")
+    a2 = _insert_queue_item(session_queue, "default", "user_b", origin="webv2:p:a:2")
+    other = _insert_queue_item(session_queue, "default", "user_a", origin="webv2:p:b:1")
+    unscoped = _insert_queue_item(session_queue, "default", "user_a")
+
+    result = session_queue.cancel_all_except_current("default", origin_prefix="webv2:p:a:")
+
+    assert result.canceled == 2
+    assert _canceled_events(mock_invoker)[0].canceled_item_ids_by_user == {"user_a": [a1], "user_b": [a2]}
+    assert _status_of(session_queue, other) == "pending"
+    assert _status_of(session_queue, unscoped) == "pending"
+
+    result = session_queue.cancel_all_except_current("default", user_id="user_a", origin_prefix="webv2:p:b:")
+
+    assert result.canceled == 1
+    assert _status_of(session_queue, other) == "canceled"
+    assert _status_of(session_queue, unscoped) == "pending"
+
+
+def test_cancel_by_queue_id_scoped_to_origin_prefix_and_user(
+    session_queue: SqliteSessionQueue, mock_invoker: Invoker
+) -> None:
+    """The scoped cancel-all behind the webv2 queue widget's "Cancel All Items": pending items in the
+    prefix are swept in one statement, other origins and other users' items stay untouched."""
+    a1 = _insert_queue_item(session_queue, "default", "user_a", origin="webv2:p:a:1")
+    b1 = _insert_queue_item(session_queue, "default", "user_b", origin="webv2:p:a:2")
+    other = _insert_queue_item(session_queue, "default", "user_a", origin="webv2:p:b:1")
+
+    result = session_queue.cancel_by_queue_id("default", user_id="user_a", origin_prefix="webv2:p:a:")
+
+    assert result.canceled == 1
+    assert _canceled_events(mock_invoker)[0].canceled_item_ids_by_user == {"user_a": [a1]}
+    assert _status_of(session_queue, b1) == "pending"
+    assert _status_of(session_queue, other) == "pending"
 
 
 def test_delete_all_except_current_emits_queue_items_canceled(

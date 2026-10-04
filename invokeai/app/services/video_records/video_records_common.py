@@ -1,5 +1,6 @@
 import datetime
-from typing import Optional, Union
+import re
+from typing import Any, Optional, Union
 
 from pydantic import BaseModel, Field, StrictBool, StrictStr
 
@@ -32,6 +33,53 @@ class VideoRecordDeleteException(Exception):
         super().__init__(message)
 
 
+# The `media_origin` marker, projected out of the `metadata` JSON blob. Kept as a bare
+# expression so the polymorphic gallery query can alias it into its own UNION half.
+#
+# The `json_valid` guard is not decoration: `json_extract` RAISES on unparseable text, and
+# this expression now runs on every row of every video listing. An unguarded call would let
+# a single malformed blob fail the whole page rather than one video -- and the column is
+# plain TEXT with no CHECK constraint, so nothing but convention keeps one out. Every
+# in-tree writer goes through `MetadataField`, so this is insurance, not a live bug.
+MEDIA_ORIGIN_JSON_EXPR = (
+    "CASE WHEN json_valid(videos.metadata) THEN json_extract(videos.metadata, '$.media_origin') END"
+)
+MEDIA_ORIGIN_SQL_EXPR = f"{MEDIA_ORIGIN_JSON_EXPR} AS media_origin"
+
+# The longest marker worth carrying. Only `audio_upload` has meaning today, but the field is
+# an open vocabulary, so this is a sanity bound rather than an allowlist. It matters because
+# upload metadata is client-supplied and unbounded, and this one key now rides EVERY row of
+# EVERY listing: without a cap, one upload with a 200 KB marker is echoed back on every
+# gallery page that includes it.
+MEDIA_ORIGIN_MAX_LENGTH = 64
+
+# A marker is an identifier-shaped token (`audio_upload` is the only one so far). Matching
+# the SHAPE rather than an allowlist keeps the vocabulary open, while rejecting the two
+# things `json_extract` hands back as strings without them being markers: a JSON object or
+# array arrives as its serialized text (`'{"a":"b"}'`, `'[1,2]'`), which `isinstance(str)`
+# alone would happily propagate.
+MEDIA_ORIGIN_PATTERN = re.compile(r"\A[A-Za-z0-9_-]+\Z")
+
+
+def coerce_media_origin(value: Any) -> Optional[str]:
+    """The `media_origin` marker as a string, or None for anything that is not one.
+
+    Upload metadata is validated only as a JSON *object* (`MetadataField` is a
+    `RootModel[dict[str, Any]]`), so a client may store any JSON value under this key, and
+    `json_extract` hands back the matching SQLite type — an int for a JSON number, 0/1 for a
+    JSON boolean. Feeding one of those to the `Optional[str]` field would raise a
+    `ValidationError` while *deserializing the row*, which does not merely mislabel the
+    video: it makes the record, its DTO, and every gallery listing that contains it fail to
+    build. One odd upload would take out the gallery. An unrecognized marker means the same
+    thing as an absent one, so it is dropped here rather than propagated -- an empty string,
+    one past :data:`MEDIA_ORIGIN_MAX_LENGTH`, and anything not shaped like a marker per
+    :data:`MEDIA_ORIGIN_PATTERN`.
+    """
+    if not isinstance(value, str) or len(value) > MEDIA_ORIGIN_MAX_LENGTH:
+        return None
+    return value if MEDIA_ORIGIN_PATTERN.match(value) else None
+
+
 VIDEO_DTO_COLS = ", ".join(
     [
         "videos." + c
@@ -52,13 +100,21 @@ VIDEO_DTO_COLS = ", ".join(
             "deleted_at",
             "starred",
             "video_subfolder",
+            "project_id",
+            "file_size_bytes",
         ]
     ]
+    # `media_origin` is not a column: it is the one key of the `metadata` JSON blob the
+    # frontend needs on every row (it marks an upload the ingest converter wrapped from an
+    # audio file). Extracting just that key keeps listings from carrying whole metadata
+    # blobs. `json_extract` yields NULL for a NULL or non-object blob; what it yields for a
+    # non-string value is `coerce_media_origin`'s problem, not the query's.
+    + [MEDIA_ORIGIN_SQL_EXPR]
 )
 
 
 class VideoRecord(BaseModelExcludeNull):
-    """Deserialized video record without metadata."""
+    """Deserialized video record: the columns, plus the one `media_origin` key projected out of metadata."""
 
     video_name: str = Field(description="The unique name of the video.")
     video_origin: ResourceOrigin = Field(description="The origin of the video.")
@@ -78,6 +134,17 @@ class VideoRecord(BaseModelExcludeNull):
     starred: bool = Field(description="Whether this video is starred.")
     has_workflow: bool = Field(description="Whether this video has a workflow associated.")
     video_subfolder: str = Field(default="", description="The subfolder where the video is stored on disk.")
+    project_id: Optional[str] = Field(
+        default=None, description="The project this video originated in, if it was made for one."
+    )
+    file_size_bytes: Optional[int] = Field(
+        default=None, description="Bytes the video, its thumbnail and sidecar occupy on disk; null until measured."
+    )
+    media_origin: Optional[str] = Field(
+        default=None,
+        description="How this video entered the gallery, if it was marked: 'audio_upload' for an uploaded audio "
+        "file the server wrapped into a waveform video.",
+    )
 
 
 class VideoRecordChanges(BaseModelExcludeNull, extra="allow"):
@@ -108,6 +175,9 @@ def deserialize_video_record(video_dict: dict) -> VideoRecord:
     starred = video_dict.get("starred", False)
     has_workflow = video_dict.get("has_workflow", False)
     video_subfolder = video_dict.get("video_subfolder", "")
+    media_origin = coerce_media_origin(video_dict.get("media_origin", None))
+    project_id = video_dict.get("project_id", None)
+    file_size_bytes = video_dict.get("file_size_bytes", None)
 
     return VideoRecord(
         video_name=video_name,
@@ -126,6 +196,9 @@ def deserialize_video_record(video_dict: dict) -> VideoRecord:
         starred=starred,
         has_workflow=has_workflow,
         video_subfolder=video_subfolder,
+        media_origin=media_origin,
+        project_id=project_id,
+        file_size_bytes=file_size_bytes,
     )
 
 

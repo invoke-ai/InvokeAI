@@ -7,7 +7,7 @@ from typing import Any, Dict, Literal, Optional, TypeVar, Union
 
 from pydantic import model_validator
 
-from invokeai.app.invocations.anima_denoise import AnimaDenoiseInvocation
+from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
 from invokeai.app.invocations.baseinvocation import (
     BaseInvocation,
     BaseInvocationOutput,
@@ -15,8 +15,6 @@ from invokeai.app.invocations.baseinvocation import (
     invocation,
     invocation_output,
 )
-from invokeai.app.invocations.controlnet import ControlField, ControlNetInvocation
-from invokeai.app.invocations.denoise_latents import DenoiseLatentsInvocation
 from invokeai.app.invocations.fields import (
     FieldDescriptions,
     ImageField,
@@ -27,8 +25,7 @@ from invokeai.app.invocations.fields import (
     UIType,
     WithMetadata,
 )
-from invokeai.app.invocations.flux_denoise import FluxDenoiseInvocation
-from invokeai.app.invocations.ip_adapter import IPAdapterField, IPAdapterInvocation
+from invokeai.app.invocations.flux.flux_denoise import FluxDenoiseInvocation
 from invokeai.app.invocations.metadata import LoRAMetadataField, MetadataOutput
 from invokeai.app.invocations.model import (
     CLIPField,
@@ -53,8 +50,11 @@ from invokeai.app.invocations.primitives import (
     StringOutput,
 )
 from invokeai.app.invocations.scheduler import SchedulerOutput
-from invokeai.app.invocations.t2i_adapter import T2IAdapterField, T2IAdapterInvocation
-from invokeai.app.invocations.z_image_denoise import ZImageDenoiseInvocation
+from invokeai.app.invocations.sd.controlnet import ControlField, ControlNetInvocation
+from invokeai.app.invocations.sd.denoise_latents import DenoiseLatentsInvocation
+from invokeai.app.invocations.sd.ip_adapter import IPAdapterField, IPAdapterInvocation
+from invokeai.app.invocations.sd.t2i_adapter import T2IAdapterField, T2IAdapterInvocation
+from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.app.services.shared.invocation_context import InvocationContext
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
 from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES

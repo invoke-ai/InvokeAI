@@ -435,8 +435,8 @@ def test_a_dropped_admission_claim_lets_shutdown_evict_its_record(mock_logger):
     del admission_claim  # the load was cancelled before it could retrieve the model
     gc.collect()
     assert _wait_until(lambda: "m" not in cache._cached_models), "a cancelled admission stayed resident"
-    assert store.refcount("m") == 0
-    assert budget.total_in_use() == 0
+    assert _wait_until(lambda: store.refcount("m") == 0), "the evicted record kept its shared-weights reference"
+    assert _wait_until(lambda: budget.total_in_use() == 0), "the evicted record kept its budget bytes"
 
 
 def test_a_dead_worker_falls_back_to_the_admission_claim(mock_logger):
@@ -555,8 +555,8 @@ def test_a_live_admission_survives_worker_hold_being_stripped(mock_logger):
     del admission_claim  # the load ends; only now is the record nobody's
     gc.collect()
     assert _wait_until(lambda: "m" not in cache._cached_models), "the finished admission stayed resident"
-    assert store.refcount("m") == 0
-    assert budget.total_in_use() == 0
+    assert _wait_until(lambda: store.refcount("m") == 0), "the evicted record kept its shared-weights reference"
+    assert _wait_until(lambda: budget.total_in_use() == 0), "the evicted record kept its budget bytes"
 
 
 @pytest.mark.parametrize("death_before_shutdown", [True, False], ids=["death-then-shutdown", "shutdown-then-death"])
@@ -763,8 +763,8 @@ def test_an_unadopted_claim_releases_its_hold_when_dropped(mock_logger):
     gc.collect()
     assert _wait_until(lambda: "m" not in cache._cached_models), "a dropped claim stranded its record"
     assert record.first_use_holds == 0
-    assert store.refcount("m") == 0
-    assert budget.total_in_use() == 0
+    assert _wait_until(lambda: store.refcount("m") == 0), "the evicted record kept its shared-weights reference"
+    assert _wait_until(lambda: budget.total_in_use() == 0), "the evicted record kept its budget bytes"
 
 
 def test_a_spent_claim_cannot_consume_a_later_holders_hold(mock_logger):
@@ -798,8 +798,8 @@ def test_a_spent_claim_cannot_consume_a_later_holders_hold(mock_logger):
     del claim_b
     gc.collect()
     assert _wait_until(lambda: "m" not in cache._cached_models), "holder B's claim did not release"
-    assert store.refcount("m") == 0
-    assert budget.total_in_use() == 0
+    assert _wait_until(lambda: store.refcount("m") == 0), "the evicted record kept its shared-weights reference"
+    assert _wait_until(lambda: budget.total_in_use() == 0), "the evicted record kept its budget bytes"
 
 
 def test_abandoned_holder_reaches_zero_after_shutdown(mock_logger):
@@ -820,8 +820,8 @@ def test_abandoned_holder_reaches_zero_after_shutdown(mock_logger):
     del loaded_model
     gc.collect()
     assert _wait_until(lambda: "m" not in cache._cached_models), "the abandoned record was never evicted"
-    assert store.refcount("m") == 0
-    assert budget.total_in_use() == 0
+    assert _wait_until(lambda: store.refcount("m") == 0), "the evicted record kept its shared-weights reference"
+    assert _wait_until(lambda: budget.total_in_use() == 0), "the evicted record kept its budget bytes"
 
 
 def test_cold_admission_sweep_does_not_clear_wrapper_holds(mock_logger):
@@ -1179,7 +1179,7 @@ def test_shutdown_cleanup_start_failure_falls_back_to_a_live_normal_worker(mock_
     del admission_claim
     assert _wait_until(lambda: "m" not in cache._cached_models)
     assert record.first_use_holds == 0
-    assert store.refcount("m") == 0
+    assert _wait_until(lambda: store.refcount("m") == 0), "the evicted record kept its shared-weights reference"
 
 
 @pytest.mark.filterwarnings("ignore::pytest.PytestUnhandledThreadExceptionWarning")
@@ -2545,6 +2545,106 @@ def test_cache_stats_reflect_shared_global_budget(mock_logger):
         # system high watermark is their max - not their sum.
         assert cache_a.stats.high_watermark == S
         assert cache_b.stats.high_watermark == S
+        # cache_used is system-wide for the same reason, and is the field the aggregate reports as
+        # *current* usage. Asserted here because it is the one the aggregate takes a max() over:
+        # a cache that stops syncing it silently pins the reported usage for the whole system.
+        assert cache_a.stats.cache_used == S
+        assert cache_b.stats.cache_used == S
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
+def test_admission_syncs_stats_before_returning(mock_logger):
+    """put() must report the admitted model immediately, not on the next get() or eviction.
+
+    Nothing else runs between an admission and the /models/stats read (or the per-invocation
+    models_cached figure) on an idle device, so a sync skipped here lags by every model admitted
+    since the last retrieval."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 10), shared_store=store)
+    cache = _make_cache(store, budget, mock_logger)
+    try:
+        cache.stats = CacheStats()
+        cache.put("a", DummyModule())
+        assert cache.stats.in_cache == 1
+        assert cache.stats.cache_used == S
+        cache.put("b", DummyModule())
+        assert cache.stats.in_cache == 2
+        assert cache.stats.cache_used == 2 * S
+    finally:
+        cache.shutdown()
+
+
+def test_peer_eviction_syncs_the_evicted_caches_stats(mock_logger):
+    """A cache evicted on behalf of a peer must re-sync its own stats.
+
+    evict_unlocked_for_peer() is reached from another device's make_room, not from one of this
+    cache's synchronized methods, so nothing else re-syncs it. If it does not sync, the evicted
+    cache keeps advertising its pre-eviction cache_used/in_cache until its device next runs a
+    session — and because /models/stats aggregates cache_used with max() across per-device caches,
+    a single stale idle cache reports peak usage for the entire system, which reads as a cache
+    that never releases memory."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 10), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_a.stats = CacheStats()
+        # A prior clear in this session must not be overwritten by the peer eviction's count.
+        cache_b.stats = CacheStats(cleared=2)
+        cache_a.put("a1", DummyModule())
+        cache_b.put("b1", DummyModule())
+        _use_and_release(cache_a, "a1")
+        _use_and_release(cache_b, "b1")
+        # Two distinct models resident across the two devices: global usage is 2S, and b holds one.
+        assert budget.total_in_use() == 2 * S
+        assert cache_b.stats.in_cache == 1
+        assert cache_b.stats.cache_used == 2 * S
+
+        # The multi-GPU path: a's own evictable entries are exhausted, so it asks b to shed.
+        # `is_satisfied` never returns True, so b drops every unlocked entry it has.
+        assert cache_b.evict_unlocked_for_peer(is_satisfied=lambda: False) == 1
+        assert "b1" not in cache_b._cached_models
+        assert budget.total_in_use() == S
+
+        assert cache_b.stats.in_cache == 0
+        assert cache_b.stats.cache_used == S
+        # Peer evictions are real evictions and must be counted; otherwise `cleared` only ever
+        # reflects the requesting cache and under-reports system-wide.
+        assert cache_b.stats.cleared == 3
+    finally:
+        cache_a.shutdown()
+        cache_b.shutdown()
+
+
+def test_budget_reconcile_syncs_the_reconciling_caches_stats(mock_logger):
+    """The deferred-reconcile path drops entries outside any synchronized method too, so it owes
+    the same stat sync as evict_unlocked_for_peer (same defect, second door)."""
+    store = SharedCpuWeightsStore()
+    budget = RamBudget(max_bytes=int(S * 10), shared_store=store)
+    cache_a = _make_cache(store, budget, mock_logger)
+    cache_b = _make_cache(store, budget, mock_logger)
+    try:
+        cache_b.stats = CacheStats()
+        cache_a.put("a1", DummyModule())
+        cache_b.put("b1", DummyModule())
+        _use_and_release(cache_a, "a1")
+        _use_and_release(cache_b, "b1")
+        assert cache_b.stats.in_cache == 1
+        assert cache_b.stats.cache_used == 2 * S
+
+        # Drive the budget negative so a pending reconcile actually evicts, then ask b to honor it
+        # exactly as a peer's post-admission request would. The cap is lowered directly because
+        # RamBudget exposes max_bytes read-only; reaching this state through admissions would only
+        # add setup without exercising anything more.
+        budget._max_bytes = int(S * 0.5)
+        cache_b.request_budget_reconcile()
+
+        assert _wait_until(lambda: "b1" not in cache_b._cached_models)
+        assert cache_b.stats.in_cache == 0
+        assert cache_b.stats.cache_used == budget.total_in_use()
+        assert cache_b.stats.cleared == 1
     finally:
         cache_a.shutdown()
         cache_b.shutdown()
@@ -3621,14 +3721,17 @@ def test_dropped_cache_is_collectable_and_its_worker_exits(mock_logger):
     store = SharedCpuWeightsStore()
     budget = RamBudget(max_bytes=int(S * 8), shared_store=store)
 
-    def worker_count() -> int:
-        return sum(1 for t in threading.enumerate() if t.name == "model-cache-deferred-work")
+    def workers() -> set[threading.Thread]:
+        return {t for t in threading.enumerate() if t.name == "model-cache-deferred-work"}
 
-    before = worker_count()
+    # Identity, not a count: a worker from an earlier test in this process may still be winding
+    # down, and one starting as another exits leaves the count unchanged. Threads also start
+    # asynchronously, so the set is converged on rather than sampled at one instant.
+    before = workers()
     cache = _make_cache(store, budget, mock_logger)
     module = DummyModule()
     cache.put("model", module)
-    assert worker_count() == before + 1
+    assert _wait_until(lambda: workers() - before), "the cache never started its worker"
 
     cache_ref = weakref.ref(cache)
     module_ref = weakref.ref(module)
@@ -3638,7 +3741,7 @@ def test_dropped_cache_is_collectable_and_its_worker_exits(mock_logger):
     assert cache_ref() is None, "the worker thread kept the ModelCache alive"
     assert module_ref() is None, "the dropped cache's model is still resident in RAM"
     # The finalizer wakes the parked worker so it exits rather than leaking a thread per cache.
-    assert _wait_until(lambda: worker_count() == before), "the worker thread outlived its cache"
+    assert _wait_until(lambda: not workers() - before), "the worker thread outlived its cache"
 
 
 def test_dropped_non_shared_cache_releases_only_its_budget_charge(mock_logger):

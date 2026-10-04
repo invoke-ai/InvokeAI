@@ -13,7 +13,7 @@ import torch
 
 from invokeai.app.invocations.fields import LatentsField
 from invokeai.app.invocations.model import ModelIdentifierField, VAEField
-from invokeai.app.invocations.wan_latents_to_image import WanLatentsToImageInvocation
+from invokeai.app.invocations.vae.wan_latents_to_image import WanLatentsToImageInvocation
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
 
 

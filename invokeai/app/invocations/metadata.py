@@ -16,6 +16,7 @@ from invokeai.app.invocations.fields import (
     MetadataField,
     OutputField,
     UIType,
+    VideoField,
 )
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.app.invocations.primitives import StringOutput
@@ -184,8 +185,47 @@ GENERATION_MODES = Literal[
     "wan_img2img",
     "wan_inpaint",
     "wan_outpaint",
+    "wan_t2v",
     "wan_i2v",
+    "wan_interpolate",
+    "wan_extend_video",
+    "minimax_h3_t2v",
+    "minimax_h3_i2v",
+    "ltx2_t2v",
+    "ltx2_i2v",
+    "ltx2_a2v",
+    "ltx2_v2a",
+    "ltx2_lf2v",
+    "ltx2_flf2v",
+    "ltx2_extend_video",
+    "minimax_h3_lf2v",
+    "minimax_h3_flf2v",
+    "minimax_h3_extend_video",
+    "minimax_h3_ref2v",
+    "minimax_h3_txt2img",
 ]
+
+
+class MiniMaxH3ReferenceMetadataField(BaseModel):
+    """One recorded Ref2VA reference: names and options only, in conditioning order."""
+
+    kind: Literal["image", "video"] = Field(description="Whether the reference was an image or a video.")
+    image_name: Optional[str] = Field(default=None, description="The reference image's name.")
+    video_name: Optional[str] = Field(default=None, description="The reference video's name.")
+    conditioning: Optional[str] = Field(
+        default=None, description="A video reference's conditioning choice (video_audio / video / audio)."
+    )
+    detail: Optional[str] = Field(default=None, description="An image reference's sizing choice (max / match).")
+    start_frame: Optional[int] = Field(default=None, description="A video reference's trim start (inclusive).")
+    end_frame: Optional[int] = Field(default=None, description="A video reference's trim end (inclusive).")
+
+
+# The version of the metadata record `core_metadata` emits, stamped as `metadata_version`. It is
+# semver over the *record*, not this node: a minor bump adds keys (any 1.x reader parses any
+# other 1.x, ignoring unknown keys); a major bump renames, removes or retypes one. A record
+# without the key predates versioning and is read with the same rules. Documented, with the
+# field table, in docs/development/Architecture/media-metadata.
+CORE_METADATA_VERSION = "1.0.0"
 
 
 @invocation(
@@ -193,7 +233,7 @@ GENERATION_MODES = Literal[
     title="Core Metadata",
     tags=["metadata"],
     category="metadata",
-    version="2.2.0",
+    version="2.7.0",
     classification=Classification.Internal,
 )
 class CoreMetadataInvocation(BaseInvocation):
@@ -248,11 +288,11 @@ class CoreMetadataInvocation(BaseInvocation):
         default=None,
         description="The Qwen3 text encoder model used for Z-Image inference",
     )
-    # FLUX.2 [dev] uses a Mistral text encoder where FLUX.2 Klein uses Qwen3, so it needs its own slot
-    # rather than reusing `qwen3_encoder` - the two are never both present on one image.
+    # FLUX.2 [dev] and ERNIE-Image use Mistral-family text encoders where FLUX.2 Klein uses Qwen3, so they
+    # need their own slot rather than reusing `qwen3_encoder` - the two are never both present on one image.
     mistral_encoder: Optional[ModelIdentifierField] = InputField(
         default=None,
-        description="The Mistral text encoder model used for FLUX.2 [dev] inference",
+        description="The Mistral text encoder model used for FLUX.2 [dev] or ERNIE-Image inference",
     )
     # Ideogram 4 assembles its structured JSON caption at generation time (ideogram4_caption_builder),
     # so this is a declared field rather than a static extra: the graph wires the builder's output to it
@@ -260,6 +300,84 @@ class CoreMetadataInvocation(BaseInvocation):
     ideogram4_caption: Optional[str] = InputField(
         default=None,
         description="The structured JSON caption encoded for Ideogram 4 inference",
+    )
+
+    # Video generation. Frame count and keyframes have no home among the image fields, and
+    # the two MiniMax H3 single-file overrides are separate models from the main install, so
+    # `model` alone would not identify what actually ran.
+    num_frames: Optional[int] = InputField(
+        default=None,
+        description="The number of video frames generated",
+    )
+    first_frame_image: Optional[ImageField] = InputField(
+        default=None,
+        description="The image used as the video's first frame",
+    )
+    last_frame_image: Optional[ImageField] = InputField(
+        default=None,
+        description="The image used as the video's last frame",
+    )
+    source_video: Optional[VideoField] = InputField(
+        default=None,
+        description="The video this generation was derived from, e.g. the clip an extend workflow continues",
+    )
+    source_video_start_frame: Optional[int] = InputField(
+        default=None,
+        description="The first frame (inclusive) of the source video that was kept",
+    )
+    source_video_end_frame: Optional[int] = InputField(
+        default=None,
+        description="The last frame (inclusive) of the source video that was kept",
+    )
+    ltx2_context_frames: Optional[int] = InputField(
+        default=None,
+        description="Frames of the source an LTX-2 continuation opened with, which the join then crossfaded "
+        "out of both halves",
+    )
+    fps: Optional[int] = InputField(
+        default=None,
+        description="The frame rate of the generated video",
+    )
+    wan_guidance_scale_low_noise: Optional[float] = InputField(
+        default=None,
+        description="The classifier-free guidance scale used by the Wan low-noise expert, when it differed",
+    )
+    wan_t5_encoder_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The standalone UMT5-XXL encoder used with a single-file Wan main model",
+    )
+    wan_transformer_low_noise: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The standalone low-noise expert used with a single-file Wan main model",
+    )
+    wan_component_source: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The Wan Diffusers install whose VAE and encoder served a single-file main model",
+    )
+    minimax_h3_transformer_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The single-file MiniMax H3 transformer used in place of the main model's transformer",
+    )
+    minimax_h3_text_encoder_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The single-file MiniMax H3 Qwen3-VL text encoder used in place of the main model's",
+    )
+    minimax_h3_component_source: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The MiniMax H3 Diffusers install whose VAEs and encoder served a single-file transformer",
+    )
+    minimax_h3_hybrid_base_model: Optional[ModelIdentifierField] = InputField(
+        default=None,
+        description="The FL2VA transformer whose later blocks overlaid the Ref2VA transformer (the hybrid)",
+    )
+    minimax_h3_hybrid_start_block: Optional[int] = InputField(
+        default=None,
+        description="The first transformer block taken from the hybrid base",
+    )
+    minimax_h3_references: Optional[list[MiniMaxH3ReferenceMetadataField]] = InputField(
+        default=None,
+        description="The ordered Ref2VA references this generation was conditioned on (names and options only; "
+        "the media is re-resolved from the gallery at recall time)",
     )
 
     # High resolution fix metadata.
@@ -322,6 +440,7 @@ class CoreMetadataInvocation(BaseInvocation):
 
         as_dict = self.model_dump(exclude_none=True, exclude={"id", "type", "is_intermediate", "use_cache"})
         as_dict["app_version"] = __version__
+        as_dict["metadata_version"] = CORE_METADATA_VERSION
 
         return MetadataOutput(metadata=MetadataField.model_validate(as_dict))
 

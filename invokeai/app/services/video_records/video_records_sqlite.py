@@ -4,6 +4,7 @@ from typing import Optional, Union, cast
 
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
@@ -44,6 +45,72 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
         if not result:
             raise VideoRecordNotFoundException
         return deserialize_video_record(dict(result))
+
+    _MAX_SQL_VARIABLES = 500
+
+    def get_subfolders(self, video_names: list[str]) -> dict[str, str]:
+        subfolders: dict[str, str] = {}
+        with self._db.transaction() as cursor:
+            for start in range(0, len(video_names), self._MAX_SQL_VARIABLES):
+                chunk = video_names[start : start + self._MAX_SQL_VARIABLES]
+                placeholders = ",".join("?" for _ in chunk)
+                cursor.execute(
+                    f"SELECT video_name, video_subfolder FROM videos WHERE video_name IN ({placeholders})", chunk
+                )
+                for row in cursor.fetchall():
+                    subfolders[cast(str, row[0])] = cast(str, row[1])
+        return subfolders
+
+    def delete_intermediates_by_names(
+        self, video_names: list[str], guard: Optional[IntermediateDeleteGuard] = None
+    ) -> list[str]:
+        deleted: list[str] = []
+        try:
+            with self._db.transaction() as cursor:
+                for start in range(0, len(video_names), self._MAX_SQL_VARIABLES):
+                    chunk = video_names[start : start + self._MAX_SQL_VARIABLES]
+                    if guard is not None:
+                        chunk = guard(cursor, chunk)
+                        if not chunk:
+                            continue
+                    placeholders = ",".join("?" for _ in chunk)
+                    select_query = f"SELECT video_name FROM videos WHERE video_name IN ({placeholders})"
+                    cursor.execute(select_query, chunk)
+                    present_before = {cast(str, r[0]) for r in cursor.fetchall()}
+                    cursor.execute(
+                        f"DELETE FROM videos WHERE video_name IN ({placeholders}) AND is_intermediate = TRUE",
+                        chunk,
+                    )
+                    cursor.execute(select_query, chunk)
+                    present_after = {cast(str, r[0]) for r in cursor.fetchall()}
+                    deleted.extend(name for name in chunk if name in present_before and name not in present_after)
+        except sqlite3.Error as e:
+            raise VideoRecordDeleteException from e
+        return deleted
+
+    def set_file_size_bytes(self, video_name: str, file_size_bytes: Optional[int]) -> None:
+        with self._db.transaction() as cursor:
+            try:
+                cursor.execute(
+                    "UPDATE videos SET file_size_bytes = ? WHERE video_name = ?;",
+                    (file_size_bytes, video_name),
+                )
+            except sqlite3.Error as e:
+                raise VideoRecordSaveException from e
+
+    def set_file_sizes_bytes(self, sizes: dict[str, int]) -> None:
+        if not sizes:
+            return
+        with self._db.transaction() as cursor:
+            try:
+                # Backfill only fills gaps: the writer's own measurement, taken after the file exists,
+                # wins over one taken before it was written.
+                cursor.executemany(
+                    "UPDATE videos SET file_size_bytes = ? WHERE video_name = ? AND file_size_bytes IS NULL;",
+                    [(size, name) for name, size in sizes.items()],
+                )
+            except sqlite3.Error as e:
+                raise VideoRecordSaveException from e
 
     def get_user_id(self, video_name: str) -> Optional[str]:
         with self._db.transaction() as cursor:
@@ -257,6 +324,7 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
         metadata: Optional[str] = None,
         user_id: Optional[str] = None,
         video_subfolder: str = "",
+        project_id: Optional[str] = None,
     ) -> datetime:
         with self._db.transaction() as cursor:
             try:
@@ -277,9 +345,10 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
                         starred,
                         has_workflow,
                         user_id,
-                        video_subfolder
+                        video_subfolder,
+                        project_id
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
                     """,
                     (
                         video_name,
@@ -297,6 +366,7 @@ class SqliteVideoRecordStorage(VideoRecordStorageBase):
                         has_workflow,
                         user_id or "system",
                         video_subfolder,
+                        project_id,
                     ),
                 )
 

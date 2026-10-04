@@ -4,6 +4,10 @@ title: Recall Parameters API
 
 ## Overview
 
+:::tip
+For the Video panel, see the [Video Recall API](/development/guides/video-recall-api/).
+:::
+
 The Recall Parameters API is a REST endpoint on the InvokeAI backend that
 lets external processes set recallable generation parameters on the
 frontend. Supported parameters include:
@@ -37,11 +41,15 @@ Typical use cases:
 3. **Resolution** — models are resolved from human-readable names to the
    internal model keys used by the frontend, and image filenames are
    validated against `{INVOKEAI_ROOT}/outputs/images`.
-4. **Broadcast** — a `recall_parameters_updated` event is emitted on the
-   websocket room for `queue_id`.
-5. **Frontend update** — any connected client subscribed to that queue
-   applies the update to its Redux store, so UI fields, LoRAs, control
-   layers, IP adapters, and reference images all populate immediately.
+4. **Broadcast** — a `recall_parameters_updated` event is emitted, once, to
+   the calling user's room and the administrators' room. webv2 ignores events
+   addressed to another user; the legacy frontend applies them, so an
+   administrator using it also receives other users' recalls.
+5. **Frontend update** — the calling user's connected clients
+   apply the update to their generation settings, so UI fields, LoRAs,
+   reference images and (in the legacy frontend) control layers populate
+   immediately. See [Frontend behavior](#frontend-behavior) for what each
+   frontend applies.
 
 ## Endpoint
 
@@ -465,18 +473,62 @@ fetch(API_URL, {
 
 ## WebSocket Events
 
-Parameter updates emit a `recall_parameters_updated` event to the queue
-room. Connected frontend clients automatically:
+Parameter updates emit a `recall_parameters_updated` event to the calling
+user's room and the administrators' room. The calling user's connected frontend
+clients automatically:
 
 1. Apply standard parameters (prompts, steps, dimensions, etc.).
 2. Load and add LoRAs to the LoRA list.
-3. Apply control-layer configurations.
+3. Apply control-layer configurations (legacy frontend only).
 4. Merge the recalled reference images — IP Adapter / FLUX Redux entries and
    model-free reference images both feed the same reference-image list, using
    the config flavor that matches the currently-selected main model. By
    default this **replaces** the existing list; with `append=true` it is
    **added** to whatever is already there (see
    [Query parameters](#query-parameters)).
+
+## Frontend behavior
+
+### webv2 (default UI)
+
+The update lands in the **Generate** panel of the project that was active when
+the event arrived, and shows a notification summarizing how many fields were
+applied. If that project is still on screen, the Generate widget is brought to the
+front the same way the [Video Recall API](/development/guides/video-recall-api/#frontend-behavior)
+brings the Video widget forward: its tab is selected, a floating window is raised
+(and unrolled if shaded),
+and nothing moves while the user is typing. Parameters the Generate panel has no home for, and entries that could
+not be resolved, are left out and named in a second notification so the caller
+can tell what did not land. The editor must be open: events that arrive while
+the user is on the Launchpad are dropped even though the request returns 200.
+In multi-user mode only the requesting user's own sessions apply the update;
+administrators' sessions ignore other users' recalls.
+
+| Parameter                                                                                              | webv2 behavior                                                                                                                          |
+| ------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------- |
+| `positive_prompt`, `negative_prompt`, `seed`, `steps`, `cfg_scale`, `cfg_rescale_multiplier`, `scheduler`, `width`, `height`, `clip_skip`, `seamless_x`, `seamless_y` | Applied. A recalled `seed` also turns off seed randomization; `clip_skip` applies only to model families that expose it (SD 1.x / 2.x). |
+| `model`                                                                                                | Switches the Generate model. Changing model applies that model's defaults (steps, CFG, CFG rescale, scheduler, size, VAE precision) and runs the same compatibility pass as the model selector (incompatible LoRAs, VAE and component selections are cleared; reference images are retargeted) before the explicit values in the same request are applied. |
+| `vae_model`                                                                                            | Matched by key or name and applied when compatible with the effective model.                                                             |
+| `guidance`                                                                                             | Applied as the CFG/guidance value for FLUX, FLUX.2, Qwen Image and Z-Image models when `cfg_scale` is not also given; reported as not applied otherwise. |
+| `loras`                                                                                                | Replaces the LoRA list. Entries that are not installed or not compatible with the effective model are dropped and reported.              |
+| `ip_adapters`, `reference_images`                                                                      | Feed the reference image list, retargeted to the effective model's reference-image type. Files no longer in the gallery are dropped and reported; if none of the recalled images exist the project keeps its current list. `append=true` adds behind the existing entries without re-checking them; the model's reference-image limit is enforced (newest entries are dropped first). |
+| `control_layers`                                                                                       | **Not applied.** Control layers live on the Canvas in webv2, not in the Generate panel.                                                  |
+| `denoise_strength`, `refiner_*`                                                                        | **Not applied.** The Generate panel has no image-to-image strength or SDXL refiner settings.                                              |
+
+In `strict` mode, omitted scalar parameters reset to the effective model's
+defaults (empty prompts, randomized seed, default steps/CFG/scheduler/size),
+and omitted lists clear. An omitted `model` keeps the current model.
+
+Events are applied in arrival order; an `append` request that overlaps a
+still-loading replace sees the replaced list. The handler is loaded on the
+first event of a session; if that load fails, the event is dropped, an error is
+recorded in the notification center, and the next event retries the load.
+
+### Legacy web
+
+The legacy frontend applies prompts, steps, CFG, size, seed, model, LoRAs,
+control layers and reference images to its Redux store. It ignores `null`
+scalar values, so `strict` mode only clears the list-typed parameters there.
 
 ## Error Handling
 
@@ -505,8 +557,11 @@ INFO: Resolved 1 reference image(s)
 
 ### Frontend
 
-Set `localStorage.ROARR_FILTER = 'debug'` in the browser to see all debug
-messages under the `events` namespace.
+webv2 reports each applied update, and any parameters it could not apply, in
+the notification center; failures are recorded as errors there as well.
+
+In the legacy frontend, set `localStorage.ROARR_FILTER = 'debug'` in the
+browser to see all debug messages under the `events` namespace.
 
 ```
 INFO: Applied 5 recall parameters to store

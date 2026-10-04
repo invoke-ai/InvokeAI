@@ -1,4 +1,3 @@
-# Copyright (c) 2024 Lincoln D. Stein and the InvokeAI Development Team
 """
 Init file for the model loader.
 """

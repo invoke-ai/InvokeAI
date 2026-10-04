@@ -2,39 +2,56 @@
 title: Call Saved Workflow Architecture
 ---
 
-## Goal
+## Callable Workflow Contract
 
-`CallSavedWorkflowInvocation` should become an engine-native workflow call boundary, not a frontend-only dynamic node
-and not a compile-time graph inliner.
+`CallSavedWorkflowInvocation` is an engine-native workflow call boundary, not a frontend-only dynamic node and not a
+compile-time graph inliner.
 
-The long-term feature goal is:
+The callable-workflow contract is:
 
 - A parent workflow can call a saved workflow selected by ID.
 - The call node redraws in the editor based on the selected workflow's exposed form fields.
 - Parent values and inbound connections bind to those exposed fields as call arguments.
 - Execution suspends at the call node, runs the selected workflow as a dependent workflow execution, captures explicit
   return values, and then resumes the parent workflow.
-- The architecture must work for Invoke frontend graphs and for externally submitted graphs that use the same node type.
+- The architecture must work for Invoke frontend graphs and for externally submitted graphs that use the same node
+  type.
 
-This document records the current state, the target architecture, and the execution contract needed to continue
-development later.
+This document describes the callable-workflow architecture and execution contract. Saved-workflow calls use a dedicated
+queue boundary for durable rows and queue transitions, while invocation and graph state use the lifecycle
+effect/dependency seam to declare, persist, and resume the call.
 
-## Implementation Priority
+The callable node, saved-workflow, and queue interaction contract is stable. Internal execution references, tokens,
+effects, frames, and scheduler records are persistence-only implementation metadata. Version-2
+`dump_execution_state()` rebuilds execution references and ordinary output tokens, retains frame-scoped activation
+tokens and compact dispatch metadata needed for active recovery, and omits terminal saved-workflow lifecycle effects
+and completed child dependencies. The active child queue row is the recovery authority: attached child state remains
+available in memory but is omitted from the persisted parent snapshot, while terminal child state is omitted entirely.
+Ordinary model serialization and public schemas exclude these four internal ledgers. Existing fields,
+requiredness, statuses, events, and client behavior remain compatible. Frontend application behavior is outside this
+backend architecture. No code under `invokeai/frontend/...`, including generated `openapi.json` or `schema.ts`, is part
+of this execution behavior; the existing frontend/backend external interface is stable.
+
+The internal generic boundary is implemented in `invokeai.app.services.shared.execution_engine`. It provides
+frame-scoped gates, ordered streams, continuations, and capability-bound child dependency records. These records are
+used as adapters around the existing queue and materialization paths; they do not add frontend handles, queue statuses,
+event payloads, or author-time graph fields.
+
+## Design Principles
 
 Favor the architecturally correct design over the fastest implementation path.
 
-The work may still proceed incrementally, but each increment should satisfy all of the following:
+Changes to this area should satisfy all of the following:
 
 - testable in isolation
 - compatible with the long-term architecture described here
 - non-breaking to existing code and existing workflow execution behavior
 
-Speed is not the primary goal for this phase. The primary goal is to move toward the durable design without introducing
-throwaway execution semantics that would need to be unwound later.
+The durable design is preferred over throwaway execution semantics.
 
-## Current State
+## Current Behavior
 
-Implemented already in the branch:
+The callable-workflow feature provides:
 
 - A real invocation exists: `call_saved_workflow`.
 - A real return node exists: `workflow_return`.
@@ -50,7 +67,17 @@ Implemented already in the branch:
 - Incompatible or no-longer-exposed inbound edges are removed in the editor.
 - Backend validation exists for `workflow_id` existence and access rights.
 
-Implemented runtime scaffolding:
+The runtime uses an additive execution-effects seam:
+
+- the runner invokes `invoke_internal_with_effects()` and applies its result through `GraphExecutionState.apply()`;
+- stable execution references, frames, output tokens, and accepted effects are persisted with the runtime state;
+- `emit` and `close_stream` are dispatchable by default;
+- lifecycle recording for `spawn`, `await`, and `fail` is capability-gated and returns a validated child handle where
+  applicable; queue mutation remains in the queue adapter;
+- saved workflow calls continue through `WorkflowCallCoordinator` and `WorkflowCallQueueLifecycle`, with a generic
+  child dependency record validating their relationship and aggregation.
+
+Runtime state:
 
 - `GraphExecutionState` now persists workflow-call runtime state:
   - `workflow_call_stack`
@@ -67,15 +94,19 @@ Implemented runtime scaffolding:
   - child sessions carry a `workflow_call_parent` reference back to the parent call relationship
 - `GraphExecutionState.next()` returns no runnable node while the parent session is waiting on a child workflow call.
 - `GraphExecutionState.is_complete()` stays false while waiting.
-- `DefaultSessionRunner.run_node()` now treats `call_saved_workflow` as a call boundary instead of a normal executable
-  node.
-- On boundary entry, the runner:
-  - validates the selected workflow
-  - builds a workflow call frame
-  - converts the saved workflow JSON into a backend `Graph`
-  - validates and applies parent call arguments to the child graph
-  - creates a child `GraphExecutionState`
-  - attaches that child session to the waiting parent session
+- `DefaultSessionRunner.run_node()` invokes `call_saved_workflow` through the same effect-aware invocation path as
+  other nodes. The invocation records one capability-bound `spawn_execution` effect and one matching `await` effect;
+  authorization and input collection happen before those effects are recorded.
+- `GraphExecutionState.apply()` persists the pending lifecycle effects without completing the call node. The queue
+  adapter then consumes the effects to:
+  - build a workflow call frame
+  - convert the saved workflow JSON into a backend `Graph`
+  - validate and apply parent call arguments to the child graph
+  - create child `GraphExecutionState` instances and durable child queue rows
+  - attach those child sessions to the waiting parent session
+- When the generic child dependency reaches a terminal result, the queue adapter projects the legacy workflow-call
+  fields, resumes the parent through `GraphExecutionState.apply()`, and completes the call node with ordered return
+  values. A capability-gated `fail` effect records a parent failure without creating child rows.
 - Workflow-call runtime responsibilities are now split:
   - `WorkflowCallCoordinator` handles call-specific setup:
     - build the child graph
@@ -83,7 +114,7 @@ Implemented runtime scaffolding:
     - create the child `GraphExecutionState`
     - suspend the parent and enqueue the child queue item
   - `WorkflowCallQueueLifecycle` handles queue-visible parent/child lifecycle:
-    - run child queue items
+    - dispatch child queue items through the normal session runner
     - resume waiting parents after child success
     - complete the parent call node with the child `workflow_return` values
     - fail suspended parents after child failure and cascade that failure upward through parent call chains
@@ -101,16 +132,21 @@ Implemented runtime scaffolding:
   - `root_item_id`
   - `workflow_call_depth`
   - child workflow executions are now inserted as their own pending queue rows using those columns
+- Child queue rows and the parent's complete waiting-session projection are published in one durable queue transaction.
+  Concurrent child completions update the latest parent session transactionally, so a sibling cannot overwrite another
+  sibling's completion.
 - Parent queue items now enter a real `waiting` status while suspended on a child workflow execution.
 - `_on_after_run_session()` no longer completes queue items whose sessions are incomplete but waiting.
 - Dynamic call arguments now execute end-to-end in the current runner path:
-  - literal dynamic values are serialized into a hidden `workflow_inputs` payload on the parent node at graph-build time
+  - literal dynamic values are serialized into a hidden `workflow_inputs` payload on the parent node at graph-build
+    time
   - stale hidden `workflow_inputs` values from recalled graphs are ignored unless a matching current dynamic field
     exists
   - existing dynamic input values are preserved across refresh only while the exposed field type remains compatible; if
     the selected child workflow changes the exposed field type at the same node/field path, the caller input resets to
     the child workflow's current initial value
-  - connected dynamic values are accepted as special call-boundary edges and are resolved from parent results at runtime
+  - connected dynamic values are accepted as special call-boundary edges and are resolved from parent results at
+    runtime
   - both are validated against the child workflow's exposed form interface before being applied to the child graph
 - Queue lifecycle semantics now exist for workflow-call chains:
   - parent queue items are suspended in `waiting` while a child queue row runs
@@ -130,20 +166,20 @@ Implemented runtime scaffolding:
     - child queue rows keep `Cancel`
     - child queue rows hide `Retry`
   - child queue-row creation is now fail-clean:
-    - if call-boundary setup fails after some child rows have already been inserted, those child rows are deleted before
-      the parent invocation is failed
+    - if call-boundary setup fails after some child rows have already been inserted, those child rows are deleted
+      before the parent invocation is failed
   - child queue-row fan-out is bounded by remaining queue capacity, not just the global queue-size setting:
     - a workflow call that would exceed the remaining pending capacity now fails instead of silently truncating or
       over-enqueuing child rows
     - child insertion rechecks pending capacity in the same database transaction as the insert
 
-Implemented conversion helper:
+Workflow conversion:
 
 - `workflow_graph_builder.py` converts saved workflow JSON into an executable backend `Graph`.
 - It currently supports the invocation-node subset needed for this feature.
 - It flattens connector nodes and omits explicit destination field values when a connection exists, matching frontend
   graph-build semantics.
-- It now serves as the first explicit callable-workflow compatibility gate:
+- It enforces the callable-workflow boundary:
   - the selected workflow must contain exactly one `workflow_return` node
   - connected batch child inputs produced by ordinary non-generator upstream nodes still fail early with a clear
     unsupported-feature error
@@ -162,7 +198,7 @@ Implemented conversion helper:
   - workflow library list items now surface an explicit unsupported badge and localized reason without blocking normal
     workflow viewing or editing
 
-What is still not implemented:
+Current callable-workflow limitations:
 
 - connected batch child inputs whose batch values are produced by ordinary non-generator upstream nodes are still not
   supported and must fail with a clear domain error
@@ -170,21 +206,17 @@ What is still not implemented:
   with a clear domain error
 - broader child-workflow compatibility coverage still needs to be expanded from real unsupported shapes rather than
   trying to interpret every frontend-only workflow representation through the current graph-builder path
-- the current workflow-call queue lifecycle is still implemented through dedicated workflow-call runtime classes rather
-  than a fully generalized parent/child scheduler model
+- the queue lifecycle remains implemented by dedicated workflow-call runtime classes, but each waiting call also
+  registers an internal `ChildDependencyRecord` with an engine-issued capability. The record validates exact parent
+  identity, ordered all-of aggregation, resource limits, and idempotent child terminal events before the existing queue
+  adapter resumes, fails, or cancels the parent
 
-Conclusion:
+The editor contract, parent call boundary, child execution, argument forwarding, explicit return capture, suspended
+parent status, queue-visible child rows, and upward failure cascade are all handled by the current runtime.
 
-- the editor contract is largely in place
-- the parent-side runtime call boundary is in place
-- child execution, argument forwarding, explicit child return capture, suspended parent status, queue-visible child
-  rows, and upward failure cascade now work
-- the remaining major runtime work is to harden and generalize the parent/child scheduler model rather than prove the
-  basic call boundary
+## Architecture
 
-## Architectural Direction
-
-Use the architecture that is more likely to be kept long-term:
+The implementation uses the following architecture:
 
 - `call_saved_workflow` is a call boundary.
 - The parent graph does not inline the full child workflow into itself at queue time.
@@ -193,7 +225,7 @@ Use the architecture that is more likely to be kept long-term:
 - The child workflow returns explicit outputs to the parent.
 - The parent resumes once the child returns successfully.
 
-This is preferred over full graph expansion because it:
+This keeps execution at the call boundary instead of expanding the full child graph because it:
 
 - avoids execution-graph blowup
 - preserves workflow boundaries
@@ -201,9 +233,9 @@ This is preferred over full graph expansion because it:
 - supports explicit return values
 - keeps externally submitted graphs viable as long as they use the same node type and contract
 
-## Non-Goals For The Next Phase
+## Current Limitations
 
-These should not be the first implementation target:
+The current implementation does not provide:
 
 - full inline graph expansion of called workflows
 - unlimited nested workflow call support
@@ -241,8 +273,8 @@ Each dynamic input must have:
 - a default value if defined by the child workflow
 - a user-facing label and description when available
 
-Current fast-path identity is based on child `nodeId + fieldName`. That is acceptable short-term in the editor, but a
-longer-term stable interface ID would be better if child workflows are frequently duplicated or refactored.
+Current fast-path identity is based on child `nodeId + fieldName`. A stable interface ID may be useful if child
+workflows are frequently duplicated.
 
 ### 3. Input Binding At Runtime
 
@@ -259,39 +291,50 @@ Argument values may come from:
 - parent literal field values
 - resolved inbound connections into the call node's dynamic inputs
 
-For batch-aware child workflows, the parent call boundary should still pass normal exposed form inputs. Batching should
-emerge from the child workflow's own internal batch nodes or generators, not from a separate caller-side batch protocol.
+For batch-aware child workflows, the parent call boundary passes normal exposed form inputs. Batching emerges from the
+child workflow's own internal batch nodes or generators, not from a separate caller-side batch protocol.
 
 ### 4. Child Workflow Execution
 
 The child workflow runs as its own dependent execution context, not as an inlined copy of the parent graph.
 
-Desired semantics:
+Execution semantics:
 
 - parent execution pauses at the call node
 - child execution runs with inherited context where appropriate
 - child workflow finishes or fails
 - parent resumes only if child execution succeeds
 
-This implies the queue/session/runtime layer needs an explicit parent-child execution relationship.
+The queue/session/runtime layer now implements an explicit parent-child execution relationship through runtime state,
+durable queue metadata, and queue-visible child rows.
+
+Child snapshot semantics are explicit:
+
+- the saved workflow is resolved and converted to a child `Graph` when the call is created
+- the child queue row persists that graph snapshot and its inputs; resume/recovery uses that snapshot rather than
+  resolving the saved workflow again
+- an active parent retains the child session in memory while it is waiting, but its persisted snapshot keeps only
+  compact lifecycle metadata because the child queue row is authoritative
+- queue pruning is the boundary that removes the child row's postmortem snapshot; retry creates a new execution and
+  therefore resolves the saved workflow again under the retrying user's authorization
 
 Current limitation:
 
-- the temporary `workflow_graph_builder.py` path still reconstructs only the ordinary invocation subset of child
-  workflows
+- the `workflow_graph_builder.py` path currently reconstructs only the ordinary invocation subset of child workflows
 - direct batch-special child workflows now bypass that path and use queue batch expansion instead
 - generator-backed batch child workflows now bypass that path too when the batch is fed directly by a supported
   generator node
-- connected batch child inputs produced by ordinary non-generator upstream nodes are still not supported and should fail
-  early with a clear unsupported-feature error
-- the current queue-visible child execution path still relies on `WorkflowCallCoordinator` to resume or fail parents
-  directly rather than a more general queue scheduler abstraction
-- the current implementation is still an intermediate architecture step, but it is now materially closer to the intended
-  durable parent/child model than the earlier inline-runner path
+- connected batch child inputs produced by ordinary non-generator upstream nodes are still not supported and fail early
+  with a clear unsupported-feature error
+- the current queue-visible child execution path still relies on `WorkflowCallCoordinator` and
+  `WorkflowCallQueueLifecycle` for durable row creation and parent transitions; generic lifecycle effects and
+  `ChildDependencyRecord` supply the invocation intent, identity, ordered aggregation, idempotency, and terminal
+  decision without changing the public queue contract
 
 ### 4a. Queue Lifecycle Contract
 
-The current queue-visible implementation uses the following lifecycle contract:
+The current queue-visible implementation uses the following lifecycle contract. The generic child record is an internal
+validation and aggregation seam; it does not add queue columns, statuses, events, or frontend handles.
 
 - root or parent queue items may enter `waiting` while suspended on a child workflow call
 - child workflow executions are represented as real queue rows with explicit parent/child relationship metadata
@@ -312,8 +355,8 @@ The current queue-visible implementation uses the following lifecycle contract:
     must receive only the retry item ids for their own roots, while admins can still observe the full retried set
 - workflow live-update sockets join workflow event rooms in both authenticated multiuser mode and unauthenticated
   single-user mode; the frontend relies on those events to invalidate workflow library data and clear deleted saved
-  workflow selections; in single-user mode, workflow CRUD events emit only to the admin room to avoid duplicate delivery
-  to sockets that are also joined to `user:system`
+  workflow selections; in single-user mode, workflow CRUD events emit only to the admin room to avoid duplicate
+  delivery to sockets that are also joined to `user:system`
 - a public-to-private transition emits a schema-defined `workflow_access_revoked` event to shared-workflow subscribers;
   non-owner, non-admin clients clear references to that workflow while owners and admins retain access
 - the saved-workflow node picker queries owned/default workflows and public shared workflows separately, merges them by
@@ -325,8 +368,8 @@ The current queue-visible implementation uses the following lifecycle contract:
   - workflow-call child enqueue events use the same owner-aware redaction as ordinary status transitions, even though
     they do not pass through `_set_queue_item_status`
 
-This is now part of the intended user-facing contract, even though the orchestration still lives in
-`WorkflowCallCoordinator`.
+`WorkflowCallCoordinator` owns child setup and enqueueing. `WorkflowCallQueueLifecycle` owns parent resume and terminal
+propagation, using the session queue service for durable row transitions.
 
 ### 4b. Batch Child Workflows
 
@@ -354,7 +397,8 @@ Current semantics:
 - the workflow call creates one child queue row per expanded batch session
 - supported generator value shapes are resolved into concrete batch items before queue batch expansion
 - declared generator counts are rejected before resolution when they exceed remaining child capacity
-- cartesian expansion size is computed arithmetically before session generation rather than by materializing the product
+- cartesian expansion size is computed arithmetically before session generation rather than by materializing the
+  product
 - batch outputs may feed a named `workflow_return_value.value` directly; each expanded child returns one value for that
   key
 - parent resume waits for all child rows tied to that workflow call
@@ -459,8 +503,8 @@ Retry behavior:
 
 - retry is root-oriented
 - child queue rows should not be directly retried from the UI
-- backend retry of a child id should normalize to the root workflow call chain rather than create an isolated child-only
-  rerun
+- backend retry of a child id should normalize to the root workflow call chain rather than create an isolated
+  child-only rerun
 
 ### 5. Return Values
 
@@ -495,8 +539,8 @@ Batch return aggregation:
 
 - when a called workflow expands into multiple child queue rows, each child row produces its own named return map
 - the parent aggregates those child maps as `dict[str, list[Any]]`
-- each key maps to child values in child enqueue order, preserving positional correspondence with batch inputs even when
-  child executions complete out of order
+- each key maps to child values in child enqueue order, preserving positional correspondence with batch inputs even
+  when child executions complete out of order
 - duplicate keys within a single child return map are still invalid; repeated keys across batch children are the normal
   aggregation path
 
@@ -505,9 +549,9 @@ Batch return aggregation:
 If child execution fails:
 
 - the call node fails
-- the parent workflow fails unless a later design adds explicit error-handling semantics
+- the parent workflow fails
 
-For the first implementation, failure propagation should be simple and strict.
+Failure propagation is simple and strict.
 
 ### 7. Access Control
 
@@ -519,9 +563,9 @@ This matters even if the parent workflow was authored in a context where the chi
 
 ### 8. Recursion And Nesting
 
-Nested and recursive `call_saved_workflow` execution should be allowed, but bounded.
+Nested and recursive `call_saved_workflow` execution is allowed, but bounded.
 
-Initial implementation should enforce:
+The runtime enforces:
 
 - nested workflow calls are allowed
 - recursive workflow calls are allowed
@@ -531,16 +575,15 @@ Initial implementation should enforce:
 This allows legitimate recursive or conditionally terminating workflow structures while still preventing unbounded call
 growth.
 
-## Where The Runtime Work Belongs
+## Runtime Ownership
 
-The goal is to support externally submitted graphs, not only frontend-authored graphs. Therefore the authoritative
-execution logic must live in Python.
+Externally submitted graphs and frontend-authored graphs use the same Python execution path. The backend owns the
+authoritative execution logic.
 
-Recommended high-level design:
+The runtime design is:
 
 - a backend `GraphExpander` or broader graph-preparation service may still exist as an abstraction point
-- but for this feature, the preferred long-term runtime model is not full graph expansion
-- instead, the runtime needs a call-execution mechanism in the Python execution stack
+- the runtime uses a call-execution mechanism in the Python execution stack rather than full graph expansion
 
 Relevant existing path:
 
@@ -551,16 +594,17 @@ Relevant existing path:
 
 Current insertion points already used:
 
-- `DefaultSessionRunner.run_node()` detects `call_saved_workflow` and enters boundary state
+- `DefaultSessionRunner.run_node()` supplies the call capability and inputs, invokes the node through the effect-aware
+  path, persists its pending lifecycle effects through `GraphExecutionState.apply()`, then dispatches the queue adapter
 - `GraphExecutionState` stores the waiting/call-stack state and attached child session
-- `WorkflowCallCoordinator` currently establishes the call boundary and enqueues child workflow executions as real queue
-  rows
+- `WorkflowCallCoordinator` currently establishes the call boundary and enqueues child workflow executions as real
+  queue rows
 - `WorkflowCallQueueLifecycle` currently resumes or fails parents when those child rows complete
 - child queue items already carry stable parent/child identifiers in both runtime objects and durable queue columns
 
-Next runtime work still needed:
+Queue lifecycle boundary:
 
-- keep `WorkflowCallQueueLifecycle` as the bounded workflow-call lifecycle component for this PR
+- `WorkflowCallQueueLifecycle` remains the bounded workflow-call lifecycle component
   - the current workflow-call feature is the only caller of parent/child queue semantics
   - replacing it with a generalized queue dependency scheduler now would add regression risk without unlocking a
     concrete user workflow
@@ -595,7 +639,7 @@ The dedicated child-workflow return nodes are implemented. Responsibilities:
 - guarantee that only one such node exists per workflow
 - behave as a normal node in the editor, with singularity enforced by both frontend and Python validation/runtime code
 
-This should remain the canonical reusable return mechanism for any future subworkflow call behavior.
+This is the canonical reusable return mechanism for subworkflow calls.
 
 ### Execution Relationship Tracking
 
@@ -608,8 +652,7 @@ Session/runtime state records:
 
 ### Workflow Return Value Flow
 
-The workflow return value should not be persisted back into the saved workflow record and should not be derived from
-frontend state.
+The workflow return value is not persisted back into the saved workflow record and is not derived from frontend state.
 
 The intended runtime flow is:
 
@@ -623,17 +666,13 @@ The intended runtime flow is:
 1. The parent `call_saved_workflow` node is completed with that returned named value map.
 1. The parent graph resumes.
 
-## Named Return Implementation Status
+## Named Return Contract
 
-Named returns are implemented for backend invocation behavior, caller-side extraction, runtime propagation, and batch
-aggregation. Remaining work is limited to incremental frontend UX cleanup and any future expansion of supported batch
-shapes.
+Named returns cover backend invocation behavior, caller-side extraction, runtime propagation, and batch aggregation.
 
-### Stage 1: Backend Return Contract
+### Backend Return Contract
 
-Status: implemented in backend invocation tests.
-
-Goal:
+Current behavior:
 
 - establish the named return data model and invocation primitives
 
@@ -641,22 +680,21 @@ Contract:
 
 - `WorkflowReturnValueField` stores one `key: str` and one `value: Any`
 - `workflow_return_value` creates a single `WorkflowReturnValueField` from a key and connected value
-- `workflow_return` accepts either one `WorkflowReturnValueField` member or a list of `WorkflowReturnValueField` members
+- `workflow_return` accepts either one `WorkflowReturnValueField` member or a list of `WorkflowReturnValueField`
+  members
 - `WorkflowReturnOutput` exposes `values: dict[str, Any]`
 - duplicate keys in one non-batch `workflow_return` execution are invalid and must fail clearly
 
-Tests first:
+Validation:
 
 - `workflow_return_value` emits the requested key/value pair
 - `workflow_return` emits a named value map from one or more return members
 - duplicate keys in one `workflow_return` execution are rejected
 - empty returns are valid only if that remains an intentional callable-workflow contract
 
-### Stage 2: Caller-Side Extraction Primitive
+### Caller-Side Extraction Primitive
 
-Status: implemented in backend invocation tests.
-
-Goal:
+Current behavior:
 
 - let the calling workflow extract a named return value without relying on collection position
 
@@ -664,19 +702,17 @@ Contract:
 
 - `workflow_return_get` accepts the named return map and a key
 - `workflow_return_get` outputs the selected value as `Any`
-- missing keys fail clearly unless a later version intentionally adds default-value support
+- missing keys fail clearly
 
-Tests first:
+Validation:
 
 - extracting an existing key returns the stored value
 - extracting a missing key fails with a useful message
 - extracted `Any` values can feed typed downstream nodes through the existing connection compatibility rules
 
-### Stage 3: Runtime Propagation
+### Runtime Propagation
 
-Status: implemented in backend runtime tests.
-
-Goal:
+Current behavior:
 
 - carry named return maps through queue-visible child execution and parent resume
 
@@ -687,17 +723,15 @@ Contract:
 - failed child execution behavior is unchanged
 - cancel/retry lifecycle behavior is unchanged
 
-Tests first:
+Validation:
 
 - a called workflow returning `{image: image_value}` completes the parent `call_saved_workflow` output with that key
 - a caller-side extraction node can consume that output after parent resume
 - missing or invalid `workflow_return` nodes still fail with the existing clear errors
 
-### Stage 4: Batch Return Aggregation
+### Batch Return Aggregation
 
-Status: implemented in backend runtime tests.
-
-Goal:
+Current behavior:
 
 - define named returns for child workflows that expand into multiple queue rows
 
@@ -712,19 +746,18 @@ Contract:
 - if a non-batch workflow wants multiple images under one key, it must collect those images into a single list value
   before returning that key
 
-Tests first:
+Validation:
 
 - a batched child returning `{image: image_value}` from each child row produces `{image: [image_1, image_2, ...]}`
 - sibling failure still cancels remaining siblings and fails the parent
 - duplicate keys inside one child row are rejected rather than silently aggregated
 
-### Stage 5: Frontend Schema, UI, And Docs
+### Frontend Schema, UI, And Docs
 
-Status: mostly implemented. Schema/type generation includes the backend nodes and fields; editor connection coverage and
-localized UI strings are in place for the current node wiring. Future UX cleanup should be driven by concrete user
-testing rather than added as speculative work.
+Existing schema/type generation includes the backend nodes and fields; editor connection coverage and localized UI
+strings are in place for the current node wiring.
 
-Goal:
+Current behavior:
 
 - make named returns usable and visible in the editor
 
@@ -735,14 +768,14 @@ Contract:
 - `call_saved_workflow` exposes the named return map output
 - users can wire that output to `workflow_return_get`
 
-Tests first:
+Validation:
 
 - frontend connection/type tests cover return-value collection wiring
 - frontend connection/type tests cover wiring one `workflow_return_value.value` directly to `workflow_return.values`
 - frontend connection/type tests cover `call_saved_workflow.values -> workflow_return_get.values`
 - docs describe how a called workflow creates named returns and how a caller extracts them
 
-## Frontend Responsibilities In The Long-Term Design
+## Frontend Responsibilities
 
 The frontend remains responsible for editor-time behavior:
 
@@ -756,15 +789,9 @@ The frontend remains responsible for editor-time behavior:
     inputs during backend compatibility evaluation, so workflows that are valid once the caller supplies exposed values
     are not disabled prematurely
 
-Potential future optimization:
+## Validation Coverage
 
-- add a backend endpoint that returns a normalized callable workflow interface
-- this would let the frontend avoid re-parsing full saved workflow payloads to redraw the node
-- it would also give the frontend a backend-authoritative interface hash for drift detection
-
-## Tests Needed Going Forward
-
-Already covered:
+Coverage includes:
 
 - workflow-call stack and waiting state on `GraphExecutionState`
 - depth-limit enforcement
@@ -779,35 +806,24 @@ Already covered:
 - literal and connected dynamic call arguments are applied to the child graph at runtime
 - non-exposed dynamic call arguments are rejected at runtime
 - child `workflow_return` output is captured and becomes the parent `call_saved_workflow` output
-- named `workflow_return` values can be constructed, propagated to the parent, extracted by key, and batch-aggregated as
-  `dict[str, list[Any]]`
+- named `workflow_return` values can be constructed, propagated to the parent, extracted by key, and batch-aggregated
+  as `dict[str, list[Any]]`
 - child workflows without a `workflow_return` node fail cleanly when called
 - child execution events now include stable workflow-call relationship metadata on the child `SessionQueueItem`
 - parent-child resume and failure propagation through queue-visible child rows
 - nested runtime execution with bounded stack depth
 - direct and generator-backed batch-special child workflows through queue child-row expansion
-- compatibility metadata for required exposed inputs, missing/multiple returns, supported named batch-return shapes, and
-  unsupported batch input wiring
+- compatibility metadata for required exposed inputs, missing/multiple returns, supported named batch-return shapes,
+  and unsupported batch input wiring
 
-Still needed in later increments:
+Supported extension policy:
 
 - focused coverage for any newly supported batch or generator shape when its contract changes
-- possible migration from dedicated workflow-call queue lifecycle handling to a more general scheduler or
-  queue-lifecycle model only if another feature needs reusable dependent queue items
+- a more general scheduler or queue-lifecycle model is warranted only if another feature needs reusable dependent queue
+  items; the current queue lifecycle remains authoritative
 
-## Recommended Immediate Next Step
+## Operational Guidance
 
-The next incremental step should be:
-
-- stop adding feature slices unless they close a concrete correctness gap or unlock a realistic user workflow
-- stabilize the current branch with review, targeted test runs, and cleanup of stale design-doc language
-- treat migration from `WorkflowCallQueueLifecycle` to a generalized parent/child queue lifecycle as a larger
-  architecture slice, not as small follow-on busywork
-
-The current branch is at the point where:
-
-- parent call-boundary state exists
-- child execution state can be created from the selected saved workflow
-- child execution, argument forwarding, explicit return propagation, suspended parent status, queue-visible child rows,
-  and upward failure cascade work through the current coordinator + queue path
-- but long-term generalized parent/child scheduling semantics are still missing
+The queue path owns durable child rows, parent waiting/resume transitions, cancellation, retry, recovery, and events.
+The generic child record validates identity, ordered aggregation, resource limits, and idempotent terminal events; it
+does not replace the queue lifecycle.

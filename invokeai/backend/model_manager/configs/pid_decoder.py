@@ -3,17 +3,20 @@
 PiD decoders are released by NVIDIA at https://huggingface.co/nvidia/PiD and
 ship per supported backbone (FLUX.1, FLUX.2, SD3, SDXL, Qwen-Image). Most
 backbones offer two resolution presets (`res2k_sr4x_*` and `res2kto4k_sr4x_*`),
-while SDXL and Qwen-Image ship only the `res2kto4k_sr4x_*` preset. See
+while SDXL and Qwen-Image ship only the `res2kto4k_sr4x_*` preset. The second
+generation, PiD v1.5, exists for FLUX.1, FLUX.2 and Qwen-Image in the 2K-to-4K
+preset; Comfy-Org repackages both generations as single safetensors files. See
 `LICENSE-PiD.txt` at the repo root — code is Apache-2.0, weights are NSCLv1
 (non-commercial / research).
 """
 
-import re
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Any, Literal, Self
 
 from pydantic import Field
 
+from invokeai.backend.model_manager.configs.backbone_names import backbone_from_components, name_components
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base, Config_Base
 from invokeai.backend.model_manager.configs.identification_utils import (
     InvalidMatchError,
@@ -25,11 +28,15 @@ from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
-    ModelSourceType,
     ModelType,
     PiDDecoderVariantType,
 )
-from invokeai.backend.pid.state_dict_utils import pid_net_shapes
+from invokeai.backend.pid.state_dict_utils import (
+    PID_VERSION_BY_LQ_HIDDEN_DIM,
+    PiDVersion,
+    pid_net_shapes,
+    strip_net_prefix,
+)
 
 # Marker substring produced by `PidNet.lq_proj` (see
 # invokeai/backend/pid/_src/networks/pid_net.py). The pretrained PixDiT_T2I
@@ -44,24 +51,27 @@ def _looks_like_pid_decoder(state_dict: dict[str | int, Any]) -> bool:
     return any(isinstance(k, str) and _PID_MARKER_SUBSTRING in k for k in state_dict)
 
 
-# PidNet's latent input projection: a Conv2d of shape (lq_hidden_dim, lq_latent_channels, 3, 3).
+# PidNet's latent input projection: a Conv2d of shape (lq_hidden_dim, latent input channels, 3, 3).
 # Identification reads three separate facts off this one weight — the architecture version (dim 0),
 # the backbone (dim 1) and, via the contract, its kernel — which is why it is worth naming.
 _LATENT_PROJ_KEY = "lq_proj.latent_proj.0.weight"
 
-# dim 1 of the latent projection is the backbone's latent channel count. It is the only architectural
-# dimension that varies between backbones, and therefore the only name-independent discriminator
-# available. FLUX.1, SD3 and Qwen-Image are architecturally identical and share 16 channels; nothing
-# in the weights can separate them.
-_LATENT_CHANNELS_TO_BASES: dict[int, set[BaseModelType]] = {
-    4: {BaseModelType.StableDiffusionXL},
-    16: {BaseModelType.Flux, BaseModelType.StableDiffusion3, BaseModelType.QwenImage},
-    128: {BaseModelType.Flux2},
+# dim 1 of the latent projection is the backbone's latent channel count as the projection takes it. It is the only
+# architectural dimension that varies between backbones, and therefore the only name-independent discriminator
+# available. FLUX.1, SD3 and Qwen-Image are architecturally identical and share 16 channels; nothing in the weights
+# can separate them. v1.5 unpatchifies FLUX.2's 128 channels to 32 before the projection, and NVIDIA ships it for
+# FLUX.1, FLUX.2 and Qwen-Image only.
+_LATENT_CHANNELS_TO_BASES: dict[PiDVersion, dict[int, set[BaseModelType]]] = {
+    PiDVersion.V1: {
+        4: {BaseModelType.StableDiffusionXL},
+        16: {BaseModelType.Flux, BaseModelType.StableDiffusion3, BaseModelType.QwenImage},
+        128: {BaseModelType.Flux2},
+    },
+    PiDVersion.V1_5: {
+        16: {BaseModelType.Flux, BaseModelType.QwenImage},
+        32: {BaseModelType.Flux2},
+    },
 }
-
-# dim 0 is PidNet's `lq_hidden_dim`. `build_pid_net` constructs the legacy 512-dim network; NVIDIA's
-# v1.5 checkpoints use 1024 (plus PiT injection, scalar gates, etc.) and cannot be loaded into it.
-_SUPPORTED_LQ_HIDDEN_DIM = 512
 
 # Keyed by `Any`, not `str`: a bare checkpoint reaches identification with its keys untouched, so a
 # `.pth` is free to supply keys that are not strings (see `strip_net_prefix`).
@@ -89,22 +99,21 @@ def _raise_if_discriminator_malformed(shapes: _Shapes, contract: Mapping[str, tu
         )
 
 
-def _raise_if_architecture_unsupported(shapes: _Shapes) -> None:
-    """Reject a PiD decoder whose network shape `build_pid_net` cannot construct.
+def _pid_version(shapes: _Shapes) -> PiDVersion:
+    """The decoder generation, read off the latent projection's width; reject a width no generation has.
 
-    Runs before the contract check so the diagnosis is the accurate one: a v1.5 checkpoint is intact,
-    and judging it against the legacy contract would report it as a pile of missing and unexpected
-    keys rather than as the newer architecture it is.
+    Runs before the contract check, which depends on it, so the diagnosis is the accurate one: judged against
+    either generation's contract, an unknown architecture would be reported as a pile of missing and unexpected
+    keys rather than as the architecture it is.
     """
     lq_hidden_dim = shapes[_LATENT_PROJ_KEY][0]  # type: ignore[index]  # rank checked above
-    if lq_hidden_dim != _SUPPORTED_LQ_HIDDEN_DIM:
-        raise InvalidMatchError(
-            f"PiD decoder has lq_proj hidden dim {lq_hidden_dim}, but InvokeAI only supports the legacy "
-            f"{_SUPPORTED_LQ_HIDDEN_DIM}-dim architecture (NVIDIA's v1.5 checkpoints are not yet supported)."
-        )
+    if (version := PID_VERSION_BY_LQ_HIDDEN_DIM.get(lq_hidden_dim)) is None:
+        supported = ", ".join(f"{dim} ({v.value})" for dim, v in PID_VERSION_BY_LQ_HIDDEN_DIM.items())
+        raise InvalidMatchError(f"PiD decoder has lq_proj hidden dim {lq_hidden_dim}; InvokeAI supports {supported}.")
+    return version
 
 
-def _raise_if_no_backbone_can_accept(shapes: _Shapes) -> None:
+def _raise_if_no_backbone_can_accept(shapes: _Shapes, version: PiDVersion) -> None:
     """Reject a PiD decoder that none of the five backbone configs could ever claim.
 
     The counterpart to `_validate_base`, and the reason the two are separate. `_validate_base` decides
@@ -118,10 +127,15 @@ def _raise_if_no_backbone_can_accept(shapes: _Shapes) -> None:
     reported as a shape mismatch on one weight, which is true and useless.
     """
     channels = shapes[_LATENT_PROJ_KEY][1]  # type: ignore[index]  # rank checked above
-    if channels not in _LATENT_CHANNELS_TO_BASES:
+    bases_by_channels = _LATENT_CHANNELS_TO_BASES[version]
+    if channels not in bases_by_channels:
+        supported = ", ".join(
+            f"{count} for {'/'.join(sorted(base.value for base in bases))}"
+            for count, bases in bases_by_channels.items()
+        )
         raise InvalidMatchError(
-            f"PiD checkpoint has {channels} latent channels; no supported backbone uses this "
-            "(supported: 4 for SDXL, 16 for FLUX.1/SD3/Qwen-Image, 128 for FLUX.2)"
+            f"PiD {version.value} checkpoint has {channels} latent channels; no supported backbone uses this "
+            f"(supported: {supported})"
         )
 
 
@@ -179,70 +193,6 @@ def _raise_if_pid_net_contract_unmet(shapes: _Shapes, contract: Mapping[str, tup
         )
 
 
-def _name_components(mod: ModelOnDisk, override_fields: dict[str, Any]) -> tuple[str, ...]:
-    """The name evidence for backbone and variant, most specific first.
-
-    NVIDIA distributes PiD checkpoints as
-    ``PiD_res2k_sr4x_official_<backbone>_distill_4step/model_ema_bf16.pth``, so the backbone and the
-    preset usually live in the *directory* name rather than the weights filename. A direct
-    single-file install stores the checkpoint as ``<uuid>/model_ema_bf16.pth`` and drops that
-    directory, which is why the install source is consulted at all: for an HF or URL install it still
-    carries NVIDIA's name.
-
-    These used to be concatenated into one string and substring-matched, which let a fixed backbone
-    precedence decide cases the name had already answered — `/flux/model_sd3.pth` matched `flux`
-    first and was registered as FLUX although the file itself says sd3. Matching component by
-    component and taking the first that names exactly one backbone lets the more specific name win.
-
-    A local install contributes no source: the model manager sets `source` to the file's own path
-    when there is no remote one (`ModelConfigFactory.build_common_fields`), so trusting it would mean
-    matching against arbitrary ancestor directories of wherever the user keeps their models. Nothing
-    is lost by dropping it — `install_path` identifies a local file *before* it moves it, so the
-    filename and parent directory are still the originals.
-    """
-    components = [mod.path.name, mod.path.parent.name]
-    if override_fields.get("source_type") != ModelSourceType.Path:
-        components.append(str(override_fields.get("source") or ""))
-    return tuple(c for c in components if c)
-
-
-# Ordered so that a more specific spelling is consumed before a more general one that it contains:
-# `flux2` before `flux`. That is precedence between two spellings of one answer, not between two
-# answers — see `_backbone_named_in`.
-_BACKBONE_NAME_PATTERNS: tuple[tuple[BaseModelType, re.Pattern[str]], ...] = (
-    (BaseModelType.Flux2, re.compile(r"flux[_\-.]?2")),
-    (BaseModelType.StableDiffusionXL, re.compile(r"sdxl")),
-    (BaseModelType.QwenImage, re.compile(r"qwen[_\-.]?image")),
-    (BaseModelType.StableDiffusion3, re.compile(r"sd[_\-.]?3")),
-    (BaseModelType.Flux, re.compile(r"flux")),
-)
-
-
-def _backbone_named_in(text: str) -> BaseModelType | None:
-    """The single backbone *text* names, or None if it names none — or more than one.
-
-    Two different backbones in one string is not a precedence question, it is a text that decides
-    nothing; resolving it by a fixed order is how a directory named `flux` came to outrank a file
-    named `model_sd3`. Abstaining leaves the decision to the explicit `base` override, or to the
-    FLUX.1 default for the 16-channel family.
-    """
-    remaining, found = text.lower(), set()
-    for base, pattern in _BACKBONE_NAME_PATTERNS:
-        if pattern.search(remaining):
-            found.add(base)
-            # Consumed so the general spelling cannot match the specific one's leftovers.
-            remaining = pattern.sub(" ", remaining)
-    return next(iter(found)) if len(found) == 1 else None
-
-
-def _backbone_from_components(components: tuple[str, ...]) -> BaseModelType | None:
-    """The backbone named by the most specific component that names exactly one."""
-    for component in components:
-        if (named := _backbone_named_in(component)) is not None:
-            return named
-    return None
-
-
 # Backbones for which NVIDIA ships exactly one preset — for these the variant is known even when the
 # name gives nothing away. FLUX.1 / FLUX.2 / SD3 ship both presets and fall back to `Res2k_Sr4x`.
 _SINGLE_VARIANT_BACKBONES: dict[BaseModelType, PiDDecoderVariantType] = {
@@ -251,20 +201,123 @@ _SINGLE_VARIANT_BACKBONES: dict[BaseModelType, PiDDecoderVariantType] = {
 }
 
 
-def _variant_from_components(components: tuple[str, ...], base: BaseModelType) -> PiDDecoderVariantType:
+def _variant_from_components(
+    components: tuple[str, ...], base: BaseModelType, version: PiDVersion
+) -> PiDDecoderVariantType:
     """Map NVIDIA's `res2k_sr4x` / `res2kto4k_sr4x` name slice to a variant.
 
     Same specificity ordering as the backbone match. If no component names a preset, fall back to the
-    backbone's only published one where there is one, and to ``Res2k_Sr4x`` for those shipping both.
+    only published one where there is one — every v1.5 decoder, and SDXL's and Qwen-Image's v1 — and to
+    ``Res2k_Sr4x`` for the v1 backbones shipping both.
     """
     for component in components:
         n = component.lower()
-        # `res2kto4k` contains `res2k`, so the 2K-to-4K spellings are tested first.
-        if "res2kto4k" in n or "res2k_to_4k" in n or "res2k_to4k" in n:
+        # `res2kto4k` contains `res2k`, so the 2K-to-4K spellings are tested first. Comfy-Org names the preset by
+        # its input and output sizes instead (`pid_1.5_flux1_1024_to_4096_4step_bf16`).
+        if "res2kto4k" in n or "res2k_to_4k" in n or "res2k_to4k" in n or "1024_to_4096" in n:
             return PiDDecoderVariantType.Res2kTo4k_Sr4x
         if "res2k" in n:
             return PiDDecoderVariantType.Res2k_Sr4x
+    if version is PiDVersion.V1_5:
+        return PiDDecoderVariantType.Res2kTo4k_Sr4x
     return _SINGLE_VARIANT_BACKBONES.get(base, PiDDecoderVariantType.Res2k_Sr4x)
+
+
+def _raise_if_named_undistilled(components: tuple[str, ...], folder_name: str) -> None:
+    """Reject a v1.5 decoder whose name marks it as NVIDIA's undistilled teacher.
+
+    NVIDIA published each v1.5 decoder twice: the 4-step distilled student the decode nodes sample, and the
+    undistilled teacher (`PiD_v1pt5_*_undistilled`, Comfy-Org's `pid_1.5_*_bf16` without `_4step`), which is
+    sampled with ~25 CFG steps. Both carry the same keys and shapes, so only the name tells them apart — and
+    sampled with the student schedule a teacher decodes to a degraded image without any error. A name that says
+    neither is accepted.
+
+    Comfy-Org's spelling marks the teacher by what its file name lacks, so it is only read off file names — the
+    last segment of the file's own name or of its install source — never off ``folder_name``, the folder a local
+    install is identified in, which a user may well have named `pid_1.5_decoders`.
+    """
+    for component in components:
+        n = component.lower()
+        file_name = "" if component == folder_name else n.replace("\\", "/").rsplit("/", 1)[-1]
+        if "undistilled" in n or (file_name.startswith("pid_1.5_") and "4step" not in file_name):
+            raise InvalidMatchError(
+                f"PiD v1.5 checkpoint {component!r} is named as an undistilled (teacher) decoder. InvokeAI samples "
+                "PiD with the distilled 4-step schedule; install the `_4step` build instead."
+            )
+
+
+def _int8_sidecar_keys(state_dict: dict[Any, Any], path: Path) -> set[str]:
+    """The keys of Comfy-Org's `int8_tensorwise` side channel, which the contract does not list; reject a quantization
+    `load_pid_decoder` would refuse.
+
+    Held to what the loader accepts, so an int8 build that registers also loads: every marked layer needs an int8
+    weight, a per-row or per-tensor `weight_scale`, and a marker declaring `int8_tensorwise` with a rotation group the
+    decode has a Hadamard for and that divides the layer's inputs; every int8 weight needs a marker. Anything else
+    decodes garbage or fails at every decode, and every config class would turn the file away for the same reason.
+
+    Dtypes and shapes come from the header identification reads. The markers' JSON does not — a header has no tensor
+    data — so it is read from the safetensors file itself, once the dtypes have shown the file is worth reading.
+    """
+    import torch
+
+    from invokeai.backend.quantization.fp8_scaled import COMFY_QUANT_SUFFIX
+    from invokeai.backend.quantization.int8_convrot import (
+        CONVROT_GROUP_SIZE,
+        INT8_TENSORWISE_FORMAT,
+        check_hadamard_size,
+        check_int8_scale_layout,
+        read_comfy_quant_markers,
+    )
+
+    stripped = strip_net_prefix(state_dict)
+    marked = {k[: -len(COMFY_QUANT_SUFFIX)] for k in stripped if isinstance(k, str) and k.endswith(COMFY_QUANT_SUFFIX)}
+    if not_int8 := sorted(
+        layer for layer in marked if getattr(stripped.get(f"{layer}.weight"), "dtype", None) is not torch.int8
+    ):
+        raise InvalidMatchError(
+            f"PiD checkpoint quantizes {len(not_int8)} layer(s) other than as int8, e.g. '{not_int8[0]}'; only "
+            "int8_tensorwise builds are supported."
+        )
+    if unmarked := sorted(
+        k
+        for k, v in stripped.items()
+        if getattr(v, "dtype", None) is torch.int8
+        and not (isinstance(k, str) and k.endswith(".weight") and k[: -len(".weight")] in marked)
+    ):
+        raise InvalidMatchError(
+            f"PiD checkpoint has {len(unmarked)} int8 weight(s) with no int8_tensorwise marker, e.g. {unmarked[:3]}."
+        )
+    if not marked:
+        return set()
+
+    try:
+        markers = strip_net_prefix(read_comfy_quant_markers(path))
+    except Exception as e:
+        raise InvalidMatchError(
+            f"PiD checkpoint marks {len(marked)} layer(s) int8, but its markers cannot be read from {path.name}: {e}"
+        ) from e
+    for layer in sorted(marked):
+        weight, scale, marker = (
+            stripped[f"{layer}.weight"],
+            stripped.get(f"{layer}.weight_scale"),
+            markers.get(layer, {}),
+        )
+        try:
+            if marker.get("format") != INT8_TENSORWISE_FORMAT:
+                raise ValueError(f"'{layer}' is marked {marker.get('format') or 'with an unreadable marker'}")
+            if scale is None:
+                raise ValueError(f"'{layer}' is missing its weight_scale")
+            check_int8_scale_layout(layer, weight, scale)
+            if marker.get("convrot", False):
+                group = int(marker.get("convrot_groupsize", CONVROT_GROUP_SIZE))
+                check_hadamard_size(group)
+                if weight.shape[-1] % group:
+                    raise ValueError(
+                        f"'{layer}' rotates groups of {group}, which do not divide its {weight.shape[-1]} inputs"
+                    )
+        except ValueError as e:
+            raise InvalidMatchError(f"PiD int8 checkpoint cannot be loaded: {e}") from e
+    return {f"{layer}{suffix}" for layer in marked for suffix in (COMFY_QUANT_SUFFIX, ".weight_scale")}
 
 
 class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
@@ -295,8 +348,8 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         # no reason to load for the overwhelming majority of files.
         from invokeai.backend.pid.decode import required_pid_net_shapes
 
-        contract = required_pid_net_shapes()
-        shapes = pid_net_shapes(state_dict)
+        sidecars = _int8_sidecar_keys(state_dict, mod.path)
+        shapes = {k: v for k, v in pid_net_shapes(state_dict).items() if k not in sidecars}
 
         # Everything from here to `_validate_base` is backbone-independent: each of these rejects a file
         # *every* PiD config class would reject for the same reason, which is exactly the case the plain
@@ -306,21 +359,26 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         # The latent projection carries both the architecture version and the backbone, so the checks
         # that read it can only speak when it is there. When it is not, the file is truncated, and the
         # contract check diagnoses that far better than a guess about the architecture would.
+        version = PiDVersion.V1
         if _LATENT_PROJ_KEY in shapes:
-            _raise_if_discriminator_malformed(shapes, contract)
-            _raise_if_architecture_unsupported(shapes)
-            _raise_if_no_backbone_can_accept(shapes)
-        _raise_if_pid_net_contract_unmet(shapes, contract)
+            # Both generations give this conv the same rank and kernel, so either contract judges its form.
+            _raise_if_discriminator_malformed(shapes, required_pid_net_shapes(version=PiDVersion.V1))
+            version = _pid_version(shapes)
+            _raise_if_no_backbone_can_accept(shapes, version)
+        _raise_if_pid_net_contract_unmet(shapes, required_pid_net_shapes(version=version))
 
         # Guaranteed by the checks above: the contract proved the weight is present and the malformed
         # check proved it is a conv. The backbone therefore always comes from the weights — the name
         # can only break the FLUX.1 / SD3 / Qwen-Image tie, never pick a backbone on its own.
         latent_channels = shapes[_LATENT_PROJ_KEY][1]  # type: ignore[index]
-        components = _name_components(mod, override_fields)
+        components = name_components(mod, override_fields)
+        if version is PiDVersion.V1_5:
+            _raise_if_named_undistilled(components, mod.path.parent.name)
 
         cls._validate_base(
             latent_channels=latent_channels,
-            named_base=_backbone_from_components(components),
+            version=version,
+            named_base=backbone_from_components(components),
             had_base_override=override_fields.get("base") is not None,
         )
 
@@ -328,7 +386,7 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         # Read, not popped: `override_fields` is built once by the factory and passed to every
         # candidate class, so consuming `variant` here would take it away from whichever PiD class
         # actually matches (which, without a `base` override, need not be this one).
-        variant = override_fields.get("variant") or _variant_from_components(components, base)
+        variant = override_fields.get("variant") or _variant_from_components(components, base, version)
         return cls(**{k: v for k, v in override_fields.items() if k != "variant"}, variant=variant)
 
     @classmethod
@@ -336,6 +394,7 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         cls,
         *,
         latent_channels: int,
+        version: PiDVersion,
         named_base: BaseModelType | None,
         had_base_override: bool,
     ) -> None:
@@ -346,18 +405,19 @@ class PiDDecoder_Checkpoint_Config_Base(Checkpoint_Config_Base):
         would rule out all five are raised in ``from_model_on_disk`` before this runs.
 
         The latent channel count is authoritative and is the only thing separating SDXL (4ch) and
-        FLUX.2 (128ch) from the 16ch family. FLUX.1, SD3 and Qwen-Image are architecturally
-        identical, so within that family, in order of how much the evidence can be trusted:
+        FLUX.2 (128ch; 32ch in v1.5) from the 16ch family. FLUX.1, SD3 and Qwen-Image are
+        architecturally identical, so within that family, in order of how much the evidence can be
+        trusted:
 
         - an explicit ``base`` override wins outright. ``raise_for_override_fields`` has already
           validated it against this class's ``Literal``, so it names exactly one of the five, and
           whoever set it knows more than a filename anyone can write;
-        - failing that, a name component naming exactly one of the three decides;
+        - failing that, a name component naming exactly one of the family decides;
         - failing that, the family defaults to FLUX.1.
         """
         expected_base = cls.model_fields["base"].default
         # Guaranteed present: an unsupported channel count was rejected outright before this ran.
-        candidate_bases = _LATENT_CHANNELS_TO_BASES[latent_channels]
+        candidate_bases = _LATENT_CHANNELS_TO_BASES[version][latent_channels]
 
         if expected_base not in candidate_bases:
             raise NotAMatchError(f"latent channels={latent_channels} do not match backbone {expected_base}")
@@ -386,7 +446,7 @@ class PiDDecoder_Checkpoint_FLUX_Config(PiDDecoder_Checkpoint_Config_Base, Confi
 
 
 class PiDDecoder_Checkpoint_Flux2_Config(PiDDecoder_Checkpoint_Config_Base, Config_Base):
-    """PiD decoder for the FLUX.2 backbone (128-channel latent)."""
+    """PiD decoder for the FLUX.2 backbone (128-channel latent; PiD v1.5 projects it unpatchified to 32)."""
 
     base: Literal[BaseModelType.Flux2] = Field(default=BaseModelType.Flux2)
     variant: PiDDecoderVariantType = Field(description="Resolution preset of the PiD decoder checkpoint.")

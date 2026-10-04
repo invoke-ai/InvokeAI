@@ -3,8 +3,11 @@ from abc import ABC
 from pathlib import Path
 from typing import Any, Literal, Self
 
-from pydantic import BaseModel, ConfigDict, Field
+import torch
+from pydantic import BaseModel, Field
 
+from invokeai.backend.ltx2 import checkpoint_layout as ltx2_layout
+from invokeai.backend.model_manager.checkpoint_prefix import COMFYUI_KEY_PREFIXES
 from invokeai.backend.model_manager.configs.base import (
     Checkpoint_Config_Base,
     Config_Base,
@@ -12,11 +15,22 @@ from invokeai.backend.model_manager.configs.base import (
     SubmodelDefinition,
 )
 from invokeai.backend.model_manager.configs.clip_embed import get_clip_variant_type_from_config
+
+# Re-exported: `MainModelDefaultSettings` moved to its own module so the architecture registry
+# can hold instances of it without this module — which now looks the values *up* — becoming part
+# of an import cycle. Kept importable from here, where every caller already expects it.
+from invokeai.backend.model_manager.configs.default_settings import (  # noqa: E402
+    DEFAULTS_PRECISION as DEFAULTS_PRECISION,
+)
+from invokeai.backend.model_manager.configs.default_settings import (
+    MainModelDefaultSettings as MainModelDefaultSettings,
+)
 from invokeai.backend.model_manager.configs.flux2_variant import (
     flux2_variant_from_context_dim,
     flux2_variant_from_hidden_size,
 )
 from invokeai.backend.model_manager.configs.identification_utils import (
+    InvalidMatchError,
     NotAMatchError,
     common_config_paths,
     get_config_dict_or_raise,
@@ -29,10 +43,13 @@ from invokeai.backend.model_manager.configs.identification_utils import (
 from invokeai.backend.model_manager.configs.qwen3_encoder import _SDNQ_LOADABLE_QWEN_ARCHITECTURES
 from invokeai.backend.model_manager.model_on_disk import ModelOnDisk
 from invokeai.backend.model_manager.taxonomy import (
+    AnimaVariantType,
     BaseModelType,
     Flux2VariantType,
     FluxVariantType,
     Krea2VariantType,
+    LTX2VariantType,
+    MiniMaxH3VariantType,
     ModelFormat,
     ModelRepoVariant,
     ModelType,
@@ -44,112 +61,9 @@ from invokeai.backend.model_manager.taxonomy import (
     ZImageVariantType,
 )
 from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.int8_convrot import INT8_TENSORWISE_FORMAT, read_comfy_quant_markers
 from invokeai.backend.quantization.sdnq.detection import is_sdnq_folder
 from invokeai.backend.quantization.sdnq.sdnq_tensor import SDNQTensor
-from invokeai.backend.stable_diffusion.schedulers.schedulers import SCHEDULER_NAME_VALUES
-
-DEFAULTS_PRECISION = Literal["fp16", "fp32"]
-
-
-class MainModelDefaultSettings(BaseModel):
-    vae: str | None = Field(default=None, description="Default VAE for this model (model key)")
-    vae_precision: DEFAULTS_PRECISION | None = Field(default=None, description="Default VAE precision for this model")
-    scheduler: SCHEDULER_NAME_VALUES | None = Field(default=None, description="Default scheduler for this model")
-    steps: int | None = Field(default=None, gt=0, description="Default number of steps for this model")
-    cfg_scale: float | None = Field(default=None, ge=1, description="Default CFG Scale for this model")
-    cfg_rescale_multiplier: float | None = Field(
-        default=None, ge=0, lt=1, description="Default CFG Rescale Multiplier for this model"
-    )
-    width: int | None = Field(default=None, multiple_of=8, ge=64, description="Default width for this model")
-    height: int | None = Field(default=None, multiple_of=8, ge=64, description="Default height for this model")
-    guidance: float | None = Field(default=None, ge=1, description="Default Guidance for this model")
-    cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
-    fp8_storage: bool | None = Field(
-        default=None,
-        description="Store weights in FP8 to reduce VRAM usage (~50% savings). Weights are cast to compute dtype during inference.",
-    )
-
-    model_config = ConfigDict(extra="forbid")
-
-    @classmethod
-    def from_base(
-        cls,
-        base: BaseModelType,
-        variant: Flux2VariantType
-        | FluxVariantType
-        | ModelVariantType
-        | WanVariantType
-        | ZImageVariantType
-        | Krea2VariantType
-        | None = None,
-        name: str | None = None,
-        path: str | None = None,
-    ) -> Self | None:
-        match base:
-            case BaseModelType.StableDiffusion1:
-                return cls(width=512, height=512)
-            case BaseModelType.StableDiffusion2:
-                return cls(width=768, height=768)
-            case BaseModelType.StableDiffusionXL:
-                return cls(width=1024, height=1024)
-            case BaseModelType.ZImage:
-                # Different defaults based on variant
-                if variant == ZImageVariantType.ZBase:
-                    # Undistilled base model needs more steps and supports CFG
-                    # Recommended: steps=28-50, cfg_scale=3.0-5.0
-                    return cls(steps=50, cfg_scale=4.0, width=1024, height=1024)
-                else:
-                    # Turbo (distilled) uses fewer steps, no CFG
-                    return cls(steps=9, cfg_scale=1.0, width=1024, height=1024)
-            case BaseModelType.ErnieImage:
-                # ERNIE-Image-Turbo (distilled) uses fewer steps and CFG=1.0. The two checkpoints
-                # share an architecture and config, so there is nothing on disk to discriminate on
-                # and no Turbo variant is modeled. Fall back to the name, and also the install
-                # directory's own name so that renaming the model in the install dialog doesn't lose
-                # the Turbo defaults. Only the leaf name is matched: an in-place install records an
-                # absolute path, and an unrelated ancestor directory (e.g. /mnt/turbo-nvme/models/)
-                # must not silently give the base model Turbo's 8 steps and CFG 1.0.
-                path_name = Path(path).name if path else None
-                haystack = " ".join(part for part in (name, path_name) if part).lower()
-                if "turbo" in haystack:
-                    return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
-                return cls(steps=50, cfg_scale=4.0, width=1024, height=1024)
-            case BaseModelType.Anima:
-                return cls(steps=35, cfg_scale=4.5, width=1024, height=1024)
-            case BaseModelType.Ideogram4:
-                # Ideogram 4 uses sampler presets (default V4_QUALITY_48 = 48 steps) and a
-                # dual-branch guidance schedule; these are sensible UI defaults.
-                return cls(steps=48, cfg_scale=7.0, width=1024, height=1024)
-            case BaseModelType.Flux2:
-                # Different defaults based on variant
-                if variant == Flux2VariantType.Dev:
-                    # FLUX.2 [dev] is guidance-distilled (recommended guidance=3.5, 28 steps, CFG disabled)
-                    return cls(steps=28, cfg_scale=1.0, guidance=3.5, width=1024, height=1024)
-                elif variant in (Flux2VariantType.Klein4BBase, Flux2VariantType.Klein9BBase):
-                    # Undistilled base models need more steps
-                    return cls(steps=28, cfg_scale=1.0, width=1024, height=1024)
-                else:
-                    # Distilled models (Klein 4B, Klein 9B) use fewer steps
-                    return cls(steps=4, cfg_scale=1.0, width=1024, height=1024)
-            case BaseModelType.QwenImage:
-                return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
-            case BaseModelType.Krea2:
-                # Krea-2-Raw (Base, undistilled) needs more steps and CFG; Turbo (distilled) uses 8
-                # steps with CFG disabled. cfg_scale has a floor of 1 (ge=1); 1.0 means "no guidance".
-                if variant == Krea2VariantType.Base:
-                    # Diffusers' Krea-2 guidance 4.5 uses cond + 4.5 * (cond - uncond), which is
-                    # equivalent to InvokeAI's standard CFG convention at scale 5.5.
-                    return cls(steps=28, cfg_scale=5.5, width=1024, height=1024)
-                return cls(steps=8, cfg_scale=1.0, width=1024, height=1024)
-            case BaseModelType.Wan:
-                # Wan 2.2 recommended defaults differ by variant.
-                if variant == WanVariantType.TI2V_5B:
-                    return cls(steps=30, cfg_scale=5.0, width=1024, height=1024)
-                # Default to A14B settings (also used when variant is unknown).
-                return cls(steps=40, cfg_scale=4.0, width=1024, height=1024)
-            case _:
-                # TODO(psyche): Do we want defaults for other base types?
-                return None
 
 
 class Main_Config_Base(ABC, BaseModel):
@@ -495,14 +409,37 @@ def _has_flux2_diffusers_transformer_keys(state_dict: dict[str | int, Any]) -> b
     return False
 
 
-def _filename_suggests_base(name: str) -> bool:
-    """Check if a model name/filename suggests it is a Base (undistilled) variant.
+# Letters, not substrings: `_filename_suggests_base` used to test `"base" in name`, which fires on
+# "database" and "basement". Digits stay adjacent on purpose -- "base9b" is a name, "database" is
+# not a claim.
+_SUGGESTS_BASE = re.compile(r"(?<![a-z])base(?![a-z])")
+_SUGGESTS_DISTILLED = re.compile(r"(?<![a-z])distill")
+# "undistilled" and "non-distilled" are the Base claim spelled out, so they have to be read before
+# the word they contain. A lookbehind cannot do this: it has to span an optional separator.
+_DENIES_DISTILLED = re.compile(r"(?<![a-z])(?:non|not|un)[-_ ]?distill")
 
-    Klein 9B Base and Klein 9B have identical architectures and cannot be distinguished
-    from the state dict. We use the filename as a heuristic: filenames containing "base"
-    (e.g. "flux-2-klein-base-9b", "FLUX.2-klein-base-9B") indicate the undistilled model.
+
+def _filename_suggests_base(name: str) -> bool:
+    """Whether a model's name says it is the Base (undistilled) variant.
+
+    Klein 9B Base and Klein 9B have identical architectures and identical keys, so the name is the
+    only thing left to read. Getting it wrong is not cosmetic: the two ship different default step
+    counts (28 against 4), so a distilled model identified as Base generates at seven times the cost
+    and a Base model identified as distilled generates at four steps it was never trained for.
+
+    Read in order of how specific the claim is: a denial of distillation, then a claim of it, then
+    the bare word "base". A name carrying both "distilled" and "base" is naming its ancestry rather
+    than its variant, which is how the community repacks are named -- and which *source* the same
+    weights arrive from decides the name: installed by path
+    `Winnougan/Klein9b-Distilled-Base-INT8-Convrot` is `flux-2-klein-9b-int8-convrot` and identifies
+    correctly, installed by repo id it is the repo's name and used not to.
     """
-    return "base" in name.lower()
+    lowered = name.lower()
+    if _DENIES_DISTILLED.search(lowered):
+        return True
+    if _SUGGESTS_DISTILLED.search(lowered):
+        return False
+    return bool(_SUGGESTS_BASE.search(lowered))
 
 
 def _get_flux2_variant(state_dict: dict[str | int, Any]) -> Flux2VariantType | None:
@@ -1350,6 +1287,22 @@ def _has_anima_keys(state_dict: dict[str | int, Any]) -> bool:
     return False
 
 
+#: Where Anima-3.8B v1.1 bundles its semantic connector, relative to the transformer root. The
+#: bundle records it in its header as `anima_v2_connector_prefix` (`net.anima_v2_connector.`).
+ANIMA_V2_CONNECTOR_KEY_PREFIX = "anima_v2_connector."
+
+#: Anima's own wrapper namespaces, as `_has_anima_keys` accepts them.
+_ANIMA_KEY_PREFIXES = ("", "net.", "model.diffusion_model.")
+
+
+def _get_anima_variant(state_dict: dict[str | int, Any]) -> AnimaVariantType:
+    """An Anima checkpoint that bundles the semantic connector needs Qwen3.5 as well as Qwen3."""
+    connector_prefixes = tuple(f"{prefix}{ANIMA_V2_CONNECTOR_KEY_PREFIX}" for prefix in _ANIMA_KEY_PREFIXES)
+    if any(isinstance(key, str) and key.startswith(connector_prefixes) for key in state_dict):
+        return AnimaVariantType.Qwen35
+    return AnimaVariantType.Qwen3
+
+
 class Main_Diffusers_ZImage_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Z-Image diffusers models (Z-Image-Turbo, Z-Image-Base)."""
 
@@ -1506,6 +1459,172 @@ class Main_Diffusers_Ideogram4_Config(Diffusers_Config_Base, Main_Config_Base, C
         )
 
 
+# Comfy-Org ships the two Ideogram 4 branches as separate single files whose tensors are
+# key-for-key and shape-for-shape identical. Which branch a file holds is recorded only in its
+# safetensors metadata, and the pair is not interchangeable: swapping them turns the guided
+# branch into the unguided one and vice versa, which produces images with no visible error.
+_IDEOGRAM4_METADATA_KEY = "model_type"
+_IDEOGRAM4_BRANCH_BY_METADATA = {
+    "ideogram4_cond": "conditional",
+    "ideogram4_uncond": "unconditional",
+}
+
+Ideogram4Branch = Literal["conditional", "unconditional"]
+
+
+def _has_ideogram4_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Fingerprint for Ideogram 4 single-file transformers.
+
+    ``embed_image_indicator`` is the token-type embedding for Ideogram's packed ``[text][image]``
+    sequence and no other architecture probed here carries it; the two projections pin the layer
+    layout the loader builds (``input_proj`` is the 128-channel patch input, ``adaln_proj`` the
+    512-wide AdaLN conditioning trunk).
+    """
+    return all(
+        key in state_dict
+        for key in (
+            "embed_image_indicator.weight",
+            "input_proj.weight",
+            "adaln_proj.weight",
+            "final_layer.linear.weight",
+        )
+    )
+
+
+def _ideogram4_branch_from_filename(filename: str) -> Ideogram4Branch:
+    """The branch for a file that declares none.
+
+    Not only a fallback for a stripped re-upload: the released `int8_convrot` pair carries no
+    `model_type` at all, so this is the sole path for that build.
+
+    Only the unconditional file is named for its branch, so anything else is read as the conditional
+    branch — the same default direction as the released naming. Both spellings are accepted: the
+    filename says "unconditional" and the metadata this stands in for says "uncond", and a repack
+    that drops the metadata is exactly the kind of tool that would name the file after it.
+    """
+    lowered = filename.lower()
+    return "unconditional" if "unconditional" in lowered or "uncond" in lowered else "conditional"
+
+
+class Main_Checkpoint_Ideogram4_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for Ideogram 4 single-file transformer checkpoints (safetensors).
+
+    One file holds ONE of the two dual-branch transformers. The Qwen3-VL 8B text encoder and the
+    FLUX.2 VAE are separate models, selected on the loader node; the diffusers pipeline folder
+    (``Main_Diffusers_Ideogram4_Config``) is the variant that bundles everything.
+
+    Quantization: plain bf16/fp16, ComfyUI "scaled fp8" and ComfyUI ``int8_tensorwise``(+convrot)
+    all load. The ``nvfp4`` repack of the same files is recognised and rejected with
+    `InvalidMatchError`, which keeps it out of the database entirely -- `NotAMatchError` would let
+    it fall through to `Unknown_Config` and register a 5 GiB file that nothing can ever load.
+    """
+
+    base: Literal[BaseModelType.Ideogram4] = Field(default=BaseModelType.Ideogram4)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    branch: Ideogram4Branch = Field(
+        description="Which of Ideogram 4's two transformer branches this file holds. Read from the "
+        "file's `model_type` metadata where it has any, and from the filename otherwise — the "
+        "released int8 build records no metadata at all, so keep those files under their published "
+        "names. Rename and re-install to correct it."
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        if not _has_ideogram4_keys(state_dict):
+            raise NotAMatchError("state dict does not look like an Ideogram 4 transformer")
+
+        if _has_ggml_tensors(state_dict):
+            raise NotAMatchError("GGUF-quantized Ideogram 4 checkpoints are not supported yet")
+
+        cls._raise_for_unsupported_quantization(mod, state_dict)
+
+        branch = override_fields.pop("branch", None) or cls._branch_or_raise(mod)
+
+        return cls(**override_fields, branch=branch)
+
+    @classmethod
+    def _branch_or_raise(cls, mod: ModelOnDisk) -> Ideogram4Branch:
+        """The branch, from the file's own declaration where it has one.
+
+        A declaration this does not recognise is refused rather than ignored. Falling back to the
+        filename there would quietly classify a future release (an `ideogram4_5_cond`, an edit
+        build) as one of *these* two branches, and the loader node trusts the recorded branch
+        precisely because it came from the file — which is how a wrong model would end up guiding
+        against a right one with nothing in the log.
+        """
+        declared = mod.metadata().get(_IDEOGRAM4_METADATA_KEY)
+        if not declared:
+            return _ideogram4_branch_from_filename(mod.path.name)
+        branch = _IDEOGRAM4_BRANCH_BY_METADATA.get(declared)
+        if branch is None:
+            raise InvalidMatchError(
+                f"this file declares model_type '{declared}', which is not one of Ideogram 4's two "
+                f"transformer branches ({', '.join(sorted(_IDEOGRAM4_BRANCH_BY_METADATA))}). It is most "
+                "likely a newer or different Ideogram model that this version cannot run."
+            )
+        return branch
+
+    @classmethod
+    def _raise_for_unsupported_quantization(cls, mod: ModelOnDisk, state_dict: dict[str | int, Any]) -> None:
+        """Refuse the quantization schemes this loader cannot build.
+
+        `InvalidMatchError`, not `NotAMatchError`: the file *is* an Ideogram 4 transformer, so the
+        right outcome is a refusal the installer shows, not a fall-through to `Unknown_Config` that
+        registers it as a model nothing can load.
+
+        Two of them. nvfp4 packs two codes per byte, so its uint8 weights are indistinguishable from
+        the `comfy_quant` markers every repack carries -- including the two supported ones; the
+        per-tensor `weight_scale_2` is what only nvfp4 writes.
+
+        And int8 weights *without* a readable `int8_tensorwise` marker: the loader refuses those
+        (`reject_unmarked_int8_weights`), because a rotated weight loaded as if it were not one
+        generates noise. Refusing them here too is what keeps that refusal at install time -- a
+        torchao or `int8_dynamic` repack of this architecture would otherwise register as a 9 GiB
+        model, pull in its three starter dependencies, and fail at the first render.
+
+        The markers come from the file's header rather than from `state_dict`: identification loads
+        tensors on the meta device, so it has every dtype and shape but no bytes to parse. That read
+        is a header parse plus one seek per marker, and it only happens for a file that has int8
+        weights to explain in the first place.
+        """
+        if any(isinstance(key, str) and key.endswith(".weight_scale_2") for key in state_dict):
+            raise InvalidMatchError(
+                "this is an nvfp4-quantized Ideogram 4 transformer, which is not supported yet. "
+                "Install the fp8_scaled or int8_convrot build instead."
+            )
+
+        int8_weights = sorted(
+            key
+            for key, value in state_dict.items()
+            if isinstance(key, str) and key.endswith(".weight") and getattr(value, "dtype", None) is torch.int8
+        )
+        if not int8_weights:
+            return
+
+        try:
+            markers = read_comfy_quant_markers(mod.path)
+        except Exception:
+            # Not readable safetensors, so there are no markers to find and nothing explains the
+            # int8 weights. The refusal below is the right answer for that file too.
+            markers = {}
+        unmarked = [
+            key
+            for key in int8_weights
+            if markers.get(key[: -len(".weight")], {}).get("format") != INT8_TENSORWISE_FORMAT
+        ]
+        if unmarked:
+            raise InvalidMatchError(
+                f"{len(unmarked)} int8 weight(s) in this Ideogram 4 transformer carry no readable "
+                f"'{INT8_TENSORWISE_FORMAT}' marker (e.g. '{unmarked[0]}'), so the quantization scheme "
+                "cannot be identified. Only Comfy-Org's int8_convrot build is supported."
+            )
+
+
 class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Krea-2 diffusers models (Krea-2-Turbo)."""
 
@@ -1551,6 +1670,339 @@ class Main_Diffusers_Krea2_Config(Diffusers_Config_Base, Main_Config_Base, Confi
         if config.get("is_distilled", False) is False:
             return Krea2VariantType.Base
         return Krea2VariantType.Turbo
+
+
+class Main_Diffusers_MiniMaxH3_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for MiniMax H3 (Hailuo 3.0) diffusers-format models."""
+
+    base: Literal[BaseModelType.MiniMaxH3] = Field(BaseModelType.MiniMaxH3)
+    variant: MiniMaxH3VariantType = Field()
+    components_only: bool = Field(
+        default=False,
+        description="Whether the folder holds only the shared components (tokenizer, processor, VAEs) "
+        "without transformer weights - a slim install whose transformer and text encoder must be "
+        "supplied as single-file overrides at generation time.",
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        # H3 ships as a Modular Diffusers pipeline: the root config is modular_model_index.json, not
+        # model_index.json, and the class name implies the base type. The HF repo's FL2VA/ and
+        # Ref2VA/ subtrees are the original remote-code checkpoints and declare "MiniMaxH3Pipeline"
+        # instead - deliberately not matched, since their custom Python cannot be run here.
+        raise_for_class_name(
+            mod.path / "modular_model_index.json",
+            {"MiniMaxH3ModularPipeline"},
+        )
+
+        # The jointly-denoised audio track is what distinguishes H3 from every other video family.
+        # Require the audio VAE so a partial download fails identification rather than failing
+        # mid-generation.
+        raise_for_class_name(
+            mod.path / "audio_vae" / "config.json",
+            {"AutoencoderKLMiniMaxH3Audio"},
+        )
+
+        # An override may arrive as the raw string; normalize so the folder lookup below compares enums.
+        variant = MiniMaxH3VariantType(override_fields.pop("variant", None) or cls._get_variant(mod))
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+
+        # A slim ("components-only") install carries the transformer's config.json for variant
+        # identification but no weight shards - the transformer and text encoder come from
+        # single-file installs selected in the model loader instead. Record that here so the UI
+        # can require those selections up front rather than failing mid-generation.
+        components_only = override_fields.pop("components_only", None)
+        if components_only is None:
+            if variant is MiniMaxH3VariantType.REF2VA:
+                # Ref2VA folder weights are not folder-loadable in this version (`SubModelType`
+                # has no `transformer_ref` member), so a Ref2VA install always needs the
+                # single-file overrides - weight shards present or not. Marking it
+                # components-only makes the UI require them up front instead of failing
+                # minutes into a run.
+                components_only = True
+            else:
+                transformer_dir = mod.path / "transformer"
+                components_only = not any(
+                    any(transformer_dir.glob(pattern))
+                    for pattern in ("*.safetensors", "*.bin", "*.pth", "*.pt", "*.ckpt")
+                )
+
+        return cls(
+            **override_fields,
+            variant=variant,
+            repo_variant=repo_variant,
+            components_only=components_only,
+        )
+
+    @classmethod
+    def _get_variant(cls, mod: ModelOnDisk) -> MiniMaxH3VariantType:
+        """Determine the H3 variant from which task transformer is present.
+
+        H3's task checkpoints share every component except the transformer folder: ``transformer``
+        (FL2VA: text / first/last-frame to audio-video) vs ``transformer_ref`` (Ref2VA: multi-
+        reference). A folder holding both (the full official repo) identifies as FL2VA - that is
+        the folder-loadable variant. A ``transformer_ref``-only folder identifies as REF2VA, but
+        note its weights are NOT folder-loadable in this version (``SubModelType`` has no
+        ``transformer_ref`` member); the supported Ref2VA generation path is a components install
+        plus a single-file transformer override selected in the model loader.
+        """
+        transformer_config = mod.path / "transformer" / "config.json"
+        if transformer_config.exists():
+            raise_for_class_name(transformer_config, {"MiniMaxH3Transformer3DModel"})
+            return MiniMaxH3VariantType.FL2VA
+        ref_transformer_config = mod.path / "transformer_ref" / "config.json"
+        if ref_transformer_config.exists():
+            raise_for_class_name(ref_transformer_config, {"MiniMaxH3Transformer3DModel"})
+            return MiniMaxH3VariantType.REF2VA
+        raise NotAMatchError("no transformer folder (`transformer/` or `transformer_ref/`)")
+
+
+def _has_minimax_h3_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Fingerprint for MiniMax H3 single-file transformer checkpoints (remote-code key layout,
+    as shipped by MiniMax's release and the Comfy-Org repacks, bf16 or int8 alike).
+
+    The joint audio+video patch projections are unique to H3 across every family probed here
+    (Wan keys on `patch_embedding`, FLUX on `double_blocks`, Z-Image on `cap_embedder`, ...);
+    the fused-qkv block key pins the remote-code layout the loader's converter expects.
+    """
+    return all(
+        k in state_dict for k in ("audio_patch_proj.weight", "video_patch_proj.weight", "blocks.0.attn.qkv_proj.weight")
+    )
+
+
+class Main_Checkpoint_MiniMaxH3_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for MiniMax H3 single-file transformer checkpoints (safetensors).
+
+    Covers MiniMax's single-file FL2VA transformer repacks (Comfy-Org and mirrors): bf16 or
+    Comfy ``int8_tensorwise``(+convrot) quantized, full or AdaLN-pruned ("adaln curves"). The
+    file holds ONLY the transformer - the text encoder, VAEs, tokenizer and processor must come
+    from an installed H3 diffusers-layout folder.
+
+    The FL2VA and Ref2VA task transformers are key-for-key (and, except the non-pruned
+    int8_convrot repacks, byte-size) indistinguishable, so the FILENAME is the variant
+    classifier and ``variant`` is the user-correctable override for renamed files (e.g.
+    re-uploads). A misclassified variant loads and runs but produces degraded output - FL2VA
+    expects no reference conditioning rows, Ref2VA expects them - which is why the override
+    exists rather than any attempt at content sniffing.
+    """
+
+    base: Literal[BaseModelType.MiniMaxH3] = Field(default=BaseModelType.MiniMaxH3)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: MiniMaxH3VariantType = Field()
+    pruned: bool = Field(description="Whether this is an AdaLN-pruned ('adaln curves') checkpoint.")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+        if not _has_minimax_h3_keys(state_dict):
+            raise NotAMatchError("state dict does not look like a MiniMax H3 transformer")
+
+        if _has_ggml_tensors(state_dict):
+            raise NotAMatchError("GGUF-quantized MiniMax H3 checkpoints are not supported yet")
+
+        variant = override_fields.pop("variant", None) or (
+            MiniMaxH3VariantType.REF2VA if "ref2va" in mod.path.name.lower() else MiniMaxH3VariantType.FL2VA
+        )
+        pruned = "adaln_t_table" in state_dict
+
+        return cls(**override_fields, variant=variant, pruned=pruned)
+
+
+# ---------------------------------------------------------------------------------------------
+# LTX-2
+# ---------------------------------------------------------------------------------------------
+
+LTX2_SUPPORTED_GENERATIONS = frozenset({"2.5"})
+"""The LTX-2 generations this version can run. 2.0/2.3 use a Gemma-3 encoder, bundled single files
+and different transformer switches; their files are recognised as LTX-2 and refused (an invalid
+match, so they are not registered as unknown models) rather than half-loaded."""
+
+
+def _ltx2_generation_from_keys(stripped_keys: set[str]) -> str | None:
+    """The generation a file's structure implies, for files whose header carries no version.
+
+    LTX-2.5 dropped the video feed-forward biases (2.0/2.3 keep them on both streams), and its video
+    VAE decoder gained a fourth upsampling stage (``up_blocks.8``; 2.0/2.3 stop at ``up_blocks.6``).
+    Either component identifies the generation on its own.
+    """
+    if "transformer_blocks.0.ff.net.0.proj.weight" in stripped_keys:
+        video_ff_bias = "transformer_blocks.0.ff.net.2.bias" in stripped_keys
+        audio_ff_bias = "transformer_blocks.0.audio_ff.net.2.bias" in stripped_keys
+        return "2.5" if (not video_ff_bias and audio_ff_bias) else None
+    for prefix in ("", "vae."):
+        if f"{prefix}decoder.up_blocks.0.res_blocks.0.conv1.conv.weight" in stripped_keys:
+            return "2.5" if f"{prefix}decoder.up_blocks.8.res_blocks.0.conv1.conv.weight" in stripped_keys else None
+    return None
+
+
+def _ltx2_generation_or_raise(mod: ModelOnDisk, path: Path, stripped_keys: set[str] | None) -> str:
+    """The generation a dating file belongs to: the header version when the file carries one, its
+    structure otherwise. An LTX-2 file of a generation this version cannot run is an *invalid* match:
+    recognised, and refused rather than registered as an unknown model."""
+    generation = ltx2_layout.generation_from_version(ltx2_layout.header_model_version(mod.metadata(path)))
+    if generation is None and stripped_keys is not None:
+        generation = _ltx2_generation_from_keys(stripped_keys)
+    if generation is None:
+        raise NotAMatchError(f"cannot tell which LTX-2 generation {path.name} belongs to")
+    if generation not in LTX2_SUPPORTED_GENERATIONS:
+        raise InvalidMatchError(
+            f"{path.name} is an LTX-{generation} file; only LTX-{'/'.join(sorted(LTX2_SUPPORTED_GENERATIONS))} "
+            "is supported in this version"
+        )
+    return generation
+
+
+class Main_Diffusers_LTX2_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+    """An LTX-2 folder of per-component single files in the official key layout.
+
+    This is how the ``DeepBeepMeep/LTX-2`` mirror distributes LTX-2.5: one safetensors per component
+    rather than a diffusers ``model_index.json`` tree. (The official ``Lightricks/LTX-2.5`` files use
+    the same layout for the VAEs, upsamplers and transformer, but keep the connectors inside the
+    transformer file and the text projection inside the text-encoder file; a folder of official files
+    therefore lacks a text-projection component in this version.) The folder is
+    the *component source* of a generation -- video VAE, audio VAE, vocoder, text projection, the two
+    text connectors and the latent upsamplers -- while the 22B transformer normally comes from a
+    single-file record selected in the model loader (bf16, int8-convrot or nvfp4). A folder that
+    also holds a transformer file is a full install.
+
+    ``components`` maps each role (see ``invokeai.backend.ltx2.checkpoint_layout``) to the file in the
+    folder that carries it, so the loader never re-classifies at generation time.
+    """
+
+    base: Literal[BaseModelType.LTX2] = Field(BaseModelType.LTX2)
+    variant: LTX2VariantType = Field()
+    generation: str = Field(description="The LTX-2 generation the folder's files belong to, e.g. '2.5'.")
+    components: dict[str, str] = Field(
+        default_factory=dict,
+        description="Component role -> weight file name inside the folder.",
+    )
+    components_only: bool = Field(
+        default=False,
+        description="Whether the folder holds only the shared components (VAEs, vocoder, connectors, "
+        "upsamplers) without a transformer - the transformer must then be supplied as a single-file "
+        "selection at generation time.",
+    )
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_dir(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        if any((mod.path / name).exists() for name in ("model_index.json", "modular_model_index.json")):
+            # The diffusers-layout repos (`Lightricks/LTX-2.5-Diffusers`) are a different install shape
+            # this version does not load; leave them unclaimed rather than half-matched.
+            raise NotAMatchError("diffusers-layout LTX-2 folders are not supported in this version")
+
+        components: dict[str, str] = {}
+        generations: dict[str, str] = {}
+        for weight_file in sorted(p for p in mod.path.glob("*.safetensors") if p.is_file()):
+            state_dict = mod.load_state_dict(weight_file)
+            keys = {k for k in state_dict if isinstance(k, str)}
+            roles = ltx2_layout.classify_roles(state_dict, mod.metadata(weight_file))
+            if not roles:
+                continue
+            for role in roles:
+                # First file wins for a duplicated role; sorted order keeps the choice deterministic.
+                components.setdefault(role, weight_file.name)
+            if roles & {ltx2_layout.ROLE_TRANSFORMER, ltx2_layout.ROLE_VIDEO_VAE}:
+                # The transformer and the video VAE are the two components whose structure dates
+                # the release; every such file is dated so a mixed folder is caught here, not at
+                # the strict load of whichever file sorted first.
+                stripped = {ltx2_layout.strip_transformer_prefix(k) for k in keys}
+                generations[weight_file.name] = _ltx2_generation_or_raise(mod, weight_file, stripped)
+
+        # The audio track is what distinguishes LTX-2 from every other video family: a folder without
+        # both VAEs is not an LTX-2 component source, whatever else it holds.
+        if ltx2_layout.ROLE_VIDEO_VAE not in components or ltx2_layout.ROLE_AUDIO_VAE not in components:
+            if ltx2_layout.ROLE_DIFFUSION_VIDEO_VAE in components:
+                raise NotAMatchError(
+                    "folder holds no LTX-2 video VAE + audio VAE pair (its video VAE is the diffusion-decoder "
+                    "variant, which this version does not use - install the conv video VAE)"
+                )
+            raise NotAMatchError("folder holds no LTX-2 video VAE + audio VAE pair")
+        if not generations:
+            raise NotAMatchError("cannot tell which LTX-2 generation the folder's files belong to")
+        if len(set(generations.values())) > 1:
+            raise InvalidMatchError(
+                "folder mixes LTX-2 generations: "
+                + ", ".join(f"{name} is {gen}" for name, gen in sorted(generations.items()))
+            )
+        generation = override_fields.pop("generation", None) or next(iter(generations.values()))
+        components = override_fields.pop("components", None) or components
+
+        transformer_file = components.get(ltx2_layout.ROLE_TRANSFORMER)
+        components_only = override_fields.pop("components_only", None)
+        if components_only is None:
+            components_only = transformer_file is None
+
+        variant = override_fields.pop("variant", None)
+        if variant is None:
+            variant = (
+                LTX2VariantType.Distilled
+                if transformer_file is not None and ltx2_layout.is_distilled_filename(transformer_file)
+                else LTX2VariantType.Dev
+            )
+
+        repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+        return cls(
+            **override_fields,
+            variant=LTX2VariantType(variant),
+            generation=generation,
+            components=components,
+            components_only=components_only,
+            repo_variant=repo_variant,
+        )
+
+
+class Main_Checkpoint_LTX2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """An LTX-2 single-file transformer (safetensors) in the official key layout.
+
+    Covers the bf16, Comfy ``int8_tensorwise``(+convrot) and ``nvfp4`` releases; the quantization
+    scheme is read from the file's own markers by the loader, not recorded here. The file may hold
+    only the transformer (the 2.5 releases) or bundle other components beside it (earlier
+    generations) -- either way everything else comes from an installed LTX-2 component folder.
+
+    Dev and Distilled transformers are key-for-key identical, so the FILENAME is the variant
+    classifier and ``variant`` is the user-correctable override for renamed files. A misclassified
+    variant runs but samples with the wrong recipe (guided schedule vs fixed distilled sigmas).
+    """
+
+    base: Literal[BaseModelType.LTX2] = Field(default=BaseModelType.LTX2)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    variant: LTX2VariantType = Field()
+    generation: str = Field(description="The LTX-2 generation the transformer belongs to, e.g. '2.5'.")
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+        raise_for_override_fields(cls, override_fields)
+
+        if mod.path.suffix.lower() != ".safetensors":
+            raise NotAMatchError(f"expected a .safetensors file, got {mod.path.suffix or '(no suffix)'}")
+
+        state_dict = mod.load_state_dict()
+        keys = {k for k in state_dict if isinstance(k, str)}
+        if ltx2_layout.ROLE_TRANSFORMER not in ltx2_layout.classify_roles(state_dict, mod.metadata()):
+            raise NotAMatchError("state dict does not look like an LTX-2 transformer")
+        if _has_ggml_tensors(state_dict):
+            raise NotAMatchError("GGUF-quantized LTX-2 checkpoints are not supported yet")
+
+        generation = override_fields.pop("generation", None) or _ltx2_generation_or_raise(
+            mod, mod.path, {ltx2_layout.strip_transformer_prefix(k) for k in keys}
+        )
+        variant = override_fields.pop("variant", None) or (
+            LTX2VariantType.Distilled if ltx2_layout.is_distilled_filename(mod.path.name) else LTX2VariantType.Dev
+        )
+        return cls(**override_fields, variant=LTX2VariantType(variant), generation=generation)
 
 
 class Main_Checkpoint_Krea2_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
@@ -1666,15 +2118,16 @@ class Main_Diffusers_QwenImage_Config(Diffusers_Config_Base, Main_Config_Base, C
         return QwenImageVariantType.Generate
 
 
-# ComfyUI single-file checkpoints prefix every transformer key with one of these.
-# The loaders strip them before instantiating the model (see `_strip_comfyui_prefix`
-# in the qwen_image loader); detection must strip them too so the two paths agree.
-_COMFYUI_KEY_PREFIXES = ("model.diffusion_model.", "diffusion_model.")
+# ComfyUI single-file checkpoints prefix every transformer key with one of these. The loaders strip
+# them before instantiating the model (`CheckpointPrefix`), and detection has to strip them too or
+# the two disagree: a file identification accepts, the loader then refuses with every key unexpected.
+# Shared rather than restated, which is what made them drift; the *operation* still differs, because
+# detection looks for evidence in individual names instead of normalising a whole file.
 
 
 def _strip_comfyui_key_prefix(key: str) -> str:
     """Strip a leading ComfyUI `model.diffusion_model.` / `diffusion_model.` prefix from a key."""
-    for prefix in _COMFYUI_KEY_PREFIXES:
+    for prefix in COMFYUI_KEY_PREFIXES:
         if key.startswith(prefix):
             return key[len(prefix) :]
     return key
@@ -1719,10 +2172,10 @@ def _infer_qwen_image_variant(sd: dict[str | int, Any], path: Path) -> QwenImage
 class Main_Checkpoint_QwenImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
     """Model config for Qwen Image single-file checkpoint models (safetensors, etc).
 
-    Covers both raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled checkpoints.
-    The loader dequantizes fp8 weights back to bf16 at load time; the
-    `default_settings.fp8_storage` toggle can then optionally re-cast to fp8 for
-    VRAM savings.
+    Covers raw bf16/fp16 checkpoints and ComfyUI-style fp8_scaled and nvfp4 checkpoints.
+    The loader keeps scaled fp8 weights when fp8 compute is available or the
+    `default_settings.fp8_storage` toggle is on (which also re-casts the rest to fp8),
+    and dequantizes them to bf16 at load time otherwise.
     """
 
     base: Literal[BaseModelType.QwenImage] = Field(default=BaseModelType.QwenImage)
@@ -2036,8 +2489,8 @@ def _detect_wan_expert(filename: str) -> Literal["high", "low", "none"]:
        both experts (``... I2V HIGH+LOW ...``, ``..._low_high_noise_...`` — both are
        real release patterns) or the name is simply ambiguous, so return 'none'
        rather than guess. For a LoRA 'none' means "apply to both", which is the
-       right answer for those; for a main it surfaces as a pairing error the user
-       can act on, which beats silently running one expert for both phases.
+       right answer for those; for a main it leaves the role to the explicit
+       transformer-slot wiring instead of guessing from an ambiguous name.
 
     Note the tiers are reconciled the same way. An earlier revision returned on the
     first ``noise`` marker it saw, which meant the two spellings of the same
@@ -2138,10 +2591,9 @@ def _resolve_wan_expert(
     corrected by renaming the file and re-importing.
 
     TI2V-5B is a single-transformer model, so the expert is meaningless there and is
-    pinned to 'none'. That is not cosmetic: the frontend's low-noise expert picker
-    selects on ``expert == 'low'``, so a TI2V-5B file whose name happens to contain a
-    bare ``low`` (``...-5B-lowVRAM``, ``...-Turbo-lowSteps``) would otherwise be
-    offered as an A14B partner expert it can never be.
+    pinned to 'none'. That keeps the record neutral for every expert-aware consumer;
+    the frontend's low-noise partner picker also excludes TI2V-5B structurally, even
+    if a legacy record carries a misleading ``low`` tag.
 
     Metadata is consulted only as a fallback, not as the primary signal, even though
     it is the more trustworthy of the two. Renaming a file is the one lever a user
@@ -2449,6 +2901,11 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
 
     base: Literal[BaseModelType.Anima] = Field(default=BaseModelType.Anima)
     format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+    # Required, and therefore not part of the discriminator tag. A default would put it into the tag
+    # (`Config_Base.get_tag`), which a stored record's dict does not carry, and every Anima record
+    # would stop deserializing. Records written before the field existed get it from
+    # `migration_2026_10_01_add_anima_variant`.
+    variant: AnimaVariantType = Field(description="Which text encoders the model is conditioned on.")
 
     @classmethod
     def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
@@ -2457,14 +2914,37 @@ class Main_Checkpoint_Anima_Config(Checkpoint_Config_Base, Main_Config_Base, Con
         raise_for_override_fields(cls, override_fields)
 
         cls._validate_looks_like_anima_model(mod)
+        cls._reject_unbundled_qwen35_dit(mod)
 
-        return cls(**override_fields)
+        variant = override_fields.pop("variant", None) or _get_anima_variant(mod.load_state_dict())
+        return cls(**override_fields, variant=variant)
 
     @classmethod
     def _validate_looks_like_anima_model(cls, mod: ModelOnDisk) -> None:
         has_anima_keys = _has_anima_keys(mod.load_state_dict())
         if not has_anima_keys:
             raise NotAMatchError("state dict does not look like an Anima model")
+
+    @classmethod
+    def _reject_unbundled_qwen35_dit(cls, mod: ModelOnDisk) -> None:
+        """Refuse the Anima-3.8B v1.0 DiT, which needs an adapter file this release does not load.
+
+        v1.0 trained 12 inserted blocks jointly with a separate Qwen3.5 cross-attention adapter; on its
+        own it loads cleanly as a 52-block Anima and generates with a conditioning signal its new
+        blocks were never trained without. v1.1 bundles a newer connector into the checkpoint and is
+        the release path, so the v1.0 file is refused here rather than installed as something it is
+        not. Its header names the joint training; a plain depth-expanded finetune carries no such key.
+        """
+        metadata = mod.metadata()
+        if "qwen35_joint_dit_blocks" not in metadata:
+            return
+        if _get_anima_variant(mod.load_state_dict()) is AnimaVariantType.Qwen35:
+            return
+        raise InvalidMatchError(
+            "This is the Anima-3.8B v1.0 transformer, which only works together with its separate "
+            "Qwen3.5 adapter file. Install the Anima-3.8B v1.1 checkpoint instead "
+            "(Anima-3.8B-v1.1.safetensors), which bundles its connector."
+        )
 
 
 class Main_SDNQ_FLUX_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
@@ -3279,7 +3759,52 @@ class Main_Diffusers_ErnieImage_Config(Diffusers_Config_Base, Main_Config_Base, 
         )
 
 
-# NOTE: There is deliberately no `Main_Checkpoint_ErnieImage_Config`. Single-file ERNIE-Image
-# checkpoints cannot be loaded yet (only the full diffusers pipeline layout is supported), and a
-# config that matches on install but raises on first generate would leave a permanently broken
-# entry in the Model Manager. Add it together with the checkpoint loader.
+def _has_ernie_image_keys(state_dict: dict[str | int, Any]) -> bool:
+    """Check if state dict contains ERNIE-Image transformer keys.
+
+    The single-file release carries the same keys as the diffusers checkpoint. Four of them
+    together are the fingerprint: `x_embedder.proj` (the patch projection, a conv), `text_proj` (the
+    Mistral3 conditioning projection), the model-level `adaLN_modulation.1` and `final_norm.linear`,
+    the output modulation no sibling architecture spells that way. Anima also has an
+    `x_embedder`, but it is identified by its `llm_adapter`, which ERNIE-Image does not have; the
+    text projection keeps this clear of Wan (`text_embedding.0` / `condition_embedder`), Qwen Image
+    (`txt_in`/`img_in`) and Z-Image (`cap_embedder`).
+    """
+    keys = state_dict.keys()
+    return all(
+        key in keys
+        for key in (
+            "x_embedder.proj.weight",
+            "text_proj.weight",
+            "adaLN_modulation.1.weight",
+            "final_norm.linear.weight",
+        )
+    )
+
+
+class Main_Checkpoint_ErnieImage_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+    """Model config for ERNIE-Image single-file checkpoint models (safetensors).
+
+    ERNIE-Image and ERNIE-Image-Turbo share an architecture and a key layout, so a single file
+    cannot be told apart from its weights. The architecture's default settings pick the Turbo
+    numbers from the model name, exactly as they do for the diffusers pipelines.
+    """
+
+    base: Literal[BaseModelType.ErnieImage] = Field(default=BaseModelType.ErnieImage)
+    format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+
+    @classmethod
+    def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+        raise_if_not_file(mod)
+
+        raise_for_override_fields(cls, override_fields)
+
+        state_dict = mod.load_state_dict()
+
+        if not _has_ernie_image_keys(state_dict):
+            raise NotAMatchError("state dict does not look like an ERNIE-Image model")
+
+        if _has_ggml_tensors(state_dict):
+            raise NotAMatchError("state dict looks like GGUF quantized")
+
+        return cls(**override_fields)

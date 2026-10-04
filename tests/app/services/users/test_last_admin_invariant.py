@@ -23,6 +23,7 @@ from logging import Logger
 import pytest
 
 from invokeai.app.services.auth.password_utils import hash_password
+from invokeai.app.services.shared.media_references import create_media_references_table
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import (
     SYSTEM_USER_ID,
@@ -53,6 +54,8 @@ def db() -> SqliteDatabase:
             token_epoch INTEGER NOT NULL DEFAULT 0
         );
     """)
+    # Deleting an account also drops the media references its documents held.
+    create_media_references_table(db._conn.cursor())
     db._conn.commit()
     return db
 

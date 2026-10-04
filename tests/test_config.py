@@ -90,6 +90,17 @@ def test_wan_memory_optimization_defaults_to_false_and_loads_from_yaml(tmp_path:
     assert load_and_migrate_config(temp_config_file).wan_memory_optimization is True
 
 
+def test_db_synchronous_defaults_to_full_and_loads_from_yaml(tmp_path: Path, patch_rootdir: None) -> None:
+    # The default must stay `full`: anything else would quietly reduce durability for every existing
+    # install on upgrade.
+    assert InvokeAIAppConfig().db_synchronous == "full"
+
+    temp_config_file = tmp_path / "temp_invokeai.yaml"
+    temp_config_file.write_text('schema_version: "4.0.3"\ndb_synchronous: normal\n')
+
+    assert load_and_migrate_config(temp_config_file).db_synchronous == "normal"
+
+
 def test_read_config_from_file(tmp_path: Path, patch_rootdir: None):
     """Test reading configuration from a file."""
     temp_config_file = tmp_path / "temp_invokeai.yaml"

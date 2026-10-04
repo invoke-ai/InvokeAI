@@ -32,6 +32,15 @@ on:
         type: boolean
         default: true
 
+# One run per pull request: a new push cancels the superseded run. The PR number is used rather
+# than the head branch, which two forks can share. Pushes to main and merge groups fall back to
+# the run id and never cancel each other. The group names the workflow literally
+# because `github.workflow` is the caller's name inside a reusable workflow, and release.yml calls
+# several of these at once.
+concurrency:
+  group: python-checks-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   python-checks:
     env:
@@ -55,10 +64,11 @@ jobs:
         with:
           files_yaml: |
             python:
+              # ruff config and the classifier check both read pyproject.toml.
               - 'pyproject.toml'
-              - 'invokeai/**'
-              - '!invokeai/frontend/web/**'
-              - 'tests/**'
+              - '.github/workflows/python-checks.yml'
+              # ruff lints every tracked .py file from the repository root, wherever it lives.
+              - '**/*.py'
 
       - name: setup uv
         if: ${{ steps.changed-files.outputs.python_any_changed == 'true' || inputs.always_run == true }}

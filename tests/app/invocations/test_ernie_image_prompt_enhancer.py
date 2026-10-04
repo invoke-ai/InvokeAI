@@ -15,7 +15,7 @@ import pytest
 
 def test_prompt_enhancer_is_not_idle_gpu_offloadable():
     """The whole point of the split. Marking this node would reintroduce the stall the split fixes."""
-    from invokeai.app.invocations.ernie_image_prompt_enhancer import ErnieImagePromptEnhancerInvocation
+    from invokeai.app.invocations.ernie_image.ernie_image_prompt_enhancer import ErnieImagePromptEnhancerInvocation
 
     assert ErnieImagePromptEnhancerInvocation.idle_gpu_offloadable is False
 
@@ -23,7 +23,7 @@ def test_prompt_enhancer_is_not_idle_gpu_offloadable():
 def test_text_encoder_no_longer_carries_enhancer_fields():
     """If the enhancer is ever merged back into the encoder, the encoder's `idle_gpu_offloadable=True`
     silently becomes wrong again — nothing else would fail."""
-    from invokeai.app.invocations.ernie_image_text_encoder import ErnieImageTextEncoderInvocation
+    from invokeai.app.invocations.text_encoder.ernie_image_text_encoder import ErnieImageTextEncoderInvocation
 
     fields = set(ErnieImageTextEncoderInvocation.model_fields)
     assert ErnieImageTextEncoderInvocation.idle_gpu_offloadable is True
@@ -35,7 +35,7 @@ def test_text_encoder_no_longer_carries_enhancer_fields():
 def test_prompt_passes_through_when_no_enhancer_is_connected():
     """The loader emits `prompt_enhancer=None` for a pipeline that ships no PE submodel. That must
     not load a model or fail — the graph builder still wires this node when the toggle is on."""
-    from invokeai.app.invocations.ernie_image_prompt_enhancer import ErnieImagePromptEnhancerInvocation
+    from invokeai.app.invocations.ernie_image.ernie_image_prompt_enhancer import ErnieImagePromptEnhancerInvocation
 
     invocation = ErnieImagePromptEnhancerInvocation.model_construct(prompt="a prompt", prompt_enhancer=None)
     context = MagicMock()
@@ -54,8 +54,8 @@ def test_generation_is_capped_and_cancelable(monkeypatch):
       not a bound.
     - a `StoppingCriteria` is passed, so a cancel takes effect mid-rewrite rather than after it.
     """
-    import invokeai.app.invocations.ernie_image_prompt_enhancer as pe_module
-    from invokeai.app.invocations.ernie_image_prompt_enhancer import (
+    import invokeai.app.invocations.ernie_image.ernie_image_prompt_enhancer as pe_module
+    from invokeai.app.invocations.ernie_image.ernie_image_prompt_enhancer import (
         PE_MAX_NEW_TOKENS,
         ErnieImagePromptEnhancerInvocation,
     )
@@ -101,8 +101,8 @@ def test_generation_is_capped_and_cancelable(monkeypatch):
 def test_cancel_discards_the_partial_rewrite(monkeypatch):
     """The stopping criterion makes `generate()` return a truncated sequence. Encoding that would
     silently generate an image from half a prompt, so the node must raise instead."""
-    import invokeai.app.invocations.ernie_image_prompt_enhancer as pe_module
-    from invokeai.app.invocations.ernie_image_prompt_enhancer import ErnieImagePromptEnhancerInvocation
+    import invokeai.app.invocations.ernie_image.ernie_image_prompt_enhancer as pe_module
+    from invokeai.app.invocations.ernie_image.ernie_image_prompt_enhancer import ErnieImagePromptEnhancerInvocation
     from invokeai.app.services.session_processor.session_processor_common import CanceledException
 
     invocation = ErnieImagePromptEnhancerInvocation.model_construct(

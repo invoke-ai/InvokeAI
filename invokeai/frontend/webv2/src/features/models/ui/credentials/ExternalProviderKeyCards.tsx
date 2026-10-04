@@ -1,0 +1,288 @@
+import type { ExternalProviderConfig } from '@features/models/data/api';
+/* eslint-disable react-perf/jsx-no-jsx-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-object-as-prop */
+import type { ElementType } from 'react';
+
+import { HStack, Input, Stack, Switch, Text } from '@chakra-ui/react';
+import {
+  clearExternalProviderConfig,
+  ensureExternalProvidersLoaded,
+  saveExternalProviderConfig,
+  useExternalProvidersSelector,
+} from '@features/models/data/externalProvidersStore';
+import { refreshInstalls } from '@features/models/data/installsStore';
+import { refreshStartersIfLoaded } from '@features/models/data/startersStore';
+import { KeyCardShell } from '@features/models/ui/credentials/KeyCardShell';
+import { clearHighlightedProvider, useModelsUiSelector } from '@features/models/ui/uiStore';
+import { useMountEffect } from '@platform/react/useMountEffect';
+import { useScopedAction } from '@platform/react/useScopedAction';
+import { assertAccountScopeCurrent, type AccountScope } from '@platform/state/accountLifecycle';
+import { getApiErrorMessage } from '@platform/transport/http';
+import { Button } from '@platform/ui';
+import { AlibabaCloudIcon, ByteDanceIcon, GoogleGeminiIcon } from '@platform/ui/VendoredIcon';
+import { BotIcon, HexagonIcon } from 'lucide-react';
+import { useCallback, useState } from 'react';
+import { useTranslation } from 'react-i18next';
+
+interface ProviderPresentation {
+  icon: ElementType;
+  /** Literal key-shape hint; `placeholderKey` (an i18n key) wins when set. */
+  placeholder?: string;
+  placeholderKey?: string;
+  title: string;
+}
+
+const EXTERNAL_PROVIDER_PRESENTATION: Record<string, ProviderPresentation> = {
+  alibabacloud: { icon: AlibabaCloudIcon, placeholder: 'sk-…', title: 'Alibaba Cloud (Qwen)' },
+  gemini: { icon: GoogleGeminiIcon, placeholder: 'AIza…', title: 'Google Gemini' },
+  openai: { icon: BotIcon, placeholder: 'sk-…', title: 'OpenAI' },
+  seedream: { icon: ByteDanceIcon, placeholderKey: 'models.bytePlusApiKeyPlaceholder', title: 'Seedream' },
+};
+
+/** One key card per provider the backend reports, from the shared store. */
+export const ExternalProviderKeyCards = ({ onError }: { onError: (title: string, message: string) => void }) => {
+  const { t } = useTranslation();
+  const configs = useExternalProvidersSelector((snapshot) => snapshot.configs);
+  const highlightProviderId = useModelsUiSelector((snapshot) => snapshot.highlightProviderId);
+  const loadError = useExternalProvidersSelector((snapshot) => snapshot.error);
+  const status = useExternalProvidersSelector((snapshot) => snapshot.status);
+
+  useMountEffect(() => {
+    ensureExternalProvidersLoaded().catch(() => {
+      // The snapshot records the failure; rendered inline below.
+    });
+  });
+
+  // Only a settled failure renders as an error — a retry in flight after a
+  // remount shows nothing rather than the previous attempt's stale message.
+  if (status === 'error') {
+    return (
+      <Text color="fg.error" fontSize="xs">
+        {t('models.externalProvidersUnavailable', { error: loadError ?? t('models.failedToLoadExternalProviders') })}
+      </Text>
+    );
+  }
+
+  // Show an explicit no-provider state after loading; suppress loading flicker.
+  if (status === 'loaded' && (configs ?? []).length === 0) {
+    return (
+      <Text color="fg.subtle" fontSize="xs">
+        {t('models.noExternalProviders')}
+      </Text>
+    );
+  }
+
+  return (
+    <>
+      {(configs ?? []).map((config) => {
+        const presentation = EXTERNAL_PROVIDER_PRESENTATION[config.provider_id] ?? {
+          icon: HexagonIcon,
+          title: config.provider_id,
+        };
+        const placeholder = presentation.placeholderKey
+          ? t(presentation.placeholderKey)
+          : (presentation.placeholder ?? t('models.apiKey'));
+
+        return (
+          <ExternalProviderKeyCard
+            config={config}
+            key={config.provider_id}
+            description={t('models.externalProviderKeyDescription')}
+            icon={presentation.icon}
+            isHighlighted={config.provider_id === highlightProviderId}
+            placeholder={placeholder}
+            title={presentation.title}
+            onError={(message) => onError(presentation.title, message)}
+          />
+        );
+      })}
+    </>
+  );
+};
+
+const ExternalProviderKeyCard = ({
+  config,
+  description,
+  icon,
+  isHighlighted,
+  onError,
+  placeholder,
+  title,
+}: {
+  config: ExternalProviderConfig;
+  description: string;
+  icon: ElementType;
+  isHighlighted: boolean;
+  onError: (message: string) => void;
+  placeholder: string;
+  title: string;
+}) => {
+  const { t } = useTranslation();
+  // Consume the reveal request once; keep the highlight local until the Keys tab unmounts.
+  const [isRevealed, setIsRevealed] = useState(false);
+  // A callback ref rather than an effect: the provider list loads async, so
+  // the card can mount well after the request, and this fires exactly when the
+  // node to scroll finally exists.
+  const revealRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (!node || !isHighlighted) {
+        return;
+      }
+
+      node.scrollIntoView({ block: 'nearest' });
+      setIsRevealed(true);
+      clearHighlightedProvider();
+    },
+    [isHighlighted]
+  );
+  const [apiKeyDraft, setApiKeyDraft] = useState('');
+  const [baseUrlDraft, setBaseUrlDraft] = useState(config.base_url ?? '');
+  const [overrideBaseUrl, setOverrideBaseUrl] = useState(config.base_url !== null);
+  const { isBusy, run } = useScopedAction();
+
+  const hasApiKeyDraft = apiKeyDraft.trim().length > 0;
+  const hasBaseUrlChange = overrideBaseUrl ? baseUrlDraft.trim() !== (config.base_url ?? '') : config.base_url !== null;
+
+  const runProviderAction = (
+    action: () => Promise<ExternalProviderConfig>,
+    onSuccess?: (next: ExternalProviderConfig, owner: AccountScope) => void
+  ): Promise<boolean> =>
+    run(
+      async (owner) => {
+        const nextConfig = await action();
+
+        assertAccountScopeCurrent(owner);
+        setApiKeyDraft('');
+        setBaseUrlDraft(nextConfig.base_url ?? '');
+        setOverrideBaseUrl(nextConfig.base_url !== null);
+        onSuccess?.(nextConfig, owner);
+      },
+      (_message, error) => onError(getApiErrorMessage(error, t('common.somethingWentWrong')))
+    );
+
+  const handleSave = async () => {
+    const apiKey = apiKeyDraft.trim();
+    const baseUrl = baseUrlDraft.trim();
+    const nextConfig: { api_key?: string; base_url?: string | null } = {};
+
+    if (apiKey.length > 0) {
+      nextConfig.api_key = apiKey;
+    }
+
+    if (!overrideBaseUrl && config.base_url !== null) {
+      nextConfig.base_url = '';
+    } else if (overrideBaseUrl && baseUrl !== (config.base_url ?? '')) {
+      nextConfig.base_url = baseUrl;
+    }
+
+    if (!nextConfig.api_key && nextConfig.base_url === undefined) {
+      return;
+    }
+
+    const apiKeyWasSet = nextConfig.api_key !== undefined;
+
+    await runProviderAction(
+      () => saveExternalProviderConfig(config.provider_id, nextConfig),
+      (next, owner) => {
+        if (apiKeyWasSet && next.api_key_configured) {
+          // The backend queues this provider's external starter models on
+          // key-set; pull the new jobs and refresh starters so its rows flip to
+          // Installed without an app restart.
+          void refreshInstalls(owner);
+          refreshStartersIfLoaded();
+        }
+      }
+    );
+  };
+
+  const canClear = config.api_key_configured || config.base_url !== null;
+
+  return (
+    <KeyCardShell
+      ref={revealRef}
+      description={description}
+      icon={icon}
+      isHighlighted={isRevealed}
+      status={{
+        label: config.api_key_configured ? t('models.keyStatus.configured') : t('models.keyStatus.unknown'),
+        palette: config.api_key_configured ? 'green' : 'gray',
+      }}
+      title={title}
+    >
+      <Stack gap="2">
+        <HStack gap="1.5">
+          <Input
+            aria-label={t('models.apiKeyFor', { title })}
+            disabled={isBusy}
+            placeholder={config.api_key_configured ? t('models.apiKeyConfigured') : placeholder}
+            type="password"
+            value={apiKeyDraft}
+            onChange={(event) => setApiKeyDraft(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                void handleSave();
+              }
+            }}
+          />
+        </HStack>
+        <Switch.Root
+          checked={overrideBaseUrl}
+          disabled={isBusy}
+          onCheckedChange={(event) => {
+            const checked = event.checked === true;
+
+            setOverrideBaseUrl(checked);
+
+            if (!checked) {
+              setBaseUrlDraft('');
+            }
+          }}
+        >
+          <Switch.HiddenInput />
+          <Switch.Control _checked={{ bg: 'accent.solid' }}>
+            <Switch.Thumb />
+          </Switch.Control>
+          <Switch.Label color="fg.muted" fontSize="xs">
+            {t('models.overrideBaseUrl')}
+          </Switch.Label>
+        </Switch.Root>
+        {overrideBaseUrl ? (
+          <Input
+            aria-label={t('models.baseUrlFor', { title })}
+            disabled={isBusy}
+            placeholder="https://api.example.com"
+            value={baseUrlDraft}
+            onChange={(event) => setBaseUrlDraft(event.currentTarget.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                void handleSave();
+              }
+            }}
+          />
+        ) : null}
+      </Stack>
+
+      <HStack gap="1.5">
+        <Button
+          disabled={(!hasApiKeyDraft && !hasBaseUrlChange) || isBusy}
+          loading={isBusy}
+          variant="solid"
+          onClick={() => void handleSave()}
+        >
+          {t('common.save')}
+        </Button>
+        {canClear ? (
+          <Button
+            disabled={isBusy}
+            size="lg"
+            variant="ghost"
+            onClick={() => void runProviderAction(() => clearExternalProviderConfig(config.provider_id))}
+          >
+            {t('common.clear')}
+          </Button>
+        ) : null}
+      </HStack>
+    </KeyCardShell>
+  );
+};

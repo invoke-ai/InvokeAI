@@ -7,6 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+from invokeai.backend.quantization.fp8_scaled import WEIGHT_SCALE_SUFFIXES
 from invokeai.backend.util.state_dict_loading import log_unexpected_keys
 
 if TYPE_CHECKING:
@@ -159,6 +160,34 @@ def quantize_weight_to_fp8(
     scale = amax / FP8_E4M3_MAX
     q = (w / scale).clamp(-FP8_E4M3_MAX, FP8_E4M3_MAX).to(FP8_WEIGHT_DTYPE)
     return q, scale.squeeze(1).to(torch.float32)
+
+
+def reject_scale_spellings_this_path_drops(state_dict: dict[str, torch.Tensor], what: str) -> None:
+    """Refuse a weight scale spelled in a way this path reads nothing from.
+
+    Everything here keys on ``FP8_SCALE_SUFFIX`` and only that: :func:`swap_linears_to_fp8` decides
+    a layer is quantized by it, and :func:`load_fp8_state_dict` keeps a float32 tensor by it. The
+    other spelling ComfyUI writes, ``.scale_weight``, therefore selects nothing -- the layer stays
+    an ordinary ``nn.Linear``, the fp8 codes are copied into it *as the weight*, and the scale is
+    reported at DEBUG as an unexpected key. The load succeeds and every affected weight is off by
+    ``1/weight_scale``, which for a per-row scale of ``amax/448`` is three to four orders of
+    magnitude on a typical layer.
+
+    Refusing rather than reading the second spelling, because a file that uses it is a ComfyUI
+    scaled-fp8 build and not this path's private layout: supporting those is a different piece of
+    work, with its own markers and its own per-layer flags, and this error is what would say it is
+    needed. The suffixes come from the shared tuple rather than a literal, though with two spellings
+    in it today no test can tell the two apart.
+    """
+    unread = tuple(suffix for suffix in WEIGHT_SCALE_SUFFIXES if suffix != FP8_SCALE_SUFFIX)
+    carried = sorted(key for key in state_dict if key.endswith(unread))
+    if carried:
+        raise ValueError(
+            f"{what} carries {len(carried)} weight scale(s) spelled `{unread[0]}` (e.g. "
+            f"{', '.join(carried[:3])}), and this loader reads only `{FP8_SCALE_SUFFIX}`. They would be "
+            "dropped and their layers left holding raw fp8 codes -- a model that loads and generates "
+            "noise. Use the unquantized build, or an Ideogram 4 build quantized by InvokeAI."
+        )
 
 
 def is_fp8_state_dict(state_dict: dict[str, torch.Tensor]) -> bool:

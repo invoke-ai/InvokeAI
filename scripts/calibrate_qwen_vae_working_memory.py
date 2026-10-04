@@ -47,6 +47,8 @@ from pathlib import Path
 import torch
 from diffusers.models.autoencoders.autoencoder_kl_qwenimage import AutoencoderKLQwenImage
 
+from invokeai.backend.util.attention import install_rocm_sdpa_guard
+
 LATENT_SCALE_FACTOR = 8
 
 # (height, width) pixel-space resolutions. Squares to test linearity in area, plus non-square
@@ -142,6 +144,11 @@ def _build_input(operation: str, h: int, w: int, z_dim: int, dtype: torch.dtype)
 @torch.inference_mode()
 def measure_one(vae_path: str, operation: str, h: int, w: int, dtype: torch.dtype) -> dict:
     """Measure peak reserved-memory growth for a single decode/encode. Runs in a child process."""
+    # The production path on ROCm runs attention through this guard, which bounds the score matrix a
+    # math-kernel call materializes. Measuring without it fits the constants to a peak the app never
+    # reaches. A no-op on every other build.
+    install_rocm_sdpa_guard()
+
     vae = _load_vae(vae_path, dtype)
     vae.to("cuda")
     vae.disable_tiling()  # Qwen invocations never tile; match that.
