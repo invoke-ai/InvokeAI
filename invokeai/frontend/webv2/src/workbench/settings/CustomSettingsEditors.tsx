@@ -129,10 +129,10 @@ const DeveloperNamespaceCheckbox = ({
   );
 
   return (
-    <Checkbox.Root checked={checked} size="sm" onCheckedChange={handleCheckedChange}>
+    <Checkbox.Root checked={checked} onCheckedChange={handleCheckedChange}>
       <Checkbox.HiddenInput />
       <Checkbox.Control />
-      <Checkbox.Label color="fg.muted" fontSize="xs">
+      <Checkbox.Label color="fg.muted" fontSize="md">
         {formatSettingLabel(namespace)}
       </Checkbox.Label>
     </Checkbox.Root>
@@ -146,12 +146,12 @@ export const LoggingResetSettings = () => {
 
   return (
     <HStack gap="3">
-      <Button disabled={isDefault} size="sm" variant="outline" onClick={reset}>
+      <Button disabled={isDefault} size="lg" variant="outline" onClick={reset}>
         <RotateCcwIcon />
         {t('settings.catalog.resetLoggingDefaults')}
       </Button>
       {isDefault ? (
-        <Text color="fg.muted" fontSize="xs">
+        <Text color="fg.muted" fontSize="md">
           {t('settings.catalog.loggingDefaultsActive')}
         </Text>
       ) : null}
@@ -191,13 +191,13 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
     <Stack gap="3">
       <HStack gap="2" wrap="wrap">
         {commands ? (
-          <Button size="sm" variant="outline" onClick={resetLayout}>
+          <Button size="lg" variant="outline" onClick={resetLayout}>
             <RotateCcwIcon />
             Reset layout
           </Button>
         ) : null}
         {onReveal ? (
-          <Button size="sm" variant="outline" onClick={openIntermediates}>
+          <Button size="lg" variant="outline" onClick={openIntermediates}>
             <BrushCleaningIcon />
             {t('settings.catalog.manageIntermediates')}
           </Button>
@@ -205,7 +205,7 @@ export const WorkspaceSettings = ({ onReveal }: Pick<SettingFieldProps, 'onRevea
         <Button
           borderColor="border.emphasized"
           color="fg.error"
-          size="sm"
+          size="lg"
           variant="outline"
           _hover={DANGER_BUTTON_HOVER_STYLES}
           onClick={openClearConfirm}
@@ -290,13 +290,13 @@ const CustomSettingField = ({ field, onReveal }: SettingFieldProps) => {
     <Stack gap="3" w="full">
       <Stack gap="1">
         <HStack gap="2">
-          <Text color="fg" fontSize="sm" fontWeight="500">
+          <Text color="fg" fontSize="lg" fontWeight="500">
             {resolveSettingsText(field.label, t)}
           </Text>
           {isModified ? <ModifiedSettingIndicator label={resolveSettingsText(field.label, t)} /> : null}
         </HStack>
         {field.description ? (
-          <Text color="fg.muted" fontSize="xs">
+          <Text color="fg.muted" fontSize="md">
             {resolveSettingsText(field.description, t)}
           </Text>
         ) : null}

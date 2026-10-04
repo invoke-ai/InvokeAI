@@ -28,10 +28,10 @@ export interface OperationPanelProps {
 
 const Stat = ({ label, value }: { label: string; value: string }) => (
   <Stack gap="0" minW="4rem">
-    <Text fontSize="xs" fontVariantNumeric="tabular-nums" fontWeight="600" lineHeight="shorter">
+    <Text fontSize="md" fontVariantNumeric="tabular-nums" fontWeight="600" lineHeight="shorter">
       {value}
     </Text>
-    <Text color="fg.muted" fontSize="2xs" lineHeight="shorter">
+    <Text color="fg.muted" fontSize="xs" lineHeight="shorter">
       {label}
     </Text>
   </Stack>
@@ -84,18 +84,18 @@ export const OperationPanel = ({
 
   if (lookupError) {
     return (
-      <Alert.Root size="sm" status="error" variant="surface">
+      <Alert.Root status="error" variant="surface">
         <Alert.Indicator />
         <Alert.Content>
           <Alert.Title>{t('intermediates.operation.lookupFailed')}</Alert.Title>
           <Alert.Description>{lookupError}</Alert.Description>
           <HStack gap="2" mt="2">
             {isLookupRetryable ? (
-              <Button loading={isRefetching} size="2xs" variant="outline" onClick={onRefetch}>
+              <Button loading={isRefetching} size="sm" variant="outline" onClick={onRefetch}>
                 {t('common.retry')}
               </Button>
             ) : null}
-            <Button size="2xs" variant="ghost" onClick={onDismiss}>
+            <Button size="sm" variant="ghost" onClick={onDismiss}>
               {t('intermediates.operation.dismiss')}
             </Button>
           </HStack>
@@ -106,7 +106,7 @@ export const OperationPanel = ({
 
   if (!operation) {
     return isLoading ? (
-      <Text color="fg.muted" fontSize="xs">
+      <Text color="fg.muted" fontSize="md">
         {t('intermediates.operation.pending')}
       </Text>
     ) : null;
@@ -121,7 +121,6 @@ export const OperationPanel = ({
 
   return (
     <Alert.Root
-      size="sm"
       status={operation.status === 'failed' ? 'error' : operation.status === 'completed' ? 'success' : 'info'}
       variant="surface"
     >
@@ -136,20 +135,19 @@ export const OperationPanel = ({
                   aria-label={statusLabel}
                   colorPalette="accent"
                   max={Math.max(total, 1)}
-                  size="xs"
                   value={processed}
                 >
                   <Progress.Track>
                     <Progress.Range />
                   </Progress.Track>
                 </Progress.Root>
-                <Text color="fg.muted" fontSize="2xs">
+                <Text color="fg.muted" fontSize="xs">
                   {t('intermediates.operation.progress', { done: formatCount(processed), total: formatCount(total) })}
                 </Text>
               </Stack>
             )}
             {operation.error ? (
-              <Text fontSize="xs" fontWeight="600">
+              <Text fontSize="md" fontWeight="600">
                 {operation.error}
               </Text>
             ) : null}
@@ -172,18 +170,18 @@ export const OperationPanel = ({
               <Stat label={t('intermediates.operation.reclaimed')} value={formatBytes(progress.reclaimedBytes)} />
             </HStack>
             {progress.pendingDiskCleanup > 0 ? (
-              <Text color="fg.muted" fontSize="2xs">
+              <Text color="fg.muted" fontSize="xs">
                 {t('intermediates.operation.pendingDiskNote')}
               </Text>
             ) : null}
             {settled ? (
               <HStack gap="2">
                 {canRunOperationAgain(operation) ? (
-                  <Button size="2xs" variant="outline" onClick={(event) => onRunAgain(event.currentTarget)}>
+                  <Button size="sm" variant="outline" onClick={(event) => onRunAgain(event.currentTarget)}>
                     {t('intermediates.operation.runAgain')}
                   </Button>
                 ) : null}
-                <Button size="2xs" variant="ghost" onClick={onDismiss}>
+                <Button size="sm" variant="ghost" onClick={onDismiss}>
                   {t('intermediates.operation.dismiss')}
                 </Button>
               </HStack>

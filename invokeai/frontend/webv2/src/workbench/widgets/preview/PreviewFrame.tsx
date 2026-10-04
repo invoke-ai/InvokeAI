@@ -877,7 +877,6 @@ const PreviewVideo = ({
             // is the native control bar.
             insetInlineStart="50%"
             position="absolute"
-            size="xs"
             title={t('widgets.preview.dragVideo')}
             top="2"
             touchAction="none"
@@ -938,10 +937,10 @@ const PreviewVideo = ({
               position="absolute"
               zIndex="1"
             >
-              <Text color="white" fontSize="sm" fontWeight="semibold">
+              <Text color="white" fontSize="lg" fontWeight="semibold">
                 {t('widgets.preview.videoFailed')}
               </Text>
-              <Button aria-label={t('widgets.preview.videoRetry')} size="sm" onClick={handleRetry}>
+              <Button aria-label={t('widgets.preview.videoRetry')} size="lg" onClick={handleRetry}>
                 {t('widgets.preview.videoRetry')}
               </Button>
             </Flex>

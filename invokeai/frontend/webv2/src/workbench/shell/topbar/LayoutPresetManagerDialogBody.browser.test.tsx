@@ -1,4 +1,5 @@
 import { ChakraProvider } from '@chakra-ui/react';
+import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { system } from '@theme/system';
 import { createWorkbenchStore, type WorkbenchInternalStore } from '@workbench/workbenchStore';
 import { act, useSyncExternalStore } from 'react';
@@ -30,11 +31,15 @@ vi.mock('@workbench/WorkbenchContext', () => ({
   ) => selector(useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot)),
 }));
 
+import { LayoutPresetManagerDialog } from './LayoutPresetManagerDialog';
 import { LayoutPresetManagerDialogBody } from './LayoutPresetManagerDialogBody';
+import { closeLayoutPresetManager, openLayoutPresetManager } from './layoutPresetManagerStore';
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+const noop = () => {};
 
 const renderManager = async () => {
   host = document.createElement('div');
@@ -44,7 +49,7 @@ const renderManager = async () => {
   await act(async () => {
     root?.render(
       <ChakraProvider value={system}>
-        <LayoutPresetManagerDialogBody />
+        <LayoutPresetManagerDialogBody isOpen onExitComplete={noop} />
       </ChakraProvider>
     );
     await new Promise<void>((resolve) => {
@@ -78,6 +83,7 @@ beforeEach(() => {
 });
 
 afterEach(async () => {
+  closeLayoutPresetManager();
   await act(() => root?.unmount());
   host?.remove();
   host = null;
@@ -85,6 +91,29 @@ afterEach(async () => {
 });
 
 describe('LayoutPresetManagerDialogBody', () => {
+  it('animates the lazily loaded manager out instead of unmounting it on close', async () => {
+    host = document.createElement('div');
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() =>
+      root?.render(
+        <ChakraProvider value={system}>
+          <LayoutPresetManagerDialog />
+        </ChakraProvider>
+      )
+    );
+    await act(() => openLayoutPresetManager());
+    await expect.poll(() => document.querySelector('[role="dialog"]')?.getAttribute('data-state')).toBe('open');
+    const dialog = document.querySelector('[role="dialog"]')!;
+    const done = Array.from(dialog.querySelectorAll('button')).find((button) => button.textContent === 'Done')!;
+
+    const frames = await recordDialogExit(dialog, () => act(() => userEvent.click(done)));
+
+    // An unmounted dialog never reaches its closed state, so it cannot animate out; a retained one does, then leaves.
+    expect(closingFrames(frames)).not.toHaveLength(0);
+    await expect.poll(() => document.querySelector('[role="dialog"]')).toBeNull();
+  });
+
   it('renders one account-ordered list without preset descriptions', async () => {
     await renderManager();
 

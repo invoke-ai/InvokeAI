@@ -28,10 +28,24 @@ vi.mock('react-i18next', () => ({
   }),
 }));
 
+const launchpadDialog = vi.hoisted(() => ({ onExitComplete: null as (() => void) | null }));
+
 vi.mock('./LaunchpadCommandPaletteDialog', () => ({
-  default: ({ modifierKeyLabel }: { modifierKeyLabel: string }) => (
-    <div data-modifier-key-label={modifierKeyLabel} data-testid="launchpad-palette" />
-  ),
+  default: ({
+    isOpen,
+    modifierKeyLabel,
+    onExitComplete,
+  }: {
+    isOpen: boolean;
+    modifierKeyLabel: string;
+    onExitComplete: () => void;
+  }) => {
+    launchpadDialog.onExitComplete = onExitComplete;
+
+    return (
+      <div data-modifier-key-label={modifierKeyLabel} data-open={String(isOpen)} data-testid="launchpad-palette" />
+    );
+  },
 }));
 
 import { LaunchpadCommandPalette } from './LaunchpadCommandPalette';
@@ -101,6 +115,21 @@ describe('Launchpad command-palette hotkeys', () => {
 
     await press({ code: 'KeyK', ctrlKey: true, key: 'k' });
     expectPaletteState('closed');
+  });
+
+  it('keeps the lazy dialog mounted while it animates closed, then unmounts it', async () => {
+    await renderLaunchpad();
+    const palette = () => document.querySelector<HTMLElement>('[data-testid="launchpad-palette"]');
+
+    await press({ code: 'KeyK', ctrlKey: true, key: 'k' });
+    await expect.poll(() => palette()?.dataset.open).toBe('true');
+
+    await press({ code: 'KeyK', ctrlKey: true, key: 'k' });
+    expectPaletteState('closed');
+    expect(palette()?.dataset.open).toBe('false');
+
+    await act(() => launchpadDialog.onExitComplete?.());
+    expect(palette()).toBeNull();
   });
 
   it('replaces the default binding and installs every custom binding', async () => {

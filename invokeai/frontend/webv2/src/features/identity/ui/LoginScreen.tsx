@@ -72,6 +72,7 @@ export const LoginScreen = () => {
             autoComplete="email"
             autoFocus
             placeholder="you@example.com"
+            size="lg"
             value={form.values.email}
             onChange={handleEmailChange}
           />
@@ -81,18 +82,19 @@ export const LoginScreen = () => {
             aria-invalid={form.errors.password ? true : undefined}
             autoComplete="current-password"
             placeholder={t('auth.yourPassword')}
+            size="lg"
             value={form.values.password}
             onChange={handlePasswordChange}
           />
         </Field>
-        <Checkbox.Root checked={form.values.rememberMe} size="sm" onCheckedChange={handleRememberMeChange}>
+        <Checkbox.Root checked={form.values.rememberMe} onCheckedChange={handleRememberMeChange}>
           <Checkbox.HiddenInput />
           <Checkbox.Control />
           <Checkbox.Label color="fg.muted" fontWeight="400">
             {t('auth.keepSignedIn')}
           </Checkbox.Label>
         </Checkbox.Root>
-        <Button loading={form.isSubmitting} size="sm" type="submit" variant="solid">
+        <Button loading={form.isSubmitting} size="lg" type="submit" variant="solid">
           {t('auth.signIn')}
         </Button>
       </chakra.form>

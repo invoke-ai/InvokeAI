@@ -104,7 +104,7 @@ export const GalleryBoardRow = ({
       board.ownerName ? (
         <MiddleTruncate
           color={isSelected ? 'inherit' : 'fg.muted'}
-          fontSize="2xs"
+          fontSize="xs"
           lineHeight="shorter"
           minW="0"
           text={board.ownerName}
@@ -122,7 +122,7 @@ export const GalleryBoardRow = ({
           // Its menu anchors to this button, so it must not fade out beneath it.
           opacity={isMenuOpen ? 1 : 0}
           // 24px: the target-size floor, and short enough for the 28px row.
-          size="2xs"
+          size="sm"
           transition="opacity var(--wb-motion-duration-medium) ease"
           variant="ghost"
           onClick={handleActionsClick}
@@ -161,24 +161,18 @@ export const GalleryBoardRow = ({
       >
         {isAutoAddTarget ? (
           <Tooltip content={t('widgets.gallery.autoAddBadgeTooltip')}>
-            <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} size="xs" variant="subtle">
+            <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} variant="subtle">
               {t('widgets.gallery.autoAddBadge')}
             </Badge>
           </Tooltip>
         ) : null}
         {board.projectId !== null ? (
-          <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} size="xs" variant="subtle">
+          <Badge colorPalette={isSelected ? undefined : 'accent'} flexShrink={0} variant="subtle">
             {t('common.project')}
           </Badge>
         ) : null}
         <Tooltip content={countsBreakdown}>
-          <Badge
-            aria-label={countsBreakdown}
-            flexShrink={0}
-            fontVariantNumeric="tabular-nums"
-            size="xs"
-            variant="subtle"
-          >
+          <Badge aria-label={countsBreakdown} flexShrink={0} fontVariantNumeric="tabular-nums" variant="subtle">
             {mediaCount} | {counts.assetCount}
           </Badge>
         </Tooltip>

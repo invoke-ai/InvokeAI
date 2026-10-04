@@ -132,7 +132,7 @@ const FontPreview = ({ font, compact = false }: { font: FontRecord; compact?: bo
         overflow="hidden"
         w="9"
       >
-        <Text fontFamily={family} fontSize="xl" fontStyle={font.style} fontWeight={font.weight} lineHeight="1">
+        <Text fontFamily={family} fontSize="3xl" fontStyle={font.style} fontWeight={font.weight} lineHeight="1">
           Aa
         </Text>
       </Box>
@@ -144,7 +144,7 @@ const FontPreview = ({ font, compact = false }: { font: FontRecord; compact?: bo
       <Text
         css={PREVIEW_TEXT_SX}
         fontFamily={family}
-        fontSize="3xl"
+        fontSize="5xl"
         fontStyle={font.style === 'italic' || font.style === 'oblique' ? font.style : 'normal'}
         fontWeight={font.weight}
         lineHeight="1.25"
@@ -154,11 +154,11 @@ const FontPreview = ({ font, compact = false }: { font: FontRecord; compact?: bo
       </Text>
       {loadState === 'loading' ? (
         <HStack color="fg.muted" gap="1.5" mt="2">
-          <Spinner size="xs" />
-          <Text fontSize="2xs">{t('fonts.loadingPreview')}</Text>
+          <Spinner />
+          <Text fontSize="xs">{t('fonts.loadingPreview')}</Text>
         </HStack>
       ) : loadState === 'error' ? (
-        <Button size="2xs" variant="ghost" onClick={load}>
+        <Button size="sm" variant="ghost" onClick={load}>
           {t('fonts.retryPreview')}
         </Button>
       ) : null}
@@ -184,10 +184,10 @@ const FontDetail = ({
     <Stack gap="4" p="3">
       <Flex align="flex-start" gap="2" justify="space-between" minW="0">
         <Stack gap="0.5" minW="0">
-          <Text as="h3" fontSize="lg" fontWeight="600" overflowWrap="anywhere">
+          <Text as="h3" fontSize="2xl" fontWeight="600" overflowWrap="anywhere">
             {font.label || font.family}
           </Text>
-          <Text color="fg.muted" fontSize="2xs" overflowWrap="anywhere">
+          <Text color="fg.muted" fontSize="xs" overflowWrap="anywhere">
             {font.filename} · {variantLabel}
           </Text>
         </Stack>
@@ -195,7 +195,7 @@ const FontDetail = ({
           <Button
             aria-label={t('fonts.deleteNamed', { name: font.label || font.family })}
             color="fg.muted"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={() => onDelete(font)}
           >
@@ -204,45 +204,45 @@ const FontDetail = ({
         ) : null}
       </Flex>
       <HStack gap="1.5" wrap="wrap">
-        <Badge colorPalette={font.scope === 'shared' ? 'purple' : 'gray'} fontSize="2xs" variant="surface">
+        <Badge colorPalette={font.scope === 'shared' ? 'purple' : 'gray'} fontSize="xs" variant="surface">
           {scopeLabel}
         </Badge>
-        <Badge fontSize="2xs" variant="surface">
+        <Badge fontSize="xs" variant="surface">
           {sourceLabel}
         </Badge>
         {font.axes.length > 0 ? (
-          <Badge fontSize="2xs" variant="surface">
+          <Badge fontSize="xs" variant="surface">
             {t('fonts.axisCount', { count: font.axes.length })}
           </Badge>
         ) : null}
       </HStack>
       <FontPreview key={`${font.id}:${font.contentHash}:${font.family}:${font.style}:${font.weight}`} font={font} />
       <HStack align="center" color="fg.muted" gap="2" minW="0" wrap="wrap">
-        <Text fontSize="2xs" overflowWrap="anywhere">
+        <Text fontSize="xs" overflowWrap="anywhere">
           {font.instances.length > 0
             ? t('fonts.namedInstances', { count: font.instances.length })
             : t('fonts.fileSize', { bytes: formatBytes(font.byteSize) })}
         </Text>
         {font.axes.length > 0 ? (
-          <Text fontSize="2xs" overflowWrap="anywhere">
+          <Text fontSize="xs" overflowWrap="anywhere">
             {font.axes.map((axis) => axis.tag).join(', ')}
           </Text>
         ) : null}
       </HStack>
       {font.axes.length > 0 ? (
         <Stack gap="2">
-          <Text fontSize="xs" fontWeight="600">
+          <Text fontSize="md" fontWeight="600">
             {t('fonts.axesTitle')}
           </Text>
           {font.axes.map((axis) => (
             <HStack key={axis.tag} borderBottomWidth="1px" gap="3" justify="space-between" py="2" wrap="wrap">
-              <Text fontSize="xs">
+              <Text fontSize="md">
                 {axis.label}{' '}
                 <Text as="span" color="fg.muted">
                   {axis.tag}
                 </Text>
               </Text>
-              <Text color="fg.muted" fontSize="xs" fontVariantNumeric="tabular-nums">
+              <Text color="fg.muted" fontSize="md" fontVariantNumeric="tabular-nums">
                 {axis.minimum} – {axis.maximum} · {t('fonts.axisDefault', { value: axis.default })}
               </Text>
             </HStack>
@@ -251,7 +251,7 @@ const FontDetail = ({
       ) : null}
       {font.instances.length > 0 ? (
         <Stack gap="2">
-          <Text fontSize="xs" fontWeight="600">
+          <Text fontSize="md" fontWeight="600">
             {t('fonts.instancesTitle')}
           </Text>
           <HStack gap="1.5" wrap="wrap">
@@ -279,14 +279,14 @@ const UploadStatusList = ({ items }: { items: readonly UploadItem[] }) => {
       {items.map((item) => (
         <HStack key={item.id} color={item.status === 'error' ? 'fg.error' : 'fg.muted'} gap="2">
           {item.status === 'uploading' ? (
-            <Spinner size="xs" />
+            <Spinner />
           ) : (
             <Icon as={item.status === 'error' ? CircleAlertIcon : FileTypeIcon} />
           )}
-          <Text fontSize="2xs" overflowWrap="anywhere">
+          <Text fontSize="xs" overflowWrap="anywhere">
             {item.name}
           </Text>
-          <Text fontSize="2xs">
+          <Text fontSize="xs">
             {item.status === 'queued' || item.status === 'uploading'
               ? t('fonts.uploading')
               : item.status === 'created'
@@ -504,7 +504,7 @@ const FontLibrary = () => {
             <Button
               aria-label={t('fonts.rescan')}
               disabled={isRescanning}
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={handleRescan}
             >
@@ -521,7 +521,6 @@ const FontLibrary = () => {
             <Input
               aria-label={t('fonts.searchLabel')}
               placeholder={t('fonts.searchPlaceholder')}
-              size="xs"
               value={search}
               onChange={(event) => {
                 setSearch(event.currentTarget.value);
@@ -534,7 +533,6 @@ const FontLibrary = () => {
               <IconButton
                 aria-label={t('fonts.filterMenu')}
                 color={filter !== 'all' ? 'accent.solid' : 'fg.muted'}
-                size="xs"
                 variant="outline"
               >
                 <Icon as={SlidersHorizontalIcon} boxSize="4" />
@@ -550,13 +548,13 @@ const FontLibrary = () => {
                       setOffset(0);
                     }}
                   >
-                    <Menu.ItemGroupLabel color="fg" fontSize="2xs" textTransform="uppercase">
+                    <Menu.ItemGroupLabel color="fg" fontSize="xs" textTransform="uppercase">
                       {t('fonts.filterLabel')}
                     </Menu.ItemGroupLabel>
                     {filterOptions.map((option) => (
                       <Menu.RadioItem key={option.value} value={option.value}>
                         <Menu.ItemIndicator />
-                        <Menu.ItemText fontSize="xs">{option.label}</Menu.ItemText>
+                        <Menu.ItemText>{option.label}</Menu.ItemText>
                       </Menu.RadioItem>
                     ))}
                   </Menu.RadioItemGroup>
@@ -577,7 +575,6 @@ const FontLibrary = () => {
             >
               {search.trim() ? (
                 <Button
-                  size="xs"
                   variant="outline"
                   onClick={() => {
                     setSearch('');
@@ -587,7 +584,7 @@ const FontLibrary = () => {
                   {t('common.clearSearch')}
                 </Button>
               ) : (
-                <Button size="sm" onClick={() => setActiveTab('add')}>
+                <Button size="lg" onClick={() => setActiveTab('add')}>
                   {t('fonts.addFonts')}
                   <Icon as={ArrowRightIcon} />
                 </Button>
@@ -601,7 +598,7 @@ const FontLibrary = () => {
               icon={ERROR_ICON}
               title={t('fonts.couldNotLoad')}
             >
-              <Button size="xs" variant="outline" onClick={handleRetry}>
+              <Button variant="outline" onClick={handleRetry}>
                 {t('common.retry')}
               </Button>
             </EmptyState>
@@ -616,7 +613,7 @@ const FontLibrary = () => {
               }
               title={font.label || font.family}
               trailing={
-                <Badge fontSize="2xs" variant="surface">
+                <Badge fontSize="xs" variant="surface">
                   {t(getScopeLabelKey(font.scope))}
                 </Badge>
               }
@@ -643,7 +640,7 @@ const FontLibrary = () => {
       <Tabs.Root
         asChild
         lazyMount
-        size="sm"
+        size="xl"
         unmountOnExit
         value={activeTab}
         onValueChange={(event) => setActiveTab(event.value)}
@@ -672,10 +669,10 @@ const FontLibrary = () => {
               ) : (
                 <Flex align="center" direction="column" gap="2" h="full" justify="center" p="6">
                   <Icon as={FileTypeIcon} boxSize="8" color="fg.subtle" />
-                  <Text color="fg.muted" fontSize="sm" fontWeight="600">
+                  <Text color="fg.muted" fontSize="lg" fontWeight="600">
                     {t('fonts.selectFont')}
                   </Text>
-                  <Text color="fg.muted" fontSize="xs" maxW="22rem" textAlign="center">
+                  <Text color="fg.muted" maxW="22rem" textAlign="center">
                     {t('fonts.selectFontDescription')}
                   </Text>
                 </Flex>
@@ -685,13 +682,13 @@ const FontLibrary = () => {
               <Scrollable h="full" label={t('fonts.addFonts')} minH="0" p="3">
                 <Stack align="start" gap="4" maxW="xl">
                   <Stack gap="1">
-                    <Text as="h3" fontSize="sm" fontWeight="600">
+                    <Text as="h3" fontSize="lg" fontWeight="600">
                       {t('fonts.upload')}
                     </Text>
-                    <Text color="fg.muted" fontSize="xs">
+                    <Text color="fg.muted" fontSize="md">
                       {t('fonts.description')}
                     </Text>
-                    <Text color="fg.muted" fontSize="xs">
+                    <Text color="fg.muted" fontSize="md">
                       {t('fonts.uploadDescription')}
                     </Text>
                   </Stack>
@@ -704,7 +701,7 @@ const FontLibrary = () => {
                       onChange={(value) => setUploadScope(value as FontScope)}
                     />
                   ) : null}
-                  <Button size="xs" onClick={() => inputRef.current?.click()}>
+                  <Button onClick={() => inputRef.current?.click()}>
                     <UploadIcon />
                     {effectiveUploadScope === 'shared' ? t('fonts.uploadShared') : t('fonts.upload')}
                   </Button>

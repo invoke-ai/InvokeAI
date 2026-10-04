@@ -1,4 +1,5 @@
 import { classifyGalleryUpload } from '@features/gallery/contracts';
+import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { isEditableHotkeyTarget } from '@workbench/hotkeys/keys';
 import { isHotkeyModalLayerActive } from '@workbench/hotkeys/modalLayer';
@@ -27,6 +28,8 @@ const PasteMediaDialog = lazy(() =>
 export const PasteMediaRuntime = () => {
   const [request, setRequest] = useState<PasteMediaRequest | null>(null);
   const settle = useCallback(() => setRequest(null), []);
+  // Settling closes the dialog; its request stays rendered until the close animation finishes.
+  const dialog = useExitRetainedValue(request);
 
   useMountEffect(() => {
     let ticket = 0;
@@ -54,9 +57,14 @@ export const PasteMediaRuntime = () => {
     return () => document.removeEventListener('paste', handlePaste);
   });
 
-  return request ? (
+  return dialog.value ? (
     <Suspense fallback={null}>
-      <PasteMediaDialog key={request.ticket} request={request} />
+      <PasteMediaDialog
+        key={dialog.value.ticket}
+        isOpen={dialog.isOpen}
+        request={dialog.value}
+        onExitComplete={dialog.release}
+      />
     </Suspense>
   ) : null;
 };

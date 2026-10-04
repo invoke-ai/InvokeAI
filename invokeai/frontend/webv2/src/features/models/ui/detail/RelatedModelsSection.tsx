@@ -114,7 +114,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
       <Stack gap="0.5">
         <FieldLabel>{t('models.relatedModels')}</FieldLabel>
         {canAddLinks ? (
-          <Text color="fg.subtle" fontSize="2xs">
+          <Text color="fg.subtle" fontSize="xs">
             {t('models.relatedModelsHelp')}
           </Text>
         ) : null}
@@ -126,7 +126,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
           modelTypes={LINKABLE_TYPES}
           placeholder={t('models.searchCompatibleToLink')}
           showManagerButton={false}
-          size="sm"
+          size="lg"
           value={null}
           onChange={(target) => {
             void handleAdd(target);
@@ -134,9 +134,9 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
         />
       ) : null}
       {relatedKeys === null ? (
-        <Spinner color="fg.subtle" size="xs" />
+        <Spinner color="fg.subtle" />
       ) : relatedModels.length === 0 ? (
-        <Text color="fg.subtle" fontSize="2xs">
+        <Text color="fg.subtle" fontSize="xs">
           {t('models.noRelatedModels')}
         </Text>
       ) : (
@@ -149,7 +149,7 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
                   <IconButton
                     aria-label={t('models.unlinkNamed', { name: relatedModel?.name ?? key })}
                     disabled={isMutating}
-                    size="2xs"
+                    size="sm"
                     variant="ghost"
                     onClick={() => {
                       void handleRemove(key);
@@ -164,13 +164,13 @@ const RelatedModelsForModel = ({ model, onError }: RelatedModelsSectionProps) =>
                   <>
                     <Badge
                       colorPalette={getModelBaseColorPalette(relatedModel.base)}
-                      fontSize="2xs"
-                      size="sm"
+                      fontSize="xs"
+                      size="lg"
                       variant="surface"
                     >
                       {getModelBaseLabel(relatedModel.base)}
                     </Badge>
-                    <Badge colorPalette="gray" fontSize="2xs" size="sm" variant="surface">
+                    <Badge colorPalette="gray" fontSize="xs" size="lg" variant="surface">
                       {getModelTypeLabel(relatedModel.type)}
                     </Badge>
                   </>

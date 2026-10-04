@@ -1,6 +1,7 @@
 import type { WorkbenchLanguage } from '@platform/i18n/languages';
 import type { LogLevel, LogNamespace } from '@platform/logging/contracts';
 import type { SettingsTarget } from '@platform/ui/settings/contracts';
+import type { PromptFontSize } from '@theme/scale';
 import type { WorkbenchThemeId } from '@theme/themes';
 import type { ProjectSortId, ProjectsViewId } from '@workbench/launchpad/projects/projectLibraryView';
 
@@ -63,6 +64,8 @@ export interface WorkbenchPreferences {
   preferNumericAttentionStyle: boolean;
   /** Color prompt syntax in prompt fields; changes rendering only. */
   showPromptSyntaxHighlighting: boolean;
+  /** Text size of the prompt fields. */
+  promptFontSize: PromptFontSize;
   developerLogEnabled: boolean;
   developerLogLevel: LogLevel;
   developerLogNamespaces: LogNamespace[];

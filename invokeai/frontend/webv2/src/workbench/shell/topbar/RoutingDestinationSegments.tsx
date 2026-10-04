@@ -27,7 +27,7 @@ export const RoutingDestinationSegments = ({
   );
 
   return (
-    <SegmentGroup.Root aria-label={ariaLabel} disabled={disabled} size="xs" value={value} onValueChange={handleChange}>
+    <SegmentGroup.Root aria-label={ariaLabel} disabled={disabled} value={value} onValueChange={handleChange}>
       <SegmentGroup.Indicator />
       {resultDestinations.map((destination) => (
         <SegmentGroup.Item key={destination.id} flex="1" justifyContent="center" value={destination.id}>

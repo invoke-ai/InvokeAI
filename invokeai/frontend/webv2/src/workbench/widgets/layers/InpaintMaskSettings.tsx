@@ -133,7 +133,7 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
             aria-label={t('widgets.layers.maskFill.editInColorPane')}
             alignSelf="flex-end"
             color="fg.muted"
-            size="2xs"
+            size="sm"
             variant="ghost"
             onClick={handleArmTint}
           >
@@ -145,14 +145,13 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
             aria-label={t('widgets.layers.maskFill.style')}
             collection={styleCollection}
             positioning={SELECT_POSITIONING}
-            size="xs"
             value={styleValue}
             valueText={t(`widgets.layers.maskFill.styles.${fill.style}`)}
             onValueChange={handleStyleChange}
           />
         </Field>
       </HStack>
-      <Button disabled={!engine} size="xs" variant="outline" onClick={handleInvert}>
+      <Button disabled={!engine} variant="outline" onClick={handleInvert}>
         {t('widgets.layers.maskFill.invert')}
       </Button>
     </Stack>

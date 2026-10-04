@@ -51,7 +51,7 @@ const ListFallback = () => {
 
   return (
     <Center aria-label={t('common.loading')} h="full" role="status">
-      <Spinner color="fg.subtle" size="sm" />
+      <Spinner color="fg.subtle" size="lg" />
     </Center>
   );
 };
@@ -70,7 +70,7 @@ const InvalidBanner = ({ children }: { children: ReactNode }) => (
     bg="bg.muted"
     color="fg.muted"
     display="flex"
-    fontSize="sm"
+    fontSize="lg"
     gap="2"
     px="3"
     py="2"
@@ -239,7 +239,7 @@ export const GraphPreviewDialog = ({
                 <Box display="flex" flex="1" gap="3" minH="0">
                   <PreviewPane>
                     {!graph ? (
-                      <Text color="fg.muted" fontSize="sm">
+                      <Text color="fg.muted" fontSize="lg">
                         {t('graphPreview.noCompiledGraph', { graphId })}
                       </Text>
                     ) : mode === 'json' ? (
@@ -275,7 +275,7 @@ export const GraphPreviewDialog = ({
             </Dialog.Body>
             <Dialog.Footer justifyContent="space-between">
               <Box display="flex" gap="2">
-                <Button disabled={!graph} size="xs" variant="outline" onClick={copyJson}>
+                <Button disabled={!graph} variant="outline" onClick={copyJson}>
                   <Icon
                     as={hasCopied ? CheckIcon : CopyIcon}
                     boxSize="3.5"
@@ -290,7 +290,7 @@ export const GraphPreviewDialog = ({
                     sourceLabel={sourceLabel}
                     onClose={closeDialog}
                   >
-                    <Button size="xs" variant="outline">
+                    <Button variant="outline">
                       {t('graphPreview.openAs')}
                       <Icon as={ChevronUpIcon} boxSize="3.5" />
                     </Button>
@@ -303,14 +303,13 @@ export const GraphPreviewDialog = ({
                     aria-disabled={!canInvoke}
                     cursor={canInvoke ? undefined : 'not-allowed'}
                     opacity={canInvoke ? undefined : 0.6}
-                    size="xs"
                     title={validationMessage}
                     onClick={invokeRoute}
                   >
                     {t('graphPreview.invokeRoute', { route: dialogRoute.label })}
                   </Button>
                 ) : null}
-                <Button size="xs" variant="ghost" onClick={closeDialog}>
+                <Button variant="ghost" onClick={closeDialog}>
                   {t('common.close')}
                 </Button>
               </Box>

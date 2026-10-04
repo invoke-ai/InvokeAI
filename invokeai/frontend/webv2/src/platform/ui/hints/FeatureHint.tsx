@@ -39,12 +39,12 @@ const HintCard = ({ hint, onDisable }: { hint: FeatureHintId; onDisable: (() => 
   // Padding belongs to the `hoverCard` content recipe, not here.
   return (
     <Stack gap="1.5">
-      <Heading fontSize="xs" fontWeight="600">
+      <Heading fontSize="md" fontWeight="600">
         {heading}
       </Heading>
       <Separator />
       {paragraphs.map((paragraph) => (
-        <Text key={paragraph} color="fg.muted" fontSize="xs" lineHeight="1.45">
+        <Text key={paragraph} color="fg.muted" fontSize="md" lineHeight="1.45">
           {paragraph}
         </Text>
       ))}
@@ -53,13 +53,13 @@ const HintCard = ({ hint, onDisable }: { hint: FeatureHintId; onDisable: (() => 
           <Separator />
           <HStack gap="2" minH="4">
             {onDisable && (
-              <Button color="fg.subtle" fontSize="2xs" h="auto" px="1" size="2xs" variant="plain" onClick={onDisable}>
+              <Button color="fg.subtle" fontSize="xs" h="auto" px="1" size="sm" variant="plain" onClick={onDisable}>
                 {t('common.dontShowMeThese')}
               </Button>
             )}
             <Spacer />
             {href && (
-              <Link fontSize="2xs" gap="1" href={href} rel="noreferrer" target="_blank">
+              <Link fontSize="xs" gap="1" href={href} rel="noreferrer" target="_blank">
                 {t('common.learnMore')}
                 <Icon as={ExternalLinkIcon} boxSize="3" />
               </Link>

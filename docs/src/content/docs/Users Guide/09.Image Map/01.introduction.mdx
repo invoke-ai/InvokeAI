@@ -23,8 +23,12 @@ searches against your own, or third party images.
 
 To use the Image Map you will need to install the image encoder model
 `DFN2B-CLIP-ViT-L-14-39B` from the starter models section of the Model
-Manager. Once installed, you will need to restart the backend in order
-to initiate the indexing process. If you have a large image
+Manager. No restart is needed: indexing starts shortly while the Image
+Map or the gallery is open, or when you run a semantic search. The
+model is found by its name (`image_index_model` in `invokeai.yaml`), so
+deleting or renaming it stops indexing and the Image Map offers to
+install it again. Installing a different model under that name
+switches indexing to it on its own. If you have a large image
 collection, initial indexing may take a while -- expect a gallery of
 20,000 images to take about 15 minutes to index. After this, the index
 is updated incrementally in the background.

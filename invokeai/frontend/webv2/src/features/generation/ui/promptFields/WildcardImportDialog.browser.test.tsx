@@ -36,7 +36,7 @@ const renderDialog = async (entries = ENTRIES) => {
   await act(() => {
     root?.render(
       <ChakraProvider value={system}>
-        <WildcardImportDialog entries={entries} onCancel={vi.fn()} onConfirm={onConfirm} />
+        <WildcardImportDialog entries={entries} isOpen onCancel={vi.fn()} onConfirm={onConfirm} />
       </ChakraProvider>
     );
   });

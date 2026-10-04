@@ -38,7 +38,7 @@ export const NodeInstallLog = () => {
 
   return (
     <Scrollable h="full" label={t('nodes.installActivity')} minH="0">
-      <Table.Root css={INSTALL_LOG_TABLE_SX} minW="36rem" size="sm">
+      <Table.Root css={INSTALL_LOG_TABLE_SX} minW="36rem">
         <Table.Header>
           <Table.Row>
             <Table.ColumnHeader borderColor="border.subtle" ps="3">
@@ -67,15 +67,15 @@ const InstallLogRow = ({ entry }: { entry: CustomNodeInstallLogEntry }) => {
   return (
     <Table.Row>
       <Table.Cell borderColor="border.subtle" ps="3">
-        <MiddleTruncate fontSize="xs" text={entry.name} />
+        <MiddleTruncate fontSize="md" text={entry.name} />
       </Table.Cell>
       <Table.Cell borderColor="border.subtle">
-        <Badge colorPalette={badge.palette} fontSize="2xs" variant="surface">
+        <Badge colorPalette={badge.palette} fontSize="xs" variant="surface">
           {t(badge.labelKey)}
         </Badge>
       </Table.Cell>
       <Table.Cell borderColor="border.subtle" pe="3">
-        <Text color="fg.muted" fontSize="2xs" lineClamp={2} overflowWrap="anywhere">
+        <Text color="fg.muted" fontSize="xs" lineClamp={2} overflowWrap="anywhere">
           {entry.message ?? ''}
         </Text>
       </Table.Cell>

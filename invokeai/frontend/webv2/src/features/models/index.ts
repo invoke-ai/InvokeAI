@@ -9,6 +9,7 @@ export type {
   StarterModelResponse,
 } from './core/types';
 export { getModelBaseColorPalette, getModelBaseLabel, type ModelBaseColorPalette } from './core/baseIdentity';
+export { getModelImageUrl } from './data/api';
 export { useActiveInstallSources } from './data/installsStore';
 export {
   ensureModelsLoaded,
@@ -29,4 +30,9 @@ export { useInstallActions } from './ui/add-models/useInstallActions';
 export { getStarterModelInstallSources, type StarterInstallSource } from './ui/add-models/starterModelInstallSources';
 export { ModelInstallRuntime } from './ui/ModelInstallRuntime';
 export { ModelsPage } from './ui/ModelsPage';
-export { ModelsUiProvider, type ModelsUiAdapter } from './ui/ModelsUiContext';
+export {
+  ModelsUiProvider,
+  useOpenAddModelsSearch,
+  useOpenModelInManager,
+  type ModelsUiAdapter,
+} from './ui/ModelsUiContext';

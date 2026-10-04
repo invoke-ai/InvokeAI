@@ -90,7 +90,7 @@ export const ModelFilterMenu = <Field extends ModelSortField>({
   return (
     <Menu.Root closeOnSelect={false} positioning={ROOT_POSITIONING}>
       <Menu.Trigger asChild>
-        <IconButton aria-label={ariaLabel} color={isActive ? 'accent.solid' : 'fg.muted'} size="xs" variant="outline">
+        <IconButton aria-label={ariaLabel} color={isActive ? 'accent.solid' : 'fg.muted'} variant="outline">
           <Icon as={SlidersHorizontalIcon} boxSize="4" />
         </IconButton>
       </Menu.Trigger>
@@ -171,11 +171,9 @@ const FilterSubMenu = ({
     <Menu.TriggerItem>
       <HStack gap="2" minW="0" w="full">
         <Icon as={icon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
-        <Text flexShrink={0} fontSize="xs">
-          {label}
-        </Text>
+        <Text flexShrink={0}>{label}</Text>
         {summary ? (
-          <Text color="fg.subtle" fontSize="2xs" ms="auto" minW="0" truncate>
+          <Text color="fg.subtle" fontSize="xs" ms="auto" minW="0" truncate>
             {summary}
           </Text>
         ) : null}
@@ -211,9 +209,9 @@ export const FilterMenuItem = memo(function FilterMenuItem({
   return (
     <Menu.Item aria-checked={isChecked} closeOnSelect={false} role="menuitemcheckbox" value={value} onClick={onSelect}>
       <Icon as={CheckIcon} boxSize="3" opacity={isChecked ? 1 : 0} />
-      <Menu.ItemText fontSize="xs">{label}</Menu.ItemText>
+      <Menu.ItemText fontSize="md">{label}</Menu.ItemText>
       {trailing ? (
-        <Text color="fg.subtle" fontSize="2xs" ms="auto">
+        <Text color="fg.subtle" fontSize="xs" ms="auto">
           {trailing}
         </Text>
       ) : null}

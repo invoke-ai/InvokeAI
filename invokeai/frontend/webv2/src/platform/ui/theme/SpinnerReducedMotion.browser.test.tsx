@@ -26,7 +26,7 @@ const render = async () => {
   await act(() =>
     root?.render(
       <ChakraProvider value={system}>
-        <Spinner data-testid="spinner" size="sm" />
+        <Spinner data-testid="spinner" size="lg" />
         <Skeleton data-testid="skeleton" h="4" w="20" />
       </ChakraProvider>
     )

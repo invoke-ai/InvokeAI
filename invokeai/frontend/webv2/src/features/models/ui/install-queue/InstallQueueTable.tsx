@@ -23,7 +23,7 @@ const TABLE_SX: SystemStyleObject = {
 const HEADER_PROPS = {
   borderColor: 'border.subtle',
   color: 'fg.muted',
-  fontSize: '2xs',
+  fontSize: 'xs',
   fontWeight: '700',
   letterSpacing: 'wider',
   py: '1.5',
@@ -44,7 +44,7 @@ export const InstallQueueTable = ({
   if (status === 'loading' || status === 'idle') {
     return (
       <Flex align="center" h="full" justify="center" py="6">
-        <Spinner color="fg.muted" size="sm" />
+        <Spinner color="fg.muted" size="lg" />
       </Flex>
     );
   }
@@ -52,7 +52,7 @@ export const InstallQueueTable = ({
   if (status === 'error') {
     return (
       <EmptyState danger description={error ?? undefined} h="full" title={t('models.couldNotLoadInstallQueue')}>
-        <Button size="xs" variant="outline" onClick={() => void refreshInstalls()}>
+        <Button variant="outline" onClick={() => void refreshInstalls()}>
           {t('common.retry')}
         </Button>
       </EmptyState>
@@ -72,7 +72,7 @@ export const InstallQueueTable = ({
 
   return (
     <Scrollable h="full" label={t('models.installJobs')} minH="0">
-      <Table.Root css={TABLE_SX} minW="32rem" size="sm" tableLayout="fixed" w="full">
+      <Table.Root css={TABLE_SX} minW="32rem" tableLayout="fixed" w="full">
         <Table.ColumnGroup>
           <Table.Column w="2.25rem" />
           <Table.Column />

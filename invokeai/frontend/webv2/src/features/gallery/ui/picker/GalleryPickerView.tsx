@@ -40,7 +40,7 @@ import { GalleryPickerBoards, type GalleryPickerBoardGroup } from './GalleryPick
 import { galleryPickerOptionId, GalleryPickerGrid } from './GalleryPickerGrid';
 import { useGalleryPickerScope } from './useGalleryPickerScope';
 
-const BOARD_BUTTON_EXPANDED_PROPS = { bg: 'bg.emphasized' } as const;
+const BOARD_BUTTON_EXPANDED_PROPS = { bg: 'bg.hover' } as const;
 
 /** Unseeded until the first page loads; then the Gallery's selection if it is on that page, else nothing. */
 type ActiveKeyState = GalleryItemKey | null | undefined;
@@ -317,7 +317,7 @@ export const GalleryPickerView = ({
     () => (
       <HStack flexShrink={0} gap="0">
         {scope.searchTerm ? (
-          <CloseButton aria-label={t('common.clearSearch')} size="2xs" onClick={handleClearSearch} />
+          <CloseButton aria-label={t('common.clearSearch')} size="sm" onClick={handleClearSearch} />
         ) : null}
         {scope.pane === 'items' ? <GallerySearchHelp /> : null}
       </HStack>
@@ -357,7 +357,6 @@ export const GalleryPickerView = ({
           justifyContent="flex-start"
           minW="0"
           ps="1"
-          size="xs"
           variant="ghost"
           onClick={togglePane}
         >
@@ -383,7 +382,6 @@ export const GalleryPickerView = ({
             aria-label={uploadTarget.label}
             color="fg.muted"
             disabled={!uploadTarget.isAvailable || isUploading}
-            size="xs"
             variant="ghost"
             onClick={openUploadPicker}
           >
@@ -440,13 +438,13 @@ export const GalleryPickerView = ({
         ) : (
           <Stack align="center" color="fg.muted" gap="2" justify="center" minH="7rem" px="4" py="6">
             <Icon as={ImageIcon} boxSize="4" color="fg.subtle" />
-            <Text fontSize="xs" textAlign="center" textWrap="pretty">
+            <Text fontSize="md" textAlign="center" textWrap="pretty">
               {isSearching
                 ? t('widgets.gallery.noImagesMatch')
                 : t('widgets.gallery.picker.empty', { name: boardName })}
             </Text>
             {!isSearching && uploadTarget.isAvailable ? (
-              <Button disabled={isUploading} size="xs" variant="outline" onClick={openUploadPicker}>
+              <Button disabled={isUploading} variant="outline" onClick={openUploadPicker}>
                 <Icon as={UploadIcon} boxSize="3.5" />
                 {t('widgets.gallery.picker.upload')}
               </Button>
@@ -455,15 +453,15 @@ export const GalleryPickerView = ({
         )}
       </Stack>
       <HStack borderColor="border.subtle" borderTopWidth="1px" gap="2" justify="space-between" pe="1" ps="2" py="1">
-        <Text color="fg.subtle" fontSize="2xs" fontVariantNumeric="tabular-nums" minW="0" role="status" truncate>
+        <Text color="fg.subtle" fontSize="xs" fontVariantNumeric="tabular-nums" minW="0" role="status" truncate>
           {status}
         </Text>
         {isMultiple ? (
-          <Button flexShrink={0} size="2xs" variant="subtle" onClick={onClose}>
+          <Button flexShrink={0} size="sm" variant="subtle" onClick={onClose}>
             {t('common.done')}
           </Button>
         ) : revealInGallery ? (
-          <Button color="fg.muted" flexShrink={0} size="2xs" variant="ghost" onClick={openGallery}>
+          <Button color="fg.muted" flexShrink={0} size="sm" variant="ghost" onClick={openGallery}>
             {t('widgets.gallery.picker.openGallery')}
             <Icon as={ExternalLinkIcon} boxSize="3" />
           </Button>

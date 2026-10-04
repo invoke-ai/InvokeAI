@@ -270,7 +270,7 @@ const ShapeSettings = ({ engine }: ToolFormProps) => {
           onValueCommit={onWidthCommit}
         />
       </PropertyControlRow>
-      <Text color="fg.muted" fontSize="2xs">
+      <Text color="fg.muted" fontSize="xs">
         {t(
           editor.toolKind === 'polygon'
             ? 'widgets.canvas.toolOptions.shapePolygonHint'

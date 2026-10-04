@@ -30,12 +30,12 @@ const BrowserIssueAlert = ({ issue }: { issue: DetectedBrowserIssue }) => {
   const { t } = useTranslation();
 
   return (
-    <Alert.Root borderRadius="md" role="alert" size="sm" status={issue.severity} variant="surface">
+    <Alert.Root borderRadius="md" role="alert" status={issue.severity} variant="surface">
       <Alert.Indicator alignSelf="start" mt="0.5" />
       <Alert.Content gap="2" minW="0">
         <Stack gap="0.5">
-          <Alert.Title fontSize="sm">{t(issue.titleKey)}</Alert.Title>
-          <Alert.Description fontSize="xs">{t(issue.descriptionKey)}</Alert.Description>
+          <Alert.Title fontSize="lg">{t(issue.titleKey)}</Alert.Title>
+          <Alert.Description fontSize="md">{t(issue.descriptionKey)}</Alert.Description>
         </Stack>
         <Stack gap="1.5">
           {issue.workarounds.map((workaround) => (
@@ -52,7 +52,7 @@ const BrowserIssueWorkaround = ({ workaround }: { workaround: KnownBrowserIssueW
 
   return (
     <Stack gap="1">
-      <Text color="fg.muted" fontSize="xs" overflowWrap="anywhere">
+      <Text color="fg.muted" fontSize="md" overflowWrap="anywhere">
         {t(workaround.instructionKey)}
       </Text>
       {workaround.copyableValue ? <CopyableBrowserSetting value={workaround.copyableValue} /> : null}
@@ -94,13 +94,13 @@ const CopyableBrowserSetting = ({ value }: { value: string }) => {
       minW="0"
       p="1"
     >
-      <Code bg="transparent" fontSize="2xs" minW="0" overflowWrap="anywhere" px="1" whiteSpace="normal">
+      <Code bg="transparent" fontSize="xs" minW="0" overflowWrap="anywhere" px="1" whiteSpace="normal">
         {value}
       </Code>
       <IconButton
         aria-label={t('launchpad.browserIssues.copySetting')}
         flexShrink={0}
-        size="2xs"
+        size="sm"
         title={t('launchpad.browserIssues.copySetting')}
         variant="ghost"
         onClick={handleCopy}
