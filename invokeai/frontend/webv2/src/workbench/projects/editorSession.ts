@@ -16,13 +16,17 @@ export interface EditorSession {
 
 type AcquireLock = (name: string) => Promise<ExclusiveLockResult>;
 
+/**
+ * Each call is one holder of the tab's editor session; the lock is given back when the last holder releases. A
+ * superseded editor that is still finishing its exit and the editor that replaced it share one claim, so neither can
+ * drop the lock from under the other.
+ */
 export const createEditorSessionProvider = (
   storage: SessionStoragePort,
   acquireLock: AcquireLock = acquireExclusiveLock,
   createId: () => string = createUuid
 ): (() => Promise<EditorSession>) => {
-  let sessionPromise: Promise<EditorSession> | null = null;
-  let currentSession: EditorSession | null = null;
+  let shared: { claim: Promise<{ id: string; release(): Promise<void> }>; holders: number } | null = null;
 
   const persist = (id: string): void => {
     try {
@@ -32,7 +36,7 @@ export const createEditorSessionProvider = (
     }
   };
 
-  const claim = async (): Promise<EditorSession> => {
+  const claim = async (): Promise<{ id: string; release(): Promise<void> }> => {
     let persistedId: string | null = null;
     try {
       persistedId = storage.getItem(EDITOR_SESSION_STORAGE_KEY);
@@ -45,41 +49,41 @@ export const createEditorSessionProvider = (
       const result = await acquireLock(`${EDITOR_SESSION_LOCK_PREFIX}${candidate}`);
       if (result.kind === 'acquired') {
         persist(candidate);
-        const session: EditorSession = {
-          id: candidate,
-          async release() {
-            if (currentSession === session) {
-              currentSession = null;
-              sessionPromise = null;
-            }
-            await result.release();
-          },
-        };
-        currentSession = session;
-        return session;
+        return { id: candidate, release: result.release };
       }
       candidate = createId();
       if (result.kind === 'unavailable') {
         persist(candidate);
-        const session: EditorSession = {
-          id: candidate,
-          release() {
-            if (currentSession === session) {
-              currentSession = null;
-              sessionPromise = null;
-            }
-            return Promise.resolve();
-          },
-        };
-        currentSession = session;
-        return session;
+        return { id: candidate, release: () => Promise.resolve() };
       }
     }
   };
 
   return () => {
-    sessionPromise ??= claim();
-    return sessionPromise;
+    shared ??= { claim: claim(), holders: 0 };
+    const current = shared;
+    current.holders += 1;
+    return current.claim.then(({ id, release }) => {
+      let isReleased = false;
+      return {
+        id,
+        async release() {
+          if (isReleased) {
+            return;
+          }
+          isReleased = true;
+          current.holders -= 1;
+          if (current.holders > 0) {
+            return;
+          }
+          // Stop publishing the claim before the lock is given back, so no new holder joins a released one.
+          if (shared === current) {
+            shared = null;
+          }
+          await release();
+        },
+      };
+    });
   };
 };
 

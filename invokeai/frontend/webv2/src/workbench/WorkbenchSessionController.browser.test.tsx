@@ -11,7 +11,6 @@ const harness = vi.hoisted(() => ({
   switchTo: vi.fn(),
 }));
 
-vi.mock('@features/generation/react', () => ({ flushGenerateDrafts: vi.fn() }));
 vi.mock('@tanstack/react-router', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
   useNavigate: () => harness.navigate,

@@ -379,12 +379,18 @@ export interface DurableSyncedWorkbenchPersistence {
   flushProjectToServer(project: Project): Promise<ProjectPushOutcome>;
   getProjectDraftDocument(projectId: string): Promise<string | null>;
   getRecoverableDraftDocument(projectId: string, editorSessionId: string): Promise<string | null>;
+  /** True from `persistEmptySession` until `reopenSession`: the editor is leaving and its session must stay empty. */
+  hasClosedSession(): boolean;
   hasPendingChanges(): boolean;
   hydrateProjectFromServer(projectId: string, projectName?: string): Promise<ProjectLoadResult>;
   loadWorkbench(options?: { createNew?: boolean; openProjectId?: string }): Promise<DurableHydratedWorkbenchSnapshot>;
   listRecoverableDrafts(options?: { after?: [string, string]; limit?: number }): Promise<RecoverableProjectDraftPage>;
   markProjectDeleted(projectId: string): void;
   persistEmptySession(state: WorkbenchState): Promise<void>;
+  /** Releases cross-tab project locks held for unfinished resolutions once a newer editor in this tab takes over. */
+  releaseMutationLocks(): void;
+  /** Undoes `persistEmptySession` when the editor stays open after all, writing its session again. */
+  reopenSession(state: WorkbenchState): Promise<DurableWorkbenchSaveResult>;
   resolveConflictDiscard(projectId: string): Promise<void>;
   resolveConflictSaveAsNew(project: Project): Promise<{
     boardId: string;
@@ -396,7 +402,8 @@ export interface DurableSyncedWorkbenchPersistence {
   }>;
   resolveConflictUseServer(projectId: string): Promise<ProjectLoadResult>;
   releaseProjectSync(projectId: string): void;
-  retain(): () => void;
+  /** The release resolves once this service has either been retained again or released all of its resources. */
+  retain(): () => Promise<void>;
   saveWorkbench(state: WorkbenchState): Promise<DurableWorkbenchSaveResult>;
   unmarkProjectDeleted(projectId: string): void;
 }
@@ -506,6 +513,7 @@ export const createDurableSyncedWorkbenchPersistence = (
   let lastKnownState: WorkbenchState | null = null;
   let hasPending = false;
   let sessionSavePending = false;
+  let isSessionClosed = false;
   let localDraftStatus: LocalDraftStatus = 'ok';
   const localDraftFailures = new Set<string>();
   let mutationTail: Promise<void> = Promise.resolve();
@@ -568,21 +576,26 @@ export const createDurableSyncedWorkbenchPersistence = (
     );
     return result;
   };
-  const close = (): void => {
-    if (isClosed) {
-      return;
+  const releaseAllMutationLocks = (): Promise<unknown>[] =>
+    [...projectMutationLocks].map(([projectId, lock]) => {
+      projectMutationLocks.delete(projectId);
+      return lock.release();
+    });
+  let closed: Promise<void> | null = null;
+  const close = (): Promise<void> => {
+    if (closed) {
+      return closed;
     }
     isClosed = true;
-    for (const [projectId, lock] of projectMutationLocks) {
-      projectMutationLocks.delete(projectId);
-      void lock.release().catch(() => undefined);
-    }
+    const releases = releaseAllMutationLocks();
     if (draftStorePromise) {
-      void draftStorePromise.then((store) => store.close());
+      releases.push(draftStorePromise.then((store) => store.close()));
     }
     if (editorSessionPromise) {
-      void editorSessionPromise.then((session) => session.release());
+      releases.push(editorSessionPromise.then((session) => session.release()));
     }
+    closed = Promise.allSettled(releases).then(() => undefined);
+    return closed;
   };
 
   const getOwnedDraft = async (store: ProjectDraftStore, projectId: string, editorSessionId: string) => {
@@ -1693,7 +1706,7 @@ export const createDurableSyncedWorkbenchPersistence = (
     return { project: localProject, status: 'loaded' };
   };
 
-  return {
+  const service: DurableSyncedWorkbenchPersistence = {
     acknowledgeProjectResolution: (projectId) => {
       projectResolutionFences.delete(projectId);
       releaseProjectMutation(projectId);
@@ -1942,6 +1955,7 @@ export const createDurableSyncedWorkbenchPersistence = (
       const result = await store.get(projectId, editorSessionId);
       return result.kind === 'found' ? result.draft.documentJson : null;
     },
+    hasClosedSession: () => isSessionClosed,
     hasPendingChanges: () => hasPending,
     hydrateProjectFromServer: (projectId, projectName = projectId) =>
       enqueue(() => {
@@ -2408,6 +2422,8 @@ export const createDurableSyncedWorkbenchPersistence = (
       if (isTerminallyCleared) {
         return Promise.reject(new Error('Workbench persistence was cleared and must be reloaded.'));
       }
+      // Set before the write is queued, so no save requested meanwhile can put the project back.
+      isSessionClosed = true;
       return enqueue(async () => {
         const emptyState = { ...state, activeProjectId: '', projects: [] };
         const session = await getEditorSessionForService();
@@ -2789,6 +2805,11 @@ export const createDurableSyncedWorkbenchPersistence = (
         throw error;
       });
     },
+    releaseMutationLocks: () => {
+      for (const release of releaseAllMutationLocks()) {
+        void release.catch(() => undefined);
+      }
+    },
     releaseProjectSync: (projectId) => {
       projectEnsureFailures.delete(projectId);
       if ([...pendingRetargetHandoffs.values()].some((handoff) => handoff.targetProjectId === projectId)) {
@@ -2818,17 +2839,25 @@ export const createDurableSyncedWorkbenchPersistence = (
       let isReleased = false;
       return () => {
         if (isReleased) {
-          return;
+          return Promise.resolve();
         }
         isReleased = true;
         retainCount -= 1;
         const generation = ++releaseGeneration;
-        queueMicrotask(() => {
-          if (retainCount === 0 && releaseGeneration === generation) {
-            close();
-          }
+        return new Promise<void>((resolve) => {
+          queueMicrotask(() => {
+            if (retainCount === 0 && releaseGeneration === generation) {
+              void close().then(resolve);
+            } else {
+              resolve();
+            }
+          });
         });
       };
+    },
+    reopenSession: (state) => {
+      isSessionClosed = false;
+      return service.saveWorkbench(state);
     },
     saveWorkbench: (state) => {
       if (isTerminallyCleared) {
@@ -2927,4 +2956,5 @@ export const createDurableSyncedWorkbenchPersistence = (
       }
     },
   };
+  return service;
 };

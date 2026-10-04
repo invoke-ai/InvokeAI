@@ -28,7 +28,7 @@ import {
   invalidateGallery,
   patchGalleryItemCaches,
 } from '@features/gallery/queries';
-import { flushGenerateDrafts, setPendingPromptTemplateDraft } from '@features/generation/react';
+import { setPendingPromptTemplateDraft } from '@features/generation/react';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { getMaxReferenceImages, isVaeModelConfig, isSupportedGenerateModel } from '@features/generation/settings';
 import { ensureModelsLoaded, useModelsSelector } from '@features/models';
@@ -977,7 +977,6 @@ export const useImageActions = ({
       },
       createCanvasFromImages: async (images) => {
         const owner = captureAccountScope();
-        flushGenerateDrafts();
         try {
           const result = await createCanvasFromImages({
             applyCanvasMutation: commands.canvas.apply,

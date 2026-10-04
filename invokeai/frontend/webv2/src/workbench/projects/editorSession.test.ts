@@ -41,8 +41,28 @@ describe('editor session identity', () => {
     const session = await provider();
 
     expect(session.id).toBe('session-a');
-    expect(await provider()).toBe(session);
+    const sameTab = await provider();
+    expect(sameTab.id).toBe('session-a');
     await session.release();
+    await sameTab.release();
+  });
+
+  it('keeps the lock while any holder in the tab still uses the session', async () => {
+    const acquireLock = createLockPort();
+    const provider = createEditorSessionProvider(createStorage('copied'), acquireLock, () => 'rotated');
+    const exitingEditor = await provider();
+    const nextEditor = await provider();
+
+    await exitingEditor.release();
+    const duplicatedTab = await createEditorSessionProvider(createStorage('copied'), acquireLock, () => 'dup')();
+    expect(nextEditor.id).toBe('copied');
+    expect(duplicatedTab.id).toBe('dup');
+
+    await nextEditor.release();
+    const afterLastRelease = await createEditorSessionProvider(createStorage('copied'), acquireLock, () => 'x')();
+    expect(afterLastRelease.id).toBe('copied');
+    await duplicatedTab.release();
+    await afterLastRelease.release();
   });
 
   it('rotates a copied identity when another live tab holds its claim', async () => {

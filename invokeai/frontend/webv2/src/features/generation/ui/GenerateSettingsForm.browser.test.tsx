@@ -275,12 +275,12 @@ describe('GenerateSettingsForm render isolation', () => {
     }
   });
 
-  it('flushes a pending edit to its own project when the app switches projects before the debounce', async () => {
+  it('commits a pending edit to its own project when drafts are flushed ahead of a project change', async () => {
     await stepSteps();
 
     expect(patches).toEqual([]);
 
-    // Project switches flush drafts first, then activate the other project.
+    // The Workbench's project commands flush drafts before they change the active project.
     await settle(flushGenerateDrafts);
     await renderAdapter(buildAdapter('project-2'));
     await settle(noop, 400);

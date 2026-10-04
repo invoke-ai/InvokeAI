@@ -1,6 +1,5 @@
 import type { Project } from '@workbench/projectContracts';
 
-import { flushGenerateDrafts } from '@features/generation/react';
 import {
   assertAccountScopeCurrent,
   captureAccountScope,
@@ -43,11 +42,15 @@ export const useProjectActions = (): {
   const notify = useNotify();
   const { t } = useTranslation();
 
-  const finishClose = async (projectId: string): Promise<void> => {
-    const closeResult = commands.projects.close(projectId);
+  /** False when the project changed since `unchangedFrom` (an edit was still pending), so it must be pushed again. */
+  const finishClose = async (projectId: string, unchangedFrom?: Project): Promise<boolean> => {
+    const closeResult = commands.projects.close(projectId, unchangedFrom);
     if (closeResult.ok || closeResult.reason === 'project-not-found') {
       persistenceService.releaseProjectSync(projectId);
-      return;
+      return true;
+    }
+    if (closeResult.reason === 'modified') {
+      return false;
     }
     if (closeResult.reason === 'active-queue-runs') {
       throw new Error(t('projects.activeRunsMustFinish'));
@@ -56,27 +59,38 @@ export const useProjectActions = (): {
       throw new Error(t('projects.file.notSynced'));
     }
 
-    await persistenceService.persistEmptySession(persistence.getState());
-    const retry = commands.projects.close(projectId);
-    if (retry.ok || retry.reason === 'project-not-found') {
-      persistenceService.releaseProjectSync(projectId);
-      return;
-    }
-    if (retry.reason === 'active-queue-runs') {
-      throw new Error(t('projects.activeRunsMustFinish'));
-    }
-    if (retry.reason !== 'last-project') {
-      throw new Error(t('projects.file.notSynced'));
-    }
+    let hasLeftEditor = false;
+    try {
+      await persistenceService.persistEmptySession(persistence.getState());
+      const retry = commands.projects.close(projectId, unchangedFrom);
+      if (retry.ok || retry.reason === 'project-not-found') {
+        persistenceService.releaseProjectSync(projectId);
+        return true;
+      }
+      if (retry.reason === 'modified') {
+        return false;
+      }
+      if (retry.reason === 'active-queue-runs') {
+        throw new Error(t('projects.activeRunsMustFinish'));
+      }
+      if (retry.reason !== 'last-project') {
+        throw new Error(t('projects.file.notSynced'));
+      }
 
-    persistenceService.releaseProjectSync(projectId);
-    await navigate({ to: '/' });
+      persistenceService.releaseProjectSync(projectId);
+      await navigate({ to: '/' });
+      hasLeftEditor = true;
+      return true;
+    } finally {
+      if (!hasLeftEditor) {
+        // The editor stays open after all, so its session must name its projects again.
+        void persistenceService.reopenSession(persistence.getState()).catch(() => undefined);
+      }
+    }
   };
 
   const openProject = async (projectId: string, name: string): Promise<void> => {
     const owner = captureAccountScope();
-
-    flushGenerateDrafts();
 
     if (queries.getSnapshot().projects.some((project) => project.id === projectId)) {
       commands.projects.switchTo(projectId);
@@ -119,7 +133,6 @@ export const useProjectActions = (): {
 
   const closeProject = (project: Project): void => {
     const owner = captureAccountScope();
-    flushGenerateDrafts();
 
     if (hasActiveQueueRuns(queries.getProject(project.id) ?? project)) {
       notify.error(t('projects.closeBlocked'), t('projects.activeRunsMustFinish'));
@@ -166,15 +179,17 @@ export const useProjectActions = (): {
         if (!(await persistCanvasPixels())) {
           return;
         }
+        const pushed = queries.getProject(project.id) ?? current;
         if (
           outcome.kind === 'acknowledged' &&
-          serializeProjectDocumentV3Json(queries.getProject(project.id) ?? current).documentJson !==
-            outcome.documentJson
+          serializeProjectDocumentV3Json(pushed).documentJson !== outcome.documentJson
         ) {
           continue;
         }
-        await finishClose(project.id);
-        return;
+        // Closing commits drafts still pending in editors; one that changes the project sends it round again.
+        if (await finishClose(project.id, pushed)) {
+          return;
+        }
       }
       notify.error(t('projects.closeBlocked'), t('projects.file.notSynced'));
     })().catch((error) => {
@@ -186,8 +201,6 @@ export const useProjectActions = (): {
   };
 
   const deleteProject = async (project: Project): Promise<void> => {
-    flushGenerateDrafts();
-
     if (hasActiveQueueRuns(project)) {
       notify.error(t('projects.deleteFailed'), t('projects.activeRunsMustFinish'));
       return;

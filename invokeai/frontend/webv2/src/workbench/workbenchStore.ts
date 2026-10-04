@@ -9,6 +9,7 @@ import {
   type GeneratedImageContract,
 } from '@features/gallery/contracts';
 import { recordLogEvent } from '@platform/logging/logger';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { createExternalStore } from '@platform/state/externalStore';
 import { closeWidgetOverlays } from '@platform/ui/widgetOverlayRegistry';
 import { hasActiveQueueRuns, hasInFlightQueueRuns } from '@workbench/queue-integration/activeQueueRuns';
@@ -73,7 +74,13 @@ export type ProjectCommandResult =
   | { ok: true }
   | {
       ok: false;
-      reason: 'active-queue-runs' | 'invalid-name' | 'last-project' | 'project-not-found' | 'target-already-open';
+      reason:
+        | 'active-queue-runs'
+        | 'invalid-name'
+        | 'last-project'
+        | 'modified'
+        | 'project-not-found'
+        | 'target-already-open';
     };
 
 const createCommands = (
@@ -358,8 +365,12 @@ const createCommands = (
       ),
       reportError: command('recordError'),
     },
+    // Commands that change the active or open projects first commit drafts still held by mounted editors, so an edit
+    // made while a caller awaited (hydration, a close flush) lands on the project it was typed in.
     projects: {
-      close: (projectId: string): ProjectCommandResult => {
+      /** With `unchangedFrom`, closes only while the project, drafts included, is still exactly that version. */
+      close: (projectId: string, unchangedFrom?: Project): ProjectCommandResult => {
+        flushWorkbenchDrafts();
         const state = getState();
         const project = state.projects.find((project) => project.id === projectId);
         if (!project) {
@@ -370,6 +381,10 @@ const createCommands = (
           return { ok: false, reason: 'active-queue-runs' };
         }
 
+        if (unchangedFrom && project !== unchangedFrom) {
+          return { ok: false, reason: 'modified' };
+        }
+
         if (state.projects.length === 1) {
           return { ok: false, reason: 'last-project' };
         }
@@ -378,10 +393,14 @@ const createCommands = (
         return { ok: true };
       },
       create: (): Project => {
+        flushWorkbenchDrafts();
         dispatch({ type: 'createProject' });
         return getActiveProject(getState());
       },
-      open: command('openProject', (project: Project) => ({ project })),
+      open: (project: Project): void => {
+        flushWorkbenchDrafts();
+        dispatch({ project, type: 'openProject' });
+      },
       rename: (projectId: string, name: string): ProjectCommandResult => {
         if (!getState().projects.some((project) => project.id === projectId)) {
           return { ok: false, reason: 'project-not-found' };
@@ -398,6 +417,7 @@ const createCommands = (
           return { ok: false, reason: 'project-not-found' };
         }
 
+        flushWorkbenchDrafts();
         dispatch({ projectId, type: 'switchProject' });
         return { ok: true };
       },

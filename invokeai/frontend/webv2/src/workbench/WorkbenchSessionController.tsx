@@ -1,4 +1,3 @@
-import { flushGenerateDrafts } from '@features/generation/react';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { areArraysEqual } from '@platform/state/selectors';
 import { useNavigate } from '@tanstack/react-router';
@@ -42,7 +41,6 @@ const HydratedSessionController = ({ search }: { search: WorkbenchSearch }) => {
     }
 
     if (projectIds.includes(requestedProjectId)) {
-      flushGenerateDrafts();
       commands.projects.switchTo(requestedProjectId);
       // The link is a one-time open request. Keeping it would override later
       // project selections (including a new project) on reload.
@@ -57,7 +55,6 @@ const HydratedSessionController = ({ search }: { search: WorkbenchSearch }) => {
       }
 
       if (result.status === 'loaded') {
-        flushGenerateDrafts();
         commands.projects.open(result.project);
         void navigate({ replace: true, search: {}, to: '/app' });
       } else if (result.status === 'refused') {

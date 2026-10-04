@@ -1,6 +1,7 @@
 import type { HydratedWorkbenchSnapshot } from '@workbench/persistenceContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 
+import { getLogSnapshot } from '@platform/logging/logger';
 import { describe, expect, it, vi } from 'vitest';
 
 import type { WorkbenchSaveResult } from './projects/syncedPersistence';
@@ -8,6 +9,7 @@ import type { WorkbenchSaveResult } from './projects/syncedPersistence';
 import {
   createWorkbenchPersistenceRuntime,
   type PersistenceAggregatePort,
+  type PageLifecyclePort,
   type PersistenceClock,
   type WorkbenchPersistencePort,
 } from './persistenceRuntime';
@@ -146,18 +148,46 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
 
 const createPersistence = (load: WorkbenchPersistencePort['loadWorkbench']) => {
   let pending = false;
+  let closedSession = false;
   const persistence: WorkbenchPersistencePort = {
+    hasClosedSession: () => closedSession,
     hasPendingChanges: () => pending,
     loadWorkbench: vi.fn(load),
     saveWorkbench: vi.fn((state) => Promise.resolve(saveResult(state))),
   };
   return {
     persistence,
+    setClosedSession(next: boolean) {
+      closedSession = next;
+    },
     setPending(next: boolean) {
       pending = next;
     },
   };
 };
+
+const createPage = () => {
+  let onHidden: (() => void) | null = null;
+  const port: PageLifecyclePort = {
+    subscribeHidden: (listener) => {
+      onHidden = listener;
+      return () => {
+        onHidden = null;
+      };
+    },
+  };
+  return { hide: () => onHidden?.(), port };
+};
+
+const savedNames = (persistence: WorkbenchPersistencePort): (string | undefined)[] =>
+  vi.mocked(persistence.saveWorkbench).mock.calls.map(([state]) => state.projects[0]?.name);
+
+/** The log is process-wide: read only what a test recorded after taking its mark. */
+const logMark = (): number => getLogSnapshot().entries[0]?.sequence ?? 0;
+const loggedSince = (mark: number): string[] =>
+  getLogSnapshot()
+    .entries.filter((entry) => entry.sequence > mark)
+    .map((entry) => entry.name);
 
 describe('Workbench persistence runtime', () => {
   it('hydrates before enabling saves and publishes lifecycle status', async () => {
@@ -477,19 +507,25 @@ describe('Workbench persistence runtime', () => {
     expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
   });
 
-  it('ignores server outcomes once disposed', async () => {
+  it('ignores server outcomes once its account lifetime has ended', async () => {
     const aggregate = createAggregate();
     const { persistence } = createPersistence(() => Promise.resolve(null));
     const pending = deferred<WorkbenchSaveResult>();
     vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => pending.promise);
     const clock = new FakeClock();
-    const runtime = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+    const controller = new AbortController();
+    const runtime = createWorkbenchPersistenceRuntime({
+      aggregate: aggregate.port,
+      clock,
+      persistence,
+      signal: controller.signal,
+    });
 
     runtime.start();
     await flushPromises();
     aggregate.edit('First');
     clock.runAll();
-    runtime.dispose();
+    controller.abort();
 
     pending.resolve({
       ...saveResult(aggregate.state),
@@ -580,7 +616,7 @@ describe('Workbench persistence runtime', () => {
     expect(persistence.saveWorkbench).toHaveBeenCalledTimes(2);
   });
 
-  it('cancels timers and ignores load/save completions after disposal', async () => {
+  it('ends a lifetime that never loaded without saving, ignoring the late load', async () => {
     const aggregate = createAggregate();
     const load = deferred<HydratedWorkbenchSnapshot | null>();
     const { persistence } = createPersistence(() => load.promise);
@@ -590,12 +626,13 @@ describe('Workbench persistence runtime', () => {
     runtime.subscribe(listener);
 
     runtime.start();
-    runtime.dispose();
+    const exit = runtime.exit();
     load.resolve(snapshot(createInitialWorkbenchState()));
     await flushPromises();
     aggregate.edit();
     clock.runAll();
 
+    await expect(exit.settled).resolves.toBe('nothing-to-save');
     expect(runtime.getSnapshot().phase).toBe('disposed');
     expect(aggregate.hasHydrated).toBe(false);
     expect(persistence.saveWorkbench).not.toHaveBeenCalled();
@@ -625,7 +662,7 @@ describe('Workbench persistence runtime', () => {
     expect(persistence.saveWorkbench).not.toHaveBeenCalled();
   });
 
-  it('hydrates through a fresh instance after a prior one was disposed mid-load (StrictMode remount)', async () => {
+  it('hydrates through a fresh instance after a prior one exited mid-load (StrictMode remount)', async () => {
     const aggregate = createAggregate();
     const loadedState = createInitialWorkbenchState();
     loadedState.projects[0]!.name = 'Loaded';
@@ -634,14 +671,399 @@ describe('Workbench persistence runtime', () => {
 
     const first = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
     first.start();
-    first.dispose();
+    const previousExit = first.exit();
 
-    const second = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence });
+    const second = createWorkbenchPersistenceRuntime({ aggregate: aggregate.port, clock, persistence, previousExit });
     second.start();
+    await previousExit.settled;
     await flushPromises();
 
     expect(aggregate.hasHydrated).toBe(true);
     expect(aggregate.state.projects[0]?.name).toBe('Loaded');
     expect(second.getSnapshot()).toEqual({ error: null, phase: 'idle' });
+  });
+});
+
+const startLoaded = async (options: Partial<Parameters<typeof createWorkbenchPersistenceRuntime>[0]> = {}) => {
+  const aggregate = createAggregate();
+  const fake = createPersistence(() => Promise.resolve(null));
+  const clock = new FakeClock();
+  const runtime = createWorkbenchPersistenceRuntime({
+    aggregate: aggregate.port,
+    clock,
+    persistence: fake.persistence,
+    ...options,
+  });
+  runtime.start();
+  await flushPromises();
+  return { aggregate, clock, runtime, ...fake };
+};
+
+describe('Workbench persistence runtime exit checkpoint', () => {
+  it('saves the latest state when the editor exits inside the debounce', async () => {
+    const { aggregate, persistence, runtime } = await startLoaded();
+    aggregate.edit('Latest');
+
+    const exit = runtime.exit();
+
+    await expect(exit.settled).resolves.toBe('saved');
+    expect(savedNames(persistence)).toEqual(['Latest']);
+  });
+
+  it('saves the newest state once, after the save already in flight settles', async () => {
+    const { aggregate, clock, persistence, runtime } = await startLoaded();
+    const inFlight = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
+    aggregate.edit('In flight');
+    clock.runAll();
+    aggregate.edit('Queued');
+    clock.runAll();
+    aggregate.edit('Latest');
+
+    const exit = runtime.exit();
+    await flushPromises();
+    expect(savedNames(persistence)).toEqual(['In flight']);
+
+    inFlight.resolve(saveResult(aggregate.state));
+    await expect(exit.settled).resolves.toBe('saved');
+    clock.runAll();
+    await flushPromises();
+
+    expect(savedNames(persistence)).toEqual(['In flight', 'Latest']);
+  });
+
+  it('writes nothing more when the save in flight already covers the latest state', async () => {
+    const { aggregate, clock, persistence, runtime } = await startLoaded();
+    const inFlight = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
+    aggregate.edit('Latest');
+    clock.runAll();
+
+    const exit = runtime.exit();
+    inFlight.resolve(saveResult(aggregate.state));
+
+    await expect(exit.settled).resolves.toBe('nothing-to-save');
+    expect(savedNames(persistence)).toEqual(['Latest']);
+  });
+
+  it('saves again at exit when the latest revision previously failed', async () => {
+    const { aggregate, clock, persistence, runtime } = await startLoaded();
+    vi.mocked(persistence.saveWorkbench).mockRejectedValueOnce(new Error('offline'));
+    aggregate.edit('Failed once');
+    clock.runAll();
+    await flushPromises();
+
+    await expect(runtime.exit().settled).resolves.toBe('saved');
+    expect(savedNames(persistence)).toEqual(['Failed once', 'Failed once']);
+  });
+
+  it('writes nothing once the account lifetime ends, even mid-checkpoint', async () => {
+    const controller = new AbortController();
+    const { aggregate, clock, persistence, runtime } = await startLoaded({ signal: controller.signal });
+    const inFlight = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
+    aggregate.edit('Account A');
+    clock.runAll();
+    aggregate.edit('Account A, later');
+
+    const exit = runtime.exit();
+    controller.abort();
+    inFlight.resolve(saveResult(aggregate.state));
+
+    await expect(exit.settled).resolves.toBe('abandoned');
+    expect(savedNames(persistence)).toEqual(['Account A']);
+  });
+
+  it('writes nothing for an exit that begins after the account lifetime ended', async () => {
+    const controller = new AbortController();
+    const { aggregate, persistence, runtime } = await startLoaded({ signal: controller.signal });
+    aggregate.edit('Account A');
+    controller.abort();
+
+    await expect(runtime.exit().settled).resolves.toBe('abandoned');
+    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
+  });
+
+  it('records a failed exit save without rejecting, retrying, or touching the aggregate', async () => {
+    const { aggregate, clock, persistence, runtime } = await startLoaded();
+    vi.mocked(persistence.saveWorkbench).mockRejectedValueOnce(new Error('offline'));
+    aggregate.edit('Unsaved');
+    const eventsBeforeExit = [...aggregate.events];
+    const mark = logMark();
+
+    await expect(runtime.exit().settled).resolves.toBe('failed');
+    clock.runAll();
+    await flushPromises();
+
+    expect(loggedSince(mark)).toEqual(['persistence.exit-checkpoint-failed']);
+    expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
+    expect(aggregate.events).toEqual(eventsBeforeExit);
+  });
+
+  it('saves committed state without waiting for the capture, then once more for what the capture brought in', async () => {
+    const { aggregate, persistence, runtime } = await startLoaded();
+    const pixels = deferred<void>();
+    aggregate.edit('Committed');
+
+    const exit = runtime.exit({
+      beforeCapture: async () => {
+        await pixels.promise;
+        aggregate.edit('With pixels');
+      },
+    });
+    await flushPromises();
+    expect(savedNames(persistence)).toEqual(['Committed']);
+
+    pixels.resolve();
+    await expect(exit.settled).resolves.toBe('saved');
+    expect(savedNames(persistence)).toEqual(['Committed', 'With pixels']);
+  });
+
+  it.each([
+    ['rejects', () => Promise.reject(new Error('upload failed'))],
+    [
+      'throws synchronously',
+      () => {
+        throw new Error('no engine');
+      },
+    ],
+  ])('still saves, once, and records it when the capture %s', async (_, beforeCapture) => {
+    const { aggregate, persistence, runtime } = await startLoaded();
+    aggregate.edit('Committed');
+    const mark = logMark();
+
+    await expect(runtime.exit({ beforeCapture }).settled).resolves.toBe('saved');
+
+    expect(savedNames(persistence)).toEqual(['Committed']);
+    expect(loggedSince(mark)).toEqual(['persistence.exit-capture-incomplete']);
+  });
+
+  it('stops waiting for a capture that never settles and records it', async () => {
+    const { aggregate, clock, persistence, runtime } = await startLoaded();
+    aggregate.edit('Committed');
+    const mark = logMark();
+
+    const exit = runtime.exit({ beforeCapture: () => new Promise<void>(() => {}) });
+    await flushPromises();
+    clock.runAll();
+
+    await expect(exit.settled).resolves.toBe('saved');
+    expect(savedNames(persistence)).toEqual(['Committed']);
+    expect(loggedSince(mark)).toEqual(['persistence.exit-capture-incomplete']);
+  });
+
+  it('saves again at exit when the save in flight comes back with an error', async () => {
+    const { aggregate, clock, persistence, runtime } = await startLoaded();
+    const inFlight = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
+    aggregate.edit('Latest');
+    clock.runAll();
+
+    const exit = runtime.exit();
+    inFlight.resolve({ ...saveResult(aggregate.state), error: 'server error' });
+
+    await expect(exit.settled).resolves.toBe('saved');
+    expect(savedNames(persistence)).toEqual(['Latest', 'Latest']);
+  });
+
+  it('reports an exit save the backend did not acknowledge as failed and records it', async () => {
+    const { aggregate, persistence, runtime } = await startLoaded();
+    vi.mocked(persistence.saveWorkbench).mockResolvedValueOnce({
+      ...saveResult(aggregate.state),
+      shouldRetry: true,
+    });
+    aggregate.edit('Unacknowledged');
+    const mark = logMark();
+
+    await expect(runtime.exit().settled).resolves.toBe('failed');
+
+    expect(savedNames(persistence)).toEqual(['Unacknowledged']);
+    expect(loggedSince(mark)).toEqual(['persistence.exit-checkpoint-incomplete']);
+  });
+
+  it('stops observing the aggregate and the page at exit', async () => {
+    const page = createPage();
+    const { aggregate, clock, persistence, runtime } = await startLoaded({ page: page.port });
+
+    await expect(runtime.exit().settled).resolves.toBe('nothing-to-save');
+    aggregate.edit('After exit');
+    page.hide();
+    clock.runAll();
+    await flushPromises();
+
+    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
+  });
+
+  it('does not reopen projects after the editor closed its session to leave', async () => {
+    const { aggregate, persistence, runtime, setClosedSession } = await startLoaded();
+    aggregate.edit('Last tab');
+    setClosedSession(true);
+
+    await expect(runtime.exit().settled).resolves.toBe('nothing-to-save');
+    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
+  });
+
+  it('loads a remounted editor only after the previous exit checkpoint settles', async () => {
+    const first = await startLoaded();
+    const inFlight = deferred<WorkbenchSaveResult>();
+    vi.mocked(first.persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
+    first.aggregate.edit('In flight');
+    first.clock.runAll();
+    first.aggregate.edit('Latest');
+    const previousExit = first.runtime.exit();
+
+    const second = createPersistence(() => Promise.resolve(null));
+    const remounted = createWorkbenchPersistenceRuntime({
+      aggregate: createAggregate().port,
+      clock: new FakeClock(),
+      persistence: second.persistence,
+      previousExit,
+    });
+    remounted.start();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+
+    expect(remounted.getSnapshot().phase).toBe('hydrating');
+    expect(second.persistence.loadWorkbench).not.toHaveBeenCalled();
+
+    inFlight.resolve(saveResult(first.aggregate.state));
+    await vi.waitFor(() => expect(second.persistence.loadWorkbench).toHaveBeenCalledOnce());
+
+    expect(savedNames(first.persistence)).toEqual(['In flight', 'Latest']);
+    expect(vi.mocked(second.persistence.loadWorkbench).mock.invocationCallOrder[0]).toBeGreaterThan(
+      vi.mocked(first.persistence.saveWorkbench).mock.invocationCallOrder[1]!
+    );
+  });
+
+  it('keeps a later editor waiting when the one in between left before it loaded', async () => {
+    const first = await startLoaded();
+    const inFlight = deferred<WorkbenchSaveResult>();
+    vi.mocked(first.persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
+    first.aggregate.edit('In flight');
+    first.clock.runAll();
+    const firstExit = first.runtime.exit();
+
+    const between = createWorkbenchPersistenceRuntime({
+      aggregate: createAggregate().port,
+      clock: new FakeClock(),
+      persistence: createPersistence(() => Promise.resolve(null)).persistence,
+      previousExit: firstExit,
+    });
+    between.start();
+    const betweenExit = between.exit();
+
+    const last = createPersistence(() => Promise.resolve(null));
+    createWorkbenchPersistenceRuntime({
+      aggregate: createAggregate().port,
+      clock: new FakeClock(),
+      persistence: last.persistence,
+      previousExit: betweenExit,
+    }).start();
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(last.persistence.loadWorkbench).not.toHaveBeenCalled();
+
+    inFlight.resolve(saveResult(first.aggregate.state));
+    await expect(betweenExit.settled).resolves.toBe('nothing-to-save');
+    await vi.waitFor(() => expect(last.persistence.loadWorkbench).toHaveBeenCalledOnce());
+  });
+
+  it('stops waiting at the bound and keeps the superseded checkpoint from writing', async () => {
+    const first = await startLoaded();
+    const hung = deferred<WorkbenchSaveResult>();
+    vi.mocked(first.persistence.saveWorkbench).mockImplementationOnce(() => hung.promise);
+    first.aggregate.edit('Hung');
+    first.clock.runAll();
+    first.aggregate.edit('Latest');
+    const previousExit = first.runtime.exit();
+    const mark = logMark();
+
+    const second = createPersistence(() => Promise.resolve(null));
+    const clock = new FakeClock();
+    const remounted = createWorkbenchPersistenceRuntime({
+      aggregate: createAggregate().port,
+      clock,
+      persistence: second.persistence,
+      previousExit,
+    });
+    remounted.start();
+    await flushPromises();
+    expect(second.persistence.loadWorkbench).not.toHaveBeenCalled();
+
+    clock.runAll();
+    await flushPromises();
+    expect(second.persistence.loadWorkbench).toHaveBeenCalledOnce();
+
+    hung.resolve(saveResult(first.aggregate.state));
+    await expect(previousExit.settled).resolves.toBe('abandoned');
+    expect(savedNames(first.persistence)).toEqual(['Hung']);
+    expect(loggedSince(mark)).toEqual(['persistence.exit-checkpoint-abandoned']);
+  });
+});
+
+describe('Workbench persistence runtime page lifecycle', () => {
+  it('saves the unsaved revision at once when the page is hidden', async () => {
+    const page = createPage();
+    const { aggregate, persistence } = await startLoaded({ page: page.port });
+
+    page.hide();
+    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
+
+    aggregate.edit('Before hiding');
+    page.hide();
+    expect(savedNames(persistence)).toEqual(['Before hiding']);
+  });
+
+  it('does not re-push a failed revision or one already in flight when the page is hidden', async () => {
+    const page = createPage();
+    const { aggregate, clock, persistence } = await startLoaded({ page: page.port });
+    vi.mocked(persistence.saveWorkbench).mockRejectedValueOnce(new Error('offline'));
+    aggregate.edit('Failed');
+    clock.runAll();
+    await flushPromises();
+
+    page.hide();
+    expect(savedNames(persistence)).toEqual(['Failed']);
+
+    const inFlight = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
+    aggregate.edit('In flight');
+    clock.runAll();
+    page.hide();
+    inFlight.resolve(saveResult(aggregate.state));
+    await flushPromises();
+
+    expect(savedNames(persistence)).toEqual(['Failed', 'In flight']);
+  });
+
+  it('writes nothing while the editor is leaving with a closed session', async () => {
+    const page = createPage();
+    const { aggregate, clock, persistence, setClosedSession } = await startLoaded({ page: page.port });
+    setClosedSession(true);
+
+    aggregate.edit('After the empty session');
+    clock.runAll();
+    page.hide();
+
+    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
+  });
+
+  it('queues a hidden-page save behind the one in flight', async () => {
+    const page = createPage();
+    const { aggregate, clock, persistence } = await startLoaded({ page: page.port });
+    const inFlight = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
+    aggregate.edit('In flight');
+    clock.runAll();
+    aggregate.edit('Hidden');
+
+    page.hide();
+    expect(savedNames(persistence)).toEqual(['In flight']);
+
+    inFlight.resolve(saveResult(aggregate.state));
+    await flushPromises();
+    expect(savedNames(persistence)).toEqual(['In flight', 'Hidden']);
   });
 });

@@ -86,7 +86,6 @@ export const ProjectSwitcher = () => {
   const getProject = useCallback((projectId: string): Project | null => queries.getProject(projectId), [queries]);
 
   const createProject = useCallback(() => {
-    flushGenerateDrafts();
     projects.create();
   }, [projects]);
   const showOpenDialog = useCallback(() => setIsOpenDialogVisible(true), []);

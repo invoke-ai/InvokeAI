@@ -849,6 +849,93 @@ describe('durable project persistence', () => {
     expect(releaseSession).toHaveBeenCalledOnce();
   });
 
+  it('resolves the last release only once the editor session lock is given back', async () => {
+    const owner = captureAccountScope();
+    let releaseLock!: () => void;
+    const lockReleased = new Promise<void>((resolve) => {
+      releaseLock = resolve;
+    });
+    const service = createDurableSyncedWorkbenchPersistence(owner, {
+      api: createApi(),
+      draftStore: Promise.resolve(createMemoryProjectDraftStore()),
+      editorSession: Promise.resolve({ id: 'editor-1', release: () => lockReleased }),
+      writerToken: 'writer-1',
+    });
+    await service.loadWorkbench();
+    let isReleased = false;
+
+    void service
+      .retain()()
+      .then(() => {
+        isReleased = true;
+      });
+    await new Promise((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(isReleased).toBe(false);
+
+    releaseLock();
+    await vi.waitFor(() => expect(isReleased).toBe(true));
+  });
+
+  it('keeps a closed session closed until the editor reopens it', async () => {
+    const owner = captureAccountScope();
+    const api = createApi();
+    const service = createService(owner, api);
+    const project = createDraftProject([]);
+    await service.loadWorkbench();
+
+    const closing = service.persistEmptySession(stateWith([project]));
+    expect(service.hasClosedSession()).toBe(true);
+    await closing;
+    expect(service.hasClosedSession()).toBe(true);
+
+    vi.mocked(api.saveSession).mockClear();
+    await service.reopenSession(stateWith([project]));
+
+    expect(service.hasClosedSession()).toBe(false);
+    expect(
+      vi
+        .mocked(api.saveSession)
+        .mock.calls.at(-1)?.[0]
+        .projects.map(({ id }) => id)
+    ).toEqual([project.id]);
+  });
+
+  it('gives up project locks held for an unfinished resolution when a newer editor takes over', async () => {
+    const owner = captureAccountScope();
+    const release = vi.fn(() => Promise.resolve());
+    vi.mocked(acquireProjectMutationLock).mockResolvedValue({ kind: 'acquired', release });
+    const api = createApi();
+    const draftStore = createMemoryProjectDraftStore();
+    const project = createDraftProject([]);
+    await draftStore.stage({
+      baseRevision: 1,
+      documentJson: JSON.stringify(serializeProjectDocumentV3(project)),
+      documentSchemaVersion: 3,
+      editorSessionId: 'editor-1',
+      generation: 1,
+      projectId: project.id,
+      updatedAt: Date.parse(now),
+      writerToken: 'old-writer',
+    });
+    vi.mocked(api.loadSession).mockResolvedValue({
+      account: createInitialWorkbenchState().account,
+      activeProjectId: project.id,
+      openProjectIds: [project.id],
+    });
+    const service = createService(owner, api, draftStore);
+    await service.loadWorkbench();
+    await service.resolveConflictDiscard(project.id);
+    expect(release).not.toHaveBeenCalled();
+
+    service.releaseMutationLocks();
+    expect(release).toHaveBeenCalledOnce();
+
+    service.acknowledgeProjectResolution(project.id);
+    expect(release).toHaveBeenCalledOnce();
+  });
+
   it('stages the exact V2 document before issuing a create', async () => {
     const owner = captureAccountScope();
     const api = createApi();

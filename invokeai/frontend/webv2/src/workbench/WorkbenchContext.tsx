@@ -4,8 +4,10 @@ import type { ProjectSettings } from '@workbench/settings/contracts';
 import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts';
 
 import { startIntermediatesHoldLease } from '@features/intermediates/holdLease';
+import { createLogger } from '@platform/logging/logger';
+import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
 import { useMountEffect } from '@platform/react/useMountEffect';
-import { captureAccountScope } from '@platform/state/accountLifecycle';
+import { captureAccountScope, type AccountScope } from '@platform/state/accountLifecycle';
 import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
 import { createContext, use, useEffect, useSyncExternalStore, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -16,7 +18,7 @@ import { WorkbenchSplashScreen } from './components/WorkbenchSplashScreen';
 import { WorkbenchUnavailableScreen } from './components/WorkbenchUnavailableScreen';
 import { createExtensionRegistry, type ExtensionRegistry } from './extensions/extensionRegistry';
 import { clearLayerPanelStates } from './layerPanelState';
-import { createWorkbenchPersistenceRuntime } from './persistenceRuntime';
+import { browserPageLifecycle, createWorkbenchPersistenceRuntime, type PersistenceExit } from './persistenceRuntime';
 import { createOpenProjectBroker } from './projects/openProjectBroker';
 import {
   createLiveCanvasEngines,
@@ -49,6 +51,13 @@ const WorkbenchLiveCanvasEnginesContext = createContext<LiveCanvasEngines | null
 const subscribeToNothing = (): (() => void) => () => {};
 const getNullSnapshot = (): null => null;
 
+/**
+ * Each account lifetime's latest editor exit in this tab. The next editor loads only after it settles (bounded by the
+ * runtime), so it never hydrates a snapshot older than the checkpoint and two editors never write at once. Keyed by
+ * the lifetime: another account neither waits for it nor sees it.
+ */
+const pendingEditorExits = new WeakMap<AccountScope, PersistenceExit>();
+
 export const shallowEqual = selectorShallowEqual;
 
 export const WorkbenchProvider = ({
@@ -68,7 +77,7 @@ export const WorkbenchProvider = ({
   const [loadUnavailable, setLoadUnavailable] = useState<{ message: string; retry(): void } | null>(null);
   const hasHydrated = useSyncExternalStore(store.subscribe, store.getSnapshot, store.getSnapshot).hasHydrated;
 
-  // The runtime is created inside the effect: disposal is terminal, so each
+  // The runtime is created inside the effect: exit is terminal, so each
   // mount (including a StrictMode remount) must get its own instance.
   useMountEffect(() => {
     const releasePersistence = persistence.retain();
@@ -108,7 +117,10 @@ export const WorkbenchProvider = ({
         subscribe: store.subscribe,
       },
       loadOptions,
+      logger: createLogger({ area: 'autosave', namespace: 'persistence' }, { owner }),
+      page: browserPageLifecycle,
       persistence,
+      previousExit: pendingEditorExits.get(owner),
       signal: owner.signal,
     });
     // Publish throughout the mount so sibling library surfaces mutate open projects through the sync engine.
@@ -168,8 +180,34 @@ export const WorkbenchProvider = ({
       releaseIntermediateHold();
       clearLayerPanelStates();
       openProjectBroker.dispose();
-      persistenceRuntime.dispose();
-      releasePersistence();
+      // React runs a removed provider's cleanup before its descendants', so their draft flushers are still registered.
+      flushWorkbenchDrafts();
+      // The checkpoint outlives this unmount and keeps the persistence lease until it settles.
+      const exit = persistenceRuntime.exit({
+        beforeCapture: async () => {
+          const flushes = await Promise.allSettled(
+            store.getSnapshot().projects.map((project) => liveCanvasEngines.flushPendingPixels(project.id))
+          );
+          const failures = flushes.flatMap((flush) => (flush.status === 'rejected' ? [flush.reason] : []));
+          if (failures.length > 0) {
+            throw new AggregateError(failures, 'Unsaved Canvas pixels could not be persisted.');
+          }
+        },
+      });
+      const pendingExit: PersistenceExit = {
+        settled: exit.settled.then(releasePersistence),
+        supersede: () => {
+          exit.supersede();
+          // The lease itself stays until a stalled request returns: closing now could cut off a write in progress.
+          persistence.releaseMutationLocks();
+        },
+      };
+      pendingEditorExits.set(owner, pendingExit);
+      void pendingExit.settled.then(() => {
+        if (pendingEditorExits.get(owner) === pendingExit) {
+          pendingEditorExits.delete(owner);
+        }
+      });
     };
   });
 
