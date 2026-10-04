@@ -30,7 +30,6 @@ interface GenerateConceptsContentProps {
   projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (update: GenerateSettingsUpdate) => void;
-  onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
 
 /** Whether the selected model's graph will load this concept: its family must take LoRAs and match the LoRA. */
@@ -40,7 +39,6 @@ export const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateMode
 export const GenerateConceptsContent = ({
   loraModels,
   onCommit,
-  onCommitImmediate,
   projectId,
   selectedModel,
   settings,
@@ -51,12 +49,21 @@ export const GenerateConceptsContent = ({
   const selectedLoraKeys = useMemo(() => new Set(loras.map((lora) => lora.model.key)), [loras]);
 
   const addLora = (model: ModelConfig | null) => {
-    if (!isLoraModelConfig(model) || selectedLoraKeys.has(model.key)) {
+    if (!isLoraModelConfig(model)) {
       return;
     }
 
-    onCommitImmediate({
-      loras: [...loras, { isEnabled: true, model, weight: getDefaultLoraWeight(model) }],
+    onCommit((settings) => {
+      const latestLoras = syncGenerateLorasWithModels(settings.loras, loraModels);
+
+      if (latestLoras.some((lora) => lora.model.key === model.key)) {
+        return settings;
+      }
+
+      return {
+        ...settings,
+        loras: [...latestLoras, { isEnabled: true, model, weight: getDefaultLoraWeight(model) }],
+      };
     });
   };
 

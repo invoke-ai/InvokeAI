@@ -84,7 +84,6 @@ export const GenerateGuidanceSection = ({
           selectedModel={selectedModel}
           settings={settings}
           onCommit={onConceptCommit}
-          onCommitImmediate={onCommitImmediate}
         />
       </Stack>
     </GenerateCollapsibleSection>

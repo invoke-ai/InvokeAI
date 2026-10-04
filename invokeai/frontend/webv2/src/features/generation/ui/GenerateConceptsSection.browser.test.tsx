@@ -27,6 +27,7 @@ vi.mock('react-i18next', () => {
 seedArchitectureCapabilities();
 
 const LORA_MODEL: LoraModelConfig = { base: 'sdxl', key: 'lora-1', name: 'Ink Wash', type: 'lora' };
+const ADDED_LORA_MODEL: LoraModelConfig = { base: 'sdxl', key: 'lora-2', name: 'Chalk', type: 'lora' };
 const MAIN_MODEL: GenerateModelConfig = { base: 'sdxl', key: 'main-1', name: 'Base', type: 'main' };
 const SD3_MODEL: GenerateModelConfig = { base: 'sd-3', key: 'sd3', name: 'SD3', type: 'main' };
 const LORA_MODELS = [LORA_MODEL];
@@ -34,7 +35,11 @@ const LORA: GenerateLora = { isEnabled: true, model: LORA_MODEL, weight: 0.75 };
 const SETTINGS: GenerateSettings = { ...getDefaultGenerateSettings(), loras: [LORA] };
 const ADAPTER = {
   models: {
-    ModelSelect: () => <div data-testid="concept-picker" />,
+    ModelSelect: ({ onChange }: { onChange: (model: LoraModelConfig) => void }) => (
+      <button data-testid="concept-picker" type="button" onClick={() => onChange(ADDED_LORA_MODEL)}>
+        Add concept
+      </button>
+    ),
     getBaseColorPalette: () => 'gray',
     getBaseLabel: (base: string) => base,
     getImageUrl: () => '',
@@ -47,7 +52,6 @@ let root: Root | null = null;
 
 const render = async (selectedModel: GenerateModelConfig = MAIN_MODEL, settings = SETTINGS) => {
   const onCommit = vi.fn<(update: GenerateSettingsUpdate) => void>();
-  const onCommitImmediate = vi.fn();
 
   host = document.createElement('div');
   document.body.append(host);
@@ -63,7 +67,6 @@ const render = async (selectedModel: GenerateModelConfig = MAIN_MODEL, settings 
               selectedModel={selectedModel}
               settings={settings}
               onCommit={onCommit}
-              onCommitImmediate={onCommitImmediate}
             />
           </GenerationUiProvider>
         </ChakraProvider>
@@ -71,7 +74,7 @@ const render = async (selectedModel: GenerateModelConfig = MAIN_MODEL, settings 
     );
   await renderProject('project-1');
 
-  return { onCommit, onCommitImmediate, renderProject, row: host };
+  return { onCommit, renderProject, row: host };
 };
 
 /** The settings a recorded commit produces from the rendered ones. */
@@ -94,7 +97,7 @@ afterEach(async () => {
 
 describe('GenerateConceptsContent', () => {
   it('discards a concept menu when switching projects with the same concept', async () => {
-    const { onCommit, onCommitImmediate, renderProject, row } = await render();
+    const { onCommit, renderProject, row } = await render();
 
     await stepWeight(row);
     expect(row.querySelector('[role="slider"]')?.getAttribute('aria-valuenow')).toBe('0.8');
@@ -113,7 +116,22 @@ describe('GenerateConceptsContent', () => {
     expect(document.querySelector('[role="menu"][data-state="open"]')).toBeNull();
     act(() => flushGenerateDrafts());
     expect(onCommit).not.toHaveBeenCalled();
-    expect(onCommitImmediate).not.toHaveBeenCalled();
+  });
+
+  it('adds a concept to the latest settings rather than the rendered list', async () => {
+    const { onCommit, row } = await render();
+
+    await act(() => row.querySelector<HTMLElement>('[data-testid="concept-picker"]')?.click());
+
+    expect(onCommit).toHaveBeenCalledTimes(1);
+    const update = onCommit.mock.calls[0]?.[0];
+    expect(typeof update).toBe('function');
+    // A weight that landed after this render must survive the add.
+    const latest = { ...SETTINGS, loras: [{ ...LORA, weight: 0.9 }] };
+    expect((update as (settings: GenerateSettings) => GenerateSettings)(latest).loras).toEqual([
+      { ...LORA, weight: 0.9 },
+      { isEnabled: true, model: ADDED_LORA_MODEL, weight: expect.any(Number) },
+    ]);
   });
 
   it('holds weight steps as a draft and commits them once the debounce settles', async () => {
