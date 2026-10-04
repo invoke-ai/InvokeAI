@@ -23,6 +23,7 @@ from invokeai.backend.ideogram4.transformer_pair import Ideogram4TransformerPair
 from invokeai.backend.model_manager.load.load_base import LoadedModel
 from invokeai.backend.model_manager.taxonomy import BaseModelType
 from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+from invokeai.backend.quantization.gguf.ggml_tensor import peak_ggml_linear_dequant_transient_bytes
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import Ideogram4ConditioningInfo
 from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import get_model_compute_dtype
@@ -241,17 +242,20 @@ class Ideogram4DenoiseInvocation(BaseInvocation):
 
     @staticmethod
     def _dequant_transient(model: object) -> int:
-        """What an int8 build transiently needs to dequantize its largest layer, per forward.
+        """What an int8 or GGUF build transiently needs to dequantize its largest layer, per forward.
 
-        `Int8ConvrotLinear` keeps the stored codes and materializes the dequantized, derotated
-        weight inside `forward`, so that peak is not part of the model's resident size and has to
-        fit inside the caller's reservation. Zero for a bf16 or fp8 build -- which is why it is
-        measured from the model rather than from the resolution: the two branches are separate
-        models and may be different builds.
+        `Int8ConvrotLinear` keeps the stored codes and a GGUF Linear its packed blocks, and both
+        materialize the dequantized weight inside `forward`, so that peak is not part of the model's
+        resident size and has to fit inside the caller's reservation. Zero for a bf16 or fp8 build --
+        which is why it is measured from the model rather than from the resolution: the two branches
+        are separate models and may be different builds. A model holds one scheme or the other.
         """
         if not isinstance(model, torch.nn.Module):
             return 0
-        return peak_dequant_transient_bytes(model, get_model_compute_dtype(model))
+        return max(
+            peak_dequant_transient_bytes(model, get_model_compute_dtype(model)),
+            peak_ggml_linear_dequant_transient_bytes(model),
+        )
 
     def _load_branches(
         self, context: InvocationContext, stack: ExitStack, working_mem_bytes: int

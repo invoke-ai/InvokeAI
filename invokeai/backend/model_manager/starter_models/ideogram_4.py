@@ -95,3 +95,83 @@ ideogram_4_single_file = StarterModel(
     format=ModelFormat.Checkpoint,
     dependencies=[ideogram_4_unconditional_single_file, ideogram_4_qwen3_vl_encoder_8b, flux2_vae],
 )
+
+# Community GGUF conversions of the same per-branch files, paired the same way. They are the smallest
+# Ideogram 4 builds that run on any device: the Linear weights stay packed and dequantize per forward,
+# so the download size is roughly the resident size. Pinned to a commit: none of these files carries
+# metadata, so the branch is read from the filename, and a reupload under the same path could change
+# what a pinned name means.
+#
+# Q8_0 is left out on purpose: at ~10.1GB per branch it is larger than the fp8 build it would replace.
+_MOLBAL_GGUF = "https://huggingface.co/molbal/ideogram-4-gguf/resolve/83e58701001a85d11774c13a8b2baf1c77da3f27"
+# The only K-quant pair converted with one recipe for both branches. It packs the norms and the
+# embedding as well, which the loader dequantizes once at load.
+_RECTANGLEWORM_GGUF = (
+    "https://huggingface.co/rectangleworm/ideogram-4-gguf/resolve/7b353b17986757de25ecc1be87406adf09d01d21/diffusion"
+)
+
+ideogram_4_unconditional_gguf_q4_0 = StarterModel(
+    name="Ideogram 4 Unconditional (GGUF, Q4_0)",
+    base=BaseModelType.Ideogram4,
+    source=f"{_MOLBAL_GGUF}/ideogram4-unconditional_transformer-q4_0.gguf",
+    description="The unconditional branch of Ideogram 4, in GGUF Q4_0. Useless on its own — Ideogram 4 "
+    "guides its conditional branch against this one. ~5.6GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+)
+
+ideogram_4_gguf_q4_0 = StarterModel(
+    name="Ideogram 4 (GGUF, Q4_0)",
+    base=BaseModelType.Ideogram4,
+    source=f"{_MOLBAL_GGUF}/ideogram4-transformer-q4_0.gguf",
+    description="Community GGUF of Ideogram 4 in Q4_0, the smallest build: 5.6GB per branch in memory "
+    "against 8.7GB for fp8, on every device. Installs the unconditional branch, the Qwen3-VL 8B encoder "
+    "and the VAE with it. Non-commercial license. ~21GB total",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[ideogram_4_unconditional_gguf_q4_0, ideogram_4_qwen3_vl_encoder_8b, flux2_vae],
+)
+
+ideogram_4_unconditional_gguf_q5_k = StarterModel(
+    name="Ideogram 4 Unconditional (GGUF, Q5_K)",
+    base=BaseModelType.Ideogram4,
+    source=f"{_RECTANGLEWORM_GGUF}/uncond/ideogram4_unconditional_Q5_K.gguf",
+    description="The unconditional branch of Ideogram 4, in GGUF Q5_K. Useless on its own — Ideogram 4 "
+    "guides its conditional branch against this one. ~6.4GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+)
+
+ideogram_4_gguf_q5_k = StarterModel(
+    name="Ideogram 4 (GGUF, Q5_K)",
+    base=BaseModelType.Ideogram4,
+    source=f"{_RECTANGLEWORM_GGUF}/cond/ideogram4_Q5_K.gguf",
+    description="Community GGUF of Ideogram 4 in Q5_K: 6.4GB per branch in memory, on every device. "
+    "Installs the unconditional branch, the Qwen3-VL 8B encoder and the VAE with it. Non-commercial "
+    "license. ~23GB total",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[ideogram_4_unconditional_gguf_q5_k, ideogram_4_qwen3_vl_encoder_8b, flux2_vae],
+)
+
+ideogram_4_unconditional_gguf_q5_1 = StarterModel(
+    name="Ideogram 4 Unconditional (GGUF, Q5_1)",
+    base=BaseModelType.Ideogram4,
+    source=f"{_MOLBAL_GGUF}/ideogram4-unconditional_transformer-q5_1.gguf",
+    description="The unconditional branch of Ideogram 4, in GGUF Q5_1. Useless on its own — Ideogram 4 "
+    "guides its conditional branch against this one. ~7.3GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+)
+
+ideogram_4_gguf_q5_1 = StarterModel(
+    name="Ideogram 4 (GGUF, Q5_1)",
+    base=BaseModelType.Ideogram4,
+    source=f"{_MOLBAL_GGUF}/ideogram4-transformer-q5_1.gguf",
+    description="Community GGUF of Ideogram 4 in Q5_1, the largest GGUF that is still smaller than fp8: "
+    "7.3GB per branch in memory, on every device. Installs the unconditional branch, the Qwen3-VL 8B "
+    "encoder and the VAE with it. Non-commercial license. ~25GB total",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    dependencies=[ideogram_4_unconditional_gguf_q5_1, ideogram_4_qwen3_vl_encoder_8b, flux2_vae],
+)

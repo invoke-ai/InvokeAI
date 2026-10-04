@@ -9,14 +9,18 @@ The on-disk model is a diffusers pipeline folder bundling:
 The transformer is our vendored ``Ideogram4Transformer`` (not a diffusers class), so we
 build it explicitly and load the prequantized state dict — mirroring how InvokeAI loads
 FLUX nf4. Both transformer branches are returned as a single ``Ideogram4TransformerPair``.
+
+Single files -- safetensors or GGUF -- hold one branch each; their loaders return a bare
+``Ideogram4Transformer`` and the loader node pairs two of them.
 """
 
 import itertools
 import json
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 import accelerate
+import gguf
 import torch
 from safetensors.torch import load_file
 
@@ -24,6 +28,7 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.main import (
     Main_Checkpoint_Ideogram4_Config,
     Main_Diffusers_Ideogram4_Config,
+    Main_GGUF_Ideogram4_Config,
 )
 from invokeai.backend.model_manager.load.fp8_capability import NotApplicable
 from invokeai.backend.model_manager.load.load_default import ModelLoader, _model_declared_skip_patterns
@@ -54,6 +59,8 @@ from invokeai.backend.quantization.fp8_scaled import (
     split_fp8_scaled_layers,
     warn_on_unattached_scales,
 )
+from invokeai.backend.quantization.gguf.ggml_tensor import GGMLTensor
+from invokeai.backend.quantization.gguf.loaders import gguf_sd_loader
 from invokeai.backend.quantization.int8_convrot import (
     drop_unconsumed_quantization_sidecars,
     extract_int8_convrot_markers,
@@ -509,3 +516,117 @@ class Ideogram4CheckpointModel(ModelLoader):
             return model
 
         return self._apply_fp8_layerwise_casting(model, config, SubModelType.Transformer)
+
+
+# GGUF's unquantized storage types. `gguf_sd_loader` wraps BF16 like a quantized type (torch has no
+# GGML-side view for it), so here it is as packed as Q4_0 -- but dequantizing it changes no byte count.
+_UNQUANTIZED_GGML_TYPES = frozenset(
+    {gguf.GGMLQuantizationType.F32, gguf.GGMLQuantizationType.F16, gguf.GGMLQuantizationType.BF16}
+)
+
+
+def _dequantize_ggml_at_load(
+    sd: dict[str, torch.Tensor],
+    model: torch.nn.Module,
+    skip_patterns: tuple[str, ...],
+    reserve: Callable[[int], None],
+) -> int:
+    """Replace, in `sd`, the GGUF tensors that must not -- or need not -- stay packed. Returns the count.
+
+    Must not: `GGMLTensor` only works where torch dispatches the op to it (a Linear's matmul, `mul`,
+    `add`). `F.embedding` (`embed_image_indicator`) is not dispatched at all, `F.rms_norm` validates
+    the packed buffer in C++, and `compute_dtype_of` reads the *storage* dtype -- `uint8` -- off
+    `input_proj` and `t_embedding`, then casts every activation to it. So everything that is not a
+    Linear weight or bias, plus the model's own skip patterns. Published GGUFs differ in which of these
+    they quantize (some keep the norms in BF16, others pack them to Q4_K), hence a rule by module.
+
+    Need not: an unquantized tensor is the same size either way, but kept packed it is dequantized on
+    every forward -- for the BF16 `llm_cond_proj` most releases ship, a 245M-element weight, that is a
+    measured 1.87 GB transient per call.
+
+    The framework reserved the file's size before the loader ran, which already covers every packed
+    tensor, so what is reserved here is each tensor's growth over its packed size: nothing for BF16,
+    and little for the rest -- the norms, a two-row embedding and the two embedders.
+    """
+    linear_params = {
+        f"{module_name}.{param_name}"
+        for module_name, module in model.named_modules()
+        if isinstance(module, torch.nn.Linear)
+        for param_name, _ in module.named_parameters(recurse=False)
+    }
+    keys = [
+        key
+        for key, value in sd.items()
+        if isinstance(value, GGMLTensor)
+        and (
+            value._ggml_quantization_type in _UNQUANTIZED_GGML_TYPES
+            or key not in linear_params
+            or any(pattern in key for pattern in skip_patterns)
+        )
+    ]
+    reserve(
+        sum(
+            max(0, sd[key].tensor_shape.numel() * sd[key].compute_dtype.itemsize - sd[key].quantized_data.nbytes)
+            for key in keys
+        )
+    )
+    # One at a time, so each packed original is released as its replacement lands.
+    for key in keys:
+        sd[key] = sd[key].get_dequantized_tensor()
+    return len(keys)
+
+
+@ModelLoaderRegistry.register(base=BaseModelType.Ideogram4, type=ModelType.Main, format=ModelFormat.GGUFQuantized)
+class Ideogram4GGUFModel(ModelLoader):
+    """Loads ONE branch of Ideogram 4's dual-branch transformer from a GGUF file.
+
+    The community GGUFs are conversions of the per-branch single files: key-for-key this
+    repository's ``Ideogram4Transformer``, one branch per file, paired at the loader node exactly
+    like the safetensors builds. The Linear weights stay packed as ``GGMLTensor`` and dequantize per
+    forward through the model cache's autocast layers; what the model reads outside a matmul, and
+    what is not actually quantized, is dequantized here (see `_dequantize_ggml_at_load`).
+
+    No `fp8_storage` declaration: FP8 Storage is refused for every quantized format by rule, and a
+    packed weight cannot be re-encoded anyway.
+    """
+
+    def _load_model(
+        self,
+        config: AnyModelConfig,
+        submodel_type: Optional[SubModelType] = None,
+    ) -> AnyModel:
+        if not isinstance(config, Main_GGUF_Ideogram4_Config):
+            raise ValueError(f"Expected Main_GGUF_Ideogram4_Config, got {type(config).__name__}.")
+
+        if submodel_type is not SubModelType.Transformer:
+            raise ValueError(
+                "A single-file Ideogram 4 GGUF holds only a transformer; "
+                f"'{submodel_type.value if submodel_type else 'None'}' is not in it. Select a standalone "
+                "Qwen3-VL encoder and VAE on the model loader node, or install the diffusers pipeline."
+            )
+
+        from invokeai.backend.ideogram4.modeling_ideogram4 import Ideogram4Config, Ideogram4Transformer
+
+        target_device = TorchDevice.choose_torch_device()
+        compute_dtype = TorchDevice.choose_bfloat16_safe_dtype(target_device)
+
+        # The framework has already reserved the file's size, and the weights stay packed, so that
+        # covers everything but the growth of the tensors dequantized below, which reserve for it.
+        sd: dict[str, torch.Tensor] = gguf_sd_loader(Path(config.path), compute_dtype=compute_dtype)
+
+        with accelerate.init_empty_weights():
+            model: torch.nn.Module = Ideogram4Transformer(Ideogram4Config())
+
+        dequantized = _dequantize_ggml_at_load(
+            sd, model, _model_declared_skip_patterns(model), self._ram_cache.make_room
+        )
+
+        # Strict, as for the safetensors files: every published GGUF is key-for-key this model.
+        model.load_state_dict(sd, strict=True, assign=True)
+        sd.clear()
+
+        self._logger.info(
+            f"Ideogram 4: loaded the GGUF {config.branch} branch, {dequantized} unquantized or non-Linear "
+            "tensor(s) dequantized at load, the remaining Linear weights kept packed"
+        )
+        return model

@@ -25,6 +25,10 @@ from invokeai.backend.model_manager.taxonomy import (
     SubModelType,
 )
 
+# One file holds one transformer branch, so the pair is wired up here and the encoder and VAE come
+# from elsewhere. The two formats differ only in how the weights are stored.
+_SINGLE_FILE_FORMATS = frozenset({ModelFormat.Checkpoint, ModelFormat.GGUFQuantized})
+
 
 @invocation_output("ideogram4_model_loader_output")
 class Ideogram4ModelLoaderOutput(BaseInvocationOutput):
@@ -58,16 +62,16 @@ class Ideogram4ModelLoaderInvocation(BaseInvocation):
 
     * A diffusers pipeline bundles everything - both transformer branches, the Qwen3-VL encoder
       + tokenizer, and the VAE - and needs nothing else selected.
-    * Comfy-Org's single files hold ONE branch each, so the conditional file goes in `Model`, the
-      unconditional one in `Transformer (Unconditional)`, and the Qwen3-VL 8B encoder and the
-      32-channel VAE are selected here as well.
+    * Single files - Comfy-Org's safetensors or a community GGUF - hold ONE branch each, so the
+      conditional file goes in `Model`, the unconditional one in `Transformer (Unconditional)`, and
+      the Qwen3-VL 8B encoder and the 32-channel VAE are selected here as well.
 
     Both branches run at every denoising step, so the pair is not optional.
     """
 
     model: ModelIdentifierField = InputField(
         description="The Ideogram 4 model to load. A diffusers pipeline provides every submodel; a "
-        "single-file checkpoint is the conditional transformer alone and needs the components below.",
+        "single file (safetensors or GGUF) is the conditional transformer alone and needs the components below.",
         input=Input.Direct,
         ui_model_base=BaseModelType.Ideogram4,
         ui_model_type=ModelType.Main,
@@ -76,18 +80,18 @@ class Ideogram4ModelLoaderInvocation(BaseInvocation):
 
     unconditional_model: Optional[ModelIdentifierField] = InputField(
         default=None,
-        description="The unconditional branch as a single-file checkpoint. Required when Model is a "
-        "single file; ignored for a diffusers pipeline, which bundles both branches.",
+        description="The unconditional branch as a single file (safetensors or GGUF). Required when Model "
+        "is a single file; ignored for a diffusers pipeline, which bundles both branches.",
         input=Input.Direct,
         ui_model_base=BaseModelType.Ideogram4,
         ui_model_type=ModelType.Main,
-        ui_model_format=ModelFormat.Checkpoint,
+        ui_model_format=[ModelFormat.Checkpoint, ModelFormat.GGUFQuantized],
         title="Transformer (Unconditional)",
     )
 
     qwen3_vl_encoder_model: Optional[ModelIdentifierField] = InputField(
         default=None,
-        description="Standalone Qwen3-VL 8B encoder. Required when Model is a single-file checkpoint; "
+        description="Standalone Qwen3-VL 8B encoder. Required when Model is a single file; "
         "otherwise an override for the encoder bundled in the diffusers pipeline.",
         input=Input.Direct,
         # Base `any` excludes MiniMax H3's truncated Qwen3-VL-32B, which shares this model type and
@@ -100,7 +104,7 @@ class Ideogram4ModelLoaderInvocation(BaseInvocation):
     vae_model: Optional[ModelIdentifierField] = InputField(
         default=None,
         description="Standalone VAE (the 32-channel one Ideogram 4 shares with FLUX.2). Required when "
-        "Model is a single-file checkpoint; otherwise an override for the bundled VAE.",
+        "Model is a single file; otherwise an override for the bundled VAE.",
         input=Input.Direct,
         ui_model_base=accepted_vae_bases(BaseModelType.Ideogram4),
         ui_model_type=ModelType.VAE,
@@ -113,7 +117,7 @@ class Ideogram4ModelLoaderInvocation(BaseInvocation):
             raise ValueError(
                 f"Model '{main_config.name}' is not an Ideogram 4 main model. Select an Ideogram 4 transformer."
             )
-        is_single_file = main_config.format is ModelFormat.Checkpoint
+        is_single_file = main_config.format in _SINGLE_FILE_FORMATS
 
         unconditional_transformer: TransformerField | None = None
         if is_single_file:
@@ -143,8 +147,8 @@ class Ideogram4ModelLoaderInvocation(BaseInvocation):
         if self.unconditional_model is None:
             raise ValueError(
                 "A single-file Ideogram 4 transformer is one of two branches, so "
-                "'Transformer (Unconditional)' must be selected as well. Install "
-                "'ideogram4_unconditional_*.safetensors' from the same release, or select the diffusers "
+                "'Transformer (Unconditional)' must be selected as well. Install the unconditional file of "
+                "the same release (named '*unconditional*' or '*uncond*'), or select the diffusers "
                 "pipeline, which carries both."
             )
         if self.unconditional_model.key == self.model.key:
@@ -155,9 +159,9 @@ class Ideogram4ModelLoaderInvocation(BaseInvocation):
         config = context.models.get_config(self.unconditional_model)
         if config.base is not BaseModelType.Ideogram4 or config.type is not ModelType.Main:
             raise ValueError(f"'{config.name}' is not an Ideogram 4 main model and cannot be the unconditional branch.")
-        if config.format is not ModelFormat.Checkpoint:
+        if config.format not in _SINGLE_FILE_FORMATS:
             raise ValueError(
-                f"'Transformer (Unconditional)' must be a single-file Ideogram 4 checkpoint. '{config.name}' "
+                f"'Transformer (Unconditional)' must be a single-file Ideogram 4 transformer. '{config.name}' "
                 f"is in {config.format.value} format, which bundles both branches already."
             )
         self._raise_for_wrong_branch(config, expected="unconditional", slot="Transformer (Unconditional)")
@@ -167,18 +171,19 @@ class Ideogram4ModelLoaderInvocation(BaseInvocation):
     def _raise_for_wrong_branch(config: Any, *, expected: str, slot: str) -> None:
         """Reject a swapped pair.
 
-        The branch is read from the file's own `model_type` metadata, so unlike Wan's
-        filename-derived expert tags it is not a guess and the wiring does not get to override it:
-        the two branches are otherwise identical, and swapping them produces coherent images that
-        are simply not the ones the prompt asked for - with nothing in the log to say so.
+        The branch was recorded at install time - from the file's own `model_type` metadata where
+        it has one, from its name otherwise (every GGUF) - and the wiring does not get to override
+        it: the two branches are otherwise identical, and swapping them produces coherent images
+        that are simply not the ones the prompt asked for - with nothing in the log to say so.
         """
         branch = getattr(config, "branch", None)
         if branch != expected:
             raise ValueError(
                 f"'{config.name}' is the {branch} branch of Ideogram 4 and cannot be used as '{slot}', "
                 f"which needs the {expected} one. If the two are wired the wrong way round, swap them. "
-                "A file whose metadata was stripped is classified by its name, so if this one was "
-                f"renamed, rename it to contain '{expected}' (or not) and re-install it."
+                "A file without branch metadata (every GGUF, and stripped safetensors) is classified by "
+                f"its name, so if this one was renamed, rename it to contain '{expected}' (or not) and "
+                "re-install it."
             )
 
     def _resolve_encoder(

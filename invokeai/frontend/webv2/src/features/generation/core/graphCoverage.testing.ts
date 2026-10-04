@@ -33,10 +33,11 @@ export const SHAPE_OVERRIDES: Partial<Record<SupportedGenerateBase, readonly Mod
     { label: 'qwen3', overrides: { format: 'checkpoint', variant: 'anima_qwen3' } },
     { label: 'qwen35', overrides: { format: 'checkpoint', variant: 'anima_qwen35' } },
   ],
-  // Ideogram's standalone fixture is a conditional checkpoint, not GGUF.
+  // Ideogram's single files carry a branch and come as safetensors or GGUF.
   'ideogram-4': [
     { label: 'diffusers', overrides: { format: 'diffusers' } },
     { label: 'standalone-components', overrides: { branch: 'conditional', format: 'checkpoint' } },
+    { label: 'standalone-gguf', overrides: { branch: 'conditional', format: 'gguf_quantized' } },
   ],
   // FLUX.2 dev and Klein need distinct encoder variants.
   flux2: [

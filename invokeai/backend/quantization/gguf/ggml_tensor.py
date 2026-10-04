@@ -200,3 +200,29 @@ class GGMLTensor(torch.Tensor):
         if func in GGML_TENSOR_OP_TABLE:
             return GGML_TENSOR_OP_TABLE[func](func, args, kwargs)
         return NotImplemented
+
+
+# What one dequantization allocates beyond its result, per weight element: the block kernels in
+# `utils.py` widen codes and scales through integer and float16 intermediates before the final cast.
+# Measured on CUDA (torch 2.13) for a 4608x53248 weight: about 2 bytes for Q8_0 and Q4_0, 3 for Q4_K
+# and Q6_K, 5 for Q5_K, 6 for BF16 and 8 for Q5_1.
+_DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT = 8
+
+
+def peak_ggml_linear_dequant_transient_bytes(model: torch.nn.Module) -> int:
+    """Peak bytes one forward transiently needs to dequantize this model's GGUF-packed Linear weights.
+
+    A packed Linear weight is dequantized on every forward into a full copy in its compute dtype,
+    which is not part of the model's resident size and so has to fit inside the calling node's
+    working-memory reservation. The layers run one after another and free their copy before the
+    next one allocates, so the peak is the largest single layer's: its dequantized copy, the kernels'
+    intermediates, and the packed bytes, which partial loading copies to the device for the call.
+    Zero when no Linear weight is packed.
+    """
+    peak = 0
+    for module in model.modules():
+        weight = getattr(module, "weight", None)
+        if isinstance(module, torch.nn.Linear) and isinstance(weight, GGMLTensor):
+            per_element = weight.compute_dtype.itemsize + _DEQUANT_INTERMEDIATE_BYTES_PER_ELEMENT
+            peak = max(peak, weight.tensor_shape.numel() * per_element + weight.quantized_data.nbytes)
+    return peak

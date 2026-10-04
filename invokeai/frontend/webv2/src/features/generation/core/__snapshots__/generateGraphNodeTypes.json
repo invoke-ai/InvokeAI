@@ -195,6 +195,11 @@
           "ideogram4UnconditionalModel",
           "qwen3VLEncoderModel",
           "vae"
+        ],
+        "standalone-gguf": [
+          "ideogram4UnconditionalModel",
+          "qwen3VLEncoderModel",
+          "vae"
         ]
       },
       "nodeTypes": [
