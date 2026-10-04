@@ -7,7 +7,6 @@ import torch.nn.functional as F
 from diffusers.models.attention_processor import Attention, AttnProcessor2_0
 
 from invokeai.backend.stable_diffusion.extensions.ip_adapter import IPAdapterExt
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningMode
 
 if TYPE_CHECKING:
     from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
@@ -165,8 +164,13 @@ class CustomAttnProcessor2_0(AttnProcessor2_0):
         return cast(torch.FloatTensor, hidden_states)
 
     def apply_regional_prompt_mask(
-        self, attention_mask, hidden_states, encoder_hidden_states, regional_prompt_data, percent_through
-    ):
+        self,
+        attention_mask: Optional[torch.Tensor],
+        hidden_states: torch.Tensor,
+        encoder_hidden_states: torch.Tensor,
+        regional_prompt_data: Optional[RegionalPromptData],
+        percent_through: Optional[torch.Tensor],
+    ) -> Optional[torch.Tensor]:
         if regional_prompt_data is None:
             return attention_mask
 

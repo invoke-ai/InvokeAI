@@ -68,12 +68,12 @@ from invokeai.backend.stable_diffusion.extensions.freeu import FreeUExt
 from invokeai.backend.stable_diffusion.extensions.hidiffusion import HiDiffusionExt
 from invokeai.backend.stable_diffusion.extensions.inpaint import InpaintExt
 from invokeai.backend.stable_diffusion.extensions.inpaint_model import InpaintModelExt
+from invokeai.backend.stable_diffusion.extensions.ip_adapter import IPAdapterExt
 from invokeai.backend.stable_diffusion.extensions.lora import LoRAExt
 from invokeai.backend.stable_diffusion.extensions.preview import PreviewExt
 from invokeai.backend.stable_diffusion.extensions.rescale_cfg import RescaleCFGExt
 from invokeai.backend.stable_diffusion.extensions.seamless import SeamlessExt
 from invokeai.backend.stable_diffusion.extensions.t2i_adapter import T2IAdapterExt
-from invokeai.backend.stable_diffusion.extensions.ip_adapter import IPAdapterExt
 from invokeai.backend.stable_diffusion.extensions_manager import ExtensionsManager
 from invokeai.backend.stable_diffusion.hidiffusion_utils import hidiffusion_patch
 from invokeai.backend.stable_diffusion.schedulers import SCHEDULER_MAP

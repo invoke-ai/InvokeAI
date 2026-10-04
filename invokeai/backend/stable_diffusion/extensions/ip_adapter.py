@@ -1,30 +1,32 @@
 from __future__ import annotations
 
 import math
-from dataclasses import dataclass
 from contextlib import contextmanager
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, List, Optional, Union
-import torch.nn.functional as F
 
 import torch
+import torch.nn.functional as F
 import torchvision
 from transformers import CLIPVisionModelWithProjection
 
+from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningMode
+from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
 from invokeai.backend.stable_diffusion.extension_callback_type import ExtensionCallbackType
 from invokeai.backend.stable_diffusion.extensions.base import ExtensionBase, callback
-from invokeai.backend.stable_diffusion.diffusion.regional_ip_data import RegionalIPData
-from invokeai.backend.ip_adapter.ip_adapter import IPAdapter
 from invokeai.backend.util.mask import to_standard_float_mask
 
 if TYPE_CHECKING:
-    from invokeai.app.invocations.primitives import ImageField
+    from diffusers import UNet2DConditionModel
+    from diffusers.models.attention_processor import Attention
+
     from invokeai.app.invocations.model import ModelIdentifierField
+    from invokeai.app.invocations.primitives import ImageField
     from invokeai.app.services.shared.invocation_context import InvocationContext
+    from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionProcessorWeights
     from invokeai.backend.stable_diffusion.denoise_context import DenoiseContext
     from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
-    from diffusers import UNet2DConditionModel
-    from invokeai.backend.ip_adapter.ip_attention_weights import IPAttentionProcessorWeights
 
 # TODO: refactor a little, when no longer restricted by old backend logic
 
@@ -51,6 +53,7 @@ class RegionalIPDataNew:
         self.image_prompt_embeds = []
         self.masks = []
         self.scales = []
+        self.seq_masks = None
 
     def add(self, uncond: torch.Tensor, cond: torch.Tensor, mask: Optional[torch.Tensor]) -> int:
         assert len(self.image_prompt_embeds) == len(self.masks)
@@ -63,12 +66,12 @@ class RegionalIPDataNew:
         self.scales[id] = value
 
     def build_masks(self):
-        assert isinstance(self.masks, list)
-        self.masks = RegionalIPData._prepare_masks(self.masks, self.max_downscale_factor, self.device, self.dtype)
+        self.seq_masks = RegionalIPData._prepare_masks(self.masks, self.max_downscale_factor, self.device, self.dtype)
+        self.masks = None
 
     def get_masks(self, query_seq_len: int) -> torch.Tensor:
         """Get the mask for the given query sequence length."""
-        return self.masks[query_seq_len]
+        return self.seq_masks[query_seq_len]
 
 
 class IPAdapterExt(ExtensionBase):
@@ -215,7 +218,12 @@ class IPAdapterExt(ExtensionBase):
     # run adapters in attention processor
     @staticmethod
     def run_adapters(
-        attn_processor, attn, query, hidden_states, encoder_hidden_states, regional_ip_data
+        attn_processor,
+        attn: Attention,
+        query: torch.Tensor,
+        hidden_states: torch.Tensor,
+        encoder_hidden_states: torch.Tensor,
+        regional_ip_data: Optional[RegionalIPData],  # RegionalIPDataNew
     ) -> torch.Tensor:
         batch_size, _, query_seq_len, head_dim = query.shape
         token_len = encoder_hidden_states.shape[-1]
