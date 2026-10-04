@@ -4513,6 +4513,9 @@
           "415": {
             "description": "No such job"
           },
+          "409": {
+            "description": "The job has recovery data that must be preserved"
+          },
           "422": {
             "description": "Validation Error",
             "content": {

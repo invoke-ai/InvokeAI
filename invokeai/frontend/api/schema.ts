@@ -53271,6 +53271,13 @@ export interface operations {
                     "application/json": unknown;
                 };
             };
+            /** @description The job has recovery data that must be preserved */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description No such job */
             415: {
                 headers: {
