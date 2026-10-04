@@ -400,10 +400,10 @@ const PresetTab = ({
   );
 };
 
-const MENU_AFFORDANCE_HOVER_PROPS = { bg: 'bg.emphasized', color: 'fg' } as const;
+const MENU_AFFORDANCE_HOVER_PROPS = { bg: 'bg.hover', color: 'fg' } as const;
 
-// Same fills as the widget rail's hover and active items (`WIDGET_ITEM_SX`).
-const PRESET_TAB_HOVER_PROPS = { bg: 'bg.emphasized', color: 'fg' } as const;
+// A pointed inactive preset takes the shared tinted hover; the active one keeps the widget rail's active fill.
+const PRESET_TAB_HOVER_PROPS = { '&:not([data-selected])': { bg: 'bg.hover', color: 'fg' } } as const;
 const PRESET_TAB_SELECTED_PROPS = { bg: 'bg.emphasized', color: 'fg' } as const;
 
 const DriftDot = () => <Box aria-hidden="true" bg="accent.solid" boxSize="1.5" flexShrink={0} rounded="full" />;

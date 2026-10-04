@@ -28,7 +28,7 @@ import { useTranslation } from 'react-i18next';
 
 const THUMBNAIL_SIZE = '7';
 // Use a distinct hover fill on bg.muted surfaces.
-const TEMPLATE_ROW_HOVER_PROPS = { bg: 'bg.emphasized/60' };
+const TEMPLATE_ROW_HOVER_PROPS = { bg: 'bg.hover' };
 const TEMPLATE_THUMBNAIL_FALLBACK = (
   <Box
     alignItems="center"

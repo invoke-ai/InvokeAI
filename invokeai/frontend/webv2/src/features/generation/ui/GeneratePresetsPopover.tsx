@@ -33,7 +33,7 @@ import { PANEL_HEADER_CONTROL_HEIGHT, PromptPanelHeader } from './promptFields/P
 const POPOVER_POSITIONING = { placement: 'bottom-end' } as const;
 const SEARCH_START_ELEMENT = <Icon as={SearchIcon} boxSize="3" color="fg.subtle" />;
 // The rows sit on the popover's `bg.muted` surface; hover one surface step up.
-const PRESET_ROW_HOVER_PROPS = { bg: 'bg.emphasized/60' };
+const PRESET_ROW_HOVER_PROPS = { bg: 'bg.hover' };
 const PRESET_ROW_SEPARATOR = <Separator borderColor="border.subtle" />;
 /** Below this many presets, a search box is more furniture than help. */
 const SEARCH_VISIBLE_MIN_PRESETS = 6;

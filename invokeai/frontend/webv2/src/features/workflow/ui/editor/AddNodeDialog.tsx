@@ -35,7 +35,7 @@ const UTILITY_CATEGORY = 'Utility';
 const CATEGORY_ROW_HEIGHT_PX = 28;
 const NODE_ROW_HEIGHT_PX = 44;
 const RESULT_LIST_ID = 'add-node-dialog-results';
-const ROW_HOVER_PROPS = { bg: 'bg.emphasized' };
+const ROW_HOVER_PROPS = { bg: 'bg.hover' };
 const VIRTUALIZER_INITIAL_RECT = { height: 384, width: 0 };
 
 const toCategoryLabel = (value: string): string =>
@@ -211,7 +211,7 @@ const NodeResultRow = ({
     as="button"
     aria-level={level}
     aria-selected={isActive}
-    bg={isActive ? 'bg.emphasized' : undefined}
+    bg={isActive ? 'bg.hover' : undefined}
     role="treeitem"
     tabIndex={-1}
     _hover={ROW_HOVER_PROPS}
@@ -271,7 +271,7 @@ const CategoryHeaderRow = ({
       aria-expanded={isExpanded}
       aria-level={1}
       aria-selected={isActive}
-      bg={isActive ? 'bg.emphasized' : undefined}
+      bg={isActive ? 'bg.hover' : undefined}
       role="treeitem"
       tabIndex={-1}
       _hover={ROW_HOVER_PROPS}

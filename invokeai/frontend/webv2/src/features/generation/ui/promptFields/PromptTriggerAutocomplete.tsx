@@ -15,7 +15,7 @@ const LIST_WIDTH_PX = 260;
 const MAX_LIST_HEIGHT_PX = 220;
 const CARET_GAP_PX = 4;
 const VIEWPORT_MARGIN_PX = 8;
-const OPTION_HOVER_CSS = { bg: 'bg.emphasized' };
+const OPTION_HOVER_CSS = { bg: 'bg.hover' };
 
 export const PromptTriggerAutocomplete = ({
   activeIndex,
@@ -141,7 +141,7 @@ const AutocompleteOption = ({
   return (
     <Box
       aria-selected={isActive}
-      bg={isActive ? 'bg.emphasized' : undefined}
+      bg={isActive ? 'bg.hover' : undefined}
       color="fg"
       fontSize="md"
       id={id}

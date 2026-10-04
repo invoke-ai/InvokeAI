@@ -176,7 +176,7 @@ export const tabsSlotRecipe = defineSlotRecipe({
         trigger: {
           ...chakraSlotRecipes.tabs.variants?.variant?.enclosed?.trigger,
           _hover: {
-            '&:not([data-selected])': { bg: 'bg.emphasized' },
+            '&:not([data-selected])': { bg: 'bg.hover' },
           },
         },
       },
@@ -474,8 +474,8 @@ export const dropdownItem = {
     _highlighted: { bg: 'bg.error' },
     _hover: { bg: 'bg.error' },
   },
-  _highlighted: { bg: 'bg.emphasized' },
-  _hover: { bg: 'bg.emphasized' },
+  _highlighted: { bg: 'bg.hover' },
+  _hover: { bg: 'bg.hover' },
   _focusVisible: {
     outline: '2px solid',
     outlineColor: 'accent.solid',

@@ -24,7 +24,7 @@ import { useTranslation } from 'react-i18next';
 const MAX_PREVIEW_ROWS = 200;
 const TABULAR_NUMS = { fontVariantNumeric: 'tabular-nums' } as const;
 // Use a hover fill distinct from the popover's muted surface.
-const PROMPT_ROW_HOVER_PROPS = { bg: 'bg.emphasized/60' } as const;
+const PROMPT_ROW_HOVER_PROPS = { bg: 'bg.hover' } as const;
 // Keep preview text readable while interactions are disabled.
 const DISABLED_PROMPT_ROW_PROPS = { cursor: 'default', opacity: 1 } as const;
 const NO_HOVER_PROPS = { bg: 'transparent' } as const;

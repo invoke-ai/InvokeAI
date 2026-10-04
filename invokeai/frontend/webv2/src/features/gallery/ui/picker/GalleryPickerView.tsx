@@ -40,7 +40,7 @@ import { GalleryPickerBoards, type GalleryPickerBoardGroup } from './GalleryPick
 import { galleryPickerOptionId, GalleryPickerGrid } from './GalleryPickerGrid';
 import { useGalleryPickerScope } from './useGalleryPickerScope';
 
-const BOARD_BUTTON_EXPANDED_PROPS = { bg: 'bg.emphasized' } as const;
+const BOARD_BUTTON_EXPANDED_PROPS = { bg: 'bg.hover' } as const;
 
 /** Unseeded until the first page loads; then the Gallery's selection if it is on that page, else nothing. */
 type ActiveKeyState = GalleryItemKey | null | undefined;

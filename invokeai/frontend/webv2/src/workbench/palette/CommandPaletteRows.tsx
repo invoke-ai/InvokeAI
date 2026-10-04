@@ -78,7 +78,7 @@ const EntryRow = ({
       {...rowButtonProps}
       id={domId}
       aria-selected={isActive}
-      bg={isActive ? 'bg.emphasized' : undefined}
+      bg={isActive ? 'bg.hover' : undefined}
       role="option"
       onClick={onRun}
       onMouseDown={preventFocusSteal}
@@ -158,7 +158,7 @@ const ScopeRow = ({
     {...rowButtonProps}
     id={domId}
     aria-selected={isActive}
-    bg={isActive ? 'bg.emphasized' : undefined}
+    bg={isActive ? 'bg.hover' : undefined}
     role="option"
     onClick={onRun}
     onMouseDown={preventFocusSteal}

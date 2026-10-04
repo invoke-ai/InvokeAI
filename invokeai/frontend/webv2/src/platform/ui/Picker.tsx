@@ -305,7 +305,7 @@ const PickerOptionRow = <T,>({
     <Box
       aria-disabled={isDisabled || undefined}
       aria-selected={isSelected}
-      bg={isActive && !isDisabled ? 'bg.emphasized' : undefined}
+      bg={isActive && !isDisabled ? 'bg.hover' : undefined}
       cursor={isDisabled ? 'not-allowed' : undefined}
       data-active={isActive ? '' : undefined}
       data-picker-option-id={id}

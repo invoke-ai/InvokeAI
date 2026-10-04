@@ -105,7 +105,7 @@ const brandFg: Compute = (theme) =>
 const accentSolid: Compute = (theme) => theme.colors.accent.solid;
 /** Foreground pulled toward accent: the hue of interaction fills, which apply it at low alpha. */
 const hoverTint: Compute = (theme) =>
-  `color-mix(in oklab, ${theme.colors.accent.solid} 40%, ${
+  `color-mix(in oklab, ${theme.colors.accent.solid} 55%, ${
     theme.colorScheme === 'light' ? theme.colors.neutral[950] : theme.colors.neutral[50]
   })`;
 
@@ -159,8 +159,12 @@ const semanticColors = {
   'bg.panel': stepRef(800, 100),
   'bg.emphasized': colorToken((theme) => theme.colors.control),
   'bg.inset': colorToken((theme) => theme.colors.inset),
-  /** The pointed fill for rows and tabs: a faint accent-tinted foreground, translucent so it reads on any surface. */
-  'bg.hover': mix(hoverTint, 8, () => 'transparent'),
+  /**
+   * The pointed or highlighted fill for rows, tabs, and options: a faint accent-tinted foreground, translucent so it
+   * reads on any surface. Matches the ghost/outline button hover (`gray.hoverTint/10`), so an open trigger and its
+   * highlighted option share one fill.
+   */
+  'bg.hover': mix(hoverTint, 10, () => 'transparent'),
   // Soft status fills for alerts/banners, mixed into the panel surface.
   'bg.error': mix(danger, 14, surface),
   'bg.success': mix(success, 14, surface),
