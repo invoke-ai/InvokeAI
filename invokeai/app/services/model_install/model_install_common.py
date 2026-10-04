@@ -21,8 +21,32 @@ class InvalidModelConfigException(Exception):
     pass
 
 
+INSTALL_RECOVERY_SENTINEL = ".invokeai_install_recovery_required"
+
+
 class InstallRecoveryRequiredError(RuntimeError):
     """Install transfer could not be safely rolled back; preserve both recovery roots."""
+
+
+def recovery_sentinel_path(root: Path) -> Path:
+    """Return the sidecar marker path that protects an install recovery root."""
+    return root.parent / f".{root.name}{INSTALL_RECOVERY_SENTINEL}"
+
+
+def has_recovery_sentinel(root: Path) -> bool:
+    """Return whether an install recovery root has a durable preservation marker."""
+    return recovery_sentinel_path(root).exists()
+
+
+def is_recovery_protected_path(path: Path, boundary: Path) -> bool:
+    """Return whether a path or one of its ancestors below the boundary is recovery-protected."""
+    boundary = boundary.resolve()
+    current = path.resolve()
+    while current != boundary and current.is_relative_to(boundary):
+        if has_recovery_sentinel(current):
+            return True
+        current = current.parent
+    return False
 
 
 class InstallStatus(str, Enum):

@@ -67,12 +67,17 @@ class IPAdapter_InvokeAI_Config_Base(IPAdapter_Config_Base):
 
     @classmethod
     def _get_image_encoder_model_id(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> str:
+        if "image_encoder_model_id" in override_fields:
+            override = override_fields["image_encoder_model_id"]
+            if not isinstance(override, str) or not override.strip():
+                raise NotAMatchError("empty image_encoder_model_id override")
+            return override.strip()
+
         image_encoder_metadata_file = mod.path / "image_encoder.txt"
         if not image_encoder_metadata_file.exists():
             raise NotAMatchError("missing image_encoder.txt metadata file")
-        if "image_encoder_model_id" in override_fields:
-            return override_fields["image_encoder_model_id"]
-        image_encoder_model_id = image_encoder_metadata_file.read_text(encoding="utf-8").strip()
+        with image_encoder_metadata_file.open(encoding="utf-8") as metadata:
+            image_encoder_model_id = metadata.readline().strip()
         if not image_encoder_model_id:
             raise NotAMatchError("empty image_encoder.txt metadata")
         return image_encoder_model_id

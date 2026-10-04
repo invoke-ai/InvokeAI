@@ -12,6 +12,10 @@ from typing import Set
 from pydantic import BaseModel, Field
 
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.model_install.model_install_common import (
+    INSTALL_RECOVERY_SENTINEL,
+    is_recovery_protected_path,
+)
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 # Scratch area for operations that must build a model on the models volume before registering it -
@@ -72,7 +76,7 @@ class OrphanedModelsService:
         Returns:
             List of OrphanedModelInfo objects describing orphaned directories
         """
-        models_path = self._config.models_path
+        models_path = self._config.models_path.resolve()
 
         # Get all model directories registered in the database
         db_model_directories = self._get_registered_model_directories(models_path)
@@ -115,6 +119,8 @@ class OrphanedModelsService:
         # Convert to OrphanedModelInfo objects
         result = []
         for dir_path, files in orphaned_dirs_map.items():
+            if self._contains_recovery_sentinel(dir_path):
+                continue
             # Calculate total size
             total_size = sum(f.stat().st_size for f in files if f.exists())
 
@@ -155,12 +161,24 @@ class OrphanedModelsService:
                     results[rel_path] = "error: path is not under models directory"
                     continue
 
+                if full_path == models_path:
+                    results[rel_path] = "error: cannot delete the models directory"
+                    continue
+
                 try:
                     full_path.relative_to(conversion_scratch_path)
                 except ValueError:
                     pass
                 else:
                     results[rel_path] = "error: path is reserved for active conversion"
+                    continue
+
+                if self._is_recovery_protected(full_path, models_path):
+                    results[rel_path] = "error: path is reserved for install recovery"
+                    continue
+
+                if self._contains_recovery_sentinel(full_path):
+                    results[rel_path] = "error: path contains install recovery data"
                     continue
 
                 if not full_path.exists():
@@ -175,6 +193,14 @@ class OrphanedModelsService:
                 results[rel_path] = f"error: {str(e)}"
 
         return results
+
+    @staticmethod
+    def _is_recovery_protected(path: Path, models_path: Path) -> bool:
+        return is_recovery_protected_path(path, models_path)
+
+    @staticmethod
+    def _contains_recovery_sentinel(path: Path) -> bool:
+        return path.is_dir() and any(path.rglob(f"*{INSTALL_RECOVERY_SENTINEL}"))
 
     def _get_registered_model_directories(self, models_dir: Path) -> Set[Path]:
         """Get the set of all model directories from the database."""
@@ -222,7 +248,11 @@ class OrphanedModelsService:
             if any(skip_dir in item.parts for skip_dir in self.SKIP_DIRS):
                 continue
 
-            if item.is_file() and item.suffix.lower() in self.MODEL_EXTENSIONS:
+            if (
+                item.is_file()
+                and item.suffix.lower() in self.MODEL_EXTENSIONS
+                and not self._is_recovery_protected(item.parent, models_path)
+            ):
                 model_files.add(item.resolve())
 
         return model_files

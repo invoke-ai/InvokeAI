@@ -4666,6 +4666,9 @@
               }
             }
           },
+          "409": {
+            "description": "The job has recovery data that must be preserved"
+          },
           "415": {
             "description": "No such job"
           },
@@ -4730,6 +4733,9 @@
                 }
               }
             }
+          },
+          "409": {
+            "description": "The job has recovery data that must be preserved"
           },
           "415": {
             "description": "No such job"

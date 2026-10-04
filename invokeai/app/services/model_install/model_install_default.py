@@ -1,6 +1,7 @@
 """Model installation class."""
 
 import ctypes
+import errno
 import filecmp
 import gc
 import json
@@ -13,7 +14,7 @@ import time
 from copy import deepcopy
 from pathlib import Path
 from queue import Empty, Queue
-from shutil import move, rmtree
+from shutil import copy2, copytree, move, rmtree
 from tempfile import mkdtemp
 from typing import TYPE_CHECKING, Any, Dict, List, Optional, Tuple, Type, Union
 
@@ -40,6 +41,9 @@ from invokeai.app.services.model_install.model_install_common import (
     ModelSource,
     StringLikeSource,
     URLModelSource,
+    has_recovery_sentinel,
+    is_recovery_protected_path,
+    recovery_sentinel_path,
 )
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, UnknownModelException
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
@@ -86,7 +90,6 @@ TMPDIR_PREFIX = "tmpinstall_"
 # Marker file used to resume or pause remote model installs across restarts.
 INSTALL_MARKER_FILENAME = ".invokeai_install.json"
 INSTALL_MARKER_VERSION = 1
-INSTALL_RECOVERY_SENTINEL = ".invokeai_install_recovery_required"
 
 # Filesystems cap a single path component at 255 bytes. A source that lists many explicit files
 # (an LTX-2 component folder names eight) would otherwise produce a folder name that cannot be
@@ -160,10 +163,10 @@ class ModelInstallService(ModelInstallServiceBase):
         return tmpdir / INSTALL_MARKER_FILENAME
 
     def _recovery_sentinel_path(self, tmpdir: Path) -> Path:
-        return tmpdir.parent / f".{tmpdir.name}{INSTALL_RECOVERY_SENTINEL}"
+        return recovery_sentinel_path(tmpdir)
 
     def _has_recovery_sentinel(self, tmpdir: Path) -> bool:
-        return self._recovery_sentinel_path(tmpdir).exists()
+        return has_recovery_sentinel(tmpdir)
 
     def _write_recovery_sentinel(self, tmpdir: Path) -> None:
         # Keep recovery state outside the tree being transferred into the managed model directory.
@@ -196,8 +199,6 @@ class ModelInstallService(ModelInstallServiceBase):
             self._logger.warning(f"Failed to remove install recovery sentinel in {tmpdir}: {e}")
 
     def _retain_recovery_destination(self, dest_dir: Path) -> None:
-        if not dest_dir.name.startswith(TMPDIR_PREFIX):
-            return
         try:
             if dest_dir.exists():
                 self._write_recovery_sentinel(dest_dir)
@@ -597,7 +598,31 @@ class ModelInstallService(ModelInstallServiceBase):
     def _restore_moved_path(cls, src: Path, dst: Path) -> None:
         if dst.exists() or dst.is_symlink():
             raise FileExistsError(f"Refusing to overwrite recreated source {dst}")
-        cls._rename_noreplace(src, dst)
+        try:
+            cls._rename_noreplace(src, dst)
+        except OSError as e:
+            if e.errno != errno.EXDEV:
+                raise
+            # Local imports can span filesystems. Stage a full copy beside the original source, then
+            # atomically claim its name with a no-replace rename before removing the managed copy.
+            staging_dir = Path(mkdtemp(prefix=f".{dst.name}.restore-", dir=dst.parent))
+            staged_path = staging_dir / "restored"
+            try:
+                if src.is_symlink():
+                    os.symlink(os.readlink(src), staged_path)
+                elif src.is_dir():
+                    copytree(src, staged_path, symlinks=True)
+                elif src.is_file():
+                    copy2(src, staged_path)
+                else:
+                    raise OSError(f"Cannot restore unsupported filesystem object {src}")
+                cls._rename_noreplace(staged_path, dst)
+                if src.is_dir() and not src.is_symlink():
+                    rmtree(src)
+                else:
+                    src.unlink()
+            finally:
+                rmtree(staging_dir, ignore_errors=True)
 
     def install_path(
         self,
@@ -624,6 +649,9 @@ class ModelInstallService(ModelInstallServiceBase):
                 )
             dest_dir.mkdir(parents=True)
             destination_created = True
+            # Protect every file in the destination until the model record is committed. An admin can run orphan
+            # cleanup concurrently with this transfer, and the directory is not registered until _register().
+            self._write_recovery_sentinel(dest_dir)
             dest_path = dest_dir / model_path.name if model_path.is_file() else dest_dir
             if model_path.is_file():
                 try:
@@ -683,6 +711,7 @@ class ModelInstallService(ModelInstallServiceBase):
                         leftovers = ", ".join(str(path.resolve()) for path in remaining)
                         raise OSError(f"unexpected destination artifacts remain: {leftovers}")
                     dest_dir.rmdir()
+                    self._delete_recovery_sentinel(dest_dir)
                 except Exception as cleanup_error:
                     self._retain_recovery_destination(dest_dir)
                     raise InstallRecoveryRequiredError(
@@ -698,6 +727,7 @@ class ModelInstallService(ModelInstallServiceBase):
                         leftovers = ", ".join(str(path.resolve()) for path in remaining)
                         raise OSError(f"unexpected destination artifacts remain: {leftovers}")
                     dest_dir.rmdir()
+                    self._delete_recovery_sentinel(dest_dir)
                 except Exception as cleanup_error:
                     self._retain_recovery_destination(dest_dir)
                     raise InstallRecoveryRequiredError(
@@ -826,8 +856,12 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def cancel_job(self, job: ModelInstallJob) -> None:
         """Cancel the indicated job."""
-        if job._recovery_required:
-            raise ValueError("Cannot cancel an install that requires recovery; preserve its files for manual recovery.")
+        if job._recovery_required or (
+            job._install_tmpdir is not None and self._has_recovery_sentinel(job._install_tmpdir)
+        ):
+            raise InstallRecoveryRequiredError(
+                "Cannot cancel an install that requires recovery; preserve its files for manual recovery."
+            )
         job.cancel()
         self._logger.warning(f"Cancelling {job.source}")
         if dj := job._multifile_job:
@@ -858,6 +892,10 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def restart_failed(self, job: ModelInstallJob) -> None:
         """Restart failed or non-resumable downloads for a job."""
+        if job._recovery_required or (
+            job._install_tmpdir is not None and self._has_recovery_sentinel(job._install_tmpdir)
+        ):
+            raise InstallRecoveryRequiredError("Cannot restart an install that requires recovery.")
         if not isinstance(job.source, (HFModelSource, URLModelSource)):
             return
         if not job.download_parts:
@@ -884,6 +922,10 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def restart_file(self, job: ModelInstallJob, file_source: str) -> None:
         """Restart a specific file download for a job."""
+        if job._recovery_required or (
+            job._install_tmpdir is not None and self._has_recovery_sentinel(job._install_tmpdir)
+        ):
+            raise InstallRecoveryRequiredError("Cannot restart an install that requires recovery.")
         if not isinstance(job.source, (HFModelSource, URLModelSource)):
             return
         job.status = InstallStatus.WAITING
@@ -1341,7 +1383,17 @@ class ModelInstallService(ModelInstallServiceBase):
     def _remove_dangling_install_dirs(self) -> None:
         """Remove leftover tmpdirs from aborted installs."""
         path = self._app_config.models_path
+        registered_model_paths = {
+            (path / model.path).resolve() for model in self.record_store.all_models() if model.path
+        }
         for tmpdir in path.glob(f"{TMPDIR_PREFIX}*"):
+            resolved_tmpdir = tmpdir.resolve()
+            if any(
+                model_path == resolved_tmpdir or model_path.is_relative_to(resolved_tmpdir)
+                for model_path in registered_model_paths
+            ):
+                self._logger.debug(f"Preserving registered model directory {tmpdir}")
+                continue
             if self._has_recovery_sentinel(tmpdir):
                 self._logger.warning(f"Preserving install recovery data in {tmpdir}")
                 continue
@@ -1377,10 +1429,14 @@ class ModelInstallService(ModelInstallServiceBase):
         installed_model_paths = {
             (self._app_config.models_path / x.path).resolve() for x in self.record_store.all_models()
         }
+        models_path = self._app_config.models_path.resolve()
 
         # The bool returned by this callback determines if the model is added to the list of models found by the search
         def on_model_found(model_path: Path) -> bool:
             resolved_path = model_path.resolve()
+            if is_recovery_protected_path(resolved_path, models_path):
+                self._logger.warning(f"Skipping recovery-protected model path {model_path}")
+                return False
             # Already registered models should be in the list of found models, but not re-registered.
             if resolved_path in installed_model_paths:
                 return True
@@ -1458,6 +1514,7 @@ class ModelInstallService(ModelInstallServiceBase):
         apply_lora_metadata(info, model_path.resolve(), model_images_path)
 
         model_path = model_path.resolve()
+        recovery_root = model_path if model_path.is_dir() else model_path.parent
 
         # Models in the Invoke-managed models dir should use relative paths.
         if model_path.is_relative_to(self.app_config.models_path):
@@ -1473,6 +1530,8 @@ class ModelInstallService(ModelInstallServiceBase):
                 legacy_config_path = legacy_config_path.relative_to(self.app_config.legacy_conf_path)
             info.config_path = legacy_config_path.as_posix()
         self.record_store.add_model(info)
+        if self._has_recovery_sentinel(recovery_root):
+            self._delete_recovery_sentinel(recovery_root)
         return info.key
 
     def _next_id(self) -> int:
@@ -1797,7 +1856,9 @@ class ModelInstallService(ModelInstallServiceBase):
                 assert excp is not None
                 self._set_error(install_job, excp)
                 self._download_queue.cancel_job(download_job)
-                if install_job._install_tmpdir is not None:
+                if install_job._install_tmpdir is not None and not self._has_recovery_sentinel(
+                    install_job._install_tmpdir
+                ):
                     self._safe_rmtree(install_job._install_tmpdir, self._logger)
 
                 # Let other threads know that the number of downloads has changed
@@ -1815,7 +1876,9 @@ class ModelInstallService(ModelInstallServiceBase):
                 # if install job has already registered an error, then do not replace its status with cancelled
                 if not install_job.errored and not install_job.paused:
                     install_job.cancel()
-                    if install_job._install_tmpdir is not None:
+                    if install_job._install_tmpdir is not None and not self._has_recovery_sentinel(
+                        install_job._install_tmpdir
+                    ):
                         # Mark cancelled before cleanup so we don't reuse the folder if deletion fails.
                         self._write_install_marker(install_job, status=InstallStatus.CANCELLED)
                         self._delete_install_marker(install_job._install_tmpdir)

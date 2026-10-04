@@ -863,7 +863,8 @@ class ModelConfigFactory:
             candidate_name = candidate_class.__name__
             try:
                 candidate_fields = fields
-                # This config value comes from metadata, but its explicit override must reach its own probe.
+                # Preserve the explicit encoder choice for InvokeAI IP-Adapter probes; this field is not part of
+                # the common model record changes, but re-identification can carry it from the stored config.
                 if (
                     override_fields is not None
                     and "image_encoder_model_id" in override_fields

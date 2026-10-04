@@ -2,6 +2,7 @@
 Test the model installer
 """
 
+import errno
 import gc
 import json
 import platform
@@ -36,6 +37,8 @@ from invokeai.app.services.model_install import (
     model_install_default,
 )
 from invokeai.app.services.model_install.model_install_common import (
+    INSTALL_RECOVERY_SENTINEL,
+    InstallRecoveryRequiredError,
     InstallStatus,
     InvalidModelConfigException,
     LocalModelSource,
@@ -162,6 +165,100 @@ def test_file_install_retries_copy_then_unlink_permission_error(
     assert installed_path.read_bytes() == original_bytes
     assert not embedding_file.exists()
     assert calls == 1
+
+
+def test_destination_is_hidden_from_orphan_cleanup_during_install(
+    mm2_installer: ModelInstallServiceBase,
+    embedding_file: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import has_recovery_sentinel
+    from invokeai.app.services.orphaned_models import OrphanedModelsService
+
+    orphan_service = OrphanedModelsService(config=mm2_app_config, db=mm2_installer.record_store._db)
+    observations: list[tuple[str, bool, set[str]]] = []
+    real_move = shutil.move
+
+    def move_then_scan(src: Path, dst: Path):
+        result = real_move(src, dst)
+        destination_root = dst.parent
+        orphan_keys = {orphan.path for orphan in orphan_service.find_orphaned_models()}
+        observations.append((destination_root.name, has_recovery_sentinel(destination_root), orphan_keys))
+        return result
+
+    monkeypatch.setattr(model_install_default, "move", move_then_scan)
+
+    mm2_installer.install_path(embedding_file)
+
+    assert len(observations) == 1
+    destination_key, has_sentinel, orphan_keys = observations[0]
+    assert has_sentinel
+    assert destination_key not in orphan_keys
+    assert not has_recovery_sentinel(mm2_app_config.models_path / destination_key)
+
+
+def test_unregistered_destination_remains_protected_after_registration_failure(
+    mm2_installer: ModelInstallServiceBase,
+    embedding_file: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from invokeai.app.services.model_install.model_install_common import has_recovery_sentinel
+    from invokeai.app.services.orphaned_models import OrphanedModelsService
+
+    orphan_service = OrphanedModelsService(config=mm2_app_config, db=mm2_installer.record_store._db)
+
+    def fail_recording(_config: Any) -> None:
+        raise RuntimeError("simulated model record failure")
+
+    monkeypatch.setattr(mm2_installer.record_store, "add_model", fail_recording)
+
+    with pytest.raises(RuntimeError, match="simulated model record failure"):
+        mm2_installer.install_path(embedding_file)
+
+    protected_roots = [
+        path for path in mm2_app_config.models_path.iterdir() if path.is_dir() and has_recovery_sentinel(path)
+    ]
+    assert len(protected_roots) == 1
+    recovery_root = protected_roots[0]
+    assert list(recovery_root.iterdir())
+    assert recovery_root.name not in {orphan.path for orphan in orphan_service.find_orphaned_models()}
+
+
+@pytest.mark.parametrize("is_directory", [False, True])
+def test_rollback_restores_source_across_filesystems_without_overwriting(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, is_directory: bool
+) -> None:
+    source_root = tmp_path / "source"
+    destination_root = tmp_path / "models"
+    source_root.mkdir()
+    destination_root.mkdir()
+    original = source_root / "model"
+    if is_directory:
+        original.mkdir()
+        (original / "weights.safetensors").write_bytes(b"model weights")
+    else:
+        original.write_bytes(b"model weights")
+    moved = destination_root / "model"
+    shutil.move(original, moved)
+    real_rename_noreplace = ModelInstallService._rename_noreplace
+
+    def raise_exdev_for_original(src: Path, dst: Path) -> None:
+        if src == moved:
+            raise OSError(errno.EXDEV, "cross-device link")
+        real_rename_noreplace(src, dst)
+
+    monkeypatch.setattr(ModelInstallService, "_rename_noreplace", staticmethod(raise_exdev_for_original))
+
+    ModelInstallService._restore_moved_path(moved, original)
+
+    assert original.exists()
+    assert not moved.exists()
+    if is_directory:
+        assert (original / "weights.safetensors").read_bytes() == b"model weights"
+    else:
+        assert original.read_bytes() == b"model weights"
 
 
 def test_directory_install_retries_windows_move_failures(
@@ -302,12 +399,13 @@ def test_directory_install_preserves_collision_during_rollback(
     else:
         assert recreated.read_text() == "new user file"
     assert str(mm2_app_config.models_path.resolve()) in str(exc_info.value)
-    recovery_paths = set(mm2_app_config.models_path.iterdir()) - existing_paths
+    recovery_paths = [path for path in set(mm2_app_config.models_path.iterdir()) - existing_paths if path.is_dir()]
     assert len(recovery_paths) == 1
-    recovery_dest = recovery_paths.pop()
+    recovery_dest = recovery_paths[0]
     preserved_item = recovery_dest / first_item.name
     assert preserved_item.exists()
     assert preserved_item.is_dir() == first_item_is_dir
+    assert mm2_installer._has_recovery_sentinel(recovery_dest)
 
 
 def test_directory_install_rollback_race_preserves_both_source_artifacts(
@@ -393,9 +491,10 @@ def test_directory_install_retains_unowned_destination_artifact_after_rollback(
     with pytest.raises(RuntimeError, match="recovery required") as exc_info:
         mm2_installer.install_path(diffusers_dir)
 
-    recovery_paths = set(mm2_app_config.models_path.iterdir()) - existing_paths
+    recovery_paths = [path for path in set(mm2_app_config.models_path.iterdir()) - existing_paths if path.is_dir()]
     assert len(recovery_paths) == 1
-    recovery_dest = recovery_paths.pop()
+    recovery_dest = recovery_paths[0]
+    assert mm2_installer._has_recovery_sentinel(recovery_dest)
     assert (recovery_dest / "unowned-artifact").read_text() == "created concurrently"
     assert str(diffusers_dir.resolve()) in str(exc_info.value)
     assert str(recovery_dest.resolve()) in str(exc_info.value)
@@ -463,7 +562,7 @@ def test_remote_install_recovery_survives_cleanup_and_restart(
 
     assert job.errored
     assert mm2_installer._has_recovery_sentinel(tmpdir)
-    assert model_install_default.INSTALL_RECOVERY_SENTINEL not in {path.name for path in real_iterdir(tmpdir)}
+    assert INSTALL_RECOVERY_SENTINEL not in {path.name for path in real_iterdir(tmpdir)}
     assert {path.name: path.read_bytes() for path in real_iterdir(tmpdir) if path.is_file()} == source_files
     recovery_files = [
         path
@@ -518,12 +617,150 @@ def test_cancel_recovery_required_install_preserves_recovery_data(
     job._recovery_required = True
     mm2_installer._write_recovery_sentinel(tmpdir)
 
-    with pytest.raises(ValueError, match="requires recovery"):
+    with pytest.raises(InstallRecoveryRequiredError, match="requires recovery"):
         mm2_installer.cancel_job(job)
 
     assert not job.cancelled
     assert downloaded_file.read_bytes() == b"recoverable source"
     assert mm2_installer._has_recovery_sentinel(tmpdir)
+
+
+def test_cancel_recovery_sentinel_protects_data_before_job_flag_is_set(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}recovery-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    downloaded_file = tmpdir / "model.safetensors"
+    downloaded_file.write_bytes(b"recoverable source")
+    job = ModelInstallJob(
+        id=993,
+        source=URLModelSource(url=Url("https://example.com/model.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=downloaded_file,
+        status=InstallStatus.RUNNING,
+    )
+    job._install_tmpdir = tmpdir
+    mm2_installer._write_recovery_sentinel(tmpdir)
+
+    with pytest.raises(InstallRecoveryRequiredError, match="requires recovery"):
+        mm2_installer.cancel_job(job)
+
+    assert not job.cancelled
+    assert downloaded_file.read_bytes() == b"recoverable source"
+    assert mm2_installer._has_recovery_sentinel(tmpdir)
+
+
+@pytest.mark.parametrize("operation", ["restart_failed", "restart_file"])
+def test_restart_refuses_recovery_sentinel(
+    operation: str,
+    mm2_installer: ModelInstallServiceBase,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}recovery-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    downloaded_file = tmpdir / "model.safetensors"
+    downloaded_file.write_bytes(b"recoverable source")
+    job = ModelInstallJob(
+        id=994,
+        source=URLModelSource(url=Url("https://example.com/model.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.ERROR,
+    )
+    job._install_tmpdir = tmpdir
+    mm2_installer._write_recovery_sentinel(tmpdir)
+    monkeypatch.setattr(
+        mm2_installer, "_remote_files_from_source", lambda *_args, **_kwargs: pytest.fail("restart reached source")
+    )
+
+    with pytest.raises(InstallRecoveryRequiredError, match="requires recovery"):
+        if operation == "restart_failed":
+            mm2_installer.restart_failed(job)
+        else:
+            mm2_installer.restart_file(job, str(job.source))
+
+    assert job.status is InstallStatus.ERROR
+    assert downloaded_file.read_bytes() == b"recoverable source"
+    assert mm2_installer._has_recovery_sentinel(tmpdir)
+
+
+def test_recovery_required_marker_round_trips_and_preserves_staging_dir(
+    mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    tmpdir = mm2_app_config.models_path / f"{TMPDIR_PREFIX}recovery-{uuid.uuid4().hex}"
+    tmpdir.mkdir()
+    downloaded_file = tmpdir / "model.safetensors"
+    downloaded_file.write_bytes(b"recoverable source")
+    job = ModelInstallJob(
+        id=995,
+        source=URLModelSource(url=Url("https://example.com/model.safetensors")),
+        config_in=ModelRecordChanges(),
+        local_path=tmpdir,
+        status=InstallStatus.ERROR,
+    )
+    job._install_tmpdir = tmpdir
+    job._recovery_required = True
+
+    mm2_installer._write_install_marker(job)
+    marker = json.loads((tmpdir / INSTALL_MARKER_FILENAME).read_text(encoding="utf-8"))
+    mm2_installer._remove_dangling_install_dirs()
+
+    assert marker["recovery_required"] is True
+    assert downloaded_file.read_bytes() == b"recoverable source"
+    assert tmpdir.exists()
+
+
+def test_registering_recovery_root_removes_its_sentinel(
+    mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    recovery_root = mm2_app_config.models_path / "recovered-model"
+    recovery_root.mkdir()
+    shutil.copy2(embedding_file, recovery_root / embedding_file.name)
+    sentinel = mm2_installer._recovery_sentinel_path(recovery_root)
+    sentinel.write_text("preserve until registered", encoding="utf-8")
+
+    key = mm2_installer.register_path(recovery_root)
+
+    assert mm2_installer.record_store.get_model(key).path == "recovered-model"
+    assert not sentinel.exists()
+
+
+def test_startup_scan_skips_recovery_protected_root(
+    mm2_installer: ModelInstallServiceBase, embedding_file: Path, mm2_app_config: InvokeAIAppConfig
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    recovery_root = mm2_app_config.models_path / "recovered-model"
+    recovery_root.mkdir()
+    shutil.copy2(embedding_file, recovery_root / embedding_file.name)
+    sentinel = mm2_installer._recovery_sentinel_path(recovery_root)
+    sentinel.write_text("preserve until manually registered", encoding="utf-8")
+
+    mm2_installer._register_orphaned_models()
+
+    assert mm2_installer.record_store.all_models() == []
+    assert sentinel.exists()
+    assert (recovery_root / embedding_file.name).exists()
+
+
+def test_registered_model_with_temporary_prefix_survives_startup_cleanup(
+    mm2_installer: ModelInstallServiceBase,
+    embedding_file: Path,
+    mm2_app_config: InvokeAIAppConfig,
+) -> None:
+    model_key = f"{TMPDIR_PREFIX}registered-model"
+
+    installed_key = mm2_installer.install_path(embedding_file, config=ModelRecordChanges(key=model_key))
+    installed_path = mm2_app_config.models_path / mm2_installer.record_store.get_model(installed_key).path
+
+    mm2_installer._remove_dangling_install_dirs()
+
+    assert installed_path.exists()
+    assert mm2_installer.record_store.exists(model_key)
 
 
 def test_install_registration_failure_preserves_complete_recoverable_files(

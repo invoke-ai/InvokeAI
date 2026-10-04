@@ -172,6 +172,12 @@ def test_rejected_class_change_preserves_the_original_record(store: ModelRecordS
     assert after.model_dump() == before.model_dump()
 
 
+@pytest.mark.parametrize("field", ["type", "base"])
+def test_model_record_changes_reject_invalid_classification_values(field: str) -> None:
+    with pytest.raises(ValidationError):
+        ModelRecordChanges.model_validate({field: "not-a-model-classification"})
+
+
 def test_unknown_key(store: ModelRecordServiceBase):
     config = example_ti_config("key1")
     store.add_model(config)

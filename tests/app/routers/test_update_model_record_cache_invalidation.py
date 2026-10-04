@@ -5,6 +5,7 @@ until the cached entry is evicted. The predicate must catch changes to those set
 ignoring changes that don't affect how the model loads (e.g. name, description).
 """
 
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock
 
@@ -51,6 +52,21 @@ def test_missing_default_settings_is_handled():
     assert _load_settings_changed(no_settings, _config(fp8=True)) is True
 
 
+@pytest.mark.parametrize("field", ["fp8_storage", "cpu_only"])
+def test_pydantic_nested_load_setting_changes_trigger_invalidation(field: str) -> None:
+    from pydantic import BaseModel
+
+    from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
+
+    class PydanticConfig(BaseModel):
+        default_settings: MainModelDefaultSettings | None = None
+
+    previous = PydanticConfig(default_settings=MainModelDefaultSettings(**{field: False}))
+    updated = PydanticConfig(default_settings=MainModelDefaultSettings(**{field: True}))
+
+    assert _load_settings_changed(previous, updated) is True
+
+
 def test_unrelated_field_does_not_trigger_invalidation():
     """A config missing the fp8/cpu_only attributes entirely (e.g. a model type with no such
     fields) must not falsely report a change."""
@@ -59,7 +75,7 @@ def test_unrelated_field_does_not_trigger_invalidation():
     assert _load_settings_changed(bare_a, bare_b) is False
 
 
-@pytest.mark.parametrize("field", ["path", "base", "type", "format", "variant"])
+@pytest.mark.parametrize("field", ["path", "base", "type", "format", "variant", "repo_variant"])
 def test_model_identity_changes_trigger_invalidation(field: str):
     """Fields exposed by ModelRecordChanges can change the module selected or its source path."""
     previous = _config(**{field: "old"})
@@ -67,7 +83,7 @@ def test_model_identity_changes_trigger_invalidation(field: str):
     assert _load_settings_changed(previous, updated) is True
 
 
-@pytest.mark.parametrize("field", ["path", "base", "type", "format", "variant", "name", "description"])
+@pytest.mark.parametrize("field", ["path", "base", "type", "format", "variant", "repo_variant", "name", "description"])
 def test_update_only_evicts_caches_for_load_affecting_changes(field: str, monkeypatch: pytest.MonkeyPatch):
     previous = _config(**{field: "old"})
     updated = _config(**{field: "new"})
@@ -160,3 +176,115 @@ def test_record_update_handles_real_cpu_cache_entries(
     finally:
         for cache in caches:
             cache.shutdown()
+
+
+def test_reidentify_invalidates_caches_when_identification_changes_model_class(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+):
+    """Re-probing can change loader identity just like an explicit model-record edit."""
+    from types import SimpleNamespace
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelSourceType, ModelType
+
+    previous = SimpleNamespace(
+        key="model-key",
+        path="model.safetensors",
+        name="Model",
+        description="",
+        cover_image=None,
+        source="local-source",
+        source_type=ModelSourceType.Path,
+        image_encoder_model_id="custom/image-encoder",
+        base=BaseModelType.StableDiffusion1,
+        type=ModelType.Main,
+        format=ModelFormat.Checkpoint,
+        variant="old",
+        cpu_only=False,
+        default_settings=None,
+    )
+    identified = SimpleNamespace(
+        key="model-key",
+        path="model.safetensors",
+        name="identified name",
+        description="identified description",
+        cover_image=None,
+        source="new-source",
+        source_type=ModelSourceType.Path,
+        base=BaseModelType.StableDiffusionXL,
+        type=ModelType.Main,
+        format=ModelFormat.Checkpoint,
+        variant="new",
+        cpu_only=False,
+        default_settings=None,
+    )
+    stored = SimpleNamespace(
+        replace_model=MagicMock(return_value=identified), get_model=MagicMock(return_value=previous)
+    )
+    caches = [SimpleNamespace(drop_model=MagicMock(return_value=1)) for _ in range(2)]
+    services = SimpleNamespace(
+        model_manager=SimpleNamespace(
+            store=stored, load=SimpleNamespace(ram_caches={str(i): cache for i, cache in enumerate(caches)})
+        ),
+        configuration=SimpleNamespace(models_path=tmp_path / "models"),
+        logger=MagicMock(),
+    )
+    monkeypatch.setattr(
+        model_manager_router.ApiDependencies, "invoker", SimpleNamespace(services=services), raising=False
+    )
+    monkeypatch.setattr(model_manager_router, "ModelOnDisk", lambda _path: object())
+    factory_overrides: dict[str, object] = {}
+
+    def identify(_model_on_disk: object, override_fields: dict[str, object]) -> object:
+        factory_overrides.update(override_fields)
+        return SimpleNamespace(config=identified)
+
+    monkeypatch.setattr(model_manager_router.ModelConfigFactory, "from_model_on_disk", identify)
+
+    assert model_manager_router._reidentify_model("model-key") is identified
+    assert factory_overrides["image_encoder_model_id"] == "custom/image-encoder"
+
+    for cache in caches:
+        cache.drop_model.assert_called_once_with("model-key")
+
+
+def test_reidentify_preserves_ip_adapter_encoder_override_with_blank_metadata(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    import torch
+
+    from invokeai.app.api.routers import model_manager as model_manager_router
+    from invokeai.backend.model_manager.configs.factory import ModelConfigFactory
+    from invokeai.backend.model_manager.configs.ip_adapter import IPAdapter_InvokeAI_SD1_Config
+    from invokeai.backend.model_manager.taxonomy import ModelSourceType
+
+    models_path = tmp_path / "models"
+    model_path = models_path / "ip-adapter"
+    model_path.mkdir(parents=True)
+    torch.save({"ip_adapter": {"1.to_k_ip.weight": torch.empty(1, 768)}}, model_path / "ip_adapter.bin")
+    (model_path / "image_encoder.txt").write_text("  \n", encoding="utf-8")
+    result = ModelConfigFactory.from_model_on_disk(
+        model_path, override_fields={"image_encoder_model_id": "custom/image-encoder"}, allow_unknown=False
+    )
+    assert isinstance(result.config, IPAdapter_InvokeAI_SD1_Config)
+    previous = result.config
+    previous.key = "ip-adapter-key"
+    previous.path = "ip-adapter"
+    previous.name = "IP-Adapter"
+    previous.source = "local-source"
+    previous.source_type = ModelSourceType.Path
+
+    store = SimpleNamespace(get_model=lambda _key: previous, replace_model=lambda _key, updated: updated)
+    services = SimpleNamespace(
+        model_manager=SimpleNamespace(store=store, load=SimpleNamespace(ram_caches={})),
+        configuration=SimpleNamespace(models_path=models_path),
+        logger=MagicMock(),
+    )
+    monkeypatch.setattr(
+        model_manager_router.ApiDependencies, "invoker", SimpleNamespace(services=services), raising=False
+    )
+
+    updated = model_manager_router._reidentify_model("ip-adapter-key")
+
+    assert isinstance(updated, IPAdapter_InvokeAI_SD1_Config)
+    assert updated.image_encoder_model_id == "custom/image-encoder"

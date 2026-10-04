@@ -53405,6 +53405,13 @@ export interface operations {
                     "application/json": components["schemas"]["ModelInstallJob"];
                 };
             };
+            /** @description The job has recovery data that must be preserved */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             /** @description No such job */
             415: {
                 headers: {
@@ -53447,6 +53454,13 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ModelInstallJob"];
                 };
+            };
+            /** @description The job has recovery data that must be preserved */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
             /** @description No such job */
             415: {
