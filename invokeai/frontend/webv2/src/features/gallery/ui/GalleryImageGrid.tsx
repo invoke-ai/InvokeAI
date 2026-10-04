@@ -343,8 +343,11 @@ export const GalleryImageGrid = () => {
         continue;
       }
 
-      const pageEnd = Math.min(pageOffset + GALLERY_PAGE_SIZE, sparsePageOffset + sparseBackendItemCount);
-      for (let itemIndex = pageOffset; itemIndex < pageEnd; itemIndex += 1) {
+      const visibleRangeStart = isSparsePaginated ? sparsePageOffset : 0;
+      const visibleRangeEnd = visibleRangeStart + sparseBackendItemCount;
+      const pageStart = Math.max(pageOffset, visibleRangeStart);
+      const pageEnd = Math.min(pageOffset + GALLERY_PAGE_SIZE, visibleRangeEnd);
+      for (let itemIndex = pageStart; itemIndex < pageEnd; itemIndex += 1) {
         const listingIndex = isSparsePaginated ? itemIndex - sparsePageOffset : itemIndex;
         if (!sparseListing.itemSlots.has(listingIndex)) {
           offsets.set(pageOffset, itemIndex);

@@ -59,6 +59,7 @@ const mocks = vi.hoisted(() => ({
   progressFrame: null as { dataUrl: string; width: number; height: number } | null,
   fetchNames: vi.fn(),
   fetchSparsePage: vi.fn<(filter: GalleryItemsFilter, offset: number) => Promise<GalleryItemsPage>>(),
+  fetchSparseTotal: vi.fn<(filter: GalleryItemsFilter) => Promise<number>>(),
   getItemLabel: vi.fn<GalleryUiAdapter['getItemLabel']>(),
   indexAvailability: { modelName: null, state: 'disabled' } as ImageIndexAvailability,
   measure: vi.fn(),
@@ -84,12 +85,17 @@ vi.mock('@features/gallery/data/queries', async (importOriginal) => {
     filter: GalleryItemsFilter,
     offset: number
   ) => Record<string, unknown>;
+  const getTotalOptions = actual.galleryItemsTotalOptions as (filter: GalleryItemsFilter) => Record<string, unknown>;
 
   return {
     ...actual,
     galleryItemsPageOptions: (filter: GalleryItemsFilter, offset: number) => ({
       ...getPageOptions(filter, offset),
       queryFn: () => mocks.fetchSparsePage(filter, offset),
+    }),
+    galleryItemsTotalOptions: (filter: GalleryItemsFilter) => ({
+      ...getTotalOptions(filter),
+      queryFn: () => mocks.fetchSparseTotal(filter),
     }),
     imageIndexAvailabilityOptions: () => ({
       queryFn: () => mocks.indexAvailability,
@@ -656,6 +662,7 @@ beforeEach(() => {
   accountLifecycle.activate('grid-user');
   vi.clearAllMocks();
   mocks.fetchSparsePage.mockReset();
+  mocks.fetchSparseTotal.mockReset();
   registeredCommands.clear();
   currentGallery = createGallery();
   mocks.itemProgress = null;
@@ -2135,6 +2142,39 @@ describe('GalleryImageGrid virtualization', () => {
 
     await click(host!.querySelector<HTMLButtonElement>('[data-gallery-page-error="0"] button')!);
     expect(retry).toHaveBeenCalledOnce();
+  });
+
+  it('shows and retries count discovery failure on a cold paginated page after page zero', async () => {
+    let countAttempts = 0;
+    const items = Array.from({ length: 5 }, (_, index) => createItem('image', `count-retry-${index}.png`));
+    mocks.fetchSparseTotal.mockImplementation(() => {
+      countAttempts += 1;
+      return countAttempts === 1 ? Promise.reject(new Error('Count unavailable')) : Promise.resolve(65);
+    });
+    mocks.fetchSparsePage.mockImplementation((_filter, offset) => Promise.resolve({ items, offset, total: 65 }));
+
+    await renderQueryBackedGallery(
+      createGallery({
+        items: [],
+        page: 1,
+        settings: { ...DENSE_SETTINGS, paginationMode: 'paginated' },
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(host?.querySelector('[data-gallery-page-error="0"]')).not.toBeNull();
+    });
+    const retryButton = host!.querySelector<HTMLButtonElement>('[data-gallery-page-error="0"] button')!;
+    expect(retryButton.textContent?.trim()).toBe('Retry');
+    expect(mocks.fetchSparsePage).not.toHaveBeenCalled();
+
+    await click(retryButton);
+
+    await vi.waitFor(() => {
+      expect(host?.querySelector('img[alt="count-retry-0.png"]')).not.toBeNull();
+    });
+    expect(countAttempts).toBe(2);
+    expect(mocks.fetchSparsePage.mock.calls.map(([, offset]) => offset)).toEqual([60]);
   });
 
   it('repairs offsets after a partial delete and keeps the visible item anchored through a failed page retry', async () => {
