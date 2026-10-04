@@ -6,9 +6,14 @@ A single-file SDNQ Qwen checkpoint has no config.json, so identification must ke
 `Qwen3ForCausalLM`, identification must reject anything it cannot load:
 
 - a Qwen2 causal LM (no Qwen3 QK-norm params -> missing weights), and
-- a Qwen-VL model (bundles a visual tower -> unexpected weights),
+- a Qwen-VL model, whose `visual.*` tower is accompanied by a Qwen2-style attention block that is
+  likewise missing the Qwen3 QK-norm params.
 
 while still accepting a genuine Qwen3 checkpoint carrying its q_norm/k_norm parameters.
+
+Note that the visual tower itself is no longer a rejection signal: since issue #9437 the loader
+ignores unexpected keys, so identification must not reject on them either. Missing weights are what
+both the loader and identification still refuse.
 """
 
 from pathlib import Path

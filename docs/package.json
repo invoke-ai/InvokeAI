@@ -9,6 +9,7 @@
     "check-docs-data": "pnpm run generate-docs-data && git diff --exit-code -- src/generated",
     "check-deploy-output": "node ./scripts/verify-deploy-output.mjs",
     "check-redirects": "node ./scripts/validate-redirect-targets.mjs",
+    "test": "node --test \"src/**/*.test.mjs\"",
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro"
@@ -18,6 +19,7 @@
     "@fontsource-variable/inter": "^5.2.8",
     "@fontsource-variable/roboto-mono": "^5.2.9",
     "astro": "^6.3.7",
+    "github-slugger": "^2.0.0",
     "mermaid": "^11.15.0",
     "rehype-external-links": "^3.0.0",
     "sharp": "^0.34.5",

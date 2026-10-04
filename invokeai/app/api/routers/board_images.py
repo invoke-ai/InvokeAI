@@ -5,49 +5,15 @@ from fastapi.routing import APIRouter
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers._access import (
+    assert_board_write_access as _assert_board_write_access,
+)
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.api.routers.images import MAX_IMAGE_BATCH_SIZE, ImageName
-from invokeai.app.services.board_records.board_records_common import BoardRecordNotFoundException
 from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.services.images.images_common import AddImagesToBoardResult, RemoveImagesFromBoardResult
 
 board_images_router = APIRouter(prefix="/v1/board_images", tags=["boards"])
-
-
-def _assert_board_write_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not mutate the given board.
-
-    Write access is granted when ANY of these hold:
-    - The user is an admin.
-    - The user owns the board.
-    - The board visibility is Public (public boards accept contributions from any user).
-
-    Reads the board *record*, not its DTO. The decision needs only the owner and the
-    visibility, while BoardService.get_dto also resolves the cover image and runs three COUNT
-    aggregates over the board's contents — six queries to answer a question two columns settle.
-    That cost is the only reason a batch route would be tempted to decide once and reuse the
-    answer for every name, and reusing it is what lets a permission revoked mid-batch keep
-    working until the request ends. One indexed SELECT per name is cheap enough to re-decide.
-    (These routes are sync `def`, so the queries occupy a threadpool worker rather than the
-    event loop — but a 1000-name batch still holds one for six thousand round trips.)
-    """
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    try:
-        board = ApiDependencies.invoker.services.board_records.get(board_id)
-    except BoardRecordNotFoundException:
-        raise HTTPException(status_code=404, detail="Board not found")
-    # Anything else — a locked or unreadable database — propagates. Catching it here would
-    # answer "no such board", which the batch loops below treat as a name to skip: a disk error
-    # would then drop names out of the response entirely, reported neither as moved nor as
-    # failed, and the client would show the move as done until the next refresh.
-    if current_user.is_admin:
-        return
-    if board.user_id == current_user.user_id:
-        return
-    if board.board_visibility == BoardVisibility.Public:
-        return
-    raise HTTPException(status_code=403, detail="Not authorized to modify this board")
 
 
 def _image_record_exists(image_name: str) -> bool:

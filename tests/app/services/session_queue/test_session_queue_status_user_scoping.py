@@ -34,7 +34,7 @@ def session_queue(mock_invoker: Invoker) -> SqliteSessionQueue:
     return queue
 
 
-def _insert_queue_item(session_queue: SqliteSessionQueue, user_id: str) -> int:
+def _insert_queue_item(session_queue: SqliteSessionQueue, user_id: str, origin: str | None = None) -> int:
     graph = Graph()
     graph.add_node(PromptTestInvocation(id="prompt", prompt="test"))
     session = GraphExecutionState(graph=graph)
@@ -49,7 +49,7 @@ def _insert_queue_item(session_queue: SqliteSessionQueue, user_id: str) -> int:
             )
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """,
-            ("default", session_json, session.id, batch_id, None, 0, None, None, None, None, user_id),
+            ("default", session_json, session.id, batch_id, None, 0, None, origin, None, None, user_id),
         )
         return cursor.lastrowid  # type: ignore[return-value]
 
@@ -132,6 +132,61 @@ def test_status_admin_caller_gets_user_subcounts_and_current_item_identifiers(
     assert status.in_progress == 1  # B's item, counted globally
     assert status.user_in_progress == 0  # the admin owns none in progress
     assert status.user_pending == 1  # the admin's single pending item
+
+
+def test_status_origin_scope_preserves_admin_subcounts_and_current_item_visibility(
+    session_queue: SqliteSessionQueue,
+) -> None:
+    """Origin scoping applies consistently to aggregate counts, personal counts, and the
+    current-item snapshot without hiding another owner's identifiers from an admin."""
+    admin_id = "admin-1"
+    scoped_item_id = _insert_queue_item(session_queue, user_id="user-b", origin="project-a:canvas")
+    _insert_queue_item(session_queue, user_id=admin_id, origin="project-a:workflows")
+    _insert_queue_item(session_queue, user_id="user-c", origin="project-b:canvas")
+
+    in_progress = session_queue.dequeue()
+    assert in_progress is not None and in_progress.item_id == scoped_item_id
+
+    status = session_queue.get_queue_status(
+        queue_id="default",
+        user_id=admin_id,
+        acting_user_id=admin_id,
+        origin_prefix="project-a:",
+        is_admin=True,
+    )
+
+    assert status.item_id == scoped_item_id
+    assert status.pending == 1
+    assert status.in_progress == 1
+    assert status.total == 2
+    assert status.user_pending == 1
+    assert status.user_in_progress == 0
+
+
+def test_status_origin_scope_excludes_out_of_scope_current_item(session_queue: SqliteSessionQueue) -> None:
+    """The current-item snapshot must honour origin_prefix, not just the aggregate counts.
+
+    get_queue_status reads the in-progress item with a lightweight 4-column query rather than
+    hydrating a full SessionQueueItem. That query carries its own copy of the origin filter, so
+    dropping the filter there would leak an out-of-scope item's identifiers while every
+    origin-scoped count still looked correct — which is why the positive-path test above cannot
+    catch it on its own.
+    """
+    out_of_scope_item_id = _insert_queue_item(session_queue, user_id="user-b", origin="project-b:canvas")
+    _insert_queue_item(session_queue, user_id="user-b", origin="project-a:canvas")
+
+    in_progress = session_queue.dequeue()
+    assert in_progress is not None and in_progress.item_id == out_of_scope_item_id
+
+    status = session_queue.get_queue_status(queue_id="default", origin_prefix="project-a:", is_admin=True)
+
+    assert status.item_id is None, "out-of-scope in-progress item leaked into an origin-scoped status"
+    assert status.session_id is None
+    assert status.batch_id is None
+    # The scoped counts still describe project-a only: its one pending item, and no in-progress.
+    assert status.pending == 1
+    assert status.in_progress == 0
+    assert status.total == 1
 
 
 def test_get_queue_item_ids_returns_all_users_ids(session_queue: SqliteSessionQueue) -> None:

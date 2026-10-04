@@ -26,7 +26,9 @@ _ESTIMATE = "estimate_pid_decode_working_memory"
 
 
 def _modules_constructing_a_decode_config() -> list[Path]:
-    modules = sorted(p for p in _INVOCATIONS_DIR.glob("*.py") if "PiDDecodeConfig(" in p.read_text(encoding="utf-8"))
+    # `rglob`, not `glob`: node modules live in per-architecture subpackages, and the PiD decoders
+    # are spread across `pid/` and the architectures they serve.
+    modules = sorted(p for p in _INVOCATIONS_DIR.rglob("*.py") if "PiDDecodeConfig(" in p.read_text(encoding="utf-8"))
     assert modules, "no PiD nodes found - has the invocations directory moved?"
     return modules
 
@@ -68,6 +70,18 @@ def test_pid_node_estimates_working_memory_for_the_same_mode_it_decodes_in(modul
         assert passes_flag, (
             f"{module_path.name}:{call.lineno} estimates working memory without {_FLAG}; "
             "the cache would reserve the unoptimized peak and withhold the VRAM the flag frees."
+        )
+
+
+@pytest.mark.parametrize("module_path", _modules_constructing_a_decode_config(), ids=lambda p: p.stem)
+def test_pid_node_estimates_working_memory_for_the_decoder_it_loaded(module_path: Path) -> None:
+    """An int8_tensorwise decoder dequantizes a weight per forward that its resident size does not cover; the
+    estimate can only add it when it is handed the decoder."""
+    tree = ast.parse(module_path.read_text(encoding="utf-8"))
+    for call in _calls(tree, _ESTIMATE):
+        assert any(kw.arg == "pid_net" for kw in call.keywords), (
+            f"{module_path.name}:{call.lineno} estimates working memory without pid_net=; an int8 decoder's "
+            "dequant transient would not be reserved."
         )
 
 

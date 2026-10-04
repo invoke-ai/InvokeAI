@@ -5,11 +5,15 @@ import pytest
 import torch
 
 from invokeai.app.invocations.fields import TensorField
-from invokeai.app.invocations.krea2_text_encoder import Krea2TextEncoderInvocation
 from invokeai.app.invocations.model import LoRAField, ModelIdentifierField, Qwen3VLEncoderField
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, SubModelType
+from invokeai.app.invocations.text_encoder.krea2_text_encoder import Krea2TextEncoderInvocation
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
 from invokeai.backend.patches.lora_conversions.krea2_lora_constants import KREA2_LORA_QWEN3VL_PREFIX
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
+
+# These fakes stand in for a dense safetensors encoder, so LoRA is applied directly. The sidecar
+# decision for a quantized one is covered in test_text_encoders_with_packed_layers.py.
+_ENCODER_CONFIG = SimpleNamespace(format=ModelFormat.Checkpoint)
 
 
 class _Tokenizer:
@@ -42,9 +46,14 @@ class _TokenizerInfo:
 
 
 class _TextEncoderInfo:
+    # `model` and `compute_device` are read before the lock, to size the dequant transient the node
+    # reserves for a packed encoder.
+    model = _TextEncoder()
+    compute_device = torch.device("cpu")
+
     @contextmanager
-    def model_on_device(self):
-        yield ({}, _TextEncoder())
+    def model_on_device(self, working_mem_bytes=None):
+        yield ({}, self.model)
 
 
 def _identifier(key: str, model_type: ModelType, base: BaseModelType = BaseModelType.Any) -> ModelIdentifierField:
@@ -92,7 +101,8 @@ def _context(lora_model, lora_infos: list | None = None) -> SimpleNamespace:
         return _TextEncoderInfo()
 
     return SimpleNamespace(
-        models=SimpleNamespace(load=load), util=SimpleNamespace(signal_progress=lambda _message: None)
+        models=SimpleNamespace(load=load, get_config=lambda _identifier: _ENCODER_CONFIG),
+        util=SimpleNamespace(signal_progress=lambda _message: None),
     )
 
 
@@ -105,10 +115,10 @@ def test_encode_applies_qwen3_vl_lora_and_returns_selected_hidden_layers(monkeyp
         return nullcontext()
 
     monkeypatch.setattr(
-        "invokeai.app.invocations.krea2_text_encoder.LayerPatcher.apply_smart_model_patches", apply_patches
+        "invokeai.app.invocations.text_encoder.krea2_text_encoder.LayerPatcher.apply_smart_model_patches", apply_patches
     )
     monkeypatch.setattr(
-        "invokeai.app.invocations.krea2_text_encoder.TorchDevice.choose_bfloat16_safe_dtype",
+        "invokeai.app.invocations.text_encoder.krea2_text_encoder.TorchDevice.choose_bfloat16_safe_dtype",
         lambda _device: torch.float32,
     )
 
@@ -136,7 +146,7 @@ def test_encode_rejects_a_loaded_non_patch_lora(monkeypatch) -> None:
         return nullcontext()
 
     monkeypatch.setattr(
-        "invokeai.app.invocations.krea2_text_encoder.LayerPatcher.apply_smart_model_patches", apply_patches
+        "invokeai.app.invocations.text_encoder.krea2_text_encoder.LayerPatcher.apply_smart_model_patches", apply_patches
     )
 
     with pytest.raises(TypeError, match="Expected ModelPatchRaw"):
@@ -147,7 +157,7 @@ def test_encode_preserves_suffix_for_a_prompt_that_overflows_truncation(monkeypa
     # Regression: a prompt longer than the tokenizer budget must NOT lose the assistant-turn suffix. The
     # encoder tokenizes (prefix + prompt) with truncation and appends the suffix AFTER, so the final tokens
     # always end with the suffix template (building one string and truncating it would cut the suffix off).
-    from invokeai.app.invocations.krea2_text_encoder import _KREA2_SUFFIX
+    from invokeai.backend.krea2.text_encoding import KREA2_SUFFIX as _KREA2_SUFFIX
 
     suffix_ids = [901, 902, 903, 904, 905]
 
@@ -192,8 +202,11 @@ def test_encode_preserves_suffix_for_a_prompt_that_overflows_truncation(monkeypa
     encoder = _CapturingEncoder()
 
     class _CapturingEncoderInfo:
+        model = encoder
+        compute_device = torch.device("cpu")
+
         @contextmanager
-        def model_on_device(self):
+        def model_on_device(self, working_mem_bytes=None):
             yield ({}, encoder)
 
     class _TruncatingTokenizerInfo:
@@ -209,15 +222,16 @@ def test_encode_preserves_suffix_for_a_prompt_that_overflows_truncation(monkeypa
         return _CapturingEncoderInfo()
 
     context = SimpleNamespace(
-        models=SimpleNamespace(load=load), util=SimpleNamespace(signal_progress=lambda _message: None)
+        models=SimpleNamespace(load=load, get_config=lambda _identifier: _ENCODER_CONFIG),
+        util=SimpleNamespace(signal_progress=lambda _message: None),
     )
 
     monkeypatch.setattr(
-        "invokeai.app.invocations.krea2_text_encoder.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.text_encoder.krea2_text_encoder.LayerPatcher.apply_smart_model_patches",
         lambda **_kwargs: nullcontext(),
     )
     monkeypatch.setattr(
-        "invokeai.app.invocations.krea2_text_encoder.TorchDevice.choose_bfloat16_safe_dtype",
+        "invokeai.app.invocations.text_encoder.krea2_text_encoder.TorchDevice.choose_bfloat16_safe_dtype",
         lambda _device: torch.float32,
     )
 
@@ -240,7 +254,7 @@ def test_encode_preserves_suffix_for_a_prompt_that_overflows_truncation(monkeypa
 
 
 def test_encode_uses_reference_fixed_length_layout_and_position_ids(monkeypatch) -> None:
-    from invokeai.app.invocations.krea2_text_encoder import _KREA2_SUFFIX
+    from invokeai.backend.krea2.text_encoding import KREA2_SUFFIX as _KREA2_SUFFIX
 
     captured: dict = {}
 
@@ -290,8 +304,11 @@ def test_encode_uses_reference_fixed_length_layout_and_position_ids(monkeypatch)
     encoder = _ReferenceLayoutEncoder()
 
     class _ReferenceLayoutEncoderInfo:
+        model = encoder
+        compute_device = torch.device("cpu")
+
         @contextmanager
-        def model_on_device(self):
+        def model_on_device(self, working_mem_bytes=None):
             yield ({}, encoder)
 
     encoder_id = _identifier("encoder", ModelType.Qwen3VLEncoder)
@@ -308,15 +325,16 @@ def test_encode_uses_reference_fixed_length_layout_and_position_ids(monkeypatch)
         return _ReferenceLayoutEncoderInfo()
 
     context = SimpleNamespace(
-        models=SimpleNamespace(load=load), util=SimpleNamespace(signal_progress=lambda _message: None)
+        models=SimpleNamespace(load=load, get_config=lambda _identifier: _ENCODER_CONFIG),
+        util=SimpleNamespace(signal_progress=lambda _message: None),
     )
 
     monkeypatch.setattr(
-        "invokeai.app.invocations.krea2_text_encoder.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.text_encoder.krea2_text_encoder.LayerPatcher.apply_smart_model_patches",
         lambda **_kwargs: nullcontext(),
     )
     monkeypatch.setattr(
-        "invokeai.app.invocations.krea2_text_encoder.TorchDevice.choose_bfloat16_safe_dtype",
+        "invokeai.app.invocations.text_encoder.krea2_text_encoder.TorchDevice.choose_bfloat16_safe_dtype",
         lambda _device: torch.float32,
     )
 
@@ -329,6 +347,38 @@ def test_encode_uses_reference_fixed_length_layout_and_position_ids(monkeypatch)
     assert captured["attention_mask"].dtype == torch.bool
     assert captured["position_ids"].shape == (3, 1, 546)
     assert captured["position_ids"][0, 0, -5:].tolist() == [4, 5, 6, 7, 8]
+
+
+def test_visual_tower_lora_layers_are_skipped_without_blaming_the_adapter(monkeypatch) -> None:
+    """The loader drops the Qwen3-VL visual tower, so an adapter carrying layers for it finds no
+    module. The converter really does emit these keys (see `test_krea2_lora_conversion_utils`), and
+    the 4B's vision tower has 27 blocks, so left to the patcher this is ~108 "Failed to find module
+    for LoRA layer key" lines per generation -- reading as an adapter failure for layers that never
+    affected an image.
+
+    Asserted on the pattern handed to the patcher, since the suppression is the patcher's to apply.
+    """
+    import re
+
+    captured: dict = {}
+
+    def capture(**kwargs):
+        captured.update(kwargs)
+        return nullcontext()
+
+    monkeypatch.setattr(
+        "invokeai.app.invocations.text_encoder.krea2_text_encoder.LayerPatcher.apply_smart_model_patches",
+        capture,
+    )
+
+    _invocation()._encode(_context(ModelPatchRaw(layers={})))
+
+    pattern = captured["suppress_warning_layers"]
+    assert isinstance(pattern, re.Pattern)
+    assert pattern.search(f"{KREA2_LORA_QWEN3VL_PREFIX}visual.blocks.0.attn.qkv")
+    # The language tower is what the adapter is for; a miss there is a real problem and must still
+    # be reported.
+    assert not pattern.search(f"{KREA2_LORA_QWEN3VL_PREFIX}layers.0.self_attn.q_proj")
 
 
 def test_invoke_preserves_the_regional_mask_on_its_conditioning_output(monkeypatch) -> None:

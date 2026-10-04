@@ -12,6 +12,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ResourceOrigin,
 )
 from invokeai.app.services.images.images_common import ImageDTO
+from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard, IntermediateDeleteResult
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
@@ -56,8 +57,24 @@ class ImageServiceABC(ABC):
         workflow: Optional[str] = None,
         graph: Optional[str] = None,
         user_id: Optional[str] = None,
+        project_id: Optional[str] = None,
     ) -> ImageDTO:
         """Creates an image, storing the file and its metadata."""
+        pass
+
+    @abstractmethod
+    def copy(
+        self,
+        source_image_name: str,
+        board_id: Optional[str] = None,
+        user_id: Optional[str] = None,
+    ) -> ImageDTO:
+        """Duplicates an existing image under a new identity, optionally onto a board.
+
+        The record is cloned and the file copied byte for byte — no decode, no re-encode — so
+        embedded metadata, workflow and graph travel with it. The copy is never intermediate and
+        is never starred.
+        """
         pass
 
     @abstractmethod
@@ -126,10 +143,15 @@ class ImageServiceABC(ABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageDTO]:
-        """Gets a paginated list of image DTOs with starred images first when starred_first=True."""
+        """Gets a paginated list of image DTOs with starred images first when starred_first=True.
+
+        created_from/created_to are inclusive YYYY-MM-DD bounds on created_at (UTC days).
+        """
         pass
 
     @abstractmethod
@@ -138,13 +160,24 @@ class ImageServiceABC(ABC):
         pass
 
     @abstractmethod
-    def delete_intermediates(self) -> int:
-        """Deletes all intermediate images."""
+    def delete_intermediates_by_names(
+        self, image_names: list[str], guard: Optional[IntermediateDeleteGuard] = None
+    ) -> IntermediateDeleteResult:
+        """Deletes the named images that are still intermediates, journalled, reporting the names removed.
+
+        ``guard`` is consulted on the deleting transaction so the cleanup policy's final check and
+        the record removal are one atomic step.
+        """
         pass
 
     @abstractmethod
-    def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
-        """Gets the number of intermediate images. If user_id is provided, only counts that user's intermediates."""
+    def delete_images_by_names(self, image_names: list[str]) -> tuple[list[str], list[str]]:
+        """Deletes exactly these images; returns ``(deleted_names, failed_names)``.
+
+        For callers that must decide whether the deletion may proceed *before* destroying
+        anything, and so enumerate the names themselves. Same per-image failure semantics as
+        ``delete_images_on_board``.
+        """
         pass
 
     @abstractmethod
@@ -171,8 +204,13 @@ class ImageServiceABC(ABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> ImageNamesResult:
-        """Gets ordered list of image names with metadata for optimistic updates."""
+        """Gets ordered list of image names with metadata for optimistic updates.
+
+        created_from/created_to are inclusive YYYY-MM-DD bounds on created_at (UTC days).
+        """
         pass

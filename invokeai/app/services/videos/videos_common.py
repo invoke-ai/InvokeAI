@@ -11,7 +11,7 @@ class VideoUrlsDTO(BaseModelExcludeNull):
 
     video_name: str = Field(description="The unique name of the video.")
     video_url: str = Field(description="The URL of the video file (MP4).")
-    thumbnail_url: str = Field(description="The URL of the video's first-frame thumbnail (WebP).")
+    thumbnail_url: str = Field(description="The URL of the video's thumbnail (WebP).")
 
 
 class VideoDTO(VideoRecord, VideoUrlsDTO):

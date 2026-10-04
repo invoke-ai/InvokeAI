@@ -39,12 +39,13 @@ class BoardService(BoardServiceABC):
             return None, cover_video.video_name
         return cover_image.image_name, None
 
-    def _get_counts(self, board_id: str) -> tuple[int, int, int]:
-        """Return ``(image_count, video_count, asset_count)`` for a board."""
+    def _get_counts(self, board_id: str) -> tuple[int, int, int, int]:
+        """Return ``(image_count, video_count, asset_count, asset_video_count)`` for a board."""
         image_count = self.__invoker.services.board_image_records.get_image_count_for_board(board_id)
         asset_count = self.__invoker.services.board_image_records.get_asset_count_for_board(board_id)
         video_count = self.__invoker.services.board_video_records.get_video_count_for_board(board_id)
-        return image_count, video_count, asset_count
+        asset_video_count = self.__invoker.services.board_video_records.get_asset_video_count_for_board(board_id)
+        return image_count, video_count, asset_count, asset_video_count
 
     def create(
         self,
@@ -55,9 +56,12 @@ class BoardService(BoardServiceABC):
         return board_record_to_dto(board_record, None, 0, 0)
 
     def get_dto(self, board_id: str) -> BoardDTO:
-        board_record = self.__invoker.services.board_records.get(board_id)
+        # One query for the record and its claiming project. `get_dto` is what every authorization
+        # check resolves through, so a second lookup here is a second transaction — and the lock it
+        # takes — on the most-travelled read in the API.
+        board_record, project_id = self.__invoker.services.board_records.get_with_project_id(board_id)
         cover_image_name, cover_video_name = self._resolve_cover(board_record.board_id)
-        image_count, video_count, asset_count = self._get_counts(board_id)
+        image_count, video_count, asset_count, asset_video_count = self._get_counts(board_id)
         return board_record_to_dto(
             board_record,
             cover_image_name,
@@ -65,6 +69,8 @@ class BoardService(BoardServiceABC):
             asset_count,
             cover_video_name=cover_video_name,
             video_count=video_count,
+            asset_video_count=asset_video_count,
+            project_id=project_id,
         )
 
     def update(
@@ -72,20 +78,14 @@ class BoardService(BoardServiceABC):
         board_id: str,
         changes: BoardChanges,
     ) -> BoardDTO:
-        board_record = self.__invoker.services.board_records.update(board_id, changes)
-        cover_image_name, cover_video_name = self._resolve_cover(board_record.board_id)
-        image_count, video_count, asset_count = self._get_counts(board_id)
-        return board_record_to_dto(
-            board_record,
-            cover_image_name,
-            image_count,
-            asset_count,
-            cover_video_name=cover_video_name,
-            video_count=video_count,
-        )
+        self.__invoker.services.board_records.update(board_id, changes)
+        # Re-read through `get_dto` rather than shaping the update's own return: it is the one
+        # place that resolves cover, counts and claiming project together, and an update that
+        # dropped `project_id` would tell the gallery a project's board is an ordinary one.
+        return self.get_dto(board_id)
 
-    def delete(self, board_id: str) -> None:
-        self.__invoker.services.board_records.delete(board_id)
+    def delete_if_unclaimed(self, board_id: str) -> bool:
+        return self.__invoker.services.board_records.delete_if_unclaimed(board_id)
 
     def get_many(
         self,
@@ -128,6 +128,9 @@ class BoardService(BoardServiceABC):
         summaries = self.__invoker.services.gallery.get_board_media_summaries(
             [record.board_id for record in board_records]
         )
+        project_ids = self.__invoker.services.board_records.get_project_ids_for_boards(
+            [record.board_id for record in board_records]
+        )
         owners = (
             self.__invoker.services.users.get_many([record.user_id for record in board_records]) if is_admin else {}
         )
@@ -149,6 +152,8 @@ class BoardService(BoardServiceABC):
                     owner_username,
                     cover_video_name=summary.cover_video_name,
                     video_count=summary.video_count,
+                    asset_video_count=summary.asset_video_count,
+                    project_id=project_ids.get(r.board_id),
                 )
             )
 

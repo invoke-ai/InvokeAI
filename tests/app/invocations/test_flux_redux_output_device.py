@@ -8,7 +8,7 @@ from unittest.mock import MagicMock
 import torch
 
 from invokeai.app.invocations.fields import ImageField
-from invokeai.app.invocations.flux_redux import FluxReduxInvocation
+from invokeai.app.invocations.flux.flux_redux import FluxReduxInvocation
 
 
 def test_flux_redux_conditioning_is_saved_on_cpu(monkeypatch):

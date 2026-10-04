@@ -1,5 +1,6 @@
 """Regression tests for the PiD distill schedule, decoder/base validation and checkpoint completeness."""
 
+import logging
 import math
 from typing import Any
 from unittest.mock import patch
@@ -315,7 +316,7 @@ class TestLoadPidDecoderRejectsPartialCheckpoints:
     def tiny_net(self, monkeypatch: pytest.MonkeyPatch) -> "TestLoadPidDecoderRejectsPartialCheckpoints._TinyNet":
         """Stand in for the (multi-GB) real PidNet — only load_state_dict's bookkeeping is under test."""
         net = self._TinyNet()
-        monkeypatch.setattr("invokeai.backend.pid.decode.build_pid_net", lambda backbone: net)
+        monkeypatch.setattr("invokeai.backend.pid.decode.build_pid_net", lambda backbone, version: net)
         return net
 
     def test_complete_state_dict_loads(self, tiny_net: torch.nn.Module) -> None:
@@ -331,10 +332,23 @@ class TestLoadPidDecoderRejectsPartialCheckpoints:
         with pytest.raises(RuntimeError, match="missing 1 keys"):
             load_pid_decoder(sd, BaseModelType.Flux)
 
-    def test_unexpected_keys_are_rejected(self, tiny_net: torch.nn.Module) -> None:
+    def test_unexpected_keys_are_ignored_and_logged_at_debug(
+        self, tiny_net: torch.nn.Module, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """An extra key says nothing about whether the weights that *are* present are right, so the
+        checkpoint still loads and the extras are reported only at DEBUG (issue #9437)."""
         sd = dict(tiny_net.state_dict()) | {"not_a_pid_key": torch.zeros(1)}
-        with pytest.raises(RuntimeError, match="unexpected keys"):
+        with caplog.at_level(logging.DEBUG, logger="invokeai.backend.util.state_dict_loading"):
+            assert load_pid_decoder(sd, BaseModelType.Flux) is tiny_net
+        assert "not_a_pid_key" in caplog.text
+
+    def test_unexpected_keys_are_silent_above_debug(
+        self, tiny_net: torch.nn.Module, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        sd = dict(tiny_net.state_dict()) | {"not_a_pid_key": torch.zeros(1)}
+        with caplog.at_level(logging.INFO, logger="invokeai.backend.util.state_dict_loading"):
             load_pid_decoder(sd, BaseModelType.Flux)
+        assert caplog.text == ""
 
     def test_non_string_keys_are_rejected_before_torch_sees_them(self, tiny_net: torch.nn.Module) -> None:
         """A bare checkpoint keeps whatever keys the `.pth` was pickled with (see `strip_net_prefix`),

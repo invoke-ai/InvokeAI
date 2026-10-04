@@ -2,7 +2,7 @@
 
 Covers subfolder forwarding for all strategies, the delete_images_on_board
 silent-failure contract (Points 2 & 3 from PR review), and the transactional
-staged-deletion contracts of delete() and delete_intermediates().
+staged-deletion contracts of delete() and delete_intermediates_by_names().
 """
 
 import errno
@@ -50,7 +50,7 @@ def image_service() -> ImageService:
     invoker.services.urls.get_image_url.return_value = "http://localhost/img.png"
     invoker.services.configuration.image_subfolder_strategy = "flat"
     # By default every named intermediate is still an intermediate when the delete runs.
-    invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: list(names)
+    invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names, guard=None: list(names)
 
     svc.start(invoker)
     return svc
@@ -285,18 +285,20 @@ class TestDeleteForwardsSubfolder:
 
     def test_delete_intermediates_forwards_subfolder(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.get_intermediates.return_value = [
-            ("img1.png", "intermediate"),
-            ("img2.png", "intermediate"),
-        ]
+        invoker.services.image_records.get_subfolders.return_value = {
+            "img1.png": "intermediate",
+            "img2.png": "intermediate",
+        }
 
-        count = image_service.delete_intermediates()
+        result = image_service.delete_intermediates_by_names(["img1.png", "img2.png"])
 
-        assert count == 2
+        assert result.deleted_names == ["img1.png", "img2.png"]
         invoker.services.image_files.begin_delete.assert_called_once_with(
             [("img1.png", "intermediate"), ("img2.png", "intermediate")]
         )
-        invoker.services.image_records.delete_intermediates_by_names.assert_called_once_with(["img1.png", "img2.png"])
+        invoker.services.image_records.delete_intermediates_by_names.assert_called_once_with(
+            ["img1.png", "img2.png"], guard=None
+        )
         invoker.services.image_files.commit_delete.assert_called_once_with(
             invoker.services.image_files.begin_delete.return_value, image_names=["img1.png", "img2.png"]
         )
@@ -388,7 +390,7 @@ def disk_image_service(tmp_path: Path) -> ImageService:
     invoker = MagicMock()
     invoker.services.configuration.pil_compress_level = 1
     # By default every named intermediate is still an intermediate when the delete runs.
-    invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: list(names)
+    invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names, guard=None: list(names)
     storage = DiskImageFileStorage(tmp_path / "outputs")
     invoker.services.image_files = storage
     storage.start(invoker)
@@ -581,7 +583,7 @@ class TestDeleteTransactional:
 
 
 class TestDeleteIntermediatesTransactional:
-    """delete_intermediates() deletes records first, then purges the files of exactly the rows it
+    """delete_intermediates_by_names() deletes records first, then purges the files of exactly the rows it
     removed. It never stages or restores a promoted image's files, so there is no restore step for a
     concurrent delete to race (PR #9361, JPPhoto round 2)."""
 
@@ -591,17 +593,17 @@ class TestDeleteIntermediatesTransactional:
         names = ["tmp1.png", "tmp2.png", "tmp3.png"]
         for name in names:
             _save_image_file(storage, name)
-        invoker.services.image_records.get_intermediates.return_value = [(name, "") for name in names]
+        invoker.services.image_records.get_subfolders.return_value = dict.fromkeys(names, "")
         deleted_callbacks: list[str] = []
         disk_image_service.on_deleted(deleted_callbacks.append)
 
-        count = disk_image_service.delete_intermediates()
+        result = disk_image_service.delete_intermediates_by_names(names)
 
-        assert count == 3
+        assert result.deleted_names == names and result.purge_deferred == []
         for name in names:
             assert not storage.get_path(name).exists()
             assert not storage.get_path(name, thumbnail=True).exists()
-        invoker.services.image_records.delete_intermediates_by_names.assert_called_once_with(names)
+        invoker.services.image_records.delete_intermediates_by_names.assert_called_once_with(names, guard=None)
         assert deleted_callbacks == names
         assert _staging_dirs(storage) == []
 
@@ -611,21 +613,21 @@ class TestDeleteIntermediatesTransactional:
         storage = invoker.services.image_files
         for name in ("tmp1.png", "promoted.png", "tmp2.png"):
             _save_image_file(storage, name)
-        invoker.services.image_records.get_intermediates.return_value = [
-            ("tmp1.png", ""),
-            ("promoted.png", ""),
-            ("tmp2.png", ""),
-        ]
+        invoker.services.image_records.get_subfolders.return_value = {
+            "tmp1.png": "",
+            "promoted.png": "",
+            "tmp2.png": "",
+        }
         # The store reports it removed everything except promoted.png, so that file is never purged.
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: [
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names, guard=None: [
             name for name in names if name != "promoted.png"
         ]
         deleted_callbacks: list[str] = []
         disk_image_service.on_deleted(deleted_callbacks.append)
 
-        count = disk_image_service.delete_intermediates()
+        result = disk_image_service.delete_intermediates_by_names(["tmp1.png", "promoted.png", "tmp2.png"])
 
-        assert count == 2
+        assert result.deleted_names == ["tmp1.png", "tmp2.png"]
         assert storage.get_path("promoted.png").exists()
         assert storage.get_path("promoted.png", thumbnail=True).exists()
         for name in ("tmp1.png", "tmp2.png"):
@@ -636,14 +638,16 @@ class TestDeleteIntermediatesTransactional:
 
     def test_only_deleted_rows_are_purged_and_announced(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", ""), ("promoted.png", "")]
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: ["tmp1.png"]
+        invoker.services.image_records.get_subfolders.return_value = {"tmp1.png": "", "promoted.png": ""}
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names, guard=None: [
+            "tmp1.png"
+        ]
         deleted_callbacks: list[str] = []
         image_service.on_deleted(deleted_callbacks.append)
 
-        count = image_service.delete_intermediates()
+        result = image_service.delete_intermediates_by_names(["tmp1.png", "promoted.png"])
 
-        assert count == 1
+        assert result.deleted_names == ["tmp1.png"]
         # The promoted row's file is never touched: only the deleted row is purged.
         invoker.services.image_files.commit_delete.assert_called_once_with(
             invoker.services.image_files.begin_delete.return_value, image_names=["tmp1.png"]
@@ -652,9 +656,9 @@ class TestDeleteIntermediatesTransactional:
 
     def test_subfolder_is_forwarded_to_the_file_purge(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", "a/b")]
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: list(names)
-        image_service.delete_intermediates()
+        invoker.services.image_records.get_subfolders.return_value = {"tmp1.png": "a/b"}
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names, guard=None: list(names)
+        image_service.delete_intermediates_by_names(["tmp1.png"])
 
         invoker.services.image_files.begin_delete.assert_called_once_with([("tmp1.png", "a/b")])
 
@@ -662,15 +666,17 @@ class TestDeleteIntermediatesTransactional:
         """A filesystem failure must not undo the committed record deletions or raise: the records
         are already gone, and the journal the purge leaves behind is retried at the next startup."""
         invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", ""), ("tmp2.png", "")]
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: list(names)
+        invoker.services.image_records.get_subfolders.return_value = {"tmp1.png": "", "tmp2.png": ""}
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names, guard=None: list(names)
         invoker.services.image_files.commit_delete.side_effect = ImageFileDeleteException("purge failed")
         deleted_callbacks: list[str] = []
         image_service.on_deleted(deleted_callbacks.append)
 
-        count = image_service.delete_intermediates()
+        result = image_service.delete_intermediates_by_names(["tmp1.png", "tmp2.png"])
 
-        assert count == 2
+        assert result.deleted_names == ["tmp1.png", "tmp2.png"]
+        # The purge failure is reported, not raised: the caller counts these as pending disk cleanup.
+        assert result.purge_deferred == ["tmp1.png", "tmp2.png"]
         # Both records were deleted, so both deletions are announced despite the file failure.
         assert deleted_callbacks == ["tmp1.png", "tmp2.png"]
         invoker.services.image_files.abandon_delete.assert_not_called()
@@ -678,13 +684,13 @@ class TestDeleteIntermediatesTransactional:
 
     def test_db_failure_raises_and_purges_nothing(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.get_intermediates.return_value = [("tmp1.png", ""), ("tmp2.png", "")]
+        invoker.services.image_records.get_subfolders.return_value = {"tmp1.png": "", "tmp2.png": ""}
         invoker.services.image_records.delete_intermediates_by_names.side_effect = ImageRecordDeleteException()
         deleted_callbacks: list[str] = []
         image_service.on_deleted(deleted_callbacks.append)
 
         with pytest.raises(ImageRecordDeleteException):
-            image_service.delete_intermediates()
+            image_service.delete_intermediates_by_names(["tmp1.png", "tmp2.png"])
 
         # No record was removed, so no file may be purged and the journal must be discarded.
         invoker.services.image_files.commit_delete.assert_not_called()
@@ -695,12 +701,12 @@ class TestDeleteIntermediatesTransactional:
 
     def test_nothing_deleted_returns_zero_and_fires_no_callbacks(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.get_intermediates.return_value = [("promoted.png", "")]
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names: []
+        invoker.services.image_records.get_subfolders.return_value = {"promoted.png": ""}
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = lambda names, guard=None: []
         deleted_callbacks: list[str] = []
         image_service.on_deleted(deleted_callbacks.append)
 
-        assert image_service.delete_intermediates() == 0
+        assert image_service.delete_intermediates_by_names(["promoted.png"]).deleted_names == []
 
         # The journal still lists the promoted image; the purge selects nothing.
         invoker.services.image_files.commit_delete.assert_called_once_with(
@@ -710,11 +716,11 @@ class TestDeleteIntermediatesTransactional:
 
     def test_empty_intermediates_is_a_noop(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.get_intermediates.return_value = []
+        invoker.services.image_records.get_subfolders.return_value = {}
         deleted_callbacks: list[str] = []
         image_service.on_deleted(deleted_callbacks.append)
 
-        assert image_service.delete_intermediates() == 0
+        assert image_service.delete_intermediates_by_names(["gone.png"]).deleted_names == []
 
         # Nothing to delete: no journal is written and the record store is never asked to delete.
         invoker.services.image_records.delete_intermediates_by_names.assert_not_called()
@@ -723,7 +729,7 @@ class TestDeleteIntermediatesTransactional:
 
 
 class TestDeleteIntermediatesAgainstRealRecords:
-    """delete_intermediates() wired to a real record store, so no stub stands in for the DB decision.
+    """delete_intermediates_by_names() wired to a real record store, so no stub stands in for the DB decision.
 
     The mocked tests above can only assert that the service honours whatever the store reports. These
     exercise the real store, which is where the promoted-vs-already-gone distinction is actually made,
@@ -746,14 +752,14 @@ class TestDeleteIntermediatesAgainstRealRecords:
         image that is in the snapshot yet is no longer an intermediate by the time the conditional
         DELETE runs, so its record (and files) must survive.
         """
-        real_get_intermediates = records.get_intermediates
+        real_get_subfolders = records.get_subfolders
 
-        def snapshot_then_promote():
-            pairs = real_get_intermediates()
+        def snapshot_then_promote(names: list[str]) -> dict[str, str]:
+            subfolders = real_get_subfolders(names)
             records.update(image_name, ImageRecordChanges(is_intermediate=False))
-            return pairs
+            return subfolders
 
-        monkeypatch.setattr(records, "get_intermediates", snapshot_then_promote)
+        monkeypatch.setattr(records, "get_subfolders", snapshot_then_promote)
 
     def test_all_intermediates_are_deleted(self, wired) -> None:
         svc, records, storage = wired
@@ -762,7 +768,7 @@ class TestDeleteIntermediatesAgainstRealRecords:
         deleted_callbacks: list[str] = []
         svc.on_deleted(deleted_callbacks.append)
 
-        assert svc.delete_intermediates() == 2
+        assert svc.delete_intermediates_by_names(["tmp1.png", "tmp2.png"]).deleted_names == ["tmp1.png", "tmp2.png"]
 
         for name in ("tmp1.png", "tmp2.png"):
             assert not storage.get_path(name).exists()
@@ -779,7 +785,7 @@ class TestDeleteIntermediatesAgainstRealRecords:
         deleted_callbacks: list[str] = []
         svc.on_deleted(deleted_callbacks.append)
 
-        assert svc.delete_intermediates() == 1
+        assert svc.delete_intermediates_by_names(["tmp1.png", "promoted.png"]).deleted_names == ["tmp1.png"]
 
         assert storage.get_path("promoted.png").exists()
         assert records.get("promoted.png").is_intermediate is False
@@ -794,22 +800,22 @@ class TestDeleteIntermediatesAgainstRealRecords:
         self._seed(records, storage, "tmp1.png")
         self._seed(records, storage, "gone.png")
 
-        real_get_intermediates = records.get_intermediates
+        real_get_subfolders = records.get_subfolders
 
-        def snapshot_then_delete_gone():
-            pairs = real_get_intermediates()
+        def snapshot_then_delete_gone(names: list[str]) -> dict[str, str]:
+            subfolders = real_get_subfolders(names)
             # A single-image delete elsewhere removes gone.png (record and files) after our snapshot.
             records.delete("gone.png")
             storage.delete("gone.png")
-            return pairs
+            return subfolders
 
-        monkeypatch.setattr(records, "get_intermediates", snapshot_then_delete_gone)
+        monkeypatch.setattr(records, "get_subfolders", snapshot_then_delete_gone)
         deleted_callbacks: list[str] = []
         svc.on_deleted(deleted_callbacks.append)
 
-        count = svc.delete_intermediates()
+        result = svc.delete_intermediates_by_names(["tmp1.png", "gone.png"])
 
-        assert count == 1
+        assert result.deleted_names == ["tmp1.png"]
         assert deleted_callbacks == ["tmp1.png"]
         assert not storage.get_path("tmp1.png").exists()
         # gone.png was purged by the other path; we neither resurrect nor re-report it.
@@ -828,8 +834,8 @@ class TestDeleteIntermediatesAgainstRealRecords:
 
         real_delete_by_names = records.delete_intermediates_by_names
 
-        def delete_then_lose_the_promoted_record(names: list[str]):
-            deleted = real_delete_by_names(names)
+        def delete_then_lose_the_promoted_record(names: list[str], guard=None):
+            deleted = real_delete_by_names(names, guard=guard)
             # A concurrent single-image delete removes the promoted image entirely, right after the
             # conditional DELETE chose to keep it.
             records.delete("promoted.png")
@@ -840,9 +846,9 @@ class TestDeleteIntermediatesAgainstRealRecords:
         deleted_callbacks: list[str] = []
         svc.on_deleted(deleted_callbacks.append)
 
-        count = svc.delete_intermediates()
+        result = svc.delete_intermediates_by_names(["tmp1.png", "promoted.png"])
 
-        assert count == 1
+        assert result.deleted_names == ["tmp1.png"]
         assert deleted_callbacks == ["tmp1.png"]
         assert not storage.get_path("tmp1.png").exists()
         # promoted.png's files stay deleted — never resurrected into an orphan.
@@ -922,10 +928,11 @@ class TestDeleteJournalSurvivesFailedPurges:
         svc.on_deleted(deleted_callbacks.append)
 
         with patch.object(Path, "unlink", _unlink_always_fails):
-            count = svc.delete_intermediates()
+            result = svc.delete_intermediates_by_names(["tmp1.png", "tmp2.png"])
 
         # The records are committed as gone, so the deletion succeeded and is announced...
-        assert count == 2
+        assert result.deleted_names == ["tmp1.png", "tmp2.png"]
+        assert result.purge_deferred == ["tmp1.png", "tmp2.png"]
         assert sorted(deleted_callbacks) == ["tmp1.png", "tmp2.png"]
         for name in ("tmp1.png", "tmp2.png"):
             with pytest.raises(ImageRecordNotFoundException):
@@ -1145,7 +1152,7 @@ class TestDeleteVersusSubfolderMove:
         wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
         monkeypatch,
     ) -> None:
-        """While delete_intermediates() runs its unit, a concurrent move_all_images() must wait.
+        """While delete_intermediates_by_names() runs its unit, a concurrent move_all_images() must wait.
 
         Without the lock the move relocates the image mid-delete and the delete's purge sweeps
         the abandoned path: the files survive at the new subfolder with no record and no journal.
@@ -1158,14 +1165,14 @@ class TestDeleteVersusSubfolderMove:
         delete_may_finish = threading.Event()
         real_delete_by_names = records.delete_intermediates_by_names
 
-        def delete_after_pause(names: list[str]) -> list[str]:
+        def delete_after_pause(names: list[str], guard=None) -> list[str]:
             delete_started.set()
             assert delete_may_finish.wait(timeout=10), "the move never let the delete finish"
-            return real_delete_by_names(names)
+            return real_delete_by_names(names, guard=guard)
 
         monkeypatch.setattr(records, "delete_intermediates_by_names", delete_after_pause)
 
-        delete_thread = threading.Thread(target=svc.delete_intermediates)
+        delete_thread = threading.Thread(target=lambda: svc.delete_intermediates_by_names(["raced.png"]))
         delete_thread.start()
         assert delete_started.wait(timeout=10), "the delete never reached its record deletion"
 
@@ -1341,3 +1348,62 @@ class TestDeleteVersusSubfolderMove:
         assert not storage.get_path("raced.png", image_subfolder="old").exists()
         assert storage.get_path("raced.png", thumbnail=True).exists()
         assert _staging_dirs(storage) == []
+
+
+class TestStorageAccounting:
+    """Every write measures the files it produced so cleanup can report reclaimable space."""
+
+    def test_create_records_the_project_and_the_size_of_image_and_thumbnail(self, wired) -> None:
+        svc, records, storage = wired
+        invoker = svc._ImageService__invoker  # type: ignore
+        invoker.services.names.create_image_name.return_value = "made.png"
+        invoker.services.urls.get_image_url.return_value = "/made.png"
+        invoker.services.board_image_records.get_board_for_image.return_value = None
+        invoker.services.configuration.image_subfolder_strategy = "flat"
+
+        dto = svc.create(
+            image=Image.new("RGB", (64, 64)),
+            image_origin=ResourceOrigin.INTERNAL,
+            image_category=ImageCategory.GENERAL,
+            is_intermediate=True,
+            project_id="project-1",
+        )
+
+        expected = (
+            storage.get_path("made.png").stat().st_size + storage.get_path("made.png", thumbnail=True).stat().st_size
+        )
+        assert dto.project_id == "project-1"
+        assert dto.file_size_bytes == expected
+        assert records.get("made.png").file_size_bytes == expected
+
+    def test_copy_measures_the_new_files(self, wired) -> None:
+        svc, records, storage = wired
+        invoker = svc._ImageService__invoker  # type: ignore
+        invoker.services.names.create_image_name.return_value = "copy.png"
+        invoker.services.urls.get_image_url.return_value = "/copy.png"
+        invoker.services.board_image_records.get_board_for_image.return_value = None
+        invoker.services.configuration.image_subfolder_strategy = "flat"
+        _seed_record(records, "source.png", is_intermediate=False)
+        _save_image_file(storage, "source.png")
+
+        dto = svc.copy("source.png")
+
+        assert dto.file_size_bytes == (
+            storage.get_path("copy.png").stat().st_size + storage.get_path("copy.png", thumbnail=True).stat().st_size
+        )
+
+    def test_a_failed_measurement_leaves_the_size_unknown_and_the_image_intact(self, wired, monkeypatch) -> None:
+        svc, records, storage = wired
+        invoker = svc._ImageService__invoker  # type: ignore
+        invoker.services.names.create_image_name.return_value = "made.png"
+        invoker.services.urls.get_image_url.return_value = "/made.png"
+        invoker.services.board_image_records.get_board_for_image.return_value = None
+        invoker.services.configuration.image_subfolder_strategy = "flat"
+        monkeypatch.setattr(storage, "get_file_size_bytes", MagicMock(side_effect=OSError("stat failed")))
+
+        dto = svc.create(
+            image=Image.new("RGB", (64, 64)), image_origin=ResourceOrigin.INTERNAL, image_category=ImageCategory.GENERAL
+        )
+
+        assert dto.file_size_bytes is None
+        assert storage.get_path("made.png").exists()

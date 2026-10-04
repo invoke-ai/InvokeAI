@@ -669,3 +669,91 @@ def test_lazy_patch_iterator_that_constructs_a_model_does_not_deadlock():
     patcher.join(timeout=10)
     assert not patcher.is_alive(), "patching a lazily-constructed LoRA must not deadlock on MODEL_LOAD_LOCK"
     assert result.get("done") is True
+
+
+def _one_layer_patch(in_features: int, out_features: int, rank: int = 4) -> ModelPatchRaw:
+    return ModelPatchRaw(
+        layers={
+            "linear_layer_1": LoRALayer(
+                up=torch.ones(out_features, rank, dtype=torch.bfloat16),
+                mid=None,
+                down=torch.ones(rank, in_features, dtype=torch.bfloat16),
+                alpha=None,
+                bias=None,
+            )
+        }
+    )
+
+
+def _placement(patch: ModelPatchRaw) -> tuple[torch.device, torch.dtype]:
+    layer = patch.layers["linear_layer_1"]
+    return layer.up.device, layer.up.dtype
+
+
+@pytest.mark.parametrize("force_sidecar", [False, True], ids=["direct", "sidecar"])
+@pytest.mark.parametrize(
+    "device",
+    ["cpu", pytest.param("cuda", marks=pytest.mark.skipif(not torch.cuda.is_available(), reason="requires a GPU"))],
+)
+def test_patching_leaves_the_cached_patch_where_it_found_it(force_sidecar: bool, device: str) -> None:
+    """A patch is the model cache's own object, not a copy, and `BaseLayerPatch.to()` rebinds its
+    tensors in place. So anything patching does to a patch's device or dtype outlives the patched
+    scope, inside a record the cache is still accounting for.
+
+    Both paths used to leave a mark. Direct patching promoted the patch to float32 for the maths and
+    returned only its device, permanently doubling the record while the cache went on billing the
+    size it measured at `put()`. Sidecar patching moved it onto the compute device and returned
+    nothing: `clear_patches()` drops the module's reference, so the tensors stayed on the GPU inside
+    a RAM-pinned record -- `cur_vram_bytes()` reports zero for it and `full_unload_from_vram()`
+    early-returns, so the cache could not reclaim what it could not see. At a few tens of MB that was
+    invisible; at LTX-2's 8.9 GB step-distillation LoRA it is a first-order VRAM consumer.
+    """
+    model = DummyModuleWithOneLayer(in_features=8, out_features=16, device=device, dtype=torch.bfloat16)
+    apply_custom_layers_to_model(model)
+    patch = _one_layer_patch(in_features=8, out_features=16)
+    before = _placement(patch)
+    before_bytes = patch.calc_size()
+
+    with LayerPatcher.apply_smart_model_patches(
+        model=model,
+        patches=[(patch, 1.0)],
+        prefix="",
+        dtype=torch.bfloat16,
+        force_sidecar_patching=force_sidecar,
+    ):
+        # The sidecar path has to keep it on the compute device while the forward needs it.
+        if force_sidecar and device != "cpu":
+            assert _placement(patch)[0].type == device
+
+    assert _placement(patch) == before
+    assert patch.calc_size() == before_bytes
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="requires a GPU")
+def test_every_layer_of_a_multi_layer_patch_is_returned() -> None:
+    """A real LoRA is many layers -- the LTX-2 accelerator is 1660 of them -- and each is moved
+    onto the device separately. Restoring only the ones that happen to be reached first would
+    strand the remainder, which is the same leak in a form that a single-layer test cannot see."""
+    model = DummyModuleWithTwoLayers(in_features=8, out_features=8, device="cuda", dtype=torch.bfloat16)
+    apply_custom_layers_to_model(model)
+    patch = ModelPatchRaw(
+        layers={
+            name: LoRALayer(
+                up=torch.ones(8, 4, dtype=torch.bfloat16),
+                mid=None,
+                down=torch.ones(4, 8, dtype=torch.bfloat16),
+                alpha=None,
+                bias=None,
+            )
+            for name in ("linear_layer_1", "linear_layer_2")
+        }
+    )
+
+    with LayerPatcher.apply_smart_model_patches(
+        model=model, patches=[(patch, 1.0)], prefix="", dtype=torch.bfloat16, force_sidecar_patching=True
+    ):
+        pass
+
+    for layer in patch.layers.values():
+        assert layer.up.device.type == "cpu"
+        assert layer.up.dtype == torch.bfloat16

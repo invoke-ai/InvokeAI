@@ -16,6 +16,7 @@ Hardware requirements vary significantly depending on model and image output siz
 The requirements below are rough guidelines for best performance. GPUs with less VRAM typically still work, if a bit slower. Follow the [Low VRAM Guide] to optimize performance.
 
 - All Apple Silicon (M1, M2, etc) Macs work, but 16GB+ memory is recommended.
+- Nvidia GPUs need compute capability 7.5 or newer (GTX 16xx, RTX 20xx and everything after) and a driver from the R580 series or newer. Maxwell, Pascal and Volta cards (GTX 9xx/10xx, Titan V, Tesla P40/P100/V100) are not supported by Invoke's CUDA build: stay on the previous Invoke release, or do a [manual install](../manual) with `--torch-backend=cu126`, whose PyTorch build still includes these GPUs (not tested by the Invoke team). With a driver that is too old, Invoke starts on the CPU and logs an error saying so; on an unsupported GPU it logs an error at startup and generation fails.
 - AMD GPUs are supported on Linux only. The VRAM requirements are the same as Nvidia GPUs.
 - Intel Arc GPUs (Alchemist, Battlemage and newer) are supported on Windows and Linux `x86_64`. The VRAM requirements are the same as Nvidia GPUs.
 - Linux ARM64 (`aarch64`) devices — e.g. Raspberry Pi 5, other SBCs, ARM servers — are supported in CPU-only mode. Local generation is slow without a GPU, but API-backed models (e.g. GPT Image, Gemini) work well.
@@ -24,13 +25,15 @@ The requirements below are rough guidelines for best performance. GPUs with less
 
 | Model Family | Best resolution | GPU (series) | VRAM (min) | RAM (min) | Notes |
 |---|---:|---|---:|---:|---|
-| SD1.5 | 512x512 | Nvidia 10xx+ | 4GB | 8GB |  |
+| SD1.5 | 512x512 | Nvidia 16xx+ | 4GB | 8GB |  |
 | SDXL | 1024x1024 | Nvidia 20xx+ | 8GB | 16GB |  |
-| FLUX.1 | 1024x1024 | Nvidia 20xx+ | 10GB | 32GB |  |
+| FLUX.1 | 1024x1024 | Nvidia 20xx+ | 10GB | 32GB | Download totals: NF4 ~12GB, int8 ~18GB, bf16 ~33GB. The int8 transformer is 11.5GB resident on any supported GPU, so it streams on a 10GB card |
 | FLUX.2 Klein 4B | 1024x1024 | Nvidia 30xx+ | 12GB | 16GB | FP8 works with 8GB+; Diffusers + encoder |
-| FLUX.2 Klein 9B | 1024x1024 | Nvidia 40xx | 24GB | 32GB | FP8 works with 12GB+; Diffusers + encoder |
-| Z-Image Turbo | 1024x1024 | Nvidia 20xx+ | 8GB | 16GB | Q4_K 8GB; Q8/BF16 16GB+ |
-| Krea-2 (Turbo / Raw) | 1024x1024 | Nvidia 40xx | 24GB | 32GB | FP8 works with 16GB+; GGUF Q4_K ~12GB. Diffusers ~26GB; GGUF needs a standalone VAE + Qwen3-VL encoder |
+| FLUX.2 Klein 9B | 1024x1024 | Nvidia 30xx+ | 12GB | 32GB | int8 transformer ~9.5GB on any supported GPU; FP8 checkpoints stay about as small with FP8 Storage, which installation switches on. The Qwen3 8B encoder is 15GB (int8 7.6GB) and streams on a 12GB card |
+| Z-Image Turbo | 1024x1024 | Nvidia 20xx+ | 8GB | 16GB | Q4_K / NVFP4 / int8 8GB (int8 ~6GB resident); Q8/BF16 16GB+ |
+| Krea-2 (Turbo / Raw) | 1024x1024 | Nvidia 40xx | 24GB | 32GB | FP8 works with 16GB+; NVFP4 or GGUF Q4_K transformer ~7GB, plus the Qwen3-VL encoder (8.5GB bf16, ~2.8GB as GGUF Q4_K), int8 transformer 12.6GB. Diffusers ~26GB; single files need a standalone VAE + Qwen3-VL encoder (GGUF encoder ~2.8GB) |
+| Ideogram 4 | 1024x1024 | Nvidia 30xx+ | 24GB | 32GB | Two transformers resident at once. nf4 build fits 24GB (CUDA only); single-file fp8 or int8 pair ~17.5GB plus the Qwen3-VL 8B encoder. See [Ideogram 4](/users-guide/models/local-models/ideogram4/) |
+| ERNIE-Image | 1024x1024 | Nvidia 40xx | 24GB | 32GB | Single-file transformer ~16GB plus the Ministral 3B encoder ~7.7GB |
 | Wan 2.2 A14B (T2V/I2V) | 1280x720 | Nvidia 30xx+ | 12GB | 32GB | Dual-expert MoE; Q4_K_M 12GB; Q8 18GB+; Diffusers requires 32GB+ |
 | Wan 2.2 TI2V-5B | 1280x720 | Nvidia 20xx+ | 8GB | 16GB | Single transformer; Q4_K_M 6GB+; Q8 8GB+; Diffusers 12GB+ |
 
@@ -44,9 +47,9 @@ The requirements below are rough guidelines for best performance. GPUs with less
   You don't need to do this if you are installing with the [Invoke Launcher](../installation).
 :::
 
-Invoke requires python `3.11` through `3.12`. If you don't already have one of these versions installed, we suggest installing `3.12`, as it will be supported for longer.
+Invoke requires python `3.12`. Newer versions, `3.13` included, are not supported yet.
 
-Check that your system has an up-to-date Python installed by running `python3 --version` in the terminal (Linux, macOS) or cmd/powershell (Windows).
+Check which version you have by running `python3 --version` in the terminal (Linux, macOS) or cmd/powershell (Windows).
 
 :::tip[Installing Python]{icon="seti:python"}
   <Tabs syncKey="operatingSystem">
@@ -60,7 +63,7 @@ Check that your system has an up-to-date Python installed by running `python3 --
     <TabItem label="MacOS" icon="apple">
       <Steps>
         1. Install python with [an official installer].
-        2. If model installs fail with a certificate error, you may need to run this command (changing the python version to match what you have installed): `/Applications/Python\ 3.11/Install\ Certificates.command`
+        2. If model installs fail with a certificate error, you may need to run this command: `/Applications/Python\ 3.12/Install\ Certificates.command`
         3. If you haven't already, you will need to install the XCode CLI Tools by running `xcode-select --install` in a terminal.
       </Steps>
     </TabItem>
@@ -112,6 +115,8 @@ Go to the [CUDA Toolkit Downloads] and carefully follow the instructions for you
 
 Confirm that `nvidia-smi` displays driver and CUDA versions after installation.
 
+Invoke's CUDA build (PyTorch 2.13 with CUDA 13.0) needs an Nvidia driver from the R580 series or newer. See [Hardware](#hardware) for the supported GPUs.
+
 #### Linux - via Nvidia Container Runtime
 
 An alternative to installing CUDA locally is to use the [Nvidia Container Runtime] to run the application in a container.
@@ -148,6 +153,40 @@ If, after restarting the app, this doesn't improve your performance, either rest
   While the application does run on AMD GPUs, there are occasional bumps related to spotty torch support.
 :::
 
+:::note[MIOpen kernel search]
+  Invoke starts with `MIOPEN_FIND_MODE=FAST` so that MIOpen (ROCm's convolution library) does not
+  spend minutes benchmarking kernels the first time each convolution shape runs - most noticeable on
+  the video VAEs, which run many distinct shapes. Export `MIOPEN_FIND_MODE` yourself to override it
+  (for example `MIOPEN_FIND_MODE=NORMAL` to let MIOpen re-tune its kernel database).
+:::
+
+:::note[Wide-head attention runs on the math kernel]
+  On ROCm builds Invoke routes attention whose head dimension exceeds 256 to PyTorch's math kernel.
+  The fused kernels return wrong output there on torch 2.13 / ROCm 7.2 (measured on a W7900), which
+  showed up as black or noisy images from the image VAEs - their mid-block attention is one 512-wide
+  head. The math kernel builds the whole attention matrix (about 4 GB for a 1024px VAE decode, 21 GB
+  at 1536px), so Invoke computes it in pieces of at most 1 GB. The result can differ from a single
+  math call in the last bit of a bf16 value, and each such call is roughly 10% slower. Export
+  `INVOKE_ROCM_FUSED_SDPA_MAX_HEAD_DIM` to raise the threshold on a build whose fused kernels are
+  known to be correct.
+:::
+
+:::note[Attention without a fused kernel]
+  Where PyTorch has no fused attention kernel for a call, it runs on the math kernel as well, and
+  Invoke computes that in pieces of at most 1 GB too. That is what makes large models and
+  resolutions usable on such builds: Z-Image at 1024px would otherwise build 8 GB of attention
+  scores per call, Krea-2 almost 13 GB.
+:::
+
+:::note[Idle process pegging one CPU core]
+  After GPU work, ROCm's HSA runtime can leave its internal `AsyncEventsLoop` thread busy-spinning
+  on one CPU core indefinitely instead of blocking - a livelock in `libhsa-runtime64.so`, not an
+  Invoke bug (see [ROCm/ROCm#6522] and [ROCm/TheRock#7051]). It inflates `rocm-smi`'s GPU-busy%
+  reading too, so it can look like a stuck generation when the queue is actually idle. If you see
+  this, export `HSA_TOOLS_DISABLE_REGISTER=1` before launching Invoke; unset it only if you need
+  `rocprof`/ROCTracer-based kernel profiling, which this disables.
+:::
+
 Run `rocm-smi` on your system's command line verify that drivers and ROCm are installed. If this command fails, or doesn't report versions, you will need to install them.
 
 Go to the [ROCm Documentation] and carefully follow the instructions for your system to get everything installed.
@@ -171,3 +210,5 @@ An alternative to installing ROCm locally is to use a [ROCm docker container] to
 [Intel client GPU install guide]: https://dgpu-docs.intel.com/driver/client/overview.html
 [ROCm Documentation]: https://rocmdocs.amd.com
 [ROCm docker container]: https://rocmdocs.amd.com/en/latest/Deep_learning/Deep_learning.html#docker-containers
+[ROCm/ROCm#6522]: https://github.com/ROCm/ROCm/issues/6522
+[ROCm/TheRock#7051]: https://github.com/ROCm/TheRock/issues/7051

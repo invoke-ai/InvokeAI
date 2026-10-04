@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from invokeai.app.invocations.wan_latents_to_video import (
+from invokeai.app.invocations.vae.wan_latents_to_video import (
     WanLatentsToVideoInvocation,
     _iter_decoded_frames,
     _validate_video_latent_batch,

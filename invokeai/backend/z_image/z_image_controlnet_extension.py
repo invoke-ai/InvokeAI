@@ -1,4 +1,3 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """Z-Image ControlNet Extension for spatial conditioning.
 
 This module provides an extension-based approach to Z-Image ControlNet,
@@ -84,126 +83,6 @@ class ZImageControlNetExtension:
             return True
         step_percent = step_index / total_steps
         return self._begin_step_percent <= step_percent <= self._end_step_percent
-
-    def prepare_control_state(
-        self,
-        base_transformer: ZImageTransformer2DModel,
-        cap_feats: torch.Tensor,
-        timestep_emb: torch.Tensor,
-        x_item_seqlens: List[int],
-        cap_item_seqlens: List[int],
-        x_freqs_cis: torch.Tensor,
-        patch_size: int = 2,
-        f_patch_size: int = 1,
-    ) -> torch.Tensor:
-        """Prepare control state (control_unified) for incremental hint computation.
-
-        This processes the control condition through patchify and noise_refiner,
-        returning the control_unified tensor that will be used incrementally.
-        """
-        bsz = 1
-        device = self._control_cond.device
-
-        # Patchify control context
-        control_context = [self._control_cond]
-        (
-            control_patches,
-            _,
-            _control_pos_ids,
-            control_pad_mask,
-        ) = patchify_control_context(
-            control_context,
-            patch_size,
-            f_patch_size,
-            cap_feats.size(1),
-        )
-
-        # Embed control context
-        ctrl_item_seqlens = [len(p) for p in control_patches]
-        ctrl_max_seqlen = max(ctrl_item_seqlens)
-
-        control_cat = torch.cat(control_patches, dim=0)
-        embedder_key = f"{patch_size}-{f_patch_size}"
-        control_cat = self._adapter.control_all_x_embedder[embedder_key](control_cat)
-
-        # Apply padding token
-        adaln_input = timestep_emb.type_as(control_cat)
-        x_pad_token = self._adapter.x_pad_token.to(dtype=control_cat.dtype)
-        control_cat[torch.cat(control_pad_mask)] = x_pad_token
-
-        control_list = list(control_cat.split(ctrl_item_seqlens, dim=0))
-        control_padded = pad_sequence(control_list, batch_first=True, padding_value=0.0)
-
-        # Use x_freqs_cis from main path for aligned position encoding
-        ctrl_freqs_cis_for_refiner = x_freqs_cis[:, : control_padded.shape[1]]
-
-        ctrl_attn_mask = torch.zeros((bsz, ctrl_max_seqlen), dtype=torch.bool, device=device)
-        for i, seq_len in enumerate(ctrl_item_seqlens):
-            ctrl_attn_mask[i, :seq_len] = 1
-
-        # Refine control context through control_noise_refiner
-        for layer in self._adapter.control_noise_refiner:
-            control_padded = layer(control_padded, ctrl_attn_mask, ctrl_freqs_cis_for_refiner, adaln_input)
-
-        # Store these for compute_single_hint
-        self._ctrl_item_seqlens = ctrl_item_seqlens
-        self._adaln_input = adaln_input
-
-        # Unify control with caption features
-        control_unified = []
-        for i in range(bsz):
-            ctrl_len = ctrl_item_seqlens[i]
-            cap_len = cap_item_seqlens[i]
-            control_unified.append(torch.cat([control_padded[i][:ctrl_len], cap_feats[i][:cap_len]]))
-
-        control_unified = pad_sequence(control_unified, batch_first=True, padding_value=0.0)
-
-        if not hasattr(self, "_prepare_printed"):
-            self._prepare_printed = True
-            logger.debug("Control state prepared: shape %s", control_unified.shape)
-
-        return control_unified
-
-    def compute_single_hint(
-        self,
-        control_layer_idx: int,
-        control_state: torch.Tensor,
-        unified_hidden_states: torch.Tensor,
-        attn_mask: torch.Tensor,
-        freqs_cis: torch.Tensor,
-        adaln_input: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Compute a single hint from one control layer.
-
-        Args:
-            control_layer_idx: Which control layer to use (0, 1, 2, ...)
-            control_state: Current control state (stacked tensor from previous layers)
-            unified_hidden_states: Current unified hidden states from main transformer
-            attn_mask: Attention mask
-            freqs_cis: RoPE frequencies
-            adaln_input: Timestep embedding
-
-        Returns:
-            Tuple of (hint tensor, updated control_state)
-        """
-        layer = self._adapter.control_layers[control_layer_idx]
-
-        # Run control layer with CURRENT unified_hidden_states
-        control_state = layer(
-            control_state,
-            x=unified_hidden_states,
-            attn_mask=attn_mask,
-            freqs_cis=freqs_cis,
-            adaln_input=adaln_input,
-        )
-
-        # Extract hint from stacked state
-        # After control layer, control_state is stacked: [skip_0, ..., skip_n, running_state]
-        # We want the latest skip (second to last element)
-        unbinded = torch.unbind(control_state)
-        hint = unbinded[-2]  # Latest skip connection
-
-        return hint, control_state
 
     def compute_hints(
         self,
@@ -321,17 +200,17 @@ class ZImageControlNetExtension:
                 if hasattr(refiner0, "attn"):
                     logger.debug("noise_refiner[0] attn.wq norm: %.6f", refiner0.attn.wq.weight.norm().item())
 
+        hint_list = []
         for layer in self._adapter.control_layers:
-            c = layer(
+            hint, c = layer(
                 c,
                 x=unified_hidden_states,
                 attn_mask=attn_mask,
                 freqs_cis=freqs_cis,
                 adaln_input=adaln_input,
             )
-
-        # Extract hints (all but the last element which is the running state)
-        hints = tuple(torch.unbind(c)[:-1])
+            hint_list.append(hint)
+        hints = tuple(hint_list)
 
         if not hasattr(self, "_hints_printed"):
             self._hints_printed = True

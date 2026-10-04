@@ -9,7 +9,7 @@ from invokeai.app.invocations.baseinvocation import (
 )
 from invokeai.app.invocations.fields import InputField, OutputField
 from invokeai.app.invocations.image import ImageField
-from invokeai.app.services.events.events_common import EventBase
+from invokeai.app.services.events.events_common import EventBase, InvocationProgressEvent
 from invokeai.app.services.session_processor.session_processor_common import ProgressImage
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem
 from invokeai.app.services.shared.invocation_context import InvocationContext
@@ -97,6 +97,14 @@ class AnyTypeTestInvocation(BaseInvocation):
         return AnyTypeTestInvocationOutput(value=self.value)
 
 
+@invocation("test_marked_any", version="1.0.0")
+class MarkedAnyTypeTestInvocation(AnyTypeTestInvocation):
+    marker: str = InputField(default="")
+
+    def invoke(self, context: InvocationContext) -> AnyTypeTestInvocationOutput:
+        return AnyTypeTestInvocationOutput(value=f"{self.marker}{self.value}")
+
+
 @invocation("test_polymorphic", version="1.0.0")
 class PolymorphicStringTestInvocation(BaseInvocation):
     value: Union[str, list[str]] = InputField(default="")
@@ -132,6 +140,14 @@ def create_edge(from_id: str, from_field: str, to_id: str, to_field: str) -> Edg
     )
 
 
+def create_loop_linkage(from_id: str, to_id: str) -> Edge:
+    return Edge(
+        type="loop_linkage",
+        source=EdgeConnection(node_id=from_id, field="loop_linkage"),
+        destination=EdgeConnection(node_id=to_id, field="loop_linkage"),
+    )
+
+
 class TestEvent(EventBase):
     __test__ = False  # not a pytest test case
 
@@ -156,8 +172,13 @@ class TestEventService(EventServiceBase):
         message: str,
         percentage: float | None = None,
         image: "ProgressImage | None" = None,
-    ) -> None:
-        pass
+        revision: int | None = None,
+    ) -> InvocationProgressEvent:
+        if invocation is None:
+            # Model-load tests signal imageless progress outside any invocation; nothing retains
+            # the (unbuildable) event in that case.
+            return None  # type: ignore[return-value]
+        return super().emit_invocation_progress(queue_item, invocation, message, percentage, image, revision)
 
 
 def wait_until(condition: Callable[[], bool], timeout: int = 10, interval: float = 0.1) -> None:

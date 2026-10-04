@@ -2,7 +2,7 @@
 
 import pytest
 
-from invokeai.app.invocations.qwen_image_denoise import QwenImageDenoiseInvocation
+from invokeai.app.invocations.qwen_image.qwen_image_denoise import QwenImageDenoiseInvocation
 
 
 class TestPrepareCfgScale:

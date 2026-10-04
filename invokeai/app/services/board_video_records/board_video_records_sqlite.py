@@ -95,3 +95,19 @@ class SqliteBoardVideoRecordStorage(BoardVideoRecordStorageBase):
             )
             count = cast(int, cursor.fetchone()[0])
         return count
+
+    def get_asset_video_count_for_board(self, board_id: str) -> int:
+        with self._db.transaction() as cursor:
+            cursor.execute(
+                """--sql
+                SELECT COUNT(*)
+                FROM board_videos
+                INNER JOIN videos ON board_videos.video_name = videos.video_name
+                WHERE videos.is_intermediate = FALSE
+                AND videos.video_category != 'general'
+                AND board_videos.board_id = ?;
+                """,
+                (board_id,),
+            )
+            count = cast(int, cursor.fetchone()[0])
+        return count

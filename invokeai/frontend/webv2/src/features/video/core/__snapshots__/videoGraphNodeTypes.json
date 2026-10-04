@@ -1,0 +1,1051 @@
+{
+  "connections": [
+    "collect collection collect collection",
+    "collect collection minimax_h3_reference_conditioning references",
+    "collect collection minimax_h3_text_encoder references",
+    "collect collection video_concat videos",
+    "core_metadata metadata ltx2_latents_to_video metadata",
+    "core_metadata metadata minimax_h3_latents_to_video metadata",
+    "core_metadata metadata video_concat metadata",
+    "core_metadata metadata wan_l2v metadata",
+    "extract_video_range fps float_to_int value",
+    "extract_video_range fps ltx2_denoise fps",
+    "extract_video_range fps ltx2_extend_conditioning fps",
+    "extract_video_range fps ltx2_latents_to_video fps",
+    "extract_video_range video collect item",
+    "extract_video_range video ltx2_extend_conditioning video",
+    "extract_video_range video video_frame_extract video",
+    "float_to_int value video_concat fps",
+    "float_to_int value wan_l2v fps",
+    "integer value core_metadata seed",
+    "integer value ltx2_denoise seed",
+    "integer value minimax_h3_denoise seed",
+    "integer value wan_video_denoise seed",
+    "ltx2_audio_conditioning audio_conditioning ltx2_denoise audio_conditioning",
+    "ltx2_audio_conditioning audio_conditioning ltx2_latents_to_video source_audio",
+    "ltx2_audio_conditioning num_frames ltx2_denoise num_frames",
+    "ltx2_denoise audio_latents ltx2_denoise audio_latents",
+    "ltx2_denoise audio_latents ltx2_latents_to_video audio_latents",
+    "ltx2_denoise video_latents ltx2_latent_upsample video_latents",
+    "ltx2_denoise video_latents ltx2_latents_to_video video_latents",
+    "ltx2_duration num_frames core_metadata num_frames",
+    "ltx2_duration num_frames ltx2_denoise num_frames",
+    "ltx2_extend_conditioning audio_conditioning ltx2_denoise audio_prefix_conditioning",
+    "ltx2_extend_conditioning context_frames video_concat transition_frames",
+    "ltx2_extend_conditioning video_conditioning ltx2_denoise video_conditioning",
+    "ltx2_image_conditioning video_conditioning ltx2_denoise keyframe_conditioning",
+    "ltx2_image_conditioning video_conditioning ltx2_denoise video_conditioning",
+    "ltx2_latent_upsample latents ltx2_denoise latents",
+    "ltx2_latents_to_video video collect item",
+    "ltx2_model_loader audio_vae ltx2_audio_conditioning audio_vae",
+    "ltx2_model_loader audio_vae ltx2_extend_conditioning audio_vae",
+    "ltx2_model_loader audio_vae ltx2_latents_to_video audio_vae",
+    "ltx2_model_loader latent_upsampler ltx2_latent_upsample latent_upsampler",
+    "ltx2_model_loader text_encoder ltx2_text_encoder text_encoder",
+    "ltx2_model_loader transformer ltx2_denoise transformer",
+    "ltx2_model_loader vae ltx2_extend_conditioning vae",
+    "ltx2_model_loader vae ltx2_image_conditioning vae",
+    "ltx2_model_loader vae ltx2_latent_upsample vae",
+    "ltx2_model_loader vae ltx2_latents_to_video vae",
+    "ltx2_model_loader vae ltx2_video_conditioning vae",
+    "ltx2_model_loader vocoder ltx2_audio_conditioning vocoder",
+    "ltx2_model_loader vocoder ltx2_extend_conditioning vocoder",
+    "ltx2_model_loader vocoder ltx2_latents_to_video vocoder",
+    "ltx2_text_encoder conditioning ltx2_denoise positive_conditioning",
+    "ltx2_text_encoder conditioning ltx2_duration conditioning",
+    "ltx2_text_encoder negative_conditioning ltx2_denoise negative_conditioning",
+    "ltx2_video_conditioning num_frames ltx2_denoise num_frames",
+    "ltx2_video_conditioning video_conditioning ltx2_denoise full_video_conditioning",
+    "ltx2_video_conditioning video_conditioning ltx2_latents_to_video source_video",
+    "minimax_h3_denoise audio_latents minimax_h3_latents_to_video audio_latents",
+    "minimax_h3_denoise video_latents minimax_h3_latents_to_video video_latents",
+    "minimax_h3_frame_conditioning frame_conditioning minimax_h3_denoise frame_conditioning",
+    "minimax_h3_image_reference reference collect item",
+    "minimax_h3_latents_to_video video collect item",
+    "minimax_h3_model_loader audio_vae minimax_h3_latents_to_video audio_vae",
+    "minimax_h3_model_loader audio_vae minimax_h3_reference_conditioning audio_vae",
+    "minimax_h3_model_loader text_encoder minimax_h3_text_encoder text_encoder",
+    "minimax_h3_model_loader transformer minimax_h3_denoise transformer",
+    "minimax_h3_model_loader vae minimax_h3_frame_conditioning vae",
+    "minimax_h3_model_loader vae minimax_h3_latents_to_video vae",
+    "minimax_h3_model_loader vae minimax_h3_reference_conditioning vae",
+    "minimax_h3_reference_conditioning reference_conditioning minimax_h3_denoise reference_conditioning",
+    "minimax_h3_text_encoder conditioning minimax_h3_denoise positive_conditioning",
+    "string value core_metadata negative_prompt",
+    "string value core_metadata positive_prompt",
+    "string value ltx2_text_encoder negative_prompt",
+    "string value ltx2_text_encoder prompt",
+    "string value minimax_h3_text_encoder prompt",
+    "string value wan_text_encoder prompt",
+    "video_frame_extract image core_metadata first_frame_image",
+    "video_frame_extract image minimax_h3_frame_conditioning first_image",
+    "video_frame_extract image minimax_h3_text_encoder first_image",
+    "video_frame_extract image wan_ref_image_encoder image",
+    "wan_l2v video collect item",
+    "wan_model_loader transformer wan_video_denoise transformer",
+    "wan_model_loader vae wan_l2v vae",
+    "wan_model_loader vae wan_ref_image_encoder vae",
+    "wan_model_loader wan_t5_encoder wan_text_encoder wan_t5_encoder",
+    "wan_ref_image_encoder ref_image wan_video_denoise ref_image",
+    "wan_text_encoder conditioning wan_video_denoise negative_conditioning",
+    "wan_text_encoder conditioning wan_video_denoise positive_conditioning",
+    "wan_video_denoise latents wan_l2v latents"
+  ],
+  "_comment": "Generated by src/features/video/core/videoGraphCoverage.test.ts; regenerate with `vitest -u`. Excluded from oxfmt so the test alone owns its layout. Consumed by tests/app/invocations/test_frontend_graph_node_types.py, which checks every node type, edge field and literal input value below against the backend invocation registry, and every connection for whether the backend considers the two field types compatible. An empty literalInputs value list means the field is set to something other than a scalar, so only its name is checked.",
+  "byBase": {
+    "ltx-2": {
+      "modes": [
+        "audio-to-video",
+        "extend",
+        "first-frame",
+        "first-last",
+        "last-frame",
+        "txt2vid",
+        "video-to-audio"
+      ],
+      "nodeTypes": [
+        "collect",
+        "core_metadata",
+        "extract_video_range",
+        "integer",
+        "ltx2_audio_conditioning",
+        "ltx2_denoise",
+        "ltx2_duration",
+        "ltx2_extend_conditioning",
+        "ltx2_image_conditioning",
+        "ltx2_latent_upsample",
+        "ltx2_latents_to_video",
+        "ltx2_model_loader",
+        "ltx2_text_encoder",
+        "ltx2_video_conditioning",
+        "string",
+        "video_concat"
+      ]
+    },
+    "minimax-h3": {
+      "modes": [
+        "extend",
+        "first-frame",
+        "first-last",
+        "last-frame",
+        "reference",
+        "txt2vid"
+      ],
+      "nodeTypes": [
+        "collect",
+        "core_metadata",
+        "extract_video_range",
+        "integer",
+        "minimax_h3_denoise",
+        "minimax_h3_frame_conditioning",
+        "minimax_h3_image_reference",
+        "minimax_h3_latents_to_video",
+        "minimax_h3_model_loader",
+        "minimax_h3_reference_conditioning",
+        "minimax_h3_text_encoder",
+        "string",
+        "video_concat",
+        "video_frame_extract"
+      ]
+    },
+    "wan": {
+      "modes": [
+        "extend",
+        "first-frame",
+        "first-last",
+        "txt2vid"
+      ],
+      "nodeTypes": [
+        "collect",
+        "core_metadata",
+        "extract_video_range",
+        "float_to_int",
+        "integer",
+        "string",
+        "video_concat",
+        "video_frame_extract",
+        "wan_l2v",
+        "wan_model_loader",
+        "wan_ref_image_encoder",
+        "wan_text_encoder",
+        "wan_video_denoise"
+      ]
+    }
+  },
+  "fieldsByNodeType": {
+    "collect": {
+      "inputs": [
+        "collection",
+        "item"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "collection"
+      ]
+    },
+    "core_metadata": {
+      "inputs": [
+        "first_frame_image",
+        "negative_prompt",
+        "num_frames",
+        "positive_prompt",
+        "seed"
+      ],
+      "literalInputs": {
+        "cfg_scale": [
+          1,
+          3,
+          5
+        ],
+        "first_frame_image": [],
+        "fps": [
+          16,
+          24
+        ],
+        "generation_mode": [
+          "ltx2_a2v",
+          "ltx2_extend_video",
+          "ltx2_flf2v",
+          "ltx2_i2v",
+          "ltx2_lf2v",
+          "ltx2_t2v",
+          "ltx2_v2a",
+          "minimax_h3_extend_video",
+          "minimax_h3_flf2v",
+          "minimax_h3_i2v",
+          "minimax_h3_lf2v",
+          "minimax_h3_ref2v",
+          "minimax_h3_t2v",
+          "wan_extend_video",
+          "wan_i2v",
+          "wan_interpolate",
+          "wan_t2v"
+        ],
+        "height": [
+          1024,
+          1536,
+          704,
+          720,
+          768
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "last_frame_image": [],
+        "ltx2_audio_cfg_scale": [
+          7
+        ],
+        "ltx2_base_height": [
+          512,
+          768
+        ],
+        "ltx2_base_width": [
+          1376,
+          896
+        ],
+        "ltx2_component_source": [],
+        "ltx2_conditioning_role": [
+          "audio",
+          "video"
+        ],
+        "ltx2_conditioning_video": [],
+        "ltx2_context_frames": [
+          17
+        ],
+        "ltx2_modality_scale": [
+          3
+        ],
+        "ltx2_stg_scale": [
+          1
+        ],
+        "ltx2_text_encoder_model": [],
+        "ltx2_two_stage": [
+          true
+        ],
+        "minimax_h3_component_source": [],
+        "minimax_h3_references": [],
+        "minimax_h3_text_encoder_model": [],
+        "model": [],
+        "num_frames": [
+          121,
+          124,
+          41,
+          81
+        ],
+        "source_video": [],
+        "source_video_end_frame": [
+          47
+        ],
+        "source_video_start_frame": [
+          0
+        ],
+        "steps": [
+          30,
+          40,
+          50,
+          8
+        ],
+        "use_cache": [
+          true
+        ],
+        "vae": [],
+        "wan_guidance_scale_low_noise": [
+          4
+        ],
+        "wan_t5_encoder_model": [],
+        "width": [
+          1248,
+          1280,
+          1344,
+          1792,
+          2752
+        ]
+      },
+      "outputs": [
+        "metadata"
+      ]
+    },
+    "extract_video_range": {
+      "inputs": [],
+      "literalInputs": {
+        "end_frame": [
+          -1
+        ],
+        "fps": [
+          24
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "start_frame": [
+          0
+        ],
+        "use_cache": [
+          false
+        ],
+        "video": []
+      },
+      "outputs": [
+        "fps",
+        "video"
+      ]
+    },
+    "float_to_int": {
+      "inputs": [
+        "value"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "method": [
+          "Nearest"
+        ],
+        "multiple": [
+          1
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "value"
+      ]
+    },
+    "integer": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "value"
+      ]
+    },
+    "ltx2_audio_conditioning": {
+      "inputs": [
+        "audio_vae",
+        "vocoder"
+      ],
+      "literalInputs": {
+        "fps": [
+          24
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ],
+        "video": []
+      },
+      "outputs": [
+        "audio_conditioning",
+        "num_frames"
+      ]
+    },
+    "ltx2_denoise": {
+      "inputs": [
+        "audio_conditioning",
+        "audio_latents",
+        "audio_prefix_conditioning",
+        "fps",
+        "full_video_conditioning",
+        "keyframe_conditioning",
+        "latents",
+        "negative_conditioning",
+        "num_frames",
+        "positive_conditioning",
+        "seed",
+        "transformer",
+        "video_conditioning"
+      ],
+      "literalInputs": {
+        "audio_cfg_scale": [
+          1,
+          7
+        ],
+        "cfg_scale": [
+          1,
+          3
+        ],
+        "fps": [
+          24
+        ],
+        "height": [
+          1024,
+          1536,
+          512,
+          704,
+          768
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "modality_scale": [
+          1,
+          3
+        ],
+        "num_frames": [
+          121,
+          41
+        ],
+        "schedule": [
+          "auto"
+        ],
+        "steps": [
+          30,
+          8
+        ],
+        "stg_scale": [
+          0,
+          1
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1248,
+          1376,
+          1792,
+          2752,
+          896
+        ]
+      },
+      "outputs": [
+        "audio_latents",
+        "video_latents"
+      ]
+    },
+    "ltx2_duration": {
+      "inputs": [
+        "conditioning"
+      ],
+      "literalInputs": {
+        "duration_head": [],
+        "fps": [
+          24
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "max_seconds": [
+          5.041666666666667
+        ],
+        "min_seconds": [
+          1
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "num_frames"
+      ]
+    },
+    "ltx2_extend_conditioning": {
+      "inputs": [
+        "audio_vae",
+        "fps",
+        "vae",
+        "video",
+        "vocoder"
+      ],
+      "literalInputs": {
+        "context_frames": [
+          17
+        ],
+        "height": [
+          1024,
+          1536,
+          512,
+          704,
+          768
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ],
+        "video": [],
+        "width": [
+          1248,
+          1376,
+          1792,
+          2752,
+          896
+        ]
+      },
+      "outputs": [
+        "audio_conditioning",
+        "context_frames",
+        "video_conditioning"
+      ]
+    },
+    "ltx2_image_conditioning": {
+      "inputs": [
+        "vae"
+      ],
+      "literalInputs": {
+        "frame_index": [
+          -1,
+          0
+        ],
+        "height": [
+          1024,
+          1536,
+          512,
+          704,
+          768
+        ],
+        "image": [],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1248,
+          1376,
+          1792,
+          2752,
+          896
+        ]
+      },
+      "outputs": [
+        "video_conditioning"
+      ]
+    },
+    "ltx2_latent_upsample": {
+      "inputs": [
+        "latent_upsampler",
+        "vae",
+        "video_latents"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    },
+    "ltx2_latents_to_video": {
+      "inputs": [
+        "audio_latents",
+        "audio_vae",
+        "fps",
+        "metadata",
+        "source_audio",
+        "source_video",
+        "vae",
+        "video_latents",
+        "vocoder"
+      ],
+      "literalInputs": {
+        "fps": [
+          24
+        ],
+        "is_intermediate": [
+          false,
+          true
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": [
+        "video"
+      ]
+    },
+    "ltx2_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "component_source": [],
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "text_encoder_model": [],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "audio_vae",
+        "latent_upsampler",
+        "text_encoder",
+        "transformer",
+        "vae",
+        "vocoder"
+      ]
+    },
+    "ltx2_text_encoder": {
+      "inputs": [
+        "negative_prompt",
+        "prompt",
+        "text_encoder"
+      ],
+      "literalInputs": {
+        "encode_negative": [
+          false,
+          true
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning",
+        "negative_conditioning"
+      ]
+    },
+    "ltx2_video_conditioning": {
+      "inputs": [
+        "vae"
+      ],
+      "literalInputs": {
+        "fps": [
+          24
+        ],
+        "height": [
+          704
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ],
+        "video": [],
+        "width": [
+          1248
+        ]
+      },
+      "outputs": [
+        "num_frames",
+        "video_conditioning"
+      ]
+    },
+    "minimax_h3_denoise": {
+      "inputs": [
+        "frame_conditioning",
+        "positive_conditioning",
+        "reference_conditioning",
+        "seed",
+        "transformer"
+      ],
+      "literalInputs": {
+        "height": [
+          768
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "num_frames": [
+          "124"
+        ],
+        "steps": [
+          51
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1344
+        ]
+      },
+      "outputs": [
+        "audio_latents",
+        "video_latents"
+      ]
+    },
+    "minimax_h3_frame_conditioning": {
+      "inputs": [
+        "first_image",
+        "vae"
+      ],
+      "literalInputs": {
+        "first_image": [],
+        "height": [
+          768
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "last_image": [],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1344
+        ]
+      },
+      "outputs": [
+        "frame_conditioning"
+      ]
+    },
+    "minimax_h3_image_reference": {
+      "inputs": [],
+      "literalInputs": {
+        "detail": [
+          "max"
+        ],
+        "image": [],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "reference"
+      ]
+    },
+    "minimax_h3_latents_to_video": {
+      "inputs": [
+        "audio_latents",
+        "audio_vae",
+        "metadata",
+        "vae",
+        "video_latents"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          false,
+          true
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": [
+        "video"
+      ]
+    },
+    "minimax_h3_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "text_encoder_model": [],
+        "transformer_model": [],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "audio_vae",
+        "text_encoder",
+        "transformer",
+        "vae"
+      ]
+    },
+    "minimax_h3_reference_conditioning": {
+      "inputs": [
+        "audio_vae",
+        "references",
+        "vae"
+      ],
+      "literalInputs": {
+        "height": [
+          768
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "num_frames": [
+          124
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1344
+        ]
+      },
+      "outputs": [
+        "reference_conditioning"
+      ]
+    },
+    "minimax_h3_text_encoder": {
+      "inputs": [
+        "first_image",
+        "prompt",
+        "references",
+        "text_encoder"
+      ],
+      "literalInputs": {
+        "first_image": [],
+        "height": [
+          768
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "last_image": [],
+        "num_frames": [
+          124
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1344
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
+    },
+    "string": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "value"
+      ]
+    },
+    "video_concat": {
+      "inputs": [
+        "fps",
+        "metadata",
+        "transition_frames",
+        "videos"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          false
+        ],
+        "size_mismatch": [
+          "match_first"
+        ],
+        "transition": [
+          "crossfade"
+        ],
+        "transition_frames": [
+          2
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": []
+    },
+    "video_frame_extract": {
+      "inputs": [
+        "video"
+      ],
+      "literalInputs": {
+        "frame_index": [
+          -1
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": [
+        "image"
+      ]
+    },
+    "wan_l2v": {
+      "inputs": [
+        "fps",
+        "latents",
+        "metadata",
+        "vae"
+      ],
+      "literalInputs": {
+        "fps": [
+          16
+        ],
+        "is_intermediate": [
+          false,
+          true
+        ],
+        "use_cache": [
+          false
+        ]
+      },
+      "outputs": [
+        "video"
+      ]
+    },
+    "wan_model_loader": {
+      "inputs": [],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "model": [],
+        "use_cache": [
+          true
+        ],
+        "vae_model": [],
+        "wan_t5_encoder_model": []
+      },
+      "outputs": [
+        "transformer",
+        "vae",
+        "wan_t5_encoder"
+      ]
+    },
+    "wan_ref_image_encoder": {
+      "inputs": [
+        "image",
+        "vae"
+      ],
+      "literalInputs": {
+        "end_image": [],
+        "height": [
+          704,
+          720
+        ],
+        "image": [],
+        "is_intermediate": [
+          true
+        ],
+        "num_frames": [
+          81
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1280
+        ]
+      },
+      "outputs": [
+        "ref_image"
+      ]
+    },
+    "wan_text_encoder": {
+      "inputs": [
+        "prompt",
+        "wan_t5_encoder"
+      ],
+      "literalInputs": {
+        "is_intermediate": [
+          true
+        ],
+        "use_cache": [
+          true
+        ]
+      },
+      "outputs": [
+        "conditioning"
+      ]
+    },
+    "wan_video_denoise": {
+      "inputs": [
+        "negative_conditioning",
+        "positive_conditioning",
+        "ref_image",
+        "seed",
+        "transformer"
+      ],
+      "literalInputs": {
+        "guidance_scale": [
+          5
+        ],
+        "guidance_scale_low_noise": [
+          4
+        ],
+        "height": [
+          704,
+          720
+        ],
+        "is_intermediate": [
+          true
+        ],
+        "num_frames": [
+          81
+        ],
+        "steps": [
+          40
+        ],
+        "use_cache": [
+          true
+        ],
+        "width": [
+          1280
+        ]
+      },
+      "outputs": [
+        "latents"
+      ]
+    }
+  }
+}

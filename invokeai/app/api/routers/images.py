@@ -2,6 +2,7 @@ import asyncio
 import io
 import json
 import traceback
+from datetime import date
 from typing import Annotated, ClassVar, Optional
 
 from fastapi import BackgroundTasks, Body, HTTPException, Path, Query, Request, Response, UploadFile
@@ -12,9 +13,12 @@ from pydantic import BaseModel, Field, StringConstraints, model_validator
 
 from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.extract_metadata_from_image import extract_metadata_from_image
+from invokeai.app.api.extract_metadata import extract_metadata_from_image
 from invokeai.app.api.routers._access import (
     assert_board_read_access as _assert_board_read_access,
+)
+from invokeai.app.api.routers._access import (
+    assert_board_write_access as _assert_board_write_access,
 )
 from invokeai.app.api.routers._access import (
     assert_image_owner as _assert_image_owner,
@@ -22,6 +26,11 @@ from invokeai.app.api.routers._access import (
 from invokeai.app.api.routers._access import (
     assert_image_read_access as _assert_image_read_access,
 )
+from invokeai.app.api.routers._access import assert_project_owned
+from invokeai.app.api.routers._access import (
+    board_share_recipients as _board_share_recipients,
+)
+from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.invocations.fields import MetadataField
 from invokeai.app.services.image_records.image_records_common import (
@@ -30,6 +39,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageRecordChanges,
     ImageRecordNotFoundException,
     ResourceOrigin,
+    is_gallery_category,
 )
 from invokeai.app.services.images.images_common import (
     DeleteImagesResult,
@@ -38,6 +48,7 @@ from invokeai.app.services.images.images_common import (
     StarredImagesResult,
     UnstarredImagesResult,
 )
+from invokeai.app.services.intermediates.intermediates_base import IntermediatesCaller
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.util.controlnet_utils import heuristic_resize_fast
@@ -103,6 +114,12 @@ async def upload_image(
     is_intermediate: bool = Query(description="Whether this is an intermediate image"),
     board_id: Optional[str] = Query(default=None, description="The board to add this image to, if any"),
     session_id: Optional[str] = Query(default=None, description="The session ID associated with this upload, if any"),
+    project_id: Optional[str] = Query(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description="The caller's project this upload originates in, if any; recorded for intermediates cleanup",
+    ),
     crop_visible: Optional[bool] = Query(default=False, description="Whether to crop the image"),
     resize_to: Optional[str] = Body(
         default=None,
@@ -118,19 +135,8 @@ async def upload_image(
     """Uploads an image for the current user"""
     # If uploading into a board, verify the user has write access.
     # Public boards allow uploads from any authenticated user.
-    if board_id is not None:
-        from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-        try:
-            board = await asyncio.to_thread(ApiDependencies.invoker.services.boards.get_dto, board_id=board_id)
-        except Exception:
-            raise HTTPException(status_code=404, detail="Board not found")
-        if (
-            not current_user.is_admin
-            and board.user_id != current_user.user_id
-            and board.board_visibility != BoardVisibility.Public
-        ):
-            raise HTTPException(status_code=403, detail="Not authorized to upload to this board")
+    board = await asyncio.to_thread(_assert_board_write_access, board_id, current_user)
+    await asyncio.to_thread(assert_project_owned, project_id, current_user)
 
     await asyncio.to_thread(assert_image_move_maintenance_inactive)
 
@@ -195,15 +201,22 @@ async def upload_image(
             graph=extracted_metadata.invokeai_graph,
             is_intermediate=is_intermediate,
             user_id=current_user.user_id,
+            project_id=project_id,
         )
-
-        response.status_code = 201
-        response.headers["Location"] = image_dto.image_url
-
-        return image_dto
     except Exception:
         ApiDependencies.invoker.services.logger.error(traceback.format_exc())
         raise HTTPException(status_code=500, detail="Failed to create image")
+
+    if not is_intermediate and is_gallery_category(image_category):
+        shared_user_ids = await asyncio.to_thread(_board_share_recipients, board)
+        ApiDependencies.invoker.services.events.emit_image_uploaded(
+            image_dto, user_id=current_user.user_id, board=board, shared_user_ids=shared_user_ids
+        )
+
+    response.status_code = 201
+    response.headers["Location"] = image_dto.image_url
+
+    return image_dto
 
 
 class ImageUploadEntry(BaseModel):
@@ -268,14 +281,19 @@ def delete_image(
 def clear_intermediates(
     current_user: CurrentUserOrDefault,
 ) -> int:
-    """Clears all intermediates. Requires admin."""
+    """Clears every safe intermediate image, instance-wide. Requires admin.
+
+    Runs under the same policy as the intermediates manager: images that active work, a saved
+    document or the recency window protect are kept. Videos are not touched; use the manager.
+    """
     if not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Only admins can clear all intermediates")
     assert_image_move_maintenance_inactive()
 
     try:
-        count_deleted = ApiDependencies.invoker.services.images.delete_intermediates()
-        return count_deleted
+        return ApiDependencies.invoker.services.intermediates.clear_all_images_now(
+            IntermediatesCaller(user_id=current_user.user_id, is_admin=current_user.is_admin)
+        )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to clear intermediates")
 
@@ -284,11 +302,15 @@ def clear_intermediates(
 def get_intermediates_count(
     current_user: CurrentUserOrDefault,
 ) -> int:
-    """Gets the count of intermediate images. Non-admin users only see their own intermediates."""
+    """Counts the intermediate images a clear would delete. Non-admin users only see their own intermediates.
+
+    Active, recent and referenced images are left out, as `DELETE /intermediates` keeps them.
+    """
 
     try:
-        user_id = None if current_user.is_admin else current_user.user_id
-        return ApiDependencies.invoker.services.images.get_intermediates_count(user_id=user_id)
+        return ApiDependencies.invoker.services.intermediates.count_safe_images(
+            IntermediatesCaller(user_id=current_user.user_id, is_admin=current_user.is_admin)
+        )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get intermediates")
 
@@ -497,7 +519,11 @@ def list_image_dtos(
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
     board_id: Optional[str] = Query(
         default=None,
-        description="The board id to filter by. Use 'none' to find images without a board.",
+        description=(
+            "The board id to filter by. Use 'none' for the current user's uncategorized images or 'all' for "
+            "images on every readable, non-archived board plus authorized uncategorized images. If omitted, "
+            "non-admin results remain limited to images owned by the current user."
+        ),
     ),
     # Bounds matter: these flow verbatim into SQL, and a negative LIMIT means *unlimited*
     # in SQLite — one request would materialize every image row into a DTO. The lower
@@ -507,26 +533,34 @@ def list_image_dtos(
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    created_from: Optional[date] = Query(
+        default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
+    ),
+    created_to: Optional[date] = Query(
+        default=None, description="Inclusive end date (YYYY-MM-DD) to filter by created_at."
+    ),
 ) -> OffsetPaginatedResults[ImageDTO]:
     """Gets a list of image DTOs for the current user"""
 
     # Validate that the caller can read from this board before listing its images.
-    # "none" is a sentinel for uncategorized images and is handled by the SQL layer.
-    if board_id is not None and board_id != "none":
+    # "none" and "all" are sentinels handled by the SQL layer.
+    if board_id is not None and board_id not in {"none", "all"}:
         _assert_board_read_access(board_id, current_user)
 
     image_dtos = ApiDependencies.invoker.services.images.get_many(
-        offset,
-        limit,
-        starred_first,
-        order_dir,
-        image_origin,
-        categories,
-        is_intermediate,
-        board_id,
-        search_term,
-        current_user.user_id,
-        current_user.is_admin,
+        offset=offset,
+        limit=limit,
+        starred_first=starred_first,
+        order_dir=order_dir,
+        image_origin=image_origin,
+        categories=categories,
+        is_intermediate=is_intermediate,
+        board_id=board_id,
+        search_term=search_term,
+        created_from=created_from.isoformat() if created_from else None,
+        created_to=created_to.isoformat() if created_to else None,
+        user_id=current_user.user_id,
+        is_admin=current_user.is_admin,
     )
 
     return image_dtos
@@ -649,6 +683,67 @@ def delete_uncategorized_images(
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to delete images")
+
+
+class CopiedImage(BaseModel):
+    source_image_name: str = Field(description="The image that was copied")
+    image_name: str = Field(description="The name assigned to the copy")
+
+
+class CopyImagesResult(BaseModel):
+    copied: list[CopiedImage] = Field(description="The copies that were made, in request order")
+    failed: list[str] = Field(description="The source image names that could not be copied")
+
+
+@images_router.post("/copy", operation_id="copy_images_to_board", response_model=CopyImagesResult)
+def copy_images_to_board(
+    current_user: CurrentUserOrDefault,
+    image_names: list[ImageName] = Body(description="The names of the images to copy", max_length=MAX_COPY_BATCH_SIZE),
+    board_id: Optional[str] = Body(default=None, description="The board to put the copies on, if any"),
+) -> CopyImagesResult:
+    """Copies images, optionally onto a board, and returns the new names.
+
+    Each copy is a genuinely new image with its own name, because `board_images` keys on
+    `image_name` — one image can sit on exactly one board, so sharing a name between two boards is
+    not representable. Duplicating a project needs that: its copy must own its media outright.
+
+    The pixels never leave the server, and never leave the disk either: `images.copy` clones the
+    record and copies the file byte for byte, so the embedded metadata, workflow and graph travel
+    without being parsed and rewritten. Category and origin travel; the originating session and
+    node do not. Starring is not copied — callers that want it use `POST /images/star`, the same
+    path an import uses.
+
+    Per-image failures are reported rather than raised, so one unreadable source cannot cost the
+    caller the whole batch.
+
+    A sync `def`, so FastAPI runs the batch on its threadpool: file copies are blocking, and a
+    board's worth of them on the event loop would stall every other request for the duration.
+
+    Read access is enough to copy, which means an image on a board shared with you can be copied
+    into something you own, and the copy outlives the share. That is deliberate — it is what makes
+    a shared board usable as a source — but it is a real widening of what "read-only" means, so it
+    is stated rather than left to be discovered.
+    """
+    _assert_board_write_access(board_id, current_user)
+    assert_image_move_maintenance_inactive()
+
+    copied: list[CopiedImage] = []
+    failed: list[str] = []
+
+    for image_name in image_names:
+        try:
+            _assert_image_read_access(image_name, current_user)
+            image_dto = ApiDependencies.invoker.services.images.copy(
+                source_image_name=image_name,
+                board_id=board_id,
+                user_id=current_user.user_id,
+            )
+            copied.append(CopiedImage(source_image_name=image_name, image_name=image_dto.image_name))
+        except Exception:
+            ApiDependencies.invoker.services.logger.error(f"Failed to copy image {image_name}", exc_info=True)
+            failed.append(image_name)
+
+    return CopyImagesResult(copied=copied, failed=failed)
 
 
 class ImagesUpdatedFromListResult(BaseModel):
@@ -864,11 +959,21 @@ def get_image_names(
     is_intermediate: Optional[bool] = Query(default=None, description="Whether to list intermediate images."),
     board_id: Optional[str] = Query(
         default=None,
-        description="The board id to filter by. Use 'none' to find images without a board.",
+        description=(
+            "The board id to filter by. Use 'none' for the current user's uncategorized images or 'all' for "
+            "images on every readable, non-archived board plus authorized uncategorized images. If omitted, "
+            "non-admin results remain limited to images owned by the current user."
+        ),
     ),
     order_dir: SQLiteDirection = Query(default=SQLiteDirection.Descending, description="The order of sort"),
     starred_first: bool = Query(default=True, description="Whether to sort by starred images first"),
     search_term: Optional[str] = Query(default=None, description="The term to search for"),
+    created_from: Optional[date] = Query(
+        default=None, description="Inclusive start date (YYYY-MM-DD) to filter by created_at."
+    ),
+    created_to: Optional[date] = Query(
+        default=None, description="Inclusive end date (YYYY-MM-DD) to filter by created_at."
+    ),
 ) -> ImageNamesResult:
     """Gets ordered list of image names with metadata for optimistic updates.
 
@@ -877,7 +982,7 @@ def get_image_names(
     """
 
     # Validate that the caller can read from this board before listing its images.
-    if board_id is not None and board_id != "none":
+    if board_id is not None and board_id not in {"none", "all"}:
         _assert_board_read_access(board_id, current_user)
 
     try:
@@ -889,6 +994,8 @@ def get_image_names(
             is_intermediate=is_intermediate,
             board_id=board_id,
             search_term=search_term,
+            created_from=created_from.isoformat() if created_from else None,
+            created_to=created_to.isoformat() if created_to else None,
             user_id=current_user.user_id,
             is_admin=current_user.is_admin,
         )

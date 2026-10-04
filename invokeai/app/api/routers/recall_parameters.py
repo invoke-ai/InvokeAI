@@ -9,6 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
+from invokeai.app.api.routers._access import assert_image_read_access as _assert_image_read_access
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.backend.image_util.controlnet_processor import process_controlnet_image
 from invokeai.backend.model_manager.taxonomy import ModelType
@@ -353,8 +354,6 @@ def _assert_recall_image_access(parameters: "RecallParameter", current_user: Cur
     endpoint to extract image dimensions and — for ControlNet preprocessors — mint
     a derived processed image they can then fetch.
     """
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
     image_names: list[str] = []
     if parameters.control_layers:
         for layer in parameters.control_layers:
@@ -369,29 +368,8 @@ def _assert_recall_image_access(parameters: "RecallParameter", current_user: Cur
             if ref.image_name is not None:
                 image_names.append(ref.image_name)
 
-    if not image_names:
-        return
-
-    # Admin can access all images
-    if current_user.is_admin:
-        return
-
     for image_name in image_names:
-        owner = ApiDependencies.invoker.services.image_records.get_user_id(image_name)
-        if owner is not None and owner == current_user.user_id:
-            continue
-
-        # Check board visibility
-        board_id = ApiDependencies.invoker.services.board_image_records.get_board_for_image(image_name)
-        if board_id is not None:
-            try:
-                board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-                if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-                    continue
-            except Exception:
-                pass
-
-        raise HTTPException(status_code=403, detail=f"Not authorized to access image {image_name}")
+        _assert_image_read_access(image_name, current_user)
 
 
 @recall_parameters_router.post(

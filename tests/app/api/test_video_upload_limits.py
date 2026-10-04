@@ -8,8 +8,12 @@ straight into one temp file, enforcing MAX_UPLOAD_SIZE as the bytes arrive — d
 """
 
 import asyncio
+import gc
 import tempfile
 import time
+import tracemalloc
+from collections.abc import Iterator
+from contextlib import contextmanager
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any
@@ -33,6 +37,7 @@ from invokeai.app.api_app import (
 from invokeai.app.services.auth.token_service import TokenData, create_access_token, set_jwt_secret
 from invokeai.app.services.board_records.board_records_common import BoardVisibility
 from invokeai.app.services.image_records.image_records_common import ImageCategory
+from invokeai.app.util.video_ingest import VideoIngestError
 from invokeai.app.util.video_thumbnails import VideoDecodeTimeoutError
 
 MAX_BODY = 1024  # tiny cap for tests
@@ -52,7 +57,9 @@ def test_configured_upload_slots_bound_peak_temp_storage_usage() -> None:
 
 def test_upload_probe_requires_a_decodable_frame(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr(videos, "probe_video_with_codec", lambda path: (48, 32, 1.0, 8.0, "h264"))
-    monkeypatch.setattr(videos, "extract_video_frame", lambda path, frame_index=0, raise_on_timeout=False: None)
+    monkeypatch.setattr(
+        videos, "extract_representative_video_frame", lambda path, duration=None, fps=None, raise_on_timeout=False: None
+    )
 
     with pytest.raises(ValueError, match="decodable frame"):
         videos._probe_decodable_video(Path("metadata-only.mp4"))
@@ -61,7 +68,11 @@ def test_upload_probe_requires_a_decodable_frame(monkeypatch: pytest.MonkeyPatch
 def test_upload_probe_accepts_valid_metadata_and_frame(monkeypatch: pytest.MonkeyPatch):
     frame = MagicMock()
     monkeypatch.setattr(videos, "probe_video_with_codec", lambda path: (48, 32, 1.0, 8.0, "h264"))
-    monkeypatch.setattr(videos, "extract_video_frame", lambda path, frame_index=0, raise_on_timeout=False: frame)
+    monkeypatch.setattr(
+        videos,
+        "extract_representative_video_frame",
+        lambda path, duration=None, fps=None, raise_on_timeout=False: frame,
+    )
 
     assert videos._probe_decodable_video(Path("valid.mp4")) == ((48, 32, 1.0, 8.0), frame)
 
@@ -70,11 +81,11 @@ def test_upload_probe_timeout_is_inconclusive_not_a_rejection(monkeypatch: pytes
     """A decode-worker timeout is server contention, not evidence the video is bad — the
     upload must proceed (without a pre-extracted frame) rather than 415."""
 
-    def _timeout(path, frame_index=0, raise_on_timeout=False):
+    def _timeout(path, duration=None, fps=None, raise_on_timeout=False):
         raise VideoDecodeTimeoutError("decode worker timed out")
 
     monkeypatch.setattr(videos, "probe_video_with_codec", lambda path: (48, 32, 1.0, 8.0, "h264"))
-    monkeypatch.setattr(videos, "extract_video_frame", _timeout)
+    monkeypatch.setattr(videos, "extract_representative_video_frame", _timeout)
 
     assert videos._probe_decodable_video(Path("busy-server.mp4")) == ((48, 32, 1.0, 8.0), None)
 
@@ -154,6 +165,76 @@ def test_other_routes_unaffected():
     response = client.post("/api/v1/images/upload", content=b"x" * (MAX_BODY + 1))
     assert response.status_code == 200
     assert calls == ["other"]
+
+
+@pytest.mark.parametrize(
+    ("path", "bounded"),
+    [
+        ("/api/v1/recall/video/default/initial-video/upload", True),
+        ("/api/v1/recall/video/default/reference-video/upload", True),
+        ("/api/v1/recall/video/default/conditioning-video/upload", True),
+        # The name-only siblings carry no body, so they must not compete for upload slots.
+        ("/api/v1/recall/video/default/initial-video", False),
+        ("/api/v1/recall/video/default/reference-video", False),
+        ("/api/v1/recall/video/default/conditioning-video", False),
+    ],
+)
+def test_video_recall_uploads_share_the_video_upload_bound(path: str, bounded: bool):
+    app = FastAPI()
+    calls: list[str] = []
+
+    @app.post(path)
+    async def route() -> dict[str, bool]:
+        calls.append(path)
+        return {"ok": True}
+
+    client = TestClient(VideoUploadLimitASGIMiddleware(app, max_body_bytes=MAX_BODY, max_concurrent=MAX_CONCURRENT))
+
+    response = client.post(path, content=b"x" * (MAX_BODY + 1))
+
+    assert response.status_code == (413 if bounded else 200)
+    assert calls == ([] if bounded else [path])
+
+
+@pytest.mark.parametrize(
+    "path", ["/api/v1/videos/upload", "/api/v1/recall/video/default/reference-video/upload"], ids=["upload", "recall"]
+)
+def test_a_trailing_encoded_newline_does_not_slip_past_the_bound(path: str):
+    """Starlette's `^...$` route regex matches `/upload\n`, so the bound must match it too."""
+    app = FastAPI()
+    calls: list[str] = []
+
+    @app.post(path)
+    async def route() -> dict[str, bool]:
+        calls.append(path)
+        return {"ok": True}
+
+    client = TestClient(VideoUploadLimitASGIMiddleware(app, max_body_bytes=MAX_BODY, max_concurrent=MAX_CONCURRENT))
+
+    assert client.post(f"{path}%0A", content=b"x" * 10).status_code == 200, "the route must still be reachable"
+    response = client.post(f"{path}%0A", content=b"x" * (MAX_BODY + 1))
+
+    assert response.status_code == 413
+    assert calls == [path]
+
+
+def test_a_path_parameter_that_is_only_a_newline_stays_bounded():
+    """`PUT /projects/%0A` routes with project_id "\n"; stripping the newline must not unbound it."""
+    app = FastAPI()
+    calls: list[str] = []
+
+    @app.put("/api/v1/projects/{project_id}")
+    async def update(project_id: str) -> dict[str, bool]:
+        calls.append(project_id)
+        return {"ok": True}
+
+    client = TestClient(api_app.ProjectWriteLimitASGIMiddleware(app, max_body_bytes=MAX_BODY, max_concurrent=2))
+
+    assert client.put("/api/v1/projects/%0A", content=b"x").status_code == 200, "the route must still be reachable"
+    response = client.put("/api/v1/projects/%0A", content=b"x" * (MAX_BODY + 1))
+
+    assert response.status_code == 413
+    assert calls == ["\n"]
 
 
 def test_concurrency_bound_returns_429():
@@ -540,6 +621,7 @@ def _run_upload(request: MagicMock) -> Any:
             is_intermediate=False,
             board_id=None,
             session_id=None,
+            project_id=None,
         )
     )
 
@@ -548,8 +630,8 @@ def test_upload_video_closes_tmp_handle_when_stream_copy_fails():
     captured_handles: list[Any] = []
     real_named_tmp = tempfile.NamedTemporaryFile
 
-    async def run_immediately(func: Any, *args: Any):
-        return func(*args)
+    async def run_immediately(func: Any, *args: Any, **kwargs: Any):
+        return func(*args, **kwargs)
 
     def failing_named_tmp(*args: Any, **kwargs: Any):
         handle = real_named_tmp(*args, **kwargs)
@@ -581,8 +663,8 @@ def test_upload_video_writes_exactly_one_copy_of_the_body():
     captured_handles: list[Any] = []
     real_named_tmp = tempfile.NamedTemporaryFile
 
-    async def run_immediately(func: Any, *args: Any):
-        return func(*args)
+    async def run_immediately(func: Any, *args: Any, **kwargs: Any):
+        return func(*args, **kwargs)
 
     def recording_named_tmp(*args: Any, **kwargs: Any):
         handle = real_named_tmp(*args, **kwargs)
@@ -595,12 +677,12 @@ def test_upload_video_writes_exactly_one_copy_of_the_body():
         with (
             patch("invokeai.app.api.routers.videos.tempfile.NamedTemporaryFile", side_effect=recording_named_tmp),
             patch("invokeai.app.api.routers.videos.run_in_threadpool", side_effect=run_immediately),
-            patch("invokeai.app.api.routers.videos._is_mp4_file", return_value=False),
+            _reject_at_ingest(),
             pytest.raises(HTTPException) as error,
         ):
             _run_upload(_fake_upload_request(_multipart_body(payload), chunk_size=13))
 
-        # Stops at the container check — the point is what reached the disk before that.
+        # Stops at the ingest rejection — the point is what reached the disk before that.
         assert error.value.status_code == 415
         assert b"".join(written) == payload
     finally:
@@ -621,8 +703,8 @@ def test_upload_video_rejects_bad_file_part_before_any_of_it_reaches_disk():
     real_named_tmp = tempfile.NamedTemporaryFile
     body = _multipart_body(payload, filename="notes.txt", content_type="text/plain")
 
-    async def run_immediately(func: Any, *args: Any):
-        return func(*args)
+    async def run_immediately(func: Any, *args: Any, **kwargs: Any):
+        return func(*args, **kwargs)
 
     def recording_named_tmp(*args: Any, **kwargs: Any):
         handle = real_named_tmp(*args, **kwargs)
@@ -656,8 +738,8 @@ def test_upload_video_rejects_bad_file_part_without_finishing_the_body():
     consumed: list[int] = []
     body = _multipart_body(b"x" * 4096, filename="notes.txt", content_type="text/plain")
 
-    async def run_immediately(func: Any, *args: Any):
-        return func(*args)
+    async def run_immediately(func: Any, *args: Any, **kwargs: Any):
+        return func(*args, **kwargs)
 
     request = MagicMock()
     request.headers = {"content-type": f"multipart/form-data; boundary={BOUNDARY}"}
@@ -685,8 +767,8 @@ def test_upload_video_accepts_the_content_type_in_any_case(header: str):
     """Content-Type is case-insensitive (RFC 7231) and parse_options_header preserves case,
     so an upper-case media type used to be a 422 instead of a normal upload."""
 
-    async def run_immediately(func: Any, *args: Any):
-        return func(*args)
+    async def run_immediately(func: Any, *args: Any, **kwargs: Any):
+        return func(*args, **kwargs)
 
     request = MagicMock()
     request.headers = {"content-type": f"{header}; boundary={BOUNDARY}"}
@@ -699,12 +781,12 @@ def test_upload_video_accepts_the_content_type_in_any_case(header: str):
 
     with (
         patch("invokeai.app.api.routers.videos.run_in_threadpool", side_effect=run_immediately),
-        patch("invokeai.app.api.routers.videos._is_mp4_file", return_value=False),
+        _reject_at_ingest(),
         pytest.raises(HTTPException) as error,
     ):
         _run_upload(request)
 
-    # Got as far as the container check either way — i.e. the body was parsed, not refused.
+    # Got as far as the ingest step either way — i.e. the body was parsed, not refused.
     assert error.value.status_code == 415
 
 
@@ -719,8 +801,8 @@ def test_upload_video_rejects_a_body_with_no_closing_boundary():
     truncated = complete[: -len(f"--{BOUNDARY}--\r\n".encode())]
     is_mp4 = MagicMock(return_value=True)
 
-    async def run_immediately(func: Any, *args: Any):
-        return func(*args)
+    async def run_immediately(func: Any, *args: Any, **kwargs: Any):
+        return func(*args, **kwargs)
 
     with (
         patch("invokeai.app.api.routers.videos.run_in_threadpool", side_effect=run_immediately),
@@ -736,7 +818,7 @@ def test_upload_video_rejects_a_body_with_no_closing_boundary():
     # Control: the same body with its closing boundary gets past the completeness check.
     with (
         patch("invokeai.app.api.routers.videos.run_in_threadpool", side_effect=run_immediately),
-        patch("invokeai.app.api.routers.videos._is_mp4_file", return_value=False),
+        _reject_at_ingest(),
         pytest.raises(HTTPException) as error,
     ):
         _run_upload(_fake_upload_request(complete, chunk_size=64))
@@ -744,9 +826,24 @@ def test_upload_video_rejects_a_body_with_no_closing_boundary():
     assert error.value.status_code == 415
 
 
+@contextmanager
+def _reject_at_ingest() -> Iterator[None]:
+    """A non-MP4 body goes to the ingest converter rather than stopping at the container check.
+
+    Stubbing the converter to reject keeps these tests stopping at the same 415 the container
+    check used to raise; the route logs the rejection, so ApiDependencies needs an invoker.
+    """
+    with (
+        patch("invokeai.app.api.routers.videos._is_mp4_file", return_value=False),
+        patch("invokeai.app.api.routers.videos.ingest_media_to_mp4", side_effect=VideoIngestError("rejected")),
+        patch.object(videos, "ApiDependencies", MagicMock()),
+    ):
+        yield
+
+
 def _forbidden_board_deps() -> MagicMock:
     deps = MagicMock()
-    deps.invoker.services.boards.get_dto.return_value = SimpleNamespace(
+    deps.invoker.services.board_records.get.return_value = SimpleNamespace(
         user_id="someone-else", board_visibility=BoardVisibility.Private
     )
     return deps
@@ -839,7 +936,7 @@ def test_upload_answered_before_the_body_ends_closes_the_connection(query_string
     scope = _upload_scope(query_string)
     middleware = VideoUploadLimitASGIMiddleware(_real_upload_app(), max_body_bytes=10 * len(body), max_concurrent=1)
 
-    with patch.object(videos, "ApiDependencies", _forbidden_board_deps()):
+    with patch("invokeai.app.api.routers._access.ApiDependencies", _forbidden_board_deps()):
         status, headers, sent_at_response, total = _drive_upload(middleware, body, scope)
 
     assert status == expected_status
@@ -862,7 +959,7 @@ def test_close_does_not_trust_a_client_supplied_content_length():
     scope["headers"] = [*scope["headers"], (b"content-length", b"0"), (b"transfer-encoding", b"chunked")]
     middleware = VideoUploadLimitASGIMiddleware(_real_upload_app(), max_body_bytes=10 * len(body), max_concurrent=1)
 
-    with patch.object(videos, "ApiDependencies", _forbidden_board_deps()):
+    with patch("invokeai.app.api.routers._access.ApiDependencies", _forbidden_board_deps()):
         status, headers, _sent, _total = _drive_upload(middleware, body, scope)
 
     assert status == 403
@@ -904,7 +1001,7 @@ def test_close_is_not_sent_on_http2():
     scope["http_version"] = "2"
     middleware = VideoUploadLimitASGIMiddleware(_real_upload_app(), max_body_bytes=10 * len(body), max_concurrent=1)
 
-    with patch.object(videos, "ApiDependencies", _forbidden_board_deps()):
+    with patch("invokeai.app.api.routers._access.ApiDependencies", _forbidden_board_deps()):
         status, headers, _sent, _total = _drive_upload(middleware, body, scope)
     assert status == 403
     assert not any(name == b"connection" for name, _ in headers)
@@ -958,19 +1055,12 @@ def test_completed_upload_does_not_close_the_connection():
     connection.
     """
     body = _multipart_body(b"z" * 2048)
-    deps = MagicMock()
-    deps.invoker.services.videos.create.return_value = SimpleNamespace(
-        video_url="/api/v1/videos/i/v.mp4/full", video_name="v.mp4"
-    )
     middleware = VideoUploadLimitASGIMiddleware(_real_upload_app(), max_body_bytes=10 * len(body), max_concurrent=1)
 
-    with (
-        patch.object(videos, "ApiDependencies", deps),
-        patch.object(videos, "_is_mp4_file", return_value=False),
-    ):
+    with _reject_at_ingest():
         status, headers, sent_at_response, total = _drive_upload(middleware, body)
 
-    # 415 from the container check — reached only after the whole body was read.
+    # 415 from the ingest rejection — reached only after the whole body was read.
     assert status == 415
     assert sent_at_response == total
     assert not any(name == b"connection" for name, _ in headers)
@@ -995,8 +1085,8 @@ def test_rejections_the_middleware_makes_itself_also_close_the_connection():
 
 
 def test_upload_video_requires_a_file_part():
-    async def run_immediately(func: Any, *args: Any):
-        return func(*args)
+    async def run_immediately(func: Any, *args: Any, **kwargs: Any):
+        return func(*args, **kwargs)
 
     body = f'--{BOUNDARY}\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n{{}}\r\n--{BOUNDARY}--\r\n'.encode()
 
@@ -1014,8 +1104,8 @@ def test_upload_video_rejects_oversized_file_part_mid_stream(monkeypatch: pytest
     monkeypatch.setattr(videos, "MAX_UPLOAD_SIZE", 512)
     written = 0
 
-    async def run_immediately(func: Any, *args: Any):
-        return func(*args)
+    async def run_immediately(func: Any, *args: Any, **kwargs: Any):
+        return func(*args, **kwargs)
 
     real_named_tmp = tempfile.NamedTemporaryFile
     captured_handles: list[Any] = []
@@ -1110,3 +1200,73 @@ def test_chunked_body_aborted_once_over_cap():
     # Only the first chunk (under the cap) reached the app as a body message.
     body_bytes = sum(len(m.get("body", b"")) for m in seen if m["type"] == "http.request")
     assert body_bytes == 600
+
+
+def _metadata_part_head() -> bytes:
+    return f'--{BOUNDARY}\r\nContent-Disposition: form-data; name="metadata"\r\n\r\n'.encode()
+
+
+def _closing_boundary() -> bytes:
+    return f"\r\n--{BOUNDARY}--\r\n".encode()
+
+
+@pytest.mark.parametrize("chunk_size", [1, 2, 3])
+def test_upload_metadata_buffer_is_bounded_by_its_size_not_its_chunk_count(chunk_size: int):
+    """A client that dribbles the metadata field in tiny pieces must not amplify what the
+    server retains.
+
+    The parser hands the field over in whatever pieces the client sent it. Buffering one
+    `bytes` object per piece retained 8-22x the payload (per-object overhead dominates;
+    single-byte `bytes` are interned, so 2-byte pieces are the worst case), which turned
+    the 1 MiB metadata cap into a ~22 MiB one per upload. The buffer must be flat so the
+    cap bounds memory, not just payload.
+    """
+    payload = b"x" * (64 * 1024)
+    with tempfile.TemporaryFile() as destination:
+        callbacks = videos._VideoUploadStreamParser(destination)
+        parser = MultipartParser(BOUNDARY.encode(), callbacks.callbacks)
+        parser.write(_metadata_part_head())
+
+        was_tracing = tracemalloc.is_tracing()
+        if not was_tracing:
+            tracemalloc.start()
+        try:
+            gc.collect()  # so an unrelated collection mid-loop cannot skew the delta
+            before, _ = tracemalloc.get_traced_memory()
+            for start in range(0, len(payload), chunk_size):
+                parser.write(payload[start : start + chunk_size])
+            after, _ = tracemalloc.get_traced_memory()
+        finally:
+            if not was_tracing:
+                tracemalloc.stop()
+
+        retained = after - before
+        # bytearray over-allocates by at most ~12.5%; anything near 2x means per-chunk objects.
+        assert retained < 2 * len(payload), f"retained {retained / len(payload):.1f}x the payload"
+
+        parser.write(_closing_boundary())
+        parser.finalize()
+        assert callbacks.metadata == payload.decode()
+
+
+def test_upload_metadata_cap_counts_the_whole_field_across_chunks(monkeypatch: pytest.MonkeyPatch):
+    monkeypatch.setattr(videos, "MAX_UPLOAD_METADATA_SIZE", 32)
+
+    def parse(payload: bytes, chunk_size: int) -> videos._VideoUploadStreamParser:
+        with tempfile.TemporaryFile() as destination:
+            callbacks = videos._VideoUploadStreamParser(destination)
+            parser = MultipartParser(BOUNDARY.encode(), callbacks.callbacks)
+            parser.write(_metadata_part_head())
+            for start in range(0, len(payload), chunk_size):
+                parser.write(payload[start : start + chunk_size])
+            parser.write(_closing_boundary())
+            parser.finalize()
+            return callbacks
+
+    # Exactly at the cap, split unevenly across chunks: accepted and reassembled intact.
+    assert parse(b"a" * 32, chunk_size=5).metadata == "a" * 32
+
+    # One byte over, where no single chunk is anywhere near the cap: still rejected.
+    with pytest.raises(HTTPException) as error:
+        parse(b"a" * 33, chunk_size=5)
+    assert error.value.status_code == 413

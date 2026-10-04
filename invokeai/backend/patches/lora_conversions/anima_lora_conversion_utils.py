@@ -10,10 +10,11 @@ Some Anima LoRAs also target the Qwen3 text encoder with lora_te_ prefix keys
 """
 
 import re
-from typing import Dict
+from typing import Dict, Optional
 
 import torch
 
+from invokeai.backend.anima.block_layout import KNOWN_DEPTHS, adapter_block_positions
 from invokeai.backend.patches.layers.base_layer_patch import BaseLayerPatch
 from invokeai.backend.patches.layers.utils import any_lora_layer_from_state_dict
 from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
@@ -298,3 +299,31 @@ def lora_model_from_anima_state_dict(state_dict: Dict[str, torch.Tensor], alpha:
             layers[final_key] = layer
 
     return ModelPatchRaw(layers=layers)
+
+
+_TRANSFORMER_BLOCK_KEY_RE = re.compile(rf"^{re.escape(ANIMA_LORA_TRANSFORMER_PREFIX)}blocks\.(\d+)\.")
+
+
+def anima_lora_for_depth(patch: ModelPatchRaw, target_depth: int) -> tuple[ModelPatchRaw, Optional[int]]:
+    """The LoRA with its DiT block keys moved to where `target_depth`'s model keeps the blocks it was trained on.
+
+    A LoRA trained on Anima base, applied to a depth-expanded finetune (see `invokeai.backend.anima.block_layout`),
+    would otherwise patch the wrong blocks from the third one on. Returns the patch -- a new one sharing the layers,
+    so the cached LoRA stays as it is -- and the depth it was moved from, or the patch itself and None when nothing
+    moves. Only `blocks.N.` keys of the transformer move; the LLM adapter's own `llm_adapter.blocks.N.` and the text
+    encoder's keys do not.
+    """
+    indices = [int(match.group(1)) for key in patch.layers if (match := _TRANSFORMER_BLOCK_KEY_RE.match(key))]
+    if not indices:
+        return patch, None
+    positions = adapter_block_positions(max(indices), target_depth)
+    if positions is None:
+        return patch, None
+
+    def moved(key: str) -> str:
+        return _TRANSFORMER_BLOCK_KEY_RE.sub(
+            lambda m: f"{ANIMA_LORA_TRANSFORMER_PREFIX}blocks.{positions[int(m.group(1))]}.", key, count=1
+        )
+
+    source_depth = next(depth for depth in KNOWN_DEPTHS if depth > max(indices))
+    return ModelPatchRaw(layers={moved(key): layer for key, layer in patch.layers.items()}), source_depth

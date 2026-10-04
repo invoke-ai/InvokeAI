@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
-
 import hashlib
 import os
 from pathlib import Path
@@ -30,6 +28,12 @@ HASHING_ALGORITHMS = Literal[
     "shake_256",
 ]
 MODEL_FILE_EXTENSIONS = (".ckpt", ".safetensors", ".bin", ".pt", ".pth")
+
+HASH_CHUNK_SIZE = 8 * 1024 * 1024
+"""Size of the buffer model files are read through when hashing.
+
+Large enough that the read syscalls are not the bottleneck, small enough that hashing a model costs a
+fixed few megabytes no matter how big the model is."""
 
 
 class ModelHash:
@@ -153,8 +157,32 @@ class ModelHash:
         return files
 
     @staticmethod
+    def _feed(hasher: "blake3", file_path: Path) -> str:
+        """Feeds a file to a hasher through a fixed-size buffer and returns the hexdigest.
+
+        Deliberately not blake3's `update_mmap`: mapping a multi-GB checkpoint charges the whole file to the
+        process working set and keeps it mapped for as long as the hasher lives. Freshly installed models are
+        moved immediately after hashing, and on Windows a live mapping blocks that move. Reading the same bytes
+        through a buffer costs `HASH_CHUNK_SIZE` instead of the file size, and for the single-threaded default it
+        is also faster than mapping.
+
+        Args:
+            hasher: The blake3 hasher to feed
+            file_path: Path to the file to hash
+
+        Returns:
+            Hexdigest of the hash of the file
+        """
+        buffer = bytearray(HASH_CHUNK_SIZE)
+        mv = memoryview(buffer)
+        with open(file_path, "rb", buffering=0) as f:
+            while n := f.readinto(mv):
+                hasher.update(mv[:n])
+        return hasher.hexdigest()
+
+    @staticmethod
     def _blake3(file_path: Path) -> str:
-        """Hashes a file using BLAKE3, using parallelized and memory-mapped I/O to avoid reading the entire file into memory.
+        """Hashes a file using BLAKE3, hashing each buffer of the file in parallel.
 
         Args:
             file_path: Path to the file to hash
@@ -162,9 +190,7 @@ class ModelHash:
         Returns:
             Hexdigest of the hash of the file
         """
-        file_hasher = blake3(max_threads=blake3.AUTO)
-        file_hasher.update_mmap(file_path)
-        return file_hasher.hexdigest()
+        return ModelHash._feed(blake3(max_threads=blake3.AUTO), file_path)
 
     @staticmethod
     def _blake3_single(file_path: Path) -> str:
@@ -176,9 +202,7 @@ class ModelHash:
         Returns:
             Hexdigest of the hash of the file
         """
-        file_hasher = blake3()
-        file_hasher.update_mmap(file_path)
-        return file_hasher.hexdigest()
+        return ModelHash._feed(blake3(), file_path)
 
     @staticmethod
     def _get_hashlib(algorithm: HASHING_ALGORITHMS) -> Callable[[Path], str]:

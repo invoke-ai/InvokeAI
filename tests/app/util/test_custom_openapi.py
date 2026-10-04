@@ -3,7 +3,11 @@ from pydantic import create_model
 
 from invokeai.app.invocations.baseinvocation import InvocationRegistry
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
-from invokeai.app.util.custom_openapi import get_openapi_func, normalize_path_defaults
+from invokeai.app.util.custom_openapi import (
+    get_openapi_func,
+    normalize_path_defaults,
+    remove_unreferenced_internal_execution_schemas,
+)
 
 
 class _FakeOutput:
@@ -88,3 +92,21 @@ def test_path_defaults_are_normalized_to_forward_slashes() -> None:
     assert (
         schema["properties"]["nested_path"]["oneOf"][0]["properties"]["cache_dir"]["default"] == "models/.nested_cache"
     )
+
+
+def test_internal_execution_schemas_are_retained_when_publicly_referenced() -> None:
+    schema = {
+        "paths": {},
+        "components": {
+            "schemas": {
+                "Public": {"properties": {"reference": {"$ref": "#/components/schemas/ExecutionReference"}}},
+                "ExecutionReference": {"properties": {"frame": {"$ref": "#/components/schemas/ExecutionFrame"}}},
+                "ExecutionFrame": {},
+                "ExecutionToken": {},
+            }
+        },
+    }
+
+    remove_unreferenced_internal_execution_schemas(schema)
+
+    assert set(schema["components"]["schemas"]) == {"Public", "ExecutionReference", "ExecutionFrame"}

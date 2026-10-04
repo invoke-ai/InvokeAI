@@ -20,6 +20,7 @@ from invokeai.app.services.session_queue.session_queue_common import (
     calc_session_count,
     create_session_nfv_tuples,
 )
+from invokeai.app.services.shared.execution_state_migration import load_execution_state
 from invokeai.app.services.shared.graph import GraphExecutionState, WorkflowCallFrame
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.shared.workflow_graph_builder import (
@@ -635,7 +636,7 @@ def build_batch_child_workflow_session_results(
 
     child_session_results: list[WorkflowCallChildSessionResult] = []
     for session_id, session_json, field_values_json in create_session_nfv_tuples(batch, maximum_children):
-        generated_session = GraphExecutionState.model_validate_json(session_json)
+        generated_session = load_execution_state(json.loads(session_json))
         child_session = parent_session.create_child_workflow_execution_state(generated_session.graph, call_frame)
         child_session.id = session_id
         field_values = [NodeFieldValue.model_validate(field_value) for field_value in json.loads(field_values_json)]

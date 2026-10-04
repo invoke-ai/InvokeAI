@@ -26,7 +26,7 @@ do not mention. That is advisory only: classifiers are optional in PEP 621 and
 informational on PyPI, so they cannot decide whether a pin is installable —
 ``requires-python`` does. One consequence is deliberate and worth stating: a
 version that satisfies an open-ended ``requires-python`` but that no interpreter
-has (``>=3.11`` with a ``3.99`` pin) is not caught here. Catching it would mean
+has (``>=3.12`` with a ``3.99`` pin) is not caught here. Catching it would mean
 gating on non-normative metadata, and a checker that rejects a legal pin is worse
 than one that misses an implausible typo.
 
@@ -227,10 +227,10 @@ def check_python_classifiers(pins: dict, pyproject: dict) -> list[str]:
 
     `requires-python` is what actually gates installation, and it is the only authority this
     script fails on. Classifiers are optional in PEP 621 and purely informational on PyPI, so a
-    pin they don't mention is a documentation gap, not a broken install: `requires-python =
-    ">=3.11, <3.13"` genuinely permits a 3.11 pin whether or not a 3.11 classifier exists.
-    Saying so out loud is still useful - the classifiers are what we publish - but it must not
-    fail the build, and their *absence* must not be treated as a finding at all.
+    pin they don't mention is a documentation gap, not a broken install: a pin `requires-python`
+    admits is installable whether or not any classifier names it. Saying so out loud is still
+    useful - the classifiers are what we publish - but it must not fail the build, and their
+    *absence* must not be treated as a finding at all.
 
     Never raises, for the same reason check_python doesn't.
     """

@@ -10,6 +10,10 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_conv2d import (
     CustomConv2d,
 )
+from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_dequantizing_linear import (
+    CustomInt8ConvrotLinear,
+    CustomNVFP4Linear,
+)
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_diffusers_rms_norm import (
     CustomDiffusersRMSNorm,
 )
@@ -31,6 +35,8 @@ from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custo
 from invokeai.backend.model_manager.load.model_cache.torch_module_autocast.custom_modules.custom_module_mixin import (
     CustomModuleMixin,
 )
+from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
+from invokeai.backend.quantization.nvfp4 import NVFP4Linear
 
 AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]] = {
     torch.nn.Linear: CustomLinear,
@@ -41,6 +47,8 @@ AUTOCAST_MODULE_TYPE_MAPPING: dict[type[torch.nn.Module], type[torch.nn.Module]]
     torch.nn.LayerNorm: CustomLayerNorm,
     FluxRMSNorm: CustomFluxRMSNorm,
     DiffusersRMSNorm: CustomDiffusersRMSNorm,
+    Int8ConvrotLinear: CustomInt8ConvrotLinear,
+    NVFP4Linear: CustomNVFP4Linear,
 }
 
 try:

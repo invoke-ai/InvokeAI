@@ -75,7 +75,7 @@ def test_anima_dpmpp_2m_produces_anima_compatible_sigma_schedule():
     """
     import inspect
 
-    from invokeai.app.invocations.anima_denoise import loglinear_timestep_shift
+    from invokeai.app.invocations.anima.anima_denoise import loglinear_timestep_shift
     from invokeai.backend.flux.schedulers import ANIMA_SHIFT
 
     num_steps = 10
@@ -107,7 +107,7 @@ def test_anima_dpmpp_2m_with_denoising_start_honors_clipped_schedule():
     """
     import inspect
 
-    from invokeai.app.invocations.anima_denoise import loglinear_timestep_shift
+    from invokeai.app.invocations.anima.anima_denoise import loglinear_timestep_shift
     from invokeai.backend.flux.schedulers import ANIMA_SHIFT
 
     num_steps = 30
@@ -145,7 +145,7 @@ def test_anima_set_begin_index_path_step_count_with_denoising_end():
     """
     import inspect
 
-    from invokeai.app.invocations.anima_denoise import loglinear_timestep_shift
+    from invokeai.app.invocations.anima.anima_denoise import loglinear_timestep_shift
     from invokeai.backend.flux.schedulers import ANIMA_SHIFT
 
     num_steps = 30
@@ -271,7 +271,7 @@ def test_anima_heun_uses_anima_shift_for_internal_schedule():
 
     Fix: give Heun shift=ANIMA_SHIFT so its internal schedule approximates Anima's reference.
     """
-    from invokeai.app.invocations.anima_denoise import loglinear_timestep_shift
+    from invokeai.app.invocations.anima.anima_denoise import loglinear_timestep_shift
 
     cls, kwargs = ANIMA_SCHEDULER_MAP["heun"]
     from invokeai.backend.flux.schedulers import ANIMA_SHIFT

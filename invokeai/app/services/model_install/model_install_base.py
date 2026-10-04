@@ -1,4 +1,3 @@
-# Copyright 2023 Lincoln D. Stein and the InvokeAI development team
 """Baseclass definitions for the model installer."""
 
 from abc import ABC, abstractmethod

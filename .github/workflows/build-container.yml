@@ -9,7 +9,7 @@ on:
       - 'invokeai/**'
       - 'docker/Dockerfile'
       - 'docker/docker-entrypoint.sh'
-      - 'workflows/build-container.yml'
+      - '.github/workflows/build-container.yml'
     tags:
       - 'v*.*.*'
   workflow_dispatch:
@@ -100,7 +100,13 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build container
-        timeout-minutes: 40
+        # The rocm image's venv layer is ~7.2GB compressed - roughly 60% larger than
+        # cuda's and 9x cpu's - and BuildKit gzips a single layer on one thread, so
+        # the export alone is ~6.5 min on a healthy runner. The whole job normally
+        # lands at ~17 min, but every phase roughly doubles on a slow runner, which
+        # blew through the old 40 min cap four times (2026-07-28, 2026-09-17 x2,
+        # 2026-09-22).
+        timeout-minutes: 90
         id: docker_build
         uses: docker/build-push-action@v7
         with:
@@ -109,7 +115,21 @@ jobs:
           platforms: ${{ env.PLATFORMS }}
           build-args: |
             GPU_DRIVER=${{ matrix.gpu-driver }}
-          push: ${{ github.ref == 'refs/heads/main' || github.ref_type == 'tag' || github.event.inputs.push-to-registry }}
+          # `outputs` rather than `push` so we can set the compression level: BuildKit
+          # defaults to gzip -6, which runs at ~19MB/s over that one big layer. gzip -1
+          # is 2-3x faster for ~15% larger layers, which is a good trade when the
+          # bottleneck is CI wall-clock rather than registry bandwidth. An empty
+          # `outputs` emits no --output at all, which is what a non-pushing build did
+          # before.
+          #
+          # The `== 'true'` is load-bearing. `github.event.inputs.*` is always a string,
+          # and every non-empty string is truthy, so a bare reference to an unchecked
+          # boolean input evaluates as TRUE. `push:` got away with it because the action
+          # ran that input through core.getBooleanInput, which maps "false" to false;
+          # `outputs:` is read with getInputList and passes any non-empty string straight
+          # through to --output. Without the comparison, a manual run from a non-main
+          # branch with the box unchecked would publish that branch to ghcr.
+          outputs: ${{ (github.ref == 'refs/heads/main' || github.ref_type == 'tag' || github.event.inputs.push-to-registry == 'true') && 'type=image,push=true,compression=gzip,compression-level=1' || '' }}
           provenance: mode=max
           sbom: true
           tags: ${{ steps.meta.outputs.tags }}

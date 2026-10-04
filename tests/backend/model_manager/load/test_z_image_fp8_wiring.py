@@ -45,6 +45,10 @@ def _prepare_loader(monkeypatch, tmp_path, state_dict: dict[str, torch.Tensor]):
 
     loader = object.__new__(ZImageCheckpointModel)
     loader._ram_cache = SimpleNamespace(make_room=MagicMock())
+    # The scaled-fp8 path reads the safetensors header (logging if it cannot) and asks the device
+    # whether the fp8 matmul is usable, so the stub needs both of those too.
+    loader._logger = MagicMock()
+    loader._torch_device = torch.device("cpu")
     return loader, config
 
 

@@ -8,9 +8,11 @@ from invokeai.backend.patches.lora_conversions.anima_lora_constants import (
 from invokeai.backend.patches.lora_conversions.anima_lora_conversion_utils import (
     _convert_kohya_te_key,
     _convert_kohya_unet_key,
+    anima_lora_for_depth,
     is_state_dict_likely_anima_lora,
     lora_model_from_anima_state_dict,
 )
+from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from tests.backend.patches.lora_conversions.lora_state_dicts.anima_lora_kohya_format import (
     state_dict_keys as anima_kohya_keys,
 )
@@ -228,3 +230,65 @@ def test_empty_state_dict_returns_empty_model():
     """An empty state dict should produce a ModelPatchRaw with no layers."""
     lora_model = lora_model_from_anima_state_dict({})
     assert len(lora_model.layers) == 0
+
+
+# --- depth-expanded finetunes ------------------------------------------------------------------------
+
+
+def _patch(*keys: str) -> ModelPatchRaw:
+    return ModelPatchRaw(layers={key: object() for key in keys})  # type: ignore[misc]
+
+
+T = ANIMA_LORA_TRANSFORMER_PREFIX
+
+
+def test_a_base_lora_moves_to_the_base_blocks_of_anima_2_9b() -> None:
+    original = _patch(
+        f"{T}blocks.0.self_attn.q_proj",
+        f"{T}blocks.2.cross_attn.k_proj",
+        f"{T}blocks.27.mlp.layer2",
+        f"{T}llm_adapter.blocks.3.self_attn.q_proj",
+        f"{ANIMA_LORA_QWEN3_PREFIX}layers.2.self_attn.q_proj",
+    )
+    moved, moved_from = anima_lora_for_depth(original, 40)
+
+    assert moved_from == 28
+    assert sorted(moved.layers) == sorted(
+        [
+            f"{T}blocks.0.self_attn.q_proj",
+            f"{T}blocks.3.cross_attn.k_proj",
+            f"{T}blocks.39.mlp.layer2",
+            # The LLM adapter's own blocks and the text encoder are not DiT blocks.
+            f"{T}llm_adapter.blocks.3.self_attn.q_proj",
+            f"{ANIMA_LORA_QWEN3_PREFIX}layers.2.self_attn.q_proj",
+        ]
+    )
+    # The same layer objects, and the cached LoRA itself untouched.
+    assert set(map(id, moved.layers.values())) == set(map(id, original.layers.values()))
+    assert f"{T}blocks.27.mlp.layer2" in original.layers
+
+
+def test_a_base_lora_moves_to_the_base_blocks_of_anima_3_8b() -> None:
+    moved, moved_from = anima_lora_for_depth(_patch(f"{T}blocks.2.mlp.layer1", f"{T}blocks.27.mlp.layer1"), 52)
+    assert moved_from == 28
+    assert sorted(moved.layers) == [f"{T}blocks.4.mlp.layer1", f"{T}blocks.51.mlp.layer1"]
+
+
+def test_an_anima_2_9b_lora_moves_to_its_blocks_in_anima_3_8b() -> None:
+    moved, moved_from = anima_lora_for_depth(_patch(f"{T}blocks.3.mlp.layer1", f"{T}blocks.39.mlp.layer1"), 52)
+    assert moved_from == 40
+    assert sorted(moved.layers) == [f"{T}blocks.4.mlp.layer1", f"{T}blocks.51.mlp.layer1"]
+
+
+@pytest.mark.parametrize(
+    ("keys", "depth"),
+    [
+        ((f"{T}blocks.27.mlp.layer1",), 28),
+        ((f"{T}blocks.39.mlp.layer1",), 40),
+        ((f"{T}llm_adapter.blocks.0.self_attn.q_proj", f"{ANIMA_LORA_QWEN3_PREFIX}layers.0.mlp.up_proj"), 40),
+    ],
+    ids=["base-on-base", "2.9B-on-2.9B", "no-dit-blocks"],
+)
+def test_a_lora_for_this_depth_is_returned_as_it_is(keys, depth) -> None:
+    original = _patch(*keys)
+    assert anima_lora_for_depth(original, depth) == (original, None)

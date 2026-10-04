@@ -7,6 +7,7 @@ and a non-admin caller saw every user's videos. The fix added an
 behaviour so the regression cannot reappear.
 """
 
+import json
 import sqlite3
 
 import pytest
@@ -258,3 +259,125 @@ def test_exists_propagates_a_storage_error(store: SqliteVideoRecordStorage):
 
     with pytest.raises(sqlite3.OperationalError):
         store.exists("video-1.mp4")
+
+
+def _save_with_metadata(store: SqliteVideoRecordStorage, name: str, metadata: str | None) -> None:
+    store.save(
+        video_name=name,
+        video_origin=ResourceOrigin.EXTERNAL,
+        video_category=ImageCategory.USER,
+        width=640,
+        height=360,
+        duration=1.0,
+        fps=24.0,
+        has_workflow=False,
+        is_intermediate=False,
+        metadata=metadata,
+        user_id="alice",
+    )
+
+
+def test_media_origin_is_projected_out_of_the_metadata_blob(store: SqliteVideoRecordStorage) -> None:
+    """The record carries `media_origin` so clients need no separate /metadata request.
+
+    An audio upload the ingest converter wrapped into a waveform video is marked
+    `audio_upload`; the frontend starts such a reference on its soundtrack alone, and a
+    wrong value there costs a video reference slot and roughly doubles the packed sequence.
+    """
+    _save_with_metadata(store, "wrapped.mp4", '{"media_origin": "audio_upload", "note": "kept"}')
+
+    assert store.get("wrapped.mp4").media_origin == "audio_upload"
+    # The rest of the blob stays behind the /metadata route rather than riding every row.
+    assert store.get_metadata("wrapped.mp4") is not None
+
+
+@pytest.mark.parametrize(
+    "metadata",
+    [
+        pytest.param(None, id="no metadata at all"),
+        pytest.param("{}", id="metadata without the key"),
+        pytest.param('{"note": "kept"}', id="metadata with other keys"),
+    ],
+)
+def test_media_origin_is_none_when_unmarked(store: SqliteVideoRecordStorage, metadata: str | None) -> None:
+    """`json_extract` over a NULL or key-less blob yields NULL rather than raising."""
+    _save_with_metadata(store, "plain.mp4", metadata)
+
+    assert store.get("plain.mp4").media_origin is None
+
+
+def test_media_origin_survives_a_listing(store: SqliteVideoRecordStorage) -> None:
+    """`get_many` selects the same columns, so a listed row carries the marker too."""
+    _save_with_metadata(store, "wrapped.mp4", '{"media_origin": "audio_upload"}')
+    _save_with_metadata(store, "plain.mp4", None)
+
+    listed = store.get_many(offset=0, limit=10, order_dir=SQLiteDirection.Descending, user_id="alice", is_admin=False)
+    origins = {record.video_name: record.media_origin for record in listed.items}
+
+    assert origins == {"wrapped.mp4": "audio_upload", "plain.mp4": None}
+
+
+@pytest.mark.parametrize(
+    "raw",
+    [
+        pytest.param("1", id="a JSON number"),
+        pytest.param("true", id="a JSON boolean"),
+        pytest.param("1.5", id="a JSON float"),
+        pytest.param('""', id="an empty string, which the frontend also reads as no marker"),
+        # `json_extract` hands an object or array back as its SERIALIZED TEXT, so these
+        # arrive as `str` and an isinstance check alone would propagate them.
+        pytest.param('{"a": "b"}', id="a JSON object, returned as its text"),
+        pytest.param("[1, 2]", id="a JSON array, returned as its text"),
+        pytest.param('"has a space"', id="a string that is not marker-shaped"),
+    ],
+)
+def test_a_non_string_marker_does_not_break_the_record(store: SqliteVideoRecordStorage, raw: str) -> None:
+    """A client may store any JSON value under `media_origin`; the row must still deserialize.
+
+    `MetadataField` validates only that the blob is an object, so `json_extract` can hand
+    back an int or a float. Passing one to the `Optional[str]` field raised while building
+    the record -- which took out the video's DTO *and* every gallery listing containing it,
+    so one odd upload broke the gallery.
+    """
+    _save_with_metadata(store, "odd.mp4", '{"media_origin": ' + raw + "}")
+
+    assert store.get("odd.mp4").media_origin is None
+
+
+def test_metadata_that_is_not_an_object_leaves_the_marker_unset(store: SqliteVideoRecordStorage) -> None:
+    """`json_extract` over a non-object blob yields NULL rather than raising."""
+    _save_with_metadata(store, "array.mp4", "[1, 2, 3]")
+
+    assert store.get("array.mp4").media_origin is None
+
+
+def test_a_malformed_metadata_blob_does_not_fail_the_query(store: SqliteVideoRecordStorage) -> None:
+    """`json_extract` RAISES on unparseable text, and this expression runs on every listed row.
+
+    Unguarded, one malformed blob would fail the whole page — `get_many` deserializes rows in
+    a comprehension — rather than the one video. The column is plain TEXT with no CHECK, so
+    only convention keeps such a row out; the `json_valid` guard makes that not matter.
+    """
+    _save_with_metadata(store, "bad.mp4", "not json at all")
+    _save_with_metadata(store, "good.mp4", '{"media_origin": "audio_upload"}')
+
+    listed = store.get_many(offset=0, limit=10, order_dir=SQLiteDirection.Descending, user_id="alice", is_admin=False)
+
+    assert {record.video_name: record.media_origin for record in listed.items} == {
+        "bad.mp4": None,
+        "good.mp4": "audio_upload",
+    }
+
+
+def test_an_overlong_marker_is_dropped_rather_than_echoed_on_every_row(store: SqliteVideoRecordStorage) -> None:
+    """Upload metadata is client-supplied and unbounded, and this key now rides every row.
+
+    Without a cap, one upload carrying a huge marker is echoed back on every gallery page
+    that includes the video.
+    """
+    _save_with_metadata(store, "huge.mp4", json.dumps({"media_origin": "A" * 5000}))
+
+    assert store.get("huge.mp4").media_origin is None
+    # A marker of a plausible length still passes.
+    _save_with_metadata(store, "fine.mp4", json.dumps({"media_origin": "audio_upload"}))
+    assert store.get("fine.mp4").media_origin == "audio_upload"

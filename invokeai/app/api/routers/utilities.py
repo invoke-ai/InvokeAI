@@ -2,19 +2,18 @@ import asyncio
 import logging
 import re
 import threading
+from contextlib import ExitStack
 from pathlib import Path
-from typing import Optional, Union
+from typing import Optional
 from urllib.parse import quote
 
 import torch
-from dynamicprompts.generators import CombinatorialPromptGenerator, RandomPromptGenerator
 from fastapi import Body, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.routing import APIRouter
 from fontTools.ttLib import TTFont
 from PIL import ImageFont
 from pydantic import BaseModel, Field
-from pyparsing import ParseException
 from transformers import AutoProcessor, AutoTokenizer, LlavaOnevisionForConditionalGeneration, LlavaOnevisionProcessor
 
 from invokeai.app.api.auth_dependencies import CurrentUserOrDefault
@@ -23,12 +22,20 @@ from invokeai.app.api.routers._access import assert_image_read_access
 from invokeai.app.api.routers.image_move_maintenance import assert_image_move_maintenance_inactive
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.image_files.image_files_common import ImageFileNotFoundException
+from invokeai.app.services.image_records.image_records_common import ImageRecordNotFoundException
 from invokeai.app.services.model_records.model_records_base import UnknownModelException
-from invokeai.app.util.dynamicprompts import find_missing_wildcards
+from invokeai.app.services.system_prompt_records.system_prompt_records_common import (
+    EXPAND_PROMPT_MAX_TOKENS_DEFAULT,
+    EXPAND_PROMPT_MAX_TOKENS_MAX,
+    EXPAND_PROMPT_MAX_TOKENS_MIN,
+)
+from invokeai.app.services.wildcard_records.wildcard_records_common import build_wildcard_manager
+from invokeai.app.util.dynamicprompts import expand_dynamic_prompt
 from invokeai.app.util.misc import SEED_MAX, get_random_seed
 from invokeai.backend.llava_onevision_pipeline import LlavaOnevisionPipeline
 from invokeai.backend.model_manager.taxonomy import ModelType
 from invokeai.backend.text_llm_pipeline import DEFAULT_SYSTEM_PROMPT, ProgressCallback, TextLLMPipeline
+from invokeai.backend.util.device_pool import idle_device_borrowed
 from invokeai.backend.util.devices import TorchDevice
 
 logger = logging.getLogger(__name__)
@@ -41,7 +48,9 @@ FONT_MEDIA_TYPES = {
     ".woff": "font/woff",
     ".woff2": "font/woff2",
 }
-FONT_CACHE_CONTROL = "private, max-age=31536000, immutable"
+# Directory-backed files can be replaced in place. They must not be pinned by the browser's
+# immutable cache, otherwise a rescan can expose stale bytes to a project.
+FONT_CACHE_CONTROL = "private, no-cache"
 
 # The underlying model loader is not thread-safe, so we serialize load_model calls.
 _model_load_lock = threading.Lock()
@@ -86,32 +95,17 @@ def parse_dynamicprompts(
     combinatorial: bool = Body(default=True, description="Whether to use the combinatorial generator"),
     seed: int | None = Body(None, description="The seed to use for random generation. Only used if not combinatorial"),
 ) -> DynamicPromptsResponse:
-    """Creates a batch process"""
-    max_prompts = min(max_prompts, 10000)
-    generator: Union[RandomPromptGenerator, CombinatorialPromptGenerator]
-    error: Optional[str] = None
-
-    # An unknown wildcard used as a variant value sends the combinatorial generator into an infinite
-    # loop, so bail out early with a clear message instead of hanging the request (and with it the UI
-    # preview). The random generator handles unknown wildcards gracefully, so only the combinatorial
-    # path is guarded.
-    if combinatorial:
-        missing_wildcards = find_missing_wildcards(prompt)
-        if missing_wildcards:
-            wildcards = ", ".join(missing_wildcards)
-            return DynamicPromptsResponse(prompts=[prompt], error=f"No values found for wildcard(s): {wildcards}")
-
-    try:
-        if combinatorial:
-            generator = CombinatorialPromptGenerator()
-            prompts = generator.generate(prompt, max_prompts=max_prompts)
-        else:
-            generator = RandomPromptGenerator(seed=seed)
-            prompts = generator.generate(prompt, num_images=max_prompts)
-    except ParseException as e:
-        prompts = [prompt]
-        error = str(e)
-    return DynamicPromptsResponse(prompts=prompts if prompts else [""], error=error)
+    """Expands a prompt's dynamic syntax against the current user's wildcards."""
+    expanded = expand_dynamic_prompt(
+        prompt,
+        max_prompts=min(max_prompts, 10000),
+        combinatorial=combinatorial,
+        seed=seed,
+        wildcard_manager=build_wildcard_manager(
+            ApiDependencies.invoker.services.wildcard_records.get_many(user_id=current_user.user_id)
+        ),
+    )
+    return DynamicPromptsResponse(prompts=expanded.prompts, error=expanded.error)
 
 
 def _get_fonts_dir() -> Path:
@@ -371,11 +365,26 @@ def get_user_font_file(font_path: str, _current_user: CurrentUserOrDefault) -> F
 class ExpandPromptRequest(BaseModel):
     prompt: str
     model_key: str
-    max_tokens: int = Field(default=300, ge=1, le=2048)
+    max_tokens: int = Field(
+        default=EXPAND_PROMPT_MAX_TOKENS_DEFAULT,
+        ge=EXPAND_PROMPT_MAX_TOKENS_MIN,
+        le=EXPAND_PROMPT_MAX_TOKENS_MAX,
+        description=(
+            "Cap on the tokens the LLM may emit. Clients that expand with a stored system prompt "
+            "send that prompt's own `max_tokens` here; omitting it uses the default."
+        ),
+    )
     system_prompt: str | None = None
     seed: int | None = Field(default=None, ge=0, le=SEED_MAX, description="Seed for reproducible text generation")
     task_id: str | None = Field(
         default=None, description="Client-supplied task ID used to correlate socket progress events to this request"
+    )
+    image_name: str | None = Field(
+        default=None,
+        description=(
+            "An image to condition the rewrite on, such as a video's first frame. Requires a model whose "
+            "`supports_images` is true."
+        ),
     )
 
 
@@ -426,6 +435,7 @@ def _run_expand_prompt(
     seed: int | None,
     task_id: str | None,
     user_id: str,
+    image_name: str | None = None,
 ) -> tuple[str, int]:
     """Run text LLM inference synchronously (called from thread)."""
     model_manager = ApiDependencies.invoker.services.model_manager
@@ -434,32 +444,55 @@ def _run_expand_prompt(
 
     if model_config.type != ModelType.TextLLM:
         raise ValueError(f"Model '{model_key}' is not a TextLLM model (got {model_config.type})")
+    # Only the TextLLM config carries the flag (the record type is a union); older records validate to False.
+    if image_name is not None and not getattr(model_config, "supports_images", False):
+        raise ValueError(f"Model '{model_config.name}' cannot read images; choose a vision-capable text LLM")
+
+    # Read before the model load so a missing image fails fast.
+    image = (
+        ApiDependencies.invoker.services.images.get_pil_image(image_name).convert("RGB")
+        if image_name is not None
+        else None
+    )
 
     if task_id is not None:
         events.emit_llm_task_progress(task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model")
 
-    with _model_load_lock:
-        loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
+    # Loaded before the model so the disk reads do not hold it on the device. A processor carries its own
+    # tokenizer; loading another would parse the (for Gemma, ~30 MB) vocabulary twice.
+    model_abs_path = _resolve_model_path(model_config.path)
+    processor = AutoProcessor.from_pretrained(model_abs_path, local_files_only=True) if image is not None else None
+    tokenizer = (
+        processor.tokenizer
+        if processor is not None
+        else AutoTokenizer.from_pretrained(model_abs_path, local_files_only=True)
+    )
 
-    with torch.no_grad(), loaded_model.model_on_device() as (_, model):
-        model_abs_path = _resolve_model_path(model_config.path)
-        tokenizer = AutoTokenizer.from_pretrained(model_abs_path, local_files_only=True)
+    # Outside the session queue: take an idle GPU (and its lock) for the load and the run. The borrow is
+    # taken once the load lock is ours, so a request queued behind another's load holds no GPU meanwhile;
+    # borrowing never blocks, so this ordering cannot deadlock.
+    with ExitStack() as gpu:
+        with _model_load_lock:
+            gpu.enter_context(idle_device_borrowed(purpose="Expand Prompt"))
+            loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
 
-        pipeline = TextLLMPipeline(model, tokenizer)
-        model_device = next(model.parameters()).device
+        with torch.no_grad(), loaded_model.model_on_device() as (_, model):
+            pipeline = TextLLMPipeline(model, tokenizer, processor)
+            model_device = next(model.parameters()).device
 
-        progress_callback = _make_progress_callback(events, task_id, user_id)
+            progress_callback = _make_progress_callback(events, task_id, user_id)
 
-        effective_seed = seed if seed is not None else get_random_seed()
-        output = pipeline.run(
-            prompt=prompt,
-            system_prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
-            max_new_tokens=max_tokens,
-            seed=effective_seed,
-            device=model_device,
-            dtype=TorchDevice.choose_torch_dtype(),
-            progress_callback=progress_callback,
-        )
+            effective_seed = seed if seed is not None else get_random_seed()
+            output = pipeline.run(
+                prompt=prompt,
+                system_prompt=system_prompt or DEFAULT_SYSTEM_PROMPT,
+                max_new_tokens=max_tokens,
+                seed=effective_seed,
+                device=model_device,
+                dtype=TorchDevice.choose_torch_dtype(),
+                progress_callback=progress_callback,
+                image=image,
+            )
 
     return output, effective_seed
 
@@ -473,6 +506,11 @@ def _run_expand_prompt(
 )
 async def expand_prompt(current_user: CurrentUserOrDefault, body: ExpandPromptRequest) -> ExpandPromptResponse:
     """Expand a brief prompt into a detailed image generation prompt using a text LLM."""
+    if body.image_name is not None:
+        # Same policy as image-to-prompt: non-owners cannot probe stored images through this endpoint.
+        await asyncio.to_thread(assert_image_move_maintenance_inactive)
+        await asyncio.to_thread(assert_image_read_access, body.image_name, current_user)
+
     events = ApiDependencies.invoker.services.events
     try:
         expanded, seed = await asyncio.to_thread(
@@ -484,6 +522,7 @@ async def expand_prompt(current_user: CurrentUserOrDefault, body: ExpandPromptRe
             body.seed,
             body.task_id,
             current_user.user_id,
+            body.image_name,
         )
         if body.task_id is not None:
             events.emit_llm_task_complete(task_id=body.task_id, user_id=current_user.user_id)
@@ -492,6 +531,11 @@ async def expand_prompt(current_user: CurrentUserOrDefault, body: ExpandPromptRe
         if body.task_id is not None:
             events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error="Model not found")
         raise HTTPException(status_code=404, detail=f"Model '{body.model_key}' not found")
+    except (ImageFileNotFoundException, ImageRecordNotFoundException):
+        # The record check matters for admins (and single-user mode), whose access check never reads the record.
+        if body.task_id is not None:
+            events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error="Image not found")
+        raise HTTPException(status_code=404, detail=f"Image '{body.image_name}' not found")
     except ValueError as e:
         if body.task_id is not None:
             events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error=str(e))
@@ -538,34 +582,36 @@ def _run_image_to_prompt(
     if task_id is not None:
         events.emit_llm_task_progress(task_id=task_id, user_id=user_id, phase="loading_model", message="Loading model")
 
-    with _model_load_lock:
-        loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
+    # Read before the borrow below, so neither disk read holds a GPU.
+    image = ApiDependencies.invoker.services.images.get_pil_image(image_name).convert("RGB")
+    processor = AutoProcessor.from_pretrained(_resolve_model_path(model_config.path), local_files_only=True)
+    if not isinstance(processor, LlavaOnevisionProcessor):
+        raise TypeError(f"Expected LlavaOnevisionProcessor, got {type(processor).__name__}")
 
-    # Load the image from InvokeAI's image store.
-    image = ApiDependencies.invoker.services.images.get_pil_image(image_name)
-    image = image.convert("RGB")
+    # Outside the session queue: take an idle GPU (and its lock) for the load and the run. The borrow is
+    # taken once the load lock is ours, so a request queued behind another's load holds no GPU meanwhile;
+    # borrowing never blocks, so this ordering cannot deadlock.
+    with ExitStack() as gpu:
+        with _model_load_lock:
+            gpu.enter_context(idle_device_borrowed(purpose="Image to Prompt"))
+            loaded_model = model_manager.load.load_model(model_config, user_id=user_id)
 
-    with torch.no_grad(), loaded_model.model_on_device() as (_, model):
-        if not isinstance(model, LlavaOnevisionForConditionalGeneration):
-            raise TypeError(f"Expected LlavaOnevisionForConditionalGeneration, got {type(model).__name__}")
+        with torch.no_grad(), loaded_model.model_on_device() as (_, model):
+            if not isinstance(model, LlavaOnevisionForConditionalGeneration):
+                raise TypeError(f"Expected LlavaOnevisionForConditionalGeneration, got {type(model).__name__}")
 
-        model_abs_path = _resolve_model_path(model_config.path)
-        processor = AutoProcessor.from_pretrained(model_abs_path, local_files_only=True)
-        if not isinstance(processor, LlavaOnevisionProcessor):
-            raise TypeError(f"Expected LlavaOnevisionProcessor, got {type(processor).__name__}")
+            pipeline = LlavaOnevisionPipeline(model, processor)
+            model_device = next(model.parameters()).device
 
-        pipeline = LlavaOnevisionPipeline(model, processor)
-        model_device = next(model.parameters()).device
+            progress_callback = _make_progress_callback(events, task_id, user_id)
 
-        progress_callback = _make_progress_callback(events, task_id, user_id)
-
-        output = pipeline.run(
-            prompt=instruction,
-            images=[image],
-            device=model_device,
-            dtype=TorchDevice.choose_torch_dtype(),
-            progress_callback=progress_callback,
-        )
+            output = pipeline.run(
+                prompt=instruction,
+                images=[image],
+                device=model_device,
+                dtype=TorchDevice.choose_torch_dtype(),
+                progress_callback=progress_callback,
+            )
 
     return output
 
@@ -602,7 +648,7 @@ async def image_to_prompt(current_user: CurrentUserOrDefault, body: ImageToPromp
         if body.task_id is not None:
             events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error="Model not found")
         raise HTTPException(status_code=404, detail=f"Model '{body.model_key}' not found")
-    except ImageFileNotFoundException:
+    except (ImageFileNotFoundException, ImageRecordNotFoundException):
         if body.task_id is not None:
             events.emit_llm_task_error(task_id=body.task_id, user_id=current_user.user_id, error="Image not found")
         raise HTTPException(status_code=404, detail=f"Image '{body.image_name}' not found")
