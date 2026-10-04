@@ -29,6 +29,7 @@ import {
   getVideoModes,
   getVideoPromptPolicy,
   getVideoValidationReasons,
+  getAutoDurationBounds,
   isAutoDurationActive,
   isAutoDurationSupportedForMode,
   getWanExpertWiringWarning,
@@ -2531,11 +2532,14 @@ describe('auto duration', () => {
     }
   );
 
-  it('has none for a continuation: its length is the new material the user asked for', () => {
+  it('sizes a continuation at the source rate, with the context counted against the ceiling', () => {
     const extending = settings({
+      fps: 24,
+      ltx2ExtendContextFrames: 25,
+      numFrames: 121,
       sourceVideo: {
         endFrame: 48,
-        fps: 24,
+        fps: 30,
         height: 704,
         numFrames: 49,
         startFrame: 0,
@@ -2544,8 +2548,15 @@ describe('auto duration', () => {
       },
     } as Partial<VideoSettings>);
 
-    expect(isAutoDurationSupportedForMode(extending)).toBe(false);
-    expect(isAutoDurationActive(extending)).toBe(false);
+    expect(isAutoDurationSupportedForMode(extending)).toBe(true);
+    // 25 held frames leave 121 - 24 = 97 for the prediction, at 30 fps; the total is back at 121.
+    expect(getAutoDurationBounds(ltx2('ltx2_dev'), extending)).toEqual({
+      contextFrames: 25,
+      fps: 30,
+      maxFrames: 121,
+      maxSeconds: 97 / 30,
+      minSeconds: 1,
+    });
   });
 
   it('is inactive without a head, however the flag is stored', () => {

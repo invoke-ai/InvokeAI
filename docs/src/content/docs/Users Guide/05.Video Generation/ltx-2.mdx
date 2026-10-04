@@ -85,7 +85,8 @@ LTX-2.5 ships with a small **duration head** that reads your prompt, as the mode
 
 * With it on, the head chooses the clip's length, and **Frames becomes Max frames** — the longest clip it may choose. That number still sizes the run's memory, so it stays editable, and its help text shows the range in seconds. Raise it to allow longer shots.
 * The head chooses between one second (or the shortest clip LTX-2 makes) and Max frames, at the panel's FPS, and lands on the 8·n + 1 frame grid. If Max frames is too short to leave it a choice, the clip simply runs at that length.
-* It is off for audio-to-video, video-to-audio and extensions, where the source clip decides the length.
+* For an [extension](#extending-with-ltx-2) the prompt describes the continuation, so the head chooses the length of the new material, at the source clip's frame rate, and the Context Frames are added in front of it. Max frames still counts the whole generated clip, context included.
+* It is off for audio-to-video and video-to-audio, where the conditioning clip decides the length.
 * The length that ran is what the video records, so recalling it reproduces that exact clip; recall turns Auto duration off for that reason.
 
 The duration head is a separate, optional 3.6 MB install (**LTX-2.5 Duration Head** in the starter models). It is fetched from Lightricks' own repository, which is license-gated: the install needs a Hugging Face token from an account that has accepted the LTX-2.5 license. Once installed it is selected automatically; the switch stays off until you turn it on.

@@ -1384,13 +1384,30 @@ describe('compileVideoGraph — LTX-2 auto duration', () => {
     expect(hasEdge(backendGraph, encoder.id, 'conditioning', duration.id, 'conditioning')).toBe(true);
   });
 
-  it('stays out of a continuation, whose length the source clip already fixes', () => {
+  it('sizes a continuation from its prompt, at the source rate, behind the context it holds', () => {
     const model = ltx2Model('ltx2_dev');
-    const settings = autoSettings(model, { sourceVideo: LTX2_SOURCE_CLIP });
+    // The source plays at 30 fps against a 24 fps panel, so a head reading the panel's rate is caught.
+    const settings = autoSettings(model, { fps: 24, numFrames: 121, sourceVideo: { ...LTX2_SOURCE_CLIP, fps: 30 } });
     const { backendGraph } = compileVideoGraph(settings, model);
+    const duration = nodeOfType(backendGraph, 'ltx2_duration');
+    const denoise = nodeOfType(backendGraph, 'ltx2_denoise');
+    const extend = nodeOfType(backendGraph, 'ltx2_extend_conditioning');
+    const rateSource = backendGraph.edges.find(
+      (edge) => edge.destination.node_id === denoise.id && edge.destination.field === 'fps'
+    )?.source;
 
-    // Two edges into one `num_frames` is a malformed graph, not a preference that loses.
-    expect(nodesOfType(backendGraph, 'ltx2_duration')).toHaveLength(0);
+    // The context actually held, and the rate the run actually plays at, both known only at run time.
+    expect(hasEdge(backendGraph, extend.id, 'context_frames', duration.id, 'context_frames')).toBe(true);
+    expect(rateSource).toBeDefined();
+    expect(hasEdge(backendGraph, rateSource!.node_id, rateSource!.field, duration.id, 'fps')).toBe(true);
+    // 17 context frames leave 121 - 16 = 105 for the prediction, read at the source's 30 fps.
+    expect(duration.max_seconds).toBe(105 / 30);
+    expect(duration.max_num_frames).toBe(121);
+    expect(
+      backendGraph.edges.filter(
+        (edge) => edge.destination.node_id === denoise.id && edge.destination.field === 'num_frames'
+      )
+    ).toEqual([expect.objectContaining({ source: { field: 'num_frames', node_id: duration.id } })]);
   });
 
   it('runs both passes of a two-stage preset at the length it chose', () => {

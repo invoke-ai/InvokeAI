@@ -24788,8 +24788,10 @@ export type components = {
          *     prediction is clamped to `min_seconds`/`max_seconds` and then snapped down onto the VAE's
          *     causal temporal grid (`8k + 1`), which is the only frame count a generation can run at.
          *
-         *     Conditioning clips and video extension fix the frame count by construction -- the source
-         *     footage decides it -- so this node has nothing to say about those graphs.
+         *     For an extension, the prompt describes the continuation rather than the frames it opens with,
+         *     so the prediction sizes the new material and `context_frames` is added in front of it.
+         *     Conditioning clips fix the frame count by construction -- the clip decides it -- so this node
+         *     has nothing to say about those graphs.
          */
         LTX2DurationInvocation: {
             /**
@@ -24840,6 +24842,18 @@ export type components = {
              */
             max_seconds?: number;
             /**
+             * Context Frames
+             * @description Source frames the run opens with, as an extension's `context_frames`. The prediction covers what follows them, so they are added to it. 0 when nothing is held.
+             * @default 0
+             */
+            context_frames?: number;
+            /**
+             * Max Num Frames
+             * @description Longest total frame count the run was sized for. The result never exceeds it, whatever frame rate the seconds bounds turn out to be read at.
+             * @default null
+             */
+            max_num_frames?: number | null;
+            /**
              * type
              * @default ltx2_duration
              * @constant
@@ -24853,7 +24867,7 @@ export type components = {
         LTX2DurationOutput: {
             /**
              * Num Frames
-             * @description Frame count on LTX-2's 8k+1 grid. Wire into the denoise node's `num_frames`.
+             * @description Frame count on LTX-2's 8k+1 grid, including any context frames. Wire into the denoise node's `num_frames`.
              */
             num_frames: number;
             /**
