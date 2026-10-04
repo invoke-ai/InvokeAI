@@ -6,6 +6,7 @@ import gc
 import json
 import platform
 import shutil
+import sqlite3
 import threading
 import time
 import uuid
@@ -32,6 +33,7 @@ from invokeai.app.services.model_install import (
     HFModelSource,
     ModelInstallService,
     ModelInstallServiceBase,
+    model_install_default,
 )
 from invokeai.app.services.model_install.model_install_common import (
     InstallStatus,
@@ -45,7 +47,7 @@ from invokeai.app.services.model_install.model_install_default import (
     INSTALL_MARKER_VERSION,
     TMPDIR_PREFIX,
 )
-from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
+from invokeai.app.services.model_records import ModelRecordChanges, ModelRecordServiceSQL, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
 from invokeai.backend.model_manager.metadata import RemoteModelFile
 from invokeai.backend.model_manager.taxonomy import (
@@ -130,6 +132,135 @@ def test_install(
     assert model_record.path.endswith(f"{key}/test_embedding.safetensors")
     assert (mm2_app_config.models_path / model_record.path).exists()
     assert model_record.source == embedding_file.as_posix()
+
+
+def test_directory_install_retries_windows_move_failures(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A transient handle failure must not strand a partially moved directory install."""
+    expected_files = {
+        path.relative_to(diffusers_dir): path.read_bytes() for path in diffusers_dir.rglob("*") if path.is_file()
+    }
+    real_move = shutil.move
+    calls = 0
+
+    def flaky_move(src: Path, dst: Path):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise PermissionError("simulated Windows file-handle race")
+        return real_move(src, dst)
+
+    monkeypatch.setattr(model_install_default, "move", flaky_move)
+
+    key = mm2_installer.install_path(diffusers_dir)
+
+    model_record = mm2_installer.record_store.get_model(key)
+    installed_path = mm2_app_config.models_path / model_record.path
+    installed_files = {
+        path.relative_to(installed_path): path.read_bytes() for path in installed_path.rglob("*") if path.is_file()
+    }
+    assert installed_files == expected_files
+    assert calls >= 3
+
+
+def test_directory_install_failure_does_not_leave_partial_destination(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    existing_paths = set(mm2_app_config.models_path.iterdir())
+
+    def fail_first_move(_src: Path, _dst: Path):
+        raise PermissionError("simulated Windows file-handle race")
+
+    monkeypatch.setattr(model_install_default, "move", fail_first_move)
+
+    with pytest.raises(PermissionError, match="simulated Windows file-handle race"):
+        mm2_installer.install_path(diffusers_dir)
+
+    assert set(mm2_app_config.models_path.iterdir()) == existing_paths
+    assert list(diffusers_dir.iterdir())
+    assert mm2_installer.record_store.all_models() == []
+
+
+def test_directory_install_late_move_failure_restores_source_files(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """A locked later file must not strand files already removed from a user's import folder."""
+    expected_files = {
+        path.relative_to(diffusers_dir): path.read_bytes() for path in diffusers_dir.rglob("*") if path.is_file()
+    }
+    existing_paths = set(mm2_app_config.models_path.iterdir())
+    first_item, locked_item, *_ = list(diffusers_dir.iterdir())
+    real_move = shutil.move
+    moved_first_item = False
+
+    def move_with_locked_source(src: Path, dst: Path):
+        nonlocal moved_first_item
+        if src == locked_item:
+            assert moved_first_item
+            raise PermissionError("source file remains locked")
+        result = real_move(src, dst)
+        if src == first_item:
+            moved_first_item = True
+        return result
+
+    monkeypatch.setattr(model_install_default, "move", move_with_locked_source)
+
+    with pytest.raises(PermissionError, match="source file remains locked"):
+        mm2_installer.install_path(diffusers_dir)
+
+    assert moved_first_item
+    assert {
+        path.relative_to(diffusers_dir): path.read_bytes() for path in diffusers_dir.rglob("*") if path.is_file()
+    } == expected_files
+    assert set(mm2_app_config.models_path.iterdir()) == existing_paths
+    assert mm2_installer.record_store.all_models() == []
+
+
+def test_install_registration_failure_preserves_complete_recoverable_files(
+    mm2_installer: ModelInstallServiceBase,
+    diffusers_dir: Path,
+    mm2_app_config: InvokeAIAppConfig,
+) -> None:
+    """A database made read-only after startup can reject registration after file moves succeed."""
+    expected_files = {
+        path.relative_to(diffusers_dir): path.read_bytes() for path in diffusers_dir.rglob("*") if path.is_file()
+    }
+    existing_paths = set(mm2_app_config.models_path.iterdir())
+
+    store = mm2_installer.record_store
+    assert isinstance(store, ModelRecordServiceSQL)
+    # Exercise a genuine SQLite write rejection without changing permissions on any real user database.
+    with store._db.transaction() as cursor:
+        cursor.execute("PRAGMA query_only = ON")
+    try:
+        with pytest.raises(sqlite3.OperationalError, match="readonly database"):
+            mm2_installer.install_path(diffusers_dir)
+    finally:
+        with store._db.transaction() as cursor:
+            cursor.execute("PRAGMA query_only = OFF")
+
+    assert mm2_installer.record_store.all_models() == []
+    new_paths = set(mm2_app_config.models_path.iterdir()) - existing_paths
+    # A rollback to the source or a complete unregistered managed folder both preserve recovery.
+    recoverable_roots = [diffusers_dir, *new_paths]
+    complete_copies = [
+        root
+        for root in recoverable_roots
+        if {path.relative_to(root): path.read_bytes() for path in root.rglob("*") if path.is_file()} == expected_files
+    ]
+    assert len(complete_copies) == 1
+    recovered_key = mm2_installer.register_path(complete_copies[0])
+    assert mm2_installer.record_store.get_model(recovered_key).key == recovered_key
 
 
 def test_rename(
