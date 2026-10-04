@@ -498,9 +498,9 @@ export const useImageActions = ({
         },
       });
     };
-    const deleteItems = (items: GalleryItemRef[]): Promise<void> =>
+    const deleteItems: ImageActions['deleteItems'] = (items, options) =>
       confirmImageDeletion
-        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items))
+        ? requestDeletionConfirmation(items, () => deleteItemsConfirmed(items), options?.returnFocus)
         : deleteItemsConfirmed(items);
     const moveItemsToBoard = (items: GalleryItemRef[], boardId: string): Promise<void> => {
       // On partial move failure, restore then reapply confirmed items. Capture prior boards from cache and store,

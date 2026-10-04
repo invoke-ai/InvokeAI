@@ -1,10 +1,10 @@
-import type { GalleryItem, GalleryItemRef } from '@features/gallery/core/items';
+import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/core/items';
 import type { GalleryThumbnailFit } from '@features/gallery/core/settings';
 
 import { Badge, chakra } from '@chakra-ui/react';
 import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities';
-import { formatGalleryVideoDuration, toGalleryItemRef } from '@features/gallery/core/items';
+import { formatGalleryVideoDuration, toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items';
 import { IconButton } from '@platform/ui/Button';
 import { StarIcon } from 'lucide-react';
 import { useCallback, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type MouseEvent } from 'react';
@@ -60,9 +60,11 @@ const GalleryThumbnail = ({
   getItemLabel,
   isPrimary,
   isSelected,
+  isTabStop,
   item,
   onClick,
   onContextMenu,
+  onFocusLost,
   onToggleStarred,
 }: {
   alwaysShowDimensions: boolean;
@@ -75,9 +77,13 @@ const GalleryThumbnail = ({
   getItemLabel: ((item: GalleryItemRef) => Promise<string | null>) | null;
   isPrimary: boolean;
   isSelected: boolean;
+  /** The grid's one thumbnail Tab stop; the other thumbnails are reached with the arrow keys. */
+  isTabStop: boolean;
   item: GalleryItem;
   onClick: (item: GalleryItem, event: MouseEvent) => void;
   onContextMenu: (item: GalleryItem, x: number, y: number) => void;
+  /** Runs after the tile left the document holding focus, once the grid has committed what replaced it. */
+  onFocusLost: (itemKey: GalleryItemKey) => void;
   onToggleStarred: (item: GalleryItem) => void;
 }) => {
   const { t } = useTranslation();
@@ -109,12 +115,26 @@ const GalleryThumbnail = ({
     setDragOrigin(isDragging ? (tileRef.current?.getBoundingClientRect() ?? null) : null);
   }, [isDragging]);
 
+  const itemKey = toGalleryItemKey(item);
+  // Covers focus anywhere in the tile, its star toggle included: a star click can move the item between sections.
   const setTileRef = useCallback(
     (node: HTMLDivElement | null) => {
       tileRef.current = node;
       setNodeRef(node);
+
+      if (!node) {
+        return;
+      }
+
+      return () => {
+        if (node.contains(document.activeElement)) {
+          queueMicrotask(() => onFocusLost(itemKey));
+        }
+        tileRef.current = null;
+        setNodeRef(null);
+      };
     },
-    [setNodeRef]
+    [itemKey, onFocusLost, setNodeRef]
   );
 
   const previewStyle = useMemo(
@@ -216,7 +236,9 @@ const GalleryThumbnail = ({
             : t('widgets.gallery.selectImageForPreview', { name: item.name })
         }
         aria-pressed={isSelected}
+        data-gallery-item-key={itemKey}
         style={THUMBNAIL_BUTTON_STYLE}
+        tabIndex={isTabStop ? 0 : -1}
         type="button"
         onClick={handleClick}
         onKeyDown={handleActivationKeyDown}
@@ -268,6 +290,8 @@ const GalleryThumbnail = ({
         opacity={item.starred ? 1 : 0}
         position="absolute"
         size="sm"
+        // Pointer-only: the star hotkey toggles the selection, which keyboard focus follows.
+        tabIndex={-1}
         top="1"
         transition="opacity var(--wb-motion-duration-medium) ease"
         variant="solid"

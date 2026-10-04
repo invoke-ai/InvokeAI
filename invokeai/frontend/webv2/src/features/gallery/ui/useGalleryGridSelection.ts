@@ -1,4 +1,4 @@
-import type { GalleryItem, GalleryItemRef } from '@features/gallery/core/items';
+import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gallery/core/items';
 
 import {
   isGalleryImageItem,
@@ -72,11 +72,12 @@ export const useGalleryGridSelection = () => {
     return loadedItems.some((item) => toGalleryItemKey(item) === primaryTargetItemKey) ? contextMenuTarget : null;
   }, [contextMenuTarget, loadedItems]);
 
+  /** Selects from the anchor (the primary selection unless a keyboard range names its own) through `item`. */
   const selectItemRange = useCallback(
-    async (item: GalleryItem) => {
+    async (item: GalleryItem, anchorKey?: GalleryItemKey | null) => {
       const owner = captureAccountScope();
       const capturedContext = rangeInteractionContextRef.current;
-      const anchorItemKey = capturedContext.selectedItemKey;
+      const anchorItemKey = anchorKey ?? capturedContext.selectedItemKey;
       const targetItemKey = toGalleryItemKey(item);
 
       if (!anchorItemKey) {
@@ -128,6 +129,22 @@ export const useGalleryGridSelection = () => {
     [actions, filter, gallery.items, queryClient, starredStrip.items]
   );
 
+  const toggleItem = useCallback(
+    (item: GalleryItem) => {
+      const itemKey = toGalleryItemKey(item);
+      const remainingItemKeys = gallery.selectedItemKeys.filter((key) => key !== itemKey);
+      const nextPrimaryItem =
+        gallery.selectedItemKey === itemKey
+          ? (loadedItems.find(
+              (candidate) => toGalleryItemKey(candidate) === remainingItemKeys[remainingItemKeys.length - 1]
+            ) ?? null)
+          : null;
+
+      actions.toggleItemInSelection(item, nextPrimaryItem);
+    },
+    [actions, gallery.selectedItemKey, gallery.selectedItemKeys, loadedItems]
+  );
+
   const handleThumbnailClick = useCallback(
     (item: GalleryItem, event: MouseEvent) => {
       if (event.shiftKey) {
@@ -141,21 +158,12 @@ export const useGalleryGridSelection = () => {
       }
 
       if (event.ctrlKey || event.metaKey) {
-        const itemKey = toGalleryItemKey(item);
-        const remainingItemKeys = gallery.selectedItemKeys.filter((key) => key !== itemKey);
-        const nextPrimaryItem =
-          gallery.selectedItemKey === itemKey
-            ? (loadedItems.find(
-                (candidate) => toGalleryItemKey(candidate) === remainingItemKeys[remainingItemKeys.length - 1]
-              ) ?? null)
-            : null;
-
-        actions.toggleItemInSelection(item, nextPrimaryItem);
+        toggleItem(item);
       } else {
         actions.selectItem(item);
       }
     },
-    [actions, gallery.selectedItemKey, gallery.selectedItemKeys, loadedItems, selectItemRange]
+    [actions, selectItemRange, toggleItem]
   );
 
   const handleThumbnailContextMenu = useCallback(
@@ -214,6 +222,8 @@ export const useGalleryGridSelection = () => {
     handleThumbnailContextMenu,
     loadedItems,
     selectedItemKeys,
+    selectItemRange,
     syncRangeInteractionContext,
+    toggleItem,
   };
 };

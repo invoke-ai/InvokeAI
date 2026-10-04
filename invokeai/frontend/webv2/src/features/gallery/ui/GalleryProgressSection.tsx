@@ -242,6 +242,7 @@ const GalleryProgressTile = ({
       aria-label={`${label} · ${status}`}
       aria-pressed={isShownSelected}
       aria-disabled={session.state !== 'running'}
+      data-gallery-session-id={session.id}
       tabIndex={session.state === 'running' ? 0 : -1}
       borderColor={isShownSelected ? 'accent.solid' : 'border.subtle'}
       borderWidth="2px"

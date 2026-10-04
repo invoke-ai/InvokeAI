@@ -4,7 +4,7 @@ import { firstPartyHotkeyCatalog, OPEN_COMMAND_PALETTE_HOTKEY } from './catalog'
 
 describe('firstPartyHotkeyCatalog', () => {
   it('keeps legacy default hotkey parity', () => {
-    expect(firstPartyHotkeyCatalog).toHaveLength(104);
+    expect(firstPartyHotkeyCatalog).toHaveLength(113);
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.togglePreview');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.invoke');
     expect(firstPartyHotkeyCatalog.map((hotkey) => hotkey.id)).toContain('app.openCommandPalette');

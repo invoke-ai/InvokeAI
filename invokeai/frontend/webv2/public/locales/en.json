@@ -3942,11 +3942,20 @@
       "commands": {
         "clearSelection": "Clear gallery selection",
         "deleteSelection": "Delete gallery selection",
+        "extendSelectionDown": "Extend gallery selection down",
+        "extendSelectionLeft": "Extend gallery selection left",
+        "extendSelectionRight": "Extend gallery selection right",
+        "extendSelectionUp": "Extend gallery selection up",
+        "moveFocusDown": "Move gallery focus down without selecting",
+        "moveFocusLeft": "Move gallery focus left without selecting",
+        "moveFocusRight": "Move gallery focus right without selecting",
+        "moveFocusUp": "Move gallery focus up without selecting",
         "navigationDown": "Gallery navigation down",
         "navigationLeft": "Gallery navigation left",
         "navigationRight": "Gallery navigation right",
         "navigationUp": "Gallery navigation up",
         "selectAllOnPage": "Select all gallery images on page",
+        "toggleFocusedInSelection": "Add or remove the focused gallery item from the selection",
         "toggleStarImage": "Toggle gallery image star",
         "toggleStarredOnly": "Toggle gallery starred-only filter"
       },
@@ -4056,6 +4065,7 @@
         }
       },
       "itemsAriaLabel": "Gallery items",
+      "contentAriaLabel": "Gallery content",
       "listingLoadFailed": "Could not load these items.",
       "listingLoadMoreFailed": "Could not load more items.",
       "listingRefreshFailed": "Could not refresh. Showing earlier results.",

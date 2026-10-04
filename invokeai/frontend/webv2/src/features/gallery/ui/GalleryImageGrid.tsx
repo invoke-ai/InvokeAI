@@ -9,7 +9,11 @@ import {
   type GalleryRevealRequest,
 } from '@features/gallery/core/selection';
 import { isDateBoardId } from '@features/gallery/data/backend';
-import { GALLERY_PAGE_SIZE, imageIndexAvailabilityOptions } from '@features/gallery/data/queries';
+import {
+  GALLERY_PAGE_SIZE,
+  imageIndexAvailabilityOptions,
+  type GalleryItemsFilter,
+} from '@features/gallery/data/queries';
 import { Button, DropZone } from '@platform/ui';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRightIcon, StarIcon, UploadIcon } from 'lucide-react';
@@ -23,10 +27,12 @@ import {
   useState,
   useSyncExternalStore,
   type DragEvent,
+  type FocusEvent,
   type KeyboardEvent,
   type ReactNode,
 } from 'react';
-import { useVirtualizer } from 'react-hook-tanstack-virtual';
+import { flushSync } from 'react-dom';
+import { defaultRangeExtractor, useVirtualizer, type Range } from 'react-hook-tanstack-virtual';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -220,6 +226,41 @@ const GalleryStarredSection = ({
 
 /** A tile's own select button, not the star toggle layered over it. */
 const TILE_BUTTON_SELECTOR = '[role="listitem"] button[aria-pressed]';
+const TAB_STOP_SELECTOR = 'button[data-gallery-item-key][tabindex="0"]';
+
+const NO_ITEMS: GalleryItem[] = [];
+const GRID_OVERSCAN_ROWS = 4;
+
+/** Where keyboard focus last was among the thumbnails: the scope and position outlive the tile itself. */
+interface FocusedTile {
+  filter: GalleryItemsFilter;
+  index: number;
+  key: GalleryItemKey;
+}
+
+/** The rows in view plus the one keyboard focus needs wherever the grid scrolls; -1 keeps nothing. */
+const extractRangeKeeping = (range: Range, keptRow: number): number[] => {
+  const indexes = defaultRangeExtractor(range);
+
+  return keptRow < 0 || keptRow >= range.count || indexes.includes(keptRow)
+    ? indexes
+    : [...indexes, keptRow].sort((a, b) => a - b);
+};
+
+/** The item of the thumbnail tile holding `element`, whether its select button or the star toggle over it. */
+const getTileItemKey = (element: Element | null): GalleryItemKey | null =>
+  (element
+    ?.closest('[role="listitem"]')
+    ?.querySelector('[data-gallery-item-key]')
+    ?.getAttribute('data-gallery-item-key') ?? null) as GalleryItemKey | null;
+
+/** The tile that shows a navigation entry: a thumbnail, or an in-progress session. */
+const findEntryTile = (viewport: HTMLElement, entry: GalleryNavigationEntry): HTMLElement | null =>
+  viewport.querySelector<HTMLElement>(
+    entry.kind === 'session'
+      ? `[data-gallery-session-id="${CSS.escape(entry.id)}"]`
+      : `[data-gallery-item-key="${CSS.escape(toGalleryItemKey(entry.item))}"]`
+  );
 
 /** Prefers a visible tile; an empty grid offers whatever else it shows (its upload target, the strip header). */
 const focusVisibleGridContent = (viewport: HTMLElement | null, edge: 'first' | 'last') => {
@@ -231,7 +272,8 @@ const focusVisibleGridContent = (viewport: HTMLElement | null, edge: 'first' | '
 /** Measure viewport width for columns so both layouts share the same grid. */
 export const GalleryImageGrid = () => {
   const { t } = useTranslation();
-  const { actions, gallery, isWindowTruncated, itemActions, listing, region, starredStrip } = useGalleryWidget();
+  const { actions, filter, gallery, isWindowTruncated, itemActions, listing, region, starredStrip } =
+    useGalleryWidget();
   const {
     gallery: galleryCommands,
     getItemLabel,
@@ -265,7 +307,9 @@ export const GalleryImageGrid = () => {
     handleThumbnailContextMenu,
     loadedItems,
     selectedItemKeys,
+    selectItemRange,
     syncRangeInteractionContext,
+    toggleItem,
   } = useGalleryGridSelection();
 
   const columnCount = getGalleryColumnCount({ imageDensityPercent, widthPx: viewportWidth });
@@ -295,8 +339,8 @@ export const GalleryImageGrid = () => {
   // Exclude collapsed tiles from navigation, but retain hidden starred selections' section identity so arrows can
   // step out.
   const isProgressOpen = showPendingItems && !progressSectionCollapsed;
+  const shownStripItems = isStarredOpen ? starredCells : NO_ITEMS;
   const navigationSections = useMemo((): GalleryNavigationEntry[][] => {
-    const shownStripItems = isStarredOpen ? starredCells : [];
     const selectedKey = gallery.selectedItemKey;
     const isSelected = (item: GalleryItem) => toGalleryItemKey(item) === selectedKey;
     const hiddenStripSelection =
@@ -320,19 +364,36 @@ export const GalleryImageGrid = () => {
         : [],
       gallery.items.map((item) => ({ item, kind: 'item' })),
     ];
-  }, [
-    gallery.items,
-    gallery.selectedItemKey,
-    isProgressOpen,
-    isStarredOpen,
-    progressSessions,
-    starredCells,
-    starredStrip.items,
-  ]);
+  }, [gallery.items, gallery.selectedItemKey, isProgressOpen, progressSessions, shownStripItems, starredStrip.items]);
   const cursorKey =
     followedProgressSessionId !== null
       ? getGallerySessionNavigationKey(followedProgressSessionId)
       : gallery.selectedItemKey;
+
+  // Thumbnails in visual order, strip first. They share one thumbnail Tab stop: the tile focus was last on, else the
+  // selection, else the tile that took the focused one's place in the same scope (after a deletion, the neighbour
+  // selected next), else the first. Progress tiles, disclosures, the upload zone and retries keep their own stops.
+  const tileKeys = useMemo(
+    () => [...shownStripItems, ...gallery.items].map(toGalleryItemKey),
+    [gallery.items, shownStripItems]
+  );
+  const [focusedTile, setFocusedTile] = useState<FocusedTile | null>(null);
+  const selectedTileIndex = gallery.selectedItemKey === null ? -1 : tileKeys.indexOf(gallery.selectedItemKey);
+  const focusedTileIndex = focusedTile === null ? -1 : tileKeys.indexOf(focusedTile.key);
+  const tabStopIndex =
+    focusedTileIndex >= 0
+      ? focusedTileIndex
+      : selectedTileIndex >= 0
+        ? selectedTileIndex
+        : focusedTile?.filter === filter
+          ? Math.max(0, Math.min(focusedTile.index, tileKeys.length - 1))
+          : 0;
+  const tabStopKey = tileKeys[tabStopIndex] ?? null;
+  const tabStopRow =
+    tabStopIndex < shownStripItems.length ? -1 : Math.floor((tabStopIndex - shownStripItems.length) / columnCount);
+  // Scrolling never unmounts the Tab stop, which is also the focused tile while the grid holds focus: focus would
+  // fall to the document body, and Tab would skip the grid.
+  const rangeExtractor = useCallback((range: Range) => extractRangeKeeping(range, tabStopRow), [tabStopRow]);
 
   const rowCount = rows.length;
   const cellSizePx = getGalleryCellSizePx({ columnCount, widthPx: viewportWidth });
@@ -362,7 +423,8 @@ export const GalleryImageGrid = () => {
     estimateSize: estimateRowSize,
     getItemKey: getRowKey,
     getScrollElement,
-    overscan: 4,
+    overscan: GRID_OVERSCAN_ROWS,
+    rangeExtractor,
   });
 
   const measureVirtualizer = useEffectEvent(() => {
@@ -412,13 +474,115 @@ export const GalleryImageGrid = () => {
     }
   };
 
+  const handleGridFocus = useCallback(
+    (event: FocusEvent<HTMLElement>) => {
+      const key = getTileItemKey(event.target as HTMLElement);
+
+      if (key) {
+        const index = tileKeys.indexOf(key as GalleryItemKey);
+
+        setFocusedTile((current) =>
+          current?.key === key && current.index === index && current.filter === filter
+            ? current
+            : { filter, index, key: key as GalleryItemKey }
+        );
+      }
+    },
+    [filter, tileKeys]
+  );
+
+  // A tile that leaves the document holding focus (deleted, moved between the strip and the listing, replaced by
+  // another board's) takes focus with it. The same item takes it back where it now shows, else the Tab stop, else
+  // the grid itself while it has no tiles, so the keys stay with the gallery; a user who already went elsewhere
+  // keeps their focus.
+  const restoreTileFocus = useCallback((itemKey: GalleryItemKey) => {
+    const viewport = viewportRef.current;
+    const active = document.activeElement;
+
+    if (viewport && (active === null || active === document.body)) {
+      (
+        viewport.querySelector<HTMLElement>(`[data-gallery-item-key="${CSS.escape(itemKey)}"]`) ??
+        viewport.querySelector<HTMLElement>(TAB_STOP_SELECTOR) ??
+        viewport
+      ).focus({ preventScroll: true });
+    }
+  }, []);
+
+  /** The tile holding keyboard focus inside the grid: a thumbnail's item key, or a session's navigation key. */
+  const getFocusedTileKey = (): string | null => {
+    const viewport = viewportRef.current;
+    const active = document.activeElement;
+
+    if (!viewport || !(active instanceof HTMLElement) || !viewport.contains(active)) {
+      return null;
+    }
+
+    const sessionId = active.closest('[data-gallery-session-id]')?.getAttribute('data-gallery-session-id');
+
+    return sessionId ? getGallerySessionNavigationKey(sessionId) : getTileItemKey(active);
+  };
+  const getCursorKey = () => getFocusedTileKey() ?? cursorKey;
+  const getFocusedItem = () => {
+    const key = getTileItemKey(document.activeElement);
+
+    return key && viewportRef.current?.contains(document.activeElement)
+      ? (loadedItems.find((item) => toGalleryItemKey(item) === key) ?? null)
+      : null;
+  };
+
+  /**
+   * Arrow keys move keyboard focus to the entry while focus is in the grid; a command run elsewhere leaves focus be,
+   * and a focus-only move (no `select`) needs focus in the grid to mean anything.
+   */
+  const moveToEntry = (entry: GalleryNavigationEntry, select: (() => void) | null) => {
+    const viewport = viewportRef.current;
+
+    if (!viewport?.contains(document.activeElement)) {
+      if (select) {
+        select();
+        scrollToEntry(entry);
+      }
+      return;
+    }
+
+    // Committed before focus moves: the target becomes the Tab stop, which keeps it mounted however far it is.
+    flushSync(() => {
+      select?.();
+
+      if (entry.kind === 'item') {
+        const key = toGalleryItemKey(entry.item);
+
+        setFocusedTile({ filter, index: tileKeys.indexOf(key), key });
+      }
+    });
+    scrollToEntry(entry);
+    findEntryTile(viewport, entry)?.focus({ preventScroll: true });
+  };
+
+  // A confirmation the grid's keys opened returns focus to the tile that held it, or to the Tab stop once a
+  // deletion has taken that tile away.
+  const getDialogReturnFocus = () => {
+    const viewport = viewportRef.current;
+    const opener = document.activeElement;
+
+    if (!viewport || !(opener instanceof HTMLElement) || !viewport.contains(opener)) {
+      return undefined;
+    }
+
+    return () => (opener.isConnected ? opener : (viewport.querySelector<HTMLElement>(TAB_STOP_SELECTOR) ?? viewport));
+  };
+
   useGalleryGridHotkeys({
     actionSelectionRefs,
     columnCount,
-    cursorKey,
+    getCursorKey,
+    getDialogReturnFocus,
+    getFocusedItem,
     loadedItems,
+    moveToEntry,
     navigationSections,
-    scrollToEntry,
+    selectItemRange,
+    toggleItem,
   });
 
   // Only explicit reveals scroll. Retry while the item loads; retire the request when another selection supersedes
@@ -513,7 +677,8 @@ export const GalleryImageGrid = () => {
   }, [rowHeightPx, rows, pinnedHeight]);
 
   const virtualRows = virtualizer.virtualItems;
-  const lastVisibleRowIndex = virtualRows[virtualRows.length - 1]?.index ?? 0;
+  // From the rows in view and their overscan, never the Tab stop kept mounted far below them.
+  const lastVisibleRowIndex = Math.min((virtualizer.range?.endIndex ?? 0) + GRID_OVERSCAN_ROWS, rowCount - 1);
 
   useEffect(() => {
     if (paginationMode === 'infinite' && rowCount > 0 && lastVisibleRowIndex >= rowCount - 2) {
@@ -626,9 +791,11 @@ export const GalleryImageGrid = () => {
           getItemLabel={getReadyItemLabel}
           isPrimary={!isFollowingLive && itemKey === gallery.selectedItemKey}
           isSelected={!isFollowingLive && selectedItemKeys.has(itemKey)}
+          isTabStop={itemKey === tabStopKey}
           item={item}
           onClick={handleThumbnailClick}
           onContextMenu={handleThumbnailContextMenu}
+          onFocusLost={restoreTileFocus}
           onToggleStarred={handleToggleStarred}
         />
       );
@@ -644,9 +811,11 @@ export const GalleryImageGrid = () => {
       isComparisonActive,
       isFollowingLive,
       region,
+      restoreTileFocus,
       selectedItemKeys,
       showImageDimensions,
       t,
+      tabStopKey,
       thumbnailFit,
     ]
   );
@@ -692,7 +861,19 @@ export const GalleryImageGrid = () => {
           </Flex>
         ) : null}
         <ScrollArea.Root h="full" minH="0" variant="hover" w="full">
-          <ScrollArea.Viewport ref={viewportRef} data-dnd-auto-scroll="false" h="full" outline="none" w="full">
+          {/* Focusable from script only: it holds keyboard focus while the grid has no tiles to give it. */}
+          <ScrollArea.Viewport
+            ref={viewportRef}
+            aria-label={t('widgets.gallery.contentAriaLabel')}
+            data-dnd-auto-scroll="false"
+            focusVisibleRing="inside"
+            h="full"
+            outline="none"
+            role="group"
+            tabIndex={-1}
+            w="full"
+            onFocus={handleGridFocus}
+          >
             <ScrollArea.Content display="flex" flexDirection="column" minH="full">
               {pinnedHeight > 0 ? (
                 <Box

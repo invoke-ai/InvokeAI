@@ -600,7 +600,10 @@ describe('partial image mutation outcomes', () => {
 });
 
 type ExpectedItemActions = {
-  deleteItems(refs: Array<{ kind: 'image' | 'video'; name: string }>): Promise<void>;
+  deleteItems(
+    refs: Array<{ kind: 'image' | 'video'; name: string }>,
+    options?: { returnFocus?: () => HTMLElement | null }
+  ): Promise<void>;
   downloadItem(item: { fullUrl: string; kind: 'image' | 'video'; name: string }): Promise<void>;
   downloadItems(
     refs: Array<{ kind: 'image' | 'video'; name: string }>,
@@ -632,11 +635,13 @@ describe('mixed item mutation outcomes', () => {
         </QueryClientProvider>
       );
     });
+    const returnFocus = () => null;
     await act(async () => {
-      await getItemActions().deleteItems(refs);
+      await getItemActions().deleteItems(refs, { returnFocus });
     });
 
-    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function));
+    // The dialog learns where focus goes once the deletion has removed the control that asked for it.
+    expect(mocks.requestDeletionConfirmation).toHaveBeenCalledWith(refs, expect.any(Function), returnFocus);
     expect(mocks.itemDelete).not.toHaveBeenCalled();
 
     await act(async () => {

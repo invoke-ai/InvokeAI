@@ -82,6 +82,7 @@ vi.mock('@features/gallery/data/queries', async (importOriginal) => ({
 vi.mock('react-hook-tanstack-virtual', async (importOriginal) => {
   const actual = await importOriginal<typeof VirtualModule>();
   return {
+    ...actual,
     useVirtualizer: (options: {
       count: number;
       horizontal?: boolean;
@@ -1068,10 +1069,14 @@ describe('GalleryImageGrid mixed item cells', () => {
       ],
       items[0]
     );
-    expect(imageActionMocks.deleteItems).toHaveBeenCalledWith([
-      { kind: 'image', name: 'shared' },
-      { kind: 'video', name: 'shared' },
-    ]);
+    // Run with focus outside the grid, the dialog keeps its own focus return.
+    expect(imageActionMocks.deleteItems).toHaveBeenCalledWith(
+      [
+        { kind: 'image', name: 'shared' },
+        { kind: 'video', name: 'shared' },
+      ],
+      { returnFocus: undefined }
+    );
     expect(imageActionMocks.setItemsStarred).toHaveBeenCalledWith(
       [
         { kind: 'image', name: 'shared' },
