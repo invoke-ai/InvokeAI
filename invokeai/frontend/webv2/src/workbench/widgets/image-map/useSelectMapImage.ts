@@ -3,13 +3,12 @@ import type { GalleryItemKey, GalleryItemRef } from '@features/gallery/contracts
 import { galleryItems, toGalleryItemKey } from '@features/gallery';
 import {
   claimGalleryNavigationSequence,
-  abortGalleryLocatorRequests,
-  createGalleryLocatorRequest,
   isGalleryNavigationCurrent,
   parseGallerySemanticReference,
   registerImageCluster,
   requestGalleryItemReveal,
 } from '@features/gallery/contracts';
+import { abortGalleryLocatorRequests, createGalleryLocatorRequest } from '@features/gallery/utility';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { revealGalleryItem } from '@workbench/image-actions/revealGalleryItem';
@@ -90,7 +89,7 @@ export const useMapSelection = (): MapSelectionActions => {
           // Select and reveal the proximity list's first item even if already selected, restoring scroll after a
           // repeated click.
           commands.gallery.selectItem(image);
-          requestGalleryItemReveal(toGalleryItemKey(primaryItem));
+          requestGalleryItemReveal(toGalleryItemKey(primaryItem), accountScope.signal);
         })
         .catch(() => {
           // Selection is simply left unchanged on hydrate failure.

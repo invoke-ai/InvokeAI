@@ -1,6 +1,6 @@
 import type { GalleryItem, GalleryItemsPage } from '@features/gallery/core/items';
 
-import { abortGalleryLocatorRequests, createGalleryLocatorRequest } from '@features/gallery/core/locatorCancellation';
+import { abortGalleryLocatorRequests, createGalleryLocatorRequest } from '@features/gallery/core/selection';
 import { AccountScopeExpiredError, accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';

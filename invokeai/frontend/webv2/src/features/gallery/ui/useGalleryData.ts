@@ -13,6 +13,7 @@ import {
   galleryBoardsOptions,
   galleryItemsInfiniteOptions,
   galleryItemsPageOptions,
+  galleryItemsTotalOptions,
   getGalleryListingBoardsQuery,
   type GalleryItemsFilter,
 } from '@features/gallery/data/queries';
@@ -129,15 +130,17 @@ const isRecentItemVisible = (item: GalleryItem, filter: GalleryItemsFilter): boo
 export const mergeGalleryItemWindow = ({
   backendItems,
   filter,
+  knownBackendItemKeys,
   maxRows,
   recentImages,
 }: {
   backendItems: readonly GalleryItem[];
   filter: GalleryItemsFilter;
+  knownBackendItemKeys?: ReadonlySet<ReturnType<typeof toGalleryItemKey>>;
   maxRows: number;
   recentImages: readonly GeneratedImageContract[];
 }): GalleryItem[] => {
-  const missingRecentItems = getGalleryRecentItems({ backendItems, filter, recentImages });
+  const missingRecentItems = getGalleryRecentItems({ backendItems, filter, knownBackendItemKeys, recentImages });
   const seenItemKeys = new Set<string>();
 
   const mergedItems = [...missingRecentItems, ...backendItems].filter((item) => {
@@ -164,10 +167,12 @@ export const mergeGalleryItemWindow = ({
 /** Returns the bounded local recent overlay without assigning it a backend position. */
 export const getGalleryRecentItems = ({
   backendItems,
+  knownBackendItemKeys,
   filter,
   recentImages,
 }: {
   backendItems: readonly GalleryItem[];
+  knownBackendItemKeys?: ReadonlySet<ReturnType<typeof toGalleryItemKey>>;
   filter: GalleryItemsFilter;
   recentImages: readonly GeneratedImageContract[];
 }): GalleryItem[] => {
@@ -175,7 +180,12 @@ export const getGalleryRecentItems = ({
   const recentItems = recentImages
     .slice(0, GALLERY_RECENT_IMAGE_LIMIT)
     .map(legacyGeneratedImageToGalleryItem)
-    .filter((item) => !backendItemKeys.has(toGalleryItemKey(item)) && isRecentItemVisible(item, filter));
+    .filter(
+      (item) =>
+        !backendItemKeys.has(toGalleryItemKey(item)) &&
+        !knownBackendItemKeys?.has(toGalleryItemKey(item)) &&
+        isRecentItemVisible(item, filter)
+    );
 
   if (!filter.semanticQuery) {
     recentItems.sort((a, b) => compareGalleryItems(a, b, { orderDir: filter.orderDir }));
@@ -258,6 +268,7 @@ export const useGalleryData = ({
   );
   // Query keys include the captured account epoch, so range and total state cannot survive an account switch.
   const firstPageOptions = galleryItemsPageOptions(filter, 0);
+  const totalOptions = galleryItemsTotalOptions(filter);
   const { accountId, epoch } = firstPageOptions.queryKey[3];
   const filterIdentity = JSON.stringify([accountId, epoch, filter]);
   const filterIdentityRef = useRef(filterIdentity);
@@ -291,7 +302,17 @@ export const useGalleryData = ({
   const [knownTotalSnapshot, setKnownTotalSnapshot] = useState<{ filterIdentity: string; total: number } | null>(null);
   const retainedTotal = knownTotalSnapshot?.filterIdentity === filterIdentity ? knownTotalSnapshot.total : null;
   const cachedFirstPage = queryClient.getQueryData<{ items: GalleryItem[]; total: number }>(firstPageOptions.queryKey);
-  const stableTotal = retainedTotal ?? cachedFirstPage?.total ?? null;
+  const {
+    data: queriedTotal,
+    error: totalError,
+    isFetching: isFetchingTotal,
+    refetch: refetchTotal,
+  } = useQuery({
+    ...totalOptions,
+    enabled: sparseViewport && isPaginated && page > 0 && retainedTotal === null && cachedFirstPage === undefined,
+  });
+  const hasUnresolvedTotalError = totalError !== null && retainedTotal === null && cachedFirstPage === undefined;
+  const stableTotal = retainedTotal ?? cachedFirstPage?.total ?? queriedTotal ?? null;
   const knownTotal = stableTotal;
   const maxPaginatedPage =
     knownTotal === null || !Number.isFinite(knownTotal)
@@ -305,11 +326,19 @@ export const useGalleryData = ({
     }
 
     if (isPaginated) {
+      if (knownTotal === 0) {
+        return [];
+      }
+
+      if (knownTotal === null || isFetchingTotal || hasUnresolvedTotalError) {
+        return page === 0 ? [0] : [];
+      }
+
       return [selectedPageOffset];
     }
 
-    // Page zero is the count-discovery request. Once its count is cached, subscriptions follow only the virtual
-    // range and its virtualizer overscan, even when it is far from the start of the listing.
+    // Infinite listings learn their total from page zero. Once known, subscriptions follow only the virtual range
+    // and its virtualizer overscan, even when it is far from the start of the listing.
     if (knownTotal === null && !hasRequestedRange) {
       return [0];
     }
@@ -323,6 +352,9 @@ export const useGalleryData = ({
     hasRequestedRange,
     isPaginated,
     knownTotal,
+    isFetchingTotal,
+    hasUnresolvedTotalError,
+    page,
     selectedPageOffset,
     sparseViewport,
     visibleEndIndexExclusive,
@@ -381,14 +413,15 @@ export const useGalleryData = ({
     staleTime: Infinity,
   });
 
-  // Keep the backend count for this filter lifetime after page zero leaves the active virtual range and its Query
-  // cache entry is eventually collected. Adopt a total only after active pages settle and agree.
+  // Keep this listing's total for the hook lifetime after its count/page Query data leaves cache. Active page totals
+  // replace it only after loaded pages settle and agree.
+  const currentTotal = observedTotal ?? (isPaginated && !isFetchingTotal ? queriedTotal : undefined);
   if (
     sparseViewport &&
-    observedTotal !== undefined &&
-    (knownTotalSnapshot?.filterIdentity !== filterIdentity || knownTotalSnapshot.total !== observedTotal)
+    currentTotal !== undefined &&
+    (knownTotalSnapshot?.filterIdentity !== filterIdentity || knownTotalSnapshot.total !== currentTotal)
   ) {
-    setKnownTotalSnapshot({ filterIdentity, total: observedTotal });
+    setKnownTotalSnapshot({ filterIdentity, total: currentTotal });
   }
   const {
     data: queryData,
@@ -422,6 +455,44 @@ export const useGalleryData = ({
 
     return [...pageItemsByOffset.entries()].sort(([left], [right]) => left - right).flatMap(([, items]) => items);
   }, [isPaginated, pageItemsByOffset, queryData, selectedPageOffset, sparseViewport]);
+  const backendItemKeys = useMemo(() => new Set(backendItems.map(toGalleryItemKey)), [backendItems]);
+  const eligibleRecentKeys = useMemo(
+    () =>
+      new Set<ReturnType<typeof toGalleryItemKey>>(
+        recentImages
+          .slice(0, GALLERY_RECENT_IMAGE_LIMIT)
+          .map(legacyGeneratedImageToGalleryItem)
+          .filter((item) => isRecentItemVisible(item, filter))
+          .map(toGalleryItemKey)
+      ),
+    [filter, recentImages]
+  );
+  const [authoritativeRecentSnapshot, setAuthoritativeRecentSnapshot] = useState<{
+    filterIdentity: string;
+    keys: Set<ReturnType<typeof toGalleryItemKey>>;
+  }>({ filterIdentity, keys: new Set() });
+  const reconciledBackendRecentKeys = useMemo(() => {
+    const knownKeys =
+      authoritativeRecentSnapshot.filterIdentity === filterIdentity
+        ? authoritativeRecentSnapshot.keys
+        : new Set<ReturnType<typeof toGalleryItemKey>>();
+    const keys = new Set([...knownKeys].filter((key) => eligibleRecentKeys.has(key)));
+
+    for (const key of eligibleRecentKeys) {
+      if (backendItemKeys.has(key)) {
+        keys.add(key);
+      }
+    }
+
+    return keys;
+  }, [authoritativeRecentSnapshot, backendItemKeys, eligibleRecentKeys, filterIdentity]);
+  if (
+    authoritativeRecentSnapshot.filterIdentity !== filterIdentity ||
+    reconciledBackendRecentKeys.size !== authoritativeRecentSnapshot.keys.size ||
+    [...reconciledBackendRecentKeys].some((key) => !authoritativeRecentSnapshot.keys.has(key))
+  ) {
+    setAuthoritativeRecentSnapshot({ filterIdentity, keys: reconciledBackendRecentKeys });
+  }
   const itemSlots = useMemo(
     () =>
       sparseViewport
@@ -440,16 +511,24 @@ export const useGalleryData = ({
   const maxRows = isPaginated ? GALLERY_PAGE_SIZE : GALLERY_MAX_ROWS;
   const recentItems = useMemo(
     () =>
-      sparseViewport && shouldOverlayRecentItems ? getGalleryRecentItems({ backendItems, filter, recentImages }) : [],
-    [backendItems, filter, recentImages, shouldOverlayRecentItems, sparseViewport]
+      sparseViewport && shouldOverlayRecentItems
+        ? getGalleryRecentItems({
+            backendItems,
+            filter,
+            knownBackendItemKeys: reconciledBackendRecentKeys,
+            recentImages,
+          })
+        : [],
+    [backendItems, filter, recentImages, reconciledBackendRecentKeys, shouldOverlayRecentItems, sparseViewport]
   );
   const items = useMemo(
     () =>
       sparseViewport
-        ? pageResults.some((result) => result.data) || recentItems.length > 0
+        ? pageResults.some((result) => result.data) || recentItems.length > 0 || knownTotal === 0
           ? mergeGalleryItemWindow({
               backendItems,
               filter,
+              knownBackendItemKeys: reconciledBackendRecentKeys,
               maxRows: Math.max(GALLERY_MAX_ROWS, backendItems.length + GALLERY_RECENT_IMAGE_LIMIT),
               recentImages: shouldOverlayRecentItems ? recentImages : [],
             })
@@ -465,11 +544,13 @@ export const useGalleryData = ({
     [
       backendItems,
       filter,
+      knownTotal,
       maxRows,
       pageResults,
       queryData,
       recentItems.length,
       recentImages,
+      reconciledBackendRecentKeys,
       shouldOverlayRecentItems,
       sparseViewport,
     ]
@@ -511,11 +592,30 @@ export const useGalleryData = ({
       }
     });
 
+    if (hasUnresolvedTotalError) {
+      pageStates.set(0, {
+        error: totalError,
+        isLoading: isFetchingTotal,
+        retry: () => refetchTotal(),
+      });
+    }
+
     return { itemSlots, pageStates, recentItems, total };
-  }, [itemSlots, pageOffsets, pageResults, recentItems, sparseViewport, total]);
+  }, [
+    itemSlots,
+    hasUnresolvedTotalError,
+    pageOffsets,
+    pageResults,
+    recentItems,
+    sparseViewport,
+    total,
+    totalError,
+    isFetchingTotal,
+    refetchTotal,
+  ]);
   const firstPageError = sparseListing?.pageStates.get(0)?.error ?? null;
   const pageError = pageResults.find((result) => result.error)?.error ?? null;
-  const activePageLoading = pageResults.some((result) => result.isFetching);
+  const activePageLoading = pageResults.some((result) => result.isFetching) || isFetchingTotal;
 
   return {
     boards,
@@ -525,7 +625,9 @@ export const useGalleryData = ({
     isWindowTruncated,
     items,
     loadMore,
-    queryError: sparseViewport ? (pageError ?? firstPageError) : queryError,
+    queryError: sparseViewport
+      ? (pageError ?? firstPageError ?? (hasUnresolvedTotalError ? totalError : null))
+      : queryError,
     selectedBoardId: boardId,
     setVisibleRange: sparseViewport ? setVisibleRange : undefined,
     sparseListing,

@@ -4,7 +4,6 @@ vi.mock('@features/gallery/queries', () => {
   throw new Error('The Gallery data module must stay behind the reveal dynamic import.');
 });
 
-vi.mock('@platform/state/accountLifecycle', () => ({ captureAccountScope: vi.fn() }));
 vi.mock('@tanstack/react-query', () => ({ useQueryClient: vi.fn() }));
 vi.mock('@workbench/useOpenWorkbenchWidget', () => ({ useOpenWorkbenchWidget: vi.fn() }));
 vi.mock('@workbench/WorkbenchContext', () => ({

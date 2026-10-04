@@ -194,7 +194,8 @@ const patchItemsCacheData = (
 
   // New items are left to the trailing refetch so their server ordering is preserved.
   if (isGallerySinglePageQueryKey(query.queryKey) && isGalleryItemsPage(before)) {
-    return { after: patchItemPage(before, filter, patch, itemKeys, countRemovedItems(before, itemKeys)), before };
+    const removedCount = patchRemovesItems(filter, patch) ? countRemovedItems(before, itemKeys) : 0;
+    return { after: patchItemPage(before, filter, patch, itemKeys, removedCount), before };
   }
 
   return null;

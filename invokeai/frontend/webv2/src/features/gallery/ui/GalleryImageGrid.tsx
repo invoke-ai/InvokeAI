@@ -10,7 +10,6 @@ import {
 } from '@features/gallery/core/selection';
 import { isDateBoardId } from '@features/gallery/data/backend';
 import { GALLERY_PAGE_SIZE, imageIndexAvailabilityOptions } from '@features/gallery/data/queries';
-import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { Button, DropZone } from '@platform/ui';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronRightIcon, StarIcon, UploadIcon } from 'lucide-react';
@@ -78,10 +77,10 @@ const GalleryPageError = ({ pageState }: { pageState: GallerySparsePageState }) 
 
   return (
     <Stack align="center" gap="1" maxW="full" px="1">
-      <Text color="fg.muted" fontSize="2xs" lineClamp={2} textAlign="center">
+      <Text color="fg.muted" fontSize="xs" lineClamp={2} textAlign="center">
         {pageState.error?.message}
       </Text>
-      <Button color="fg" size="2xs" variant="ghost" onClick={handleRetry}>
+      <Button color="fg" size="sm" variant="ghost" onClick={handleRetry}>
         {t('common.retry')}
       </Button>
     </Stack>
@@ -91,12 +90,16 @@ const GalleryPageError = ({ pageState }: { pageState: GallerySparsePageState }) 
 const GallerySparseSlot = ({
   cellSizePx,
   pageState,
+  showPageStatus,
 }: {
   cellSizePx: number;
   pageState: GallerySparsePageState | undefined;
+  showPageStatus: boolean;
 }) => {
+  const { t } = useTranslation();
   const error = pageState?.error;
-  const state = error ? 'error' : pageState?.isLoading ? 'loading' : 'empty';
+  const state = error && showPageStatus ? 'error' : pageState?.isLoading && showPageStatus ? 'loading' : 'empty';
+  const retry = useCallback(() => void pageState?.retry(), [pageState]);
 
   return (
     <Box
@@ -112,7 +115,25 @@ const GallerySparseSlot = ({
       overflow="hidden"
       role="listitem"
       rounded="sm"
-    />
+    >
+      {state === 'loading' ? (
+        <Stack align="center" aria-label={t('widgets.gallery.loadingBackendGallery')} gap="1" role="status">
+          <Spinner aria-hidden="true" size="md" />
+          <Text color="fg.muted" fontSize="xs" lineClamp={1}>
+            {t('widgets.gallery.loadingBackendGallery')}
+          </Text>
+        </Stack>
+      ) : state === 'error' && pageState ? (
+        <Stack align="center" gap="0" maxW="full" px="1" role="group">
+          <Text aria-live="polite" color="fg.muted" fontSize="xs" lineClamp={1} textAlign="center">
+            {error?.message}
+          </Text>
+          <Button color="fg" size="sm" variant="ghost" onClick={retry}>
+            {t('common.retry')}
+          </Button>
+        </Stack>
+      ) : null}
+    </Box>
   );
 };
 
@@ -311,12 +332,34 @@ export const GalleryImageGrid = () => {
       ? Math.min(GALLERY_PAGE_SIZE, Math.max(0, (sparseListing.total ?? 0) - sparsePageOffset))
       : (sparseListing.total ?? 0)
     : 0;
+  const sparsePageStatusOffsets = useMemo(() => {
+    if (!sparseListing) {
+      return new Map<number, number>();
+    }
+
+    const offsets = new Map<number, number>();
+    for (const [pageOffset, pageState] of sparseListing.pageStates) {
+      if (!pageState.error && !pageState.isLoading) {
+        continue;
+      }
+
+      const pageEnd = Math.min(pageOffset + GALLERY_PAGE_SIZE, sparsePageOffset + sparseBackendItemCount);
+      for (let itemIndex = pageOffset; itemIndex < pageEnd; itemIndex += 1) {
+        const listingIndex = isSparsePaginated ? itemIndex - sparsePageOffset : itemIndex;
+        if (!sparseListing.itemSlots.has(listingIndex)) {
+          offsets.set(pageOffset, itemIndex);
+          break;
+        }
+      }
+    }
+    return offsets;
+  }, [isSparsePaginated, sparseBackendItemCount, sparseListing, sparsePageOffset]);
   const sparsePageErrors = useMemo(
     () =>
       [...(sparseListing?.pageStates ?? [])].flatMap(([pageOffset, pageState]) =>
-        pageState.error ? [{ pageOffset, pageState }] : []
+        pageState.error && !sparsePageStatusOffsets.has(pageOffset) ? [{ pageOffset, pageState }] : []
       ),
-    [sparseListing?.pageStates]
+    [sparseListing?.pageStates, sparsePageStatusOffsets]
   );
   const isFollowingLive = followedProgressSessionId !== null;
   const isComparisonActive = gallery.isComparisonActive && !isFollowingLive;
@@ -734,7 +777,7 @@ export const GalleryImageGrid = () => {
       return;
     }
 
-    if (pending.accountEpoch !== captureAccountScope().epoch) {
+    if (pending.accountSignal.aborted) {
       pendingRevealRef.current = null;
 
       return;
@@ -774,7 +817,7 @@ export const GalleryImageGrid = () => {
   });
 
   useEffect(() => {
-    if (revealRequest && revealRequest.accountEpoch !== captureAccountScope().epoch) {
+    if (revealRequest?.accountSignal.aborted) {
       if (pendingRevealRef.current?.token === revealRequest.token) {
         pendingRevealRef.current = null;
       }
@@ -1247,6 +1290,7 @@ export const GalleryImageGrid = () => {
                                 key={getGallerySparseSlotKey(absoluteItemIndex)}
                                 cellSizePx={cellSizePx}
                                 pageState={sparseListing.pageStates.get(pageOffset)}
+                                showPageStatus={sparsePageStatusOffsets.get(pageOffset) === absoluteItemIndex}
                               />
                             );
                           });

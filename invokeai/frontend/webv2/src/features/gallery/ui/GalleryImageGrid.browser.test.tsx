@@ -71,9 +71,12 @@ const mocks = vi.hoisted(() => ({
     onChange?: (instance: { getVirtualItems: () => readonly { index: number }[] }) => void;
     overscan: number;
   }>,
+  useRealGridVirtualizer: false,
 }));
 
 const getNamesKey = (filter: unknown) => ['test-gallery-item-names', JSON.stringify(filter)] as const;
+const requestReveal = (itemKey: Parameters<typeof requestGalleryItemReveal>[0], absoluteIndex?: number) =>
+  requestGalleryItemReveal(itemKey, accountLifecycle.capture().signal, absoluteIndex);
 
 vi.mock('@features/gallery/data/queries', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -112,7 +115,7 @@ vi.mock('react-hook-tanstack-virtual', async (importOriginal) => {
       onChange?: (instance: { getVirtualItems: () => readonly { index: number }[] }) => void;
       overscan: number;
     }) => {
-      if (options.overscan === 2) {
+      if (options.overscan === 2 || mocks.useRealGridVirtualizer) {
         return actual.useVirtualizer(options);
       }
       mocks.virtualizerOptions.push(options);
@@ -324,7 +327,17 @@ const runtime = {
       return () => registeredCommands.delete(id);
     },
   },
-  hotkeys: { register: () => () => undefined },
+  hotkeys: {
+    register: ({ commandId, defaultKeys }: { commandId: string; defaultKeys: string[] }) => {
+      const handler = (event: KeyboardEvent) => {
+        if (defaultKeys.includes(event.key.toLowerCase())) {
+          registeredCommands.get(commandId)?.();
+        }
+      };
+      window.addEventListener('keydown', handler);
+      return () => window.removeEventListener('keydown', handler);
+    },
+  },
 };
 
 const createActions = (): GalleryActions =>
@@ -639,7 +652,7 @@ const pointer = (type: string, target: EventTarget, clientX: number, clientY: nu
 
 beforeEach(() => {
   // Drain singleton reveal intent with an unmatchable request so later tests cannot adopt it.
-  requestGalleryItemReveal('image:__drained__');
+  requestReveal('image:__drained__');
   accountLifecycle.activate('grid-user');
   vi.clearAllMocks();
   mocks.fetchSparsePage.mockReset();
@@ -654,6 +667,7 @@ beforeEach(() => {
   mocks.progressFrame = null;
   currentStrip = EMPTY_GALLERY_STARRED_STRIP;
   currentSparseListing = undefined;
+  mocks.useRealGridVirtualizer = false;
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   host = document.createElement('div');
   host.style.cssText = 'height:480px;left:20px;position:fixed;top:20px;width:600px;';
@@ -933,6 +947,24 @@ describe('GalleryImageGrid mixed item cells', () => {
 
     registeredCommands.get('gallery.toggleStarredOnly')?.();
     expect(actionMocks.setStarredOnly).toHaveBeenCalledExactlyOnceWith(true);
+  });
+
+  it('retains the selected star state for the star hotkey after sparse page eviction', async () => {
+    const starredItem = createItem('image', 'retained-starred.png', { starred: true });
+    const gallery = createGallery({
+      items: [starredItem],
+      selectedItemKey: 'image:retained-starred.png',
+      selectedItemKeys: ['image:retained-starred.png'],
+    });
+    await renderGallery(gallery);
+    await renderGallery({ ...gallery, items: [] });
+
+    registeredCommands.get('gallery.starImage')?.();
+
+    expect(imageActionMocks.setItemsStarred).toHaveBeenCalledExactlyOnceWith(
+      [{ kind: 'image', name: 'retained-starred.png' }],
+      false
+    );
   });
 
   it('renders same-name media independently and gives a video a static accessible poster', async () => {
@@ -1469,12 +1501,12 @@ describe('GalleryImageGrid reveal requests', () => {
     const gallery = createGallery();
 
     await renderGallery(gallery);
-    await interact(() => requestGalleryItemReveal('image:first.png'));
+    await interact(() => requestReveal('image:first.png'));
     expect(mocks.scrollToIndex).toHaveBeenCalledTimes(1);
 
     // Re-clicking the same map point after scrolling away must reveal again
     // even though the selection is unchanged.
-    await interact(() => requestGalleryItemReveal('image:first.png'));
+    await interact(() => requestReveal('image:first.png'));
     expect(mocks.scrollToIndex).toHaveBeenCalledTimes(2);
   });
 
@@ -1483,7 +1515,7 @@ describe('GalleryImageGrid reveal requests', () => {
     const gallery = createGallery({ items, selectedItemKey: null, selectedItemKeys: [] });
 
     await renderGallery(gallery);
-    await interact(() => requestGalleryItemReveal('image:deep.png'));
+    await interact(() => requestReveal('image:deep.png'));
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
 
     // The page lands and the revealed item appears: scroll exactly then.
@@ -1498,7 +1530,7 @@ describe('GalleryImageGrid reveal requests', () => {
 
   it('honors a reveal requested before this grid mounted, while its item is still selected', async () => {
     // A grid mounted by a reveal must honor the request that preceded its mount.
-    await interact(() => requestGalleryItemReveal('image:last.png'));
+    await interact(() => requestReveal('image:last.png'));
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
 
     await renderGallery(createGallery({ selectedItemKey: 'image:last.png', selectedItemKeys: ['image:last.png'] }));
@@ -1508,7 +1540,7 @@ describe('GalleryImageGrid reveal requests', () => {
 
   it('ignores a reveal requested before mount once the selection has moved on', async () => {
     // Age is not what makes a request stale — a superseding selection is.
-    await interact(() => requestGalleryItemReveal('image:last.png'));
+    await interact(() => requestReveal('image:last.png'));
     await renderGallery(createGallery({ selectedItemKey: 'image:first.png', selectedItemKeys: ['image:first.png'] }));
 
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
@@ -1516,7 +1548,7 @@ describe('GalleryImageGrid reveal requests', () => {
 
   it('ignores an absolute-index reveal from the previous account before this grid mounts', async () => {
     accountLifecycle.activate('grid-user-a');
-    await interact(() => requestGalleryItemReveal('image:account-a-deep.png', 70));
+    await interact(() => requestReveal('image:account-a-deep.png', 70));
     accountLifecycle.activate('grid-user-b');
 
     await renderGallery(
@@ -1547,7 +1579,7 @@ describe('GalleryImageGrid reveal requests', () => {
       settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' },
     });
     await renderGallery(gallery);
-    await interact(() => requestGalleryItemReveal('image:account-a-deep.png', 70));
+    await interact(() => requestReveal('image:account-a-deep.png', 70));
     expect(setVisibleRange).toHaveBeenCalled();
     expect(mocks.scrollToIndex).toHaveBeenCalled();
 
@@ -1579,7 +1611,7 @@ describe('GalleryImageGrid reveal requests', () => {
     });
 
     await renderGallery(gallery);
-    await interact(() => requestGalleryItemReveal('image:starred.png'));
+    await interact(() => requestReveal('image:starred.png'));
     // Loaded but row-less under the collapsed disclosure: consuming the
     // reveal here would silently drop it.
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
@@ -1607,7 +1639,7 @@ describe('GalleryImageGrid reveal requests', () => {
     const gallery = createOffPageGallery(2);
 
     await renderGallery(gallery);
-    await interact(() => requestGalleryItemReveal('image:deep.png'));
+    await interact(() => requestReveal('image:deep.png'));
 
     expect(mocks.setPage).toHaveBeenCalledWith(2);
     expect(mocks.scrollToIndex).not.toHaveBeenCalled();
@@ -1627,7 +1659,7 @@ describe('GalleryImageGrid reveal requests', () => {
     const gallery = createOffPageGallery(2);
 
     await renderGallery(gallery);
-    await interact(() => requestGalleryItemReveal('image:deep.png'));
+    await interact(() => requestReveal('image:deep.png'));
     expect(mocks.setPage).toHaveBeenCalledTimes(1);
 
     // The stamped page arrives without the item, then the user pages away.
@@ -1641,7 +1673,7 @@ describe('GalleryImageGrid reveal requests', () => {
     const gallery = createOffPageGallery(null);
 
     await renderGallery(gallery);
-    await interact(() => requestGalleryItemReveal('image:deep.png'));
+    await interact(() => requestReveal('image:deep.png'));
 
     expect(mocks.setPage).not.toHaveBeenCalled();
   });
@@ -1650,7 +1682,7 @@ describe('GalleryImageGrid reveal requests', () => {
     const gallery = createOffPageGallery(null);
 
     await renderGallery(gallery);
-    await interact(() => requestGalleryItemReveal('image:deep.png'));
+    await interact(() => requestReveal('image:deep.png'));
 
     // An off-page auto-select replaces the persisted selection.
     await renderGallery({
@@ -1674,7 +1706,7 @@ describe('GalleryImageGrid reveal requests', () => {
     const gallery = createGallery({ items, selectedItemKey: null, selectedItemKeys: [] });
 
     await renderGallery(gallery);
-    await interact(() => requestGalleryItemReveal('image:deep.png'));
+    await interact(() => requestReveal('image:deep.png'));
 
     // The user picks something else before the reveal's page arrives.
     await renderGallery({ ...gallery, selectedItemKey: 'image:first.png', selectedItemKeys: ['image:first.png'] });
@@ -1744,6 +1776,23 @@ describe('GalleryImageGrid virtualization', () => {
     expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 60, startIndex: 0 });
   });
 
+  it('shows an accessible loading status inside a sparse slot', async () => {
+    currentSparseListing = {
+      itemSlots: new Map(),
+      pageStates: new Map([[0, { error: null, isLoading: true, retry: vi.fn(() => Promise.resolve()) }]]),
+      recentItems: [],
+      total: 12,
+    };
+
+    await renderGallery(createGallery({ settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' } }));
+
+    const status = host?.querySelector('[data-gallery-slot-state="loading"] [role="status"]');
+    expect(status).not.toBeNull();
+    expect(status?.getAttribute('aria-label')).toBe('Loading gallery');
+    expect(status?.textContent).toContain('Loading gallery');
+    expect(status?.getBoundingClientRect().width).toBeGreaterThan(0);
+  });
+
   it('renders absolute sparse slots, page-local retry, and recent overlays at the sort edge', async () => {
     const first = createItem('image', 'sparse-120.png');
     const third = createItem('image', 'sparse-122.png');
@@ -1772,10 +1821,13 @@ describe('GalleryImageGrid virtualization', () => {
     expect(descendingSections.at(-1)?.dataset.gallerySection).toBe('regular');
     expect(host?.querySelector('img[alt="sparse-120.png"]')).not.toBeNull();
     expect(host?.querySelector('img[alt="sparse-122.png"]')).not.toBeNull();
-    expect(host?.querySelectorAll('[data-gallery-slot-state="error"]')).toHaveLength(8);
-    expect(host?.querySelectorAll('[data-gallery-page-error] button')).toHaveLength(1);
+    expect(host?.querySelectorAll('[data-gallery-slot-state="error"]')).toHaveLength(1);
+    expect(host?.querySelectorAll('[data-gallery-slot-state="error"] button')).toHaveLength(1);
+    expect(host?.querySelectorAll('[data-gallery-page-error] button')).toHaveLength(0);
 
-    await click(host!.querySelector<HTMLButtonElement>('[data-gallery-page-error="120"] button')!);
+    const localRetry = host!.querySelector<HTMLButtonElement>('[data-gallery-slot-state="error"] button')!;
+    expect(localRetry.closest('[role="listitem"]')?.textContent).toContain('Page unavailable');
+    await click(localRetry);
     expect(retry).toHaveBeenCalledTimes(1);
 
     await renderGallery(
@@ -1839,9 +1891,12 @@ describe('GalleryImageGrid virtualization', () => {
       })
     );
 
-    registeredCommands.get('gallery.galleryNavRight')?.();
+    const lastTile = getButton('Select page-0-last.png for preview');
+    await interact(() => lastTile.focus());
+    await act(() => userEvent.keyboard('{ArrowRight}'));
     expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 60 });
     expect(mocks.scrollToIndex).toHaveBeenCalled();
+    expect(document.activeElement).toBe(lastTile);
 
     currentSparseListing = {
       itemSlots: new Map([
@@ -1857,6 +1912,7 @@ describe('GalleryImageGrid virtualization', () => {
     };
     await renderGallery({ ...currentGallery, items: [lastInPage, firstNextPage] });
     expect(actionMocks.selectItem).toHaveBeenLastCalledWith(firstNextPage);
+    expect(document.activeElement).toBe(lastTile);
 
     registeredCommands.get('gallery.selectAllOnPage')?.();
     expect(actionMocks.selectItemRange).toHaveBeenLastCalledWith(
@@ -1883,10 +1939,148 @@ describe('GalleryImageGrid virtualization', () => {
       })
     );
 
-    await interact(() => requestGalleryItemReveal('image:deep.png', 70));
+    await interact(() => requestReveal('image:deep.png', 70));
 
     expect(setVisibleRange).toHaveBeenLastCalledWith({ endIndexExclusive: 120, startIndex: 60 });
     expect(mocks.scrollToIndex).toHaveBeenCalled();
+  });
+
+  it('bounds mounted media and keeps sparse row identity through page load, eviction, and refetch', async () => {
+    mocks.useRealGridVirtualizer = true;
+    const items = Array.from({ length: 120 }, (_, index) => createItem('image', `lifecycle-${index}.png`));
+    const pageStates = new Map([
+      [0, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+      [60, { error: null, isLoading: false, retry: vi.fn(() => Promise.resolve()) }],
+    ]);
+    const loadedSlots = new Map(items.map((item, index) => [index, item]));
+    currentSparseListing = { itemSlots: loadedSlots, pageStates, recentItems: [], total: items.length };
+
+    await renderGallery(createGallery({ items: [], settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' } }));
+
+    const viewport = host!.querySelector<HTMLElement>('[data-part="viewport"]')!;
+    const gridRows = host!.querySelectorAll('[data-gallery-section="regular"]');
+    expect(gridRows.length).toBeGreaterThan(0);
+    expect(gridRows.length).toBeLessThan(Math.ceil(items.length / 2));
+    expect(host!.querySelectorAll('img').length).toBeLessThan(items.length);
+
+    const target = [...host!.querySelectorAll<HTMLButtonElement>('button[aria-label^="Select lifecycle-"]')].find(
+      (button) => {
+        const rect = button.getBoundingClientRect();
+        const viewportRect = viewport.getBoundingClientRect();
+        return rect.top >= viewportRect.top && rect.bottom <= viewportRect.bottom;
+      }
+    );
+    expect(target).toBeDefined();
+    const targetRow = target!.closest<HTMLElement>('[data-gallery-section="regular"]')!;
+    const targetName = target!.querySelector('img')?.getAttribute('alt');
+
+    currentSparseListing = { itemSlots: new Map(), pageStates, recentItems: [], total: items.length };
+    await renderGallery({ ...currentGallery });
+
+    expect(targetRow.isConnected).toBe(true);
+    expect(host?.querySelectorAll('[data-gallery-slot-state="empty"]').length).toBeGreaterThan(0);
+    expect(host?.querySelectorAll('img')).toHaveLength(0);
+
+    currentSparseListing = { itemSlots: loadedSlots, pageStates, recentItems: [], total: items.length };
+    await renderGallery({ ...currentGallery });
+
+    expect(targetRow.isConnected).toBe(true);
+    expect(targetRow.querySelector(`img[alt="${targetName}"]`)).not.toBeNull();
+
+    const getAnchor = () =>
+      host!.querySelector<HTMLImageElement>(`img[alt="${targetName}"]`)!.closest<HTMLButtonElement>('button')!;
+    const anchorOffset = () => getAnchor().getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    const columns = () =>
+      getComputedStyle(getAnchor().closest<HTMLElement>('[data-gallery-section="regular"]')!)
+        .gridTemplateColumns.trim()
+        .split(/\s+/).length;
+    const initialOffset = anchorOffset();
+    const initialColumns = columns();
+
+    host!.style.width = '900px';
+    await vi.waitFor(() => expect(columns()).toBeGreaterThan(initialColumns));
+    expect(anchorOffset()).toBeCloseTo(initialOffset, 0);
+
+    const resizedOffset = anchorOffset();
+    const resizedColumns = columns();
+    await renderGallery({
+      ...currentGallery,
+      settings: { ...currentGallery.settings, imageDensityPercent: 75 },
+    });
+    await vi.waitFor(() => expect(columns()).not.toBe(resizedColumns));
+    expect(anchorOffset()).toBeCloseTo(resizedOffset, 0);
+
+    const densityOffset = anchorOffset();
+    host!.style.zoom = '1.2';
+    await new Promise<void>((resolve) => {
+      requestAnimationFrame(() => requestAnimationFrame(() => resolve()));
+    });
+    expect(getAnchor().isConnected).toBe(true);
+    expect(anchorOffset()).toBeCloseTo(densityOffset, 0);
+  });
+
+  it('preserves the physical viewport anchor while active sparse pages reconcile conflicting totals', async () => {
+    mocks.useRealGridVirtualizer = true;
+    host!.style.cssText = 'height:600px;left:20px;position:fixed;top:20px;width:1200px;';
+    const firstPage = Array.from({ length: 60 }, (_, index) => createItem('image', `conflict-${index}.png`));
+    const gallery = createGallery({ items: firstPage, settings: { ...DENSE_SETTINGS, paginationMode: 'infinite' } });
+    const filter = createFilter(gallery);
+    const firstPageOptions = galleryItemsPageOptions(filter, 0);
+    const laterPageOptions = galleryItemsPageOptions(filter, 60);
+    const boardOptions = galleryBoardsOptions(getGalleryListingBoardsQuery(gallery.settings));
+    queryClient!.setQueryData(boardOptions.queryKey, [board]);
+    queryClient!.setQueryData<GalleryItemsPage>(firstPageOptions.queryKey, {
+      items: firstPage,
+      offset: 0,
+      total: 180,
+    });
+
+    const pageCalls = new Map<number, number>();
+    mocks.fetchSparsePage.mockImplementation((_filter, offset) => {
+      const count = (pageCalls.get(offset) ?? 0) + 1;
+      pageCalls.set(offset, count);
+      const total = offset === 60 && count === 1 ? 180 : 181;
+
+      return Promise.resolve({
+        items: Array.from({ length: 60 }, (_, index) => createItem('image', `conflict-${offset + index}.png`)),
+        offset,
+        total,
+      });
+    });
+
+    await renderQueryBackedGallery(gallery);
+    const viewport = host!.querySelector<HTMLElement>('[data-part="viewport"]')!;
+    const firstRow = host!.querySelector<HTMLElement>('[data-gallery-section="regular"]')!;
+    const firstRowHeight = firstRow.getBoundingClientRect().height + 4;
+    const initialColumns = getComputedStyle(firstRow).gridTemplateColumns.trim().split(/\s+/).length;
+    expect(initialColumns).toBeGreaterThan(2);
+
+    await interact(() => {
+      viewport.scrollTop = 8 * firstRowHeight;
+      viewport.dispatchEvent(new Event('scroll'));
+    });
+    await vi.waitFor(() => {
+      expect(mocks.fetchSparsePage.mock.calls.map(([, offset]) => offset)).toContain(60);
+      expect(host?.querySelector('img[alt="conflict-54.png"]')).not.toBeNull();
+      expect(host?.querySelector('img[alt="conflict-60.png"]')).not.toBeNull();
+    });
+
+    const anchor = () => host!.querySelector<HTMLImageElement>('img[alt="conflict-54.png"]')!;
+    const beforeOffset = anchor().getBoundingClientRect().top - viewport.getBoundingClientRect().top;
+    expect(pageCalls.get(60)).toBe(1);
+
+    await act(async () => {
+      await queryClient!.invalidateQueries({ exact: true, queryKey: firstPageOptions.queryKey });
+    });
+    await vi.waitFor(() => {
+      expect(queryClient!.getQueryData<GalleryItemsPage>(firstPageOptions.queryKey)?.total).toBe(181);
+      expect(queryClient!.getQueryData<GalleryItemsPage>(laterPageOptions.queryKey)?.total).toBe(181);
+    });
+
+    expect(pageCalls.get(0)).toBe(2);
+    expect(pageCalls.get(60)).toBe(2);
+    expect([...pageCalls.keys()]).toEqual([60, 0]);
+    expect(anchor().getBoundingClientRect().top - viewport.getBoundingClientRect().top).toBeCloseTo(beforeOffset, 0);
   });
 
   it('captures a narrow sparse viewport with loaded and page-error slots', async () => {
@@ -1908,7 +2102,7 @@ describe('GalleryImageGrid virtualization', () => {
     );
     expect(host?.querySelector('img[alt="loaded-sparse.png"]')).not.toBeNull();
     expect(host?.querySelector('[data-gallery-slot-state="error"]')).not.toBeNull();
-    const retryButton = host!.querySelector<HTMLButtonElement>('[data-gallery-page-error="0"] button')!;
+    const retryButton = host!.querySelector<HTMLButtonElement>('[data-gallery-slot-state="error"] button')!;
     const retryStyle = getComputedStyle(retryButton);
     const surface = host!.querySelector<HTMLElement>('[data-testid="gallery-surface"]')!;
     const retryContrast = getContrastRatio(
@@ -1944,7 +2138,7 @@ describe('GalleryImageGrid virtualization', () => {
   });
 
   it('repairs offsets after a partial delete and keeps the visible item anchored through a failed page retry', async () => {
-    const items = Array.from({ length: 36 }, (_, index) => createItem('image', `mutation-item-${index}.png`));
+    const items = Array.from({ length: 96 }, (_, index) => createItem('image', `mutation-item-${index}.png`));
     const gallery = createGallery({
       items,
       selectedItemKey: 'image:mutation-item-12.png',
@@ -1953,20 +2147,38 @@ describe('GalleryImageGrid virtualization', () => {
     });
     const filter = createFilter(gallery);
     const pageOptions = galleryItemsPageOptions(filter, 0);
+    const laterPageOptions = galleryItemsPageOptions(filter, 60);
     const boardOptions = galleryBoardsOptions(getGalleryListingBoardsQuery(gallery.settings));
     const successfulDelete = { kind: 'image' as const, name: items[3]!.name };
     const failedDelete = { kind: 'image' as const, name: items[8]!.name };
     const repairedItems = items.filter((item) => item.name !== successfulDelete.name);
     queryClient!.setQueryData(boardOptions.queryKey, [board]);
     queryClient!.setQueryData<GalleryItemsPage>(pageOptions.queryKey, {
-      items,
-      itemIndices: items.map((_, index) => index),
+      items: items.slice(0, 60),
+      itemIndices: Array.from({ length: 60 }, (_, index) => index),
       offset: 0,
+      total: items.length,
+    });
+    queryClient!.setQueryData<GalleryItemsPage>(laterPageOptions.queryKey, {
+      items: items.slice(60),
+      itemIndices: Array.from({ length: 36 }, (_, index) => index + 60),
+      offset: 60,
       total: items.length,
     });
     mocks.fetchSparsePage
       .mockRejectedValueOnce(new Error('Page repair unavailable'))
-      .mockResolvedValueOnce({ items: repairedItems, offset: 0, total: repairedItems.length });
+      .mockResolvedValueOnce({
+        items: repairedItems.slice(0, 60),
+        itemIndices: Array.from({ length: 60 }, (_, index) => index),
+        offset: 0,
+        total: repairedItems.length,
+      })
+      .mockResolvedValueOnce({
+        items: repairedItems.slice(60),
+        itemIndices: Array.from({ length: 35 }, (_, index) => index + 60),
+        offset: 60,
+        total: repairedItems.length,
+      });
 
     await renderQueryBackedGallery(gallery);
 
@@ -1979,6 +2191,11 @@ describe('GalleryImageGrid virtualization', () => {
     )!;
     const beforeOffset = anchor.getBoundingClientRect().top - viewport.getBoundingClientRect().top;
     let rollback: () => void = () => undefined;
+    const cachedPage = (offset = 0) =>
+      queryClient!.getQueryData<GalleryItemsPage>((offset === 0 ? pageOptions : laterPageOptions).queryKey)!;
+
+    expect(cachedPage().itemIndices).toEqual(Array.from({ length: 60 }, (_, index) => index));
+    expect(cachedPage(60).itemIndices).toEqual(Array.from({ length: 36 }, (_, index) => index + 60));
 
     await interact(() => {
       rollback = patchGalleryItemCaches(queryClient!, {
@@ -1986,19 +2203,31 @@ describe('GalleryImageGrid virtualization', () => {
         result: { failed: [], succeeded: [successfulDelete, failedDelete] },
       });
     });
-    expect(queryClient!.getQueryData<GalleryItemsPage>(pageOptions.queryKey)?.total).toBe(34);
+    expect(queryClient!.getQueryData<GalleryItemsPage>(pageOptions.queryKey)?.total).toBe(94);
+    expect(cachedPage().itemIndices).toEqual([
+      0, 1, 2, 4, 5, 6, 7, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+      32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+    ]);
+    expect(cachedPage(60).itemIndices).toEqual(Array.from({ length: 36 }, (_, index) => index + 60));
     expect(host?.querySelector('img[alt="mutation-item-3.png"]')).toBeNull();
     expect(host?.querySelector('img[alt="mutation-item-8.png"]')).toBeNull();
 
     // Match the production partial-failure path: roll the optimistic batch back, then apply only confirmed refs.
     await interact(() => {
       rollback();
+      expect(cachedPage().itemIndices).toEqual(Array.from({ length: 60 }, (_, index) => index));
+      expect(cachedPage(60).itemIndices).toEqual(Array.from({ length: 36 }, (_, index) => index + 60));
       patchGalleryItemCaches(queryClient!, {
         kind: 'delete',
         result: { failed: [failedDelete], succeeded: [successfulDelete] },
       });
     });
-    expect(queryClient!.getQueryData<GalleryItemsPage>(pageOptions.queryKey)?.total).toBe(35);
+    expect(queryClient!.getQueryData<GalleryItemsPage>(pageOptions.queryKey)?.total).toBe(95);
+    expect(cachedPage().itemIndices).toEqual([
+      0, 1, 2, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31,
+      32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+    ]);
+    expect(cachedPage(60).itemIndices).toEqual(Array.from({ length: 36 }, (_, index) => index + 60));
     expect(host?.querySelector('img[alt="mutation-item-3.png"]')).toBeNull();
     expect(host?.querySelector('img[alt="mutation-item-8.png"]')).not.toBeNull();
 
@@ -2007,17 +2236,17 @@ describe('GalleryImageGrid virtualization', () => {
     });
     expect(mocks.fetchSparsePage).toHaveBeenCalledTimes(1);
     expect(mocks.fetchSparsePage.mock.calls.map(([, offset]) => offset)).toEqual([0]);
-    await vi.waitFor(() => expect(host?.querySelectorAll('[data-gallery-page-error="0"] button')).toHaveLength(1));
+    await vi.waitFor(() => expect(host?.querySelectorAll('[data-gallery-slot-state="error"] button')).toHaveLength(1));
     const retryOffset =
       host!
         .querySelector<HTMLButtonElement>('button[aria-label="Select mutation-item-12.png for preview"]')!
         .getBoundingClientRect().top - viewport.getBoundingClientRect().top;
     expect(Math.abs(retryOffset - beforeOffset)).toBeLessThan(1);
 
-    await click(host!.querySelector<HTMLButtonElement>('[data-gallery-page-error="0"] button')!);
+    await click(host!.querySelector<HTMLButtonElement>('[data-gallery-slot-state="error"] button')!);
     await vi.waitFor(() => {
       expect(mocks.fetchSparsePage).toHaveBeenCalledTimes(2);
-      expect(host?.querySelector('[data-gallery-page-error="0"]')).toBeNull();
+      expect(host?.querySelector('[data-gallery-slot-state="error"]')).toBeNull();
     });
 
     const repairedAnchor = host!.querySelector<HTMLButtonElement>(
@@ -2027,8 +2256,15 @@ describe('GalleryImageGrid virtualization', () => {
     expect(Math.abs(repairedOffset - beforeOffset)).toBeLessThan(1);
     expect(viewport.scrollTop).toBeLessThan(1_000);
     expect(host?.querySelector('img[alt="mutation-item-8.png"]')).not.toBeNull();
-    expect(queryClient!.getQueryData<GalleryItemsPage>(pageOptions.queryKey)?.total).toBe(35);
-    expect(mocks.fetchSparsePage.mock.calls.map(([, offset]) => offset)).toEqual([0, 0]);
+    expect(queryClient!.getQueryData<GalleryItemsPage>(pageOptions.queryKey)?.total).toBe(95);
+    expect(cachedPage().itemIndices).toEqual(Array.from({ length: 60 }, (_, index) => index));
+    expect(cachedPage(60).itemIndices).toEqual(Array.from({ length: 36 }, (_, index) => index + 60));
+    await act(async () => {
+      await queryClient!.fetchQuery(laterPageOptions);
+    });
+    expect(mocks.fetchSparsePage.mock.calls.map(([, offset]) => offset)).toEqual([0, 0, 60]);
+    expect(cachedPage(60).items.map((item) => item.name)).toEqual(repairedItems.slice(60).map((item) => item.name));
+    expect(cachedPage(60).itemIndices).toEqual(Array.from({ length: 35 }, (_, index) => index + 60));
   });
 
   it('preserves a loaded item viewport anchor when the responsive column count changes', async () => {

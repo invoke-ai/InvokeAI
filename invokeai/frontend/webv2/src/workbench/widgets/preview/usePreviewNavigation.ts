@@ -21,10 +21,13 @@ import {
   GALLERY_MAX_ROWS,
   GALLERY_PAGE_SIZE,
   fetchGalleryItemsPage,
+  fetchVerifiedGalleryItemPage,
+  isDateBoardId,
   galleryItemNamesOptions,
   galleryItemsPageOptions,
   galleryStarredStripOptions,
 } from '@features/gallery/queries';
+import { useMountEffect } from '@platform/react/useMountEffect';
 import { parseDateTokens } from '@platform/search/dateTokens';
 import { useQueries, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef } from 'react';
@@ -233,12 +236,7 @@ export const usePreviewNavigation = ({
     }
   }, [navigationContextKey]);
 
-  useEffect(
-    () => () => {
-      pageFetchRequestRef.current?.controller.abort();
-    },
-    []
-  );
+  useMountEffect(() => () => pageFetchRequestRef.current?.controller.abort());
 
   const isPaginatedWindow = navigationPaginationMode === 'paginated';
   const selectedPageOffset = Math.max(0, selectedPage) * GALLERY_PAGE_SIZE;
@@ -494,6 +492,19 @@ export const usePreviewNavigation = ({
         ?.offset ?? selectedPageOffset
     );
   }, [boardPageResults, selectedItemKey, selectedPageOffset]);
+  const selectedItemIsMissingFromStampedPage =
+    selectedItem !== null &&
+    selectedItemKey !== null &&
+    navigationSemanticQuery === null &&
+    !isDateBoardId(navigationBoardId) &&
+    selectedPageQuery.data !== undefined &&
+    !selectedPageQuery.isFetching &&
+    !stripItems.some((item) => toGalleryItemKey(item) === selectedItemKey) &&
+    !navigationLocalItems.some((item) => toGalleryItemKey(item) === selectedItemKey) &&
+    !boardPageResults
+      .find(({ offset }) => offset === selectedPageOffset)
+      ?.data.items.some((item) => toGalleryItemKey(item) === selectedItemKey);
+  const selectedItemNeedsLocation = selectedItemIsMissingFromStampedPage;
 
   // Share navigation between keyboard, footer, and swipe; comparison does not step saved images.
   const navigate = useCallback(
@@ -515,7 +526,7 @@ export const usePreviewNavigation = ({
 
       const loadedEntry = getGalleryNavigationStep(navigationSections, cursorKey, direction);
 
-      if (loadedEntry !== null) {
+      if (loadedEntry !== null && !selectedItemNeedsLocation) {
         pageFetchRequestRef.current?.controller.abort();
         pageFetchRequestRef.current = null;
         pendingNavigationContextRef.current = null;
@@ -536,6 +547,44 @@ export const usePreviewNavigation = ({
 
       return (async () => {
         try {
+          if (selectedItemNeedsLocation && selectedItem) {
+            const located = await fetchVerifiedGalleryItemPage(
+              queryClient,
+              listingFilterWithStarred,
+              toGalleryItemRef(selectedItem),
+              undefined,
+              controller.signal
+            );
+
+            if (navigationContextKeyRef.current !== navigationContextKey) {
+              return false;
+            }
+
+            if (located !== null) {
+              pages.splice(0, pages.length, { offset: located.offset, data: located.page });
+              pageOffset = located.offset;
+              total = located.total;
+              const sections = [
+                sessionEntries,
+                stripEntries,
+                toItemEntries(
+                  mergePreviewBoardItems(located.page.items, previewMergeItems, navigationOrderDir, {
+                    isRanked: navigationSemanticQuery !== null,
+                  }).filter((item) => !stripKeys.has(toGalleryItemKey(item)))
+                ),
+              ];
+              const entry = getGalleryNavigationStep(sections, cursorKey, direction);
+
+              if (entry !== null) {
+                return stepTo(entry, pages);
+              }
+            } else if (selectedPageOffset >= (listingTotal ?? total ?? 0)) {
+              return false;
+            } else if (loadedEntry !== null) {
+              return stepTo(loadedEntry, boardPageResults);
+            }
+          }
+
           if (total === undefined) {
             const currentPage = await fetchGalleryItemsPage(queryClient, listingFilterWithStarred, selectedPageOffset, {
               signal: controller.signal,
@@ -633,6 +682,8 @@ export const usePreviewNavigation = ({
       navigationSections,
       navigationOrderDir,
       selectedPageOffset,
+      selectedItem,
+      selectedItemNeedsLocation,
       navigationSemanticQuery,
       pendingNavigationContextRef,
       pageFetchRequestRef,

@@ -127,7 +127,7 @@ describe('revealGalleryItem', () => {
     expect(commands.gallery.selectBoard).toHaveBeenCalledWith('board-1');
     expect(commands.gallery.setPage).toHaveBeenCalledWith(2);
     expect(commands.gallery.selectItem).toHaveBeenCalledWith(item, 'project-1', 2);
-    expect(mocks.requestReveal).toHaveBeenCalledWith('image:target.png', 127);
+    expect(mocks.requestReveal).toHaveBeenCalledWith('image:target.png', revealTicket.accountScope.signal, 127);
   });
 
   it('keeps selection, filters, board, and scroll unchanged when the one locator retry cannot verify a page', async () => {

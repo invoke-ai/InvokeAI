@@ -37,6 +37,7 @@ import {
   useQueueItemProgressImage,
   useQueueItemSwapProgressImage,
 } from '@features/queue/react';
+import { captureAccountScope } from '@platform/state/accountLifecycle';
 import {
   imageUrlToStreamingSource,
   progressImageToStreamingSource,
@@ -225,7 +226,7 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
     (item: GalleryItem, selectionPage: number) => {
       gallery.selectItem(item, undefined, selectionPage, true);
       // Deliberate navigation: the grid follows it, unlike auto-selection.
-      requestGalleryItemReveal(toGalleryItemKey(item));
+      requestGalleryItemReveal(toGalleryItemKey(item), captureAccountScope().signal);
     },
     [gallery]
   );

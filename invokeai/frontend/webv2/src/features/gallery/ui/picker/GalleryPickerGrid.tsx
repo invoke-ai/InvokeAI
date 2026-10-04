@@ -174,10 +174,10 @@ const GalleryPickerPlaceholder = ({
     >
       {error && retry ? (
         <Stack align="center" gap="1" maxW="full" px="1">
-          <Text color="fg.muted" fontSize="2xs" lineClamp={2} textAlign="center">
+          <Text color="fg.muted" fontSize="xs" lineClamp={2} textAlign="center">
             {error.message}
           </Text>
-          <Button size="2xs" variant="ghost" onClick={handleRetry}>
+          <Button size="sm" variant="ghost" onClick={handleRetry}>
             {t('common.retry')}
           </Button>
         </Stack>

@@ -10,13 +10,15 @@ export {
   galleryItemLocationOptions,
   galleryItemNamesOptions,
   galleryItemsPageOptions,
+  galleryItemsTotalOptions,
   galleryItemsInfiniteOptions,
   galleryKeys,
   galleryStarredStripOptions,
+  isDateBoardId,
   getGalleryListingBoardsQuery,
   imageIndexAvailabilityOptions,
 } from './data/queries';
-export { abortGalleryLocatorRequests, createGalleryLocatorRequest } from './core/locatorCancellation';
+export { abortGalleryLocatorRequests, createGalleryLocatorRequest } from './core/selection';
 export type {
   CanonicalGalleryItemsFilter,
   GalleryBoardsQuery,
@@ -26,7 +28,7 @@ export type {
   GalleryItemsWindow,
   VerifiedGalleryItemPage,
 } from './data/queries';
-export type { GalleryLocatorRequest } from './core/locatorCancellation';
+export type { GalleryLocatorRequest } from './core/selection';
 export {
   getGalleryItemBoardIdsFromCaches,
   getGalleryItemStarredFromCaches,

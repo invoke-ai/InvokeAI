@@ -3,12 +3,8 @@ import type { GalleryRevealTicket } from '@workbench/image-actions/revealGallery
 import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { Project } from '@workbench/projectContracts';
 
-import {
-  abortGalleryLocatorRequests,
-  claimGalleryNavigationSequence,
-  createGalleryLocatorRequest,
-  isGalleryNavigationCurrent,
-} from '@features/gallery/contracts';
+import { claimGalleryNavigationSequence, isGalleryNavigationCurrent } from '@features/gallery/contracts';
+import { abortGalleryLocatorRequests, createGalleryLocatorRequest } from '@features/gallery/utility';
 import { captureAccountScope } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { useOpenWorkbenchWidget } from '@workbench/useOpenWorkbenchWidget';

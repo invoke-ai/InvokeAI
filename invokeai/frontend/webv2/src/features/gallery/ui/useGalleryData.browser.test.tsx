@@ -1,4 +1,5 @@
 import type { GalleryItem } from '@features/gallery/core/items';
+import type { GalleryImage } from '@features/gallery/core/types';
 
 import { getGallerySettings } from '@features/gallery/core/settings';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
@@ -24,6 +25,12 @@ const settings = getGallerySettings({ paginationMode: 'infinite' });
 const paginatedSettings = getGallerySettings({ paginationMode: 'paginated' });
 let latestData: GalleryData | null = null;
 
+const readRequests = () =>
+  mocks.listGalleryItems.mock.calls.map(([request]) => {
+    const { limit, offset } = request as { limit: number; offset: number };
+    return { limit, offset };
+  });
+
 const createItem = (index: number): GalleryItem => ({
   boardId: 'none',
   category: 'general',
@@ -38,13 +45,33 @@ const createItem = (index: number): GalleryItem => ({
   width: 64,
 });
 
-const Probe = ({ page = 0, paginated = false }: { page?: number; paginated?: boolean } = {}) => {
+const recentImages: GalleryImage[] = [
+  {
+    boardId: 'none',
+    height: 64,
+    imageCategory: 'general',
+    imageName: 'recent.png',
+    imageUrl: '/full/recent.png',
+    queuedAt: new Date(1_000).toISOString(),
+    sourceQueueItemId: 'recent-generation',
+    starred: false,
+    thumbnailUrl: '/thumb/recent.png',
+    width: 64,
+  },
+];
+
+const Probe = ({
+  page = 0,
+  paginated = false,
+  searchTerm = '',
+  recentImages = [],
+}: { page?: number; paginated?: boolean; recentImages?: GalleryImage[]; searchTerm?: string } = {}) => {
   const data = useGalleryData({
     galleryView: 'images',
     page,
     projectBoardId: null,
-    recentImages: [],
-    searchTerm: '',
+    recentImages,
+    searchTerm,
     selectedBoardId: null,
     settings: paginated ? paginatedSettings : settings,
     sparseViewport: true,
@@ -58,6 +85,7 @@ const Probe = ({ page = 0, paginated = false }: { page?: number; paginated?: boo
       <output data-testid="total">{data.total ?? 'unknown'}</output>
       <output data-testid="page-offsets">{[...(data.sparseListing?.pageStates.keys() ?? [])].join(',')}</output>
       <output data-testid="anchor">{data.sparseListing?.itemSlots.get(6_000)?.name ?? 'missing'}</output>
+      <output data-testid="items">{data.items?.map((item) => item.name).join(',') ?? 'unknown'}</output>
     </>
   );
 };
@@ -115,7 +143,10 @@ describe('useGalleryData sparse page subscriptions', () => {
     );
 
     await vi.waitFor(() => expect(latestData?.items).toHaveLength(2));
-    expect(mocks.listGalleryItems.mock.calls.map(([request]) => (request as { offset: number }).offset)).toEqual([60]);
+    expect(readRequests()).toEqual([
+      { limit: 0, offset: 0 },
+      { limit: 60, offset: 60 },
+    ]);
     expect([...latestData!.sparseListing!.itemSlots.keys()]).toEqual([0, 1]);
 
     await act(() =>
@@ -126,24 +157,18 @@ describe('useGalleryData sparse page subscriptions', () => {
       )
     );
 
-    expect(mocks.listGalleryItems.mock.calls.map(([request]) => (request as { offset: number }).offset)).toEqual([60]);
+    expect(readRequests()).toEqual([
+      { limit: 0, offset: 0 },
+      { limit: 60, offset: 60 },
+    ]);
     expect([...latestData!.sparseListing!.pageStates.keys()]).toEqual([60]);
     expect(latestData?.sparseListing?.itemSlots.get(0)?.name).toBe('image-60.png');
     expect(latestData?.sparseListing?.itemSlots.get(1)?.name).toBe('image-61.png');
   });
 
-  it('keeps an empty listing at page zero when a later page is requested', async () => {
+  it('keeps an empty cold paginated listing at page zero without fetching a page', async () => {
     mocks.listGalleryItems.mockResolvedValue({ items: [], total: 0 });
 
-    await act(() =>
-      root?.render(
-        <QueryClientProvider client={queryClient!}>
-          <Probe paginated />
-        </QueryClientProvider>
-      )
-    );
-
-    await vi.waitFor(() => expect(latestData?.total).toBe(0));
     await act(() =>
       root?.render(
         <QueryClientProvider client={queryClient!}>
@@ -152,8 +177,9 @@ describe('useGalleryData sparse page subscriptions', () => {
       )
     );
 
-    expect(mocks.listGalleryItems.mock.calls.map(([request]) => (request as { offset: number }).offset)).toEqual([0]);
-    expect([...latestData!.sparseListing!.pageStates.keys()]).toEqual([0]);
+    await vi.waitFor(() => expect(latestData?.total).toBe(0));
+    expect(readRequests()).toEqual([{ limit: 0, offset: 0 }]);
+    expect([...latestData!.sparseListing!.pageStates.keys()]).toEqual([]);
     expect(latestData?.items).toEqual([]);
   });
 
@@ -167,13 +193,15 @@ describe('useGalleryData sparse page subscriptions', () => {
     );
 
     await vi.waitFor(() => expect(host?.querySelector('[data-testid="total"]')?.textContent).toBe(String(TOTAL)));
-    expect(mocks.listGalleryItems.mock.calls.map(([request]) => (request as { offset: number }).offset)).toEqual([0]);
+    expect(readRequests()).toEqual([{ limit: 60, offset: 0 }]);
 
     await act(() => latestData?.setVisibleRange?.({ endIndexExclusive: 6_120, startIndex: 6_000 }));
 
     await vi.waitFor(() => {
-      expect(mocks.listGalleryItems.mock.calls.map(([request]) => (request as { offset: number }).offset)).toEqual([
-        0, 6_000, 6_060,
+      expect(readRequests()).toEqual([
+        { limit: 60, offset: 0 },
+        { limit: 60, offset: 6_000 },
+        { limit: 60, offset: 6_060 },
       ]);
     });
 
@@ -187,7 +215,224 @@ describe('useGalleryData sparse page subscriptions', () => {
     expect(activePageOffsets).toEqual([6_000, 6_060]);
   });
 
-  it('uses an indexed distant range before page-zero count discovery completes', async () => {
+  it('discovers a cold later page count before fetching only the clamped item page', async () => {
+    const total = 62;
+    mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) =>
+      Promise.resolve({
+        items: Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, index) =>
+          createItem(offset + index)
+        ),
+        total,
+      })
+    );
+
+    await act(() =>
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <Probe page={5} paginated />
+        </QueryClientProvider>
+      )
+    );
+
+    await vi.waitFor(() => expect(latestData?.items).toHaveLength(2));
+    expect(readRequests()).toEqual([
+      { limit: 0, offset: 0 },
+      { limit: 60, offset: 60 },
+    ]);
+    expect([...latestData!.sparseListing!.pageStates.keys()]).toEqual([60]);
+  });
+
+  it('surfaces count errors and retries count discovery before loading a clamped page', async () => {
+    let attempts = 0;
+    mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) => {
+      attempts += 1;
+      if (attempts === 1) {
+        return Promise.reject(new Error('count unavailable'));
+      }
+
+      return Promise.resolve({
+        items: Array.from({ length: Math.max(0, Math.min(limit, 62 - offset)) }, (_, index) =>
+          createItem(offset + index)
+        ),
+        total: 62,
+      });
+    });
+
+    await act(() =>
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <Probe page={5} paginated />
+        </QueryClientProvider>
+      )
+    );
+    await vi.waitFor(() => expect(latestData?.queryError?.message).toBe('count unavailable'));
+    expect([...latestData!.sparseListing!.pageStates.keys()]).toEqual([0]);
+    await act(async () => {
+      await latestData?.sparseListing?.pageStates.get(0)?.retry();
+    });
+    await vi.waitFor(() => expect(latestData?.items).toHaveLength(2));
+    expect(readRequests()).toEqual([
+      { limit: 0, offset: 0 },
+      { limit: 0, offset: 0 },
+      { limit: 60, offset: 60 },
+    ]);
+  });
+
+  it.each(['filter', 'account'] as const)('does not apply a retry result after a %s transition', async (transition) => {
+    let activeScope = 'old';
+    let oldPageCallCount = 0;
+    let resolveOldRetry: (() => void) | undefined;
+    const requestsByScope: { limit: number; offset: number; scope: string }[] = [];
+    mocks.listGalleryItems.mockImplementation(
+      ({ limit, offset, searchTerm }: { limit: number; offset: number; searchTerm: string }) => {
+        const scope = searchTerm === 'new listing' || activeScope === 'new' ? 'new' : 'old';
+        requestsByScope.push({ limit, offset, scope });
+
+        if (scope === 'new') {
+          return Promise.resolve({
+            items: Array.from({ length: Math.max(0, Math.min(limit, 62 - offset)) }, (_, index) => ({
+              ...createItem(offset + index),
+              name: `new-${offset + index}.png`,
+            })),
+            total: 62,
+          });
+        }
+
+        if (limit === 0) {
+          return Promise.resolve({ items: [], total: 62 });
+        }
+
+        if (offset === 60 && oldPageCallCount === 0) {
+          oldPageCallCount += 1;
+          return Promise.reject(new Error('temporary page failure'));
+        }
+
+        if (offset === 60) {
+          oldPageCallCount += 1;
+        }
+
+        return new Promise((resolve) => {
+          resolveOldRetry = () =>
+            resolve({
+              items: Array.from({ length: 2 }, (_, index) => ({
+                ...createItem(offset + index),
+                name: `stale-${offset + index}.png`,
+              })),
+              total: 62,
+            });
+        });
+      }
+    );
+
+    await act(() =>
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <Probe page={1} paginated />
+        </QueryClientProvider>
+      )
+    );
+    await vi.waitFor(() => expect(latestData?.queryError?.message).toBe('temporary page failure'));
+
+    act(() => {
+      void latestData?.sparseListing?.pageStates.get(60)?.retry();
+    });
+    await vi.waitFor(() => expect(oldPageCallCount).toBe(2));
+
+    if (transition === 'account') {
+      await act(() => {
+        activeScope = 'new';
+        accountLifecycle.activate('gallery-query-retry-new-account');
+        root?.render(
+          <QueryClientProvider client={queryClient!}>
+            <Probe page={1} paginated />
+          </QueryClientProvider>
+        );
+      });
+    } else {
+      await act(() =>
+        root?.render(
+          <QueryClientProvider client={queryClient!}>
+            <Probe page={1} paginated searchTerm="new listing" />
+          </QueryClientProvider>
+        )
+      );
+    }
+    await vi.waitFor(() => expect(latestData?.items?.map((item) => item.name)).toEqual(['new-61.png', 'new-60.png']));
+
+    await act(() => resolveOldRetry?.());
+    await new Promise<void>((resolve) => {
+      setTimeout(resolve, 0);
+    });
+    expect(latestData?.items?.map((item) => item.name)).toEqual(['new-61.png', 'new-60.png']);
+    expect(latestData?.total).toBe(62);
+    const newScopeRequests = requestsByScope.filter(({ scope }) => scope === 'new');
+    expect(newScopeRequests.map(({ limit, offset }) => ({ limit, offset }))).toEqual([
+      { limit: 0, offset: 0 },
+      { limit: 60, offset: 60 },
+    ]);
+  });
+
+  it('keeps an authoritative recent out of the overlay after its page is evicted and reloaded', async () => {
+    const authoritativeItem = { ...createItem(0), name: 'recent.png' };
+    const pageCalls = new Map<number, number>();
+    let resolvePageZero: (() => void) | undefined;
+    mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) => {
+      pageCalls.set(offset, (pageCalls.get(offset) ?? 0) + 1);
+      const items =
+        offset === 0
+          ? [authoritativeItem, ...Array.from({ length: limit - 1 }, (_, index) => createItem(index + 1))]
+          : Array.from({ length: limit }, (_, index) => createItem(offset + index));
+
+      if (offset === 0 && pageCalls.get(offset) === 1) {
+        return new Promise((resolve) => {
+          resolvePageZero = () => resolve({ items, total: TOTAL });
+        });
+      }
+
+      return Promise.resolve({ items, total: TOTAL });
+    });
+
+    await act(() =>
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <Probe recentImages={recentImages} />
+        </QueryClientProvider>
+      )
+    );
+    await vi.waitFor(() => {
+      expect(latestData?.items?.filter((item) => item.name === 'recent.png')).toHaveLength(1);
+      expect(latestData?.sparseListing?.recentItems.map((item) => item.name)).toEqual(['recent.png']);
+    });
+
+    await act(() => resolvePageZero?.());
+    await vi.waitFor(() => expect(latestData?.sparseListing?.recentItems).toEqual([]));
+    expect(latestData?.items?.filter((item) => item.name === 'recent.png')).toHaveLength(1);
+    expect(latestData?.sparseListing?.itemSlots.get(0)?.name).toBe('recent.png');
+    expect(latestData?.total).toBe(TOTAL);
+
+    await act(() => latestData?.setVisibleRange?.({ endIndexExclusive: 6_060, startIndex: 6_000 }));
+    await vi.waitFor(() => expect(latestData?.sparseListing?.pageStates.has(6_000)).toBe(true));
+    const pageZero = queryClient
+      ?.getQueryCache()
+      .findAll({ queryKey: ['gallery', 'items', 'list'] })
+      .find((query) => query.queryKey[5] === 'page' && query.queryKey[6] === 0);
+    expect(pageZero?.getObserversCount()).toBe(0);
+    if (pageZero) {
+      await act(() => queryClient?.removeQueries({ exact: true, queryKey: pageZero.queryKey }));
+    }
+
+    await act(() => latestData?.setVisibleRange?.({ endIndexExclusive: 60, startIndex: 0 }));
+    await vi.waitFor(() => {
+      expect(pageCalls.get(0)).toBe(2);
+      expect(latestData?.items?.filter((item) => item.name === 'recent.png')).toHaveLength(1);
+    });
+    expect(latestData?.items?.filter((item) => item.name === 'recent.png')).toHaveLength(1);
+    expect(latestData?.sparseListing?.itemSlots.get(0)?.name).toBe('recent.png');
+    expect(latestData?.sparseListing?.recentItems).toEqual([]);
+    expect(latestData?.total).toBe(TOTAL);
+  });
+
+  it('uses an indexed distant range while the initial page is still pending', async () => {
     let releaseCountDiscovery: (() => void) | undefined;
     mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) => {
       if (offset === 0) {
@@ -215,14 +460,13 @@ describe('useGalleryData sparse page subscriptions', () => {
         </QueryClientProvider>
       )
     );
-    await vi.waitFor(() =>
-      expect(mocks.listGalleryItems.mock.calls.map(([request]) => (request as { offset: number }).offset)).toEqual([0])
-    );
+    await vi.waitFor(() => expect(readRequests()).toEqual([{ limit: 60, offset: 0 }]));
 
     await act(() => latestData?.setVisibleRange?.({ endIndexExclusive: 6_060, startIndex: 6_000 }));
     await vi.waitFor(() => {
-      expect(mocks.listGalleryItems.mock.calls.map(([request]) => (request as { offset: number }).offset)).toEqual([
-        0, 6_000,
+      expect(readRequests()).toEqual([
+        { limit: 60, offset: 0 },
+        { limit: 60, offset: 6_000 },
       ]);
     });
     const activePageOffsets = queryClient
@@ -235,7 +479,7 @@ describe('useGalleryData sparse page subscriptions', () => {
     releaseCountDiscovery?.();
   });
 
-  it('reconciles same-total conflicts across generations without moving the visible anchor', async () => {
+  it('keeps the logical sparse range stable while reconciling page totals', async () => {
     const retryPageResolvers = new Map<number, () => void>();
     const pageCallCounts = new Map<number, number>();
     const createPage = (offset: number, limit: number, total: number) => ({

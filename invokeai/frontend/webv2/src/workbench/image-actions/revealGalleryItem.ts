@@ -147,9 +147,9 @@ export const revealGalleryItem = (
 
     commands.gallery.selectItem(image, projectId, page ?? undefined);
     if (boardIndex === null) {
-      requestGalleryItemReveal(toGalleryItemKey(ref));
+      requestGalleryItemReveal(toGalleryItemKey(ref), accountScope.signal);
     } else {
-      requestGalleryItemReveal(toGalleryItemKey(ref), boardIndex);
+      requestGalleryItemReveal(toGalleryItemKey(ref), accountScope.signal, boardIndex);
     }
   });
 };

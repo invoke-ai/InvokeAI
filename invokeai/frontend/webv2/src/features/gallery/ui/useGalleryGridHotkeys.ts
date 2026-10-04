@@ -1,13 +1,14 @@
 import type { GalleryItem, GalleryItemRef } from '@features/gallery/core/items';
 import type { GalleryNavigationDirection, GalleryNavigationEntry } from '@features/gallery/core/selection';
 
-import { shouldStarSelection, toGalleryItemRef } from '@features/gallery/core/items';
+import { toGalleryItemRef } from '@features/gallery/core/items';
 import { getGalleryNavigationStep } from '@features/gallery/core/selection';
 import { useEffect, useEffectEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget } from './GalleryWidgetContext';
+import { useGallerySelectionStarred } from './useGallerySelectionStar';
 
 const GALLERY_HOTKEYS = [
   ['gallery.selectAllOnPage', 'widgets.gallery.commands.selectAllOnPage', null, ['mod+a']],
@@ -53,6 +54,7 @@ export const useGalleryGridHotkeys = ({
   const { t } = useTranslation();
   const { actions, gallery, itemActions, runtime } = useGalleryWidget();
   const { followProgressSession, gallery: galleryCommands } = useGalleryUi();
+  const shouldStar = useGallerySelectionStarred(actionSelectionRefs, loadedItems);
 
   const navigate = useEffectEvent((direction: GalleryNavigationDirection) => {
     const entry = getGalleryNavigationStep(navigationSections, cursorKey, direction, columnCount);
@@ -98,7 +100,7 @@ export const useGalleryGridHotkeys = ({
     }
 
     if (commandId === 'gallery.starImage' && actionSelectionRefs.length > 0) {
-      void itemActions.setItemsStarred(actionSelectionRefs, shouldStarSelection(loadedItems, actionSelectionRefs));
+      void itemActions.setItemsStarred(actionSelectionRefs, shouldStar);
       return;
     }
 

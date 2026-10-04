@@ -121,6 +121,12 @@ const mocks = vi.hoisted(() => {
     galleryStripItems: [] as Array<GalleryImageItem | GalleryVideoItem>,
     galleryItemPageOffsets: [] as number[],
     galleryPageFetchSignals: [] as AbortSignal[],
+    deferredPageFetches: new Map<
+      number,
+      { promise: Promise<GalleryItemsPage>; resolve: (page: GalleryItemsPage) => void }
+    >(),
+    verifiedGalleryPage: null as null | { index: number; offset: number; page: GalleryItemsPage; total: number },
+    verifiedGalleryPageFetches: [] as Array<{ ref: { kind: 'image' | 'video'; name: string }; signal: AbortSignal }>,
     galleryItemPages: [] as GalleryItemsPage[],
     galleryItemNames: [] as Array<{ kind: 'image' | 'video'; name: string }>,
     galleryItemNamesOptionCalls: 0,
@@ -186,6 +192,7 @@ vi.mock('@features/queue/react', async (importOriginal) => ({
 vi.mock('@features/gallery/queries', () => ({
   GALLERY_MAX_ROWS: 600,
   GALLERY_PAGE_SIZE: 60,
+  isDateBoardId: (boardId: string) => boardId.startsWith('by_date:'),
   flattenGalleryItemsData: (data: InfiniteData<GalleryItemsPage, number> | undefined) =>
     data?.pages.flatMap((page) => page.items) ?? [],
   galleryBoardsOptions: () => ({ queryFn: () => [], queryKey: ['test-boards'], staleTime: Infinity }),
@@ -281,6 +288,19 @@ vi.mock('@features/gallery/queries', () => ({
       queryKey: ['test-items-page', query, offset],
       queryFn: () => {
         mocks.galleryItemPageOffsets.push(offset);
+        const deferred = mocks.deferredPageFetches.get(offset);
+        if (deferred && signal) {
+          return Promise.race([
+            deferred.promise,
+            new Promise<never>((_resolve, reject) => {
+              const abort = () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+              signal.addEventListener('abort', abort, { once: true });
+              if (signal.aborted) {
+                abort();
+              }
+            }),
+          ]);
+        }
         return Promise.resolve({
           ...storedPage,
           items: orderedItems,
@@ -289,6 +309,25 @@ vi.mock('@features/gallery/queries', () => ({
         });
       },
       staleTime: Infinity,
+    });
+  },
+  fetchVerifiedGalleryItemPage: (
+    _queryClient: QueryClient,
+    _query: { boardId: string; orderDir?: 'ASC' | 'DESC'; starred?: boolean },
+    ref: { kind: 'image' | 'video'; name: string },
+    _owner: unknown,
+    signal: AbortSignal
+  ) => {
+    mocks.verifiedGalleryPageFetches.push({ ref, signal });
+    const result = mocks.verifiedGalleryPage;
+    return new Promise((resolve, reject) => {
+      const abort = () => reject(signal.reason ?? new DOMException('Aborted', 'AbortError'));
+      signal.addEventListener('abort', abort, { once: true });
+      if (signal.aborted) {
+        abort();
+      } else {
+        resolve(result);
+      }
     });
   },
   galleryItemNamesOptions: (query: { boardId: string; starred?: boolean }) => {
@@ -617,6 +656,9 @@ beforeEach(() => {
   mocks.galleryStripItems = [];
   mocks.galleryItemPageOffsets.length = 0;
   mocks.galleryPageFetchSignals.length = 0;
+  mocks.deferredPageFetches.clear();
+  mocks.verifiedGalleryPage = null;
+  mocks.verifiedGalleryPageFetches.length = 0;
   mocks.galleryItemNames = [];
   mocks.galleryItemNamesOptionCalls = 0;
   mocks.imageActionOptions = null;
@@ -661,6 +703,204 @@ const selectedThumb = (): string | null | undefined =>
   host?.querySelector<HTMLButtonElement>('button[aria-current]')?.getAttribute('aria-label');
 
 describe('preview keyboard navigation boundary', () => {
+  it('re-resolves a deleted-prefix selection by key before stepping and stamps its updated page', async () => {
+    const selected = createImageItem('survivor', '2026-07-20T00:00:01.000Z');
+    const neighbor = createImageItem('preceding-survivor', '2026-07-20T00:00:02.000Z');
+    const resolvedPage = { items: [neighbor, selected], offset: 60, total: 62 };
+    setGalleryValues({
+      galleryPage: 0,
+      recentImages: [],
+      selectedImage: legacyImage('survivor', selected.createdAt),
+      selectedImageName: 'survivor',
+      selectedImageQuery: { ...deepQuery, page: 5 },
+    });
+    mocks.galleryItemPages = Array.from({ length: 6 }, (_unused, index) => ({
+      items: index === 5 ? [] : [],
+      total: 62,
+    }));
+    mocks.verifiedGalleryPage = { index: 61, offset: 60, page: resolvedPage, total: 62 };
+
+    await render();
+    await pressArrow('ArrowLeft');
+
+    expect(mocks.verifiedGalleryPageFetches.map(({ ref }) => ref)).toEqual([{ kind: 'image', name: 'survivor' }]);
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'image', name: 'preceding-survivor' }),
+      undefined,
+      1,
+      true
+    );
+  });
+
+  it('re-resolves a reordered selection when its page stamp is stale although total is unchanged', async () => {
+    const selected = createImageItem('reordered', '2026-07-20T00:00:01.000Z');
+    const neighbor = createImageItem('reordered-neighbor', '2026-07-20T00:00:02.000Z');
+    const resolvedPage = { items: [neighbor, selected], offset: 0, total: 600 };
+    setGalleryValues({
+      galleryPage: 0,
+      recentImages: [],
+      selectedImage: legacyImage('reordered', selected.createdAt),
+      selectedImageName: 'reordered',
+      selectedImageQuery: { ...deepQuery, page: 5 },
+    });
+    mocks.galleryItemPages = Array.from({ length: 10 }, () => ({ items: [], total: 600 }));
+    mocks.verifiedGalleryPage = { index: 1, offset: 0, page: resolvedPage, total: 600 };
+
+    await render();
+    await pressArrow('ArrowLeft');
+
+    expect(mocks.verifiedGalleryPageFetches).toHaveLength(1);
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'image', name: 'reordered-neighbor' }),
+      undefined,
+      0,
+      true
+    );
+  });
+
+  it('continues across the adjacent page when the verified selection is at a page boundary', async () => {
+    const selected = createImageItem('boundary-reordered', '2026-07-20T00:00:01.000Z');
+    const neighbor = createImageItem('boundary-reordered-neighbor', '2026-07-19T00:00:00.000Z');
+    const resolvedPage = { items: [selected], offset: 60, total: 180 };
+    setGalleryValues({
+      galleryPage: 0,
+      recentImages: [],
+      selectedImage: legacyImage('boundary-reordered', selected.createdAt),
+      selectedImageName: 'boundary-reordered',
+      selectedImageQuery: { ...deepQuery, page: 5 },
+    });
+    mocks.galleryItemPages = Array.from({ length: 6 }, (_unused, index) => ({
+      items: index === 2 ? [neighbor] : [],
+      total: 180,
+    }));
+    mocks.verifiedGalleryPage = { index: 119, offset: 60, page: resolvedPage, total: 180 };
+
+    await render();
+    await pressArrow('ArrowRight');
+
+    expect(mocks.verifiedGalleryPageFetches).toHaveLength(1);
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: 'image', name: 'boundary-reordered-neighbor' }),
+      undefined,
+      2,
+      true
+    );
+  });
+
+  it('does not select a missing key when verified lookup returns no result', async () => {
+    setGalleryValues({
+      galleryPage: 0,
+      recentImages: [],
+      selectedImage: legacyImage('gone', '2026-07-20T00:00:01.000Z'),
+      selectedImageName: 'gone',
+      selectedImageQuery: { ...deepQuery, page: 5 },
+    });
+    mocks.galleryItemPages = Array.from({ length: 6 }, () => ({ items: [], total: 62 }));
+
+    await render();
+    await pressArrow('ArrowLeft');
+
+    expect(mocks.verifiedGalleryPageFetches).toHaveLength(1);
+    expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
+  });
+
+  it('keeps date-board selections off the ordinary listing locator', async () => {
+    setGalleryValues({
+      galleryPage: 0,
+      recentImages: [],
+      selectedImage: legacyImage('date-board-item', '2026-07-20T00:00:01.000Z'),
+      selectedImageName: 'date-board-item',
+      selectedImageQuery: { ...deepQuery, boardId: 'by_date:2026-07-20', page: 5 },
+    });
+    mocks.galleryItemPages = Array.from({ length: 6 }, () => ({ items: [], total: 62 }));
+
+    await render();
+    await pressArrow('ArrowLeft');
+
+    expect(mocks.verifiedGalleryPageFetches).toHaveLength(0);
+  });
+
+  it.each([
+    ['search filter', () => ({ selectedImageQuery: { ...deepQuery, page: 0, searchTerm: 'changed' } })],
+    ['sort order', () => ({ selectedImageQuery: { ...deepQuery, page: 0, imageOrderDir: 'ASC' } })],
+    [
+      'selected item',
+      () => ({
+        selectedImage: legacyImage('context-changed', '2026-07-19T00:00:00.000Z'),
+        selectedImageName: 'context-changed',
+      }),
+    ],
+  ] as Array<[string, () => Record<string, unknown>]>)(
+    'aborts a deferred boundary read when the %s changes and ignores its late result',
+    async (_transition, getPatch) => {
+      const selected = createImageItem('boundary-selected', '2026-07-20T00:00:01.000Z');
+      let resolve!: (page: GalleryItemsPage) => void;
+      const promise = new Promise<GalleryItemsPage>((done) => {
+        resolve = done;
+      });
+      setGalleryValues({
+        galleryPage: 0,
+        recentImages: [],
+        selectedImage: legacyImage('boundary-selected', selected.createdAt),
+        selectedImageName: 'boundary-selected',
+        selectedImageQuery: { ...deepQuery, page: 0 },
+      });
+      mocks.galleryItemPages = Array.from({ length: 3 }, (_unused, index) => ({
+        items: index === 0 ? [selected] : [],
+        total: 180,
+      }));
+      mocks.deferredPageFetches.set(120, { promise, resolve });
+
+      await render();
+      await pressArrow('ArrowRight');
+      await expect.poll(() => mocks.galleryPageFetchSignals.length > 0).toBe(true);
+      const signal = mocks.galleryPageFetchSignals.at(-1)!;
+      expect(signal.aborted).toBe(false);
+
+      setGalleryValues(getPatch());
+      await rerender();
+      expect(signal.aborted).toBe(true);
+      resolve({ items: [createImageItem('late-boundary', '2026-07-19T00:00:00.000Z')], offset: 120, total: 180 });
+      await act(() => Promise.resolve());
+
+      expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
+    }
+  );
+
+  it('aborts a deferred boundary read on unmount and ignores its late result', async () => {
+    const selected = createImageItem('unmount-selected', '2026-07-20T00:00:01.000Z');
+    let resolve!: (page: GalleryItemsPage) => void;
+    const promise = new Promise<GalleryItemsPage>((done) => {
+      resolve = done;
+    });
+    setGalleryValues({
+      galleryPage: 0,
+      recentImages: [],
+      selectedImage: legacyImage('unmount-selected', selected.createdAt),
+      selectedImageName: 'unmount-selected',
+      selectedImageQuery: { ...deepQuery, page: 0 },
+    });
+    mocks.galleryItemPages = Array.from({ length: 3 }, (_unused, index) => ({
+      items: index === 0 ? [selected] : [],
+      total: 180,
+    }));
+    mocks.deferredPageFetches.set(120, { promise, resolve });
+
+    await render();
+    await pressArrow('ArrowRight');
+    await expect.poll(() => mocks.galleryPageFetchSignals.length > 0).toBe(true);
+    const signal = mocks.galleryPageFetchSignals.at(-1)!;
+
+    await act(() => {
+      root?.unmount();
+    });
+    expect(signal.aborted).toBe(true);
+    resolve({ items: [createImageItem('late-unmount', '2026-07-19T00:00:00.000Z')], offset: 120, total: 180 });
+    await act(() => Promise.resolve());
+
+    expect(mocks.commands.gallery.selectItem).not.toHaveBeenCalled();
+  });
+
   it('walks the starred strip into the unstarred listing and back, as the grid lays them out', async () => {
     const starredTop = { ...createImageItem('starred-top', '2026-07-23T00:00:00.000Z'), starred: true };
     const starredNext = { ...createImageItem('starred-next', '2026-07-22T00:00:00.000Z'), starred: true };
@@ -737,6 +977,7 @@ describe('preview keyboard navigation boundary', () => {
       selectedImageName: 'starred-deep',
     });
     await render();
+    await expect.poll(() => selectedThumb()).toBe('starred-deep');
     await pressArrow('ArrowLeft');
     expect(mocks.commands.gallery.selectItem).toHaveBeenLastCalledWith(
       expect.objectContaining({ name: 'starred-top' }),
@@ -794,7 +1035,7 @@ describe('preview keyboard navigation boundary', () => {
     await render();
     await pressArrow('ArrowRight');
 
-    expect(vi.mocked(requestGalleryItemReveal)).toHaveBeenCalledWith('image:oldest');
+    expect(vi.mocked(requestGalleryItemReveal)).toHaveBeenCalledWith('image:oldest', expect.any(AbortSignal));
   });
 
   it('keeps a just-completed batch navigable before the backend refetch lands', async () => {

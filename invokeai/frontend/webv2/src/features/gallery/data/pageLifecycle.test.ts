@@ -13,7 +13,12 @@ vi.mock('./backend', () => ({
 
 import { planGalleryPageOffsets } from '@features/gallery/ui/galleryGridLayout';
 
-import { GALLERY_PAGE_SIZE, galleryItemsPageOptions, type GalleryItemsFilter } from './queries';
+import {
+  GALLERY_PAGE_SIZE,
+  galleryItemsPageOptions,
+  galleryStarredStripOptions,
+  type GalleryItemsFilter,
+} from './queries';
 
 const filter: GalleryItemsFilter = {
   boardId: 'board-1',
@@ -83,6 +88,99 @@ describe('Gallery sparse page lifecycle', () => {
     ]);
     expect(retainedItems).toHaveLength(10 * GALLERY_PAGE_SIZE);
 
+    client.clear();
+  });
+
+  it('bounds failed inactive pages along with successfully loaded pages', async () => {
+    const client = createQueryClient();
+    backend.listGalleryItems.mockRejectedValue(new Error('temporary failure'));
+
+    for (let index = 0; index < 25; index += 1) {
+      await expect(fetchPage(client, index)).rejects.toThrow('temporary failure');
+      expect(pageQueries(client).length).toBeLessThanOrEqual(10);
+    }
+
+    expect(pageQueries(client)).toHaveLength(10);
+    expect(pageQueries(client).every((query) => query.state.status === 'error')).toBe(true);
+    client.clear();
+  });
+
+  it.each([37, 6_000, 600_000])('bounds retained page data while browsing a %i-item listing', async (total) => {
+    const client = createQueryClient();
+    backend.listGalleryItems.mockImplementation(({ offset }: { offset: number }) =>
+      Promise.resolve({
+        ...createPage(offset),
+        items: Array.from({ length: Math.min(GALLERY_PAGE_SIZE, total - offset) }, (_, index) =>
+          createItem(offset + index)
+        ),
+        itemIndices: Array.from({ length: Math.min(GALLERY_PAGE_SIZE, total - offset) }, (_, index) => offset + index),
+        total,
+      })
+    );
+
+    const pageCount = Math.ceil(total / GALLERY_PAGE_SIZE);
+    const sampledPages = Math.min(pageCount, 100);
+    for (let sample = 0; sample < sampledPages; sample += 1) {
+      const pageIndex = Math.floor((sample * (pageCount - 1)) / Math.max(1, sampledPages - 1));
+      await fetchPage(client, pageIndex);
+
+      const retained = pageQueries(client);
+      expect(retained).toHaveLength(Math.min(sample + 1, 10));
+      expect(retained.flatMap((query) => (query.state.data as GalleryItemsPage).items).length).toBeLessThanOrEqual(
+        Math.min(total, 10 * GALLERY_PAGE_SIZE)
+      );
+    }
+
+    expect(backend.listGalleryItems).toHaveBeenCalledTimes(sampledPages);
+    expect(pageQueries(client).flatMap((query) => (query.state.data as GalleryItemsPage).items)).toHaveLength(
+      Math.min(total, 10 * GALLERY_PAGE_SIZE)
+    );
+    if (pageCount > 10) {
+      expect(client.getQueryData(galleryItemsPageOptions(filter, 0).queryKey)).toBeUndefined();
+      backend.listGalleryItems.mockClear();
+      await fetchPage(client, 0);
+      expect(backend.listGalleryItems.mock.calls.map(([request]) => request.offset)).toEqual([0]);
+      expect(pageQueries(client)).toHaveLength(10);
+    }
+    client.clear();
+  });
+
+  it('requests only new viewport pages for a page scroll, fling, distant jump, and backward reload', async () => {
+    const client = createQueryClient();
+    backend.listGalleryItems.mockImplementation(({ offset }: { offset: number }) =>
+      Promise.resolve({ ...createPage(offset), total: 600_000 })
+    );
+    let unsubscribePrevious: Array<() => void> = [];
+    const browseRange = async (startIndex: number, expectedRequests: number[]) => {
+      const offsets = planGalleryPageOffsets({
+        endIndexExclusive: startIndex + 120,
+        startIndex,
+        total: 600_000,
+      });
+      const observers = offsets.map(
+        (offset) => new QueryObserver(client, { ...galleryItemsPageOptions(filter, offset), enabled: false })
+      );
+      const unsubscribes = observers.map((observer) => observer.subscribe(() => undefined));
+      unsubscribePrevious.forEach((unsubscribe) => unsubscribe());
+      backend.listGalleryItems.mockClear();
+      await Promise.all(offsets.map((offset) => client.fetchQuery(galleryItemsPageOptions(filter, offset))));
+      expect(backend.listGalleryItems.mock.calls.map(([request]) => request.offset)).toEqual(expectedRequests);
+      expect(observers.every((observer) => observer.getCurrentResult().data?.items.length === 60)).toBe(true);
+      expect(pageQueries(client).filter((query) => query.getObserversCount() === 0).length).toBeLessThanOrEqual(10);
+      unsubscribePrevious = unsubscribes;
+    };
+
+    await browseRange(0, [0, 60]);
+    await browseRange(60, [120]);
+    await browseRange(6_000, [6_000, 6_060]);
+    await browseRange(540_000, [540_000, 540_060]);
+    for (const start of [12_000, 18_000, 24_000, 30_000, 36_000]) {
+      await browseRange(start, [start, start + 60]);
+    }
+    expect(client.getQueryData(galleryItemsPageOptions(filter, 0).queryKey)).toBeUndefined();
+    await browseRange(0, [0, 60]);
+    unsubscribePrevious.forEach((unsubscribe) => unsubscribe());
+    expect(pageQueries(client)).toHaveLength(10);
     client.clear();
   });
 
@@ -201,6 +299,46 @@ describe('Gallery sparse page lifecycle', () => {
     );
     expect(peak).toBe(4);
     expect(started).toBe(visibleOffsets.length);
+    client.clear();
+  });
+
+  it('shares the four-request limit between visible pages and the starred strip', async () => {
+    const client = createQueryClient();
+    const pending: Array<{ resolve: () => void }> = [];
+    let active = 0;
+    let peak = 0;
+    let started = 0;
+    backend.listGalleryItems.mockImplementation(({ offset }: { offset: number }) => {
+      started += 1;
+      active += 1;
+      peak = Math.max(peak, active);
+      return new Promise<GalleryItemsPage>((resolve) => {
+        pending.push({
+          resolve: () => {
+            active -= 1;
+            resolve(createPage(offset));
+          },
+        });
+      });
+    });
+
+    const pageRequests = Array.from({ length: 4 }, (_, index) =>
+      client.fetchQuery(galleryItemsPageOptions(filter, index * GALLERY_PAGE_SIZE))
+    );
+    await vi.waitFor(() => expect(started).toBe(4));
+    const stripRequest = client.fetchQuery(galleryStarredStripOptions(filter));
+    await Promise.resolve();
+    expect(started).toBe(4);
+
+    pending.shift()?.resolve();
+    await vi.waitFor(() => expect(started).toBe(5));
+    while (pending.length) {
+      pending.shift()?.resolve();
+    }
+    await Promise.all([...pageRequests, stripRequest]);
+
+    expect(peak).toBe(4);
+    expect(started).toBe(5);
     client.clear();
   });
 

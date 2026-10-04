@@ -39,6 +39,7 @@ import {
 } from './backend';
 
 export { GALLERY_MAX_INFINITE_PAGES, GALLERY_MAX_ROWS, GALLERY_PAGE_SIZE, GALLERY_STARRED_STRIP_LIMIT };
+export { isDateBoardId };
 
 export interface GalleryBoardsQuery {
   includeArchived?: boolean;
@@ -188,6 +189,8 @@ export const galleryKeys = {
     [...galleryKeys.itemListsForAccount(owner), filter, ...getWindowKey(window)] as GalleryItemsListQueryKey,
   itemPage: (owner: AccountScope, filter: CanonicalGalleryItemsFilter, offset: number): GalleryItemsPageQueryKey =>
     [...galleryKeys.itemListsForAccount(owner), filter, 'page', normalizePageOffset(offset)] as const,
+  itemTotal: (owner: AccountScope, filter: CanonicalGalleryItemsFilter) =>
+    [...galleryKeys.itemListsForAccount(owner), filter, 'total'] as const,
   starredStrip: (owner: AccountScope, filter: CanonicalGalleryItemsFilter): GalleryItemsStripQueryKey =>
     [...galleryKeys.itemListsForAccount(owner), filter, 'strip'] as const,
   itemNamesRoot: () => [...galleryKeys.itemsRoot(), 'names'] as const,
@@ -297,7 +300,11 @@ const ensureLifecycle = (client: QueryClient): GalleryPageLifecycle => {
           return false;
         }
 
-        return query.state.data !== undefined && query.state.fetchStatus === 'idle' && query.getObserversCount() === 0;
+        return (
+          query.state.fetchStatus === 'idle' &&
+          (query.state.data !== undefined || query.state.status === 'error') &&
+          query.getObserversCount() === 0
+        );
       });
 
     if (candidates.length <= MAX_INACTIVE_PAGES_PER_LISTING) {
@@ -463,6 +470,27 @@ export const galleryItemsPageOptions = (inputFilter: GalleryItemsFilter, offset:
       );
     },
     queryKey: galleryKeys.itemPage(owner, filter, pageOffset),
+    staleTime: 60_000,
+  });
+};
+
+/** A bounded count-only read shared by every page of one account-scoped listing. */
+export const galleryItemsTotalOptions = (inputFilter: GalleryItemsFilter) => {
+  const owner = captureAccountScope();
+  const filter = canonicalizeGalleryItemsFilter(inputFilter);
+
+  return queryOptions({
+    queryFn: async ({ client, signal }) => {
+      const requestSignal = AbortSignal.any([signal, owner.signal]);
+      const page = await fetchGalleryItemsRange(client, owner, filter, {
+        limit: 0,
+        offset: 0,
+        signal: requestSignal,
+      });
+
+      return page.total;
+    },
+    queryKey: galleryKeys.itemTotal(owner, filter),
     staleTime: 60_000,
   });
 };
@@ -986,12 +1014,17 @@ export const galleryStarredStripOptions = (inputFilter: GalleryItemsFilter) => {
   const filter: CanonicalGalleryItemsFilter = { ...canonicalizeGalleryItemsFilter(inputFilter), starred: true };
 
   return queryOptions({
-    queryFn: ({ client, signal }) =>
-      fetchGalleryItemsRange(client, owner, filter, {
-        limit: GALLERY_STARRED_STRIP_LIMIT,
-        offset: 0,
-        signal: AbortSignal.any([signal, owner.signal]),
-      }),
+    queryFn: ({ client, signal }) => {
+      const requestSignal = AbortSignal.any([signal, owner.signal]);
+
+      return fetchGalleryPageWithLifecycle(client, requestSignal, () =>
+        fetchGalleryItemsRange(client, owner, filter, {
+          limit: GALLERY_STARRED_STRIP_LIMIT,
+          offset: 0,
+          signal: requestSignal,
+        })
+      );
+    },
     queryKey: galleryKeys.starredStrip(owner, filter),
     staleTime: 60_000,
   });

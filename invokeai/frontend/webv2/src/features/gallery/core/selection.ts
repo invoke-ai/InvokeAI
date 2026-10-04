@@ -1,5 +1,3 @@
-import { captureAccountScope } from '@platform/state/accountLifecycle';
-
 import type { GalleryImage, GeneratedImageContract } from './types';
 
 import {
@@ -138,7 +136,7 @@ export const getGalleryDeletionSuccessor = (
  */
 
 export interface GalleryRevealRequest {
-  accountEpoch: number;
+  accountSignal: AbortSignal;
   absoluteIndex?: number;
   itemKey: GalleryItemKey;
   token: number;
@@ -149,9 +147,13 @@ let nextToken = 0;
 
 const listeners = new Set<() => void>();
 
-export const requestGalleryItemReveal = (itemKey: GalleryItemKey, absoluteIndex?: number): void => {
+export const requestGalleryItemReveal = (
+  itemKey: GalleryItemKey,
+  accountSignal: AbortSignal,
+  absoluteIndex?: number
+): void => {
   nextToken += 1;
-  currentRequest = { accountEpoch: captureAccountScope().epoch, absoluteIndex, itemKey, token: nextToken };
+  currentRequest = { accountSignal, absoluteIndex, itemKey, token: nextToken };
   for (const listener of listeners) {
     listener();
   }
@@ -161,7 +163,7 @@ export const requestGalleryItemReveal = (itemKey: GalleryItemKey, absoluteIndex?
 export const getGalleryRevealRequest = (): GalleryRevealRequest | null => {
   const request = currentRequest;
 
-  return request?.accountEpoch === captureAccountScope().epoch ? request : null;
+  return request && !request.accountSignal.aborted ? request : null;
 };
 
 export const subscribeGalleryRevealRequests = (listener: () => void): (() => void) => {
@@ -176,6 +178,33 @@ export const subscribeGalleryRevealRequests = (listener: () => void): (() => voi
  * Order navigation gestures across mounts and surfaces before async hydration; only the latest may update the
  * shared selection.
  */
+
+export interface GalleryLocatorRequest {
+  signal: AbortSignal;
+  release: () => void;
+}
+
+const activeGalleryLocatorRequests = new Set<AbortController>();
+
+/** Create a cancellable locator lifetime shared by Gallery reveal entry points. */
+export const createGalleryLocatorRequest = (): GalleryLocatorRequest => {
+  const controller = new AbortController();
+  activeGalleryLocatorRequests.add(controller);
+
+  return {
+    signal: controller.signal,
+    release: () => activeGalleryLocatorRequests.delete(controller),
+  };
+};
+
+/** A later Gallery navigation supersedes every locator currently in flight. */
+export const abortGalleryLocatorRequests = (): void => {
+  for (const controller of activeGalleryLocatorRequests) {
+    controller.abort();
+  }
+
+  activeGalleryLocatorRequests.clear();
+};
 
 let navigationSequence = 0;
 

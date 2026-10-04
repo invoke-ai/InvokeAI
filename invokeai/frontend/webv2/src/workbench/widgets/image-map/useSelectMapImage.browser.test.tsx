@@ -34,6 +34,9 @@ vi.mock('@features/gallery/contracts', async (importOriginal) => ({
   getGallerySettings: () => mocks.settings,
   registerImageCluster: mocks.registerImageCluster,
   requestGalleryItemReveal: mocks.requestReveal,
+}));
+
+vi.mock('@features/gallery/utility', () => ({
   abortGalleryLocatorRequests: () => {
     mocks.locatorControllers.forEach((controller) => controller.abort());
   },
@@ -198,7 +201,7 @@ describe('useMapSelection', () => {
       });
       // The reveal channel is what scrolls the grid; the selection alone must
       // not (auto-selected generation results would yank the scroll).
-      expect(mocks.requestReveal).toHaveBeenCalledWith('image:a.png', 0);
+      expect(mocks.requestReveal).toHaveBeenCalledWith('image:a.png', expect.any(AbortSignal), 0);
     });
 
     it('reveals a clicked video through its own namespace', async () => {
@@ -216,7 +219,7 @@ describe('useMapSelection', () => {
         kind: 'video',
         name: 'clip.mp4',
       });
-      expect(mocks.requestReveal).toHaveBeenCalledWith('video:clip.mp4', 1);
+      expect(mocks.requestReveal).toHaveBeenCalledWith('video:clip.mp4', expect.any(AbortSignal), 1);
     });
 
     it('finds a video at its own position in a mixed listing', async () => {
@@ -232,7 +235,7 @@ describe('useMapSelection', () => {
 
       // Index 120 of a 60-per-page listing is page 2; the image's index 0 is page 0.
       expect(mocks.setPage).toHaveBeenCalledWith(2);
-      expect(mocks.requestReveal).toHaveBeenCalledWith('video:shared', 120);
+      expect(mocks.requestReveal).toHaveBeenCalledWith('video:shared', expect.any(AbortSignal), 120);
     });
 
     it("selects the image's board before the image itself", async () => {
@@ -292,7 +295,7 @@ describe('useMapSelection', () => {
       await flush(() => handle.click?.({ kind: 'image', name: 'deep.png' }));
 
       expect(mocks.setPage).not.toHaveBeenCalled();
-      expect(mocks.requestReveal).toHaveBeenCalledWith('image:deep.png', 130);
+      expect(mocks.requestReveal).toHaveBeenCalledWith('image:deep.png', expect.any(AbortSignal), 130);
       expect(mocks.selectItem.mock.calls[0]?.[2]).toBe(2);
     });
 
@@ -319,7 +322,7 @@ describe('useMapSelection', () => {
       expect(mocks.setPage).not.toHaveBeenCalled();
       expect(mocks.selectItem).toHaveBeenCalledTimes(1);
       expect(mocks.selectItem.mock.calls[0]?.[2]).toBe(11);
-      expect(mocks.requestReveal).toHaveBeenCalledWith('image:deep.png', 700);
+      expect(mocks.requestReveal).toHaveBeenCalledWith('image:deep.png', expect.any(AbortSignal), 700);
     });
 
     it('drops the page landing when the ordering settings changed mid-lookup', async () => {
@@ -495,7 +498,7 @@ describe('useMapSelection', () => {
 
       expect(mocks.resolve).toHaveBeenCalledWith({ kind: 'video', name: 'clip.mp4' });
       expect(mocks.registerImageCluster).toHaveBeenCalledWith(['video:clip.mp4', 'image:a.png'], 'beaches');
-      expect(mocks.requestReveal).toHaveBeenCalledWith('video:clip.mp4');
+      expect(mocks.requestReveal).toHaveBeenCalledWith('video:clip.mp4', expect.any(AbortSignal));
     });
 
     it('shows the cluster as a gallery filter with the clicked image selected and revealed', async () => {
@@ -527,7 +530,7 @@ describe('useMapSelection', () => {
       // Re-clicking the same cluster point after scrolling away must return
       // the grid to the top; the reveal channel carries that even when the
       // selection is unchanged.
-      expect(mocks.requestReveal).toHaveBeenCalledWith('image:a.png');
+      expect(mocks.requestReveal).toHaveBeenCalledWith('image:a.png', expect.any(AbortSignal));
     });
 
     it("selects the primary image's board before the cluster filter", async () => {

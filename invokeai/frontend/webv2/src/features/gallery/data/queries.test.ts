@@ -27,6 +27,7 @@ import {
   galleryBoardsOptions,
   galleryItemNamesOptions,
   galleryItemsPageOptions,
+  galleryItemsTotalOptions,
   galleryItemsInfiniteOptions,
   galleryStarredStripOptions,
   getGalleryItemListQueries,
@@ -174,6 +175,47 @@ describe('Gallery item query read model', () => {
     expect(backend.listGalleryItems).toHaveBeenCalledWith(expect.objectContaining({ limit: 60, offset: 60 }));
     expect(page).toMatchObject({ itemIndices: Array.from({ length: 60 }, (_, index) => 60 + index), offset: 60 });
     expect(getGalleryItemListQueries(queryClient).map((query) => query.queryKey)).toEqual([options.queryKey]);
+  });
+
+  it('shares a count-only read on the account and listing key without fetching item rows', async () => {
+    const queryClient = createQueryClient();
+    let total = 62;
+    backend.listGalleryItems.mockImplementation(() => Promise.resolve({ items: [], total }));
+    const options = galleryItemsTotalOptions(baseFilter);
+
+    await expect(
+      Promise.all([
+        queryClient.fetchQuery(options),
+        queryClient.fetchQuery(galleryItemsTotalOptions({ ...baseFilter, searchTerm: ' portrait ' })),
+      ])
+    ).resolves.toEqual([62, 62]);
+
+    expect(backend.listGalleryItems).toHaveBeenCalledOnce();
+    expect(backend.listGalleryItems).toHaveBeenCalledWith(expect.objectContaining({ limit: 0, offset: 0 }));
+    expect(options.queryKey).toEqual(galleryItemsTotalOptions(baseFilter).queryKey);
+    expect(options.queryKey).not.toEqual(galleryItemsTotalOptions({ ...baseFilter, boardId: 'board-2' }).queryKey);
+    total = 63;
+    await invalidateGalleryItems(queryClient);
+    await expect(queryClient.fetchQuery(options)).resolves.toBe(63);
+    expect(backend.listGalleryItems).toHaveBeenCalledTimes(2);
+    accountLifecycle.activate('gallery-query-test-count-transition');
+    expect(galleryItemsTotalOptions(baseFilter).queryKey).not.toEqual(options.queryKey);
+  });
+
+  it('discovers date-board totals through its shared name metadata without hydrating rows', async () => {
+    const queryClient = createQueryClient();
+    const dateFilter = { ...baseFilter, boardId: 'by_date:2026-07-18' };
+    backend.listGalleryDateBoardItemNames.mockResolvedValue({
+      items: [{ kind: 'image', name: 'date-image' }],
+      total: 1,
+    });
+    backend.hydrateGalleryDateBoardItemPage.mockResolvedValue({ items: [], offset: 0, total: 1 });
+
+    await expect(queryClient.fetchQuery(galleryItemsTotalOptions(dateFilter))).resolves.toBe(1);
+    expect(backend.listGalleryDateBoardItemNames).toHaveBeenCalledOnce();
+    expect(backend.hydrateGalleryDateBoardItemPage).toHaveBeenCalledWith(
+      expect.objectContaining({ limit: 0, offset: 0, total: 1 })
+    );
   });
 
   it('keeps short final API pages aligned to their requested absolute offset', async () => {

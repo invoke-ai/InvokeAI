@@ -182,6 +182,22 @@ describe('GallerySelectionBar', () => {
     expect(itemActions.setItemsStarred).toHaveBeenCalledWith(expect.anything(), false);
   });
 
+  it('retains the selected item star state after its sparse page is evicted', async () => {
+    const gallery = createGallery({
+      items: [createItem('b.png', true)],
+      selectedItemKey: 'image:b.png',
+      selectedItemKeys: ['image:b.png'],
+    });
+
+    await renderBar(gallery);
+    await renderBar({ ...gallery, items: [] });
+
+    expect(getButton('widgets.gallery.unstarSelection')).toBeTruthy();
+    await click(getButton('widgets.gallery.unstarSelection'));
+
+    expect(itemActions.setItemsStarred).toHaveBeenCalledExactlyOnceWith([{ kind: 'image', name: 'b.png' }], false);
+  });
+
   it('reads star state from the strip for a selection the listing window has not loaded', async () => {
     await renderBar(createGallery({ items: [] }), {
       items: [createItem('a.png', true), createItem('b.png', true)],
