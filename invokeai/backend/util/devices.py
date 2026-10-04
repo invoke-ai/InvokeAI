@@ -548,19 +548,19 @@ class TorchDevice:
         return NAME_TO_PRECISION[config.precision]
 
     @classmethod
-    def choose_krea2_gguf_dtype(cls, device: Optional[torch.device] = None) -> torch.dtype:
-        """Choose the compute dtype for Krea-2 GGUF weights.
+    def choose_krea2_transformer_dtype(cls, is_gguf: bool, device: Optional[torch.device] = None) -> torch.dtype:
+        """Choose the dtype a Krea-2 transformer runs in. Its loader and the denoise step must agree.
 
-        Krea-2 GGUF dequantization in BF16 is unreliable on MPS, so use FP32 there. On other devices,
-        explicit precision settings are honored and ``auto`` retains the BF16-safe default used by Krea-2.
+        GGUF on MPS runs in float32: with bfloat16 it produces noise there. The GGUF compute dtype is
+        not only the dequantization target -- on MPS every GGUF Linear casts its input to it, so the
+        whole transformer, and therefore the latents, conditioning and LoRA sidecar weights fed to it,
+        must use the same dtype. Everything else keeps the bfloat16-safe default. ``config.precision``
+        is deliberately not consulted, since the Krea-2 text encoder and other loaders ignore it too.
         """
         device = device or cls.choose_torch_device()
-        if device.type == "mps":
+        if is_gguf and device.type == "mps":
             return torch.float32
-        config = get_config()
-        if config.precision == "auto":
-            return cls.choose_bfloat16_safe_dtype(device)
-        return NAME_TO_PRECISION[config.precision]
+        return cls.choose_bfloat16_safe_dtype(device)
 
 
 _PEER_AWARE_SENTINEL = "_invokeai_peer_aware"
