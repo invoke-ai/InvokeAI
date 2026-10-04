@@ -142,4 +142,8 @@ class StableDiffusionBackend:
         return noise_pred
 
     def _unet_forward(self, **kwargs) -> torch.Tensor:
-        return self.unet(**kwargs).sample
+        # First three args should be positional, not keywords, so torch hooks can see them.
+        sample = kwargs.pop("sample")
+        timestep = kwargs.pop("timestep")
+        encoder_hidden_states = kwargs.pop("encoder_hidden_states")
+        return self.unet(sample, timestep, encoder_hidden_states, **kwargs).sample
