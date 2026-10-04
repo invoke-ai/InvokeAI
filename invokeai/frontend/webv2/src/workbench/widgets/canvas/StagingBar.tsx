@@ -152,7 +152,6 @@ export const StagingBar = ({
           h={areThumbnailsVisible ? THUMBNAIL_STRIP_HEIGHT : '0'}
           opacity={areThumbnailsVisible ? 1 : 0}
           pointerEvents={areThumbnailsVisible ? 'auto' : 'none'}
-          size="xs"
           transition="height var(--wb-motion-duration-slow) ease, opacity var(--wb-motion-duration-slow) ease"
           variant="hover"
           w="full"
@@ -205,8 +204,8 @@ export const StagingBar = ({
       <CanvasOptionsBar>
         {isGenerating ? (
           <HStack color="fg.muted" gap="1.5" px="1">
-            <Spinner size="xs" />
-            <Text fontSize="xs" fontWeight="600">
+            <Spinner />
+            <Text fontSize="md" fontWeight="600">
               {t('widgets.canvas.staging.generating')}
             </Text>
           </HStack>
@@ -220,7 +219,6 @@ export const StagingBar = ({
                   ? t('widgets.canvas.hideStagingThumbnails')
                   : t('widgets.canvas.showStagingThumbnails')
               }
-              size="xs"
               variant="ghost"
               onClick={onToggleThumbnails}
             >
@@ -231,13 +229,12 @@ export const StagingBar = ({
               <IconButton
                 aria-label={t('widgets.canvas.previousStagedCandidate')}
                 disabled={!hasMultipleSlots}
-                size="xs"
                 variant="ghost"
                 onClick={() => onCycle(-1)}
               >
                 <ChevronLeftIcon />
               </IconButton>
-              <Text fontSize="xs" fontVariantNumeric="tabular-nums" minW="3.5rem" px="1" textAlign="center">
+              <Text fontSize="md" fontVariantNumeric="tabular-nums" minW="3.5rem" px="1" textAlign="center">
                 {t('widgets.canvas.candidateCount', {
                   current: selectedImageIndex + 1,
                   total: slots.length,
@@ -246,7 +243,6 @@ export const StagingBar = ({
               <IconButton
                 aria-label={t('widgets.canvas.nextStagedCandidate')}
                 disabled={!hasMultipleSlots}
-                size="xs"
                 variant="ghost"
                 onClick={() => onCycle(1)}
               >
@@ -259,7 +255,7 @@ export const StagingBar = ({
             <AutoSwitchMenu mode={autoSwitchMode} onSelect={onSetAutoSwitch} />
 
             {cancelableQueueItemId ? (
-              <Button size="xs" variant="ghost" onClick={() => onCancelQueueItem(cancelableQueueItemId)}>
+              <Button variant="ghost" onClick={() => onCancelQueueItem(cancelableQueueItemId)}>
                 <XIcon />
                 {t('common.cancel')}
               </Button>
@@ -280,7 +276,6 @@ export const StagingBar = ({
                         ? t('widgets.canvas.hideStagedResultPreview')
                         : t('widgets.canvas.showStagedResultPreview')
                     }
-                    size="xs"
                     variant="ghost"
                     onClick={onToggleVisibility}
                   >
@@ -292,30 +287,29 @@ export const StagingBar = ({
                   <IconButton
                     aria-label={t('widgets.canvas.staging.saveToGallery')}
                     disabled={isSaving}
-                    size="xs"
                     variant="ghost"
                     onClick={handleSaveToGallery}
                   >
-                    {isSaving ? <Spinner size="xs" /> : <SaveIcon />}
+                    {isSaving ? <Spinner /> : <SaveIcon />}
                   </IconButton>
                 </Tooltip>
 
                 <Tooltip content={t('common.discard')}>
-                  <IconButton aria-label={t('common.discard')} size="xs" variant="ghost" onClick={onDiscardSelected}>
+                  <IconButton aria-label={t('common.discard')} variant="ghost" onClick={onDiscardSelected}>
                     <XIcon />
                   </IconButton>
                 </Tooltip>
 
                 <CanvasFloatingBarDivider />
 
-                <Button size="xs" variant="ghost" onClick={onDiscardAll}>
+                <Button variant="ghost" onClick={onDiscardAll}>
                   <Trash2Icon />
                   {t('common.discardAll')}
                 </Button>
 
                 <Menu.Root positioning={MENU_POSITIONING}>
                   <Group attached>
-                    <Button disabled={!canAccept} size="xs" onClick={onAccept}>
+                    <Button disabled={!canAccept} onClick={onAccept}>
                       <CheckIcon />
                       {t('widgets.canvas.acceptToLayer')}
                     </Button>
@@ -324,7 +318,6 @@ export const StagingBar = ({
                         aria-label={t('widgets.canvas.staging.moreAcceptOptions')}
                         disabled={!canAccept}
                         minW="0"
-                        size="xs"
                         w="6"
                       >
                         <ChevronDownIcon />
@@ -336,7 +329,7 @@ export const StagingBar = ({
                       <MenuContent minW="13rem" py="1">
                         <Menu.Item value="save-disabled-layer" onClick={onSaveToLayerAndContinue}>
                           <EyeOffIcon size={14} />
-                          <Menu.ItemText fontSize="xs">{t('widgets.canvas.staging.saveAsDisabledLayer')}</Menu.ItemText>
+                          <Menu.ItemText fontSize="md">{t('widgets.canvas.staging.saveAsDisabledLayer')}</Menu.ItemText>
                         </Menu.Item>
                       </MenuContent>
                     </Menu.Positioner>
@@ -367,9 +360,9 @@ const AutoSwitchMenu = ({ mode, onSelect }: { mode: AutoSwitchMode; onSelect: (m
       <Tooltip content={t('widgets.canvas.staging.autoSwitch')}>
         <span style={{ display: 'inline-flex' }}>
           <Menu.Trigger asChild>
-            <Button minW="unset" px="2" size="xs" variant="ghost">
+            <Button minW="unset" px="2" variant="ghost">
               <SparklesIcon size={13} />
-              <Text fontSize="xs">{label(mode)}</Text>
+              <Text fontSize="md">{label(mode)}</Text>
             </Button>
           </Menu.Trigger>
         </span>
@@ -382,7 +375,7 @@ const AutoSwitchMenu = ({ mode, onSelect }: { mode: AutoSwitchMode; onSelect: (m
               {AUTO_SWITCH_MODES.map((value) => (
                 <Menu.Item key={value} value={value} onClick={() => onSelect(value)}>
                   <CheckIcon size={12} opacity={mode === value ? 1 : 0} />
-                  <Menu.ItemText fontSize="xs">{label(value)}</Menu.ItemText>
+                  <Menu.ItemText fontSize="md">{label(value)}</Menu.ItemText>
                 </Menu.Item>
               ))}
             </Menu.ItemGroup>
@@ -463,7 +456,7 @@ const StagingThumbnail = ({
         bg="blackAlpha.700"
         bottom="1"
         color="white"
-        fontSize="2xs"
+        fontSize="xs"
         fontWeight="700"
         left="1"
         px="1.5"
@@ -519,7 +512,6 @@ const StagingPlaceholderProgress = ({ percentage }: { percentage: number | null 
         borderWidth={1}
         p={0.5}
         rounded="full"
-        size="xs"
         value={percentage}
       >
         <ProgressCircle.Circle>

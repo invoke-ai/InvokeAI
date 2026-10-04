@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 783834,
+        "brotliBytes": 787696,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 783016,
+        "gzipBytes": 787013,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2012114,
-        "largestAssetRawBytes": 749225,
+        "initialRawBytes": 2022885,
+        "largestAssetRawBytes": 749233,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 94155,
+        "ownedRawBytes": 95743,
         "requestCount": 36,
         "scriptRequestCount": 20,
         "sourceOwners": [
@@ -194,6 +194,7 @@
           "source:src/platform/performance/semanticReady.ts",
           "source:src/platform/pwa/registerServiceWorker.ts",
           "source:src/platform/query/client.ts",
+          "source:src/platform/react/useExitRetainedValue.ts",
           "source:src/platform/react/useMountEffect.ts",
           "source:src/platform/react/usePreservedScrollOffset.ts",
           "source:src/platform/react/useZodForm.ts",
@@ -258,7 +259,9 @@
           "source:src/platform/ui/list/listLayout.ts",
           "source:src/platform/ui/settings/contracts.ts",
           "source:src/platform/ui/theme/applyTheme.ts",
+          "source:src/platform/ui/theme/rebase.ts",
           "source:src/platform/ui/theme/recipes.ts",
+          "source:src/platform/ui/theme/scale.ts",
           "source:src/platform/ui/theme/system.ts",
           "source:src/platform/ui/theme/themes.ts",
           "source:src/platform/ui/toaster.tsx",
@@ -337,15 +340,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1139046,
+        "brotliBytes": 1147969,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1132999,
+        "gzipBytes": 1142157,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3111181,
-        "largestAssetRawBytes": 749225,
+        "initialRawBytes": 3137996,
+        "largestAssetRawBytes": 749233,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 143824,
+        "ownedRawBytes": 148443,
         "requestCount": 74,
         "scriptRequestCount": 58,
         "sourceOwners": [
@@ -715,6 +718,7 @@
           "source:src/platform/query/client.ts",
           "source:src/platform/react/composeProviders.tsx",
           "source:src/platform/react/draftRegistry.ts",
+          "source:src/platform/react/useExitRetainedValue.ts",
           "source:src/platform/react/useMountEffect.ts",
           "source:src/platform/react/usePreservedScrollOffset.ts",
           "source:src/platform/react/useZodForm.ts",
@@ -783,7 +787,9 @@
           "source:src/platform/ui/list/listLayout.ts",
           "source:src/platform/ui/settings/contracts.ts",
           "source:src/platform/ui/theme/applyTheme.ts",
+          "source:src/platform/ui/theme/rebase.ts",
           "source:src/platform/ui/theme/recipes.ts",
+          "source:src/platform/ui/theme/scale.ts",
           "source:src/platform/ui/theme/system.ts",
           "source:src/platform/ui/theme/themes.ts",
           "source:src/platform/ui/toaster.tsx",
@@ -1072,7 +1078,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-02",
+  "capturedAt": "2026-10-04",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

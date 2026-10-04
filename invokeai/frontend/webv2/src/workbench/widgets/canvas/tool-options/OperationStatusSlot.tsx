@@ -38,7 +38,7 @@ export const OperationStatusSlot = ({
       align="center"
       color={errorText ? 'fg.error' : 'fg.muted'}
       flex="0 1 auto"
-      fontSize="xs"
+      fontSize="md"
       gap="1"
       maxW="16rem"
       minW={minW}
@@ -50,7 +50,7 @@ export const OperationStatusSlot = ({
           </span>
           {detail && detail !== errorText ? (
             <Tooltip content={detail}>
-              <IconButton aria-label={technicalDetailsLabel} flexShrink="0" size="xs" tabIndex={0} variant="ghost">
+              <IconButton aria-label={technicalDetailsLabel} flexShrink="0" tabIndex={0} variant="ghost">
                 <InfoIcon />
               </IconButton>
             </Tooltip>
@@ -60,7 +60,7 @@ export const OperationStatusSlot = ({
         <Flex align="center" aria-live="polite" gap="2" minW="0" role="status">
           {isBusy ? (
             <>
-              <Spinner flexShrink="0" size="xs" />
+              <Spinner flexShrink="0" />
               <span>{statusText}</span>
             </>
           ) : null}
@@ -93,7 +93,7 @@ export const OperationStatusChip = ({
 }: OperationStatusChipProps) => (
   <HStack gap="1" minW="0">
     <Tooltip content={sourceLabel}>
-      <Text flexShrink={0} fontSize="xs" fontWeight="semibold" minW="0" truncate>
+      <Text flexShrink={0} fontSize="md" fontWeight="semibold" minW="0" truncate>
         {title}
         <VisuallyHidden>{sourceLabel}</VisuallyHidden>
       </Text>

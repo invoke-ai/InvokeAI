@@ -2,7 +2,7 @@ import type { UpscaleUiAdapter } from '@features/upscale';
 import type { ReactNode } from 'react';
 
 import { areProjectPromptDraftsEqual, getPromptDraftFromValues } from '@features/generation/settings';
-import { UpscaleUiProvider } from '@features/upscale';
+import { createDefaultUpscaleWidgetValues, normalizeUpscaleWidgetValues, UpscaleUiProvider } from '@features/upscale';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
@@ -36,7 +36,15 @@ export const UpscaleUiAdapterProvider = ({ children }: { children: ReactNode }) 
     [commands, projectId]
   );
   const patchValues = useCallback<UpscaleUiAdapter['patchValues']>(
-    (values, origin) => commands.widgets.patchValues('upscale', values, projectId, origin),
+    (values, origin) =>
+      commands.widgets.patchValues(
+        'upscale',
+        typeof values === 'function'
+          ? (current) => values(normalizeUpscaleWidgetValues(current) ?? createDefaultUpscaleWidgetValues())
+          : values,
+        projectId,
+        origin
+      ),
     [commands, projectId]
   );
   const reportError = useCallback<UpscaleUiAdapter['reportError']>(

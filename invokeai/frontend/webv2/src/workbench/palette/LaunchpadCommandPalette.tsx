@@ -1,3 +1,4 @@
+import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { OPEN_COMMAND_PALETTE_HOTKEY } from '@workbench/hotkeys/catalog';
 import { MOD_KEY_LABEL, toTinykeysBinding } from '@workbench/hotkeys/keys';
@@ -29,30 +30,41 @@ const LaunchpadCommandPaletteHotkeys = ({ keys }: { keys: readonly string[] }) =
   return null;
 };
 
-/** Lightweight Launchpad runtime and lazy dialog host. */
+/** Lightweight Launchpad runtime and lazy dialog host; the dialog stays mounted while it animates closed. */
 export const LaunchpadCommandPalette = () => {
   const isOpen = useIsCommandPaletteOpen();
+  const dialog = useExitPresence(isOpen);
   const customHotkeys = useWorkbenchPreferenceSelector((preferences) => preferences.customHotkeys);
   const paletteHotkeys = applyCustomHotkeys(OPEN_COMMAND_PALETTE_HOTKEY, customHotkeys).keys;
 
   return (
     <>
       <LaunchpadCommandPaletteHotkeys key={paletteHotkeys.join('\n')} keys={paletteHotkeys} />
-      {isOpen ? <OpenLaunchpadCommandPalette /> : null}
+      {dialog.isMounted ? (
+        <MountedLaunchpadCommandPalette key={dialog.generation} isOpen={isOpen} onExitComplete={dialog.release} />
+      ) : null}
     </>
   );
 };
 
-const OpenLaunchpadCommandPalette = () => {
+const MountedLaunchpadCommandPalette = ({
+  isOpen,
+  onExitComplete,
+}: {
+  isOpen: boolean;
+  onExitComplete: () => void;
+}) => {
   const preferences = useWorkbenchPreferences();
 
   return (
     <Suspense fallback={null}>
       <LazyLaunchpadCommandPaletteDialog
+        isOpen={isOpen}
         modifierKeyLabel={MOD_KEY_LABEL}
         preferences={preferences}
         settingsEntryDeps={SETTINGS_ENTRY_DEPS}
         onClose={closeCommandPalette}
+        onExitComplete={onExitComplete}
       />
     </Suspense>
   );

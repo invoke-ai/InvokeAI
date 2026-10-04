@@ -22,6 +22,8 @@ export interface ImageMapPoint {
 export interface ImageMapPoints {
   points: ImageMapPoint[];
   state: ImageMapState;
+  /** Encoder fingerprint; cached labels belong only to this model. */
+  modelId: string | null;
   /** The accessible image set changed since this projection was computed; a refresh is pending. */
   stale: boolean;
   pointCount: number;
@@ -47,6 +49,7 @@ interface BackendImageMapPoint {
 interface BackendImageMapPointsResponse {
   points: BackendImageMapPoint[];
   state: ImageMapState;
+  model_id?: string | null;
   stale: boolean;
   point_count: number;
   model_name?: string | null;
@@ -60,6 +63,7 @@ const INCLUDE_VIDEOS_PARAM = { include_videos: 'true' } as const;
 
 const mapPoints = (body: BackendImageMapPointsResponse): ImageMapPoints => ({
   clusterEps: body.cluster_eps ?? null,
+  modelId: body.model_id ?? null,
   modelName: body.model_name ?? null,
   pointCount: body.point_count,
   points: body.points.map((point) => {
@@ -98,32 +102,35 @@ export const fetchImageMapPoints = async (options?: { eps?: number; minSamples?:
 export interface ImageMapStatus {
   /** Embedding-index counts, or null: the backend omits them for non-admins. */
   index: ImageIndexCounts | null;
+  state: ImageMapState;
+  modelId: string | null;
+  modelName: string | null;
 }
 
 interface BackendImageMapStatusResponse {
   enabled: boolean;
+  model_id?: string | null;
   index?: { total: number; embedded: number; failed?: number } | null;
+  model_name?: string | null;
+  projection: { state: ImageMapState };
 }
 
-/** Read index counts from status; projection details already come from points. */
+/** Read index progress and encoder availability without fetching/clustering the points. */
 export const fetchImageMapStatus = async (): Promise<ImageMapStatus> => {
-  // Request the same video-inclusive map as other endpoints, including the unused projection portion.
   const body = await apiFetchJson<BackendImageMapStatusResponse>(
     `/api/v1/image_map/status?${new URLSearchParams(INCLUDE_VIDEOS_PARAM).toString()}`
   );
 
-  if (!body.index) {
-    return { index: null };
-  }
-
-  const { embedded, total } = body.index;
-  const failed = body.index.failed ?? 0;
+  const { embedded = 0, failed = 0, total = 0 } = body.index ?? {};
 
   return {
     // `pending` is a computed property on the backend model and so is absent
     // from the serialized response; it is derived the same way here (failures
     // are excluded so it can still drain to zero).
-    index: { embedded, failed, pending: Math.max(0, total - embedded - failed), total },
+    index: body.index ? { embedded, failed, pending: Math.max(0, total - embedded - failed), total } : null,
+    modelId: body.model_id ?? null,
+    modelName: body.model_name ?? null,
+    state: body.projection.state,
   };
 };
 

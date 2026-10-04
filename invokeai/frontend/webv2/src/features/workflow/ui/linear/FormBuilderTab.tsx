@@ -114,7 +114,7 @@ const BuilderDragGhost = ({ element }: { element: WorkflowFormElement }) => (
     shadow="md"
   >
     <Icon as={GripVerticalIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
-    <Text color="fg.muted" fontSize="2xs" fontWeight="600" minW="0" truncate>
+    <Text color="fg.muted" fontSize="xs" fontWeight="600" minW="0" truncate>
       {getFormElementTitle(element)}
     </Text>
   </HStack>
@@ -204,7 +204,7 @@ const BuilderCardBase = ({
           {...listeners}
         >
           <Icon as={GripVerticalIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
-          <Text color="fg.muted" fontSize="2xs" fontWeight="600" minW="0" truncate>
+          <Text color="fg.muted" fontSize="xs" fontWeight="600" minW="0" truncate>
             {title}
           </Text>
           <Box flex="1" />
@@ -212,7 +212,7 @@ const BuilderCardBase = ({
             {extraActions}
             <IconButton
               aria-label="Remove from form"
-              size="2xs"
+              size="sm"
               variant="ghost"
               onClick={() => editGraph({ elementId: element.id, type: 'removeFormElement' })}
             >
@@ -251,7 +251,7 @@ const ContainerDropZoneBody = ({
       ref={setNodeRef}
       alignSelf="stretch"
       flex={isEmpty ? '1' : undefined}
-      fontSize="2xs"
+      fontSize="xs"
       isOver={isActive}
       px="2"
       py="1.5"
@@ -305,7 +305,7 @@ const ShuffleToggleAction = ({
       aria-label="Show shuffle button"
       aria-pressed={showShuffle}
       color={showShuffle ? 'accent.solid' : undefined}
-      size="2xs"
+      size="sm"
       title={showShuffle ? 'Hide shuffle button' : 'Show shuffle button'}
       variant="ghost"
       onClick={() => editGraph({ elementId: element.id, showShuffle: !showShuffle, type: 'setNodeFieldShowShuffle' })}
@@ -364,7 +364,7 @@ const BuilderElementBase = ({
           extraActions={
             <IconButton
               aria-label={isRow ? 'Switch container to column layout' : 'Switch container to row layout'}
-              size="2xs"
+              size="sm"
               title={isRow ? 'Switch to column layout' : 'Switch to row layout'}
               variant="ghost"
               onClick={() =>
@@ -400,7 +400,7 @@ const BuilderElementBase = ({
             <>
               <IconButton
                 aria-label="Zoom to node in editor"
-                size="2xs"
+                size="sm"
                 title="Zoom to node in the Workflow editor"
                 variant="ghost"
                 onClick={() => {
@@ -416,7 +416,7 @@ const BuilderElementBase = ({
                 aria-label="Show field description"
                 aria-pressed={element.data.showDescription}
                 color={element.data.showDescription ? 'accent.solid' : undefined}
-                size="2xs"
+                size="sm"
                 title={element.data.showDescription ? 'Hide field description' : 'Show field description'}
                 variant="ghost"
                 onClick={() =>
@@ -445,10 +445,9 @@ const BuilderElementBase = ({
         <BuilderCard element={element} title={getFormElementTitle(element)}>
           <Input
             aria-label="Form heading"
-            fontSize="sm"
+            fontSize="lg"
             fontWeight="700"
             placeholder="Heading"
-            size="xs"
             value={element.data.content}
             variant="flushed"
             onChange={(event: ChangeEvent<HTMLInputElement>) =>
@@ -464,11 +463,10 @@ const BuilderElementBase = ({
           <Textarea
             aria-label="Form text"
             color="fg.muted"
-            fontSize="2xs"
+            fontSize="xs"
             minH="2.5rem"
             placeholder="Text"
             resize="vertical"
-            size="xs"
             value={element.data.content}
             variant="flushed"
             onChange={(event: ChangeEvent<HTMLTextAreaElement>) =>
@@ -506,7 +504,7 @@ const AddElementMenu = () => {
   return (
     <Menu.Root positioning={{ placement: 'bottom-start' }}>
       <Menu.Trigger asChild>
-        <Button size="2xs" variant="ghost">
+        <Button size="sm" variant="ghost">
           <Icon as={PlusIcon} boxSize="3" />
           Add form element
         </Button>
@@ -694,7 +692,7 @@ export const FormBuilderTab = ({ projectGraph }: { projectGraph: ProjectGraphSta
         <BuilderDropTargetContext value={dropTarget}>
           <Stack gap="2" p="3" w="full">
             {rootChildren.length === 0 ? (
-              <Text color="fg.muted" fontSize="2xs">
+              <Text color="fg.muted" fontSize="xs">
                 The form is empty. Pin fields from the Workflow editor's nodes, then arrange them here — drag card title
                 bars to reorder, drop them into containers, and add headings or dividers below.
               </Text>

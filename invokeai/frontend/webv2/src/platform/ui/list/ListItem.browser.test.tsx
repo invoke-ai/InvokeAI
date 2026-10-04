@@ -65,6 +65,47 @@ describe('ListItem', () => {
     await userEvent.hover(primary());
   });
 
+  it('keeps detail on the row surface outside the primary button, deferring to a menu it handles itself', async () => {
+    const onContextMenu = vi.fn();
+
+    await render(
+      <ListItem
+        detail={
+          <div>
+            <input aria-label="Weight" onContextMenu={(event) => event.preventDefault()} />
+            <span>Plain detail</span>
+          </div>
+        }
+        title="A concept"
+        onContextMenu={onContextMenu}
+      />
+    );
+
+    const input = host.querySelector('input')!;
+
+    expect(input.closest('[role="listitem"]')).not.toBeNull();
+    expect(primary().contains(input)).toBe(false);
+
+    input.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    expect(onContextMenu).not.toHaveBeenCalled();
+
+    host.querySelector('span')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+    expect(onContextMenu).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps the hover surface while its context menu is open', async () => {
+    const surface = () => getComputedStyle(primary().parentElement!).backgroundColor;
+
+    await userEvent.unhover(document.body);
+    await render(<ListItem title="A model" onContextMenu={vi.fn()} />);
+    const resting = surface();
+
+    await render(<ListItem isMenuOpen title="A model" onContextMenu={vi.fn()} />);
+
+    expect(resting).toBe('rgba(0, 0, 0, 0)');
+    expect(surface()).not.toBe(resting);
+  });
+
   it('renders a static row without a press handler as plain content, not a button', async () => {
     await render(<ListItem title="Read only" />);
 

@@ -19281,10 +19281,15 @@ export type components = {
             points: components["schemas"]["ImageMapPoint"][];
             /**
              * State
-             * @description disabled: indexing is off; model_missing: indexing is enabled but the configured embedding model is not installed; empty: nothing to show; computing: a projection is being built; ready: points are served
+             * @description disabled: indexing is off; model_missing: indexing is enabled but the configured embedding model is not installed; empty: nothing to show; computing: a projection is being built, or the index is switching to a replacement embedding model; ready: points are served
              * @enum {string}
              */
             state: "disabled" | "model_missing" | "empty" | "computing" | "ready";
+            /**
+             * Model Id
+             * @description Active encoder fingerprint; clients must discard cached labels when it changes
+             */
+            model_id?: string | null;
             /**
              * Model Name
              * @description The configured embedding model's name; only set when state is model_missing, so the client can tell the user which model to install
@@ -19418,6 +19423,11 @@ export type components = {
              * @description Whether the embedding index is running
              */
             enabled: boolean;
+            /**
+             * Model Id
+             * @description Active encoder fingerprint; clients must discard cached labels when it changes
+             */
+            model_id?: string | null;
             /**
              * Model Name
              * @description The configured embedding model's name; only set when the projection state is model_missing

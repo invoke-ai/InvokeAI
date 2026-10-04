@@ -8,7 +8,14 @@ import { galleryImageUrls } from '@features/gallery/utility';
 import { GenerationUiProvider } from '@features/generation/react';
 import { normalizeRebalancePresets } from '@features/generation/settings';
 import { useAuthSession, useCapabilities } from '@features/identity';
-import { ensureModelsLoaded, getModelBaseColorPalette, getModelBaseLabel, useModelsSelector } from '@features/models';
+import {
+  ensureModelsLoaded,
+  getModelBaseColorPalette,
+  getModelBaseLabel,
+  getModelImageUrl,
+  useModelsSelector,
+  useOpenModelInManager,
+} from '@features/models';
 import { getQueueReadModelOptions } from '@features/queue';
 import {
   buildProjectQueueItemOriginPrefix,
@@ -157,6 +164,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
     }),
     [findImage, queryClient, selectedGalleryImage]
   );
+  const openInModelManager = useOpenModelInManager();
   const modelsGroup = useMemo<GenerationUiAdapter['models']>(
     () => ({
       ModelSelect,
@@ -165,6 +173,8 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       error: modelsError,
       getBaseColorPalette: getModelBaseColorPalette,
       getBaseLabel: getModelBaseLabel,
+      getImageUrl: getModelImageUrl,
+      openInModelManager: openInModelManager ?? undefined,
       // Use hash navigation and lazy filter seeding to keep router/manager code out of initial bundles; set the
       // filter before navigation.
       openManager: (options) => {
@@ -185,7 +195,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
       },
       status: modelsStatus,
     }),
-    [modelsCatalog, modelsError, modelsStatus, project.activeProjectId]
+    [modelsCatalog, modelsError, modelsStatus, openInModelManager, project.activeProjectId]
   );
   const notificationsGroup = useMemo<GenerationUiAdapter['notifications']>(
     () => ({ error: notify.error, info: notify.info, reportError: notifications.reportError }),

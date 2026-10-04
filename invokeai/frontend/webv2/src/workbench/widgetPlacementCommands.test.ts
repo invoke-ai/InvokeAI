@@ -2,7 +2,7 @@ import type { WidgetRegion } from '@workbench/layoutContracts';
 import type { Project, WorkbenchState } from '@workbench/projectContracts';
 import type { NormalizedWidgetManifest, RegisteredWidget } from '@workbench/widgetContracts';
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 import type { WorkbenchAction } from './workbenchState.testing';
 import type { WorkbenchWidgetCommands } from './workbenchStore';
@@ -78,7 +78,7 @@ const createWidgetCommands = (dispatch: (action: WorkbenchAction) => void): Work
   open: (options) => dispatch({ ...options, type: 'openRegionWidget' }),
   patchInstanceValues: (instanceId, values, projectId) =>
     dispatch({ instanceId, projectId, type: 'patchWidgetInstanceValues', values }),
-  patchValues: (widgetId, values, projectId) => dispatch({ projectId, type: 'patchWidgetValues', values, widgetId }),
+  patchValues: vi.fn(),
   reorder: (options) => dispatch({ ...options, type: 'reorderWidgetInstances' }),
   revealFloating: (instanceId) => dispatch({ instanceId, type: 'revealFloatingWidget' }),
   select: (options) => dispatch({ ...options, type: 'selectRegionWidget' }),

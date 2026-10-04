@@ -230,7 +230,7 @@ export const WIDGET_ITEM_SX: SystemStyleObject = {
   w: 9,
   color: 'fg.muted',
   '&[aria-pressed="false"]:hover, &[data-floating]:hover': {
-    bg: 'bg.emphasized',
+    bg: 'bg.hover',
     color: 'fg',
   },
   '&[aria-pressed="true"]': {

@@ -20,6 +20,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createExternalStore } from '@platform/state/externalStore';
 import { createSingleFlight } from '@platform/state/singleFlight';
+import { isPromptFontSize } from '@theme/scale';
 import { DEFAULT_THEME_ID, resolveWorkbenchThemeId } from '@theme/themes';
 import { deleteClientStateValue, getClientStateValue, setClientStateValue } from '@workbench/projects/api';
 import { fetchSessionBlob } from '@workbench/projects/session';
@@ -62,6 +63,7 @@ export const DEFAULT_PREFERENCES: WorkbenchPreferences = {
   launchpadProjectsView: 'grid',
   notifyOnEnqueue: true,
   preferNumericAttentionStyle: false,
+  promptFontSize: 'default',
   queueJobsScope: 'all',
   reduceMotion: false,
   showPromptSyntaxHighlighting: true,
@@ -326,6 +328,9 @@ export const normalizeWorkbenchPreferences = (preferences?: WorkbenchPreferences
     typeof preferences?.preferNumericAttentionStyle === 'boolean'
       ? preferences.preferNumericAttentionStyle
       : DEFAULT_PREFERENCES.preferNumericAttentionStyle,
+  promptFontSize: isPromptFontSize(preferences?.promptFontSize)
+    ? preferences.promptFontSize
+    : DEFAULT_PREFERENCES.promptFontSize,
   queueJobsScope:
     preferences?.queueJobsScope === 'all-projects'
       ? 'all'

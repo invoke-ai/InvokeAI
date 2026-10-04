@@ -18,7 +18,7 @@ const AlphaNoticeModalLayer = () => {
 };
 
 /** Wait for account preferences before showing the notice; dismissal follows the account. */
-export const AlphaNoticeDialog = () => {
+export const AlphaNoticeDialog = ({ onExitComplete }: { onExitComplete?: () => void }) => {
   const { t } = useTranslation();
   const isOpen = useWorkbenchSettingsSelector(
     (snapshot) => snapshot.status === 'ready' && !snapshot.preferences.alphaNoticeAcknowledged
@@ -38,6 +38,7 @@ export const AlphaNoticeDialog = () => {
       open={isOpen}
       role="alertdialog"
       size="sm"
+      onExitComplete={onExitComplete}
       onOpenChange={handleOpenChange}
     >
       {isOpen ? <AlphaNoticeModalLayer /> : null}
@@ -50,8 +51,8 @@ export const AlphaNoticeDialog = () => {
             </Dialog.Header>
             <Dialog.Body>
               <Stack gap="2">
-                <Text fontSize="xs">{t('alphaNotice.body')}</Text>
-                <Text fontSize="xs">
+                <Text fontSize="md">{t('alphaNotice.body')}</Text>
+                <Text fontSize="md">
                   {t('alphaNotice.reportPrefix')}{' '}
                   <Link color="accent.fg" href={ISSUES_URL} rel="noreferrer" target="_blank">
                     {t('alphaNotice.reportLink')}
@@ -61,7 +62,7 @@ export const AlphaNoticeDialog = () => {
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button ref={dismissRef} colorPalette="accent" size="xs" variant="solid" onClick={acknowledge}>
+              <Button ref={dismissRef} colorPalette="accent" variant="solid" onClick={acknowledge}>
                 {t('alphaNotice.dismiss')}
               </Button>
             </Dialog.Footer>

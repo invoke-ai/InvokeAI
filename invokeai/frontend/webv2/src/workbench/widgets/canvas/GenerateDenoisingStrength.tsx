@@ -53,7 +53,7 @@ export const GenerateDenoisingStrength = () => {
   const badges = useMemo(
     () => (
       <>
-        <Badge size="xs">{formatStrengthPercent(draftStrength)}</Badge>
+        <Badge>{formatStrengthPercent(draftStrength)}</Badge>
         <DenoisingStrengthWave value={draftStrength} />
       </>
     ),

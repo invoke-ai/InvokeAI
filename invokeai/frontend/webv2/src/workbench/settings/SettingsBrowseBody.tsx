@@ -25,7 +25,7 @@ const retrySave = () => {
 const SEARCH_START_ELEMENT = <Icon as={SearchIcon} boxSize="3.5" color="fg.muted" />;
 /** The `/` shortcut its surface handles with `focusSettingsSearchOnSlash`. */
 const SEARCH_HOTKEY_HINT = (
-  <Kbd aria-hidden pointerEvents="none" size="sm" variant="outline">
+  <Kbd aria-hidden pointerEvents="none" variant="outline">
     /
   </Kbd>
 );
@@ -36,7 +36,7 @@ export const SettingsSearchField = ({
   value,
 }: {
   onChange: (query: string) => void;
-  size: 'xs' | 'sm';
+  size: 'md' | 'lg';
   value: string;
 }) => {
   const { t } = useTranslation();
@@ -46,7 +46,7 @@ export const SettingsSearchField = ({
   const endElement = useMemo(
     () =>
       value ? (
-        <Button aria-label={t('settingsDialog.clearSearch')} me="-2" size="2xs" variant="ghost" onClick={clear}>
+        <Button aria-label={t('settingsDialog.clearSearch')} me="-2" size="sm" variant="ghost" onClick={clear}>
           <XIcon />
         </Button>
       ) : (
@@ -111,12 +111,10 @@ export const SettingsBrowseBody = ({
     <>
       {error ? (
         <HStack role="alert" px="4" py="2" bg="bg.error">
-          <Text fontSize="xs" color="fg.error" flex="1">
+          <Text fontSize="md" color="fg.error" flex="1">
             {error}
           </Text>
-          <Button size="xs" onClick={retrySave}>
-            {t('common.retry')}
-          </Button>
+          <Button onClick={retrySave}>{t('common.retry')}</Button>
         </HStack>
       ) : null}
       <VisuallyHidden role="status">{searching ? t('settingsDialog.resultCount', { count }) : ''}</VisuallyHidden>
@@ -154,7 +152,7 @@ export const SettingsBrowseBody = ({
           {searching && !displayed.length ? (
             <Stack align="center" py="12" gap="3">
               <Text color="fg.muted">{t('settingsDialog.noResults')}</Text>
-              <Button size="sm" variant="outline" onClick={onClearSearch}>
+              <Button size="lg" variant="outline" onClick={onClearSearch}>
                 {t('settingsDialog.clearSearch')}
               </Button>
             </Stack>
@@ -192,7 +190,7 @@ const SettingsSectionContent = ({
       ) : null}
       {search ? (
         <Stack gap="0.5" pt="5">
-          <Text as="h3" fontWeight="600" fontSize="sm">
+          <Text as="h3" fontWeight="600" fontSize="lg">
             {resolveSettingsText(section.label, t)}
           </Text>
           {section.entries[0] ? <SettingsScopeLabel scope={section.entries[0].field.scope} /> : null}

@@ -2,8 +2,7 @@
 import type { ReactNode } from 'react';
 
 import { Box, Menu, Portal } from '@chakra-ui/react';
-import { MenuContent } from '@platform/ui/Menu';
-import { useState } from 'react';
+import { MenuContent, useContextMenu } from '@platform/ui/Menu';
 import { useTranslation } from 'react-i18next';
 
 interface GenerateFieldContextMenuProps {
@@ -25,14 +24,14 @@ export const GenerateFieldContextMenu = ({
   resetLabel,
 }: GenerateFieldContextMenuProps) => {
   const { t } = useTranslation();
-  const [point, setPoint] = useState<{ x: number; y: number } | null>(null);
+  const { anchor: point, close, onRequestDismiss, open } = useContextMenu();
 
   return (
     <Box
       w="full"
       onContextMenu={(event) => {
         event.preventDefault();
-        setPoint({ x: event.clientX, y: event.clientY });
+        open({ x: event.clientX, y: event.clientY });
       }}
     >
       {children}
@@ -44,9 +43,10 @@ export const GenerateFieldContextMenu = ({
         }}
         onOpenChange={(event) => {
           if (!event.open) {
-            setPoint(null);
+            close();
           }
         }}
+        onRequestDismiss={onRequestDismiss}
       >
         <Portal>
           <Menu.Positioner>

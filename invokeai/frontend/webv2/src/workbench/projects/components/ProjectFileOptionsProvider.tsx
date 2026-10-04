@@ -1,3 +1,4 @@
+import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { type AccountScope, isAccountScopeCurrent } from '@platform/state/accountLifecycle';
 import {
@@ -45,6 +46,8 @@ export const useProjectFileOptions = (): ProjectFileOptionsControl => {
 
 export const ProjectFileOptionsProvider = ({ children }: { children: ReactNode }) => {
   const [request, setRequest] = useState<ProjectFileOptionsRequest | null>(null);
+  // Settling closes the dialog; its request stays rendered until the close animation finishes.
+  const dialog = useExitRetainedValue(request);
   const current = useRef<ProjectFileOptionsRequest | null>(null);
   const ticket = useRef(0);
   const requestOptions = useCallback((kind: ProjectFileOptionsRequest['kind'], name: string, owner: AccountScope) => {
@@ -86,9 +89,14 @@ export const ProjectFileOptionsProvider = ({ children }: { children: ReactNode }
   return (
     <ProjectFileOptionsContext.Provider value={control}>
       {children}
-      {request ? (
+      {dialog.value ? (
         <Suspense fallback={null}>
-          <ProjectFileOptionsDialog key={request.ticket} request={request} />
+          <ProjectFileOptionsDialog
+            key={dialog.value.ticket}
+            isOpen={dialog.isOpen}
+            request={dialog.value}
+            onExitComplete={dialog.release}
+          />
         </Suspense>
       ) : null}
     </ProjectFileOptionsContext.Provider>

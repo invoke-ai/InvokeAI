@@ -28,7 +28,7 @@ export const DropTargetOverlay = ({
       zIndex="2"
     >
       {label ? (
-        <Text color="fg" fontSize="sm" fontWeight="700" px="2" textAlign="center" textWrap="pretty">
+        <Text color="fg" fontSize="lg" fontWeight="700" px="2" textAlign="center" textWrap="pretty">
           {label}
         </Text>
       ) : null}
