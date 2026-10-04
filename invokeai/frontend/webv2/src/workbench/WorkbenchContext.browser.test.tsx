@@ -1,12 +1,16 @@
+import type { GenerationUiAdapter } from '@features/generation/react';
 import type * as projectsApi from '@workbench/projects/api';
 import type { ProjectRecordDTO } from '@workbench/projects/api';
 import type { WorkbenchCommands } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { GenerationUiProvider } from '@features/generation/react';
 import { useRegisterDraftFlusher } from '@platform/react/draftRegistry';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { system } from '@theme/system';
+import { GenerateDenoisingStrength } from '@workbench/widgets/canvas/GenerateDenoisingStrength';
+import { DEFAULT_CANVAS_DENOISING_STRENGTH } from '@workbench/widgets/canvas/invoke/canvasStrength';
 import { act, StrictMode } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -124,10 +128,20 @@ const activeProject = (): { id: string; name: string } | null => {
   return output ? { id: output.dataset.projectId!, name: output.textContent } : null;
 };
 
-const mountEditor = async ({ strict = false } = {}) => {
+const generationUi = {
+  sectionPreferences: { sectionsOpen: {}, setSectionOpen: () => undefined },
+} as unknown as GenerationUiAdapter;
+
+const mountEditor = async ({ strict = false, withStrength = false } = {}) => {
   const editorTree = (
     <WorkbenchProvider>
       <EditorProbe />
+      {/* A real Generate control that holds its edits in a debounced draft. */}
+      {withStrength ? (
+        <GenerationUiProvider adapter={generationUi}>
+          <GenerateDenoisingStrength />
+        </GenerationUiProvider>
+      ) : null}
     </WorkbenchProvider>
   );
   await act(() =>
@@ -241,5 +255,47 @@ describe('WorkbenchProvider exit checkpoint', () => {
     const finalSave = server.calls.lastIndexOf('update:Newest');
     expect(server.calls.indexOf('update:Slow')).toBeLessThan(finalSave);
     expect(server.calls.lastIndexOf('list')).toBeGreaterThan(finalSave);
+  });
+});
+
+describe('WorkbenchProvider hidden page', () => {
+  const strengthSlider = () => host.querySelector<HTMLElement>('[data-scope="scrubber"] [role="slider"]');
+  const strengthValue = () => Number(strengthSlider()?.getAttribute('aria-valuenow'));
+  const typedStrength = DEFAULT_CANVAS_DENOISING_STRENGTH + 0.01;
+
+  it('saves an edit still held in a draft when the page is hidden, before the draft debounce', async () => {
+    const projectId = activeProject()!.id;
+    await leaveEditor();
+    await mountEditor({ withStrength: true });
+    await vi.waitFor(() => expect(strengthSlider()).not.toBeNull(), { timeout: 5_000 });
+    const savedBeforeEdit = JSON.stringify(server.records.get(projectId)?.data);
+
+    const slider = strengthSlider()!;
+    await act(() => {
+      slider.focus();
+      slider.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+    });
+    act(() => {
+      window.dispatchEvent(new PageTransitionEvent('pagehide'));
+    });
+
+    // Committing the draft leaves the control as the user left it.
+    expect(document.activeElement).toBe(slider);
+    expect(strengthValue()).toBeCloseTo(typedStrength);
+    // Well before the 250 ms draft debounce and 500 ms autosave could have saved it on their own.
+    await vi.waitFor(() => expect(JSON.stringify(server.records.get(projectId)?.data)).not.toBe(savedBeforeEdit), {
+      timeout: 600,
+    });
+
+    // The page goes away: its lifetime ends without the editor's exit checkpoint, and a new one loads it again.
+    const { storageSuffix } = accountLifecycle.capture();
+    accountLifecycle.invalidate();
+    await leaveEditor();
+    accountLifecycle.activate('editor-exit-test', storageSuffix);
+    await mountEditor({ withStrength: true });
+    await vi.waitFor(() => expect(strengthSlider()).not.toBeNull(), { timeout: 5_000 });
+
+    expect(activeProject()!.id).toBe(projectId);
+    expect(strengthValue()).toBeCloseTo(typedStrength);
   });
 });

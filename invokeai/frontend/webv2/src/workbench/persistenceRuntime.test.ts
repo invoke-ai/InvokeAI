@@ -179,6 +179,20 @@ const createPage = () => {
   return { hide: () => onHidden?.(), port };
 };
 
+/** A draft an editor holds outside the aggregate until `commit` (the draft registry's flush) commits it. */
+const createHeldDraft = () => {
+  const held = { commitTo: null as ReturnType<typeof createAggregate> | null, name: null as string | null };
+  return {
+    commit: vi.fn(() => {
+      if (held.name !== null) {
+        held.commitTo?.edit(held.name);
+        held.name = null;
+      }
+    }),
+    held,
+  };
+};
+
 const savedNames = (persistence: WorkbenchPersistencePort): (string | undefined)[] =>
   vi.mocked(persistence.saveWorkbench).mock.calls.map(([state]) => state.projects[0]?.name);
 
@@ -881,6 +895,19 @@ describe('Workbench persistence runtime exit checkpoint', () => {
     expect(loggedSince(mark)).toEqual(['persistence.exit-checkpoint-incomplete']);
   });
 
+  it('commits drafts editors still hold and saves them in the one checkpoint write', async () => {
+    const draft = createHeldDraft();
+    const { aggregate, clock, persistence, runtime } = await startLoaded({ commitDrafts: draft.commit });
+    draft.held.commitTo = aggregate;
+    draft.held.name = 'Drafted';
+
+    await expect(runtime.exit().settled).resolves.toBe('saved');
+    clock.runAll();
+    await flushPromises();
+
+    expect(savedNames(persistence)).toEqual(['Drafted']);
+  });
+
   it('stops observing the aggregate and the page at exit', async () => {
     const page = createPage();
     const { aggregate, clock, persistence, runtime } = await startLoaded({ page: page.port });
@@ -1038,15 +1065,73 @@ describe('Workbench persistence runtime page lifecycle', () => {
     expect(savedNames(persistence)).toEqual(['Failed', 'In flight']);
   });
 
-  it('writes nothing while the editor is leaving with a closed session', async () => {
+  it('commits held drafts before deciding whether the hidden page has anything to save', async () => {
     const page = createPage();
-    const { aggregate, clock, persistence, setClosedSession } = await startLoaded({ page: page.port });
+    const draft = createHeldDraft();
+    const { aggregate, clock, persistence } = await startLoaded({ commitDrafts: draft.commit, page: page.port });
+    draft.held.commitTo = aggregate;
+
+    page.hide();
+    expect(draft.commit).toHaveBeenCalledOnce();
+    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
+
+    draft.held.name = 'Typed just before hiding';
+    page.hide();
+    expect(savedNames(persistence)).toEqual(['Typed just before hiding']);
+
+    // The debounced save the commit scheduled is replaced, not repeated.
+    clock.runAll();
+    await flushPromises();
+    expect(savedNames(persistence)).toEqual(['Typed just before hiding']);
+  });
+
+  it('writes nothing and leaves drafts alone while the editor is leaving with a closed session', async () => {
+    const page = createPage();
+    const draft = createHeldDraft();
+    const { aggregate, clock, persistence, setClosedSession } = await startLoaded({
+      commitDrafts: draft.commit,
+      page: page.port,
+    });
+    draft.held.commitTo = aggregate;
     setClosedSession(true);
 
     aggregate.edit('After the empty session');
     clock.runAll();
+    draft.held.name = 'Drafted after the empty session';
     page.hide();
 
+    expect(draft.commit).not.toHaveBeenCalled();
+    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
+  });
+
+  it('leaves drafts alone when the page is hidden before loading or after its account lifetime ended', async () => {
+    const page = createPage();
+    const draft = createHeldDraft();
+    const aggregate = createAggregate();
+    draft.held.commitTo = aggregate;
+    draft.held.name = 'Drafted';
+    const load = deferred<HydratedWorkbenchSnapshot | null>();
+    const { persistence } = createPersistence(() => load.promise);
+    const controller = new AbortController();
+    const runtime = createWorkbenchPersistenceRuntime({
+      aggregate: aggregate.port,
+      clock: new FakeClock(),
+      commitDrafts: draft.commit,
+      page: page.port,
+      persistence,
+      signal: controller.signal,
+    });
+
+    runtime.start();
+    page.hide();
+    expect(draft.commit).not.toHaveBeenCalled();
+
+    load.resolve(null);
+    await flushPromises();
+    controller.abort();
+    page.hide();
+
+    expect(draft.commit).not.toHaveBeenCalled();
     expect(persistence.saveWorkbench).not.toHaveBeenCalled();
   });
 

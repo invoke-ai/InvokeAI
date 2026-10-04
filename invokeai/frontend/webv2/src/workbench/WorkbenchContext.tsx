@@ -116,6 +116,8 @@ export const WorkbenchProvider = ({
         setHasHydrated: store.setHasHydrated,
         subscribe: store.subscribe,
       },
+      // At exit, React runs a removed provider's cleanup before its descendants', so their flushers are still registered.
+      commitDrafts: flushWorkbenchDrafts,
       loadOptions,
       logger: createLogger({ area: 'autosave', namespace: 'persistence' }, { owner }),
       page: browserPageLifecycle,
@@ -180,8 +182,6 @@ export const WorkbenchProvider = ({
       releaseIntermediateHold();
       clearLayerPanelStates();
       openProjectBroker.dispose();
-      // React runs a removed provider's cleanup before its descendants', so their draft flushers are still registered.
-      flushWorkbenchDrafts();
       // The checkpoint outlives this unmount and keeps the persistence lease until it settles.
       const exit = persistenceRuntime.exit({
         beforeCapture: async () => {

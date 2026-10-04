@@ -429,6 +429,15 @@ const runResponsiveTopbarJourney = async (browser) => {
       });
 
       assert.equal(metrics.scrollWidth, metrics.clientWidth, `The topbar must not overflow at ${width}px.`);
+      const documentHeights = await page.evaluate(() => ({
+        clientHeight: document.documentElement.clientHeight,
+        scrollHeight: document.documentElement.scrollHeight,
+      }));
+      assert.equal(
+        documentHeights.scrollHeight,
+        documentHeights.clientHeight,
+        `The workbench must not scroll the document at ${width}px.`
+      );
       assert.equal(metrics.controlsInsideHeader, true, `Every topbar control must remain visible at ${width}px.`);
       assert.equal(metrics.zonesDoNotOverlap, true, `Topbar zones must not overlap at ${width}px.`);
       assert.ok(

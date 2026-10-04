@@ -65,9 +65,9 @@ export interface PersistenceExit {
 
 export interface WorkbenchPersistenceRuntime {
   /**
-   * Ends the editor lifetime. Stops observing the aggregate and saves its latest committed state unless it is already
-   * saved. `beforeCapture` brings state still held outside the aggregate in (bounded); if that moves the state on, it
-   * is saved once more.
+   * Ends the editor lifetime. Stops observing the aggregate, commits held drafts, and saves the latest committed state
+   * unless it is already saved. `beforeCapture` brings state still held outside the aggregate in (bounded); if that
+   * moves the state on, it is saved once more.
    */
   exit(options?: { beforeCapture?: () => Promise<unknown> }): PersistenceExit & {
     settled: Promise<PersistenceExitOutcome>;
@@ -115,6 +115,7 @@ const errorMessage = (error: unknown, fallback: string): string => (error instan
 export const createWorkbenchPersistenceRuntime = ({
   aggregate,
   clock = browserClock,
+  commitDrafts,
   loadOptions,
   logger = defaultLogger,
   page,
@@ -125,6 +126,11 @@ export const createWorkbenchPersistenceRuntime = ({
 }: {
   aggregate: PersistenceAggregatePort;
   clock?: PersistenceClock;
+  /**
+   * Synchronously commits edits that editors still hold outside the aggregate, so the hidden-page save and the exit
+   * checkpoint include them.
+   */
+  commitDrafts?: () => void;
   loadOptions?: WorkbenchLoadOptions;
   logger?: Logger;
   /** Saves the current revision immediately when the page is hidden or unloaded. */
@@ -336,13 +342,30 @@ export const createWorkbenchPersistenceRuntime = ({
     });
   };
 
+  /** A draft that cannot be committed must not keep the already committed state from being saved. */
+  const commitPendingDrafts = (): void => {
+    try {
+      commitDrafts?.();
+    } catch (error) {
+      logger.warn({
+        error,
+        message: 'Pending editor drafts could not be committed before saving.',
+        name: 'persistence.draft-commit-failed',
+      });
+    }
+  };
+
   /** Best effort only: a hidden page may be frozen or discarded before the request completes. */
   const saveBeforeHidden = (): void => {
+    // A closed session must not change until the editor leaves or reopens it, so its drafts stay where they are.
+    if (isStopped() || !hasLoaded || persistence.hasClosedSession()) {
+      return;
+    }
+    // Committing a draft notifies the aggregate, which schedules the debounced save this replaces.
+    commitPendingDrafts();
     const revision = aggregate.getPersistedRevision();
     // A failed revision waits for a new edit as it does under the debounce; hiding and unloading both fire.
     if (
-      isStopped() ||
-      !hasLoaded ||
       revision === lastSavedRevision ||
       revision === failedRevision ||
       (isSaveInFlight && revision === inFlightRevision)
@@ -580,6 +603,7 @@ export const createWorkbenchPersistenceRuntime = ({
     }
     exiting = true;
     stopObserving();
+    commitPendingDrafts();
     let isSuperseded = false;
     const settled = checkpoint(beforeCapture, () => isSuperseded).finally(dispose);
     exitHandle = {

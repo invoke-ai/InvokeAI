@@ -54,6 +54,14 @@ export const tooltipSlotRecipe = defineSlotRecipe({
       ...chakraSlotRecipes.tooltip.base?.arrowTip,
       borderColor: 'border.emphasized',
     },
+    positioner: {
+      ...chakraSlotRecipes.tooltip.base?.positioner,
+      // Zag translates the positioner by `--x`/`--y`, which it sets inline a frame after opening. Unset, they leave it
+      // at the page's origin, where a tooltip closed within that frame (focus, then a click that disables the trigger)
+      // would fade out. Default off-screen, as Zag does for a positioner with no placement.
+      '--x': '0px',
+      '--y': '-100vh',
+    },
   },
 });
 
