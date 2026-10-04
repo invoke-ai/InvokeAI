@@ -14,6 +14,7 @@ import { getGalleryUploadTargetLabel } from '@features/gallery/ui/GalleryUploadB
 import { GalleryViewSegmentTabs } from '@features/gallery/ui/GalleryViewTabs';
 import { useGalleryUploadAction } from '@features/gallery/ui/useGalleryUploadAction';
 import { useGalleryUploadInput } from '@features/gallery/ui/useGalleryUploadInput';
+import { isImeComposing } from '@platform/browser/imeComposition';
 import { Button, CloseButton, IconButton } from '@platform/ui/Button';
 import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
 import { segmentTabsPanelId, segmentTabsTabId } from '@platform/ui/SegmentTabs';
@@ -221,7 +222,7 @@ export const GalleryPickerView = ({
 
   const handleSearchKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
-      if (event.nativeEvent.isComposing) {
+      if (isImeComposing(event.nativeEvent)) {
         return;
       }
 

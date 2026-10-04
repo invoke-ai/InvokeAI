@@ -197,4 +197,23 @@ describe('AddNodeDialog search', () => {
 
     expect(onAddNode).toHaveBeenCalledExactlyOnceWith(TEMPLATES.integer);
   });
+
+  it('leaves arrows and Enter to an IME while it composes', async () => {
+    const { onAddNode, search } = await renderOpen();
+    await act(() => userEvent.type(search, 'integer'));
+    const activeRow = () => document.getElementById(search.getAttribute('aria-activedescendant')!)?.textContent;
+    const press = (key: string, init: KeyboardEventInit) =>
+      act(() => {
+        search.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key, ...init }));
+      });
+    const bestMatch = activeRow();
+
+    await press('ArrowDown', { isComposing: true });
+    await press('Enter', { isComposing: true });
+    // Safari's confirming keydown arrives after compositionend, marked only by keyCode 229.
+    await press('Enter', { keyCode: 229 });
+
+    expect(activeRow()).toBe(bestMatch);
+    expect(onAddNode).not.toHaveBeenCalled();
+  });
 });

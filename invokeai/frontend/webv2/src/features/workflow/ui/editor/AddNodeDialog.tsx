@@ -11,6 +11,7 @@ import {
   LOOP_LINKAGE_FIELD,
   resolveConnectorSource,
 } from '@features/workflow/utility';
+import { isImeComposing } from '@platform/browser/imeComposition';
 import { useExitPresence } from '@platform/react/useExitRetainedValue';
 import { IconButton, Tooltip } from '@platform/ui';
 import { Dialog } from '@platform/ui/Dialog';
@@ -637,6 +638,10 @@ const AddNodeDialogContent = ({
 
   const onSearchKeyDown = useCallback(
     (event: KeyboardEvent<HTMLInputElement>) => {
+      if (isImeComposing(event.nativeEvent)) {
+        return;
+      }
+
       if (event.key === 'ArrowDown') {
         event.preventDefault();
         moveActiveIndex(1);

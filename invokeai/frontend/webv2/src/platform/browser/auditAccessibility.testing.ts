@@ -11,3 +11,15 @@ export const auditAccessibility = async (target: Element): Promise<axe.Result[]>
 
   return (await axe.run(target)).violations;
 };
+
+/**
+ * Text of each node failing `color-contrast`, sorted. Pinning known offenders by text keeps the rule on: a new
+ * failing node, or a fixed one, changes the list.
+ */
+export const contrastOffenderTexts = (violations: readonly axe.Result[]): string[] =>
+  violations
+    .filter((violation) => violation.id === 'color-contrast')
+    .flatMap((violation) =>
+      violation.nodes.map((node) => document.querySelector(String(node.target[0]))?.textContent ?? node.html)
+    )
+    .sort();

@@ -46,6 +46,8 @@ const ROUTE_SHARED_MODULES = [
   '/features/nodes/index.ts',
   '/features/nodes/ui/NodesPage.tsx',
   '/platform/browser/downloadBlob.ts',
+  // Editor search fields and the lazy pickers share the IME guard; alone it costs a startup request.
+  '/platform/browser/imeComposition.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
   '/platform/ui/Tooltip.tsx',
@@ -74,6 +76,8 @@ const ROUTE_SHARED_MODULES = [
   '/platform/ui/list/ListSectionHeader.tsx',
   '/platform/ui/list/ListStack.tsx',
   '/platform/ui/list/listLayout.ts',
+  // The eager List and the lazy Picker share the pinned-header range helpers.
+  '/platform/ui/list/virtualSections.ts',
   // Lazy lists (graph preview) share these with startup; left ungrouped they split into an extra startup chunk.
   '/platform/react/usePreservedScrollOffset.ts',
   '/platform/ui/Scrollable.tsx',

@@ -12,6 +12,7 @@ import {
   usePromptTriggerOptions,
 } from '@features/generation/ui/promptFields/promptTriggerOptions';
 import { DismissOnViewportChange } from '@features/generation/ui/promptFields/useDismissOnViewportChange';
+import { isImeComposing } from '@platform/browser/imeComposition';
 import { useCallback, useId, useMemo, useRef, useState } from 'react';
 
 const CARET_KEYS = ['ArrowLeft', 'ArrowRight', 'Home', 'End'];
@@ -103,7 +104,7 @@ export const usePromptTriggerAutocomplete = ({
 
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLTextAreaElement>): void => {
-      if (!isOpen || event.nativeEvent.isComposing || event.keyCode === 229) {
+      if (!isOpen || isImeComposing(event.nativeEvent)) {
         return;
       }
 
