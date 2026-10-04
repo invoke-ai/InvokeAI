@@ -43,6 +43,7 @@ type CanvasShapeToolModuleConfig = {
   FREEHAND_SIMPLIFY_MIN_POINTS: number;
   FREEHAND_SIMPLIFY_TOLERANCE: number;
   VECTOR_FREEHAND_FIT_ERROR_PX: number;
+  VECTOR_FREEHAND_MIN_FIT_ERROR: number;
   VECTOR_FREEHAND_STREAMLINE: number;
   PREVIEW_STROKE_COLOR: string;
   PREVIEW_STROKE_WIDTH_PX: number;
@@ -58,6 +59,7 @@ const DEFAULT_CONFIG: CanvasShapeToolModuleConfig = {
   FREEHAND_SIMPLIFY_MIN_POINTS: 200,
   FREEHAND_SIMPLIFY_TOLERANCE: 0.6,
   VECTOR_FREEHAND_FIT_ERROR_PX: 2,
+  VECTOR_FREEHAND_MIN_FIT_ERROR: 0.25,
   VECTOR_FREEHAND_STREAMLINE: 0.35,
   PREVIEW_STROKE_COLOR: rgbaColorToString({ r: 90, g: 175, b: 255, a: 1 }),
   PREVIEW_STROKE_WIDTH_PX: 1.5,
@@ -282,7 +284,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     }
 
     const shapeType = this.manager.stateApi.getSettings().shapeType;
-    const point = this.getEntityRelativePoint(cursorPos.relative, selectedEntity.state.position);
+    const point = this.getEntityRelativePoint(
+      cursorPos.relative,
+      selectedEntity.state.position,
+      selectedEntity.state.type !== 'vector_layer' || shapeType !== 'freehand'
+    );
 
     if (shapeType === 'polygon') {
       await this.onPolygonPointerDown(point, selectedEntity.entityIdentifier, e.evt.shiftKey);
@@ -320,7 +326,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
-    const point = this.getEntityRelativePoint(cursorPos.relative, activeEntity.state.position);
+    const point = this.getEntityRelativePoint(
+      cursorPos.relative,
+      activeEntity.state.position,
+      activeEntity.state.type !== 'vector_layer' || shapeType !== 'freehand'
+    );
 
     if (shapeType === 'polygon') {
       if (!this.hasActivePolygonSession()) {
@@ -359,7 +369,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       return;
     }
 
-    const point = this.getEntityRelativePoint(cursorPos.relative, activeEntity.state.position);
+    const point = this.getEntityRelativePoint(
+      cursorPos.relative,
+      activeEntity.state.position,
+      activeEntity.state.type !== 'vector_layer' || shapeType !== 'freehand'
+    );
 
     if (shapeType === 'freehand') {
       await this.handleFreehandPointerMove(point);
@@ -632,7 +646,11 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
       const stabilizedPoints = this.getStabilizedVectorFreehandPoints();
       const points = fitPolylineToBezierPoints(
         stabilizedPoints,
-        this.manager.stage.unscale(this.config.VECTOR_FREEHAND_FIT_ERROR_PX)
+        // Bound fitting accuracy in canvas units so extreme zoom does not preserve every subpixel wobble.
+        Math.max(
+          this.config.VECTOR_FREEHAND_MIN_FIT_ERROR,
+          this.manager.stage.unscale(this.config.VECTOR_FREEHAND_FIT_ERROR_PX)
+        )
       );
       if (points.length >= 2) {
         this.addVectorPath(points, false);
@@ -822,8 +840,9 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
     });
   };
 
-  private getEntityRelativePoint = (point: Coordinate, position: Coordinate): Coordinate => {
-    return floorCoord(offsetCoord(point, position));
+  private getEntityRelativePoint = (point: Coordinate, position: Coordinate, snapToPixel = true): Coordinate => {
+    const relativePoint = offsetCoord(point, position);
+    return snapToPixel ? floorCoord(relativePoint) : relativePoint;
   };
 
   private getCompositeOperation = (): CanvasRectState['compositeOperation'] => {
@@ -979,7 +998,7 @@ export class CanvasShapeToolModule extends CanvasModuleBase {
 
   private getStabilizedVectorFreehandPoints = (): Coordinate[] => {
     return getStrokePoints(this.freehandPoints, {
-      size: 1,
+      size: this.manager.stage.unscale(1),
       thinning: 0,
       smoothing: 0.5,
       streamline: this.config.VECTOR_FREEHAND_STREAMLINE,

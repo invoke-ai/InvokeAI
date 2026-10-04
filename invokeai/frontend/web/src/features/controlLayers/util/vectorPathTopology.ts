@@ -1,5 +1,6 @@
 import { deepClone } from 'common/util/deepClone';
-import type { CanvasBezierPathState, Coordinate } from 'features/controlLayers/store/types';
+import type { CanvasBezierPathState, CanvasBezierPointState, Coordinate } from 'features/controlLayers/store/types';
+import { setBezierPointType } from 'features/controlLayers/util/bezierPath';
 
 type TopologyResult = {
   path: CanvasBezierPathState;
@@ -29,6 +30,15 @@ const reversePoints = (path: CanvasBezierPathState): CanvasBezierPathState['poin
     outHandle: point.inHandle,
   }));
 
+const prepareJoinedEndpoint = (point: CanvasBezierPointState, connectingHandle: 'inHandle' | 'outHandle') => {
+  if (point.type === 'corner') {
+    point[connectingHandle] = null;
+    return;
+  }
+  // Keep the existing segment's tangent and restore the handle used by the new segment.
+  setBezierPointType(point, point.type, connectingHandle === 'inHandle' ? 'outHandle' : 'inHandle');
+};
+
 export const deleteVectorPathPoints = (
   sourcePaths: CanvasBezierPathState[],
   pointRefs: VectorPathPointRef[]
@@ -55,9 +65,21 @@ export const deleteVectorPathPoints = (
       return false;
     }
 
-    for (const pointIndex of pointIndices) {
-      path.points.splice(pointIndex, 1);
-    }
+    const deletedIndices = new Set(pointIndices);
+    path.points = path.points.filter((point, pointIndex, points) => {
+      if (deletedIndices.has(pointIndex)) {
+        return false;
+      }
+      const previousIndex = path.isClosed ? (pointIndex - 1 + points.length) % points.length : pointIndex - 1;
+      const nextIndex = path.isClosed ? (pointIndex + 1) % points.length : pointIndex + 1;
+      const previousDeleted = deletedIndices.has(previousIndex);
+      const nextDeleted = deletedIndices.has(nextIndex);
+      if (previousDeleted || nextDeleted) {
+        // Preserve the tangent on the unchanged side of the surviving point.
+        setBezierPointType(point, point.type, nextDeleted && !previousDeleted ? 'inHandle' : 'outHandle');
+      }
+      return true;
+    });
     return true;
   });
 
@@ -242,21 +264,20 @@ export const joinVectorPathEndpoints = (
       return null;
     }
     if (shouldWeld) {
-      sourcePath.points = [
-        {
-          anchor: { ...targetPoint.anchor },
-          inHandle: translateHandle(lastPoint.inHandle, lastPoint.anchor, targetPoint.anchor),
-          outHandle: translateHandle(firstPoint.outHandle, firstPoint.anchor, targetPoint.anchor),
-          type: 'corner',
-        },
-        ...sourcePath.points.slice(1, -1),
-      ];
+      const joinedPoint: CanvasBezierPointState = {
+        anchor: { ...targetPoint.anchor },
+        inHandle: translateHandle(lastPoint.inHandle, lastPoint.anchor, targetPoint.anchor),
+        outHandle: translateHandle(firstPoint.outHandle, firstPoint.anchor, targetPoint.anchor),
+        type: targetPoint.type,
+      };
+      setBezierPointType(joinedPoint, joinedPoint.type, targetPointIndex === 0 ? 'outHandle' : 'inHandle');
+      sourcePath.points = [joinedPoint, ...sourcePath.points.slice(1, -1)];
       sourcePath.isClosed = true;
       return { path: sourcePath, activePointIndex: 0 };
     }
 
-    firstPoint.inHandle = null;
-    lastPoint.outHandle = null;
+    prepareJoinedEndpoint(firstPoint, 'inHandle');
+    prepareJoinedEndpoint(lastPoint, 'outHandle');
     sourcePath.isClosed = true;
     return { path: sourcePath, activePointIndex: targetPointIndex };
   }
@@ -271,27 +292,25 @@ export const joinVectorPathEndpoints = (
   }
 
   if (shouldWeld) {
+    const joinedPoint: CanvasBezierPointState = {
+      anchor: { ...targetStartPoint.anchor },
+      inHandle: translateHandle(sourceEndPoint.inHandle, sourceEndPoint.anchor, targetStartPoint.anchor),
+      outHandle: targetStartPoint.outHandle,
+      type: targetStartPoint.type,
+    };
+    setBezierPointType(joinedPoint, joinedPoint.type, 'outHandle');
     return {
       path: {
         ...sourcePath,
-        points: [
-          ...sourcePoints.slice(0, -1),
-          {
-            anchor: { ...targetStartPoint.anchor },
-            inHandle: translateHandle(sourceEndPoint.inHandle, sourceEndPoint.anchor, targetStartPoint.anchor),
-            outHandle: targetStartPoint.outHandle,
-            type: 'corner',
-          },
-          ...targetPoints.slice(1),
-        ],
+        points: [...sourcePoints.slice(0, -1), joinedPoint, ...targetPoints.slice(1)],
         isClosed: false,
       },
       activePointIndex: sourcePoints.length - 1,
     };
   }
 
-  sourceEndPoint.outHandle = null;
-  targetStartPoint.inHandle = null;
+  prepareJoinedEndpoint(sourceEndPoint, 'outHandle');
+  prepareJoinedEndpoint(targetStartPoint, 'inHandle');
   return {
     path: {
       ...sourcePath,

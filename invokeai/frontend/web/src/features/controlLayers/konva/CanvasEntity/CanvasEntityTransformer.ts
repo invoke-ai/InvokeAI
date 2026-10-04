@@ -626,7 +626,20 @@ export class CanvasEntityTransformer extends CanvasModuleBase {
     this.manager.stateApi.setEntityPosition({ entityIdentifier: this.parent.entityIdentifier, position });
   };
 
+  getIsTransformingVectorPath = () => this.vectorPathId !== null && this.$isTransforming.get();
+
   nudgeBy = (offset: Coordinate) => {
+    if (this.getIsTransformingVectorPath()) {
+      if (this.$isProcessing.get()) {
+        return;
+      }
+      // Keep path nudges in the transform preview so Apply/Cancel retain their transaction semantics.
+      const position = this.konva.proxyRect.position();
+      this.konva.proxyRect.position({ x: position.x + offset.x, y: position.y + offset.y });
+      this.syncObjectGroupWithProxyRect();
+      return;
+    }
+
     // We can immediately move both the proxy rect and layer objects so we don't have to wait for a redux round-trip,
     // which can take up to 2ms in my testing. This is optional, but can make the interaction feel more responsive,
     // especially on lower-end devices.

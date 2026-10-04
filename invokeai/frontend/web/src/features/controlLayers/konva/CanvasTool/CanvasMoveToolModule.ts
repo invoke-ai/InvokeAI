@@ -66,10 +66,6 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
       return;
     }
 
-    if (this.parent.tools.path.hasActiveEditSession()) {
-      return;
-    }
-
     const selectedEntity = this.manager.stateApi.getSelectedEntityAdapter();
 
     if (!selectedEntity) {
@@ -88,6 +84,14 @@ export class CanvasMoveToolModule extends CanvasModuleBase {
     const isBusy = this.manager.$isBusy.get();
     const isMoveToolSelected = this.parent.$tool.get() === 'move';
     const isThisEntityTransforming = this.manager.stateApi.$transformingAdapter.get() === selectedEntity;
+
+    if (
+      selectedEntity.transformer.$isProcessing.get() ||
+      (this.parent.tools.path.hasActiveEditSession() &&
+        !(isThisEntityTransforming && selectedEntity.transformer.getIsTransformingVectorPath()))
+    ) {
+      return;
+    }
 
     if (isBusy) {
       // When the canvas is busy, we shouldn't allow nudging - except when the canvas is busy transforming the selected
