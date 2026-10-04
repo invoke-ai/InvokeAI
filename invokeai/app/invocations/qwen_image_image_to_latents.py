@@ -94,18 +94,15 @@ class QwenImageImageToLatentsInvocation(BaseInvocation, WithMetadata, WithBoard)
 
                 posterior = vae.encode(image_tensor).latent_dist
                 # Use mode (argmax) for deterministic encoding, matching diffusers
-                latents: torch.Tensor = posterior.mode().to(dtype=vae.dtype)
+                # Keep the per-channel normalization in fp32 even when the VAE runs at reduced precision.
+                latents: torch.Tensor = posterior.mode().to(dtype=torch.float32)
 
             # Normalize with per-channel latents_mean / latents_std
-            latents_mean = (
-                torch.tensor(vae.config.latents_mean)
-                .view(1, vae.config.z_dim, 1, 1, 1)
-                .to(latents.device, latents.dtype)
+            latents_mean = torch.tensor(vae.config.latents_mean, device=latents.device, dtype=torch.float32).view(
+                1, vae.config.z_dim, 1, 1, 1
             )
-            latents_std = (
-                torch.tensor(vae.config.latents_std)
-                .view(1, vae.config.z_dim, 1, 1, 1)
-                .to(latents.device, latents.dtype)
+            latents_std = torch.tensor(vae.config.latents_std, device=latents.device, dtype=torch.float32).view(
+                1, vae.config.z_dim, 1, 1, 1
             )
             latents = (latents - latents_mean) / latents_std
 

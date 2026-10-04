@@ -41,6 +41,7 @@ from invokeai.app.services.model_install.model_install_common import (
 from invokeai.app.services.model_records import DuplicateModelException, ModelRecordServiceBase, UnknownModelException
 from invokeai.app.services.model_records.model_records_base import ModelRecordChanges
 from invokeai.app.util.misc import get_iso_timestamp
+from invokeai.app.util.path_safety import is_plain_filename
 from invokeai.backend.model_manager.configs.base import Checkpoint_Config_Base
 from invokeai.backend.model_manager.configs.external_api import (
     ExternalApiModelConfig,
@@ -243,12 +244,18 @@ class ModelInstallService(ModelInstallServiceBase):
                     self._logger.info(f"Removing duplicate temporary directory {tmpdir}")
                     self._safe_rmtree(tmpdir, self._logger)
                     continue
+                # Inside the `try`: a marker written by an older version can hold a config that no longer
+                # validates, and that must skip this marker, not abort the restore of every marker after it. Note
+                # that an unsafe *key* is no longer such a case - `ModelRecordChanges` deliberately accepts one so
+                # the install is restored and then fails at the join in `install_path()`, which errors the job and
+                # reclaims its tmpdir. Skipping it here would strand the partial download instead: no job is
+                # created to clean up, and `_remove_dangling_install_dirs` keeps any readable non-terminal marker.
+                config_in = ModelRecordChanges(**(marker.get("config_in") or {}))
                 seen_sources.add(source_str)
             except Exception as e:
                 self._logger.warning(f"Skipping install marker in {tmpdir}: {e}")
                 continue
 
-            config_in = ModelRecordChanges(**(marker.get("config_in") or {}))
             job = ModelInstallJob(
                 id=self._next_id(),
                 source=source,
@@ -310,6 +317,9 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _resume_remote_download(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.WAITING
+        # Sources whose partial file has vanished. _enqueue_remote_download replaces job.download_parts
+        # with fresh parts, so the flag must be carried onto them or the resume response loses it.
+        restarted_from_scratch: set[str] = set()
         if job.download_parts:
             for part in job.download_parts:
                 if part.complete or part.bytes <= 0:
@@ -321,6 +331,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     part.bytes = 0
                     part.resume_from_scratch = True
                     part.resume_message = "Partial file missing. Restarted download from the beginning."
+                    restarted_from_scratch.add(str(part.source))
             job.bytes = sum(p.bytes for p in job.download_parts)
         remote_files, metadata = self._remote_files_from_source(job.source)
         subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
@@ -333,6 +344,7 @@ class ModelInstallService(ModelInstallServiceBase):
             subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
             subfolders=subfolders if len(subfolders) > 1 else None,
             resume_metadata=job._resume_metadata,
+            restarted_from_scratch=restarted_from_scratch,
         )
 
     @property
@@ -460,6 +472,10 @@ class ModelInstallService(ModelInstallServiceBase):
         config = config or ModelRecordChanges()
         info: AnyModelConfig = self._probe(Path(model_path), config)  # type: ignore
 
+        # The key names the directory the model is moved into. `ModelRecordChanges` validates a client-supplied key,
+        # but a caller can build one without validation, so check again here - before anything is created or moved.
+        if not is_plain_filename(info.key):
+            raise ValueError(f"Invalid model key {info.key!r}: it must be a plain filename")
         dest_dir = self.app_config.models_path / info.key
         try:
             if dest_dir.exists():
@@ -1014,6 +1030,9 @@ class ModelInstallService(ModelInstallServiceBase):
         )
         name = job.config_in.name or f"{provider_id} {provider_model_id}"
         key = job.config_in.key or slugify(f"{provider_id}-{provider_model_id}")
+        # External registration builds its config directly, so it never passes through `_probe`'s check.
+        if not is_plain_filename(key):
+            raise InvalidModelConfigException(f"Invalid model key {key!r}: it must be a plain filename")
 
         existing_external = next(
             (
@@ -1150,6 +1169,12 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _probe(self, model_path: Path, config: Optional[ModelRecordChanges] = None):
         config = config or ModelRecordChanges()
+        # A caller may name the key it wants, and the key names a directory under `models_path` and a file under
+        # `model_images`. `ModelRecordChanges` deliberately does not validate it (it is the update body too, and is
+        # re-parsed from old install markers), so assert it here - the one place a caller-supplied key becomes a
+        # record's key, for in-place registration as well as for a move-in install.
+        if config.key is not None and not is_plain_filename(config.key):
+            raise InvalidModelConfigException(f"Invalid model key {config.key!r}: it must be a plain filename")
         hash_algo = self._app_config.hashing_algorithm
         fields = config.model_dump()
 
@@ -1320,6 +1345,7 @@ class ModelInstallService(ModelInstallServiceBase):
         subfolders: Optional[List[Path]] = None,
         resume_metadata: Optional[dict] = None,
         clear_partials: bool = False,
+        restarted_from_scratch: Optional[set[str]] = None,
     ) -> ModelInstallJob:
         job.source_metadata = metadata
         job.local_path = destdir
@@ -1362,9 +1388,15 @@ class ModelInstallService(ModelInstallServiceBase):
                 part.final_url = meta.get("final_url") or part.final_url
                 if meta.get("download_path"):
                     part.download_path = Path(meta.get("download_path"))
+        if restarted_from_scratch:
+            for part in multifile_job.download_parts:
+                if str(part.source) in restarted_from_scratch:
+                    part.resume_from_scratch = True
+                    part.resume_message = "Partial file missing. Restarted download from the beginning."
         with self._lock:
             self._download_cache[multifile_job.id] = job
         job._multifile_job = multifile_job
+        job.download_parts = multifile_job.download_parts
 
         self._write_install_marker(job, status=InstallStatus.WAITING)
         files_string = "file" if len(remote_files) == 1 else "files"
