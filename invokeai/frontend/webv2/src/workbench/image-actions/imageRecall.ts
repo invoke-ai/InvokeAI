@@ -208,8 +208,7 @@ const getClipSkip = (metadata: unknown): number | null => {
   return clipSkip !== null && clipSkip >= 0 ? clipSkip : null;
 };
 
-const getClipSkipMax = (model: GenerateModelConfig): number | null =>
-  getGenerationUiPolicy(model, { cfgScale: 1 }).clipSkipMax;
+const getClipSkipMax = (model: GenerateModelConfig): number | null => getGenerationUiPolicy(model).clipSkipMax;
 
 const getHiDiffusionPatch = (
   metadata: unknown,
@@ -224,7 +223,7 @@ const getHiDiffusionPatch = (
     | 'hiDiffusionWindowAttentionEnabled'
   >
 > => {
-  if (!getGenerationUiPolicy(model, { cfgScale: 1 }).hiDiffusionVisible) {
+  if (!getGenerationUiPolicy(model).hiDiffusionVisible) {
     return {};
   }
 

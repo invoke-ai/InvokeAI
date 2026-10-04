@@ -7,7 +7,9 @@ import { HStack, Stack, Tag } from '@chakra-ui/react';
 import { getPromptPolicy } from '@features/generation/core/baseGenerationPolicies';
 import { sanitizeBatchCount } from '@features/generation/core/batch';
 import { flattenPromptTemplateExpansion } from '@features/generation/core/promptTemplates';
+import { type GenerateDraft, pickGenerateSettings } from '@features/generation/ui/generateDebounce';
 import { useGenerateValues, useGenerationUi } from '@features/generation/ui/GenerationUiContext';
+import { useExternalStoreSelector } from '@platform/state/selectors';
 import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -15,7 +17,7 @@ import { NegativePromptField } from './NegativePromptField';
 import { PositivePromptField } from './PositivePromptField';
 
 interface GeneratePromptFieldsProps {
-  settings: GenerateSettings;
+  draft: GenerateDraft;
   projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
@@ -48,20 +50,43 @@ const getPromptValues = (values: Record<string, unknown>): GeneratePromptValues 
   positivePromptHeightPx: typeof values.positivePromptHeightPx === 'number' ? values.positivePromptHeightPx : 96,
 });
 
+const selectPromptSettings = pickGenerateSettings([
+  'dynamicPromptsCombinatorial',
+  'dynamicPromptsMaxPrompts',
+  'dynamicPromptsSampleSeed',
+  'dynamicPromptsSeedBehaviour',
+  'expandPromptModelKey',
+  'imageToPromptModelKey',
+  'loras',
+  'promptTemplate',
+  'promptTemplateViewMode',
+  'seedMode',
+]);
+
 const selectBatchCount = (values: Record<string, unknown>): number => sanitizeBatchCount(values.batchCount);
 
 export const GeneratePromptFields = ({
+  draft,
   onCommit,
   onCommitImmediate,
   projectId,
   selectedModel,
-  settings,
 }: GeneratePromptFieldsProps) => {
   const { t } = useTranslation();
   const { showPromptSyntaxHighlighting } = useGenerationUi().project;
   const promptValues = useGenerateValues(getPromptValues);
   const batchCount = useGenerateValues(selectBatchCount, Object.is);
-  const promptPolicy = getPromptPolicy(selectedModel, settings);
+  const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectPromptSettings);
+  // Only the negative field's visibility and help text render here; both derive from the model and draft settings.
+  const promptPolicy = useExternalStoreSelector(
+    draft.subscribe,
+    draft.getSnapshot,
+    (draftSettings: GenerateSettings) => {
+      const { negativeHelpText, negativeVisible } = getPromptPolicy(selectedModel, draftSettings);
+
+      return { negativeHelpText, negativeVisible };
+    }
+  );
 
   const usePromptHistoryItem = useCallback(
     (prompt: PromptHistoryItem) => {

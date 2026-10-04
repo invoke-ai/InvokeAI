@@ -1,11 +1,6 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 /* oxlint-disable react-perf/jsx-no-new-object-as-prop, react-perf/jsx-no-new-function-as-prop, react-perf/jsx-no-new-array-as-prop, react-perf/jsx-no-jsx-as-prop */
-import type {
-  GenerateLora,
-  GenerateModelConfig,
-  GenerateSettings,
-  LoraModelConfig,
-} from '@features/generation/core/types';
+import type { GenerateLora, GenerateModelConfig, LoraModelConfig } from '@features/generation/core/types';
 
 import { Box, Stack, Text } from '@chakra-ui/react';
 import { isLoraSupported } from '@features/generation/core/baseGenerationPolicies';
@@ -25,8 +20,8 @@ import { GenerationModelSelect as ModelSelect, useGenerationUi } from './Generat
 import { ConceptList, ConceptRow, type ConceptUpdate } from './shared/ConceptRow';
 
 interface GenerateConceptsContentProps {
-  settings: GenerateSettings;
   loraModels: LoraModelConfig[];
+  loras: GenerateLora[];
   projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (update: GenerateSettingsUpdate) => void;
@@ -38,14 +33,14 @@ export const isCompatibleLora = (lora: GenerateLora, selectedModel: GenerateMode
 
 export const GenerateConceptsContent = ({
   loraModels,
+  loras: draftLoras,
   onCommit,
   projectId,
   selectedModel,
-  settings,
 }: GenerateConceptsContentProps) => {
   const { t } = useTranslation();
   const models = useGenerationUi().models;
-  const loras = useMemo(() => syncGenerateLorasWithModels(settings.loras, loraModels), [loraModels, settings.loras]);
+  const loras = useMemo(() => syncGenerateLorasWithModels(draftLoras, loraModels), [draftLoras, loraModels]);
   const selectedLoraKeys = useMemo(() => new Set(loras.map((lora) => lora.model.key)), [loras]);
 
   const addLora = (model: ModelConfig | null) => {

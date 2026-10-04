@@ -4,6 +4,7 @@ import type { GenerateSettings, MainModelConfig } from '@features/generation/cor
 import { ChakraProvider } from '@chakra-ui/react';
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { getDefaultGenerateSettings } from '@features/generation/core/baseGenerationPolicies';
+import { createExternalStoreCore } from '@platform/state/externalStoreCore';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { createInstance } from 'i18next';
@@ -142,8 +143,8 @@ const render = async (model: MainModelConfig, settings: Partial<GenerateSettings
         <ChakraProvider value={system}>
           <I18nextProvider i18n={i18n}>
             <GenerateRenderSection
+              draft={createExternalStoreCore({ ...getDefaultGenerateSettings(model), ...settings })}
               selectedModel={model}
-              settings={{ ...getDefaultGenerateSettings(model), ...settings }}
               onCommit={onCommit}
               onCommitImmediate={vi.fn()}
             />

@@ -63,9 +63,9 @@ const render = async (selectedModel: GenerateModelConfig = MAIN_MODEL, settings 
           <GenerationUiProvider adapter={ADAPTER}>
             <GenerateConceptsContent
               loraModels={LORA_MODELS}
+              loras={settings.loras}
               projectId={projectId}
               selectedModel={selectedModel}
-              settings={settings}
               onCommit={onCommit}
             />
           </GenerationUiProvider>

@@ -11,19 +11,21 @@ import {
   MAX_DIMENSION,
   MIN_DIMENSION,
 } from '@features/generation/core/settings';
+import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Button, IconButton, Tooltip } from '@platform/ui';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { ArrowLeftRightIcon, LockIcon } from 'lucide-react';
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
+import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { type GenerationQueueInsights, useGenerationQueueInsights } from './GenerationUiContext';
 import { AspectRatioLockButton, AspectRatioSelect } from './shared/AspectRatioSelect';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
 
 interface GenerateDimensionFieldsProps {
-  settings: GenerateSettings;
+  draft: GenerateDraft;
   projectId: string;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
@@ -236,13 +238,22 @@ const SizePreview = ({
 
 const selectSecondsPerRun = (insights: GenerationQueueInsights) => insights.secondsPerRun;
 
+const selectDimensionSettings = pickGenerateSettings([
+  'aspectRatioId',
+  'aspectRatioIsLocked',
+  'aspectRatioValue',
+  'height',
+  'width',
+]);
+
 export const GenerateDimensionFields = ({
+  draft,
   onCommit,
   projectId,
   selectedModel,
-  settings,
 }: GenerateDimensionFieldsProps) => {
   const { t } = useTranslation();
+  const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectDimensionSettings);
   const secondsPerRun = useGenerationQueueInsights(selectSecondsPerRun);
   const [draftDimensions, setDraftDimensions] = useState<Dimensions | null>(null);
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;

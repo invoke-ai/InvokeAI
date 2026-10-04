@@ -25,10 +25,11 @@ import {
   getGenerateModelSelectionResult,
   getGenerationDimensions,
   getGenerationModelAvailabilityReasons,
-  getGenerationModelPolicy,
+  getGenerationUiPolicy,
   getGenerationValidationReasons,
   getMaxReferenceImages,
   getPromptPolicy,
+  getSchedulerOptions,
   getSettingsWithModelDefaults,
   isReferenceImageSupported,
   isGenerateModelSelectable,
@@ -169,20 +170,17 @@ describe('architecture policy, read from the backend capability table', () => {
     const zbase = createModel('z-image', { variant: 'zbase' });
     const anima = createModel('anima');
 
-    expect(
-      getGenerationModelPolicy(createModel('sdxl'), createSettings(createModel('sdxl'))).scheduler.options.map(
-        (option) => option.value
-      )
-    ).toContain('euler_a');
-    expect(
-      getGenerationModelPolicy(flux, createSettings(flux)).scheduler.options.map((option) => option.value)
-    ).toEqual(['euler', 'heun', 'lcm']);
-    expect(
-      getGenerationModelPolicy(zbase, createSettings(zbase)).scheduler.options.map((option) => option.value)
-    ).toEqual(['euler', 'heun']);
-    expect(
-      getGenerationModelPolicy(anima, createSettings(anima)).scheduler.options.map((option) => option.value)
-    ).toEqual(['euler', 'heun', 'dpmpp_2m', 'dpmpp_2m_sde', 'er_sde', 'lcm']);
+    expect(getSchedulerOptions(createModel('sdxl')).map((option) => option.value)).toContain('euler_a');
+    expect(getSchedulerOptions(flux).map((option) => option.value)).toEqual(['euler', 'heun', 'lcm']);
+    expect(getSchedulerOptions(zbase).map((option) => option.value)).toEqual(['euler', 'heun']);
+    expect(getSchedulerOptions(anima).map((option) => option.value)).toEqual([
+      'euler',
+      'heun',
+      'dpmpp_2m',
+      'dpmpp_2m_sde',
+      'er_sde',
+      'lcm',
+    ]);
     expect(coerceSchedulerForGraph(zbase, 'lcm')).toBe('euler');
   });
 
@@ -221,40 +219,33 @@ describe('architecture policy, read from the backend capability table', () => {
   });
 
   it('matches expected UI availability per base', () => {
-    expect(getGenerationModelPolicy(createModel('sd-1'), createSettings(createModel('sd-1'))).ui).toMatchObject({
+    expect(getGenerationUiPolicy(createModel('sd-1'))).toMatchObject({
       clipSkipMax: 12,
       cfgRescaleVisible: true,
       hiDiffusionVisible: true,
       schedulerVisible: true,
     });
-    expect(getGenerationModelPolicy(createModel('sd-2'), createSettings(createModel('sd-2'))).ui).toMatchObject({
+    expect(getGenerationUiPolicy(createModel('sd-2'))).toMatchObject({
       clipSkipMax: 24,
       cfgRescaleVisible: true,
       hiDiffusionVisible: false,
     });
-    expect(getGenerationModelPolicy(createModel('sdxl'), createSettings(createModel('sdxl'))).ui).toMatchObject({
+    expect(getGenerationUiPolicy(createModel('sdxl'))).toMatchObject({
       hiDiffusionVisible: true,
     });
-    expect(getGenerationModelPolicy(createModel('flux'), createSettings(createModel('flux'))).ui).toMatchObject({
+    expect(getGenerationUiPolicy(createModel('flux'))).toMatchObject({
       guidanceLabel: 'Guidance',
       hiDiffusionVisible: false,
       schedulerVisible: true,
       clipSkipMax: null,
     });
-    expect(getGenerationModelPolicy(createModel('sd-3'), createSettings(createModel('sd-3'))).ui).toMatchObject({
+    expect(getGenerationUiPolicy(createModel('sd-3'))).toMatchObject({
       schedulerVisible: false,
       sdVaeVisible: false,
     });
-    expect(
-      getGenerationModelPolicy(createModel('qwen-image'), createSettings(createModel('qwen-image'))).ui.schedulerVisible
-    ).toBe(false);
-    expect(getGenerationModelPolicy(externalModel, createSettings(externalModel)).ui.seedVisible).toBe(false);
-    expect(
-      getGenerationModelPolicy(
-        { ...externalModel, capabilities: { supports_seed: true } },
-        createSettings(externalModel)
-      ).ui.seedVisible
-    ).toBe(true);
+    expect(getGenerationUiPolicy(createModel('qwen-image')).schedulerVisible).toBe(false);
+    expect(getGenerationUiPolicy(externalModel).seedVisible).toBe(false);
+    expect(getGenerationUiPolicy({ ...externalModel, capabilities: { supports_seed: true } }).seedVisible).toBe(true);
   });
 
   // The ordered list of generatable bases is pinned in `supportedBases.test.ts`, which now owns it.
@@ -1351,7 +1342,7 @@ describe('the guidance slider value from a model record', () => {
       const model = createModel(base, {
         default_settings: { cfg_scale: 7, guidance: 9 },
       } as Partial<MainModelConfig>);
-      const label = getGenerationModelPolicy(model, createSettings(model)).ui.guidanceLabel;
+      const label = getGenerationUiPolicy(model).guidanceLabel;
 
       expect(getDefaultGenerateSettings(model).cfgScale, `${base} (${label}) read the wrong field`).toBe(
         label === 'Guidance' ? 9 : 7

@@ -4,8 +4,9 @@ import type { GenerateModelConfig, GenerateSettings, Ideogram4SamplerPreset } fr
 import { Badge, Box, createListCollection, HStack, Image, Input, Separator, Stack, Text } from '@chakra-ui/react';
 import {
   getDefaultGenerateSettings,
-  getGenerationModelPolicy,
+  getGenerationUiPolicy,
   getGuidanceBoundReason,
+  getSchedulerOptions,
 } from '@features/generation/core/baseGenerationPolicies';
 import { getEffectivePrompts } from '@features/generation/core/promptTemplates';
 import {
@@ -19,6 +20,7 @@ import {
   IDEOGRAM4_STEPS_MIN,
   MAX_KREA2_SEED_VARIANCE_STRENGTH,
 } from '@features/generation/core/settings';
+import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Combobox } from '@platform/ui/Combobox';
 import { Field } from '@platform/ui/Field';
 import { ModelDefaultButton } from '@platform/ui/ModelDefaultButton';
@@ -29,6 +31,7 @@ import { Tooltip } from '@platform/ui/Tooltip';
 import { useTranslation } from 'react-i18next';
 
 import { GenerateConditioningRebalanceField } from './GenerateConditioningRebalanceField';
+import { type GenerateDraft, pickGenerateSettings } from './generateDebounce';
 import { type GenerationQueueInsights, useGenerationQueueInsights } from './GenerationUiContext';
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 import { GenerateFieldContextMenu } from './shared/GenerateFieldContextMenu';
@@ -47,10 +50,44 @@ const GUIDANCE_SLIDER_MAX = 10;
 const GUIDANCE_INPUT_MAX = 100;
 
 interface GenerateRenderSectionProps {
-  settings: GenerateSettings;
+  draft: GenerateDraft;
   selectedModel: GenerateModelConfig | undefined;
   onCommit: (patch: Partial<GenerateSettings>) => void;
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
+}
+
+const selectRenderSettings = pickGenerateSettings([
+  'batchCount',
+  'cfgScale',
+  'dynamicPromptsCombinatorial',
+  'dynamicPromptsMaxPrompts',
+  'dynamicPromptsSampleSeed',
+  'dynamicPromptsSeedBehaviour',
+  'ideogram4ColorPalette',
+  'ideogram4GuidanceScale',
+  'ideogram4Mu',
+  'ideogram4SamplerPreset',
+  'ideogram4Steps',
+  'krea2RebalanceEnabled',
+  'krea2RebalanceMultiplier',
+  'krea2RebalanceWeights',
+  'krea2SeedVarianceEnabled',
+  'krea2SeedVarianceRandomizePercent',
+  'krea2SeedVarianceStrength',
+  // The seed field counts the prompts the effective positive prompt expands to.
+  'negativePrompt',
+  'positivePrompt',
+  'promptTemplate',
+  'scheduler',
+  'seed',
+  'seedMode',
+  'steps',
+  'wanGuidanceScaleLowNoise',
+]);
+
+interface RenderFieldsProps {
+  settings: ReturnType<typeof selectRenderSettings>;
+  onCommit: GenerateRenderSectionProps['onCommit'];
 }
 
 /** Labels expose step counts hidden in backend preset IDs. */
@@ -64,7 +101,7 @@ const IDEOGRAM4_PRESET_COLLECTION = createListCollection({
   items: IDEOGRAM4_SAMPLER_PRESETS.map((value) => ({ label: IDEOGRAM4_PRESET_LABELS[value], value })),
 });
 
-const Ideogram4SamplingFields = ({ onCommit, settings }: Pick<GenerateRenderSectionProps, 'onCommit' | 'settings'>) => {
+const Ideogram4SamplingFields = ({ onCommit, settings }: RenderFieldsProps) => {
   const { t } = useTranslation();
 
   return (
@@ -159,10 +196,7 @@ const Ideogram4SamplingFields = ({ onCommit, settings }: Pick<GenerateRenderSect
 };
 
 /** Null low-noise guidance inherits main guidance. */
-const WanLowNoiseGuidanceField = ({
-  onCommit,
-  settings,
-}: Pick<GenerateRenderSectionProps, 'onCommit' | 'settings'>) => {
+const WanLowNoiseGuidanceField = ({ onCommit, settings }: RenderFieldsProps) => {
   const { t } = useTranslation();
 
   return (
@@ -188,7 +222,7 @@ const WanLowNoiseGuidanceField = ({
 };
 
 /** Perturbs Krea-2 conditioning between seeds — a variation concern, so it sits by the seed. */
-const Krea2SeedVarianceFields = ({ onCommit, settings }: Pick<GenerateRenderSectionProps, 'onCommit' | 'settings'>) => {
+const Krea2SeedVarianceFields = ({ onCommit, settings }: RenderFieldsProps) => {
   const { t } = useTranslation();
 
   return (
@@ -234,7 +268,7 @@ const Krea2SeedVarianceFields = ({ onCommit, settings }: Pick<GenerateRenderSect
 const selectSeedHistory = (insights: GenerationQueueInsights) => insights.seedHistory;
 
 /** Clicking an executed seed switches to fixed mode. */
-const SeedField = ({ onCommit, settings }: Pick<GenerateRenderSectionProps, 'onCommit' | 'settings'>) => {
+const SeedField = ({ onCommit, settings }: RenderFieldsProps) => {
   const { t } = useTranslation();
   const seedHistory = useGenerationQueueInsights(selectSeedHistory);
   // Share expansion queries so seed counts match submission without duplicate fetches.
@@ -283,19 +317,20 @@ const SeedField = ({ onCommit, settings }: Pick<GenerateRenderSectionProps, 'onC
 };
 
 export const GenerateRenderSection = ({
+  draft,
   onCommit,
   onCommitImmediate,
   selectedModel,
-  settings,
 }: GenerateRenderSectionProps) => {
   const { t } = useTranslation();
+  const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectRenderSettings);
   const modelDefaults = selectedModel ? getDefaultGenerateSettings(selectedModel) : null;
-  const policy = getGenerationModelPolicy(selectedModel, settings);
+  const uiPolicy = getGenerationUiPolicy(selectedModel);
   const familyBase = selectedModel && selectedModel.type !== 'external_image_generator' ? selectedModel.base : null;
 
   // Cap both input and track at the architecture ceiling without crossing the floor.
-  const guidanceInputMax = policy.ui.guidanceMax ?? GUIDANCE_INPUT_MAX;
-  const guidanceSliderMax = Math.max(policy.ui.guidanceMin, Math.min(GUIDANCE_SLIDER_MAX, guidanceInputMax));
+  const guidanceInputMax = uiPolicy.guidanceMax ?? GUIDANCE_INPUT_MAX;
+  const guidanceSliderMax = Math.max(uiPolicy.guidanceMin, Math.min(GUIDANCE_SLIDER_MAX, guidanceInputMax));
   // Validate recalled/persisted values inline because they bypass model-selection clamps.
   const guidanceError = selectedModel ? getGuidanceBoundReason(selectedModel, settings.cfgScale) : null;
 
@@ -310,9 +345,9 @@ export const GenerateRenderSection = ({
   const badges = (
     <>
       <Badge>
-        {settings.steps} · {policy.ui.guidanceLabel} {settings.cfgScale}
+        {settings.steps} · {uiPolicy.guidanceLabel} {settings.cfgScale}
       </Badge>
-      {policy.ui.seedVisible ? (
+      {uiPolicy.seedVisible ? (
         <Badge>
           {settings.seedMode === 'random'
             ? t('common.seedMode.random')
@@ -363,10 +398,10 @@ export const GenerateRenderSection = ({
             error={guidanceError}
             hint="guidance"
             inputMax={guidanceInputMax}
-            label={policy.ui.guidanceLabel}
+            label={uiPolicy.guidanceLabel}
             marks={modelDefaults ? [modelDefaults.cfgScale] : undefined}
             max={guidanceSliderMax}
-            min={policy.ui.guidanceMin}
+            min={uiPolicy.guidanceMin}
             step={0.5}
             value={settings.cfgScale}
             onChange={(cfgScale) => commitNumber('cfgScale', cfgScale)}
@@ -383,7 +418,7 @@ export const GenerateRenderSection = ({
           </>
         ) : null}
         {familyBase === 'wan' ? <WanLowNoiseGuidanceField settings={settings} onCommit={onCommit} /> : null}
-        {policy.ui.schedulerVisible ? (
+        {uiPolicy.schedulerVisible ? (
           <GenerateFieldContextMenu
             copyValue={() => settings.scheduler}
             isAtDefault={modelDefaults !== null && settings.scheduler === modelDefaults.scheduler}
@@ -394,7 +429,7 @@ export const GenerateRenderSection = ({
                 <Combobox
                   aria-label={t('widgets.generate.scheduler')}
                   flex="1"
-                  options={policy.scheduler.options}
+                  options={getSchedulerOptions(selectedModel, settings.scheduler)}
                   value={settings.scheduler}
                   onValueChange={(scheduler) => onCommit({ scheduler })}
                 />
@@ -410,7 +445,7 @@ export const GenerateRenderSection = ({
         ) : null}
         {familyBase === 'ideogram-4' ? <Ideogram4SamplingFields settings={settings} onCommit={onCommit} /> : null}
         <Separator borderColor="border.subtle" />
-        {policy.ui.seedVisible ? <SeedField settings={settings} onCommit={onCommit} /> : null}
+        {uiPolicy.seedVisible ? <SeedField settings={settings} onCommit={onCommit} /> : null}
         {familyBase === 'krea-2' ? (
           <>
             <Separator borderColor="border.subtle" />

@@ -1,9 +1,14 @@
 import type { GenerationModelCatalogItem as ModelConfig } from '@features/generation/contracts';
 import type { GenerateModelConfig, GenerateSettings, LoraModelConfig } from '@features/generation/core/types';
-import type { GenerateSettingsUpdate } from '@features/generation/ui/generateDebounce';
 
 import { Badge, Separator, Stack } from '@chakra-ui/react';
 import { isReferenceImageSupported } from '@features/generation/core/baseGenerationPolicies';
+import {
+  type GenerateDraft,
+  type GenerateSettingsUpdate,
+  pickGenerateSettings,
+} from '@features/generation/ui/generateDebounce';
+import { useExternalStoreSelector } from '@platform/state/selectors';
 import { useTranslation } from 'react-i18next';
 
 import { GenerateConceptsContent, isCompatibleLora } from './GenerateConceptsSection';
@@ -11,11 +16,11 @@ import { GenerateReferenceImagesContent } from './reference-images/GenerateRefer
 import { GenerateCollapsibleSection } from './shared/GenerateCollapsibleSection';
 
 interface GenerateGuidanceSectionProps {
+  draft: GenerateDraft;
   loraModels: LoraModelConfig[];
   models: readonly ModelConfig[];
   projectId: string;
   selectedModel: GenerateModelConfig | undefined;
-  settings: GenerateSettings;
   /** Debounced draft-update channel — reference-image edits ride the form's debounce. */
   onReferenceCommit: (update: GenerateSettingsUpdate) => void;
   /** Flushed update channel — concept rows debounce their own weight drafts first. */
@@ -23,7 +28,10 @@ interface GenerateGuidanceSectionProps {
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
 
+const selectGuidanceSettings = pickGenerateSettings(['loras', 'referenceImages']);
+
 export const GenerateGuidanceSection = ({
+  draft,
   loraModels,
   models,
   onCommitImmediate,
@@ -31,9 +39,9 @@ export const GenerateGuidanceSection = ({
   onReferenceCommit,
   projectId,
   selectedModel,
-  settings,
 }: GenerateGuidanceSectionProps) => {
   const { t } = useTranslation();
+  const settings = useExternalStoreSelector(draft.subscribe, draft.getSnapshot, selectGuidanceSettings);
   const referenceImagesSupported = isReferenceImageSupported(selectedModel);
   const referenceImageCount = settings.referenceImages.length;
   const activeReferenceImages = referenceImagesSupported
@@ -72,17 +80,17 @@ export const GenerateGuidanceSection = ({
       <Stack gap="2" p="2">
         <GenerateReferenceImagesContent
           models={models}
+          referenceImages={settings.referenceImages}
           selectedModel={selectedModel}
-          settings={settings}
           onCommit={onReferenceCommit}
           onCommitImmediate={onCommitImmediate}
         />
         {referenceImagesSupported || referenceImageCount > 0 ? <Separator borderColor="bg.subtle" /> : null}
         <GenerateConceptsContent
           loraModels={loraModels}
+          loras={settings.loras}
           projectId={projectId}
           selectedModel={selectedModel}
-          settings={settings}
           onCommit={onConceptCommit}
         />
       </Stack>

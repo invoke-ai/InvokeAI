@@ -1,5 +1,5 @@
 import type { GenerateSettings } from '@features/generation/core/types';
-import type { ExternalStoreCore } from '@platform/state/externalStoreCore';
+import type { ReadableExternalStore } from '@platform/state/projectedExternalStore';
 
 import { areJsonValuesStructurallyEqual } from '@platform/core/json';
 
@@ -76,71 +76,24 @@ export const reuseEqualGenerateSettingsValues = (
   return reconciled ?? next;
 };
 
-export type GenerateDraftStore = ExternalStoreCore<GenerateSettings>;
-
-const draftViews = new WeakSet<object>();
-
-export const isDraftView = (value: object): boolean => draftViews.has(value);
+/**
+ * The form's draft settings as a read-only store: each snapshot is plain immutable `GenerateSettings`. Sections
+ * subscribe through a selector of the fields they render and read `getSnapshot()` in handlers that need more.
+ */
+export type GenerateDraft = ReadableExternalStore<GenerateSettings>;
 
 /**
- * Returns a `getSnapshot` for one subscriber that yields a live view of the draft. The view is replaced (so the
- * subscriber re-renders) only when a key it has read changes; enumerating it counts as reading every key.
- *
- * Contract for holders of a view:
- * - Every read returns the latest draft, including reads through a view retained from an earlier render, so a
- *   retained view cannot be diffed against a newer one; compare read values instead.
- * - A view must not escape into stores, query keys, structuredClone, or persistence. Copy the fields you need.
- *   Only a whole view handed back to the form's settings commit is unwrapped (see `isDraftView`).
+ * Selects the listed settings. Under the external-store selector hooks' shallow equality the selection keeps its
+ * identity until a listed value changes, so a subscriber re-renders only for its own fields.
  */
-export const createDraftTracker = (draft: GenerateDraftStore) => {
-  let baseline = draft.getSnapshot();
-  let readKeys = new Set<PropertyKey>();
-  let readsAll = false;
-  const read = (key: PropertyKey) => {
-    readKeys.add(key);
-    return Reflect.get(draft.getSnapshot(), key);
-  };
-  const createView = (): GenerateSettings => {
-    readKeys = new Set();
-    readsAll = false;
-    const view = new Proxy({} as GenerateSettings, {
-      defineProperty: () => false,
-      deleteProperty: () => false,
-      get: (_target, key) => read(key),
-      getOwnPropertyDescriptor: (_target, key) => {
-        read(key);
-        const descriptor = Reflect.getOwnPropertyDescriptor(draft.getSnapshot(), key);
-        return descriptor ? { ...descriptor, configurable: true } : undefined;
-      },
-      has: (_target, key) => {
-        readKeys.add(key);
-        return Reflect.has(draft.getSnapshot(), key);
-      },
-      ownKeys: () => {
-        readsAll = true;
-        return Reflect.ownKeys(draft.getSnapshot());
-      },
-      set: () => false,
-    });
-    draftViews.add(view);
-    return view;
-  };
-  let view = createView();
+export const pickGenerateSettings =
+  <Key extends keyof GenerateSettings>(keys: readonly Key[]) =>
+  (settings: GenerateSettings): Pick<GenerateSettings, Key> => {
+    const picked = {} as Pick<GenerateSettings, Key>;
 
-  return () => {
-    const snapshot = draft.getSnapshot();
-
-    if (snapshot !== baseline) {
-      const previous = baseline;
-      const changed =
-        readsAll || [...readKeys].some((key) => !Object.is(Reflect.get(previous, key), Reflect.get(snapshot, key)));
-      baseline = snapshot;
-
-      if (changed) {
-        view = createView();
-      }
+    for (const key of keys) {
+      picked[key] = settings[key];
     }
 
-    return view;
+    return picked;
   };
-};

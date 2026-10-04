@@ -321,7 +321,7 @@ export const buildRecallParametersSettings = ({
   } else if (has('clip_skip')) {
     const clipSkip = getSupportedClipSkip(parameters, values.model);
 
-    if (getGenerationUiPolicy(values.model, { cfgScale: 1 }).clipSkipMax === null) {
+    if (getGenerationUiPolicy(values.model).clipSkipMax === null) {
       skip('clip_skip', 'incompatible', values.model.name);
     } else if (clipSkip === null) {
       skip('clip_skip', 'invalid');

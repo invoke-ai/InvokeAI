@@ -36,8 +36,8 @@ const IMAGE_ONLY = ['image'] as const;
 
 interface GenerateReferenceImagesContentProps {
   models: readonly ModelConfig[];
+  referenceImages: GenerateReferenceImage[];
   selectedModel: GenerateModelConfig | undefined;
-  settings: GenerateSettings;
   onCommit: (update: GenerateSettingsUpdate) => void;
   onCommitImmediate: (patch: Partial<GenerateSettings>) => void;
 }
@@ -46,12 +46,11 @@ export const GenerateReferenceImagesContent = ({
   models,
   onCommit,
   onCommitImmediate,
+  referenceImages,
   selectedModel,
-  settings,
 }: GenerateReferenceImagesContentProps) => {
   const { t } = useTranslation();
   const { gallery } = useGenerationUi();
-  const referenceImages = settings.referenceImages;
   const isSupported = isReferenceImageSupported(selectedModel);
   const maxReferenceImages = getMaxReferenceImages(selectedModel);
   const canAdd = referenceImages.length < maxReferenceImages;
