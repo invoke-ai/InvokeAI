@@ -2,7 +2,8 @@
 
 The database layer raises these instead of driver exceptions, so a service can tell a duplicate key from
 a missing reference without knowing which database it runs on. Errors are classified by the driver's
-error code, never by message text: messages differ between backends and change between versions.
+error code, not by message text: messages differ between backends and change between versions. The one
+exception is a code SQLite shares between two causes, told apart by SQLite's fixed message.
 """
 
 import sqlite3
@@ -94,6 +95,10 @@ _SQLITE_PRIMARY_CODES: dict[int, type[DatabaseError]] = {
     5: LockTimeoutError,  # SQLITE_BUSY, after the busy timeout ran out
     6: LockTimeoutError,  # SQLITE_LOCKED
 }
+# SQLite enforces ON DELETE RESTRICT through a trigger program, so a violation carries the code of a trigger's
+# RAISE(); only SQLite's fixed foreign key message tells the two apart.
+_SQLITE_CONSTRAINT_TRIGGER = 1811
+_SQLITE_FOREIGN_KEY_MESSAGE = "FOREIGN KEY constraint failed"
 
 # MySQL and MariaDB server error numbers, the first argument of the PyMySQL exception.
 _MYSQL_ERRORS: dict[int, type[DatabaseError]] = {
@@ -121,6 +126,8 @@ def translate_error(error: BaseException, dialect_name: str) -> Optional[Databas
         code = getattr(original, "sqlite_errorcode", None)
         if code is None:
             return None
+        if code == _SQLITE_CONSTRAINT_TRIGGER and str(original) == _SQLITE_FOREIGN_KEY_MESSAGE:
+            return ForeignKeyViolation(str(original))
         neutral = _SQLITE_CODES.get(code) or _SQLITE_PRIMARY_CODES.get(code & 0xFF)
         return neutral(str(original)) if neutral is not None else None
     if dialect_name in ("mysql", "mariadb"):

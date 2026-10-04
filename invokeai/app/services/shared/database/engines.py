@@ -7,6 +7,10 @@ from sqlalchemy import URL, Connection, Engine, create_engine, event
 from sqlalchemy.engine import ExceptionContext
 from sqlalchemy.pool import AssertionPool
 
+# The dialect names of the server backends. MariaDB must be reached through a `mariadb+` URL: SQLAlchemy names
+# the dialect after the URL, and the schema's per-flavor DDL (collations, generated columns) follows that name.
+SERVER_DIALECTS = ("mysql", "mariadb")
+
 # Execution option carrying a transaction's write intent from `Database.begin()` to the MySQL begin hook.
 WRITE_INTENT = "invokeai_write_intent"
 
@@ -78,8 +82,13 @@ def create_mysql_engine(url: URL) -> Engine:
     # First, so the session settings are in place before SQLAlchemy inspects the connection (it reads
     # sql_mode, e.g. ANSI_QUOTES, to decide how to quote identifiers).
     event.listen(engine, "connect", _configure_mysql_session, insert=True)
+    expects_mariadb = engine.dialect.name == "mariadb"
+
+    def set_collation(dbapi_connection: Any, connection_record: object) -> None:
+        _set_mysql_collation(dbapi_connection, expects_mariadb)
+
     # Last, because SQLAlchemy's own connection setup sends a plain `SET NAMES`, resetting the collation.
-    event.listen(engine, "connect", _set_mysql_collation)
+    event.listen(engine, "connect", set_collation)
     event.listen(engine, "begin", _begin_mysql_transaction)
     event.listen(engine, "reset", _reset_mysql_connection)
     return engine
@@ -97,9 +106,15 @@ def _configure_mysql_session(dbapi_connection: Any, connection_record: object) -
         cursor.close()
 
 
-def _set_mysql_collation(dbapi_connection: Any, connection_record: object) -> None:
-    # How literals and parameters compare; columns compare by their table's collation.
+def _set_mysql_collation(dbapi_connection: Any, expects_mariadb: bool) -> None:
     is_mariadb = "mariadb" in dbapi_connection.get_server_info().lower()
+    if is_mariadb and not expects_mariadb:
+        # (The reverse, a mariadb+ URL for MySQL, SQLAlchemy refuses itself.)
+        raise ValueError(
+            "The database server is MariaDB, but the URL names MySQL: use a mariadb+pymysql:// URL, so that "
+            "tables are created with MariaDB's collations and column definitions"
+        )
+    # How literals and parameters compare; columns compare by their table's collation.
     collation = MARIADB_BINARY_COLLATION if is_mariadb else MYSQL_BINARY_COLLATION
     cursor = dbapi_connection.cursor()
     try:

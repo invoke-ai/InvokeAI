@@ -13,7 +13,12 @@ from sqlalchemy import Connection, Engine, make_url
 from sqlalchemy.exc import DBAPIError
 
 from invokeai.app.services.config.config_default import DB_SYNCHRONOUS
-from invokeai.app.services.shared.database.engines import WRITE_INTENT, create_mysql_engine, create_sqlite_engine
+from invokeai.app.services.shared.database.engines import (
+    SERVER_DIALECTS,
+    WRITE_INTENT,
+    create_mysql_engine,
+    create_sqlite_engine,
+)
 from invokeai.app.services.shared.database.errors import ConflictError, NestedTransactionError, translate_error
 from invokeai.app.services.shared.database.queries import Queries
 
@@ -24,8 +29,7 @@ R = TypeVar("R")
 _CONFLICT_ATTEMPTS = 3
 _CONFLICT_BASE_DELAY_SECONDS = 0.05
 
-# Server backends and the one driver whose error numbers `translate_error` reads.
-_SUPPORTED_SERVER_BACKENDS = ("mysql", "mariadb")
+# The one server driver, whose error numbers `translate_error` reads.
 _SUPPORTED_SERVER_DRIVER = "pymysql"
 
 
@@ -153,13 +157,10 @@ class Database:
     def open_url(cls, url: str, logger: Logger) -> "Database":
         """Opens a MySQL or MariaDB database through PyMySQL, e.g. `mariadb+pymysql://user:password@host/invokeai`."""
         parsed = make_url(url)
-        if (
-            parsed.get_backend_name() not in _SUPPORTED_SERVER_BACKENDS
-            or parsed.get_driver_name() != _SUPPORTED_SERVER_DRIVER
-        ):
+        if parsed.get_backend_name() not in SERVER_DIALECTS or parsed.get_driver_name() != _SUPPORTED_SERVER_DRIVER:
             raise ValueError(
                 f"Unsupported database URL scheme '{parsed.drivername}', expected "
-                f"{' or '.join(f'{backend}+{_SUPPORTED_SERVER_DRIVER}' for backend in _SUPPORTED_SERVER_BACKENDS)}"
+                f"{' or '.join(f'{backend}+{_SUPPORTED_SERVER_DRIVER}' for backend in SERVER_DIALECTS)}"
             )
         logger.info(f"Connecting to database {parsed.render_as_string(hide_password=True)}")
         return cls(create_mysql_engine(parsed), logger)

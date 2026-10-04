@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 import pytest
 from sqlalchemy import URL
-from sqlalchemy.exc import DBAPIError
+from sqlalchemy.exc import DBAPIError, InvalidRequestError
 
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.errors import (
@@ -407,6 +407,21 @@ class TestServerBackends:
             after = q.items.count()
 
         assert (before, after) == (1, 2)
+
+    @pytest.mark.uses_database
+    def test_a_url_naming_the_other_server_flavor_is_refused(self, _external_test_schema: URL) -> None:
+        # Tables are created with the collations and column definitions of the flavor the URL names.
+        other = "mysql+pymysql" if _external_test_schema.get_backend_name() == "mariadb" else "mariadb+pymysql"
+        database = Database.open_url(
+            _external_test_schema.set(drivername=other).render_as_string(hide_password=False),
+            InvokeAILogger.get_logger("test_database"),
+        )
+        try:
+            with pytest.raises((ValueError, InvalidRequestError), match="MariaDB"):
+                with database.begin(write=False):
+                    pass
+        finally:
+            database.dispose()
 
     def test_literals_compare_byte_for_byte(self, empty_database: Database) -> None:
         # The connection's collation, which comparisons of parameters and literals use: case and trailing

@@ -115,3 +115,19 @@ def test_an_error_without_a_backend_neutral_meaning_is_not_translated(empty_data
             conn.exec_driver_sql("SELECT * FROM a_table_that_does_not_exist")
 
     assert not isinstance(raised.value, DatabaseError)
+
+
+@pytest.mark.sqlite_only
+def test_a_trigger_raising_an_error_is_not_a_foreign_key_violation(
+    probe: ProbeQueries, empty_database: Database
+) -> None:
+    # SQLite reports both with the same error code: it enforces ON DELETE RESTRICT with a trigger program.
+    with empty_database.begin(write=True) as conn:
+        conn.exec_driver_sql(
+            "CREATE TRIGGER refuse_names AFTER INSERT ON probe_items BEGIN SELECT RAISE(ABORT, 'refused'); END"
+        )
+
+    with pytest.raises(DBAPIError) as raised:
+        probe.items.add(1, "a")
+
+    assert not isinstance(raised.value, DatabaseError)
