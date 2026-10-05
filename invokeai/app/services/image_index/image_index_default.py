@@ -1664,11 +1664,9 @@ class ImageIndexService(ImageIndexServiceBase):
             configs = store.search_by_attr(model_name=model_name, model_type=model_type)
             if not configs:
                 continue
-            # Names are not unique (the UNIQUE(name, base, type) constraint is gone), and
-            # `search_by_attr` orders by type/base/name/format — so for two otherwise identical
-            # rows the tiebreak is insertion order, and reinstalling one moves the winner. That
-            # changes the model hash, and `start()` then discards every embedding computed under
-            # the old one. Order by key instead: stable across reinstalls of the same set.
+            # Names are not unique (the UNIQUE(name, base, type) constraint is gone). Choose by key,
+            # which is stable across reinstalls of the same set: a different winner changes the
+            # model hash, and `start()` then discards every embedding computed under the old one.
             chosen = min(configs, key=lambda config: config.key)
             if len(configs) > 1:
                 self._invoker.services.logger.warning(

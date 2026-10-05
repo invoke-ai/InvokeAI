@@ -30,6 +30,8 @@ from invokeai.app.services.shared.database.queries.boards import BoardQueries
 from invokeai.app.services.shared.database.queries.client_state import ClientStateQueries
 from invokeai.app.services.shared.database.queries.locks import LockQueries
 from invokeai.app.services.shared.database.queries.media_references import MediaReferenceQueries
+from invokeai.app.services.shared.database.queries.model_relationships import ModelRelationshipQueries
+from invokeai.app.services.shared.database.queries.models import ModelQueries
 from invokeai.app.services.shared.database.queries.projects import ProjectQueries
 from invokeai.app.services.shared.database.queries.style_presets import StylePresetQueries
 from invokeai.app.services.shared.database.queries.system_prompts import SystemPromptQueries
@@ -82,6 +84,14 @@ class Queries:
     @cached_property
     def media_references(self) -> MediaReferenceQueries:
         return MediaReferenceQueries(self._scope)
+
+    @cached_property
+    def model_relationships(self) -> ModelRelationshipQueries:
+        return ModelRelationshipQueries(self._scope)
+
+    @cached_property
+    def models(self) -> ModelQueries:
+        return ModelQueries(self._scope)
 
     @cached_property
     def projects(self) -> ProjectQueries:

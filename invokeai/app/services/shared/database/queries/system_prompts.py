@@ -12,7 +12,6 @@ from sqlalchemy import (
     Update,
     bindparam,
     delete,
-    func,
     insert,
     literal,
     or_,
@@ -21,6 +20,7 @@ from sqlalchemy import (
     update,
 )
 
+from invokeai.app.services.shared.database.dialect import CaseInsensitiveOrder
 from invokeai.app.services.shared.database.queries.base import QueryModule, mapped, read, write
 from invokeai.app.services.shared.database.schema.system_prompts import system_prompts
 from invokeai.app.services.shared.database.types import now_text
@@ -36,12 +36,12 @@ _NAMES = tuple(column.name for column in _COLUMNS)
 
 _GET = select(*_COLUMNS).where(_S.id == bindparam("system_prompt_id"))
 _INSERT = insert(system_prompts)
-_ALL = select(*_COLUMNS).order_by(func.lower(_S.name), _S.id)
+_ALL = select(*_COLUMNS).order_by(CaseInsensitiveOrder(_S.name), _S.id)
 # An account's own prompts and the shared ones. The id breaks ties of equal names.
 _VISIBLE = (
     select(*_COLUMNS)
     .where(or_(_S.user_id == bindparam("user_id"), _S.is_public == true()))
-    .order_by(func.lower(_S.name), _S.id)
+    .order_by(CaseInsensitiveOrder(_S.name), _S.id)
 )
 
 

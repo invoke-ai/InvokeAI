@@ -49,6 +49,7 @@ WORKFLOWS = 300
 STYLE_PRESETS = 50
 SYSTEM_PROMPTS = 20
 WILDCARDS = 25
+MODELS = 500
 WORKFLOW_TAGS = ["sdxl", "flux", "upscale", "inpaint", "video", "portrait", "landscape", "controlnet"]
 
 
@@ -76,6 +77,7 @@ class Services:
         )
         from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
         from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+        from invokeai.app.services.model_records import ModelRecordServiceSQL
         from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
         from invokeai.app.services.style_preset_records.style_preset_records_default import StylePresetRecordsStorage
         from invokeai.app.services.system_prompt_records.system_prompt_records_default import (
@@ -98,6 +100,7 @@ class Services:
         self.style_preset_records = StylePresetRecordsStorage(db.database)
         self.system_prompt_records = SystemPromptRecordsStorage(db.database)
         self.wildcard_records = WildcardRecordsStorage(db.database)
+        self.model_records = ModelRecordServiceSQL(db.database, logging.getLogger("benchmark_database.quiet"))
         # Listing gallery items builds their URLs through the invoker's URL service.
         from invokeai.app.services.urls.urls_default import LocalUrlService
 
@@ -170,6 +173,45 @@ def _workflow_template() -> Any:
     return workflow_records_common.WorkflowWithoutIDValidator.validate_python(workflow)
 
 
+def _model_config(i: int) -> Any:
+    """A main model, a VAE or an embedding, by turns."""
+    from invokeai.backend.model_manager.configs.main import Main_Diffusers_SDXL_Config
+    from invokeai.backend.model_manager.configs.textual_inversion import TI_File_SD1_Config
+    from invokeai.backend.model_manager.configs.vae import VAE_Diffusers_SD1_Config
+    from invokeai.backend.model_manager.taxonomy import (
+        BaseModelType,
+        ModelRepoVariant,
+        ModelSourceType,
+        ModelType,
+        ModelVariantType,
+        SchedulerPredictionType,
+    )
+
+    common = {
+        "key": str(uuid.UUID(int=i)),
+        "path": f"/models/{i}/model",
+        "name": f"Model {i}",
+        "hash": f"blake3:{i:064x}",
+        "file_size": 2_000_000 + i,
+        "source": f"https://example.com/models/{i}",
+        "source_type": ModelSourceType.Url,
+    }
+    if i % 3 == 0:
+        return Main_Diffusers_SDXL_Config(
+            **common,
+            base=BaseModelType.StableDiffusionXL,
+            type=ModelType.Main,
+            variant=ModelVariantType.Normal,
+            prediction_type=SchedulerPredictionType.Epsilon,
+            repo_variant=ModelRepoVariant.Default,
+        )
+    if i % 3 == 1:
+        return VAE_Diffusers_SD1_Config(
+            **common, base=BaseModelType.StableDiffusion1, type=ModelType.VAE, repo_variant=ModelRepoVariant.Default
+        )
+    return TI_File_SD1_Config(**common, base=BaseModelType.StableDiffusion1, type=ModelType.TextualInversion)
+
+
 def _seed(services: Services, images: int, boards: int, rng: random.Random) -> list[str]:
     from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
     from invokeai.app.services.style_preset_records.style_preset_records_common import (
@@ -232,6 +274,8 @@ def _seed(services: Services, images: int, boards: int, rng: random.Random) -> l
     values = [f"value {i}" for i in range(20)]
     for i in range(WILDCARDS):
         services.wildcard_records.create(WildcardWithoutId(name=f"set{i}", values=values), user_id="user-0")
+    for i in range(MODELS):
+        services.model_records.add_model(_model_config(i))
     return names
 
 
@@ -241,6 +285,7 @@ def _operations(
     """Operation name -> (one call, how many calls to time)."""
     from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
     from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+    from invokeai.app.services.model_records import ModelRecordChanges
     from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
     from invokeai.app.services.style_preset_records.style_preset_records_common import StylePresetChanges
     from invokeai.app.services.system_prompt_records.system_prompt_records_common import SystemPromptChanges
@@ -303,6 +348,7 @@ def _operations(
         prompt.id for prompt in services.system_prompt_records.get_many(user_id="user-0") if prompt.user_id == "user-0"
     ]
     wildcard_values = [f"value {i}" for i in range(20)]
+    model_keys = [str(uuid.UUID(int=i)) for i in range(MODELS)]
 
     general = [ImageCategory.GENERAL]
 
@@ -409,6 +455,16 @@ def _operations(
         "wildcards.create": (
             lambda: services.wildcard_records.create(
                 WildcardWithoutId(name=f"new{uuid.uuid4().hex}", values=wildcard_values), user_id="user-0"
+            ),
+            200,
+        ),
+        # Loading a model reads its config, and the model manager lists every model.
+        "models.get_model": (lambda: services.model_records.get_model(rng.choice(model_keys)), 1000),
+        "models.exists": (lambda: services.model_records.exists(rng.choice(model_keys)), 1000),
+        "models.search_by_attr(all)": (lambda: services.model_records.search_by_attr(), 20),
+        "models.update_model": (
+            lambda: services.model_records.update_model(
+                model_keys[0], ModelRecordChanges(description=f"Edit {next(saves)}")
             ),
             200,
         ),

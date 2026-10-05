@@ -24,16 +24,12 @@ DATABASE_LAYER = (
 # allowed fails the test until its number is lowered, so the amount of SQL outside the layer only shrinks.
 # Do not raise a number or add a file.
 NOT_YET_PORTED: dict[str, int] = {
-    "invokeai/app/api/routers/model_manager.py": 2,
     "invokeai/app/services/fonts/fonts_default.py": 32,
     "invokeai/app/services/gallery/gallery_default.py": 16,
     "invokeai/app/services/image_index/image_index_records_sqlite.py": 26,
     "invokeai/app/services/image_moves/image_moves_default.py": 58,
     "invokeai/app/services/image_records/image_records_sqlite.py": 63,
     "invokeai/app/services/intermediates/intermediates_records_sqlite.py": 73,
-    "invokeai/app/services/model_records/model_records_sql.py": 25,
-    "invokeai/app/services/model_relationship_records/model_relationship_records_sqlite.py": 8,
-    "invokeai/app/services/orphaned_models/orphaned_models_service.py": 2,
     "invokeai/app/services/session_queue/session_queue_sqlite.py": 166,
     "invokeai/app/services/shared/intermediate_delete.py": 1,
     "invokeai/app/services/shared/media_references.py": 9,

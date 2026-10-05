@@ -29,6 +29,7 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordOrderBy,
     BoardVisibility,
 )
+from invokeai.app.services.shared.database.dialect import CaseInsensitiveOrder
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, locking, mapped, read, write
 from invokeai.app.services.shared.database.schema.boards import boards, shared_boards
 from invokeai.app.services.shared.database.schema.projects import projects
@@ -164,7 +165,7 @@ def _list(
     # `get_all` has always sorted names case-insensitively, a page of `get_many` by the names as stored.
     key: ColumnElement[Any] = boards.c.board_name if order_by == BoardRecordOrderBy.Name else boards.c.created_at
     if order_by == BoardRecordOrderBy.Name and not paged:
-        key = func.lower(boards.c.board_name)
+        key = CaseInsensitiveOrder(boards.c.board_name)
     # The board id breaks ties, so that equal keys keep one order from page to page.
     ordering = [key, boards.c.board_id]
     statement = _listing(select(*_BOARD_COLUMNS), is_admin, include_archived).order_by(

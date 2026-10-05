@@ -5,7 +5,6 @@ from .model_records_base import (  # noqa F401
     InvalidModelException,
     ModelRecordServiceBase,
     UnknownModelException,
-    ModelSummary,
     ModelRecordChanges,
     ModelRecordOrderBy,
 )
@@ -17,7 +16,6 @@ __all__ = [
     "DuplicateModelException",
     "InvalidModelException",
     "UnknownModelException",
-    "ModelSummary",
     "ModelRecordChanges",
     "ModelRecordOrderBy",
 ]

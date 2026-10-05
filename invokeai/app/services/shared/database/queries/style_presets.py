@@ -11,7 +11,6 @@ from sqlalchemy import (
     Update,
     bindparam,
     delete,
-    func,
     insert,
     literal,
     or_,
@@ -20,6 +19,7 @@ from sqlalchemy import (
     update,
 )
 
+from invokeai.app.services.shared.database.dialect import CaseInsensitiveOrder
 from invokeai.app.services.shared.database.queries.base import QueryModule, mapped, read, write
 from invokeai.app.services.shared.database.schema.style_presets import style_presets
 from invokeai.app.services.style_preset_records.style_preset_records_common import (
@@ -62,7 +62,7 @@ def _list(visible_to_all: bool, scoped: bool, typed: bool) -> Select[Any]:
     if typed:
         statement = statement.where(_P.type == bindparam("type"))
     # The id breaks ties, so that equal names keep one order.
-    return statement.order_by(func.lower(_P.name), _P.id)
+    return statement.order_by(CaseInsensitiveOrder(_P.name), _P.id)
 
 
 def _preset(row: Sequence[Any]) -> StylePresetRecordDTO:
