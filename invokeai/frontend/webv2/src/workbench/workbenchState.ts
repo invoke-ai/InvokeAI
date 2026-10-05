@@ -180,6 +180,7 @@ import {
   getCanvasStagingSlots,
   getFirstCanvasPlaceholderSlotIndex,
   type CanvasStagingSlot,
+  isCancellableQueueItem,
 } from './canvasStagingView';
 import {
   cascadeDefaultGeometry,
@@ -492,7 +493,13 @@ type WorkbenchReducerAction =
       positivePrompts?: string[];
       projectId: string;
     }
-  | { type: 'cancelQueueItem'; queueItemId: string; projectId?: string }
+  | {
+      type: 'cancelQueueItem';
+      queueItemId: string;
+      projectId?: string;
+      /** Replaces the generic cancellation notice when the caller knows why the run stopped. */
+      notice?: { title: string; message: string };
+    }
   | { type: 'cancelAllQueueItems'; projectId?: string }
   | { type: 'cancelAllQueueItemsExceptCurrent'; projectId?: string; currentQueueItemId?: string | null }
   | { type: 'clearCompletedQueueItems' }
@@ -2964,9 +2971,6 @@ const updateQueueItem = (project: Project, queueItemId: string, getItem: (item: 
   return didChange ? { ...project, queue: { items } } : project;
 };
 
-const isCancellableQueueItem = (item: QueueItem): boolean =>
-  item.cancellable && (item.status === 'pending' || item.status === 'running');
-
 const isClearableQueueItem = (item: QueueItem): boolean => item.status === 'completed' || item.status === 'failed';
 
 const shouldApplyQueueBulkActionToProject = (project: Project, projectId?: string): boolean =>
@@ -5078,9 +5082,9 @@ export const __workbenchReducerInternal = (
         nextState,
         createNotification({
           kind: 'info',
-          message: `${targetProject.name}: ${action.queueItemId}`,
+          message: action.notice?.message ?? `${targetProject.name}: ${action.queueItemId}`,
           projectId: targetProject.id,
-          title: 'Invocation cancellation requested',
+          title: action.notice?.title ?? 'Invocation cancellation requested',
         })
       );
     }

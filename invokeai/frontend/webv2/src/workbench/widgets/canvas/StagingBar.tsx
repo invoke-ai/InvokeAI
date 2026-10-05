@@ -3,6 +3,7 @@ import type { CanvasStagingAreaContractV2, CanvasStagingCandidateContract } from
 import type { CanvasStagingSlot } from '@workbench/canvasStagingView';
 
 import {
+  Box,
   Flex,
   HStack,
   Menu,
@@ -17,7 +18,7 @@ import {
 import { galleryDurability } from '@features/gallery';
 import { galleryImageUrls } from '@features/gallery/utility';
 import { useQueueItemProgress, useQueueItemProgressImage } from '@features/queue/react';
-import { Button, Group, IconButton, MenuContent, toaster, Tooltip } from '@platform/ui';
+import { Button, Group, IconButton, MenuContent, toaster, Tooltip, useTooltipTriggerIds } from '@platform/ui';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { wheelScrollsHorizontally } from '@platform/ui/wheelScrollsHorizontally';
@@ -47,8 +48,29 @@ type AutoSwitchMode = CanvasStagingAreaContractV2['autoSwitchMode'];
 const THUMBNAIL_STRIP_HEIGHT = '5rem';
 const AUTO_SWITCH_MODES: AutoSwitchMode[] = ['off', 'progress', 'latest'];
 const MENU_POSITIONING = { placement: 'top-end' } as const;
+/**
+ * Below this bar width the "Generating" text and "Discard All" collapse to icons, so the accept split button (the
+ * only pointer path to "Keep as Hidden Layer") stays inside the canvas. Measured on the staging slot itself.
+ */
+const COMPACT = '@container staging-bar (width < 48rem)';
+const STAGING_ROOT_CSS = { containerName: 'staging-bar', containerType: 'inline-size' } as const;
+const WIDE_ONLY_CSS = { [COMPACT]: { display: 'none' } } as const;
+const COMPACT_ONLY_CSS = { display: 'none', [COMPACT]: { display: 'inline-flex' } } as const;
+/** Visually hidden while compact, still read as the status text. */
+const COMPACT_SR_ONLY_CSS = {
+  [COMPACT]: {
+    clipPath: 'inset(50%)',
+    height: '1px',
+    overflow: 'hidden',
+    position: 'absolute',
+    whiteSpace: 'nowrap',
+    width: '1px',
+  },
+} as const;
 
 interface StagingBarProps {
+  /** Accepting also stops the selected candidate's still-running batch. */
+  acceptStopsBatch: boolean;
   antialiasProgressImages: boolean;
   areThumbnailsVisible: boolean;
   autoSwitchMode: AutoSwitchMode;
@@ -78,6 +100,7 @@ interface StagingBarProps {
  * engine.previews; the parent positions this bar above tool options.
  */
 export const StagingBar = ({
+  acceptStopsBatch,
   antialiasProgressImages,
   areThumbnailsVisible,
   autoSwitchMode,
@@ -113,6 +136,10 @@ export const StagingBar = ({
   }
   const hasSlots = slots.length > 0;
   const cancelableQueueItemId = getCancelableCanvasStagingQueueItemId(selectedSlot);
+  const acceptLabel = t(
+    acceptStopsBatch ? 'widgets.canvas.staging.acceptAndStopBatch' : 'widgets.canvas.acceptToLayer'
+  );
+  const acceptMenuIds = useTooltipTriggerIds();
 
   const handleSaveToGallery = async () => {
     if (!selectedCandidate || isSaving) {
@@ -134,9 +161,17 @@ export const StagingBar = ({
   };
 
   return (
-    <Stack align="center" animationDuration="moderate" animationName="slide-from-bottom, fade-in" gap="2" w="full">
+    <Stack
+      align="center"
+      animationDuration="moderate"
+      animationName="slide-from-bottom, fade-in"
+      css={STAGING_ROOT_CSS}
+      gap="2"
+      w="full"
+    >
       {contextMenuTarget ? (
         <StagingItemContextMenu
+          acceptLabel={acceptLabel}
           canAccept={canAccept}
           target={contextMenuTarget}
           onAccept={onAccept}
@@ -203,12 +238,14 @@ export const StagingBar = ({
 
       <CanvasOptionsBar>
         {isGenerating ? (
-          <HStack color="fg.muted" gap="1.5" px="1">
-            <Spinner />
-            <Text fontSize="md" fontWeight="600">
-              {t('widgets.canvas.staging.generating')}
-            </Text>
-          </HStack>
+          <Tooltip content={t('widgets.canvas.staging.generating')}>
+            <HStack color="fg.muted" flexShrink="0" gap="1.5" position="relative" px="1" role="status">
+              <Spinner />
+              <Text css={COMPACT_SR_ONLY_CSS} fontSize="md" fontWeight="600" whiteSpace="nowrap">
+                {t('widgets.canvas.staging.generating')}
+              </Text>
+            </HStack>
+          </Tooltip>
         ) : null}
 
         {hasSlots && selectedSlot ? (
@@ -302,27 +339,45 @@ export const StagingBar = ({
 
                 <CanvasFloatingBarDivider />
 
-                <Button variant="ghost" onClick={onDiscardAll}>
+                <Button css={WIDE_ONLY_CSS} flexShrink="0" variant="ghost" onClick={onDiscardAll}>
                   <Trash2Icon />
                   {t('common.discardAll')}
                 </Button>
+                <Tooltip content={t('common.discardAll')}>
+                  <IconButton
+                    aria-label={t('common.discardAll')}
+                    css={COMPACT_ONLY_CSS}
+                    variant="ghost"
+                    onClick={onDiscardAll}
+                  >
+                    <Trash2Icon />
+                  </IconButton>
+                </Tooltip>
 
-                <Menu.Root positioning={MENU_POSITIONING}>
-                  <Group attached>
+                <Menu.Root ids={acceptMenuIds} positioning={MENU_POSITIONING}>
+                  <Group attached flexShrink="0">
                     <Button disabled={!canAccept} onClick={onAccept}>
                       <CheckIcon />
-                      {t('widgets.canvas.acceptToLayer')}
+                      {/* Both labels share one cell, so the bar keeps its width when the batch finishes. */}
+                      <Box as="span" display="inline-grid">
+                        <AcceptLabel visible={!acceptStopsBatch}>{t('widgets.canvas.acceptToLayer')}</AcceptLabel>
+                        <AcceptLabel visible={acceptStopsBatch}>
+                          {t('widgets.canvas.staging.acceptAndStopBatch')}
+                        </AcceptLabel>
+                      </Box>
                     </Button>
-                    <Menu.Trigger asChild>
-                      <IconButton
-                        aria-label={t('widgets.canvas.staging.moreAcceptOptions')}
-                        disabled={!canAccept}
-                        minW="0"
-                        w="6"
-                      >
-                        <ChevronDownIcon />
-                      </IconButton>
-                    </Menu.Trigger>
+                    <Tooltip content={t('widgets.canvas.staging.moreAcceptOptions')} ids={acceptMenuIds}>
+                      <Menu.Trigger asChild>
+                        <IconButton
+                          aria-label={t('widgets.canvas.staging.moreAcceptOptions')}
+                          disabled={!canAccept}
+                          minW="0"
+                          w="6"
+                        >
+                          <ChevronDownIcon />
+                        </IconButton>
+                      </Menu.Trigger>
+                    </Tooltip>
                   </Group>
                   <Portal>
                     <Menu.Positioner>
@@ -343,6 +398,12 @@ export const StagingBar = ({
     </Stack>
   );
 };
+
+const AcceptLabel = ({ children, visible }: { children: string; visible: boolean }) => (
+  <Box as="span" gridArea="1 / 1" visibility={visible ? 'visible' : 'hidden'}>
+    {children}
+  </Box>
+);
 
 const AutoSwitchMenu = ({ mode, onSelect }: { mode: AutoSwitchMode; onSelect: (mode: AutoSwitchMode) => void }) => {
   const { t } = useTranslation();

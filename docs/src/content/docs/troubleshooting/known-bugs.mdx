@@ -1,19 +1,9 @@
 ---
 title: Known Bugs
 description: Places where the current release does not yet behave as the documentation describes, with workarounds.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-05
 ---
 
 This page lists known cases where InvokeAI does not yet behave as this documentation describes. Each entry explains what happens instead and how to work around it. Entries are removed once the fix is released.
 
-## v7.0.0-alpha
-
-### Canvas: shapes do not add to inpaint masks or regional guidance
-
-**Documented behavior:** With an inpaint mask or regional guidance layer selected, the **Shape** tool adds the drawn shape to the mask or region. See the [Canvas guide](/users-guide/canvas/canvas-guide/#tool-options).
-
-**Current behavior:** The Shape tool creates a new raster layer named "Shape N" instead, and the mask or region is unchanged. With an inpaint mask selected, the new raster layer also becomes part of the image inside the generation frame, which can change the result of the next generation.
-
-**Workaround:** Paint masks and regions with the **Brush** (**B**). If a Shape layer was created by mistake, delete it or undo with **Ctrl+Z**.
-
-**Tracking:** [invoke-ai/InvokeAI-7#386](https://github.com/invoke-ai/InvokeAI-7/issues/386)
+There are currently no known bugs of this kind.

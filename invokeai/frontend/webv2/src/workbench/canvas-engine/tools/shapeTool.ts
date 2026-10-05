@@ -1,8 +1,8 @@
 /**
- * Shapes use box drags, polygon clicks or closed freehand. Commit pixels to eligible selected paint with
- * selection/bbox clipping, otherwise create a parametric layer. Locked/disabled/unready paint refuses. Shift
- * constrains box aspect; previews/cancellation do not dispatch, and nonzero shapes produce one structural or
- * stroke commit.
+ * Shapes use box drags, polygon clicks or closed freehand. Commit pixels to an eligible selected paint layer or
+ * mask (as opaque mask coverage) with selection/bbox clipping, otherwise create a parametric layer.
+ * Locked/disabled/unready paint or masks refuse. Shift constrains box aspect; previews/cancellation do not
+ * dispatch, and nonzero shapes produce one structural or stroke commit.
  */
 
 import type { CanvasLayerSourceContract, CanvasRasterLayerContractV2 } from '@workbench/canvas-engine/contracts';
@@ -13,7 +13,8 @@ import type { PlacedSurface, Rect, Vec2 } from '@workbench/canvas-engine/types';
 
 import { lookupDocumentLeaf } from '@workbench/canvas-engine/document-model/documentModel';
 import { getDocumentLeaves } from '@workbench/canvas-engine/document/documentIndex';
-import { isLeafPaintable } from '@workbench/canvas-engine/document/layerEligibility';
+import { isLayerTransparencyLocked, isLeafPaintable } from '@workbench/canvas-engine/document/layerEligibility';
+import { isMaskLayer, maskAsPaintSource } from '@workbench/canvas-engine/document/sources';
 import { polygonBounds } from '@workbench/canvas-engine/freehand';
 import { identity, invert, multiply, translate } from '@workbench/canvas-engine/math/mat2d';
 import { intersect, roundOut, transformBounds } from '@workbench/canvas-engine/math/rect';
@@ -22,6 +23,7 @@ import { drawShapeSource } from '@workbench/canvas-engine/render/rasterizers/sha
 import type { Tool, ToolContext } from './tool';
 
 import { layerMatrix } from './moveHitTest';
+import { MASK_PAINT_COLOR } from './paintConstants';
 import {
   extendFreehandTrace,
   finishFreehandTrace,
@@ -97,8 +99,19 @@ export const polygonShapeFrom = (
   };
 };
 
-/** Where a finished shape went: pixels, refused by the paint layer, or not a paint layer at all. */
-type PixelPlacement = 'placed' | 'refused' | 'unsupported';
+/** Where a finished shape went: pixels, nothing to draw, refused by the paint layer or mask, or neither at all. */
+type PixelPlacement = 'placed' | 'nothing' | 'refused' | 'unsupported';
+
+/** With fill off and no stroke to draw, a shape changes no pixel, so it records no step and uploads nothing. */
+const drawsNothing = (source: ShapeSource): boolean =>
+  source.fill === null && (source.stroke === null || source.strokeWidth <= 0);
+
+/** A mask takes the shape's footprint as coverage: each enabled part paints opaque, whatever its color. */
+const maskCoverageOf = (source: ShapeSource): ShapeSource => ({
+  ...source,
+  fill: source.fill === null ? null : MASK_PAINT_COLOR,
+  stroke: source.stroke === null ? null : MASK_PAINT_COLOR,
+});
 
 /** Whether a session was started for the current kind option; a kind change mid-session drops it. */
 const sessionFitsKind = (session: Session, kind: ShapeToolOptions['kind']): boolean =>
@@ -136,17 +149,21 @@ export const createShapeTool = (): Tool => {
 
   /**
    * One pixel-shape stroke grows local bounds within selection/bbox clips, draws through the layer inverse and
-   * applies the same masks as brush painting.
+   * applies the same masks as brush painting, on paint pixels or mask alpha alike.
    */
   const commitPixels = (ctx: ToolContext, leaf: SemanticLeaf, placed: PlacedShape): PixelPlacement => {
     const layer = leaf.layer;
-    if (layer.type !== 'raster' || layer.source.type !== 'paint') {
+    const paint = layer.type === 'raster' && layer.source.type === 'paint' ? layer.source : maskAsPaintSource(layer);
+    if (!paint) {
       return 'unsupported';
+    }
+    if (drawsNothing(placed.source)) {
+      return 'nothing';
     }
     if (!isLeafPaintable(leaf)) {
       return 'refused';
     }
-    if (layer.source.bitmap) {
+    if (paint.bitmap) {
       const existing = ctx.layers.get(layer.id);
       if (!existing || existing.stale) {
         // The durable pixels are not in the cache yet: drawing now would lose them.
@@ -206,7 +223,8 @@ export const createShapeTool = (): Tool => {
       // layer inverse then scratch offset.
       const scratch = ctx.backend.createSurface(dirtyRect.width, dirtyRect.height);
       const draw = scratch.ctx;
-      const { rect, source } = placed;
+      const { rect } = placed;
+      const source = isMaskLayer(layer) ? maskCoverageOf(placed.source) : placed.source;
       const toScratch = multiply(translate(identity(), { x: -dirtyRect.x, y: -dirtyRect.y }), toLocal);
       draw.setTransform(toScratch.a, toScratch.b, toScratch.c, toScratch.d, toScratch.e, toScratch.f);
       drawShapeSource(draw, source, rect.x, rect.y, rect.width, rect.height);
@@ -225,7 +243,7 @@ export const createShapeTool = (): Tool => {
       }
       surfaceCtx.save();
       surfaceCtx.setTransform(1, 0, 0, 1, 0, 0);
-      surfaceCtx.globalCompositeOperation = layer.isTransparencyLocked ? 'source-atop' : 'source-over';
+      surfaceCtx.globalCompositeOperation = isLayerTransparencyLocked(layer) ? 'source-atop' : 'source-over';
       surfaceCtx.drawImage(scratch.canvas, sx, sy);
       surfaceCtx.restore();
       const afterImageData = surfaceCtx.getImageData(sx, sy, dirtyRect.width, dirtyRect.height);
@@ -266,7 +284,10 @@ export const createShapeTool = (): Tool => {
     ctx.commitStructural('Add shape', forward, inverse);
   };
 
-  /** Places a finished shape on the selected paint layer when asked, else on a new layer. */
+  /**
+   * Places a finished shape on the selected paint layer or mask when asked, else on a new layer. A refused
+   * selected target places nothing rather than adding a layer the user did not ask for.
+   */
   const commit = (ctx: ToolContext, placed: PlacedShape | null): void => {
     reset(ctx);
     const doc = ctx.getDocument();

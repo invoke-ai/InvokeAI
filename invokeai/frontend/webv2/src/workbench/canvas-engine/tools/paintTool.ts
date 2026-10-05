@@ -16,6 +16,7 @@ import { fromTRS, invert } from '@workbench/canvas-engine/math/mat2d';
 
 import type { StrokeEdit, Tool, ToolContext } from './tool';
 
+import { MASK_PAINT_COLOR } from './paintConstants';
 import { createStrokeSession, type StrokeSession } from './strokeSession';
 
 /** Bit for the primary (usually left) mouse button in `PointerEvent.buttons`. */
@@ -38,9 +39,6 @@ export interface PaintToolSpec {
   /** Whether pen pressure modulates alpha along the stroke. Absent means never (eraser). */
   pressureOpacity?(ctx: ToolContext): boolean;
 }
-
-/** Colour brush strokes paint into a MASK cache: an opaque stencil (only alpha matters). */
-const MASK_STROKE_COLOR = '#ffffff';
 
 /** The resolved paint target for a gesture. `createdLayer` is set only when auto-created. */
 interface PaintTarget {
@@ -142,7 +140,7 @@ const resolveTarget = (ctx: ToolContext, tool: PaintToolSpec['id']): PaintTarget
     }
     const edit = ctx.beginStrokeEdit();
     return edit
-      ? editTarget(edit, selected.id, { color: MASK_STROKE_COLOR, forceOpaque: true, transform: selected.transform })
+      ? editTarget(edit, selected.id, { color: MASK_PAINT_COLOR, forceOpaque: true, transform: selected.transform })
       : null;
   }
 

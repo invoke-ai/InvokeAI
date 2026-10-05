@@ -424,10 +424,14 @@ const createCommands = (
       },
     },
     queue: {
-      cancel: command('cancelQueueItem', (projectId: string | undefined, queueItemId: string) => ({
-        projectId,
-        queueItemId,
-      })),
+      cancel: command(
+        'cancelQueueItem',
+        (projectId: string | undefined, queueItemId: string, notice?: ActionPayload<'cancelQueueItem'>['notice']) => ({
+          projectId,
+          queueItemId,
+          ...(notice ? { notice } : {}),
+        })
+      ),
       cancelAll: command('cancelAllQueueItems', (projectId?: string) => ({ projectId })),
       cancelAllExceptCurrent: command(
         'cancelAllQueueItemsExceptCurrent',

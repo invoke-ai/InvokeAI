@@ -122,6 +122,7 @@ const render = async (handlers: Partial<Parameters<typeof StagingItemContextMenu
       <QueryClientProvider client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}>
         <ChakraProvider value={system}>
           <StagingItemContextMenu
+            acceptLabel="widgets.canvas.acceptToLayer"
             canAccept
             target={target}
             onAccept={vi.fn()}
@@ -183,5 +184,14 @@ describe('StagingItemContextMenu', () => {
     await activate(label);
 
     expect(handlers[handler]).toHaveBeenCalledOnce();
+  });
+
+  it('names its accept item as the bar does and runs the same accept', async () => {
+    const handlers = { acceptLabel: 'Accept and Stop Batch', onAccept: vi.fn() };
+    await render(handlers);
+
+    await activate('Accept and Stop Batch');
+
+    expect(handlers.onAccept).toHaveBeenCalledOnce();
   });
 });

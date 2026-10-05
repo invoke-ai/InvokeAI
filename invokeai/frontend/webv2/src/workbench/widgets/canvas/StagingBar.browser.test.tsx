@@ -8,13 +8,24 @@ import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeAll, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 
 import { CanvasBottomOverlay } from './CanvasBottomOverlay';
 import { StagingBar } from './StagingBar';
 
-const contextMenu = vi.hoisted(() => ({ targets: [] as { slotId: string; x: number; y: number }[] }));
+const contextMenu = vi.hoisted(() => ({
+  acceptLabels: [] as string[],
+  targets: [] as { slotId: string; x: number; y: number }[],
+}));
 vi.mock('./StagingItemContextMenu', () => ({
-  StagingItemContextMenu: ({ target }: { target: { slot: { id: string }; x: number; y: number } }) => {
+  StagingItemContextMenu: ({
+    acceptLabel,
+    target,
+  }: {
+    acceptLabel: string;
+    target: { slot: { id: string }; x: number; y: number };
+  }) => {
+    contextMenu.acceptLabels.push(acceptLabel);
     contextMenu.targets.push({ slotId: target.slot.id, x: target.x, y: target.y });
     return <div data-testid="staging-context-menu" />;
   },
@@ -74,7 +85,13 @@ const renderStagingBar = async (
   onSaveToLayerAndContinue: () => void = noop,
   onPreloadCandidate: (imageName: string) => void = noop,
   onSelectImage: (index: number) => void = noop,
-  slotAt: (index: number) => CanvasStagingSlot = makeSlot
+  slotAt: (index: number) => CanvasStagingSlot = makeSlot,
+  {
+    acceptStopsBatch = false,
+    canvasWidth = CANVAS_WIDTH,
+    isGenerating = false,
+    onAccept = noop,
+  }: { acceptStopsBatch?: boolean; canvasWidth?: number; isGenerating?: boolean; onAccept?: () => void } = {}
 ) => {
   const slots = Array.from({ length: slotCount }, (_, index) => slotAt(index));
   const selectedSlot = slots[selectedImageIndex];
@@ -89,22 +106,23 @@ const renderStagingBar = async (
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <Box h="400px" position="relative" w={`${CANVAS_WIDTH}px`}>
+          <Box h="400px" position="relative" w={`${canvasWidth}px`}>
             <CanvasBottomOverlay.Root>
               <CanvasBottomOverlay.Staging>
                 <StagingBar
+                  acceptStopsBatch={acceptStopsBatch}
                   antialiasProgressImages={false}
                   areThumbnailsVisible
                   autoSwitchMode="off"
                   canAccept
                   hasMultipleSlots={slotCount > 1}
-                  isGenerating={false}
+                  isGenerating={isGenerating}
                   isVisible
                   selectedCandidate={selectedSlot?.kind === 'candidate' ? selectedSlot.candidate : undefined}
                   selectedImageIndex={selectedImageIndex}
                   selectedSlot={selectedSlot}
                   slots={slots}
-                  onAccept={noop}
+                  onAccept={onAccept}
                   onCancelQueueItem={noop}
                   onCycle={noop}
                   onDiscardAll={noop}
@@ -275,4 +293,60 @@ describe('StagingBar thumbnail strip', () => {
 
     expect(onSaveToLayerAndContinue).toHaveBeenCalledOnce();
   });
+  it('names the accept action for the batch it stops, in the bar and its menu, and keeps the hidden-layer alternative', async () => {
+    await renderStagingBar(1);
+    await expect.element(page.getByRole('button', { exact: true, name: 'Accept to Layer' })).toBeVisible();
+    const keptWidth = page
+      .getByRole('button', { exact: true, name: 'Accept to Layer' })
+      .element()
+      .getBoundingClientRect().width;
+
+    const onAccept = vi.fn();
+    const onSaveToLayerAndContinue = vi.fn();
+    await renderStagingBar(1, 0, onSaveToLayerAndContinue, noop, noop, makeSlot, { acceptStopsBatch: true, onAccept });
+    const acceptAndStop = page.getByRole('button', { exact: true, name: 'Accept and Stop Batch' });
+    await expect.element(acceptAndStop).toBeVisible();
+    // The label swap does not resize the bar.
+    expect(acceptAndStop.element().getBoundingClientRect().width).toBe(keptWidth);
+    await acceptAndStop.click();
+    expect(onAccept).toHaveBeenCalledOnce();
+
+    const thumbnail = page.getByRole('button', { name: 'Select staged candidate 1' }).element();
+    await interact(() =>
+      thumbnail.dispatchEvent(
+        new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 50, clientY: 50 })
+      )
+    );
+    expect(contextMenu.acceptLabels.at(-1)).toBe('Accept and Stop Batch');
+
+    await page.getByRole('button', { name: 'More accept options' }).click();
+    const keepHidden = page.getByRole('menuitem', { name: 'Keep as Hidden Layer' });
+    await expect.element(keepHidden).toBeVisible();
+    await keepHidden.click();
+    expect(onSaveToLayerAndContinue).toHaveBeenCalledOnce();
+    expect(onAccept).toHaveBeenCalledOnce();
+  });
+
+  it.each([640, 700, 800])(
+    'keeps the accept split button inside a %ipx canvas while a batch is generating',
+    async (canvasWidth) => {
+      const { overlay } = await renderStagingBar(
+        3,
+        0,
+        noop,
+        noop,
+        noop,
+        (index) => (index === 0 ? makeSlot(index) : makePlaceholder(index)),
+        { acceptStopsBatch: true, canvasWidth, isGenerating: true }
+      );
+      const trigger = page.getByRole('button', { name: 'More accept options' }).element();
+      const accept = page.getByRole('button', { exact: true, name: 'Accept and Stop Batch' }).element();
+      const bounds = overlay.getBoundingClientRect();
+      expect(trigger.getBoundingClientRect().right).toBeLessThanOrEqual(bounds.right);
+      expect(accept.getBoundingClientRect().left).toBeGreaterThanOrEqual(bounds.left);
+      // Collapsed or not, Discard All and the generating status keep their names.
+      await expect.element(page.getByRole('button', { name: 'Discard All' })).toBeVisible();
+      expect(page.getByRole('status').element().textContent).toBe('Generating…');
+    }
+  );
 });

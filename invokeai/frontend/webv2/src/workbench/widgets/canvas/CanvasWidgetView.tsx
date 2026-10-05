@@ -54,6 +54,7 @@ import { CanvasColorFeed } from './color-system/CanvasColorFeed';
 import { useActiveColorCommands } from './color-system/useActiveColors';
 import { useCanvasOperation } from './engineStoreHooks';
 import { executeCanvasImageDropImport } from './executeCanvasImageDropImport';
+import { acceptStagedCandidate, getStoppableCandidateBatch } from './stagedAcceptance';
 import { StagingBar } from './StagingBar';
 import { selectStagedPreviewSource, stagedPreviewKey } from './stagingPreview';
 import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
@@ -144,6 +145,9 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const selectedSlot = stagingSlots[stagingArea.selectedImageIndex];
   const selectedCandidate = selectedSlot?.kind === 'candidate' ? selectedSlot.candidate : undefined;
   const selectedPlaceholder = selectedSlot?.kind === 'placeholder' ? selectedSlot : null;
+  const acceptStopsBatch = selectedCandidate
+    ? getStoppableCandidateBatch(selectedCandidate, queueItems) !== null
+    : false;
   const hasStagingSlots = stagingSlots.length > 0;
   const hasMultipleStagingSlots = stagingSlots.length > 1;
   const isCanvasGenerationInFlight = queueItems.some(
@@ -279,17 +283,28 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
       if (selectedSlot?.kind !== 'candidate' || !engine) {
         return;
       }
-      const result = engine.layers.commitStagedImage({
-        candidate: selectedSlot.candidate,
-        continueStaging,
-        selectedImageIndex: stagingArea.selectedImageIndex,
-      });
+      const result = acceptStagedCandidate(
+        {
+          commit: (options) => engine.layers.commitStagedImage(options),
+          stopBatch: (queueItemId) =>
+            queue.cancel(projectId, queueItemId, {
+              message: t('widgets.canvas.staging.acceptStopMessage'),
+              title: t('widgets.canvas.staging.acceptStopTitle'),
+            }),
+        },
+        {
+          candidate: selectedSlot.candidate,
+          continueStaging,
+          queueItems,
+          selectedImageIndex: stagingArea.selectedImageIndex,
+        }
+      );
       if (result.status !== 'committed' && result.status !== 'busy') {
         // A candidate that left staging is as stale as one that changed under the accept.
         reportLayerOperation(result.status === 'missing' ? 'stale' : result.status, notify.error, t);
       }
     },
-    [engine, notify, selectedSlot, stagingArea.selectedImageIndex, t]
+    [engine, notify, projectId, queue, queueItems, selectedSlot, stagingArea.selectedImageIndex, t]
   );
   /* eslint-enable react/preserve-manual-memoization */
   const acceptStagedImage = useCallback(() => commitSelectedStagedImage(false), [commitSelectedStagedImage]);
@@ -526,6 +541,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
                 antialiasProgressImages={antialiasProgressImages}
                 areThumbnailsVisible={stagingArea.areThumbnailsVisible}
                 autoSwitchMode={stagingArea.autoSwitchMode}
+                acceptStopsBatch={acceptStopsBatch}
                 canAccept={interactionCapabilities.canAcceptStagedImage}
                 hasMultipleSlots={hasMultipleStagingSlots}
                 isGenerating={isCanvasGenerationInFlight}

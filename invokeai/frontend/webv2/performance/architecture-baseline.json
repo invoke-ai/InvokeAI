@@ -2,10 +2,10 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 790640,
+        "brotliBytes": 790624,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 789839,
+        "gzipBytes": 789843,
         "imageRawBytes": 44398,
         "initialRawBytes": 2031535,
         "largestAssetRawBytes": 749011,
@@ -343,12 +343,12 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1154184,
+        "brotliBytes": 1154370,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1147906,
+        "gzipBytes": 1148072,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3156053,
+        "initialRawBytes": 3156424,
         "largestAssetRawBytes": 749011,
         "otherAssetRawBytes": 0,
         "ownedRawBytes": 147847,

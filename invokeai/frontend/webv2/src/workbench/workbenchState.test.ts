@@ -6255,6 +6255,81 @@ describe('workbenchReducer canvas v2 layer reducers', () => {
     expect(getCanvas(rolledBack).stagingArea).toBe(stagingArea);
   });
 
+  it.each([
+    ['keeps an editable mask as the editing target', false, 'm'],
+    ['selects the result over a locked mask the next stroke would refuse', true, 'accepted'],
+  ])('%s through an accept and its rollback', (_label, isLocked, expectedSelection) => {
+    let state = withCanvasLayers(createInitialWorkbenchState(), [
+      { ...createInpaintMaskLayer('m'), isLocked },
+      createRasterLayer('a'),
+    ]);
+    state = workbenchReducer(state, { id: 'm', type: 'setCanvasSelectedLayer' });
+    const candidate: Project['canvas']['stagingArea']['pendingImages'][number] = {
+      height: 64,
+      imageName: 'eye.png',
+      imageUrl: 'url',
+      placement: { height: 64, opacity: 1, width: 64, x: 0, y: 0 },
+      queuedAt: 'now',
+      sourceQueueItemId: 'queue-1',
+      thumbnailUrl: 'thumb',
+      width: 64,
+    };
+    const stagingArea: Project['canvas']['stagingArea'] = {
+      ...getCanvas(state).stagingArea,
+      isVisible: true,
+      pendingImageIds: ['queue-1'],
+      pendingImages: [candidate],
+      selectedImageIndex: 0,
+    };
+    state = {
+      ...state,
+      projects: state.projects.map((project) =>
+        project.id === state.activeProjectId ? { ...project, canvas: { ...project.canvas, stagingArea } } : project
+      ),
+    };
+    const layer: CanvasRasterLayerContractV2 = { ...createRasterLayer('accepted', 'eye.png'), name: 'Accepted' };
+    const event = {
+      createdAt: '2026-07-16T00:00:00.000Z',
+      id: 'event-accepted',
+      summary: 'Accepted eye.png into a new raster layer',
+      type: 'canvas-layer-accepted' as const,
+    };
+
+    const committed = workbenchReducer(state, {
+      anchor: stackTopAnchor(state.activeProjectId),
+      candidateFingerprint: getCanvasStagingCandidateFingerprint(candidate),
+      continueStaging: false,
+      event,
+      layer,
+      selectedImageIndex: 0,
+      type: 'commitStagedImage',
+    });
+
+    expect(getCanvas(committed).document.stacks.raster.map((node) => node.id)).toEqual(['accepted', 'a']);
+    expect(getCanvas(committed).document.stacks.raster[0]).toMatchObject({ isEnabled: true });
+    expect(getCanvas(committed).document.selectedLayerId).toBe(expectedSelection);
+
+    const rollback = (from: WorkbenchState) =>
+      workbenchReducer(from, {
+        continueStaging: false,
+        event,
+        layer,
+        selectedLayerId: 'm',
+        stagingArea,
+        type: 'rollbackStagedImageCommit',
+      });
+    // A selection that moved after the accept is not the accept's own result, so the rollback refuses it.
+    const moved = workbenchReducer(committed, {
+      id: expectedSelection === 'm' ? 'accepted' : 'm',
+      type: 'setCanvasSelectedLayer',
+    });
+    expect(rollback(moved)).toBe(moved);
+    const rolledBack = rollback(committed);
+    expect(getCanvas(rolledBack).document.stacks.raster.map((node) => node.id)).toEqual(['a']);
+    expect(getCanvas(rolledBack).document.selectedLayerId).toBe('m');
+    expect(getCanvas(rolledBack).stagingArea).toBe(stagingArea);
+  });
+
   it('removes layers and repairs selection to the nearest remaining layer (below, then above)', () => {
     let state = withCanvasLayers(createInitialWorkbenchState(), [
       createRasterLayer('a'),

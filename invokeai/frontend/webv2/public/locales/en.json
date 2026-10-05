@@ -3035,6 +3035,9 @@
       "showStagedResultPreview": "Show staged result preview",
       "showStagingThumbnails": "Show staging thumbnails",
       "staging": {
+        "acceptAndStopBatch": "Accept and Stop Batch",
+        "acceptStopMessage": "Stopping the rest of its batch, which shows as cancelled in the queue.",
+        "acceptStopTitle": "Result accepted",
         "autoSwitch": "Auto-switch",
         "autoSwitchLatest": "Newest",
         "autoSwitchOff": "Off",
@@ -3124,6 +3127,7 @@
         "shapeFreehand": "Freehand",
         "shapeFreehandHint": "Drag to draw a freeform shape.",
         "shapeHint": "Drag to draw a shape.",
+        "shapeMaskHint": "Shapes add to the selected mask; fill and stroke set which parts, not their colors.",
         "shapePolygon": "Polygon",
         "shapePolygonHint": "Click to place points. Double-click, Enter, or click the first point to close.",
         "shapeRect": "Rectangle",

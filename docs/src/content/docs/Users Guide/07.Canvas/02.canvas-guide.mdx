@@ -1,7 +1,7 @@
 ---
 title: Canvas guide
 description: A detailed guide to the Canvas — its tools and their options, navigation, the header buttons, the generation frame, selections, transform, filters, the staging area, menus, settings and keyboard shortcuts.
-lastUpdated: 2026-09-30
+lastUpdated: 2026-10-05
 ---
 
 import { Image } from 'astro:assets';
@@ -140,7 +140,10 @@ Then click **Run**. If the workflow has no image input and output it can connect
 When the Canvas is the destination, results appear in the staging area at the bottom of the canvas, not directly on it. The staging bar lets you:
 
 * Step through the results with the arrows, or with **←** and **→**, and show or hide the result thumbnails.
-* **Accept to Layer** — add the current result as a new raster layer and close the staging area. The arrow next to it offers **Keep as Hidden Layer**, which adds the result as a disabled layer and keeps staging open.
+* **Accept to Layer** — add the current result as a new raster layer at the top of the raster layers and close the staging area.
+  * A selected inpaint mask, regional guidance or control layer that you can still edit stays selected, so you can carry on painting it. Otherwise the new layer is selected.
+  * While the rest of the result's batch is still queued or generating, the button reads **Accept and Stop Batch** and also cancels those remaining images. The batch then shows as cancelled in the queue, and undoing the accepted layer does not restart it.
+  * The arrow next to it offers **Keep as Hidden Layer**, which adds the result as a disabled layer and keeps staging open and the batch running.
 * **Save to gallery** the current result, **Discard** it (**Delete**), or **Discard All**.
 * Hide the preview of the current result to compare it with the canvas underneath.
 * **Auto-switch** — show each new result as it arrives (**Newest**), follow the one in progress (**In progress**), or stay on the current one (**Off**).

@@ -410,6 +410,8 @@ export const createQueueRuntime = ({
   const pendingJournalSettles = new Map<string, { ownershipEpoch: number; projectId: string; queueItemId: string }>();
   const durableJournalSignatures = new Map<string, string>();
   const reportedJournalFailures = new Set<string>();
+  /** Runs whose failed cancellation was already reported; retries stay quiet until the run settles. */
+  const reportedCancelFailures = new Set<string>();
   const ownedLocks = new Map<string, Extract<QueueRunLock, { kind: 'acquired' }>>();
   const lockRequests = new Map<string, Promise<boolean>>();
   const preparingRunKeys = new Set<string>();
@@ -724,6 +726,7 @@ export const createQueueRuntime = ({
     pendingReconcileRunKeys.delete(key);
     reconcileRetryRunKeys.delete(key);
     cancelRequestedRunKeys.delete(key);
+    reportedCancelFailures.delete(key);
     invalidateAttempt(projectId, queueItemId);
     pendingJournalRecords.delete(key);
     const ownershipEpoch = ownershipEpochs.get(key) ?? 0;
@@ -782,12 +785,15 @@ export const createQueueRuntime = ({
       })
       .catch((error: unknown) => {
         if (isActive()) {
-          commands.recordError({
-            area: 'queue-cancel',
-            message: toErrorMessage(error),
-            namespace: 'queue',
-            projectId,
-          });
+          if (!reportedCancelFailures.has(key)) {
+            reportedCancelFailures.add(key);
+            commands.recordError({
+              area: 'queue-cancel',
+              message: `Could not stop queue item ${queueItem.id} yet; retrying automatically. ${toErrorMessage(error)}`,
+              namespace: 'queue',
+              projectId,
+            });
+          }
           reconcileRetryRunKeys.add(key);
           scheduleRetry();
         }
@@ -1449,6 +1455,7 @@ export const createQueueRuntime = ({
           startedRunKeys.delete(key);
           pendingReconcileRunKeys.delete(key);
           reconcileRetryRunKeys.delete(key);
+          reportedCancelFailures.delete(key);
           pendingJournalRecords.delete(key);
           releaseRunOwnershipAfterJournal(tracked.projectId, tracked.queueItemId);
         }

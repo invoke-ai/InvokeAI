@@ -1350,6 +1350,132 @@ describe('queue runtime', () => {
     await runtime.dispose();
   });
 
+  /** Two running batches whose cancellations fail `failures[queueItemId]` times before the backend accepts. */
+  const createFailingCancelHarness = (failures: Record<string, number>) => {
+    const items = ['batch-eyes', 'batch-mouth'].map((id): QueueItem => ({ ...createPendingQueueItem(), id }));
+    const project = { id: 'project-1', queue: { items } };
+    const listeners = new Set<() => void>();
+    const notify = () => listeners.forEach((listener) => listener());
+    const byBackendId = new Map<number, QueueItem>();
+    let nextBackendId = 88;
+    const enqueueGenerate = vi.fn(() => {
+      const backendId = nextBackendId++;
+      return Promise.resolve({ batchId: `backend-${backendId}`, enqueued: 1, itemIds: [backendId], requested: 1 });
+    });
+    const cancelQueueItemsByBatchIds = vi.fn(([batchId]: string[]) => {
+      const item = items.find((candidate) => candidate.backendBatchId === batchId)!;
+      const left = failures[item.id] ?? 0;
+      failures[item.id] = left - 1;
+      return left > 0 ? Promise.reject(new Error(`${item.id} unavailable`)) : Promise.resolve();
+    });
+    const recordError = vi.fn();
+    const commands = createTestCommands({
+      markBackendSubmitted: ({ backendBatchId, backendItemIds, queueItemId }) => {
+        const item = items.find((candidate) => candidate.id === queueItemId)!;
+        Object.assign(item, { backendBatchId, backendItemIds, status: 'running' });
+        backendItemIds.forEach((backendId) => byBackendId.set(backendId, item));
+        notify();
+      },
+      recordError,
+      setCancellationPending: ({ pending, queueItemId }) => {
+        items.find((candidate) => candidate.id === queueItemId)!.cancellationPending = pending || undefined;
+        notify();
+      },
+    });
+    const runtime = createQueueRuntime({
+      ...runtimeServices,
+      backend: createTestBackend({
+        cancelQueueItemsByBatchIds,
+        enqueueGenerate,
+        // Retries reconcile against the backend, which still reports each batch running.
+        getItem: vi.fn((backendId: number) =>
+          Promise.resolve({
+            id: backendId,
+            origin: buildQueueItemOrigin(byBackendId.get(backendId)!.id, project.id),
+            status: 'in_progress' as const,
+          })
+        ),
+      }),
+      history: {
+        commands,
+        getSnapshot: () => ({ connectionStatus: 'connected', isHydrated: true, projects: [project] }),
+        subscribe: (listener) => {
+          listeners.add(listener);
+          return () => listeners.delete(listener);
+        },
+      },
+      journal: createTestJournal(),
+    });
+    const cancel = (queueItemId: string) => {
+      Object.assign(
+        items.find((item) => item.id === queueItemId)!,
+        { cancellationPending: true, status: 'cancelled' }
+      );
+      notify();
+    };
+    const settled = (queueItemId: string) =>
+      vi.waitFor(() => expect(items.find((item) => item.id === queueItemId)!.cancellationPending).toBeUndefined(), {
+        timeout: 3000,
+      });
+    const reportedFor = () =>
+      recordError.mock.calls.map(
+        ([payload]) => /queue item (\S+) yet/.exec(String((payload as { message: string }).message))?.[1]
+      );
+    return { cancel, cancelQueueItemsByBatchIds, items, project, recordError, reportedFor, runtime, settled };
+  };
+
+  it('reports a failing batch cancellation once and keeps retrying until the backend stops it', async () => {
+    const h = createFailingCancelHarness({ 'batch-eyes': 2 });
+    h.runtime.start();
+    await vi.waitFor(() => expect(h.items.every((item) => item.backendBatchId)).toBe(true));
+
+    h.cancel('batch-eyes');
+    await h.settled('batch-eyes');
+
+    expect(
+      h.cancelQueueItemsByBatchIds.mock.calls.filter(([[batchId]]) => batchId === h.items[0]!.backendBatchId)
+    ).toHaveLength(3);
+    expect(h.recordError).toHaveBeenCalledOnce();
+    expect(h.recordError).toHaveBeenCalledWith(
+      expect.objectContaining({
+        area: 'queue-cancel',
+        message: 'Could not stop queue item batch-eyes yet; retrying automatically. batch-eyes unavailable',
+        projectId: h.project.id,
+      })
+    );
+    expect(h.items[1]!.status).toBe('running');
+    await h.runtime.dispose();
+  });
+
+  it('reports each batch whose cancellation fails, whether at the same time or after another settled', async () => {
+    const h = createFailingCancelHarness({ 'batch-eyes': 1, 'batch-mouth': 1 });
+    h.runtime.start();
+    await vi.waitFor(() => expect(h.items.every((item) => item.backendBatchId)).toBe(true));
+
+    h.cancel('batch-eyes');
+    await h.settled('batch-eyes');
+    expect(h.reportedFor()).toEqual(['batch-eyes']);
+
+    h.cancel('batch-mouth');
+    await h.settled('batch-mouth');
+    expect(h.reportedFor()).toEqual(['batch-eyes', 'batch-mouth']);
+    await h.runtime.dispose();
+  });
+
+  it('reports a second batch that fails while the first is still retrying', async () => {
+    const h = createFailingCancelHarness({ 'batch-eyes': 2, 'batch-mouth': 2 });
+    h.runtime.start();
+    await vi.waitFor(() => expect(h.items.every((item) => item.backendBatchId)).toBe(true));
+
+    h.cancel('batch-eyes');
+    h.cancel('batch-mouth');
+    await h.settled('batch-eyes');
+    await h.settled('batch-mouth');
+
+    expect(h.reportedFor().sort()).toEqual(['batch-eyes', 'batch-mouth']);
+    await h.runtime.dispose();
+  });
+
   it('cancels an enqueue accepted after local cancellation before settling recovery', async () => {
     const queueItem: QueueItem = createPendingQueueItem();
     const project = { id: 'project-1', queue: { items: [queueItem] } };

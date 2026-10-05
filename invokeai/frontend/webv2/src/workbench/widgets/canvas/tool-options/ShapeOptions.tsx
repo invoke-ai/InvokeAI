@@ -161,6 +161,11 @@ const useShapeEditor = (engine: ToolFormProps['engine']) => {
 const ShapeSettings = ({ engine }: ToolFormProps) => {
   const { t } = useTranslation();
   const editor = useShapeEditor(engine);
+  const selectsMask = useActiveProjectSelector((project) => {
+    const { document } = project.canvas;
+    const layer = document.selectedLayerId ? getDocumentLayer(document, document.selectedLayerId) : undefined;
+    return layer?.type === 'inpaint_mask' || layer?.type === 'regional_guidance';
+  });
   const sampleColor = useColorSampler(engine);
   // A selected layer shows its own kind and can only switch among the box
   // kinds (a box has no vertices to become a polygon; a polygon switched to a
@@ -216,6 +221,11 @@ const ShapeSettings = ({ engine }: ToolFormProps) => {
           value={editor.target}
           onValueChange={editor.setTarget}
         />
+      ) : null}
+      {selectsMask && editor.target === 'selected' ? (
+        <Text color="fg.muted" fontSize="xs">
+          {t('widgets.canvas.toolOptions.shapeMaskHint')}
+        </Text>
       ) : null}
       {/* The chip stays enabled-looking but inert when the slot is off; the toggle owns enablement. */}
       <PropertyControlRow label={t('widgets.canvas.toolOptions.shapeFill')}>

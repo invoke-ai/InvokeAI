@@ -258,8 +258,17 @@ const setupEngine = (doc: CanvasDocumentContractV3, options: { readbackAlpha?: n
   );
 
   const reactive = createReactiveStore(doc);
+  const stubBackend = createTestStubRasterBackend(options);
+  const surfaces: StubRasterSurface[] = [];
   const engine = createCanvasEngine({
-    backend: createTestStubRasterBackend(options),
+    backend: {
+      ...stubBackend,
+      createSurface: (width: number, height: number) => {
+        const surface = stubBackend.createSurface(width, height);
+        surfaces.push(surface);
+        return surface;
+      },
+    },
     imageResolver: () => Promise.resolve(new Blob()),
     projectId: 'p1',
     store: reactive.store,
@@ -272,7 +281,18 @@ const setupEngine = (doc: CanvasDocumentContractV3, options: { readbackAlpha?: n
   engine.surface.attach(screen.element, overlay.element);
   raf.flush();
 
-  return { dispatch: reactive.dispatch, engine, overlay, raf, setDocument: reactive.setDocument, strokes };
+  /** The image data most recently written into any surface with `putImageData`. */
+  const lastWrittenPixels = (): unknown =>
+    surfaces.flatMap((surface) => surface.callLog.filter((entry) => entry.op === 'putImageData')).at(-1)?.args[0];
+  return {
+    dispatch: reactive.dispatch,
+    engine,
+    lastWrittenPixels,
+    overlay,
+    raf,
+    setDocument: reactive.setDocument,
+    strokes,
+  };
 };
 
 afterEach(() => {
@@ -356,6 +376,103 @@ describe('inpaint mask painting', () => {
     // The mask persistence must NEVER dispatch a paint source (that would convert
     // the mask into a raster paint layer).
     expect(dispatch.mock.calls.map((c) => c[0]).some((a) => a.type === 'updateCanvasLayerSource')).toBe(false);
+    engine.lifecycle.dispose();
+  });
+});
+
+describe('inpaint mask shapes', () => {
+  it('draws a shape into the selected mask as one undoable stroke that persists as mask alpha', async () => {
+    const { dispatch, engine, lastWrittenPixels, overlay, strokes } = setupEngine(maskDoc(), { readbackAlpha: 255 });
+    engine.tools.setTool('shape');
+    overlay.fire('pointerdown', pointerAt(20, 20));
+    overlay.fire('pointermove', pointerAt(60, 50));
+    overlay.fire('pointerup', pointerAt(60, 50, 0));
+
+    expect(strokes).toHaveLength(1);
+    expect(strokes[0]).toMatchObject({ layerId: 'mask1', tool: 'shape' });
+    const actions = () => dispatch.mock.calls.map((c) => c[0]);
+    expect(actions().some((a) => a.type === 'addCanvasLayer')).toBe(false);
+    expect(engine.history.getEntries().past).toEqual(['Draw shape']);
+
+    // Undo puts the mask's pre-shape pixels back over the shape's rect; redo puts the shape's pixels back.
+    expect(await engine.history.undo()).toBe('applied');
+    expect(lastWrittenPixels()).toBe(strokes[0]!.beforeImageData);
+    expect(await engine.history.redo()).toBe('applied');
+    expect(lastWrittenPixels()).toBe(strokes[0]!.afterImageData);
+
+    await engine.lifecycle.flushPendingUploads();
+    const persisted = actions().filter(
+      (a): a is Extract<EngineTestAction, { type: 'updateCanvasLayerConfig' }> =>
+        a.type === 'updateCanvasLayerConfig' && a.id === 'mask1'
+    );
+    expect(persisted.at(-1)?.config).toMatchObject({
+      layerType: 'inpaint_mask',
+      mask: { bitmap: { imageName: 'mask-img' } },
+    });
+    expect(actions().some((a) => a.type === 'updateCanvasLayerSource')).toBe(false);
+    engine.lifecycle.dispose();
+  });
+});
+
+describe('accepting a result while a mask is selected', () => {
+  it('keeps the mask selected through accept, undo and redo so the next stroke refines it', async () => {
+    const raf = createControllableRaf();
+    vi.stubGlobal('requestAnimationFrame', raf.requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', raf.cancelFrame);
+    vi.stubGlobal(
+      'Path2D',
+      class FakePath2D {
+        closePath() {}
+        lineTo() {}
+        moveTo() {}
+        quadraticCurveTo() {}
+      }
+    );
+    const reducer = createReducerBackedStore(maskDoc());
+    const candidate = {
+      height: 40,
+      imageName: 'left-eye.png',
+      imageUrl: '/left-eye.png',
+      placement: { height: 40, opacity: 1, width: 40, x: 10, y: 10 },
+      queuedAt: '2026-07-16T00:00:00.000Z',
+      sourceQueueItemId: 'queue-eye',
+      thumbnailUrl: '/left-eye-thumb.png',
+      width: 40,
+    };
+    reducer.store.dispatch({ candidate, projectId: reducer.projectId, type: 'appendCanvasStagingCandidate' });
+    const engine = createCanvasEngine({
+      backend: createTestStubRasterBackend(),
+      imageResolver: () => Promise.resolve(new Blob()),
+      projectId: reducer.projectId,
+      store: reducer.store,
+    });
+    const strokes: StrokeCommittedEvent[] = [];
+    engine.tools.onStrokeCommitted((event) => strokes.push(event));
+    const overlay = createInputCanvas();
+    engine.surface.attach(createInputCanvas().element, overlay.element);
+    raf.flush();
+    const document = () => reducer.store.getState().projects[0]!.canvas.document;
+
+    const accepted = engine.layers.commitStagedImage({ candidate, selectedImageIndex: 0 });
+    expect(accepted.status).toBe('committed');
+    const layerId = accepted.status === 'committed' ? accepted.layerId : '';
+    expect(document().stacks.raster[0]).toMatchObject({ id: layerId, isEnabled: true });
+    expect(document().selectedLayerId).toBe('mask1');
+
+    // The other eye, straight away: the brush lands on the mask, not on the accepted image.
+    engine.tools.setTool('brush');
+    overlay.fire('pointerdown', pointerAt(60, 20));
+    overlay.fire('pointermove', pointerAt(80, 30));
+    overlay.fire('pointerup', pointerAt(80, 30, 0));
+    expect(strokes.map((stroke) => stroke.layerId)).toEqual(['mask1']);
+
+    expect(await engine.history.undo()).toBe('applied');
+    expect(await engine.history.undo()).toBe('applied');
+    expect(document().stacks.raster).toEqual([]);
+    expect(document().selectedLayerId).toBe('mask1');
+    expect(await engine.history.redo()).toBe('applied');
+    expect(document().stacks.raster[0]?.id).toBe(layerId);
+    expect(document().selectedLayerId).toBe('mask1');
     engine.lifecycle.dispose();
   });
 });
