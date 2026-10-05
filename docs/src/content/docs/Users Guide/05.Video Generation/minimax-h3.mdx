@@ -19,7 +19,7 @@ media's video, audio, or both video and audio.
 
 MiniMax H3 ships as two task transformers that share every other component. **FL2VA** — *first/last-frame to video with audio* — covers text-to-video, first frame, last frame, both, and extend. **Ref2VA** — *reference to video with audio* — conditions a new clip on **reference media**: up to 3 videos and 9 images, in an order you choose (order changes the result). Every generation from either includes a **jointly generated stereo soundtrack**, muxed into the MP4 as AAC.
 
-The panel switches task by transformer: select the Ref2VA single-file transformer as the **Model** and the conditioning sections become the ordered **References** list; select the FL2VA transformer to get the five frame/extend modes back. A video reference can contribute its image track, its soundtrack, or both — soundtrack-only references must be paired with at least one visual reference. Image references default to a high-detail 2048 px encoding ("Max"); the "Match generation size" option is several times faster at some fidelity cost.
+The panel switches task by transformer: select the Ref2VA single-file transformer as the **Model** and the conditioning sections become the ordered **References** list; select the FL2VA transformer to get the five frame/extend modes back. A video reference can contribute its image track, its soundtrack, or both; soundtrack-only references can be used on their own. Image references default to a high-detail 2048 px encoding ("Max"); the "Match generation size" option is several times faster at some fidelity cost.
 
 What makes it different from Wan in practice:
 

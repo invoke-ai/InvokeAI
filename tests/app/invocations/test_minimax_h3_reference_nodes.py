@@ -63,9 +63,9 @@ class TestMediaField:
                 [MiniMaxH3ReferenceMediaField(image=ImageField(image_name="a"), video=VideoField(video_name="b"))]
             )
 
-    def test_normalize_rejects_all_audio(self):
-        with pytest.raises(ValueError, match="cannot be used alone"):
-            normalize_reference_list([_video_ref(conditioning="audio")])
+    def test_normalize_accepts_all_audio(self):
+        references = [_video_ref(conditioning="audio")]
+        assert normalize_reference_list(references) == references
 
     def test_normalize_rejects_caps(self):
         with pytest.raises(ValueError, match="At most 3 video"):
