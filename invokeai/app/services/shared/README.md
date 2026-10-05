@@ -209,10 +209,15 @@ Runs a sequence of checks:
      branch source is a collector, use its inferred item root type instead of its declared `list[Any]` output. This
      preserves type checks through If branches and chained collectors, while matching string branches can feed a
      string collector without an intermediate string node.
+   - When an `If.value` feeds a typed collection input, each resolved collector branch is checked against the target
+     using its inferred item root. When an `If.value` feeds `Collect.collection`, the possible item roots from all
+     resolved branches must have one compatible root; mutually exclusive branches do not permit a heterogeneous
+     collector input. For example, `If(Collect[int], StringCollection) -> Collect.collection` is rejected.
    - Iterators over collectors validate their item consumers against the same inferred collector root type. Mixed
      `int` and `float` items therefore require consumers compatible with `float`.
    - If a branch is unresolved, retain the declared output compatibility behavior (`Any` for collector type
-     inference). The graph's separate DAG check rejects cycles before projection.
+     inference), and stop downstream incremental type revalidation at that unresolved `If`. The graph's separate DAG
+     check rejects cycles before projection.
    - This widens compatibility: a direct collector with both `int` and `float` items, previously rejected, now resolves
      to `float`. Its downstream consumers must accept floats; unrelated mixed item types remain invalid.
    - Ordinary source ports use the direct compatibility path with already resolved nodes, without If traversal or
@@ -247,11 +252,13 @@ Checks a single prospective edge before insertion:
 - Iterator/collector constraints re-checked when the edge creates relevant patterns.
 
 After inserting an edge into `If.true_input` or `If.false_input`, or into a collector's `item` or `collection`,
-`add_edge` revalidates affected downstream connections. Collector input changes first pass that collector's candidate
-validation, then the walk follows resolved If outputs and collector chains to check each affected If, collector, or
-iterator once. Ordinary nodes end this dependency walk; unresolved If outputs and unrelated unfinished nodes are not
-revalidated. If a check fails, the new edge is removed and adjacency indexes are restored before the validation error
-is raised.
+`add_edge` revalidates affected connections in both directions. Candidate collector checks validate local roots before
+insertion; after insertion, the walk checks upstream collectors against their updated downstream roots, then follows
+resolved If outputs and collector chains to check affected collectors and iterators once. Ordinary nodes end this
+dependency walk; unresolved If outputs and unrelated unfinished nodes are not revalidated. When a plain item is added
+to a collector whose concrete root is unchanged and whose only consumers are direct iterators, iterator output types
+are checked against that known root without resolving the same collector again. If a check fails, the new edge is
+removed and adjacency indexes are restored before the validation error is raised.
 
 ### 3.4 Topology utilities
 
@@ -261,8 +268,17 @@ is raised.
 
 ### 3.5 Mutation helpers
 
-- `add_node`, `update_node` (preserve edges, rewrite endpoints if id changes), `delete_node`.
+- `add_node`, `update_node` (preserve edges, rewrite endpoints if id changes; failed rewrites restore the original node
+  and edges, then invalidate lazy adjacency indexes so later lookups rebuild them), `delete_node`.
 - `add_edge`, `delete_edge` (with validation).
+
+### 3.6 Compatibility
+
+Graph validation runs when a workflow is queued and when a persisted runtime session is hydrated. New inferred collector
+root checks can therefore reject an older saved workflow at enqueue time, or make a pending queue snapshot unreadable
+when the queue worker restores it. Unreadable pending snapshots are marked failed and retained for recovery by the
+queue's quarantine path; they are not silently executed. The workflow can be edited to make collector inputs and
+consumers agree with the inferred root before it is queued again.
 
 ## 4) GraphExecutionState (runtime)
 
