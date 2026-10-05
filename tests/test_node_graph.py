@@ -1353,6 +1353,63 @@ def test_graph_collector_revalidation_ignores_unrelated_incomplete_nodes():
     assert second_edge in graph.edges
 
 
+def test_graph_collector_validation_bounds_shared_if_type_resolution(monkeypatch: pytest.MonkeyPatch):
+    layers = 6
+    first_value = IntegerInvocation(id="first_value", value=1)
+    second_value = IntegerInvocation(id="second_value", value=2)
+    first_collector = CollectInvocation(id="collect_a_0")
+    second_collector = CollectInvocation(id="collect_b_0")
+    nodes = [first_value, second_value, first_collector, second_collector]
+    edges = [
+        create_edge(first_value.id, "value", first_collector.id, "item"),
+        create_edge(second_value.id, "value", second_collector.id, "item"),
+    ]
+    previous_collectors = [first_collector, second_collector]
+
+    for layer in range(1, layers + 1):
+        if_node = IfInvocation(id=f"if_{layer}")
+        current_collectors = [CollectInvocation(id=f"collect_{branch}_{layer}") for branch in ("a", "b")]
+        nodes.extend([if_node, *current_collectors])
+        edges.extend(
+            [
+                create_edge(previous_collectors[0].id, "collection", if_node.id, "true_input"),
+                create_edge(previous_collectors[1].id, "collection", if_node.id, "false_input"),
+                *[create_edge(if_node.id, "value", collector.id, "collection") for collector in current_collectors],
+            ]
+        )
+        previous_collectors = current_collectors
+
+    graph = Graph(nodes={node.id: node for node in nodes}, edges=edges)
+    resolution_counts: list[int] = []
+    active_resolution_counts: list[int] = []
+    original_resolve_collection = Graph._resolve_collection_input_types
+    original_resolve_collector = Graph._resolve_collector_input_types
+
+    def count_collector_resolutions(graph: Graph, node_id: str, visited: set[str] | None = None) -> set[Any]:
+        if active_resolution_counts:
+            active_resolution_counts[-1] += 1
+        return original_resolve_collector(graph, node_id, visited)
+
+    def count_collection_resolutions(
+        graph: Graph, collection_inputs: list[EdgeConnection], visited_collectors: set[str] | None = None
+    ) -> set[Any]:
+        is_root_resolution = visited_collectors is None
+        if is_root_resolution:
+            active_resolution_counts.append(0)
+        try:
+            return original_resolve_collection(graph, collection_inputs, visited_collectors)
+        finally:
+            if is_root_resolution:
+                resolution_counts.append(active_resolution_counts.pop())
+
+    monkeypatch.setattr(Graph, "_resolve_collection_input_types", count_collection_resolutions)
+    monkeypatch.setattr(Graph, "_resolve_collector_input_types", count_collector_resolutions)
+
+    graph.validate_self()
+
+    assert max(resolution_counts) <= 4 * layers
+
+
 def test_graph_rejects_iterator_consumers_incompatible_with_if_collector_branches():
     graph = Graph()
     string_value = StringInvocation(id="string", value="text")

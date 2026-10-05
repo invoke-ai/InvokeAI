@@ -2021,7 +2021,8 @@ class Graph(BaseModel):
 
     def _resolve_collector_input_types(self, node_id: str, visited: Optional[set[str]] = None) -> set[Any]:
         """Resolves possible item types for a collector's inputs, recursively following chained collectors."""
-        visited = visited or set()
+        if visited is None:
+            visited = set()
         if node_id in visited:
             return set()
         visited.add(node_id)
@@ -2113,12 +2114,14 @@ class Graph(BaseModel):
     def _resolve_collection_input_types(
         self, collection_inputs: list[EdgeConnection], visited_collectors: Optional[set[str]] = None
     ) -> set[Any]:
-        visited_collectors = visited_collectors or set()
+        """Resolves collection item types, sharing visits across unioned branch sources."""
+        if visited_collectors is None:
+            visited_collectors = set()
         input_field_types: set[Any] = set()
         for input_conn in collection_inputs:
             source_node = self.get_node(input_conn.node_id)
             if isinstance(source_node, CollectInvocation) and input_conn.field == COLLECTION_FIELD:
-                input_field_types.update(self._resolve_collector_input_types(source_node.id, visited_collectors.copy()))
+                input_field_types.update(self._resolve_collector_input_types(source_node.id, visited_collectors))
                 continue
 
             if isinstance(source_node, IfInvocation) and input_conn.field == "value":
@@ -2133,7 +2136,7 @@ class Graph(BaseModel):
                     branch_source_node = self.get_node(source.node_id)
                     if isinstance(branch_source_node, CollectInvocation) and source.field == COLLECTION_FIELD:
                         input_field_types.update(
-                            self._resolve_collector_input_types(branch_source_node.id, visited_collectors.copy())
+                            self._resolve_collector_input_types(branch_source_node.id, visited_collectors)
                         )
                     else:
                         output_field_type = get_output_field_type(branch_source_node, source.field)
