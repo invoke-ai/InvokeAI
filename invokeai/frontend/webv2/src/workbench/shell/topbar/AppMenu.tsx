@@ -19,24 +19,30 @@ import {
   BlocksIcon,
   BoxIcon,
   ChevronDownIcon,
+  ChevronRightIcon,
   FolderIcon,
   HouseIcon,
   ListOrderedIcon,
   SearchIcon,
   SettingsIcon,
   TypeIcon,
+  DatabaseIcon,
 } from 'lucide-react';
-import { useCallback, type ElementType } from 'react';
+import { lazy, Suspense, useCallback, useState, type ElementType } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { useTopbarShortcut } from './useTopbarShortcut';
 
 const MENU_POSITIONING = { placement: 'bottom-start' } as const;
+const DATABASE_SUBMENU_POSITIONING = { placement: 'right-start' } as const;
+const LazyDatabaseMaintenanceDialog = lazy(() =>
+  import('./DatabaseMaintenanceDialog').then((module) => ({ default: module.DatabaseMaintenanceDialog }))
+);
 const DISCORD_URL = 'https://discord.gg/ZmtBAhwWhy';
 
 export const AppMenu = () => {
   const { t } = useTranslation();
-  const { canManageModels, canManageNodes } = useCapabilities();
+  const { canManageAppConfig, canManageModels, canManageNodes } = useCapabilities();
   const hasAccount = useHasAccountSection();
   const navigate = useNavigate();
   const projectId = useActiveProjectId();
@@ -60,87 +66,128 @@ export const AppMenu = () => {
   }, [navigate]);
   const openQueue = useCallback(() => openWorkbenchWidget('queue'), [openWorkbenchWidget]);
   const openSettings = useCallback(() => openWorkbenchSettings(), []);
+  const [isDatabaseDialogMounted, setIsDatabaseDialogMounted] = useState(false);
+  const [isDatabaseDialogOpen, setIsDatabaseDialogOpen] = useState(false);
+  const openDatabaseConfirmation = useCallback(() => {
+    setIsDatabaseDialogMounted(true);
+    setIsDatabaseDialogOpen(true);
+  }, []);
+  const closeDatabaseConfirmation = useCallback(() => setIsDatabaseDialogOpen(false), []);
 
   return (
-    <Menu.Root positioning={MENU_POSITIONING}>
-      <Menu.Trigger asChild>
-        <IconButton aria-label={t('topbar.appMenu.open')} className="group" pe="1.5" size="lg" variant="ghost">
-          <AppMenuGlyph />
-        </IconButton>
-      </Menu.Trigger>
+    <>
+      <Menu.Root positioning={MENU_POSITIONING}>
+        <Menu.Trigger asChild>
+          <IconButton aria-label={t('topbar.appMenu.open')} className="group" pe="1.5" size="lg" variant="ghost">
+            <AppMenuGlyph />
+          </IconButton>
+        </Menu.Trigger>
+        <Portal>
+          <Menu.Positioner>
+            <MenuContent minW="15rem">
+              <HStack justify="space-between" px="3" py="2">
+                <Text fontWeight="800">Invoke</Text>
+                <Text color="fg.subtle" fontSize="xs">
+                  v{APP_VERSION}
+                </Text>
+              </HStack>
+              <Menu.Separator />
+              <Menu.Item value="home" onClick={openHome}>
+                <Icon as={HouseIcon} boxSize="3.5" />
+                <Menu.ItemText>{t('launchpad.sections.home')}</Menu.ItemText>
+              </Menu.Item>
+              <Menu.Separator />
+              <Menu.ItemGroup>
+                <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
+                  {t('topbar.appMenu.manage')}
+                </Menu.ItemGroupLabel>
+                <Menu.Item value="projects" onClick={openProjects}>
+                  <Icon as={FolderIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('launchpad.sections.projects')}</Menu.ItemText>
+                </Menu.Item>
+                {canManageModels ? (
+                  <Menu.Item value="models" onClick={openModels}>
+                    <Icon as={BoxIcon} boxSize="3.5" />
+                    <Menu.ItemText>{t('models.manager')}</Menu.ItemText>
+                  </Menu.Item>
+                ) : null}
+                {canManageNodes ? (
+                  <Menu.Item value="nodes" onClick={openNodes}>
+                    <Icon as={BlocksIcon} boxSize="3.5" />
+                    <Menu.ItemText>{t('nodes.manager')}</Menu.ItemText>
+                  </Menu.Item>
+                ) : null}
+                {canManageAppConfig ? <DatabaseMaintenanceManageMenu onRunVacuum={openDatabaseConfirmation} /> : null}
+                <Menu.Item value="fonts" onClick={openFonts}>
+                  <Icon as={TypeIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('launchpad.sections.fonts')}</Menu.ItemText>
+                </Menu.Item>
+                <Menu.Item value="queue" onClick={openQueue}>
+                  <Icon as={ListOrderedIcon} boxSize="3.5" />
+                  <Menu.ItemText>{t('widgets.labels.queue')}</Menu.ItemText>
+                  {queuedCount > 0 ? (
+                    <Badge colorPalette="accent" fontSize="xs" ms="auto" variant="surface">
+                      {queuedCount}
+                    </Badge>
+                  ) : null}
+                </Menu.Item>
+              </Menu.ItemGroup>
+              {hasAccount ? (
+                <>
+                  <Menu.Separator />
+                  <AccountMenuSection />
+                </>
+              ) : null}
+              <Menu.Separator />
+              <HStack gap="0.5" px="0" py="0">
+                <SearchMenuAction />
+                <SettingsMenuAction onClick={openSettings} />
+                <AppMenuAction
+                  icon={LightbulbFilamentIcon}
+                  label={t('whatsNew.whatsNewInInvoke')}
+                  value="whats-new"
+                  onClick={openWhatsNew}
+                />
+                <AppMenuLink
+                  href={DOCS_URL}
+                  icon={BookOpenTextIcon}
+                  label={t('topbar.appMenu.documentation')}
+                  value="documentation"
+                />
+                <AppMenuLink href={DISCORD_URL} icon={DiscordIcon} label="Discord" value="discord" />
+              </HStack>
+            </MenuContent>
+          </Menu.Positioner>
+        </Portal>
+      </Menu.Root>
+      {isDatabaseDialogMounted ? (
+        <Suspense fallback={null}>
+          <LazyDatabaseMaintenanceDialog isOpen={isDatabaseDialogOpen} onClose={closeDatabaseConfirmation} />
+        </Suspense>
+      ) : null}
+    </>
+  );
+};
+
+const DatabaseMaintenanceManageMenu = ({ onRunVacuum }: { onRunVacuum: () => void }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Menu.Root positioning={DATABASE_SUBMENU_POSITIONING}>
+      <Menu.TriggerItem>
+        <HStack gap="2" minW="0" w="full">
+          <Icon as={DatabaseIcon} boxSize="3.5" color="fg.subtle" flexShrink={0} />
+          <Text flex="1">{t('settings.databaseMaintenance.menuLabel')}</Text>
+          <Icon as={ChevronRightIcon} boxSize="3" color="fg.subtle" flexShrink={0} />
+        </HStack>
+      </Menu.TriggerItem>
       <Portal>
         <Menu.Positioner>
-          <MenuContent minW="15rem">
-            <HStack justify="space-between" px="3" py="2">
-              <Text fontWeight="800">Invoke</Text>
-              <Text color="fg.subtle" fontSize="xs">
-                v{APP_VERSION}
-              </Text>
-            </HStack>
-            <Menu.Separator />
-            <Menu.Item value="home" onClick={openHome}>
-              <Icon as={HouseIcon} boxSize="3.5" />
-              <Menu.ItemText>{t('launchpad.sections.home')}</Menu.ItemText>
+          <MenuContent minW="14rem">
+            <Menu.Item value="run-vacuum" onClick={onRunVacuum}>
+              <Icon as={DatabaseIcon} boxSize="3.5" />
+              <Menu.ItemText>{t('settings.databaseMaintenance.runVacuum')}</Menu.ItemText>
             </Menu.Item>
-            <Menu.Separator />
-            <Menu.ItemGroup>
-              <Menu.ItemGroupLabel color="fg.subtle" fontSize="xs" textTransform="uppercase">
-                {t('topbar.appMenu.manage')}
-              </Menu.ItemGroupLabel>
-              <Menu.Item value="projects" onClick={openProjects}>
-                <Icon as={FolderIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('launchpad.sections.projects')}</Menu.ItemText>
-              </Menu.Item>
-              {canManageModels ? (
-                <Menu.Item value="models" onClick={openModels}>
-                  <Icon as={BoxIcon} boxSize="3.5" />
-                  <Menu.ItemText>{t('models.manager')}</Menu.ItemText>
-                </Menu.Item>
-              ) : null}
-              {canManageNodes ? (
-                <Menu.Item value="nodes" onClick={openNodes}>
-                  <Icon as={BlocksIcon} boxSize="3.5" />
-                  <Menu.ItemText>{t('nodes.manager')}</Menu.ItemText>
-                </Menu.Item>
-              ) : null}
-              <Menu.Item value="fonts" onClick={openFonts}>
-                <Icon as={TypeIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('launchpad.sections.fonts')}</Menu.ItemText>
-              </Menu.Item>
-              <Menu.Item value="queue" onClick={openQueue}>
-                <Icon as={ListOrderedIcon} boxSize="3.5" />
-                <Menu.ItemText>{t('widgets.labels.queue')}</Menu.ItemText>
-                {queuedCount > 0 ? (
-                  <Badge colorPalette="accent" fontSize="xs" ms="auto" variant="surface">
-                    {queuedCount}
-                  </Badge>
-                ) : null}
-              </Menu.Item>
-            </Menu.ItemGroup>
-            {hasAccount ? (
-              <>
-                <Menu.Separator />
-                <AccountMenuSection />
-              </>
-            ) : null}
-            <Menu.Separator />
-            <HStack gap="0.5" px="0" py="0">
-              <SearchMenuAction />
-              <SettingsMenuAction onClick={openSettings} />
-              <AppMenuAction
-                icon={LightbulbFilamentIcon}
-                label={t('whatsNew.whatsNewInInvoke')}
-                value="whats-new"
-                onClick={openWhatsNew}
-              />
-              <AppMenuLink
-                href={DOCS_URL}
-                icon={BookOpenTextIcon}
-                label={t('topbar.appMenu.documentation')}
-                value="documentation"
-              />
-              <AppMenuLink href={DISCORD_URL} icon={DiscordIcon} label="Discord" value="discord" />
-            </HStack>
           </MenuContent>
         </Menu.Positioner>
       </Portal>

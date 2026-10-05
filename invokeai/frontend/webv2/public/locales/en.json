@@ -1785,6 +1785,15 @@
       "saveFailed": "Could not save the vocabulary.",
       "loadFailed": "Could not load the vocabulary."
     },
+    "databaseMaintenance": {
+      "menuLabel": "Database maintenance",
+      "runVacuum": "Run VACUUM",
+      "confirmTitle": "Run database VACUUM?",
+      "confirmBody": "VACUUM can take a long time for large databases and pauses database activity while it runs.",
+      "completed": "Database VACUUM completed.",
+      "failed": "Database VACUUM failed.",
+      "requestFailed": "The database could not be vacuumed."
+    },
     "catalog": {
       "themeId": {
         "label": "Theme",
