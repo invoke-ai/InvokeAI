@@ -86,8 +86,9 @@ MINIMAX_H3_KEYFRAME_NOISE_AUG = 0.999
 MINIMAX_H3_KEYFRAME_ENCODE_SEED = 42
 
 # Reference caps of the `ref2va` task, per the reference implementation: at most 9 image, 3 video and 3 audio
-# references, and at most 12 in total. Upstream also rejects a set of only audio references; this port deliberately
-# accepts one, which packs no visual condition rows (the generated audio and video follow the reference soundtracks).
+# references, and at most 12 in total. The diffusers pipeline also rejects a set of only audio references; this port
+# deliberately accepts one, which packs no visual condition rows (the generated audio and video follow the reference
+# soundtracks).
 MINIMAX_H3_MAX_IMAGE_REFERENCES = 9
 MINIMAX_H3_MAX_VIDEO_REFERENCES = 3
 MINIMAX_H3_MAX_AUDIO_REFERENCES = 3
