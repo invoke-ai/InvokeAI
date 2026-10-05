@@ -167,11 +167,16 @@ describe('queue reads at the transport boundary', () => {
     accountLifecycle.invalidate();
   });
 
-  it.each([60, 1_000])(
-    'refreshes a %i-item read model with one id read and one hydration of at most the window',
-    async (size) => {
+  it.each([
+    { predatesItemIdsLimit: false, size: 60 },
+    { predatesItemIdsLimit: false, size: 1_000 },
+    // An older server ignores the limit and answers with every id.
+    { predatesItemIdsLimit: true, size: 1_000 },
+  ])(
+    'refreshes a $size-item read model with one window-sized id read and one hydration of at most the window (server predates the limit: $predatesItemIdsLimit)',
+    async ({ predatesItemIdsLimit, size }) => {
       accountLifecycle.activate('queue-transport-reads');
-      const server = createQueueServer(queueOf(size));
+      const server = createQueueServer(queueOf(size), { predatesItemIdsLimit });
       vi.stubGlobal('fetch', server.fetch);
       const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
       const window = Array.from({ length: QUEUE_RECENT_WINDOW }, (_, index) => size - index);
@@ -180,7 +185,7 @@ describe('queue reads at the transport boundary', () => {
 
       expect([...server.requests].sort()).toEqual([
         'GET current',
-        'GET item_ids?order_dir=DESC',
+        'GET item_ids?limit=50&order_dir=DESC',
         'GET next',
         'GET status',
         'POST items_by_ids',

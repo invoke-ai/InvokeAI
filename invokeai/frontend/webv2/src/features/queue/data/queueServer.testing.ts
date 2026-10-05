@@ -17,9 +17,13 @@ export const createQueueItemDTO = (
 
 /**
  * A `fetch` stand-in for the backend's queue read routes. It answers `item_ids` like the server (every id, newest
- * first) and records each request as `METHOD route?query` so tests can assert exactly what crossed the transport.
+ * first, or the first `limit` of them) and records each request as `METHOD route?query` so tests can assert exactly
+ * what crossed the transport. `predatesItemIdsLimit` answers like a server without `limit`, with every id.
  */
-export const createQueueServer = (items: readonly QueueServerItemDTO[]) => {
+export const createQueueServer = (
+  items: readonly QueueServerItemDTO[],
+  { predatesItemIdsLimit = false }: { predatesItemIdsLimit?: boolean } = {}
+) => {
   const requests: string[] = [];
   const hydratedIds: number[][] = [];
   const respond = (body: unknown, status = 200) =>
@@ -61,8 +65,10 @@ export const createQueueServer = (items: readonly QueueServerItemDTO[]) => {
     }
     if (route === 'item_ids') {
       const ids = items.map((item) => item.item_id).sort((left, right) => right - left);
+      const limit = predatesItemIdsLimit ? null : url.searchParams.get('limit');
+      const returned = limit === null ? ids : ids.slice(0, Number(limit));
 
-      return respond({ item_ids: ids, total_count: ids.length });
+      return respond({ item_ids: returned, total_count: returned.length });
     }
     if (route === 'items_by_ids') {
       const { item_ids: requested } = JSON.parse(String(init?.body)) as { item_ids: number[] };

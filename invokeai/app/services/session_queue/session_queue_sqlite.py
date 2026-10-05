@@ -2052,6 +2052,7 @@ class SqliteSessionQueue(SessionQueueBase):
         order_dir: SQLiteDirection = SQLiteDirection.Descending,
         user_id: Optional[str] = None,
         origin_prefix: Optional[str] = None,
+        limit: Optional[int] = None,
     ) -> ItemIdsResult:
         with self._db.transaction() as cursor_:
             query = """--sql
@@ -2059,7 +2060,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 FROM session_queue
                 WHERE queue_id = ?
                 """
-            query_params: list[str] = [queue_id]
+            query_params: list[str | int] = [queue_id]
 
             if user_id is not None:
                 query += " AND user_id = ?"
@@ -2072,6 +2073,15 @@ class SqliteSessionQueue(SessionQueueBase):
             # Items enqueued together share a created_at; they stay in enqueue order in either
             # direction. idx_session_queue_listing, scanned backwards, yields the newest-first order.
             query += f" ORDER BY created_at {order_dir.value}, item_id ASC"
+
+            # Either direction walks the index in order (oldest first sorts only items that share a
+            # created_at), so a limited read stops once `limit` entries pass the filters and costs the
+            # window rather than the history. A scope with fewer matches than `limit` (an origin prefix
+            # with few or no items) still walks the queue's whole index, and one whose matches lie far
+            # back walks it until it reaches them: origin is filtered on each entry, not used to seek.
+            if limit is not None:
+                query += " LIMIT ?"
+                query_params.append(limit)
 
             cursor_.execute(query, query_params)
             result = cast(list[sqlite3.Row], cursor_.fetchall())
@@ -2133,13 +2143,22 @@ class SqliteSessionQueue(SessionQueueBase):
         is_admin: bool = False,
     ) -> SessionQueueStatus:
         with self._db.transaction() as cursor:
-            # Aggregate counts are global across all users within the requested scope.
-            query = """--sql
-                SELECT status, count(*)
+            # Aggregate counts are global across all users within the requested scope. When
+            # user_id is provided, the same pass also counts that user's own items, so the caller
+            # can render the per-user portion of the badge. These are returned in the separate
+            # user_pending/user_in_progress fields and never replace the global counts. Counting
+            # both in one statement reads the scope's history once instead of twice.
+            params: list[str] = []
+            user_count = ""
+            if user_id is not None:
+                user_count = ", SUM(CASE WHEN user_id = ? THEN 1 ELSE 0 END)"
+                params.append(user_id)
+            query = f"""--sql
+                SELECT status, count(*){user_count}
                 FROM session_queue
                 WHERE queue_id = ?
                 """
-            params: list[str] = [queue_id]
+            params.append(queue_id)
 
             if origin_prefix is not None:
                 query += " AND origin LIKE ?"
@@ -2149,31 +2168,9 @@ class SqliteSessionQueue(SessionQueueBase):
             cursor.execute(query, params)
             counts_result = cast(list[sqlite3.Row], cursor.fetchall())
 
-            # When user_id is provided, additionally compute that user's own counts so the
-            # caller can render the per-user portion of the badge. These are returned in the
-            # separate user_pending/user_in_progress fields and never replace the global counts.
-            user_counts_result: list[sqlite3.Row] = []
-            if user_id is not None:
-                user_query = """--sql
-                    SELECT status, count(*)
-                    FROM session_queue
-                    WHERE queue_id = ? AND user_id = ?
-                    """
-                user_params = [queue_id, user_id]
-
-                if origin_prefix is not None:
-                    user_query += " AND origin LIKE ?"
-                    user_params.append(f"{origin_prefix}%")
-
-                user_query += """--sql
-                    GROUP BY status
-                    """
-                cursor.execute(user_query, user_params)
-                user_counts_result = cast(list[sqlite3.Row], cursor.fetchall())
-
             # Only the four identifier columns, not a full SessionQueueItem: this runs on
             # every status poll, and hydrating the item would deserialize its whole session
-            # graph. The origin filter mirrors the aggregate-count queries above so a
+            # graph. The origin filter mirrors the aggregate-count query above so a
             # scoped caller never sees another scope's current item.
             current_item_query = """--sql
                 SELECT item_id, session_id, batch_id, user_id
@@ -2196,7 +2193,7 @@ class SqliteSessionQueue(SessionQueueBase):
         user_pending: Optional[int] = None
         user_in_progress: Optional[int] = None
         if user_id is not None:
-            user_counts: dict[str, int] = {row[0]: row[1] for row in user_counts_result}
+            user_counts: dict[str, int] = {row[0]: row[2] for row in counts_result}
             user_pending = user_counts.get("pending", 0)
             user_in_progress = user_counts.get("in_progress", 0)
 

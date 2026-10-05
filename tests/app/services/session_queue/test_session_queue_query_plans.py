@@ -55,6 +55,15 @@ def test_queue_listing_and_counts_read_only_the_listing_index(session_queue: Sql
     assert LISTING_INDEX in newest_first[0]
     assert "TEMP B-TREE" not in newest_first[0]
 
+    # The recent window reads the index in order with no sort in between, so LIMIT can stop the walk
+    # (test_limited_newest_first_listing_stops_after_the_window shows that it does).
+    recent_window = _plans(
+        session_queue, lambda: session_queue.get_queue_item_ids("default", SQLiteDirection.Descending, limit=50)
+    )
+    assert len(recent_window) == 1
+    assert LISTING_INDEX in recent_window[0]
+    assert "TEMP B-TREE" not in recent_window[0]
+
     # Oldest first sorts only items that share a created_at, by item_id.
     oldest_first = _plans(session_queue, lambda: session_queue.get_queue_item_ids("default", SQLiteDirection.Ascending))
     assert len(oldest_first) == 1
@@ -67,9 +76,55 @@ def test_queue_listing_and_counts_read_only_the_listing_index(session_queue: Sql
             "default", user_id="alice", acting_user_id="alice", origin_prefix="webv2:p:1:q:"
         ),
     )
+    # The global and per-user counts come from one pass over the scope's history.
     counts = [plan for plan in status if "idx_session_queue_listing" in plan]
-    assert len(counts) == 2, status
-    assert all(LISTING_INDEX in plan for plan in counts)
+    assert len(counts) == 1, status
+    assert LISTING_INDEX in counts[0]
+
+
+def _vm_steps(session_queue: SqliteSessionQueue, read: Callable[[], object]) -> int:
+    """Virtual machine steps (in units of 10) the service's statements execute during `read`."""
+    conn = session_queue._db._conn
+    steps = 0
+
+    def count() -> int:
+        nonlocal steps
+        steps += 1
+        return 0
+
+    conn.set_progress_handler(count, 10)
+    try:
+        read()
+    finally:
+        conn.set_progress_handler(None, 0)
+    return steps
+
+
+def _append_history(session_queue: SqliteSessionQueue, start: int, count: int) -> None:
+    with session_queue._db.transaction() as cursor:
+        cursor.executemany(
+            """--sql
+            INSERT INTO session_queue (queue_id, session, session_id, batch_id, created_at)
+            VALUES ('default', '{}', ?, 'batch', ?);
+            """,
+            [(f"session-{index}", f"2026-01-01 00:00:00.{index:06d}") for index in range(start, start + count)],
+        )
+
+
+def test_limited_newest_first_listing_stops_after_the_window(session_queue: SqliteSessionQueue) -> None:
+    def recent_window() -> object:
+        return session_queue.get_queue_item_ids("default", SQLiteDirection.Descending, limit=50)
+
+    _append_history(session_queue, 0, 100)
+    small = _vm_steps(session_queue, recent_window)
+    _append_history(session_queue, 100, 4_900)
+    large = _vm_steps(session_queue, recent_window)
+    unlimited = _vm_steps(session_queue, lambda: session_queue.get_queue_item_ids("default"))
+
+    # Fifty times the history costs the limited read about the same; the full listing shows the
+    # measure does see history.
+    assert large <= 2 * small, (small, large)
+    assert unlimited >= 20 * large, (large, unlimited)
 
 
 def test_point_reads_do_not_scan_the_queue_through_the_listing_index(session_queue: SqliteSessionQueue) -> None:

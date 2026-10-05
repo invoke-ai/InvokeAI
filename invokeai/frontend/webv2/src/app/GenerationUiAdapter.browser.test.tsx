@@ -106,6 +106,7 @@ const invalidateQueue = async () => {
 
 const projectScopeQuery = (projectId: string) =>
   `GET item_ids?${new URLSearchParams({
+    limit: '50',
     order_dir: 'DESC',
     origin_prefix: buildProjectQueueItemOriginPrefix(projectId),
   }).toString()}`;

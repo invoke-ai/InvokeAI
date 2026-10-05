@@ -243,6 +243,23 @@ const getJson = async (backend, path, init) => {
   return body;
 };
 
+test('queue item ids take the backend limit: the head of the order, counted as returned, bounded', async () => {
+  await withRepresentativeBackend(async (backend) => {
+    for (const orderDir of ['DESC', 'ASC']) {
+      const all = await getJson(backend, `/api/v1/queue/default/item_ids?order_dir=${orderDir}`);
+      const limited = await getJson(backend, `/api/v1/queue/default/item_ids?order_dir=${orderDir}&limit=50`);
+
+      assert.equal(all.total_count, 500);
+      assert.deepEqual(limited, { item_ids: all.item_ids.slice(0, 50), total_count: 50 });
+    }
+    for (const limit of ['0', '-1', '1001', 'fifty']) {
+      const response = await fetch(`${backend.origin}/api/v1/queue/default/item_ids?limit=${limit}`);
+
+      assert.equal(response.status, 422, `limit=${limit}`);
+    }
+  });
+});
+
 test('merged gallery list and names share qualified ordering, filters, ownership, totals, and pagination', async () => {
   await withRepresentativeBackend(async (backend) => {
     const defaultPage = await getJson(

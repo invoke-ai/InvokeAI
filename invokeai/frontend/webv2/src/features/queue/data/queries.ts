@@ -49,11 +49,12 @@ export const queueReadModelOptions = (
           backend.readStatus(scope, requestSignal),
           backend.readCurrent(scope, requestSignal),
           backend.readNext(scope, requestSignal),
-          backend.readItemIds('desc', scope, requestSignal),
+          backend.readItemIds('desc', scope, requestSignal, QUEUE_RECENT_WINDOW),
         ]);
 
         assertAccountScopeCurrent(owner);
         requestSignal.throwIfAborted();
+        // A server that predates the id limit answers with every id.
         const items = await backend.readItemsById(idsResult.itemIds.slice(0, QUEUE_RECENT_WINDOW), requestSignal);
 
         assertAccountScopeCurrent(owner);
