@@ -22,7 +22,6 @@ from sqlalchemy import (
     update,
 )
 
-from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.database.dialect import (
     CaseInsensitiveLike,
@@ -128,7 +127,8 @@ class _Shape(NamedTuple):
     """Which filters a listing has: never their values, which are bound, so that the shapes are few."""
 
     origin: bool
-    # The categories' values, sorted; None for no category filter. Rendered literally: there are few.
+    # The categories' values, sorted; None for no category filter. Each value is bound on its own, so that a list
+    # of a given length is one statement whatever it holds.
     categories: Optional[tuple[str, ...]]
     intermediate: bool
     # "any" (no board filter), "none" (on no board) or "one".
@@ -256,12 +256,6 @@ def _records(page: tuple[Sequence[Sequence[Any]], int]) -> tuple[list[VideoRecor
     return [_record(row) for row in rows], total
 
 
-def _metadata(row: Optional[Sequence[Any]]) -> tuple[bool, Optional[MetadataField]]:
-    if row is None:
-        return False, None
-    return True, MetadataFieldValidator.validate_json(row[0]) if row[0] is not None else None
-
-
 class VideoQueries(QueryModule):
     @mapped(_record_or_none)
     @read
@@ -273,11 +267,11 @@ class VideoQueries(QueryModule):
         """The video's owner; None also for a video that does not exist."""
         return conn.execute(_GET_USER_ID, {"video_name": video_name}).scalar()
 
-    @mapped(_metadata)
     @read
-    def metadata(self, conn: Connection, video_name: str) -> Optional[Row[Any]]:
-        """Whether the video exists, and its metadata."""
-        return conn.execute(_GET_METADATA, {"video_name": video_name}).first()
+    def metadata(self, conn: Connection, video_name: str) -> tuple[bool, Optional[str]]:
+        """Whether the video exists, and its metadata as stored: JSON text, or None."""
+        row = conn.execute(_GET_METADATA, {"video_name": video_name}).first()
+        return (False, None) if row is None else (True, row[0])
 
     @read
     def exists(self, conn: Connection, video_name: str) -> bool:

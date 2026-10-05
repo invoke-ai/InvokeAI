@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_base import ImageRecordStorageBase
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -48,7 +48,7 @@ class ImageRecordStorage(ImageRecordStorageBase):
         exists, metadata = self._queries.images.metadata(image_name)
         if not exists:
             raise ImageRecordNotFoundException
-        return metadata
+        return MetadataFieldValidator.validate_json(metadata) if metadata is not None else None
 
     def exists(self, image_name: str) -> bool:
         return self._queries.images.exists(image_name)

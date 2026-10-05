@@ -26,13 +26,6 @@ class VideoRecordSaveException(Exception):
         super().__init__(message)
 
 
-class VideoRecordDeleteException(Exception):
-    """Raised when a video record cannot be deleted."""
-
-    def __init__(self, message="Video record not deleted"):
-        super().__init__(message)
-
-
 # The `media_origin` marker, projected out of the `metadata` JSON blob. Kept as a bare
 # expression so the polymorphic gallery query can alias it into its own UNION half.
 #
@@ -78,39 +71,6 @@ def coerce_media_origin(value: Any) -> Optional[str]:
     if not isinstance(value, str) or len(value) > MEDIA_ORIGIN_MAX_LENGTH:
         return None
     return value if MEDIA_ORIGIN_PATTERN.match(value) else None
-
-
-VIDEO_DTO_COLS = ", ".join(
-    [
-        "videos." + c
-        for c in [
-            "video_name",
-            "video_origin",
-            "video_category",
-            "width",
-            "height",
-            "duration",
-            "fps",
-            "session_id",
-            "node_id",
-            "has_workflow",
-            "is_intermediate",
-            "created_at",
-            "updated_at",
-            "deleted_at",
-            "starred",
-            "video_subfolder",
-            "project_id",
-            "file_size_bytes",
-        ]
-    ]
-    # `media_origin` is not a column: it is the one key of the `metadata` JSON blob the
-    # frontend needs on every row (it marks an upload the ingest converter wrapped from an
-    # audio file). Extracting just that key keeps listings from carrying whole metadata
-    # blobs. `json_extract` yields NULL for a NULL or non-object blob; what it yields for a
-    # non-string value is `coerce_media_origin`'s problem, not the query's.
-    + [MEDIA_ORIGIN_SQL_EXPR]
-)
 
 
 class VideoRecord(BaseModelExcludeNull):

@@ -26,12 +26,12 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
     ImageRecord,
     ImageRecordChanges,
-    ImageRecordDeleteException,
     ImageRecordNotFoundException,
     ResourceOrigin,
 )
 from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
+from invokeai.app.services.shared.database.errors import LockTimeoutError
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.util.misc import get_iso_timestamp
 from invokeai.backend.util.logging import InvokeAILogger
@@ -539,11 +539,11 @@ class TestDeleteTransactional:
         storage = invoker.services.image_files
         _save_image_file(storage, "img.png")
         invoker.services.image_records.get.return_value = _make_record(image_name="img.png")
-        invoker.services.image_records.delete.side_effect = ImageRecordDeleteException()
+        invoker.services.image_records.delete.side_effect = LockTimeoutError("database is locked")
         deleted_callbacks: list[str] = []
         disk_image_service.on_deleted(deleted_callbacks.append)
 
-        with pytest.raises(ImageRecordDeleteException):
+        with pytest.raises(LockTimeoutError):
             disk_image_service.delete("img.png")
 
         # Nothing was moved, so the image and its thumbnail are still exactly where they were.
@@ -554,12 +554,12 @@ class TestDeleteTransactional:
 
     def test_delete_journal_cleanup_failure_still_raises_db_error(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
-        invoker.services.image_records.delete.side_effect = ImageRecordDeleteException()
+        invoker.services.image_records.delete.side_effect = LockTimeoutError("database is locked")
         invoker.services.image_files.abandon_delete.side_effect = ImageFileDeleteException("journal locked")
         deleted_callbacks: list[str] = []
         image_service.on_deleted(deleted_callbacks.append)
 
-        with pytest.raises(ImageRecordDeleteException):
+        with pytest.raises(LockTimeoutError):
             image_service.delete("test.png")
 
         invoker.services.image_files.abandon_delete.assert_called_once_with(
@@ -685,11 +685,13 @@ class TestDeleteIntermediatesTransactional:
     def test_db_failure_raises_and_purges_nothing(self, image_service: ImageService):
         invoker = image_service._ImageService__invoker  # type: ignore
         invoker.services.image_records.get_subfolders.return_value = {"tmp1.png": "", "tmp2.png": ""}
-        invoker.services.image_records.delete_intermediates_by_names.side_effect = ImageRecordDeleteException()
+        invoker.services.image_records.delete_intermediates_by_names.side_effect = LockTimeoutError(
+            "database is locked"
+        )
         deleted_callbacks: list[str] = []
         image_service.on_deleted(deleted_callbacks.append)
 
-        with pytest.raises(ImageRecordDeleteException):
+        with pytest.raises(LockTimeoutError):
             image_service.delete_intermediates_by_names(["tmp1.png", "tmp2.png"])
 
         # No record was removed, so no file may be purged and the journal must be discarded.
@@ -880,13 +882,13 @@ class TestDeleteAgainstRealRecords:
             # this delete is still in flight, and only then does this one's own delete fail.
             real_delete(image_name)
             storage.delete(image_name)
-            raise ImageRecordDeleteException()
+            raise LockTimeoutError("database is locked")
 
         monkeypatch.setattr(records, "delete", competing_delete_then_fail)
         deleted_callbacks: list[str] = []
         svc.on_deleted(deleted_callbacks.append)
 
-        with pytest.raises(ImageRecordDeleteException):
+        with pytest.raises(LockTimeoutError):
             svc.delete("img.png")
 
         assert not storage.get_path("img.png").exists()
@@ -900,11 +902,11 @@ class TestDeleteAgainstRealRecords:
         _save_image_file(storage, "img.png")
 
         def failing_delete(image_name: str) -> None:
-            raise ImageRecordDeleteException()
+            raise LockTimeoutError("database is locked")
 
         monkeypatch.setattr(records, "delete", failing_delete)
 
-        with pytest.raises(ImageRecordDeleteException):
+        with pytest.raises(LockTimeoutError):
             svc.delete("img.png")
 
         assert storage.get_path("img.png").exists()
@@ -1019,7 +1021,7 @@ class TestFailedSaveCleanup:
         """If the record cannot be deleted the image is still referenced, so nothing may be purged."""
         invoker = image_service._ImageService__invoker  # type: ignore
         invoker.services.image_files.save.side_effect = ImageFileSaveException()
-        invoker.services.image_records.delete.side_effect = ImageRecordDeleteException()
+        invoker.services.image_records.delete.side_effect = LockTimeoutError("database is locked")
 
         with pytest.raises(ImageFileSaveException):
             image_service.create(

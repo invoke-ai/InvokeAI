@@ -1,28 +1,35 @@
-"""Regression tests for VideoRecordStorage multiuser isolation.
+"""Video records on every database backend.
 
-Covers JPPhoto's code-review finding (PR #9163): when ``board_id`` was omitted
-from /v1/videos/ and /v1/videos/names, the SQL builder applied no user filter
-and a non-admin caller saw every user's videos. The fix added an
-``elif user_id is not None and not is_admin`` branch; these tests pin the
-behaviour so the regression cannot reappear.
+The video queries are written apart from the image ones, so they are tested apart: listings and their filters,
+per-user isolation, fields, intermediate deletes and the `media_origin` marker.
+
+Per-user isolation covers JPPhoto's code-review finding (PR #9163): when ``board_id`` was omitted from /v1/videos/
+and /v1/videos/names, a non-admin caller saw every user's videos.
 """
 
 import json
+import sqlite3
+from collections.abc import Sequence
+from typing import Any
 
 import pytest
-from sqlalchemy import update
+from sqlalchemy import insert, update
 from sqlalchemy.exc import DBAPIError
 
+from invokeai.app.invocations.fields import MetadataFieldValidator
 from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
 from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.queries import Queries
 from invokeai.app.services.shared.database.schema.videos import videos
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_records.video_records_common import VideoRecordChanges, VideoRecordNotFoundException
 from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
+from tests.fixtures.database import capture_statements
+from tests.fixtures.races import while_in_flight
 
 
 @pytest.fixture
@@ -405,3 +412,278 @@ def test_only_videos_still_intermediate_are_deleted_and_reported_in_the_given_or
 
     assert deleted == ["c.mp4", "a.mp4"]
     assert [store.exists(name) for name in ("a.mp4", "b.mp4", "c.mp4")] == [False, True, False]
+
+
+def test_a_promotion_in_flight_is_waited_for_and_keeps_the_record(
+    database: Database, store: VideoRecordStorage
+) -> None:
+    """A delete that meets a promotion still in flight waits for it, and then keeps the promoted record."""
+    _save(store, "tmp.mp4", "alice", is_intermediate=True)
+    _save(store, "promoted.mp4", "alice", is_intermediate=True)
+    deleted: list[str] = []
+
+    def promote(q: Queries) -> None:
+        q.videos.update("promoted.mp4", VideoRecordChanges(is_intermediate=False))
+
+    errors = while_in_flight(
+        database, promote, lambda: deleted.extend(store.delete_intermediates_by_names(["tmp.mp4", "promoted.mp4"]))
+    )
+
+    assert errors == []
+    assert deleted == ["tmp.mp4"]
+    assert store.get("promoted.mp4").is_intermediate is False
+
+
+def test_a_guard_narrows_what_is_deleted(store: VideoRecordStorage) -> None:
+    _save(store, "a.mp4", "alice", is_intermediate=True)
+    _save(store, "b.mp4", "alice", is_intermediate=True)
+    asked: list[list[str]] = []
+
+    def guard(cursor: sqlite3.Cursor, names: Sequence[str]) -> list[str]:
+        asked.append(list(names))
+        return [name for name in names if name != "b.mp4"]
+
+    assert store.delete_intermediates_by_names(["a.mp4", "b.mp4"], guard) == ["a.mp4"]
+    assert asked == [["a.mp4", "b.mp4"]]
+    assert store.get("b.mp4").is_intermediate is True
+
+
+class TestListingFilters:
+    """Each filter of a listing, on pages and names alike, for an administrator's view."""
+
+    @pytest.fixture
+    def board_id(self, database: Database, store: VideoRecordStorage) -> str:
+        board = BoardRecordStorage(database).save("Board", "alice")
+        # name, category, origin, metadata, starred, intermediate, on the board, created at
+        rows = [
+            (
+                "boarded.mp4",
+                ImageCategory.GENERAL,
+                ResourceOrigin.INTERNAL,
+                '{"prompt": "a 100% Cat_Photo"}',
+                True,
+                False,
+                True,
+                "01",
+            ),
+            (
+                "user.mp4",
+                ImageCategory.USER,
+                ResourceOrigin.INTERNAL,
+                '{"prompt": "a 100x catXphoto"}',
+                False,
+                False,
+                False,
+                "02",
+            ),
+            ("external.mp4", ImageCategory.GENERAL, ResourceOrigin.EXTERNAL, None, False, False, False, "03"),
+            ("intermediate.mp4", ImageCategory.GENERAL, ResourceOrigin.INTERNAL, None, True, True, True, "04"),
+        ]
+        for name, category, origin, metadata, starred, intermediate, on_board, day in rows:
+            store.save(
+                video_name=name,
+                video_origin=origin,
+                video_category=category,
+                width=8,
+                height=8,
+                duration=1.0,
+                fps=8.0,
+                has_workflow=False,
+                is_intermediate=intermediate,
+                starred=starred,
+                metadata=metadata,
+                user_id="alice",
+            )
+            with database.begin(write=True) as conn:
+                conn.execute(
+                    update(videos).where(videos.c.video_name == name).values(created_at=f"2026-01-{day} 00:00:00.000")
+                )
+            if on_board:
+                BoardVideoRecordStorage(database).add_video_to_board(board.board_id, name)
+        return board.board_id
+
+    @pytest.mark.parametrize(
+        ("filters", "expected"),
+        [
+            pytest.param({"board_id": "board"}, {"boarded.mp4", "intermediate.mp4"}, id="one board"),
+            pytest.param({"board_id": "none"}, {"user.mp4", "external.mp4"}, id="no board"),
+            pytest.param({"categories": [ImageCategory.USER]}, {"user.mp4"}, id="categories"),
+            pytest.param({"video_origin": ResourceOrigin.EXTERNAL}, {"external.mp4"}, id="origin"),
+            pytest.param({"is_intermediate": False}, {"boarded.mp4", "user.mp4", "external.mp4"}, id="intermediate"),
+            # Literal % and _, and either case: the unescaped pattern would also match "100x catXphoto".
+            pytest.param({"search_term": "100% cat_"}, {"boarded.mp4"}, id="search"),
+        ],
+    )
+    def test_a_filter_narrows_pages_and_names_alike(
+        self, store: VideoRecordStorage, board_id: str, filters: dict[str, Any], expected: set[str]
+    ) -> None:
+        if filters.get("board_id") == "board":
+            filters = {**filters, "board_id": board_id}
+
+        page = store.get_many(limit=10, is_admin=True, **filters)
+        names = store.get_video_names(is_admin=True, **filters)
+
+        assert {record.video_name for record in page.items} == expected
+        assert page.total == names.total_count == len(expected)
+        assert names.starred_count == len(expected & {"boarded.mp4", "intermediate.mp4"})
+        assert [record.video_name for record in page.items] == names.video_names
+
+    def test_starred_videos_come_first_and_are_counted(self, store: VideoRecordStorage, board_id: str) -> None:
+        names = store.get_video_names(starred_first=True, order_dir=SQLiteDirection.Descending, is_admin=True)
+        unstarred_first = store.get_video_names(starred_first=False, order_dir=SQLiteDirection.Ascending, is_admin=True)
+
+        assert names.video_names == ["intermediate.mp4", "boarded.mp4", "external.mp4", "user.mp4"]
+        assert names.starred_count == 2
+        assert unstarred_first.video_names == ["boarded.mp4", "user.mp4", "external.mp4", "intermediate.mp4"]
+
+    def test_the_cover_is_the_newest_video_that_is_no_intermediate(
+        self, store: VideoRecordStorage, board_id: str
+    ) -> None:
+        cover = store.get_most_recent_video_for_board(board_id)
+
+        assert cover is not None and cover.video_name == "boarded.mp4"
+
+
+class TestFields:
+    def test_save_stores_every_field_and_update_changes_every_field(self, store: VideoRecordStorage) -> None:
+        store.save(
+            video_name="full.mp4",
+            video_origin=ResourceOrigin.EXTERNAL,
+            video_category=ImageCategory.CONTROL,
+            width=640,
+            height=480,
+            duration=2.5,
+            fps=30.0,
+            has_workflow=True,
+            is_intermediate=True,
+            starred=True,
+            session_id="session-1",
+            node_id="node-1",
+            metadata='{"seed": 1}',
+            user_id="user-1",
+            video_subfolder="sub/dir",
+            project_id="project-1",
+        )
+
+        saved = store.get("full.mp4")
+        store.update(
+            "full.mp4",
+            VideoRecordChanges(
+                video_category=ImageCategory.USER, session_id="session-2", is_intermediate=False, starred=False
+            ),
+        )
+        updated = store.get("full.mp4")
+
+        assert (
+            saved.video_origin,
+            saved.video_category,
+            saved.width,
+            saved.height,
+            saved.duration,
+            saved.fps,
+            saved.has_workflow,
+            saved.is_intermediate,
+            saved.starred,
+            saved.session_id,
+            saved.node_id,
+            saved.video_subfolder,
+            saved.project_id,
+        ) == (
+            ResourceOrigin.EXTERNAL,
+            ImageCategory.CONTROL,
+            640,
+            480,
+            2.5,
+            30.0,
+            True,
+            True,
+            True,
+            "session-1",
+            "node-1",
+            "sub/dir",
+            "project-1",
+        )
+        assert store.get_user_id("full.mp4") == "user-1"
+        assert store.get_metadata("full.mp4") == MetadataFieldValidator.validate_json('{"seed": 1}')
+        assert (updated.video_category, updated.session_id, updated.is_intermediate, updated.starred) == (
+            ImageCategory.USER,
+            "session-2",
+            False,
+            False,
+        )
+        assert updated.node_id == "node-1" and updated.has_workflow is True
+
+    def test_saving_a_taken_name_keeps_the_record_and_returns_its_time(
+        self, database: Database, store: VideoRecordStorage
+    ) -> None:
+        _save(store, "taken.mp4", "alice")
+        with database.begin(write=True) as conn:
+            conn.execute(
+                update(videos).where(videos.c.video_name == "taken.mp4").values(created_at="2026-01-01 00:00:00.000")
+            )
+
+        created_at = store.save(
+            video_name="taken.mp4",
+            video_origin=ResourceOrigin.EXTERNAL,
+            video_category=ImageCategory.USER,
+            width=1,
+            height=1,
+            duration=9.0,
+            fps=None,
+            has_workflow=True,
+            user_id="bob",
+        )
+
+        record = store.get("taken.mp4")
+        assert created_at.isoformat(" ", "milliseconds") == "2026-01-01 00:00:00.000"
+        assert (record.video_origin, record.width, store.get_user_id("taken.mp4")) == (
+            ResourceOrigin.INTERNAL,
+            64,
+            "alice",
+        )
+
+
+def test_a_size_backfill_fills_only_sizes_not_known_yet(store: VideoRecordStorage) -> None:
+    _save(store, "unknown.mp4", "alice")
+    _save(store, "measured.mp4", "alice")
+    store.set_file_size_bytes("measured.mp4", 100)
+
+    store.set_file_sizes_bytes({"unknown.mp4": 7, "measured.mp4": 9})
+
+    assert [store.get(name).file_size_bytes for name in ("unknown.mp4", "measured.mp4")] == [7, 100]
+
+
+@pytest.mark.parametrize("operation", ["delete_intermediates_by_names", "delete_many", "get_subfolders"])
+def test_every_name_is_covered_and_no_statement_binds_more_than_sqlite_takes(
+    database: Database, store: VideoRecordStorage, operation: str
+) -> None:
+    """999 is the SQLITE_MAX_VARIABLE_NUMBER default on builds older than 3.32."""
+    names = [f"tmp{i:05d}.mp4" for i in range(2 * 500 + 7)]
+    with database.begin(write=True) as conn:
+        conn.execute(
+            insert(videos),
+            [
+                {
+                    "video_name": name,
+                    "video_origin": ResourceOrigin.INTERNAL.value,
+                    "video_category": ImageCategory.GENERAL.value,
+                    "width": 8,
+                    "height": 8,
+                    "is_intermediate": True,
+                    "video_subfolder": "sub",
+                }
+                for name in names
+            ],
+        )
+
+    with capture_statements(database) as statements:
+        result = getattr(store, operation)(names)
+
+    widest = max(len(parameters) for _, parameters in statements)
+    assert 0 < widest <= 999
+    if operation == "get_subfolders":
+        assert result == dict.fromkeys(names, "sub")
+    else:
+        assert store.get_video_names().video_names == []
+    if operation == "delete_intermediates_by_names":
+        assert result == names

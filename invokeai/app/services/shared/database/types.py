@@ -17,8 +17,10 @@ where SQLite has none: an index key holds at most 3072 bytes on MySQL and MariaD
 Booleans are SQLAlchemy's `Boolean`: BOOLEAN on SQLite, TINYINT(1) on a server.
 """
 
+import functools
+from collections.abc import Callable
 from datetime import datetime, timezone
-from typing import Any
+from typing import Any, TypeVar, cast
 
 from sqlalchemy import BigInteger, Double, Integer, LargeBinary, String, Text
 from sqlalchemy.dialects.mysql import LONGBLOB, LONGTEXT
@@ -37,6 +39,26 @@ MARIADB_NOCASE_COLLATION = "utf8mb4_uca1400_nopad_as_ci"
 # 'YYYY-MM-DD HH:MM:SS.fff' needs 23 characters. Some rows hold ISO 8601 text instead, at most 32 characters:
 # `datetime.isoformat()` with microseconds and a UTC offset.
 TIMESTAMP_LENGTH = 32
+
+_Load = TypeVar("_Load", bound=Callable[[Any, Dialect], TypeEngine[Any]])
+
+
+def _per_backend(load: _Load) -> _Load:
+    """Keeps the type that `load` gives each backend, per column type.
+
+    SQLAlchemy asks for it again on every execution of an expanding IN, and adapts every new type it gets anew,
+    which cost about 19 µs a statement.
+    """
+
+    @functools.wraps(load)
+    def cached(self: Any, dialect: Dialect) -> TypeEngine[Any]:
+        types: dict[tuple[type, str], TypeEngine[Any]] = self.__dict__.setdefault("_backend_types", {})
+        key = (type(dialect), dialect.name)
+        if key not in types:
+            types[key] = load(self, dialect)
+        return types[key]
+
+    return cast(_Load, cached)
 
 
 def now_text() -> str:
@@ -71,6 +93,7 @@ class Key(TypeDecorator[str]):
         super().__init__()
         self.length = length
 
+    @_per_backend
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name in SERVER_DIALECTS:
             return dialect.type_descriptor(String(self.length))
@@ -90,6 +113,7 @@ class NoCaseKey(TypeDecorator[str]):
         super().__init__()
         self.length = length
 
+    @_per_backend
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "mysql":
             return dialect.type_descriptor(String(self.length, collation=MYSQL_NOCASE_COLLATION))
@@ -104,6 +128,7 @@ class LongText(TypeDecorator[str]):
     impl = Text
     cache_ok = True
 
+    @_per_backend
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name in SERVER_DIALECTS:
             return dialect.type_descriptor(LONGTEXT())
@@ -123,6 +148,7 @@ class Timestamp(TypeDecorator[str]):
         super().__init__(TIMESTAMP_LENGTH)
         self.declared = declared
 
+    @_per_backend
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "sqlite":
             return dialect.type_descriptor(_Declared(self.declared))
@@ -135,6 +161,7 @@ class BigInt(TypeDecorator[int]):
     impl = BigInteger
     cache_ok = True
 
+    @_per_backend
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "sqlite":
             return dialect.type_descriptor(Integer())
@@ -147,6 +174,7 @@ class Real(TypeDecorator[float]):
     impl = Double
     cache_ok = True
 
+    @_per_backend
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name == "sqlite":
             return dialect.type_descriptor(REAL())
@@ -159,6 +187,7 @@ class Blob(TypeDecorator[bytes]):
     impl = LargeBinary
     cache_ok = True
 
+    @_per_backend
     def load_dialect_impl(self, dialect: Dialect) -> TypeEngine[Any]:
         if dialect.name in SERVER_DIALECTS:
             return dialect.type_descriptor(LONGBLOB())

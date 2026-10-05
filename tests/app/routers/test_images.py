@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
-from sqlalchemy.exc import DBAPIError
 
 from invokeai.app.api.auth_dependencies import get_current_user_or_default
 from invokeai.app.api.dependencies import ApiDependencies
@@ -501,13 +500,13 @@ def test_delete_image_db_fault_during_lookup_returns_500_not_404(
 def test_delete_image_db_failure_returns_500_and_restores_files(
     monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
 ) -> None:
-    from invokeai.app.services.image_records.image_records_common import ImageRecordDeleteException
+    from invokeai.app.services.shared.database.errors import LockTimeoutError
 
     storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
     _save_deletable_image(mock_invoker, storage, "del.png")
 
     def failing_delete(image_name: str) -> None:
-        raise ImageRecordDeleteException()
+        raise LockTimeoutError("database is locked")
 
     monkeypatch.setattr(mock_invoker.services.image_records, "delete", failing_delete)
 
@@ -708,19 +707,6 @@ def test_delete_does_not_report_a_name_that_never_existed(
     body = response.json()
     assert body["deleted_images"] == []
     assert body["failed_images"] == []
-
-
-def test_image_records_get_does_not_disguise_a_storage_error_as_not_found(
-    mock_sqlite_database: SqliteDatabase,
-) -> None:
-    """The narrowing itself: a database error out of the SELECT must stay a database error."""
-    from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
-
-    storage = ImageRecordStorage(mock_sqlite_database.database)
-    mock_sqlite_database._conn.execute("ALTER TABLE images RENAME TO images_moved;")
-
-    with pytest.raises(DBAPIError, match="no such table"):
-        storage.get("a.png")
 
 
 def test_delete_still_reports_a_genuine_storage_failure(

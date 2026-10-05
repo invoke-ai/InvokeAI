@@ -12,6 +12,7 @@ import pytest
 from sqlalchemy import insert, select, true, update
 from sqlalchemy.exc import DBAPIError
 
+from invokeai.app.invocations.fields import MetadataFieldValidator
 from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardVisibility
 from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
@@ -173,6 +174,98 @@ class TestSave:
         assert store.get_user_id("missing.png") is None
 
 
+class TestFields:
+    def test_save_stores_every_field_and_update_changes_every_field(self, store: ImageRecordStorage) -> None:
+        store.save(
+            image_name="full.png",
+            image_origin=ResourceOrigin.EXTERNAL,
+            image_category=ImageCategory.CONTROL,
+            width=640,
+            height=480,
+            has_workflow=True,
+            is_intermediate=True,
+            starred=True,
+            session_id="session-1",
+            node_id="node-1",
+            metadata='{"seed": 1}',
+            user_id="user-1",
+            image_subfolder="sub/dir",
+            project_id="project-1",
+        )
+
+        saved = store.get("full.png")
+        store.update(
+            "full.png",
+            ImageRecordChanges(
+                image_category=ImageCategory.USER, session_id="session-2", is_intermediate=False, starred=False
+            ),
+        )
+        updated = store.get("full.png")
+
+        assert (
+            saved.image_origin,
+            saved.image_category,
+            saved.width,
+            saved.height,
+            saved.has_workflow,
+            saved.is_intermediate,
+            saved.starred,
+            saved.session_id,
+            saved.node_id,
+            saved.image_subfolder,
+            saved.project_id,
+        ) == (
+            ResourceOrigin.EXTERNAL,
+            ImageCategory.CONTROL,
+            640,
+            480,
+            True,
+            True,
+            True,
+            "session-1",
+            "node-1",
+            "sub/dir",
+            "project-1",
+        )
+        assert store.get_user_id("full.png") == "user-1"
+        assert store.get_metadata("full.png") == MetadataFieldValidator.validate_json('{"seed": 1}')
+        assert (updated.image_category, updated.session_id, updated.is_intermediate, updated.starred) == (
+            ImageCategory.USER,
+            "session-2",
+            False,
+            False,
+        )
+        assert updated.node_id == "node-1" and updated.has_workflow is True
+
+
+class TestFilters:
+    def test_the_origin_filter_narrows_pages_and_names_alike(self, store: ImageRecordStorage) -> None:
+        _save(store, "internal.png")
+        store.save(
+            image_name="external.png",
+            image_origin=ResourceOrigin.EXTERNAL,
+            image_category=ImageCategory.GENERAL,
+            width=8,
+            height=8,
+            has_workflow=False,
+        )
+
+        page = store.get_many(limit=10, image_origin=ResourceOrigin.EXTERNAL)
+        names = store.get_image_names(image_origin=ResourceOrigin.EXTERNAL)
+
+        assert [r.image_name for r in page.items] == names.image_names == ["external.png"]
+        assert page.total == 1
+
+    def test_a_size_backfill_fills_only_sizes_not_known_yet(self, store: ImageRecordStorage) -> None:
+        _save(store, "unknown.png")
+        _save(store, "measured.png")
+        store.set_file_size_bytes("measured.png", 100)
+
+        store.set_file_sizes_bytes({"unknown.png": 7, "measured.png": 9})
+
+        assert [store.get(name).file_size_bytes for name in ("unknown.png", "measured.png")] == [7, 100]
+
+
 class TestGetSubfolders:
     """get_subfolders() maps the named rows to their on-disk subfolders without touching them."""
 
@@ -300,25 +393,40 @@ class TestDeleteIntermediatesByNames:
         assert store.get(survivor).is_intermediate is False
         assert _intermediates(database) == []
 
-    @pytest.mark.parametrize(
-        "operation",
-        [
-            pytest.param(ImageRecordStorage.delete_intermediates_by_names, id="delete_intermediates_by_names"),
-            pytest.param(ImageRecordStorage.delete_many, id="delete_many"),
-            pytest.param(ImageRecordStorage.get_subfolders, id="get_subfolders"),
-        ],
-    )
-    def test_no_statement_binds_more_than_sqlite_takes(
-        self, database: Database, store: ImageRecordStorage, operation: Any
+    @pytest.mark.parametrize("operation", ["delete_intermediates_by_names", "delete_many", "get_subfolders"])
+    def test_every_name_is_covered_and_no_statement_binds_more_than_sqlite_takes(
+        self, database: Database, store: ImageRecordStorage, operation: str
     ) -> None:
         """999 is the SQLITE_MAX_VARIABLE_NUMBER default on builds older than 3.32."""
         names = [f"tmp{i:05d}.png" for i in range(2 * 500 + 7)]
+        with database.begin(write=True) as conn:
+            conn.execute(
+                insert(images),
+                [
+                    {
+                        "image_name": name,
+                        "image_origin": ResourceOrigin.INTERNAL.value,
+                        "image_category": ImageCategory.GENERAL.value,
+                        "width": 8,
+                        "height": 8,
+                        "is_intermediate": True,
+                        "image_subfolder": "sub",
+                    }
+                    for name in names
+                ],
+            )
 
         with capture_statements(database) as statements:
-            operation(store, names)
+            result = getattr(store, operation)(names)
 
         widest = max(len(parameters) for _, parameters in statements)
         assert 0 < widest <= 999
+        if operation == "get_subfolders":
+            assert result == dict.fromkeys(names, "sub")
+        else:
+            assert store.get_image_names().image_names == []
+        if operation == "delete_intermediates_by_names":
+            assert result == names
 
     def test_a_guard_narrows_what_is_deleted(self, store: ImageRecordStorage) -> None:
         _save(store, "a.png", is_intermediate=True)
@@ -435,6 +543,16 @@ class TestOwnershipFilteringOmittedBoard:
 
         assert result.total == 3
 
+    @pytest.mark.parametrize(("user_id", "is_admin"), [("admin", True), (None, False)])
+    def test_get_many_none_board_unscoped_lists_every_owners_unboarded_images(
+        self, stores: Stores, user_id: Optional[str], is_admin: bool
+    ) -> None:
+        self._seed_two_users(stores)
+
+        result = stores[0].get_many(limit=10, board_id="none", user_id=user_id, is_admin=is_admin)
+
+        assert {r.image_name for r in result.items} == {"u1-uncat.png", "u2-uncat.png"}
+
     def test_get_many_none_board_still_filters_by_owner(self, stores: Stores) -> None:
         """board_id="none" (uncategorized) keeps its existing per-user isolation."""
         self._seed_two_users(stores)
@@ -544,6 +662,7 @@ class TestAllReadableBoardsFiltering:
                     "own-uncategorized.png",
                 },
             ),
+            ("user3", False, {"shared-visibility.png", "public-visibility.png"}),
             (
                 "admin",
                 True,
@@ -751,6 +870,16 @@ class TestCreatedAtRangeFiltering:
         assert store.get_image_names_by_date("2026-1-31").image_names == []
         assert store.get_image_names_by_date("20260131").image_names == []
         assert store.get_image_names_by_date("2026-01-31 00:00").image_names == []
+        assert store.get_image_names_by_date("").image_names == []
+
+    def test_the_last_day_there_is_matches_nothing_as_sqlite_did(
+        self, database: Database, store: ImageRecordStorage
+    ) -> None:
+        # Its next day cannot be represented; SQLite's DATE(day, '+1 day') gave NULL.
+        self._seed_dated(database, store)
+
+        assert store.get_many(limit=10, created_to="9999-12-31").items == []
+        assert store.get_image_names(created_to="9999-12-31").image_names == []
 
 
 class TestOrdering:
@@ -772,6 +901,22 @@ class TestOrdering:
         assert listed(False, SQLiteDirection.Ascending) == ["a.png", "b.png", "c.png"]
         assert listed(False, SQLiteDirection.Descending) == ["c.png", "b.png", "a.png"]
         assert listed(True, SQLiteDirection.Descending) == ["b.png", "c.png", "a.png"]
+        assert listed(True, SQLiteDirection.Ascending) == ["b.png", "a.png", "c.png"]
+
+    def test_pages_walk_the_listing_and_a_page_of_none_still_counts(
+        self, database: Database, store: ImageRecordStorage
+    ) -> None:
+        for i, name in enumerate(("c.png", "a.png", "b.png")):
+            _save(store, name)
+            _set_created_at(database, name, f"2026-01-0{i + 1} 00:00:00.000")
+        names = store.get_image_names().image_names
+
+        pages = [store.get_many(offset=offset, limit=1) for offset in range(3)]
+        count_only = store.get_many(limit=0)
+
+        assert [[r.image_name for r in page.items] for page in pages] == [[name] for name in names]
+        assert {page.total for page in pages} == {3}
+        assert count_only.items == [] and count_only.total == 3
 
 
 @pytest.mark.sqlite_only
@@ -837,6 +982,21 @@ class TestGetImageNamesQueryPlans:
         assert result.image_names == ["unboarded.png"]
         assert "NOT (EXISTS" in statement
         assert "OUTER JOIN" not in statement
+
+    @pytest.mark.parametrize("board_id", ["none", "all"])
+    def test_membership_checks_search_their_indexes(self, database: Database, stores: Stores, board_id: str) -> None:
+        """A membership check that scanned a table would cost every listed image all memberships."""
+        image_store, board_store, board_image_store = stores
+        _save(image_store, "boarded.png", user_id="alice")
+        _save(image_store, "unboarded.png", user_id="alice")
+        board = board_store.save("Board", "alice")
+        board_image_store.add_image_to_board(board.board_id, "boarded.png")
+
+        _, _, plan = _capture_names_plan(database, image_store, board_id=board_id, user_id="alice", is_admin=False)
+
+        assert any("board_images" in step for step in plan)
+        scans = [step for step in plan if step.startswith("SCAN")]
+        assert not [step for step in scans if any(table in step for table in ("board_images", "boards"))]
 
     def test_nonadmin_asset_query_has_no_forced_index(self, database: Database, store: ImageRecordStorage) -> None:
         _save(store, "asset.png", user_id="alice", category=ImageCategory.CONTROL)

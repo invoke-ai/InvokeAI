@@ -25,7 +25,6 @@ from sqlalchemy import (
     update,
 )
 
-from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.board_records.board_records_common import BoardVisibility
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -131,7 +130,8 @@ class _Shape(NamedTuple):
     """Which filters a listing has: never their values, which are bound, so that the shapes are few."""
 
     origin: bool
-    # The categories' values, sorted; None for no category filter. Rendered literally: there are few.
+    # The categories' values, sorted; None for no category filter. Each value is bound on its own, so that a list
+    # of a given length is one statement whatever it holds.
     categories: Optional[tuple[str, ...]]
     intermediate: bool
     # "any" (no board filter), "none" (on no board), "all" (on no board or a readable one) or "one".
@@ -163,19 +163,20 @@ def _shape(
         board=board,
         scoped=user_id is not None and not is_admin,
         search=bool(search_term),
-        created_from=bool(created_from),
-        created_to=bool(created_to),
+        created_from=created_from is not None,
+        created_to=created_to is not None,
     )
 
 
 def _day_after(day: str) -> str:
-    """The day after an ISO day (`YYYY-MM-DD`), as text that timestamps of that day sort before. An invalid day gives
-    the empty text, which no timestamp sorts before, as SQLite's DATE() of an invalid day matched nothing."""
+    """The day after an ISO day (`YYYY-MM-DD`), as text that timestamps of that day sort before. An invalid day, or
+    the last one there is, gives the empty text, which no timestamp sorts before: SQLite's DATE() gave NULL for both,
+    which matched nothing."""
     try:
         parsed = date.fromisoformat(day)
-    except ValueError:
+        return (parsed + timedelta(days=1)).isoformat() if parsed.isoformat() == day else ""
+    except (ValueError, OverflowError):
         return ""
-    return (parsed + timedelta(days=1)).isoformat() if parsed.isoformat() == day else ""
 
 
 def _parameters(
@@ -194,7 +195,7 @@ def _parameters(
         "board_id": board_id,
         "pattern": like_contains(search_term) if search_term else None,
         "created_from": created_from,
-        "created_before": _day_after(created_to) if created_to else None,
+        "created_before": _day_after(created_to) if created_to is not None else None,
         "user_id": user_id,
     }
 
@@ -312,12 +313,6 @@ def _records(page: tuple[Sequence[Sequence[Any]], int]) -> tuple[list[ImageRecor
     return [_record(row) for row in rows], total
 
 
-def _metadata(row: Optional[Sequence[Any]]) -> tuple[bool, Optional[MetadataField]]:
-    if row is None:
-        return False, None
-    return True, MetadataFieldValidator.validate_json(row[0]) if row[0] is not None else None
-
-
 class ImageQueries(QueryModule):
     @mapped(_record_or_none)
     @read
@@ -329,11 +324,11 @@ class ImageQueries(QueryModule):
         """The image's owner; None also for an image that does not exist."""
         return conn.execute(_GET_USER_ID, {"image_name": image_name}).scalar()
 
-    @mapped(_metadata)
     @read
-    def metadata(self, conn: Connection, image_name: str) -> Optional[Row[Any]]:
-        """Whether the image exists, and its metadata."""
-        return conn.execute(_GET_METADATA, {"image_name": image_name}).first()
+    def metadata(self, conn: Connection, image_name: str) -> tuple[bool, Optional[str]]:
+        """Whether the image exists, and its metadata as stored: JSON text, or None."""
+        row = conn.execute(_GET_METADATA, {"image_name": image_name}).first()
+        return (False, None) if row is None else (True, row[0])
 
     @read
     def exists(self, conn: Connection, image_name: str) -> bool:

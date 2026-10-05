@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from invokeai.app.invocations.fields import MetadataField
+from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.database.database import Database
 from invokeai.app.services.shared.database.queries import Queries
@@ -61,7 +61,7 @@ class VideoRecordStorage(VideoRecordStorageBase):
         exists, metadata = self._queries.videos.metadata(video_name)
         if not exists:
             raise VideoRecordNotFoundException
-        return metadata
+        return MetadataFieldValidator.validate_json(metadata) if metadata is not None else None
 
     def update(self, video_name: str, changes: VideoRecordChanges) -> None:
         self._queries.videos.update(video_name, changes)

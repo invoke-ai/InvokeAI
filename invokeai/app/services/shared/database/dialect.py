@@ -36,9 +36,9 @@ def upsert(dialect_name: str, table: Table, *, update: Sequence[str]) -> Insert:
     columns to the values it would have inserted instead.
 
     Execute it with the row's values, keyed by column name. A column's `onupdate` does not apply to the update:
-    list `updated_at` in `update` and pass its value. The primary key must be the table's only unique key,
-    because MySQL and MariaDB update the row a conflict with any unique key finds, the others only on the key
-    named.
+    list `updated_at` in `update` and pass its value. Every unique key of the table must be on the primary key's
+    columns, because MySQL and MariaDB update the row a conflict with any unique key finds, the others only on the
+    key named.
     """
     _require_only_primary_key(table)
     if dialect_name in SERVER_DIALECTS:
@@ -65,7 +65,7 @@ def insert_ignore(dialect_name: str, table: Table) -> Insert:
     It skips that conflict only: a NULL, a failed CHECK and a missing foreign key still raise. (SQLite's `INSERT
     OR IGNORE` would skip the first two, MySQL's `INSERT IGNORE` all three.) Its row count does not tell whether
     the row was inserted: a skipped row counts 0 on SQLite and 1 on MySQL and MariaDB, which count the rows found.
-    The primary key must be the table's only unique key, as for `upsert`.
+    Every unique key must be on the primary key's columns, as for `upsert`.
     """
     _require_only_primary_key(table)
     if dialect_name in SERVER_DIALECTS:
