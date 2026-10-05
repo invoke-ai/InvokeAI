@@ -1,9 +1,11 @@
 import json
 import re
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
-from dynamicprompts.wildcards import WildcardManager
 from pydantic import BaseModel, Field, TypeAdapter, field_validator
+
+if TYPE_CHECKING:
+    from dynamicprompts.wildcards import WildcardManager
 
 
 class WildcardNotFoundError(Exception):
@@ -105,7 +107,7 @@ class WildcardRecordDTO(WildcardWithoutId):
 WildcardRecordDTOValidator = TypeAdapter(WildcardRecordDTO)
 
 
-def build_wildcard_manager(wildcards: list[WildcardRecordDTO]) -> WildcardManager:
+def build_wildcard_manager(wildcards: list[WildcardRecordDTO]) -> "WildcardManager":
     """Builds the manager that resolves `__name__` against a user's wildcards.
 
     `root_map` accepts in-memory value lists, so wildcards resolve without ever touching the
@@ -115,5 +117,8 @@ def build_wildcard_manager(wildcards: list[WildcardRecordDTO]) -> WildcardManage
     Constructed per request. The tree is built lazily from a handful of small lists, so there is
     nothing here worth caching and invalidating against edits.
     """
+    # Imported here: the database layer imports this module for its records, and only expanding a prompt needs it.
+    from dynamicprompts.wildcards import WildcardManager
+
     root_map = {"": [{wildcard.name: wildcard.values for wildcard in wildcards if wildcard.values}]}
     return WildcardManager(root_map=root_map)

@@ -44,8 +44,8 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
     from invokeai.app.services.images.images_default import ImageService
     from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
     from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
-    from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import (
-        SqliteSystemPromptRecordsStorage,
+    from invokeai.app.services.system_prompt_records.system_prompt_records_default import (
+        SystemPromptRecordsStorage,
     )
     from invokeai.app.services.users.users_default import UserService
     from tests.test_nodes import TestEventService
@@ -79,7 +79,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
-        system_prompt_records=SqliteSystemPromptRecordsStorage(db=db),
+        system_prompt_records=SystemPromptRecordsStorage(db.database),
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore

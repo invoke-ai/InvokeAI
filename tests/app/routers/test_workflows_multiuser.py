@@ -69,12 +69,12 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
     from invokeai.app.services.images.images_default import ImageService
     from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
     from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
-    from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import (
-        SqliteSystemPromptRecordsStorage,
+    from invokeai.app.services.system_prompt_records.system_prompt_records_default import (
+        SystemPromptRecordsStorage,
     )
     from invokeai.app.services.users.users_default import UserService
     from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
-    from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
+    from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
     from tests.test_nodes import TestEventService
 
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
@@ -106,14 +106,14 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
-        system_prompt_records=SqliteSystemPromptRecordsStorage(db=db),
+        system_prompt_records=SystemPromptRecordsStorage(db.database),
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistence(db.database),
         project_records=ProjectRecordsStorage(db.database),
         users=UserService(db.database),
-        wildcard_records=SqliteWildcardRecordsStorage(db=db),
+        wildcard_records=WildcardRecordsStorage(db.database),
         external_generation=None,  # type: ignore
         videos=None,  # type: ignore
         video_files=None,  # type: ignore

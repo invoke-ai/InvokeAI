@@ -44,6 +44,11 @@ ACCOUNTS = 200
 CLIENT_STATE_KEYS = 200
 PROJECTS = 50
 WORKFLOWS = 300
+# One account's library: its own style presets beside the bundled and the shared ones, its system prompts, and the
+# wildcards its prompts draw from.
+STYLE_PRESETS = 50
+SYSTEM_PROMPTS = 20
+WILDCARDS = 25
 WORKFLOW_TAGS = ["sdxl", "flux", "upscale", "inpaint", "video", "portrait", "landscape", "controlnet"]
 
 
@@ -72,7 +77,12 @@ class Services:
         from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
         from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
         from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
+        from invokeai.app.services.style_preset_records.style_preset_records_default import StylePresetRecordsStorage
+        from invokeai.app.services.system_prompt_records.system_prompt_records_default import (
+            SystemPromptRecordsStorage,
+        )
         from invokeai.app.services.users.users_default import UserService
+        from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
         from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 
         self.database = db.database
@@ -85,6 +95,9 @@ class Services:
         self.client_state = ClientStatePersistence(db.database)
         self.project_records = ProjectRecordsStorage(db.database)
         self.workflow_records = WorkflowRecordsStorage(db.database)
+        self.style_preset_records = StylePresetRecordsStorage(db.database)
+        self.system_prompt_records = SystemPromptRecordsStorage(db.database)
+        self.wildcard_records = WildcardRecordsStorage(db.database)
         # Listing gallery items builds their URLs through the invoker's URL service.
         from invokeai.app.services.urls.urls_default import LocalUrlService
 
@@ -92,8 +105,9 @@ class Services:
         invoker.services.urls = LocalUrlService()
         invoker.services.logger = logging.getLogger("benchmark_database.quiet")
         self.gallery.start(invoker)
-        # Starting the library stores the bundled workflows.
+        # Starting the library stores the bundled workflows and style presets.
         self.workflow_records.start(invoker)
+        self.style_preset_records.start(invoker)
 
 
 def _metadata(rng: random.Random) -> str:
@@ -158,6 +172,13 @@ def _workflow_template() -> Any:
 
 def _seed(services: Services, images: int, boards: int, rng: random.Random) -> list[str]:
     from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+    from invokeai.app.services.style_preset_records.style_preset_records_common import (
+        PresetData,
+        PresetType,
+        StylePresetWithoutId,
+    )
+    from invokeai.app.services.system_prompt_records.system_prompt_records_common import SystemPromptWithoutId
+    from invokeai.app.services.wildcard_records.wildcard_records_common import WildcardWithoutId
 
     board_ids = [services.board_records.save(board_name=f"Board {i}", user_id="system").board_id for i in range(boards)]
     names: list[str] = []
@@ -189,7 +210,9 @@ def _seed(services: Services, images: int, boards: int, rng: random.Random) -> l
                 is_admin=False,
             )
     for i in range(CLIENT_STATE_KEYS):
-        services.client_state.set_by_key("system", f"canvas_snapshot:{i}", json.dumps({"imageName": names[i]}))
+        services.client_state.set_by_key(
+            "system", f"canvas_snapshot:{i}", json.dumps({"imageName": names[i % len(names)]})
+        )
     # Each project claims one of the oldest boards, so the boards stay as many as asked for and the newest one,
     # whose board operations are timed, belongs to no project.
     for i in range(min(PROJECTS, boards - 1)):
@@ -199,6 +222,16 @@ def _seed(services: Services, images: int, boards: int, rng: random.Random) -> l
         tags = ", ".join(rng.sample(WORKFLOW_TAGS, rng.randint(1, 3)))
         workflow = template.model_copy(update={"name": f"Workflow {i}", "tags": tags})
         services.workflow_records.create(workflow, user_id="system", is_public=i % 10 == 0)
+    for i in range(STYLE_PRESETS):
+        data = PresetData(positive_prompt=f"style {i}, {{prompt}}, highly detailed", negative_prompt="blurry, lowres")
+        preset = StylePresetWithoutId(name=f"Preset {i}", preset_data=data, type=PresetType.User, is_public=i % 5 == 0)
+        services.style_preset_records.create(preset, user_id="user-0" if i % 2 else "user-1")
+    for i in range(SYSTEM_PROMPTS):
+        prompt = SystemPromptWithoutId(name=f"Prompt {i}", content="Expand the prompt. " * 20)
+        services.system_prompt_records.create(prompt, user_id="user-0", is_public=i % 4 == 0)
+    values = [f"value {i}" for i in range(20)]
+    for i in range(WILDCARDS):
+        services.wildcard_records.create(WildcardWithoutId(name=f"set{i}", values=values), user_id="user-0")
     return names
 
 
@@ -209,6 +242,9 @@ def _operations(
     from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
     from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
     from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+    from invokeai.app.services.style_preset_records.style_preset_records_common import StylePresetChanges
+    from invokeai.app.services.system_prompt_records.system_prompt_records_common import SystemPromptChanges
+    from invokeai.app.services.wildcard_records.wildcard_records_common import WildcardWithoutId
     from invokeai.app.services.workflow_records.workflow_records_common import (
         Workflow,
         WorkflowCategory,
@@ -259,6 +295,14 @@ def _operations(
             WorkflowRecordOrderBy.UpdatedAt, SQLiteDirection.Descending, library, page=0, per_page=50
         )
         return [services.workflow_records.get(item.workflow_id) for item in page.items]
+
+    own_presets = [
+        preset.id for preset in services.style_preset_records.get_many(user_id="user-0") if preset.user_id == "user-0"
+    ]
+    own_prompts = [
+        prompt.id for prompt in services.system_prompt_records.get_many(user_id="user-0") if prompt.user_id == "user-0"
+    ]
+    wildcard_values = [f"value {i}" for i in range(20)]
 
     general = [ImageCategory.GENERAL]
 
@@ -337,6 +381,36 @@ def _operations(
         "workflows.counts_by_tag(5)": (
             lambda: services.workflow_records.counts_by_tag(WORKFLOW_TAGS[:5], library, user_id="system"),
             50,
+        ),
+        # A prompt-template node reads its preset, a text-LLM node its system prompt, and every prompt expansion
+        # reads the account's wildcards.
+        "style_presets.get (prompt template)": (
+            lambda: services.style_preset_records.get(own_presets[0]),
+            1000,
+        ),
+        "style_presets.get_many (account)": (
+            lambda: services.style_preset_records.get_many(user_id="user-0"),
+            200,
+        ),
+        "style_presets.update": (
+            lambda: services.style_preset_records.update(
+                own_presets[1], StylePresetChanges(name=f"Preset {next(saves)}", type=None)
+            ),
+            200,
+        ),
+        "system_prompts.get (text LLM)": (lambda: services.system_prompt_records.get(own_prompts[0]), 1000),
+        "system_prompts.update": (
+            lambda: services.system_prompt_records.update(
+                own_prompts[1], SystemPromptChanges(content=f"Expand {next(saves)}"), user_id="user-0"
+            ),
+            200,
+        ),
+        "wildcards.get_many (dynamic prompts)": (lambda: services.wildcard_records.get_many("user-0"), 500),
+        "wildcards.create": (
+            lambda: services.wildcard_records.create(
+                WildcardWithoutId(name=f"new{uuid.uuid4().hex}", values=wildcard_values), user_id="user-0"
+            ),
+            200,
         ),
     }
 

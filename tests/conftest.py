@@ -32,12 +32,12 @@ from invokeai.app.services.invocation_stats.invocation_stats_default import Invo
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import (
-    SqliteSystemPromptRecordsStorage,
+from invokeai.app.services.system_prompt_records.system_prompt_records_default import (
+    SystemPromptRecordsStorage,
 )
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
-from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
+from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
@@ -123,14 +123,14 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
         style_preset_image_files=None,  # type: ignore
-        system_prompt_records=SqliteSystemPromptRecordsStorage(db=db),
+        system_prompt_records=SystemPromptRecordsStorage(db.database),
         workflow_thumbnails=None,  # type: ignore
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistence(db.database),
         project_records=ProjectRecordsStorage(db.database),
         users=UserService(db.database),
-        wildcard_records=SqliteWildcardRecordsStorage(db=db),
+        wildcard_records=WildcardRecordsStorage(db.database),
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
         video_records=SqliteVideoRecordStorage(db=db),

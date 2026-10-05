@@ -27,7 +27,7 @@ from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
-from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
+from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 from tests.test_nodes import TestEventService
 
@@ -82,7 +82,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         client_state_persistence=ClientStatePersistence(db.database),
         project_records=ProjectRecordsStorage(db.database),
         users=UserService(db.database),
-        wildcard_records=SqliteWildcardRecordsStorage(db=db),
+        wildcard_records=WildcardRecordsStorage(db.database),
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
         video_records=SqliteVideoRecordStorage(db=db),

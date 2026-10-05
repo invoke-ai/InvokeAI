@@ -56,14 +56,14 @@ from invokeai.app.services.session_processor.session_processor_default import (
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.services.style_preset_images.style_preset_images_disk import StylePresetImageFileStorageDisk
-from invokeai.app.services.style_preset_records.style_preset_records_sqlite import SqliteStylePresetRecordsStorage
-from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import SqliteSystemPromptRecordsStorage
+from invokeai.app.services.style_preset_records.style_preset_records_default import StylePresetRecordsStorage
+from invokeai.app.services.system_prompt_records.system_prompt_records_default import SystemPromptRecordsStorage
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
 from invokeai.app.services.videos.videos_default import VideoService
-from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
+from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.architectures import conditioning_safe_globals
@@ -198,10 +198,10 @@ class ApiDependencies:
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
         workflow_records = WorkflowRecordsStorage(db.database)
-        style_preset_records = SqliteStylePresetRecordsStorage(db=db)
-        wildcard_records = SqliteWildcardRecordsStorage(db=db)
+        style_preset_records = StylePresetRecordsStorage(db.database)
+        wildcard_records = WildcardRecordsStorage(db.database)
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
-        system_prompt_records = SqliteSystemPromptRecordsStorage(db=db)
+        system_prompt_records = SystemPromptRecordsStorage(db.database)
         workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
         client_state_persistence = ClientStatePersistence(db.database)
         project_records = ProjectRecordsStorage(db.database)

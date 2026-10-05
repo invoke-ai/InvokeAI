@@ -182,8 +182,9 @@ jobs:
               - 'uv.lock'
               - '.github/workflows/python-tests.yml'
               - 'invokeai/**/*.py'
-              # The workflow library's tests store the bundled workflows.
+              # The library's tests store the bundled workflows and style presets.
               - 'invokeai/app/services/workflow_records/default_workflows/**'
+              - 'invokeai/app/services/style_preset_records/default_style_presets.json'
               - 'tests/**'
 
   # The database layer against MySQL and MariaDB, at the oldest release of each that InvokeAI supports.

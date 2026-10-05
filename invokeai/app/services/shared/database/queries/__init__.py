@@ -31,7 +31,10 @@ from invokeai.app.services.shared.database.queries.client_state import ClientSta
 from invokeai.app.services.shared.database.queries.locks import LockQueries
 from invokeai.app.services.shared.database.queries.media_references import MediaReferenceQueries
 from invokeai.app.services.shared.database.queries.projects import ProjectQueries
+from invokeai.app.services.shared.database.queries.style_presets import StylePresetQueries
+from invokeai.app.services.shared.database.queries.system_prompts import SystemPromptQueries
 from invokeai.app.services.shared.database.queries.users import UserQueries
+from invokeai.app.services.shared.database.queries.wildcards import WildcardQueries
 from invokeai.app.services.shared.database.queries.workflows import WorkflowQueries
 
 if TYPE_CHECKING:
@@ -85,8 +88,20 @@ class Queries:
         return ProjectQueries(self._scope)
 
     @cached_property
+    def style_presets(self) -> StylePresetQueries:
+        return StylePresetQueries(self._scope)
+
+    @cached_property
+    def system_prompts(self) -> SystemPromptQueries:
+        return SystemPromptQueries(self._scope)
+
+    @cached_property
     def users(self) -> UserQueries:
         return UserQueries(self._scope)
+
+    @cached_property
+    def wildcards(self) -> WildcardQueries:
+        return WildcardQueries(self._scope)
 
     @cached_property
     def workflows(self) -> WorkflowQueries:
