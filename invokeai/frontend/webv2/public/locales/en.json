@@ -2471,26 +2471,24 @@
       "seedSummary": "{{mode}} · {{seed}}",
       "renamePresetNamed": "Rename preset {{name}}",
       "renamePresetTitle": "Rename preset",
+      "renderSize": {
+        "description": "Scale before processing: generate at this size, then resize the result to fit the frame.",
+        "height": "Render height",
+        "label": "Render at",
+        "methods": {
+          "auto": "Optimal for model",
+          "manual": "Custom",
+          "none": "Frame size"
+        },
+        "width": "Render width"
+      },
       "resetToModelDefault": "Reset to model default",
       "resetToConceptDefault": "Reset to concept default",
       "resetToDefault": "Reset to default",
       "retry": "Retry",
       "savePresetAction": "Save",
       "savePresetTitle": "Save preset",
-      "scaleBeforeProcessing": "Scale before processing",
       "selectSupportedModelFirst": "Select a supported Generate model first.",
-      "scalingOptions": {
-        "height": "Height",
-        "method": "Scale method",
-        "methods": {
-          "auto": "Auto",
-          "manual": "Manual",
-          "none": "Off"
-        },
-        "processingAtFrame": "Generates at the generation size; nothing to resize.",
-        "processingSize": "Generates at {{width}}x{{height}}, then resizes back to the generation size.",
-        "width": "Width"
-      },
       "searchPresets": "Search presets",
       "secondsPerRun": "~{{value}}s/run",
       "sizePreviewHandle": "Drag to resize the generation size",

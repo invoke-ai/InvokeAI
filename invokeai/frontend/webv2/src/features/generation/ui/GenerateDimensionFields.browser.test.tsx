@@ -17,6 +17,7 @@ vi.mock('./GenerationUiContext', () => ({
   useGenerationQueueInsights: (select: (insights: unknown) => unknown) =>
     select({ secondsPerRun: null, seedHistory: [] }),
   useGenerationUi: () => ({
+    project: { invocationSourceId: 'generate' },
     sectionPreferences: { sectionsOpen: { dimensions: true }, setSectionOpen: vi.fn() },
   }),
 }));

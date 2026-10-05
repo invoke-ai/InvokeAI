@@ -64,10 +64,9 @@ When the Canvas is the source of a generation, InvokeAI looks at what is inside 
 
 In the Edit layout, **Invoke** uses the Canvas as its source and sends the results back to the Canvas. The routing control next to Invoke shows this. Editing the canvas switches the route back to the Canvas automatically, unless the routing is locked. See [Routing images to the Gallery or the Canvas](/users-guide/image-generation/introduction/#routing-images-to-the-gallery-or-the-canvas).
 
-When the source is the Canvas, the Generate panel adds three sections at the bottom:
+When the source is the Canvas, the **Size** section's width and height are the frame's, and **Render at** at the bottom of the section chooses the size the model generates at before the result is scaled back to the frame (legacy versions called this *Scale before processing*): the frame's own size, the model's optimal size, or a custom size. The Generate panel also adds two sections at the bottom:
 
 * **Denoising strength** — how much image-to-image, inpainting and outpainting may change the existing content. The default is 75%.
-* **Scale before processing** — generate at a different size, for example the model's optimal size, and scale the result back to the frame.
 * **Compositing** — how inpainted and outpainted areas are filled and blended: **Infill method**, **Coherence pass mode**, **Coherence edge size**, **Coherence min denoise** and **Mask blur**.
 
 Results do not go straight onto the canvas. They appear in the **staging area**, a bar at the bottom of the canvas where you can step through the candidates, then **Accept to Layer** the one you want (it becomes a new raster layer), **Save to gallery**, or **Discard**. While results are staged, the canvas tools are locked except for **View**.

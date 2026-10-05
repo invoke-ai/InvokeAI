@@ -50,9 +50,26 @@ export interface GeneratePresetRecord {
   values: Record<string, unknown>;
 }
 
+/** What the canvas tells the Size section about the size the model generates at. */
+export interface CanvasRenderSize {
+  /** The render-size controls, laid out in the Size section's footer. */
+  controls: ReactNode;
+  /** The result is generated at this size, then resized to the frame; null until a model is selected. */
+  size: { height: number; width: number } | null;
+}
+
+export interface CanvasRenderSizeProps {
+  /** Lays out the Size section around the canvas's render size. */
+  children: (renderSize: CanvasRenderSize) => ReactNode;
+  /** The frame as the Size section shows it, including a resize that has not been committed yet. */
+  frame: { height: number; width: number };
+}
+
 /** This port keeps Generation independent of Workbench. */
 export interface GenerationUiAdapter {
   CanvasGenerationSections: ComponentType;
+  /** Wraps the Size section in canvas mode, where the frame and the render size can differ. */
+  CanvasRenderSize: ComponentType<CanvasRenderSizeProps>;
   account: {
     currentUserId: string | null;
     multiuserEnabled: boolean;

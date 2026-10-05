@@ -42,10 +42,12 @@ import { lazy, useCallback, useMemo } from 'react';
 export const getGenerationSelectedGalleryImage = getSelectedGalleryImageFromValues;
 
 const ModelSelect = lazy(() => import('@features/models/react').then((module) => ({ default: module.ModelSelect })));
+const loadCanvasGenerateSlots = () => import('@workbench/widgets/canvas/GenerateCanvasSections');
 const GenerateCanvasSections = lazy(() =>
-  import('@workbench/widgets/canvas/GenerateCanvasSections').then((module) => ({
-    default: module.GenerateCanvasSections,
-  }))
+  loadCanvasGenerateSlots().then((module) => ({ default: module.GenerateCanvasSections }))
+);
+const GenerateCanvasRenderSize = lazy(() =>
+  loadCanvasGenerateSlots().then((module) => ({ default: module.GenerateCanvasRenderSize }))
 );
 
 const RECENT_RUN_WINDOW = 10;
@@ -372,6 +374,7 @@ export const GenerationUiAdapterProvider = ({ children }: { children: ReactNode 
   const adapter = useMemo<GenerationUiAdapter>(
     () => ({
       CanvasGenerationSections: GenerateCanvasSections,
+      CanvasRenderSize: GenerateCanvasRenderSize,
       account: accountGroup,
       capabilities: capabilitiesGroup,
       gallery: galleryGroup,
