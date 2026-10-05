@@ -77,19 +77,19 @@ such cases is as follows.
      the assigned reviewer should send a comment to the author asking
      if they are still working on the PR.
 
-     If no response is received after two weeks of inactivity, the assigned
-     reviewer moves to the next step.
+     If the PR has seen no activity from the author two weeks after it
+     stalled, the assigned reviewer moves to the next step.
 
   2. The assigned reviewer determines whether the PR is salvageable.
 
      The assigned reviewer makes a judgement call whether the PR is worth pursuing and that the
      effort justifies the returns. They may:
      - Elect to take ownership of the PR and shepherd it into the merge.
-     - Abandon the PR.
+     - Decline to adopt it (see step 5).
 
   3. In the event the assigned reviewer elects to take ownership, they must:
-     - Confirm that the PR is marked pushable by maintainers.
-     - Assign a secondary reviewer to review their work.
+     - Confirm that "Allow edits by maintainers" is enabled on the PR.
+     - Ask a maintainer to assign a secondary reviewer to review their work.
 
   4. The assigned reviewer pushes fixes to the PR branch, and the secondary reviewer
      reviews and ultimately approves the PR, as per usual practice.
