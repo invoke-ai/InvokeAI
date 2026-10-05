@@ -9,9 +9,9 @@ import sqlite3
 
 import pytest
 
-from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardVisibility
-from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import (
     ImageCategory,
@@ -34,15 +34,15 @@ def store() -> SqliteImageRecordStorage:
 
 
 @pytest.fixture
-def stores() -> tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage]:
+def stores() -> tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage]:
     """Image, board, and board-image storages sharing one in-memory database."""
     config = InvokeAIAppConfig(use_memory_db=True)
     logger = InvokeAILogger.get_logger(config=config)
     db = create_mock_sqlite_database(config, logger)
     return (
         SqliteImageRecordStorage(db=db),
-        SqliteBoardRecordStorage(db=db),
-        SqliteBoardImageRecordStorage(db=db),
+        BoardRecordStorage(db.database),
+        BoardImageRecordStorage(db.database),
     )
 
 
@@ -303,7 +303,7 @@ class TestOwnershipFilteringOmittedBoard:
 
     def _seed_two_users(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> str:
         """user1: one image on a private board + one uncategorized. user2: one uncategorized."""
         image_store, board_store, board_image_store = stores
@@ -316,7 +316,7 @@ class TestOwnershipFilteringOmittedBoard:
 
     def test_get_many_omitted_board_filters_by_owner(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         self._seed_two_users(stores)
         image_store = stores[0]
@@ -328,7 +328,7 @@ class TestOwnershipFilteringOmittedBoard:
 
     def test_get_many_omitted_board_owner_sees_boarded_and_uncategorized(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         self._seed_two_users(stores)
         image_store = stores[0]
@@ -340,7 +340,7 @@ class TestOwnershipFilteringOmittedBoard:
 
     def test_get_many_omitted_board_admin_sees_all(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         self._seed_two_users(stores)
         image_store = stores[0]
@@ -352,7 +352,7 @@ class TestOwnershipFilteringOmittedBoard:
 
     def test_get_many_omitted_board_single_user_mode_sees_all(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         """user_id=None (single-user mode) applies no ownership filter."""
         self._seed_two_users(stores)
@@ -364,7 +364,7 @@ class TestOwnershipFilteringOmittedBoard:
 
     def test_get_many_none_board_still_filters_by_owner(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         """board_id="none" (uncategorized) keeps its existing per-user isolation."""
         self._seed_two_users(stores)
@@ -376,7 +376,7 @@ class TestOwnershipFilteringOmittedBoard:
 
     def test_get_many_explicit_board_returns_board_contents(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         """An explicit board_id lists that board's images; read access is the router's job."""
         board_id = self._seed_two_users(stores)
@@ -388,7 +388,7 @@ class TestOwnershipFilteringOmittedBoard:
 
     def test_get_image_names_omitted_board_filters_by_owner(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         self._seed_two_users(stores)
         image_store = stores[0]
@@ -400,7 +400,7 @@ class TestOwnershipFilteringOmittedBoard:
 
     def test_get_image_names_omitted_board_admin_sees_all(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         self._seed_two_users(stores)
         image_store = stores[0]
@@ -412,7 +412,7 @@ class TestOwnershipFilteringOmittedBoard:
 
     def test_get_image_names_omitted_board_single_user_mode_sees_all(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         self._seed_two_users(stores)
         image_store = stores[0]
@@ -423,7 +423,7 @@ class TestOwnershipFilteringOmittedBoard:
 
     def test_get_image_names_none_board_still_filters_by_owner(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         self._seed_two_users(stores)
         image_store = stores[0]
@@ -436,7 +436,7 @@ class TestOwnershipFilteringOmittedBoard:
 class TestAllReadableBoardsFiltering:
     def _seed_visibility_matrix(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         image_store, board_store, board_image_store = stores
 
@@ -507,7 +507,7 @@ class TestAllReadableBoardsFiltering:
     )
     def test_all_scope_authorization_and_counts_are_consistent(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
         user_id: str,
         is_admin: bool,
         expected: set[str],
@@ -530,7 +530,7 @@ class TestAllReadableBoardsFiltering:
 
     def test_all_scope_combines_with_inclusive_date_filters(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         self._seed_visibility_matrix(stores)
         image_store = stores[0]
@@ -559,7 +559,7 @@ class TestAllReadableBoardsFiltering:
     @pytest.mark.parametrize(("user_id", "is_admin"), [("user1", False), ("admin", True)])
     def test_all_scope_excludes_dangling_board_associations(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
         user_id: str,
         is_admin: bool,
     ) -> None:
@@ -659,7 +659,7 @@ class TestCreatedAtRangeFiltering:
 
     def test_range_combines_with_board_filter(
         self,
-        stores: tuple[SqliteImageRecordStorage, SqliteBoardRecordStorage, SqliteBoardImageRecordStorage],
+        stores: tuple[SqliteImageRecordStorage, BoardRecordStorage, BoardImageRecordStorage],
     ) -> None:
         image_store, board_store, board_image_store = stores
         self._seed_dated(image_store)

@@ -15,13 +15,14 @@ from invokeai.app.services.events.events_common import QueueItemsCanceledEvent
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from tests.test_nodes import PromptTestInvocation
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker) -> SqliteSessionQueue:
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
     """Create a SqliteSessionQueue backed by the mock invoker's in-memory database."""
-    db = mock_invoker.services.board_records._db
+    db = mock_sqlite_database
     queue = SqliteSessionQueue(db=db)
     queue.start(mock_invoker)
     return queue

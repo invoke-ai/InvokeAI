@@ -122,10 +122,3 @@ class BoardRecordProjectOwnedException(BoardRecordSaveException):
 
     def __init__(self, message="Board belongs to a project"):
         super().__init__(message)
-
-
-class BoardRecordDeleteException(Exception):
-    """Raised when an board record cannot be deleted."""
-
-    def __init__(self, message="Board record not deleted"):
-        super().__init__(message)

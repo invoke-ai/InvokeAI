@@ -24,23 +24,24 @@ from invokeai.app.services.shared.execution_state_migration import (
     load_execution_state,
 )
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from tests.test_nodes import TestEventService
 
 _EMPTY_SESSION_JSON = json.dumps(to_jsonable_python(GraphExecutionState(graph=Graph()).model_dump()))
 
 
 @pytest.fixture
-def session_queue_fifo(mock_invoker: Invoker) -> SqliteSessionQueue:
+def session_queue_fifo(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
     """Queue backed by a single-user (FIFO) invoker."""
     # Default config has multiuser=False, so FIFO is always used.
-    db = mock_invoker.services.board_records._db
+    db = mock_sqlite_database
     queue = SqliteSessionQueue(db=db)
     queue.start(mock_invoker)
     return queue
 
 
 @pytest.fixture
-def session_queue_round_robin(mock_invoker: Invoker) -> SqliteSessionQueue:
+def session_queue_round_robin(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
     """Queue backed by a multiuser invoker with round_robin mode."""
     mock_invoker.services.configuration = InvokeAIAppConfig(
         use_memory_db=True,
@@ -48,7 +49,7 @@ def session_queue_round_robin(mock_invoker: Invoker) -> SqliteSessionQueue:
         multiuser=True,
         session_queue_mode="round_robin",
     )
-    db = mock_invoker.services.board_records._db
+    db = mock_sqlite_database
     queue = SqliteSessionQueue(db=db)
     queue.start(mock_invoker)
     return queue
@@ -723,7 +724,7 @@ def test_round_robin_dequeue_does_not_scan_full_history(session_queue_round_robi
     assert item.user_id == "user_a"
 
 
-def test_round_robin_ignored_in_single_user_mode(mock_invoker: Invoker) -> None:
+def test_round_robin_ignored_in_single_user_mode(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> None:
     """When multiuser=False, round_robin config is ignored and FIFO is used."""
     mock_invoker.services.configuration = InvokeAIAppConfig(
         use_memory_db=True,
@@ -731,7 +732,7 @@ def test_round_robin_ignored_in_single_user_mode(mock_invoker: Invoker) -> None:
         multiuser=False,
         session_queue_mode="round_robin",
     )
-    db = mock_invoker.services.board_records._db
+    db = mock_sqlite_database
     queue = SqliteSessionQueue(db=db)
     queue.start(mock_invoker)
 
@@ -848,7 +849,7 @@ def test_affinity_applies_in_fifo_mode(session_queue_fifo: SqliteSessionQueue) -
     assert second is not None and second.item_id == cold_id
 
 
-def test_affinity_disabled_by_explicit_fifo_mode(mock_invoker: Invoker) -> None:
+def test_affinity_disabled_by_explicit_fifo_mode(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> None:
     """An admin who explicitly sets session_queue_mode=FIFO is promised strict insertion
     order, so affinity reordering must not apply."""
     mock_invoker.services.configuration = InvokeAIAppConfig(
@@ -856,7 +857,7 @@ def test_affinity_disabled_by_explicit_fifo_mode(mock_invoker: Invoker) -> None:
         node_cache_size=0,
         session_queue_mode="FIFO",
     )
-    db = mock_invoker.services.board_records._db
+    db = mock_sqlite_database
     queue = SqliteSessionQueue(db=db)
     queue.start(mock_invoker)
     _install_fake_cache(mock_invoker, "cuda:0", {_WARM_MODEL_KEY})

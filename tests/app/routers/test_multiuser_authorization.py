@@ -24,10 +24,9 @@ from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem, SessionQueueItemSummary
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
-from invokeai.backend.util.logging import InvokeAILogger
-from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
 
 class MockApiDependencies(ApiDependencies):
@@ -74,10 +73,10 @@ def _mock_urls() -> MagicMock:
 
 
 @pytest.fixture
-def mock_services() -> InvocationServices:
-    from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
-    from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
-    from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
+def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
+    from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
+    from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+    from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
     from invokeai.app.services.boards.boards_default import BoardService
     from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
     from invokeai.app.services.client_state_persistence.client_state_persistence_default import (
@@ -96,13 +95,12 @@ def mock_services() -> InvocationServices:
     from tests.test_nodes import TestEventService
 
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
-    logger = InvokeAILogger.get_logger()
-    db = create_mock_sqlite_database(configuration, logger)
+    db = mock_sqlite_database
 
     return InvocationServices(
-        board_image_records=SqliteBoardImageRecordStorage(db=db),
+        board_image_records=BoardImageRecordStorage(db.database),
         board_images=None,  # type: ignore
-        board_records=SqliteBoardRecordStorage(db=db),
+        board_records=BoardRecordStorage(db.database),
         boards=BoardService(),
         bulk_download=BulkDownloadService(),
         configuration=configuration,
@@ -142,7 +140,7 @@ def mock_services() -> InvocationServices:
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
         video_records=SqliteVideoRecordStorage(db=db),
-        board_video_records=SqliteBoardVideoRecordStorage(db=db),
+        board_video_records=BoardVideoRecordStorage(db.database),
         gallery=None,  # type: ignore
         image_index_records=None,  # type: ignore
         image_index=None,  # type: ignore
@@ -248,10 +246,9 @@ def _share_board(client: TestClient, token: str, board_id: str) -> None:
     assert r.status_code == status.HTTP_201_CREATED
 
 
-def _share_board_with_user(mock_invoker: Invoker, board_id: str, user_id: str) -> None:
+def _share_board_with_user(db: SqliteDatabase, board_id: str, user_id: str) -> None:
     """Insert an explicit per-user share row directly into the shared_boards table."""
-    board_records: Any = mock_invoker.services.board_records
-    with board_records._db.transaction() as cursor:
+    with db.transaction() as cursor:
         cursor.execute(
             "INSERT OR IGNORE INTO shared_boards (board_id, user_id) VALUES (?, ?)",
             (board_id, user_id),
@@ -1131,7 +1128,12 @@ class TestImageReadAuth:
         assert r.status_code != status.HTTP_403_FORBIDDEN
 
     def test_explicit_share_grants_image_read_to_member(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        mock_sqlite_database: SqliteDatabase,
+        user1_token: str,
+        user2_token: str,
     ):
         """An image on a private board explicitly shared with user2 should be readable
         by user2 — matching the visibility the board_id="all" listing already grants."""
@@ -1145,7 +1147,7 @@ class TestImageReadAuth:
         r = client.get("/api/v1/images/i/explicit-share-img", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
-        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+        _share_board_with_user(mock_sqlite_database, board_id, user2.user_id)
 
         r = client.get("/api/v1/images/i/explicit-share-img", headers=_auth(user2_token))
         assert r.status_code != status.HTTP_403_FORBIDDEN
@@ -1208,14 +1210,19 @@ class TestImageReadAuth:
         assert r.status_code == status.HTTP_200_OK
 
     def test_list_images_explicitly_shared_private_board_allowed_for_member(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        mock_sqlite_database: SqliteDatabase,
+        user1_token: str,
+        user2_token: str,
     ):
         """User2 should be able to list a private board explicitly shared with them,
         on both the DTO and names endpoints."""
         user2 = mock_invoker.services.users.get_by_email("user2@test.com")
         assert user2 is not None
         board_id = _create_board(client, user1_token, "Explicit Share Enum Board")
-        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+        _share_board_with_user(mock_sqlite_database, board_id, user2.user_id)
 
         r = client.get(f"/api/v1/images/?board_id={board_id}", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_200_OK
@@ -1224,7 +1231,12 @@ class TestImageReadAuth:
         assert r.status_code == status.HTTP_200_OK
 
     def test_explicitly_shared_private_board_dto_and_image_names_allowed_for_member(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        mock_sqlite_database: SqliteDatabase,
+        user1_token: str,
+        user2_token: str,
     ):
         """User2 should be able to fetch the board DTO and board image_names of a private
         board explicitly shared with them; a non-member (user1's other boards aside) stays 403."""
@@ -1237,7 +1249,7 @@ class TestImageReadAuth:
         r = client.get(f"/api/v1/boards/{board_id}/image_names", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
-        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+        _share_board_with_user(mock_sqlite_database, board_id, user2.user_id)
 
         r = client.get(f"/api/v1/boards/{board_id}", headers=_auth(user2_token))
         assert r.status_code == status.HTTP_200_OK
@@ -2157,7 +2169,12 @@ class TestRecallImageAccess:
         assert r.status_code != status.HTTP_403_FORBIDDEN
 
     def test_recall_explicitly_shared_board_image_allowed_for_member(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str, user2_token: str
+        self,
+        client: TestClient,
+        mock_invoker: Invoker,
+        mock_sqlite_database: SqliteDatabase,
+        user1_token: str,
+        user2_token: str,
     ):
         """User2 should be able to reference an image on a private board explicitly shared with them."""
         user1 = mock_invoker.services.users.get_by_email("user1@test.com")
@@ -2176,7 +2193,7 @@ class TestRecallImageAccess:
         )
         assert r.status_code == status.HTTP_403_FORBIDDEN
 
-        _share_board_with_user(mock_invoker, board_id, user2.user_id)
+        _share_board_with_user(mock_sqlite_database, board_id, user2.user_id)
 
         r = client.post(
             "/api/v1/recall/default",
@@ -2369,7 +2386,7 @@ class TestQueueStatusScoping:
         assert scoped.pending == 5  # global, unchanged
         assert scoped.user_pending == 2  # this user's share
 
-    def _setup_queue_router(self, mock_invoker: Invoker):
+    def _setup_queue_router(self, mock_invoker: Invoker, db: SqliteDatabase):
         """Wire a real session queue and a stub processor into the invoker the router uses,
         so GET /queue/{queue_id}/status exercises the real service contract."""
         from unittest.mock import MagicMock
@@ -2377,7 +2394,6 @@ class TestQueueStatusScoping:
         from invokeai.app.services.session_processor.session_processor_common import SessionProcessorStatus
         from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 
-        db = mock_invoker.services.board_records._db
         queue = SqliteSessionQueue(db=db)
         queue.start(mock_invoker)
         mock_invoker.services.session_queue = queue
@@ -2388,13 +2404,18 @@ class TestQueueStatusScoping:
         return queue
 
     def test_get_queue_status_route_returns_global_and_user_counts(
-        self, setup_jwt_secret: None, enable_multiuser: Any, mock_invoker: Invoker, client: TestClient
+        self,
+        setup_jwt_secret: None,
+        enable_multiuser: Any,
+        mock_invoker: Invoker,
+        mock_sqlite_database: SqliteDatabase,
+        client: TestClient,
     ):
         """Regression test: GET /api/v1/queue/{queue_id}/status must return 200 (not 500) and the
         expected global and per-user counts for both non-admin and admin callers. Previously the
         router called get_queue_status() with a keyword the service did not accept, raising a
         TypeError that the broad except turned into a 500 for every status request."""
-        queue = self._setup_queue_router(mock_invoker)
+        queue = self._setup_queue_router(mock_invoker, mock_sqlite_database)
 
         user1_id = _create_user(mock_invoker, "user1@test.com", "User One")
         user2_id = _create_user(mock_invoker, "user2@test.com", "User Two")

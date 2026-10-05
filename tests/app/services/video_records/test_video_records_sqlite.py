@@ -12,7 +12,7 @@ import sqlite3
 
 import pytest
 
-from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
@@ -155,7 +155,7 @@ class TestDeterministicOrdering:
         assert descending == list(reversed(ascending))
 
     def test_board_cover_uses_name_as_same_timestamp_tie_breaker(self, store: SqliteVideoRecordStorage) -> None:
-        board = SqliteBoardRecordStorage(store._db).save("Board", "system")
+        board = BoardRecordStorage(store._db.database).save("Board", "system")
         _save(store, "a.mp4", user_id="system")
         _save(store, "b.mp4", user_id="system")
         self._set_same_timestamp(store)

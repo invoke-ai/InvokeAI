@@ -5,10 +5,10 @@ import sqlite3
 import numpy as np
 import pytest
 
-from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_records.board_records_common import BoardChanges, BoardVisibility
-from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
-from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
+from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_index.image_index_common import (
     IndexedItem,
@@ -48,13 +48,13 @@ def image_records(db: SqliteDatabase) -> SqliteImageRecordStorage:
 
 
 @pytest.fixture
-def board_records(db: SqliteDatabase) -> SqliteBoardRecordStorage:
-    return SqliteBoardRecordStorage(db=db)
+def board_records(db: SqliteDatabase) -> BoardRecordStorage:
+    return BoardRecordStorage(db.database)
 
 
 @pytest.fixture
-def board_image_records(db: SqliteDatabase) -> SqliteBoardImageRecordStorage:
-    return SqliteBoardImageRecordStorage(db=db)
+def board_image_records(db: SqliteDatabase) -> BoardImageRecordStorage:
+    return BoardImageRecordStorage(db.database)
 
 
 @pytest.fixture
@@ -63,8 +63,8 @@ def video_records(db: SqliteDatabase) -> SqliteVideoRecordStorage:
 
 
 @pytest.fixture
-def board_video_records(db: SqliteDatabase) -> SqliteBoardVideoRecordStorage:
-    return SqliteBoardVideoRecordStorage(db=db)
+def board_video_records(db: SqliteDatabase) -> BoardVideoRecordStorage:
+    return BoardVideoRecordStorage(db.database)
 
 
 @pytest.fixture
@@ -481,8 +481,8 @@ def test_count_index_status(image_records: SqliteImageRecordStorage, index_recor
 
 def test_accessible_images_scoping(
     image_records: SqliteImageRecordStorage,
-    board_records: SqliteBoardRecordStorage,
-    board_image_records: SqliteBoardImageRecordStorage,
+    board_records: BoardRecordStorage,
+    board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     other_user_id: str,
 ) -> None:
@@ -531,8 +531,8 @@ def test_accessible_images_scoping(
 def test_accessible_images_includes_individually_shared_boards(
     db: SqliteDatabase,
     image_records: SqliteImageRecordStorage,
-    board_records: SqliteBoardRecordStorage,
-    board_image_records: SqliteBoardImageRecordStorage,
+    board_records: BoardRecordStorage,
+    board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     other_user_id: str,
 ) -> None:
@@ -560,8 +560,8 @@ def test_accessible_images_includes_individually_shared_boards(
 
 def test_accessible_images_includes_boards_owned_by_user(
     image_records: SqliteImageRecordStorage,
-    board_records: SqliteBoardRecordStorage,
-    board_image_records: SqliteBoardImageRecordStorage,
+    board_records: BoardRecordStorage,
+    board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     other_user_id: str,
 ) -> None:
@@ -582,8 +582,8 @@ def test_accessible_images_includes_boards_owned_by_user(
 
 def test_accessible_images_excludes_archived_boards(
     image_records: SqliteImageRecordStorage,
-    board_records: SqliteBoardRecordStorage,
-    board_image_records: SqliteBoardImageRecordStorage,
+    board_records: BoardRecordStorage,
+    board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     other_user_id: str,
 ) -> None:
@@ -613,8 +613,8 @@ def test_accessible_images_excludes_archived_boards(
 
 def test_accessible_images_returns_boarded_images_once(
     image_records: SqliteImageRecordStorage,
-    board_records: SqliteBoardRecordStorage,
-    board_image_records: SqliteBoardImageRecordStorage,
+    board_records: BoardRecordStorage,
+    board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
     # `board_images` has PRIMARY KEY (image_name), so an image is on at most one board and the
@@ -631,8 +631,8 @@ def test_accessible_images_returns_boarded_images_once(
 
 def test_accessible_images_are_filtered_by_model_id(
     image_records: SqliteImageRecordStorage,
-    board_records: SqliteBoardRecordStorage,
-    board_image_records: SqliteBoardImageRecordStorage,
+    board_records: BoardRecordStorage,
+    board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     other_user_id: str,
 ) -> None:
@@ -658,8 +658,8 @@ def test_accessible_images_are_filtered_by_model_id(
 
 def test_accessible_images_exclude_individually_shared_archived_board(
     image_records: SqliteImageRecordStorage,
-    board_records: SqliteBoardRecordStorage,
-    board_image_records: SqliteBoardImageRecordStorage,
+    board_records: BoardRecordStorage,
+    board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     db: SqliteDatabase,
     other_user_id: str,
@@ -864,8 +864,8 @@ def test_embedding_a_missing_video_is_a_noop(index_records: ImageIndexRecordsSql
 
 def test_video_access_scoping_follows_board_membership(
     video_records: SqliteVideoRecordStorage,
-    board_records: SqliteBoardRecordStorage,
-    board_video_records: SqliteBoardVideoRecordStorage,
+    board_records: BoardRecordStorage,
+    board_video_records: BoardVideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     other_user_id: str,
 ) -> None:
@@ -890,8 +890,8 @@ def test_video_access_scoping_follows_board_membership(
 
 def test_videos_on_archived_boards_are_hidden_from_every_scope(
     video_records: SqliteVideoRecordStorage,
-    board_records: SqliteBoardRecordStorage,
-    board_video_records: SqliteBoardVideoRecordStorage,
+    board_records: BoardRecordStorage,
+    board_video_records: BoardVideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
     _save_video(video_records, "archived.mp4")

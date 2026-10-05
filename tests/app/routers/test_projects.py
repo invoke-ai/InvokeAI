@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.project_records import project_records_sqlite
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from tests.app.routers.conftest import _auth, _create_board
 
 
@@ -266,9 +267,11 @@ def test_deleting_a_project_deletes_its_board(client: TestClient, user1_token: s
     assert board.status_code == status.HTTP_404_NOT_FOUND
 
 
-def test_deleting_a_project_leaves_its_media_uncategorized(client: TestClient, mock_invoker: Invoker, user1_token: str):
+def test_deleting_a_project_leaves_its_media_uncategorized(
+    client: TestClient, mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase, user1_token: str
+):
     created = _create_project(client, user1_token).json()
-    with mock_invoker.services.board_records._db.transaction() as cursor:
+    with mock_sqlite_database.transaction() as cursor:
         cursor.execute(
             "INSERT INTO images (image_name, image_origin, image_category, width, height)"
             " VALUES ('kept.png', 'internal', 'general', 64, 64);"
@@ -279,7 +282,7 @@ def test_deleting_a_project_leaves_its_media_uncategorized(client: TestClient, m
 
     client.delete(f"/api/v1/projects/{created['project_id']}", headers=_auth(user1_token))
 
-    with mock_invoker.services.board_records._db.transaction() as cursor:
+    with mock_sqlite_database.transaction() as cursor:
         cursor.execute("SELECT COUNT(*) FROM images WHERE image_name = 'kept.png';")
         assert cursor.fetchone()[0] == 1
         cursor.execute("SELECT COUNT(*) FROM board_images WHERE image_name = 'kept.png';")
@@ -287,10 +290,10 @@ def test_deleting_a_project_leaves_its_media_uncategorized(client: TestClient, m
 
 
 def test_the_board_snapshot_lists_the_projects_visible_media(
-    client: TestClient, mock_invoker: Invoker, user1_token: str
+    client: TestClient, mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase, user1_token: str
 ):
     created = _create_project(client, user1_token).json()
-    with mock_invoker.services.board_records._db.transaction() as cursor:
+    with mock_sqlite_database.transaction() as cursor:
         for name, category, intermediate in (
             ("shown.png", "general", False),
             ("asset.png", "control", False),

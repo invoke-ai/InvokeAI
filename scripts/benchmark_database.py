@@ -54,10 +54,11 @@ class _StatementCounter(logging.Handler):
 
 class Services:
     def __init__(self, db: Any) -> None:
-        from invokeai.app.services.board_image_records.board_image_records_sqlite import (
-            SqliteBoardImageRecordStorage,
+        from invokeai.app.services.board_image_records.board_image_records_default import (
+            BoardImageRecordStorage,
         )
-        from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
+        from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+        from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
         from invokeai.app.services.client_state_persistence.client_state_persistence_default import (
             ClientStatePersistence,
         )
@@ -67,8 +68,9 @@ class Services:
 
         self.database = db.database
         self.image_records = SqliteImageRecordStorage(db=db)
-        self.board_records = SqliteBoardRecordStorage(db=db)
-        self.board_image_records = SqliteBoardImageRecordStorage(db=db)
+        self.board_records = BoardRecordStorage(db.database)
+        self.board_image_records = BoardImageRecordStorage(db.database)
+        self.board_video_records = BoardVideoRecordStorage(db.database)
         self.gallery = SqliteGalleryService(db=db)
         self.users = UserService(db.database)
         self.client_state = ClientStatePersistence(db.database)
@@ -146,6 +148,18 @@ def _operations(
     from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 
     sample = iter(rng.choices(names, k=100_000))
+    a_board = services.board_records.get_all(
+        user_id="system", is_admin=True, order_by=BoardRecordOrderBy.CreatedAt, direction=SQLiteDirection.Descending
+    )[0].board_id
+
+    def board_dto_queries() -> object:
+        # The queries of `BoardService.get_dto`: the board with the project claiming it, and its counts.
+        return (
+            services.board_records.get_with_project_id(a_board),
+            services.board_image_records.get_counts_for_board(a_board),
+            services.board_video_records.get_counts_for_board(a_board),
+        )
+
     general = [ImageCategory.GENERAL]
 
     def save_image() -> object:
@@ -195,6 +209,7 @@ def _operations(
             ),
             50,
         ),
+        "boards.get_dto (record and counts)": (board_dto_queries, 500),
         "image_records.save": (save_image, 200),
         # Every authenticated request reads its account.
         "users.get": (lambda: services.users.get(f"user-{rng.randrange(ACCOUNTS)}"), 1000),

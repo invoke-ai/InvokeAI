@@ -4,7 +4,7 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import Boolean, Insert, String, Table, UniqueConstraint
+from sqlalchemy import Boolean, FromClause, Insert, Join, String, Table, UniqueConstraint
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.compiler import SQLCompiler
@@ -129,6 +129,32 @@ def _compile_case_insensitive_like_sqlite(element: CaseInsensitiveLike, compiler
 def _compile_case_insensitive_like(element: CaseInsensitiveLike, compiler: SQLCompiler, **kw: Any) -> str:
     expression, pattern = (compiler.process(clause, **kw) for clause in element.clauses)
     return f"lower({expression}) LIKE lower({pattern}) ESCAPE {_literal(compiler, _LIKE_ESCAPE)}"
+
+
+class OrderedJoin(Join):
+    """An inner join that SQLite plans with its left side as the outer loop.
+
+    SQLite never reorders the tables of a CROSS JOIN, so it renders as `left CROSS JOIN right ON ...` there: a
+    planner hint that keeps the work proportional to the left side (a board's membership, say, rather than every
+    image an index would offer first). Other backends get a plain JOIN and choose the order themselves. Inner only:
+    a CROSS JOIN has no outer form.
+    """
+
+    inherit_cache = True
+
+    def __init__(self, left: FromClause, right: FromClause, onclause: ColumnElement[bool]) -> None:
+        super().__init__(left, right, onclause)
+
+
+@compiles(OrderedJoin, "sqlite")
+def _compile_ordered_join_sqlite(element: OrderedJoin, compiler: SQLCompiler, **kw: Any) -> str:
+    # `SQLCompiler.visit_join` with CROSS JOIN for JOIN. The ON clause tells SQLAlchemy's linter that the two sides
+    # are joined, as it does for a plain join.
+    kw.pop("asfrom", None)
+    assert element.onclause is not None
+    left = compiler.process(element.left, asfrom=True, **kw)
+    right = compiler.process(element.right, asfrom=True, **kw)
+    return f"{left} CROSS JOIN {right} ON {compiler.process(element.onclause, **kw)}"
 
 
 def _literal(compiler: SQLCompiler, value: str) -> str:

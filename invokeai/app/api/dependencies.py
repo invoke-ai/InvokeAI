@@ -5,10 +5,10 @@ import torch
 
 from invokeai.app.services.app_settings import AppSettingsService
 from invokeai.app.services.auth.token_service import set_jwt_secret
-from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
+from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
 from invokeai.app.services.board_images.board_images_default import BoardImagesService
-from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
-from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
+from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.boards.boards_default import BoardService
 from invokeai.app.services.bulk_download.bulk_download_default import BulkDownloadService
 from invokeai.app.services.client_state_persistence.client_state_persistence_default import ClientStatePersistence
@@ -138,9 +138,9 @@ class ApiDependencies:
         configuration = config
         logger = logger
 
-        board_image_records = SqliteBoardImageRecordStorage(db=db)
+        board_image_records = BoardImageRecordStorage(db.database)
         board_images = BoardImagesService()
-        board_records = SqliteBoardRecordStorage(db=db)
+        board_records = BoardRecordStorage(db.database)
         boards = BoardService()
         events = FastAPIEventService(event_handler_id, loop=loop)
         bulk_download = BulkDownloadService()
@@ -149,7 +149,7 @@ class ApiDependencies:
         images = ImageService()
         video_records = SqliteVideoRecordStorage(db=db)
         videos = VideoService()
-        board_video_records = SqliteBoardVideoRecordStorage(db=db)
+        board_video_records = BoardVideoRecordStorage(db.database)
         gallery = SqliteGalleryService(db=db)
         invocation_cache = MemoryInvocationCache(max_cache_size=config.node_cache_size)
         tensors = ObjectSerializerForwardCache(

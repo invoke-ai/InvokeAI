@@ -24,6 +24,9 @@ from typing import TYPE_CHECKING, Optional, Self, TypeVar
 from invokeai.app.services.shared.database.errors import NestedTransactionError, TransactionFailedError
 from invokeai.app.services.shared.database.queries.app_settings import AppSettingQueries
 from invokeai.app.services.shared.database.queries.base import OwnTransaction, QueryScope, SharedTransaction
+from invokeai.app.services.shared.database.queries.board_images import BoardImageQueries
+from invokeai.app.services.shared.database.queries.board_videos import BoardVideoQueries
+from invokeai.app.services.shared.database.queries.boards import BoardQueries
 from invokeai.app.services.shared.database.queries.client_state import ClientStateQueries
 from invokeai.app.services.shared.database.queries.locks import LockQueries
 from invokeai.app.services.shared.database.queries.media_references import MediaReferenceQueries
@@ -50,6 +53,18 @@ class Queries:
     @cached_property
     def app_settings(self) -> AppSettingQueries:
         return AppSettingQueries(self._scope)
+
+    @cached_property
+    def board_images(self) -> BoardImageQueries:
+        return BoardImageQueries(self._scope)
+
+    @cached_property
+    def board_videos(self) -> BoardVideoQueries:
+        return BoardVideoQueries(self._scope)
+
+    @cached_property
+    def boards(self) -> BoardQueries:
+        return BoardQueries(self._scope)
 
     @cached_property
     def client_state(self) -> ClientStateQueries:

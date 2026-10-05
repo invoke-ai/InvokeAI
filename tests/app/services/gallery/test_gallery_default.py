@@ -21,9 +21,9 @@ from typing import TypeVar
 
 import pytest
 
-from invokeai.app.services.board_image_records.board_image_records_sqlite import SqliteBoardImageRecordStorage
-from invokeai.app.services.board_records.board_records_sqlite import SqliteBoardRecordStorage
-from invokeai.app.services.board_video_records.board_video_records_sqlite import SqliteBoardVideoRecordStorage
+from invokeai.app.services.board_image_records.board_image_records_default import BoardImageRecordStorage
+from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
+from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.gallery.gallery_common import GalleryItemKind
 from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
@@ -47,9 +47,9 @@ def services():
         "gallery": gallery,
         "images": SqliteImageRecordStorage(db=db),
         "videos": SqliteVideoRecordStorage(db=db),
-        "boards": SqliteBoardRecordStorage(db=db),
-        "board_images": SqliteBoardImageRecordStorage(db=db),
-        "board_videos": SqliteBoardVideoRecordStorage(db=db),
+        "boards": BoardRecordStorage(db.database),
+        "board_images": BoardImageRecordStorage(db.database),
+        "board_videos": BoardVideoRecordStorage(db.database),
     }
 
 
@@ -701,13 +701,13 @@ class TestGalleryQueryPlans:
         _save_image(services["images"], "image.png", user_id="alice")
         services["board_images"].add_image_to_board(board.board_id, "image.png")
 
-        count, _, details = _capture_plan(
+        counts, _, details = _capture_plan(
             services,
-            lambda: services["board_images"].get_image_count_for_board(board.board_id),
-            "SELECT COUNT(*)",
+            lambda: services["board_images"].get_counts_for_board(board.board_id),
+            "FROM board_images CROSS JOIN images",
         )
 
-        assert count == 1
+        assert counts == (1, 0)
         assert next(i for i, detail in enumerate(details) if "board_images" in detail) < next(
             i for i, detail in enumerate(details) if "images" in detail and "board_images" not in detail
         )

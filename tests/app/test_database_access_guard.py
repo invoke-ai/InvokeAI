@@ -25,9 +25,6 @@ DATABASE_LAYER = (
 # Do not raise a number or add a file.
 NOT_YET_PORTED: dict[str, int] = {
     "invokeai/app/api/routers/model_manager.py": 2,
-    "invokeai/app/services/board_image_records/board_image_records_sqlite.py": 22,
-    "invokeai/app/services/board_records/board_records_sqlite.py": 35,
-    "invokeai/app/services/board_video_records/board_video_records_sqlite.py": 13,
     "invokeai/app/services/fonts/fonts_default.py": 32,
     "invokeai/app/services/gallery/gallery_default.py": 16,
     "invokeai/app/services/image_index/image_index_records_sqlite.py": 26,

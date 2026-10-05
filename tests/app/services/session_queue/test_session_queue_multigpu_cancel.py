@@ -14,12 +14,13 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItemNotFoundError
 from invokeai.app.services.session_queue.session_queue_sqlite import SqliteSessionQueue
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from tests.test_nodes import PromptTestInvocation, TestEventService
 
 
 @pytest.fixture
-def session_queue(mock_invoker: Invoker) -> SqliteSessionQueue:
-    db = mock_invoker.services.board_records._db
+def session_queue(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase) -> SqliteSessionQueue:
+    db = mock_sqlite_database
     queue = SqliteSessionQueue(db=db)
     queue.start(mock_invoker)
     return queue
