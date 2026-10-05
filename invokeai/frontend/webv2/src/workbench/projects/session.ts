@@ -122,10 +122,11 @@ const listDurableRecoveryProjectIds = async (): Promise<DurableRecoveryProjectId
   }
 
   try {
-    const [drafts, retargets, queueRuns] = await Promise.all([
+    const [drafts, retargets, queueRuns, journal] = await Promise.all([
       draftStore.list({ limit: 1 }),
       draftStore.listRetargets({ limit: 1 }),
       queueRunJournal.listProjectIds(),
+      draftStore.peekUnloadJournalProjectIds(1),
     ]);
     if (drafts.kind !== 'available' || retargets.kind !== 'available' || queueRuns.kind !== 'available') {
       return { kind: 'unavailable' };
@@ -137,6 +138,8 @@ const listDurableRecoveryProjectIds = async (): Promise<DurableRecoveryProjectId
           ...queueRuns.projectIds,
           ...drafts.items.map((draft) => draft.projectId),
           ...retargets.items.map((handoff) => handoff.targetProjectId),
+          // An edit journaled before the project's first save becomes its draft when the editor loads.
+          ...(journal.kind === 'available' ? journal.projectIds : []),
         ]),
       ],
     };

@@ -4,7 +4,7 @@ import type { RefusedWorkbenchProject, WorkbenchState } from '@workbench/project
 
 import { createLogger } from '@platform/logging/logger';
 
-import type { WorkbenchLoadOptions, WorkbenchSaveResult } from './projects/syncedPersistence';
+import type { UnloadJournalOutcome, WorkbenchLoadOptions, WorkbenchSaveResult } from './projects/syncedPersistence';
 
 import { WorkbenchBackendUnavailableError } from './projects/syncedPersistence';
 
@@ -34,6 +34,11 @@ export interface WorkbenchPersistencePort {
   /** True while the editor is leaving after closing its last tab: its session must stay empty, so nothing saves. */
   hasClosedSession(): boolean;
   hasPendingChanges(): boolean;
+  /**
+   * Synchronously writes committed state that is not yet in local recovery, for a page that may unload before an
+   * asynchronous save finishes.
+   */
+  journalBeforeUnload(state: WorkbenchState): UnloadJournalOutcome;
   loadWorkbench(options?: WorkbenchLoadOptions): Promise<HydratedWorkbenchSnapshot | null>;
   saveWorkbench(state: WorkbenchState): Promise<WorkbenchSaveResult>;
 }
@@ -160,6 +165,8 @@ export const createWorkbenchPersistenceRuntime = ({
   let inFlightSave: Promise<void> | null = null;
   /** The revision the exit checkpoint last tried to write. */
   let lastExitRevision: number | null = null;
+  /** The newest revision journaled; `pagehide` and becoming hidden both fire on unload. */
+  let journaledRevision: number | null = null;
   let retryAttempt = 0;
   let queuedSaveRequireCurrentRevision: boolean | null = null;
   let pendingPreviousExit = previousExit ?? null;
@@ -355,6 +362,62 @@ export const createWorkbenchPersistenceRuntime = ({
     }
   };
 
+  /**
+   * The only write that can land while the page unloads: a save first stages through fenced IndexedDB round trips that
+   * an unloading page never finishes. The journal is reconciled into local recovery on the next load.
+   */
+  const journalBeforeUnload = (): void => {
+    const revision = aggregate.getPersistedRevision();
+    if (
+      disposed ||
+      !hasLoaded ||
+      persistence.hasClosedSession() ||
+      revision === lastSavedRevision ||
+      revision === journaledRevision
+    ) {
+      return;
+    }
+    try {
+      const outcome = persistence.journalBeforeUnload(aggregate.getState());
+      if (outcome.kind === 'unavailable') {
+        logger.warn({
+          message: 'Unsaved changes could not be journaled for recovery before the page was hidden.',
+          name: 'persistence.unload-journal-unavailable',
+        });
+        return;
+      }
+      journaledRevision = revision;
+      if (outcome.kind === 'journaled') {
+        void outcome.written.then((isWritten) => {
+          if (isWritten) {
+            return;
+          }
+          // The next hidden event writes it again.
+          if (journaledRevision === revision) {
+            journaledRevision = null;
+          }
+          logger.warn({
+            message: 'Unsaved changes journaled for recovery before the page was hidden were not written.',
+            name: 'persistence.unload-journal-aborted',
+          });
+        });
+      }
+      if (outcome.kind === 'journaled' && outcome.skippedOversizedProjectIds.length > 0) {
+        logger.warn({
+          context: { projectIds: outcome.skippedOversizedProjectIds },
+          message: 'Projects too large to journal before the page was hidden rely on autosave alone.',
+          name: 'persistence.unload-journal-oversized',
+        });
+      }
+    } catch (error) {
+      logger.warn({
+        error,
+        message: 'Unsaved changes could not be journaled for recovery before the page was hidden.',
+        name: 'persistence.unload-journal-unavailable',
+      });
+    }
+  };
+
   /** Best effort only: a hidden page may be frozen or discarded before the request completes. */
   const saveBeforeHidden = (): void => {
     // A closed session must not change until the editor leaves or reopens it, so its drafts stay where they are.
@@ -363,6 +426,7 @@ export const createWorkbenchPersistenceRuntime = ({
     }
     // Committing a draft notifies the aggregate, which schedules the debounced save this replaces.
     commitPendingDrafts();
+    journalBeforeUnload();
     const revision = aggregate.getPersistedRevision();
     // A failed revision waits for a new edit as it does under the debounce; hiding and unloading both fire.
     if (
@@ -605,7 +669,17 @@ export const createWorkbenchPersistenceRuntime = ({
     stopObserving();
     commitPendingDrafts();
     let isSuperseded = false;
-    const settled = checkpoint(beforeCapture, () => isSuperseded).finally(dispose);
+    // The checkpoint's save cannot finish if the page unloads meanwhile (leaving and reloading at once).
+    const unsubscribeExitPage =
+      page?.subscribeHidden(() => {
+        if (!isSuperseded) {
+          journalBeforeUnload();
+        }
+      }) ?? null;
+    const settled = checkpoint(beforeCapture, () => isSuperseded).finally(() => {
+      unsubscribeExitPage?.();
+      dispose();
+    });
     exitHandle = {
       settled,
       supersede: () => {

@@ -19,6 +19,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 const server = vi.hoisted(() => ({
   calls: [] as string[],
   clientState: new Map<string, string>(),
+  /** Writes fail as they do for requests an unloading page starts; reads still answer the next page. */
+  offline: false,
   records: new Map<string, ProjectRecordDTO>(),
   updateGate: null as Promise<void> | null,
 }));
@@ -29,9 +31,13 @@ vi.mock('@workbench/projects/api', async (importOriginal) => {
   const actual = await importOriginal<typeof projectsApi>();
   const { ApiError } = await import('@platform/transport/http');
   const notFound = () => new ApiError('not found', 404);
+  const unreachable = () => Promise.reject(new TypeError('Failed to fetch'));
   return {
     ...actual,
     createProjectSettled: (request: projectsApi.ProjectCreateRequest) => {
+      if (server.offline) {
+        return unreachable();
+      }
       const id = request.project_id!;
       const record: ProjectRecordDTO = {
         board_id: `board-${id}`,
@@ -63,11 +69,17 @@ vi.mock('@workbench/projects/api', async (importOriginal) => {
       );
     },
     setClientStateValue: (key: string, value: string) => {
+      if (server.offline) {
+        return unreachable();
+      }
       server.clientState.set(key, value);
       return Promise.resolve();
     },
     updateProject: async (projectId: string, request: projectsApi.ProjectUpdateRequest) => {
       server.calls.push(`update:${request.name}`);
+      if (server.offline) {
+        return unreachable();
+      }
       await server.updateGate;
       const current = server.records.get(projectId);
       if (!current) {
@@ -163,7 +175,39 @@ const rename = (name: string) =>
 
 const savedName = (projectId: string) => server.records.get(projectId)?.name;
 
+/** Every IndexedDB connection the page has opened, so an unload can cut off those that already existed. */
+const openConnections = new Set<IDBDatabase>();
+const openDatabase = IDBFactory.prototype.open;
+const transaction = IDBDatabase.prototype.transaction;
+let revivePage: (() => void) | null = null;
+
+/**
+ * What a document unload does to work the page has not finished: its IndexedDB connections start no further
+ * transactions (a transaction already committed still lands) and its requests never reach the server. The next
+ * page's own connections, opened afterwards, work normally.
+ */
+const unloadPage = (): void => {
+  const deadConnections = new Set(openConnections);
+  server.offline = true;
+  IDBDatabase.prototype.transaction = function (this: IDBDatabase, ...args: Parameters<IDBDatabase['transaction']>) {
+    if (deadConnections.has(this)) {
+      throw new DOMException('The document unloaded.', 'InvalidStateError');
+    }
+    return transaction.apply(this, args);
+  } as IDBDatabase['transaction'];
+  revivePage = () => {
+    IDBDatabase.prototype.transaction = transaction;
+    server.offline = false;
+    revivePage = null;
+  };
+};
+
 beforeEach(async () => {
+  IDBFactory.prototype.open = function (this: IDBFactory, ...args: Parameters<IDBFactory['open']>) {
+    const request = openDatabase.apply(this, args);
+    request.addEventListener('success', () => openConnections.add(request.result));
+    return request;
+  };
   server.calls = [];
   server.clientState.clear();
   server.records.clear();
@@ -179,6 +223,9 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  revivePage?.();
+  IDBFactory.prototype.open = openDatabase;
+  openConnections.clear();
   await act(() => root.unmount());
   host.remove();
   accountLifecycle.invalidate();
@@ -297,5 +344,60 @@ describe('WorkbenchProvider hidden page', () => {
 
     expect(activeProject()!.id).toBe(projectId);
     expect(strengthValue()).toBeCloseTo(typedStrength);
+  });
+
+  it('recovers an edit still held in a draft when the page unloads before anything can save it', async () => {
+    const projectId = activeProject()!.id;
+    await leaveEditor();
+    await mountEditor({ withStrength: true });
+    await vi.waitFor(() => expect(strengthSlider()).not.toBeNull(), { timeout: 5_000 });
+    const savedBeforeEdit = JSON.stringify(server.records.get(projectId)?.data);
+
+    const slider = strengthSlider()!;
+    await act(() => {
+      slider.focus();
+      slider.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, key: 'ArrowRight' }));
+    });
+    act(() => {
+      window.dispatchEvent(new PageTransitionEvent('pagehide'));
+      unloadPage();
+    });
+    // The page's state goes away; neither its hidden-page save nor its exit checkpoint can write anything.
+    await leaveEditor();
+    await mountEditor({ withStrength: true });
+    await vi.waitFor(() => expect(strengthSlider()).not.toBeNull(), { timeout: 5_000 });
+
+    expect(activeProject()!.id).toBe(projectId);
+    expect(strengthValue()).toBeCloseTo(typedStrength);
+    expect(JSON.stringify(server.records.get(projectId)?.data)).toBe(savedBeforeEdit);
+    // Recovered as a pending edit, which the next page saves once it can.
+    revivePage!();
+    await vi.waitFor(() => expect(JSON.stringify(server.records.get(projectId)?.data)).not.toBe(savedBeforeEdit), {
+      timeout: 5_000,
+    });
+  });
+
+  it('does not let the journal of a back/forward-cached page override work saved after it resumed', async () => {
+    const projectId = activeProject()!.id;
+
+    await rename('While cached');
+    act(() => {
+      window.dispatchEvent(new PageTransitionEvent('pagehide', { persisted: true }));
+    });
+    // Restored from the cache: the save requested on hiding lands, and editing continues.
+    act(() => {
+      window.dispatchEvent(new PageTransitionEvent('pageshow', { persisted: true }));
+    });
+    await vi.waitFor(() => expect(savedName(projectId)).toBe('While cached'), { timeout: 5_000 });
+    await rename('After resuming');
+    await vi.waitFor(() => expect(savedName(projectId)).toBe('After resuming'), { timeout: 5_000 });
+
+    act(unloadPage);
+    await leaveEditor();
+    revivePage!();
+    await mountEditor();
+    await waitForHydratedEditor();
+
+    expect(activeProject()).toEqual({ id: projectId, name: 'After resuming' });
   });
 });

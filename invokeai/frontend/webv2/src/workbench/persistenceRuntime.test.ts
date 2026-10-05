@@ -152,6 +152,7 @@ const createPersistence = (load: WorkbenchPersistencePort['loadWorkbench']) => {
   const persistence: WorkbenchPersistencePort = {
     hasClosedSession: () => closedSession,
     hasPendingChanges: () => pending,
+    journalBeforeUnload: vi.fn(() => ({ kind: 'nothing-to-journal' as const })),
     loadWorkbench: vi.fn(load),
     saveWorkbench: vi.fn((state) => Promise.resolve(saveResult(state))),
   };
@@ -1150,5 +1151,156 @@ describe('Workbench persistence runtime page lifecycle', () => {
     inFlight.resolve(saveResult(aggregate.state));
     await flushPromises();
     expect(savedNames(persistence)).toEqual(['In flight', 'Hidden']);
+  });
+});
+
+describe('Workbench persistence runtime unload journal', () => {
+  const journalTo = (
+    persistence: WorkbenchPersistencePort,
+    written: () => Promise<boolean> = () => Promise.resolve(true)
+  ) => {
+    const journaledNames: (string | undefined)[] = [];
+    persistence.journalBeforeUnload = vi.fn((state: WorkbenchState) => {
+      journaledNames.push(state.projects[0]?.name);
+      return { kind: 'journaled' as const, projectIds: [], skippedOversizedProjectIds: [], written: written() };
+    });
+    return journaledNames;
+  };
+
+  it('journals committed drafts before the hidden-page save, including a revision whose save is in flight', async () => {
+    const page = createPage();
+    const draft = createHeldDraft();
+    const { aggregate, clock, persistence } = await startLoaded({ commitDrafts: draft.commit, page: page.port });
+    draft.held.commitTo = aggregate;
+    const journaledNames = journalTo(persistence);
+
+    page.hide();
+    expect(journaledNames).toEqual([]);
+
+    draft.held.name = 'Typed just before hiding';
+    page.hide();
+    // Unloading fires both `pagehide` and becoming hidden; the second has nothing new to journal.
+    page.hide();
+    expect(journaledNames).toEqual(['Typed just before hiding']);
+    expect(vi.mocked(persistence.journalBeforeUnload!).mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(persistence.saveWorkbench).mock.invocationCallOrder[0]!
+    );
+    await flushPromises();
+
+    const inFlight = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => inFlight.promise);
+    aggregate.edit('Saving');
+    clock.runAll();
+    // The page may unload before this save stages anything, so the journal covers it too.
+    page.hide();
+    expect(journaledNames).toEqual(['Typed just before hiding', 'Saving']);
+
+    inFlight.resolve(saveResult(aggregate.state));
+    await flushPromises();
+    expect(savedNames(persistence)).toEqual(['Typed just before hiding', 'Saving']);
+  });
+
+  it('journals while the exit checkpoint saves, until it settles', async () => {
+    const page = createPage();
+    const { aggregate, persistence, runtime } = await startLoaded({ page: page.port });
+    const journaledNames = journalTo(persistence);
+    const checkpointSave = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => checkpointSave.promise);
+    aggregate.edit('Left the editor');
+
+    const exit = runtime.exit();
+    // Leaving the editor and reloading at once: the checkpoint's save cannot finish.
+    page.hide();
+    expect(journaledNames).toEqual(['Left the editor']);
+
+    checkpointSave.resolve(saveResult(aggregate.state));
+    await expect(exit.settled).resolves.toBe('saved');
+    page.hide();
+    expect(journaledNames).toEqual(['Left the editor']);
+  });
+
+  it('does not journal for an exit a newer editor superseded', async () => {
+    const page = createPage();
+    const { aggregate, persistence, runtime } = await startLoaded({ page: page.port });
+    const journaledNames = journalTo(persistence);
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => deferred<WorkbenchSaveResult>().promise);
+    aggregate.edit('Superseded');
+
+    runtime.exit().supersede();
+    page.hide();
+
+    expect(journaledNames).toEqual([]);
+  });
+
+  it('reports a journal that could not be written and still saves', async () => {
+    const page = createPage();
+    const { aggregate, persistence } = await startLoaded({ page: page.port });
+    persistence.journalBeforeUnload = vi
+      .fn<NonNullable<WorkbenchPersistencePort['journalBeforeUnload']>>()
+      .mockReturnValueOnce({ kind: 'unavailable' })
+      .mockImplementationOnce(() => {
+        throw new Error('storage gone');
+      })
+      .mockReturnValueOnce({
+        kind: 'journaled',
+        projectIds: [],
+        skippedOversizedProjectIds: ['huge'],
+        written: Promise.resolve(true),
+      });
+    const mark = logMark();
+
+    aggregate.edit('First');
+    page.hide();
+    aggregate.edit('Second');
+    page.hide();
+    aggregate.edit('Third');
+    page.hide();
+
+    // Newest first.
+    expect(loggedSince(mark).filter((name) => name.startsWith('persistence.unload-journal'))).toEqual([
+      'persistence.unload-journal-oversized',
+      'persistence.unload-journal-unavailable',
+      'persistence.unload-journal-unavailable',
+    ]);
+    expect(savedNames(persistence)).toEqual(['First']);
+    // Saving goes on: the hidden-page saves queued behind the first still run.
+    await flushPromises();
+    await flushPromises();
+    expect(savedNames(persistence)).toEqual(['First', 'Third']);
+  });
+
+  it('journals the revision again after a journal write that aborted', async () => {
+    const page = createPage();
+    const { aggregate, persistence } = await startLoaded({ page: page.port });
+    let isWritten = false;
+    const journaledNames = journalTo(persistence, () => Promise.resolve(isWritten));
+    vi.mocked(persistence.saveWorkbench).mockImplementation(() => deferred<WorkbenchSaveResult>().promise);
+    const mark = logMark();
+    aggregate.edit('Hidden');
+
+    page.hide();
+    await flushPromises();
+    isWritten = true;
+    page.hide();
+
+    expect(journaledNames).toEqual(['Hidden', 'Hidden']);
+    expect(loggedSince(mark)).toContain('persistence.unload-journal-aborted');
+  });
+
+  it('does not journal, nor count as journaled, while the session is closed', async () => {
+    const page = createPage();
+    const { aggregate, persistence, runtime, setClosedSession } = await startLoaded({ page: page.port });
+    const journaledNames = journalTo(persistence);
+    vi.mocked(persistence.saveWorkbench).mockImplementation(() => deferred<WorkbenchSaveResult>().promise);
+    aggregate.edit('Closing');
+    runtime.exit();
+    setClosedSession(true);
+    page.hide();
+    expect(journaledNames).toEqual([]);
+
+    // The close did not complete and the session reopened: the same revision is journaled after all.
+    setClosedSession(false);
+    page.hide();
+    expect(journaledNames).toEqual(['Closing']);
   });
 });
