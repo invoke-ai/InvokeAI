@@ -994,7 +994,7 @@ export const useImageActions = ({
           if (result.status === 'imported' && result.failedImageNames.length === 0) {
             notifications.add({
               kind: 'success',
-              title: t('widgets.canvas.import.newCanvasSuccess', { count: result.layerIds.length }),
+              title: t('widgets.canvas.import.newProjectSuccess', { count: result.layerIds.length }),
             });
           } else {
             const notice = getCanvasImportNotice(result);

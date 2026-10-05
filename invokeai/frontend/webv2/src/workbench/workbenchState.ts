@@ -1842,6 +1842,38 @@ const getNextInstanceId = (region: WidgetRegionState, instanceId: WidgetInstance
   return region.instanceIds.find((enabledInstanceId) => enabledInstanceId !== instanceId) ?? null;
 };
 
+/**
+ * An instance opened in the center can stay a member of a side panel, but is not shown twice: a side panel fronting
+ * it fronts its next member instead, or collapses when it has none. Only the pointer moves; no panel opens, so a
+ * hidden panel stays hidden and later shows its neighbour. The bottom region is left alone: its members include
+ * tooltip-only status items, and without the widget registry the reducer cannot tell which of them render a panel.
+ */
+const SIDE_PANEL_REGIONS = ['left', 'right'] as const satisfies readonly WidgetRegion[];
+
+const yieldSidePanelsTo = (
+  widgetRegions: Project['widgetRegions'],
+  instanceId: WidgetInstanceId
+): Project['widgetRegions'] => {
+  let next = widgetRegions;
+
+  for (const regionId of SIDE_PANEL_REGIONS) {
+    const region = next[regionId];
+
+    if (region.activeInstanceId !== instanceId) {
+      continue;
+    }
+
+    const neighbour = getNextInstanceId(region, instanceId);
+
+    next = {
+      ...next,
+      [regionId]: neighbour ? { ...region, activeInstanceId: neighbour } : { ...region, isCollapsed: true },
+    };
+  }
+
+  return next;
+};
+
 const updateActiveWidgetRegion = (
   state: WorkbenchState,
   region: WidgetRegion,
@@ -3816,20 +3848,17 @@ export const __workbenchReducerInternal = (
         const placed = docked.widgetRegions[action.region].instanceIds.includes(instanceId)
           ? docked
           : updateRegionOrder(docked, action.region, (slots) => [...slots, { instanceId, isFloating: false }]);
+        const widgetRegions = {
+          ...placed.widgetRegions,
+          [action.region]: { ...placed.widgetRegions[action.region], activeInstanceId: instanceId, isCollapsed: false },
+        };
 
         // One reveal, for the placement that ends up in front.
         return applyAutoRouteForWidgetReveal(
           {
             ...placed,
             layout: openPanelForRegion(placed.layout, action.region),
-            widgetRegions: {
-              ...placed.widgetRegions,
-              [action.region]: {
-                ...placed.widgetRegions[action.region],
-                activeInstanceId: instanceId,
-                isCollapsed: false,
-              },
-            },
+            widgetRegions: action.region === 'center' ? yieldSidePanelsTo(widgetRegions, instanceId) : widgetRegions,
           },
           action.widgetId,
           context

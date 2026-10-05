@@ -304,7 +304,6 @@ registerAccountOwnedResource({
 
 export interface CenterPreviewToggleState {
   isPreviewActive: boolean;
-  previewInstanceId: WidgetInstanceId | null;
   returnInstanceId: WidgetInstanceId | null;
 }
 
@@ -319,7 +318,7 @@ export const getCenterPreviewToggleState = (project: WidgetPlacementProject): Ce
       ? remembered
       : (center.instanceIds.find((id) => id !== previewInstanceId) ?? null);
 
-  return { isPreviewActive, previewInstanceId, returnInstanceId };
+  return { isPreviewActive, returnInstanceId };
 };
 
 const rememberReturnView = (project: WidgetPlacementProject): void => {
@@ -335,8 +334,8 @@ const rememberReturnView = (project: WidgetPlacementProject): void => {
 };
 
 /**
- * Swaps the preview into the center and back to the view it replaced. One preview instance can
- * sit in the center and a rail at once, so a rail actively showing it moves to its neighbour first.
+ * Swaps the preview into the center and back to the view it replaced. Opening it in the center hands any rail
+ * fronting the same instance to its neighbour (see `openRegionWidget`).
  */
 export const toggleCenterPreview = ({
   getWidgetsForRegion,
@@ -347,7 +346,7 @@ export const toggleCenterPreview = ({
   project: WidgetPlacementProject;
   widgets: WorkbenchWidgetCommands;
 }): boolean => {
-  const { isPreviewActive, previewInstanceId, returnInstanceId } = getCenterPreviewToggleState(project);
+  const { isPreviewActive, returnInstanceId } = getCenterPreviewToggleState(project);
 
   if (isPreviewActive) {
     return (
@@ -357,21 +356,6 @@ export const toggleCenterPreview = ({
   }
 
   rememberReturnView(project);
-
-  for (const [region, state] of Object.entries(project.widgetRegions) as [
-    WidgetRegion,
-    { activeInstanceId: string; instanceIds: string[] },
-  ][]) {
-    if (region === 'center' || state.activeInstanceId !== previewInstanceId) {
-      continue;
-    }
-
-    const neighbour = state.instanceIds.find((id) => id !== previewInstanceId);
-
-    if (neighbour) {
-      widgets.select({ projectId: project.projectId, region, widgetId: neighbour });
-    }
-  }
 
   return openWidgetPlacement({
     getWidgetsForRegion,

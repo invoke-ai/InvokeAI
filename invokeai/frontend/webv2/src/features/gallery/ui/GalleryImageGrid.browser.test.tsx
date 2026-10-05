@@ -889,20 +889,92 @@ describe('GalleryImageGrid mixed item cells', () => {
     await interact(() => pointer('pointerup', videoButton.ownerDocument, 120, 80), 300);
   });
 
-  it.each([
-    { key: '{Enter}', label: 'Enter' },
-    { key: ' ', label: 'Space' },
-  ])('opens a video with $label without activating keyboard DnD', async ({ key }) => {
+  it('selects a video with Space without activating keyboard DnD', async () => {
     const video = createItem('video', 'keyboard.mp4');
 
     await renderGallery(createGallery({ items: [video] }));
     const videoButton = getButton('Select video keyboard.mp4, duration 1:06, for preview');
 
     await interact(() => videoButton.focus());
-    await act(() => userEvent.keyboard(key));
+    await act(() => userEvent.keyboard(' '));
 
     expect(actionMocks.selectItem).toHaveBeenCalledWith(video);
+    expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
     expect(onDragStart).not.toHaveBeenCalled();
+  });
+
+  it('opens the focused video in Preview with Enter, once, without activating keyboard DnD', async () => {
+    const video = createItem('video', 'keyboard.mp4');
+
+    await renderGallery(createGallery({ items: [video] }));
+    const videoButton = getButton('Select video keyboard.mp4, duration 1:06, for preview');
+
+    await interact(() => videoButton.focus());
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(imageActionMocks.openItemInPreview).toHaveBeenCalledExactlyOnceWith(video);
+    // Opening selects; the button's own click would select a second time first.
+    expect(actionMocks.selectItem).not.toHaveBeenCalled();
+    expect(onDragStart).not.toHaveBeenCalled();
+  });
+
+  it('opens once for a held Enter, ignoring its auto-repeat', async () => {
+    const image = createItem('image', 'first.png');
+
+    await renderGallery();
+    const button = getButton('Select first.png for preview');
+    const pressEnter = (repeat: boolean) =>
+      interact(() =>
+        button.dispatchEvent(new KeyboardEvent('keydown', { bubbles: true, cancelable: true, key: 'Enter', repeat }))
+      );
+
+    await interact(() => button.focus());
+    await pressEnter(false);
+    await pressEnter(true);
+    await pressEnter(true);
+
+    expect(imageActionMocks.openItemInPreview).toHaveBeenCalledExactlyOnceWith(image);
+  });
+
+  it('opens a double-clicked thumbnail in Preview after its clicks select it', async () => {
+    const image = createItem('image', 'first.png');
+
+    // The default selection is elsewhere, so the first click's selection is observable.
+    await renderGallery(createGallery({ selectedItemKey: 'image:last.png', selectedItemKeys: ['image:last.png'] }));
+    await act(() => userEvent.dblClick(getButton('Select first.png for preview')));
+
+    expect(actionMocks.selectItem).toHaveBeenCalledWith(image);
+    expect(imageActionMocks.openItemInPreview).toHaveBeenCalledExactlyOnceWith(image);
+  });
+
+  it.each([
+    { expectSelection: () => expect(actionMocks.selectItemRange).toHaveBeenCalled(), modifier: 'shiftKey' },
+    { expectSelection: () => expect(actionMocks.toggleItemInSelection).toHaveBeenCalled(), modifier: 'ctrlKey' },
+    { expectSelection: () => expect(actionMocks.toggleItemInSelection).toHaveBeenCalled(), modifier: 'metaKey' },
+    { expectSelection: () => expect(actionMocks.setCompareItem).toHaveBeenCalled(), modifier: 'altKey' },
+  ])('keeps a $modifier double-click a selection gesture that opens nothing', async ({ expectSelection, modifier }) => {
+    mocks.fetchNames.mockResolvedValue({ items: [] });
+    await renderGallery();
+    const button = getButton('Select last.png for preview');
+
+    await click(button, { [modifier]: true, detail: 1 });
+    await click(button, { [modifier]: true, detail: 2 });
+    await interact(() =>
+      button.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2, [modifier]: true }))
+    );
+
+    expectSelection();
+    expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
+  });
+
+  it('toggles the star on each click of a double-click without selecting or opening the item', async () => {
+    await renderGallery();
+    await act(() => userEvent.dblClick(getButton('Star first.png')));
+
+    expect(imageActionMocks.setItemsStarred).toHaveBeenCalledTimes(2);
+    expect(imageActionMocks.setItemsStarred).toHaveBeenCalledWith([{ kind: 'image', name: 'first.png' }], true);
+    expect(actionMocks.selectItem).not.toHaveBeenCalled();
+    expect(imageActionMocks.openItemInPreview).not.toHaveBeenCalled();
   });
 
   it.each([

@@ -761,6 +761,7 @@ export const GalleryImageGrid = () => {
     (item: GalleryItem) => void itemActions.setItemsStarred([{ kind: item.kind, name: item.name }], !item.starred),
     [itemActions]
   );
+  const handleOpenItem = useCallback((item: GalleryItem) => itemActions.openItemInPreview(item), [itemActions]);
 
   // Releasing the anchor puts the window back over the top of the listing.
   const handleReturnToBoardTop = useCallback(() => galleryCommands.setPage(0), [galleryCommands]);
@@ -796,6 +797,7 @@ export const GalleryImageGrid = () => {
           onClick={handleThumbnailClick}
           onContextMenu={handleThumbnailContextMenu}
           onFocusLost={restoreTileFocus}
+          onOpen={handleOpenItem}
           onToggleStarred={handleToggleStarred}
         />
       );
@@ -805,6 +807,7 @@ export const GalleryImageGrid = () => {
       gallery.selectedItemKey,
       getDragItems,
       getReadyItemLabel,
+      handleOpenItem,
       handleThumbnailClick,
       handleThumbnailContextMenu,
       handleToggleStarred,

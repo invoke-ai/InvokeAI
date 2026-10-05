@@ -248,7 +248,13 @@ const applyDeletion = async (refs: GalleryItemRef[]) => {
   select(before.find((item) => successor !== null && toGalleryItemKey(item) === toGalleryItemKey(successor)) ?? null);
 };
 const confirmationRef = createRef<RequestDeletionConfirmation>();
+const openedInPreview: string[] = [];
 const itemActions = {
+  // As the workbench opens one: select the item, then reveal Preview elsewhere in the layout.
+  openItemInPreview: (item: GalleryItem) => {
+    select(item);
+    openedInPreview.push(item.name);
+  },
   deleteItems: (refs: GalleryItemRef[], options?: { returnFocus?: () => HTMLElement | null }) =>
     state.confirmDeletion
       ? confirmationRef.current!(refs, () => applyDeletion(refs), options?.returnFocus)
@@ -453,6 +459,7 @@ const tabIntoGallery = async () => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  openedInPreview.length = 0;
   accountLifecycle.activate('grid-focus-user');
   runtimeMocks.store = createWorkbenchStore();
   runtimeMocks.extensions = createExtensionRegistry();
@@ -505,11 +512,18 @@ describe('Gallery grid keyboard focus', () => {
 
     await press('{ArrowRight}');
     await press('{ArrowRight}');
-    await press('{Enter}');
     await press(' ');
 
     expect(focusedThumbnail()).toBe('image-2.png');
     expect(selectedKeys()).toEqual(['image:image-2.png']);
+    expect(openedInPreview).toEqual([]);
+
+    // Enter is not a gallery hotkey: it reaches the focused tile alone, which opens it.
+    await press('{ArrowRight}');
+    await press('{Enter}');
+
+    expect(openedInPreview).toEqual(['image-3.png']);
+    expect(selectedKeys()).toEqual(['image:image-3.png']);
   });
 
   it('keeps the focused tile when the wheel scrolls it away, and resumes from it on the next arrow', async () => {

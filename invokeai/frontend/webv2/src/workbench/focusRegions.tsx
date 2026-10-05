@@ -90,8 +90,9 @@ export const createWorkbenchFocusController = ({
       : null;
 
   /**
-   * Leaves focus alone when it is already inside the container, and gives up if the container never shows, the
-   * project or account changes first, or the user presses somewhere else.
+   * Leaves focus alone while it is inside the container, and gives up if the container never shows, the project or
+   * account changes first, or the user presses somewhere else. Focus that starts inside is still watched: the opener
+   * can sit in the view the open replaces, which drops its focus a frame later.
    */
   const moveFocus = (target: WorkbenchFocusTarget, findContainer: () => HTMLElement | null): void => {
     // The control that asked, where a closing menu or dialog would put focus back.
@@ -127,12 +128,10 @@ export const createWorkbenchFocusController = ({
       const container = findContainer();
 
       if (container) {
-        if (!container.contains(document.activeElement)) {
-          if (!container.hasAttribute('tabindex')) {
-            container.tabIndex = -1;
-          }
-          settle(container, performance.now() + FOCUS_MOVE_SETTLE_MS);
+        if (!container.hasAttribute('tabindex')) {
+          container.tabIndex = -1;
         }
+        settle(container, performance.now() + FOCUS_MOVE_SETTLE_MS);
         return;
       }
 

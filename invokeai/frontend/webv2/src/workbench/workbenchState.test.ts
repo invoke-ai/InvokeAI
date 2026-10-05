@@ -917,6 +917,91 @@ describe('workbench widget region opening', () => {
     expect(getActiveProject(state).widgetRegions.bottom.instanceIds).toEqual(['diagnostics', 'queue']);
     expect(getActiveProject(state).widgetRegions.bottom.isCollapsed).toBe(false);
   });
+
+  describe('opening a side panel’s front instance in the center', () => {
+    // Edit shows Canvas in the center and keeps Preview a member of the right panel, behind Layers.
+    const editWithPreviewInRightPanel = (patch: (project: Project) => Project = (project) => project) => {
+      let state = workbenchReducer(createInitialWorkbenchState(), { presetId: 'edit', type: 'applyPreset' });
+      state = workbenchReducer(state, { region: 'right', type: 'selectRegionWidget', widgetId: 'preview' });
+
+      return {
+        ...state,
+        projects: state.projects.map((project) => (project.id === state.activeProjectId ? patch(project) : project)),
+      };
+    };
+    const openPreviewInCenter = (state: WorkbenchState) =>
+      getActiveProject(workbenchReducer(state, { region: 'center', type: 'openRegionWidget', widgetId: 'preview' }));
+
+    it('shows the one instance in the center while the panel fronts its neighbour', () => {
+      const before = editWithPreviewInRightPanel();
+      expect(getActiveProject(before).widgetRegions.right).toMatchObject({
+        activeInstanceId: 'preview',
+        instanceIds: ['layers', 'preview'],
+      });
+
+      const project = openPreviewInCenter(before);
+
+      expect(project.widgetRegions.center).toMatchObject({
+        activeInstanceId: 'preview',
+        instanceIds: ['canvas', 'preview'],
+      });
+      expect(project.widgetRegions.right).toMatchObject({
+        activeInstanceId: 'layers',
+        instanceIds: ['layers', 'preview'],
+        isCollapsed: false,
+      });
+      expect(Object.values(project.widgetInstances).filter((instance) => instance.typeId === 'preview')).toHaveLength(
+        1
+      );
+    });
+
+    it('moves only the pointer of a hidden panel, leaving it hidden', () => {
+      const project = openPreviewInCenter(
+        editWithPreviewInRightPanel((value) => ({
+          ...value,
+          layout: { ...value.layout, panels: { ...value.layout.panels, isRightOpen: false } },
+        }))
+      );
+
+      expect(project.layout.panels.isRightOpen).toBe(false);
+      expect(project.widgetRegions.right.activeInstanceId).toBe('layers');
+    });
+
+    it('collapses a panel holding nothing else', () => {
+      const project = openPreviewInCenter(
+        editWithPreviewInRightPanel((value) => ({
+          ...value,
+          widgetRegions: {
+            ...value.widgetRegions,
+            right: { ...value.widgetRegions.right, activeInstanceId: 'preview', instanceIds: ['preview'] },
+          },
+        }))
+      );
+
+      expect(project.widgetRegions.right).toMatchObject({ activeInstanceId: 'preview', isCollapsed: true });
+      expect(project.widgetRegions.center.activeInstanceId).toBe('preview');
+    });
+
+    it('leaves the bottom region alone, whose next member may be a status item with no panel', () => {
+      const before = editWithPreviewInRightPanel((value) => ({
+        ...value,
+        widgetRegions: {
+          ...value.widgetRegions,
+          bottom: {
+            ...value.widgetRegions.bottom,
+            activeInstanceId: 'preview',
+            instanceIds: ['server-status', 'preview'],
+            isCollapsed: false,
+          },
+        },
+      }));
+
+      const project = openPreviewInCenter(before);
+
+      expect(project.widgetRegions.bottom).toEqual(getActiveProject(before).widgetRegions.bottom);
+      expect(project.widgetRegions.right.activeInstanceId).toBe('layers');
+    });
+  });
 });
 
 describe('adopting a project from another realm', () => {
