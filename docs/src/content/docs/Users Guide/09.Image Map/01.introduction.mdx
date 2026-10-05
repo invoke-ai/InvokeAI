@@ -33,6 +33,21 @@ collection, initial indexing may take a while -- expect a gallery of
 20,000 images to take about 15 minutes to index. After this, the index
 is updated incrementally in the background.
 
+### Embedding storage
+
+On first startup after this update, InvokeAI converts saved image and video
+embeddings in one database transaction. It reuses saved vectors and does
+not run the embedding model again. InvokeAI creates a database backup
+before conversion. Large indexes can add one-time startup time. Restore
+that pre-upgrade backup before running an older application version.
+
+New embeddings use float16 on disk and decode to float32 for search and
+projections. This halves raw embedding BLOB storage. SQLite may retain
+freed pages, so the database file may not shrink by half. Search and
+projection calculations still use float32 in memory. Float16 quantization
+can slightly change similarity scores, so items with nearly equal scores
+can change order.
+
 ### Inactivating the Image Map
 
 If you wish to turn off Image Map indexing and hide its panel
@@ -88,4 +103,3 @@ the gallery, preview, or another browser tab) onto the search box. All
 similar images will be shown in the gallery.
 
 To exit search mode, click the "X" to the right of the search box.
-

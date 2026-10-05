@@ -6,6 +6,7 @@ import numpy as np
 from pydantic import BaseModel, ConfigDict, Field
 
 EMBEDDING_DTYPE = np.float32
+EMBEDDING_STORAGE_DTYPE = np.dtype("<f2")
 
 MediaKind = Literal["image", "video"]
 
@@ -64,51 +65,62 @@ class ProjectionRecord(BaseModel):
 
 
 def embedding_to_blob(embedding: np.ndarray) -> bytes:
-    """Serialize a 1-D embedding vector to bytes for BLOB storage.
+    """Serialize a 1-D embedding vector as contiguous little-endian float16 bytes.
 
-    The vector is stored as float32; a float64 input is narrowed. Callers are responsible for
-    L2-normalizing — this only rejects vectors that could not have been normalized, because a
-    non-finite value silently poisons every similarity and projection computation that later
-    touches the same batch, with no way to attribute it after the fact.
+    Callers are responsible for L2-normalizing. Narrowing can overflow or underflow, so validate
+    the stored representation as well as the input.
     """
     if embedding.ndim != 1:
         raise ValueError(f"Expected a 1-D embedding, got shape {embedding.shape}")
     if embedding.shape[0] == 0:
-        # A zero-dim row would be stored with dim=0 and then fail every batch it appears in,
-        # because `get_embeddings` requires one consistent dim across the result set.
         raise ValueError("Refusing to store a zero-length embedding")
     if not np.issubdtype(embedding.dtype, np.floating):
-        # Checked before the cast, which would otherwise raise TypeError (not the documented
-        # ValueError) on a structured dtype, and would silently discard the imaginary part of a
-        # complex one.
         raise ValueError(f"Expected a floating-point embedding, got dtype {embedding.dtype}")
-    with np.errstate(all="ignore"):
-        # Narrowing can overflow to inf or underflow to zero; both are reported below as
-        # ValueError. Suppressing every flag here keeps that true even if some caller has set
-        # `np.seterr(all="raise")` process-wide, which would otherwise surface as
-        # FloatingPointError and break this function's documented contract.
-        narrowed = np.ascontiguousarray(embedding, dtype=EMBEDDING_DTYPE)
-    if not np.isfinite(narrowed).all():
-        # Also catches a float64 magnitude that overflows to inf when narrowed to float32.
+    if not np.isfinite(embedding).all():
         raise ValueError("Embedding contains NaN or infinite values")
+
+    with np.errstate(all="ignore"):
+        narrowed = np.ascontiguousarray(embedding, dtype=EMBEDDING_STORAGE_DTYPE)
+    if not np.isfinite(narrowed).all():
+        raise ValueError("Embedding contains NaN or infinite values after narrowing to float16")
     if not narrowed.any():
-        # All-zero cannot be an L2-normalized vector. It arrives either from an encoder failure
-        # or from float64 components that underflowed to zero when narrowed, and it produces
-        # NaN in every cosine similarity it takes part in.
         raise ValueError("Refusing to store an all-zero embedding; it cannot be L2-normalized")
     return narrowed.tobytes()
 
 
-def blob_to_embedding(blob: bytes, dim: int) -> np.ndarray:
-    """Deserialize an embedding BLOB, validating its length against the stored dim.
+def blob_to_embedding(blob: bytes, dim: int, encoding: str) -> np.ndarray:
+    """Deserialize an explicitly encoded embedding BLOB, validating its dimension and contents.
 
-    Returns a read-only view over the blob; copy before mutating.
+    Returns a read-only float32 vector. Legacy float32 rows retain their stored values. Float16
+    rows decode to float32 and are renormalized after quantization.
     """
-    if len(blob) != dim * EMBEDDING_DTYPE().itemsize:
-        raise ValueError(
-            f"Embedding blob is {len(blob)} bytes; expected {dim * EMBEDDING_DTYPE().itemsize} for dim {dim}"
-        )
-    return np.frombuffer(blob, dtype=EMBEDDING_DTYPE)
+    if isinstance(dim, (bool, np.bool_)) or not isinstance(dim, (int, np.integer)) or dim <= 0:
+        raise ValueError(f"Embedding dimension must be a positive integer, got {dim!r}")
+    if encoding == "float32":
+        dtype = EMBEDDING_DTYPE
+    elif encoding == "float16":
+        dtype = EMBEDDING_STORAGE_DTYPE
+    else:
+        raise ValueError(f"Unsupported embedding encoding: {encoding!r}")
+
+    expected = int(dim) * np.dtype(dtype).itemsize
+    if len(blob) != expected:
+        raise ValueError(f"Embedding blob is {len(blob)} bytes; expected {expected} for {encoding} dimension {dim}")
+
+    decoded = np.frombuffer(blob, dtype=dtype)
+    if encoding == "float16":
+        decoded = decoded.astype(EMBEDDING_DTYPE)
+    if not np.isfinite(decoded).all():
+        raise ValueError("Embedding contains NaN or infinite values")
+    if not decoded.any():
+        raise ValueError("Refusing to read an all-zero embedding; it cannot be L2-normalized")
+
+    if encoding == "float16":
+        values64 = decoded.astype(np.float64)
+        norm = np.sqrt(np.sum(values64 * values64, dtype=np.float64))
+        decoded = (values64 / norm).astype(EMBEDDING_DTYPE)
+    decoded.setflags(write=False)
+    return decoded
 
 
 def coords_to_blob(coords: np.ndarray) -> bytes:

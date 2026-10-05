@@ -95,13 +95,13 @@ class ImageIndexRecordsSqlite(ImageIndexRecordsBase):
             # genuine bug and is allowed to propagate.
             cursor.execute(
                 f"""--sql
-                INSERT INTO {namespace.embeddings_table} ({namespace.name_column}, model_id, dim, embedding)
-                SELECT ?, ?, ?, ?
+                INSERT INTO {namespace.embeddings_table} ({namespace.name_column}, model_id, dim, embedding, encoding)
+                SELECT ?, ?, ?, ?, 'float16'
                 WHERE EXISTS (
                   SELECT 1 FROM {namespace.table} WHERE {namespace.table}.{namespace.name_column} = ?
                 )
                 ON CONFLICT ({namespace.name_column}, model_id)
-                DO UPDATE SET dim = excluded.dim, embedding = excluded.embedding;
+                DO UPDATE SET dim = excluded.dim, embedding = excluded.embedding, encoding = excluded.encoding;
                 """,
                 (item.name, model_id, embedding.shape[0], blob, item.name),
             )
@@ -112,7 +112,7 @@ class ImageIndexRecordsSqlite(ImageIndexRecordsBase):
         # Dedupe while preserving order so repeated input items cannot
         # double-count rows in downstream projection/similarity math.
         items = list(dict.fromkeys(items))
-        rows: dict[IndexedItem, tuple[int, bytes]] = {}
+        rows: dict[IndexedItem, tuple[int, bytes, str]] = {}
 
         # Only the reads happen under the transaction. Deserialization and validation are done
         # afterwards so a malformed row raises outside it: `transaction()` rolls the shared
@@ -126,14 +126,14 @@ class ImageIndexRecordsSqlite(ImageIndexRecordsBase):
                     placeholders = ",".join("?" * len(chunk))
                     cursor.execute(
                         f"""--sql
-                        SELECT {namespace.name_column}, dim, embedding
+                        SELECT {namespace.name_column}, dim, embedding, encoding
                         FROM {namespace.embeddings_table}
                         WHERE model_id = ? AND {namespace.name_column} IN ({placeholders});
                         """,
                         (model_id, *chunk),
                     )
-                    for name, dim, blob in cursor.fetchall():
-                        rows[IndexedItem(namespace.kind, name)] = (dim, blob)
+                    for name, dim, blob, encoding in cursor.fetchall():
+                        rows[IndexedItem(namespace.kind, name)] = (dim, blob, encoding)
 
         # Read back in the caller's order: the returned matrix's rows align with it.
         found_items = [item for item in items if item in rows]
@@ -141,12 +141,12 @@ class ImageIndexRecordsSqlite(ImageIndexRecordsBase):
         dim: int | None = None
         vectors: list[np.ndarray] = []
         for item in found_items:
-            row_dim, blob = rows[item]
+            row_dim, blob, encoding = rows[item]
             if dim is None:
                 dim = row_dim
             elif row_dim != dim:
                 raise ValueError(f"Inconsistent embedding dims for model {model_id}: found {row_dim} and {dim}")
-            vectors.append(blob_to_embedding(blob, row_dim))
+            vectors.append(blob_to_embedding(blob, row_dim, encoding))
 
         if not vectors:
             return [], np.empty((0, 0), dtype=EMBEDDING_DTYPE)

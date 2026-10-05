@@ -881,7 +881,9 @@ def test_reinstalled_encoder_keeping_its_key_embeds_with_the_new_weights(
         expected = (expected / expected.norm()).numpy()
         stored = index_records.get_embeddings([item], replacement.hash)[1][0]
         assert not np.allclose(expected, retired_embedding, atol=1e-3), "the two encoders must disagree"
-        np.testing.assert_allclose(stored, expected, atol=1e-5)
+        np.testing.assert_allclose(stored, expected, atol=1e-4)
+        cosine = float(np.dot(stored.astype(np.float64), expected.astype(np.float64)))
+        assert 1.0 - cosine <= 1e-6
     finally:
         service.stop()
         cache.shutdown()
