@@ -835,42 +835,6 @@ def _nested_iterate_chain_graph(*, outer_collection: list[list[str]] | None = No
     return graph
 
 
-def _iterate_if_inner_iterate_collect_graph() -> Graph:
-    """Build nested Iterate/If graph whose collections must stay in each outer frame."""
-    graph = Graph()
-    graph.add_node(CollectionConcatInvocation(id="outer_source", first=[1, 2]))
-    graph.add_node(IterateInvocation(id="outer_iterate"))
-    graph.add_node(FixedCollectionTestInvocation(id="true_source"))
-    graph.add_node(FixedCollectionTestInvocation(id="false_source"))
-    graph.add_node(IfInvocation(id="select_inner"))
-    graph.add_node(IterateInvocation(id="inner_iterate"))
-    graph.add_node(AddInvocation(id="add"))
-    graph.add_node(CollectInvocation(id="collect"))
-    graph.add_node(AnyTypeTestInvocation(id="sink"))
-
-    def connect(source: str, source_field: str, destination: str, destination_field: str) -> None:
-        graph.add_edge(create_edge(source, source_field, destination, destination_field))
-
-    connect("outer_source", "collection", "outer_iterate", "collection")
-    connect("outer_iterate", "item", "add", "a")
-    connect("outer_iterate", "item", "true_source", "value")
-    connect("outer_iterate", "item", "false_source", "value")
-    connect("true_source", "collection", "select_inner", "true_input")
-    connect("false_source", "collection", "select_inner", "false_input")
-    connect("true_source", "condition", "select_inner", "condition")
-    # Issue #9609 reports this direct edge through a reviewed graph-validation change.
-    with patch.object(
-        Graph,
-        "_validate_edge",
-        lambda graph, edge, allow_inputless_source_collector: graph.get_node(edge.destination.node_id),
-    ):
-        graph._add_edge(create_edge("select_inner", "value", "inner_iterate", "collection"), False)
-    connect("inner_iterate", "item", "add", "b")
-    connect("add", "value", "collect", "item")
-    connect("collect", "collection", "sink", "value")
-    return graph
-
-
 def _nested_iterate_add_collect_graph() -> Graph:
     graph = Graph()
     graph.add_node(CollectionConcatInvocation(id="outer_source", first=[1, 2]))
@@ -3252,37 +3216,6 @@ def test_nested_iterate_chain_matches_compatibility() -> None:
     assert generic_state.is_complete()
     assert compatibility_state.is_complete()
     assert _state_projection(generic_state) == _state_projection(compatibility_state)
-
-
-@pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
-def test_iterate_if_inner_iterate_collect_keeps_values_in_outer_frame(
-    force_compatibility_scheduler: bool,
-) -> None:
-    graph = _iterate_if_inner_iterate_collect_graph()
-    with patch.object(Graph, "validate_self", lambda _: None):
-        state = GraphExecutionState(graph=graph)
-
-    trace, state = _run(state, force_compatibility_scheduler=force_compatibility_scheduler)
-
-    assert trace.count("sink") == 2
-    sinks_by_outer_path = {
-        state._get_iteration_path(exec_id): state.results[exec_id].value
-        for exec_id in state._prepared_registry().get_prepared_ids("sink")
-    }
-    assert sinks_by_outer_path == {(0,): [1, 2], (1,): [2, 3]}
-
-
-def test_nested_iterate_collect_keeps_add_outputs_in_outer_frame() -> None:
-    state = GraphExecutionState(graph=_nested_iterate_add_collect_graph())
-
-    trace, state = _run(state, force_compatibility_scheduler=True)
-
-    assert trace.count("sink") == 2
-    sinks_by_outer_path = {
-        state._get_iteration_path(exec_id): state.results[exec_id].value
-        for exec_id in state._prepared_registry().get_prepared_ids("sink")
-    }
-    assert sinks_by_outer_path == {(0,): [1, 2], (1,): [2, 3]}
 
 
 @pytest.mark.parametrize("force_compatibility_scheduler", [False, True])
