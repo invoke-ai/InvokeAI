@@ -185,6 +185,8 @@ const PALETTE_HIDDEN_COMMANDS = new Set([
   'gallery.moveFocusRight',
   'gallery.moveFocusUp',
   'gallery.toggleFocusedInSelection',
+  'viewer.nextItem',
+  'viewer.previousItem',
 ]);
 
 /** App-category commands regrouped into palette-facing sections. */

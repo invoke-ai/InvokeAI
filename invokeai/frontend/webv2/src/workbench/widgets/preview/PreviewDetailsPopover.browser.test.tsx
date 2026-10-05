@@ -6,16 +6,22 @@ import type * as GalleryQueriesModule from '@features/gallery/queries';
 import type * as IdentityModule from '@features/identity';
 import type { ImageActions } from '@workbench/image-actions';
 import type { ImageMapImageLabels } from '@workbench/image-map/api';
+import type { WidgetContributionSource } from '@workbench/widgetContracts';
+import type * as WorkbenchContextModule from '@workbench/WorkbenchContext';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
+import { createExtensionRegistry, type ExtensionRegistry } from '@workbench/extensions/extensionRegistry';
+import { FocusRegionProvider, useFocusRegionProps } from '@workbench/focusRegions';
+import { createTestFocusController } from '@workbench/focusRegions.testing';
+import { WorkbenchHotkeyRuntime } from '@workbench/hotkeys/WorkbenchHotkeyRuntime';
 import { createInstance } from 'i18next';
 import { act, useState } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { page } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { PreviewDetailsPopover } from './PreviewDetailsPopover';
 
@@ -39,6 +45,7 @@ vi.mock('@features/gallery', async (importOriginal) => {
   };
 });
 const mocks = vi.hoisted(() => ({
+  extensions: null as unknown as ExtensionRegistry,
   getImageLabels: vi.fn<() => Promise<ImageMapImageLabels | null>>(),
   indexAvailability: { modelName: null, state: 'disabled' } as ImageIndexAvailability,
 }));
@@ -50,6 +57,20 @@ vi.mock('@features/gallery/queries', async (importOriginal) => ({
     queryKey: ['test-image-index-availability'],
   }),
 }));
+// Preview is the center region's active widget; the workbench hotkey runtime routes keys by it.
+const project = {
+  id: 'project-1',
+  widgetInstances: { 'preview-instance': { id: 'preview-instance', typeId: 'preview' } },
+  widgetRegions: { center: { activeInstanceId: 'preview-instance', instanceIds: ['preview-instance'] } },
+};
+vi.mock('@workbench/WorkbenchContext', async (importOriginal) => ({
+  ...(await importOriginal<typeof WorkbenchContextModule>()),
+  useActiveProjectSelector: (selector: (value: typeof project) => unknown) => selector(project),
+  useOptionalWorkbenchExtensions: () => mocks.extensions,
+  useWorkbenchExtensions: () => mocks.extensions,
+}));
+// They need the whole application; the test registers Preview's step binding itself.
+vi.mock('@workbench/hotkeys/firstPartyCommands', () => ({ useRegisterFirstPartyCommands: () => {} }));
 vi.mock('@workbench/image-map/imageLabelCache', () => ({ getImageLabels: mocks.getImageLabels }));
 vi.mock('@features/identity', async (importOriginal) => {
   const actual = await importOriginal<typeof IdentityModule>();
@@ -158,7 +179,14 @@ const Widget = ({ item }: { item: GalleryImageItem | GalleryVideoItem }) => {
   const [stage, setStage] = useState<HTMLDivElement | null>(null);
 
   return (
-    <div role="region" style={{ display: 'flex', flexDirection: 'column', height: 360, width: 640 }}>
+    <div
+      {...useFocusRegionProps('center')}
+      data-hotkey-widget-instance-id="preview-instance"
+      data-hotkey-widget-region="center"
+      data-hotkey-widget-type-id="preview"
+      role="region"
+      style={{ display: 'flex', flexDirection: 'column', height: 360, width: 640 }}
+    >
       <div style={{ display: 'flex', height: 32, justifyContent: 'flex-end' }}>
         <PreviewDetailsPopover
           actions={actions}
@@ -170,7 +198,7 @@ const Widget = ({ item }: { item: GalleryImageItem | GalleryVideoItem }) => {
           onOpenChange={onOpenChange}
         />
       </div>
-      <div ref={setStage} data-testid="stage" style={{ flex: 1, minHeight: 0 }} />
+      <div ref={setStage} data-testid="stage" style={{ flex: 1, minHeight: 0 }} tabIndex={-1} />
       <div data-testid="filmstrip" style={{ height: 60 }} />
     </div>
   );
@@ -182,7 +210,10 @@ const render = async (item: GalleryImageItem | GalleryVideoItem) => {
       <QueryClientProvider client={queryClient}>
         <I18nextProvider i18n={i18n}>
           <ChakraProvider value={system}>
-            <Widget item={item} />
+            <FocusRegionProvider controller={createTestFocusController()}>
+              <WorkbenchHotkeyRuntime />
+              <Widget item={item} />
+            </FocusRegionProvider>
           </ChakraProvider>
         </I18nextProvider>
       </QueryClientProvider>
@@ -207,6 +238,7 @@ const expectBoundedByStage = () => {
 };
 
 beforeEach(() => {
+  mocks.extensions = createExtensionRegistry();
   onOpenChange.mockReset();
   mocks.getImageLabels.mockReset();
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -317,6 +349,43 @@ describe('PreviewDetailsPopover', () => {
     expect(document.body.textContent).toContain('image workflow');
     // Nothing behind Graph, so it is not offered.
     await expect.element(page.getByRole('tab', { name: 'Graph' })).toHaveAttribute('aria-disabled', 'true');
+  });
+
+  it('moves between its tabs with the arrows without stepping the previewed item', async () => {
+    // Preview's own step binding, as the widget registers it.
+    const source: WidgetContributionSource = {
+      instanceId: 'preview-instance',
+      projectId: 'project-1',
+      region: 'center',
+      typeId: 'preview',
+    };
+    const step = vi.fn();
+    mocks.extensions.commands.register({ handler: step, id: 'viewer.nextItem', source, title: 'Show next item' });
+    mocks.extensions.hotkeys.register({
+      commandId: 'viewer.nextItem',
+      defaultKeys: ['arrowright'],
+      id: 'viewer.nextItem',
+      scope: 'widget',
+      source,
+      title: 'Show next item',
+    });
+    await render(imageItem);
+    const press = async (target: HTMLElement) => {
+      await act(async () => {
+        target.focus();
+        await userEvent.keyboard('{ArrowRight}');
+      });
+    };
+
+    // On the stage the binding is live.
+    await press(stage());
+    expect(step).toHaveBeenCalledTimes(1);
+
+    const detailsTab = document.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]')!;
+    expect(detailsTab.textContent).toBe('Details');
+    await press(detailsTab);
+    await expect.element(page.getByRole('tab', { name: 'Metadata' })).toHaveAttribute('aria-selected', 'true');
+    expect(step).toHaveBeenCalledTimes(1);
   });
 
   it('bounds video details by the stage too', async () => {

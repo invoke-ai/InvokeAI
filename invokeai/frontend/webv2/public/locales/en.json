@@ -2738,6 +2738,8 @@
       "commands": {
         "deletePreviewImage": "Delete preview image",
         "nextComparisonMode": "Next comparison mode",
+        "nextItem": "Show next item",
+        "previousItem": "Show previous item",
         "swapComparisonImages": "Swap comparison images",
         "toggleFilmstrip": "Toggle filmstrip",
         "zoomToActual": "Zoom preview to 100%",

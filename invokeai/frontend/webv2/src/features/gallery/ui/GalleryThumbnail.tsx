@@ -15,6 +15,9 @@ import { getGalleryItemDragData, getGalleryItemDragId } from './galleryDnd';
 import { GalleryTileFrame } from './GalleryTileFrame';
 
 /** Desaturate armed and active touch drags, including the portalled preview. */
+/** The grid's one thumbnail Tab stop: the tile keyboard focus returns to. */
+export const GALLERY_TAB_STOP_SELECTOR = 'button[data-gallery-item-key][tabindex="0"]';
+
 const THUMBNAIL_DRAG_CSS = { filter: 'saturate(0)' } as const;
 const THUMBNAIL_ARMED_CSS = { '&[data-drag-armed=true]': { filter: 'saturate(0)' } } as const;
 

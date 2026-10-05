@@ -848,4 +848,171 @@ describe('Gallery grid keyboard focus', () => {
     expect(selectedKey()).toBe('image:starred-1.png');
     expect(focusedThumbnail()).toBe('starred-1.png');
   });
+
+  it('steps Shift and mod arrows from a followed in-progress tile to its neighbour, never the first starred tile', async () => {
+    const strip = [createItem('starred-0.png', { starred: true }), createItem('starred-1.png', { starred: true })];
+    await renderGrid(createItems(40), { sessions: [createSession('running', 'running')], strip });
+    await act(() => userEvent.click(thumbnail('image-1.png')!));
+    await settle();
+
+    // Up from the listing's first row follows the running tile above it.
+    await press('{ArrowUp}');
+    expect(state.followedSessionId).toBe('running');
+    expect(document.activeElement?.getAttribute('data-gallery-session-id')).toBe('running');
+
+    // Focus alone moves past the tile to the next thumbnail, which follows it in the listing, then on along it.
+    await press('{Control>}{ArrowRight}{/Control}');
+    expect(focusedThumbnail()).toBe('image-0.png');
+    await press('{Control>}{ArrowRight}{/Control}');
+    expect(focusedThumbnail()).toBe('image-1.png');
+    await press('{Control>}{ArrowRight}{/Control}');
+    expect(focusedThumbnail()).toBe('image-2.png');
+    expect(selectedKey()).toBe('image:image-1.png');
+
+    await press('{Control>}{ArrowLeft}{ArrowLeft}{/Control}');
+    expect(focusedThumbnail()).toBe('image-0.png');
+
+    await press('{ArrowUp}');
+    expect(state.followedSessionId).toBe('running');
+
+    // A range runs from the selection to that same neighbour.
+    await press('{Shift>}{ArrowRight}{/Shift}');
+    await until(() => expect(selectedKey()).toBe('image:image-0.png'));
+    expect(selectedKeys()).toEqual(['image:image-0.png', 'image:image-1.png']);
+    expect(focusedThumbnail()).toBe('image-0.png');
+  });
+
+  it('steps from a clicked thumbnail while a run is followed, also after a resubmit follows it again', async () => {
+    const strip = [createItem('starred-0.png', { starred: true }), createItem('starred-1.png', { starred: true })];
+    const items = createItems(40);
+    // The user's sequence: a run is followed live when they click a thumbnail, which pauses following.
+    await renderGrid(items, {
+      followedSessionId: 'running',
+      selected: null,
+      sessions: [createSession('running', 'running')],
+      strip,
+    });
+    await act(() => userEvent.click(thumbnail('image-4.png')!));
+    await settle();
+    expect(state.followedSessionId).toBeNull();
+
+    await press('{ArrowRight}');
+    expect(selectedKey()).toBe('image:image-5.png');
+
+    // Invoking again follows the new run while the thumbnail keeps keyboard focus: the arrows step from that tile,
+    // whether the In progress section is shown or collapsed.
+    for (const [collapsed, expected] of [
+      [false, 'image-6.png'],
+      [true, 'image-7.png'],
+    ] as const) {
+      await act(() => {
+        setGallery({ settings: { ...state.gallery.settings, progressSectionCollapsed: collapsed } });
+        setState({ followedSessionId: 'running' });
+      });
+      await press('{ArrowRight}');
+      expect(selectedKey()).toBe(`image:${expected}`);
+      expect(focusedThumbnail()).toBe(expected);
+    }
+  });
+
+  it('steps from the selection while the followed tile is collapsed out of the grid', async () => {
+    const strip = [createItem('starred-0.png', { starred: true }), createItem('starred-1.png', { starred: true })];
+    const items = createItems(40);
+    await renderGrid(items, {
+      followedSessionId: 'running',
+      selected: items[4]!,
+      sessions: [createSession('running', 'running')],
+      settings: { progressSectionCollapsed: true },
+      strip,
+    });
+    // Collapsing the section leaves focus on its disclosure, outside every thumbnail.
+    await act(() => host!.querySelector<HTMLButtonElement>('[data-progress-disclosure]')!.focus());
+
+    await press('{ArrowRight}');
+    expect(selectedKey()).toBe('image:image-5.png');
+    expect(focusedThumbnail()).toBe('image-5.png');
+
+    // Each resubmit follows live again; with focus off the thumbnails and the tile still hidden, the arrows keep
+    // stepping from the selection.
+    for (const expected of ['image-6.png', 'image-7.png']) {
+      await act(() => {
+        host!.querySelector<HTMLButtonElement>('[data-progress-disclosure]')!.focus();
+        setState({ followedSessionId: 'running' });
+      });
+      await press('{ArrowRight}');
+      expect(selectedKey()).toBe(`image:${expected}`);
+    }
+
+    // Shown, the followed tile is where the arrows start, as in Preview: right of it is the listing's first tile.
+    await act(() => setGallery({ settings: { ...state.gallery.settings, progressSectionCollapsed: false } }));
+    await act(() => {
+      host!.querySelector<HTMLButtonElement>('[data-progress-disclosure]')!.focus();
+      setState({ followedSessionId: 'running' });
+    });
+    await press('{ArrowRight}');
+    expect(selectedKey()).toBe('image:image-0.png');
+  });
+
+  it('starts from the first thumbnail in view, not the first starred one, when no cursor is on screen', async () => {
+    const strip = [createItem('starred-0.png', { starred: true }), createItem('starred-1.png', { starred: true })];
+    await renderGrid(createItems(400), { selected: null, strip });
+    // Scrolled well past the strip with nothing selected and focus on the grid itself, off every thumbnail.
+    await act(() => {
+      viewport().scrollTop = 3000;
+    });
+    await until(() => expect(thumbnail('image-0.png')).toBeNull());
+    await act(() => viewport().focus());
+
+    await press('{ArrowRight}');
+
+    const landed = selectedKey()!.replace(/^image:/, '');
+    expect(landed).not.toBe('starred-0.png');
+    expect(isInView(thumbnail(landed)!)).toBe(true);
+    expect(focusedThumbnail()).toBe(landed);
+  });
+
+  it('returns focus to the thumbnail Tab stop, not the first starred tile, when the last followed run ends', async () => {
+    const strip = [createItem('starred-0.png', { starred: true }), createItem('starred-1.png', { starred: true })];
+    await renderGrid(createItems(40), { sessions: [createSession('running', 'running')], strip });
+    await act(() => userEvent.click(thumbnail('image-1.png')!));
+    await settle();
+    // With no selection, the Tab stop is the thumbnail focus was last on.
+    await press('{Escape}');
+    expect(selectedKey()).toBeNull();
+    expect(focusedThumbnail()).toBe('image-1.png');
+
+    await press('{ArrowUp}');
+    expect(document.activeElement?.getAttribute('data-gallery-session-id')).toBe('running');
+
+    // The run finishes; its tile, holding focus, leaves with the whole In progress section.
+    await act(() => setState({ followedSessionId: null, sessions: [] }));
+    await until(() => expect(focusedThumbnail()).toBe('image-1.png'));
+  });
+
+  it('keeps stepping from the selection as results arrive above it and as it moves into the strip', async () => {
+    const strip = [createItem('starred-0.png', { starred: true }), createItem('starred-1.png', { starred: true })];
+    const items = createItems(40);
+    await renderGrid(items, { sessions: [createSession('running', 'running')], strip });
+    await act(() => userEvent.click(thumbnail('image-4.png')!));
+    await settle();
+
+    await press('{ArrowRight}');
+    expect(selectedKey()).toBe('image:image-5.png');
+
+    // The run finishes: its result lands at the top of the listing and its tile leaves, shifting every row.
+    const result = createItem('result-0.png');
+    await act(() => setState({ gallery: { ...state.gallery, items: [result, ...state.gallery.items] }, sessions: [] }));
+    await until(() => expect(focusedThumbnail()).toBe('image-5.png'));
+
+    await press('{ArrowRight}');
+    expect(selectedKey()).toBe('image:image-6.png');
+    expect(focusedThumbnail()).toBe('image-6.png');
+
+    // Starred, the selection moves to the strip's end; the next step is from there, onto the listing's first tile.
+    await press('.');
+    await until(() => expect(document.activeElement?.closest('[data-gallery-section="starred"]')).not.toBeNull());
+    await press('{ArrowRight}');
+    expect(selectedKey()).toBe('image:result-0.png');
+    expect(focusedThumbnail()).toBe('result-0.png');
+  });
 });

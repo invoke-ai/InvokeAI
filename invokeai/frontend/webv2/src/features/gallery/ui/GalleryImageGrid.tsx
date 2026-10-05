@@ -51,7 +51,7 @@ import {
 } from './galleryGridLayout';
 import { focusVisibleOperable, GalleryLoadErrorState, GalleryLoadNotice, GalleryRetryButton } from './GalleryLoadError';
 import { GalleryProgressSection } from './GalleryProgressSection';
-import { GalleryThumbnailCell } from './GalleryThumbnail';
+import { GALLERY_TAB_STOP_SELECTOR, GalleryThumbnailCell } from './GalleryThumbnail';
 import { useGalleryUi } from './GalleryUiContext';
 import { useGalleryWidget, type GalleryStarredStrip } from './GalleryWidgetContext';
 import { useGalleryGridHotkeys } from './useGalleryGridHotkeys';
@@ -226,7 +226,6 @@ const GalleryStarredSection = ({
 
 /** A tile's own select button, not the star toggle layered over it. */
 const TILE_BUTTON_SELECTOR = '[role="listitem"] button[aria-pressed]';
-const TAB_STOP_SELECTOR = 'button[data-gallery-item-key][tabindex="0"]';
 
 const NO_ITEMS: GalleryItem[] = [];
 const GRID_OVERSCAN_ROWS = 4;
@@ -365,10 +364,6 @@ export const GalleryImageGrid = () => {
       gallery.items.map((item) => ({ item, kind: 'item' })),
     ];
   }, [gallery.items, gallery.selectedItemKey, isProgressOpen, progressSessions, shownStripItems, starredStrip.items]);
-  const cursorKey =
-    followedProgressSessionId !== null
-      ? getGallerySessionNavigationKey(followedProgressSessionId)
-      : gallery.selectedItemKey;
 
   // Thumbnails in visual order, strip first. They share one thumbnail Tab stop: the tile focus was last on, else the
   // selection, else the tile that took the focused one's place in the same scope (after a deletion, the neighbour
@@ -502,7 +497,7 @@ export const GalleryImageGrid = () => {
     if (viewport && (active === null || active === document.body)) {
       (
         viewport.querySelector<HTMLElement>(`[data-gallery-item-key="${CSS.escape(itemKey)}"]`) ??
-        viewport.querySelector<HTMLElement>(TAB_STOP_SELECTOR) ??
+        viewport.querySelector<HTMLElement>(GALLERY_TAB_STOP_SELECTOR) ??
         viewport
       ).focus({ preventScroll: true });
     }
@@ -521,7 +516,33 @@ export const GalleryImageGrid = () => {
 
     return sessionId ? getGallerySessionNavigationKey(sessionId) : getTileItemKey(active);
   };
-  const getCursorKey = () => getFocusedTileKey() ?? cursorKey;
+  // A followed session the grid does not show (its section collapsed) gives way to the selection.
+  const getCursorCandidates = () => [
+    getFocusedTileKey(),
+    followedProgressSessionId === null ? null : getGallerySessionNavigationKey(followedProgressSessionId),
+    gallery.selectedItemKey,
+  ];
+  /** The first thumbnail in view, where the arrows start when no cursor is on screen. */
+  const getFirstVisibleTileKey = (): string | null => {
+    const viewport = viewportRef.current;
+
+    if (!viewport) {
+      return null;
+    }
+
+    const bounds = viewport.getBoundingClientRect();
+
+    // Document order is visual order: the pinned strip, then the rendered listing rows by index.
+    for (const tile of viewport.querySelectorAll<HTMLElement>('button[data-gallery-item-key]')) {
+      const rect = tile.getBoundingClientRect();
+
+      if (rect.bottom > bounds.top && rect.top < bounds.bottom) {
+        return tile.getAttribute('data-gallery-item-key');
+      }
+    }
+
+    return null;
+  };
   const getFocusedItem = () => {
     const key = getTileItemKey(document.activeElement);
 
@@ -569,14 +590,16 @@ export const GalleryImageGrid = () => {
       return undefined;
     }
 
-    return () => (opener.isConnected ? opener : (viewport.querySelector<HTMLElement>(TAB_STOP_SELECTOR) ?? viewport));
+    return () =>
+      opener.isConnected ? opener : (viewport.querySelector<HTMLElement>(GALLERY_TAB_STOP_SELECTOR) ?? viewport);
   };
 
   useGalleryGridHotkeys({
     actionSelectionRefs,
     columnCount,
-    getCursorKey,
+    getCursorCandidates,
     getDialogReturnFocus,
+    getFirstVisibleTileKey,
     getFocusedItem,
     loadedItems,
     moveToEntry,

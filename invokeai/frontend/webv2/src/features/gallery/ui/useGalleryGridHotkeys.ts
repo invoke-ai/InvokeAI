@@ -2,7 +2,7 @@ import type { GalleryItem, GalleryItemKey, GalleryItemRef } from '@features/gall
 import type { GalleryNavigationDirection, GalleryNavigationEntry } from '@features/gallery/core/selection';
 
 import { shouldStarSelection, toGalleryItemKey, toGalleryItemRef } from '@features/gallery/core/items';
-import { getGalleryNavigationStep } from '@features/gallery/core/selection';
+import { getGalleryNavigationCursor, getGalleryNavigationStep } from '@features/gallery/core/selection';
 import { useEffect, useEffectEvent, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -60,10 +60,6 @@ const GALLERY_HOTKEYS = [
   readonly string[],
 ])[];
 
-/** Ranges and focus moves step between items only; in-progress sessions are followed, never selected. */
-const withoutSessions = (sections: readonly (readonly GalleryNavigationEntry[])[]) =>
-  sections.map((section) => section.filter((entry) => entry.kind === 'item'));
-
 /**
  * Read current handler state without re-registering commands on selection changes, avoiding palette and hotkey
  * churn.
@@ -71,8 +67,9 @@ const withoutSessions = (sections: readonly (readonly GalleryNavigationEntry[])[
 export const useGalleryGridHotkeys = ({
   actionSelectionRefs,
   columnCount,
-  getCursorKey,
+  getCursorCandidates,
   getDialogReturnFocus,
+  getFirstVisibleTileKey,
   getFocusedItem,
   loadedItems,
   moveToEntry,
@@ -82,10 +79,15 @@ export const useGalleryGridHotkeys = ({
 }: {
   actionSelectionRefs: GalleryItemRef[];
   columnCount: number;
-  /** Where the arrow keys step from: the tile holding keyboard focus, else the followed session or selected item. */
-  getCursorKey: () => string | null;
+  /**
+   * Where the arrow keys step from, in priority order: the tile holding keyboard focus, the followed session, the
+   * selected item. The first the grid shows is the cursor.
+   */
+  getCursorCandidates: () => (string | null)[];
   /** Where focus returns from a dialog a command opens; undefined leaves that to the dialog. */
   getDialogReturnFocus: () => (() => HTMLElement | null) | undefined;
+  /** The first thumbnail in view: where the arrows land when no cursor is on screen. */
+  getFirstVisibleTileKey: () => string | null;
   /** The thumbnail holding keyboard focus, if any. */
   getFocusedItem: () => GalleryItem | null;
   /** Everything on hand for star-state lookups, strip included. */
@@ -107,13 +109,20 @@ export const useGalleryGridHotkeys = ({
   const keyboardRangeRef = useRef<{ anchorKey: GalleryItemKey | null; reachedKey: GalleryItemKey } | null>(null);
 
   const navigate = useEffectEvent((direction: GalleryNavigationDirection, mode: GalleryNavigationMode) => {
-    const cursorKey = getCursorKey();
-    const entry = getGalleryNavigationStep(
-      mode === 'select' ? navigationSections : withoutSessions(navigationSections),
-      cursorKey,
-      direction,
-      columnCount
-    );
+    const cursorKey = getGalleryNavigationCursor(navigationSections, getCursorCandidates());
+    // Ranges and focus moves step between items only: in-progress sessions are followed, never selected. They stay in
+    // the sections, since one can be where the step starts.
+    const firstVisibleKey = cursorKey === null ? getFirstVisibleTileKey() : null;
+    // With no cursor on screen the arrows start where the user is looking, not at the top of the sequence.
+    const entry =
+      (firstVisibleKey === null
+        ? null
+        : navigationSections
+            .flat()
+            .find((candidate) => candidate.kind === 'item' && toGalleryItemKey(candidate.item) === firstVisibleKey)) ??
+      getGalleryNavigationStep(navigationSections, [cursorKey], direction, columnCount, {
+        itemsOnly: mode !== 'select',
+      });
 
     if (!entry) {
       return;

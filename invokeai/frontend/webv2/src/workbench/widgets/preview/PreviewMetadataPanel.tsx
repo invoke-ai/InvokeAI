@@ -15,7 +15,7 @@ import {
   type ImageRecallKind,
 } from '@workbench/image-actions';
 import { CopyIcon } from 'lucide-react';
-import { useCallback, type ReactNode } from 'react';
+import { useCallback, type KeyboardEvent, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { parsePreviewMetadata, type PreviewMetadataEntry } from './previewMetadata';
@@ -26,6 +26,15 @@ import { parsePreviewMetadata, type PreviewMetadataEntry } from './previewMetada
  */
 
 const GROUP_HOVER_VISIBLE = { opacity: 1 };
+
+const TAB_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'End', 'Home']);
+
+/** The tab list moves between its tabs with these keys; Preview's arrow bindings must not step the item too. */
+const keepTabKeys = (event: KeyboardEvent<HTMLElement>) => {
+  if (TAB_KEYS.has(event.key)) {
+    event.stopPropagation();
+  }
+};
 
 /**
  * Offer field recall only where a dedicated verb exists; model/steps/scheduler retain copy and use All/Remix for
@@ -254,7 +263,7 @@ const DetailsTabs = ({
       unmountOnExit
       variant="outline"
     >
-      <Tabs.List flexShrink={0}>
+      <Tabs.List flexShrink={0} onKeyDown={keepTabKeys}>
         {details ? (
           <Tabs.Trigger fontSize="xs" value="details">
             {t('widgets.preview.details')}

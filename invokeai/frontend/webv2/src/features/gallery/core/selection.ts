@@ -177,8 +177,8 @@ export const claimGalleryNavigationSequence = (): number => ++navigationSequence
 export const isGalleryNavigationCurrent = (sequence: number): boolean => sequence === navigationSequence;
 
 /*
- * Grid and Preview share section order; horizontal navigation crosses seams while vertical navigation preserves
- * columns.
+ * Grid and Preview share section order: the starred strip, the in-progress sessions, then the listing. Horizontal
+ * navigation crosses seams while vertical navigation preserves columns.
  */
 
 export type GalleryNavigationEntry =
@@ -192,26 +192,42 @@ export const getGallerySessionNavigationKey = (sessionId: string): string => `se
 const getGalleryNavigationEntryKey = (entry: GalleryNavigationEntry): string =>
   entry.kind === 'item' ? toGalleryItemKey(entry.item) : getGallerySessionNavigationKey(entry.id);
 
-const isNavigable = (entry: GalleryNavigationEntry | undefined): entry is GalleryNavigationEntry =>
-  entry !== undefined && (entry.kind === 'item' || entry.navigable);
+/**
+ * Where an arrow steps from: the first candidate the sections show. A candidate they do not show (a followed session
+ * under a collapsed section, a selection on another page) is passed over rather than read as no cursor at all; null
+ * means no candidate is shown.
+ */
+export const getGalleryNavigationCursor = (
+  sections: readonly (readonly GalleryNavigationEntry[])[],
+  cursorKeys: readonly (string | null)[]
+): string | null => {
+  const shownKeys = new Set(sections.flat().map(getGalleryNavigationEntryKey));
+
+  return cursorKeys.find((key): key is string => key !== null && shownKeys.has(key)) ?? null;
+};
 
 /**
  * Each section starts its own rows. Vertical navigation preserves columns, selects the nearest navigable cell, and
- * skips empty rows; no cursor starts at the first entry.
+ * skips empty rows; with no cursor shown it starts at the first navigable entry. `itemsOnly` steps over sessions
+ * without removing them, so a session can still be the cursor and still holds its rows.
  */
 export const getGalleryNavigationStep = (
   sections: readonly (readonly GalleryNavigationEntry[])[],
-  cursorKey: string | null,
+  cursorKeys: readonly (string | null)[],
   direction: GalleryNavigationDirection,
-  columnCount = 1
+  columnCount = 1,
+  { itemsOnly = false }: { itemsOnly?: boolean } = {}
 ): GalleryNavigationEntry | null => {
+  const isNavigable = (entry: GalleryNavigationEntry | undefined): entry is GalleryNavigationEntry =>
+    entry !== undefined && (entry.kind === 'item' || (!itemsOnly && entry.navigable));
   const entries = sections.flat();
-  const index =
-    cursorKey === null ? -1 : entries.findIndex((entry) => getGalleryNavigationEntryKey(entry) === cursorKey);
+  const cursorKey = getGalleryNavigationCursor(sections, cursorKeys);
 
-  if (index === -1) {
+  if (cursorKey === null) {
     return entries.find(isNavigable) ?? null;
   }
+
+  const index = entries.findIndex((entry) => getGalleryNavigationEntryKey(entry) === cursorKey);
 
   if (direction === 'left' || direction === 'right') {
     const step = direction === 'right' ? 1 : -1;
