@@ -1016,7 +1016,8 @@ describe('InvocationFlowNode chrome and export', () => {
     });
 
     await render(adapter, 1, false, nodes);
-    await vi.waitFor(() => expect(host.textContent).toContain(i18n.t('nodes.stylePresetMissing')));
+    // The record lookup settles asynchronously; the default one-second wait is too short on a loaded machine.
+    await vi.waitFor(() => expect(host.textContent).toContain(i18n.t('nodes.stylePresetMissing')), { timeout: 5_000 });
     await render(adapter, 1, true, nodes);
     await exportWorkflowAsPng({
       bounds: { x: 20, y: 20, width: 300, height: 260 },
