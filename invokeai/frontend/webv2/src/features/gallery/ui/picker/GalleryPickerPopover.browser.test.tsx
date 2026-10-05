@@ -380,6 +380,51 @@ describe('GalleryPickerPopover', () => {
     expect(mocks.listInfiniteItems).not.toHaveBeenCalled();
   });
 
+  it('shows and retries a failed uncached page within the current listing', async () => {
+    const total = 120;
+    let failedSecondPage = false;
+    mocks.listItems.mockImplementation((filter: { offset: number }) => {
+      if (filter.offset === 60 && !failedSecondPage) {
+        failedSecondPage = true;
+        return Promise.reject(new Error('page request failed'));
+      }
+
+      const items = Array.from({ length: Math.min(60, total - filter.offset) }, (_, index) =>
+        image(`page-${filter.offset + index}.png`)
+      );
+
+      return {
+        itemIndices: items.map((_, index) => filter.offset + index),
+        items,
+        offset: filter.offset,
+        total,
+      };
+    });
+
+    const { dialog } = await openPicker();
+    const input = getSearchInput(dialog);
+
+    await pressKey(input, 'End');
+    await vi.waitFor(() =>
+      expect(mocks.listItems.mock.calls.filter(([filter]) => filter.offset === 60)).toHaveLength(1)
+    );
+    for (let index = 0; index < 59; index += 1) {
+      await pressKey(input, 'ArrowLeft');
+    }
+    const retry = await vi.waitFor(() => {
+      const button = [...dialog.querySelectorAll<HTMLButtonElement>('button')].find((candidate) =>
+        candidate.textContent?.includes('common.retry')
+      );
+
+      expect(button).toBeDefined();
+      return button;
+    });
+    expect(retry).toBeDefined();
+    await pressKey(input, 'Enter');
+    await vi.waitFor(() => expect(getActiveOption(dialog)?.dataset.itemKey).toBe('image:page-60.png'));
+    expect(mocks.listItems.mock.calls.filter(([filter]) => filter.offset === 60)).toHaveLength(2);
+  });
+
   it('closes on Escape and returns focus to the trigger', async () => {
     const { dialog, trigger } = await openPicker();
 

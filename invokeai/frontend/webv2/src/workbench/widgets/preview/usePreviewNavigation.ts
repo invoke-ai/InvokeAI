@@ -187,7 +187,7 @@ export const usePreviewNavigation = ({
   /** The gallery's in-progress tiles, in its order; only running ones can be stepped onto. */
   progressSessions: readonly QueueProgressSession[];
   queueItems: QueueItem[];
-  selectGalleryItem: (item: GalleryItem, selectionPage: number) => void;
+  selectGalleryItem: (item: GalleryItem, selectionPage: number, absoluteIndex?: number) => void;
   selectedImageQuery: ReturnType<typeof getGallerySelectedImageQuery>;
   selectedItem: GalleryItem | null;
   selectedItemKey: GalleryItemKey | null;
@@ -343,10 +343,31 @@ export const usePreviewNavigation = ({
   const stampSelection = useCallback(
     (item: GalleryItem, pages: typeof boardPageResults) => {
       if (isAccountScopeCurrent(accountScope)) {
-        selectGalleryItem(item, getSelectionPageIn(item, pages));
+        const page =
+          navigationSemanticQuery === null
+            ? pages.find(({ data }) =>
+                data.items.some((candidate) => toGalleryItemKey(candidate) === toGalleryItemKey(item))
+              )
+            : undefined;
+        const itemIndex = page?.data.items.findIndex(
+          (candidate) => toGalleryItemKey(candidate) === toGalleryItemKey(item)
+        );
+        const pageItemIndex = itemIndex !== undefined && itemIndex >= 0 ? itemIndex : undefined;
+        const candidateAbsoluteIndex =
+          page && pageItemIndex !== undefined
+            ? (page.data.itemIndices?.[pageItemIndex] ?? page.offset + pageItemIndex)
+            : undefined;
+        const absoluteIndex =
+          candidateAbsoluteIndex !== undefined &&
+          Number.isInteger(candidateAbsoluteIndex) &&
+          candidateAbsoluteIndex >= 0
+            ? candidateAbsoluteIndex
+            : undefined;
+
+        selectGalleryItem(item, getSelectionPageIn(item, pages), absoluteIndex);
       }
     },
-    [accountScope, getSelectionPageIn, selectGalleryItem]
+    [accountScope, getSelectionPageIn, navigationSemanticQuery, selectGalleryItem]
   );
   const getSelectionPage = useCallback(
     (item: GalleryItem) => getSelectionPageIn(item, boardPageResults),

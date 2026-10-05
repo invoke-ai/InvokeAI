@@ -223,10 +223,10 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
   );
 
   const selectGalleryItemAtPage = useCallback(
-    (item: GalleryItem, selectionPage: number) => {
+    (item: GalleryItem, selectionPage: number, absoluteIndex?: number) => {
       gallery.selectItem(item, undefined, selectionPage, true);
       // Deliberate navigation: the grid follows it, unlike auto-selection.
-      requestGalleryItemReveal(toGalleryItemKey(item), captureAccountScope().signal);
+      requestGalleryItemReveal(toGalleryItemKey(item), captureAccountScope().signal, absoluteIndex);
     },
     [gallery]
   );

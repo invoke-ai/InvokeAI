@@ -91,23 +91,30 @@ export const GalleryPickerView = ({
   // Async uploads need current selection capacity.
   const selectionRef = useRef(selection);
   // Keep prior absolute slots dimmed during scope changes; a new scope starts at its own page zero.
-  const [lastListing, setLastListing] = useState<GallerySparseListing | null>(null);
+  const [lastListing, setLastListing] = useState<{ filterIdentity: string; listing: GallerySparseListing } | null>(
+    null
+  );
 
   // eslint-disable-next-line react/refs
   selectionRef.current = selection;
 
-  if (data.items !== null && data.sparseListing && !haveSameSlots(lastListing, data.sparseListing)) {
-    setLastListing(data.sparseListing);
+  const filterIdentity = JSON.stringify(galleryItemsPageOptions(data.filter, 0).queryKey.slice(3, 5));
+  if (
+    data.items !== null &&
+    data.sparseListing &&
+    (lastListing?.filterIdentity !== filterIdentity || !haveSameSlots(lastListing.listing, data.sparseListing))
+  ) {
+    setLastListing({ filterIdentity, listing: data.sparseListing });
   }
 
   const knownTotal = data.total;
-  const isStale = data.items === null && lastListing !== null && knownTotal !== 0;
-  const listing = isStale ? lastListing : data.sparseListing;
+  const isStale =
+    data.items === null && lastListing !== null && lastListing.filterIdentity !== filterIdentity && knownTotal !== 0;
+  const listing = isStale ? lastListing?.listing : data.sparseListing;
   const itemSlots = listing?.itemSlots ?? EMPTY_SLOTS;
   const pageStates = isStale ? EMPTY_PAGE_STATES : (listing?.pageStates ?? EMPTY_PAGE_STATES);
   const total = listing?.total ?? knownTotal;
   const totalSlots = total ?? GALLERY_PAGE_SIZE;
-  const filterIdentity = JSON.stringify(galleryItemsPageOptions(data.filter, 0).queryKey.slice(3, 5));
   const activeFilterCursor = activeCursor?.filterIdentity === filterIdentity ? activeCursor.index : null;
   const setVisibleRange = data.setVisibleRange;
 

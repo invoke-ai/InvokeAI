@@ -2,6 +2,7 @@ import type { GalleryItem } from '@features/gallery/core/items';
 import type { GalleryImage } from '@features/gallery/core/types';
 
 import { getGallerySettings } from '@features/gallery/core/settings';
+import { invalidateGallery } from '@features/gallery/data/queryCache';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, useEffect } from 'react';
@@ -166,7 +167,7 @@ describe('useGalleryData sparse page subscriptions', () => {
     expect(latestData?.sparseListing?.itemSlots.get(1)?.name).toBe('image-61.png');
   });
 
-  it('keeps an empty cold paginated listing at page zero without fetching a page', async () => {
+  it('keeps an empty cold paginated listing subscribed to page zero', async () => {
     mocks.listGalleryItems.mockResolvedValue({ items: [], total: 0 });
 
     await act(() =>
@@ -178,9 +179,44 @@ describe('useGalleryData sparse page subscriptions', () => {
     );
 
     await vi.waitFor(() => expect(latestData?.total).toBe(0));
-    expect(readRequests()).toEqual([{ limit: 0, offset: 0 }]);
-    expect([...latestData!.sparseListing!.pageStates.keys()]).toEqual([]);
+    expect(readRequests()).toEqual([
+      { limit: 0, offset: 0 },
+      { limit: 60, offset: 0 },
+    ]);
+    expect([...latestData!.sparseListing!.pageStates.keys()]).toEqual([0]);
     expect(latestData?.items).toEqual([]);
+  });
+
+  it.each([
+    ['infinite', false],
+    ['numbered', true],
+  ] as const)('refetches an empty %s listing after gallery invalidation', async (_mode, paginated) => {
+    let total = 0;
+    mocks.listGalleryItems.mockImplementation(({ offset, limit }: { offset: number; limit: number }) =>
+      Promise.resolve({
+        items: Array.from({ length: Math.max(0, Math.min(limit, total - offset)) }, (_, index) =>
+          createItem(offset + index)
+        ),
+        total,
+      })
+    );
+
+    await act(() =>
+      root?.render(
+        <QueryClientProvider client={queryClient!}>
+          <Probe page={paginated ? 5 : 0} paginated={paginated} />
+        </QueryClientProvider>
+      )
+    );
+    await vi.waitFor(() => expect(latestData?.total).toBe(0));
+    expect(latestData?.items).toEqual([]);
+
+    total = 1;
+    await act(() => invalidateGallery(queryClient!));
+    await vi.waitFor(() => {
+      expect(latestData?.total).toBe(1);
+      expect(latestData?.items?.map((item) => item.name)).toEqual(['image-0.png']);
+    });
   });
 
   it('discovers total at page zero, then fetches only aligned pages around a distant range', async () => {

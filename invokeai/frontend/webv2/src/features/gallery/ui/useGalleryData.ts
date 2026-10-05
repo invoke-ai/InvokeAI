@@ -327,7 +327,8 @@ export const useGalleryData = ({
 
     if (isPaginated) {
       if (knownTotal === 0) {
-        return [];
+        // Keep page zero observed so gallery invalidation can discover items added after an empty result.
+        return [0];
       }
 
       if (knownTotal === null || isFetchingTotal || hasUnresolvedTotalError) {
@@ -339,6 +340,10 @@ export const useGalleryData = ({
 
     // Infinite listings learn their total from page zero. Once known, subscriptions follow only the virtual range
     // and its virtualizer overscan, even when it is far from the start of the listing.
+    if (knownTotal === 0) {
+      return [0];
+    }
+
     if (knownTotal === null && !hasRequestedRange) {
       return [0];
     }

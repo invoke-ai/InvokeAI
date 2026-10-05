@@ -1087,7 +1087,28 @@ describe('preview keyboard navigation boundary', () => {
     await render();
     await pressArrow('ArrowRight');
 
-    expect(vi.mocked(requestGalleryItemReveal)).toHaveBeenCalledWith('image:oldest', expect.any(AbortSignal));
+    expect(vi.mocked(requestGalleryItemReveal)).toHaveBeenCalledWith('image:oldest', expect.any(AbortSignal), 1);
+  });
+
+  it('reveals an ordinary deep-page navigation at its absolute sparse listing index', async () => {
+    const deepNewer = createImageItem('deep-newer', '2026-07-20T00:00:02.000Z');
+    const deepOlder = createImageItem('deep-older', '2026-07-20T00:00:01.000Z');
+
+    setGalleryValues({
+      galleryPage: 0,
+      recentImages: [],
+      selectedImage: legacyImage('deep-newer', deepNewer.createdAt),
+      selectedImageName: 'deep-newer',
+      selectedImageQuery: deepQuery,
+    });
+    mocks.galleryItemPages = deepBoardPages([deepNewer, deepOlder]);
+    mocks.galleryItemPages[30] = { ...mocks.galleryItemPages[30]!, itemIndices: [1801, 1806] };
+
+    await render();
+    await pressArrow('ArrowRight');
+
+    expect(mocks.commands.gallery.selectItem).toHaveBeenCalledWith(deepOlder, undefined, 30, true);
+    expect(vi.mocked(requestGalleryItemReveal)).toHaveBeenCalledWith('image:deep-older', expect.any(AbortSignal), 1806);
   });
 
   it('keeps a just-completed batch navigable before the backend refetch lands', async () => {
