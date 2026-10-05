@@ -63,6 +63,7 @@ import {
   parseGallerySemanticReference,
   toGallerySemanticTextReference,
   getGalleryAutoAddBoardId,
+  getGallerySelectionBoardId,
   getSelectedGalleryItemFromValues,
   legacyGeneratedImageToGalleryItem,
   normalizeGalleryImage,
@@ -4900,7 +4901,7 @@ export const __workbenchReducerInternal = (
             action.preserveNavigationQuery && existingNavigationQuery
               ? { ...existingNavigationQuery, page: selectedImagePage }
               : {
-                  boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
+                  boardId: getGallerySelectionBoardId(values),
                   galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
                   imageOrderDir: settings.imageOrderDir,
                   page: selectedImagePage,
@@ -4945,7 +4946,7 @@ export const __workbenchReducerInternal = (
               selectedImageNames: [...selectedItemKeys, itemKey],
               selectedImagePage,
               selectedImageQuery: {
-                boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
+                boardId: getGallerySelectionBoardId(values),
                 galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
                 imageOrderDir: settings.imageOrderDir,
                 page: selectedImagePage,
@@ -5021,7 +5022,7 @@ export const __workbenchReducerInternal = (
               hasSelectionPage && existingNavigationQuery
                 ? { ...existingNavigationQuery, page: selectedImagePage }
                 : {
-                    boardId: typeof values.selectedBoardId === 'string' ? values.selectedBoardId : 'none',
+                    boardId: getGallerySelectionBoardId(values),
                     galleryView: values.galleryView === 'assets' ? 'assets' : 'images',
                     imageOrderDir: settings.imageOrderDir,
                     page: selectedImagePage,

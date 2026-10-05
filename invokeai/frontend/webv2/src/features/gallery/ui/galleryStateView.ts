@@ -80,6 +80,13 @@ export const getGalleryRawSelectedBoardId = (values: Record<string, unknown>): s
   typeof values.selectedBoardId === 'string' ? values.selectedBoardId : null;
 
 /**
+ * The board a selection made in the grid is stamped with: the saved choice, else the project board the grid falls
+ * back to showing. Stamping Uncategorized instead points Preview at a listing the selection is not in.
+ */
+export const getGallerySelectionBoardId = (values: Record<string, unknown>): string =>
+  getGalleryRawSelectedBoardId(values) ?? getGalleryProjectBoardId(values) ?? 'none';
+
+/**
  * Use the chosen destination or project board; date buckets defer to the project, while explicit none remains
  * Uncategorized.
  */
@@ -155,12 +162,7 @@ export const getGallerySelectedImageQuery = (values: Record<string, unknown>): G
   const settings = getGallerySettings(values);
 
   return {
-    boardId:
-      query && typeof query.boardId === 'string'
-        ? query.boardId
-        : typeof values.selectedBoardId === 'string'
-          ? values.selectedBoardId
-          : 'none',
+    boardId: query && typeof query.boardId === 'string' ? query.boardId : getGallerySelectionBoardId(values),
     galleryView:
       query?.galleryView === 'assets' || query?.galleryView === 'images'
         ? query.galleryView

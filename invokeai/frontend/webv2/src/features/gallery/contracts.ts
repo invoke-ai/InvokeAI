@@ -62,6 +62,7 @@ export {
   getGalleryDestinationBoardId,
   getGalleryPage,
   getGallerySelectedBoardId,
+  getGallerySelectionBoardId,
   getGallerySelectedImagePage,
   getGallerySelectedImageQuery,
   getGallerySemanticImageQuery,

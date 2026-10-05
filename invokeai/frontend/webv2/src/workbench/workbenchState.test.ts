@@ -5175,6 +5175,32 @@ describe('workbenchReducer Phase 5 generation flow', () => {
     expect(values.selectedImageQuery).toMatchObject({ starredOnly: false });
   });
 
+  it('stamps a selection with the project board the grid shows when no board was chosen', () => {
+    let state = createInitialWorkbenchState();
+    const projectId = getActiveProject(state).id;
+    const stampedBoardId = () =>
+      (getProjectWidgetValues(getActiveProject(state), 'gallery').selectedImageQuery as { boardId: string }).boardId;
+
+    state = workbenchReducer(state, { boardId: 'project-board', projectId, type: 'setGalleryProjectBoardId' });
+    state = workbenchReducer(state, {
+      item: createGalleryImageItem('a.png', 'project-board'),
+      type: 'selectGalleryItem',
+    });
+    expect(stampedBoardId()).toBe('project-board');
+
+    state = workbenchReducer(state, {
+      itemKeys: ['image:a.png', 'image:b.png'],
+      primaryItem: createGalleryImageItem('b.png', 'project-board'),
+      type: 'setGalleryMultiSelection',
+    });
+    expect(stampedBoardId()).toBe('project-board');
+
+    // An explicit choice, Uncategorized included, still wins over the project board.
+    state = workbenchReducer(state, { boardId: 'none', type: 'selectGalleryBoard' });
+    state = workbenchReducer(state, { item: createGalleryImageItem('c.png'), type: 'selectGalleryItem' });
+    expect(stampedBoardId()).toBe('none');
+  });
+
   it('stamps a landing generation against the unfiltered listing', () => {
     // Following a fresh, unstarred result must leave the starred-only listing.
     let state = primeGenerate();
