@@ -57,7 +57,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
     from invokeai.app.services.client_state_persistence.client_state_persistence_default import (
         ClientStatePersistence,
     )
-    from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+    from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
     from invokeai.app.services.images.images_default import ImageService
     from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
     from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
@@ -65,7 +65,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         SystemPromptRecordsStorage,
     )
     from invokeai.app.services.users.users_default import UserService
-    from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+    from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
     from tests.test_nodes import TestEventService
 
     configuration = InvokeAIAppConfig(use_memory_db=True, node_cache_size=0)
@@ -80,7 +80,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         configuration=configuration,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=SqliteImageRecordStorage(db=db),
+        image_records=ImageRecordStorage(db.database),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
@@ -106,7 +106,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         external_generation=None,  # type: ignore
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
-        video_records=SqliteVideoRecordStorage(db=db),
+        video_records=VideoRecordStorage(db.database),
         board_video_records=BoardVideoRecordStorage(db.database),
         gallery=None,  # type: ignore
         wildcard_records=None,  # type: ignore

@@ -27,11 +27,11 @@ from invokeai.app.services.image_index.image_index_default import (
 )
 from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_common import image_record_to_dto
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.services.videos.videos_common import VideoDTO, video_record_to_dto
 from invokeai.app.services.videos.videos_default import VideoService
 from invokeai.backend.util.devices import TorchDevice
@@ -92,8 +92,8 @@ def db() -> SqliteDatabase:
 
 
 @pytest.fixture
-def image_records(db: SqliteDatabase) -> SqliteImageRecordStorage:
-    return SqliteImageRecordStorage(db=db)
+def image_records(db: SqliteDatabase) -> ImageRecordStorage:
+    return ImageRecordStorage(db.database)
 
 
 @pytest.fixture
@@ -110,8 +110,8 @@ def images_service() -> ImageService:
 
 
 @pytest.fixture
-def video_records(db: SqliteDatabase) -> SqliteVideoRecordStorage:
-    return SqliteVideoRecordStorage(db=db)
+def video_records(db: SqliteDatabase) -> VideoRecordStorage:
+    return VideoRecordStorage(db.database)
 
 
 @pytest.fixture
@@ -136,12 +136,12 @@ def _make_invoker(
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     enabled: bool = True,
-    image_records: SqliteImageRecordStorage | None = None,
+    image_records: ImageRecordStorage | None = None,
     device: str | None = "cpu",
     session_queue: object | None = None,
     model_manager: object | None = None,
     videos_service: VideoService | None = None,
-    video_records: SqliteVideoRecordStorage | None = None,
+    video_records: VideoRecordStorage | None = None,
 ) -> SimpleNamespace:
     config = InvokeAIAppConfig(
         use_memory_db=True,
@@ -184,7 +184,7 @@ def accelerator_host(monkeypatch: pytest.MonkeyPatch) -> None:
 
 
 def _save_image(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     image_name: str,
     is_intermediate: bool = False,
     image_category: ImageCategory = ImageCategory.GENERAL,
@@ -202,7 +202,7 @@ def _save_image(
 
 
 def _save_video(
-    video_records: SqliteVideoRecordStorage,
+    video_records: VideoRecordStorage,
     video_name: str,
     is_intermediate: bool = False,
     video_category: ImageCategory = ImageCategory.GENERAL,
@@ -221,12 +221,12 @@ def _save_video(
     )
 
 
-def _video_dto_for(video_records: SqliteVideoRecordStorage, video_name: str) -> VideoDTO:
+def _video_dto_for(video_records: VideoRecordStorage, video_name: str) -> VideoDTO:
     record = video_records.get(video_name)
     return video_record_to_dto(record, video_url="http://x/v.mp4", thumbnail_url="http://x/v.webp", board_id=None)
 
 
-def _dto_for(image_records: SqliteImageRecordStorage, image_name: str):
+def _dto_for(image_records: ImageRecordStorage, image_name: str):
     record = image_records.get(image_name)
     return image_record_to_dto(record, image_url="http://x/i.png", thumbnail_url="http://x/t.png", board_id=None)
 
@@ -251,7 +251,7 @@ def test_disabled_service_is_inert(
 
 
 def test_backfill_indexes_preexisting_eligible_images(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -275,7 +275,7 @@ def test_backfill_indexes_preexisting_eligible_images(
 
 
 def test_on_changed_indexes_new_eligible_image_and_skips_ineligible(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -295,7 +295,7 @@ def test_on_changed_indexes_new_eligible_image_and_skips_ineligible(
 
 
 def test_unloadable_image_is_skipped_and_backfill_completes(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -318,7 +318,7 @@ def test_unloadable_image_is_skipped_and_backfill_completes(
 
 
 def test_backfill_logs_what_it_indexed_and_that_it_finished(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -344,7 +344,7 @@ def test_backfill_logs_what_it_indexed_and_that_it_finished(
 
 
 def test_restart_over_an_indexed_gallery_logs_nothing(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -365,7 +365,7 @@ def test_restart_over_an_indexed_gallery_logs_nothing(
 
 
 def test_backfill_reports_images_it_could_not_embed(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -398,7 +398,7 @@ def test_backfill_reports_images_it_could_not_embed(
 
 
 def test_transient_encode_failure_is_retried_to_success(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -589,7 +589,7 @@ def test_late_activation_survives_a_model_store_failure(
 
 
 def test_broken_encoder_leaves_images_pending_rather_than_quarantined(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -611,7 +611,7 @@ def test_broken_encoder_leaves_images_pending_rather_than_quarantined(
 
 
 def test_status_event_reports_failures_so_a_settled_index_is_not_mistaken_for_complete(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -645,7 +645,7 @@ def test_status_event_reports_failures_so_a_settled_index_is_not_mistaken_for_co
 
 
 def test_index_recovers_from_an_encoder_outage_without_a_restart(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -686,7 +686,7 @@ def test_index_recovers_from_an_encoder_outage_without_a_restart(
 
 
 def test_sustained_storage_failure_does_not_quarantine_images(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -724,7 +724,7 @@ def test_sustained_storage_failure_does_not_quarantine_images(
 
 
 def test_batch_failure_is_charged_to_the_images_when_the_encoder_is_healthy(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -769,7 +769,7 @@ def test_systemic_backoff_grows_and_is_capped(service: ImageIndexService) -> Non
 
 
 def test_zero_norm_embedding_fails_only_its_own_image(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -801,7 +801,7 @@ def test_zero_norm_embedding_fails_only_its_own_image(
 
 
 def test_start_discards_only_other_models_embeddings(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -828,7 +828,7 @@ def test_start_discards_only_other_models_embeddings(
 
 
 def test_disabled_service_does_not_discard_embeddings(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -845,7 +845,7 @@ def test_disabled_service_does_not_discard_embeddings(
 
 
 def test_worker_waits_for_generation_to_finish_when_not_on_cpu(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     accelerator_host: None,
@@ -874,7 +874,7 @@ def test_worker_waits_for_generation_to_finish_when_not_on_cpu(
 
 
 def test_generation_wait_does_not_block_shutdown(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     accelerator_host: None,
@@ -894,7 +894,7 @@ def test_generation_wait_does_not_block_shutdown(
 
 
 def test_projection_does_not_wait_for_an_in_progress_generation(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     accelerator_host: None,
@@ -933,7 +933,7 @@ def test_projection_does_not_wait_for_an_in_progress_generation(
 
 
 def test_a_partially_stored_batch_does_not_escalate_the_backoff(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -979,7 +979,7 @@ def test_a_partially_stored_batch_does_not_escalate_the_backoff(
 
 
 def test_unparseable_device_is_ignored_rather_than_wedging_the_worker(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -1045,7 +1045,7 @@ def test_duplicate_model_names_resolve_deterministically(
 
 
 def test_status_event_emitted(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1068,7 +1068,7 @@ def _status_events(invoker) -> list[ImageIndexStatusEvent]:
 
 
 def test_on_changed_emits_pending_status_before_embedding(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1088,7 +1088,7 @@ def test_on_changed_emits_pending_status_before_embedding(
 
 
 def test_on_deleted_emits_status(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1107,7 +1107,7 @@ def test_on_deleted_emits_status(
 
 
 def test_permanently_failed_image_still_reaches_quiescence(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1136,7 +1136,7 @@ def test_permanently_failed_image_still_reaches_quiescence(
 
 
 def test_upsert_failure_routes_through_retry_to_success(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1165,7 +1165,7 @@ def test_upsert_failure_routes_through_retry_to_success(
 
 
 def test_upsert_value_error_also_routes_through_retry(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1200,7 +1200,7 @@ def test_upsert_value_error_also_routes_through_retry(
 
 
 def test_normalizable_extreme_magnitudes_are_not_dropped(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -1228,7 +1228,7 @@ def test_normalizable_extreme_magnitudes_are_not_dropped(
 
 
 def test_ineligible_transition_clears_failure_bookkeeping(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1251,7 +1251,7 @@ def test_ineligible_transition_clears_failure_bookkeeping(
 
 
 def test_owner_poke_emitted_at_quiescence(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1286,7 +1286,7 @@ def test_stop_joins_worker(
 
 
 def test_projection_job_computes_and_caches(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1318,7 +1318,7 @@ def test_projection_job_computes_and_caches(
 
 
 def test_projection_failure_caches_empty_result_instead_of_looping(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1357,7 +1357,7 @@ def test_projection_failure_caches_empty_result_instead_of_looping(
 
 
 def test_a_permanently_failing_projection_is_retried_once_not_every_request(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1393,7 +1393,7 @@ def test_a_permanently_failing_projection_is_retried_once_not_every_request(
 
 
 def test_a_cached_row_with_no_finite_points_is_a_failed_fit_not_a_result(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1450,7 +1450,7 @@ def test_a_cached_row_with_no_finite_points_is_a_failed_fit_not_a_result(
 
 
 def test_a_lost_projection_write_does_not_burn_the_retry(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1506,7 +1506,7 @@ def test_a_lost_projection_write_does_not_burn_the_retry(
 
 
 def test_an_explicit_refresh_restores_a_spent_retry(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1563,7 +1563,7 @@ def test_projection_request_dedup_is_last_writer_wins(service: ImageIndexService
 
 
 def test_systemic_embedding_outage_does_not_starve_projections(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -1609,7 +1609,7 @@ def test_systemic_embedding_outage_does_not_starve_projections(
 
 
 def test_search_similar_ranks_by_cosine_and_respects_scope(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -1692,7 +1692,7 @@ def test_embed_image_retries_once_after_a_failed_encode(
 
 
 def test_projection_request_is_requeued_when_the_database_read_fails(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -1730,7 +1730,7 @@ def test_projection_request_is_requeued_when_the_database_read_fails(
 
 
 def test_unchanged_scope_does_not_recompute_the_projection(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
@@ -2087,7 +2087,7 @@ def test_search_similar_returns_empty_when_not_running(service: ImageIndexServic
 
 def test_search_similar_scopes_to_the_requesting_user(
     db: SqliteDatabase,
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
@@ -2690,10 +2690,10 @@ def test_a_transient_custom_terms_read_failure_keeps_the_rebuild_queued(
 
 
 def test_backfill_indexes_preexisting_videos(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     images_service: ImageService,
     videos_service: VideoService,
-    video_records: SqliteVideoRecordStorage,
+    video_records: VideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
 ) -> None:
@@ -2714,7 +2714,7 @@ def test_backfill_indexes_preexisting_videos(
 def test_new_video_is_indexed_from_its_thumbnail(
     images_service: ImageService,
     videos_service: VideoService,
-    video_records: SqliteVideoRecordStorage,
+    video_records: VideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
 ) -> None:
@@ -2735,7 +2735,7 @@ def test_new_video_is_indexed_from_its_thumbnail(
 def test_video_thumbnail_is_what_gets_embedded(
     images_service: ImageService,
     videos_service: VideoService,
-    video_records: SqliteVideoRecordStorage,
+    video_records: VideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
     # The embedding must come from the video's own thumbnail, not from the image service (which
@@ -2773,7 +2773,7 @@ def test_video_thumbnail_is_what_gets_embedded(
 def test_unreadable_video_thumbnail_is_charged_to_the_video(
     images_service: ImageService,
     videos_service: VideoService,
-    video_records: SqliteVideoRecordStorage,
+    video_records: VideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
 ) -> None:
@@ -2793,7 +2793,7 @@ def test_unreadable_video_thumbnail_is_charged_to_the_video(
 def test_deleted_video_is_forgotten(
     images_service: ImageService,
     videos_service: VideoService,
-    video_records: SqliteVideoRecordStorage,
+    video_records: VideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
 ) -> None:
@@ -2821,8 +2821,8 @@ def test_deleted_video_is_forgotten(
 def test_video_owner_is_poked_when_its_embedding_lands(
     images_service: ImageService,
     videos_service: VideoService,
-    video_records: SqliteVideoRecordStorage,
-    image_records: SqliteImageRecordStorage,
+    video_records: VideoRecordStorage,
+    image_records: ImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
 ) -> None:
@@ -2853,7 +2853,7 @@ def test_video_owner_is_poked_when_its_embedding_lands(
 def test_video_leaving_eligibility_clears_its_failure_bookkeeping(
     images_service: ImageService,
     videos_service: VideoService,
-    video_records: SqliteVideoRecordStorage,
+    video_records: VideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
     service: ImageIndexService,
 ) -> None:

@@ -22,7 +22,7 @@ from invokeai.app.services.external_generation.external_generation_default impor
 from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.image_index.image_index_default import ImageIndexService
 from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.intermediates.intermediates_default import IntermediatesService
 from invokeai.app.services.intermediates.intermediates_records_sqlite import IntermediatesRecordsSqlite
@@ -36,7 +36,7 @@ from invokeai.app.services.system_prompt_records.system_prompt_records_default i
     SystemPromptRecordsStorage,
 )
 from invokeai.app.services.users.users_default import UserService
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
@@ -105,7 +105,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         configuration=configuration,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=SqliteImageRecordStorage(db=db),
+        image_records=ImageRecordStorage(db.database),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
@@ -133,7 +133,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         wildcard_records=WildcardRecordsStorage(db.database),
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
-        video_records=SqliteVideoRecordStorage(db=db),
+        video_records=VideoRecordStorage(db.database),
         board_video_records=BoardVideoRecordStorage(db.database),
         # Real SQLite-backed gallery service: the virtual-boards router reads dates and
         # per-date item names through it, and MagicMock cannot exercise the filter SQL.

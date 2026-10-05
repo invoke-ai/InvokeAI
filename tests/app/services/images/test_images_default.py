@@ -30,7 +30,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageRecordNotFoundException,
     ResourceOrigin,
 )
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
 from invokeai.app.util.misc import get_iso_timestamp
@@ -78,7 +78,7 @@ def _make_record(
 
 
 @pytest.fixture
-def real_image_service(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage]:
+def real_image_service(tmp_path: Path) -> tuple[ImageService, ImageRecordStorage, DiskImageFileStorage]:
     logger = InvokeAILogger.get_logger()
     config = InvokeAIAppConfig(use_memory_db=True, image_subfolder_strategy="flat")
     config._root = tmp_path
@@ -87,7 +87,7 @@ def real_image_service(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordS
     invoker.services.configuration.pil_compress_level = 6
     storage.start(invoker)
     db = init_db(config=config, logger=logger, image_files=storage)
-    records = SqliteImageRecordStorage(db=db)
+    records = ImageRecordStorage(db.database)
 
     invoker.services.configuration.image_subfolder_strategy = "flat"
     invoker.services.names.create_image_name.return_value = "uploaded.png"
@@ -103,7 +103,7 @@ def real_image_service(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordS
 
 
 def test_create_rolls_back_record_and_files_when_thumbnail_save_fails(
-    real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage],
+    real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage],
 ) -> None:
     service, records, storage = real_image_service
     image = Image.new("RGB", (32, 32), "red")
@@ -131,7 +131,7 @@ def test_create_rolls_back_record_and_files_when_thumbnail_save_fails(
 
 
 def test_create_accepts_large_16_bit_image(
-    real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage],
+    real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage],
 ) -> None:
     service, records, storage = real_image_service
     image = Image.new("I;16", (1024, 1024), 32768)
@@ -419,11 +419,11 @@ def _failing_directory_fsync(error_number: int):
 
 
 @pytest.fixture
-def wired(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage]:
+def wired(tmp_path: Path) -> tuple[ImageService, ImageRecordStorage, DiskImageFileStorage]:
     """ImageService wired to a real record store and a real disk store — no stub decides anything."""
     config = InvokeAIAppConfig(use_memory_db=True)
     logger = InvokeAILogger.get_logger(config=config)
-    records = SqliteImageRecordStorage(db=create_mock_sqlite_database(config, logger))
+    records = ImageRecordStorage(create_mock_sqlite_database(config, logger).database)
     storage = DiskImageFileStorage(tmp_path / "outputs")
 
     svc = ImageService()
@@ -440,12 +440,12 @@ def wired(tmp_path: Path) -> tuple[ImageService, SqliteImageRecordStorage, DiskI
 @pytest.fixture
 def wired_with_move_service(
     tmp_path: Path,
-) -> tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService]:
+) -> tuple[ImageService, ImageRecordStorage, DiskImageFileStorage, ImageMoveService]:
     """ImageService and ImageMoveService wired to one real db and disk store, as production does."""
     config = InvokeAIAppConfig(use_memory_db=True, image_subfolder_strategy="flat")
     logger = InvokeAILogger.get_logger(config=config)
     db = create_mock_sqlite_database(config, logger)
-    records = SqliteImageRecordStorage(db=db)
+    records = ImageRecordStorage(db.database)
     storage = DiskImageFileStorage(tmp_path / "outputs")
     moves = ImageMoveService(db=db, image_files=storage, config=config, logger=logger)
 
@@ -463,7 +463,7 @@ def wired_with_move_service(
     return svc, records, storage, moves
 
 
-def _seed_record_at_subfolder(records: SqliteImageRecordStorage, name: str, image_subfolder: str) -> None:
+def _seed_record_at_subfolder(records: ImageRecordStorage, name: str, image_subfolder: str) -> None:
     records.save(
         image_name=name,
         image_origin=ResourceOrigin.INTERNAL,
@@ -476,7 +476,7 @@ def _seed_record_at_subfolder(records: SqliteImageRecordStorage, name: str, imag
     )
 
 
-def _seed_record(records: SqliteImageRecordStorage, name: str, is_intermediate: bool = True) -> None:
+def _seed_record(records: ImageRecordStorage, name: str, is_intermediate: bool = True) -> None:
     records.save(
         image_name=name,
         image_origin=ResourceOrigin.INTERNAL,
@@ -488,7 +488,7 @@ def _seed_record(records: SqliteImageRecordStorage, name: str, is_intermediate: 
     )
 
 
-def _restart_file_storage(storage: DiskImageFileStorage, records: SqliteImageRecordStorage) -> DiskImageFileStorage:
+def _restart_file_storage(storage: DiskImageFileStorage, records: ImageRecordStorage) -> DiskImageFileStorage:
     """Simulates a restart over the same output folder, running delete-journal recovery."""
     invoker = MagicMock()
     invoker.services.image_records = records
@@ -736,13 +736,13 @@ class TestDeleteIntermediatesAgainstRealRecords:
     and where the concurrency hazards JPPhoto reported would surface.
     """
 
-    def _seed(self, records: SqliteImageRecordStorage, storage: DiskImageFileStorage, name: str) -> None:
+    def _seed(self, records: ImageRecordStorage, storage: DiskImageFileStorage, name: str) -> None:
         _seed_record(records, name)
         _save_image_file(storage, name)
 
     def _promote_after_snapshot(
         self,
-        records: SqliteImageRecordStorage,
+        records: ImageRecordStorage,
         monkeypatch,
         image_name: str,
     ) -> None:
@@ -1056,7 +1056,7 @@ class TestFailedSaveCleanup:
     @pytest.mark.skipif(os.name == "nt", reason="Windows cannot open a directory for fsync")
     def test_a_leftover_file_is_never_orphaned_without_a_journal(
         self,
-        real_image_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage],
+        real_image_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage],
     ) -> None:
         """Real storage, real records: the save leaves a file behind and the disk refuses to make
         the cleanup journal durable. The record must survive, and an ordinary delete once the disk
@@ -1149,7 +1149,7 @@ class TestDeleteVersusSubfolderMove:
 
     def test_move_cannot_interleave_with_delete_intermediates(
         self,
-        wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
+        wired_with_move_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage, ImageMoveService],
         monkeypatch,
     ) -> None:
         """While delete_intermediates_by_names() runs its unit, a concurrent move_all_images() must wait.
@@ -1206,7 +1206,7 @@ class TestDeleteVersusSubfolderMove:
 
     def test_move_holds_the_lock_across_its_batch_cycle(
         self,
-        wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
+        wired_with_move_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage, ImageMoveService],
     ) -> None:
         """While a move unit runs, a concurrent delete must wait for it rather than race it.
 
@@ -1238,7 +1238,7 @@ class TestDeleteVersusSubfolderMove:
 
     def test_failed_save_cleanup_purges_the_relocated_subfolder_too(
         self,
-        wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
+        wired_with_move_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage, ImageMoveService],
     ) -> None:
         """A failed save whose record was relocated mid-save must not strand the moved files.
 
@@ -1261,7 +1261,7 @@ class TestDeleteVersusSubfolderMove:
         new_thumbnail.parent.mkdir(parents=True, exist_ok=True)
         old_image.replace(new_image)
         old_thumbnail.replace(new_thumbnail)
-        with records._db.transaction() as cursor:
+        with moves._db.transaction() as cursor:
             cursor.execute("UPDATE images SET image_subfolder = '' WHERE image_name = 'failed.png';")
         assert records.get("failed.png").image_subfolder == ""
 
@@ -1278,7 +1278,7 @@ class TestDeleteVersusSubfolderMove:
 
     def test_move_cannot_interleave_with_create(
         self,
-        wired_with_move_service: tuple[ImageService, SqliteImageRecordStorage, DiskImageFileStorage, ImageMoveService],
+        wired_with_move_service: tuple[ImageService, ImageRecordStorage, DiskImageFileStorage, ImageMoveService],
         monkeypatch,
     ) -> None:
         """While create() runs its save unit, a concurrent move_all_images() must wait.

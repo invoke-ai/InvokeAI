@@ -29,7 +29,7 @@ from invokeai.app.services.image_files.image_files_disk import DiskImageFileStor
 from invokeai.app.services.image_index.image_index_default import ImageIndexService, warm_up_attention
 from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.intermediates.intermediates_default import IntermediatesService
 from invokeai.app.services.intermediates.intermediates_records_sqlite import IntermediatesRecordsSqlite
@@ -61,7 +61,7 @@ from invokeai.app.services.system_prompt_records.system_prompt_records_default i
 from invokeai.app.services.urls.urls_default import LocalUrlService
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.services.videos.videos_default import VideoService
 from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
@@ -144,10 +144,10 @@ class ApiDependencies:
         boards = BoardService()
         events = FastAPIEventService(event_handler_id, loop=loop)
         bulk_download = BulkDownloadService()
-        image_records = SqliteImageRecordStorage(db=db)
+        image_records = ImageRecordStorage(db.database)
         image_moves = ImageMoveService(db=db, image_files=image_files, config=configuration, logger=logger)
         images = ImageService()
-        video_records = SqliteVideoRecordStorage(db=db)
+        video_records = VideoRecordStorage(db.database)
         videos = VideoService()
         board_video_records = BoardVideoRecordStorage(db.database)
         gallery = SqliteGalleryService(db=db)

@@ -1,6 +1,4 @@
 import os
-import sqlite3
-from contextlib import contextmanager
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock
@@ -8,6 +6,7 @@ from unittest.mock import MagicMock
 import pytest
 from fastapi import BackgroundTasks
 from fastapi.testclient import TestClient
+from sqlalchemy.exc import DBAPIError
 
 from invokeai.app.api.auth_dependencies import get_current_user_or_default
 from invokeai.app.api.dependencies import ApiDependencies
@@ -19,6 +18,7 @@ from invokeai.app.services.image_records.image_records_common import ImageNamesR
 from invokeai.app.services.images.images_common import ImageDTO
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
 @pytest.fixture(autouse=True, scope="module")
@@ -471,7 +471,7 @@ def test_delete_image_lookup_failure_returns_500_not_404(
 
 
 def test_delete_image_db_fault_during_lookup_returns_500_not_404(
-    monkeypatch: Any, mock_invoker: Invoker, tmp_path: Path, client: TestClient
+    monkeypatch: Any, mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase, tmp_path: Path, client: TestClient
 ) -> None:
     """A database fault while reading the record is a 500, driven through the real record store.
 
@@ -483,13 +483,13 @@ def test_delete_image_db_fault_during_lookup_returns_500_not_404(
     storage = prepare_delete_image_test(monkeypatch, mock_invoker, tmp_path)
     _save_deletable_image(mock_invoker, storage, "del.png")
 
-    # Break the table out from under the query. Any sqlite3.Error would do; this one is deterministic.
+    # Break the table out from under the query. Any database error would do; this one is deterministic.
     records = mock_invoker.services.image_records
-    records._db._conn.execute("ALTER TABLE images RENAME TO images_moved;")
+    mock_sqlite_database._conn.execute("ALTER TABLE images RENAME TO images_moved;")
     try:
         response = client.delete("/api/v1/images/i/del.png")
     finally:
-        records._db._conn.execute("ALTER TABLE images_moved RENAME TO images;")
+        mock_sqlite_database._conn.execute("ALTER TABLE images_moved RENAME TO images;")
 
     assert response.status_code == 500
     assert response.json()["detail"] == "Failed to delete image"
@@ -710,24 +710,16 @@ def test_delete_does_not_report_a_name_that_never_existed(
     assert body["failed_images"] == []
 
 
-def test_image_records_get_does_not_disguise_a_storage_error_as_not_found(monkeypatch: Any) -> None:
-    """The narrowing itself: a sqlite3.Error out of the SELECT must stay a sqlite3.Error."""
-    from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+def test_image_records_get_does_not_disguise_a_storage_error_as_not_found(
+    mock_sqlite_database: SqliteDatabase,
+) -> None:
+    """The narrowing itself: a database error out of the SELECT must stay a database error."""
+    from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 
-    storage = SqliteImageRecordStorage.__new__(SqliteImageRecordStorage)
+    storage = ImageRecordStorage(mock_sqlite_database.database)
+    mock_sqlite_database._conn.execute("ALTER TABLE images RENAME TO images_moved;")
 
-    class _Cursor:
-        def execute(self, *args: Any, **kwargs: Any) -> None:
-            raise sqlite3.OperationalError("database disk image is malformed")
-
-    class _Db:
-        @contextmanager
-        def transaction(self):
-            yield _Cursor()
-
-    storage._db = _Db()  # pyright: ignore[reportAttributeAccessIssue]
-
-    with pytest.raises(sqlite3.OperationalError):
+    with pytest.raises(DBAPIError, match="no such table"):
         storage.get("a.png")
 
 

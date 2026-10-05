@@ -28,10 +28,10 @@ from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.gallery.gallery_common import GalleryItemKind
 from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.urls.urls_default import LocalUrlService
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
@@ -44,9 +44,10 @@ def services():
     gallery = SqliteGalleryService(db=db)
     gallery.start(SimpleNamespace(services=SimpleNamespace(urls=LocalUrlService())))  # type: ignore[arg-type]
     return {
+        "db": db,
         "gallery": gallery,
-        "images": SqliteImageRecordStorage(db=db),
-        "videos": SqliteVideoRecordStorage(db=db),
+        "images": ImageRecordStorage(db.database),
+        "videos": VideoRecordStorage(db.database),
         "boards": BoardRecordStorage(db.database),
         "board_images": BoardImageRecordStorage(db.database),
         "board_videos": BoardVideoRecordStorage(db.database),
@@ -54,7 +55,7 @@ def services():
 
 
 def _save_image(
-    store: SqliteImageRecordStorage,
+    store: ImageRecordStorage,
     name: str,
     user_id: str,
     category: ImageCategory = ImageCategory.GENERAL,
@@ -72,7 +73,7 @@ def _save_image(
 
 
 def _save_video(
-    store: SqliteVideoRecordStorage,
+    store: VideoRecordStorage,
     name: str,
     user_id: str,
     category: ImageCategory = ImageCategory.GENERAL,
@@ -95,7 +96,7 @@ T = TypeVar("T")
 
 
 def _capture_plan(services, call: Callable[[], T], statement_marker: str) -> tuple[T, str, list[str]]:
-    db = services["images"]._db
+    db = services["db"]
     statements: list[str] = []
     db._conn.set_trace_callback(statements.append)
     try:
@@ -152,13 +153,13 @@ class TestListItemNamesOmittedBoardIdMultiuser:
 
 def _backdate(services, table: str, name_col: str, name: str, created_at: str) -> None:
     """Rewrites created_at so tests can build multi-date galleries (save() always stamps now)."""
-    db = services["images"]._db
+    db = services["db"]
     with db.transaction() as cursor:
         cursor.execute(f"UPDATE {table} SET created_at = ? WHERE {name_col} = ?", (created_at, name))
 
 
 def _star(services, table: str, name_col: str, name: str) -> None:
-    db = services["images"]._db
+    db = services["db"]
     with db.transaction() as cursor:
         cursor.execute(f"UPDATE {table} SET starred = 1 WHERE {name_col} = ?", (name,))
 
@@ -491,7 +492,7 @@ class TestGetBoardMediaSummaries:
         services["board_videos"].add_video_to_board(populated.board_id, "cover.mp4")
         services["board_videos"].add_video_to_board(populated.board_id, "intermediate.mp4")
         services["board_videos"].add_video_to_board(populated.board_id, "uploaded.mp4")
-        with services["images"]._db.transaction() as cursor:
+        with services["db"].transaction() as cursor:
             cursor.execute(
                 "UPDATE images SET starred = 1, created_at = ? WHERE image_name = ?",
                 ("2026-01-05 12:00:00", "cover.png"),
@@ -778,7 +779,7 @@ class TestOrderingTieBreakers:
         assert covers == {(None, "b.mp4")}
 
 
-def _save_marked_video(store: SqliteVideoRecordStorage, name: str, user_id: str, metadata: str | None) -> None:
+def _save_marked_video(store: VideoRecordStorage, name: str, user_id: str, metadata: str | None) -> None:
     store.save(
         video_name=name,
         video_origin=ResourceOrigin.EXTERNAL,

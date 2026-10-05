@@ -7,6 +7,7 @@ from typing import Any, Optional
 
 from sqlalchemy import Connection, Row, bindparam, delete, func, insert, select, true, update
 
+from invokeai.app.services.shared.database.dialect import fixed_limit
 from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, mapped, read, write
 from invokeai.app.services.shared.database.schema.users import users
 from invokeai.app.services.users.users_common import UserDTO
@@ -39,7 +40,7 @@ _PAGE = (
 )
 _COUNT_ACTIVE_ADMINS = select(func.count()).select_from(users).where(*_IS_ACTIVE_ADMIN)
 _FIRST_ACTIVE_ADMIN_EMAIL = (
-    select(users.c.email).where(*_IS_ACTIVE_ADMIN).order_by(users.c.created_at, users.c.user_id).limit(1)
+    select(users.c.email).where(*_IS_ACTIVE_ADMIN).order_by(users.c.created_at, users.c.user_id).limit(fixed_limit(1))
 )
 _INSERT = insert(users)
 # An UPDATE reserves bind names that equal column names for its SET clause.

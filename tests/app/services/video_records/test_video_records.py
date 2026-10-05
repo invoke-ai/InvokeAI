@@ -1,4 +1,4 @@
-"""Regression tests for SqliteVideoRecordStorage multiuser isolation.
+"""Regression tests for VideoRecordStorage multiuser isolation.
 
 Covers JPPhoto's code-review finding (PR #9163): when ``board_id`` was omitted
 from /v1/videos/ and /v1/videos/names, the SQL builder applied no user filter
@@ -8,32 +8,34 @@ behaviour so the regression cannot reappear.
 """
 
 import json
-import sqlite3
 
 import pytest
+from sqlalchemy import update
+from sqlalchemy.exc import DBAPIError
 
 from invokeai.app.services.board_records.board_records_default import BoardRecordStorage
-from invokeai.app.services.config.config_default import InvokeAIAppConfig
+from invokeai.app.services.board_video_records.board_video_records_default import BoardVideoRecordStorage
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.shared.database.database import Database
+from invokeai.app.services.shared.database.schema.videos import videos
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
-from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
-from invokeai.app.services.video_records.video_records_common import VideoRecordNotFoundException
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
-from invokeai.backend.util.logging import InvokeAILogger
-from tests.fixtures.sqlite_database import create_mock_sqlite_database
+from invokeai.app.services.video_records.video_records_common import VideoRecordChanges, VideoRecordNotFoundException
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 
 
 @pytest.fixture
-def store() -> SqliteVideoRecordStorage:
-    config = InvokeAIAppConfig(use_memory_db=True)
-    logger = InvokeAILogger.get_logger(config=config)
-    db = create_mock_sqlite_database(config, logger)
-    return SqliteVideoRecordStorage(db=db)
+def store(database: Database) -> VideoRecordStorage:
+    return VideoRecordStorage(database)
 
 
-def _save(store: SqliteVideoRecordStorage, name: str, user_id: str) -> None:
+def _drop_the_videos_table(database: Database) -> None:
+    with database.begin(write=True) as conn:
+        conn.exec_driver_sql("DROP TABLE videos")
+
+
+def _save(store: VideoRecordStorage, name: str, user_id: str, is_intermediate: bool = False) -> None:
     store.save(
         video_name=name,
         video_origin=ResourceOrigin.INTERNAL,
@@ -43,13 +45,13 @@ def _save(store: SqliteVideoRecordStorage, name: str, user_id: str) -> None:
         duration=1.0,
         fps=8.0,
         has_workflow=False,
-        is_intermediate=False,
+        is_intermediate=is_intermediate,
         user_id=user_id,
     )
 
 
 @pytest.fixture
-def seeded_store(store: SqliteVideoRecordStorage) -> SqliteVideoRecordStorage:
+def seeded_store(store: VideoRecordStorage) -> VideoRecordStorage:
     # Two videos per user; all without board association (the bug occurred when board_id
     # was omitted from the query).
     _save(store, "alice_1.mp4", user_id="alice")
@@ -62,18 +64,18 @@ def seeded_store(store: SqliteVideoRecordStorage) -> SqliteVideoRecordStorage:
 class TestGetManyOmittedBoardIdMultiuser:
     """get_many() with board_id=None must filter by user_id for non-admin callers."""
 
-    def test_non_admin_only_sees_own_videos(self, seeded_store: SqliteVideoRecordStorage) -> None:
+    def test_non_admin_only_sees_own_videos(self, seeded_store: VideoRecordStorage) -> None:
         result = seeded_store.get_many(user_id="alice", is_admin=False)
         names = {v.video_name for v in result.items}
         assert names == {"alice_1.mp4", "alice_2.mp4"}
         assert result.total == 2
 
-    def test_admin_sees_every_users_videos(self, seeded_store: SqliteVideoRecordStorage) -> None:
+    def test_admin_sees_every_users_videos(self, seeded_store: VideoRecordStorage) -> None:
         result = seeded_store.get_many(user_id="alice", is_admin=True)
         names = {v.video_name for v in result.items}
         assert names == {"alice_1.mp4", "alice_2.mp4", "bob_1.mp4", "bob_2.mp4"}
 
-    def test_no_user_id_returns_all(self, seeded_store: SqliteVideoRecordStorage) -> None:
+    def test_no_user_id_returns_all(self, seeded_store: VideoRecordStorage) -> None:
         # No user_id means the caller is bypassing user filtering entirely (e.g. internal calls).
         result = seeded_store.get_many(user_id=None, is_admin=False)
         names = {v.video_name for v in result.items}
@@ -83,16 +85,16 @@ class TestGetManyOmittedBoardIdMultiuser:
 class TestGetVideoNamesOmittedBoardIdMultiuser:
     """get_video_names() with board_id=None must filter by user_id for non-admin callers."""
 
-    def test_non_admin_only_sees_own_videos(self, seeded_store: SqliteVideoRecordStorage) -> None:
+    def test_non_admin_only_sees_own_videos(self, seeded_store: VideoRecordStorage) -> None:
         result = seeded_store.get_video_names(user_id="alice", is_admin=False)
         assert set(result.video_names) == {"alice_1.mp4", "alice_2.mp4"}
         assert result.total_count == 2
 
-    def test_admin_sees_every_users_videos(self, seeded_store: SqliteVideoRecordStorage) -> None:
+    def test_admin_sees_every_users_videos(self, seeded_store: VideoRecordStorage) -> None:
         result = seeded_store.get_video_names(user_id="alice", is_admin=True)
         assert set(result.video_names) == {"alice_1.mp4", "alice_2.mp4", "bob_1.mp4", "bob_2.mp4"}
 
-    def test_explicit_none_board_still_isolates(self, seeded_store: SqliteVideoRecordStorage) -> None:
+    def test_explicit_none_board_still_isolates(self, seeded_store: VideoRecordStorage) -> None:
         # The "none" sentinel (uncategorized) must also apply the user filter — this was the
         # only path that was correct *before* the fix; the test guards against accidental
         # regression there too.
@@ -102,12 +104,14 @@ class TestGetVideoNamesOmittedBoardIdMultiuser:
 
 class TestDeterministicOrdering:
     @staticmethod
-    def _set_same_timestamp(store: SqliteVideoRecordStorage) -> None:
-        with store._db.transaction() as cursor:
-            cursor.execute("UPDATE videos SET created_at = '2026-07-20 00:00:00.000'")
+    def _set_same_timestamp(database: Database) -> None:
+        with database.begin(write=True) as conn:
+            conn.execute(update(videos).values(created_at="2026-07-20 00:00:00.000"))
 
-    def test_same_timestamp_pages_have_stable_mirrored_order(self, seeded_store: SqliteVideoRecordStorage) -> None:
-        self._set_same_timestamp(seeded_store)
+    def test_same_timestamp_pages_have_stable_mirrored_order(
+        self, database: Database, seeded_store: VideoRecordStorage
+    ) -> None:
+        self._set_same_timestamp(database)
 
         ascending = [
             seeded_store.get_many(
@@ -137,8 +141,10 @@ class TestDeterministicOrdering:
         assert ascending == ["alice_1.mp4", "alice_2.mp4"]
         assert descending == list(reversed(ascending))
 
-    def test_same_timestamp_name_list_has_stable_mirrored_order(self, seeded_store: SqliteVideoRecordStorage) -> None:
-        self._set_same_timestamp(seeded_store)
+    def test_same_timestamp_name_list_has_stable_mirrored_order(
+        self, database: Database, seeded_store: VideoRecordStorage
+    ) -> None:
+        self._set_same_timestamp(database)
 
         ascending = seeded_store.get_video_names(
             starred_first=False,
@@ -154,16 +160,15 @@ class TestDeterministicOrdering:
         assert ascending == ["alice_1.mp4", "alice_2.mp4"]
         assert descending == list(reversed(ascending))
 
-    def test_board_cover_uses_name_as_same_timestamp_tie_breaker(self, store: SqliteVideoRecordStorage) -> None:
-        board = BoardRecordStorage(store._db.database).save("Board", "system")
+    def test_board_cover_uses_name_as_same_timestamp_tie_breaker(
+        self, database: Database, store: VideoRecordStorage
+    ) -> None:
+        board = BoardRecordStorage(database).save("Board", "system")
         _save(store, "a.mp4", user_id="system")
         _save(store, "b.mp4", user_id="system")
-        self._set_same_timestamp(store)
-        with store._db.transaction() as cursor:
-            cursor.executemany(
-                "INSERT INTO board_videos (board_id, video_name) VALUES (?, ?)",
-                [(board.board_id, "a.mp4"), (board.board_id, "b.mp4")],
-            )
+        self._set_same_timestamp(database)
+        for name in ("a.mp4", "b.mp4"):
+            BoardVideoRecordStorage(database).add_video_to_board(board.board_id, name)
 
         assert store.get_most_recent_video_for_board(board.board_id).video_name == "b.mp4"
 
@@ -180,15 +185,9 @@ class TestUserDeletionLifecycle:
     user-deletion story is a deliberate decision rather than an accident.
     """
 
-    @pytest.fixture
-    def migrated_db(self) -> SqliteDatabase:
-        config = InvokeAIAppConfig(use_memory_db=True)
-        logger = InvokeAILogger.get_logger(config=config)
-        return create_mock_sqlite_database(config, logger)
-
-    def test_videos_survive_owner_deletion_and_remain_admin_only(self, migrated_db: SqliteDatabase) -> None:
-        users = UserService(migrated_db.database)
-        store = SqliteVideoRecordStorage(db=migrated_db)
+    def test_videos_survive_owner_deletion_and_remain_admin_only(self, database: Database) -> None:
+        users = UserService(database)
+        store = VideoRecordStorage(database)
 
         owner = users.create(
             UserCreateRequest(
@@ -213,7 +212,10 @@ class TestUserDeletionLifecycle:
         assert "doomed.mp4" not in {v.video_name for v in other_view.items}
 
 
-def test_get_propagates_a_storage_error_instead_of_reporting_the_row_missing(store: SqliteVideoRecordStorage):
+@pytest.mark.sqlite_only  # A dropped table would stay dropped for every later test on a shared server schema.
+def test_get_propagates_a_storage_error_instead_of_reporting_the_row_missing(
+    database: Database, store: VideoRecordStorage
+):
     """An unreadable database must not be indistinguishable from a deleted video.
 
     `get` used to translate every sqlite3.Error into VideoRecordNotFoundException, which made
@@ -226,42 +228,53 @@ def test_get_propagates_a_storage_error_instead_of_reporting_the_row_missing(sto
     # A real storage failure rather than a patched one: the SELECT below cannot run at all, the
     # same shape a locked or corrupt database presents. The row's absence is not what is being
     # reported, and the caller must be able to tell.
-    with store._db.transaction() as cursor:
-        cursor.execute("DROP TABLE videos;")
+    _drop_the_videos_table(database)
 
-    with pytest.raises(sqlite3.OperationalError):
+    with pytest.raises(DBAPIError):
         store.get("video-1.mp4")
 
 
-def test_get_still_reports_a_positively_absent_row_as_missing(store: SqliteVideoRecordStorage):
+def test_get_still_reports_a_positively_absent_row_as_missing(store: VideoRecordStorage):
     """The narrowing stays exactly that narrow: absence is still absence."""
     with pytest.raises(VideoRecordNotFoundException):
         store.get("never-existed.mp4")
 
 
-def test_exists_reports_a_row_get_cannot_deserialize(store: SqliteVideoRecordStorage):
+def test_exists_reports_a_row_get_cannot_deserialize(database: Database, store: VideoRecordStorage):
     """Presence, not readability. `get` would raise on an enum value this version does not know
     — a row written by a newer one — and the refusal path reads that as absence, which would
     report a live video gone."""
     _save(store, "video-1.mp4", "user-1")
-    with store._db.transaction() as cursor:
-        cursor.execute("UPDATE videos SET video_category = 'from_the_future' WHERE video_name = ?;", ("video-1.mp4",))
+    with database.begin(write=True) as conn:
+        conn.execute(
+            update(videos).where(videos.c.video_name == "video-1.mp4").values(video_category="from_the_future")
+        )
 
     with pytest.raises(ValueError):
         store.get("video-1.mp4")
     assert store.exists("video-1.mp4") is True
 
 
-def test_exists_propagates_a_storage_error(store: SqliteVideoRecordStorage):
+@pytest.mark.sqlite_only  # See above.
+def test_exists_propagates_a_storage_error(database: Database, store: VideoRecordStorage):
     """ "Could not look" is not "not there" — the caller answers 404 on a False."""
-    with store._db.transaction() as cursor:
-        cursor.execute("DROP TABLE videos;")
+    _drop_the_videos_table(database)
 
-    with pytest.raises(sqlite3.OperationalError):
+    with pytest.raises(DBAPIError):
         store.exists("video-1.mp4")
 
 
-def _save_with_metadata(store: SqliteVideoRecordStorage, name: str, metadata: str | None) -> None:
+@pytest.mark.sqlite_only  # See above.
+def test_get_metadata_propagates_a_storage_error(database: Database, store: VideoRecordStorage):
+    """As for `get`: a metadata read that fails is not a video that is gone."""
+    _save(store, "video-1.mp4", "user-1")
+    _drop_the_videos_table(database)
+
+    with pytest.raises(DBAPIError):
+        store.get_metadata("video-1.mp4")
+
+
+def _save_with_metadata(store: VideoRecordStorage, name: str, metadata: str | None) -> None:
     store.save(
         video_name=name,
         video_origin=ResourceOrigin.EXTERNAL,
@@ -277,7 +290,7 @@ def _save_with_metadata(store: SqliteVideoRecordStorage, name: str, metadata: st
     )
 
 
-def test_media_origin_is_projected_out_of_the_metadata_blob(store: SqliteVideoRecordStorage) -> None:
+def test_media_origin_is_projected_out_of_the_metadata_blob(store: VideoRecordStorage) -> None:
     """The record carries `media_origin` so clients need no separate /metadata request.
 
     An audio upload the ingest converter wrapped into a waveform video is marked
@@ -299,14 +312,14 @@ def test_media_origin_is_projected_out_of_the_metadata_blob(store: SqliteVideoRe
         pytest.param('{"note": "kept"}', id="metadata with other keys"),
     ],
 )
-def test_media_origin_is_none_when_unmarked(store: SqliteVideoRecordStorage, metadata: str | None) -> None:
+def test_media_origin_is_none_when_unmarked(store: VideoRecordStorage, metadata: str | None) -> None:
     """`json_extract` over a NULL or key-less blob yields NULL rather than raising."""
     _save_with_metadata(store, "plain.mp4", metadata)
 
     assert store.get("plain.mp4").media_origin is None
 
 
-def test_media_origin_survives_a_listing(store: SqliteVideoRecordStorage) -> None:
+def test_media_origin_survives_a_listing(store: VideoRecordStorage) -> None:
     """`get_many` selects the same columns, so a listed row carries the marker too."""
     _save_with_metadata(store, "wrapped.mp4", '{"media_origin": "audio_upload"}')
     _save_with_metadata(store, "plain.mp4", None)
@@ -331,7 +344,7 @@ def test_media_origin_survives_a_listing(store: SqliteVideoRecordStorage) -> Non
         pytest.param('"has a space"', id="a string that is not marker-shaped"),
     ],
 )
-def test_a_non_string_marker_does_not_break_the_record(store: SqliteVideoRecordStorage, raw: str) -> None:
+def test_a_non_string_marker_does_not_break_the_record(store: VideoRecordStorage, raw: str) -> None:
     """A client may store any JSON value under `media_origin`; the row must still deserialize.
 
     `MetadataField` validates only that the blob is an object, so `json_extract` can hand
@@ -344,14 +357,14 @@ def test_a_non_string_marker_does_not_break_the_record(store: SqliteVideoRecordS
     assert store.get("odd.mp4").media_origin is None
 
 
-def test_metadata_that_is_not_an_object_leaves_the_marker_unset(store: SqliteVideoRecordStorage) -> None:
+def test_metadata_that_is_not_an_object_leaves_the_marker_unset(store: VideoRecordStorage) -> None:
     """`json_extract` over a non-object blob yields NULL rather than raising."""
     _save_with_metadata(store, "array.mp4", "[1, 2, 3]")
 
     assert store.get("array.mp4").media_origin is None
 
 
-def test_a_malformed_metadata_blob_does_not_fail_the_query(store: SqliteVideoRecordStorage) -> None:
+def test_a_malformed_metadata_blob_does_not_fail_the_query(store: VideoRecordStorage) -> None:
     """`json_extract` RAISES on unparseable text, and this expression runs on every listed row.
 
     Unguarded, one malformed blob would fail the whole page — `get_many` deserializes rows in
@@ -369,7 +382,7 @@ def test_a_malformed_metadata_blob_does_not_fail_the_query(store: SqliteVideoRec
     }
 
 
-def test_an_overlong_marker_is_dropped_rather_than_echoed_on_every_row(store: SqliteVideoRecordStorage) -> None:
+def test_an_overlong_marker_is_dropped_rather_than_echoed_on_every_row(store: VideoRecordStorage) -> None:
     """Upload metadata is client-supplied and unbounded, and this key now rides every row.
 
     Without a cap, one upload carrying a huge marker is echoed back on every gallery page
@@ -381,3 +394,14 @@ def test_an_overlong_marker_is_dropped_rather_than_echoed_on_every_row(store: Sq
     # A marker of a plausible length still passes.
     _save_with_metadata(store, "fine.mp4", json.dumps({"media_origin": "audio_upload"}))
     assert store.get("fine.mp4").media_origin == "audio_upload"
+
+
+def test_only_videos_still_intermediate_are_deleted_and_reported_in_the_given_order(store: VideoRecordStorage) -> None:
+    for name in ("a.mp4", "b.mp4", "c.mp4"):
+        _save(store, name, "alice", is_intermediate=True)
+    store.update("b.mp4", VideoRecordChanges(is_intermediate=False))
+
+    deleted = store.delete_intermediates_by_names(["c.mp4", "b.mp4", "gone.mp4", "a.mp4"])
+
+    assert deleted == ["c.mp4", "a.mp4"]
+    assert [store.exists(name) for name in ("a.mp4", "b.mp4", "c.mp4")] == [False, True, False]

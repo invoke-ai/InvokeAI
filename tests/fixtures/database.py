@@ -17,7 +17,7 @@ from typing import Any, Optional
 from unittest import mock
 
 import pytest
-from sqlalchemy import URL, Engine, create_engine, delete, insert, make_url, select
+from sqlalchemy import URL, Engine, create_engine, delete, event, insert, make_url, select
 
 from invokeai.app.services.config.config_default import DefaultInvokeAIAppConfig
 from invokeai.app.services.image_files.image_files_base import ImageFileStorageBase
@@ -229,3 +229,24 @@ def _drop_all_tables(database: Database) -> None:
             conn.exec_driver_sql(f"DROP TABLE `{table}`")
         conn.exec_driver_sql("SET FOREIGN_KEY_CHECKS = 1")
         conn.commit()
+
+
+@contextmanager
+def capture_statements(database: Database) -> Iterator[list[tuple[str, Any]]]:
+    """The statements the database runs inside the block, each with its parameters as the driver gets them."""
+    captured: list[tuple[str, Any]] = []
+
+    def record(conn: Any, cursor: Any, statement: str, parameters: Any, context: Any, executemany: bool) -> None:
+        captured.append((statement, parameters))
+
+    event.listen(database.engine, "before_cursor_execute", record)
+    try:
+        yield captured
+    finally:
+        event.remove(database.engine, "before_cursor_execute", record)
+
+
+def explain_query_plan(database: Database, statement: str, parameters: Any) -> list[str]:
+    """The details of SQLite's plan for a captured statement."""
+    with database.begin(write=False) as conn:
+        return [row[3] for row in conn.exec_driver_sql(f"EXPLAIN QUERY PLAN {statement}", parameters).all()]

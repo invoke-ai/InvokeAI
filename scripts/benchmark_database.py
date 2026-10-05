@@ -50,6 +50,7 @@ STYLE_PRESETS = 50
 SYSTEM_PROMPTS = 20
 WILDCARDS = 25
 MODELS = 500
+VIDEOS = 2_000
 WORKFLOW_TAGS = ["sdxl", "flux", "upscale", "inpaint", "video", "portrait", "landscape", "controlnet"]
 
 
@@ -76,7 +77,7 @@ class Services:
             ClientStatePersistence,
         )
         from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
-        from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+        from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
         from invokeai.app.services.model_records import ModelRecordServiceSQL
         from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
         from invokeai.app.services.style_preset_records.style_preset_records_default import StylePresetRecordsStorage
@@ -84,11 +85,13 @@ class Services:
             SystemPromptRecordsStorage,
         )
         from invokeai.app.services.users.users_default import UserService
+        from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
         from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
         from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 
         self.database = db.database
-        self.image_records = SqliteImageRecordStorage(db=db)
+        self.image_records = ImageRecordStorage(db.database)
+        self.video_records = VideoRecordStorage(db.database)
         self.board_records = BoardRecordStorage(db.database)
         self.board_image_records = BoardImageRecordStorage(db.database)
         self.board_video_records = BoardVideoRecordStorage(db.database)
@@ -241,6 +244,25 @@ def _seed(services: Services, images: int, boards: int, rng: random.Random) -> l
         names.append(name)
         if i % 2 == 0:
             services.board_image_records.add_image_to_board(board_id=board_ids[i % boards], image_name=name)
+    for i in range(VIDEOS):
+        name = f"{uuid.UUID(int=rng.getrandbits(128))}.mp4"
+        services.video_records.save(
+            video_name=name,
+            video_origin=ResourceOrigin.INTERNAL,
+            video_category=ImageCategory.GENERAL,
+            width=1280,
+            height=720,
+            duration=5.0,
+            fps=24.0,
+            has_workflow=False,
+            is_intermediate=i % 20 == 0,
+            starred=i % 50 == 0,
+            # Every row's listing reads the media origin out of its metadata.
+            metadata=json.dumps({"media_origin": "audio_upload"}) if i % 10 == 0 else _metadata(rng),
+            user_id="system",
+        )
+        if i % 2 == 0:
+            services.board_video_records.add_video_to_board(board_id=board_ids[i % boards], video_name=name)
     # Accounts are inserted directly: the service would hash a password for each, which takes most of a second.
     with services.database.queries.transaction() as q:
         for i in range(ACCOUNTS):
@@ -351,6 +373,7 @@ def _operations(
     model_keys = [str(uuid.UUID(int=i)) for i in range(MODELS)]
 
     general = [ImageCategory.GENERAL]
+    video_names = services.video_records.get_video_names(user_id="system", is_admin=True).video_names
 
     def save_image() -> object:
         return services.image_records.save(
@@ -377,6 +400,26 @@ def _operations(
                 categories=general, is_intermediate=False, user_id="system", is_admin=True
             ),
             10,
+        ),
+        # A non-admin's "all" view: images on no board that it owns, and those on boards it may read.
+        "image_records.get_image_names(all, account)": (
+            lambda: services.image_records.get_image_names(
+                categories=general, is_intermediate=False, board_id="all", user_id="user-1", is_admin=False
+            ),
+            10,
+        ),
+        "video_records.get": (lambda: services.video_records.get(rng.choice(video_names)), 1000),
+        "video_records.get_many(page of 100)": (
+            lambda: services.video_records.get_many(
+                limit=100, categories=general, is_intermediate=False, user_id="system", is_admin=True
+            ),
+            50,
+        ),
+        "video_records.get_video_names(all)": (
+            lambda: services.video_records.get_video_names(
+                categories=general, is_intermediate=False, user_id="system", is_admin=True
+            ),
+            20,
         ),
         "gallery.get_item_names(all)": (
             lambda: services.gallery.get_item_names(

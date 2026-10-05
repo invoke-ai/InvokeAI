@@ -15,7 +15,7 @@ from invokeai.app.services.image_moves.image_moves_default import (
     UnreadableImageError,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.session_queue.session_queue_common import DEFAULT_QUEUE_ID, SessionQueueStatus
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.shared.sqlite.sqlite_util import init_db
@@ -31,7 +31,8 @@ def _build_db(tmp_path: Path) -> SqliteDatabase:
 
 
 def _save_record(
-    records: SqliteImageRecordStorage,
+    service: ImageMoveService,
+    records: ImageRecordStorage,
     image_name: str,
     subfolder: str,
     created_at: str,
@@ -47,13 +48,13 @@ def _save_record(
         is_intermediate=is_intermediate,
         image_subfolder=subfolder,
     )
-    with records._db.transaction() as cursor:
+    with service._db.transaction() as cursor:
         cursor.execute("UPDATE images SET created_at = ? WHERE image_name = ?;", (created_at, image_name))
 
 
 def _save_image(
     service: ImageMoveService,
-    records: SqliteImageRecordStorage,
+    records: ImageRecordStorage,
     image_name: str,
     subfolder: str,
     created_at: str,
@@ -61,6 +62,7 @@ def _save_image(
     is_intermediate: bool = False,
 ) -> None:
     _save_record(
+        service,
         records,
         image_name=image_name,
         subfolder=subfolder,
@@ -77,9 +79,9 @@ def _corrupt_png_idat(path: Path) -> None:
     path.write_bytes(data)
 
 
-def _service(tmp_path: Path, strategy: str = "date") -> tuple[ImageMoveService, SqliteImageRecordStorage]:
+def _service(tmp_path: Path, strategy: str = "date") -> tuple[ImageMoveService, ImageRecordStorage]:
     db = _build_db(tmp_path)
-    records = SqliteImageRecordStorage(db=db)
+    records = ImageRecordStorage(db.database)
     storage = DiskImageFileStorage(tmp_path / "images")
     invoker = MagicMock()
     invoker.services.configuration.pil_compress_level = 6
@@ -108,7 +110,7 @@ def _job_states(service: ImageMoveService) -> dict[int, str]:
 def test_move_all_images_uses_created_at_for_date_strategy(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "image-a.png"
-    _save_record(records, image_name=image_name, subfolder="", created_at="2024-02-03 04:05:06.000")
+    _save_record(service, records, image_name=image_name, subfolder="", created_at="2024-02-03 04:05:06.000")
     service.image_files.save(Image.new("RGB", (16, 16), "red"), image_name=image_name)
 
     result = service.move_all_images()
@@ -125,6 +127,7 @@ def test_missing_intermediate_source_file_is_treated_as_success(tmp_path: Path) 
     service, records = _service(tmp_path, strategy="date")
     image_name = "missing-intermediate.png"
     _save_record(
+        service,
         records,
         image_name=image_name,
         subfolder="",
@@ -171,6 +174,7 @@ def test_missing_non_intermediate_source_file_still_fails(tmp_path: Path) -> Non
     service, records = _service(tmp_path, strategy="date")
     image_name = "missing-general.png"
     _save_record(
+        service,
         records,
         image_name=image_name,
         subfolder="",
@@ -187,6 +191,7 @@ def test_move_all_images_continues_after_missing_non_intermediate_source_file(tm
     missing_image_name = "missing-general.png"
     valid_image_name = "valid-general.png"
     _save_record(
+        service,
         records,
         image_name=missing_image_name,
         subfolder="",
@@ -208,7 +213,7 @@ def test_move_all_images_continues_after_missing_non_intermediate_source_file(tm
 def test_move_recovers_existing_16_bit_destination_without_thumbnail(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "large-16-bit.png"
-    _save_record(records, image_name=image_name, subfolder="", created_at="2024-02-04 04:05:06.000")
+    _save_record(service, records, image_name=image_name, subfolder="", created_at="2024-02-04 04:05:06.000")
     old_path = service.image_files.get_path(image_name)
     old_path.parent.mkdir(parents=True, exist_ok=True)
     image = Image.new("I;16", (1024, 1024), 32768)
@@ -275,7 +280,7 @@ def test_regenerate_thumbnail_closes_temp_file_before_writing(tmp_path: Path) ->
 def test_move_does_not_relocate_source_when_thumbnail_generation_fails(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "thumbnail-retry.png"
-    _save_record(records, image_name=image_name, subfolder="", created_at="2024-02-05 04:05:06.000")
+    _save_record(service, records, image_name=image_name, subfolder="", created_at="2024-02-05 04:05:06.000")
     old_path = service.image_files.get_path(image_name)
     old_path.parent.mkdir(parents=True, exist_ok=True)
     Image.new("RGB", (32, 32), "red").save(old_path, format="PNG")
@@ -305,6 +310,7 @@ def test_recovery_treats_missing_intermediate_source_file_as_success(tmp_path: P
     service, records = _service(tmp_path, strategy="date")
     image_name = "missing-intermediate-recovery.png"
     _save_record(
+        service,
         records,
         image_name=image_name,
         subfolder="",
@@ -326,7 +332,7 @@ def test_recovery_treats_missing_intermediate_source_file_as_success(tmp_path: P
 def test_startup_recovery_commits_after_files_moved_but_db_not_updated(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "image-b.png"
-    _save_record(records, image_name=image_name, subfolder="", created_at="2025-06-07 08:09:10.000")
+    _save_record(service, records, image_name=image_name, subfolder="", created_at="2025-06-07 08:09:10.000")
     service.image_files.save(Image.new("RGB", (16, 16), "blue"), image_name=image_name)
 
     moves = service.plan_batch(last_image_name="", limit=100)
@@ -366,7 +372,7 @@ def test_cleanup_empty_source_directories_after_move(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "image-c.png"
     old_subfolder = "old/nested"
-    _save_record(records, image_name=image_name, subfolder=old_subfolder, created_at="2024-11-12 01:02:03.000")
+    _save_record(service, records, image_name=image_name, subfolder=old_subfolder, created_at="2024-11-12 01:02:03.000")
     service.image_files.save(Image.new("RGB", (16, 16), "green"), image_name=image_name, image_subfolder=old_subfolder)
     old_parent = service.image_files.get_path(image_name, image_subfolder=old_subfolder).parent
     old_thumb_parent = service.image_files.get_path(image_name, thumbnail=True, image_subfolder=old_subfolder).parent
@@ -429,7 +435,7 @@ def test_startup_recovery_cleans_empty_source_directories(tmp_path: Path) -> Non
 def test_preflight_rejects_active_uncommitted_job_for_same_image(tmp_path: Path) -> None:
     service, records = _service(tmp_path, strategy="date")
     image_name = "image-d.png"
-    _save_record(records, image_name=image_name, subfolder="", created_at="2024-01-02 03:04:05.000")
+    _save_record(service, records, image_name=image_name, subfolder="", created_at="2024-01-02 03:04:05.000")
     service.image_files.save(Image.new("RGB", (16, 16), "yellow"), image_name=image_name)
 
     moves = service.plan_batch(last_image_name="", limit=100)

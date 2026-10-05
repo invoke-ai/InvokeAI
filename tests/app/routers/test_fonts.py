@@ -9,12 +9,13 @@ from fastapi.testclient import TestClient
 
 from invokeai.app.services.fonts.fonts_default import FontService
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
 @pytest.fixture
-def font_service(mock_invoker: Invoker, tmp_path: Path) -> FontService:
+def font_service(mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase, tmp_path: Path) -> FontService:
     service = FontService(
-        db=mock_invoker.services.image_records._db,
+        db=mock_sqlite_database,
         fonts_dir=tmp_path / "fonts",
         storage_dir=tmp_path / "uploaded-fonts",
     )

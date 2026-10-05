@@ -28,6 +28,7 @@ from invokeai.app.services.shared.database.queries.board_images import BoardImag
 from invokeai.app.services.shared.database.queries.board_videos import BoardVideoQueries
 from invokeai.app.services.shared.database.queries.boards import BoardQueries
 from invokeai.app.services.shared.database.queries.client_state import ClientStateQueries
+from invokeai.app.services.shared.database.queries.images import ImageQueries
 from invokeai.app.services.shared.database.queries.locks import LockQueries
 from invokeai.app.services.shared.database.queries.media_references import MediaReferenceQueries
 from invokeai.app.services.shared.database.queries.model_relationships import ModelRelationshipQueries
@@ -36,6 +37,7 @@ from invokeai.app.services.shared.database.queries.projects import ProjectQuerie
 from invokeai.app.services.shared.database.queries.style_presets import StylePresetQueries
 from invokeai.app.services.shared.database.queries.system_prompts import SystemPromptQueries
 from invokeai.app.services.shared.database.queries.users import UserQueries
+from invokeai.app.services.shared.database.queries.videos import VideoQueries
 from invokeai.app.services.shared.database.queries.wildcards import WildcardQueries
 from invokeai.app.services.shared.database.queries.workflows import WorkflowQueries
 
@@ -78,6 +80,10 @@ class Queries:
         return ClientStateQueries(self._scope)
 
     @cached_property
+    def images(self) -> ImageQueries:
+        return ImageQueries(self._scope)
+
+    @cached_property
     def locks(self) -> LockQueries:
         return LockQueries(self._scope)
 
@@ -108,6 +114,10 @@ class Queries:
     @cached_property
     def users(self) -> UserQueries:
         return UserQueries(self._scope)
+
+    @cached_property
+    def videos(self) -> VideoQueries:
+        return VideoQueries(self._scope)
 
     @cached_property
     def wildcards(self) -> WildcardQueries:

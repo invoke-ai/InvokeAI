@@ -29,12 +29,12 @@ from invokeai.app.services.image_index.projection import (
     scope_hash,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.services.videos.videos_default import VideoService
 
 MODEL_ID = "test-model-hash"
@@ -168,7 +168,7 @@ def image_index_service() -> FakeImageIndexService:
     return FakeImageIndexService()
 
 
-def _video_service(thumbnails: Path, video_records: SqliteVideoRecordStorage) -> VideoService:
+def _video_service(thumbnails: Path, video_records: VideoRecordStorage) -> VideoService:
     """A video service that resolves thumbnails to real files, which is all these endpoints read.
 
     It goes through the record store first, like the real one: a name with no video raises
@@ -218,7 +218,7 @@ def mock_services(
         configuration=configuration,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=SqliteImageRecordStorage(db=db),
+        image_records=ImageRecordStorage(db.database),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
@@ -243,7 +243,7 @@ def mock_services(
         users=UserService(db.database),
         wildcard_records=None,  # type: ignore
         system_prompt_records=None,  # type: ignore
-        videos=_video_service(tmp_path, video_records := SqliteVideoRecordStorage(db=db)),
+        videos=_video_service(tmp_path, video_records := VideoRecordStorage(db.database)),
         video_files=None,  # type: ignore
         video_records=video_records,
         board_video_records=BoardVideoRecordStorage(db.database),

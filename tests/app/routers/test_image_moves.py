@@ -16,7 +16,7 @@ from invokeai.app.services.bulk_download.bulk_download_default import BulkDownlo
 from invokeai.app.services.client_state_persistence.client_state_persistence_default import ClientStatePersistence
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveJobAlreadyRunning, ImageMoveQueueActive
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.invocation_services import InvocationServices
@@ -26,7 +26,7 @@ from invokeai.app.services.project_records.project_records_default import Projec
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.app.services.wildcard_records.wildcard_records_default import WildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 from tests.test_nodes import TestEventService
@@ -58,7 +58,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         configuration=configuration,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=SqliteImageRecordStorage(db=db),
+        image_records=ImageRecordStorage(db.database),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
@@ -85,7 +85,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         wildcard_records=WildcardRecordsStorage(db.database),
         videos=None,  # type: ignore
         video_files=None,  # type: ignore
-        video_records=SqliteVideoRecordStorage(db=db),
+        video_records=VideoRecordStorage(db.database),
         board_video_records=BoardVideoRecordStorage(db.database),
         gallery=None,  # type: ignore
         image_index_records=None,  # type: ignore

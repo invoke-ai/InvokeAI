@@ -206,7 +206,7 @@ def test_start_keeps_staged_delete_when_the_record_cannot_be_read(storage: DiskV
 
     The recovery decides between purging the staged files and restoring them by asking whether
     the record is still there, so it needs that read to distinguish "gone" from "could not
-    look". `SqliteVideoRecordStorage.get` used to translate every sqlite3.Error into
+    look". `VideoRecordStorage.get` used to translate every sqlite3.Error into
     VideoRecordNotFoundException, which made an unreadable database delete the user's video
     files outright. Now the staged copy survives for a later attempt.
     """

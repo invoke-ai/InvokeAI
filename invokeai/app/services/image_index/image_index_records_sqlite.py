@@ -236,7 +236,7 @@ class ImageIndexRecordsSqlite(ImageIndexRecordsBase):
 
     def list_accessible_embedded_items(self, user_id: str | None, model_id: str) -> list[IndexedItem]:
         # Both clauses mirror the gallery "all" listing semantics
-        # (image_records_sqlite / video_records_sqlite): items on archived
+        # (queries/images.py / queries/videos.py): items on archived
         # boards are hidden from every scope, and a scoped user sees their own
         # unboarded items plus items on active boards they own, that are
         # shared/public, or that were individually shared with them via

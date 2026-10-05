@@ -4,7 +4,7 @@ import re
 from collections.abc import Sequence
 from typing import Any
 
-from sqlalchemy import Boolean, FromClause, Insert, Join, String, Table, UniqueConstraint
+from sqlalchemy import Boolean, FromClause, Insert, Integer, Join, String, Table, UniqueConstraint, literal_column
 from sqlalchemy.dialects import mysql, postgresql, sqlite
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.sql.compiler import SQLCompiler
@@ -18,12 +18,16 @@ _LIKE_ESCAPE = "\\"
 
 
 def _require_only_primary_key(table: Table) -> None:
-    # MySQL and MariaDB resolve a conflict with any unique key, the other backends only one on the key named.
+    # MySQL and MariaDB resolve a conflict with any unique key, the other backends only one on the key named. A
+    # unique index of the primary key's own columns (some migrated SQLite tables have one) is that same key.
     if not table.primary_key.columns:
         raise ValueError(f"Table {table.name} has no primary key")
-    if any(isinstance(constraint, UniqueConstraint) for constraint in table.constraints) or any(
-        index.unique for index in table.indexes
-    ):
+    key = set(table.primary_key.columns)
+    unique_keys = [
+        set(constraint.columns) for constraint in table.constraints if isinstance(constraint, UniqueConstraint)
+    ]
+    unique_keys += [set(index.columns) for index in table.indexes if index.unique]
+    if any(columns != key for columns in unique_keys):
         raise ValueError(f"Table {table.name} has a unique key besides its primary key")
 
 
@@ -75,6 +79,16 @@ def insert_ignore(dialect_name: str, table: Table) -> Insert:
     raise ValueError(f"No insert_ignore for the {dialect_name} dialect")
 
 
+def fixed_limit(count: int) -> ColumnElement[int]:
+    """A LIMIT written into the statement, for a count that is the same on every execution, such as a lookup's 1.
+
+    SQLite runs a statement whose LIMIT is a bound parameter 10-20 µs slower, on every execution and with the same
+    plan, than one whose LIMIT is a literal. A count the caller chooses stays a bound parameter: each literal would
+    be a statement of its own.
+    """
+    return literal_column(str(int(count)), Integer)
+
+
 class JsonValue(ColumnElement[Any]):
     """The value at a member path of a JSON document held in a text column, as SQLite's `json_extract()` gives it.
 
@@ -115,6 +129,40 @@ def _compile_json_value_postgresql(element: JsonValue, compiler: SQLCompiler, **
     members = "{" + ",".join(element.path.split(".")[1:]) + "}"
     value = f"(CAST({compiler.preparer.quote(element.document)} AS JSONB) #>> {_literal(compiler, members)})"
     return f"CAST({value} AS BIGINT)" if element.integer else value
+
+
+class JsonString(FunctionElement[str]):
+    """The string at a member path of a JSON document in a text column, for a query; SQL NULL when the document is
+    no valid JSON, the member is missing, or it holds anything but a string.
+
+    The same on every backend: SQLite's `json_extract()` would give 1 for true where a server gives 'true'.
+    """
+
+    inherit_cache = True
+    name = "json_string"
+
+    def __init__(self, document: ColumnElement[Any], path: str) -> None:
+        if _SIMPLE_JSON_PATH.fullmatch(path) is None:
+            raise ValueError(f"Unsupported JSON path {path!r}: only member paths such as '$.meta.category' are")
+        super().__init__(document, literal_column(f"'{path}'"))
+
+
+@compiles(JsonString, "sqlite")
+def _compile_json_string_sqlite(element: JsonString, compiler: SQLCompiler, **kw: Any) -> str:
+    document, path = (compiler.process(clause, **kw) for clause in element.clauses)
+    # Nested, so that json_type() never reads a document json_valid() rejected: it would raise.
+    member = f"CASE WHEN json_type({document}, {path}) = 'text' THEN json_extract({document}, {path}) END"
+    return f"CASE WHEN json_valid({document}) THEN {member} END"
+
+
+@compiles(JsonString, "mysql")
+@compiles(JsonString, "mariadb")
+def _compile_json_string_mysql(element: JsonString, compiler: SQLCompiler, **kw: Any) -> str:
+    document, path = (compiler.process(clause, **kw) for clause in element.clauses)
+    extracted = f"JSON_EXTRACT({document}, {path})"
+    # JSON_TYPE() answers in utf8mb4_bin, which MySQL will not compare with a literal in the connection's collation.
+    member = f"CASE WHEN JSON_TYPE({extracted}) = 'STRING' COLLATE utf8mb4_bin THEN JSON_UNQUOTE({extracted}) END"
+    return f"CASE WHEN JSON_VALID({document}) THEN {member} END"
 
 
 class CaseInsensitiveLike(FunctionElement[bool]):

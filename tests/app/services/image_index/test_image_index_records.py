@@ -22,11 +22,11 @@ from invokeai.app.services.image_index.image_index_records_sqlite import (
     ImageIndexRecordsSqlite,
 )
 from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
-from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.users.users_default import UserService
-from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
+from invokeai.app.services.video_records.video_records_default import VideoRecordStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.fixtures.sqlite_database import create_mock_sqlite_database
 
@@ -43,8 +43,8 @@ def db() -> SqliteDatabase:
 
 
 @pytest.fixture
-def image_records(db: SqliteDatabase) -> SqliteImageRecordStorage:
-    return SqliteImageRecordStorage(db=db)
+def image_records(db: SqliteDatabase) -> ImageRecordStorage:
+    return ImageRecordStorage(db.database)
 
 
 @pytest.fixture
@@ -58,8 +58,8 @@ def board_image_records(db: SqliteDatabase) -> BoardImageRecordStorage:
 
 
 @pytest.fixture
-def video_records(db: SqliteDatabase) -> SqliteVideoRecordStorage:
-    return SqliteVideoRecordStorage(db=db)
+def video_records(db: SqliteDatabase) -> VideoRecordStorage:
+    return VideoRecordStorage(db.database)
 
 
 @pytest.fixture
@@ -82,7 +82,7 @@ def other_user_id(db: SqliteDatabase) -> str:
 
 
 def _save_image(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     image_name: str,
     user_id: str = SYSTEM_USER_ID,
     is_intermediate: bool = False,
@@ -101,7 +101,7 @@ def _save_image(
 
 
 def _save_video(
-    video_records: SqliteVideoRecordStorage,
+    video_records: VideoRecordStorage,
     video_name: str,
     user_id: str = SYSTEM_USER_ID,
     is_intermediate: bool = False,
@@ -232,9 +232,7 @@ def test_coords_from_blob_are_writable() -> None:
 # --- Embedding CRUD ---
 
 
-def test_upsert_and_get_roundtrip(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
-) -> None:
+def test_upsert_and_get_roundtrip(image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite) -> None:
     _save_image(image_records, "a.png")
     _save_image(image_records, "b.png")
     va, vb = _vec(1), _vec(2)
@@ -250,7 +248,7 @@ def test_upsert_and_get_roundtrip(
 
 
 def test_upsert_replaces_existing_embedding(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
+    image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite
 ) -> None:
     _save_image(image_records, "a.png")
     index_records.upsert_embedding(IndexedItem("image", "a.png"), MODEL_ID, _vec(1))
@@ -263,7 +261,7 @@ def test_upsert_replaces_existing_embedding(
 
 
 def test_get_embeddings_empty_input_and_no_matches(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
+    image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite
 ) -> None:
     names, matrix = index_records.get_embeddings([], MODEL_ID)
     assert names == []
@@ -277,7 +275,7 @@ def test_get_embeddings_empty_input_and_no_matches(
 
 
 def test_get_embeddings_chunks_large_requests(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
+    image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite
 ) -> None:
     # Straddle the IN-clause chunk boundary so the multi-chunk path really runs. Derived from
     # the constant rather than hardcoded, so raising the chunk size cannot silently reduce this
@@ -299,7 +297,7 @@ def test_get_embeddings_chunks_large_requests(
 
 
 def test_get_embeddings_rejects_inconsistent_dims(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite, db: SqliteDatabase
+    image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite, db: SqliteDatabase
 ) -> None:
     # The ABC promises a failure on mixed dims under one model_id. Write a short vector behind
     # the service's back, since upsert_embedding alone cannot produce the inconsistency.
@@ -318,7 +316,7 @@ def test_get_embeddings_rejects_inconsistent_dims(
 
 
 def test_get_embeddings_deduplicates_input_names(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
+    image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite
 ) -> None:
     _save_image(image_records, "a.png")
     index_records.upsert_embedding(IndexedItem("image", "a.png"), MODEL_ID, _vec(1))
@@ -344,7 +342,7 @@ def test_set_projection_for_deleted_user_is_noop(index_records: ImageIndexRecord
 
 
 def test_skipped_write_raises_nothing_and_leaves_the_connection_usable(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite, db: SqliteDatabase
+    image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite, db: SqliteDatabase
 ) -> None:
     # The missing-parent case is handled by `WHERE EXISTS`, not by provoking and swallowing an
     # IntegrityError. That matters because `db.transaction()` commits/rolls back the whole
@@ -372,7 +370,7 @@ def test_skipped_write_does_not_raise_integrity_error(index_records: ImageIndexR
 
 
 def test_delete_embedding_removes_all_models(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
+    image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite
 ) -> None:
     _save_image(image_records, "a.png")
     index_records.upsert_embedding(IndexedItem("image", "a.png"), MODEL_ID, _vec(1))
@@ -385,7 +383,7 @@ def test_delete_embedding_removes_all_models(
 
 
 def test_image_delete_cascades_to_embeddings(
-    db: SqliteDatabase, image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
+    db: SqliteDatabase, image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite
 ) -> None:
     _save_image(image_records, "a.png")
     index_records.upsert_embedding(IndexedItem("image", "a.png"), MODEL_ID, _vec(1))
@@ -396,7 +394,7 @@ def test_image_delete_cascades_to_embeddings(
 
 
 def test_delete_embeddings_for_other_models(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
+    image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite
 ) -> None:
     _save_image(image_records, "a.png")
     index_records.upsert_embedding(IndexedItem("image", "a.png"), MODEL_ID, _vec(1))
@@ -413,7 +411,7 @@ def test_delete_embeddings_for_other_models(
 
 
 def test_list_unembedded_skips_ineligible_and_embedded(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
+    image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite
 ) -> None:
     _save_image(image_records, "eligible.png")
     _save_image(image_records, "embedded.png")
@@ -427,7 +425,7 @@ def test_list_unembedded_skips_ineligible_and_embedded(
 
 
 def test_list_unembedded_respects_limit_and_returns_oldest_first(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite, db: SqliteDatabase
+    image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite, db: SqliteDatabase
 ) -> None:
     # `created_at` has millisecond resolution, so five back-to-back saves almost always tie and
     # the `image_name ASC` tie-break alone decides the result — which would let a reversed
@@ -457,13 +455,13 @@ def test_list_unembedded_rejects_negative_limit(index_records: ImageIndexRecords
 
 
 def test_list_unembedded_zero_limit_returns_nothing(
-    image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite
+    image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite
 ) -> None:
     _save_image(image_records, "a.png")
     assert index_records.list_unembedded_items(MODEL_ID, limit=0) == []
 
 
-def test_count_index_status(image_records: SqliteImageRecordStorage, index_records: ImageIndexRecordsSqlite) -> None:
+def test_count_index_status(image_records: ImageRecordStorage, index_records: ImageIndexRecordsSqlite) -> None:
     _save_image(image_records, "a.png")
     _save_image(image_records, "b.png")
     _save_image(image_records, "intermediate.png", is_intermediate=True)
@@ -480,7 +478,7 @@ def test_count_index_status(image_records: SqliteImageRecordStorage, index_recor
 
 
 def test_accessible_images_scoping(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     board_records: BoardRecordStorage,
     board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
@@ -530,7 +528,7 @@ def test_accessible_images_scoping(
 
 def test_accessible_images_includes_individually_shared_boards(
     db: SqliteDatabase,
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     board_records: BoardRecordStorage,
     board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
@@ -559,7 +557,7 @@ def test_accessible_images_includes_individually_shared_boards(
 
 
 def test_accessible_images_includes_boards_owned_by_user(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     board_records: BoardRecordStorage,
     board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
@@ -567,7 +565,7 @@ def test_accessible_images_includes_boards_owned_by_user(
 ) -> None:
     # An image uploaded by another user onto a board the system user OWNS is
     # accessible to the board owner — matching the gallery "all" listing
-    # (image_records_sqlite), which grants access via boards.user_id even
+    # (image_records_default), which grants access via boards.user_id even
     # without shared/public visibility or a shared_boards row.
     _save_image(image_records, "theirs-on-my-board.png", user_id=other_user_id)
     index_records.upsert_embedding(IndexedItem("image", "theirs-on-my-board.png"), MODEL_ID, _vec(1))
@@ -581,7 +579,7 @@ def test_accessible_images_includes_boards_owned_by_user(
 
 
 def test_accessible_images_excludes_archived_boards(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     board_records: BoardRecordStorage,
     board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
@@ -612,7 +610,7 @@ def test_accessible_images_excludes_archived_boards(
 
 
 def test_accessible_images_returns_boarded_images_once(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     board_records: BoardRecordStorage,
     board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
@@ -630,7 +628,7 @@ def test_accessible_images_returns_boarded_images_once(
 
 
 def test_accessible_images_are_filtered_by_model_id(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     board_records: BoardRecordStorage,
     board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
@@ -657,7 +655,7 @@ def test_accessible_images_are_filtered_by_model_id(
 
 
 def test_accessible_images_exclude_individually_shared_archived_board(
-    image_records: SqliteImageRecordStorage,
+    image_records: ImageRecordStorage,
     board_records: BoardRecordStorage,
     board_image_records: BoardImageRecordStorage,
     index_records: ImageIndexRecordsSqlite,
@@ -760,8 +758,8 @@ def test_custom_vocab_case_variant_duplicates_cannot_fail_the_replace(index_reco
 
 
 def test_videos_are_stored_counted_and_listed_alongside_images(
-    image_records: SqliteImageRecordStorage,
-    video_records: SqliteVideoRecordStorage,
+    image_records: ImageRecordStorage,
+    video_records: VideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
     _save_image(image_records, "a.png")
@@ -782,8 +780,8 @@ def test_videos_are_stored_counted_and_listed_alongside_images(
 
 
 def test_an_image_and_a_video_are_different_items(
-    image_records: SqliteImageRecordStorage,
-    video_records: SqliteVideoRecordStorage,
+    image_records: ImageRecordStorage,
+    video_records: VideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
     # Names are generated with kind-specific extensions, so this cannot happen by accident —
@@ -802,7 +800,7 @@ def test_an_image_and_a_video_are_different_items(
 
 
 def test_ineligible_videos_are_not_indexable(
-    video_records: SqliteVideoRecordStorage, index_records: ImageIndexRecordsSqlite
+    video_records: VideoRecordStorage, index_records: ImageIndexRecordsSqlite
 ) -> None:
     _save_video(video_records, "eligible.mp4")
     _save_video(video_records, "intermediate.mp4", is_intermediate=True)
@@ -814,8 +812,8 @@ def test_ineligible_videos_are_not_indexable(
 
 def test_unembedded_listing_merges_both_kinds_oldest_first(
     db: SqliteDatabase,
-    image_records: SqliteImageRecordStorage,
-    video_records: SqliteVideoRecordStorage,
+    image_records: ImageRecordStorage,
+    video_records: VideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
     # Interleaved creation times: listing one namespace and then the other would put every
@@ -845,7 +843,7 @@ def test_unembedded_listing_merges_both_kinds_oldest_first(
 
 
 def test_deleting_a_video_deletes_its_embedding(
-    video_records: SqliteVideoRecordStorage, index_records: ImageIndexRecordsSqlite
+    video_records: VideoRecordStorage, index_records: ImageIndexRecordsSqlite
 ) -> None:
     _save_video(video_records, "clip.mp4")
     index_records.upsert_embedding(IndexedItem("video", "clip.mp4"), MODEL_ID, _vec(1))
@@ -863,7 +861,7 @@ def test_embedding_a_missing_video_is_a_noop(index_records: ImageIndexRecordsSql
 
 
 def test_video_access_scoping_follows_board_membership(
-    video_records: SqliteVideoRecordStorage,
+    video_records: VideoRecordStorage,
     board_records: BoardRecordStorage,
     board_video_records: BoardVideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
@@ -889,7 +887,7 @@ def test_video_access_scoping_follows_board_membership(
 
 
 def test_videos_on_archived_boards_are_hidden_from_every_scope(
-    video_records: SqliteVideoRecordStorage,
+    video_records: VideoRecordStorage,
     board_records: BoardRecordStorage,
     board_video_records: BoardVideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
@@ -905,8 +903,8 @@ def test_videos_on_archived_boards_are_hidden_from_every_scope(
 
 
 def test_accessible_listing_orders_images_before_videos(
-    image_records: SqliteImageRecordStorage,
-    video_records: SqliteVideoRecordStorage,
+    image_records: ImageRecordStorage,
+    video_records: VideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
     # The listing feeds the projection scope hash and the search matrix, both of which need a
@@ -955,8 +953,8 @@ def test_projection_without_stored_kinds_reads_as_images(
 
 
 def test_delete_embeddings_for_other_models_covers_both_kinds(
-    image_records: SqliteImageRecordStorage,
-    video_records: SqliteVideoRecordStorage,
+    image_records: ImageRecordStorage,
+    video_records: VideoRecordStorage,
     index_records: ImageIndexRecordsSqlite,
 ) -> None:
     _save_image(image_records, "a.png")

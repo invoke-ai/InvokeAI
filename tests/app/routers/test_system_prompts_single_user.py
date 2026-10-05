@@ -40,7 +40,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
     from invokeai.app.services.client_state_persistence.client_state_persistence_default import (
         ClientStatePersistence,
     )
-    from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+    from invokeai.app.services.image_records.image_records_default import ImageRecordStorage
     from invokeai.app.services.images.images_default import ImageService
     from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
     from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
@@ -62,7 +62,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         configuration=configuration,
         events=TestEventService(),
         image_files=None,  # type: ignore
-        image_records=SqliteImageRecordStorage(db=db),
+        image_records=ImageRecordStorage(db.database),
         images=ImageService(),
         invocation_cache=MemoryInvocationCache(max_cache_size=0),
         logger=logging,  # type: ignore
