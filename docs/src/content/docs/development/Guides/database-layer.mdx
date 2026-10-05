@@ -139,6 +139,10 @@ with db.queries.transaction() as q:
 
 A second transaction waits at `acquire()` until the first ends, and then reads what it committed. `acquire()` must be the first call of its transaction, taking all the transaction's locks at once, in name order: so they guard everything the transaction reads, and two transactions cannot deadlock on them. On SQLite the transaction already excludes every other, but the lock rows are read there too: a lock whose row is missing raises on every backend instead of locking nothing.
 
+A decision about one row needs no named lock: the row is the lock. The transaction locks the row before it reads what it decides on, with a query method marked `@locking` that selects it `FOR UPDATE` (`q.boards.lock(board_id)`, `q.projects.lock(user_id, project_id)`). Every transaction that changes what the decision reads writes or locks the same row, so it waits until the decision has committed, and the decision sees what such a transaction committed before. A project save works this way, so its revision and compatibility checks apply to the row it writes, and so does a project claiming a board: a board made public, deleted or claimed by another project meanwhile is either seen by the claim or finds the board claimed. Row locks, too, are held only inside a `transaction()`; called on its own, a lock method raises.
+
+Rows are locked in one order, a project's before its board's, so two transactions that lock both cannot deadlock on them. A single statement that locks a board and then reads its project, like the boards service's guarded update and delete, cannot keep that order; the rare deadlock it causes with a project write is retried by `run()`.
+
 ## Testing
 
 Tests that need a database use a fixture from `tests/fixtures/database.py`, and are marked `uses_database` for it:

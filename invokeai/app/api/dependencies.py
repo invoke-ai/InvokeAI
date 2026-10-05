@@ -48,7 +48,7 @@ from invokeai.app.services.names.names_default import SimpleNameService
 from invokeai.app.services.object_serializer.object_serializer_disk import ObjectSerializerDisk
 from invokeai.app.services.object_serializer.object_serializer_forward_cache import ObjectSerializerForwardCache
 from invokeai.app.services.progress_previews.progress_previews_default import MemoryProgressPreviews
-from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
+from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
@@ -204,7 +204,7 @@ class ApiDependencies:
         system_prompt_records = SqliteSystemPromptRecordsStorage(db=db)
         workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
         client_state_persistence = ClientStatePersistence(db.database)
-        project_records = ProjectRecordsSqlite(db=db)
+        project_records = ProjectRecordsStorage(db.database)
         users = UserService(db.database)
         image_index_records = ImageIndexRecordsSqlite(db=db)
         image_index = ImageIndexService()

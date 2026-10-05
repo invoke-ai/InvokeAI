@@ -1,4 +1,5 @@
-"""Named database locks (`queries/locks.py`); what they serialise is tested with the work they guard."""
+"""Database locks: named locks (`queries/locks.py`) and the locks of single rows. What they serialise is tested with
+the work they guard."""
 
 import pytest
 from sqlalchemy import delete
@@ -34,3 +35,13 @@ def test_a_lock_after_other_work_in_the_transaction_is_refused(database: Databas
         with database.queries.transaction() as q:
             q.users.count_active_admins()
             q.locks.acquire(DatabaseLock.ADMIN_ACCOUNTS)
+
+
+@pytest.mark.parametrize("row", ["board", "project"])
+def test_a_row_lock_outside_a_transaction_is_refused(database: Database, row: str) -> None:
+    # It would be released as soon as it was taken.
+    with pytest.raises(RuntimeError, match="only a transaction"):
+        if row == "board":
+            database.queries.boards.lock("board")
+        else:
+            database.queries.projects.lock("system", "project")

@@ -30,7 +30,7 @@ from invokeai.app.services.invocation_cache.invocation_cache_memory import Memor
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
+from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite import (
     SqliteSystemPromptRecordsStorage,
@@ -127,7 +127,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistence(db.database),
-        project_records=ProjectRecordsSqlite(db=db),
+        project_records=ProjectRecordsStorage(db.database),
         users=UserService(db.database),
         wildcard_records=SqliteWildcardRecordsStorage(db=db),
         videos=None,  # type: ignore

@@ -13,6 +13,10 @@ runs once to warm up and then repeatedly; the median and p95 time per call are r
 of SQL statements per call, counted in a separate pass with statement logging on so that the logging
 does not distort the timings. Timings vary between runs on a busy machine: compare runs made back to
 back, and repeat a comparison before trusting a small difference.
+
+A change that ports a service to the database layer renames the storage this script constructs, so the base of
+such a change runs its own copy of the script: `python <checkout of the base>/scripts/benchmark_database.py`.
+Operations only the branch times show without a base value.
 """
 
 import argparse
@@ -38,6 +42,7 @@ BUDGET_FLOOR_MS = 0.05
 
 ACCOUNTS = 200
 CLIENT_STATE_KEYS = 200
+PROJECTS = 50
 
 
 class _StatementCounter(logging.Handler):
@@ -64,6 +69,7 @@ class Services:
         )
         from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
         from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
+        from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
         from invokeai.app.services.users.users_default import UserService
 
         self.database = db.database
@@ -74,6 +80,7 @@ class Services:
         self.gallery = SqliteGalleryService(db=db)
         self.users = UserService(db.database)
         self.client_state = ClientStatePersistence(db.database)
+        self.project_records = ProjectRecordsStorage(db.database)
         # Listing gallery items builds their URLs through the invoker's URL service.
         from invokeai.app.services.urls.urls_default import LocalUrlService
 
@@ -100,6 +107,34 @@ def _metadata(rng: random.Random) -> str:
             "loras": [{"key": str(uuid.UUID(int=rng.getrandbits(128))), "weight": 0.75} for _ in range(3)],
         }
     )
+
+
+def _project_document(rng: random.Random, names: list[str]) -> dict[str, Any]:
+    """A canvas of 20 layers, each an image and five brush strokes: about 25 KB of JSON referencing 20 images."""
+    layers = [
+        {
+            "id": f"layer_{i}",
+            "type": "raster_layer",
+            "isEnabled": True,
+            "opacity": 1.0,
+            "position": {"x": rng.randrange(-512, 512), "y": rng.randrange(-512, 512)},
+            "objects": [
+                {"id": f"image_{i}", "type": "image", "image": {"image_name": rng.choice(names), "width": 1024}},
+                *(
+                    {
+                        "id": f"line_{i}_{j}",
+                        "type": "brush_line",
+                        "strokeWidth": 50,
+                        "color": {"r": rng.randrange(256), "g": rng.randrange(256), "b": rng.randrange(256), "a": 1},
+                        "points": [rng.randrange(1024) for _ in range(40)],
+                    }
+                    for j in range(5)
+                ),
+            ],
+        }
+        for i in range(20)
+    ]
+    return {"canvas": {"layers": layers, "bbox": {"x": 0, "y": 0, "width": 1024, "height": 1024}}}
 
 
 def _seed(services: Services, images: int, boards: int, rng: random.Random) -> list[str]:
@@ -136,6 +171,10 @@ def _seed(services: Services, images: int, boards: int, rng: random.Random) -> l
             )
     for i in range(CLIENT_STATE_KEYS):
         services.client_state.set_by_key("system", f"canvas_snapshot:{i}", json.dumps({"imageName": names[i]}))
+    # Each project claims one of the oldest boards, so the boards stay as many as asked for and the newest one,
+    # whose board operations are timed, belongs to no project.
+    for i in range(min(PROJECTS, boards - 1)):
+        services.project_records.create("system", f"Project {i}", _project_document(rng, names), board_id=board_ids[i])
     return names
 
 
@@ -159,6 +198,21 @@ def _operations(
             services.board_image_records.get_counts_for_board(a_board),
             services.board_video_records.get_counts_for_board(a_board),
         )
+
+    project_ids = [summary.project_id for summary in services.project_records.list("system")]
+    autosave_documents = [_project_document(rng, names) for _ in range(10)]
+    revision: list[int] = []
+
+    def autosave() -> object:
+        # One project saved again and again, each time from the revision the last save returned. The timed and the
+        # counted pass save the same project: each reads its revision on its first call, the warm-up.
+        if not revision:
+            revision.append(services.project_records.get("system", project_ids[0]).revision)
+        record = services.project_records.update(
+            "system", project_ids[0], revision[0], "Autosaved", autosave_documents[revision[0] % 10]
+        )
+        revision[0] = record.revision
+        return record
 
     general = [ImageCategory.GENERAL]
 
@@ -222,6 +276,9 @@ def _operations(
             lambda: services.client_state.set_by_key("system", "canvas", json.dumps({"imageName": next(sample)})),
             200,
         ),
+        "projects.get (25 KB document)": (lambda: services.project_records.get("system", rng.choice(project_ids)), 500),
+        "projects.list": (lambda: services.project_records.list("system"), 200),
+        "projects.update (autosave)": (autosave, 200),
     }
 
 
@@ -324,6 +381,8 @@ def main() -> int:
     parser.add_argument("--json", type=Path, help="write the results to this file")
     parser.add_argument("--compare", nargs=2, type=Path, metavar=("BASE", "HEAD"), help="compare two result files")
     args = parser.parse_args()
+    if args.boards < 2:
+        parser.error("--boards must be at least 2: projects claim the oldest boards, and the newest stays unclaimed")
 
     if args.compare:
         base, head = (json.loads(path.read_text()) for path in args.compare)

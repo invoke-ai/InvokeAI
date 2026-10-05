@@ -13,7 +13,7 @@ from invokeai.app.api_app import app
 from invokeai.app.services.config.config_default import InvokeAIAppConfig
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
+from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
@@ -111,7 +111,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistence(db.database),
-        project_records=ProjectRecordsSqlite(db=db),
+        project_records=ProjectRecordsStorage(db.database),
         users=UserService(db.database),
         wildcard_records=SqliteWildcardRecordsStorage(db=db),
         external_generation=None,  # type: ignore

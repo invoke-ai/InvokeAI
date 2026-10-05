@@ -12,7 +12,7 @@ from fastapi import status
 from fastapi.testclient import TestClient
 
 from invokeai.app.services.invoker import Invoker
-from invokeai.app.services.project_records import project_records_sqlite
+from invokeai.app.services.project_records import project_records_default
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from tests.app.routers.conftest import _auth, _create_board
 
@@ -37,7 +37,7 @@ def test_creating_a_project_creates_and_returns_its_board(client: TestClient, us
 def test_oversized_project_documents_return_a_structured_413(
     client: TestClient, user1_token: str, monkeypatch: pytest.MonkeyPatch
 ):
-    monkeypatch.setattr(project_records_sqlite, "PROJECT_DOCUMENT_MAX_BYTES", 16)
+    monkeypatch.setattr(project_records_default, "PROJECT_DOCUMENT_MAX_BYTES", 16)
 
     response = _create_project(client, user1_token, data={"value": "x" * 32})
 
@@ -54,7 +54,7 @@ def test_oversized_project_updates_return_a_structured_413(
     client: TestClient, user1_token: str, monkeypatch: pytest.MonkeyPatch
 ):
     created = _create_project(client, user1_token).json()
-    monkeypatch.setattr(project_records_sqlite, "PROJECT_DOCUMENT_MAX_BYTES", 16)
+    monkeypatch.setattr(project_records_default, "PROJECT_DOCUMENT_MAX_BYTES", 16)
 
     response = client.put(
         f"/api/v1/projects/{created['project_id']}",

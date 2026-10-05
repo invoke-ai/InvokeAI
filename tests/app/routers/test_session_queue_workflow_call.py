@@ -54,7 +54,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
     from invokeai.app.services.images.images_default import ImageService
     from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
     from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
-    from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
+    from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
     from invokeai.app.services.users.users_default import UserService
     from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
     from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
@@ -93,7 +93,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         model_relationship_records=None,  # type: ignore
         model_relationships=None,  # type: ignore
         client_state_persistence=ClientStatePersistence(db.database),
-        project_records=ProjectRecordsSqlite(db=db),
+        project_records=ProjectRecordsStorage(db.database),
         users=UserService(db.database),
         wildcard_records=SqliteWildcardRecordsStorage(db=db),
         external_generation=None,  # type: ignore

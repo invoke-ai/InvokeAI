@@ -30,6 +30,7 @@ from invokeai.app.services.shared.database.queries.boards import BoardQueries
 from invokeai.app.services.shared.database.queries.client_state import ClientStateQueries
 from invokeai.app.services.shared.database.queries.locks import LockQueries
 from invokeai.app.services.shared.database.queries.media_references import MediaReferenceQueries
+from invokeai.app.services.shared.database.queries.projects import ProjectQueries
 from invokeai.app.services.shared.database.queries.users import UserQueries
 
 if TYPE_CHECKING:
@@ -77,6 +78,10 @@ class Queries:
     @cached_property
     def media_references(self) -> MediaReferenceQueries:
         return MediaReferenceQueries(self._scope)
+
+    @cached_property
+    def projects(self) -> ProjectQueries:
+        return ProjectQueries(self._scope)
 
     @cached_property
     def users(self) -> UserQueries:

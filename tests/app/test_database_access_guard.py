@@ -34,7 +34,6 @@ NOT_YET_PORTED: dict[str, int] = {
     "invokeai/app/services/model_records/model_records_sql.py": 25,
     "invokeai/app/services/model_relationship_records/model_relationship_records_sqlite.py": 8,
     "invokeai/app/services/orphaned_models/orphaned_models_service.py": 2,
-    "invokeai/app/services/project_records/project_records_sqlite.py": 29,
     "invokeai/app/services/session_queue/session_queue_sqlite.py": 166,
     "invokeai/app/services/shared/intermediate_delete.py": 1,
     "invokeai/app/services/shared/media_references.py": 9,

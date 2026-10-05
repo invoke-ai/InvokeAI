@@ -111,6 +111,20 @@ def write(method: Callable[Concatenate[M, Connection, P], R]) -> Callable[Concat
     return call
 
 
+def locking(method: Callable[Concatenate[M, Connection, P], R]) -> Callable[Concatenate[M, P], R]:
+    """Marks a query method that locks rows until its transaction ends (`SELECT ... FOR UPDATE`; a SQLite transaction
+    excludes every other one already). It runs as a write, and only in a `transaction()`: in a transaction of its
+    own, the lock would be released as soon as it was taken."""
+
+    @functools.wraps(method)
+    def call(self: M, /, *args: P.args, **kwargs: P.kwargs) -> R:
+        if not isinstance(self._scope, SharedTransaction):
+            raise RuntimeError(f"{method.__qualname__} locks rows, which only a transaction() holds")
+        return self._scope.run(lambda conn: method(self, conn, *args, **kwargs), write=True)
+
+    return call
+
+
 def mapped(mapper: Callable[[T], R]) -> Callable[[Callable[Concatenate[M, P], T]], Callable[Concatenate[M, P], R]]:
     """Applies `mapper` to what a `read` or `write` method returns, outside its transaction when it has one of its own.
 

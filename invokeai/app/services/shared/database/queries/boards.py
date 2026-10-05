@@ -29,7 +29,7 @@ from invokeai.app.services.board_records.board_records_common import (
     BoardRecordOrderBy,
     BoardVisibility,
 )
-from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, mapped, read, write
+from invokeai.app.services.shared.database.queries.base import IN_CHUNK, QueryModule, locking, mapped, read, write
 from invokeai.app.services.shared.database.schema.boards import boards, shared_boards
 from invokeai.app.services.shared.database.schema.projects import projects
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
@@ -54,6 +54,11 @@ _GET_WITH_PROJECT_ID = (
     .where(boards.c.board_id == bindparam("board_id"))
 )
 _EXISTS = select(literal(1)).where(boards.c.board_id == bindparam("board_id"))
+_LOCK = (
+    select(boards.c.user_id, boards.c.board_visibility)
+    .where(boards.c.board_id == bindparam("board_id"))
+    .with_for_update()
+)
 _PROJECT_IDS = select(projects.c.board_id, projects.c.project_id).where(
     projects.c.board_id.in_(bindparam("board_ids", expanding=True))
 )
@@ -63,6 +68,13 @@ _IS_SHARED_WITH = select(literal(1)).where(
     shared_boards.c.board_id == bindparam("board_id"), shared_boards.c.user_id == bindparam("user_id")
 )
 _SHARED_USER_IDS = select(shared_boards.c.user_id).where(shared_boards.c.board_id == bindparam("board_id"))
+_IS_SHARED = select(exists().where(shared_boards.c.board_id == bindparam("board_id")))
+_RENAME = (
+    update(boards)
+    .where(boards.c.board_id == bindparam("target_board_id"))
+    .values(board_name=bindparam("new_board_name"))
+)
+_RENAME_AND_UNARCHIVE = _RENAME.values(archived=false())
 
 
 def _board(row: Sequence[Any]) -> BoardRecord:
@@ -184,6 +196,22 @@ class BoardQueries(QueryModule):
     def exists(self, conn: Connection, board_id: str) -> bool:
         return conn.execute(_EXISTS, {"board_id": board_id}).first() is not None
 
+    @locking
+    def lock(self, conn: Connection, board_id: str) -> Optional[tuple[str, str]]:
+        """Locks the board's row until the transaction ends: its owner and visibility, or None when there is no
+        such board.
+
+        Locked before a transaction reads what it decides on, the row makes every transaction that changes the
+        board -- its owner, visibility or sharing, a project claiming it, its deletion -- wait until this one has
+        ended, and this one's later reads see what such a transaction committed before. Lock the board's project
+        first, if there is one: rows are locked in that order.
+        """
+        row: Optional[Sequence[Any]] = conn.execute(_LOCK, {"board_id": board_id}).first()
+        if row is None:
+            return None
+        user_id, board_visibility = row
+        return user_id, board_visibility
+
     @read
     def project_ids(self, conn: Connection, board_ids: Sequence[str]) -> dict[str, str]:
         """The id of the project that claims each of these boards, for the boards a project claims."""
@@ -236,6 +264,11 @@ class BoardQueries(QueryModule):
     def shared_user_ids(self, conn: Connection, board_id: str) -> list[str]:
         return list(conn.execute(_SHARED_USER_IDS, {"board_id": board_id}).scalars().all())
 
+    @read
+    def is_shared(self, conn: Connection, board_id: str) -> bool:
+        """Whether the board is shared with any account."""
+        return bool(conn.execute(_IS_SHARED, {"board_id": board_id}).scalar_one())
+
     @write
     def insert(self, conn: Connection, *, board_id: str, board_name: str, user_id: str) -> None:
         conn.execute(_INSERT, {"board_id": board_id, "board_name": board_name, "user_id": user_id})
@@ -260,6 +293,14 @@ class BoardQueries(QueryModule):
             },
         )
         return result.rowcount > 0
+
+    @write
+    def rename(self, conn: Connection, board_id: str, board_name: str, *, unarchive: bool = False) -> None:
+        """Renames the board, and with `unarchive` un-archives it, whether or not a project claims it: for the
+        projects storage, whose boards take their names from their projects. (`update` leaves the name of a
+        claimed board as it is.)"""
+        statement = _RENAME_AND_UNARCHIVE if unarchive else _RENAME
+        conn.execute(statement, {"target_board_id": board_id, "new_board_name": board_name})
 
     @write
     def delete_if_unclaimed(self, conn: Connection, board_id: str) -> bool:
