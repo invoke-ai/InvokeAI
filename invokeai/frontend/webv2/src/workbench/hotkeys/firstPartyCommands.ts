@@ -19,6 +19,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { useQueryClient } from '@tanstack/react-query';
 import { submitActiveInvocation } from '@workbench/activeInvocationSubmission';
+import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { builtInLayoutPresetDescriptors } from '@workbench/layoutPresets';
 import { toggleCommandPalette } from '@workbench/palette/paletteStore';
 import { openWorkbenchSettings } from '@workbench/settings/settingsDialogStore';
@@ -109,7 +110,13 @@ export const useRegisterFirstPartyCommands = () => {
    * gallery" must not silently retarget every subsequent invoke.
    */
   const submitInvocation = async (destinationOverride?: ResultDestination) => {
-    await submitActiveInvocation({ commands, destinationOverride, getModels: getAvailableModels, queries });
+    await submitActiveInvocation({
+      commands,
+      destinationOverride,
+      formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
+      getModels: getAvailableModels,
+      queries,
+    });
   };
 
   const notifyNoImageSelected = () =>

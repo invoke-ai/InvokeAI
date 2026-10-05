@@ -8,14 +8,15 @@ import type {
   CanvasControlAdapterContract,
   CanvasControlLayerContract,
   CanvasDocumentCapability,
-  CanvasLayerContract,
 } from '@workbench/canvas-engine/api';
 import type { LayerFilterOperationEngine } from '@workbench/widgets/layers/LayerFilterOperationButton';
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 
 import { createListCollection, HStack, NumberInput, Stack, Switch, Text } from '@chakra-ui/react';
 import {
-  getControlValidationReason,
+  CONTROL_ADAPTER_KINDS,
+  getControlModelUnusableReason,
+  getSuggestedControlKind,
   isControlKindSupportedForBase,
   type ControlAdapterKind,
 } from '@features/generation/graph';
@@ -28,29 +29,24 @@ import { useModelsSelector } from '@features/models';
 import { focusFirstOperable } from '@platform/react/focusIfUnclaimed';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Button, Field, Select, Slider } from '@platform/ui';
-import { lookupDocumentLeaf } from '@workbench/canvas-engine/api';
 import { getCanvasOperations, resolveDefaultFilterForModel } from '@workbench/canvas-operations/api';
+import { CONTROL_KIND_BASE } from '@workbench/controlAdapters';
+import { describeControlLayerReason, getControlLayerReasonInSequence } from '@workbench/controlLayerChecks';
 import { useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { getCompatibleControlModels } from './controlModelOptions';
+import { getCompatibleControlModels, switchControlAdapterKind } from './controlModelOptions';
 import { LayerFilterOperationButton } from './LayerFilterOperationButton';
-import { CONTROL_ADAPTER_DEFAULTS, CONTROL_WEIGHT_BOUNDS } from './layerOps';
+import { CONTROL_WEIGHT_BOUNDS } from './layerOps';
 import { runLayerFilterOperation } from './layerPropertiesOperation';
 import { useSelectedMainModel } from './useSelectedMainModel';
 
 const SELECT_POSITIONING = { placement: 'bottom-end', sameWidth: true } as const;
 
 const selectCapabilitiesStatus = (snapshot: ArchitectureCapabilitiesSnapshot) => snapshot.status;
-
-const CONTROL_ADAPTER_KINDS: readonly ControlAdapterKind[] = [
-  'controlnet',
-  't2i_adapter',
-  'control_lora',
-  'z_image_control',
-];
+const selectCapabilitiesRevision = (snapshot: ArchitectureCapabilitiesSnapshot) => snapshot.revision;
 const CONTROL_MODES: readonly NonNullable<CanvasControlAdapterContract['controlMode']>[] = [
   'balanced',
   'more_prompt',
@@ -73,21 +69,6 @@ interface ControlLayerSettingsProps {
 }
 
 /** Edit adapters through canvas undo; utility-queue filter previews leave the document untouched until Apply. */
-/** Contributing control leaves of one adapter kind with content, in generation order. */
-const contributingControlLayers = (
-  engine: CanvasStructuralEngine & LayerFilterOperationEngine & { readonly document: CanvasDocumentCapability },
-  kind: CanvasControlAdapterContract['kind']
-): CanvasLayerContract[] =>
-  (engine.document.model()?.compileLeaves() ?? [])
-    .filter(
-      (leaf) =>
-        leaf.contributionEnabled &&
-        leaf.layer.type === 'control' &&
-        leaf.layer.adapter.kind === kind &&
-        engine.exports.hasExportableLayerContent(leaf.id)
-    )
-    .map((leaf) => leaf.layer);
-
 export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
   const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
@@ -145,9 +126,19 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
     useCallback(
       () =>
         CONTROL_ADAPTER_KINDS.filter((kind) =>
-          base ? isControlKindSupportedForBase(base, kind) : kind !== 'z_image_control'
+          // Without a main model there is no base to offer a base's own kind for.
+          base ? isControlKindSupportedForBase(base, kind) : CONTROL_KIND_BASE[kind] === undefined
         ),
       [base]
+    )
+  );
+  // The kind to offer when this layer's kind is one the main model cannot run.
+  const suggestedKind = useExternalStoreSelector(
+    subscribeArchitectureCapabilities,
+    getArchitectureCapabilitiesSnapshot,
+    useCallback(
+      () => (base && !isControlKindSupportedForBase(base, adapter.kind) ? getSuggestedControlKind(base) : null),
+      [adapter.kind, base]
     )
   );
   const kindCollection = useMemo(
@@ -158,33 +149,56 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
     [kindOptions, t]
   );
 
-  // Adapter models matching the current kind + base (mirrors the generate model list).
+  // Adapter models matching the current kind + base (mirrors the generate model list). A kind the main model cannot
+  // run offers none: the fix is switching kind, and listing its models would present them as usable.
   const modelOptions = useMemo(
-    () => getCompatibleControlModels(models, base, adapter.kind),
-    [adapter.kind, base, models]
+    () => (suggestedKind ? [] : getCompatibleControlModels(models, base, adapter.kind)),
+    [adapter.kind, base, models, suggestedKind]
   );
+  // Why an empty list is empty, when installed models of the right family were held back.
+  const hiddenModelReasons = useMemo(() => {
+    const kindBase = CONTROL_KIND_BASE[adapter.kind];
+    if (modelOptions.length > 0 || !kindBase || base !== kindBase) {
+      return [];
+    }
+    const reasons = models
+      .filter((model) => model.base === base)
+      .map((model) => getControlModelUnusableReason(model, adapter.kind))
+      .filter((reason) => reason === 'lllite_inpaint_adapter' || reason === 'lllite_channels_unknown');
+    return [...new Set(reasons)].sort();
+  }, [adapter.kind, base, modelOptions.length, models]);
   const modelCollection = useMemo(
     () => createListCollection({ items: modelOptions.map((model) => ({ label: model.name, value: model.key })) }),
     [modelOptions]
   );
 
-  const handleKindChange = useCallback(
-    ({ value }: SelectValueChangeDetails) => {
-      const kind = value[0] as ControlAdapterKind | undefined;
-      if (!kind || kind === adapter.kind) {
+  const switchKind = useCallback(
+    (kind: ControlAdapterKind) => {
+      if (kind === adapter.kind) {
         return;
       }
-      // Switching kind clears the model (its base/type no longer matches) and, for
-      // non-ControlNet kinds, drops the control mode.
-      const defaults = CONTROL_ADAPTER_DEFAULTS[kind];
       commitAdapter(
-        { ...defaults, beginEndStepPct: [...defaults.beginEndStepPct] },
+        switchControlAdapterKind(adapter, kind, models, base),
         { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct] },
         t('widgets.layers.control.kind')
       );
     },
-    [adapter, commitAdapter, t]
+    [adapter, base, commitAdapter, models, t]
   );
+  const handleKindChange = useCallback(
+    ({ value }: SelectValueChangeDetails) => {
+      const kind = value[0] as ControlAdapterKind | undefined;
+      if (kind) {
+        switchKind(kind);
+      }
+    },
+    [switchKind]
+  );
+  const handleSwitchToSuggestedKind = useCallback(() => {
+    if (suggestedKind) {
+      switchKind(suggestedKind);
+    }
+  }, [suggestedKind, switchKind]);
 
   const handleModelChange = useCallback(
     ({ value }: SelectValueChangeDetails) => {
@@ -333,54 +347,35 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   const weightAria = useMemo(() => [t('widgets.layers.control.weight')], [t]);
   const rangeAria = useMemo(() => [t('widgets.layers.control.beginStep'), t('widgets.layers.control.endStep')], [t]);
 
-  const selectedModelName = modelOptions.find((model) => model.key === adapter.model)?.name;
+  // The catalog name, not the filtered options: an unusable model still needs a name for the alert to refer to.
   const adapterModel = models.find((model) => model.key === adapter.model) ?? null;
   const hasContent = useCanvasEngineRead(engine, () => engine?.exports.hasExportableLayerContent(layer.id) ?? false);
-  const controlLoraIndex = useCanvasEngineRead(engine, () =>
-    adapter.kind === 'control_lora' && engine
-      ? contributingControlLayers(engine, 'control_lora').findIndex((candidate) => candidate.id === layer.id)
-      : 0
-  );
-  const zImageControlIndex = useCanvasEngineRead(engine, () =>
-    adapter.kind === 'z_image_control' && engine
-      ? contributingControlLayers(engine, 'z_image_control').findIndex((candidate) => candidate.id === layer.id)
-      : 0
-  );
-  const contributing = useCanvasEngineRead(engine, () =>
-    engine
-      ? (lookupDocumentLeaf(engine.document.model()?.document, layer.id)?.contributionEnabled ?? false)
-      : layer.isEnabled
-  );
-  // Same reason as `kindOptions`: validation asks the capability table whether the kind is supported.
-  const validationReason = useExternalStoreSelector(
+  // Re-read the reason when the capability table changes; the engine read below consults it.
+  const capabilitiesRevision = useExternalStoreSelector(
     subscribeArchitectureCapabilities,
     getArchitectureCapabilitiesSnapshot,
-    useCallback(
-      () =>
-        contributing && mainModel
-          ? getControlValidationReason({
-              adapterModel: adapterModel ? { base: adapterModel.base, type: adapterModel.type } : null,
-              beginEndStepPct: adapter.beginEndStepPct,
-              controlLoraIndex: Math.max(0, controlLoraIndex),
-              kind: adapter.kind,
-              mainBase: mainModel.base,
-              mainVariant: mainModel.variant ?? undefined,
-              weight: adapter.weight,
-              zImageControlIndex: Math.max(0, zImageControlIndex),
-            })
-          : null,
-      [
-        adapter.beginEndStepPct,
-        adapter.kind,
-        adapter.weight,
-        adapterModel,
-        contributing,
-        controlLoraIndex,
-        mainModel,
-        zImageControlIndex,
-      ]
-    )
+    selectCapabilitiesRevision
   );
+  // Judged as the invocation judges it: earlier contributing control layers with content claim limited slots first,
+  // and only layers that pass claim one.
+  const validationReason = useCanvasEngineRead(engine, () => {
+    void capabilitiesRevision;
+    if (!mainModel) {
+      return null;
+    }
+    const leaves = engine?.document.model()?.compileLeaves() ?? [];
+    const index = leaves.findIndex((leaf) => leaf.layer.id === layer.id);
+    const contributing = engine ? (leaves[index]?.contributionEnabled ?? false) : layer.isEnabled;
+    if (!contributing) {
+      return null;
+    }
+    const earlier = leaves
+      .slice(0, Math.max(0, index))
+      .filter((leaf) => leaf.contributionEnabled && engine?.exports.hasExportableLayerContent(leaf.id))
+      .map((leaf) => leaf.layer)
+      .filter((candidate): candidate is CanvasControlLayerContract => candidate.type === 'control');
+    return getControlLayerReasonInSequence({ earlier, layer, mainModel, models });
+  });
   // Content-dependent problems only matter once the layer has pixels, but a
   // missing model deserves the warning even on a fresh empty layer. A missing
   // capability table is not a problem with this layer and is shown on its own.
@@ -389,8 +384,12 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   // retry it started keeps the button, and the user's focus, in place.
   const isRetryingCapabilities = hasRequestedCapabilitiesRetry && capabilitiesStatus === 'loading';
   const showCapabilitiesFailure = capabilitiesUnavailable && (capabilitiesStatus === 'error' || isRetryingCapabilities);
+  // A missing model or a kind to switch is worth saying on a fresh empty layer; an empty model list explains itself.
   const visibleValidationReason =
-    validationReason && !capabilitiesUnavailable && (hasContent || validationReason === 'missing_model')
+    validationReason &&
+    !capabilitiesUnavailable &&
+    (hasContent || validationReason === 'missing_model' || validationReason === 'switch_adapter_kind') &&
+    !(validationReason === 'missing_model' && hiddenModelReasons.length > 0)
       ? validationReason
       : null;
 
@@ -408,13 +407,20 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
           />
         </Field>
       </HStack>
-      <Field label={t('widgets.layers.control.model')}>
+      <Field
+        helpText={
+          hiddenModelReasons.length > 0
+            ? hiddenModelReasons.map((reason) => t(`widgets.layers.control.hiddenModels.${reason}`)).join(' ')
+            : undefined
+        }
+        label={t('widgets.layers.control.model')}
+      >
         <Select
           aria-label={t('widgets.layers.control.model')}
           collection={modelCollection}
           positioning={SELECT_POSITIONING}
           value={modelValue}
-          valueText={selectedModelName ?? t('widgets.layers.control.selectModel')}
+          valueText={adapterModel?.name ?? t('widgets.layers.control.selectModel')}
           valueTextProps={adapter.model ? undefined : MISSING_MODEL_VALUE_TEXT_PROPS}
           onValueChange={handleModelChange}
         />
@@ -492,9 +498,18 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
         operations={engine ? getCanvasOperations(engine) : null}
       />
       {visibleValidationReason ? (
-        <Text color="fg.warning" fontSize="xs" role="alert">
-          {t(`widgets.layers.control.validation.${visibleValidationReason}`)}
-        </Text>
+        <HStack align="center" gap="2" role="alert">
+          <Text color="fg.warning" flex="1" fontSize="xs">
+            {describeControlLayerReason(t, visibleValidationReason, suggestedKind)}
+          </Text>
+          {visibleValidationReason === 'switch_adapter_kind' && suggestedKind ? (
+            <Button flexShrink={0} variant="outline" onClick={handleSwitchToSuggestedKind}>
+              {t('widgets.layers.control.switchKind', {
+                kind: t(`widgets.layers.control.kinds.${suggestedKind}`),
+              })}
+            </Button>
+          ) : null}
+        </HStack>
       ) : null}
       {showCapabilitiesFailure ? (
         <HStack ref={handOverFocusOnLoad} aria-busy={isRetryingCapabilities} gap="2" role="alert">

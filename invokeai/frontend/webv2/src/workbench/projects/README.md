@@ -43,6 +43,12 @@ The old workbench mirror, sync map, and refused-project localStorage keys are de
 
 Cold-start offline editing is not supported. When the backend cannot load, the unavailable screen provides retry and local draft/run exports. Conflicted or schema-refused drafts are retained until explicitly resolved or deleted; they are never silently evicted.
 
+## Additive canvas values
+
+A new value in a closed canvas set, such as a control layer's adapter kind (`anima_lllite`), is added without raising the canvas schema version or the project's compatibility floor. Builds that know the value load and save it unchanged; builds that do not refuse the canvas rather than rewrite it, because coercing an unknown kind to a known one would replace the user's adapter on the next autosave. In an older build the project is not opened and the user sees that it "contains canvas data this version of Invoke cannot read"; the saved copy is untouched and can be exported, and a build that knows the value opens it as saved. Raise the schema version instead when older builds could misread a document without refusing it.
+
+Load does not reinterpret a known value either. An Anima control layer saved as ControlNet before ControlNet-LLLite was supported keeps its kind and model; the layer settings name the adapter type to switch to and offer a one-step switch that keeps the model, weight and step range where the new kind can use them.
+
 ## Font dependencies
 
 Custom text retains an immutable font reference and explicit variation coordinates. Browser registration names are runtime state and never enter the project document. New typography requires Canvas schema 4; documents without it retain their existing compatibility floor.

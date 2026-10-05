@@ -14,6 +14,9 @@ import { describe, expect, it, vi } from 'vitest';
 
 import { resolveAndSubmitGraphPreviewInvocation } from './graphPreviewInvocation';
 
+// Production words rejections from the locale; tests only need the structured rejection to reach the notice.
+const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
+
 // Seed capabilities to match app boot; submission fails closed without them.
 seedArchitectureCapabilities();
 
@@ -70,6 +73,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
 
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -91,6 +95,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
 
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -114,6 +119,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
 
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,
@@ -134,6 +140,7 @@ describe('resolveAndSubmitGraphPreviewInvocation', () => {
 
     const submitted = resolveAndSubmitGraphPreviewInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation,

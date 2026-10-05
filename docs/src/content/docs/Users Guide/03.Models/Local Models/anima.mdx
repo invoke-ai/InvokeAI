@@ -119,11 +119,20 @@ includes text-encoder layers, to the Qwen3 encoder. In the workflow editor use *
 ## ControlNet-LLLite adapters
 
 Anima supports kohya-ss's **ControlNet-LLLite** adapters, small models (8–66 MB) that condition the
-transformer on an image. These are available **in the workflow editor only**: add an **Anima
-ControlNet-LLLite** node, give it the conditioning image and a control model, and connect it to the
-**Control LLLite** input of **Denoise - Anima**. Several adapters can be combined by collecting them, but
-each adapter model may be used only once per generation. Each node has **Weight**, **Begin Step
-Percent** and **End Step Percent** settings.
+transformer on an image. Each adapter model may be used only once per generation, and each has
+**Weight**, **Begin Step Percent** and **End Step Percent** settings.
+
+- **On the canvas**, add a control layer while an Anima model is selected. Its adapter type is **Anima
+  ControlNet-LLLite**, its pixels are the control image, and several control layers combine as long as
+  each uses a different model. The **Model** list holds the control adapters (Sketch, Depth, Scribble,
+  Lineart, Pose); the Inpainting adapter needs an inpaint mask rather than a control image, so it is not
+  offered there. An adapter installed before Invoke recorded which kind it is is not listed either:
+  re-identify it in the Model Manager.
+  A control layer from an older project may still be set to **ControlNet**, which Anima cannot run; its
+  settings say so and offer **Switch to Anima ControlNet-LLLite**, which keeps the selected adapter.
+- **In the workflow editor**, add an **Anima ControlNet-LLLite** node, give it the conditioning image and
+  a control model, and connect it to the **Control LLLite** input of **Denoise - Anima**, collecting
+  several nodes to combine them.
 
 | Starter model                       | Purpose                                                        |
 | ----------------------------------- | -------------------------------------------------------------- |

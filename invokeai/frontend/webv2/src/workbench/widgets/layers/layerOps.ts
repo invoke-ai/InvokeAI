@@ -20,7 +20,7 @@ export type { CanvasStructuralEngine } from '@workbench/canvas-engine/api';
 
 import { getRegionalGuidanceSupport } from '@features/generation/graph';
 import { getSourceContentRect, isMergeableRasterLayer, mergeDownEligibility } from '@workbench/canvas-engine/api';
-import { CONTROL_ADAPTER_DEFAULTS } from '@workbench/controlAdapters';
+import { CONTROL_ADAPTER_DEFAULTS, createDefaultControlAdapter } from '@workbench/controlAdapters';
 
 type LayerTransform = CanvasLayerBaseContract['transform'];
 
@@ -326,9 +326,8 @@ export const createControlLayer = (
   base?: string | null,
   model?: string | null
 ): CanvasControlLayerContract => {
-  const adapter = base === 'z-image' ? CONTROL_ADAPTER_DEFAULTS.z_image_control : DEFAULT_CONTROL_ADAPTER;
   return {
-    adapter: { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct], model: model ?? null },
+    adapter: createDefaultControlAdapter(base, model ?? null),
     blendMode: 'normal',
     id,
     isEnabled: true,
@@ -442,10 +441,9 @@ const pixelLayerToControl = (
   if (!source) {
     return null;
   }
-  const adapter = base === 'z-image' ? CONTROL_ADAPTER_DEFAULTS.z_image_control : DEFAULT_CONTROL_ADAPTER;
   return {
     ...destinationBase(layer, id, isCopy),
-    adapter: { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct], model: model ?? null },
+    adapter: createDefaultControlAdapter(base, model ?? null),
     source,
     type: 'control',
     withTransparencyEffect: true,

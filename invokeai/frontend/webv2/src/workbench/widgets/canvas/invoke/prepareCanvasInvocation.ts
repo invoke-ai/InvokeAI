@@ -19,9 +19,10 @@ import type { WorkbenchCommands, WorkbenchNotificationCommands } from '@workbenc
 
 import { compileCanvasGraph, type CanvasCompileMode } from '@features/generation/canvasGraph';
 import {
+  type ControlAdapterKind,
+  createControlValidationSequence,
   detectCanvasMode,
-  getControlValidationReason,
-  getControlValidationReasonMessage,
+  getSuggestedControlKind,
   getRegionalGuidanceRejectionReason,
   getRegionalGuidanceSupport,
   type ControlLayerGraphInput,
@@ -49,13 +50,21 @@ import { readCanvasScaling } from './canvasScaling';
 /** Title on every canvas-invoke failure notice. */
 export const CANVAS_INVOKE_ERROR_TITLE = 'Canvas generation failed';
 
-/** Structured control-layer rejection: callers map `code` to localized text. */
-export class ControlLayerValidationError extends Error {
+/** A control layer that blocks the invocation, as `formatControlLayerError` words it for the notice. */
+export interface ControlLayerRejection {
+  code: ControlValidationReason;
+  layerName: string;
+  suggestedKind: ControlAdapterKind | null;
+}
+
+/** Structured control-layer rejection: callers word it from the locale; the message is for logs only. */
+export class ControlLayerValidationError extends Error implements ControlLayerRejection {
   constructor(
     readonly code: ControlValidationReason,
-    readonly layerName: string
+    readonly layerName: string,
+    readonly suggestedKind: ControlAdapterKind | null
   ) {
-    super(getControlValidationReasonMessage(code, layerName));
+    super(`Control layer "${layerName}" is invalid: ${code}.`);
     this.name = 'ControlLayerValidationError';
   }
 }
@@ -97,8 +106,8 @@ export interface RunCanvasInvocationDeps {
   /** Persisted "scale before processing" policy, defaulted. */
   scaling: CanvasScalingSettings;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
-  /** Localizes a control-layer rejection; defaults to the English validation sentence. */
-  formatControlLayerError?: (code: ControlValidationReason, layerName: string) => string;
+  /** Words a control-layer rejection from the locale; its error message is for logs only. */
+  formatControlLayerError: (rejection: ControlLayerRejection) => string;
 }
 
 const recordNotice = (
@@ -121,31 +130,24 @@ const createControlLayerCollector = (
   toGraphInputs(images: readonly { layerId: string; imageName: string }[]): ControlLayerGraphInput[];
 } => {
   const metadata = new Map<string, Omit<ControlLayerGraphInput, 'imageName'>>();
-  let controlLoraCount = 0;
-  let zImageControlCount = 0;
+  const validate = createControlValidationSequence(model);
 
   return {
     shouldComposite: (layer) => {
       const { adapter } = layer;
       const resolved = adapter.model ? models?.find((candidate) => candidate.key === adapter.model) : undefined;
-      const rejection = getControlValidationReason({
-        adapterModel: resolved ? { base: resolved.base, type: resolved.type } : null,
+      const rejection = validate({
+        adapterModel: resolved ?? null,
         beginEndStepPct: adapter.beginEndStepPct,
-        controlLoraIndex: adapter.kind === 'control_lora' ? controlLoraCount : 0,
         kind: adapter.kind,
-        mainBase: model.base,
-        mainVariant: model.variant ?? undefined,
         weight: adapter.weight,
-        zImageControlIndex: adapter.kind === 'z_image_control' ? zImageControlCount : 0,
       });
       if (rejection || !resolved) {
-        throw new ControlLayerValidationError(rejection ?? 'missing_model', layer.name);
-      }
-      if (adapter.kind === 'control_lora') {
-        controlLoraCount += 1;
-      }
-      if (adapter.kind === 'z_image_control') {
-        zImageControlCount += 1;
+        throw new ControlLayerValidationError(
+          rejection ?? 'missing_model',
+          layer.name,
+          rejection === 'switch_adapter_kind' ? getSuggestedControlKind(model.base) : null
+        );
       }
       metadata.set(layer.id, {
         beginEndStepPct: adapter.beginEndStepPct,
@@ -159,6 +161,7 @@ const createControlLayerCollector = (
           type: resolved.type,
           ...(typeof resolved.hash === 'string' ? { hash: resolved.hash } : {}),
         },
+        modelCondInChannels: resolved.cond_in_channels,
         weight: adapter.weight,
       });
       return true;
@@ -374,8 +377,8 @@ export const runCanvasInvocation = async (deps: RunCanvasInvocationDeps): Promis
     }
 
     const message =
-      error instanceof ControlLayerValidationError && deps.formatControlLayerError
-        ? deps.formatControlLayerError(error.code, error.layerName)
+      error instanceof ControlLayerValidationError
+        ? deps.formatControlLayerError(error)
         : error instanceof Error
           ? error.message
           : String(error);
@@ -420,8 +423,8 @@ export interface PrepareCanvasInvocationArgs {
    */
   compositing?: CanvasCompositingSettings;
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
-  /** Localizes a control-layer rejection; defaults to the English validation sentence. */
-  formatControlLayerError?: (code: ControlValidationReason, layerName: string) => string;
+  /** Words a control-layer rejection from the locale; its error message is for logs only. */
+  formatControlLayerError: (rejection: ControlLayerRejection) => string;
 }
 
 /**

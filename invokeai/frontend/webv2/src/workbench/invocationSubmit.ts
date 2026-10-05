@@ -58,8 +58,8 @@ export interface SubmitResolvedInvocationDeps {
    * submitResolvedInvocationSnapshot.
    */
   prepareCanvasInvocation: (args: PrepareCanvasInvocationArgs) => Promise<void> | void;
-  /** Localizes a control-layer rejection notice; defaults to the English validation sentence. */
-  formatControlLayerError?: PrepareCanvasInvocationArgs['formatControlLayerError'];
+  /** Words a control-layer rejection from the locale; its error message is for logs only. */
+  formatControlLayerError: PrepareCanvasInvocationArgs['formatControlLayerError'];
 }
 
 /**

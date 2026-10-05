@@ -19,6 +19,7 @@ const owner = { signal: new AbortController().signal } as AccountScope;
 const createArgs = (state = createInitialWorkbenchState()) => {
   return {
     commands: {} as WorkbenchCommands,
+    formatControlLayerError: ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`,
     getModels: () => undefined,
     queries: {
       getSnapshot: () => ({

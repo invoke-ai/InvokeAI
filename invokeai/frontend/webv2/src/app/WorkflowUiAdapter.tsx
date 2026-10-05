@@ -18,6 +18,7 @@ import {
 } from '@platform/state/accountLifecycle';
 import { createProjectedExternalStore } from '@platform/state/projectedExternalStore';
 import { shallowEqual } from '@platform/state/selectors';
+import { describeControlLayerIssue } from '@workbench/controlLayerChecks';
 import { useWorkbenchFocus } from '@workbench/focusRegions';
 import { resolveAndSubmitGraphPreviewInvocation } from '@workbench/graphPreviewInvocation';
 import { useFindGalleryItem } from '@workbench/image-actions/useFindGalleryItem';
@@ -41,6 +42,7 @@ import {
   useWorkbenchQueries,
 } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
+import { useTranslation } from 'react-i18next';
 
 import { WorkflowCommandShortcut } from './WorkflowCommandShortcut';
 
@@ -122,6 +124,7 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
   const commands = useWorkbenchCommands();
   const queries = useWorkbenchQueries();
   const openWidget = useOpenWorkbenchWidget();
+  const { t } = useTranslation();
 
   const adapter = useMemo<WorkflowGraphPreviewPort>(
     () => ({
@@ -145,7 +148,10 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
         return {
           canInvoke: isInvocationRouteValid(route),
           label: formatRoute(route),
-          validationMessage: route.validationMessage,
+          validationMessage:
+            typeof route.validationMessage === 'object' && 'controlLayerIssue' in route.validationMessage
+              ? describeControlLayerIssue(t, route.validationMessage.controlLayerIssue)
+              : route.validationMessage,
         };
       },
       invoke: async (sourceId) => {
@@ -157,6 +163,7 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
           assertAccountScopeCurrent(owner);
           return resolveAndSubmitGraphPreviewInvocation({
             commands,
+            formatControlLayerError: (rejection) => describeControlLayerIssue(t, rejection),
             models: availabilityModels,
             owner,
             prepareCanvasInvocation,
@@ -181,7 +188,7 @@ const WorkflowGraphPreviewAdapterProvider = ({ children }: { children: ReactNode
         openWidget('workflow');
       },
     }),
-    [availabilityModels, commands, openWidget, queries, routeInput]
+    [availabilityModels, commands, openWidget, queries, routeInput, t]
   );
 
   return <WorkflowGraphPreviewProvider adapter={adapter}>{children}</WorkflowGraphPreviewProvider>;

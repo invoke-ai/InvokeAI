@@ -5542,7 +5542,7 @@ export type components = {
              * Control Kinds
              * @description Sorted.
              */
-            control_kinds?: ("controlnet" | "t2i_adapter" | "control_lora" | "z_image_control")[];
+            control_kinds?: ("controlnet" | "t2i_adapter" | "control_lora" | "z_image_control" | "anima_lllite")[];
             /**
              * Max Reference Images
              * @default 0

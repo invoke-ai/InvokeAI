@@ -5,9 +5,9 @@ import type { BackendGraphContract, BackendInvocationContract } from '@features/
 
 import { addEdge, addNode } from '@features/generation/core/graphBuilder';
 
-import type { ControlAdapterKind, ControlValidationReason } from './controlValidation';
+import type { ControlAdapterKind } from './controlValidation';
 
-import { getControlValidationReason } from './controlValidation';
+import { createControlValidationSequence } from './controlValidation';
 
 /** The deterministic denoise node id every canvas base graph uses. */
 export const CONTROL_DENOISE_NODE_ID = 'denoise_latents';
@@ -36,6 +36,8 @@ export interface ControlLayerGraphInput {
   weight: number;
   beginEndStepPct: [number, number];
   controlMode: 'balanced' | 'more_prompt' | 'more_control' | 'unbalanced' | null;
+  /** The resolved model's `cond_in_channels`; required to validate an Anima ControlNet-LLLite layer. */
+  modelCondInChannels?: number | null;
 }
 
 /** Kind support is separate from control-mode/model compatibility. */
@@ -43,7 +45,7 @@ export { isControlKindSupportedForBase } from './controlValidation';
 
 /** Options for {@link addControlLayers}. */
 export interface AddControlLayersOptions {
-  /** The main model base — selects controlnet vs flux_controlnet and support. */
+  /** The main model base — selects the adapter nodes and support. */
   base: SupportedGenerateBase;
   /** The main model variant (a FLUX `dev_fill` blocks Control LoRA). */
   modelVariant?: string;
@@ -64,8 +66,8 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
 
   let controlNetCollector: BackendInvocationContract | null = null;
   let t2iAdapterCollector: BackendInvocationContract | null = null;
-  let controlLoraCount = 0;
-  let zImageControlCount = 0;
+  let lliteCollector: BackendInvocationContract | null = null;
+  const validate = createControlValidationSequence({ base, variant: modelVariant });
 
   const ensureControlNetCollector = (): BackendInvocationContract => {
     if (!controlNetCollector) {
@@ -83,16 +85,21 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
     return t2iAdapterCollector;
   };
 
+  // `anima_denoise.control_lllite` takes one field or a list; a collector carries any count through one edge.
+  const ensureLliteCollector = (): BackendInvocationContract => {
+    if (!lliteCollector) {
+      lliteCollector = addNode(graph, { id: 'control_lllite_collector', type: 'collect' });
+      addEdge(graph, lliteCollector, 'collection', denoise, 'control_lllite');
+    }
+    return lliteCollector;
+  };
+
   for (const layer of layers) {
-    const reason = getControlValidationReason({
-      adapterModel: layer.model,
+    const reason = validate({
+      adapterModel: { ...layer.model, cond_in_channels: layer.modelCondInChannels },
       beginEndStepPct: layer.beginEndStepPct,
-      controlLoraIndex: layer.kind === 'control_lora' ? controlLoraCount : 0,
       kind: layer.kind,
-      mainBase: base,
-      mainVariant: modelVariant,
       weight: layer.weight,
-      zImageControlIndex: layer.kind === 'z_image_control' ? zImageControlCount : 0,
     });
     if (reason) {
       throw new Error(`Invalid control layer: ${reason}`);
@@ -133,7 +140,18 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
         weight: layer.weight,
       });
       addEdge(graph, node, 'control_lora', denoise, 'control_lora');
-      controlLoraCount += 1;
+    } else if (layer.kind === 'anima_lllite') {
+      // No mask: a control layer supplies a control image, and validation admits only 3-channel adapters.
+      const node = addNode(graph, {
+        begin_step_percent: layer.beginEndStepPct[0],
+        control_model: layer.model,
+        end_step_percent: layer.beginEndStepPct[1],
+        id: `anima_lllite_${layer.id}`,
+        image: { image_name: layer.imageName },
+        type: 'anima_lllite',
+        weight: layer.weight,
+      });
+      addEdge(graph, node, 'control', ensureLliteCollector(), 'item');
     } else {
       const node = addNode(graph, {
         begin_step_percent: layer.beginEndStepPct[0],
@@ -145,78 +163,6 @@ export const addControlLayers = (graph: BackendGraphContract, options: AddContro
         type: 'z_image_control',
       });
       addEdge(graph, node, 'control', denoise, 'control');
-      zImageControlCount += 1;
     }
   }
-};
-
-/** Return null when valid, otherwise the rejection reason. */
-export const getControlLayerRejectionReason = (params: {
-  layerName: string;
-  hasContent: boolean;
-  kind: ControlAdapterKind;
-  adapterModel: { base: string; type?: string } | null;
-  beginEndStepPct: [number, number];
-  controlLoraIndex?: number;
-  mainBase: string;
-  mainVariant?: string;
-  weight: number;
-  zImageControlIndex?: number;
-}): string | null => {
-  const {
-    adapterModel,
-    beginEndStepPct,
-    controlLoraIndex = 0,
-    hasContent,
-    kind,
-    layerName,
-    mainBase,
-    mainVariant,
-    weight,
-    zImageControlIndex = 0,
-  } = params;
-
-  if (!hasContent) {
-    return `Control layer "${layerName}" has no control content.`;
-  }
-  const reason = getControlValidationReason({
-    adapterModel: adapterModel ? { base: adapterModel.base, type: adapterModel.type ?? kind } : null,
-    beginEndStepPct,
-    controlLoraIndex,
-    kind,
-    mainBase,
-    mainVariant,
-    weight,
-    zImageControlIndex,
-  });
-  return reason ? getControlValidationReasonMessage(reason, layerName) : null;
-};
-
-/** The human-readable sentence for a control validation reason code. */
-export const getControlValidationReasonMessage = (reason: ControlValidationReason, layerName: string): string => {
-  if (reason === 'missing_model') {
-    return `Control layer "${layerName}" has no control model selected.`;
-  }
-  if (reason === 'capabilities_unavailable') {
-    return `Control layer "${layerName}" cannot be checked until model capabilities have loaded.`;
-  }
-  if (reason === 'unsupported_adapter') {
-    return `Control layer "${layerName}" is not supported for the selected base model.`;
-  }
-  if (reason === 'incompatible_base') {
-    return `Control layer "${layerName}" uses an incompatible base model.`;
-  }
-  if (reason === 'invalid_adapter_values') {
-    return `Control layer "${layerName}" has invalid control adapter settings.`;
-  }
-  if (reason === 'control_lora_limit') {
-    return 'Only one Control LoRA can be used at a time.';
-  }
-  if (reason === 'z_image_control_limit') {
-    return 'Only one Z-Image control layer can be used at a time.';
-  }
-  if (reason === 'flux_fill_control_lora') {
-    return 'Control LoRA is not compatible with FLUX Fill.';
-  }
-  return `Control layer "${layerName}" uses an incompatible control adapter.`;
 };

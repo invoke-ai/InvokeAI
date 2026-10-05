@@ -120,8 +120,8 @@ Adjustment child rows each have their own settings, such as **Brightness** and *
 
 ### Control layer
 
-* **Adapter type** — ControlNet, T2I Adapter, Control LoRA or Z-Image ControlNet, depending on the model selected in the Generate panel.
-* **Model** — the installed control models of that type for the same model family. If the list is empty, install one from the starter models.
+* **Adapter type** — ControlNet, T2I Adapter, Control LoRA, Z-Image ControlNet or Anima ControlNet-LLLite, depending on the model selected in the Generate panel.
+* **Model** — the installed control models of that type for the same model family. If the list is empty, install one from the starter models. For Anima, the list holds the LLLite control adapters but not the Inpainting adapter, and each LLLite model can drive only one control layer per generation.
 * **Weight** — how strongly the guide is followed (0 to 2; the default is 0.75 for ControlNet).
 * **Step range** — the part of the generation, from start to finish, in which the guide applies.
 * **Control mode** (ControlNet only) — **Balanced**, **More prompt**, **More control** or **Unbalanced**.

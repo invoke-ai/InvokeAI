@@ -1,19 +1,9 @@
 import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
 import { describe, expect, it } from 'vitest';
 
-import type {
-  AddControlLayersOptions,
-  ControlAdapterKind,
-  ControlLayerGraphInput,
-  ControlModelIdentifier,
-} from './addControlLayers';
+import type { AddControlLayersOptions, ControlLayerGraphInput, ControlModelIdentifier } from './addControlLayers';
 
-import {
-  addControlLayers,
-  CONTROL_DENOISE_NODE_ID,
-  getControlLayerRejectionReason,
-  isControlKindSupportedForBase,
-} from './addControlLayers';
+import { addControlLayers, CONTROL_DENOISE_NODE_ID, isControlKindSupportedForBase } from './addControlLayers';
 
 interface TestGraph {
   id: string;
@@ -78,6 +68,12 @@ describe('isControlKindSupportedForBase', () => {
     expect(isControlKindSupportedForBase('sdxl', 't2i_adapter')).toBe(true);
     expect(isControlKindSupportedForBase('flux', 't2i_adapter')).toBe(false);
     expect(isControlKindSupportedForBase('sd-2', 't2i_adapter')).toBe(false);
+  });
+
+  it('anima_lllite is supported on anima only, which supports nothing else', () => {
+    expect(isControlKindSupportedForBase('anima', 'anima_lllite')).toBe(true);
+    expect(isControlKindSupportedForBase('sdxl', 'anima_lllite')).toBe(false);
+    expect(isControlKindSupportedForBase('anima', 'controlnet')).toBe(false);
   });
 
   it('control_lora is supported on flux only', () => {
@@ -352,6 +348,110 @@ describe('addControlLayers — Z-Image control', () => {
   });
 });
 
+describe('addControlLayers — Anima ControlNet-LLLite', () => {
+  const lllite = (key: string): ControlModelIdentifier => ({
+    base: 'anima',
+    hash: `hash-${key}`,
+    key,
+    name: `LLLite ${key}`,
+    type: 'controlnet',
+  });
+  const lliteLayer = (id: string, key: string, overrides: Partial<ControlLayerGraphInput> = {}) =>
+    layer({
+      beginEndStepPct: [0, 1],
+      controlMode: null,
+      id,
+      imageName: `${id}.png`,
+      kind: 'anima_lllite',
+      model: lllite(key),
+      modelCondInChannels: 3,
+      weight: 1,
+      ...overrides,
+    });
+  const runAnima = (layers: ControlLayerGraphInput[]) => run({ base: 'anima', layers });
+
+  it('adds nothing for an Anima graph without control layers', () => {
+    expect(runAnima([])).toEqual(baseGraph());
+  });
+
+  it('builds one anima_lllite node per layer with the backend field names, without a mask', () => {
+    const graph = runAnima([lliteLayer('A', 'sketch', { beginEndStepPct: [0.1, 0.8], weight: 0.6 })]);
+
+    expect(graph.nodes.anima_lllite_A).toEqual({
+      begin_step_percent: 0.1,
+      control_model: lllite('sketch'),
+      end_step_percent: 0.8,
+      id: 'anima_lllite_A',
+      image: { image_name: 'A.png' },
+      is_intermediate: true,
+      type: 'anima_lllite',
+      use_cache: true,
+      weight: 0.6,
+    });
+    expect(graph.nodes.control_lllite_collector).toEqual({
+      id: 'control_lllite_collector',
+      is_intermediate: true,
+      type: 'collect',
+      use_cache: true,
+    });
+    expect(graph.edges).toEqual([
+      {
+        destination: { field: 'control_lllite', node_id: 'denoise_latents' },
+        source: { field: 'collection', node_id: 'control_lllite_collector' },
+      },
+      {
+        destination: { field: 'item', node_id: 'control_lllite_collector' },
+        source: { field: 'control', node_id: 'anima_lllite_A' },
+      },
+    ]);
+  });
+
+  it('fans several adapters into one collector feeding denoise.control_lllite once', () => {
+    const graph = runAnima([
+      lliteLayer('A', 'sketch'),
+      lliteLayer('B', 'depth', { weight: -1 }),
+      lliteLayer('C', 'pose', { weight: 2 }),
+    ]);
+
+    expect(Object.values(graph.nodes).filter((node) => node.type === 'anima_lllite')).toHaveLength(3);
+    expect(Object.values(graph.nodes).filter((node) => node.type === 'collect')).toHaveLength(1);
+    expect(edgesTo(graph, 'control_lllite_collector', 'item').map((edge) => edge.source)).toEqual([
+      { field: 'control', node_id: 'anima_lllite_A' },
+      { field: 'control', node_id: 'anima_lllite_B' },
+      { field: 'control', node_id: 'anima_lllite_C' },
+    ]);
+    expect(edgesTo(graph, 'denoise_latents', 'control_lllite')).toHaveLength(1);
+    expect(graph.nodes.anima_lllite_B?.weight).toBe(-1);
+    expect(graph.nodes.anima_lllite_C?.weight).toBe(2);
+    // ControlNet-only fields never reach the LLLite node.
+    expect(graph.nodes.anima_lllite_A).not.toHaveProperty('control_mode');
+    expect(graph.nodes.anima_lllite_A).not.toHaveProperty('mask');
+  });
+
+  it('rejects a model the denoiser would apply twice', () => {
+    expect(() => runAnima([lliteLayer('A', 'sketch'), lliteLayer('B', 'sketch')])).toThrow(/duplicate_lllite_model/);
+  });
+
+  it.each([
+    [{ modelCondInChannels: 4 }, /lllite_inpaint_adapter/],
+    [{ modelCondInChannels: null }, /lllite_channels_unknown/],
+    [{ modelCondInChannels: undefined }, /lllite_channels_unknown/],
+    [{ weight: 2.01 }, /invalid_adapter_values/],
+    [{ weight: -1.01 }, /invalid_adapter_values/],
+    [{ beginEndStepPct: [0.5, 0.5] as [number, number] }, /invalid_adapter_values/],
+    [{ model: { ...lllite('sd'), base: 'sd-1' } }, /incompatible_base/],
+    [{ kind: 'controlnet' as const }, /switch_adapter_kind/],
+  ])('rejects %o', (overrides, reason) => {
+    expect(() => runAnima([lliteLayer('A', 'sketch', overrides)])).toThrow(reason);
+  });
+
+  it('rejects an LLLite layer on another base', () => {
+    expect(() => run({ base: 'sdxl', layers: [lliteLayer('A', 'sketch', { model: lllite('x') })] })).toThrow(
+      /switch_adapter_kind/
+    );
+  });
+});
+
 describe('addControlLayers — per-layer separation', () => {
   it('creates two distinct adapter nodes feeding one shared collector', () => {
     const graph = run({
@@ -381,13 +481,13 @@ describe('addControlLayers — per-layer separation', () => {
 });
 
 describe('addControlLayers — unsupported kind rejected', () => {
-  it('rejects a t2i_adapter layer on flux', () => {
+  it('rejects a t2i_adapter layer on flux, which runs another kind', () => {
     expect(() =>
       run({
         base: 'flux',
         layers: [layer({ id: 'X', kind: 't2i_adapter', model: model('flux', 't2i_adapter') })],
       })
-    ).toThrow(/unsupported_adapter/);
+    ).toThrow(/switch_adapter_kind/);
   });
 
   it('rejects a mixed set containing an unsupported layer', () => {
@@ -399,7 +499,7 @@ describe('addControlLayers — unsupported kind rejected', () => {
           layer({ id: 'keep', kind: 'controlnet', model: model('flux') }),
         ],
       })
-    ).toThrow(/unsupported_adapter/);
+    ).toThrow(/switch_adapter_kind/);
   });
 
   it('rejects a graph input whose resolved model has an incompatible base', () => {
@@ -417,96 +517,5 @@ describe('addControlLayers — missing denoise node', () => {
     expect(() => addControlLayers(graph as never, { base: 'sd-1', layers: [layer()] })).toThrow(
       /missing the denoise node/
     );
-  });
-});
-
-describe('getControlLayerRejectionReason', () => {
-  const validParams = {
-    layerName: 'My Layer',
-    hasContent: true,
-    kind: 'controlnet' as ControlAdapterKind,
-    adapterModel: { base: 'sd-1' },
-    beginEndStepPct: [0, 1] as [number, number],
-    mainBase: 'sd-1',
-    mainVariant: undefined as string | undefined,
-    weight: 0.75,
-  };
-
-  it('returns null for a valid controlnet on sd-1 with a matching model base', () => {
-    expect(getControlLayerRejectionReason(validParams)).toBeNull();
-  });
-
-  it('rejects when the layer has no content', () => {
-    const reason = getControlLayerRejectionReason({ ...validParams, hasContent: false });
-    expect(reason).toEqual(expect.any(String));
-    expect(reason).toContain('no control content');
-  });
-
-  it('rejects when no adapter model is selected', () => {
-    const reason = getControlLayerRejectionReason({ ...validParams, adapterModel: null });
-    expect(reason).toEqual(expect.any(String));
-    expect(reason).toContain('no control model');
-  });
-
-  it('rejects when the base+kind is unsupported', () => {
-    const reason = getControlLayerRejectionReason({
-      ...validParams,
-      mainBase: 'sd-2',
-      adapterModel: { base: 'sd-2' },
-    });
-    expect(reason).toEqual(expect.any(String));
-    expect(reason).toContain('not supported');
-  });
-
-  it('rejects when the adapter model base does not match the main base', () => {
-    const reason = getControlLayerRejectionReason({
-      ...validParams,
-      adapterModel: { base: 'sdxl' },
-    });
-    expect(reason).toEqual(expect.any(String));
-    expect(reason).toContain('incompatible base');
-  });
-
-  it('rejects FLUX Fill (dev_fill) + control_lora', () => {
-    const reason = getControlLayerRejectionReason({
-      layerName: 'My Layer',
-      hasContent: true,
-      kind: 'control_lora',
-      adapterModel: { base: 'flux' },
-      beginEndStepPct: [0, 1],
-      mainBase: 'flux',
-      mainVariant: 'dev_fill',
-      weight: 0.75,
-    });
-    expect(reason).toEqual(expect.any(String));
-    expect(reason).toContain('FLUX Fill');
-  });
-
-  it('rejects malformed adapter values with an explicit sentence', () => {
-    expect(getControlLayerRejectionReason({ ...validParams, weight: Number.NaN })).toBe(
-      'Control layer "My Layer" has invalid control adapter settings.'
-    );
-  });
-
-  it('rejects a second Control LoRA / Z-Image control via the index params', () => {
-    expect(
-      getControlLayerRejectionReason({
-        ...validParams,
-        adapterModel: { base: 'flux' },
-        controlLoraIndex: 1,
-        kind: 'control_lora',
-        mainBase: 'flux',
-      })
-    ).toBe('Only one Control LoRA can be used at a time.');
-
-    expect(
-      getControlLayerRejectionReason({
-        ...validParams,
-        adapterModel: { base: 'z-image', type: 'controlnet' },
-        kind: 'z_image_control',
-        mainBase: 'z-image',
-        zImageControlIndex: 1,
-      })
-    ).toBe('Only one Z-Image control layer can be used at a time.');
   });
 });

@@ -21,7 +21,8 @@ import { submitResolvedInvocation } from './invocationSubmit';
 export interface ActiveInvocationSubmissionArgs {
   commands: WorkbenchCommands;
   destinationOverride?: ResultDestination;
-  formatControlLayerError?: PrepareCanvasInvocationArgs['formatControlLayerError'];
+  /** Words a control-layer rejection from the locale; its error message is for logs only. */
+  formatControlLayerError: PrepareCanvasInvocationArgs['formatControlLayerError'];
   getModels: () => readonly ModelConfig[] | undefined;
   queries: WorkbenchQueries;
 }

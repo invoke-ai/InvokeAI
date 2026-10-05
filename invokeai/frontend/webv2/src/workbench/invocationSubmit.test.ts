@@ -36,6 +36,9 @@ const getActiveProject = (state: ReturnType<typeof createInitialWorkbenchState>)
 };
 import { createWorkbenchStore } from './workbenchStore';
 
+// Production words rejections from the locale; tests only need the structured rejection to reach the notice.
+const formatControlLayerError = ({ code, layerName }: { code: string; layerName: string }) => `${layerName}: ${code}`;
+
 const field = (name: string, typeName: string, overrides: Record<string, unknown> = {}) => ({
   default: undefined,
   description: '',
@@ -170,6 +173,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
 
     await submitResolvedInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -222,6 +226,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
 
     await submitResolvedInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),
@@ -240,6 +245,7 @@ describe('submitResolvedInvocation with a workflow generator', () => {
 
     await submitResolvedInvocation({
       commands,
+      formatControlLayerError,
       models: undefined,
       owner: captureAccountScope(),
       prepareCanvasInvocation: vi.fn(),

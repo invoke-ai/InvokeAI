@@ -234,7 +234,7 @@ export type CanvasAdjustmentEntry =
 export type CanvasAdjustmentsContract = readonly CanvasAdjustmentEntry[];
 
 export interface CanvasControlAdapterContract {
-  kind: 'controlnet' | 't2i_adapter' | 'control_lora' | 'z_image_control';
+  kind: 'controlnet' | 't2i_adapter' | 'control_lora' | 'z_image_control' | 'anima_lllite';
   model: string | null;
   weight: number;
   beginEndStepPct: [number, number];

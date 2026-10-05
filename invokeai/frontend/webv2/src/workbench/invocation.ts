@@ -1,10 +1,10 @@
 import type { ModelConfig } from '@features/models';
 import type { ProjectGraphState } from '@features/workflow/contracts';
-import type { ForLoopValidationReason } from '@features/workflow/utility';
 import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 import type {
   InvocationMode,
   InvocationRoute,
+  InvocationValidationReason,
   InvocationSourceId,
   ResolvedInvocationRoute,
   ResultDestination,
@@ -23,10 +23,11 @@ import { getUpscaleValidationReasons, normalizeUpscaleWidgetValues } from '@feat
 import { getVideoWidgetValidationReasons, normalizeVideoWidgetValues } from '@features/video';
 import { getProjectGraphReadiness } from '@features/workflow/graph';
 import { getInvocationTemplatesSnapshot } from '@features/workflow/react';
+import { localizeForLoopValidationReason } from '@features/workflow/utility';
 import { areArraysEqual, createStableSelector } from '@platform/state/selectors';
 import { compileContributingLayers } from '@workbench/canvas-engine/api';
 
-import { getBlockingControlLayerIssues } from './controlLayerChecks';
+import { describeControlLayerIssue, getBlockingControlLayerIssues } from './controlLayerChecks';
 import { getActiveProjectGraph } from './projectWorkflows';
 import { getProjectWidgetValues } from './widgetState';
 
@@ -212,7 +213,7 @@ export const resolveInvocationRouteInput = (
           batchCount: sanitizeBatchCount(input.workflowValues.batchCount),
         })
       : null;
-  const validationReasons: Array<string | ForLoopValidationReason> = [];
+  const validationReasons: InvocationValidationReason[] = [];
 
   if (!isInvocationSourceAvailable(sourceId)) {
     validationReasons.push(`${getSourceLabel(sourceId)} is not an available invocation source.`);
@@ -257,7 +258,7 @@ export const resolveInvocationRouteInput = (
             layers: input.canvasLayers,
             mainModel: values.model,
             models,
-          }).map((issue) => issue.message)
+          }).map((controlLayerIssue) => ({ controlLayerIssue }))
         );
       }
     }
@@ -294,3 +295,12 @@ export const resolveInvocationRouteInput = (
 
 export const isInvocationRouteValid = (route: ResolvedInvocationRoute): boolean =>
   route.sourceValid && route.destinationValid;
+
+/** Words any route validation reason for display; control-layer issues come from the locale. */
+export const localizeInvocationValidationReason = (
+  reason: InvocationValidationReason,
+  t: (key: string, options?: Record<string, unknown>) => string
+): string =>
+  typeof reason === 'object' && 'controlLayerIssue' in reason
+    ? describeControlLayerIssue(t, reason.controlLayerIssue)
+    : localizeForLoopValidationReason(reason, t);

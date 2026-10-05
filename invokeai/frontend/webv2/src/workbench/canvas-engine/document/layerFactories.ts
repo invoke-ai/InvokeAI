@@ -7,7 +7,7 @@ import type {
 } from '@workbench/canvas-engine/contracts';
 import type { Rect } from '@workbench/canvas-engine/types';
 
-import { CONTROL_ADAPTER_DEFAULTS } from '@workbench/controlAdapters';
+import { createDefaultControlAdapter } from '@workbench/controlAdapters';
 
 export const DEFAULT_INPAINT_MASK_FILL = { color: '#e07575', style: 'diagonal' } as const;
 export const REGIONAL_GUIDANCE_FILL_COLORS: readonly string[] = [
@@ -94,9 +94,8 @@ export const createControlLayer = (
   base?: string | null,
   model?: string | null
 ): CanvasControlLayerContract => {
-  const adapter = base === 'z-image' ? CONTROL_ADAPTER_DEFAULTS.z_image_control : CONTROL_ADAPTER_DEFAULTS.controlnet;
   return {
-    adapter: { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct], model: model ?? null },
+    adapter: createDefaultControlAdapter(base, model ?? null),
     blendMode: 'normal',
     id,
     isEnabled: true,

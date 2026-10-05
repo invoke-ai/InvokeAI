@@ -13,7 +13,9 @@
       "guidance_max": null,
       "scheduler_set": "anima",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "anima_lllite"
+      ],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
       "supports_regional_guidance": true,
@@ -69,7 +71,9 @@
       "guidance_max": null,
       "scheduler_set": "anima",
       "scheduler_applies_to_graph": true,
-      "control_kinds": [],
+      "control_kinds": [
+        "anima_lllite"
+      ],
       "max_reference_images": 0,
       "reference_images_require_variant": null,
       "supports_regional_guidance": true,

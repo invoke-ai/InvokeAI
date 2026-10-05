@@ -2,11 +2,12 @@ import type { ArchitectureCapabilitiesSnapshot } from '@features/generation/runt
 import type { CanvasLayerContract } from '@workbench/canvas-engine/api';
 
 import { Icon } from '@chakra-ui/react';
+import { getSuggestedControlKind } from '@features/generation/graph';
 import { getArchitectureCapabilitiesSnapshot, subscribeArchitectureCapabilities } from '@features/generation/runtime';
 import { useModelsSelector } from '@features/models';
 import { useExternalStoreSelector } from '@platform/state/selectors';
 import { Tooltip } from '@platform/ui';
-import { getControlLayerAttentionReason } from '@workbench/controlLayerChecks';
+import { describeControlLayerReason, getControlLayerAttentionReason } from '@workbench/controlLayerChecks';
 import { TriangleAlertIcon } from 'lucide-react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -44,6 +45,11 @@ export const ControlLayerWarningIcon = ({
       [contributing, layer, mainModel, models]
     )
   );
+  const suggestedKind = useExternalStoreSelector(
+    subscribeArchitectureCapabilities,
+    getArchitectureCapabilitiesSnapshot,
+    useCallback(() => (mainModel ? getSuggestedControlKind(mainModel.base) : null), [mainModel])
+  );
 
   // Distinguish loading/failed capabilities from unsupported adapters; failures should point to retry.
   if (!reason || (reason === 'capabilities_unavailable' && capabilitiesStatus !== 'error')) {
@@ -53,7 +59,7 @@ export const ControlLayerWarningIcon = ({
   const message =
     reason === 'capabilities_unavailable'
       ? `${t('widgets.layers.control.capabilitiesLoadFailed')} ${t('widgets.layers.control.capabilitiesRetryHint')}`
-      : t(`widgets.layers.control.validation.${reason}`);
+      : describeControlLayerReason(t, reason, suggestedKind);
 
   return (
     <Tooltip content={message}>

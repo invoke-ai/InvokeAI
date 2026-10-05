@@ -7,19 +7,30 @@ import { ensureArchitectureCapabilitiesLoaded } from '@features/generation/data/
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
+import { createDocumentModel } from '@workbench/canvas-engine/api';
+import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { attachCanvasOperations } from '@workbench/canvas-operations/operationAccess';
+import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { I18nextProvider, initReactI18next } from 'react-i18next';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { page } from 'vitest/browser';
 
 import { ControlLayerSettings } from './ControlLayerSettings';
+import { createControlLayer } from './layerOps';
 
 // Stable identities, as the real stores hand out, so only the table's arrival can re-read the policy.
 const catalog = vi.hoisted(() => ({
-  mainModel: { base: 'sd-1', key: 'sd1-main', name: 'SD 1.5', type: 'main' },
-  models: [{ base: 'sd-1', key: 'sd1-controlnet', name: 'SD 1.5 ControlNet', type: 'controlnet' }],
+  mainModel: { base: 'sd-1', key: 'sd1-main', name: 'SD 1.5', type: 'main' } as Record<string, unknown>,
+  models: [{ base: 'sd-1', key: 'sd1-controlnet', name: 'SD 1.5 ControlNet', type: 'controlnet' }] as Record<
+    string,
+    unknown
+  >[],
 }));
+// Tests that swap the catalog restore these identities afterwards.
+const SD1_CATALOG = { ...catalog };
 
 vi.mock('@features/models', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -70,7 +81,34 @@ const settle = async (run: () => void = () => undefined) => {
   });
 };
 
-const render = async () => {
+type Engine = NonNullable<Parameters<typeof ControlLayerSettings>[0]['engine']>;
+
+/** Committed document edits, in order; each carries the adapter patch the panel prepared. */
+const commits: { label: string; edit: unknown }[] = [];
+
+/** Just enough engine for the panel's reads and commits: every layer has content and contributes, in order. */
+const engineWith = (layers: CanvasControlLayerContract[]): Engine => {
+  const model = createDocumentModel(
+    { ...createEmptyCanvasDocument(), stacks: stacksFrom(layers) },
+    { editRevision: 0, projectId: 'test-project' }
+  );
+  const engine = {
+    document: { model: () => model },
+    exports: { hasExportableLayerContent: () => true },
+    interaction: { subscribe: () => () => undefined },
+    layers: {
+      beginStructuralPreview: () => null,
+      commitPrepared: (label: string, edit: unknown) => {
+        commits.push({ edit, label });
+        return { status: 'committed' as const };
+      },
+    },
+  } as unknown as Engine;
+  attachCanvasOperations(engine, {} as never);
+  return engine;
+};
+
+const render = async (controlLayer: CanvasControlLayerContract = layer, engine: Engine | null = null) => {
   applyThemeToRoot('classic');
   host = document.createElement('div');
   host.style.width = '260px';
@@ -80,7 +118,7 @@ const render = async () => {
     root?.render(
       <I18nextProvider i18n={i18n}>
         <ChakraProvider value={system}>
-          <ControlLayerSettings engine={null} layer={layer} onOperationStarted={ignoreOperationStarted} />
+          <ControlLayerSettings engine={engine} layer={controlLayer} onOperationStarted={ignoreOperationStarted} />
         </ChakraProvider>
       </I18nextProvider>
     )
@@ -99,6 +137,7 @@ afterEach(async () => {
   host = null;
   root = null;
   getArchitectureCapabilities.mockReset();
+  Object.assign(catalog, SD1_CATALOG);
   // Returns the capability store and the core registry to their unloaded state between tests.
   accountLifecycle.invalidate();
 });
@@ -174,5 +213,157 @@ describe('ControlLayerSettings and the capability table', () => {
     } finally {
       elsewhere.remove();
     }
+  });
+});
+
+describe('ControlLayerSettings on an Anima main model', () => {
+  const lllite = (key: string, name: string, cond_in_channels: number | null) => ({
+    base: 'anima',
+    cond_in_channels,
+    key,
+    name,
+    type: 'controlnet',
+  });
+  const ANIMA_MODELS = [
+    lllite('sketch', 'Anima LLLite Sketch', 3),
+    lllite('inpainting', 'Anima LLLite Inpainting', 4),
+    lllite('unidentified', 'Anima LLLite (old install)', null),
+  ];
+  const animaLayer = (
+    kind: string,
+    model: string | null,
+    id = 'control-1',
+    values: Partial<CanvasControlLayerContract['adapter']> = {}
+  ): CanvasControlLayerContract => {
+    const base = createControlLayer(id, id, 'anima', model);
+    return {
+      ...base,
+      adapter: { ...base.adapter, ...values, kind: kind as CanvasControlLayerContract['adapter']['kind'] },
+    };
+  };
+  /** The model Select's hidden native options, as the kind ones are read. */
+  const offeredModels = () =>
+    [...host!.querySelectorAll('select')]
+      .flatMap((select) => [...select.options].map((option) => option.value))
+      .filter((value) => catalog.models.some((model) => model.key === value));
+  const button = (name: string) => [...host!.querySelectorAll('button')].find((b) => b.textContent === name);
+  /** The adapter each commit wrote, read from the prepared edit's forward patch. */
+  const committedAdapters = () =>
+    commits
+      .map(({ edit }) => JSON.stringify(edit))
+      .map((json) => {
+        const match = /"adapter":(\{[^{}]*"beginEndStepPct":\[[^\]]*\][^{}]*\})/u.exec(json);
+        return match ? (JSON.parse(match[1]!) as Record<string, unknown>) : null;
+      });
+
+  /** Renders `layers.at(-1)` as the selected layer of a document holding all of them, each with content. */
+  const renderWith = async (
+    mainModel: Record<string, unknown> | null,
+    models: Record<string, unknown>[],
+    ...layers: CanvasControlLayerContract[]
+  ) => {
+    catalog.mainModel = mainModel as Record<string, unknown>;
+    catalog.models = models;
+    commits.length = 0;
+    getArchitectureCapabilities.mockResolvedValueOnce(architectureCapabilitiesFixture);
+    await settle(ensureArchitectureCapabilitiesLoaded);
+    await render(layers.at(-1), engineWith(layers));
+  };
+  const ANIMA_MAIN = { base: 'anima', key: 'anima-main', name: 'Anima', type: 'main' };
+  const renderAnima = (...layers: CanvasControlLayerContract[]) => renderWith(ANIMA_MAIN, ANIMA_MODELS, ...layers);
+
+  it('offers ControlNet-LLLite and its control adapters, and accepts one without a warning', async () => {
+    await renderAnima(animaLayer('anima_lllite', 'sketch'));
+
+    expect(offersKind('anima_lllite')).toBe(true);
+    expect(offersKind('controlnet')).toBe(false);
+    expect(offeredModels()).toEqual(['sketch']);
+    expect(host!.textContent).toContain('Anima LLLite Sketch');
+    expect(textOf('alert')).toBe('');
+  });
+
+  it('turns a layer saved as ControlNet into LLLite in one step, keeping its model, weight and steps', async () => {
+    await renderAnima(animaLayer('controlnet', 'sketch', 'old', { beginEndStepPct: [0.1, 0.7], weight: 0.6 }));
+
+    // The alert names the fix, and the model list does not present any model as usable under the wrong kind.
+    expect(textOf('alert')).toContain('widgets.layers.control.validation.switch_adapter_kind');
+    expect(offeredModels()).toEqual([]);
+    expect(host!.textContent).toContain('Anima LLLite Sketch');
+
+    await settle(() => button('widgets.layers.control.switchKind')?.click());
+
+    expect(committedAdapters()).toEqual([
+      { beginEndStepPct: [0.1, 0.7], controlMode: null, kind: 'anima_lllite', model: 'sketch', weight: 0.6 },
+    ]);
+  });
+
+  it('asks for the switch, not a model, on a model-less layer saved as ControlNet', async () => {
+    await renderAnima(animaLayer('controlnet', null));
+
+    expect(textOf('alert')).toContain('widgets.layers.control.validation.switch_adapter_kind');
+    expect(textOf('alert')).not.toContain('missing_model');
+  });
+
+  it('switches through the Adapter type select the same way', async () => {
+    await renderAnima(animaLayer('controlnet', 'sketch', 'old', { beginEndStepPct: [0.1, 0.7], weight: 0.6 }));
+
+    await act(() => page.getByRole('combobox', { name: 'widgets.layers.control.kind' }).click());
+    await act(() => page.getByRole('option', { name: 'widgets.layers.control.kinds.anima_lllite' }).click());
+    await settle();
+
+    expect(committedAdapters()).toEqual([
+      { beginEndStepPct: [0.1, 0.7], controlMode: null, kind: 'anima_lllite', model: 'sketch', weight: 0.6 },
+    ]);
+  });
+
+  it('explains an empty LLLite list instead of only asking for a model', async () => {
+    await renderWith(ANIMA_MAIN, ANIMA_MODELS.slice(1), animaLayer('anima_lllite', null));
+
+    expect(offeredModels()).toEqual([]);
+    expect(host!.textContent).toContain('widgets.layers.control.hiddenModels.lllite_inpaint_adapter');
+    expect(host!.textContent).toContain('widgets.layers.control.hiddenModels.lllite_channels_unknown');
+    expect(textOf('alert')).toBe('');
+  });
+
+  it('flags a second layer applying the same LLLite model, but not the first', async () => {
+    const first = animaLayer('anima_lllite', 'sketch', 'first');
+    const second = animaLayer('anima_lllite', 'sketch', 'second');
+    await renderAnima(first, second);
+    expect(textOf('alert')).toBe('widgets.layers.control.validation.duplicate_lllite_model');
+
+    await act(() => root?.unmount());
+    host?.remove();
+    await render(first, engineWith([first, second]));
+    expect(textOf('alert')).toBe('');
+  });
+
+  it('names an unusable adapter by its catalog name beside the alert about it', async () => {
+    await renderAnima(animaLayer('anima_lllite', 'inpainting'));
+
+    expect(textOf('alert')).toBe('widgets.layers.control.validation.lllite_inpaint_adapter');
+    expect(host!.textContent).toContain('Anima LLLite Inpainting');
+    expect(host!.textContent).not.toContain('widgets.layers.control.selectModel');
+  });
+
+  it('offers ControlNet for an LLLite layer once the main model is not Anima, dropping the LLLite model', async () => {
+    await renderWith(
+      { base: 'sdxl', key: 'sdxl-main', name: 'SDXL', type: 'main' },
+      [...ANIMA_MODELS, { base: 'sdxl', key: 'sdxl-control', name: 'SDXL ControlNet', type: 'controlnet' }],
+      animaLayer('anima_lllite', 'sketch', 'lllite', { beginEndStepPct: [0.2, 0.8], weight: 0.9 })
+    );
+    expect(textOf('alert')).toContain('widgets.layers.control.validation.switch_adapter_kind');
+
+    await settle(() => button('widgets.layers.control.switchKind')?.click());
+
+    expect(committedAdapters()).toEqual([
+      { beginEndStepPct: [0.2, 0.8], controlMode: 'balanced', kind: 'controlnet', model: null, weight: 0.9 },
+    ]);
+  });
+
+  it('hides the base-bound LLLite kind while no main model is selected', async () => {
+    await renderWith(null, ANIMA_MODELS, animaLayer('controlnet', null));
+
+    expect(offersKind('controlnet')).toBe(true);
+    expect(offersKind('anima_lllite')).toBe(false);
   });
 });

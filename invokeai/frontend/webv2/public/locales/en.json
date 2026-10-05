@@ -3548,9 +3548,14 @@
           "scribble_edge_detection": "Scribble",
           "spandrel_filter": "Spandrel"
         },
+        "hiddenModels": {
+          "lllite_channels_unknown": "ControlNet-LLLite models whose adapter type is unknown are hidden. Re-identify them in the Model Manager.",
+          "lllite_inpaint_adapter": "Inpainting ControlNet-LLLite adapters are hidden: they need an inpaint mask, not a control image."
+        },
         "invalidLayer": "Control layer \"{{name}}\": {{reason}}",
         "kind": "Adapter type",
         "kinds": {
+          "anima_lllite": "Anima ControlNet-LLLite",
           "control_lora": "Control LoRA",
           "controlnet": "ControlNet",
           "t2i_adapter": "T2I Adapter",
@@ -3568,15 +3573,20 @@
         "preview": "Preview filter",
         "selectModel": "Select a model",
         "stepRange": "Step range",
+        "switchKind": "Switch to {{kind}}",
         "transparencyEffect": "Transparent preview",
         "validation": {
           "capabilities_unavailable": "waiting for model capabilities to load.",
           "control_lora_limit": "Only one Control LoRA can be used at a time.",
+          "duplicate_lllite_model": "Another control layer already uses this ControlNet-LLLite model; each can be applied once per generation.",
           "flux_fill_control_lora": "Control LoRA is not compatible with FLUX Fill.",
           "incompatible_adapter": "The selected model does not match this adapter type.",
           "incompatible_base": "The control model is incompatible with the selected base model.",
           "invalid_adapter_values": "Control weight and step range must be valid before generating.",
+          "lllite_channels_unknown": "This ControlNet-LLLite model's adapter type is unknown. Re-identify it in the Model Manager.",
+          "lllite_inpaint_adapter": "This is an inpainting ControlNet-LLLite adapter; a control layer needs a control adapter.",
           "missing_model": "Select a control model before generating.",
+          "switch_adapter_kind": "Switch the adapter type to {{kind}} to use this layer with the selected model.",
           "unsupported_adapter": "This control adapter is not supported by the selected base model.",
           "z_image_control_limit": "Only one Z-Image control can be used at a time."
         },

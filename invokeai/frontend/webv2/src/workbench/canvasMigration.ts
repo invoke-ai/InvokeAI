@@ -130,7 +130,8 @@ const zControlAdapter = z
   .object({
     beginEndStepPct: z.tuple([zFiniteNumber, zFiniteNumber]),
     controlMode: z.enum(['balanced', 'more_prompt', 'more_control', 'unbalanced']).nullable(),
-    kind: z.enum(['controlnet', 't2i_adapter', 'control_lora', 'z_image_control']),
+    // An unknown kind refuses the document: this build cannot apply it, and rewriting it would lose it on save.
+    kind: z.enum(['controlnet', 't2i_adapter', 'control_lora', 'z_image_control', 'anima_lllite']),
     model: z.string().nullable(),
     weight: zFiniteNumber,
   })

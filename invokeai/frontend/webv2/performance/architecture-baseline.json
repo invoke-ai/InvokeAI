@@ -2,10 +2,10 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 790624,
+        "brotliBytes": 790645,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 789843,
+        "gzipBytes": 789850,
         "imageRawBytes": 44398,
         "initialRawBytes": 2031535,
         "largestAssetRawBytes": 749011,
@@ -343,15 +343,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1154370,
+        "brotliBytes": 1154046,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1148072,
+        "gzipBytes": 1147946,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3156424,
+        "initialRawBytes": 3154683,
         "largestAssetRawBytes": 749011,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 147847,
+        "ownedRawBytes": 148019,
         "requestCount": 73,
         "scriptRequestCount": 57,
         "sourceOwners": [
@@ -541,7 +541,6 @@
           "source:src/features/generation/core/architectureCapabilities.ts",
           "source:src/features/generation/core/baseGenerationPolicies.ts",
           "source:src/features/generation/core/batch.ts",
-          "source:src/features/generation/core/canvas/addControlLayers.ts",
           "source:src/features/generation/core/canvas/addRegionalGuidance.ts",
           "source:src/features/generation/core/canvas/controlValidation.ts",
           "source:src/features/generation/core/catalogSearch.ts",

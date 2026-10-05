@@ -13,6 +13,8 @@ import { submitResolvedInvocation } from './invocationSubmit';
 
 export interface GraphPreviewInvokeDeps {
   commands: Pick<WorkbenchCommands, 'generation' | 'notifications'>;
+  /** Words a blocked canvas preview's control layer for the notice. */
+  formatControlLayerError: Parameters<typeof prepareCanvasInvocation>[0]['formatControlLayerError'];
   models: readonly ModelConfig[] | undefined;
   owner: AccountScope;
   prepareCanvasInvocation: typeof prepareCanvasInvocation;
@@ -23,6 +25,7 @@ export interface GraphPreviewInvokeDeps {
 /** Resolves and submits a preview against the post-draft-flush project snapshot. */
 export const resolveAndSubmitGraphPreviewInvocation = ({
   commands,
+  formatControlLayerError,
   models,
   owner,
   prepareCanvasInvocation: prepareCanvas,
@@ -44,6 +47,14 @@ export const resolveAndSubmitGraphPreviewInvocation = ({
     return false;
   }
 
-  void submitResolvedInvocation({ commands, models, owner, prepareCanvasInvocation: prepareCanvas, project, route });
+  void submitResolvedInvocation({
+    commands,
+    formatControlLayerError,
+    models,
+    owner,
+    prepareCanvasInvocation: prepareCanvas,
+    project,
+    route,
+  });
   return true;
 };
