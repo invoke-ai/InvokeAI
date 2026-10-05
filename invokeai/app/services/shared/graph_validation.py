@@ -756,16 +756,25 @@ class Graph(BaseModel):
             list.append(self.edges, edge)
             self._add_edge_to_indexes(edge)
             try:
-                self._validate_if_branch_input_dependents(edge, destination_node)
+                self._validate_type_dependents_after_edge(edge, destination_node)
             except Exception:
                 self.delete_edge(edge)
                 raise
         else:
             raise InvalidEdgeError()
 
-    def _validate_if_branch_input_dependents(self, edge: Edge, node: BaseInvocation) -> None:
-        """Revalidate type-dependent paths through Ifs and collectors after adding an If branch."""
-        if not isinstance(node, IfInvocation) or edge.destination.field not in ("true_input", "false_input"):
+    def _validate_type_dependents_after_edge(self, edge: Edge, node: BaseInvocation) -> None:
+        """Revalidate downstream collector and iterator contracts after a type-dependent edge change."""
+        validate_start_node = True
+        if isinstance(node, IfInvocation):
+            if edge.destination.field not in ("true_input", "false_input"):
+                return
+        elif isinstance(node, CollectInvocation):
+            if edge.destination.field not in (ITEM_FIELD, COLLECTION_FIELD):
+                return
+            # _validate_edge checked the collector with the candidate input before insertion.
+            validate_start_node = False
+        else:
             return
 
         pending_nodes: list[IfInvocation | CollectInvocation | IterateInvocation] = [node]
@@ -785,11 +794,12 @@ class Graph(BaseModel):
                 continue
 
             if isinstance(source_node, CollectInvocation):
-                err = self._is_collector_connection_valid(source_node.id)
-                if err is not None:
-                    raise InvalidEdgeError(
-                        f"Collector output type does not match collector input type ({source_node.id}): {err}"
-                    )
+                if source_node.id != node.id or validate_start_node:
+                    err = self._is_collector_connection_valid(source_node.id)
+                    if err is not None:
+                        raise InvalidEdgeError(
+                            f"Collector output type does not match collector input type ({source_node.id}): {err}"
+                        )
                 output_field = COLLECTION_FIELD
             else:
                 if self._get_effective_output_connections(source_node.id, "value") is None:
@@ -2022,14 +2032,11 @@ class Graph(BaseModel):
             input_field_types = list(self._get_effective_output_field_types(edge.source.node_id, edge.source.field))
             input_types.update(self._resolve_item_input_types(input_field_types))
 
-        for edge in self._get_input_edges(node_id, COLLECTION_FIELD):
-            source_node = self.get_node(edge.source.node_id)
-            if isinstance(source_node, CollectInvocation) and edge.source.field == COLLECTION_FIELD:
-                input_types.update(self._resolve_collector_input_types(source_node.id, visited.copy()))
-                continue
-
-            for input_field_type in self._get_effective_output_field_types(edge.source.node_id, edge.source.field):
-                input_types.update(extract_collection_item_types(input_field_type))
+        input_types.update(
+            self._resolve_collection_input_types(
+                [edge.source for edge in self._get_input_edges(node_id, COLLECTION_FIELD)], visited
+            )
+        )
 
         return input_types
 
@@ -2103,15 +2110,38 @@ class Graph(BaseModel):
             if resolved_type != NoneType
         }
 
-    def _resolve_collection_input_types(self, collection_inputs: list[EdgeConnection]) -> set[Any]:
+    def _resolve_collection_input_types(
+        self, collection_inputs: list[EdgeConnection], visited_collectors: Optional[set[str]] = None
+    ) -> set[Any]:
+        visited_collectors = visited_collectors or set()
         input_field_types: set[Any] = set()
         for input_conn in collection_inputs:
             source_node = self.get_node(input_conn.node_id)
             if isinstance(source_node, CollectInvocation) and input_conn.field == COLLECTION_FIELD:
-                input_field_types.update(self._resolve_collector_input_types(source_node.id))
+                input_field_types.update(self._resolve_collector_input_types(source_node.id, visited_collectors.copy()))
                 continue
-            for input_field_type in self._get_effective_output_field_types(input_conn.node_id, input_conn.field):
-                input_field_types.update(extract_collection_item_types(input_field_type))
+
+            if isinstance(source_node, IfInvocation) and input_conn.field == "value":
+                sources = self._get_effective_output_connections(input_conn.node_id, input_conn.field)
+                if sources is None:
+                    output_field_types = self._get_effective_output_field_types(input_conn.node_id, input_conn.field)
+                    for output_field_type in output_field_types:
+                        input_field_types.update(extract_collection_item_types(output_field_type))
+                    continue
+
+                for source in sources:
+                    branch_source_node = self.get_node(source.node_id)
+                    if isinstance(branch_source_node, CollectInvocation) and source.field == COLLECTION_FIELD:
+                        input_field_types.update(
+                            self._resolve_collector_input_types(branch_source_node.id, visited_collectors.copy())
+                        )
+                    else:
+                        output_field_type = get_output_field_type(branch_source_node, source.field)
+                        input_field_types.update(extract_collection_item_types(output_field_type))
+                continue
+
+            for output_field_type in self._get_effective_output_field_types(input_conn.node_id, input_conn.field):
+                input_field_types.update(extract_collection_item_types(output_field_type))
         return input_field_types
 
     def _validate_collector_collection_inputs(self, collection_input_field_types: list[Any]) -> str | None:

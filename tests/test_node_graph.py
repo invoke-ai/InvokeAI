@@ -25,6 +25,7 @@ from invokeai.app.invocations.primitives import (
     ColorInvocation,
     FloatCollectionInvocation,
     FloatInvocation,
+    IntegerCollectionInvocation,
     IntegerInvocation,
     StringCollectionInvocation,
     StringInvocation,
@@ -1240,6 +1241,116 @@ def test_graph_rejects_integer_iterator_output_for_mixed_numeric_collector(throu
         graph.add_edge(invalid_output_edge)
 
     assert invalid_output_edge not in graph.edges
+
+
+def test_graph_collector_rejects_new_input_that_invalidates_iterator_output():
+    integer_source = IntegerInvocation(id="integer", value=1)
+    float_source = FloatInvocation(id="float", value=2.5)
+    collector = CollectInvocation(id="collect")
+    iterator = IterateInvocation(id="iterate")
+    integer_sink = IntegerInvocation(id="sink")
+    graph = Graph(nodes={node.id: node for node in (integer_source, float_source, collector, iterator, integer_sink)})
+    graph.add_edge(create_edge(integer_source.id, "value", collector.id, "item"))
+    graph.add_edge(create_edge(collector.id, "collection", iterator.id, "collection"))
+    graph.add_edge(create_edge(iterator.id, "item", integer_sink.id, "value"))
+    graph.validate_self()
+
+    invalid_input_edge = create_edge(float_source.id, "value", collector.id, "item")
+    with pytest.raises(InvalidEdgeError):
+        graph.add_edge(invalid_input_edge)
+
+    assert invalid_input_edge not in graph.edges
+    graph.validate_self()
+
+
+def test_graph_collector_rejects_new_input_that_invalidates_if_branch_iterator_output():
+    integer_source = IntegerInvocation(id="integer", value=1)
+    float_source = FloatInvocation(id="float", value=2.5)
+    collector = CollectInvocation(id="collect")
+    fallback = IntegerCollectionInvocation(id="fallback", collection=[2])
+    if_node = IfInvocation(id="if")
+    iterator = IterateInvocation(id="iterate")
+    integer_sink = IntegerInvocation(id="sink")
+    graph = Graph(
+        nodes={
+            node.id: node
+            for node in (integer_source, float_source, collector, fallback, if_node, iterator, integer_sink)
+        }
+    )
+    graph.add_edge(create_edge(integer_source.id, "value", collector.id, "item"))
+    graph.add_edge(create_edge(collector.id, "collection", if_node.id, "true_input"))
+    graph.add_edge(create_edge(fallback.id, "collection", if_node.id, "false_input"))
+    graph.add_edge(create_edge(if_node.id, "value", iterator.id, "collection"))
+    graph.add_edge(create_edge(iterator.id, "item", integer_sink.id, "value"))
+    graph.validate_self()
+
+    invalid_input_edge = create_edge(float_source.id, "value", collector.id, "item")
+    with pytest.raises(InvalidEdgeError):
+        graph.add_edge(invalid_input_edge)
+
+    assert invalid_input_edge not in graph.edges
+    graph.validate_self()
+
+
+def test_graph_collector_rejects_new_input_through_if_and_downstream_collector():
+    integer_source = IntegerInvocation(id="integer", value=1)
+    float_source = FloatInvocation(id="float", value=2.5)
+    collector = CollectInvocation(id="collect")
+    fallback = IntegerCollectionInvocation(id="fallback", collection=[2])
+    if_node = IfInvocation(id="if")
+    downstream_collector = CollectInvocation(id="downstream_collect")
+    iterator = IterateInvocation(id="iterate")
+    integer_sink = IntegerInvocation(id="sink")
+    graph = Graph(
+        nodes={
+            node.id: node
+            for node in (
+                integer_source,
+                float_source,
+                collector,
+                fallback,
+                if_node,
+                downstream_collector,
+                iterator,
+                integer_sink,
+            )
+        }
+    )
+    graph.add_edge(create_edge(integer_source.id, "value", collector.id, "item"))
+    graph.add_edge(create_edge(collector.id, "collection", if_node.id, "true_input"))
+    graph.add_edge(create_edge(fallback.id, "collection", if_node.id, "false_input"))
+    graph.add_edge(create_edge(if_node.id, "value", downstream_collector.id, "collection"))
+    graph.add_edge(create_edge(downstream_collector.id, "collection", iterator.id, "collection"))
+    graph.add_edge(create_edge(iterator.id, "item", integer_sink.id, "value"))
+    graph.validate_self()
+
+    invalid_input_edge = create_edge(float_source.id, "value", collector.id, "item")
+    with pytest.raises(InvalidEdgeError):
+        graph.add_edge(invalid_input_edge)
+
+    assert invalid_input_edge not in graph.edges
+    graph.validate_self()
+
+
+def test_graph_collector_revalidation_ignores_unrelated_incomplete_nodes():
+    first_source = StringInvocation(id="first", value="one")
+    second_source = StringInvocation(id="second", value="two")
+    collector = CollectInvocation(id="collect")
+    unrelated_collector = CollectInvocation(id="unrelated_collect")
+    unrelated_iterator = IterateInvocation(id="unrelated_iterate")
+    graph = Graph(
+        nodes={
+            node.id: node for node in (first_source, second_source, collector, unrelated_collector, unrelated_iterator)
+        }
+    )
+
+    first_edge = create_edge(first_source.id, "value", collector.id, "item")
+    second_edge = create_edge(second_source.id, "value", collector.id, "item")
+    graph.add_edge(first_edge)
+    graph.add_edge(second_edge)
+
+    assert first_edge in graph.edges
+    assert second_edge in graph.edges
 
 
 def test_graph_rejects_iterator_consumers_incompatible_with_if_collector_branches():
