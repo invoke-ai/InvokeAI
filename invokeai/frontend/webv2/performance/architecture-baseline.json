@@ -2,15 +2,15 @@
   "build": {
     "launchpad": {
       "baseline": {
-        "brotliBytes": 789806,
+        "brotliBytes": 790640,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 789109,
+        "gzipBytes": 789839,
         "imageRawBytes": 44398,
-        "initialRawBytes": 2028310,
+        "initialRawBytes": 2031535,
         "largestAssetRawBytes": 749011,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 95741,
+        "ownedRawBytes": 98108,
         "requestCount": 36,
         "scriptRequestCount": 20,
         "sourceOwners": [
@@ -343,15 +343,15 @@
     },
     "editor": {
       "baseline": {
-        "brotliBytes": 1153088,
+        "brotliBytes": 1154184,
         "cssRawBytes": 2159,
         "fontRawBytes": 219480,
-        "gzipBytes": 1147042,
+        "gzipBytes": 1147906,
         "imageRawBytes": 44398,
-        "initialRawBytes": 3152544,
+        "initialRawBytes": 3156053,
         "largestAssetRawBytes": 749011,
         "otherAssetRawBytes": 0,
-        "ownedRawBytes": 147689,
+        "ownedRawBytes": 147847,
         "requestCount": 73,
         "scriptRequestCount": 57,
         "sourceOwners": [
@@ -485,6 +485,7 @@
           "source:src/app/UpscaleUiAdapter.tsx",
           "source:src/app/VideoUiAdapter.tsx",
           "source:src/app/WorkbenchApp.tsx",
+          "source:src/app/WorkflowCommandShortcut.tsx",
           "source:src/app/WorkflowUiAdapter.tsx",
           "source:src/app/accountLifecycle.ts",
           "source:src/app/loggingRuntime.ts",
@@ -1084,7 +1085,7 @@
       "source": "src/app/WorkbenchApp.tsx"
     }
   },
-  "capturedAt": "2026-10-04",
+  "capturedAt": "2026-10-05",
   "developmentInvalidation": {
     "platformUiBarrel": {
       "specifier": "@platform/ui",

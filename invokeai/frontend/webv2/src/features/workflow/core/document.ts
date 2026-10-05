@@ -724,7 +724,7 @@ const undoLabels: Partial<Record<ProjectGraphAction['type'], string>> = {
   addGraphElements: 'Paste workflow nodes',
   addNode: 'Add workflow node',
   addNodeAndEdge: 'Add workflow node',
-  exposeField: 'Expose workflow field',
+  exposeField: 'Add workflow field to form',
   moveFormElement: 'Edit workflow form',
   moveFormElementTo: 'Edit workflow form',
   removeEdges: 'Disconnect workflow fields',

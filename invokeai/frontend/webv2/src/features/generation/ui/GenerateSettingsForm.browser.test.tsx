@@ -12,6 +12,7 @@ import { wildcardsQueryOptions } from '@features/generation/data/wildcards';
 import { flushGenerateDrafts } from '@features/generation/react';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { createExternalStoreCore, type ExternalStoreCore } from '@platform/state/externalStoreCore';
+import { closingFrames, recordDialogExit } from '@platform/ui/dialogExit.testing';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { system } from '@theme/system';
 import { act, Fragment } from 'react';
@@ -547,7 +548,14 @@ describe('GenerateSettingsForm render isolation', () => {
     const confirm = [...dialog!.querySelectorAll<HTMLButtonElement>('button')].find(
       (button) => button.textContent === 'widgets.generate.switchModelConfirm'
     );
-    await settle(() => confirm?.click());
+    const frames = closingFrames(await recordDialogExit(dialog!, () => settle(() => confirm?.click())));
+
+    // The switch lands as the dialog closes, and the dialog animates out still listing what was confirmed.
+    expect(frames).not.toHaveLength(0);
+    for (const frame of frames) {
+      expect(frame.text).toContain('widgets.generate.switchModelBody: Dimensions and LoRAs');
+    }
+
     await settle(noop, 400);
 
     expect(patches).toHaveLength(1);

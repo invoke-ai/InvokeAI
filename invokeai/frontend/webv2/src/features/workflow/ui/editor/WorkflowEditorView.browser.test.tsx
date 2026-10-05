@@ -269,6 +269,8 @@ describe('WorkflowEditorView first open', () => {
 
     await renderEditor(project);
     await expect.poll(nodeIds).toHaveLength(12);
+    // The flow registers its instance on init, which can land after the nodes are in the DOM.
+    await expect.poll(getWorkflowFlowInstance).toBeTruthy();
     const outgoingFlow = getWorkflowFlowInstance();
 
     const consoleError = vi.spyOn(console, 'error');

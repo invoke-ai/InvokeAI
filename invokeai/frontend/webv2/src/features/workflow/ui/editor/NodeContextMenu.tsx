@@ -1,6 +1,7 @@
 import type { XYPosition } from '@features/workflow/contracts';
 
 import { Icon, Menu, Portal } from '@chakra-ui/react';
+import { useWorkflowUi } from '@features/workflow/ui/WorkflowUiContext';
 import { MenuContent } from '@platform/ui/Menu';
 import {
   ChevronsDownUpIcon,
@@ -59,6 +60,7 @@ export const NodeContextMenu = ({
   onUpdate: () => void;
 }) => {
   const { t } = useTranslation();
+  const { CommandShortcut } = useWorkflowUi();
   const positioning = useMemo(
     () => ({
       getAnchorRect: () => (menuState ? { height: 1, width: 1, x: menuState.x, y: menuState.y } : null),
@@ -87,16 +89,23 @@ export const NodeContextMenu = ({
                 <Menu.Item value="copy" onClick={onCopy}>
                   <Icon as={CopyIcon} boxSize="3.5" />
                   <Menu.ItemText>{t('common.copy')}</Menu.ItemText>
-                  <Menu.ItemCommand>Ctrl C</Menu.ItemCommand>
+                  <Menu.ItemCommand>
+                    <CommandShortcut commandId="workflows.copySelection" />
+                  </Menu.ItemCommand>
                 </Menu.Item>
                 <Menu.Item disabled={!canPaste} value="paste" _disabled={DISABLED_PROPS} onClick={onPaste}>
                   <Icon as={ClipboardPasteIcon} boxSize="3.5" />
                   <Menu.ItemText>{t('nodes.contextPaste')}</Menu.ItemText>
-                  <Menu.ItemCommand>Ctrl V</Menu.ItemCommand>
+                  <Menu.ItemCommand>
+                    <CommandShortcut commandId="workflows.pasteSelection" />
+                  </Menu.ItemCommand>
                 </Menu.Item>
                 <Menu.Item value="duplicate" onClick={onDuplicate}>
                   <Icon as={CopyPlusIcon} boxSize="3.5" />
                   <Menu.ItemText>{t('common.duplicate')}</Menu.ItemText>
+                  <Menu.ItemCommand>
+                    <CommandShortcut commandId="workflows.duplicateSelection" />
+                  </Menu.ItemCommand>
                 </Menu.Item>
                 {menuState.isNodeOpen !== null ? (
                   <Menu.Item value="toggle-open" onClick={onToggleOpen}>
@@ -116,7 +125,9 @@ export const NodeContextMenu = ({
                 <Menu.Item data-danger="" value="delete" onClick={onDelete}>
                   <Icon as={Trash2Icon} boxSize="3.5" />
                   <Menu.ItemText>{t('common.delete')}</Menu.ItemText>
-                  <Menu.ItemCommand>Del</Menu.ItemCommand>
+                  <Menu.ItemCommand>
+                    <CommandShortcut commandId="workflows.deleteSelection" />
+                  </Menu.ItemCommand>
                 </Menu.Item>
               </>
             )}

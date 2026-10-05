@@ -42,6 +42,8 @@ import {
 } from '@workbench/WorkbenchContext';
 import { useMemo } from 'react';
 
+import { WorkflowCommandShortcut } from './WorkflowCommandShortcut';
+
 const selectInvocationRouteInput = createInvocationRouteInputSelector();
 
 const selectWorkflowPreferences = (preferences: WorkbenchPreferences) => ({
@@ -250,6 +252,7 @@ export const WorkflowUiAdapterProvider = ({ children }: { children: ReactNode })
   const findInGallery = useFindGalleryItem();
   const adapter = useMemo<WorkflowUiAdapter>(
     () => ({
+      CommandShortcut: WorkflowCommandShortcut,
       capabilities,
       commands: {
         addWorkflow: (document, options) => commands.workflows.add(document, options),

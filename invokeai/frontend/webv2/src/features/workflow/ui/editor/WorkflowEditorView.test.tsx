@@ -1,10 +1,32 @@
+import { ChakraProvider } from '@chakra-ui/react';
+import { system } from '@theme/system';
+import { createInstance } from 'i18next';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { I18nextProvider } from 'react-i18next';
 import { describe, expect, it } from 'vitest';
 
 import type { WorkflowFlowEdge, WorkflowFlowNode } from './flowAdapters';
 
 import { CONTENT_VISIBILITY_ZOOM } from './InvocationFlowNode';
 import { WORKFLOW_INITIAL_RENDER_NODE_COUNT } from './performanceConstants';
-import { getInitialRenderFlowModel, getRenderedFlowModel, getZoomedOutMountViewport } from './WorkflowEditorView';
+import {
+  getInitialRenderFlowModel,
+  getRenderedFlowModel,
+  getZoomedOutMountViewport,
+  WorkflowEditorPreparingState,
+} from './WorkflowEditorView';
+
+const englishCatalogModules = import.meta.glob('../../../../../public/locales/en.json', {
+  eager: true,
+  import: 'default',
+});
+const testI18n = createInstance();
+await testI18n.init({
+  initAsync: false,
+  interpolation: { escapeValue: false },
+  lng: 'en',
+  resources: { en: { translation: Object.values(englishCatalogModules)[0] as Record<string, unknown> } },
+});
 
 const createNode = (id: string, x: number): WorkflowFlowNode => ({
   data: { documentNode: { data: { label: '', notes: '' }, id, position: { x, y: 0 }, type: 'notes' } },
@@ -15,11 +37,10 @@ const createNode = (id: string, x: number): WorkflowFlowNode => ({
 
 const createEdge = (id: string, source: string, target: string): WorkflowFlowEdge => ({
   data: {
-    fieldTypeLabel: 'Unknown',
+    fieldTypeLabel: null,
     pathType: 'default',
     stroke: 'var(--xy-edge-stroke)',
     strokeWidth: 2,
-    tooltip: 'Unknown field type',
   },
   id,
   source,
@@ -121,5 +142,21 @@ describe('getZoomedOutMountViewport', () => {
   it('keeps the default viewport for a single position', () => {
     expect(getZoomedOutMountViewport([target('a', 4000, 4000)], container)).toBeNull();
     expect(getZoomedOutMountViewport([], container)).toBeNull();
+  });
+});
+
+describe('WorkflowEditorPreparingState', () => {
+  const sentence = (nodeCount: number, edgeCount: number) =>
+    renderToStaticMarkup(
+      <ChakraProvider value={system}>
+        <I18nextProvider i18n={testI18n}>
+          <WorkflowEditorPreparingState edgeCount={edgeCount} nodeCount={nodeCount} />
+        </I18nextProvider>
+      </ChakraProvider>
+    ).match(/Loading [^<]*/)?.[0];
+
+  it('counts nodes and edges with their own plural forms and grouped digits', () => {
+    expect(sentence(1, 1)).toBe('Loading 1 node and 1 edge.');
+    expect(sentence(1234, 2)).toBe('Loading 1,234 nodes and 2 edges.');
   });
 });

@@ -131,6 +131,8 @@ export const GenerateModelCard = ({
         onClose={() => setPendingSwitchModel(null)}
         onConfirm={() => {
           if (pendingSwitchModel) {
+            // Close before committing, so the dialog animates out listing what was confirmed, not the switched draft.
+            setPendingSwitchModel(null);
             commitModelSelection(pendingSwitchModel);
           }
         }}

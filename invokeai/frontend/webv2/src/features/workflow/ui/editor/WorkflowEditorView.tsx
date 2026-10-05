@@ -61,6 +61,7 @@ import {
   type MouseEvent as ReactMouseEvent,
 } from 'react';
 import { flushSync } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 
 import type { WorkflowImageExportView } from './WorkflowImageExportView';
 
@@ -95,6 +96,7 @@ import { reportNodeHover, reportNodeSelection, workflowSelectionStore } from './
 import { useEraser } from './useEraser';
 import { useLasso } from './useLasso';
 import { WorkflowEdge } from './WorkflowEdge';
+import { WORKFLOW_HOTKEYS } from './workflowHotkeys';
 import { WorkflowSelectionRequestRuntime } from './WorkflowSelectionRequestRuntime';
 import { getWorkflowViewport, getWorkflowViewportKey, setWorkflowViewport } from './workflowViewportStore';
 
@@ -242,22 +244,25 @@ const getEventClientPosition = (event: MouseEvent | TouchEvent): { x: number; y:
   return touch ? { x: touch.clientX, y: touch.clientY } : null;
 };
 
-const WorkflowEditorPreparingState = ({ edgeCount, nodeCount }: { edgeCount: number; nodeCount: number }) => (
-  <Flex align="center" bg="bg.inset" h="full" justify="center" p="6" w="full">
-    <Stack align="center" gap="3" textAlign="center">
-      <HStack color="fg.muted" gap="2">
-        <Spinner size="lg" />
-        <Text fontSize="lg" fontWeight="700">
-          Preparing workflow graph
+export const WorkflowEditorPreparingState = ({ edgeCount, nodeCount }: { edgeCount: number; nodeCount: number }) => {
+  const { t } = useTranslation();
+
+  return (
+    <Flex align="center" bg="bg.inset" h="full" justify="center" p="6" w="full">
+      <Stack align="center" gap="3" textAlign="center">
+        <HStack color="fg.muted" gap="2">
+          <Spinner size="lg" />
+          <Text fontSize="lg" fontWeight="700">
+            {t('widgets.workflow.preparingGraph')}
+          </Text>
+        </HStack>
+        <Text color="fg.subtle" fontSize="md">
+          {t('widgets.workflow.loadingGraph', { edgeCount, nodeCount })}
         </Text>
-      </HStack>
-      <Text color="fg.subtle" fontSize="md">
-        Loading {nodeCount.toLocaleString()} node{nodeCount === 1 ? '' : 's'} and {edgeCount.toLocaleString()} edge
-        {edgeCount === 1 ? '' : 's'}.
-      </Text>
-    </Stack>
-  </Flex>
-);
+      </Stack>
+    </Flex>
+  );
+};
 
 const getSelectedNodeIdSet = (nodes: WorkflowFlowNode[]): Set<string> =>
   new Set(nodes.filter((node) => node.selected).map((node) => node.id));
@@ -304,6 +309,7 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   const { mark: markWorkbenchPerf, measure: measureWorkbenchPerf, time: timeWorkbenchPerf } = ui.performance;
   const { editGraph, redo, undo } = useProjectGraphCommands();
   const notify = useWorkflowNotifications();
+  const { t } = useTranslation();
   const {
     reduceMotion,
     themeId,
@@ -656,10 +662,10 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
       const copiedCount = copyNodesToClipboard(projectGraph, getActionNodeIds(nodeId));
 
       if (copiedCount > 0) {
-        notify.success(`Copied ${copiedCount} node${copiedCount === 1 ? '' : 's'}`);
+        notify.success(t('widgets.workflow.copiedNodes', { count: copiedCount }));
       }
     },
-    [getActionNodeIds, notify, projectGraph]
+    [getActionNodeIds, notify, projectGraph, t]
   );
 
   const pasteNodes = useCallback(() => {
@@ -761,26 +767,19 @@ const WorkflowFlow = ({ runtime }: { runtime: WorkflowRuntimeApi }) => {
   });
 
   useEffect(() => {
-    const hotkeys = [
-      ['workflows.addNode', 'Add workflow node', ['shift+a', 'space']],
-      ['workflows.copySelection', 'Copy workflow selection', ['mod+c']],
-      ['workflows.pasteSelection', 'Paste workflow selection', ['mod+v']],
-      ['workflows.pasteSelectionWithEdges', 'Paste workflow selection with edges', ['mod+shift+v']],
-      ['workflows.duplicateSelection', 'Duplicate workflow selection', ['mod+d']],
-      ['workflows.selectAll', 'Select all workflow nodes', ['mod+a']],
-      ['workflows.deleteSelection', 'Delete workflow selection', ['delete', 'backspace']],
-      ['workflows.undo', 'Undo workflow edit', ['mod+z']],
-      ['workflows.redo', 'Redo workflow edit', ['mod+shift+z', 'mod+y']],
-    ] as const;
-    const disposers = hotkeys.flatMap(([id, title, defaultKeys]) => [
-      runtime.commands.register({ handler: () => executeWorkflowHotkey(id), id, title }),
-      runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
-    ]);
+    const disposers = WORKFLOW_HOTKEYS.flatMap(({ defaultKeys, id, titleKey }) => {
+      const title = t(titleKey);
+
+      return [
+        runtime.commands.register({ handler: () => executeWorkflowHotkey(id), id, title }),
+        runtime.hotkeys.register({ commandId: id, defaultKeys: [...defaultKeys], id, title }),
+      ];
+    });
 
     return () => {
       disposers.forEach((dispose) => dispose());
     };
-  }, [runtime.commands, runtime.hotkeys]);
+  }, [runtime.commands, runtime.hotkeys, t]);
 
   const onNodesChange = useCallback(
     (changes: NodeChange<WorkflowFlowNode>[]) => {
