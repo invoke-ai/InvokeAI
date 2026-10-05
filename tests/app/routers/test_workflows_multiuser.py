@@ -16,7 +16,7 @@ from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
-from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
+from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 
 
 class MockApiDependencies(ApiDependencies):
@@ -101,7 +101,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         session_processor=None,  # type: ignore
         session_queue=None,  # type: ignore
         urls=None,  # type: ignore
-        workflow_records=SqliteWorkflowRecordsStorage(db=db),
+        workflow_records=WorkflowRecordsStorage(db.database),
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore

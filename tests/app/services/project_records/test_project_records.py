@@ -1,7 +1,6 @@
 """Project records on every database backend: CRUD, optimistic concurrency, boards, and user isolation."""
 
-import threading
-from collections.abc import Callable, Sequence
+from collections.abc import Sequence
 from typing import Any, Optional
 
 import pytest
@@ -39,6 +38,7 @@ from invokeai.app.services.shared.database.schema.media_references import media_
 from invokeai.app.services.shared.database.schema.projects import projects
 from invokeai.app.services.shared.database.schema.users import users
 from invokeai.app.services.shared.database.schema.videos import videos
+from tests.fixtures.races import when_called, while_in_flight
 
 SYSTEM_USER_ID = "system"
 OTHER_USER_ID = "other"
@@ -665,117 +665,8 @@ def test_get_board_id_is_user_scoped(project_records: ProjectRecordsStorage, oth
 
 # region writes racing each other
 #
-# On a server transactions run side by side. A write locks the rows it decides on before it reads them, a
-# project's before its board's: a write in flight is either seen by the write that waited for it or finds what it
-# decided on unchanged, and no two writes deadlock. (On SQLite a transaction in flight blocks every other one
-# anyway.)
-
-
-@pytest.fixture
-def lost_races(monkeypatch: pytest.MonkeyPatch) -> list[ConflictError]:
-    """Every deadlock a retried transaction of the test loses, including those it then wins on another attempt. (A
-    transaction in flight is not retried: it raises what it loses.)"""
-    lost: list[ConflictError] = []
-    retry_conflicts = Database.retry_conflicts
-
-    def recording(self: Database, transaction: Callable[[], object]) -> object:
-        def recorded() -> object:
-            try:
-                return transaction()
-            except ConflictError as error:
-                lost.append(error)
-                raise
-
-        return retry_conflicts(self, recorded)
-
-    monkeypatch.setattr(Database, "retry_conflicts", recording)
-    return lost
-
-
-def _waiting(change: Callable[[], object]) -> Callable[[], list[BaseException]]:
-    """Starts `change` on another thread and asserts that half a second later it still waits, for a lock the
-    caller's transaction holds. Returns a function that waits for `change` to end and returns what it raised."""
-    errors: list[BaseException] = []
-
-    def run() -> None:
-        try:
-            change()
-        except BaseException as e:  # noqa: BLE001 - returned to the caller
-            errors.append(e)
-
-    thread = threading.Thread(target=run)
-    thread.start()
-    thread.join(timeout=0.5)
-    assert thread.is_alive(), f"the change did not wait for the transaction in flight; it raised {errors!r}"
-
-    def ended() -> list[BaseException]:
-        thread.join(timeout=30)
-        assert not thread.is_alive(), "the change still waits"
-        return errors
-
-    return ended
-
-
-def _while_in_flight(
-    database: Database, work: Callable[[Queries], object], change: Callable[[], object]
-) -> list[BaseException]:
-    """Runs `change` while another transaction has done `work` and has not committed; that transaction then commits,
-    and `change` goes on. Returns what `change` raised."""
-    done = threading.Event()
-    proceed = threading.Event()
-    failures: list[BaseException] = []
-
-    def in_flight() -> None:
-        try:
-            with database.queries.transaction() as q:
-                work(q)
-                done.set()
-                proceed.wait(timeout=30)
-        except BaseException as e:  # noqa: BLE001 - raised again below
-            failures.append(e)
-            done.set()
-
-    holder = threading.Thread(target=in_flight)
-    holder.start()
-    try:
-        assert done.wait(timeout=10), "the transaction in flight did not get to its work"
-        if failures:
-            raise failures[0]
-        ended = _waiting(change)
-    finally:
-        proceed.set()
-        holder.join(timeout=10)
-    if failures:
-        raise failures[0]
-    return ended()
-
-
-def _when_called(
-    monkeypatch: pytest.MonkeyPatch, cls: type, method: str, change: Callable[[], object]
-) -> Callable[[], list[BaseException]]:
-    """Makes the first call of `cls.method` start `change` when it returns, still in its transaction, and go on once
-    `change` waits for that transaction. Call it in a unit of `queries.run()`; the returned function, called after the
-    unit, returns what `change` raised."""
-    real = getattr(cls, method)
-    first = True
-    started: list[Callable[[], list[BaseException]]] = []
-
-    def then_change(self: object, *args: object, **kwargs: object) -> object:
-        nonlocal first
-        result = real(self, *args, **kwargs)
-        if first:
-            # Cleared before the change starts: a change that calls the method itself must not start another one.
-            first = False
-            started.append(_waiting(change))
-        return result
-
-    monkeypatch.setattr(cls, method, then_change)
-
-    def ended() -> list[BaseException]:
-        assert started, f"{cls.__name__}.{method} was not called"
-        return started[0]()
-
-    return ended
+# A write locks the rows it decides on before it reads them, a project's before its board's: a write in flight is
+# either seen by the write that waited for it or finds what it decided on unchanged, and no two writes deadlock.
 
 
 def _replace_project(q: Queries, *, minimum_canvas_schema_version: int = 2) -> None:
@@ -812,15 +703,15 @@ def test_a_claim_sees_the_board_change_it_waited_for(
 
     refusal: type[Exception]
     if in_flight == "publish":
-        ended = _when_called(monkeypatch, BoardQueries, "update", claim)
+        ended = when_called(monkeypatch, BoardQueries, "update", claim)
         BoardRecordStorage(database).update("staging", BoardChanges(board_visibility=BoardVisibility.Public))
         errors, refusal = ended(), ProjectBoardUnavailableError
     elif in_flight == "delete":
         # The boards service deletes a board with this one statement.
-        errors = _while_in_flight(database, lambda q: q.boards.delete_if_unclaimed("staging"), claim)
+        errors = while_in_flight(database, lambda q: q.boards.delete_if_unclaimed("staging"), claim)
         refusal = ProjectBoardNotFoundError
     else:
-        ended = _when_called(monkeypatch, ProjectQueries, "insert", claim)
+        ended = when_called(monkeypatch, ProjectQueries, "insert", claim)
         project_records.create(SYSTEM_USER_ID, "First", {}, project_id="first", board_id="staging")
         errors, refusal = ended(), ProjectBoardUnavailableError
 
@@ -848,7 +739,7 @@ def test_a_board_change_waits_for_a_claim_in_flight_and_then_finds_the_board_cla
         else:
             board_records.update("staging", BoardChanges(board_visibility=BoardVisibility.Public))
 
-    ended = _when_called(monkeypatch, ProjectQueries, "insert", change_board)
+    ended = when_called(monkeypatch, ProjectQueries, "insert", change_board)
     project_records.create(SYSTEM_USER_ID, "First", {}, project_id="first", board_id="staging")
     errors = ended()
 
@@ -875,7 +766,7 @@ def test_a_save_waits_for_a_write_of_its_project_in_flight(
         return project_records.update(SYSTEM_USER_ID, "project", expected_revision=1, name="Late", data={"v": "late"})
 
     if in_flight == "save":
-        ended = _when_called(monkeypatch, ProjectQueries, "save", late_save)
+        ended = when_called(monkeypatch, ProjectQueries, "save", late_save)
         project_records.update(SYSTEM_USER_ID, "project", expected_revision=1, name="First", data={"v": "first"})
         (error,) = ended()
         assert isinstance(error, ProjectRecordConflictError) and error.current_revision == 2
@@ -883,7 +774,7 @@ def test_a_save_waits_for_a_write_of_its_project_in_flight(
         assert (stored.name, stored.data, stored.revision) == ("First", {"v": "first"}, 2)
         assert _board(database, created.board_id) == ("First", False)
     else:
-        ended = _when_called(monkeypatch, ProjectQueries, "delete", late_save)
+        ended = when_called(monkeypatch, ProjectQueries, "delete", late_save)
         project_records.delete(SYSTEM_USER_ID, "project")
         assert [type(e) for e in ended()] == [ProjectRecordNotFoundError]
     assert lost_races == []
@@ -897,7 +788,7 @@ def test_a_save_checks_and_writes_the_project_it_waited_for(
     an older client must not write over a project of a newer canvas schema -- and saves into it, board and all."""
     project_records.create(SYSTEM_USER_ID, "Old", {"old": True}, project_id="project")
 
-    errors = _while_in_flight(
+    errors = while_in_flight(
         database,
         lambda q: _replace_project(q, minimum_canvas_schema_version=3),
         lambda: project_records.update(
@@ -929,7 +820,7 @@ def test_deleting_a_project_deletes_the_board_it_locked(
     replace the project deletes the replacement's board, not the one it saw first."""
     project_records.create(SYSTEM_USER_ID, "First", {}, project_id="project")
 
-    errors = _while_in_flight(database, _replace_project, lambda: project_records.delete(SYSTEM_USER_ID, "project"))
+    errors = while_in_flight(database, _replace_project, lambda: project_records.delete(SYSTEM_USER_ID, "project"))
 
     assert (errors, lost_races) == ([], [])
     assert project_records.list(SYSTEM_USER_ID) == []
@@ -945,7 +836,7 @@ def test_a_resent_claim_waits_for_a_save_of_its_project_in_flight(
     _insert_board(database, "staging", name="Untitled")
     project_records.create(SYSTEM_USER_ID, "Imported", {}, project_id="project", board_id="staging")
 
-    ended = _when_called(
+    ended = when_called(
         monkeypatch,
         ProjectQueries,
         "save",
@@ -967,7 +858,7 @@ def test_a_board_delete_waits_for_a_delete_of_its_project_in_flight(
     created = project_records.create(SYSTEM_USER_ID, "Doomed", {}, project_id="project")
     deleted: list[bool] = []
 
-    ended = _when_called(
+    ended = when_called(
         monkeypatch,
         ProjectQueries,
         "delete",

@@ -111,12 +111,21 @@ class CaseInsensitiveLike(FunctionElement[bool]):
         super().__init__(expression, pattern)
 
 
+def _escape_like(text: str) -> str:
+    escaped = text.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
+    return escaped.replace("%", _LIKE_ESCAPE + "%").replace("_", _LIKE_ESCAPE + "_")
+
+
 def like_prefix(prefix: str) -> str:
     """The `CaseInsensitiveLike` pattern of the values that start with `prefix`; `%`, `_` and `\\` in it match
     only themselves."""
-    escaped = prefix.replace(_LIKE_ESCAPE, _LIKE_ESCAPE * 2)
-    escaped = escaped.replace("%", _LIKE_ESCAPE + "%").replace("_", _LIKE_ESCAPE + "_")
-    return escaped + "%"
+    return _escape_like(prefix) + "%"
+
+
+def like_contains(text: str) -> str:
+    """The `CaseInsensitiveLike` pattern of the values that contain `text`; `%`, `_` and `\\` in it match only
+    themselves."""
+    return "%" + _escape_like(text) + "%"
 
 
 @compiles(CaseInsensitiveLike, "sqlite")

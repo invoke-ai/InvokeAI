@@ -26,7 +26,7 @@ from invokeai.app.services.project_records.project_records_default import Projec
 from invokeai.app.services.session_queue.session_queue_common import SessionQueueItem, SessionQueueItemSummary
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 from invokeai.app.services.users.users_common import UserCreateRequest
-from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
+from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 
 
 class MockApiDependencies(ApiDependencies):
@@ -123,7 +123,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         # every name was skipped before the ownership check ran, and the test passed no
         # matter what the route did. The returns must be strings; ImageDTO validates them.
         urls=_mock_urls(),
-        workflow_records=SqliteWorkflowRecordsStorage(db=db),
+        workflow_records=WorkflowRecordsStorage(db.database),
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore
@@ -1715,7 +1715,7 @@ class TestWorkflowListScoping:
     """Tests that listing workflows in multiuser mode does not filter out default workflows."""
 
     def test_default_workflows_visible_when_listing_user_and_default(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+        self, client: TestClient, mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase, user1_token: str
     ):
         """When categories=['user','default'], default workflows must still appear even
         though user_id_filter is set to the current user (default workflows belong to 'system')."""
@@ -1743,7 +1743,7 @@ class TestWorkflowListScoping:
         )
         wf_with_id = Workflow(**default_wf.model_dump(), id=uuid_string())
         # Insert directly via DB since the create API rejects default workflows
-        with mock_invoker.services.workflow_records._db.transaction() as cursor:
+        with mock_sqlite_database.transaction() as cursor:
             cursor.execute(
                 "INSERT INTO workflow_library (workflow_id, workflow, user_id) VALUES (?, ?, ?)",
                 (wf_with_id.id, wf_with_id.model_dump_json(), "system"),
@@ -1766,7 +1766,7 @@ class TestWorkflowListScoping:
         assert "user" in categories_found
 
     def test_default_workflows_visible_when_no_category_filter(
-        self, client: TestClient, mock_invoker: Invoker, user1_token: str
+        self, client: TestClient, mock_invoker: Invoker, mock_sqlite_database: SqliteDatabase, user1_token: str
     ):
         """When no categories filter is given, default workflows should still appear."""
         from invokeai.app.services.workflow_records.workflow_records_common import (
@@ -1792,7 +1792,7 @@ class TestWorkflowListScoping:
             form_fields=[],
         )
         wf_with_id = Workflow(**default_wf.model_dump(), id=uuid_string())
-        with mock_invoker.services.workflow_records._db.transaction() as cursor:
+        with mock_sqlite_database.transaction() as cursor:
             cursor.execute(
                 "INSERT INTO workflow_library (workflow_id, workflow, user_id) VALUES (?, ?, ?)",
                 (wf_with_id.id, wf_with_id.model_dump_json(), "system"),

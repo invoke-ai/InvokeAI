@@ -64,7 +64,7 @@ from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStor
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
 from invokeai.app.services.videos.videos_default import VideoService
 from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
-from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
+from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
 from invokeai.backend.architectures import conditioning_safe_globals
 from invokeai.backend.architectures import validate as validate_architectures
@@ -197,7 +197,7 @@ class ApiDependencies:
         session_processor = DefaultSessionProcessor(session_runner=DefaultSessionRunner())
         session_queue = SqliteSessionQueue(db=db)
         urls = LocalUrlService()
-        workflow_records = SqliteWorkflowRecordsStorage(db=db)
+        workflow_records = WorkflowRecordsStorage(db.database)
         style_preset_records = SqliteStylePresetRecordsStorage(db=db)
         wildcard_records = SqliteWildcardRecordsStorage(db=db)
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")

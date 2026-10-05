@@ -43,7 +43,6 @@ NOT_YET_PORTED: dict[str, int] = {
     "invokeai/app/services/system_prompt_records/system_prompt_records_sqlite.py": 24,
     "invokeai/app/services/video_records/video_records_sqlite.py": 46,
     "invokeai/app/services/wildcard_records/wildcard_records_sqlite.py": 13,
-    "invokeai/app/services/workflow_records/workflow_records_sqlite.py": 53,
     "invokeai/backend/util/gallery_maintenance.py": 8,
     "invokeai/frontend/install/import_images.py": 13,
     "scripts/remove_orphaned_models.py": 3,

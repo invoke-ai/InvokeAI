@@ -43,6 +43,8 @@ BUDGET_FLOOR_MS = 0.05
 ACCOUNTS = 200
 CLIENT_STATE_KEYS = 200
 PROJECTS = 50
+WORKFLOWS = 300
+WORKFLOW_TAGS = ["sdxl", "flux", "upscale", "inpaint", "video", "portrait", "landscape", "controlnet"]
 
 
 class _StatementCounter(logging.Handler):
@@ -71,6 +73,7 @@ class Services:
         from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
         from invokeai.app.services.project_records.project_records_default import ProjectRecordsStorage
         from invokeai.app.services.users.users_default import UserService
+        from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 
         self.database = db.database
         self.image_records = SqliteImageRecordStorage(db=db)
@@ -81,12 +84,16 @@ class Services:
         self.users = UserService(db.database)
         self.client_state = ClientStatePersistence(db.database)
         self.project_records = ProjectRecordsStorage(db.database)
+        self.workflow_records = WorkflowRecordsStorage(db.database)
         # Listing gallery items builds their URLs through the invoker's URL service.
         from invokeai.app.services.urls.urls_default import LocalUrlService
 
         invoker = mock.Mock()
         invoker.services.urls = LocalUrlService()
+        invoker.services.logger = logging.getLogger("benchmark_database.quiet")
         self.gallery.start(invoker)
+        # Starting the library stores the bundled workflows.
+        self.workflow_records.start(invoker)
 
 
 def _metadata(rng: random.Random) -> str:
@@ -137,6 +144,18 @@ def _project_document(rng: random.Random, names: list[str]) -> dict[str, Any]:
     return {"canvas": {"layers": layers, "bbox": {"x": 0, "y": 0, "width": 1024, "height": 1024}}}
 
 
+def _workflow_template() -> Any:
+    """The bundled workflow of median size, as an account's workflow."""
+    from invokeai.app.services.workflow_records import workflow_records_common
+
+    bundled = Path(workflow_records_common.__file__).parent / "default_workflows"
+    paths = sorted(bundled.glob("*.json"), key=lambda path: path.stat().st_size)
+    workflow = json.loads(paths[len(paths) // 2].read_text(encoding="utf-8"))
+    workflow.pop("id", None)
+    workflow["meta"]["category"] = "user"
+    return workflow_records_common.WorkflowWithoutIDValidator.validate_python(workflow)
+
+
 def _seed(services: Services, images: int, boards: int, rng: random.Random) -> list[str]:
     from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
 
@@ -175,6 +194,11 @@ def _seed(services: Services, images: int, boards: int, rng: random.Random) -> l
     # whose board operations are timed, belongs to no project.
     for i in range(min(PROJECTS, boards - 1)):
         services.project_records.create("system", f"Project {i}", _project_document(rng, names), board_id=board_ids[i])
+    template = _workflow_template()
+    for i in range(WORKFLOWS):
+        tags = ", ".join(rng.sample(WORKFLOW_TAGS, rng.randint(1, 3)))
+        workflow = template.model_copy(update={"name": f"Workflow {i}", "tags": tags})
+        services.workflow_records.create(workflow, user_id="system", is_public=i % 10 == 0)
     return names
 
 
@@ -185,6 +209,11 @@ def _operations(
     from invokeai.app.services.board_records.board_records_common import BoardRecordOrderBy
     from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
     from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
+    from invokeai.app.services.workflow_records.workflow_records_common import (
+        Workflow,
+        WorkflowCategory,
+        WorkflowRecordOrderBy,
+    )
 
     sample = iter(rng.choices(names, k=100_000))
     a_board = services.board_records.get_all(
@@ -213,6 +242,23 @@ def _operations(
         )
         revision[0] = record.revision
         return record
+
+    library = [WorkflowCategory.User]
+    workflows = services.workflow_records.get_many(
+        WorkflowRecordOrderBy.CreatedAt, SQLiteDirection.Ascending, library, user_id="system"
+    ).items
+    workflow_ids = [workflow.workflow_id for workflow in workflows]
+    edited = services.workflow_records.get(workflow_ids[0]).workflow
+    edits = [Workflow(**edited.model_copy(update={"notes": f"Edit {i}"}).model_dump()) for i in range(10)]
+    saves = iter(range(10**9))
+
+    def library_page() -> object:
+        # What `GET /v1/workflows` asks of the storage for a page of 50: the page, then each workflow, which the
+        # route checks for being callable.
+        page = services.workflow_records.get_many(
+            WorkflowRecordOrderBy.UpdatedAt, SQLiteDirection.Descending, library, page=0, per_page=50
+        )
+        return [services.workflow_records.get(item.workflow_id) for item in page.items]
 
     general = [ImageCategory.GENERAL]
 
@@ -279,6 +325,19 @@ def _operations(
         "projects.get (25 KB document)": (lambda: services.project_records.get("system", rng.choice(project_ids)), 500),
         "projects.list": (lambda: services.project_records.list("system"), 200),
         "projects.update (autosave)": (autosave, 200),
+        "workflows.get": (lambda: services.workflow_records.get(rng.choice(workflow_ids)), 500),
+        "workflows.library page (list + get each)": (library_page, 20),
+        "workflows.get_many(page of 50)": (
+            lambda: services.workflow_records.get_many(
+                WorkflowRecordOrderBy.Name, SQLiteDirection.Ascending, library, page=0, per_page=50, user_id="system"
+            ),
+            50,
+        ),
+        "workflows.update": (lambda: services.workflow_records.update(edits[next(saves) % 10]), 200),
+        "workflows.counts_by_tag(5)": (
+            lambda: services.workflow_records.counts_by_tag(WORKFLOW_TAGS[:5], library, user_id="system"),
+            50,
+        ),
     }
 
 

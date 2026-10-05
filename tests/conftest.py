@@ -38,7 +38,7 @@ from invokeai.app.services.system_prompt_records.system_prompt_records_sqlite im
 from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
 from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
-from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
+from invokeai.app.services.workflow_records.workflow_records_default import WorkflowRecordsStorage
 from invokeai.backend.util.logging import InvokeAILogger
 from tests.backend.model_manager.model_manager_fixtures import *  # noqa: F403
 from tests.fixtures.database import (  # noqa: F401
@@ -49,6 +49,7 @@ from tests.fixtures.database import (  # noqa: F401
     empty_database,
     external_test_db_url,
 )
+from tests.fixtures.races import lost_races  # noqa: F401
 from tests.fixtures.sqlite_database import create_mock_sqlite_database  # noqa: F401
 from tests.test_nodes import TestEventService
 
@@ -117,7 +118,7 @@ def mock_services(mock_sqlite_database: SqliteDatabase) -> InvocationServices:
         session_processor=None,  # type: ignore
         session_queue=None,  # type: ignore
         urls=None,  # type: ignore
-        workflow_records=SqliteWorkflowRecordsStorage(db=db),
+        workflow_records=WorkflowRecordsStorage(db.database),
         tensors=None,  # type: ignore
         conditioning=None,  # type: ignore
         style_preset_records=None,  # type: ignore

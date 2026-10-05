@@ -32,6 +32,7 @@ from invokeai.app.services.shared.database.queries.locks import LockQueries
 from invokeai.app.services.shared.database.queries.media_references import MediaReferenceQueries
 from invokeai.app.services.shared.database.queries.projects import ProjectQueries
 from invokeai.app.services.shared.database.queries.users import UserQueries
+from invokeai.app.services.shared.database.queries.workflows import WorkflowQueries
 
 if TYPE_CHECKING:
     from invokeai.app.services.shared.database.database import Database
@@ -86,6 +87,10 @@ class Queries:
     @cached_property
     def users(self) -> UserQueries:
         return UserQueries(self._scope)
+
+    @cached_property
+    def workflows(self) -> WorkflowQueries:
+        return WorkflowQueries(self._scope)
 
     @contextmanager
     def transaction(self, *, read_only: bool = False) -> Iterator[Self]:

@@ -57,7 +57,9 @@ def get_workflow(
         if not (is_default or is_owner or workflow.is_public or current_user.is_admin):
             raise HTTPException(status_code=403, detail="Not authorized to access this workflow")
 
-    thumbnail_url = ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow_id)
+    thumbnail_url = ApiDependencies.invoker.services.workflow_thumbnails.get_url(
+        workflow_id, category=workflow.workflow.meta.category
+    )
     compatibility = get_workflow_call_compatibility(
         workflow=workflow.workflow.model_dump(),
         workflow_id=workflow.workflow_id,
@@ -302,7 +304,9 @@ def list_workflows(
             continue
         workflows_with_thumbnails.append(
             WorkflowRecordListItemWithThumbnailDTO(
-                thumbnail_url=ApiDependencies.invoker.services.workflow_thumbnails.get_url(workflow.workflow_id),
+                thumbnail_url=ApiDependencies.invoker.services.workflow_thumbnails.get_url(
+                    workflow.workflow_id, category=workflow.category
+                ),
                 call_saved_workflow_compatibility=compatibility,
                 **workflow.model_dump(),
             )
