@@ -6,6 +6,7 @@ so the planner treats `queue_id = ?` as selective; reads that must cost their ow
 the queue's history keep queue_id off the listing index.
 """
 
+import re
 from collections.abc import Callable
 
 import pytest
@@ -68,7 +69,9 @@ def test_queue_listing_and_counts_read_only_the_listing_index(session_queue: Sql
     oldest_first = _plans(session_queue, lambda: session_queue.get_queue_item_ids("default", SQLiteDirection.Ascending))
     assert len(oldest_first) == 1
     assert LISTING_INDEX in oldest_first[0]
-    assert "TEMP B-TREE" not in oldest_first[0].replace("TEMP B-TREE FOR LAST TERM OF ORDER BY", "")
+    # SQLite words that partial sort differently by version; a full sort reads "FOR ORDER BY".
+    partial_sort = re.compile(r"TEMP B-TREE FOR (LAST TERM|RIGHT PART) OF ORDER BY")
+    assert "TEMP B-TREE" not in partial_sort.sub("", oldest_first[0])
 
     status = _plans(
         session_queue,
