@@ -429,13 +429,14 @@ export const PreviewWidgetView = ({ region, runtime }: WidgetViewProps) => {
       setContextMenuTarget({ itemRefs: [toGalleryItemRef(item)], items: [item], x, y }),
     []
   );
+  const { selectForCompare } = imageActions;
   const compareFilmstripItem = useCallback(
     (item: GalleryItem) => {
       if (isGalleryImageItem(item)) {
-        imageActions.selectForCompare(galleryImageItemToGalleryImage(item));
+        selectForCompare(galleryImageItemToGalleryImage(item));
       }
     },
-    [imageActions]
+    [selectForCompare]
   );
   const openItemContextMenu = useCallback(
     (x: number, y: number) => {

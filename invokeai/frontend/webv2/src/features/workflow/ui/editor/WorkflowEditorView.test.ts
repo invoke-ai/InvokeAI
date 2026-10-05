@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 
 import type { WorkflowFlowEdge, WorkflowFlowNode } from './flowAdapters';
 
+import { CONTENT_VISIBILITY_ZOOM } from './InvocationFlowNode';
 import { WORKFLOW_INITIAL_RENDER_NODE_COUNT } from './performanceConstants';
-import { getInitialRenderFlowModel, getRenderedFlowModel } from './WorkflowEditorView';
+import { getInitialRenderFlowModel, getRenderedFlowModel, getZoomedOutMountViewport } from './WorkflowEditorView';
 
 const createNode = (id: string, x: number): WorkflowFlowNode => ({
   data: { documentNode: { data: { label: '', notes: '' }, id, position: { x, y: 0 }, type: 'notes' } },
@@ -72,5 +73,53 @@ describe('getInitialRenderFlowModel', () => {
 
     expect(rendered?.nodes).toHaveLength(WORKFLOW_INITIAL_RENDER_NODE_COUNT);
     expect(rendered?.edges.map((edge) => edge.id)).toEqual(['inside']);
+  });
+});
+
+describe('getZoomedOutMountViewport', () => {
+  const target = (id: string, x: number, y: number) => ({ id, position: { x, y } });
+  const container = { height: 900, width: 450 };
+
+  it('keeps the default viewport while the fit could still land at a readable zoom', () => {
+    expect(getZoomedOutMountViewport([target('a', 0, 0), target('b', 1000, 0)], container)).toBeNull();
+    expect(getZoomedOutMountViewport([target('a', 0, 0), target('b', 0, 2000)], container)).toBeNull();
+  });
+
+  it('opens below the content zoom when the positions alone are wider or taller than that zoom shows', () => {
+    const wide = getZoomedOutMountViewport([target('a', 0, 0), target('b', 1200, 0)], container);
+    const tall = getZoomedOutMountViewport([target('a', 0, 0), target('b', 0, 2400)], container);
+
+    expect(wide?.zoom).toBeLessThan(CONTENT_VISIBILITY_ZOOM);
+    expect(tall?.zoom).toBeLessThan(CONTENT_VISIBILITY_ZOOM);
+  });
+
+  it('counts the fit’s padding, which lowers the zoom it can land at', () => {
+    // 450 px less XYFlow's 10% padding leaves 410 px, which shows 1025 px of positions at the content zoom.
+    expect(getZoomedOutMountViewport([target('a', 0, 0), target('b', 1030, 0)], container)?.zoom).toBeLessThan(
+      CONTENT_VISIBILITY_ZOOM
+    );
+    expect(getZoomedOutMountViewport([target('a', 0, 0), target('b', 1020, 0)], container)).toBeNull();
+  });
+
+  it('frames the positions in the container', () => {
+    const viewport = getZoomedOutMountViewport([target('a', -500, 100), target('b', 2500, 700)], container);
+
+    expect(viewport).not.toBeNull();
+    const { x, y, zoom } = viewport!;
+
+    for (const position of [
+      { x: -500, y: 100 },
+      { x: 2500, y: 700 },
+    ]) {
+      expect(position.x * zoom + x).toBeGreaterThanOrEqual(0);
+      expect(position.x * zoom + x).toBeLessThanOrEqual(container.width);
+      expect(position.y * zoom + y).toBeGreaterThanOrEqual(0);
+      expect(position.y * zoom + y).toBeLessThanOrEqual(container.height);
+    }
+  });
+
+  it('keeps the default viewport for a single position', () => {
+    expect(getZoomedOutMountViewport([target('a', 4000, 4000)], container)).toBeNull();
+    expect(getZoomedOutMountViewport([], container)).toBeNull();
   });
 });

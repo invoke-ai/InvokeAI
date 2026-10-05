@@ -236,6 +236,12 @@ export const useImageActions = ({
     void ensureModelsLoaded();
   });
 
+  // Selection-independent, so callers can hand it to every thumbnail without re-rendering them per selection.
+  const selectForCompare = useCallback(
+    (image: GalleryImage) => gallery.setCompareImage(image, projectId),
+    [gallery, projectId]
+  );
+
   return useMemo<ImageActions>(() => {
     const recordError = (error: unknown) =>
       notifications.reportError({
@@ -972,9 +978,7 @@ export const useImageActions = ({
           openWorkbenchWidget('generate', { preferredRegions: ['left'] });
         }
       },
-      selectForCompare: (image) => {
-        gallery.setCompareImage(image, projectId);
-      },
+      selectForCompare,
       createCanvasFromImages: async (images) => {
         const owner = captureAccountScope();
         try {
@@ -1163,6 +1167,7 @@ export const useImageActions = ({
     queryClient,
     queries,
     requestDeletionConfirmation,
+    selectForCompare,
     supportedModels,
     t,
     vaeModels,

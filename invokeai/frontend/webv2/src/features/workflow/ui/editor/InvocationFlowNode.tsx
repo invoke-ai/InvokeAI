@@ -50,7 +50,7 @@ const NODE_WIDTH = '18rem';
 /** Row padding-x in px; inline handles sit in the label rows, so they pull back out past it. */
 const ROW_PADDING_X = 12;
 /** Below this viewport zoom, field content renders as skeleton bars (ComfyUI-style) for performance/readability. */
-const CONTENT_VISIBILITY_ZOOM = 0.4;
+export const CONTENT_VISIBILITY_ZOOM = 0.4;
 
 /** True while the viewport is zoomed out far enough that field content is unreadable noise. */
 const useIsZoomedOut = (): boolean => {

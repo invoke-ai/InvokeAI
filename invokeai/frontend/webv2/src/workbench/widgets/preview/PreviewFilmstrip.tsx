@@ -12,7 +12,7 @@ import { Scrollable } from '@platform/ui/Scrollable';
 import { StreamingImageFrame } from '@platform/ui/streaming-image/StreamingImageFrame';
 import { progressImageToStreamingSource } from '@platform/ui/streaming-image/streamingImageSource';
 import { CheckIcon, HourglassIcon, PinIcon } from 'lucide-react';
-import { useCallback, useMemo, type MouseEvent } from 'react';
+import { memo, useCallback, useMemo, type MouseEvent } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { PreviewDensity } from './previewDensity';
@@ -253,7 +253,8 @@ const FilmstripLiveThumb = ({
   );
 };
 
-const FilmstripThumb = ({
+// Memoized: the strip lists the whole board, and a selection move should re-render only the two thumbs it changes.
+const FilmstripThumb = memo(function FilmstripThumb({
   item,
   isSelected,
   size,
@@ -267,7 +268,7 @@ const FilmstripThumb = ({
   onCompare?: (item: GalleryItem) => void;
   onContextMenu?: (item: GalleryItem, x: number, y: number) => void;
   onSelect: (item: GalleryItem) => void;
-}) => {
+}) {
   const itemRef = useMemo(() => toGalleryItemRef(item), [item]);
   const dragData = useMemo(() => getGalleryItemDragData([itemRef]), [itemRef]);
   const thumbnailSrc = item.thumbnailUrl || (item.kind === 'image' ? item.fullUrl : null);
@@ -334,7 +335,7 @@ const FilmstripThumb = ({
       )}
     </Box>
   );
-};
+});
 
 const EMPTY_SESSIONS: readonly QueueProgressSession[] = [];
 

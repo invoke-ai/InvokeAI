@@ -151,8 +151,9 @@ vi.mock('@workbench/canvas-operations/api', async () => {
   };
 });
 
-vi.mock('@workbench/WorkbenchContext', () => ({
-  useWorkbenchCommands: () => ({
+vi.mock('@workbench/WorkbenchContext', () => {
+  // The workbench store owns one commands object, so it is the same on every read.
+  const commands = {
     canvas: { apply: vi.fn() },
     gallery: {
       patchItems: (...args: unknown[]) => mocks.galleryPatchItems(...args),
@@ -171,15 +172,19 @@ vi.mock('@workbench/WorkbenchContext', () => ({
     widgets: {
       patchValues: (...args: unknown[]) => mocks.galleryWidgetsPatchValues(...args),
     },
-  }),
-  useWorkbenchQueries: () => ({
-    getProject: vi.fn(),
-    getSnapshot: (...args: unknown[]) => mocks.getSnapshot(...args),
-    isActiveProject: vi.fn(() => true),
-  }),
-  // Only the Video panel's reference capacity is selected; no test here exercises it.
-  useWorkbenchSelector: () => false,
-}));
+  };
+
+  return {
+    useWorkbenchCommands: () => commands,
+    useWorkbenchQueries: () => ({
+      getProject: vi.fn(),
+      getSnapshot: (...args: unknown[]) => mocks.getSnapshot(...args),
+      isActiveProject: vi.fn(() => true),
+    }),
+    // Only the Video panel's reference capacity is selected; no test here exercises it.
+    useWorkbenchSelector: () => false,
+  };
+});
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -347,6 +352,24 @@ describe('new canvas from images', () => {
       title: 'widgets.canvas.import.staleProject',
     });
     expect(mocks.openWorkbenchWidget).not.toHaveBeenCalled();
+  });
+});
+
+describe('compare selection handler', () => {
+  it('stays the same handler while selection-dependent actions are rebuilt', async () => {
+    const before = actionsRef.current!;
+
+    await act(() => {
+      root?.render(
+        <QueryClientProvider client={new QueryClient()}>
+          <Probe modelKey="other-model" ref={actionsRef} />
+        </QueryClientProvider>
+      );
+    });
+
+    // Thumbnail strips hand it to every thumb; a new handler per selection would re-render them all.
+    expect(actionsRef.current).not.toBe(before);
+    expect(actionsRef.current!.selectForCompare).toBe(before.selectForCompare);
   });
 });
 
