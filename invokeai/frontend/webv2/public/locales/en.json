@@ -675,6 +675,7 @@
       "failed": "The font could not be replaced. Finish the current Canvas operation and retry."
     },
     "addFonts": "Add Fonts",
+    "backToList": "Back to fonts",
     "details": "Details",
     "selectFont": "Select a font",
     "selectFontDescription": "Choose a font from your library to preview it and view its details.",
@@ -1069,6 +1070,7 @@
     "apiKeys": "API Keys",
     "apiKeysDescription": "Keys are used when installing protected models and when generating with external API models.",
     "backendDisconnectedProgressStale": "Backend disconnected. Progress may be stale.",
+    "backToList": "Back to models",
     "base": "Base",
     "baseArchitecture": "Base Architecture",
     "baseUrlFor": "{{title}} base URL",
@@ -1455,6 +1457,7 @@
   "nodes": {
     "addNodes": "Add Nodes",
     "alreadyInstalledError": "'{{name}}' is already installed. Uninstall it first to reinstall.",
+    "backToList": "Back to node packs",
     "copyPath": "Copy path",
     "couldNotReloadCustomNodes": "Could not reload custom nodes.",
     "couldNotLoadPacks": "Could not load custom node packs",
@@ -4611,6 +4614,7 @@
     "search": "Search settings…",
     "clearSearch": "Clear search",
     "section": "Settings section",
+    "backToList": "Back to preferences",
     "allResults": "All results",
     "results": "Search results",
     "resultCount_one": "{{count}} setting found",

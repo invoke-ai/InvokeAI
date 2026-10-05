@@ -2,15 +2,17 @@ import type { ModelConfig } from '@features/models/core/types';
 import type * as ModelsApi from '@features/models/data/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
-import { refreshModels, setModelsSnapshotForTests } from '@features/models/data/modelsStore';
+import { refreshModels, removeModelsFromStore, setModelsSnapshotForTests } from '@features/models/data/modelsStore';
 import { MAX_MODEL_DRAFTS, recordModelDraftFields } from '@features/models/ui/modelDraftsStore';
-import { openModelDetail } from '@features/models/ui/uiStore';
+import { closeModelDetail, openModelDetail, pruneModelsUiKeys } from '@features/models/ui/uiStore';
+import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
-import { system } from '@theme/system';
+import { applyThemeToRoot } from '@theme/applyTheme';
+import { DEFAULT_THEME_ID, system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { userEvent } from 'vitest/browser';
+import { page, userEvent } from 'vitest/browser';
 
 import { ModelManagerView } from './ModelManagerView';
 
@@ -23,6 +25,7 @@ const { api, pending } = vi.hoisted(() => ({
   api: {
     getModelsDir: vi.fn(() => Promise.resolve('/models')),
     listMissingModels: vi.fn(() => Promise.resolve([])),
+    deleteModel: vi.fn(),
     listModels: vi.fn(),
     updateModel: vi.fn(),
   },
@@ -446,6 +449,217 @@ describe('model manager drafts', () => {
 
     expect(rowMarker('m0')).toBeNull();
     expect(rowMarker('m1')).not.toBeNull();
+  });
+});
+
+describe('model manager in a single pane', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  /** Below the 50rem both panes need: the library and the detail take turns. */
+  const NARROW_PX = 640;
+  const back = () => page.getByRole('button', { name: 'models.backToList' });
+  const library = () => page.getByRole('heading', { name: 'models.title' });
+  const detail = () => page.getByRole('tablist');
+  const row = (key: string) => document.querySelector<HTMLElement>(`[data-list-row="${key}"] [data-list-primary]`)!;
+  const setWidth = async (width: number) => {
+    await act(async () => {
+      host.style.width = `${String(width)}px`;
+      await new Promise((resolve) => {
+        requestAnimationFrame(resolve);
+      });
+    });
+  };
+
+  /** True when the control is inside the pane's visible scroll viewport, not just inside the manager's width. */
+  const isInView = (element: HTMLElement) => {
+    const bounds = element.getBoundingClientRect();
+    const viewport = element.closest('[data-scope="scroll-area"][data-part="viewport"]') ?? host;
+    const visible = viewport.getBoundingClientRect();
+
+    return (
+      bounds.left >= visible.left &&
+      bounds.right <= visible.right &&
+      bounds.top >= visible.top &&
+      bounds.bottom <= visible.bottom
+    );
+  };
+
+  beforeEach(async () => {
+    applyThemeToRoot(DEFAULT_THEME_ID);
+    api.listModels.mockReset();
+    api.deleteModel.mockReset();
+    accountLifecycle.activate('model-manager-single-pane-test', ':user:model-manager-single-pane-test');
+    setModelsSnapshotForTests({ models: [A, B], status: 'loaded' });
+    closeModelDetail();
+    host = document.createElement('div');
+    host.style.cssText = `display:flex;height:450px;width:${String(NARROW_PX)}px;`;
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <ModelManagerView />
+        </ChakraProvider>
+      )
+    );
+  });
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    accountLifecycle.invalidate();
+  });
+
+  it('opens a model from the library, keeps its actions in view, and goes back to the row', async () => {
+    await expect.element(library()).toBeVisible();
+    await expect.element(detail()).not.toBeInTheDocument();
+    // The install queue reports under the library as well as under the detail.
+    await expect.element(page.getByRole('button', { name: /models.installQueue/ })).toBeVisible();
+    expect(await auditAccessibility(host)).toEqual([]);
+
+    await click(row(B.key));
+
+    await expect.element(back()).toHaveFocus();
+    await expect.element(library()).not.toBeInTheDocument();
+    const edit = page.getByRole('button', { name: 'common.edit', exact: true });
+    const actions = page.getByRole('button', { name: 'models.actions', exact: true });
+    for (const control of [edit, actions]) {
+      await expect.element(control).toBeVisible();
+      expect(isInView(control.element() as HTMLElement)).toBe(true);
+    }
+    await expect.element(page.getByRole('button', { name: /models.installQueue/ })).toBeVisible();
+    expect(await auditAccessibility(host)).toEqual([]);
+    await edit.click();
+    expect(isEditorOpen()).toBe(true);
+
+    await back().click();
+
+    await expect.element(library()).toBeVisible();
+    expect(document.activeElement).toBe(row(B.key));
+    expect(row(B.key).getAttribute('aria-current')).toBe('true');
+  });
+
+  it('reaches Add Models from the library header', async () => {
+    await page.getByRole('button', { name: 'models.addModels', exact: true }).click();
+
+    await expect.element(page.getByRole('tab', { name: 'models.addModels' })).toHaveAttribute('aria-selected', 'true');
+    await expect.element(back()).toHaveFocus();
+  });
+
+  it('keeps an unsaved draft through Back, reopening, and wide and narrow resizes', async () => {
+    await click(row(A.key));
+    await startEditing('Draft A');
+
+    await back().click();
+    expect(rowMarker(A.key)).not.toBeNull();
+    await click(row(A.key));
+    expect(nameInput()?.value).toBe('Draft A');
+
+    await setWidth(1200);
+    await expect.element(library()).toBeVisible();
+    await expect.element(back()).not.toBeInTheDocument();
+    expect(nameInput()?.value).toBe('Draft A');
+
+    await setWidth(NARROW_PX);
+    await expect.element(back()).toBeVisible();
+    expect(isEditorOpen()).toBe(true);
+    expect(nameInput()?.value).toBe('Draft A');
+  });
+
+  it('returns to the library with focus on a row after deleting the open model', async () => {
+    api.deleteModel.mockResolvedValue(undefined);
+    await click(row(B.key));
+
+    await page.getByRole('button', { name: 'models.actions', exact: true }).click();
+    await page.getByRole('menuitem', { name: 'models.deleteModel' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'models.deleteModel' }).click();
+
+    await expect.element(page.getByRole('alertdialog')).not.toBeInTheDocument();
+    await expect.element(library()).toBeVisible();
+    await vi.waitFor(() => expect(document.activeElement).toBe(row(A.key)));
+    expect(api.deleteModel).toHaveBeenCalledWith(B.key, expect.anything());
+  });
+
+  it('shows the detail when a model is opened from elsewhere, such as the install queue', async () => {
+    await act(() => openModelDetail(A.key));
+
+    await expect.element(detail()).toBeVisible();
+    await expect.element(back()).toBeVisible();
+  });
+});
+
+describe('model manager starting pane', () => {
+  let host: HTMLDivElement;
+  let root: Root;
+
+  const library = () => page.getByRole('heading', { name: 'models.title' });
+  const addTab = () => page.getByRole('tab', { name: 'models.addModels' });
+
+  const mount = async (models: ModelConfig[]) => {
+    // An account change resets the manager, so the starting pane is still undecided.
+    accountLifecycle.activate('model-manager-start-test', ':user:model-manager-start-test');
+    setModelsSnapshotForTests({ models, status: 'loaded' });
+    host = document.createElement('div');
+    host.style.cssText = 'display:flex;height:450px;width:640px;';
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() =>
+      root.render(
+        <ChakraProvider value={system}>
+          <ModelManagerView />
+        </ChakraProvider>
+      )
+    );
+  };
+
+  afterEach(async () => {
+    await act(() => root.unmount());
+    host.remove();
+    accountLifecycle.invalidate();
+  });
+
+  it('opens a non-empty library on the list', async () => {
+    await mount([A, B]);
+
+    await expect.element(library()).toBeVisible();
+    await expect.element(addTab()).not.toBeInTheDocument();
+  });
+
+  it('opens an empty library on Add Models, and an arriving install leaves the pane, tab and focus alone', async () => {
+    await mount([]);
+
+    await expect.element(addTab()).toHaveAttribute('aria-selected', 'true');
+    await expect.element(library()).not.toBeInTheDocument();
+    // Settling the starting pane does not pull focus into an untouched page.
+    expect(document.activeElement).toBe(document.body);
+    const field = await vi.waitFor(() => {
+      const input = document.querySelector<HTMLInputElement>(
+        '[role="tabpanel"] input[type="text"], [role="tabpanel"] input:not([type])'
+      );
+      expect(input).not.toBeNull();
+      return input!;
+    });
+    await act(() => userEvent.click(field));
+
+    await act(() => setModelsSnapshotForTests({ models: [A], status: 'loaded' }));
+
+    await expect.element(addTab()).toHaveAttribute('aria-selected', 'true');
+    await expect.element(library()).not.toBeInTheDocument();
+    expect(document.activeElement).toBe(field);
+  });
+
+  it('stays on the list, now empty, when the last model is deleted', async () => {
+    await mount([A]);
+    await expect.element(library()).toBeVisible();
+
+    await act(() => {
+      removeModelsFromStore([A.key]);
+      pruneModelsUiKeys([A.key]);
+    });
+
+    await expect.element(library()).toBeVisible();
+    await expect.element(addTab()).not.toBeInTheDocument();
   });
 });
 

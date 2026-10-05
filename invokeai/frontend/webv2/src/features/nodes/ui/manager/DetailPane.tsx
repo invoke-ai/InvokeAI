@@ -3,10 +3,14 @@ import type { NodePackInfo } from '@features/nodes/core/catalog';
 
 import { Box, Flex, Icon, Text } from '@chakra-ui/react';
 import { useCustomNodesSelector } from '@features/nodes/data/nodesStore';
-import { NodeActivityBar } from '@features/nodes/ui/activity/NodeActivityBar';
 import { AddNodesView } from '@features/nodes/ui/add-nodes/AddNodesView';
 import { NodePackDetail } from '@features/nodes/ui/detail/NodePackDetail';
-import { updateNodesUi, useNodesUiSelector, type NodesManagerTab } from '@features/nodes/ui/nodesUiStore';
+import {
+  openNodesManagerTab,
+  updateNodesUi,
+  useNodesUiSelector,
+  type NodesManagerTab,
+} from '@features/nodes/ui/nodesUiStore';
 import { UninstallPackDialog } from '@features/nodes/ui/shared/UninstallPackDialog';
 import { Scrollable, Tabs } from '@platform/ui';
 import { ManagerDetailHeader } from '@platform/ui/ManagerLayout';
@@ -15,7 +19,7 @@ import { BlocksIcon, PlusIcon } from 'lucide-react';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-/** Right side of the nodes manager: selected pack details, Add Nodes, and activity footer. */
+/** Right side of the nodes manager: selected pack details and Add Nodes. Recent activity is the layout's footer. */
 export const DetailPane = () => {
   const { t } = useTranslation();
   const activePackName = useNodesUiSelector((snapshot) => snapshot.activePackName);
@@ -31,14 +35,14 @@ export const DetailPane = () => {
       size="xl"
       unmountOnExit
       value={activeTab}
-      onValueChange={(event) => updateNodesUi({ activeTab: event.value as NodesManagerTab })}
+      onValueChange={(event) => openNodesManagerTab(event.value as NodesManagerTab)}
     >
       <Flex direction="column" flex="1" minH="0" minW="0">
         <ManagerDetailHeader>
           <Tabs.List mb="-1px">
-            <Tabs.Trigger value="details">
+            <Tabs.Trigger data-manager-item-tab="" value="details">
               <Icon as={BlocksIcon} boxSize="3" />
-              <MiddleTruncate maxW="14rem" text={detailLabel} />
+              <MiddleTruncate maxW="14rem" minW="0" text={detailLabel} />
             </Tabs.Trigger>
             <Tabs.Trigger value="add">
               <Icon as={PlusIcon} boxSize="3" />
@@ -55,8 +59,6 @@ export const DetailPane = () => {
             <AddNodesView />
           </Tabs.Content>
         </Box>
-
-        <NodeActivityBar />
       </Flex>
     </Tabs.Root>
   );

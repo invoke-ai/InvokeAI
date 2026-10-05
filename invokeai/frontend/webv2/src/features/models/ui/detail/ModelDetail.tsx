@@ -233,14 +233,15 @@ const ModelIdentitySection = memo(function ModelIdentitySection({
 
   return (
     <>
-      <HStack align="start" gap="3">
+      {/* Below about 34rem the actions wrap under the title rather than crush it. */}
+      <HStack align="start" gap="3" wrap="wrap">
         <ModelImageUpload
           key={model.key}
           model={model}
           onError={(message) => notify.error(t('models.modelImage'), message)}
           onUpdated={() => notify.success(t('models.modelImageUpdated'))}
         />
-        <Stack flex="1" gap="1" minW="0">
+        <Stack flex="1 1 10rem" gap="1" minW="0">
           <Text fontSize="lg" fontWeight="700" lineClamp={2}>
             {model.name}
           </Text>
@@ -301,7 +302,7 @@ const ModelDetailActions = ({
   const [isActionBusy, setIsActionBusy] = useState(false);
 
   return (
-    <HStack flexShrink={0} gap="1" wrap="wrap">
+    <HStack flexShrink={0} gap="1" justify="flex-end" ms="auto" wrap="wrap">
       {isConvertibleToDiffusers(model) ? (
         <Button variant="outline" onClick={() => onRequestConfirm({ kind: 'convert', model })}>
           <Icon as={HuggingFaceIcon} boxSize="3" />
@@ -484,7 +485,7 @@ const ModelAttributes = ({ isMissing, model }: { isMissing: boolean; model: Mode
       <DataList.Root gap="2.5" orientation="horizontal" variant="subtle">
         {attributes.map((attribute) => (
           <DataList.Item key={attribute.label}>
-            <DataList.ItemLabel color="fg.subtle" fontSize="xs" minW="8rem" textTransform="uppercase">
+            <DataList.ItemLabel color="fg.muted" fontSize="xs" minW="8rem" textTransform="uppercase">
               {attribute.label}
             </DataList.ItemLabel>
             <DataList.ItemValue alignItems="center" display="flex" fontSize="xs" gap="1" overflowWrap="anywhere">

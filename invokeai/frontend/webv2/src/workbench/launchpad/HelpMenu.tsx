@@ -2,14 +2,16 @@ import type { ElementType } from 'react';
 
 import { chakra, HStack, Icon, Menu, Portal, Text } from '@chakra-ui/react';
 import { APP_VERSION, DOCS_URL } from '@platform/runtime/appMetadata';
-import { Button } from '@platform/ui/Button';
+import { Button, IconButton } from '@platform/ui/Button';
 import { MenuContent } from '@platform/ui/Menu';
+import { Tooltip, useTooltipTriggerIds } from '@platform/ui/Tooltip';
 import { DiscordIcon, GithubIcon } from '@platform/ui/VendoredIcon';
 import { BookOpenTextIcon, ChevronRightIcon, ClapperboardIcon, CircleQuestionMarkIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 
 const MENU_POSITIONING = { placement: 'right-end' } as const;
-const GROUP_LABEL_PROPS = { color: 'fg.subtle', fontSize: 'xs', textTransform: 'uppercase' } as const;
+/** fg.muted: fg.subtle falls below 4.5:1 on the menu surface at this size. */
+const GROUP_LABEL_PROPS = { color: 'fg.muted', fontSize: 'xs', textTransform: 'uppercase' } as const;
 const TRIGGER_JUSTIFY = { justifyContent: 'space-between' } as const;
 
 interface HelpLink {
@@ -63,20 +65,38 @@ const HelpMenuLink = ({ href, icon, labelKey, value }: HelpLink) => {
   );
 };
 
-export const HelpMenu = () => {
+/** `compact` is the icon-only rail: the trigger is named by a tooltip instead of its label. */
+export const HelpMenu = ({ compact = false }: { compact?: boolean }) => {
   const { t } = useTranslation();
+  const ids = useTooltipTriggerIds();
 
   return (
-    <Menu.Root positioning={MENU_POSITIONING}>
-      <Menu.Trigger asChild>
-        <Button aria-label={t('launchpad.help.label')} color="fg.muted" css={TRIGGER_JUSTIFY} variant="ghost" w="full">
-          <Icon as={CircleQuestionMarkIcon} boxSize="3.5" />
-          <Text flex="1" textAlign="start" truncate>
-            {t('launchpad.help.label')}
-          </Text>
-          <Icon as={ChevronRightIcon} boxSize="3" />
-        </Button>
-      </Menu.Trigger>
+    <Menu.Root ids={ids} positioning={MENU_POSITIONING}>
+      {compact ? (
+        <Tooltip content={t('launchpad.help.label')} ids={ids} placement="right">
+          <Menu.Trigger asChild>
+            <IconButton aria-label={t('launchpad.help.label')} color="fg.muted" size="lg" variant="ghost">
+              <Icon as={CircleQuestionMarkIcon} boxSize="3.5" />
+            </IconButton>
+          </Menu.Trigger>
+        </Tooltip>
+      ) : (
+        <Menu.Trigger asChild>
+          <Button
+            aria-label={t('launchpad.help.label')}
+            color="fg.muted"
+            css={TRIGGER_JUSTIFY}
+            variant="ghost"
+            w="full"
+          >
+            <Icon as={CircleQuestionMarkIcon} boxSize="3.5" />
+            <Text flex="1" textAlign="start" truncate>
+              {t('launchpad.help.label')}
+            </Text>
+            <Icon as={ChevronRightIcon} boxSize="3" />
+          </Button>
+        </Menu.Trigger>
+      )}
       <Portal>
         <Menu.Positioner>
           <MenuContent minW="13rem">
@@ -98,7 +118,7 @@ export const HelpMenu = () => {
               <Text fontSize="xs" fontWeight="700">
                 Invoke
               </Text>
-              <Text color="fg.subtle" fontSize="xs">
+              <Text color="fg.muted" fontSize="xs">
                 {t('launchpad.help.version', { version: APP_VERSION })}
               </Text>
             </HStack>

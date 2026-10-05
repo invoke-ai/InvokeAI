@@ -74,7 +74,6 @@ const SECTION_PATHS: Record<
 const SECTIONS_CSS: SystemStyleObject = {
   display: 'flex',
   flex: 1,
-  flexDirection: { base: 'column', md: 'row' },
   minH: 0,
 };
 

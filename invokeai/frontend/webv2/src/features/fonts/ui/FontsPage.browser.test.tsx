@@ -1,7 +1,9 @@
 import { ChakraProvider } from '@chakra-ui/react';
+import { auditAccessibility } from '@platform/browser/auditAccessibility.testing';
 import { accountLifecycle } from '@platform/state/accountLifecycle';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { system } from '@theme/system';
+import { applyThemeToRoot } from '@theme/applyTheme';
+import { DEFAULT_THEME_ID, system } from '@theme/system';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -65,10 +67,12 @@ const pagerButton = (text: string): HTMLButtonElement | null =>
   [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === text) ?? null;
 let queryClient: QueryClient;
 
-const renderPage = async (): Promise<void> => {
+/** 960px fits the library and the detail side by side (both need 800px); 640px shows one at a time. */
+const renderPage = async (width = 960): Promise<void> => {
+  applyThemeToRoot(DEFAULT_THEME_ID);
   host = document.createElement('div');
   host.style.height = '720px';
-  host.style.width = '960px';
+  host.style.width = `${String(width)}px`;
   document.body.append(host);
   root = createRoot(host);
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -361,5 +365,101 @@ describe('FontsPage', () => {
     } finally {
       accountLifecycle.invalidate();
     }
+  });
+  it('opens a font in a single pane, deletes it, and lands on the list', async () => {
+    dependencies.deleteFont.mockResolvedValue(undefined);
+    await renderPage(640);
+    await vi.waitFor(() => expect(host.textContent).toContain('Example Sans Regular'));
+    const back = page.getByRole('button', { name: 'fonts.backToList' });
+    const library = page.getByRole('list', { name: 'fonts.library' });
+    await expect.element(page.getByRole('tablist')).not.toBeInTheDocument();
+    expect(await auditAccessibility(host)).toEqual([]);
+
+    await userEvent.click(host.querySelector<HTMLElement>('[role="listitem"] [data-list-primary]')!);
+
+    await expect.element(back).toHaveFocus();
+    await expect.element(library).not.toBeInTheDocument();
+    await expect.element(page.getByRole('heading', { name: 'Example Sans Regular' })).toBeVisible();
+    expect(await auditAccessibility(host)).toEqual([]);
+    await page.getByRole('button', { name: 'fonts.deleteNamed' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'fonts.deleteConfirm' }).click();
+
+    await expect.element(page.getByRole('alertdialog')).not.toBeInTheDocument();
+    await expect.element(library).toBeVisible();
+    await vi.waitFor(() => {
+      const focused = document.activeElement as HTMLElement;
+      expect(focused.matches('[data-list-primary]')).toBe(true);
+      expect(focused.checkVisibility({ visibilityProperty: true })).toBe(true);
+    });
+    expect(dependencies.deleteFont).toHaveBeenCalledWith('font-a');
+  });
+
+  it('opens an empty library on Add Fonts, and its empty state leads back there', async () => {
+    dependencies.fontsQueryOptions.mockImplementation((params: unknown) => ({
+      queryFn: () => Promise.resolve({ items: [], limit: 100, offset: 0, total: 0 }),
+      queryKey: ['fonts', params],
+    }));
+    await renderPage(640);
+    const upload = page.getByRole('button', { name: 'fonts.upload', exact: true });
+
+    await expect.element(upload).toBeVisible();
+    await page.getByRole('button', { name: 'fonts.backToList' }).click();
+    await expect.element(upload).not.toBeInTheDocument();
+    await page.getByRole('list', { name: 'fonts.library' }).query();
+    await page.getByRole('button', { name: 'fonts.addFonts', exact: true }).first().click();
+
+    await expect.element(upload).toBeVisible();
+    await expect.element(page.getByRole('button', { name: 'fonts.backToList' })).toHaveFocus();
+  });
+  it.each([
+    ['single-pane', 640],
+    ['side by side', 960],
+  ])('keeps Add Fonts, and focus, when the first upload lands (%s)', async (_mode, width) => {
+    let items: (typeof font)[] = [];
+    dependencies.fontsQueryOptions.mockImplementation((params: unknown) => ({
+      queryFn: () => Promise.resolve({ items, limit: 100, offset: 0, total: items.length }),
+      queryKey: ['fonts', params],
+    }));
+    dependencies.uploadFont.mockImplementation(() => {
+      items = [font];
+      return Promise.resolve({ created: true });
+    });
+    await renderPage(width);
+    const addTab = page.getByRole('tab', { name: 'fonts.addFonts' });
+    const upload = page.getByRole('button', { name: 'fonts.upload', exact: true });
+    await expect.element(addTab).toHaveAttribute('aria-selected', 'true');
+    await act(() => upload.element().focus());
+
+    const input = host.querySelector<HTMLInputElement>('input[type="file"]')!;
+    Object.defineProperty(input, 'files', {
+      configurable: true,
+      value: [new File(['font'], 'font.ttf', { type: 'font/ttf' })],
+    });
+    await act(() => input.dispatchEvent(new Event('change', { bubbles: true })));
+
+    await vi.waitFor(() => expect(host.textContent).toContain('Example Sans Regular'));
+    await expect.element(addTab).toHaveAttribute('aria-selected', 'true');
+    await expect.element(upload).toHaveFocus();
+  });
+
+  it('stays on the list, now empty, after deleting the last font in a single pane', async () => {
+    let items = [font];
+    dependencies.fontsQueryOptions.mockImplementation((params: unknown) => ({
+      queryFn: () => Promise.resolve({ items, limit: 100, offset: 0, total: items.length }),
+      queryKey: ['fonts', params],
+    }));
+    dependencies.deleteFont.mockImplementation(() => {
+      items = [];
+      return Promise.resolve();
+    });
+    await renderPage(640);
+    await vi.waitFor(() => expect(host.textContent).toContain('Example Sans Regular'));
+    await userEvent.click(host.querySelector<HTMLElement>('[role="listitem"] [data-list-primary]')!);
+
+    await page.getByRole('button', { name: 'fonts.deleteNamed' }).click();
+    await page.getByRole('alertdialog').getByRole('button', { name: 'fonts.deleteConfirm' }).click();
+
+    await expect.element(page.getByText('fonts.emptyTitle', { exact: true })).toBeVisible();
+    await expect.element(page.getByRole('tab', { name: 'fonts.addFonts' })).not.toBeInTheDocument();
   });
 });
