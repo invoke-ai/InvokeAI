@@ -3,11 +3,13 @@ import { captureAccountScope, isAccountScopeCurrent, type AccountScope } from '@
 import type { IdentityTokenAdapter } from './core/tokenStorage';
 
 import { browserIdentityTokenAdapter } from './core/tokenStorage';
+import { isNewEpochForCurrentSession, isPasswordChangePending, waitForPasswordChange } from './passwordChangeGate';
 import { handleUnauthorizedResponse } from './session';
 
 export interface IdentityTransportAuthAdapter {
   getIdentity(): unknown;
   getToken(): string | null;
+  onRefreshedToken(replacement: string, requestToken: string, requestIdentity: unknown): void;
   onUnauthorized(rejectedToken: string, rejectedIdentity: unknown): void;
 }
 
@@ -26,15 +28,37 @@ export const createIdentityTransportAuthAdapter = (
 ): IdentityTransportAuthAdapter => ({
   getIdentity: account.capture,
   getToken: token.get,
-  onUnauthorized: (rejectedToken, rejectedIdentity) => {
+  onRefreshedToken: (replacement, requestToken, requestIdentity) => {
     if (
+      (token.get() === requestToken || isNewEpochForCurrentSession(requestToken, token.get(), replacement)) &&
+      typeof requestIdentity === 'object' &&
+      requestIdentity !== null &&
+      account.isCurrent(requestIdentity as AccountScope)
+    ) {
+      token.set(replacement);
+    }
+  },
+  onUnauthorized: (rejectedToken, rejectedIdentity) => {
+    const isStillCurrent = (): boolean =>
       token.get() === rejectedToken &&
       typeof rejectedIdentity === 'object' &&
       rejectedIdentity !== null &&
-      account.isCurrent(rejectedIdentity as AccountScope)
-    ) {
-      onUnauthorized();
+      account.isCurrent(rejectedIdentity as AccountScope);
+
+    if (!isStillCurrent()) {
+      return;
     }
+
+    if (isPasswordChangePending(rejectedToken)) {
+      void waitForPasswordChange(rejectedToken, isStillCurrent).then(() => {
+        if (isStillCurrent()) {
+          onUnauthorized();
+        }
+      });
+      return;
+    }
+
+    onUnauthorized();
   },
 });
 

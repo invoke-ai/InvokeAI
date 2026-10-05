@@ -42,6 +42,31 @@ describe('deployment-aware backend URLs', () => {
 });
 
 describe('request identity ownership', () => {
+  it('hands a successful password-change replacement to the identity owner before returning', async () => {
+    let token = 'old-token';
+    const identity = {};
+    const onRefreshedToken = vi.fn((replacement: string, requestToken: string, requestIdentity: unknown) => {
+      expect(requestToken).toBe('old-token');
+      expect(requestIdentity).toBe(identity);
+      token = replacement;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(new Response('{}', { headers: { 'X-Refreshed-Token': 'new-token' }, status: 200 }))
+    );
+    configureHttpAuth({
+      getIdentity: () => identity,
+      getToken: () => token,
+      onRefreshedToken,
+      onUnauthorized: vi.fn(),
+    });
+
+    await apiFetch('/api/v1/auth/me', { method: 'PATCH' });
+
+    expect(onRefreshedToken).toHaveBeenCalledOnce();
+    expect(token).toBe('new-token');
+  });
+
   it('preserves response headers on API errors for Retry-After handling', async () => {
     const identity = {};
     vi.stubGlobal(

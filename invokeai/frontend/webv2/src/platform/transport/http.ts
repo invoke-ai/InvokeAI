@@ -10,6 +10,7 @@ export interface HttpAuthAdapter {
   /** Opaque identity-lifetime token; object identity must rotate on reauthentication. */
   getIdentity(): unknown;
   getToken(): string | null;
+  onRefreshedToken?(replacement: string, requestToken: string, requestIdentity: unknown): void;
   onUnauthorized(rejectedToken: string, rejectedIdentity: unknown): void;
 }
 
@@ -215,6 +216,14 @@ export const apiFetch = async (path: string, init?: RequestInit): Promise<Respon
   let expiredCurrentIdentity = false;
 
   assertHttpIdentityCurrent(requestIdentity);
+
+  if (response.ok && requestToken) {
+    const replacement = response.headers?.get('X-Refreshed-Token');
+
+    if (replacement) {
+      authAdapter.onRefreshedToken?.(replacement, requestToken, requestIdentity);
+    }
+  }
 
   if (response.status === 401 && requestToken !== null && authAdapter.getToken() === requestToken) {
     expiredCurrentIdentity = true;

@@ -1,4 +1,5 @@
-import { apiFetch, apiFetchJson } from '@platform/transport/http';
+import { beginPasswordChange, getTokenUserId } from '@features/identity/passwordChangeGate';
+import { apiFetch, apiFetchJson, getHttpAuthToken } from '@platform/transport/http';
 
 /** Keep auth transport DTO field names unchanged; session state and components own reshaping. */
 
@@ -83,19 +84,34 @@ export const setupAdmin = (request: SetupRequest): Promise<{ success: boolean; u
     method: 'POST',
   });
 
-export const updateCurrentUser = (request: ProfileUpdateRequest): Promise<UserDTO> =>
-  apiFetchJson<UserDTO>(`${AUTH_BASE}/me`, { body: JSON.stringify(request), method: 'PATCH' });
+export const updateCurrentUser = async (request: ProfileUpdateRequest): Promise<UserDTO> => {
+  const finish = request.new_password !== undefined ? beginPasswordChange(getHttpAuthToken()) : null;
+
+  try {
+    return await apiFetchJson<UserDTO>(`${AUTH_BASE}/me`, { body: JSON.stringify(request), method: 'PATCH' });
+  } finally {
+    finish?.();
+  }
+};
 
 export const listUsers = (): Promise<UserDTO[]> => apiFetchJson<UserDTO[]>(`${AUTH_BASE}/users`);
 
 export const createUser = (request: UserCreateRequest): Promise<UserDTO> =>
   apiFetchJson<UserDTO>(`${AUTH_BASE}/users`, { body: JSON.stringify(request), method: 'POST' });
 
-export const updateUser = (userId: string, changes: UserUpdateRequest): Promise<UserDTO> =>
-  apiFetchJson<UserDTO>(`${AUTH_BASE}/users/${encodeURIComponent(userId)}`, {
-    body: JSON.stringify(changes),
-    method: 'PATCH',
-  });
+export const updateUser = async (userId: string, changes: UserUpdateRequest): Promise<UserDTO> => {
+  const token = changes.password !== undefined ? getHttpAuthToken() : null;
+  const finish = getTokenUserId(token) === userId ? beginPasswordChange(token) : null;
+
+  try {
+    return await apiFetchJson<UserDTO>(`${AUTH_BASE}/users/${encodeURIComponent(userId)}`, {
+      body: JSON.stringify(changes),
+      method: 'PATCH',
+    });
+  } finally {
+    finish?.();
+  }
+};
 
 export const deleteUser = async (userId: string): Promise<void> => {
   await apiFetch(`${AUTH_BASE}/users/${encodeURIComponent(userId)}`, { method: 'DELETE' });
