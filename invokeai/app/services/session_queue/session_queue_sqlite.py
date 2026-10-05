@@ -145,6 +145,17 @@ FIFO_DEQUEUE_QUERY = """--sql
     LIMIT 1
     """
 
+# The database keeps no table statistics, so the planner takes `queue_id = ?` as selective. A
+# statement that filters `queue_id = ?` and reads only idx_session_queue_listing's columns, or one
+# that looks rows up by `item_id IN (...)` beside `queue_id = ?`, is moved onto that index and scans
+# the queue's whole retained history. Likewise `user_id = ?` can win over a selective column such as
+# batch_id and read the user's whole history. Guard such a term with a unary + (which keeps it off
+# every index) or give the statement a selective indexed predicate the planner prefers.
+#
+# This capacity check runs on every enqueue and must cost the pending backlog, not the history: with
+# the guard, the status index finds the pending items.
+PENDING_QUEUE_ITEM_COUNT_QUERY = "SELECT count(*) FROM session_queue WHERE +queue_id = ? AND status = 'pending';"
+
 
 class SqliteSessionQueue(SessionQueueBase):
     __invoker: Invoker
@@ -258,16 +269,7 @@ class SqliteSessionQueue(SessionQueueBase):
     def _get_current_queue_size(self, queue_id: str) -> int:
         """Gets the current number of pending queue items"""
         with self._db.transaction() as cursor:
-            cursor.execute(
-                """--sql
-                SELECT count(*)
-                FROM session_queue
-                WHERE
-                queue_id = ?
-                AND status = 'pending'
-                """,
-                (queue_id,),
-            )
+            cursor.execute(PENDING_QUEUE_ITEM_COUNT_QUERY, (queue_id,))
             count = cast(int, cursor.fetchone()[0])
         return count
 
@@ -396,10 +398,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 if receipt is not None:
                     return settle_receipt(receipt)
             require_project(cursor)
-            cursor.execute(
-                "SELECT count(*) FROM session_queue WHERE queue_id = ? AND status = 'pending';",
-                (queue_id,),
-            )
+            cursor.execute(PENDING_QUEUE_ITEM_COUNT_QUERY, (queue_id,))
             preliminary_queue_size = cast(int, cursor.fetchone()[0])
 
         max_queue_size = self.__invoker.services.configuration.max_queue_size
@@ -429,12 +428,7 @@ class SqliteSessionQueue(SessionQueueBase):
 
             require_project(cursor)
 
-            cursor.execute(
-                """--sql
-                SELECT count(*) FROM session_queue WHERE queue_id = ? AND status = 'pending';
-                """,
-                (queue_id,),
-            )
+            cursor.execute(PENDING_QUEUE_ITEM_COUNT_QUERY, (queue_id,))
             current_queue_size = cast(int, cursor.fetchone()[0])
             max_new_queue_items = max(0, max_queue_size - current_queue_size)
             priority = 0
@@ -452,10 +446,13 @@ class SqliteSessionQueue(SessionQueueBase):
             if enqueued_count > 0:
                 accepted_batch_id = batch.batch_id
                 while True:
+                    # The unary + on queue_id and user_id keeps this, and the readback below, on
+                    # idx_session_queue_batch_id; unguarded, the planner picks a user_id index and
+                    # reads the user's whole history (see PENDING_QUEUE_ITEM_COUNT_QUERY).
                     cursor.execute(
                         """--sql
                         SELECT 1 FROM session_queue
-                        WHERE queue_id = ? AND user_id = ? AND batch_id = ?
+                        WHERE +queue_id = ? AND +user_id = ? AND batch_id = ?
                         LIMIT 1;
                         """,
                         (queue_id, user_id, accepted_batch_id),
@@ -501,7 +498,7 @@ class SqliteSessionQueue(SessionQueueBase):
                 """--sql
                 SELECT item_id
                 FROM session_queue
-                WHERE queue_id = ? AND user_id = ? AND batch_id = ?
+                WHERE +queue_id = ? AND +user_id = ? AND batch_id = ?
                 ORDER BY item_id ASC;
                 """,
                 (queue_id, user_id, accepted_batch.batch_id),
@@ -1271,7 +1268,8 @@ class SqliteSessionQueue(SessionQueueBase):
                 """,
                 tuple(params),
             )
-            item_ids = [row[0] for row in cursor.fetchall()]
+            # Cancel in id order; sorted here for the reason given in _collect_item_ids_by_user.
+            item_ids = sorted(row[0] for row in cursor.fetchall())
 
         canceled: list[int] = []
         for item_id in item_ids:
@@ -1308,7 +1306,9 @@ class SqliteSessionQueue(SessionQueueBase):
             tuple(params),
         )
         item_ids_by_user: dict[str, list[int]] = {}
-        for item_id, owner_user_id in cursor.fetchall():
+        # Ascending ids, sorted here rather than in SQL: an ORDER BY moves the plan off the covering
+        # idx_session_queue_listing onto a user index that reads every row of the user's history.
+        for item_id, owner_user_id in sorted(tuple(row) for row in cursor.fetchall()):
             item_ids_by_user.setdefault(owner_user_id, []).append(item_id)
         return item_ids_by_user
 
@@ -1735,14 +1735,7 @@ class SqliteSessionQueue(SessionQueueBase):
             if parent_status_row[0] in ("completed", "failed", "canceled"):
                 raise ValueError("Cannot enqueue workflow call children for a terminal parent queue item.")
 
-            cursor.execute(
-                """--sql
-                SELECT COUNT(*)
-                FROM session_queue
-                WHERE queue_id = ? AND status = 'pending'
-                """,
-                (parent_queue_item.queue_id,),
-            )
+            cursor.execute(PENDING_QUEUE_ITEM_COUNT_QUERY, (parent_queue_item.queue_id,))
             pending_count = cast(int, cursor.fetchone()[0])
             max_queue_size = self.__invoker.services.configuration.max_queue_size
             if pending_count + len(child_sessions) > max_queue_size:
@@ -1858,14 +1851,7 @@ class SqliteSessionQueue(SessionQueueBase):
             if parent_row[0] in ("completed", "failed", "canceled"):
                 raise ValueError("Cannot enqueue workflow call child for a terminal parent queue item.")
 
-            cursor.execute(
-                """--sql
-                SELECT COUNT(*)
-                FROM session_queue
-                WHERE queue_id = ? AND status = 'pending'
-                """,
-                (parent_queue_item.queue_id,),
-            )
+            cursor.execute(PENDING_QUEUE_ITEM_COUNT_QUERY, (parent_queue_item.queue_id,))
             pending_count = cast(int, cursor.fetchone()[0])
             if pending_count >= self.__invoker.services.configuration.max_queue_size:
                 raise TooManySessionsError(
@@ -1989,7 +1975,7 @@ class SqliteSessionQueue(SessionQueueBase):
 
             if item_id is not None:
                 query += """--sql
-                    AND (priority < ?) OR (priority = ? AND item_id > ?)
+                    AND ((priority < ?) OR (priority = ? AND item_id > ?))
                     """
                 params.extend([priority, priority, item_id])
 
@@ -2083,7 +2069,9 @@ class SqliteSessionQueue(SessionQueueBase):
                 query += " AND origin LIKE ?"
                 query_params.append(f"{origin_prefix}%")
 
-            query += f" ORDER BY created_at {order_dir.value}"
+            # Items enqueued together share a created_at; they stay in enqueue order in either
+            # direction. idx_session_queue_listing, scanned backwards, yields the newest-first order.
+            query += f" ORDER BY created_at {order_dir.value}, item_id ASC"
 
             cursor_.execute(query, query_params)
             result = cast(list[sqlite3.Row], cursor_.fetchall())
@@ -2100,6 +2088,9 @@ class SqliteSessionQueue(SessionQueueBase):
             # Each id becomes one bind parameter, so a single IN (...) would blow past SQLite's
             # per-statement variable limit for large id lists. Query in chunks instead - callers
             # are bounded at the API layer, but this keeps any caller from hitting that ceiling.
+            # The unary + keeps queue_id off idx_session_queue_listing, so the requested primary
+            # keys are looked up rather than the queue's history scanned (see
+            # PENDING_QUEUE_ITEM_COUNT_QUERY for the rule).
             for chunk_start in range(0, len(item_ids), SQLITE_MAX_BIND_PARAMS_PER_CHUNK):
                 chunk = item_ids[chunk_start : chunk_start + SQLITE_MAX_BIND_PARAMS_PER_CHUNK]
                 placeholders = ", ".join("?" for _ in chunk)
@@ -2122,7 +2113,7 @@ class SqliteSessionQueue(SessionQueueBase):
                         sq.parent_item_id
                     FROM session_queue sq
                     LEFT JOIN users u ON sq.user_id = u.user_id
-                    WHERE sq.queue_id = ? AND sq.item_id IN ({placeholders})
+                    WHERE +sq.queue_id = ? AND sq.item_id IN ({placeholders})
                     """,
                     (queue_id, *chunk),
                 )
@@ -2251,7 +2242,8 @@ class SqliteSessionQueue(SessionQueueBase):
                 """
             params: list[str] = [queue_id, batch_id]
             if user_id is not None:
-                query += " AND user_id = ?"
+                # + keeps the batch_id index in charge (see PENDING_QUEUE_ITEM_COUNT_QUERY).
+                query += " AND +user_id = ?"
                 params.append(user_id)
             query += " GROUP BY status"
             cursor.execute(query, params)
