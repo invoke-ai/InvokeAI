@@ -204,6 +204,20 @@
     },
     {
       "category": "PATHS",
+      "default": "full",
+      "description": "SQLite durability setting. `full`, the default and what InvokeAI has always used, flushes every commit to disk. `normal` acknowledges commits without waiting for that flush - measured at roughly 12x shorter commits on an SSD - and cannot corrupt the database under WAL, which is why it is refused, with a warning, when WAL is unavailable for the database file. What `normal` gives up is the most recent transactions on a power loss or OS crash: a just-written image record or queue status, not the image file itself.",
+      "env_var": "INVOKEAI_DB_SYNCHRONOUS",
+      "literal_values": [
+        "full",
+        "normal"
+      ],
+      "name": "db_synchronous",
+      "required": false,
+      "type": "typing.Literal['full', 'normal']",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
       "default": "outputs",
       "description": "Path to directory for outputs.",
       "env_var": "INVOKEAI_OUTPUTS_DIR",
@@ -222,6 +236,39 @@
       "name": "fonts_dir",
       "required": false,
       "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": "fonts-uploaded",
+      "description": "Path to application-managed uploaded fonts.",
+      "env_var": "INVOKEAI_FONTS_STORAGE_DIR",
+      "literal_values": [],
+      "name": "fonts_storage_dir",
+      "required": false,
+      "type": "<class 'pathlib.Path'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": 33554432,
+      "description": "Maximum size of one uploaded custom font in bytes.",
+      "env_var": "INVOKEAI_MAX_FONT_UPLOAD_BYTES",
+      "literal_values": [],
+      "name": "max_font_upload_bytes",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
+      "category": "PATHS",
+      "default": 1073741824,
+      "description": "Maximum total size of uploaded custom fonts in bytes per account or shared library.",
+      "env_var": "INVOKEAI_MAX_FONT_LIBRARY_BYTES",
+      "literal_values": [],
+      "name": "max_font_library_bytes",
+      "required": false,
+      "type": "<class 'int'>",
       "validation": {}
     },
     {
@@ -481,6 +528,50 @@
     },
     {
       "category": "CACHE",
+      "default": true,
+      "description": "When a session uses main models of another architecture than the previous one on the same GPU, move every model it does not use from VRAM to RAM before it runs. Models both sessions use stay. Switching back reloads the moved models from RAM, which costs a few seconds per switch when both architectures would have fit in VRAM together; turn this off if you alternate between such models.",
+      "env_var": "INVOKEAI_OFFLOAD_ON_ARCHITECTURE_SWITCH",
+      "literal_values": [],
+      "name": "offload_on_architecture_switch",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": false,
+      "description": "After every queue item (each image of a batch), move the models held in VRAM to RAM and return the freed memory to the GPU driver. The models stay cached in RAM; the next item reloads them from there, which costs a few seconds (more with keep_ram_copy_of_weights off). Changes nothing where VRAM is system memory (CPU, MPS, integrated GPUs). Turn this on if a generation that runs fine the first time runs out of memory, or slows down sharply because the GPU spills into shared memory, when it is repeated.",
+      "env_var": "INVOKEAI_CLEAR_VRAM_AFTER_SESSION",
+      "literal_values": [],
+      "name": "clear_vram_after_session",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": false,
+      "description": "Keep ComfyUI 'scaled fp8' checkpoints quantized instead of dequantizing them at load, and run their matmuls on the fp8 tensor cores (requires an Ada/SM 8.9 or newer NVIDIA GPU, or a ROCm GPU that passes an fp8 matmul probe; falls back automatically otherwise). Speeds up denoising and keeps the transformer at fp8 size - FP8 Storage alone also keeps it at that size, without the speedup - but quantizes activations as well, so images will differ from previous versions at the same seed. Reproducibility also requires the model to be FULLY resident in VRAM: a layer whose weights are still in RAM falls back to the dequantized path, and since which layers are resident shifts from run to run, the same seed then yields visibly different images. For repeatable output, ensure the model loads at 100% (e.g. enable_partial_loading=false with enough free VRAM).",
+      "env_var": "INVOKEAI_FP8_COMPUTE",
+      "literal_values": [],
+      "name": "fp8_compute",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
+      "default": true,
+      "description": "Honor the per-layer 'full_precision_matrix_mult' flags that some scaled-fp8 checkpoints ship. Those layers then dequantize on every forward instead of using the fp8 tensor cores, which can cost a large part of the fp8_compute speedup - on checkpoints that mark many layers, most of it. Set to false to run every quantized layer on the fp8 tensor cores, ignoring the producer's instruction; faster, but the marked layers were flagged as numerically sensitive, so quality may suffer. Only has an effect when fp8_compute is enabled.",
+      "env_var": "INVOKEAI_FP8_COMPUTE_FULL_PRECISION_HINTS",
+      "literal_values": [],
+      "name": "fp8_compute_full_precision_hints",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "CACHE",
       "default": null,
       "description": "DEPRECATED: This setting is no longer used. It has been replaced by `max_cache_ram_gb`, but most users will not need to use this config since automatic cache size limits should work well in most cases. This config setting will be removed once the new model cache behavior is stable.",
       "env_var": "INVOKEAI_RAM",
@@ -515,7 +606,7 @@
     {
       "category": "CACHE",
       "default": null,
-      "description": "Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally.",
+      "description": "Configure the Torch CUDA memory allocator. This will impact peak reserved VRAM usage and performance. Setting to \"backend:cudaMallocAsync\" works well on many systems. The optimal configuration is highly dependent on the system configuration (device type, VRAM, CUDA driver version, etc.), so must be tuned experimentally. Unset on a ROCm build of PyTorch on Windows, \"expandable_segments:True\" is used.",
       "env_var": "INVOKEAI_PYTORCH_CUDA_ALLOC_CONF",
       "literal_values": [],
       "name": "pytorch_cuda_alloc_conf",
@@ -585,6 +676,20 @@
     },
     {
       "category": "GENERATION",
+      "default": "float32",
+      "description": "The dtype seeded noise is drawn in for SD1.5/SDXL, SD3, FLUX.1, FLUX.2, CogView4 and the Z-Image seed variance enhancer. `float32` draws the same noise on every platform. `float16` is the half-precision draw of earlier versions: on macOS it keeps the images your seeds gave before this update; on Windows and Linux both values give (nearly) the same images, and images made before the update cannot be reproduced there.",
+      "env_var": "INVOKEAI_NOISE_DTYPE",
+      "literal_values": [
+        "float32",
+        "float16"
+      ],
+      "name": "noise_dtype",
+      "required": false,
+      "type": "typing.Literal['float32', 'float16']",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
       "default": false,
       "description": "Enable experimental Wan memory optimizations at the cost of slower generation.",
       "env_var": "INVOKEAI_WAN_MEMORY_OPTIMIZATION",
@@ -648,10 +753,21 @@
     {
       "category": "GENERATION",
       "default": false,
-      "description": "Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty).",
+      "description": "Whether to enable tiled VAE decode (reduces memory consumption with some performance penalty). A tiled decode is not pixel-identical to a single-pass one: a VAE decoder normalises and attends over the whole image, so the difference is spread across it rather than confined to the tile seams. Also tiles the encode. Read by the SD1.5/SDXL, FLUX.1, Z-Image and Qwen-Image VAE nodes, the Anima encode and the Krea-2 style reference; other model families ignore it.",
       "env_var": "INVOKEAI_FORCE_TILED_DECODE",
       "literal_values": [],
       "name": "force_tiled_decode",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "GENERATION",
+      "default": true,
+      "description": "Decode large images in tiles when an untiled decode's estimated working memory would take most of the GPU's memory (FLUX.1, Z-Image, Qwen-Image, Krea-2 and Wan decodes). Turn off to decode untiled unless tiling is requested; the FLUX.1 and Z-Image decodes then still retry tiled after running out of memory. Anima keeps tiling a decode too large for its GPU either way, because tiling is what makes that case fast there.",
+      "env_var": "INVOKEAI_AUTO_TILED_DECODE",
+      "literal_values": [],
+      "name": "auto_tiled_decode",
       "required": false,
       "type": "<class 'bool'>",
       "validation": {}
@@ -865,6 +981,50 @@
       "validation": {}
     },
     {
+      "category": "IMAGE INDEX",
+      "default": true,
+      "description": "Maintain a semantic embedding index of gallery images and videos, used by the image map and semantic search features.",
+      "env_var": "INVOKEAI_IMAGE_INDEX_ENABLED",
+      "literal_values": [],
+      "name": "image_index_enabled",
+      "required": false,
+      "type": "<class 'bool'>",
+      "validation": {}
+    },
+    {
+      "category": "IMAGE INDEX",
+      "default": "DFN2B-CLIP-ViT-L-14-39B",
+      "description": "Name of the installed CLIP Vision or SigLIP model used to embed gallery images and video thumbnails. Changing the model discards embeddings computed by the previous model.",
+      "env_var": "INVOKEAI_IMAGE_INDEX_MODEL",
+      "literal_values": [],
+      "name": "image_index_model",
+      "required": false,
+      "type": "<class 'str'>",
+      "validation": {}
+    },
+    {
+      "category": "IMAGE INDEX",
+      "default": null,
+      "description": "Set to `cpu` to compute image embeddings on the CPU with a service-local copy of the model - avoids VRAM use and lets indexing run during generations. Any other value is ignored: embeddings otherwise run on the model cache's device, pausing while generations are in progress.",
+      "env_var": "INVOKEAI_IMAGE_INDEX_DEVICE",
+      "literal_values": [],
+      "name": "image_index_device",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "IMAGE INDEX",
+      "default": 8,
+      "description": "Number of gallery items embedded per batch by the image index worker.",
+      "env_var": "INVOKEAI_IMAGE_INDEX_BATCH_SIZE",
+      "literal_values": [],
+      "name": "image_index_batch_size",
+      "required": false,
+      "type": "<class 'int'>",
+      "validation": {}
+    },
+    {
       "category": "EXTERNAL PROVIDERS",
       "default": null,
       "description": "API key for Alibaba Cloud DashScope image generation.",
@@ -882,6 +1042,28 @@
       "env_var": "INVOKEAI_EXTERNAL_ALIBABACLOUD_BASE_URL",
       "literal_values": [],
       "name": "external_alibabacloud_base_url",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "API key for Atlas Cloud image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_ATLASCLOUD_API_KEY",
+      "literal_values": [],
+      "name": "external_atlascloud_api_key",
+      "required": false,
+      "type": "typing.Optional[str]",
+      "validation": {}
+    },
+    {
+      "category": "EXTERNAL PROVIDERS",
+      "default": null,
+      "description": "Base URL override for Atlas Cloud image generation.",
+      "env_var": "INVOKEAI_EXTERNAL_ATLASCLOUD_BASE_URL",
+      "literal_values": [],
+      "name": "external_atlascloud_base_url",
       "required": false,
       "type": "typing.Optional[str]",
       "validation": {}

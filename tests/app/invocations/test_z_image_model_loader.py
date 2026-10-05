@@ -12,7 +12,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from invokeai.app.invocations.model import ModelIdentifierField
-from invokeai.app.invocations.z_image_model_loader import ZImageModelLoaderInvocation
+from invokeai.app.invocations.z_image.z_image_model_loader import ZImageModelLoaderInvocation
 from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, SubModelType
 
 

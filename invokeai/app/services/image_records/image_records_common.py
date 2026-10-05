@@ -63,8 +63,21 @@ ASSETS_CATEGORIES: list[ImageCategory] = [
     ImageCategory.CONTROL,
     ImageCategory.MASK,
     ImageCategory.USER,
-    ImageCategory.OTHER,
 ]
+"""The categories the gallery's assets view lists.
+
+OTHER is deliberately absent: it is the private category for images a canvas
+layer owns (paint bitmaps, composites, adopted filter results). Those are layer
+pixels, not gallery content, so they belong to neither view. Because OTHER is in
+neither IMAGE_CATEGORIES nor ASSETS_CATEGORIES, such an image can stay durable —
+safe from intermediate garbage collection, which would strand the layer pointing
+at it — without ever surfacing in the gallery or in a board's counts.
+"""
+
+
+def is_gallery_category(category: ImageCategory) -> bool:
+    """Whether media of this category shows in a gallery view (Images or Assets)."""
+    return category in IMAGE_CATEGORIES or category in ASSETS_CATEGORIES
 
 
 class InvalidImageCategoryException(ValueError):
@@ -116,6 +129,8 @@ IMAGE_DTO_COLS = ", ".join(
             "deleted_at",
             "starred",
             "image_subfolder",
+            "project_id",
+            "file_size_bytes",
         ]
     ]
 )
@@ -158,6 +173,12 @@ class ImageRecord(BaseModelExcludeNull):
     """Whether this image is starred."""
     has_workflow: bool = Field(description="Whether this image has a workflow.")
     image_subfolder: str = Field(default="", description="The subfolder where the image is stored on disk.")
+    project_id: Optional[str] = Field(
+        default=None, description="The project this image originated in, if it was made for one."
+    )
+    file_size_bytes: Optional[int] = Field(
+        default=None, description="Bytes the image and its thumbnail occupy on disk; null until measured."
+    )
 
 
 class ImageRecordChanges(BaseModelExcludeNull, extra="allow"):
@@ -203,6 +224,8 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
     starred = image_dict.get("starred", False)
     has_workflow = image_dict.get("has_workflow", False)
     image_subfolder = image_dict.get("image_subfolder", "")
+    project_id = image_dict.get("project_id", None)
+    file_size_bytes = image_dict.get("file_size_bytes", None)
 
     return ImageRecord(
         image_name=image_name,
@@ -219,6 +242,8 @@ def deserialize_image_record(image_dict: dict) -> ImageRecord:
         starred=starred,
         has_workflow=has_workflow,
         image_subfolder=image_subfolder,
+        project_id=project_id,
+        file_size_bytes=file_size_bytes,
     )
 
 

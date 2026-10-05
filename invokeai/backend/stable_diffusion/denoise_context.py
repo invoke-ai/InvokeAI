@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from contextlib import ExitStack
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Any, Dict, Optional, Tuple, Type, Union
 
@@ -72,6 +73,15 @@ class DenoiseInputs:
 @dataclass
 class DenoiseContext:
     """Context with all variables in denoise"""
+
+    # Format used in this run.
+    dtype: torch.dtype
+
+    # Device used in this run.
+    device: torch.device
+
+    # Context manager to load extension models.
+    exit_stack: ExitStack
 
     # Initial variables passed to denoise. Supposed to be unchanged.
     inputs: DenoiseInputs

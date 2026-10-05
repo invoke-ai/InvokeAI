@@ -16,6 +16,9 @@ class IfInvocationOutput(BaseInvocationOutput):
 class IfInvocation(BaseInvocation):
     """Selects between two optional inputs based on a boolean condition."""
 
+    execution_effects_enabled = True
+    execution_activation_fields = frozenset({"true_input", "false_input"})
+
     condition: bool = InputField(default=False, description="The condition used to select an input", title="Condition")
     true_input: Optional[Any] = InputField(
         default=None,
@@ -31,4 +34,8 @@ class IfInvocation(BaseInvocation):
     )
 
     def invoke(self, context: InvocationContext) -> IfInvocationOutput:
+        selected_field = "true_input" if self.condition else "false_input"
+        execution = getattr(context, "execution", None)
+        if execution is not None:
+            execution.emit(selected_field, selected_field, token_kind="activation")
         return IfInvocationOutput(value=self.true_input if self.condition else self.false_input)

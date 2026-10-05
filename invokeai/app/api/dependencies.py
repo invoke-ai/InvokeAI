@@ -1,5 +1,3 @@
-# Copyright (c) 2022 Kyle Schouviller (https://github.com/kyle0654)
-
 import asyncio
 from logging import Logger
 
@@ -20,16 +18,22 @@ from invokeai.app.services.events.events_fastapievents import FastAPIEventServic
 from invokeai.app.services.external_generation.external_generation_default import ExternalGenerationService
 from invokeai.app.services.external_generation.providers import (
     AlibabaCloudProvider,
+    AtlasCloudProvider,
     GeminiProvider,
     OpenAIProvider,
     SeedreamProvider,
 )
 from invokeai.app.services.external_generation.startup import sync_configured_external_starter_models
+from invokeai.app.services.fonts.fonts_default import FontService
 from invokeai.app.services.gallery.gallery_default import SqliteGalleryService
 from invokeai.app.services.image_files.image_files_disk import DiskImageFileStorage
+from invokeai.app.services.image_index.image_index_default import ImageIndexService, warm_up_attention
+from invokeai.app.services.image_index.image_index_records_sqlite import ImageIndexRecordsSqlite
 from invokeai.app.services.image_moves.image_moves_default import ImageMoveService
 from invokeai.app.services.image_records.image_records_sqlite import SqliteImageRecordStorage
 from invokeai.app.services.images.images_default import ImageService
+from invokeai.app.services.intermediates.intermediates_default import IntermediatesService
+from invokeai.app.services.intermediates.intermediates_records_sqlite import IntermediatesRecordsSqlite
 from invokeai.app.services.invocation_cache.invocation_cache_memory import MemoryInvocationCache
 from invokeai.app.services.invocation_services import InvocationServices
 from invokeai.app.services.invocation_stats.invocation_stats_default import InvocationStatsService
@@ -44,6 +48,8 @@ from invokeai.app.services.model_relationships.model_relationships_default impor
 from invokeai.app.services.names.names_default import SimpleNameService
 from invokeai.app.services.object_serializer.object_serializer_disk import ObjectSerializerDisk
 from invokeai.app.services.object_serializer.object_serializer_forward_cache import ObjectSerializerForwardCache
+from invokeai.app.services.progress_previews.progress_previews_default import MemoryProgressPreviews
+from invokeai.app.services.project_records.project_records_sqlite import ProjectRecordsSqlite
 from invokeai.app.services.session_processor.session_processor_default import (
     DefaultSessionProcessor,
     DefaultSessionRunner,
@@ -58,23 +64,12 @@ from invokeai.app.services.users.users_default import UserService
 from invokeai.app.services.video_files.video_files_disk import DiskVideoFileStorage
 from invokeai.app.services.video_records.video_records_sqlite import SqliteVideoRecordStorage
 from invokeai.app.services.videos.videos_default import VideoService
+from invokeai.app.services.wildcard_records.wildcard_records_sqlite import SqliteWildcardRecordsStorage
 from invokeai.app.services.workflow_records.workflow_records_sqlite import SqliteWorkflowRecordsStorage
 from invokeai.app.services.workflow_thumbnails.workflow_thumbnails_disk import WorkflowThumbnailFileStorageDisk
-from invokeai.backend.stable_diffusion.diffusion.conditioning_data import (
-    AnimaConditioningInfo,
-    BasicConditioningInfo,
-    CogView4ConditioningInfo,
-    ConditioningFieldData,
-    ErnieImageConditioningInfo,
-    FLUXConditioningInfo,
-    Ideogram4ConditioningInfo,
-    Krea2ConditioningInfo,
-    QwenImageConditioningInfo,
-    SD3ConditioningInfo,
-    SDXLConditioningInfo,
-    WanConditioningInfo,
-    ZImageConditioningInfo,
-)
+from invokeai.backend.architectures import conditioning_safe_globals
+from invokeai.backend.architectures import validate as validate_architectures
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData
 from invokeai.backend.util.logging import InvokeAILogger
 from invokeai.version.invokeai_version import __version__
 
@@ -110,6 +105,15 @@ class ApiDependencies:
         loop: asyncio.AbstractEventLoop,
         logger: Logger = logger,
     ) -> None:
+        # The one authoritative architecture gate. Every entry point that builds services comes
+        # through here — `run_app`'s lifespan, and the embedders and tests that never go through
+        # `run_app` at all — so this is the only place it is called. It runs before anything else
+        # because `ObjectSerializerDisk` below derives its `safe_globals` from the registry, and
+        # that mutates process-global torch state. The import above is at module scope rather than
+        # lazily inside this function for the same reason, one step earlier: it is what fills the
+        # registry, and importing this module is all `scripts/generate_openapi_schema.py` does.
+        validate_architectures()
+
         logger.info(f"InvokeAI version {__version__}")
         logger.info(f"Root directory = {str(config.root_path)}")
 
@@ -159,21 +163,12 @@ class ApiDependencies:
         conditioning = ObjectSerializerForwardCache(
             ObjectSerializerDisk[ConditioningFieldData](
                 output_folder / "conditioning",
-                safe_globals=[
-                    ConditioningFieldData,
-                    BasicConditioningInfo,
-                    SDXLConditioningInfo,
-                    FLUXConditioningInfo,
-                    SD3ConditioningInfo,
-                    CogView4ConditioningInfo,
-                    ZImageConditioningInfo,
-                    ErnieImageConditioningInfo,
-                    Ideogram4ConditioningInfo,
-                    QwenImageConditioningInfo,
-                    Krea2ConditioningInfo,
-                    AnimaConditioningInfo,
-                    WanConditioningInfo,
-                ],
+                # Every architecture's conditioning class, from what each declares under
+                # invokeai/backend/architectures/defs/. Missing one here fails nowhere near
+                # here: the encoder runs, writes its output, and the denoise node then dies
+                # unpickling it — which is why the list is assembled in one place and this call
+                # site is asserted against it in tests/backend/architectures/test_conditioning.py.
+                safe_globals=conditioning_safe_globals(),
                 ephemeral=True,
             ),
         )
@@ -188,6 +183,7 @@ class ApiDependencies:
         external_generation = ExternalGenerationService(
             providers={
                 AlibabaCloudProvider.provider_id: AlibabaCloudProvider(app_config=configuration, logger=logger),
+                AtlasCloudProvider.provider_id: AtlasCloudProvider(app_config=configuration, logger=logger),
                 GeminiProvider.provider_id: GeminiProvider(app_config=configuration, logger=logger),
                 OpenAIProvider.provider_id: OpenAIProvider(app_config=configuration, logger=logger),
                 SeedreamProvider.provider_id: SeedreamProvider(app_config=configuration, logger=logger),
@@ -205,11 +201,24 @@ class ApiDependencies:
         urls = LocalUrlService()
         workflow_records = SqliteWorkflowRecordsStorage(db=db)
         style_preset_records = SqliteStylePresetRecordsStorage(db=db)
+        wildcard_records = SqliteWildcardRecordsStorage(db=db)
         style_preset_image_files = StylePresetImageFileStorageDisk(style_presets_folder / "images")
         system_prompt_records = SqliteSystemPromptRecordsStorage(db=db)
         workflow_thumbnails = WorkflowThumbnailFileStorageDisk(workflow_thumbnails_folder)
         client_state_persistence = ClientStatePersistenceSqlite(db=db)
+        project_records = ProjectRecordsSqlite(db=db)
         users = UserService(db=db)
+        image_index_records = ImageIndexRecordsSqlite(db=db)
+        image_index = ImageIndexService()
+        intermediates = IntermediatesService(records=IntermediatesRecordsSqlite(db=db), logger=logger)
+        fonts = FontService(
+            db=db,
+            fonts_dir=configuration.fonts_path,
+            storage_dir=configuration.fonts_storage_path,
+            logger=logger,
+            max_upload_bytes=configuration.max_font_upload_bytes,
+            max_library_bytes=configuration.max_font_library_bytes,
+        )
 
         services = InvocationServices(
             board_image_records=board_image_records,
@@ -221,6 +230,7 @@ class ApiDependencies:
             events=events,
             image_files=image_files,
             image_moves=image_moves,
+            progress_previews=MemoryProgressPreviews(),
             image_records=image_records,
             images=images,
             invocation_cache=invocation_cache,
@@ -240,17 +250,29 @@ class ApiDependencies:
             tensors=tensors,
             conditioning=conditioning,
             style_preset_records=style_preset_records,
+            wildcard_records=wildcard_records,
             style_preset_image_files=style_preset_image_files,
             system_prompt_records=system_prompt_records,
             workflow_thumbnails=workflow_thumbnails,
             client_state_persistence=client_state_persistence,
+            project_records=project_records,
             users=users,
             videos=videos,
             video_files=video_files,
             video_records=video_records,
             board_video_records=board_video_records,
             gallery=gallery,
+            image_index_records=image_index_records,
+            image_index=image_index,
+            fonts=fonts,
+            intermediates=intermediates,
         )
+
+        # Constructing the Invoker starts every service, including the session
+        # processor thread (which may immediately resume queue items that were
+        # pending at shutdown). Trigger torch attention's lazy, non-thread-safe
+        # kernel init while the process is still single-threaded.
+        warm_up_attention(config, logger)
 
         ApiDependencies.invoker = Invoker(services)
         configured_external_providers = {

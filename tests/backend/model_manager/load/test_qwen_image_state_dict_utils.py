@@ -12,7 +12,6 @@ from invokeai.backend.model_manager.load.model_loaders.qwen_image import (
     _build_qwen_image_transformer_config,
     _dequantize_comfyui_fp8,
     _remap_qwen_vl_checkpoint_keys,
-    _strip_comfyui_prefix,
     _strip_quantization_metadata,
 )
 from tests.backend.model_manager.load.state_dicts.qwen_vl_encoder_comfyui_keys import (
@@ -130,20 +129,6 @@ class TestDequantizeComfyuiFp8:
         assert count == 1
         expected = torch.tensor([[10.0, 10.0], [10.0, 10.0], [20.0, 20.0], [20.0, 20.0]])
         assert torch.allclose(sd["l.weight"], expected)
-
-
-class TestStripComfyuiPrefix:
-    def test_strips_diffusion_model_prefix(self):
-        sd = {
-            "model.diffusion_model.transformer_blocks.0.img_mod.1.weight": torch.empty(1),
-            "model.diffusion_model.img_in.weight": torch.empty(1),
-        }
-        out = _strip_comfyui_prefix(sd)
-        assert set(out.keys()) == {"transformer_blocks.0.img_mod.1.weight", "img_in.weight"}
-
-    def test_no_prefix_is_a_noop(self):
-        sd = {"transformer_blocks.0.x": torch.empty(1)}
-        assert _strip_comfyui_prefix(sd) is sd
 
 
 class TestBuildQwenImageTransformerConfig:

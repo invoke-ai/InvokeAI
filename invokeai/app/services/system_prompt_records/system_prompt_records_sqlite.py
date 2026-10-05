@@ -41,10 +41,17 @@ class SqliteSystemPromptRecordsStorage(SystemPromptRecordsStorageBase):
         with self._db.transaction() as cursor:
             cursor.execute(
                 """--sql
-                INSERT INTO system_prompts (id, name, content, user_id, is_public)
-                VALUES (?, ?, ?, ?, ?);
+                INSERT INTO system_prompts (id, name, content, user_id, is_public, max_tokens)
+                VALUES (?, ?, ?, ?, ?, ?);
                 """,
-                (system_prompt_id, system_prompt.name, system_prompt.content, user_id, is_public),
+                (
+                    system_prompt_id,
+                    system_prompt.name,
+                    system_prompt.content,
+                    user_id,
+                    is_public,
+                    system_prompt.max_tokens,
+                ),
             )
         return self.get(system_prompt_id)
 
@@ -83,6 +90,14 @@ class SqliteSystemPromptRecordsStorage(SystemPromptRecordsStorageBase):
                 cursor.execute(
                     f"UPDATE system_prompts SET is_public = ? WHERE id = ?{scope_clause};",
                     (changes.is_public, system_prompt_id, *scope_args),
+                )
+            # `max_tokens` is the one field whose null is a value rather than "no change": it means
+            # "drop back to the endpoint default". `is not None` would make a cap unclearable once
+            # set, so the presence of the key in the request body decides instead.
+            if "max_tokens" in changes.model_fields_set:
+                cursor.execute(
+                    f"UPDATE system_prompts SET max_tokens = ? WHERE id = ?{scope_clause};",
+                    (changes.max_tokens, system_prompt_id, *scope_args),
                 )
         return self.get(system_prompt_id)
 

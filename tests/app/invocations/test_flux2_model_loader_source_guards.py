@@ -22,8 +22,8 @@ from unittest.mock import MagicMock
 
 import pytest
 
-from invokeai.app.invocations.flux2_dev_model_loader import Flux2DevModelLoaderInvocation
-from invokeai.app.invocations.flux2_klein_model_loader import Flux2KleinModelLoaderInvocation
+from invokeai.app.invocations.flux2.flux2_dev_model_loader import Flux2DevModelLoaderInvocation
+from invokeai.app.invocations.flux2.flux2_klein_model_loader import Flux2KleinModelLoaderInvocation
 from invokeai.app.invocations.model import ModelIdentifierField
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,

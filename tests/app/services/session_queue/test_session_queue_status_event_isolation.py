@@ -209,11 +209,11 @@ def test_event_redaction_uses_same_lightweight_snapshot(
     a_event = _last_status_event_for_item(event_bus, a_item_id)
     assert a_event.user_id == user_a
     assert a_event.queue_status.item_id is None, (
-        "race-window leak: other user's item_id survived because the second "
-        "get_current() returned None and the redaction guard was skipped"
+        "leak: B's item_id reached A's event — the identifier read and the redaction "
+        "decision must come from one snapshot inside a single transaction"
     )
-    assert a_event.queue_status.session_id is None, "race-window leak of session_id"
-    assert a_event.queue_status.batch_id is None, "race-window leak of batch_id"
+    assert a_event.queue_status.session_id is None, "leak of B's session_id"
+    assert a_event.queue_status.batch_id is None, "leak of B's batch_id"
 
 
 def test_event_preserves_identifiers_when_current_item_is_the_changed_item(

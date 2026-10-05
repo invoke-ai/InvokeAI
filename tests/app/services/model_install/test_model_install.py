@@ -12,11 +12,13 @@ import uuid
 from pathlib import Path
 from types import SimpleNamespace
 from typing import Any, Dict
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic_core import Url
 
 from invokeai.app.services.config import InvokeAIAppConfig
+from invokeai.app.services.download import DownloadJob, MultiFileDownloadJob
 from invokeai.app.services.events.events_base import EventServiceBase
 from invokeai.app.services.events.events_common import (
     ModelInstallCompleteEvent,
@@ -45,6 +47,7 @@ from invokeai.app.services.model_install.model_install_default import (
 )
 from invokeai.app.services.model_records import ModelRecordChanges, UnknownModelException
 from invokeai.backend.model_manager.configs.external_api import ExternalApiModelConfig
+from invokeai.backend.model_manager.metadata import RemoteModelFile
 from invokeai.backend.model_manager.taxonomy import (
     BaseModelType,
     ModelFormat,
@@ -96,6 +99,26 @@ def test_registration_meta_override_succeed(mm2_installer: ModelInstallServiceBa
     assert model_record.name == "banana_sushi"
     assert model_record.source == "fake/repo_id"
     assert model_record.key == "xyzzy"
+
+
+def test_registration_keeps_the_default_settings_sent_with_the_install(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path
+) -> None:
+    """Identification computes a model's default settings; the ones a user picked while installing must survive it."""
+    import torch
+    from safetensors.torch import save_file
+
+    checkpoint = tmp_path / "qwen_image.safetensors"
+    save_file(
+        {"img_in.weight": torch.zeros(8, 4), "txt_in.weight": torch.zeros(8, 4), "txt_norm.weight": torch.ones(4)},
+        str(checkpoint),
+    )
+
+    key = mm2_installer.register_path(checkpoint, ModelRecordChanges(default_settings={"fp8_storage": True}))
+
+    record = mm2_installer.record_store.get_model(key)
+    assert record.default_settings is not None
+    assert record.default_settings.fp8_storage is True
 
 
 def test_install(
@@ -1001,6 +1024,106 @@ def test_restore_paused_hf_install_preserves_access_token(
         shutil.rmtree(tmpdir, ignore_errors=True)
 
 
+def test_restart_failed_uses_parts_created_before_download_started(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    part = DownloadJob(
+        source=source.url,
+        dest=tmp_path / "model.safetensors",
+        canonical_url="https://cdn.example.com/model.safetensors",
+        etag='"model-etag"',
+        expected_total_bytes=8,
+    )
+    download_job = MultiFileDownloadJob(id=123, dest=tmp_path, download_parts={part})
+    job = ModelInstallJob(id=99999, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+
+    monkeypatch.setattr(mm2_installer, "_multifile_download", lambda **_: download_job)
+    submit_multifile_download = MagicMock()
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", submit_multifile_download)
+    mm2_installer._enqueue_remote_download(
+        job=job,
+        source=source,
+        remote_files=[remote_file],
+        metadata=None,
+        destdir=tmp_path,
+    )
+
+    part.resume_required = True
+    mm2_installer._download_cancelled_callback(download_job)
+
+    assert job.status == InstallStatus.PAUSED
+    assert job.model_dump(mode="json")["download_parts"][0]["resume_required"] is True
+    marker = mm2_installer._read_install_marker(tmp_path)
+    assert marker is not None
+    assert marker["files"][0]["etag"] == '"model-etag"'
+    assert marker["files"][0]["resume_required"] is True
+    submit_multifile_download.assert_called_once_with(download_job)
+
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    enqueue_remote_download = MagicMock()
+    monkeypatch.setattr(mm2_installer, "_enqueue_remote_download", enqueue_remote_download)
+    mm2_installer.restart_failed(job)
+
+    assert job.status == InstallStatus.WAITING
+    enqueue_remote_download.assert_called_once()
+    assert enqueue_remote_download.call_args.kwargs["clear_partials"] is True
+
+
+def test_resume_reports_restart_from_scratch_on_fresh_parts(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Resuming replaces download_parts; a vanished partial file must still be reported on the new parts."""
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    old_part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    old_part.bytes = 4
+    old_part.download_path = tmp_path / "model.safetensors"  # no .downloading file on disk
+    job = ModelInstallJob(id=4242, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
+    job._install_tmpdir = tmp_path
+    job.download_parts = {old_part}
+    job.status = InstallStatus.PAUSED
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    submit_multifile_download = MagicMock()
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", submit_multifile_download)
+
+    mm2_installer.resume_job(job)
+
+    submit_multifile_download.assert_called_once()
+    assert old_part not in job.download_parts
+    parts = job.model_dump(mode="json")["download_parts"]
+    assert len(parts) == 1
+    assert parts[0]["resume_from_scratch"] is True
+    assert "Partial file missing" in parts[0]["resume_message"]
+
+
+def test_resume_does_not_report_restart_from_scratch_when_partial_exists(
+    mm2_installer: ModelInstallServiceBase, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    assert isinstance(mm2_installer, ModelInstallService)
+    source = URLModelSource(url=Url("https://example.com/model.safetensors"))
+    old_part = DownloadJob(source=source.url, dest=tmp_path / "model.safetensors")
+    old_part.bytes = 4
+    old_part.download_path = tmp_path / "model.safetensors"
+    (tmp_path / "model.safetensors.downloading").write_bytes(b"1234")
+    job = ModelInstallJob(id=4243, source=source, config_in=ModelRecordChanges(), local_path=tmp_path)
+    job._install_tmpdir = tmp_path
+    job.download_parts = {old_part}
+    job.status = InstallStatus.PAUSED
+    remote_file = RemoteModelFile(url=source.url, path=Path("model.safetensors"), size=8)
+    monkeypatch.setattr(mm2_installer, "_remote_files_from_source", lambda _: ([remote_file], None))
+    monkeypatch.setattr(mm2_installer._download_queue, "submit_multifile_download", MagicMock())
+
+    mm2_installer.resume_job(job)
+
+    parts = job.model_dump(mode="json")["download_parts"]
+    assert len(parts) == 1
+    assert parts[0]["resume_from_scratch"] is False
+
+
 def test_404_download(mm2_installer: ModelInstallServiceBase, mm2_app_config: InvokeAIAppConfig) -> None:
     source = URLModelSource(url=Url("https://test.com/missing_model.safetensors"))
     job = mm2_installer.import_model(source)
@@ -1083,6 +1206,36 @@ def test_heuristic_import_with_type(mm2_installer: ModelInstallServiceBase, mode
     mm2_installer.wait_for_job(install_job2, timeout=10)
     assert install_job2.complete
     assert install_job2.config_out if model_params["type"] == "embedding" else not install_job2.config_out
+
+
+def test_multifile_download_layout_with_explicit_files(mm2_installer: ModelInstallServiceBase, tmp_path: Path) -> None:
+    """Explicit file entries in a multi-subfolder source keep their repo-relative paths: the root
+    pipeline index lands at the model root and transformer/config.json stays inside transformer/
+    (naive relative_to() matching would flatten it to the root), while plain subfolder entries keep
+    the pre-existing one-directory-per-subfolder layout."""
+    from invokeai.backend.model_manager.metadata.metadata_base import RemoteModelFile
+
+    remote_files = [
+        RemoteModelFile(url="https://example.com/root_index", path=Path("MiniMax-H3/modular_model_index.json")),
+        RemoteModelFile(url="https://example.com/transformer_config", path=Path("MiniMax-H3/transformer/config.json")),
+        RemoteModelFile(url="https://example.com/vae_config", path=Path("MiniMax-H3/vae/config.json")),
+        RemoteModelFile(
+            url="https://example.com/vae_weights", path=Path("MiniMax-H3/vae/diffusion_pytorch_model.safetensors")
+        ),
+    ]
+    job = mm2_installer._multifile_download(  # pyright: ignore[reportAttributeAccessIssue]
+        remote_files=remote_files,
+        dest=tmp_path,
+        subfolders=[Path("modular_model_index.json"), Path("transformer/config.json"), Path("vae")],
+        submit_job=False,
+    )
+    top = Path("MiniMax-H3_modular_model_index_config_vae")
+    assert {part.dest.relative_to(tmp_path.resolve()) for part in job.download_parts} == {
+        top / "modular_model_index.json",
+        top / "transformer" / "config.json",
+        top / "vae" / "config.json",
+        top / "vae" / "diffusion_pytorch_model.safetensors",
+    }
 
 
 def test_restore_keeps_a_legacy_marker_whose_key_predates_key_validation(

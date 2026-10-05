@@ -13,11 +13,17 @@ from invokeai.app.invocations.fields import (
     LatentsField,
     TensorField,
 )
-from invokeai.app.invocations.krea2_denoise import KREA2_LATENT_CHANNELS, Krea2DenoiseInvocation
+from invokeai.app.invocations.krea2.krea2_denoise import (
+    KREA2_LATENT_CHANNELS,
+    Krea2DenoiseInvocation,
+    requires_sidecar_patching,
+)
 from invokeai.app.invocations.model import ModelIdentifierField, TransformerField
 from invokeai.backend.krea2.sampling_utils import build_sigmas, pack_latents, unpack_latents
 from invokeai.backend.krea2.style_reference import Krea2StyleReferenceMode, capture_style_reference
 from invokeai.backend.model_manager.taxonomy import BaseModelType, Krea2VariantType, ModelFormat, ModelType
+from invokeai.backend.quantization.dequantizing_linear import peak_dequant_transient_bytes
+from invokeai.backend.quantization.int8_convrot import Int8ConvrotLinear
 from invokeai.backend.rectified_flow.rectified_flow_inpaint_extension import RectifiedFlowInpaintExtension
 from invokeai.backend.stable_diffusion.diffusion.conditioning_data import ConditioningFieldData, Krea2ConditioningInfo
 
@@ -332,6 +338,12 @@ class _Transformer:
         # The real Krea2Transformer2DModel exposes this; denoise swaps in a memory-efficient attention processor.
         self.installed_processors = processor
 
+    def modules(self):
+        # Denoise walks the module tree to decide whether LoRA has to be applied as a sidecar: an
+        # int8_tensorwise build's Linears hold their weights as buffers, which a direct patch
+        # cannot write into. This double stands in for an unquantized model.
+        return iter(())
+
     def __call__(self, *, hidden_states, encoder_hidden_states, **_kwargs):
         self.conditioning_values.append(float(encoder_hidden_states.mean()))
         # The real transformer concatenates [text, image] before attention, so this is the sequence length a
@@ -357,8 +369,18 @@ class _TransformerInfo:
     def __init__(self, transformer: _Transformer) -> None:
         self.transformer = transformer
 
+    @property
+    def model(self):
+        """`LoadedModel.model` -- the model without locking it.
+
+        Several denoise nodes read it to size their working-memory reservation, which has to happen
+        before `model_on_device` is entered.
+        """
+        return self.transformer
+
     @contextmanager
-    def model_on_device(self, **_kwargs):
+    def model_on_device(self, **kwargs):
+        self.working_mem_bytes = kwargs.get("working_mem_bytes")
         yield ({}, self.transformer)
 
 
@@ -434,14 +456,14 @@ def _patch_runtime(monkeypatch) -> None:
         "diffusers.schedulers.scheduling_flow_match_euler_discrete.FlowMatchEulerDiscreteScheduler", _Scheduler
     )
     monkeypatch.setattr(
-        "invokeai.app.invocations.krea2_denoise.TorchDevice.choose_torch_device", lambda: torch.device("cpu")
+        "invokeai.app.invocations.krea2.krea2_denoise.TorchDevice.choose_torch_device", lambda: torch.device("cpu")
     )
     monkeypatch.setattr(
-        "invokeai.app.invocations.krea2_denoise.TorchDevice.choose_bfloat16_safe_dtype",
+        "invokeai.app.invocations.krea2.krea2_denoise.TorchDevice.choose_bfloat16_safe_dtype",
         lambda _device: torch.float32,
     )
     monkeypatch.setattr(
-        "invokeai.app.invocations.krea2_denoise.LayerPatcher.apply_smart_model_patches",
+        "invokeai.app.invocations.krea2.krea2_denoise.LayerPatcher.apply_smart_model_patches",
         lambda **_kwargs: nullcontext(),
     )
 
@@ -460,7 +482,7 @@ def test_run_diffusion_keeps_fp32_sampler_state_with_bf16_model_input(
     """
     _patch_runtime(monkeypatch)
     monkeypatch.setattr(
-        "invokeai.app.invocations.krea2_denoise.TorchDevice.choose_bfloat16_safe_dtype",
+        "invokeai.app.invocations.krea2.krea2_denoise.TorchDevice.choose_bfloat16_safe_dtype",
         lambda _device: torch.bfloat16,
     )
 
@@ -509,7 +531,7 @@ def test_run_diffusion_keeps_fp32_sampler_state_with_bf16_model_input(
                 return merged
 
         monkeypatch.setattr(
-            "invokeai.app.invocations.krea2_denoise.RectifiedFlowInpaintExtension", _TrackingInpaintExtension
+            "invokeai.app.invocations.krea2.krea2_denoise.RectifiedFlowInpaintExtension", _TrackingInpaintExtension
         )
 
     latents = invocation._run_diffusion(context)
@@ -651,7 +673,7 @@ def test_run_diffusion_reaches_masked_denoising_merge(monkeypatch, tmp_path) -> 
             merge_sigmas.append(sigma)
             return latents
 
-    monkeypatch.setattr("invokeai.app.invocations.krea2_denoise.RectifiedFlowInpaintExtension", _InpaintExtension)
+    monkeypatch.setattr("invokeai.app.invocations.krea2.krea2_denoise.RectifiedFlowInpaintExtension", _InpaintExtension)
 
     latents = _runtime_invocation(cfg_scale=1.0, with_mask=True)._run_diffusion(_runtime_context(tmp_path, transformer))
 
@@ -674,6 +696,9 @@ def test_run_diffusion_uses_per_prompt_position_ids_when_lengths_differ(monkeypa
 
         def set_attn_processor(self, processor) -> None:
             pass
+
+        def modules(self):
+            return iter(())
 
         def __call__(self, *, hidden_states, encoder_hidden_states, position_ids, **_kwargs):
             text_len = encoder_hidden_states.shape[1]
@@ -1203,3 +1228,118 @@ def test_regional_attention_memory_includes_masks_build_scratch_and_dtype_sized_
     assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.bfloat16) == 500
     assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, negative, torch.float32) == 740
     assert Krea2DenoiseInvocation._regional_attention_mask_bytes(positive, None, torch.bfloat16) == 400
+
+
+class TestRequiresSidecarPatching:
+    """LoRA cannot be written into an int8 buffer, and the config format does not say when one
+    is present: an `int8_tensorwise` Krea-2 is a plain `checkpoint` as far as the config knows."""
+
+    class _Tree:
+        def __init__(self, *modules) -> None:
+            self._modules = modules
+
+        def modules(self):
+            return iter(self._modules)
+
+    def test_an_unquantized_checkpoint_is_patched_directly(self) -> None:
+        assert not requires_sidecar_patching(self._Tree(torch.nn.Linear(2, 2)), ModelFormat.Checkpoint)
+
+    def test_a_gguf_model_is_still_recognised_by_its_format(self) -> None:
+        assert requires_sidecar_patching(self._Tree(), ModelFormat.GGUFQuantized)
+
+    def test_an_int8_convrot_checkpoint_is_recognised_by_its_modules(self) -> None:
+        int8_linear = Int8ConvrotLinear(
+            weight=torch.zeros(4, 4, dtype=torch.int8), weight_scale=torch.ones(4, 1), convrot=False
+        )
+        tree = self._Tree(torch.nn.Linear(2, 2), int8_linear)
+        assert requires_sidecar_patching(tree, ModelFormat.Checkpoint)
+
+
+class TestTheInt8DequantTransientReachesTheReservation:
+    """An int8_tensorwise build materializes the dequantized, derotated weight per forward call.
+
+    The activation estimate cannot see it -- the weights are buffers, and the transient is allocated
+    inside the layer -- so without this the cache reserves for the activations alone and a model that
+    loaded comfortably OOMs in its first step. A helper existing is not the same as it being called,
+    which is the regression worth catching here rather than in the helper's own unit test.
+    """
+
+    def _reservation_for(self, monkeypatch, tmp_path, transformer: _Transformer) -> int:
+        info = _TransformerInfo(transformer)
+        context = _runtime_context(tmp_path, transformer)
+        context.models.load = lambda _identifier: info
+        _patch_runtime(monkeypatch)
+        _runtime_invocation(cfg_scale=1.0)._run_diffusion(context)
+        return info.working_mem_bytes
+
+    def test_an_int8_model_reserves_the_transient_on_top_of_the_activations(self, monkeypatch, tmp_path) -> None:
+        dense = _Transformer()
+        quantized = _Transformer()
+        layer = Int8ConvrotLinear(
+            weight=torch.zeros(1024, 512, dtype=torch.int8),
+            weight_scale=torch.ones(1024, 1),
+            convrot=False,
+        )
+        quantized.modules = lambda: iter((quantized, layer))
+
+        dense_bytes = self._reservation_for(monkeypatch, tmp_path, dense)
+        quantized_bytes = self._reservation_for(monkeypatch, tmp_path, quantized)
+
+        # `_patch_runtime` pins the compute dtype to float32, which is what the node passes on.
+        transient = peak_dequant_transient_bytes(quantized, torch.float32)
+        assert transient > 0
+        assert quantized_bytes == dense_bytes + transient
+
+
+class TestTheAttentionScoreMatrixReachesTheReservation:
+    """The activation estimate assumes a fused attention kernel. Where the build has none -- ROCm on Windows, MPS --
+    the main blocks also build a score matrix (12.9 GiB per call for 1024px unchunked), and the reservation must
+    price it: for the heads of the loaded model and the sequence the transformer really attends over."""
+
+    def _reservation_for(
+        self, monkeypatch, tmp_path, score_bytes: int, invocation=None, **context_kwargs
+    ) -> tuple[int, list[dict], _Transformer]:
+        import invokeai.app.invocations.krea2.krea2_denoise as denoise_module
+
+        transformer = _Transformer()
+        transformer.config = SimpleNamespace(num_attention_heads=48, attention_head_dim=128)
+        info = _TransformerInfo(transformer)
+        context = _runtime_context(tmp_path, transformer, **context_kwargs)
+        context.models.load = lambda _identifier: info
+        _patch_runtime(monkeypatch)
+        asked: list[dict] = []
+
+        def score_matrix_bytes(**kwargs) -> int:
+            asked.append(kwargs)
+            return score_bytes
+
+        monkeypatch.setattr(denoise_module, "sdpa_score_matrix_bytes", score_matrix_bytes)
+        (invocation or _runtime_invocation(cfg_scale=1.0))._run_diffusion(context)
+        return info.working_mem_bytes, asked, transformer
+
+    def test_the_score_matrix_is_reserved_for_the_attended_sequence(self, monkeypatch, tmp_path) -> None:
+        fused_bytes, _, _ = self._reservation_for(monkeypatch, tmp_path, score_bytes=0)
+        materializing_bytes, asked, transformer = self._reservation_for(monkeypatch, tmp_path, score_bytes=12345)
+
+        assert materializing_bytes == fused_bytes + 12345
+        assert len(asked) == 1
+        assert (asked[0]["num_heads"], asked[0]["head_dim"]) == (48, 128)
+        assert asked[0]["seq_len"] == transformer.combined_sequence_lengths[0]
+        assert asked[0]["has_attn_mask"] is False
+
+    def test_the_longer_of_the_cfg_passes_and_the_regional_mask_are_priced(self, monkeypatch, tmp_path) -> None:
+        invocation = _runtime_invocation(cfg_scale=2.0)
+        invocation.positive_conditioning = Krea2ConditioningField(
+            conditioning_name="positive", mask=TensorField(tensor_name="positive-region")
+        )
+        invocation.negative_conditioning = Krea2ConditioningField(
+            conditioning_name="negative", mask=TensorField(tensor_name="negative-region")
+        )
+
+        _, asked, transformer = self._reservation_for(
+            monkeypatch, tmp_path, score_bytes=1, invocation=invocation, negative_text_seq_len=5
+        )
+
+        assert len(set(transformer.combined_sequence_lengths)) == 2, "the passes must attend over different lengths"
+        assert asked[0]["seq_len"] == max(transformer.combined_sequence_lengths)
+        assert asked[0]["has_attn_mask"] is True

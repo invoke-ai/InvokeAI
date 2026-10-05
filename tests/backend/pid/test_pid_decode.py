@@ -316,7 +316,7 @@ class TestLoadPidDecoderRejectsPartialCheckpoints:
     def tiny_net(self, monkeypatch: pytest.MonkeyPatch) -> "TestLoadPidDecoderRejectsPartialCheckpoints._TinyNet":
         """Stand in for the (multi-GB) real PidNet — only load_state_dict's bookkeeping is under test."""
         net = self._TinyNet()
-        monkeypatch.setattr("invokeai.backend.pid.decode.build_pid_net", lambda backbone: net)
+        monkeypatch.setattr("invokeai.backend.pid.decode.build_pid_net", lambda backbone, version: net)
         return net
 
     def test_complete_state_dict_loads(self, tiny_net: torch.nn.Module) -> None:

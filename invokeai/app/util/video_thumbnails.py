@@ -24,7 +24,7 @@ import tempfile
 import threading
 import time
 from pathlib import Path
-from typing import Any, Callable, Iterator, Optional
+from typing import Any, Callable, Iterator, NamedTuple, Optional
 
 import numpy as np
 import psutil
@@ -399,6 +399,222 @@ def extract_video_frame(
         return None
     finally:
         Path(tmp_name).unlink(missing_ok=True)
+
+
+# Where in a clip the gallery thumbnail search starts. Frame 0 is a poor representative:
+# generated videos commonly fade in from black or start on a conditioning frame, and an
+# audio-only upload wrapped in a synthesized waveform track (see video_ingest.py) renders its
+# first frame from a near-empty audio window — an all-black tile. About a second in, capped at
+# the clip's midpoint so short clips still resolve to a real frame, is far more representative.
+THUMBNAIL_FRAME_TARGET_SECONDS = 1.0
+# Used when the container reports no usable fps; matches the video models' native rate and the
+# synthesized waveform track's rate.
+THUMBNAIL_FRAME_FALLBACK_FPS = 24.0
+
+# Where to look when the frame at the first rung decodes but is empty (see
+# FrameScore.informative): the long fade-in or title-sequence case, which no fixed offset can
+# cover because it scales with the runtime. Fractions of the duration; a candidate must land
+# meaningfully *later* than the frame just rejected, which is what walks the ladder forward
+# past a title sequence rather than back into it. More fractions than MAX_DEEPER_SEEK_ATTEMPTS
+# on purpose: the early ones are unusable on a short clip and get skipped.
+DEEPER_SEEK_FRACTIONS: tuple[float, ...] = (0.1, 0.35, 0.6)
+MIN_DEEPER_SEEK_GAP_SECONDS = 1.0
+# Ceiling on the deeper rungs. Each attempt costs a decode-worker spawn, and the upload
+# path runs this inside the request. With the opening rung and the frame-0 walk-back the
+# search is at most MAX_DEEPER_SEEK_ATTEMPTS + 2 decodes.
+MAX_DEEPER_SEEK_ATTEMPTS = 2
+
+# A candidate frame passes three gates read off one luma histogram: it is not flat, not
+# dark, and not mostly one level. The first two thresholds are ported from PhotoMapAI, which
+# calibrated them against a labelled corpus of synthetic-but-realistic frames and real
+# encodes; the third was added after the first two let real title cards through (see
+# FRAME_FLAT_FRACTION_CEILING). Erring towards rejection is deliberate throughout: a frame
+# wrongly called empty only costs another decode, and the best-scoring frame is returned
+# either way; a frame wrongly kept is the black thumbnail this whole search exists to avoid.
+#
+# Shannon entropy of the luma histogram, in bits, below which a frame is flat: a black
+# screen, a solid slate, a fade. Junk in the calibration corpus measured 0.0-0.8 bits (pure
+# black 0.0, dense end credits ~0.65); real content starts around 1.1 even when almost
+# entirely dark — a night skyline, fireworks against black, an overcast snowfield — because
+# a dark *scene* has tone everywhere while a slate is one level.
+FRAME_ENTROPY_FLOOR = 0.75
+
+# Entropy measures flatness, not darkness, and the two come apart at the bottom of the
+# range. A photograph dimmed to a peak luma of 2/255 — black to any viewer — still measures
+# ~1.45 bits, because the dither spread across a handful of levels carries information;
+# black carrying nothing but sensor noise measures ~1.27 after an x264 round trip. Both
+# clear the entropy floor, and the floor cannot be raised to catch them: the dimmest real
+# content in the calibration corpus measures 1.07. So darkness is asked about separately,
+# as a high quantile of the luma histogram: "are there any genuinely bright pixels", not
+# "is the average bright", so fireworks on a night sky survive. A quantile rather than the
+# maximum, so one stuck pixel, a timecode burn-in or a logo cannot vouch for an otherwise
+# black frame.
+FRAME_HIGHLIGHT_QUANTILE = 0.999
+# Between the junk band (a 1% fade measures 2, a 2% fade 5, black with sensor noise 7) and
+# the dimmest frame accepted from a real library (32). Low rather than high because a
+# rejected frame falls through to the entropy ranking, where grain over black outranks
+# genuinely dim content: a frame has to be darker than anything with recoverable content
+# before it is put at that risk.
+FRAME_LUMA_FLOOR = 10.0
+
+# Fraction of pixels within FRAME_FLAT_BAND luma levels of the most common level above
+# which a frame is a card: titles, a logo or a caption on a solid background. Synthetic
+# title cards measure 0.2-0.3 bits and fail the entropy floor, but real encoded ones do
+# not reliably: three title cards from a real library measured 0.74, 0.80 and 0.94 bits,
+# straddling the floor, because x264 ringing around anti-aliased text spreads a few percent
+# of pixels across most of the histogram. What they have in common is the background: 93-96%
+# of their pixels sit on one level, while no accepted frame from the same library exceeded
+# 0.68 (a portrait on white seamless, a pillarboxed clip) and ordinary content sits below
+# 0.1. The band absorbs codec noise on the background; the ceiling sits in the middle of the
+# gap. A product shot or a slide with a large plain background can fail this gate, at the
+# cost of the extra decodes only: every rung of such a clip fails alike, and the
+# highest-entropy one is returned.
+FRAME_FLAT_BAND = 2
+FRAME_FLAT_FRACTION_CEILING = 0.9
+
+
+class FrameScore(NamedTuple):
+    """The three histogram measures of a thumbnail candidate. See the gate constants above."""
+
+    entropy: float
+    highlight_luma: float
+    flat_fraction: float
+
+    @classmethod
+    def measure(cls, frame: Image.Image) -> "FrameScore":
+        """Scores ``frame`` from one luma histogram; an empty frame measures as kept."""
+        histogram = frame.convert("L").histogram()
+        total = sum(histogram)
+        if not total:
+            return cls(math.inf, 255.0, 0.0)
+        entropy = -sum((count / total) * math.log2(count / total) for count in histogram if count)
+        # Whole pixels, floored at one: a float headroom makes the boundary arbitrary
+        # (1000 * (1 - 0.999) is 1.0000000000000009), and the floor keeps a frame of very
+        # few pixels measurable. Read from white downwards, so it costs 256 steps, not a sort.
+        headroom = max(1, int(total * (1.0 - FRAME_HIGHLIGHT_QUANTILE)))
+        seen = 0
+        highlight = 0.0
+        for level in range(255, -1, -1):
+            seen += histogram[level]
+            if seen >= headroom:
+                highlight = float(level)
+                break
+        mode = max(range(256), key=histogram.__getitem__)
+        flat = sum(histogram[max(0, mode - FRAME_FLAT_BAND) : mode + FRAME_FLAT_BAND + 1]) / total
+        return cls(entropy, highlight, flat)
+
+    @property
+    def gates_passed(self) -> int:
+        return (
+            int(self.entropy >= FRAME_ENTROPY_FLOOR)
+            + int(self.highlight_luma >= FRAME_LUMA_FLOOR)
+            + int(self.flat_fraction < FRAME_FLAT_FRACTION_CEILING)
+        )
+
+    @property
+    def informative(self) -> bool:
+        """All three gates have to hold: flat frames are slates, dark ones fades, mostly-one-level ones cards."""
+        return self.gates_passed == 3
+
+    @property
+    def rank(self) -> tuple[int, float]:
+        """Ordering among frames that failed: fewest gates failed, then entropy.
+
+        Gates first because entropy alone ranks grain over black (~1.3 bits, fails the luma
+        gate) above a legible title card (~0.8 bits, fails only the flat gate); when nothing
+        better is reachable the card is the thumbnail a person would pick.
+        """
+        return (self.gates_passed, self.entropy)
+
+
+def thumbnail_frame_candidates(duration: Optional[float], fps: Optional[float]) -> list[int]:
+    """The frame indices a gallery thumbnail is tried from, in order.
+
+    The opening rung is roughly THUMBNAIL_FRAME_TARGET_SECONDS in, capped at the clip's
+    midpoint; then up to MAX_DEEPER_SEEK_ATTEMPTS rungs at DEEPER_SEEK_FRACTIONS of the
+    duration, each meaningfully later than the last; then frame 0 as the walk-back, which
+    doubles as the fallback for containers whose metadata overstates the decodable range.
+    Returns ``[0]`` when the duration is unknown or degenerate — callers without metadata
+    keep first-frame behavior. Both inputs are untrusted container metadata, so a
+    non-finite value degrades to the safe answer rather than raising.
+    """
+    if duration is None or not math.isfinite(duration) or duration <= 0:
+        return [0]
+    effective_fps = fps if fps is not None and math.isfinite(fps) and fps > 0 else THUMBNAIL_FRAME_FALLBACK_FPS
+    seconds = [min(THUMBNAIL_FRAME_TARGET_SECONDS, duration / 2)]
+    for fraction in DEEPER_SEEK_FRACTIONS:
+        if len(seconds) > MAX_DEEPER_SEEK_ATTEMPTS:
+            break
+        candidate = duration * fraction
+        if candidate >= seconds[-1] + MIN_DEEPER_SEEK_GAP_SECONDS:
+            seconds.append(candidate)
+    candidates: list[int] = []
+    # Finite inputs can still multiply to infinity; such a rung cannot be decoded, so it is
+    # dropped rather than raised on.
+    for index in [*(int(offset * effective_fps) for offset in seconds if math.isfinite(offset * effective_fps)), 0]:
+        if index not in candidates:
+            candidates.append(index)
+    return candidates
+
+
+def extract_representative_video_frame(
+    video_path: Path,
+    duration: Optional[float] = None,
+    fps: Optional[float] = None,
+    timeout: float = VIDEO_DECODE_TIMEOUT_SECONDS,
+    raise_on_timeout: bool = False,
+) -> Optional[Image.Image]:
+    """Extracts the thumbnail frame: the first informative one on the seek ladder, else the best.
+
+    Walks thumbnail_frame_candidates in order and returns the first frame FrameScore calls
+    informative. If every reachable frame is empty — a clip that really is all dark, or the
+    waveform track wrapping an audio upload — the best-ranked frame seen is returned, so the
+    video still gets a thumbnail rather than a gallery placeholder; the waveform case thereby
+    lands on the busiest window of the track.
+
+    An opening rung with no decodable frame means the metadata overstates the range or the
+    file is damaged there; the deeper rungs are later still, so the search goes straight to
+    the frame-0 walk-back rather than spending the budget proving each one empty.
+
+    The whole search shares one budget of two ``timeout``s, the same worst case the
+    two-attempt version had (a slow decode *failure* followed by a full fallback decode).
+    A timeout, or an exhausted budget, ends the search: it is contention or an adversarial
+    file, not evidence about the index, and another rung would hold a request worker for
+    another full budget. If a frame was already decoded it is returned — a dark thumbnail
+    beats none — otherwise the VideoDecodeTimeoutError propagates with ``raise_on_timeout``
+    and the call returns None without it, as ``extract_video_frame`` would.
+    """
+    queue = thumbnail_frame_candidates(duration, fps)
+    opening = queue[0]
+    best: Optional[tuple[tuple[int, float], Image.Image]] = None
+    deadline = time.monotonic() + 2 * timeout
+    try:
+        while queue:
+            frame_index = queue.pop(0)
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise VideoDecodeTimeoutError(f"Thumbnail search for {video_path} exhausted its {2 * timeout}s budget")
+            frame = extract_video_frame(
+                video_path, frame_index=frame_index, timeout=min(timeout, remaining), raise_on_timeout=True
+            )
+            if frame is None:
+                if frame_index == opening and queue:
+                    queue = [queue[-1]]
+                continue
+            score = FrameScore.measure(frame)
+            if score.informative:
+                return frame
+            if best is None or score.rank > best[0]:
+                best = (score.rank, frame)
+            # Frames can be up to MAX_VIDEO_FRAME_PIXELS; don't hold a rejected one across
+            # the next decode.
+            del frame
+    except VideoDecodeTimeoutError:
+        if best is None:
+            if raise_on_timeout:
+                raise
+            return None
+    return best[1] if best is not None else None
 
 
 def probe_video_with_codec(

@@ -46,6 +46,11 @@ class GalleryItem(BaseModelExcludeNull):
     # Video-only fields. None for images.
     duration: Optional[float] = Field(default=None, description="Video duration in seconds. None for images.")
     fps: Optional[float] = Field(default=None, description="Video frames per second. None for images.")
+    media_origin: Optional[str] = Field(
+        default=None,
+        description="How a video entered the gallery, if it was marked: 'audio_upload' for an uploaded audio file "
+        "the server wrapped into a waveform video. None for images and for unmarked videos.",
+    )
 
 
 class GalleryItemNamesResult(BaseModel):
@@ -81,3 +86,4 @@ class BoardMediaSummary:
     image_count: int = 0
     video_count: int = 0
     asset_count: int = 0
+    asset_video_count: int = 0

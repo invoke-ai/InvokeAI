@@ -1,5 +1,3 @@
-# Copyright (c) 2023 Kyle Schouviller (https://github.com/kyle0654)
-
 from typing import Optional
 
 import torch
@@ -28,6 +26,7 @@ from invokeai.app.invocations.fields import (
     Krea2ConditioningField,
     Krea2StyleReferenceField,
     LatentsField,
+    MiniMaxH3ConditioningField,
     OutputField,
     QwenImageConditioningField,
     SD3ConditioningField,
@@ -560,6 +559,17 @@ class WanConditioningOutput(BaseInvocationOutput):
     @classmethod
     def build(cls, conditioning_name: str) -> "WanConditioningOutput":
         return cls(conditioning=WanConditioningField(conditioning_name=conditioning_name))
+
+
+@invocation_output("minimax_h3_conditioning_output")
+class MiniMaxH3ConditioningOutput(BaseInvocationOutput):
+    """Base class for nodes that output a MiniMax H3 conditioning tensor."""
+
+    conditioning: MiniMaxH3ConditioningField = OutputField(description=FieldDescriptions.cond)
+
+    @classmethod
+    def build(cls, conditioning_name: str) -> "MiniMaxH3ConditioningOutput":
+        return cls(conditioning=MiniMaxH3ConditioningField(conditioning_name=conditioning_name))
 
 
 @invocation_output("wan_ref_image_output")

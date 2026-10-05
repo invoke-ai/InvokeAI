@@ -4,8 +4,8 @@
 CPU. That is a real assertion about the *math* - and it holds exactly - but it cannot see the shape
 of the problem the setting actually has, because the shipped path runs on CUDA under bf16 autocast
 (`PiDDecoder.decode` sets `autocast_dtype = torch.bfloat16` for every CUDA decode) with `BL` in the
-thousands rather than 8. There, splitting a GEMM into 1024-row slices makes cuBLAS pick different
-kernels and reduction orders, and the results differ by bf16 ULPs.
+thousands rather than 8. There, splitting a GEMM into 1024-row slices can make cuBLAS pick different
+kernels and reduction orders, so the results may differ by bf16 ULPs.
 
 Measured on an RTX 4090 (torch 2.7.1+cu128), production `PiTBlock` dimensions:
 
@@ -21,9 +21,10 @@ The CPU column is *not* a portable guarantee, and this module originally claimed
 `torch.equal` there passed on x86-64/MKL and failed on macOS/Accelerate in CI: splitting a GEMM along
 its row dimension can select a micro-kernel with different K-blocking, so bit-exactness is a property
 of the BLAS, not of the chunking. What is portable is that chunking only *reassociates* work, so the
-contract here is a distance bound on both paths - tight and scaled to the signal on fp32, wider and
-absolute under bf16 autocast (relative tolerances are useless there: activations pass through zero,
-so `max|rel|` reaches 1e3 on elements whose absolute error is a single bf16 ULP).
+contract here is a distance bound on both paths that also permits exact equality - tight and scaled
+to the signal on fp32, wider and absolute under bf16 autocast (relative tolerances are useless there:
+activations pass through zero, so `max|rel|` reaches 1e3 on elements whose absolute error is a single
+bf16 ULP).
 """
 
 from collections.abc import Iterator
@@ -151,13 +152,13 @@ def test_chunking_matches_the_unchunked_path_on_cpu(image_px: int, batch_size: i
     )
 
 
-@pytest.mark.skipif(not torch.cuda.is_available(), reason="the divergence only exists on the accelerated path")
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="the accelerated-path contract requires CUDA")
 @pytest.mark.parametrize(("image_px", "batch_size"), [(1024, 1), (2048, 1), (2048, 2)])
 def test_chunking_stays_within_the_documented_tolerance_on_cuda_bf16(image_px: int, batch_size: int) -> None:
     """The shipped path: CUDA + bf16 autocast, BL well above the chunk size.
 
-    Asserting equality here would be asserting something false. Asserting a bound is the honest
-    contract, and it is what the docs promise users who enable the setting.
+    Equality depends on the GPU and kernels selected, so a distance bound is the portable contract
+    promised to users who enable the setting. Exact equality is also a valid result.
     """
     block = _build_block("cuda")
     x, s_cond = _inputs(image_px, batch_size, "cuda")
@@ -180,9 +181,6 @@ def test_chunking_stays_within_the_documented_tolerance_on_cuda_bf16(image_px: i
     difference = (chunked.float() - unchunked.float()).abs()
     assert difference.max().item() <= _BF16_ABSOLUTE_TOLERANCE
     assert difference.mean().item() <= _BF16_MEAN_ABSOLUTE_TOLERANCE
-    # And it is genuinely not exact - if this ever starts failing, the divergence is gone and the
-    # tolerance contract (plus the "output changes" wording in the docs) should be revisited.
-    assert difference.max().item() > 0.0
 
 
 def test_discriminator_feature_extraction_never_reaches_the_chunked_pixel_blocks() -> None:
@@ -221,7 +219,7 @@ def test_context_parallelism_is_unreachable_so_chunking_cannot_interact_with_it(
 
     invokeai_root = Path(invokeai.__file__).parent
     vendored = invokeai_root / "backend" / "pid" / "_src"
-    # Scan the Python trees only: `invokeai/frontend/web` carries node_modules, which is huge and
+    # Scan the Python trees only: `invokeai/frontend/webv1` carries node_modules, which is huge and
     # contains symlinks that break a naive walk.
     callers = [
         path

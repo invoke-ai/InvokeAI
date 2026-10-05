@@ -1,8 +1,8 @@
-# Copyright (c) 2024, Lincoln D. Stein and the InvokeAI Development Team
 """
 Base class for model loading in InvokeAI.
 """
 
+import time
 from abc import ABC, abstractmethod
 from contextlib import contextmanager
 from logging import Logger
@@ -20,6 +20,7 @@ from invokeai.backend.model_manager.load.model_cache.cached_model.cached_model_w
 )
 from invokeai.backend.model_manager.load.model_cache.model_cache import (
     MODEL_LOAD_LOCK,
+    VRAM_MOVE_PASS_BYTES,
     FirstUseClaim,
     ModelCache,
 )
@@ -137,13 +138,49 @@ class LoadedModelWithoutConfig:
             if release_hold is not None:
                 release_hold(self._cache_record, hold_epoch)
 
-    def __enter__(self) -> AnyModel:
-        # Hold the MODEL_LOAD_LOCK read lock across the VRAM load (lock() runs
-        # load_state_dict(assign=True), which calls register_parameter) so it can't overlap a
-        # concurrent model construction that has the global register_parameter -> meta patch active.
-        # Acquired before the cache's own lock to keep a consistent lock order (see MODEL_LOAD_LOCK).
+    def _lock_paced(self, working_mem_bytes: Optional[int]) -> None:
+        """Move the model into VRAM in bounded passes, yielding the global load lock between them.
+
+        Each pass holds the MODEL_LOAD_LOCK read lock across its slice of the VRAM load (the move
+        runs load_state_dict(assign=True), which calls register_parameter, so it must not overlap
+        a concurrent model construction that has the global register_parameter -> meta patch
+        active), acquired before the cache's own lock to keep the documented lock order. Nothing
+        is held between passes, so a construction (write lock) queued on any worker runs in the
+        gap instead of waiting out the entire multi-GB stream — the write-preferring lock
+        guarantees the queued construction wins that gap. A failed pass behaves exactly like a
+        failed lock(): the cache has already unpinned the entry, so no unlock is owed here.
+
+        Known trade-off of yielding mid-stream: another load on the SAME device cache can slip
+        into a gap and pin VRAM this stream's budget had counted on. The stream then settles at
+        correspondingly lower residency (after trimming its own bytes if needed to preserve the
+        working-memory reservation) — exactly what a fresh lock() would compute at that instant.
+        Pre-pacing behavior made the interleaver wait instead. Residency recovers at the next
+        invocation's re-lock, once the interleaver unlocks.
+        """
+        stream_started_at = time.time()
         with MODEL_LOAD_LOCK.read_lock():
-            self._cache.lock(self._cache_record, None)
+            settled = self._cache.lock(self._cache_record, working_mem_bytes, max_move_bytes=VRAM_MOVE_PASS_BYTES)
+        # Termination backstop: pathological interleavings (another thread's budget disagreeing
+        # with ours can unload what a pass just loaded) could in principle re-truncate forever.
+        # After comfortably more passes than the model's size can honestly require, run one final
+        # uncapped pass — with no cap, a pass can never report itself truncated, so it settles.
+        remaining_capped_passes = self._cache_record.cached_model.total_bytes() // VRAM_MOVE_PASS_BYTES + 8
+        while not settled:
+            remaining_capped_passes -= 1
+            with MODEL_LOAD_LOCK.read_lock():
+                settled = self._cache.continue_lock(
+                    self._cache_record,
+                    working_mem_bytes,
+                    max_move_bytes=VRAM_MOVE_PASS_BYTES if remaining_capped_passes > 0 else None,
+                    stream_started_at=stream_started_at,
+                )
+            if remaining_capped_passes <= 0:
+                # The uncapped pass settles by construction; guard against a regression in that
+                # invariant turning this loop into a spin.
+                assert settled, "uncapped continue_lock pass did not settle"
+
+    def __enter__(self) -> AnyModel:
+        self._lock_paced(None)
         self._end_first_use_window()
         try:
             self.repair_required_tensors_on_device()
@@ -164,9 +201,7 @@ class LoadedModelWithoutConfig:
         :param working_mem_bytes: The amount of working memory to keep available on the compute device when loading the
             model.
         """
-        # See __enter__ for why the VRAM load is wrapped in the read lock.
-        with MODEL_LOAD_LOCK.read_lock():
-            self._cache.lock(self._cache_record, working_mem_bytes)
+        self._lock_paced(working_mem_bytes)
         self._end_first_use_window()
         try:
             self.repair_required_tensors_on_device()
@@ -204,6 +239,22 @@ class LoadedModelWithoutConfig:
     def supports_partial_loading(self) -> bool:
         """Whether this model can stream individual weights between RAM and the compute device."""
         return isinstance(self._cache_record.cached_model, CachedModelWithPartialLoad)
+
+    @property
+    def weight_bytes(self) -> int:
+        """Total size of this model's weights, resident or not."""
+        return self._cache_record.cached_model.total_bytes()
+
+    @property
+    def resident_weight_bytes(self) -> int:
+        """How many of this model's weight bytes currently sit on the compute device.
+
+        A caller that has to bound its own residency — because it holds a second model of the same
+        size at the same time — needs this to size its `unload_from_vram` request. Exposed here so
+        such a caller does not have to reach through `_cache_record.cached_model`, whose lifetime
+        the cache owns.
+        """
+        return self._cache_record.cached_model.cur_vram_bytes()
 
     def repair_required_tensors_on_device(self) -> int:
         """Repair required tensors that should be resident on the cached model's execution device."""

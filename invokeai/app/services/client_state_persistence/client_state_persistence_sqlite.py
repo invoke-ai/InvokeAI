@@ -1,5 +1,10 @@
 from invokeai.app.services.client_state_persistence.client_state_persistence_base import ClientStatePersistenceABC
 from invokeai.app.services.invoker import Invoker
+from invokeai.app.services.shared.media_references import (
+    delete_media_references,
+    extract_media_references_from_json,
+    replace_media_references,
+)
 from invokeai.app.services.shared.sqlite.sqlite_database import SqliteDatabase
 
 
@@ -17,6 +22,10 @@ class ClientStatePersistenceSqlite(ClientStatePersistenceABC):
         self._invoker = invoker
 
     def set_by_key(self, user_id: str, key: str, value: str) -> str:
+        # The legacy editor keeps its canvas layers and reference images only here, as
+        # intermediates; indexing them keeps cleanup from treating them as unused. Parsed before
+        # taking the database lock, which every other writer shares.
+        references = extract_media_references_from_json(value)
         with self._db.transaction() as cursor:
             cursor.execute(
                 """
@@ -26,6 +35,9 @@ class ClientStatePersistenceSqlite(ClientStatePersistenceABC):
                   SET value = excluded.value;
                 """,
                 (user_id, key, value),
+            )
+            replace_media_references(
+                cursor, owner_kind="client_state", user_id=user_id, owner_id=key, references=references
             )
 
         return value
@@ -68,6 +80,7 @@ class ClientStatePersistenceSqlite(ClientStatePersistenceABC):
                 """,
                 (user_id, key),
             )
+            delete_media_references(cursor, owner_kind="client_state", user_id=user_id, owner_id=key)
 
     def delete(self, user_id: str) -> None:
         with self._db.transaction() as cursor:
@@ -77,4 +90,7 @@ class ClientStatePersistenceSqlite(ClientStatePersistenceABC):
                 WHERE user_id = ?
                 """,
                 (user_id,),
+            )
+            cursor.execute(
+                "DELETE FROM media_references WHERE owner_kind = 'client_state' AND user_id = ?;", (user_id,)
             )

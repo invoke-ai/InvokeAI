@@ -111,7 +111,7 @@ def _run_guard_scenario(statuses: list[str], set_cancel_event: bool, set_stop_on
             image_moves=None,
             # Single-user mode: the post-dequeue owner check short-circuits, keeping this
             # test focused on the cancellation guard.
-            configuration=SimpleNamespace(multiuser=False),
+            configuration=SimpleNamespace(multiuser=False, clear_vram_after_session=False),
         )
     )
     processor._polling_interval = 0.001
@@ -249,7 +249,7 @@ def test_cuda_device_pin_is_deferred_until_first_claim_and_runs_once():
             image_moves=None,
             # Single-user mode: the post-dequeue owner check short-circuits, keeping this
             # test focused on device pinning.
-            configuration=SimpleNamespace(multiuser=False),
+            configuration=SimpleNamespace(multiuser=False, clear_vram_after_session=False),
         )
     )
     processor._polling_interval = 0

@@ -1,10 +1,11 @@
+import json
 import os
 import re
 import tempfile
 import traceback
 from collections.abc import Iterator
 from pathlib import Path
-from typing import Annotated, BinaryIO, Optional
+from typing import Annotated, Any, BinaryIO, Optional
 
 from fastapi import Body, HTTPException, Query, Request, Response
 from fastapi import Path as PathParam
@@ -19,9 +20,27 @@ from starlette.requests import ClientDisconnect
 
 from invokeai.app.api.auth_dependencies import CurrentMediaUserOrDefault, CurrentUserOrDefault
 from invokeai.app.api.dependencies import ApiDependencies
-from invokeai.app.api.routers.images import WorkflowAndGraphResponse, _assert_board_read_access
+from invokeai.app.api.extract_metadata import extract_metadata_from_video
+from invokeai.app.api.routers._access import (
+    assert_board_read_access as _assert_board_read_access,
+)
+from invokeai.app.api.routers._access import (
+    assert_board_write_access as _assert_board_write_access,
+)
+from invokeai.app.api.routers._access import assert_project_owned
+from invokeai.app.api.routers._access import (
+    assert_video_owner as _assert_video_owner,
+)
+from invokeai.app.api.routers._access import (
+    assert_video_read_access as _assert_video_read_access,
+)
+from invokeai.app.api.routers._access import (
+    board_share_recipients as _board_share_recipients,
+)
+from invokeai.app.api.routers._limits import MAX_COPY_BATCH_SIZE
+from invokeai.app.api.routers.images import WorkflowAndGraphResponse
 from invokeai.app.invocations.fields import MetadataField, MetadataFieldValidator
-from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin
+from invokeai.app.services.image_records.image_records_common import ImageCategory, ResourceOrigin, is_gallery_category
 from invokeai.app.services.shared.pagination import MAX_PAGE_SIZE, OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.video_records.video_records_common import (
@@ -38,19 +57,59 @@ from invokeai.app.services.videos.videos_common import (
     VideoDTO,
     VideoUrlsDTO,
 )
-from invokeai.app.util.video_thumbnails import VideoDecodeTimeoutError, extract_video_frame, probe_video_with_codec
+from invokeai.app.util.mp4_metadata import read_ftyp_major_brand
+from invokeai.app.util.video_ingest import VideoIngestError, ingest_media_to_mp4, probe_media_streams
+from invokeai.app.util.video_thumbnails import (
+    VideoDecodeTimeoutError,
+    extract_representative_video_frame,
+    probe_video_with_codec,
+)
 
 videos_router = APIRouter(prefix="/v1/videos", tags=["videos"])
 
 # Videos are immutable; set a high max-age (1 year)
 VIDEO_MAX_AGE = 31536000
 
-# MP4 only — the names service emits `{uuid}.mp4` unconditionally and we don't transcode on
-# upload. Accepting .mov/.webm/.mkv here previously caused those containers to be stored
-# under a .mp4 name and served with the .mp4 MIME type, which silently broke playback in
-# browsers when the container did not match.
-ACCEPTED_VIDEO_MIME_PREFIXES = ("video/mp4",)
-ACCEPTED_VIDEO_EXTENSIONS = (".mp4",)
+# The names service emits `{uuid}.mp4` unconditionally and files are served as video/mp4,
+# so everything *stored* must genuinely be H.264 MP4 — storing foreign containers under a
+# .mp4 name silently broke browser playback, which is why uploads were historically
+# restricted to already-compliant files. Uploads are now normalized at ingest instead
+# (see invokeai.app.util.video_ingest): H.264 in a foreign container is losslessly
+# remuxed, other codecs (iPhone HEVC, ProRes, VP9) are transcoded, and audio-only files
+# are wrapped into waveform videos so audio clips flow through the video pipeline
+# (gallery, trim, audio-only reference conditioning) without a first-class audio type.
+ACCEPTED_VIDEO_MIME_PREFIXES = ("video/",)
+# The extension lists are the fallback for uploads whose type the browser could not
+# determine (they arrive as application/octet-stream); the MIME prefixes above accept the
+# ordinary case. Everything here is demuxable and decodable by the bundled ffmpeg — ASF
+# (Windows Media) included — and lands as H.264/AAC MP4 through the ingest converter.
+ACCEPTED_VIDEO_EXTENSIONS = (
+    ".mp4",
+    ".mov",
+    ".m4v",
+    ".webm",
+    ".mkv",
+    ".avi",
+    ".mpg",
+    ".mpeg",
+    ".3gp",
+    ".wmv",
+    ".asf",
+)
+ACCEPTED_AUDIO_MIME_PREFIXES = ("audio/",)
+ACCEPTED_AUDIO_EXTENSIONS = (
+    ".mp3",
+    ".m4a",
+    ".aac",
+    ".wav",
+    ".flac",
+    ".ogg",
+    ".oga",
+    ".opus",
+    ".aiff",
+    ".aif",
+    ".wma",
+)
 
 # Per-chunk size for HTTP Range responses (1 MB)
 RANGE_CHUNK_SIZE = 1024 * 1024
@@ -67,7 +126,9 @@ MAX_UPLOAD_REQUEST_SIZE = MAX_UPLOAD_SIZE + 10 * 1024 * 1024
 # body streams, so it gets its own (generous) cap.
 MAX_UPLOAD_METADATA_SIZE = 1024 * 1024
 # Global bound on concurrent video uploads — each in-flight upload holds one full-size copy
-# of the file in temp storage until probe/thumbnail/create finish with it.
+# of the file in temp storage until probe/thumbnail/create finish with it, and a second (also
+# capped at MAX_UPLOAD_SIZE) while the ingest converter is writing its output or, inside
+# create(), while the metadata remux writes its replacement next to the stored file.
 MAX_CONCURRENT_VIDEO_UPLOADS = 2
 # Per-user bound (multiuser mode only): keeps one tenant's slow uploads from holding
 # every global slot and starving the other users into 429s.
@@ -89,30 +150,6 @@ def _get_video_cache_control() -> str:
     return f"max-age={VIDEO_MAX_AGE}"
 
 
-def _assert_video_owner(video_name: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user does not own the video and is not an admin."""
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    if current_user.is_admin:
-        return
-    owner = ApiDependencies.invoker.services.video_records.get_user_id(video_name)
-    if owner is not None and owner == current_user.user_id:
-        return
-
-    board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
-    if board_id is not None:
-        try:
-            board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-            if board.user_id == current_user.user_id:
-                return
-            if board.board_visibility == BoardVisibility.Public:
-                return
-        except Exception:
-            pass
-
-    raise HTTPException(status_code=403, detail="Not authorized to modify this video")
-
-
 def _assert_video_direct_owner(video_name: str, current_user: CurrentUserOrDefault) -> None:
     """Raise 403 if the current user is not the direct owner of the video.
 
@@ -129,66 +166,32 @@ def _assert_video_direct_owner(video_name: str, current_user: CurrentUserOrDefau
     raise HTTPException(status_code=403, detail="Not authorized to move this video")
 
 
-def _assert_board_write_access(board_id: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not mutate the given board.
+def _classify_upload(filename: Optional[str], content_type: Optional[str]) -> Optional[str]:
+    """Returns 'video' or 'audio' for an accepted upload, None for a rejected one.
 
-    Mirrors _assert_board_write_access in board_images.py: admins and the board owner
-    may write; public boards accept contributions from any user.
+    The classification is advisory (it picks the 415 message and nothing else): the
+    ingest path probes actual stream content, so a mislabeled file still converts
+    correctly or fails with a clear error.
     """
-    from invokeai.app.services.board_records.board_records_common import BoardVisibility
-
-    try:
-        board = ApiDependencies.invoker.services.boards.get_dto(board_id=board_id)
-    except Exception:
-        raise HTTPException(status_code=404, detail="Board not found")
-    if current_user.is_admin:
-        return
-    if board.user_id == current_user.user_id:
-        return
-    if board.board_visibility == BoardVisibility.Public:
-        return
-    raise HTTPException(status_code=403, detail="Not authorized to modify this board")
-
-
-def _assert_video_read_access(video_name: str, current_user: CurrentUserOrDefault) -> None:
-    """Raise 403 if the current user may not view the video."""
-    from invokeai.app.services.board_records.board_records_common import (
-        BoardRecordNotFoundException,
-        BoardVisibility,
-    )
-
-    if current_user.is_admin:
-        return
-    owner = ApiDependencies.invoker.services.video_records.get_user_id(video_name)
-    if owner is not None and owner == current_user.user_id:
-        return
-
-    board_id = ApiDependencies.invoker.services.board_video_records.get_board_for_video(video_name)
-    if board_id is not None:
-        # See `assert_image_read_access`: only a board positively known to be gone may fall
-        # through to a refusal; a lookup that cannot be decided propagates instead of
-        # impersonating a permission decision.
-        try:
-            board = ApiDependencies.invoker.services.board_records.get(board_id)
-        except BoardRecordNotFoundException:
-            pass
-        else:
-            if board.board_visibility in (BoardVisibility.Shared, BoardVisibility.Public):
-                return
-
-    # Gone and denied mean opposite things to a client holding a reference to this video, and
-    # nothing above can tell them apart. See `_assert_image_record_exists`.
-    if not ApiDependencies.invoker.services.video_records.exists(video_name):
-        raise HTTPException(status_code=404, detail="Video not found")
-    raise HTTPException(status_code=403, detail="Not authorized to access this video")
-
-
-def _is_accepted_video_upload(filename: Optional[str], content_type: Optional[str]) -> bool:
-    if content_type and content_type.startswith(ACCEPTED_VIDEO_MIME_PREFIXES):
-        return True
+    if content_type:
+        if content_type.startswith(ACCEPTED_VIDEO_MIME_PREFIXES):
+            return "video"
+        if content_type.startswith(ACCEPTED_AUDIO_MIME_PREFIXES):
+            return "audio"
     if filename:
-        return filename.lower().endswith(ACCEPTED_VIDEO_EXTENSIONS)
-    return False
+        name = filename.lower()
+        if name.endswith(ACCEPTED_VIDEO_EXTENSIONS):
+            return "video"
+        if name.endswith(ACCEPTED_AUDIO_EXTENSIONS):
+            return "audio"
+    return None
+
+
+def _with_media_origin(metadata: Optional[str], origin: str) -> str:
+    """Merges a `media_origin` marker into the upload's (already-validated) metadata JSON."""
+    parsed = json.loads(metadata) if metadata else {}
+    parsed.setdefault("media_origin", origin)
+    return json.dumps(parsed)
 
 
 class _VideoUploadStreamParser:
@@ -201,9 +204,10 @@ class _VideoUploadStreamParser:
     The spool's path cannot be reused instead — once rolled over it is an unlinked
     anonymous file, and both ffmpeg and videos.create need a real path.
 
-    Parsing the stream ourselves keeps exactly one copy on disk. It also lets the
-    file-type and size checks fire while the body is still arriving, rather than after the
-    whole thing has been written somewhere.
+    Parsing the stream ourselves keeps exactly one copy of the upload on disk (the ingest
+    step, when a file needs it, adds its own output file on top). It also lets the file-type
+    and size checks fire while the body is still arriving, rather than after the whole thing
+    has been written somewhere.
 
     Callbacks run inside `MultipartParser.write`, which the route calls in a worker thread
     — the disk writes must not happen on the event loop.
@@ -223,6 +227,7 @@ class _VideoUploadStreamParser:
         self._metadata = bytearray()
         self.filename: Optional[str] = None
         self.content_type: Optional[str] = None
+        self.upload_kind: Optional[str] = None
         self.metadata: Optional[str] = None
         self.file_size = 0
         self.saw_file_part = False
@@ -277,8 +282,9 @@ class _VideoUploadStreamParser:
         content_type = self._headers.get(b"content-type")
         self.content_type = content_type.decode("latin-1") if content_type is not None else None
         # Reject the wrong kind of file before any of its bytes reach the disk.
-        if not _is_accepted_video_upload(self.filename, self.content_type):
-            raise HTTPException(status_code=415, detail="Not a supported video file")
+        self.upload_kind = _classify_upload(self.filename, self.content_type)
+        if self.upload_kind is None:
+            raise HTTPException(status_code=415, detail="Not a supported video or audio file")
 
     def _on_part_data(self, data: bytes, start: int, end: int) -> None:
         chunk = data[start:end]
@@ -354,38 +360,22 @@ async def _stream_video_upload(request: Request, destination: BinaryIO) -> _Vide
 
 def _is_mp4_file(path: Path) -> bool:
     try:
-        with open(path, "rb") as video_file:
-            search_limit = min(path.stat().st_size, 64 * 1024)
-            position = 0
-            while position + 8 <= search_limit:
-                video_file.seek(position)
-                header = video_file.read(8)
-                box_size = int.from_bytes(header[:4], byteorder="big")
-                box_type = header[4:8]
-                header_size = 8
-                if box_size == 1:
-                    extended_size = video_file.read(8)
-                    if len(extended_size) != 8:
-                        return False
-                    box_size = int.from_bytes(extended_size, byteorder="big")
-                    header_size = 16
-                if box_size < header_size:
-                    return False
-                if box_type == b"ftyp":
-                    major_brand = video_file.read(4)
-                    return len(major_brand) == 4 and major_brand != b"qt  "
-                position += box_size
+        major_brand = read_ftyp_major_brand(path)
     except OSError:
         return False
-    return False
+    return major_brand is not None and major_brand != b"qt  "
 
 
 def _probe_decodable_video(path: Path) -> tuple[tuple[int, int, float, Optional[float]], Optional[PILImage.Image]]:
-    """Probes metadata and proves the video has a decodable first frame.
+    """Probes metadata and proves the video has a decodable frame.
 
     Returns the metadata plus the decoded frame so the save path can reuse it as the
-    thumbnail source instead of spawning another decode worker. A decode timeout is
-    contention on a loaded server, not evidence the video is bad — probe_video already
+    thumbnail source instead of spawning another decode worker. The frame comes from the
+    thumbnail seek ladder (see extract_representative_video_frame): the first informative
+    frame found starting ~1s in, else the best-scoring one, with frame 0 as the last rung.
+    Acceptance is thereby slightly WIDER than a frame-0 check: a file whose frame 0 is
+    corrupt but whose later frame decodes is accepted rather than 415'd. A decode timeout
+    is contention on a loaded server, not evidence the video is bad — probe_video already
     succeeded — so it yields (metadata, None) and the upload proceeds, with save-time
     thumbnail extraction as the backstop.
     """
@@ -394,7 +384,7 @@ def _probe_decodable_video(path: Path) -> tuple[tuple[int, int, float, Optional[
         raise ValueError("Video must use a browser-compatible H.264/AVC codec")
     metadata = (width, height, duration, fps)
     try:
-        first_frame = extract_video_frame(path, frame_index=0, raise_on_timeout=True)
+        first_frame = extract_representative_video_frame(path, duration, fps, raise_on_timeout=True)
     except VideoDecodeTimeoutError:
         return metadata, None
     if first_frame is None:
@@ -402,76 +392,60 @@ def _probe_decodable_video(path: Path) -> tuple[tuple[int, int, float, Optional[
     return metadata, first_frame
 
 
-@videos_router.post(
-    "/upload",
-    operation_id="upload_video",
-    responses={
-        201: {"description": "The video was uploaded successfully"},
-        415: {"description": "Video upload failed"},
-    },
-    status_code=201,
-    response_model=VideoDTO,
-    # The body is parsed by hand (see _stream_video_upload) so the file lands in exactly
-    # one temp file, which means FastAPI cannot infer the request schema from the
-    # signature. This spells out the same multipart body the `file` + `metadata`
-    # parameters used to generate, so the documented contract is unchanged.
-    openapi_extra={
-        "requestBody": {
-            "required": True,
-            "content": {
-                "multipart/form-data": {
-                    "schema": {
-                        "properties": {
-                            # Key order and shape mirror what FastAPI generates for the sibling
-                            # upload routes (see Body_upload_image), so the documented contract
-                            # stays byte-identical to what `file` + `metadata` produced.
-                            "file": {
-                                "type": "string",
-                                "contentMediaType": "application/octet-stream",
-                                "title": "File",
-                            },
-                            "metadata": {
-                                "anyOf": [{"type": "string"}, {"type": "null"}],
-                                "title": "Metadata",
-                                "description": "The metadata to associate with the video, must be a stringified JSON dict",
-                            },
+# The body of a video upload is parsed by hand (see _stream_video_upload) so the file lands in
+# exactly one temp file, which means FastAPI cannot infer the request schema from the route
+# signature. This spells out the same multipart body the `file` + `metadata` parameters used to
+# generate, so the documented contract is unchanged. Every route that ingests through
+# `ingest_uploaded_video` documents its body with it.
+VIDEO_UPLOAD_OPENAPI_EXTRA: dict[str, Any] = {
+    "requestBody": {
+        "required": True,
+        "content": {
+            "multipart/form-data": {
+                "schema": {
+                    "properties": {
+                        # Key order and shape mirror what FastAPI generates for the sibling
+                        # upload routes (see Body_upload_image), so the documented contract
+                        # stays byte-identical to what `file` + `metadata` produced.
+                        "file": {
+                            "type": "string",
+                            "contentMediaType": "application/octet-stream",
+                            "title": "File",
                         },
-                        "type": "object",
-                        "required": ["file"],
-                        "title": "Body_upload_video",
-                    }
+                        "metadata": {
+                            "anyOf": [{"type": "string"}, {"type": "null"}],
+                            "title": "Metadata",
+                            "description": "The metadata to associate with the video, must be a stringified JSON dict",
+                        },
+                    },
+                    "type": "object",
+                    "required": ["file"],
+                    "title": "Body_upload_video",
                 }
-            },
-        }
-    },
-)
-async def upload_video(
-    current_user: CurrentUserOrDefault,
-    request: Request,
-    response: Response,
-    video_category: ImageCategory = Query(description="The category of the video"),
-    is_intermediate: bool = Query(description="Whether this is an intermediate video"),
-    board_id: Optional[str] = Query(default=None, description="The board to add this video to, if any"),
-    session_id: Optional[str] = Query(default=None, description="The session ID associated with this upload, if any"),
-) -> VideoDTO:
-    """Uploads a video for the current user."""
-    # Check board access for uploads to a specific board.
-    if board_id is not None:
-        from invokeai.app.services.board_records.board_records_common import BoardVisibility
+            }
+        },
+    }
+}
 
-        # This rejects before any of the body is read. VideoUploadLimitASGIMiddleware is what
-        # keeps that from becoming a quota hole: it closes the connection when the app
-        # answers early, so the client's in-flight upload dies with the response.
-        try:
-            board = await run_in_threadpool(ApiDependencies.invoker.services.boards.get_dto, board_id=board_id)
-        except Exception:
-            raise HTTPException(status_code=404, detail="Board not found")
-        if (
-            not current_user.is_admin
-            and board.user_id != current_user.user_id
-            and board.board_visibility != BoardVisibility.Public
-        ):
-            raise HTTPException(status_code=403, detail="Not authorized to upload to this board")
+
+async def ingest_uploaded_video(
+    request: Request,
+    current_user: CurrentUserOrDefault,
+    *,
+    video_category: ImageCategory,
+    is_intermediate: bool,
+    board_id: Optional[str],
+    session_id: Optional[str] = None,
+    project_id: Optional[str] = None,
+) -> VideoDTO:
+    """Stream a multipart video upload from `request` into the gallery and announce it.
+
+    Callers must be routes that `VideoUploadLimitASGIMiddleware` matches: the ingress size cap
+    and the concurrency slots are enforced there, before this runs.
+    """
+    # Check board access for uploads to a specific board.
+    board = await run_in_threadpool(_assert_board_write_access, board_id, current_user)
+    await run_in_threadpool(assert_project_owned, project_id, current_user)
 
     # Stream the upload straight into a tmp file so we can probe it and then hand its path
     # to the service. Reading the full body into memory first risked exhausting RAM on
@@ -485,15 +459,68 @@ async def upload_video(
         upload = await _stream_video_upload(request, tmp)
         tmp.close()
 
-        metadata = upload.metadata
-        if metadata is not None:
+        upload_kind = upload.upload_kind
+        if upload.metadata is not None:
             try:
-                MetadataFieldValidator.validate_json(metadata)
+                MetadataFieldValidator.validate_json(upload.metadata)
             except ValidationError as e:
                 raise HTTPException(status_code=422, detail="Metadata must be a JSON object") from e
 
-        if not await run_in_threadpool(_is_mp4_file, tmp_path):
-            raise HTTPException(status_code=415, detail="Not an MP4 video file")
+        # An MP4 that InvokeAI produced carries its metadata, workflow and graph as keyed metadata, the way a
+        # PNG carries text chunks. Read them from the file as uploaded: the ingest remux below does not
+        # preserve keyed metadata. As for images, client-supplied metadata wins over the embedded copy, while
+        # workflow and graph are never client-overridable.
+        extracted = await run_in_threadpool(
+            extract_metadata_from_video,
+            tmp_path,
+            upload.metadata,
+            None,
+            None,
+            ApiDependencies.invoker.services.logger,
+        )
+        metadata = extracted.invokeai_metadata
+        if metadata is not None and len(metadata.encode("utf-8")) > MAX_UPLOAD_METADATA_SIZE:
+            # The form field is capped while it streams; an embedded record gets the same bound
+            # before it reaches the database. Workflow and graph legitimately run larger.
+            ApiDependencies.invoker.services.logger.info("Ignoring oversized metadata embedded in uploaded video")
+            metadata = None
+
+        # Already-compliant H.264 MP4s skip conversion (their only rewrite is the metadata
+        # remux inside create(), and only when there is a record to embed);
+        # everything else — foreign containers, foreign codecs, audio-only files — is
+        # normalized by the ingest converter. The conversion runs inside this upload's
+        # concurrency slot: a long HEVC transcode holds one of MAX_CONCURRENT_VIDEO_UPLOADS
+        # slots for its duration, which is the intended backpressure.
+        needs_ingest = True
+        if upload_kind == "video" and await run_in_threadpool(_is_mp4_file, tmp_path):
+            try:
+                container_probe = await run_in_threadpool(probe_media_streams, tmp_path)
+            except VideoIngestError as e:
+                raise HTTPException(status_code=415, detail=str(e))
+            # Both codecs must already be browser-safe to skip ingest: an mp4-family
+            # container can legally carry h264 video with AMR/opus/mp3/ac3 audio (e.g.
+            # older Android .3gp camera files), which browsers render as silent video.
+            # The remux branch stream-copies the h264 and normalizes only the audio.
+            needs_ingest = container_probe.video_codec != "h264" or container_probe.audio_codec not in (None, "aac")
+
+        if needs_ingest:
+            converted = tempfile.NamedTemporaryFile(prefix="invokeai_ingest_", suffix=".mp4", delete=False)
+            converted_path = Path(converted.name)
+            converted.close()
+            try:
+                ingest_action = await run_in_threadpool(
+                    ingest_media_to_mp4, tmp_path, converted_path, max_output_bytes=MAX_UPLOAD_SIZE
+                )
+                await run_in_threadpool(os.replace, converted_path, tmp_path)
+            except VideoIngestError as e:
+                ApiDependencies.invoker.services.logger.info(f"Video upload ingest failed: {e}")
+                raise HTTPException(status_code=415, detail=str(e))
+            finally:
+                converted_path.unlink(missing_ok=True)
+            if ingest_action == "audio_wrap":
+                # Mark wrapped audio uploads so clients can treat them as audio clips
+                # (e.g. defaulting an audio-only reference conditioning mode).
+                metadata = _with_media_origin(metadata, "audio_upload")
 
         try:
             (width, height, duration, fps), first_frame = await run_in_threadpool(_probe_decodable_video, tmp_path)
@@ -515,19 +542,24 @@ async def upload_video(
                     session_id=session_id,
                     board_id=board_id,
                     metadata=metadata,
-                    workflow=None,
-                    graph=None,
+                    workflow=extracted.invokeai_workflow,
+                    graph=extracted.invokeai_graph,
                     is_intermediate=is_intermediate,
                     user_id=current_user.user_id,
+                    project_id=project_id,
                 )
             )
-
-            response.status_code = 201
-            response.headers["Location"] = video_dto.video_url
-            return video_dto
         except Exception:
             ApiDependencies.invoker.services.logger.error(traceback.format_exc())
             raise HTTPException(status_code=500, detail="Failed to create video")
+
+        if not is_intermediate and is_gallery_category(video_category):
+            shared_user_ids = await run_in_threadpool(_board_share_recipients, board)
+            ApiDependencies.invoker.services.events.emit_video_uploaded(
+                video_dto, user_id=current_user.user_id, board=board, shared_user_ids=shared_user_ids
+            )
+
+        return video_dto
     finally:
         # If create() succeeded the file was moved; this unlink is a no-op then.
         try:
@@ -538,6 +570,47 @@ async def upload_video(
             tmp_path.unlink(missing_ok=True)
         except Exception:
             pass
+
+
+@videos_router.post(
+    "/upload",
+    operation_id="upload_video",
+    responses={
+        201: {"description": "The video was uploaded successfully"},
+        415: {"description": "Video upload failed"},
+    },
+    status_code=201,
+    response_model=VideoDTO,
+    openapi_extra=VIDEO_UPLOAD_OPENAPI_EXTRA,
+)
+async def upload_video(
+    current_user: CurrentUserOrDefault,
+    request: Request,
+    response: Response,
+    video_category: ImageCategory = Query(description="The category of the video"),
+    is_intermediate: bool = Query(description="Whether this is an intermediate video"),
+    board_id: Optional[str] = Query(default=None, description="The board to add this video to, if any"),
+    session_id: Optional[str] = Query(default=None, description="The session ID associated with this upload, if any"),
+    project_id: Optional[str] = Query(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description="The caller's project this upload originates in, if any; recorded for intermediates cleanup",
+    ),
+) -> VideoDTO:
+    """Uploads a video for the current user."""
+    video_dto = await ingest_uploaded_video(
+        request,
+        current_user,
+        video_category=video_category,
+        is_intermediate=is_intermediate,
+        board_id=board_id,
+        session_id=session_id,
+        project_id=project_id,
+    )
+    response.status_code = 201
+    response.headers["Location"] = video_dto.video_url
+    return video_dto
 
 
 # Declared sync (`def`, not `async def`) so FastAPI runs it in the threadpool: every call
@@ -875,7 +948,7 @@ def get_video_thumbnail(
     current_user: CurrentMediaUserOrDefault,
     video_name: str = PathParam(description="The name of thumbnail file to get"),
 ) -> Response:
-    """Returns the first-frame WebP thumbnail of an authorized video."""
+    """Returns the WebP thumbnail of an authorized video."""
     _assert_video_read_access(video_name, current_user)
     try:
         path = ApiDependencies.invoker.services.videos.get_path(video_name, thumbnail=True)
@@ -983,6 +1056,59 @@ def get_video_names(
         )
     except Exception:
         raise HTTPException(status_code=500, detail="Failed to get video names")
+
+
+class CopiedVideo(BaseModel):
+    source_video_name: str = Field(description="The video that was copied")
+    video_name: str = Field(description="The name assigned to the copy")
+
+
+class CopyVideosResult(BaseModel):
+    copied: list[CopiedVideo] = Field(description="The copies that were made, in request order")
+    failed: list[str] = Field(description="The source video names that could not be copied")
+
+
+@videos_router.post("/copy", operation_id="copy_videos_to_board", response_model=CopyVideosResult)
+def copy_videos_to_board(
+    current_user: CurrentUserOrDefault,
+    video_names: list[str] = Body(description="The names of the videos to copy", max_length=MAX_COPY_BATCH_SIZE),
+    board_id: Optional[str] = Body(default=None, description="The board to put the copies on, if any"),
+) -> CopyVideosResult:
+    """Copies videos, optionally onto a board, and returns the new names.
+
+    The image twin of this route explains why copies rather than shared references: `board_videos`
+    keys on `video_name`, so one video sits on exactly one board.
+
+    Blocking work (the service copies the file off disk) runs on FastAPI's threadpool by virtue of
+    this being a sync `def`, so a large batch cannot stall the event loop.
+
+    `move_source=False` is load-bearing, not defensive: `create` consumes the path it is given,
+    because every other caller hands it a temp file. Here the path is the *source's own* file.
+
+    Read access is enough to copy, which means a video on a board shared with you can be copied
+    into something you own, and the copy outlives the share. That is deliberate — it is what makes
+    a shared board usable as a source — but it is a real widening of what "read-only" means, so it
+    is stated rather than left to be discovered.
+    """
+    _assert_board_write_access(board_id, current_user)
+
+    copied: list[CopiedVideo] = []
+    failed: list[str] = []
+
+    for video_name in video_names:
+        try:
+            _assert_video_read_access(video_name, current_user)
+            video_dto = ApiDependencies.invoker.services.videos.copy(
+                source_video_name=video_name,
+                board_id=board_id,
+                user_id=current_user.user_id,
+            )
+            copied.append(CopiedVideo(source_video_name=video_name, video_name=video_dto.video_name))
+        except Exception:
+            ApiDependencies.invoker.services.logger.error(f"Failed to copy video {video_name}", exc_info=True)
+            failed.append(video_name)
+
+    return CopyVideosResult(copied=copied, failed=failed)
 
 
 @videos_router.post("/star", operation_id="star_videos_in_list", response_model=StarredVideosResult)

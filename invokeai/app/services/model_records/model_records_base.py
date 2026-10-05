@@ -1,4 +1,3 @@
-# Copyright (c) 2023 Lincoln D. Stein and the InvokeAI Development Team
 """
 Abstract base class for storing and retrieving model configuration records.
 """
@@ -22,11 +21,14 @@ from invokeai.backend.model_manager.configs.factory import AnyModelConfig
 from invokeai.backend.model_manager.configs.lora import LoraModelDefaultSettings
 from invokeai.backend.model_manager.configs.main import MainModelDefaultSettings
 from invokeai.backend.model_manager.taxonomy import (
+    AnimaVariantType,
     BaseModelType,
     ClipVariantType,
     Flux2VariantType,
     FluxVariantType,
     Krea2VariantType,
+    LTX2VariantType,
+    MiniMaxH3VariantType,
     MistralVariantType,
     ModelFormat,
     ModelSourceType,
@@ -34,6 +36,8 @@ from invokeai.backend.model_manager.taxonomy import (
     ModelVariantType,
     PiDDecoderVariantType,
     Qwen3VariantType,
+    Qwen3VLVariantType,
+    Qwen35VariantType,
     QwenImageVariantType,
     SchedulerPredictionType,
     WanLoRAVariantType,
@@ -149,7 +153,12 @@ class ModelRecordChanges(BaseModelExcludeNull):
         | WanVariantType
         | WanLoRAVariantType
         | Qwen3VariantType
+        | Qwen3VLVariantType
+        | Qwen35VariantType
+        | AnimaVariantType
         | Krea2VariantType
+        | MiniMaxH3VariantType
+        | LTX2VariantType
         | MistralVariantType
         | PiDDecoderVariantType
     ] = Field(description="The variant of the model.", default=None)

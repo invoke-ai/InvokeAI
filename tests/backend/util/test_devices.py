@@ -278,6 +278,71 @@ def test_legacy_precision_name():
         assert "float32" == choose_precision(torch.device("cpu"))
 
 
+# ===== choose_bfloat16_safe_dtype (a dtype question, not a memory one) =====
+
+
+def _record_constructors(monkeypatch) -> list[dict]:
+    """Capture what the dtype probe asks the backend for, without changing the answer.
+
+    Stubs return a CPU tensor so a device the test machine does not have can still be asked
+    about. Covers the constructors a probe would plausibly use; a probe that asks some other
+    way records nothing, which the assertions treat as asking for nothing.
+    """
+    asked: list[dict] = []
+    real_empty = torch.empty
+
+    def stub(*args, **kwargs):
+        asked.append({"size": args[0] if args else None, "device": kwargs.get("device")})
+        return real_empty(0, dtype=kwargs.get("dtype"))
+
+    for name in ("empty", "zeros", "ones", "tensor"):
+        monkeypatch.setattr(torch, name, stub)
+    return asked
+
+
+def test_the_bfloat16_probe_asks_the_named_device_for_nothing(monkeypatch):
+    """Two properties at once, because each one alone is satisfiable by a broken probe: whatever
+    it asks for must be empty -- a real element is an allocation a full GPU can refuse, which is
+    how a dtype query once failed a run -- and it must be asked of the device in question, not of
+    whichever device is convenient."""
+    asked = _record_constructors(monkeypatch)
+    device = torch.device("cuda:0")
+
+    assert TorchDevice.choose_bfloat16_safe_dtype(device) is torch.bfloat16
+    assert all(request["size"] in (0, (), []) for request in asked)
+    assert all(request["device"] == device for request in asked)
+
+
+def test_an_unreachable_device_still_raises_rather_than_guessing(monkeypatch):
+    """A device that cannot be reached -- an out-of-range ordinal, a backend this build lacks --
+    is a broken configuration, not a dtype verdict. Answering it with a plausible dtype buries
+    the real error in whichever loader allocates first."""
+
+    def invalid_device(*args, **kwargs):
+        raise RuntimeError("CUDA error: invalid device ordinal")
+
+    monkeypatch.setattr(torch, "empty", invalid_device)
+
+    with pytest.raises(RuntimeError, match="invalid device ordinal"):
+        TorchDevice.choose_bfloat16_safe_dtype(torch.device("cuda:9"))
+
+
+@pytest.mark.parametrize(
+    ("device_name", "expected"),
+    [("cuda", torch.float16), ("mps", torch.float32), ("xpu", torch.float32)],
+)
+def test_a_backend_that_rejects_bfloat16_falls_back_by_device(monkeypatch, device_name, expected):
+    """A rejected dtype is a verdict, unlike a device that cannot answer, and the fallback is
+    half-width on CUDA but full-width everywhere else."""
+
+    def unsupported(*args, **kwargs):
+        raise TypeError("BFloat16 is not supported on this device")
+
+    monkeypatch.setattr(torch, "empty", unsupported)
+
+    assert TorchDevice.choose_bfloat16_safe_dtype(torch.device(device_name)) is expected
+
+
 # ===== choose_anima_inference_dtype (config.precision honoring) ============
 
 
@@ -550,6 +615,25 @@ def test_xpu_mem_get_info_estimates_when_native_and_sysman_both_fail(native_erro
         assert TorchDevice.xpu_mem_get_info(torch.device("xpu")) == (30 * gib, 32 * gib)
 
 
+@pytest.mark.parametrize(
+    ("budget_gib", "expected_free_gib"),
+    [(None, 10), (13, 7), (16, 10), (5, 0)],
+    ids=["no-budget", "budget-is-tighter", "torch-is-tighter", "over-budget"],
+)
+def test_cuda_mem_get_info_is_capped_by_the_windows_video_memory_budget(budget_gib, expected_free_gib):
+    """On Windows ROCm, torch's free figure ignores other processes and the point where Windows starts paging. The
+    headroom is the budget minus this process's live allocations (16 - 10 = 6 GiB here)."""
+    gib = 1024**3
+    device = torch.device("cuda", 0)
+    budget = None if budget_gib is None else budget_gib * gib
+    with (
+        patch.object(torch.cuda, "mem_get_info", return_value=(10 * gib, 16 * gib)),
+        patch("invokeai.backend.util.devices.video_memory_budget", return_value=budget) as mock_budget,
+    ):
+        assert TorchDevice.cuda_mem_get_info(device) == (expected_free_gib * gib, 16 * gib)
+    mock_budget.assert_called_once_with(device)
+
+
 def test_get_generation_devices_auto_expands_to_all_xpu():
     """With no CUDA, `auto` enumerates every visible XPU device."""
     config = get_config()
@@ -642,3 +726,211 @@ def test_session_device_index_on_xpu():
         assert TorchDevice.get_session_device_label() == " (#1)"
     finally:
         TorchDevice.clear_session_device()
+
+
+def test_empty_cache_skips_while_peer_device_busy(monkeypatch):
+    """TorchDevice.empty_cache() must not run the process-global (peer-convoying) empty_cache
+    while another generation device is mid-session, and must run it when the pool is quiet."""
+    import torch as torch_mod
+
+    from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+    from invokeai.backend.util.devices import TorchDevice
+
+    calls: list[str] = []
+    monkeypatch.setattr(torch_mod.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch_mod.cuda, "empty_cache", lambda: calls.append("cuda"))
+    monkeypatch.setattr(torch_mod.backends.mps, "is_available", lambda: False)
+
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+    try:
+        TorchDevice.set_session_device(torch.device("cuda:1"))
+        try:
+            GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:0"))
+            try:
+                TorchDevice.empty_cache()
+                assert calls == [], "empty_cache ran while a peer device was mid-session"
+            finally:
+                GENERATION_DEVICE_POOL.release_session(torch.device("cuda:0"))
+            TorchDevice.empty_cache()
+            assert calls == ["cuda"], "empty_cache did not run once the pool was quiet"
+        finally:
+            TorchDevice.clear_session_device()
+    finally:
+        GENERATION_DEVICE_POOL.reset()
+
+
+def test_install_peer_aware_empty_cache_wraps_torch_entry_point(monkeypatch):
+    """Third-party callers (diffusers' internal empty_device_cache) invoke
+    torch.cuda.empty_cache directly; the installed wrapper must apply the same
+    skip-while-a-peer-generates policy, idempotently, and pass through when quiet."""
+    import torch as torch_mod
+
+    from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+    from invokeai.backend.util.devices import TorchDevice, install_peer_aware_empty_cache
+
+    calls: list[str] = []
+    original = torch_mod.cuda.empty_cache
+    monkeypatch.setattr(torch_mod.cuda, "empty_cache", lambda: calls.append("cuda"))
+    try:
+        install_peer_aware_empty_cache()
+        wrapped = torch_mod.cuda.empty_cache
+        assert wrapped is not original
+        install_peer_aware_empty_cache()
+        assert torch_mod.cuda.empty_cache is wrapped, "install must be idempotent"
+
+        GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+        try:
+            TorchDevice.set_session_device(torch.device("cuda:1"))
+            try:
+                GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:0"))
+                try:
+                    torch_mod.cuda.empty_cache()  # what diffusers calls
+                    assert calls == [], "wrapper ran empty_cache while a peer was mid-session"
+                finally:
+                    GENERATION_DEVICE_POOL.release_session(torch.device("cuda:0"))
+                torch_mod.cuda.empty_cache()
+                assert calls == ["cuda"], "wrapper did not pass through once quiet"
+            finally:
+                TorchDevice.clear_session_device()
+        finally:
+            GENERATION_DEVICE_POOL.reset()
+    finally:
+        # monkeypatch restores the attribute we set; make sure the true original is back for
+        # other tests regardless of ordering.
+        torch_mod.cuda.empty_cache = original
+
+
+def test_skipped_empty_cache_is_deferred_and_flushed_at_a_quiet_moment(monkeypatch):
+    """A peer-aware skip must not lose the release: it is recorded as deferred, stays pending
+    while any other device is still busy, and is performed exactly once by the first flush that
+    finds the pool quiet."""
+    import torch as torch_mod
+
+    from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+    from invokeai.backend.util.devices import TorchDevice
+
+    calls: list[str] = []
+    monkeypatch.setattr(torch_mod.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch_mod.cuda, "empty_cache", lambda: calls.append("cuda"))
+    monkeypatch.setattr(torch_mod.backends.mps, "is_available", lambda: False)
+
+    GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+    TorchDevice._empty_cache_deferred.clear()
+    try:
+        # Nothing pending: a flush is a no-op even when quiet.
+        TorchDevice.flush_deferred_empty_cache()
+        assert calls == []
+
+        # Worker on cuda:0 finishes (cancels) while cuda:1 is mid-render: its release is deferred.
+        GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:1"))
+        TorchDevice.set_session_device(torch.device("cuda:0"))
+        try:
+            TorchDevice.empty_cache()
+            assert calls == []
+            assert TorchDevice._empty_cache_deferred.is_set(), "skip did not record a deferred release"
+            # The requester itself cannot flush while the peer is busy; the request stays pending.
+            TorchDevice.flush_deferred_empty_cache()
+            assert calls == []
+            assert TorchDevice._empty_cache_deferred.is_set()
+        finally:
+            TorchDevice.clear_session_device()
+
+        # The busy worker on cuda:1 reaches a step boundary: no OTHER device is busy from its
+        # point of view, so it performs the deferred release itself, once.
+        TorchDevice.set_session_device(torch.device("cuda:1"))
+        try:
+            TorchDevice.flush_deferred_empty_cache()
+            assert calls == ["cuda"], "busy worker did not flush the deferred release at its step boundary"
+            assert not TorchDevice._empty_cache_deferred.is_set()
+            TorchDevice.flush_deferred_empty_cache()
+            assert calls == ["cuda"], "a flushed request was repeated"
+        finally:
+            TorchDevice.clear_session_device()
+            GENERATION_DEVICE_POOL.release_session(torch.device("cuda:1"))
+    finally:
+        TorchDevice._empty_cache_deferred.clear()
+        GENERATION_DEVICE_POOL.reset()
+
+
+def test_peer_aware_wrapper_defers_and_a_direct_run_clears_the_request(monkeypatch):
+    """Third-party calls through the installed torch.cuda.empty_cache wrapper defer the same
+    way, and any real run (from either entry point) satisfies the pending request."""
+    import torch as torch_mod
+
+    from invokeai.backend.util.device_pool import GENERATION_DEVICE_POOL
+    from invokeai.backend.util.devices import TorchDevice, install_peer_aware_empty_cache
+
+    calls: list[str] = []
+    original = torch_mod.cuda.empty_cache
+    monkeypatch.setattr(torch_mod.cuda, "empty_cache", lambda: calls.append("cuda"))
+    TorchDevice._empty_cache_deferred.clear()
+    try:
+        install_peer_aware_empty_cache()
+        GENERATION_DEVICE_POOL.set_generation_devices([torch.device("cuda:0"), torch.device("cuda:1")])
+        try:
+            TorchDevice.set_session_device(torch.device("cuda:0"))
+            GENERATION_DEVICE_POOL.acquire_session(torch.device("cuda:1"))
+            try:
+                torch_mod.cuda.empty_cache()  # what diffusers calls
+                assert calls == []
+                assert TorchDevice._empty_cache_deferred.is_set(), "wrapper skip did not defer the release"
+            finally:
+                GENERATION_DEVICE_POOL.release_session(torch.device("cuda:1"))
+            # Quiet again: a direct call runs and clears the request, so a later flush is a no-op.
+            torch_mod.cuda.empty_cache()
+            assert calls == ["cuda"]
+            assert not TorchDevice._empty_cache_deferred.is_set(), "a real run left the request pending"
+            TorchDevice.flush_deferred_empty_cache()
+            assert calls == ["cuda"]
+        finally:
+            TorchDevice.clear_session_device()
+            GENERATION_DEVICE_POOL.reset()
+    finally:
+        TorchDevice._empty_cache_deferred.clear()
+        torch_mod.cuda.empty_cache = original
+
+
+def test_disable_conv_benchmark_empty_cache_flips_torch_flag():
+    """The multi-GPU startup path must clear torch's post-conv-find emptyCache flag (and no-op
+    gracefully on builds that lack it)."""
+    from invokeai.backend.util.devices import disable_conv_benchmark_empty_cache
+
+    getter = getattr(torch._C, "_cuda_get_conv_benchmark_empty_cache", None)
+    setter = getattr(torch._C, "_cudnn_set_conv_benchmark_empty_cache", None)
+    if getter is None or setter is None:
+        # CPU-only torch builds lack the flag; the function must still be a safe no-op.
+        disable_conv_benchmark_empty_cache()
+        return
+
+    original = getter()
+    try:
+        setter(True)
+        disable_conv_benchmark_empty_cache()
+        assert getter() is False
+        # Idempotent: a second call keeps it disabled without raising.
+        disable_conv_benchmark_empty_cache()
+        assert getter() is False
+    finally:
+        setter(original)
+
+
+def test_a_forced_empty_cache_runs_past_a_busy_peer_and_its_wrapper(monkeypatch):
+    """The peer-aware wrapper on torch.cuda.empty_cache would defer a forced call again; it must reach torch."""
+    calls: list[str] = []
+
+    def original() -> None:
+        calls.append("torch")
+
+    def wrapper() -> None:
+        calls.append("deferred")
+
+    wrapper.__wrapped__ = original  # type: ignore[attr-defined]
+    monkeypatch.setattr(torch.cuda, "is_available", lambda: True)
+    monkeypatch.setattr(torch.cuda, "empty_cache", wrapper)
+    monkeypatch.setattr(torch.backends.mps, "is_available", lambda: False)
+    monkeypatch.setattr(TorchDevice, "_another_generation_device_busy", classmethod(lambda cls: True))
+
+    assert TorchDevice.empty_cache() is False
+    assert calls == []
+    assert TorchDevice.empty_cache(force=True) is True
+    assert calls == ["torch"]

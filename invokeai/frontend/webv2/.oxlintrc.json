@@ -1,0 +1,200 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "react", "import", "unicorn", "oxc", "react-perf", "jsx-a11y", "eslint"],
+  "categories": {
+    "correctness": "error"
+  },
+  "rules": {
+    "curly": "error",
+    "eqeqeq": "error",
+
+    "import/no-cycle": "error",
+    "import/no-duplicates": "error",
+    "import/no-relative-parent-imports": "error",
+    "import/no-absolute-path": "error",
+    "import/no-amd": "error",
+    "import/no-commonjs": "error",
+    "import/no-mutable-exports": "error",
+
+    "no-console": "warn",
+    "no-eval": "error",
+    "no-extend-native": "error",
+    "no-implied-eval": "error",
+    "no-label-var": "error",
+    "no-promise-executor-return": "error",
+    "no-return-assign": "error",
+    "no-sequences": "error",
+    "no-template-curly-in-string": "error",
+    "no-throw-literal": "error",
+    "no-unmodified-loop-condition": "error",
+    "no-var": "error",
+
+    "prefer-template": "error",
+    "radix": "error",
+    "no-restricted-exports": "error",
+    // One resize affordance: the shared handle, not Chakra's splitter.
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "@chakra-ui/react",
+            "importNames": ["Splitter", "useSplitter", "useSplitterContext"],
+            "message": "Use ResizeHandle from @platform/ui/ResizeHandle."
+          }
+        ]
+      }
+    ],
+
+    "react/jsx-curly-brace-presence": [
+      "error",
+      {
+        "props": "never",
+        "children": "never"
+      }
+    ],
+    "react/no-children-prop": "error",
+    "react/no-danger": "error",
+    "react/no-unknown-property": "error",
+    "react/jsx-no-useless-fragment": "error",
+    "react/exhaustive-deps": "error",
+
+    // Omit optimization-only todo and suppression diagnostics. Identity-trigger/ref-only dependencies use
+    // react/exhaustive-deps rather than compiler dependency rules.
+    "react/capitalized-calls": "error",
+    "react/error-boundaries": "error",
+    "react/globals": "error",
+    "react/hooks": "error",
+    "react/immutability": "error",
+    "react/incompatible-library": "error",
+    "react/invariant": "error",
+    "react/no-deriving-state-in-effects": "error",
+    "react/preserve-manual-memoization": "error",
+    "react/purity": "error",
+    "react/refs": "error",
+    "react/set-state-in-effect": "error",
+    "react/set-state-in-render": "error",
+    "react/static-components": "error",
+    "react/syntax": "error",
+    "react/unsupported-syntax": "error",
+    "react/use-memo": "error",
+    "react/void-use-memo": "error",
+
+    "react-hooks/exhaustive-deps": "error",
+    "react-hooks/rules-of-hooks": "error",
+
+    // Chakra/Ark polymorphic composites own keyboard semantics; native-tag substitutions can break them. Axe
+    // checks the resulting tree.
+    "jsx-a11y/prefer-tag-over-role": "off",
+
+    "react-perf/jsx-no-new-object-as-prop": [
+      "error",
+      {
+        "nativeAllowList": "all"
+      }
+    ],
+    "react-perf/jsx-no-new-function-as-prop": [
+      "error",
+      {
+        "nativeAllowList": "all"
+      }
+    ],
+    "react-perf/jsx-no-new-array-as-prop": [
+      "error",
+      {
+        "nativeAllowList": "all"
+      }
+    ],
+    "react-perf/jsx-no-jsx-as-prop": [
+      "error",
+      {
+        "nativeAllowList": "all"
+      }
+    ],
+
+    "require-await": "error",
+
+    "typescript/consistent-type-imports": [
+      "error",
+      {
+        "fixStyle": "separate-type-imports",
+        "prefer": "type-imports"
+      }
+    ],
+    "typescript/no-empty-interface": [
+      "error",
+      {
+        "allowSingleExtends": true
+      }
+    ],
+    "typescript/consistent-type-assertions": [
+      "error",
+      {
+        "assertionStyle": "as"
+      }
+    ],
+    "typescript/ban-ts-comment": "error",
+    "typescript/no-import-type-side-effects": "error",
+
+    "unicorn/no-abusive-eslint-disable": "error",
+    "unicorn/error-message": "error",
+    "unicorn/throw-new-error": "error",
+    "unicorn/prefer-type-error": "error",
+
+    "vitest/require-mock-type-parameters": "off"
+  },
+  "overrides": [
+    {
+      // Allow scoped autofocus for task-entry dialogs, authentication, and inline rename.
+      "files": [
+        "src/features/gallery/ui/GalleryBoardMenu.tsx",
+        "src/features/identity/ui/LoginScreen.tsx",
+        "src/features/identity/ui/SetupScreen.tsx",
+        "src/features/identity/ui/UserFormDialog.tsx",
+        "src/features/workflow/ui/editor/AddNodeDialog.tsx",
+        "src/features/workflow/ui/editor/InvocationFlowNode.tsx",
+        "src/platform/ui/RenameDialog.tsx",
+        "src/workbench/palette/CommandPaletteDialog.tsx",
+        "src/workbench/widgets/layers/LayerListItem.tsx"
+      ],
+      "rules": {
+        "jsx-a11y/no-autofocus": "off"
+      }
+    },
+    {
+      // Chakra primitives supply focusable DOM; palette options retain focus on the aria-activedescendant
+      // combobox.
+      "files": [
+        "src/features/models/ui/components/ModelSelect.tsx",
+        "src/features/models/ui/shared/ModelFilterMenu.tsx",
+        "src/features/workflow/ui/editor/AddNodeDialog.tsx",
+        "src/workbench/palette/CommandPaletteDialog.tsx",
+        "src/workbench/palette/CommandPaletteRows.tsx"
+      ],
+      "rules": {
+        "jsx-a11y/interactive-supports-focus": "off"
+      }
+    }
+  ],
+  "env": {
+    "browser": true,
+    "builtin": true,
+    "es2022": true,
+    "node": true
+  },
+  "globals": {
+    "GlobalCompositeOperation": "readonly",
+    "RequestInit": "readonly"
+  },
+  "ignorePatterns": [
+    "dist/**",
+    "node_modules/**",
+    "static/**",
+    ".husky/**",
+    "patches/**",
+    "stats.html",
+    "index.html",
+    ".yarn/**",
+    "**/*.scss"
+  ]
+}

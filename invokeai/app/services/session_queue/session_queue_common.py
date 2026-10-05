@@ -1,13 +1,15 @@
 import datetime
 import json
+from collections.abc import Mapping
 from itertools import chain, product
-from typing import Generator, Literal, Optional, TypeAlias, Union
+from typing import Any, Generator, Literal, Optional, TypeAlias, Union
 
 from pydantic import (
     AliasChoices,
     BaseModel,
     ConfigDict,
     Field,
+    PrivateAttr,
     StrictStr,
     TypeAdapter,
     field_validator,
@@ -16,6 +18,13 @@ from pydantic import (
 from pydantic_core import to_jsonable_python
 
 from invokeai.app.invocations.fields import ImageField, VideoField
+from invokeai.app.services.shared.execution_effects import normalize_persisted_execution_effects
+from invokeai.app.services.shared.execution_state_migration import (
+    CURRENT_EXECUTION_STATE_VERSION,
+    UnsupportedExecutionStateVersionError,
+    dump_execution_state,
+    load_execution_state,
+)
 from invokeai.app.services.shared.graph import Graph, GraphExecutionState, NodeNotFoundError
 from invokeai.app.services.workflow_records.workflow_records_common import (
     WorkflowWithoutID,
@@ -38,12 +47,31 @@ class BatchDuplicateNodeFieldError(ValueError):
     """Raise when a batch has duplicate node_path and field_name."""
 
 
+class EnqueueIdempotencyConflictError(ValueError):
+    """Raise when a caller reuses an enqueue idempotency key for a different submission."""
+
+
+class EnqueueReceiptLimitError(RuntimeError):
+    """Raise when a caller has too many unacknowledged enqueue requests."""
+
+
+class EnqueueProjectNotFoundError(ValueError):
+    """Raise when a project-scoped enqueue names no project owned by the caller."""
+
+    def __init__(self, project_id: str) -> None:
+        super().__init__(f"Project {project_id} not found")
+
+
 class TooManySessionsError(ValueError):
     """Raise when too many sessions are requested."""
 
 
 class SessionQueueItemNotFoundError(ValueError):
     """Raise when a queue item is not found."""
+
+
+class SessionQueueItemChangedError(ValueError):
+    """Raise when a guarded queue-item update loses a concurrent state transition."""
 
 
 # endregion
@@ -74,6 +102,18 @@ BatchDataCollection: TypeAlias = list[list[BatchDatum]]
 
 class Batch(BaseModel):
     batch_id: str = Field(default_factory=uuid_string, description="The ID of the batch")
+    idempotency_key: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description="A caller-owned retry key. Reusing it with a different payload is rejected.",
+    )
+    project_id: str | None = Field(
+        default=None,
+        min_length=1,
+        max_length=255,
+        description="The authoritative project that owns this submission, when applicable.",
+    )
     origin: str | None = Field(
         default=None,
         description="The origin of this queue item. This data is used by the frontend to determine how to handle results.",
@@ -191,13 +231,60 @@ def get_field_values(queue_item_dict: dict) -> Optional[list[NodeFieldValue]]:
     return NodeFieldValueValidator.validate_json(field_values_raw) if field_values_raw is not None else None
 
 
-GraphExecutionStateValidator = TypeAdapter(GraphExecutionState)
-
-
 def get_session(queue_item_dict: dict) -> GraphExecutionState:
     session_raw = queue_item_dict.get("session", "{}")
-    session = GraphExecutionStateValidator.validate_json(session_raw, strict=False)
-    return session
+    session_payload = json.loads(session_raw) if isinstance(session_raw, str) else session_raw
+    return load_execution_state(session_payload)
+
+
+def _normalize_queue_read_effects(payload: dict[str, Any], *, normalize_effects: bool) -> None:
+    if normalize_effects and "execution_effects" in payload:
+        payload["execution_effects"] = normalize_persisted_execution_effects(payload["execution_effects"])
+
+    child_payload = payload.get("waiting_workflow_call_child_session")
+    if not isinstance(child_payload, Mapping):
+        return
+
+    child_payload = dict(child_payload)
+    child_state = child_payload.get("state")
+    if isinstance(child_payload.get("version"), int) and isinstance(child_state, Mapping):
+        child_state = dict(child_state)
+        _normalize_queue_read_effects(child_state, normalize_effects=normalize_effects)
+        child_payload["state"] = child_state
+    else:
+        _normalize_queue_read_effects(child_payload, normalize_effects=normalize_effects)
+    payload["waiting_workflow_call_child_session"] = child_payload
+
+
+def get_session_for_queue_read(queue_item_dict: dict) -> GraphExecutionState:
+    """Build a response-shaped session without rehydrating runtime execution state."""
+    session_raw = queue_item_dict.get("session", "{}")
+    session_payload = json.loads(session_raw) if isinstance(session_raw, str) else dict(session_raw)
+    if "version" in session_payload and isinstance(session_payload.get("state"), Mapping):
+        version = session_payload["version"]
+        session_payload = dict(session_payload["state"])
+    else:
+        version = session_payload.pop("execution_state_version", None)
+
+    if version is not None:
+        if isinstance(version, bool) or not isinstance(version, int):
+            raise ValueError("Execution state snapshot version must be an integer")
+        if version > CURRENT_EXECUTION_STATE_VERSION:
+            raise UnsupportedExecutionStateVersionError(
+                f"Execution state snapshot version {version} is newer than supported version "
+                f"{CURRENT_EXECUTION_STATE_VERSION}"
+            )
+
+    graph_payload = session_payload.get("graph")
+    if not isinstance(graph_payload, Mapping):
+        raise ValueError("Queue session projection is missing a graph mapping")
+    session_payload["graph"] = Graph.model_validate(graph_payload, strict=False)
+    execution_graph_payload = session_payload.get("execution_graph")
+    if isinstance(execution_graph_payload, Mapping):
+        session_payload["execution_graph"] = Graph.model_validate(execution_graph_payload, strict=False)
+    _normalize_queue_read_effects(session_payload, normalize_effects=version != 0)
+
+    return GraphExecutionState.model_validate(session_payload, context={"queue_read_projection": True})
 
 
 def get_workflow(queue_item_dict: dict) -> Optional[WorkflowWithoutID]:
@@ -217,6 +304,11 @@ class FieldIdentifier(BaseModel):
 
 class SessionQueueItem(BaseModel):
     """Session queue item without the full graph. Used for serialization."""
+
+    _snapshot_readable: bool = PrivateAttr(default=True)
+    _session_json: str | None = PrivateAttr(default=None)
+    _workflow_json_snapshot: str | None = PrivateAttr(default=None)
+    _workflow_json_loaded: bool = PrivateAttr(default=False)
 
     item_id: int = Field(description="The identifier of the session queue item")
     status: QUEUE_ITEM_STATUS = Field(default="pending", description="The status of this queue item")
@@ -251,6 +343,9 @@ class SessionQueueItem(BaseModel):
     completed_at: Optional[Union[datetime.datetime, str]] = Field(description="When this queue item was completed")
     queue_id: str = Field(description="The id of the queue with which this item is associated")
     user_id: str = Field(default="system", description="The id of the user who created this queue item")
+    project_id: Optional[str] = Field(
+        default=None, description="The project this queue item was enqueued for, if any; its outputs inherit it"
+    )
     user_display_name: Optional[str] = Field(
         default=None, description="The display name of the user who created this queue item, if available"
     )
@@ -288,12 +383,22 @@ class SessionQueueItem(BaseModel):
     )
 
     @classmethod
-    def queue_item_from_dict(cls, queue_item_dict: dict) -> "SessionQueueItem":
+    def queue_item_from_dict(
+        cls,
+        queue_item_dict: dict,
+        *,
+        hydrate_runtime: bool = True,
+    ) -> "SessionQueueItem":
         # must parse these manually
+        session_json = queue_item_dict.get("session") if isinstance(queue_item_dict.get("session"), str) else None
         queue_item_dict["field_values"] = get_field_values(queue_item_dict)
-        queue_item_dict["session"] = get_session(queue_item_dict)
+        queue_item_dict["session"] = (
+            get_session(queue_item_dict) if hydrate_runtime else get_session_for_queue_read(queue_item_dict)
+        )
         queue_item_dict["workflow"] = get_workflow(queue_item_dict)
-        return SessionQueueItem(**queue_item_dict)
+        queue_item = SessionQueueItem(**queue_item_dict)
+        queue_item._session_json = session_json
+        return queue_item
 
     model_config = ConfigDict(
         json_schema_extra={
@@ -338,7 +443,12 @@ class SessionQueueItemSummary(BaseModel):
 
     @classmethod
     def queue_item_summary_from_dict(cls, queue_item_dict: dict) -> "SessionQueueItemSummary":
-        queue_item_dict["field_values"] = get_field_values(queue_item_dict)
+        try:
+            queue_item_dict["field_values"] = get_field_values(queue_item_dict)
+        except (TypeError, ValueError):
+            # Summaries intentionally omit the runtime session and must remain usable when a
+            # queue row contains an unreadable optional field-values payload.
+            queue_item_dict["field_values"] = None
         return cls(**queue_item_dict)
 
 
@@ -361,11 +471,11 @@ class SessionQueueStatus(BaseModel):
     total: int = Field(..., description="Total number of queue items")
     user_pending: Optional[int] = Field(
         default=None,
-        description="Number of the requesting user's queue items with status 'pending' (None for admins/global callers)",
+        description="Number of the requesting user's queue items with status 'pending' (None for global callers)",
     )
     user_in_progress: Optional[int] = Field(
         default=None,
-        description="Number of the requesting user's queue items with status 'in_progress' (None for admins/global callers)",
+        description="Number of the requesting user's queue items with status 'in_progress' (None for global callers)",
     )
 
 
@@ -402,6 +512,25 @@ class EnqueueBatchResult(BaseModel):
     batch: Batch = Field(description="The batch that was enqueued")
     priority: int = Field(description="The priority of the enqueued batch")
     item_ids: list[int] = Field(description="The IDs of the queue items that were enqueued")
+
+
+class EnqueueBatchReceipt(BaseModel):
+    batch_id: str = Field(min_length=1, description="The ID assigned to the accepted batch")
+    enqueued: int = Field(ge=1, description="The total number of queue items enqueued")
+    requested: int = Field(ge=1, description="The total number of queue items requested")
+    item_ids: list[int] = Field(min_length=1, description="The IDs of the accepted queue items")
+
+    @model_validator(mode="after")
+    def validate_result(self) -> "EnqueueBatchReceipt":
+        if self.enqueued > self.requested:
+            raise ValueError("Enqueued count cannot exceed requested count")
+        if (
+            len(self.item_ids) != self.enqueued
+            or len(set(self.item_ids)) != len(self.item_ids)
+            or any(item_id <= 0 for item_id in self.item_ids)
+        ):
+            raise ValueError("Item ids must contain one positive id per enqueued item")
+        return self
 
 
 class RetryItemsResult(BaseModel):
@@ -563,7 +692,7 @@ def create_session_nfv_tuples(batch: Batch, maximum: int) -> Generator[tuple[str
 
     # We must provide a Graph object when creating the "dummy" session dict, but we don't actually use it. It will be
     # overwritten for each session by the mutated graph_as_dict.
-    session_dict = GraphExecutionState(graph=Graph()).model_dump(warnings=False, exclude_none=True)
+    session_dict = dump_execution_state(GraphExecutionState(graph=Graph()))
 
     # Now we can create a generator that yields the session_id, session_json, and field_values_json for each session.
     count = 0
@@ -635,6 +764,7 @@ ValueToInsertTuple: TypeAlias = tuple[
     str | None,  # destination (optional)
     int | None,  # retried_from_item_id (optional, this is always None for new items)
     str,  # user_id
+    str | None,  # project_id (optional)
 ]
 """A type alias for the tuple of values to insert into the session queue table.
 
@@ -669,6 +799,7 @@ def prepare_values_to_insert(
         - destination (optional)
         - retried_from_item_id (optional, this is always None for new items)
         - user_id
+        - project_id (optional)
     """
 
     # A tuple is a fast and memory-efficient way to store the values to insert. Previously, we used a NamedTuple, but
@@ -699,6 +830,7 @@ def prepare_values_to_insert(
                 batch.destination,
                 None,
                 user_id,
+                batch.project_id,
             )
         )
     return values_to_insert

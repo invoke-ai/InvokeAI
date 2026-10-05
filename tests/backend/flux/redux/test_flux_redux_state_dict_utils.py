@@ -1,6 +1,8 @@
 # The state dict keys and shapes for a FLUX Redux model.
 # Model source: https://huggingface.co/black-forest-labs/FLUX.1-Redux-dev/blob/1282f955f706b5240161278f2ef261d2a29ad649/flux1-redux-dev.safetensors
-# The keys and shapes were extracted with extract_sd_keys_and_shapes.py.
+# The keys and shapes were extracted with the predecessor of scripts/capture_state_dict_fixture.py.
+# This fixture family records shapes alone; the tool writes `(shape, dtype)`, so a re-capture would
+# need keys_to_mock_state_dict to read both forms.
 import torch
 
 from invokeai.backend.flux.redux.flux_redux_state_dict_utils import is_state_dict_likely_flux_redux

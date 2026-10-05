@@ -1,1234 +1,1067 @@
 ---
 title: New Model Type Integration Checklist
-description: A step-by-step checklist for integrating a new foundational model type into InvokeAI, from backend model manager to frontend UI.
-lastUpdated: 2026-06-26
+description: A step-by-step checklist for integrating a new model architecture into InvokeAI, from the model manager to the webv2 frontend and the tests that enforce completeness.
+lastUpdated: 2026-10-02
 ---
 
 import { Steps, FileTree } from '@astrojs/starlight/components';
 
-This guide describes all the steps required to integrate a new model type into InvokeAI, from the backend model manager up to the React frontend.
+This guide covers every step needed to add a new model architecture to InvokeAI:
+
+- the model manager, which identifies and loads the files
+- the architecture declaration
+- the invocations that form the generation graph
+- the webv2 frontend
+- the tests and CI gates that enforce completeness
 
 :::note
-The code examples use a hypothetical `NewModel` architecture. The implementations of FLUX.1, FLUX.2 Klein, SD3, SDXL, and Z-Image in the InvokeAI codebase serve as excellent real-world references.
+The examples use a hypothetical architecture, `NewModel`, with the base value `new-model`. These real implementations follow the current patterns end to end:
+
+- **Krea-2**: a single-stream DiT with a Qwen3-VL encoder, installable as Diffusers, single-file or GGUF.
+- **Z-Image**: variants with different defaults, LoRA and control.
+- **Qwen-Image**: reference images and an edit variant.
+- **Anima**: depth-expanded finetunes (Anima-2.9B, Anima-3.8B) and a variant with a second text encoder.
+:::
+
+:::tip[Extending an architecture that already exists?]
+A finetune with a different depth, a new variant or an extra encoder for an architecture InvokeAI already
+supports is a different job: most of this checklist does not apply, and some traps apply only there --
+installed models whose stored records must keep validating, and adapters trained on the original layout.
+Start with [Extending an existing architecture](#14-extending-an-existing-architecture).
+:::
+
+:::caution[Frontend scope]
+Frontend work targets **webv2** (`invokeai/frontend/webv2`) only. The legacy UI in `invokeai/frontend/webv1` gets no graph builders or UI for new architectures. Shared generated OpenAPI artifacts live in `invokeai/frontend/api`, which CI checks; see [Tests and CI gates](#13-tests-and-ci-gates).
+:::
+
+:::tip[Start with the scaffolder]
+Add the `BaseModelType` member first (step 2.1), then run:
+
+```sh
+python scripts/new_architecture.py --base new-model --name NewModel           # dry run
+python scripts/new_architecture.py --base new-model --name NewModel --write
+```
+
+It writes three files and refuses to overwrite existing ones:
+
+- the architecture declaration, `architectures/defs/new_model.py`
+- the invocation package, `app/invocations/new_model/__init__.py`
+- the starter-model module, `starter_models/new_model.py`
+
+It then prints two lists:
+
+- **Three edits it cannot scaffold:** `taxonomy.py`, `conditioning_data.py` and `metadata.py`.
+- **Every backend module that names five or more `BaseModelType` members.** These modules dispatch on base, so each one needs checking. The list is derived on each run. It has false positives, such as the `UIType` migration code in `fields.py`. It cannot see the hand-maintained lists this guide covers, and it lists no frontend work.
+
+The generated declaration contains every required facet, but only one placeholder stops the app from booting: an all-zero latent→RGB projection, which `LatentSpace` rejects when the module is imported. The other placeholders are valid values and **boot without complaint**:
+
+- `BasicConditioningInfo` as the conditioning class
+- 1024×1024 default settings
+- `txt2img` as the only mode
+- a dimension grid of 8
+
+Treat every `TODO` in the file as mandatory.
 :::
 
 ---
 
-## 1. Backend: Model Manager
+## 1. Upstream dependencies
+
+Most architectures load their transformer, VAE and text encoder through classes from `diffusers` and `transformers`. If the pinned releases lack the new model's classes, handle the dependency first:
+
+- **Wait for a stable release** that contains the classes. Do not pin a git commit; `pyproject.toml` pins `diffusers` to an exact version.
+- **Bump in a separate change.** A new release can change the numerical behavior of every existing architecture. The change has four parts:
+  - Update `pyproject.toml` and `uv.lock`, including raised transitive minimums such as `huggingface-hub`.
+  - Update `tests/backend/model_manager/load/test_diffusers_0XX_compatibility.py`. It asserts the exact pinned version and the classes InvokeAI imports.
+  - Run the full test suite.
+  - Run smoke generations for the existing architectures.
+- **Check the `transformers` requirement in the model card against the pin.** Model cards often name the version the authors tested, not a hard minimum. Verify that the encoder and processor behave correctly on the pinned version before bumping it.
+
+---
+
+## 2. Taxonomy
+
+File: `invokeai/backend/model_manager/taxonomy.py`
 
 <Steps>
-1. **Add `BaseModelType`**
-
-   Declare your new model in the base model taxonomy.
-
-   ```python title="invokeai/backend/model_manager/taxonomy.py" ins={10}
-   class BaseModelType(str, Enum):
-       # Existing types
-       StableDiffusion1 = "sd-1"
-       StableDiffusion2 = "sd-2"
-       StableDiffusionXL = "sdxl"
-       Flux = "flux"
-       Flux2 = "flux2"        # FLUX.2 Klein
-       SD3 = "sd-3"
-       ZImage = "z-image"
-       NewModel = "newmodel"  # NEW
-   ```
-
-2. **Add Variant Type (if needed)**
-
-   If your model comes in different structural variants (e.g., different parameter counts or distilled versions), define a variant enum.
+1. **Add the `BaseModelType` member.**
 
    ```python title="invokeai/backend/model_manager/taxonomy.py"
-   # Examples of existing variants:
-   class FluxVariantType(str, Enum):
-       Schnell = "schnell"
-       Dev = "dev"
-       DevFill = "dev_fill"
+   class BaseModelType(str, Enum):
+       ...
+       Krea2 = "krea-2"
+       """Indicates the model is associated with the Krea 2 model architecture, including Krea-2-Turbo."""
+       NewModel = "new-model"
+       """Indicates the model is associated with the NewModel architecture."""
+   ```
 
-   class Flux2VariantType(str, Enum):
-       Klein4B = "klein_4b"    # Qwen3 4B encoder
-       Klein9B = "klein_9b"    # Qwen3 8B distilled
-       Klein9BBase = "klein_9b_base"
+   The value is stored in every user's model database, so it cannot be renamed later. It also names the declaration module, with `-` replaced by `_`, so it must yield a valid Python module name. Use lowercase letters, digits and `-` only, and no dots: `qwen-image-2-1`, not `qwen-image-2.1`.
 
-   # NEW (if needed):
+2. **Add a variant enum (if needed).**
+
+   Add one only when models of the architecture differ in ways that matter at load or generation time, for example distilled versus base. Variant strings are resolved *without* the base (`configs/factory.py`), so every value must be unique across all variant enums. That is why `Krea2VariantType.Turbo` is `"krea2_turbo"` and not `"turbo"`.
+
+   ```python title="invokeai/backend/model_manager/taxonomy.py"
    class NewModelVariantType(str, Enum):
-       VariantA = "variant_a"
-       VariantB = "variant_b"
+       """NewModel variants."""
+
+       Turbo = "new_model_turbo"
+       """Distilled: few steps, CFG off."""
+
+       Base = "new_model_base"
+       """Undistilled base model: more steps, CFG on."""
    ```
 
-3. **Define Default Settings**
+   List the enum in all three places:
+   - `AnyVariant` in `taxonomy.py`
+   - `variant_type_adapter` in `taxonomy.py`
+   - `ModelRecordChanges.variant` in `invokeai/app/services/model_records/model_records_base.py`
 
-   Provide default generation parameters for the UI to use when this model is selected.
+   `tests/backend/architectures/test_variants.py` checks that the three agree and that the values are unique. A variant enum on a `base=Any` config (an encoder's) belongs to no architecture, so it also goes into `BASE_AGNOSTIC_VARIANT_ENUMS` in that test.
 
-   ```python title="invokeai/backend/model_manager/configs/main.py" ins={9-10}
-   class MainModelDefaultSettings:
-       @staticmethod
-       def from_base(base: BaseModelType, variant: AnyVariant | None = None):
-           match base:
-               case BaseModelType.Flux2:
-                   if variant == Flux2VariantType.Klein9BBase:
-                       return MainModelDefaultSettings(steps=28, cfg_scale=1.0, ...)
-                   return MainModelDefaultSettings(steps=4, cfg_scale=1.0, ...)
-               case BaseModelType.NewModel:  # NEW
-                   return MainModelDefaultSettings(steps=20, cfg_scale=7.0, ...)
-   ```
+   :::caution[Adding a variant to an architecture with installed models]
+   The model config's `variant` field must be **required** (`Field()` with no default), and existing records need a [migration](#persisted-records-and-migrations). Both shortcuts break every installed model of that class:
+   - Without a migration, a stored record without `variant` fails validation and is skipped on read; the models vanish from the model list.
+   - With a default, `Config_Base.get_tag` adds the variant to the class's discriminator tag, which a stored record's dict does not carry, so no record of that class deserializes at all.
+   :::
+
+3. **Add encoder types (only for a new text encoder).**
+
+   There is no generic text-encoder type. Each encoder family has its own `ModelType` member. A matching `ModelFormat` member is needed only if the encoder ships as a folder; a single-file encoder uses `ModelFormat.Checkpoint`. Existing examples are `Qwen3Encoder`, `Qwen3VLEncoder`, `Qwen35Encoder`, `QwenVLEncoder`, `MistralEncoder` and `T5Encoder`.
+
+   Reuse an existing type whenever the encoder is a model InvokeAI already supports. Krea-2, Ideogram 4 and MiniMax H3 all use `ModelType.Qwen3VLEncoder`, told apart by `Qwen3VLVariantType`. Check whether the encoder weights are a stock checkpoint before adding a type: Anima-3.8B's `qwen35_4b.safetensors` ships its last layer without the MLP and replaces the LM head with a projection, and the conditioning was trained on exactly that.
+
+   Same width is not same family. A new family needs its own type when its architecture differs, even where an existing variant matches its hidden size: the Qwen3.5 4B and the Qwen3 4B are both 2560 wide.
 </Steps>
 
-:::tip[Checklist: Model Manager]{icon="approve-check"}
-- [ ] Extend `BaseModelType` enum (`taxonomy.py`)
-- [ ] Create variant enum if needed (`taxonomy.py`)
-- [ ] Update `AnyVariant` union (`taxonomy.py`)
-- [ ] Add default settings in `from_base()` (`configs/main.py`)
+:::tip[Checklist: Taxonomy]{icon="approve-check"}
+- [ ] `BaseModelType` member with a module-safe value
+- [ ] Variant enum with globally unique values (if needed)
+- [ ] Variant enum listed in `AnyVariant`, `variant_type_adapter` and `ModelRecordChanges.variant`
+- [ ] Encoder `ModelType` + `ModelFormat` only if no existing encoder type fits
 :::
 
 ---
 
-## 2. Backend: Model Configs
+## 3. Architecture declaration
 
-InvokeAI needs to know how to identify your model from a `.safetensors` file or a diffusers folder.
+File: `invokeai/backend/architectures/defs/new_model.py`
+
+Each architecture declares what it is in exactly one `register(...)` call. Modules under `defs/` are discovered automatically, so there is no list to edit.
+
+At boot, `validate()` runs from `ApiDependencies.initialize`. It refuses to start the app in two cases:
+- a `BaseModelType` has no module
+- a module omits a required facet
+
+It checks only that the facets are *present*, not that their values are right.
+
+| Facet | Required | What it declares | Read by |
+| --- | --- | --- | --- |
+| `LatentSpaceFacet` | yes | Latent channels, spatial compression, latent→RGB projection | Step previews (`app/util/step_callback.py`) |
+| `ConditioningFacet` | yes | The `*ConditioningInfo` class the text encoder writes | The safe-globals list for conditioning deserialization |
+| `DefaultSettingsFacet` | yes | Steps, CFG or guidance, scheduler and size per variant (`None` is the fallback); optional `by_name_hint` | Stored on the model config at identification; prefills the UI |
+| `ModalityFacet` | yes | Modes (`txt2img`, `img2img`, `inpaint`, `outpaint`, video modes) and `metadata_slug` | Must equal `GENERATION_MODES`; which canvas tools the UI offers |
+| `FeaturesFacet` | yes | Negative prompt, `dimension_grid`, guidance label and range, scheduler set, control kinds, reference images, regional guidance, and more | Served to webv2 at `GET /api/v2/models/capabilities` |
+| `VaeFacet` | no | VAE bases (and channel counts) the architecture decodes with | Model loader VAE field, VAE picker, loader validation |
+| `VariantFacet` | no | Variant enum per `ModelType` | Variant consistency tests |
+| `UNetDownscaleFacet` | no | UNet downscale factor | SD-family UNets only |
+
+The facet classes live in `invokeai/backend/architectures/facets/`. Modeled on `defs/krea_2.py`:
+
+```python title="invokeai/backend/architectures/defs/new_model.py"
+"""What the new-model architecture declares."""
+
+from invokeai.backend.architectures.facets.conditioning import ConditioningFacet
+from invokeai.backend.architectures.facets.default_settings import DefaultSettingsFacet
+from invokeai.backend.architectures.facets.features import FeaturesFacet, NegativePrompt
+from invokeai.backend.architectures.facets.latent_space import FLUX2_32, LatentSpaceFacet
+from invokeai.backend.architectures.facets.modality import ModalityFacet
+from invokeai.backend.architectures.facets.vae import VaeCompatibility, VaeFacet
+from invokeai.backend.architectures.facets.variant import VariantFacet
+from invokeai.backend.architectures.registry import register
+from invokeai.backend.model_manager.configs.default_settings import MainModelDefaultSettings
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType, NewModelVariantType
+from invokeai.backend.stable_diffusion.diffusion.conditioning_data import NewModelConditioningInfo
+
+register(
+    BaseModelType.NewModel,
+    # NewModel decodes with the FLUX.2 VAE, so it shares that latent space.
+    LatentSpaceFacet(FLUX2_32),
+    ConditioningFacet(NewModelConditioningInfo),
+    DefaultSettingsFacet(
+        {
+            # Values from the model card.
+            NewModelVariantType.Base: MainModelDefaultSettings(
+                scheduler="euler", steps=28, cfg_scale=4.0, width=1024, height=1024
+            ),
+            # Turbo, and any model whose variant is unknown.
+            None: MainModelDefaultSettings(scheduler="euler", steps=8, cfg_scale=1.0, width=1024, height=1024),
+        }
+    ),
+    ModalityFacet(frozenset({"txt2img", "img2img", "inpaint", "outpaint"}), metadata_slug="new_model"),
+    FeaturesFacet(
+        negative_prompt=NegativePrompt(visible=True, usage="cfg-gated"),
+        dimension_grid=16,  # equals `multiple_of` on new_model_denoise.width/height
+        guidance_label="CFG",
+        scheduler_set="flow",
+    ),
+    VaeFacet(frozenset({VaeCompatibility(BaseModelType.Flux2)})),
+    # Variant values must be globally unique; see taxonomy.py.
+    VariantFacet({ModelType.Main: NewModelVariantType}),
+)
+```
+
+Things to get right:
+
+- **Latent space.** If the architecture uses a VAE InvokeAI already supports, reuse its shared space from `facets/latent_space.py`:
+  - `FLUX_16`: FLUX.1, Z-Image
+  - `FLUX2_32`: FLUX.2, ERNIE-Image, Ideogram 4
+  - `WAN21_16`: Wan 2.1, Qwen-Image, Krea-2, Anima
+  - `WAN22_48`
+
+  Otherwise, declare a new `LatentSpace` in that file. Compute its projection with `scripts/generate_vae_linear_approximation.py` rather than guessing it.
+- **Grid and guidance** are pinned to the denoise node by tests:
+  - `dimension_grid` must equal the `multiple_of` on the node's width and height.
+  - `guidance_min` and `guidance_max` must match the `ge` and `le` of the guidance field.
+  - A constraint that the node only enforces inside `invoke()`, per variant, goes in `dimension_grid_by_variant`.
+- **`VaeFacet`** replaces the default rule, under which an architecture accepts only its own base. List every accepted base explicitly, including the architecture's own if it applies. Z-Image, for example, accepts only FLUX VAEs.
+- **Mode strings** are persisted in image metadata and cannot be renamed. `metadata_slug` is usually the base value with `_` (`z_image`), but not always (`krea2`).
+- **Default settings** are copied onto the model config when a model is identified (`configs/factory.py`), so model configs need no code for them. Use `by_name_hint` only for sub-models that nothing on disk can tell apart.
+
+:::tip[Checklist: Architecture declaration]{icon="approve-check"}
+- [ ] `defs/<base>.py` with one `register(...)` call
+- [ ] All five required facets carry real values, not scaffolder placeholders
+- [ ] `VaeFacet` / `VariantFacet` where applicable
+- [ ] New `LatentSpace` computed with `generate_vae_linear_approximation.py`, if the VAE is new
+:::
+
+---
+
+## 4. Model configs
+
+Folder: `invokeai/backend/model_manager/configs/`
+
+Configs identify a model on disk. Every non-abstract subclass of `Config_Base` registers itself through `Config_Base.__init_subclass__`; there is no decorator.
 
 <Steps>
-1. **Create Main Model Config**
+1. **Main model configs** (`configs/main.py`)
 
-   Define the configuration schemas for your model format(s).
-
-   ```python title="invokeai/backend/model_manager/configs/main.py"
-   # Checkpoint Format
-   @ModelConfigFactory.register
-   class Main_Checkpoint_NewModel_Config(Checkpoint_Config_Base):
-       type: Literal[ModelType.Main] = ModelType.Main
-       base: Literal[BaseModelType.NewModel] = BaseModelType.NewModel
-       format: Literal[ModelFormat.Checkpoint] = ModelFormat.Checkpoint
-       variant: NewModelVariantType = NewModelVariantType.VariantA
-
-       @classmethod
-       def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict) -> Self:
-           if not cls._validate_is_newmodel(mod):
-               raise NotAMatchError("Not a NewModel")
-           variant = cls._get_variant_or_raise(mod)
-           return cls(..., variant=variant)
-
-   # Diffusers Format
-   @ModelConfigFactory.register
-   class Main_Diffusers_NewModel_Config(Diffusers_Config_Base):
-       type: Literal[ModelType.Main] = ModelType.Main
-       base: Literal[BaseModelType.NewModel] = BaseModelType.NewModel
-       format: Literal[ModelFormat.Diffusers] = ModelFormat.Diffusers
-   ```
-
-2. **Detection Helper Functions**
-
-   Write helpers to inspect the state dictionary keys and shapes to uniquely identify your architecture.
+   One class per format. Each combines a format mixin, `Main_Config_Base` and `Config_Base`:
 
    ```python title="invokeai/backend/model_manager/configs/main.py"
-   def _is_newmodel(state_dict: dict) -> bool:
-       """Detect if state dict belongs to NewModel architecture."""
-       # Example FLUX.2 Klein detection:
-       # - context_embedder.weight shape[1] > 4096 (Qwen3 vs T5)
-       # - img_in.weight shape[1] == 128 (32 latent channels × 4)
-       required_keys = ["transformer_blocks.0.attn.to_q.weight", ...]
-       return all(key in state_dict for key in required_keys)
+   class Main_Diffusers_NewModel_Config(Diffusers_Config_Base, Main_Config_Base, Config_Base):
+       """Model config for NewModel diffusers models."""
 
-   def _get_newmodel_variant(state_dict: dict) -> NewModelVariantType:
-       """Determine variant from state dict."""
-       # Example FLUX.2: context_in_dim distinguishes Klein 4B/9B
-       context_dim = state_dict["context_embedder.weight"].shape[1]
-       if context_dim == 7680:
-           return NewModelVariantType.VariantA
-       return NewModelVariantType.VariantB
-   ```
-
-3. **VAE Config (if custom VAE)**
-
-   ```python title="invokeai/backend/model_manager/configs/vae.py"
-   @ModelConfigFactory.register
-   class VAE_Checkpoint_NewModel_Config(VAE_Checkpoint_Base):
-       type: Literal[ModelType.VAE] = ModelType.VAE
-       base: Literal[BaseModelType.NewModel] = BaseModelType.NewModel
+       base: Literal[BaseModelType.NewModel] = Field(BaseModelType.NewModel)
+       variant: NewModelVariantType = Field()
 
        @classmethod
-       def from_model_on_disk(cls, mod: ModelOnDisk, ...) -> Self:
-           if not _is_newmodel_vae(mod.state_dict):
-               raise NotAMatchError()
-           return cls(...)
+       def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+           raise_if_not_dir(mod)
+           raise_for_override_fields(cls, override_fields)
+           # The pipeline class name implies the base.
+           raise_for_class_name(common_config_paths(mod.path), {"NewModelPipeline"})
 
-   def _is_newmodel_vae(state_dict: dict) -> bool:
-       # Example FLUX.2: Check for BN layers (bn.running_mean)
-       return "encoder.bn.running_mean" in state_dict
-   ```
+           # `_get_variant` reads whatever distinguishes the variants, e.g. a flag in model_index.json.
+           variant = override_fields.pop("variant", None) or cls._get_variant(mod)
+           repo_variant = override_fields.pop("repo_variant", None) or cls._get_repo_variant_or_raise(mod)
+           return cls(**override_fields, variant=variant, repo_variant=repo_variant)
 
-4. **Text Encoder Config (if custom encoder)**
 
-   ```python title="invokeai/backend/model_manager/configs/[encoder_type].py"
-   def _has_newmodel_encoder_keys(state_dict: dict) -> bool:
-       """Check if state dict contains NewModel encoder keys."""
-       required_keys = ["model.layers.0.", "model.embed_tokens.weight"]
-       return any(
-           key.startswith(indicator) or key == indicator
-           for key in state_dict.keys()
-           for indicator in required_keys
-           if isinstance(key, str)
-       )
+   class Main_Checkpoint_NewModel_Config(Checkpoint_Config_Base, Main_Config_Base, Config_Base):
+       """Model config for NewModel single-file checkpoints."""
 
-   @ModelConfigFactory.register
-   class NewModelEncoder_Checkpoint_Config(Checkpoint_Config_Base):
-       """Configuration for single-file NewModel Encoder models."""
-
-       base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
-       type: Literal[ModelType.NewModelEncoder] = Field(default=ModelType.NewModelEncoder)
+       base: Literal[BaseModelType.NewModel] = Field(default=BaseModelType.NewModel)
        format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+       variant: NewModelVariantType = Field()
 
        @classmethod
-       def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict) -> Self:
+       def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
            raise_if_not_file(mod)
            raise_for_override_fields(cls, override_fields)
 
-           if not _has_newmodel_encoder_keys(mod.load_state_dict()):
-               raise NotAMatchError("state dict does not look like a NewModel encoder")
+           state_dict = mod.load_state_dict()
+           if not _has_new_model_keys(state_dict):
+               raise NotAMatchError("state dict does not look like a NewModel model")
+           if _has_ggml_tensors(state_dict):
+               raise NotAMatchError("state dict looks like GGUF quantized")
 
-           return cls(**override_fields)
+           variant = override_fields.pop("variant", None) or _get_new_model_variant_from_name(mod.path.name)
+           return cls(**override_fields, variant=variant)
+   ```
 
-   @ModelConfigFactory.register
-   class NewModelEncoder_Diffusers_Config(Config_Base):
-       """Configuration for NewModel Encoder in diffusers directory format."""
+   If GGUF files exist, add a `Main_GGUF_NewModel_Config` with `format: Literal[ModelFormat.GGUFQuantized]` that *requires* `_has_ggml_tensors`.
 
-       base: Literal[BaseModelType.Any] = Field(default=BaseModelType.Any)
-       type: Literal[ModelType.NewModelEncoder] = Field(default=ModelType.NewModelEncoder)
-       format: Literal[ModelFormat.Diffusers] = Field(default=ModelFormat.Diffusers)
+   The identification helpers are in `configs/identification_utils.py`:
+   - `NotAMatchError`: "not this config"
+   - `InvalidMatchError`: "this config, but the file is broken"
+   - `raise_if_not_file` / `raise_if_not_dir`
+   - `raise_for_override_fields`
+   - `raise_for_class_name`
+   - `common_config_paths`
+   - `state_dict_has_any_keys_*`
+
+2. **Detection helpers**
+
+   Detect the architecture from keys that only it has, and from shapes where keys are shared. Strip ComfyUI prefixes such as `model.diffusion_model.` from each key first, with `_strip_comfyui_key_prefix` in `configs/main.py`. It reads the shared `COMFYUI_KEY_PREFIXES`, so detection and the loaders agree on which prefixes exist. Exclude LoRA suffixes, so that a LoRA for the architecture is not mistaken for a main model.
+
+   ```python title="invokeai/backend/model_manager/configs/main.py"
+   def _has_new_model_keys(state_dict: dict[str | int, Any]) -> bool:
+       """True for NewModel transformer weights, False for its LoRAs and for every other architecture."""
+       # `txt_in.text_norm` is unique to NewModel; `img_in` alone is shared with Qwen-Image and Krea-2.
+       ...
+   ```
+
+   Widths and key prefixes are not enough where two families share them. A `model.`-prefixed Qwen3.5 export satisfies every heuristic of the Qwen3 encoder configs; only its `linear_attn` layers tell it apart, so `Qwen35Encoder_Checkpoint_Config` requires them and the Qwen3 configs reject them.
+
+   **Configs must exclude each other.** Identification iterates `Config_Base.CONFIG_CLASSES`, which is a set, so the order in the `AnyModelConfig` union decides nothing. When two configs match the same file, `matches_sort_key` breaks the tie, which amounts to chance. For every existing config whose heuristic the new files could satisfy, add a negative check on one side or both. The same applies to LoRA and VAE configs, whose heuristics are often loose, for example "any key starting with `transformer_blocks.`". Cover each exclusion with a detection test.
+
+3. **VAE config (only for a new VAE)** (`configs/vae.py`)
+
+   `VAE_Checkpoint_Config_Base` and `VAE_Diffusers_Config_Base` detect the plain `AutoencoderKL` VAEs: SD 1, SD 2 (single files only) and SDXL at 4 latent channels, FLUX.1 and SD3 at 16. Within one latent width the weights cannot tell these bases apart, so `_VAE_FAMILIES` groups them, and an explicit `base` override chooses within a family but never across one. For 16 channels, a folder's `config.json` decides by `scaling_factor`/`shift_factor`, and a config that matches neither is not filed at all. A 16-channel single file goes to the backbone named in its file name, folder or install source (`configs/backbone_names.py`), else to FLUX.1. At 4 channels the older heuristics still apply: the file name for a single file, the SDXL config values or name for a folder. A new architecture that reuses one of these networks with its own constants (CogView 4 would) belongs in that table and in the diffusers constants check, not in a new detector.
+
+   Newer architectures with their own network subclass `Checkpoint_Config_Base, Config_Base` directly, as `VAE_Checkpoint_Flux2_Config` does:
+
+   ```python title="invokeai/backend/model_manager/configs/vae.py"
+   class VAE_Checkpoint_NewModel_Config(Checkpoint_Config_Base, Config_Base):
+       """Model config for NewModel VAE checkpoints."""
+
+       type: Literal[ModelType.VAE] = Field(default=ModelType.VAE)
+       format: Literal[ModelFormat.Checkpoint] = Field(default=ModelFormat.Checkpoint)
+       base: Literal[BaseModelType.NewModel] = Field(default=BaseModelType.NewModel)
+       cpu_only: bool | None = Field(default=None, description="Whether this model should run on CPU only")
 
        @classmethod
-       def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict) -> Self:
-           raise_if_not_dir(mod)
+       def from_model_on_disk(cls, mod: ModelOnDisk, override_fields: dict[str, Any]) -> Self:
+           raise_if_not_file(mod)
            raise_for_override_fields(cls, override_fields)
-
-           # Check for text_encoder config
-           config_path = mod.path / "text_encoder" / "config.json"
-           if not config_path.exists():
-               raise NotAMatchError(f"config file not found: {config_path}")
-
-           raise_for_class_name(config_path, {"NewModelForCausalLM"})
-
+           if not _is_new_model_vae(mod.load_state_dict()):
+               raise NotAMatchError("state dict does not look like a NewModel VAE")
            return cls(**override_fields)
    ```
 
-   Examples of existing implementations:
+   Then exclude the new VAE in `VAE_Checkpoint_Config_Base._validate_looks_like_vae`, and in every family detector it could also satisfy. Wan, Qwen-Image and Anima VAEs share one layout family.
 
-   - `t5_encoder.py` — T5 Encoder for FLUX.1, SD3
-   - `qwen3_encoder.py` — Qwen3 Encoder for FLUX.2 Klein, Z-Image
-   - `clip_embed.py` — CLIP Encoder for SDXL, SD3
+4. **Text encoder config (only for a new encoder type)**
 
-5. **Update `AnyModelConfig` Union**
+   Create `configs/<encoder>.py` with `base=BaseModelType.Any`, the new `ModelType`, and one config per format: folder (its own `ModelFormat`), single-file checkpoint, and GGUF if it exists. `qwen3_encoder.py`, `qwen3_vl_encoder.py` and `mistral_encoder.py` are complete examples.
 
-   Register your new configs so the application knows to check them when scanning directories.
+5. **`AnyModelConfig` union** (`configs/factory.py`)
 
-   ```python title="invokeai/backend/model_manager/configs/factory.py" ins={3-5}
-   AnyModelConfig = Annotated[
-       # ... existing configs
-       Main_Checkpoint_NewModel_Config |
-       Main_Diffusers_NewModel_Config |
-       VAE_Checkpoint_NewModel_Config,
-       Discriminator(...)
-   ]
+   Add each new config to the union, in the shape the other entries use:
+
+   ```python title="invokeai/backend/model_manager/configs/factory.py"
+   Annotated[Main_Diffusers_NewModel_Config, Main_Diffusers_NewModel_Config.get_tag()],
    ```
+
+6. **Refuse what is recognized but not supported**
+
+   Raise `InvalidMatchError` for a file the config recognizes and cannot run, with a message that says what to install instead. `NotAMatchError` would let it fall through to another config or to `unknown`, and installing it as a working model would be worse. Anima refuses the Anima-3.8B v1.0 transformer this way: it loads cleanly as a 52-block Anima, but needs an adapter file InvokeAI does not load; its header (`qwen35_joint_dit_blocks`) is what gives it away.
 </Steps>
 
-:::tip[Checklist: Model Configs]{icon="approve-check"}
-- [ ] Create main checkpoint config (`configs/main.py`)
-- [ ] Create main diffusers config (`configs/main.py`)
-- [ ] Create detection helper functions (`_is_newmodel()`, `_get_variant()`)
-- [ ] Create VAE config if custom VAE (`configs/vae.py`)
-- [ ] Create text encoder config if custom encoder
-- [ ] Update `AnyModelConfig` union (`configs/factory.py`)
+### Persisted records and migrations
+
+Every installed model is stored as its config's JSON in the `models` table. `ModelRecordServiceSQL` *skips* a stored config that no longer validates, with a log line and nothing in the UI: the model just disappears from the model list. So any change that makes stored records invalid -- a new required field, a renamed enum value, a narrowed `Literal` -- needs a migration in `invokeai/app/services/shared/sqlite_migrator/migrations/` that rewrites them:
+
+- Name it `migration_<yyyy_mm_dd>_<what>.py` with a `build_migration(...)` that returns a `Migration`. Its `depends_on` names the newest migration on the main line. Discovery is automatic.
+- Request `app_config` in `build_migration` if the callback has to open model files; stored paths may be relative to `app_config.models_path`. Fall back to a safe value when a file is gone.
+- Touch only the records the change concerns (type, base and format), and leave records that already carry the field alone.
+- Test it against an in-memory `models` table, as `test_migration_2026_10_01_add_anima_variant.py` does.
+
+`migration_2026_09_16_add_qwen3_vl_encoder_variant` (a new required encoder variant) and `migration_2026_10_01_add_anima_variant` (a new required main-model variant that reads each checkpoint's header) are complete examples.
+
+:::tip[Checklist: Model configs]{icon="approve-check"}
+- [ ] Main configs per format (Diffusers, checkpoint, GGUF)
+- [ ] Detection helper and variant detection
+- [ ] Mutual exclusion with every existing config the new files could match, with tests
+- [ ] VAE config and exclusions in the existing VAE detectors (if the VAE is new)
+- [ ] Encoder configs (if the encoder type is new)
+- [ ] Every new config in the `AnyModelConfig` union
+- [ ] `InvalidMatchError` for recognized files that cannot run
+- [ ] A migration for every change that would invalidate stored records
 :::
 
 ---
 
-## 3. Backend: Model Loader
+## 5. Model loaders
 
-Loaders convert the files on disk (described by the config) into PyTorch models in memory.
+Folder: `invokeai/backend/model_manager/load/model_loaders/`
+
+Loaders turn a config into an in-memory model. Every module in this folder is imported automatically. A loader registers for a `(base, type, format)` triple. Lookup falls back to `base=BaseModelType.Any`, which is how encoder loaders serve every architecture.
 
 <Steps>
-1. **Create Model Loader**
+1. **Diffusers-format main model**
 
-   ```python title="invokeai/backend/model_manager/load/model_loaders/[newmodel].py"
-   @ModelLoaderRegistry.register(
-       base=BaseModelType.NewModel,
-       type=ModelType.Main,
-       format=ModelFormat.Checkpoint
-   )
-   class NewModelLoader(ModelLoader):
-       def _load_model(self, config: AnyModelConfig, submodel_type: SubModelType | None) -> AnyModel:
-           # Load and convert state dict
-           state_dict = self._load_state_dict(config.path)
+   Subclass `GenericDiffusersLoader`. It resolves each submodel's class from `model_index.json`. Override `_load_model` only for what the pipeline gets wrong: tokenizer quirks, config patches, dtype, or dropping unused modules.
 
-           # If format conversion needed (e.g., BFL → Diffusers):
-           if self._is_bfl_format(state_dict):
-               state_dict = self._convert_bfl_to_diffusers(state_dict)
+   ```python title="invokeai/backend/model_manager/load/model_loaders/new_model.py"
+   @ModelLoaderRegistry.register(base=BaseModelType.NewModel, type=ModelType.Main, format=ModelFormat.Diffusers)
+   class NewModelDiffusersModel(GenericDiffusersLoader):
+       """Loads NewModel submodels from a diffusers pipeline folder."""
 
-           # Instantiate model
-           model = NewModelTransformer(config=model_config)
-           model.load_state_dict(state_dict)
-           return model
+       def _load_model(self, config: AnyModelConfig, submodel_type: Optional[SubModelType] = None) -> AnyModel:
+           if submodel_type is None:
+               raise Exception("A submodel type must be provided when loading main pipelines.")
+           model_path = Path(config.path)
+           load_class = self.get_hf_load_class(model_path, submodel_type)
+           dtype = TorchDevice.choose_bfloat16_safe_dtype(TorchDevice.choose_torch_device())
+           result: AnyModel = load_class.from_pretrained(model_path / submodel_type.value, torch_dtype=dtype)
+           return self._apply_fp8_layerwise_casting(result, config, submodel_type)
    ```
 
-2. **VAE Loader (if custom VAE)**
+2. **Single-file and GGUF main models**
 
-   ```python title="invokeai/backend/model_manager/load/model_loaders/[newmodel].py"
-   @ModelLoaderRegistry.register(
-       base=BaseModelType.NewModel,
-       type=ModelType.VAE,
-       format=ModelFormat.Checkpoint
-   )
-   class NewModelVAELoader(ModelLoader):
-       def _load_model(self, config, submodel_type) -> AnyModel:
-           # Example FLUX.2: AutoencoderKLFlux2 with BN layers
-           from diffusers import AutoencoderKLFlux2
-           vae = AutoencoderKLFlux2.from_single_file(config.path)
-           return vae
-   ```
+   Subclass `ModelLoader`, build the transformer under `accelerate.init_empty_weights()`, convert the keys to the diffusers layout, and load with `assign=True`. `Krea2CheckpointModel` and `Krea2GGUFCheckpointModel` in `krea2.py` show the full pattern:
+   - stripping the ComfyUI prefix with `CheckpointPrefix.detect(sd).strip(sd)` (`invokeai/backend/model_manager/checkpoint_prefix.py`) rather than a hand-written loop
+   - reserving RAM before materializing, exactly once: build the empty model first, take the fp8 and nvfp4 side channels out of the state dict, then reserve, and only then fold or widen anything. A fold before the reservation lands on a cache that was never asked for the room. For fp8, nvfp4 and dense files the reservation is `reserve_for_load` (`invokeai/backend/quantization/load_plan.py`).
+   - quantized formats: ComfyUI `fp8_scaled`, `int8_convrot` and `nvfp4` (helpers in `invokeai/backend/quantization/`), and GGUF through `gguf_sd_loader`. For int8, call `install_int8_convrot_layers` instead of its individual steps. It makes the reservation itself through its `reserve` argument, so do not also call `reserve_for_load`; the steps' order matters, and skipping the first one loads a mixed checkpoint's fp8 weights without their scale.
+   - a loader that handles no quantization side channel (a VAE, an adapter, a non-strict `load_state_dict`) calls `reject_quantized_side_channel` so a quantized file is refused rather than loaded wrongly
+   - opting into FP8 storage with `_apply_fp8_layerwise_casting`
 
-3. **Text Encoder Loader (if custom encoder)**
+   **Declare FP8 Storage support at registration.** The Model Manager only shows the FP8 Storage toggle where `fp8_storage_verdict(base, type, format)` (`invokeai/backend/model_manager/load/fp8_capability.py`) says it works. A loader that does not apply the cast says so where it registers, with a reason: `fp8_storage=Unimplemented("...")` for work not done yet, `NotApplicable("...")` for a deliberate decision. `tests/backend/model_manager/load/test_fp8_capability.py` walks the registry and fails for a loader that neither casts nor declares.
 
-   ```python title="invokeai/backend/model_manager/load/model_loaders/[newmodel].py"
-   @ModelLoaderRegistry.register(
-       base=BaseModelType.Any,
-       type=ModelType.NewModelEncoder,
-       format=ModelFormat.Checkpoint
-   )
-   class NewModelEncoderLoader(ModelLoader):
-       """Load single-file NewModel Encoder models."""
+   Community single-file checkpoints often use key names that differ from diffusers, for example fused projections. Verify the conversion numerically against the diffusers module on a small config.
 
-       def _load_model(self, config: AnyModelConfig, submodel_type: SubModelType | None) -> AnyModel:
-           match submodel_type:
-               case SubModelType.TextEncoder:
-                   return self._load_text_encoder(config)
-               case SubModelType.Tokenizer:
-                   # Load tokenizer from HuggingFace or local path
-                   return AutoTokenizer.from_pretrained("org/newmodel-base")
+   **Read structural hyperparameters from the checkpoint.** A loader that hard-codes the depth or a width and loads with `strict=False` builds the wrong model without an error when a finetune changes them: it fills the first N blocks of a deeper checkpoint and drops the rest as unexpected keys, which `log_unexpected_keys` reports at DEBUG only. `reject_incomplete_load` does not catch this either -- nothing is *missing*. Anima's loader took Anima-2.9B's first 28 of 40 blocks this way and generated degraded images. Count blocks from the state dict (`count_anima_dit_blocks`), refuse gaps, and read further hyperparameters from the safetensors header where the checkpoint records them (`read_safetensors_metadata`).
 
-           raise ValueError(f"Unsupported submodel: {submodel_type}")
+3. **VAE loader (only for a new VAE)**
 
-       def _load_text_encoder(self, config: AnyModelConfig) -> AnyModel:
-           from safetensors.torch import load_file
-           from transformers import NewModelConfig, NewModelForCausalLM
+   Build the diffusers VAE class and load the converted state dict. `vae.py` and `flux.py` handle existing VAEs from native and ComfyUI layouts.
 
-           # Load state dict and determine model configuration
-           sd = load_file(config.path)
+4. **Text encoder loader (only for a new encoder type)**
 
-           # Detect model architecture from weights
-           layer_count = self._count_layers(sd)
-           hidden_size = sd["model.embed_tokens.weight"].shape[1]
-
-           # Create model with detected configuration
-           model_config = NewModelConfig(
-               hidden_size=hidden_size,
-               num_hidden_layers=layer_count,
-               # ... other config parameters
-           )
-
-           with accelerate.init_empty_weights():
-               model = NewModelForCausalLM(model_config)
-
-           model.load_state_dict(sd, assign=True)
-           return model
-   ```
+   Register with `base=BaseModelType.Any` and the encoder's `ModelType`, and serve both `SubModelType.TextEncoder` and `SubModelType.Tokenizer`. Vendor tokenizers and configs the loader needs, as `invokeai/backend/qwen2_5_vl/` does, so a single-file install loads without network access. Add the vendored files to `[tool.setuptools.package-data]` in `pyproject.toml`, or a wheel install fails with `FileNotFoundError`; `tests/test_package_data.py` checks every `*.json` and `*.json.gz` under `invokeai/backend`.
 </Steps>
 
-:::tip[Checklist: Model Loader]{icon="approve-check"}
-- [ ] Create and register main model loader
-- [ ] Create VAE loader if custom VAE
-- [ ] Create text encoder loader if custom encoder
-- [ ] Implement state dict conversion if needed (different formats)
-- [ ] Implement submodel loading (Diffusers format)
+:::tip[Checklist: Model loaders]{icon="approve-check"}
+- [ ] Loader per registered `(base, type, format)`
+- [ ] Key conversion for single-file and GGUF layouts, verified numerically against diffusers
+- [ ] Depth and other structural hyperparameters read from the checkpoint, not hard-coded
+- [ ] Quantized formats via the existing `invokeai/backend/quantization/` helpers
+- [ ] FP8 Storage: the loader casts, or declares `Unimplemented` / `NotApplicable` at registration
+- [ ] VAE and encoder loaders (if new)
 :::
 
 ---
 
-## 4. Backend: Invocations
+## 6. Conditioning plumbing
 
-Invocations expose your PyTorch functions as isolated execution nodes in InvokeAI's graph.
+A text encoder saves a `ConditioningFieldData` to disk, and the denoise node reads it back. Each architecture has its own conditioning types, and they must be threaded through five places:
 
 <Steps>
-1. **Model Loader Invocation**
+1. **Info class and union** (`invokeai/backend/stable_diffusion/diffusion/conditioning_data.py`)
 
-   ```python title="invokeai/app/invocations/[newmodel]_model_loader.py"
-   @invocation("newmodel_model_loader", title="NewModel Loader", ...)
+   Add a dataclass with a `to(device, dtype)` method, and add it to the `ConditioningFieldData.conditionings` union. The `ConditioningFacet` then puts it on the safe-globals list that deserialization needs. A class missing from that list fails with an `UnpicklingError` inside the denoise node, after the encoder has already run.
+
+   ```python title="invokeai/backend/stable_diffusion/diffusion/conditioning_data.py"
+   @dataclass
+   class NewModelConditioningInfo:
+       """NewModel text conditioning."""
+
+       prompt_embeds: torch.Tensor
+       """Shape: (batch_size, seq_len, hidden_size)."""
+
+       prompt_embeds_mask: torch.Tensor | None = None
+       """Shape: (batch_size, seq_len). True for valid tokens."""
+
+       def to(self, device: torch.device | None = None, dtype: torch.dtype | None = None):
+           self.prompt_embeds = self.prompt_embeds.to(device=device, dtype=dtype)
+           if self.prompt_embeds_mask is not None:
+               self.prompt_embeds_mask = self.prompt_embeds_mask.to(device=device)
+           return self
+   ```
+
+2. **Field** (`invokeai/app/invocations/fields.py`): `NewModelConditioningField` with `conditioning_name` and an optional `mask` for regional prompting. Add node field descriptions to `FieldDescriptions` in the same file.
+
+3. **Output** (`invokeai/app/invocations/primitives.py`): `NewModelConditioningOutput`, registered with `@invocation_output("new_model_conditioning_output")`.
+
+4. **Encoder field** (`invokeai/app/invocations/model.py`, only for a new encoder type): for example `Qwen3VLEncoderField`, with `tokenizer`, `text_encoder` and `loras`.
+
+5. **Public API** (`invokeai/invocation_api/__init__.py`): export the info class, and list it in `__all__`.
+</Steps>
+
+---
+
+## 7. Invocations
+
+Invocations expose the architecture as nodes in the generation graph.
+
+:::note[Where node files go]
+Architecture nodes live in `invokeai/app/invocations/new_model/`, one package per architecture. Nodes that several architectures share are grouped by role instead:
+
+| Nodes | Package |
+| --- | --- |
+| VAE encode and decode, latents to image or video | `invocations/vae/` |
+| Text encoders | `invocations/text_encoder/` |
+| PiD decode and upscale | `invocations/pid/` |
+
+Generic nodes (noise, primitives, image operations, metadata) stay at the top level. Keep the architecture prefix in file names even inside the package (`new_model_denoise.py`).
+
+Packages are discovered automatically. A directory of node modules without an `__init__.py` raises an `ImportError` at startup, and `tests/app/invocations/test_node_discovery.py` checks that files on disk and imported modules agree.
+:::
+
+<Steps>
+1. **Model loader** (`new_model/new_model_model_loader.py`)
+
+   Outputs the submodel identifiers. The transformer always comes from the main model; the VAE and encoder come from standalone models if selected, otherwise from the Diffusers main model. The field hints `ui_model_base` and `ui_model_type` drive the model pickers. The VAE field must use `accepted_vae_bases()`, which `tests/backend/architectures/test_vae.py` enforces.
+
+   ```python title="invokeai/app/invocations/new_model/new_model_model_loader.py"
+   @invocation_output("new_model_model_loader_output")
+   class NewModelModelLoaderOutput(BaseInvocationOutput):
+       transformer: TransformerField = OutputField(description=FieldDescriptions.transformer, title="Transformer")
+       qwen3_vl_encoder: Qwen3VLEncoderField = OutputField(
+           description=FieldDescriptions.qwen3_vl_encoder, title="Qwen3-VL Encoder"
+       )
+       vae: VAEField = OutputField(description=FieldDescriptions.vae, title="VAE")
+
+
+   @invocation("new_model_model_loader", title="Main Model - NewModel", tags=["model", "new_model"],
+               category="model", version="1.0.0", classification=Classification.Prototype)
    class NewModelModelLoaderInvocation(BaseInvocation):
-       model: ModelIdentifierField = InputField(description="Main model")
-       vae_model: ModelIdentifierField | None = InputField(default=None)
-       encoder_model: ModelIdentifierField | None = InputField(default=None)
+       model: ModelIdentifierField = InputField(
+           description=FieldDescriptions.main_model, input=Input.Direct,
+           ui_model_base=BaseModelType.NewModel, ui_model_type=ModelType.Main, title="Transformer",
+       )
+       vae_model: Optional[ModelIdentifierField] = InputField(
+           default=None, description="Standalone VAE model.", input=Input.Direct,
+           ui_model_base=accepted_vae_bases(BaseModelType.NewModel), ui_model_type=ModelType.VAE, title="VAE",
+       )
+       qwen3_vl_encoder_model: Optional[ModelIdentifierField] = InputField(
+           default=None, description="Standalone Qwen3-VL Encoder model.", input=Input.Direct,
+           ui_model_type=ModelType.Qwen3VLEncoder, title="Qwen3-VL Encoder",
+       )
 
-       def invoke(self, context: InvocationContext) -> NewModelLoaderOutput:
-           # Load transformer
-           transformer = self.model.model_copy(
-               update={"submodel_type": SubModelType.Transformer}
-           )
-           # Load VAE (from main model or separately)
-           if self.vae_model:
-               vae = self.vae_model.model_copy(...)
-           else:
-               vae = self.model.model_copy(
-                   update={"submodel_type": SubModelType.VAE}
-               )
-           return NewModelLoaderOutput(transformer=transformer, vae=vae, ...)
+       def invoke(self, context: InvocationContext) -> NewModelModelLoaderOutput:
+           transformer = self.model.model_copy(update={"submodel_type": SubModelType.Transformer})
+           # Validate each standalone component (base, type, variant, accepts_vae(...)) with an error
+           # that names what the user picked; fall back to the Diffusers main model's submodels.
+           ...
    ```
 
-2. **Text Encoder Invocation**
+2. **Text encoder** (`text_encoder/new_model_text_encoder.py`)
 
-   ```python title="invokeai/app/invocations/[newmodel]_text_encoder.py"
-   @invocation("newmodel_text_encode", title="NewModel Text Encoder", ...)
+   Loads tokenizer and encoder through `context.models.load(...)`, applies LoRAs to the encoder if the architecture has any, extracts the hidden states the transformer was trained on, and saves the conditioning:
+
+   ```python title="invokeai/app/invocations/text_encoder/new_model_text_encoder.py"
+   @invocation("new_model_text_encoder", title="Prompt - NewModel", tags=["prompt", "conditioning", "new_model"],
+               category="conditioning", version="1.0.0", classification=Classification.Prototype,
+               idle_gpu_offloadable=True)
    class NewModelTextEncoderInvocation(BaseInvocation):
-       prompt: str = InputField()
-       encoder: EncoderField = InputField()
+       prompt: str = InputField(description="Text prompt.", ui_component=UIComponent.Textarea)
+       mask: TensorField | None = InputField(default=None, description="Regional mask.", input=Input.Connection)
+       qwen3_vl_encoder: Qwen3VLEncoderField = InputField(
+           title="Qwen3-VL Encoder", description=FieldDescriptions.qwen3_vl_encoder, input=Input.Connection
+       )
 
-       def invoke(self, context: InvocationContext) -> ConditioningOutput:
-           # 1. Tokenize the prompt
-           with context.models.load(self.encoder.tokenizer) as tokenizer:
-               input_ids = tokenizer(
-                   self.prompt,
-                   return_tensors="pt",
-                   padding="max_length",
-                   max_length=256,
-                   truncation=True
-               ).input_ids
-
-           # 2. Run encoder and extract hidden states
-           # Example FLUX.2 Klein/Z-Image: Extract specific layers and stack them
-           # Different models use different layer extraction strategies:
-           # - Some use the final hidden state only
-           # - Others stack multiple intermediate layers for richer representations
-           with context.models.load(self.encoder.text_encoder) as encoder:
-               outputs = encoder(input_ids, output_hidden_states=True)
-               hidden_states = outputs.hidden_states
-
-               # Stack layers 9, 18, 27 to create combined text embedding
-               # This captures features at different abstraction levels
-               # Shape: (batch, seq_len, hidden_size) -> (batch, seq_len, hidden_size * 3)
-               stacked_embeddings = torch.cat([
-                   hidden_states[9],
-                   hidden_states[18],
-                   hidden_states[27]
-               ], dim=-1)
-
-           # 3. Create conditioning data structure
-           # The stacked embeddings become the text conditioning that guides denoising
+       @torch.no_grad()
+       def invoke(self, context: InvocationContext) -> NewModelConditioningOutput:
+           prompt_embeds, prompt_mask = self._encode(context)  # template, layer choice, padding
            conditioning_data = ConditioningFieldData(
-               conditionings=[
-                   BasicConditioningInfo(embeds=stacked_embeddings)
-               ]
+               conditionings=[NewModelConditioningInfo(prompt_embeds=prompt_embeds.cpu(), prompt_embeds_mask=prompt_mask)]
            )
-
-           # 4. Save conditioning to context and return reference
            conditioning_name = context.conditioning.save(conditioning_data)
-           return ConditioningOutput(
-               conditioning=ConditioningField(conditioning_name=conditioning_name)
-           )
+           return NewModelConditioningOutput.build(conditioning_name, mask=self.mask)
    ```
 
-3. **Denoise Invocation**
+   Copy the reference pipeline's encoding exactly and cover it with a test: the prompt template, the prefix tokens it drops, the hidden-state layer (and whether it is before or after the final norm), the padding side and the maximum length. Small deviations here degrade images without failing.
 
-   ```python title="invokeai/app/invocations/[newmodel]_denoise.py"
-   @invocation("newmodel_denoise", title="NewModel Denoise", ...)
+3. **Denoise** (`new_model/new_model_denoise.py`)
+
+   ```python title="invokeai/app/invocations/new_model/new_model_denoise.py"
+   @invocation("new_model_denoise", title="Denoise - NewModel", tags=["image", "new_model"],
+               category="image", version="1.0.0", classification=Classification.Prototype)
    class NewModelDenoiseInvocation(BaseInvocation):
-       # Standard Fields
-       latents: LatentsField | None = InputField(default=None)
-       positive_conditioning: ConditioningField = InputField()
-       negative_conditioning: ConditioningField | None = InputField(default=None)
-
-       # Model Fields
-       transformer: TransformerField = InputField()
-
-       # Denoise Parameters
-       denoising_start: float = InputField(default=0.0, ge=0, le=1)
-       denoising_end: float = InputField(default=1.0, ge=0, le=1)
-       steps: int = InputField(default=20, ge=1)
-       cfg_scale: float = InputField(default=7.0)
-
-       # Image-to-Image / Inpainting
-       denoise_mask: DenoiseMaskField | None = InputField(default=None)
-
-       # Scheduler (if model-specific)
-       scheduler: Literal["euler", "heun", "lcm"] = InputField(default="euler")
-
-       def invoke(self, context: InvocationContext) -> LatentsOutput:
-           # 1. Generate noise
-           noise = get_noise_newmodel(seed, height, width, ...)
-
-           # 2. Pack latents (if needed)
-           x = pack_newmodel(latents)
-
-           # 3. Compute schedule
-           timesteps = get_schedule_newmodel(num_steps, denoising_start, denoising_end)
-
-           # 4. Denoising loop
-           x = denoise(
-               model=transformer,
-               x=x,
-               timesteps=timesteps,
-               conditioning=conditioning,
-               cfg_scale=self.cfg_scale,
-               inpaint_extension=inpaint_extension,  # For inpainting
-           )
-
-           # 5. Unpack latents
-           latents = unpack_newmodel(x)
-
-           return LatentsOutput(latents=latents)
-   ```
-
-4. **VAE Encode Invocation**
-
-   ```python title="invokeai/app/invocations/[newmodel]_vae_encode.py"
-   @invocation("newmodel_vae_encode", title="Image to Latents - NewModel", ...)
-   class NewModelVaeEncodeInvocation(BaseInvocation):
-       image: ImageField = InputField()
-       vae: VAEField = InputField()
+       latents: Optional[LatentsField] = InputField(default=None, description=FieldDescriptions.latents,
+                                                    input=Input.Connection)
+       denoise_mask: Optional[DenoiseMaskField] = InputField(default=None, description=FieldDescriptions.denoise_mask,
+                                                             input=Input.Connection)
+       denoising_start: float = InputField(default=0.0, ge=0, le=1, description=FieldDescriptions.denoising_start)
+       denoising_end: float = InputField(default=1.0, ge=0, le=1, description=FieldDescriptions.denoising_end)
+       transformer: TransformerField = InputField(description=FieldDescriptions.transformer, input=Input.Connection)
+       positive_conditioning: NewModelConditioningField | list[NewModelConditioningField] = InputField(
+           description=FieldDescriptions.positive_cond, input=Input.Connection
+       )
+       negative_conditioning: NewModelConditioningField | list[NewModelConditioningField] | None = InputField(
+           default=None, description=FieldDescriptions.negative_cond, input=Input.Connection
+       )
+       cfg_scale: float | list[float] = InputField(default=1.0, description=FieldDescriptions.cfg_scale)
+       # `multiple_of` must equal FeaturesFacet.dimension_grid.
+       width: int = InputField(default=1024, gt=0, multiple_of=16, description="Width of the generated image.")
+       height: int = InputField(default=1024, gt=0, multiple_of=16, description="Height of the generated image.")
+       steps: int = InputField(default=8, gt=0, description=FieldDescriptions.steps)
+       seed: int = InputField(default=0, description="Randomness seed for reproducibility.")
 
        def invoke(self, context: InvocationContext) -> LatentsOutput:
-           image = context.images.get_pil(self.image.image_name)
-           image_tensor = image_resized_to_grid_as_tensor(image.convert("RGB"))
-
-           with context.models.load(self.vae.vae) as vae:
-               latent_dist = vae.encode(image_tensor)
-               latents = latent_dist.mode()  # Deterministic
-
-           return LatentsOutput(latents=latents)
+           # 1. Noise from the seed; init latents for img2img; clip the schedule by denoising_start/end.
+           # 2. Load the transformer with a working-memory estimate; apply LoRA patches.
+           # 3. Loop: model prediction, optional CFG, scheduler step,
+           #    RectifiedFlowInpaintExtension merge when a denoise_mask is set, step callback.
+           # 4. Save and return the latents.
+           ...
    ```
 
-5. **VAE Decode Invocation**
+   Report progress with `context.util.sd_step_callback(state, BaseModelType.NewModel)`; it renders previews through the architecture's `LatentSpaceFacet`. The denoise node is also where these are checked: interrupts (`context.util.is_canceled()`), inpainting, img2img through `denoising_start`, and a working-memory estimate passed to `model_on_device(working_mem_bytes=...)`.
 
-   ```python title="invokeai/app/invocations/[newmodel]_vae_decode.py"
-   @invocation("newmodel_vae_decode", title="Latents to Image - NewModel", ...)
-   class NewModelVaeDecodeInvocation(BaseInvocation):
-       latents: LatentsField = InputField()
-       vae: VAEField = InputField()
+4. **VAE encode and decode** (`vae/new_model_image_to_latents.py`, `vae/new_model_latents_to_image.py`)
 
-       def invoke(self, context: InvocationContext) -> ImageOutput:
-           latents = context.tensors.load(self.latents.latents_name)
+   Apply the VAE's latent normalization, scaling and shift or per-channel mean and std, exactly as the reference pipeline does. Handle tiling and give a working-memory estimate. The estimate helpers live in `invokeai/backend/util/vae_working_memory.py`, with calibration scripts in `scripts/calibrate_*_working_memory.py`. Node types conventionally end in `_i2l` and `_l2i`.
 
-           with context.models.load(self.vae.vae) as vae:
-               # Example FLUX.2: BN denormalization before decode
-               if hasattr(vae, "bn"):
-                   latents = self._bn_denormalize(latents, vae)
+5. **LoRA loaders** (if LoRA is supported, see [Optional features](#12-optional-features))
 
-               image = vae.decode(latents).sample
-               image = (image / 2 + 0.5).clamp(0, 1)
-
-           return ImageOutput(image=image)
-   ```
+   `new_model_lora_loader` and `new_model_lora_collection_loader`. webv2 uses the collection loader.
 </Steps>
 
 :::tip[Checklist: Invocations]{icon="approve-check"}
-- [ ] Model loader invocation (`[newmodel]_model_loader.py`)
-- [ ] Text encoder invocation (`[newmodel]_text_encoder.py`)
-- [ ] Denoise invocation (`[newmodel]_denoise.py`)
-- [ ] VAE encode invocation (`[newmodel]_vae_encode.py`)
-- [ ] VAE decode invocation (`[newmodel]_vae_decode.py`)
-- [ ] Define output classes (e.g., `NewModelLoaderOutput`)
-- [ ] Define field classes if needed (e.g., `NewModelEncoderField`)
+- [ ] Package `invocations/new_model/` with `__init__.py`
+- [ ] Model loader with `ui_model_base` / `ui_model_type`, and `accepted_vae_bases()` on the VAE field
+- [ ] Text encoder matching the reference encoding, with a test
+- [ ] Denoise: grid equals `dimension_grid`, guidance bounds equal the facet, img2img, inpaint, previews, cancel, working memory
+- [ ] VAE encode and decode with the correct normalization
 :::
 
 ---
 
-## 5. Backend: Sampling and Denoise
+## 8. Sampling
 
-This is where the actual mathematical implementation of the model lives.
+- **Backend package (optional).** Put reusable math in `invokeai/backend/new_model/`: noise, packing, position IDs, schedules and text encoding. FLUX, FLUX.2 and Krea-2 have one; Qwen-Image and Z-Image keep the loop in the denoise node. Use a package once code is shared between nodes or needs its own tests.
+- **Schedulers.** Flow-matching architectures use diffusers' `FlowMatchEulerDiscreteScheduler`, or the shared maps in `invokeai/backend/flux/schedulers.py`: `FLUX_SCHEDULER_MAP`, `ZIMAGE_SCHEDULER_MAP` and `ERNIE_IMAGE_SCHEDULER_MAP`, each with name values and labels. Declare which set the UI offers in `FeaturesFacet.scheduler_set`. Set `scheduler_applies_to_graph=True` only if the denoise node really takes a scheduler field. Reproduce the reference sigma schedule and shift (`mu`, time-shift type, terminal shift) exactly, and test it against the reference scheduler.
+- **External noise (optional).** Only if the denoise node accepts a noise tensor: extend `LatentNoiseType` and its shape and grid logic in `invokeai/app/invocations/latent_noise.py`, and extend `noise_type` in `invocations/noise.py`. Validate with `validate_noise_tensor_shape`.
+- **Timestep-dependent conditioning.** Most architectures turn the text embeddings into the transformer's context once, before the loop. If a module between encoder and transformer reads the timestep -- Anima-3.8B's semantic connector does -- the context has to be recomputed at every step, for the positive, the negative and every regional conditioning. Pass the timestep exactly as the reference does: the connector scales sigma by 1000 before embedding it, so it gets a float32 sigma, where bf16's rounding would move its high frequencies by radians. A mask that leaves a query no key (an empty prompt encoded as one masked token) needs a defined result; `masked_sdpa` makes it zero instead of leaving it to the SDPA backend.
+- **Inpainting.** Rectified-flow models use `RectifiedFlowInpaintExtension` (`invokeai/backend/rectified_flow/rectified_flow_inpaint_extension.py`).
+- **Previews.** `LatentSpaceFacet` provides them; there is nothing to add in the step callback.
+
+---
+
+## 9. Metadata and generation modes
+
+File: `invokeai/app/invocations/metadata.py`
 
 <Steps>
-1. **Sampling Utilities**
+1. **Add the mode strings to `GENERATION_MODES`.**
 
-   ```python title="invokeai/backend/[newmodel]/sampling_utils.py"
-   def get_noise_newmodel(
-       num_samples: int,
-       height: int,
-       width: int,
-       seed: int,
-       device: torch.device,
-       dtype: torch.dtype,
-   ) -> torch.Tensor:
-       """Generate noise for NewModel.
-
-       Example FLUX.2: 32 latent channels (vs 16 for FLUX.1)
-       """
-       latent_channels = 32  # Model-specific
-       latent_h = height // 8
-       latent_w = width // 8
-
-       generator = torch.Generator(device=device).manual_seed(seed)
-       return torch.randn(
-           (num_samples, latent_channels, latent_h, latent_w),
-           generator=generator,
-           device=device,
-           dtype=dtype,
-       )
-
-   def pack_newmodel(x: torch.Tensor) -> torch.Tensor:
-       """Pack latents for transformer input.
-
-       Example FLUX: 2×2 patches → (B, H/2*W/2, C*4)
-       """
-       return rearrange(x, "b c (h ph) (w pw) -> b (h w) (c ph pw)", ph=2, pw=2)
-
-   def unpack_newmodel(x: torch.Tensor, height: int, width: int) -> torch.Tensor:
-       """Unpack transformer output to latents."""
-       return rearrange(
-           x, "b (h w) (c ph pw) -> b c (h ph) (w pw)",
-           h=height // 16, w=width // 16, ph=2, pw=2
-       )
-
-   def get_schedule_newmodel(
-       num_steps: int,
-       denoising_start: float = 0.0,
-       denoising_end: float = 1.0,
-   ) -> list[float]:
-       """Create timestep schedule.
-
-       Example FLUX.2 Klein: Linear schedule from 1.0 → 0.0
-       """
-       start_step = int(num_steps * denoising_start)
-       end_step = int(num_steps * denoising_end)
-
-       sigmas = torch.linspace(1.0, 0.0, num_steps + 1)
-       return sigmas[start_step:end_step + 1].tolist()
-
-   def generate_img_ids_newmodel(batch_size: int, height: int, width: int) -> torch.Tensor:
-       """Generate position IDs for transformer.
-
-       Example FLUX.2: 4D position IDs (T, H, W, L)
-       """
-       # Model-specific position encoding
-       pass
-   ```
-
-   If the architecture supports external noise, prefer extending the standard `invokeai/app/invocations/noise.py` node's `noise_type` selector instead of adding a brand new noise node. Only add a dedicated noise invocation when the architecture's noise tensor rank or layout cannot be expressed by the standard node.
-
-2. **Denoise Function**
-
-   ```python title="invokeai/backend/[newmodel]/denoise.py"
-   def denoise(
-       model: nn.Module,
-       img: torch.Tensor,
-       img_ids: torch.Tensor,
-       txt: torch.Tensor,
-       txt_ids: torch.Tensor,
-       timesteps: list[float],
-       cfg_scale: list[float],
-       neg_txt: torch.Tensor | None = None,
-       neg_txt_ids: torch.Tensor | None = None,
-       scheduler: Any = None,
-       inpaint_extension: RectifiedFlowInpaintExtension | None = None,
-       step_callback: Callable | None = None,
-   ) -> torch.Tensor:
-       """Main denoising loop.
-
-       Example FLUX.2 Klein:
-       - No guidance_embeds (unlike FLUX.1 Dev)
-       - Supports Euler, Heun, LCM schedulers
-       - Integration with RectifiedFlowInpaintExtension
-       """
-       total_steps = len(timesteps) - 1
-
-       for step_index in range(total_steps):
-           t_curr = timesteps[step_index]
-           t_prev = timesteps[step_index + 1]
-
-           # CFG
-           if cfg_scale[step_index] > 1.0 and neg_txt is not None:
-               pred_pos = model(img, t_curr, txt, txt_ids, img_ids)
-               pred_neg = model(img, t_curr, neg_txt, neg_txt_ids, img_ids)
-               pred = pred_neg + cfg_scale[step_index] * (pred_pos - pred_neg)
-           else:
-               pred = model(img, t_curr, txt, txt_ids, img_ids)
-
-           # Scheduler step or manual Euler
-           if scheduler is not None:
-               img = scheduler.step(pred, t_curr, img).prev_sample
-           else:
-               # Manual Euler: x = x + (t_prev - t_curr) * pred
-               img = img + (t_prev - t_curr) * pred
-
-           # Inpainting merge
-           if inpaint_extension is not None:
-               img = inpaint_extension.merge_intermediate_latents_with_init_latents(img, t_prev)
-
-           # Progress callback
-           if step_callback:
-               step_callback(PipelineIntermediateState(step=step_index + 1, ...))
-
-       return img
-   ```
-
-3. **Scheduler (if model-specific)**
-
-   ```python title="invokeai/backend/[newmodel]/schedulers.py"
-   # Existing schedulers in invokeai/backend/flux/schedulers.py:
-   # - FlowMatchEulerDiscreteScheduler
-   # - FlowMatchHeunDiscreteScheduler
-   # - FlowMatchLCMScheduler
-
-   NEWMODEL_SCHEDULER_MAP = {
-       "euler": FlowMatchEulerDiscreteScheduler,
-       "heun": FlowMatchHeunDiscreteScheduler,
-       "lcm": FlowMatchLCMScheduler,
-   }
-   ```
-</Steps>
-
-:::tip[Checklist: Sampling and Denoise]{icon="approve-check"}
-- [ ] Noise generation (`get_noise_newmodel()`)
-- [ ] Pack/unpack functions (if transformer-based)
-- [ ] Schedule generation (`get_schedule_newmodel()`)
-- [ ] Position ID generation (if needed)
-- [ ] Implement denoise loop
-- [ ] Scheduler integration
-- [ ] Inpaint extension integration
-- [ ] Progress callbacks
-:::
-
----
-
-## 6. Frontend: Graph Building
-
-The UI doesn't know about Python functions; it only knows how to build graphs of Invocations.
-
-<Steps>
-1. **Create Graph Builder**
-
-   ```typescript title="invokeai/frontend/web/src/features/nodes/util/graph/generation/buildNewModelGraph.ts"
-   export const buildNewModelGraph = async (arg: GraphBuilderArg): Promise<GraphBuilderResult> => {
-     const { state, manager } = arg;
-     const { model } = state.params;
-
-     const g = new Graph();
-
-     // 1. Model Loader
-     const modelLoader = g.addNode({
-       id: NEWMODEL_MODEL_LOADER,
-       type: 'newmodel_model_loader',
-       model: Graph.getModelMetadataField(model),
-     });
-
-     // 2. Text Encoder
-     const positivePrompt = g.addNode({
-       id: POSITIVE_CONDITIONING,
-       type: 'newmodel_text_encode',
-       prompt: positivePromptText,
-     });
-     g.addEdge(modelLoader, 'encoder', positivePrompt, 'encoder');
-
-     // 3. Denoise Node
-     const denoise = g.addNode({
-       id: NEWMODEL_DENOISE,
-       type: 'newmodel_denoise',
-       steps,
-       cfg_scale: cfg,
-       scheduler: newmodelScheduler,
-       denoising_start: 0,
-       denoising_end: 1,
-     });
-     g.addEdge(modelLoader, 'transformer', denoise, 'transformer');
-     g.addEdge(positivePrompt, 'conditioning', denoise, 'positive_conditioning');
-
-     // 4. VAE Decode
-     const l2i = g.addNode({
-       id: NEWMODEL_VAE_DECODE,
-       type: 'newmodel_vae_decode',
-     });
-     g.addEdge(modelLoader, 'vae', l2i, 'vae');
-     g.addEdge(denoise, 'latents', l2i, 'latents');
-
-     // 5. Generation Mode Handling
-     let canvasOutput: Invocation<ImageOutputNodes> = l2i;
-
-     switch (generationMode) {
-       case 'txt2img':
-         canvasOutput = addTextToImage({ g, state, denoise, l2i });
-         g.upsertMetadata({ generation_mode: 'newmodel_txt2img' });
-         break;
-       case 'img2img':
-         const i2l = g.addNode({ type: 'newmodel_vae_encode' });
-         canvasOutput = await addImageToImage({ g, state, manager, denoise, l2i, i2l, ... });
-         g.upsertMetadata({ generation_mode: 'newmodel_img2img' });
-         break;
-       case 'inpaint':
-         canvasOutput = await addInpaint({ g, state, manager, denoise, l2i, i2l, ... });
-         g.upsertMetadata({ generation_mode: 'newmodel_inpaint' });
-         break;
-       case 'outpaint':
-         canvasOutput = await addOutpaint({ g, state, manager, denoise, l2i, i2l, ... });
-         g.upsertMetadata({ generation_mode: 'newmodel_outpaint' });
-         break;
-     }
-
-     return { g, noise, denoise, posCond: positivePrompt, ... };
-   };
-   ```
-
-2. **Register Graph Builder**
-
-   ```typescript title="invokeai/frontend/web/src/features/queue/hooks/useEnqueueCanvas.ts" ins={13-14}
-   switch (base) {
-     case 'sd-1':
-     case 'sd-2':
-     case 'sdxl':
-       return buildSD1Graph(arg);
-     case 'flux':
-       return buildFLUXGraph(arg);
-     case 'flux2':
-       return buildFLUXGraph(arg);  // FLUX.2 uses the same builder
-     case 'sd-3':
-       return buildSD3Graph(arg);
-     case 'z-image':
-       return buildZImageGraph(arg);
-     case 'newmodel':  // NEW
-       return buildNewModelGraph(arg);
-   }
-   ```
-
-3. **Update Type Definitions**
-
-   ```typescript title="invokeai/frontend/web/src/features/nodes/util/graph/types.ts"
-   // Add node types:
-   export type ImageOutputNodes =
-     | 'l2i' | 'flux_vae_decode' | 'flux2_vae_decode'
-     | 'sd3_l2i' | 'newmodel_vae_decode';
-
-   export type LatentToImageNodes =
-     | 'l2i' | 'flux_vae_decode' | 'flux2_vae_decode'
-     | 'sd3_l2i' | 'newmodel_vae_decode';
-
-   export type ImageToLatentsNodes =
-     | 'i2l' | 'flux_vae_encode' | 'flux2_vae_encode'
-     | 'sd3_i2l' | 'newmodel_vae_encode';
-
-   export type DenoiseLatentsNodes =
-     | 'denoise_latents' | 'flux_denoise' | 'flux2_denoise'
-     | 'sd3_denoise' | 'newmodel_denoise';
-
-   export type MainModelLoaderNodes =
-     | 'main_model_loader' | 'flux_model_loader' | 'flux2_klein_model_loader'
-     | 'sd3_model_loader' | 'newmodel_model_loader';
-   ```
-
-4. **Update Generation Mode Utilities**
-
-   Update `addImageToImage.ts`, `addInpaint.ts`, and `addOutpaint.ts` to recognize your denoise node type.
-
-   ```typescript title="invokeai/frontend/web/src/features/nodes/util/graph/generation/addImageToImage.ts"
-   // Extend the type check:
-   if (
-     denoise.type === 'cogview4_denoise' ||
-     denoise.type === 'flux_denoise' ||
-     denoise.type === 'flux2_denoise' ||
-     denoise.type === 'newmodel_denoise'  // NEW
-   ) {
-     // Rectified flow models: denoising_start instead of noise
-   }
-   ```
-</Steps>
-
-:::tip[Checklist: Graph Building]{icon="approve-check"}
-- [ ] Create graph builder (`buildNewModelGraph.ts`)
-- [ ] Register graph builder in `useEnqueueCanvas`
-- [ ] Update type definitions (`types.ts`)
-- [ ] Extend node type unions (`ImageOutputNodes`, etc.)
-- [ ] Update `addImageToImage.ts`
-- [ ] Update `addInpaint.ts`
-- [ ] Update `addOutpaint.ts`
-:::
-
----
-
-## 7. Frontend: State Management
-
-<Steps>
-1. **Add Parameter State**
-
-   ```typescript title="invokeai/frontend/web/src/features/controlLayers/store/paramsSlice.ts"
-   // Extend state interface:
-   interface ParamsState {
-     // Existing fields
-     fluxScheduler: 'euler' | 'heun' | 'lcm';
-     zImageScheduler: 'euler' | 'heun' | 'lcm';
-
-     // NEW: NewModel specific parameters
-     newmodelScheduler: 'euler' | 'heun' | 'lcm';
-     newmodelVaeModel: ParameterVAEModel | null;
-     newmodelEncoderModel: ParameterModel | null;
-   }
-
-   // Initial state:
-   const initialState: ParamsState = {
-     newmodelScheduler: 'euler',
-     newmodelVaeModel: null,
-     newmodelEncoderModel: null,
-   };
-
-   // Reducers:
-   reducers: {
-     setNewmodelScheduler: (state, action: PayloadAction<'euler' | 'heun' | 'lcm'>) => {
-       state.newmodelScheduler = action.payload;
-     },
-     newmodelVaeModelSelected: (state, action: PayloadAction<ParameterVAEModel | null>) => {
-       state.newmodelVaeModel = action.payload;
-     },
-     newmodelEncoderModelSelected: (state, action: PayloadAction<ParameterModel | null>) => {
-       state.newmodelEncoderModel = action.payload;
-     },
-   }
-   ```
-
-2. **Create Selectors**
-
-   ```typescript title="invokeai/frontend/web/src/features/controlLayers/store/paramsSlice.ts"
-   export const selectNewmodelScheduler = createSelector(
-     selectParamsSlice,
-     (params) => params.newmodelScheduler
-   );
-
-   export const selectNewmodelVaeModel = createSelector(
-     selectParamsSlice,
-     (params) => params.newmodelVaeModel
-   );
-
-   export const selectNewmodelEncoderModel = createSelector(
-     selectParamsSlice,
-     (params) => params.newmodelEncoderModel
-   );
-   ```
-</Steps>
-
-:::tip[Checklist: State Management]{icon="approve-check"}
-- [ ] Extend state interface for model-specific parameters
-- [ ] Define initial state
-- [ ] Create reducer actions
-- [ ] Create selectors
-- [ ] Export actions
-:::
-
----
-
-## 8. Frontend: Parameter Recall
-
-Ensure users can extract parameters from previously generated images.
-
-```typescript title="invokeai/frontend/web/src/features/metadata/parsing.tsx"
-// Add parameter recall handlers:
-const recallNewmodelScheduler = (metadata: CoreMetadata) => {
-  if (metadata.scheduler) {
-    dispatch(setNewmodelScheduler(metadata.scheduler));
-  }
-};
-
-const recallNewmodelVaeModel = async (metadata: CoreMetadata) => {
-  if (metadata.vae) {
-    const vaeModel = await fetchModelConfig(metadata.vae);
-    dispatch(newmodelVaeModelSelected(vaeModel));
-  }
-};
-
-const recallNewmodelEncoderModel = async (metadata: CoreMetadata) => {
-  if (metadata.encoder_model) {
-    const encoderModel = await fetchModelConfig(metadata.encoder_model);
-    dispatch(newmodelEncoderModelSelected(encoderModel));
-  }
-};
-```
-
-:::tip[Checklist: Parameter Recall]{icon="approve-check"}
-- [ ] Recall handlers for each model-specific parameter
-- [ ] Model config fetching for submodels
-- [ ] Dispatch actions for state updates
-:::
-
----
-
-## 9. Metadata and Generation Modes
-
-<Steps>
-1. **Add Generation Modes**
-
-   ```python title="invokeai/app/invocations/metadata.py" ins={11-14}
+   ```python title="invokeai/app/invocations/metadata.py"
    GENERATION_MODES = Literal[
-       # Existing modes
-       "txt2img", "img2img", "inpaint", "outpaint",
-       "sdxl_txt2img", "sdxl_img2img", "sdxl_inpaint", "sdxl_outpaint",
-       "flux_txt2img", "flux_img2img", "flux_inpaint", "flux_outpaint",
-       "flux2_txt2img", "flux2_img2img", "flux2_inpaint", "flux2_outpaint",
-       "sd3_txt2img", "sd3_img2img", "sd3_inpaint", "sd3_outpaint",
-       # NEW:
-       "newmodel_txt2img",
-       "newmodel_img2img",
-       "newmodel_inpaint",
-       "newmodel_outpaint",
+       ...
+       "new_model_txt2img",
+       "new_model_img2img",
+       "new_model_inpaint",
+       "new_model_outpaint",
    ]
    ```
 
-2. **Extend `CoreMetadata` (if needed)**
+   They must equal the `ModalityFacet` declaration: `<metadata_slug>_<mode>` for each mode. `tests/backend/architectures/test_modality.py` compares the two. webv2 writes `<slug>_txt2img`, and the canvas derives the other modes by replacing `txt2img`, so declare all four image modes if the canvas supports them.
 
-   ```python title="invokeai/app/invocations/metadata.py"
-   @invocation_output("core_metadata_output")
-   class CoreMetadataOutput(BaseInvocationOutput):
-       # Existing fields
-       model: ModelIdentifierField | None = None
-       steps: int | None = None
-       cfg_scale: float | None = None
+2. **Metadata fields (if needed).**
 
-       # NEW: Model-specific metadata fields
-       newmodel_encoder: ModelIdentifierField | None = None
-       newmodel_custom_param: float | None = None
-   ```
+   `CoreMetadataInvocation` (`core_metadata`) accepts extra fields, so architecture-specific keys such as the chosen encoder or VAE need no declaration. Declare a field only if it needs validation. Adding one requires a node version bump and follows the `CORE_METADATA_VERSION` rules documented in [Media Metadata](/development/architecture/media-metadata/).
 </Steps>
-
-:::tip[Checklist: Metadata and Generation Modes]{icon="approve-check"}
-- [ ] Add generation modes to `GENERATION_MODES`
-- [ ] Extend `CoreMetadata` if model-specific fields needed
-- [ ] Set metadata in graph builder (`g.upsertMetadata({...})`)
-:::
 
 ---
 
-## 10. Starter Models
+## 10. Starter models
 
-To allow users to easily download your model from the Model Manager UI, add it to the starter models list.
+Folder: `invokeai/backend/model_manager/starter_models/`
 
-```python title="invokeai/backend/model_manager/starter_models.py"
-# Main Model
-newmodel_main = StarterModel(
-    name="NewModel Main",
-    base=BaseModelType.NewModel,
-    source="organization/newmodel-main",  # HuggingFace repo
-    description="NewModel main transformer. ~10GB",
-    type=ModelType.Main,
-)
+The catalogue is a package with one module per architecture:
+- `types.py` holds `StarterModel`.
+- `common.py` holds encoders and upscalers that several architectures share. Import a shared dependency from there instead of declaring a second copy; if an encoder you need is declared in another architecture's module, move it to `common.py`.
 
-# VAE (if separate)
-newmodel_vae = StarterModel(
+```python title="invokeai/backend/model_manager/starter_models/new_model.py"
+"""NewModel starter models."""
+
+from invokeai.backend.model_manager.starter_models.common import qwen3_vl_encoder_4b
+from invokeai.backend.model_manager.starter_models.types import StarterModel
+from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelFormat, ModelType, NewModelVariantType
+
+new_model_vae = StarterModel(
     name="NewModel VAE",
     base=BaseModelType.NewModel,
-    source="organization/newmodel::vae",  # Submodel syntax
-    description="NewModel VAE. ~500MB",
+    source="org/NewModel::vae/diffusion_pytorch_model.safetensors",  # a file inside a repo
+    description="NewModel VAE. ~300MB",
     type=ModelType.VAE,
 )
 
-# Text Encoder (if separate)
-newmodel_encoder = StarterModel(
-    name="NewModel Encoder",
-    base=BaseModelType.Any,
-    source="organization/newmodel::text_encoder+tokenizer",
-    description="NewModel text encoder. ~5GB",
-    type=ModelType.TextEncoder,
-)
-
-# Quantized variants
-newmodel_fp8 = StarterModel(
-    name="NewModel (FP8)",
+new_model_turbo = StarterModel(
+    name="NewModel Turbo",
     base=BaseModelType.NewModel,
-    source="https://huggingface.co/org/newmodel-fp8/resolve/main/model.safetensors",
-    description="FP8 quantized version. ~5GB",
+    source="org/NewModel-Turbo",  # a whole diffusers repo
+    description="NewModel Turbo, full diffusers pipeline. ~20GB",
     type=ModelType.Main,
-    dependencies=[newmodel_vae, newmodel_encoder],  # Dependencies!
+    variant=NewModelVariantType.Turbo,
 )
 
-# Add to STARTER_MODELS list:
-STARTER_MODELS: list[StarterModel] = [
-    # ... existing models
-    newmodel_main,
-    newmodel_vae,
-    newmodel_encoder,
-    newmodel_fp8,
-]
+new_model_turbo_gguf_q4_k_m = StarterModel(
+    name="NewModel Turbo (Q4_K_M GGUF)",
+    base=BaseModelType.NewModel,
+    source="https://huggingface.co/org/NewModel-Turbo-GGUF/resolve/main/new_model_turbo-Q4_K_M.gguf",
+    description="GGUF ships only the transformer; the VAE and encoder are installed as dependencies. ~7GB",
+    type=ModelType.Main,
+    format=ModelFormat.GGUFQuantized,
+    variant=NewModelVariantType.Turbo,
+    dependencies=[new_model_vae, qwen3_vl_encoder_4b],
+)
 ```
 
-:::tip[Checklist: Starter Models]{icon="approve-check"}
-- [ ] Define main model StarterModel
-- [ ] Define VAE StarterModel if separate
-- [ ] Define text encoder StarterModel if separate
-- [ ] Define quantized variants (FP8, GGUF, etc.)
-- [ ] Set dependencies correctly
-- [ ] Add to `STARTER_MODELS` list
+Then import the models in the package's `__init__.py`:
+
+- **Add them to `STARTER_MODELS`.** It is a curated order, the order the install dialog shows, so insert them where they belong instead of appending.
+- **Optionally add a `STARTER_BUNDLES` entry** keyed by the base.
+- **Keep `source` values unique.** The module asserts that.
+
+Put license restrictions in the description; the Ideogram 4 and MiniMax H3 descriptions are examples.
+
+:::tip[Checklist: Starter models]{icon="approve-check"}
+- [ ] `starter_models/new_model.py`
+- [ ] Main model per format worth offering (Diffusers, single-file, quantized), with `format=` and `variant=`
+- [ ] VAE and encoder dependencies, shared ones from `common.py`
+- [ ] Placed in `STARTER_MODELS`; bundle in `STARTER_BUNDLES` if useful
+- [ ] License notes in descriptions
 :::
 
 ---
 
-## 11. Optional Features
+## 11. Frontend (webv2)
 
-### ControlNet Support
+webv2 does not keep per-architecture tables of its own. Grid, default settings, negative-prompt behavior, guidance label and range, scheduler set, VAE acceptance, control kinds and reference-image limits all come from the backend's `FeaturesFacet`, `DefaultSettingsFacet` and `VaeFacet`, served at `GET /api/v2/models/capabilities`. What webv2 owns is the graph topology and the per-family UI.
 
-**Backend Config** — `invokeai/backend/model_manager/configs/controlnet.py`:
+Paths below are relative to `invokeai/frontend/webv2/src/features/generation/core/` unless stated otherwise.
 
-```python title="invokeai/backend/model_manager/configs/controlnet.py"
-@ModelConfigFactory.register
-class ControlNet_Checkpoint_NewModel_Config(ControlNet_Checkpoint_Base):
-    base: Literal[BaseModelType.NewModel] = BaseModelType.NewModel
+<Steps>
+1. **Regenerate the capabilities fixture**
 
-    @classmethod
-    def from_model_on_disk(cls, mod: ModelOnDisk, ...) -> Self:
-        if not _is_newmodel_controlnet(mod.state_dict):
-            raise NotAMatchError()
-        return cls(...)
-```
+   ```sh
+   REGEN_CAPABILITIES_FIXTURE=1 uv run --no-sync pytest tests/backend/architectures/test_capabilities_fixture.py
+   ```
 
-**Backend Invocation** — `invokeai/app/invocations/[newmodel]_controlnet.py`:
+   This rewrites `__fixtures__/architectureCapabilities.json`. The mock backend and the unit tests read it.
 
-```python title="invokeai/app/invocations/[newmodel]_controlnet.py"
-@invocation("newmodel_controlnet", ...)
-class NewModelControlNetInvocation(BaseInvocation):
-    image: ImageField = InputField()
-    controlnet_model: ControlNetField = InputField()
-    control_weight: float = InputField(default=1.0)
+2. **Mark the base as buildable**
 
-    def invoke(self, context) -> ControlNetOutput:
-        # Compute ControlNet conditioning
-        pass
-```
+   - Add it to `KnownGenerationModelBase` in `contracts.ts`.
+   - Add it to `SUPPORTED_GENERATE_BASES` in `supportedBases.ts`.
+   - Update the pinned list in `supportedBases.test.ts`.
 
-**Frontend Graph:**
+3. **Write the graph builder** (`graph.ts`)
 
-```typescript title="buildNewModelGraph.ts"
-const { controlNets } = await addControlNets({ g, manager, denoise });
-```
+   Add `buildNewModelGraph` and register it in `GRAPH_BUILDERS`, which `satisfies Record<SupportedGenerateBase, …>`, so the compiler reports a missing entry. `buildZImageGraph` and `buildKrea2Graph` are good templates:
 
-### IP-Adapter / Reference Images
+   ```ts title="invokeai/frontend/webv2/src/features/generation/core/graph.ts"
+   const buildNewModelGraph = (
+     settings: GenerateSettings,
+     model: MainModelConfig,
+     outputIsIntermediate: boolean,
+     projectSettings: GenerationProjectSettings
+   ): BackendGraphContract => {
+     const vaeModel = getCompatibleVae(settings, model);
+     const graph: BackendGraphContract = { edges: [], id: createId('new_model_graph'), nodes: {} };
+     const { negativePrompt, positivePrompt, seed } = addPromptAndSeedNodes(graph);
+     const useCfg = settings.cfgScale > 1;
 
-**Backend Invocation** — `invokeai/app/invocations/[newmodel]_ip_adapter.py`:
+     const modelLoader = addNode(graph, {
+       id: 'model_loader',
+       model,
+       type: 'new_model_model_loader',
+       vae_model: vaeModel ?? undefined,
+     });
+     const posCond = addNode(graph, { id: 'pos_cond', type: 'new_model_text_encoder' });
+     const posCondCollect = addNode(graph, { id: 'pos_cond_collect', type: 'collect' });
+     const size = getDenoiseSize(settings, model);
+     const denoise = addNode(graph, {
+       cfg_scale: settings.cfgScale,
+       denoising_end: 1,
+       denoising_start: 0,
+       height: size.height,
+       id: 'denoise_latents',
+       steps: settings.steps,
+       type: 'new_model_denoise',
+       width: size.width,
+     });
+     // Creates the `canvas_output` node.
+     const output = addImageOutputNode(graph, 'new_model_l2i', outputIsIntermediate);
 
-```python title="invokeai/app/invocations/[newmodel]_ip_adapter.py"
-@invocation("newmodel_ip_adapter", ...)
-class NewModelIPAdapterInvocation(BaseInvocation):
-    image: ImageField = InputField()
-    ip_adapter_model: IPAdapterField = InputField()
-    weight: float = InputField(default=1.0)
-```
+     addEdge(graph, modelLoader, 'transformer', denoise, 'transformer');
+     addEdge(graph, modelLoader, 'qwen3_vl_encoder', posCond, 'qwen3_vl_encoder');
+     addEdge(graph, positivePrompt, 'value', posCond, 'prompt');
+     addEdge(graph, posCond, 'conditioning', posCondCollect, 'item');
+     addEdge(graph, posCondCollect, 'collection', denoise, 'positive_conditioning');
+     // …the same chain for `negative_prompt` → `neg_cond` → `neg_cond_collect` when useCfg…
+     addEdge(graph, seed, 'value', denoise, 'seed');
+     addEdge(graph, denoise, 'latents', output, 'latents');
+     addEdge(graph, modelLoader, 'vae', output, 'vae');
+     addMetadata(graph, output, settings, model, 'new_model_txt2img', projectSettings, {
+       vae: vaeModel ?? undefined,
+     });
+     return graph;
+   };
+   ```
 
-**Frontend Graph:**
+   The builder produces the **txt2img** graph only; the canvas grafts img2img, inpaint and outpaint onto it. That depends on these conventions:
+   - Node ids `positive_prompt`, `negative_prompt`, `seed`, `model_loader`, `pos_cond`, `neg_cond`, `pos_cond_collect`, `neg_cond_collect` and `denoise_latents`.
+   - An output node `canvas_output` whose `vae` input has an edge (`requireVaeSource`).
+   - `addDecodeOutput` if the architecture supports PiD decoding, otherwise `addImageOutputNode`.
 
-```typescript title="buildNewModelGraph.ts"
-const { ipAdapters } = await addIPAdapters({ g, manager, denoise });
-```
+   Validation that only one architecture needs belongs in `getModelFamilyValidationReasons` (`baseGenerationPolicies.ts`).
 
-### LoRA Support
+4. **Component pickers** (encoder, VAE, Diffusers component source)
 
-**Backend Config** — `invokeai/backend/model_manager/configs/lora.py`:
+   - Add a `case` to `getBaseComponentSectionPolicy` in `baseGenerationPolicies.ts`. Its `default` returns an empty policy silently.
+   - Add encoder filters in `componentCompatibility.ts`. If a main model can bring its own components, update `isBundledMainForBase`. VAE acceptance comes from the backend.
+   - A slot that only one variant needs goes into the policy conditionally: `getBaseComponentSectionPolicy` receives the model, so branch on `model.variant`, as FLUX.2 dev and Anima-3.8B do.
+   - A **new** settings key must be added in all of these places:
+     - `GenerateSettings` (`types.ts`)
+     - `GenerateComponentValueKey`, `COMPONENT_SETTING_LABELS`, `getComponentPolicyContext` and `getDefaultGenerateSettings` (`baseGenerationPolicies.ts`)
+     - the second `getComponentPolicyContext` in `src/features/generation/ui/GenerateComponentsSection.tsx`
+     - `normalizeGenerateSettings`, `cloneGenerateWidgetValues` and `syncGenerateWidgetValuesWithModels` (`settings.ts`)
+     - `RecalledComponentSetting` and `RECALLED_COMPONENTS` (`src/workbench/image-actions/imageRecall.ts`), under the metadata key the builder writes
+     - the test fixtures that build a complete `GenerateWidgetValues` literal (`imageRecall.test.ts`, `workbenchState.test.ts`, `importGalleryImages.test.ts`). Vitest does not type-check them; `lint:tsc` does.
 
-```python title="invokeai/backend/model_manager/configs/lora.py"
-@ModelConfigFactory.register
-class LoRA_LyCORIS_NewModel_Config(LoRA_LyCORIS_Base):
-    base: Literal[BaseModelType.NewModel] = BaseModelType.NewModel
-```
+5. **Canvas**
 
-**Backend Model Loader Integration:**
+   - Map the encode node in `CANVAS_I2L_NODE_TYPES` (`canvas/compileCanvasGraph.ts`). The map is `Partial`, so a missing entry only fails at runtime.
+   - If the architecture uses the `strength^0.2` denoising-start curve, add it to `canvasDenoisingStart`.
+   - Add a case to `BASE_CASES` in `canvas/compileCanvasGraph.test.ts`.
 
-```python title="invokeai/app/invocations/[newmodel]_model_loader.py"
-class NewModelModelLoaderOutput(BaseInvocationOutput):
-    transformer: TransformerField  # TransformerField already contains loras: list[LoRAField]
-```
+6. **Recall** (`src/workbench/image-actions/`)
 
-**Frontend Graph:**
+   - In `imageRecall.ts`, add the component keys the builder writes into metadata to `hasComponentModels` and to the component patch.
+   - Add the base to `GUIDANCE_BASES` in `recallParameters.ts` if it takes the shared guidance slider.
 
-```typescript title="buildNewModelGraph.ts"
-const { loras } = await addLoRAs({ g, manager, denoise, modelLoader });
-```
+   Nothing checks recall against what the builder writes, so test it.
 
-### Scheduler UI
+7. **Model registry and labels**
 
-**Frontend Component** — `invokeai/frontend/web/src/features/parameters/components/NewModelScheduler.tsx`:
+   - `src/features/models/core/baseIdentity.ts`: `MODEL_BASES`, plus its pinned test
+   - `src/features/models/core/types.ts`: `ModelBase`
+   - `src/features/models/core/taxonomy.ts`: variant values -- labels in `MODEL_VARIANT_LABELS`, main-model variants in `MAIN_VARIANTS_BY_BASE`, the variants of other types in `VARIANTS_BY_TYPE`
+   - `src/features/models/core/relationships.ts`: which encoder and VAE types may link to the base
+   - `src/features/workflow/core/modelRequirements.ts`: `BASE_LABELS`
+   - New user-facing strings go in `invokeai/frontend/webv2/public/locales/en.json`.
 
-```typescript title="invokeai/frontend/web/src/features/parameters/components/NewModelScheduler.tsx"
-export const NewModelSchedulerSelect = () => {
-  const dispatch = useAppDispatch();
-  const scheduler = useAppSelector(selectNewmodelScheduler);
+   A new **model type** (an encoder family) has its own set:
+   - `ModelTaxonomyType` in `types.ts`, and its label in the type list at the top of `taxonomy.ts`
+   - `NULL_BASE_ALLOWANCES` and `SINGLETON_LINK_TYPES` in `relationships.ts`
+   - the type label in `modelRequirements.ts`
+   - `CPU_ONLY_TYPES` in `src/features/models/ui/detail/CpuOnlySetting.tsx` if the config has `cpu_only`
 
-  return (
-    <Select
-      value={scheduler}
-      onChange={(value) => dispatch(setNewmodelScheduler(value))}
-      options={[
-        { value: 'euler', label: 'Euler' },
-        { value: 'heun', label: 'Heun' },
-        { value: 'lcm', label: 'LCM' },
-      ]}
-    />
-  );
-};
-```
+8. **Per-family UI (only for controls unique to the architecture)**
 
-:::tip[Checklist: Optional Features]{icon="approve-check"}
-**ControlNet:**
-- [ ] Create ControlNet config (`configs/controlnet.py`)
-- [ ] Create ControlNet invocation
-- [ ] Frontend graph integration (`addControlNets`)
+   `src/features/generation/ui/GenerateRenderSection.tsx` branches on the family for controls such as Krea-2 seed variance and Wan settings. Controls every architecture has come from capabilities; they need no code.
 
-**IP-Adapter:**
-- [ ] Create IP-Adapter invocation
-- [ ] Create image encoder config if needed
-- [ ] Frontend graph integration (`addIPAdapters`)
+9. **Regenerate the graph contract**
 
-**LoRA:**
-- [ ] Create LoRA config (`configs/lora.py`)
-- [ ] LoRA loading in model loader
-- [ ] Frontend graph integration (`addLoRAs`)
+   ```sh
+   pnpm -C invokeai/frontend/webv2 test src/features/generation/core/graphCoverage.test.ts -u
+   ```
 
-**Scheduler:**
-- [ ] Define scheduler constants
-- [ ] Frontend UI component
-- [ ] State management
+   This rewrites `__snapshots__/generateGraphNodeTypes.json`. Graph coverage and the remix round trip compile each base in the shapes listed in `graphCoverage.testing.ts`; a variant that changes the graph needs its own entry in `SHAPE_OVERRIDES`, and a component variant a slot filters for needs to be in `CANDIDATE_VARIANTS`, or neither test ever builds that graph. Then raise `SUPPORTED_BASE_COUNTS["generate"]` in `tests/app/invocations/test_frontend_graph_node_types.py`, and `LITERAL_FLOORS` if needed. That Python test checks every node type, edge field and literal value the builders emit against the backend's invocation registry.
+</Steps>
+
+:::tip[Checklist: webv2]{icon="approve-check"}
+- [ ] Capabilities fixture regenerated
+- [ ] `contracts.ts`, `supportedBases.ts` and its test
+- [ ] Builder in `graph.ts` and registered in `GRAPH_BUILDERS`
+- [ ] Component slot policy (per variant where only one needs it), encoder filters, new settings keys everywhere
+- [ ] `CANVAS_I2L_NODE_TYPES` and `BASE_CASES`
+- [ ] Recall
+- [ ] Model registry, labels, `en.json`
+- [ ] `SHAPE_OVERRIDES` / `CANDIDATE_VARIANTS` for variant-dependent graphs
+- [ ] Graph snapshot regenerated, `SUPPORTED_BASE_COUNTS` raised
+- [ ] Changed interactions verified in the browser (`--webv2`)
 :::
 
 ---
 
-## Summary: Minimal Integration
+## 12. Optional features
 
-For a **minimal txt2img integration**, the following files are required:
+### LoRA
+
+- **Backend config:** add `LoRA_LyCORIS_NewModel_Config(LoRA_LyCORIS_Config_Base, Config_Base)` in `configs/lora.py`. The key heuristics of LoRA configs are loose, so make the new config and the existing ones exclude each other, by module names and by shapes (inner dimension). Cover this with stripped LoRA fixtures in `tests/model_identification/stripped_models/`.
+- **Conversion:** add a `lora_model_from_new_model_state_dict` in `invokeai/backend/patches/lora_conversions/` and a branch for the base in `load/model_loaders/lora.py`. Handle every naming convention in circulation: diffusers/PEFT, Kohya, and ComfyUI, including fused projections.
+- **Nodes:** `new_model_lora_loader` and `new_model_lora_collection_loader`. The denoise node patches the transformer; on quantized weights it uses sidecar patching (`requires_sidecar_patching`).
+- **webv2:** `addTransformerLoraCollectionLoader(...)` in the builder. Add variant rules in `isLoraCompatibleWithModel` (`settings.ts`).
+
+### Reference images
+
+- Backend: set `FeaturesFacet.max_reference_images` (and `reference_images_require_variant` if only one variant supports them). Wire the images into the text encoder and/or the denoise node, as the reference pipeline does.
+- webv2: extend the reference-image config union (`types.ts`), `getDefaultReferenceImageConfig` and `getReferenceImageConfigSupported` (`baseGenerationPolicies.ts`), and wire the images in the builder.
+
+### Control and regional guidance
+
+- Control: set `FeaturesFacet.control_kinds`. Add the config (`configs/controlnet.py`, base class `ControlNet_Checkpoint_Config_Base`) and the node. In webv2, update `canvas/controlValidation.ts`, `canvas/addControlLayers.ts` and `src/workbench/widgets/layers/controlModelOptions.ts`.
+- Regional guidance: set `FeaturesFacet.supports_regional_guidance` and honor the conditioning `mask` in the denoise node. In webv2, update `canvas/addRegionalGuidance.ts`.
+
+### PiD decoding
+
+Declare `PiDDecoderVariantType` in the `VariantFacet`, and extend `configs/pid_decoder.py`, `load/model_loaders/pid_decoder.py` and `backend/pid/decode.py`. In webv2, update `pid.ts` and `pidGraph.ts`.
+
+---
+
+## 13. Tests and CI gates
+
+Several tests pin hand-maintained tables, so a new architecture has to extend them. They fail with a message that names the missing entry.
+
+| Test | What to add |
+| --- | --- |
+| `tests/backend/architectures/test_features.py` | `DENOISE_NODE`: the node that owns width and height |
+| `tests/backend/architectures/test_guidance_range.py` | `GUIDANCE_FIELD` (node and field the slider feeds), or `NO_GUIDANCE_SLIDER` |
+| `tests/backend/architectures/test_latent_space.py` | `DECLARED_LATENT_SPACES` |
+| `tests/backend/architectures/test_default_settings.py` | Rows in `DEFAULT_SETTINGS_MATRIX` |
+| `tests/backend/architectures/test_conditioning.py` | The pinned numbers of conditioning types and architectures |
+| `tests/backend/architectures/test_variants.py` | A `base=Any` variant enum in `BASE_AGNOSTIC_VARIANT_ENUMS`; an architecture that gains variants out of the pinned list of variant-less ones. Otherwise it checks the variant lists and unique values itself |
+| `tests/backend/architectures/test_modality.py` | Nothing if `GENERATION_MODES` matches `ModalityFacet` |
+| `tests/backend/architectures/test_capabilities_fixture.py` | Regenerate the webv2 fixture (see section 11) |
+| `tests/app/invocations/test_frontend_graph_node_types.py` | `SUPPORTED_BASE_COUNTS`, possibly `LITERAL_FLOORS` |
+| `tests/backend/model_manager/load/test_diffusers_0XX_compatibility.py` | New classes, when the dependency is bumped |
+| `tests/test_package_data.py` | Nothing if `package-data` covers the vendored files; it checks them |
+| `src/features/generation/core/graphCoverage.testing.ts` (webv2) | `SHAPE_OVERRIDES` and `CANDIDATE_VARIANTS` for variant-dependent graphs |
+| `src/workbench/image-actions/imageRecall.test.ts` (webv2) | The recorded component setting in the remix round-trip list |
+
+Beyond those tables, test what can silently go wrong:
+- detection of every format, including negative cases against similar architectures
+- key conversion against the diffusers module
+- the text-encoder template
+- the sampling schedule against the reference scheduler
+- every migration, against an in-memory `models` table
+
+Use real lightweight modules with small configs rather than mocks. For layout tests, capture the key names and shapes of the real checkpoint into a fixture under `tests/backend/model_manager/load/state_dicts/` and build the model on the `meta` device: real extents are billions of elements. Where a module is ported rather than taken from `diffusers`/`transformers`, compare it once against the reference implementation on the real weights before writing the small-config tests.
+
+**CI gates for generated artifacts.** New or changed invocations change the OpenAPI schema. CI (`openapi-checks.yml`, `typegen-checks.yml`) requires the shared package's `invokeai/frontend/api/openapi.json` and `invokeai/frontend/api/schema.ts` to be current. Regenerate both from `invokeai/frontend/api` in the repository's Python environment after installing that package's locked dependencies:
+
+```sh
+pnpm install --frozen-lockfile
+set -o pipefail
+python ../../../scripts/generate_openapi_schema.py > openapi.json && pnpm format:openapi
+python ../../../scripts/generate_openapi_schema.py | pnpm typegen
+```
+
+**Before review:**
+- Ruff (`uv tool run ruff@0.11.2 check` and `format --check`)
+- the focused tests, then the full Python suite
+- webv2 `lint:oxc`, `lint:tsc`, `architecture:check` and Vitest
+- a real generation in every mode on a GPU, compared against the reference pipeline with the same seed and settings
+- the browser flows in webv2: install, generate, canvas modes, recall
+
+---
+
+## 14. Extending an existing architecture
+
+Finetunes and variants of a supported architecture reuse almost everything above. Decide first what the new checkpoints actually change:
+
+| What changes | Treat it as | Work |
+| --- | --- | --- |
+| Only the weights (finetune, merge) | nothing | at most a starter model |
+| A structural hyperparameter nothing outside the loader depends on, such as depth | loader detection, **not** a variant | read it from the checkpoint ([5.2](#5-model-loaders)), test against the real key layout |
+| What the graph or UI needs: an extra encoder, a different conditioning path, different defaults | a **variant** | the checklist below |
+| The latent space, the VAE family or the transformer family | a new base | the rest of this guide |
+
+The scaffolder does not apply; it creates files for a new base.
+
+Anima-2.9B (40 blocks instead of 28) needed only the second row. Anima-3.8B (52 blocks, plus a connector that reads a second encoder) needed the third:
+
+<Steps>
+1. **Taxonomy.** The variant enum, with values unique across all enums, listed in the three places of [2.2](#2-taxonomy). Values describe what differs (`anima_qwen35`: conditioned on Qwen3.5 as well), not a release name, so the next finetune with the same requirements fits.
+
+2. **Config and migration.** A required `variant` field, detection from the checkpoint, `override_fields.pop("variant", None)` before detection, and a [migration](#persisted-records-and-migrations) for installed records. A model installed before the variant existed may already be the new kind; read its header in the migration rather than assume.
+
+3. **Declaration.** `VariantFacet`, per-variant `DefaultSettingsFacet` entries, the regenerated capabilities fixture. The model's defaults reach the UI through **Reset all to model defaults**; switching models keeps the user's settings.
+
+4. **Invocations.** New inputs optional, so existing workflows keep validating; node version bumps. The model loader checks the main model's variant and fails with a message naming what is missing, rather than letting the denoise node meet a `None`.
+
+5. **Frontend.** The per-variant slot and builder branch ([11.4](#11-frontend-webv2)), the variant in `MAIN_VARIANTS_BY_BASE` and `MODEL_VARIANT_LABELS`, `SHAPE_OVERRIDES` for both variants.
+
+6. **Unsupported releases.** Refuse a recognized checkpoint you do not support with `InvalidMatchError` and a pointer to the one you do.
+
+7. **Existing adapters.** LoRAs and control adapters address blocks by name, and names carry the block index. A depth expansion that inserts blocks between the original ones shifts every index after the first insertion, so an adapter trained on the original loads and runs against the wrong blocks. A remap needs the insertion positions, and model cards rarely list them, but the weights do. Compare each block of the expanded checkpoint with the original's: a block that was not trained further is bit-identical to its source, and one trained further still has a cosine similarity near 1 to it, while an inserted copy stays far lower. Record the measured table next to the architecture (Anima: `invokeai/backend/anima/block_layout.py`), apply it where the adapter binds, and say in the user guide which results to expect.
+</Steps>
+
+:::tip[Checklist: Extending an architecture]{icon="approve-check"}
+- [ ] Decided: weights only, loader detection, variant or new base
+- [ ] Structural hyperparameters read from the checkpoint, tested against a real-captured key fixture
+- [ ] Variant: required field, detection, migration with a test, `VariantFacet`, defaults per variant
+- [ ] Optional node inputs, variant check with a clear error in the model loader
+- [ ] Per-variant slot and graph branch, variant labels, `SHAPE_OVERRIDES`
+- [ ] `InvalidMatchError` for recognized but unsupported releases
+- [ ] Adapter compatibility documented
+:::
+
+---
+
+## Summary: Minimal integration
+
+A minimal txt2img integration with a Diffusers main model, reusing an existing VAE and encoder:
 
 <FileTree>
 - invokeai
   - app/invocations
-    - metadata.py
-    - `[newmodel]_model_loader.py`
-    - `[newmodel]_text_encoder.py`
-    - `[newmodel]_denoise.py`
-    - `[newmodel]_vae_decode.py`
+    - fields.py `NewModelConditioningField`
+    - primitives.py `NewModelConditioningOutput`
+    - metadata.py `GENERATION_MODES`
+    - new_model
+      - \_\_init\_\_.py required, or the package's nodes do not load
+      - new_model_model_loader.py
+      - new_model_denoise.py
+    - text_encoder
+      - new_model_text_encoder.py
+    - vae
+      - new_model_latents_to_image.py
+  - app/services/model_records/model_records_base.py only with a variant enum
   - backend
+    - architectures/defs
+      - new_model.py the architecture declaration
     - model_manager
       - taxonomy.py
       - configs
         - main.py
         - factory.py
       - load/model_loaders
-        - `[newmodel].py`
-    - `[newmodel]`
-      - sampling_utils.py
-      - denoise.py
-  - frontend/web/src/features
-    - nodes/util/graph
-      - generation/buildNewModelGraph.ts
+        - new_model.py
+      - starter_models
+        - new_model.py
+        - \_\_init\_\_.py
+    - stable_diffusion/diffusion/conditioning_data.py
+  - invocation_api/\_\_init\_\_.py
+  - frontend/webv2/src/features
+    - generation/core
+      - contracts.ts
+      - supportedBases.ts
+      - graph.ts
+      - baseGenerationPolicies.ts
+      - \_\_fixtures\_\_/architectureCapabilities.json regenerated
+      - \_\_snapshots\_\_/generateGraphNodeTypes.json regenerated
+    - models/core
+      - baseIdentity.ts
       - types.ts
-    - queue/hooks/useEnqueueCanvas.ts
-    - controlLayers/store/paramsSlice.ts
+    - workflow/core/modelRequirements.ts
+- tests
+  - backend/architectures the tables in section 13
+  - app/invocations/test_frontend_graph_node_types.py
 </FileTree>
 
-For **img2img / inpaint / outpaint**, additionally:
+For **img2img, inpaint and outpaint**, add:
 
 <FileTree>
 - invokeai
-  - app/invocations
-    - `[newmodel]_vae_encode.py`
-  - frontend/web/src/features/nodes/util/graph/generation
-    - addImageToImage.ts
-    - addInpaint.ts
-    - addOutpaint.ts
+  - app/invocations/vae
+    - new_model_image_to_latents.py
+  - frontend/webv2/src/features/generation/core/canvas
+    - compileCanvasGraph.ts `CANVAS_I2L_NODE_TYPES`
+    - compileCanvasGraph.test.ts `BASE_CASES`
 </FileTree>
 
 ---
 
-## Reference: Existing Implementations
+## Reference: existing implementations
 
-| Feature | FLUX.1 | FLUX.2 Klein | SD3 | SDXL | Z-Image |
-|---------|--------|--------------|-----|------|---------|
-| Latent Channels | 16 | 32 | 16 | 4 | 32 |
-| Text Encoder | CLIP + T5 | Qwen3 | CLIP×3 + T5 | CLIP×2 | Qwen3 |
-| VAE | 16ch | 32ch+BN | 16ch | 4ch | 32ch |
-| CFG | Optional | Optional | Yes | Yes | Optional |
-| Guidance Embed | Dev only | No | No | No | No |
-| Pack/Unpack | Yes | Yes | No | No | Yes |
+Values are taken from the declarations under `invokeai/backend/architectures/defs/`.
+
+| | FLUX.1 | FLUX.2 | Z-Image | Qwen-Image | Krea-2 |
+| --- | --- | --- | --- | --- | --- |
+| Latent space | `FLUX_16` (16 ch, 8×) | `FLUX2_32` (32 ch, 8×) | `FLUX_16` (16 ch, 8×) | `WAN21_16` (16 ch, 8×) | `WAN21_16` (16 ch, 8×) |
+| Text encoder | CLIP + T5 | Qwen3 (Klein), Mistral (Dev) | Qwen3 | Qwen2.5-VL 7B | Qwen3-VL 4B |
+| VAE accepted | FLUX.1 | FLUX.2 | FLUX.1 | Qwen-Image, Anima | Qwen-Image, Anima |
+| Guidance slider | Guidance (distilled) | Guidance (max 20) | CFG (Turbo: 1.0) | CFG 4.0 | CFG (Turbo: 1.0) |
+| Negative prompt | never | never | CFG-gated | CFG-gated | CFG-gated |
+| `dimension_grid` | 16 | 16 | 16 | 16 | 16 |
+| Scheduler set | flow | flow | flow (Base: flow-no-lcm) | standard | flow |
+| Reference images | 5 | 5 | — | 5 (edit variant) | — |
+| Code | `backend/flux/` | `backend/flux2/` | in the nodes | in the nodes | `backend/krea2/` |

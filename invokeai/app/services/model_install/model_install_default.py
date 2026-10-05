@@ -85,6 +85,26 @@ INSTALL_MARKER_FILENAME = ".invokeai_install.json"
 INSTALL_MARKER_VERSION = 1
 
 
+# Filesystems cap a single path component at 255 bytes. A source that lists many explicit files
+# (an LTX-2 component folder names eight) would otherwise produce a folder name that cannot be
+# created; the combined name is only a label, so it is shortened past this point with a count.
+_MAX_COMBINED_SUBFOLDER_NAME = 96
+
+
+def _combined_subfolder_name(subfolder_names: List[str]) -> str:
+    combined = "_".join(subfolder_names)
+    if len(combined) <= _MAX_COMBINED_SUBFOLDER_NAME:
+        return combined
+    kept: List[str] = []
+    for name in subfolder_names:
+        candidate = "_".join([*kept, name])
+        if kept and len(candidate) > _MAX_COMBINED_SUBFOLDER_NAME - 16:
+            break
+        kept.append(name)
+    remaining = len(subfolder_names) - len(kept)
+    return "_".join(kept) + (f"_and_{remaining}_more" if remaining else "")
+
+
 class ModelInstallService(ModelInstallServiceBase):
     """class for InvokeAI model installation."""
 
@@ -317,6 +337,9 @@ class ModelInstallService(ModelInstallServiceBase):
 
     def _resume_remote_download(self, job: ModelInstallJob) -> None:
         job.status = InstallStatus.WAITING
+        # Sources whose partial file has vanished. _enqueue_remote_download replaces job.download_parts
+        # with fresh parts, so the flag must be carried onto them or the resume response loses it.
+        restarted_from_scratch: set[str] = set()
         if job.download_parts:
             for part in job.download_parts:
                 if part.complete or part.bytes <= 0:
@@ -328,6 +351,7 @@ class ModelInstallService(ModelInstallServiceBase):
                     part.bytes = 0
                     part.resume_from_scratch = True
                     part.resume_message = "Partial file missing. Restarted download from the beginning."
+                    restarted_from_scratch.add(str(part.source))
             job.bytes = sum(p.bytes for p in job.download_parts)
         remote_files, metadata = self._remote_files_from_source(job.source)
         subfolders = job.source.subfolders if isinstance(job.source, HFModelSource) else []
@@ -340,6 +364,7 @@ class ModelInstallService(ModelInstallServiceBase):
             subfolder=job.source.subfolder if isinstance(job.source, HFModelSource) and len(subfolders) <= 1 else None,
             subfolders=subfolders if len(subfolders) > 1 else None,
             resume_metadata=job._resume_metadata,
+            restarted_from_scratch=restarted_from_scratch,
         )
 
     @property
@@ -1340,6 +1365,7 @@ class ModelInstallService(ModelInstallServiceBase):
         subfolders: Optional[List[Path]] = None,
         resume_metadata: Optional[dict] = None,
         clear_partials: bool = False,
+        restarted_from_scratch: Optional[set[str]] = None,
     ) -> ModelInstallJob:
         job.source_metadata = metadata
         job.local_path = destdir
@@ -1382,9 +1408,15 @@ class ModelInstallService(ModelInstallServiceBase):
                 part.final_url = meta.get("final_url") or part.final_url
                 if meta.get("download_path"):
                     part.download_path = Path(meta.get("download_path"))
+        if restarted_from_scratch:
+            for part in multifile_job.download_parts:
+                if str(part.source) in restarted_from_scratch:
+                    part.resume_from_scratch = True
+                    part.resume_message = "Partial file missing. Restarted download from the beginning."
         with self._lock:
             self._download_cache[multifile_job.id] = job
         job._multifile_job = multifile_job
+        job.download_parts = multifile_job.download_parts
 
         self._write_install_marker(job, status=InstallStatus.WAITING)
         files_string = "file" if len(remote_files) == 1 else "files"
@@ -1421,10 +1453,14 @@ class ModelInstallService(ModelInstallServiceBase):
         # subdirectory within the model folder.
 
         if subfolders and len(subfolders) > 1:
-            # Multiple subfolders: create combined name and keep subfolder structure
+            # Multiple subfolders: create combined name and keep subfolder structure. Entries may
+            # also be explicit files (e.g. "modular_model_index.json" or "transformer/config.json");
+            # use their stems in the combined name so it stays a sane directory name.
             top = Path(remote_files[0].path.parts[0])  # e.g. "Z-Image-Turbo/"
-            subfolder_names = [sf.name.replace("/", "_").replace("\\", "_") for sf in subfolders]
-            combined_name = "_".join(subfolder_names)
+            subfolder_names = [
+                (sf.stem if sf.suffix else sf.name).replace("/", "_").replace("\\", "_") for sf in subfolders
+            ]
+            combined_name = _combined_subfolder_name(subfolder_names)
             path_to_add = Path(f"{top}_{combined_name}")
 
             parts: List[RemoteModelFile] = []
@@ -1434,6 +1470,12 @@ class ModelInstallService(ModelInstallServiceBase):
                 file_path = model_file.path
                 new_path: Optional[Path] = None
                 for sf in subfolders:
+                    if file_path == top / sf:
+                        # An explicit file entry: keep its repo-relative path so e.g.
+                        # transformer/config.json stays inside transformer/. (relative_to() below
+                        # would return "." here and flatten the file to the model root.)
+                        new_path = path_to_add / sf
+                        break
                     try:
                         # Try to get relative path from this subfolder
                         relative = file_path.relative_to(top / sf)

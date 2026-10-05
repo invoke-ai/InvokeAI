@@ -12,6 +12,7 @@ filter is covered separately in tests/app/services/video_records.
 """
 
 import inspect
+import json
 from pathlib import Path
 from typing import Any
 from unittest.mock import MagicMock, patch
@@ -25,6 +26,7 @@ from invokeai.app.api.dependencies import ApiDependencies
 from invokeai.app.api.routers import videos as videos_router_module
 from invokeai.app.api.routers.videos import (
     VideoNamesBatch,
+    _classify_upload,
     _is_mp4_file,
     delete_uncategorized_videos,
     delete_video,
@@ -38,6 +40,7 @@ from invokeai.app.api_app import app
 from invokeai.app.services.invoker import Invoker
 from invokeai.app.services.users.users_common import UserCreateRequest
 from invokeai.app.services.videos.videos_common import VideoDTO
+from invokeai.app.util.video_ingest import MediaProbe
 
 
 class MockApiDependencies(ApiDependencies):
@@ -531,17 +534,18 @@ def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
     client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
 ):
     """An upload that looks like an MP4 on the surface (``.mp4`` extension or video MIME
-    type) but contains bytes ``probe_video`` can't decode must:
+    type) but contains bytes no probe can decode must:
 
-      1. Reach ``probe_video`` (the extension/MIME gate is intentionally permissive — the
-         real validation is the decode probe).
+      1. Reach the content probes (the extension/MIME gate is intentionally permissive —
+         the real validation is stream content).
       2. Surface a 415 to the caller.
-      3. Unlink the streamed-to-disk temp file so the server doesn't leak storage on every
-         garbage upload.
+      3. Unlink every temp file the route created (the streamed upload spool and, for
+         non-compliant uploads, the ingest converter's output) so the server doesn't
+         leak storage on garbage uploads.
     """
-    # Capture the tmp path the route created so we can prove it was unlinked after the
-    # 415 response. ``tempfile.NamedTemporaryFile(..., delete=False)`` is invoked inside
-    # the route, so we wrap the real call and stash the resulting path.
+    # Capture the tmp paths the route created so we can prove they were unlinked after
+    # the 415 response. ``tempfile.NamedTemporaryFile(..., delete=False)`` is invoked
+    # inside the route, so we wrap the real call and stash the resulting paths.
     captured_paths: list[Path] = []
 
     import tempfile as _tempfile
@@ -574,10 +578,11 @@ def test_upload_video_malformed_mp4_returns_415_and_cleans_up_tmp(
         )
 
     assert response.status_code == status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
-    # The route should have allocated exactly one tmp file and then unlinked it.
-    assert len(captured_paths) == 1, f"expected one tmp file, got {captured_paths}"
-    tmp_file = captured_paths[0]
-    assert not tmp_file.exists(), f"tmp file leaked after 415: {tmp_file}"
+    # The route allocates the upload spool plus (for a non-compliant container) the
+    # ingest converter's output file; every one of them must be unlinked on rejection.
+    assert len(captured_paths) == 2, f"expected upload + ingest tmp files, got {captured_paths}"
+    leaked = [p for p in captured_paths if p.exists()]
+    assert not leaked, f"tmp files leaked after 415: {leaked}"
 
 
 def test_upload_video_rejects_non_mp4_container_with_spoofed_mime(
@@ -643,7 +648,13 @@ def test_upload_video_accepts_object_metadata(client: TestClient, mock_invoker: 
     mp4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 12
     metadata = '{"seed": 123}'
 
-    with patch("invokeai.app.api.routers.videos._probe_decodable_video", return_value=((64, 64, 1.0, 8.0), None)):
+    with (
+        patch(
+            "invokeai.app.api.routers.videos.probe_media_streams",
+            return_value=MediaProbe(video_codec="h264", audio_codec="aac"),
+        ),
+        patch("invokeai.app.api.routers.videos._probe_decodable_video", return_value=((64, 64, 1.0, 8.0), None)),
+    ):
         response = client.post(
             "/api/v1/videos/upload",
             params={"video_category": "general", "is_intermediate": False},
@@ -654,6 +665,145 @@ def test_upload_video_accepts_object_metadata(client: TestClient, mock_invoker: 
 
     assert response.status_code == status.HTTP_201_CREATED
     assert mock_invoker.services.videos.create.call_args.kwargs["metadata"] == metadata
+
+
+def _make_fixture_media(path: Path, *args: str) -> Path:
+    import subprocess
+
+    import imageio_ffmpeg
+
+    subprocess.run(
+        [imageio_ffmpeg.get_ffmpeg_exe(), "-y", "-loglevel", "error", *args, str(path)],
+        check=True,
+        capture_output=True,
+    )
+    return path
+
+
+def test_upload_h264_mov_is_remuxed_and_created(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
+):
+    """A QuickTime container with H.264 inside (the iPhone 'Most Compatible' shape) must
+    upload end-to-end: ingest remuxes it to MP4 and the full decode probe then accepts
+    it. No probes are patched — this exercises the real conversion."""
+    mov = _make_fixture_media(
+        tmp_path / "clip.mov",
+        *("-f", "lavfi", "-i", "testsrc2=s=64x48:r=8:d=1"),
+        *("-c:v", "libx264", "-pix_fmt", "yuv420p"),
+    )
+    # The route unlinks its tmp file after create() returns, so the container check
+    # must happen while the file still exists — inside the mocked create call.
+    stored_was_mp4: list[bool] = []
+
+    def create(**kwargs: Any) -> VideoDTO:
+        stored_was_mp4.append(_is_mp4_file(Path(kwargs["source_path"])))
+        return _uploaded_video_dto()
+
+    mock_invoker.services.videos.create.side_effect = create
+
+    response = client.post(
+        "/api/v1/videos/upload",
+        params={"video_category": "user", "is_intermediate": False},
+        files={"file": ("clip.mov", mov.read_bytes(), "video/quicktime")},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    create_kwargs = mock_invoker.services.videos.create.call_args.kwargs
+    assert (create_kwargs["width"], create_kwargs["height"]) == (64, 48)
+    # The created file is the converted MP4, not the original QuickTime bytes.
+    assert stored_was_mp4 == [True]
+
+
+def test_upload_audio_file_is_wrapped_and_marked(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
+):
+    """An audio-only upload becomes a waveform video, and its metadata is stamped with
+    `media_origin: audio_upload` so clients can recognize wrapped audio clips."""
+    wav = _make_fixture_media(
+        tmp_path / "tone.wav",
+        *("-f", "lavfi", "-i", "anoisesrc=a=0.3:d=1"),
+        *("-c:a", "pcm_s16le"),
+    )
+    mock_invoker.services.videos.create.return_value = _uploaded_video_dto()
+
+    response = client.post(
+        "/api/v1/videos/upload",
+        params={"video_category": "user", "is_intermediate": False},
+        files={"file": ("tone.wav", wav.read_bytes(), "audio/wav")},
+        data={"metadata": '{"note": "kept"}'},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    create_kwargs = mock_invoker.services.videos.create.call_args.kwargs
+    stored_metadata = json.loads(create_kwargs["metadata"])
+    assert stored_metadata["media_origin"] == "audio_upload"
+    assert stored_metadata["note"] == "kept", "user-supplied metadata must survive the stamp"
+    assert (create_kwargs["width"], create_kwargs["height"]) == (640, 360)
+
+
+def test_upload_mp4_with_non_aac_audio_gets_audio_normalized(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
+):
+    """An MP4 whose video is already h264 but whose audio track is not browser-safe
+    (mp3 here; AMR in older Android .3gp files) must NOT take the byte-identical fast
+    path — the audio is re-encoded to AAC while the h264 stream is copied."""
+    from invokeai.app.util.video_ingest import probe_media_streams
+
+    src = _make_fixture_media(
+        tmp_path / "clip.mp4",
+        *("-f", "lavfi", "-i", "testsrc2=s=64x48:r=8:d=1"),
+        *("-f", "lavfi", "-i", "sine=frequency=440:d=1"),
+        *("-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "libmp3lame", "-shortest"),
+    )
+    stored_audio_codecs: list[str | None] = []
+
+    def create(**kwargs: Any) -> VideoDTO:
+        stored_audio_codecs.append(probe_media_streams(Path(kwargs["source_path"])).audio_codec)
+        return _uploaded_video_dto()
+
+    mock_invoker.services.videos.create.side_effect = create
+
+    response = client.post(
+        "/api/v1/videos/upload",
+        params={"video_category": "user", "is_intermediate": False},
+        files={"file": ("clip.mp4", src.read_bytes(), "video/mp4")},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    assert stored_audio_codecs == ["aac"]
+
+
+def test_upload_rejects_unrecognized_file_kind(client: TestClient, mock_invoker: Invoker, user1_token: str):
+    mock_invoker.services.videos.create.side_effect = AssertionError("unrecognized upload reached creation")
+
+    response = client.post(
+        "/api/v1/videos/upload",
+        params={"video_category": "user", "is_intermediate": False},
+        files={"file": ("notes.txt", b"just text", "text/plain")},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_415_UNSUPPORTED_MEDIA_TYPE
+
+
+@pytest.mark.parametrize(
+    ("filename", "expected"),
+    [
+        ("clip.wmv", "video"),
+        ("clip.asf", "video"),
+        ("song.wma", "audio"),
+        ("clip.MOV", "video"),
+        ("voice.M4A", "audio"),
+        ("notes.txt", None),
+    ],
+)
+def test_classify_upload_falls_back_to_the_extension(filename: str, expected: str | None) -> None:
+    """A file whose type the browser could not map arrives as octet-stream, leaving the
+    extension as the only signal. The picker offers these, so the route must accept them."""
+    assert _classify_upload(filename, "application/octet-stream") == expected
 
 
 def test_mp4_validation_allows_boxes_before_file_type(tmp_path: Path) -> None:
@@ -807,7 +957,9 @@ def test_uploaded_video_codec_must_be_browser_compatible(
         lambda _path: (64, 64, 1.0, 8.0, codec),
         raising=False,
     )
-    monkeypatch.setattr(videos_router_module, "extract_video_frame", lambda *_args, **_kwargs: MagicMock())
+    monkeypatch.setattr(
+        videos_router_module, "extract_representative_video_frame", lambda *_args, **_kwargs: MagicMock()
+    )
 
     if is_supported:
         metadata, _frame = videos_router_module._probe_decodable_video(path)
@@ -867,11 +1019,11 @@ def test_remove_video_from_board_succeeds_for_board_owner_of_non_owned_video(
     mock_invoker.services.video_records.get_user_id.return_value = user2.user_id
     mock_invoker.services.board_video_records.get_board_for_video.return_value = "user1-board"
 
-    # _assert_board_write_access reads the board DTO to check ownership/visibility.
+    # _assert_board_write_access reads the lightweight board record to check ownership/visibility.
     fake_board = MagicMock()
     fake_board.user_id = user1.user_id
     fake_board.board_visibility = BoardVisibility.Private
-    with patch.object(mock_invoker.services.boards, "get_dto", return_value=fake_board):
+    with patch.object(mock_invoker.services.board_records, "get", return_value=fake_board):
         response = client.request(
             "DELETE",
             "/api/v1/videos/board",
@@ -902,7 +1054,7 @@ def test_remove_video_from_board_rejects_third_party(
     fake_board.board_visibility = BoardVisibility.Private
 
     # user2 has no claim to either resource.
-    with patch.object(mock_invoker.services.boards, "get_dto", return_value=fake_board):
+    with patch.object(mock_invoker.services.board_records, "get", return_value=fake_board):
         response = client.request(
             "DELETE",
             "/api/v1/videos/board",
@@ -1056,3 +1208,161 @@ def test_single_video_mutations_are_offloaded_by_fastapi(handler: Any) -> None:
     every other request and socket event until the delete/update finished.
     """
     assert not inspect.iscoroutinefunction(handler)
+
+
+# --- Embedded metadata on upload -----------------------------------------------------------------
+
+
+def _tagged_upload(tmp_path: Path, tags: dict[str, str]) -> bytes:
+    """A real H.264 MP4 carrying ``tags`` as keyed metadata, as an InvokeAI download would."""
+    import numpy as np
+
+    from invokeai.app.util.mp4_metadata import write_mp4_tags
+    from invokeai.app.util.video_encoding import make_mp4_writer
+
+    plain = tmp_path / "plain.mp4"
+    writer = make_mp4_writer(plain, fps=8.0)
+    try:
+        for _ in range(2):
+            writer.append_data(np.zeros((16, 16, 3), dtype=np.uint8))
+    finally:
+        writer.close()
+    tagged = tmp_path / "tagged.mp4"
+    write_mp4_tags(plain, tagged, tags)
+    return tagged.read_bytes()
+
+
+def _upload(client: TestClient, token: str, body: bytes, metadata: str | None = None):
+    with (
+        patch(
+            "invokeai.app.api.routers.videos.probe_media_streams",
+            return_value=MediaProbe(video_codec="h264", audio_codec=None),
+        ),
+        patch("invokeai.app.api.routers.videos._probe_decodable_video", return_value=((16, 16, 0.25, 8.0), None)),
+    ):
+        return client.post(
+            "/api/v1/videos/upload",
+            params={"video_category": "general", "is_intermediate": False},
+            files={"file": ("video.mp4", body, "video/mp4")},
+            data={} if metadata is None else {"metadata": metadata},
+            headers={"Authorization": f"Bearer {token}"},
+        )
+
+
+def test_upload_video_recovers_metadata_workflow_and_graph_embedded_in_the_file(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
+):
+    mock_invoker.services.videos.create.return_value = _uploaded_video_dto()
+    tags = {
+        "invokeai_metadata": json.dumps({"seed": 42, "generation_mode": "wan_t2v", "metadata_version": "1.0.0"}),
+        "invokeai_workflow": json.dumps(
+            {
+                "name": "wf",
+                "author": "",
+                "description": "",
+                "version": "",
+                "contact": "",
+                "tags": "",
+                "notes": "",
+                "exposedFields": [],
+                "meta": {"version": "3.0.0", "category": "user"},
+                "nodes": [],
+                "edges": [],
+                "form": {"elements": {}, "rootElementId": "root"},
+            }
+        ),
+        "invokeai_graph": json.dumps({"nodes": {}, "edges": []}),
+    }
+
+    response = _upload(client, user1_token, _tagged_upload(tmp_path, tags))
+
+    assert response.status_code == status.HTTP_201_CREATED
+    kwargs = mock_invoker.services.videos.create.call_args.kwargs
+    assert kwargs["metadata"] == tags["invokeai_metadata"]
+    assert kwargs["workflow"] == tags["invokeai_workflow"]
+    assert kwargs["graph"] == tags["invokeai_graph"]
+
+
+def test_upload_video_client_metadata_wins_over_the_embedded_copy(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
+):
+    mock_invoker.services.videos.create.return_value = _uploaded_video_dto()
+    tags = {"invokeai_metadata": '{"seed": 42}', "invokeai_graph": '{"nodes": {}, "edges": []}'}
+
+    response = _upload(client, user1_token, _tagged_upload(tmp_path, tags), metadata='{"seed": 7}')
+
+    assert response.status_code == status.HTTP_201_CREATED
+    kwargs = mock_invoker.services.videos.create.call_args.kwargs
+    assert kwargs["metadata"] == '{"seed": 7}'
+    assert kwargs["workflow"] is None
+    assert kwargs["graph"] == tags["invokeai_graph"]
+
+
+def test_upload_video_without_embedded_tags_stores_no_metadata(
+    client: TestClient, mock_invoker: Invoker, user1_token: str
+):
+    mock_invoker.services.videos.create.return_value = _uploaded_video_dto()
+    mp4 = b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 12
+
+    response = _upload(client, user1_token, mp4)
+
+    assert response.status_code == status.HTTP_201_CREATED
+    kwargs = mock_invoker.services.videos.create.call_args.kwargs
+    assert (kwargs["metadata"], kwargs["workflow"], kwargs["graph"]) == (None, None, None)
+
+
+def test_upload_recovers_embedded_tags_from_a_file_the_ingest_path_rewrites(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path
+):
+    """The ingest remux does not carry keyed metadata, so extraction must happen on the file as
+    uploaded. An h264 MP4 with mp3 audio takes the real ingest path (no probes patched)."""
+    from invokeai.app.util.mp4_metadata import read_mp4_tags, write_mp4_tags
+
+    plain = _make_fixture_media(
+        tmp_path / "plain.mp4",
+        *("-f", "lavfi", "-i", "testsrc2=s=64x48:r=8:d=1"),
+        *("-f", "lavfi", "-i", "sine=frequency=440:d=1"),
+        *("-c:v", "libx264", "-pix_fmt", "yuv420p", "-c:a", "libmp3lame", "-shortest"),
+    )
+    tags = {
+        "invokeai_metadata": '{"seed": 5, "generation_mode": "wan_t2v"}',
+        "invokeai_graph": '{"nodes": {}, "edges": []}',
+    }
+    tagged = tmp_path / "tagged.mp4"
+    write_mp4_tags(plain, tagged, tags)
+    stored_tags: list[dict[str, str]] = []
+
+    def create(**kwargs: Any) -> VideoDTO:
+        stored_tags.append(read_mp4_tags(Path(kwargs["source_path"]), keys=tags))
+        return _uploaded_video_dto()
+
+    mock_invoker.services.videos.create.side_effect = create
+
+    response = client.post(
+        "/api/v1/videos/upload",
+        params={"video_category": "user", "is_intermediate": False},
+        files={"file": ("clip.mp4", tagged.read_bytes(), "video/mp4")},
+        headers={"Authorization": f"Bearer {user1_token}"},
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+    kwargs = mock_invoker.services.videos.create.call_args.kwargs
+    assert kwargs["metadata"] == tags["invokeai_metadata"]
+    assert kwargs["graph"] == tags["invokeai_graph"]
+    # The converted file reaching create() has lost the tags — which is why extraction ran first.
+    assert stored_tags == [{}]
+
+
+def test_upload_ignores_an_embedded_metadata_record_over_the_form_field_cap(
+    client: TestClient, mock_invoker: Invoker, user1_token: str, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    mock_invoker.services.videos.create.return_value = _uploaded_video_dto()
+    monkeypatch.setattr(videos_router_module, "MAX_UPLOAD_METADATA_SIZE", 64)
+    tags = {"invokeai_metadata": json.dumps({"pad": "x" * 100}), "invokeai_graph": '{"nodes": {}, "edges": []}'}
+
+    response = _upload(client, user1_token, _tagged_upload(tmp_path, tags))
+
+    assert response.status_code == status.HTTP_201_CREATED
+    kwargs = mock_invoker.services.videos.create.call_args.kwargs
+    assert kwargs["metadata"] is None
+    assert kwargs["graph"] == tags["invokeai_graph"]

@@ -167,6 +167,10 @@ class DatabaseMapper:
     def connect(self):
         """Open connection to the database."""
         self.connection = sqlite3.connect(self.database_path)
+        # FK enforcement is per-connection and off by default. Without it, the
+        # image deletions below leave orphaned rows in tables that declare
+        # ON DELETE CASCADE against images (board_images, image_embeddings).
+        self.connection.execute("PRAGMA foreign_keys = ON;")
         self.cursor = self.connection.cursor()
 
     def get_all_image_files(self):

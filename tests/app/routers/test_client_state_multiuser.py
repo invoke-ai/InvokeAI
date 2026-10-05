@@ -57,7 +57,7 @@ def get_user_token(client: TestClient, email: str, password: str = "TestPass123"
 
 
 @pytest.fixture
-def admin_token(monkeypatch: Any, mock_invoker: Invoker, client: TestClient):
+def admin_token(setup_jwt_secret: None, monkeypatch: Any, mock_invoker: Invoker, client: TestClient):
     """Get an admin token for testing."""
     # Enable multiuser mode for auth endpoints
     mock_invoker.services.configuration.multiuser = True

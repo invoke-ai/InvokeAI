@@ -22,6 +22,41 @@ class DummyModule(torch.nn.Module):
         return x
 
 
+class TiedWeightsModule(torch.nn.Module):
+    """A language model's shape: the output projection shares its weight with the embedding.
+
+    Every Qwen3 text encoder InvokeAI loads is tied this way, and so are many transformers models. The state dict
+    lists that one tensor under both names, which is what the cache has to account for and move as one.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.embed = torch.nn.Embedding(128, 64)
+        self.head = torch.nn.Linear(64, 128, bias=False)
+        self.head.weight = self.embed.weight
+        self.linear = torch.nn.Linear(64, 64)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.head(self.linear(self.embed(x)))
+
+
+class TiedRequiredParameterModule(torch.nn.Module):
+    """A tie that spans an autocast-wrapped module and a parameter the cache must keep on the compute device.
+
+    Root parameters sit in no wrapped module, so the cache counts them among the weights a partially-loaded model
+    cannot run without. Tying one to a wrapped module's weight is what makes "keep the required weights" and "move a
+    tied group as a unit" pull in opposite directions.
+    """
+
+    def __init__(self):
+        super().__init__()
+        self.linear = torch.nn.Linear(64, 128, bias=False)
+        self.required = torch.nn.Parameter(self.linear.weight)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.linear(x) + self.required.sum()
+
+
 is_github_ci = os.getenv("GITHUB_ACTIONS") == "true"
 
 parameterize_mps_and_cuda = pytest.mark.parametrize(

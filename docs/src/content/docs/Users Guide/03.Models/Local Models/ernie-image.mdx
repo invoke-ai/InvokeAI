@@ -1,0 +1,107 @@
+---
+title: ERNIE-Image
+description: Generate images with Baidu's ERNIE-Image and ERNIE-Image Turbo, from the Diffusers pipelines or the single-file transformers.
+lastUpdated: 2026-09-30
+sidebar:
+  order: 3
+---
+
+ERNIE-Image is Baidu's 8B single-stream diffusion-transformer text-to-image family. It encodes prompts
+with a **Ministral 3B** text encoder and decodes with the 32-channel **FLUX.2 VAE**. Two checkpoints are
+supported:
+
+- **ERNIE-Image** is the undistilled model. It runs at **50 steps** with **CFG 4.0** and supports negative
+  prompts.
+- **ERNIE-Image Turbo** is the distilled variant with the same architecture, tuned for **8 steps** with
+  **CFG disabled** (CFG Scale `1.0`).
+
+ERNIE-Image is **text-to-image only**. It can be used in the Generate tab and in the workflow editor, but
+not for image-to-image, inpainting or outpainting on the Canvas.
+
+## License
+
+ERNIE-Image, ERNIE-Image Turbo and the Ministral 3B text encoder are released under **Apache 2.0**, which allows commercial use. None of the downloads is gated.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
+## Hardware
+
+See the [System Requirements](/start-here/system-requirements/) table. For scale: the single-file
+transformer alone is about 16 GB and the standalone Ministral 3B encoder about 7.7 GB. On smaller
+cards, [Low-VRAM mode](/configuration/optimization/low-vram-mode/) lets InvokeAI stream models that
+don't fit entirely in VRAM.
+
+## Installing
+
+The easiest path is the **ERNIE-Image** bundle in the Model Manager. It installs **ERNIE-Image Turbo** as a
+Diffusers pipeline. The undistilled ERNIE-Image is left out of the bundle because of its size, but it can
+be installed individually from the starter models.
+
+ERNIE-Image needs three components:
+
+| Component                   | Diffusers install | Single-file install  |
+| --------------------------- | ----------------- | -------------------- |
+| Transformer                 | bundled           | the `.safetensors` file |
+| Text encoder (Ministral 3B) | bundled           | installed separately |
+| VAE (FLUX.2)                | bundled           | installed separately |
+
+The starter models:
+
+| Starter                         | Source                                    | Also installs                          |
+| ------------------------------- | ----------------------------------------- | -------------------------------------- |
+| ERNIE-Image                     | `baidu/ERNIE-Image` (Diffusers)           | nothing, everything is bundled         |
+| ERNIE-Image Turbo               | `baidu/ERNIE-Image-Turbo` (Diffusers)     | nothing, everything is bundled         |
+| ERNIE-Image (single file)       | Comfy-Org single file (~16 GB)            | Ministral 3B encoder + FLUX.2 VAE      |
+| ERNIE-Image Turbo (single file) | Comfy-Org single file (~16 GB)            | Ministral 3B encoder + FLUX.2 VAE      |
+
+The Diffusers pipelines also carry a prompt-enhancer model (see [Prompt enhancer](#prompt-enhancer)); the
+single files do not. GGUF and quantized single files are not supported.
+
+When a single-file ERNIE-Image model is selected, the **Components** section next to the model asks for:
+
+- **Mistral Encoder**: the **ERNIE-Image Ministral Encoder** starter. Ministral 3B is a different
+  architecture from the Mistral Small 3 encoder FLUX.2 uses, and the two are not interchangeable. The
+  prompt enhancer from the Diffusers folder has the same shape as the encoder but is refused as one, with
+  a message naming the file to install instead.
+- **VAE**: a FLUX.2 VAE. ERNIE-Image uses the same VAE as FLUX.2, which is why it installs under the
+  FLUX.2 base.
+
+:::note[Turbo is recognized by name]
+ERNIE-Image and ERNIE-Image Turbo share an architecture, so InvokeAI can't tell them apart from the
+weights. A model whose name contains **turbo** gets the Turbo defaults (8 steps, CFG 1.0); any other name
+gets the base defaults. If you install a Turbo checkpoint under another name, adjust the steps and CFG in
+its Default Settings.
+:::
+
+## Generation settings
+
+Selecting an ERNIE-Image model applies these defaults:
+
+| Model             | Steps | CFG Scale | Scheduler | Size      |
+| ----------------- | ----- | --------- | --------- | --------- |
+| ERNIE-Image       | 50    | 4.0       | Euler     | 1024×1024 |
+| ERNIE-Image Turbo | 8     | 1.0       | Euler     | 1024×1024 |
+
+- **CFG Scale**: `1.0` turns CFG off. Values below `1.0` are not accepted.
+- **Negative prompt**: only used when CFG Scale is above `1.0`. With Turbo at `1.0` it has no effect.
+- **Schedulers**: *Euler* (the default), *Heun (2nd order)* and *LCM*.
+- **Resolution**: width and height must be multiples of 16.
+
+LoRA, ControlNet, reference images and regional prompting are not available for ERNIE-Image.
+
+## Prompt enhancer
+
+The Diffusers ERNIE-Image pipelines include a prompt-enhancer language model that rewrites a short prompt
+into a more detailed one, sized for the target width and height. The Generate tab does not use it. To use
+it, build a workflow:
+
+1. In **Main Model - ERNIE-Image**, leave **Use Prompt Enhancer** on (the default) and select a Diffusers
+   ERNIE-Image model.
+2. Connect its **Prompt Enhancer** output to a **Prompt Enhancer - ERNIE-Image** node, and give that node
+   your prompt and the target width and height. **Temperature** (default `0.6`) and **Top P** (default
+   `0.95`) control how freely it rewrites.
+3. Feed the rewritten prompt into **Prompt - ERNIE-Image**, then on to **Denoise - ERNIE-Image** and
+   **Latents to Image - ERNIE-Image**.
+
+If no prompt enhancer is connected, for example with a single-file model, the node passes the prompt
+through unchanged. The rewritten prompt is written to the server log.

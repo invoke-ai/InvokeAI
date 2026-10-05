@@ -1,0 +1,1306 @@
+import type { GenerateModelConfig, MainModelConfig } from '@features/generation/contracts';
+import type {
+  CanvasDocumentContractV3,
+  CanvasControlLayerContract,
+  CanvasLayerContract,
+  CanvasRasterLayerContractV2,
+  CanvasStateContractV3,
+  RegionalGuidanceReferenceImage,
+  RegionalGuidanceReferenceImageAsset,
+} from '@workbench/canvas-engine/contracts';
+import type { CanvasImageUploadResult } from '@workbench/canvas-engine/document/imageUpload';
+import type { RasterSurface } from '@workbench/canvas-engine/render/raster';
+import type { Rect } from '@workbench/canvas-engine/types';
+import type { WorkbenchState } from '@workbench/projectContracts';
+import type { WorkbenchAction } from '@workbench/workbenchState.testing';
+import type { WorkbenchCommands } from '@workbench/workbenchStore';
+
+import { seedArchitectureCapabilities } from '@features/generation/core/architectureCapabilities.testing';
+import { getDefaultGenerateSettings } from '@features/generation/settings';
+import { getDocumentLeaves } from '@workbench/canvas-engine/api';
+import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { createTestStubRasterBackend } from '@workbench/canvas-engine/render/raster.testStub';
+import {
+  composeForGeneration,
+  createCompositeDedupeCache,
+  type GenerationCompositeExecutorDeps,
+  type GenerationCompositeHost,
+} from '@workbench/canvas-operations/api';
+import { createInitialWorkbenchState, workbenchReducer } from '@workbench/workbenchState.testing';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { RunCanvasInvocationDeps } from './prepareCanvasInvocation';
+
+import { DEFAULT_CANVAS_COMPOSITING } from './canvasCompositing';
+import { DEFAULT_CANVAS_SCALING } from './canvasScaling';
+import {
+  prepareCanvasInvocation,
+  resolveRegionalReferenceImages,
+  runCanvasInvocation,
+} from './prepareCanvasInvocation';
+
+const canvasBoundaryMocks = vi.hoisted(() => ({
+  getCanvasEngine: vi.fn(),
+  getCanvasOperations: vi.fn(),
+  generationDeviceOptions: [] as { device: string; name: string }[],
+}));
+
+vi.mock('@workbench/canvas-operations/api', async (importOriginal) => {
+  const original = (await importOriginal()) as Record<string, unknown>;
+
+  return {
+    ...original,
+    getCanvasEngine: canvasBoundaryMocks.getCanvasEngine,
+    getCanvasOperations: canvasBoundaryMocks.getCanvasOperations,
+  };
+});
+
+vi.mock('@features/queue/devices', async (importOriginal) => {
+  const original = (await importOriginal()) as Record<string, unknown>;
+
+  return {
+    ...original,
+    getGenerationDevicesSnapshot: () => ({
+      error: null,
+      loadState: 'loaded' as const,
+      options: canvasBoundaryMocks.generationDeviceOptions,
+      setting: 'auto' as const,
+    }),
+  };
+});
+
+const sd1Model: MainModelConfig = { base: 'sd-1', key: 'sd1-model', name: 'SD 1.5', type: 'main' };
+const externalModel: GenerateModelConfig = {
+  base: 'external',
+  capabilities: { modes: ['txt2img'], supports_seed: true },
+  format: 'external_api',
+  key: 'external-model',
+  name: 'OpenAI Image',
+  provider_id: 'openai',
+  type: 'external_image_generator',
+};
+
+const generateValuesFor = (model: GenerateModelConfig): Record<string, unknown> => ({
+  ...getDefaultGenerateSettings(model),
+  model,
+  modelKey: model.key,
+  positivePrompt: 'a canvas prompt',
+  seed: 7,
+  seedMode: 'fixed',
+});
+
+const rasterLayer = (id: string, size = 64): CanvasRasterLayerContractV2 => ({
+  blendMode: 'normal',
+  id,
+  isEnabled: true,
+  isLocked: false,
+  name: id,
+  opacity: 1,
+  source: { image: { height: size, imageName: `${id}.png`, width: size }, type: 'image' },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'raster',
+});
+
+const makeDoc = (layers: CanvasRasterLayerContractV2[], size = 64): CanvasDocumentContractV3 => ({
+  background: 'transparent',
+  bbox: { height: size, width: size, x: 0, y: 0 },
+  height: size,
+  stacks: stacksFrom(layers),
+  selectedLayerId: null,
+  version: 3,
+  width: size,
+});
+
+/** Uniform-alpha ImageData (255 = fully opaque → bboxFullyCovered true). */
+const uniformImageData = (width: number, height: number, alpha: number): ImageData => {
+  const data = new Uint8ClampedArray(Math.max(1, width) * Math.max(1, height) * 4);
+  for (let i = 3; i < data.length; i += 4) {
+    data[i] = alpha;
+  }
+  return { colorSpace: 'srgb', data, height, width } as unknown as ImageData;
+};
+
+interface Harness {
+  deps: RunCanvasInvocationDeps;
+  dispatch: ReturnType<typeof vi.fn>;
+  uploadImage: ReturnType<typeof vi.fn>;
+  flushPendingUploads: ReturnType<typeof vi.fn>;
+  events: string[];
+  surfaceIds: string[];
+  releaseRasterSnapshot: ReturnType<typeof vi.fn>;
+  dedupe: ReturnType<typeof createCompositeDedupeCache>;
+  executorDeps: GenerationCompositeExecutorDeps;
+  /** The fake engine seam the REAL `composeForGeneration` operation runs against. */
+  host: GenerationCompositeHost;
+  submittedGraphs: () => Extract<WorkbenchAction, { type: 'submitCanvasInvocationSnapshot' }>[];
+  notices: () => { message?: string }[];
+}
+
+interface HarnessOptions {
+  document?: CanvasDocumentContractV3;
+  destination?: 'canvas' | 'gallery';
+  model?: GenerateModelConfig;
+  strength?: number;
+  alpha?: number;
+  inFlight?: Set<string>;
+  flushPendingUploads?: () => Promise<void>;
+  uploadImage?: (blob: Blob) => Promise<CanvasImageUploadResult>;
+  projectId?: string;
+  dispatch?: ReturnType<typeof vi.fn<(action: WorkbenchAction) => void>>;
+  models?: RunCanvasInvocationDeps['models'];
+  outputOnlyMaskedRegions?: boolean;
+  scaling?: RunCanvasInvocationDeps['scaling'];
+}
+
+const makeHarness = (options: HarnessOptions = {}): Harness => {
+  const stub = createTestStubRasterBackend();
+  const events: string[] = [];
+  const surfaceIds: string[] = [];
+  const model = options.model ?? sd1Model;
+  const alpha = options.alpha ?? 255;
+
+  const backend = {
+    createSurface: (w: number, h: number): RasterSurface => stub.createSurface(w, h),
+    encodeSurface: (surface: RasterSurface): Promise<Blob> => stub.encodeSurface(surface),
+  };
+
+  const layerSurfaces = new Map<string, RasterSurface>();
+  const getLayerSurface = (layerId: string): Promise<{ surface: RasterSurface; rect: Rect }> => {
+    events.push('getLayerSurface');
+    surfaceIds.push(layerId);
+    let surface = layerSurfaces.get(layerId);
+    if (!surface) {
+      surface = stub.createSurface(64, 64);
+      layerSurfaces.set(layerId, surface);
+    }
+    // Content-sized: the layer's cache occupies its content rect (origin-anchored
+    // for these 64×64 image layers).
+    return Promise.resolve({ rect: { height: 64, width: 64, x: 0, y: 0 }, surface });
+  };
+
+  let counter = 0;
+  const uploadImage = vi.fn(
+    options.uploadImage ??
+      ((blob: Blob): Promise<CanvasImageUploadResult> => {
+        void blob;
+        events.push('upload');
+        counter += 1;
+        return Promise.resolve({ height: 64, imageName: `composite-${counter}.png`, width: 64 });
+      })
+  );
+
+  const flushPendingUploads = vi.fn(
+    options.flushPendingUploads ??
+      ((): Promise<void> =>
+        new Promise((resolve) => {
+          // Resolve on a microtask so a missing `await` would let compositing
+          // start first — the ordering assertion depends on this.
+          queueMicrotask(() => {
+            events.push('flush');
+            resolve();
+          });
+        }))
+  );
+
+  const dispatch = options.dispatch ?? vi.fn((_action: WorkbenchAction) => {});
+  const releaseRasterSnapshot = vi.fn();
+  const dedupe = createCompositeDedupeCache();
+
+  const makeCanvas = (document: CanvasDocumentContractV3): CanvasStateContractV3 => ({
+    document: structuredClone(document),
+    documentRevision: 0,
+    snapshots: [],
+    stagingArea: {
+      areThumbnailsVisible: true,
+      autoSwitchMode: 'off',
+      isVisible: false,
+      pendingImageIds: [],
+      pendingImages: [],
+      selectedImageIndex: 0,
+    },
+    version: 3,
+  });
+
+  const executorDeps: GenerationCompositeExecutorDeps = {
+    backend,
+    hashBlob: (blob: Blob) => blob.text(),
+    readImageData: (_surface, rect) => uniformImageData(rect.width, rect.height, alpha),
+    uploadImage: uploadImage as (blob: Blob) => Promise<CanvasImageUploadResult>,
+  };
+
+  // Run real composeForGeneration against stub raster/upload/release dependencies and a harness-owned dedupe
+  // cache.
+  const host: GenerationCompositeHost = {
+    captureDocumentSnapshot: () => ({
+      canvas: makeCanvas(options.document ?? makeDoc([rasterLayer('layer-a')])),
+      documentGeneration: 0,
+    }),
+    captureRasterSnapshot: async (documentSnapshot, layerIds) => {
+      const layerSurfaces = new Map<string, { surface: RasterSurface; rect: Rect }>();
+      for (const layerId of layerIds) {
+        layerSurfaces.set(layerId, await getLayerSurface(layerId));
+      }
+      return {
+        status: 'ok',
+        snapshot: {
+          canvas: documentSnapshot.canvas,
+          documentGeneration: documentSnapshot.documentGeneration,
+          emptyLayerIds: new Set<string>(),
+          layerSurfaces,
+          release: releaseRasterSnapshot,
+        },
+      };
+    },
+    dedupe,
+    getCompositeExecutorDeps: () => executorDeps,
+  };
+
+  const deps: RunCanvasInvocationDeps = {
+    composeForGeneration: (composeOptions) => composeForGeneration(host, composeOptions),
+    compositing: {
+      ...DEFAULT_CANVAS_COMPOSITING,
+      outputOnlyMaskedRegions: options.outputOnlyMaskedRegions ?? true,
+    },
+    destination: options.destination ?? 'canvas',
+    // The harness's tiny frames would grow under the default auto scaling; wiring tests read them at frame size.
+    scaling: options.scaling ?? { ...DEFAULT_CANVAS_SCALING, method: 'none' },
+    commands: {
+      generation: {
+        submitCanvas: (payload) => dispatch({ ...payload, type: 'submitCanvasInvocationSnapshot' }),
+      } as WorkbenchCommands['generation'],
+      notifications: {
+        add: (notice) => dispatch({ ...notice, type: 'recordNotice' }),
+      } as WorkbenchCommands['notifications'],
+    },
+    flushPendingUploads: flushPendingUploads as () => Promise<void>,
+    generateValues: generateValuesFor(model),
+    inFlight: options.inFlight ?? new Set<string>(),
+    models: options.models,
+    projectId: options.projectId ?? 'project-1',
+    projectSettings: { useCpuNoise: true },
+    signal: new AbortController().signal,
+    strength: options.strength ?? 0.75,
+  };
+
+  const submittedGraphs = () =>
+    dispatch.mock.calls.map(([action]) => action).filter((action) => action.type === 'submitCanvasInvocationSnapshot');
+  const notices = () =>
+    dispatch.mock.calls.map(([action]) => action).filter((action) => action.type === 'recordNotice');
+
+  return {
+    dedupe,
+    deps,
+    dispatch,
+    executorDeps,
+    events,
+    flushPendingUploads,
+    host,
+    notices,
+    releaseRasterSnapshot,
+    submittedGraphs,
+    surfaceIds,
+    uploadImage,
+  };
+};
+
+const controlLayer = (
+  id: string,
+  overrides: Partial<CanvasControlLayerContract['adapter']> = {},
+  hasContent = true
+): CanvasControlLayerContract => ({
+  adapter: {
+    beginEndStepPct: [0, 1],
+    controlMode: 'balanced',
+    kind: 'controlnet',
+    model: null,
+    weight: 0.75,
+    ...overrides,
+  },
+  blendMode: 'normal',
+  id,
+  isEnabled: true,
+  isLocked: false,
+  name: id,
+  opacity: 1,
+  source: hasContent
+    ? { image: { height: 64, imageName: `${id}.png`, width: 64 }, type: 'image' }
+    : { bitmap: null, type: 'paint' },
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'control',
+  withTransparencyEffect: true,
+});
+
+seedArchitectureCapabilities();
+
+describe('prepareCanvasInvocation generation-device boundary', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    canvasBoundaryMocks.getCanvasEngine.mockReset();
+    canvasBoundaryMocks.getCanvasOperations.mockReset();
+    canvasBoundaryMocks.generationDeviceOptions = [];
+  });
+
+  it('passes the XPU runtime snapshot into the compiled canvas graph metadata', async () => {
+    const harness = makeHarness({ document: makeDoc([]) });
+    canvasBoundaryMocks.generationDeviceOptions = [{ device: 'xpu:0', name: 'Intel Arc' }];
+    canvasBoundaryMocks.getCanvasEngine.mockReturnValue({
+      lifecycle: { flushPendingUploads: harness.flushPendingUploads },
+    });
+    canvasBoundaryMocks.getCanvasOperations.mockReturnValue({
+      composeForGeneration: (options: Parameters<typeof composeForGeneration>[1]) =>
+        composeForGeneration(harness.host, options),
+    });
+
+    await prepareCanvasInvocation({
+      commands: harness.deps.commands,
+      compositing: harness.deps.compositing,
+      destination: harness.deps.destination,
+      generateValues: harness.deps.generateValues,
+      models: harness.deps.models,
+      projectId: harness.deps.projectId,
+      canvasValues: { scaleMethod: 'manual', scaledHeight: 768, scaledWidth: 1024 },
+      projectSettings: { useCpuNoise: false },
+      strength: harness.deps.strength,
+    });
+
+    const nodes = harness.submittedGraphs()[0]?.graph.backendGraph?.nodes ?? {};
+    const metadata = Object.values(nodes).find((node) => node.type === 'core_metadata');
+
+    expect(metadata?.rand_device).toBe('xpu');
+  });
+});
+
+describe('runCanvasInvocation', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('generates txt2img without any composite upload when content does not overlap the bbox', async () => {
+    // Empty document → no raster content → txt2img, no executor work.
+    const harness = makeHarness({ document: makeDoc([]) });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.uploadImage).not.toHaveBeenCalled();
+    expect(harness.events).not.toContain('getLayerSurface');
+
+    const submitted = harness.submittedGraphs();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]?.graph.label).toBe('SD 1.5 txt2img');
+    // Pure txt2img graph has no image-to-latents encode node.
+    expect(submitted[0]!.graph.backendGraph!.nodes.canvas_i2l).toBeUndefined();
+    expect(harness.notices()).toHaveLength(0);
+  });
+
+  it('generates img2img with the composite reference and the strength-derived denoising_start', async () => {
+    const harness = makeHarness({ strength: 0.75 });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.uploadImage).toHaveBeenCalledTimes(1);
+
+    const submitted = harness.submittedGraphs();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]?.graph.label).toBe('SD 1.5 img2img');
+
+    const nodes = submitted[0]!.graph.backendGraph!.nodes;
+    const encode = Object.values(nodes).find((node: any) => node.type === 'i2l') as any;
+    expect(encode?.image).toEqual({ image_name: 'composite-1.png' });
+    // sd-1 is linear: denoising_start = 1 - 0.75.
+    expect(nodes.denoise_latents.denoising_start).toBeCloseTo(0.25, 10);
+    expect(harness.notices()).toHaveLength(0);
+    expect(harness.dedupe.byKey.size).toBeGreaterThan(0);
+  });
+
+  it('denoises at the persisted manual processing size and restores the bbox', async () => {
+    const harness = makeHarness({ scaling: { height: 768, method: 'manual', width: 1024 } });
+
+    await runCanvasInvocation(harness.deps);
+
+    const nodes = harness.submittedGraphs()[0]!.graph.backendGraph!.nodes;
+    expect(nodes.noise).toMatchObject({ height: 768, width: 1024 });
+    expect(nodes.canvas_resize_initial_to_processing).toMatchObject({ height: 768, width: 1024 });
+    expect(nodes.canvas_output).toMatchObject({ type: 'img_resize' });
+  });
+
+  it('reuses committed composite uploads on a later successful invocation', async () => {
+    const harness = makeHarness();
+
+    await runCanvasInvocation(harness.deps);
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(2);
+    expect(harness.uploadImage).toHaveBeenCalledTimes(1);
+  });
+
+  it('dispatches resolved prompt and seed metadata with the compiled canvas graph', async () => {
+    const harness = makeHarness();
+    harness.deps.generateValues = {
+      ...harness.deps.generateValues,
+      negativePrompt: 'low quality',
+      positivePrompt: 'a resolved canvas prompt',
+      seed: 123,
+      seedMode: 'fixed',
+    };
+
+    await runCanvasInvocation(harness.deps);
+
+    const submitted = harness.submittedGraphs();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]?.generate).toMatchObject({
+      negativePromptNodeId: 'negative_prompt',
+      positivePromptNodeId: 'positive_prompt',
+      seedNodeId: 'seed',
+      values: {
+        negativePrompt: 'low quality',
+        positivePrompt: 'a resolved canvas prompt',
+        seed: 123,
+        seedMode: 'fixed',
+      },
+    });
+  });
+
+  it('threads a Gallery destination through to the snapshot and a durable (non-intermediate) output', async () => {
+    // Empty document → txt2img, so no composite upload noise; we only care about
+    // the destination + is_intermediate wiring.
+    const harness = makeHarness({ destination: 'gallery', document: makeDoc([]) });
+
+    await runCanvasInvocation(harness.deps);
+
+    const submitted = harness.submittedGraphs();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]?.destination).toBe('gallery');
+    // A Gallery destination must produce a durable image, not a staging intermediate.
+    expect(submitted[0]!.graph.backendGraph!.nodes.canvas_output!.is_intermediate).toBe(false);
+  });
+
+  it('marks the output intermediate for a Canvas destination (staging)', async () => {
+    const harness = makeHarness({ destination: 'canvas', document: makeDoc([]) });
+
+    await runCanvasInvocation(harness.deps);
+
+    const submitted = harness.submittedGraphs();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]?.destination).toBe('canvas');
+    expect(submitted[0]!.graph.backendGraph!.nodes.canvas_output!.is_intermediate).toBe(true);
+  });
+
+  it('awaits the upload flush before compositing', async () => {
+    const harness = makeHarness();
+
+    await runCanvasInvocation(harness.deps);
+
+    // Flush must settle before any layer is rasterized/uploaded.
+    expect(harness.events[0]).toBe('flush');
+    expect(harness.events.indexOf('flush')).toBeLessThan(harness.events.indexOf('getLayerSurface'));
+    expect(harness.events.indexOf('flush')).toBeLessThan(harness.events.indexOf('upload'));
+  });
+
+  it('aborts with a visible notice when pending paint persistence fails', async () => {
+    const harness = makeHarness({
+      flushPendingUploads: () => Promise.reject(new Error('Canvas pixel persistence failed for 1 layer.')),
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toEqual([
+      expect.objectContaining({ message: 'Canvas pixel persistence failed for 1 layer.' }),
+    ]);
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.uploadImage).not.toHaveBeenCalled();
+  });
+
+  it('plans from the POST-flush document (re-reads getDocument after the flush barrier)', async () => {
+    // Reread the document after upload flush updates paint sources; pre-flush references would corrupt dedupe and
+    // omit newly painted content.
+    const preDoc = makeDoc([rasterLayer('pre')]);
+    const postDoc = makeDoc([rasterLayer('post')]);
+    let flushed = false;
+    const harness = makeHarness({
+      flushPendingUploads: () =>
+        new Promise((resolve) => {
+          queueMicrotask(() => {
+            flushed = true;
+            resolve();
+          });
+        }),
+    });
+    // Return the stale doc until the flush resolves, the fresh doc afterwards.
+    harness.host.captureDocumentSnapshot = () => ({
+      canvas: {
+        document: structuredClone(flushed ? postDoc : preDoc),
+        documentRevision: 0,
+        snapshots: [],
+        stagingArea: {
+          areThumbnailsVisible: true,
+          autoSwitchMode: 'off',
+          isVisible: false,
+          pendingImageIds: [],
+          pendingImages: [],
+          selectedImageIndex: 0,
+        },
+        version: 3,
+      },
+      documentGeneration: 0,
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    // The composite rasterized the post-flush layer, never the stale pre-flush one.
+    expect(harness.surfaceIds).toContain('post');
+    expect(harness.surfaceIds).not.toContain('pre');
+  });
+
+  it('does not submit or publish dedupe entries when the document becomes stale during raster detachment', async () => {
+    const harness = makeHarness();
+    const snapshot = {
+      canvas: {
+        document: makeDoc([rasterLayer('layer-a')]),
+        documentRevision: 0,
+        snapshots: [],
+        stagingArea: {
+          areThumbnailsVisible: true,
+          autoSwitchMode: 'off' as const,
+          isVisible: false,
+          pendingImageIds: [],
+          pendingImages: [],
+          selectedImageIndex: 0,
+        },
+        version: 2 as const,
+      },
+      documentGeneration: 0,
+    };
+    Object.assign(harness.host, {
+      captureDocumentSnapshot: vi.fn(() => snapshot),
+      captureRasterSnapshot: vi.fn(() => Promise.resolve({ status: 'stale' as const })),
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()).toHaveLength(1);
+    expect(harness.dedupe.byKey).toHaveLength(0);
+    expect(harness.dedupe.byHash).toHaveLength(0);
+  });
+
+  it.each(['aborted', 'not-ready', 'over-budget'] as const)(
+    'does not submit when raster capture returns the typed %s outcome',
+    async (status) => {
+      const harness = makeHarness();
+      harness.host.captureRasterSnapshot = vi.fn(() => Promise.resolve({ status }));
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.submittedGraphs()).toHaveLength(0);
+      expect(harness.notices()).toHaveLength(1);
+      expect(harness.dedupe.byKey).toHaveLength(0);
+      expect(harness.dedupe.byHash).toHaveLength(0);
+    }
+  );
+
+  it('passes the orchestration AbortSignal into raster snapshot capture', async () => {
+    const harness = makeHarness();
+    const controller = new AbortController();
+    const captureRasterSnapshot = vi.fn(() => Promise.resolve({ status: 'aborted' as const }));
+    harness.host.captureRasterSnapshot = captureRasterSnapshot;
+    harness.deps.signal = controller.signal;
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(captureRasterSnapshot).toHaveBeenCalledWith(
+      expect.any(Object),
+      ['layer-a'],
+      expect.objectContaining({ signal: controller.signal })
+    );
+    expect(harness.submittedGraphs()).toHaveLength(0);
+  });
+
+  it('does not start raster capture when the orchestration signal is already aborted', async () => {
+    const harness = makeHarness();
+    const controller = new AbortController();
+    const captureRasterSnapshot = vi.fn(harness.host.captureRasterSnapshot);
+    harness.host.captureRasterSnapshot = captureRasterSnapshot;
+    harness.deps.signal = controller.signal;
+    controller.abort(new DOMException('invoke cancelled', 'AbortError'));
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(captureRasterSnapshot).not.toHaveBeenCalled();
+    expect(harness.uploadImage).not.toHaveBeenCalled();
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()).toHaveLength(0);
+  });
+
+  it('quietly stops when its account signal expires during composition', async () => {
+    const harness = makeHarness();
+    const controller = new AbortController();
+    harness.deps.signal = controller.signal;
+    harness.deps.composeForGeneration = () => {
+      controller.abort(new DOMException('account changed', 'AbortError'));
+      return Promise.reject(controller.signal.reason);
+    };
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()).toHaveLength(0);
+  });
+
+  it('uses the frozen canvas and detached pixels after edits at composite, upload, and queue-dispatch boundaries', async () => {
+    let liveDocument = makeDoc([rasterLayer('frozen-layer')], 96);
+    liveDocument.bbox = { height: 64, width: 64, x: 7, y: 11 };
+    const dispatch = vi.fn((_action: WorkbenchAction) => {
+      liveDocument = { ...liveDocument, bbox: { height: 96, width: 96, x: 303, y: 404 } };
+    });
+    const harness = makeHarness({ dispatch, document: liveDocument });
+    harness.host.captureDocumentSnapshot = () => ({
+      canvas: {
+        document: structuredClone(liveDocument),
+        documentRevision: 4,
+        snapshots: [],
+        stagingArea: {
+          areThumbnailsVisible: true,
+          autoSwitchMode: 'off',
+          isVisible: false,
+          pendingImageIds: [],
+          pendingImages: [],
+          selectedImageIndex: 0,
+        },
+        version: 3,
+      },
+      documentGeneration: 9,
+    });
+    const captureRasterSnapshot = harness.host.captureRasterSnapshot;
+    harness.host.captureRasterSnapshot = async (snapshot, layerIds, captureOptions) => {
+      const result = await captureRasterSnapshot(snapshot, layerIds, captureOptions);
+      // The composite inputs are fully detached at this boundary. Subsequent
+      // edits must not alter any composite/upload/compile/dispatch input.
+      liveDocument = {
+        ...liveDocument,
+        bbox: { height: 64, width: 64, x: 101, y: 202 },
+        stacks: stacksFrom([rasterLayer('replacement-layer')]),
+      };
+      return result;
+    };
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.surfaceIds).toEqual(['frozen-layer']);
+    expect(harness.notices()).toEqual([]);
+    expect(harness.submittedGraphs()).toHaveLength(1);
+    expect(harness.submittedGraphs()[0]?.canvas.document.bbox).toEqual({ height: 64, width: 64, x: 7, y: 11 });
+    expect(getDocumentLeaves(harness.submittedGraphs()[0]?.canvas.document)[0]?.id).toBe('frozen-layer');
+    expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+    expect(harness.dedupe.byKey.size).toBeGreaterThan(0);
+  });
+
+  it.each(['coverage-scan', 'encode', 'upload'] as const)(
+    'keeps the frozen transaction when the live bbox changes at the %s boundary',
+    async (boundary) => {
+      let liveDocument = makeDoc([rasterLayer('layer-a')]);
+      const harness = makeHarness({ document: liveDocument });
+      harness.host.captureDocumentSnapshot = () => ({
+        canvas: {
+          document: structuredClone(liveDocument),
+          documentRevision: 2,
+          snapshots: [],
+          stagingArea: {
+            areThumbnailsVisible: true,
+            autoSwitchMode: 'off',
+            isVisible: false,
+            pendingImageIds: [],
+            pendingImages: [],
+            selectedImageIndex: 0,
+          },
+          version: 3,
+        },
+        documentGeneration: 3,
+      });
+      const editLiveBbox = (): void => {
+        liveDocument = { ...liveDocument, bbox: { height: 64, width: 64, x: 88, y: 99 } };
+      };
+      if (boundary === 'coverage-scan') {
+        const readImageData = harness.executorDeps.readImageData!;
+        harness.executorDeps.readImageData = (...args) => {
+          editLiveBbox();
+          return readImageData(...args);
+        };
+      } else if (boundary === 'encode') {
+        const encodeSurface = harness.executorDeps.backend.encodeSurface;
+        harness.executorDeps.backend.encodeSurface = (...args) => {
+          editLiveBbox();
+          return encodeSurface(...args);
+        };
+      } else {
+        const uploadImage = harness.executorDeps.uploadImage;
+        harness.executorDeps.uploadImage = (...args) => {
+          editLiveBbox();
+          return uploadImage(...args);
+        };
+      }
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.submittedGraphs()).toHaveLength(1);
+      expect(harness.submittedGraphs()[0]?.canvas.document.bbox).toEqual({ height: 64, width: 64, x: 0, y: 0 });
+      expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+    }
+  );
+
+  it('records a notice and dispatches no snapshot when the graph fails validation', async () => {
+    // External image generators are rejected by the graph compiler.
+    const harness = makeHarness({ model: externalModel });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    const notices = harness.notices();
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.message).toContain('does not support canvas generation');
+    expect(harness.dedupe.byKey).toHaveLength(0);
+    expect(harness.dedupe.byHash).toHaveLength(0);
+    expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('discards provisional dedupe entries when synchronous queue dispatch fails', async () => {
+    const dispatch = vi.fn((action: WorkbenchAction) => {
+      if (action.type === 'submitCanvasInvocationSnapshot') {
+        throw new Error('queue dispatch failed');
+      }
+    });
+    const harness = makeHarness({ dispatch });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.uploadImage).toHaveBeenCalledTimes(1);
+    expect(harness.dedupe.byKey).toHaveLength(0);
+    expect(harness.dedupe.byHash).toHaveLength(0);
+    expect(harness.notices()).toEqual([
+      expect.objectContaining({ message: 'queue dispatch failed', type: 'recordNotice' }),
+    ]);
+  });
+
+  it('records a notice and dispatches no snapshot when the composite upload fails', async () => {
+    const uploadImage = vi.fn(() => Promise.reject(new Error('upload exploded')));
+    const harness = makeHarness({ uploadImage });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    const notices = harness.notices();
+    expect(notices).toHaveLength(1);
+    expect(notices[0]?.message).toBe('upload exploded');
+    expect(harness.dedupe.byKey).toHaveLength(0);
+    expect(harness.dedupe.byHash).toHaveLength(0);
+    expect(harness.releaseRasterSnapshot).toHaveBeenCalledTimes(1);
+  });
+
+  it('blocks invocation with a human-readable notice when a nonempty control layer has no model', async () => {
+    const harness = makeHarness({ document: docWithLayers([controlLayer('control')]) });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()).toHaveLength(1);
+    expect(harness.notices()[0]?.message).toBe('Control layer "control" has no control model selected.');
+    expect(harness.notices()[0]?.message).not.toContain('[missing_model]');
+  });
+
+  it('prefers the injected control-layer error formatter', async () => {
+    const harness = makeHarness({ document: docWithLayers([controlLayer('control')]) });
+    const formatControlLayerError = vi.fn((code: string, layerName: string) => `localized ${code} for ${layerName}`);
+
+    await runCanvasInvocation({ ...harness.deps, formatControlLayerError });
+
+    expect(formatControlLayerError).toHaveBeenCalledWith('missing_model', 'control');
+    expect(harness.notices()[0]?.message).toBe('localized missing_model for control');
+  });
+
+  it('blocks invocation when a nonempty control layer has malformed numeric settings', async () => {
+    const model = {
+      base: 'sd-1',
+      file_size: 1,
+      format: 'checkpoint',
+      hash: 'hash',
+      key: 'controlnet',
+      name: 'ControlNet',
+      path: 'controlnet',
+      source: 'controlnet',
+      source_type: 'path' as const,
+      type: 'controlnet',
+    };
+    const harness = makeHarness({
+      document: docWithLayers([controlLayer('control', { model: model.key, weight: Number.NaN })]),
+      models: [model],
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()[0]?.message).toBe('Control layer "control" has invalid control adapter settings.');
+  });
+
+  it('ignores an empty control layer with no model', async () => {
+    const harness = makeHarness({ document: docWithLayers([controlLayer('control', {}, false)]) });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(1);
+    expect(harness.notices()).toHaveLength(0);
+  });
+
+  it('ignores a disabled nonempty control layer with no model', async () => {
+    const disabled = { ...controlLayer('control'), isEnabled: false };
+    const harness = makeHarness({ document: docWithLayers([disabled]) });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(1);
+    expect(harness.notices()).toHaveLength(0);
+    expect(harness.surfaceIds).toEqual([]);
+  });
+
+  it('blocks the second enabled nonempty Control LoRA', async () => {
+    const model = {
+      base: 'flux',
+      file_size: 1,
+      format: 'checkpoint',
+      hash: 'hash',
+      key: 'control-lora',
+      name: 'Control LoRA',
+      path: 'control-lora',
+      source: 'control-lora',
+      source_type: 'path' as const,
+      type: 'control_lora',
+    };
+    const flux = { ...sd1Model, base: 'flux' as const, key: 'flux', name: 'FLUX' };
+    const harness = makeHarness({
+      document: docWithLayers([
+        controlLayer('first', { kind: 'control_lora', model: model.key }),
+        controlLayer('second', { kind: 'control_lora', model: model.key }),
+      ]),
+      model: flux,
+      models: [model],
+    });
+    await runCanvasInvocation(harness.deps);
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()[0]?.message).toBe('Only one Control LoRA can be used at a time.');
+  });
+
+  it('prepares a Z-Image control with exact adapter and model configuration', async () => {
+    const zImage = {
+      ...sd1Model,
+      base: 'z-image' as const,
+      format: 'diffusers' as const,
+      key: 'z-image',
+      name: 'Z-Image',
+    };
+    const controlModel = {
+      base: 'z-image',
+      file_size: 1,
+      format: 'checkpoint',
+      hash: 'z-control-hash',
+      key: 'z-control',
+      name: 'Z Control',
+      path: 'z-control',
+      source: 'z-control',
+      source_type: 'path' as const,
+      type: 'controlnet',
+    };
+    const harness = makeHarness({
+      document: docWithLayers([
+        controlLayer('z-layer', {
+          beginEndStepPct: [0.15, 0.85],
+          controlMode: null,
+          kind: 'z_image_control',
+          model: controlModel.key,
+          weight: 0.7,
+        }),
+      ]),
+      model: zImage,
+      models: [controlModel],
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toHaveLength(0);
+    const node = harness.submittedGraphs()[0]?.graph.backendGraph?.nodes['z_image_control_z-layer'];
+    expect(node).toMatchObject({
+      begin_step_percent: 0.15,
+      control_context_scale: 0.7,
+      control_model: {
+        base: 'z-image',
+        hash: 'z-control-hash',
+        key: 'z-control',
+        name: 'Z Control',
+        type: 'controlnet',
+      },
+      end_step_percent: 0.85,
+      type: 'z_image_control',
+    });
+    expect(harness.surfaceIds).toEqual(['z-layer']);
+  });
+
+  it('blocks a second enabled nonempty Z-Image control', async () => {
+    const zImage = {
+      ...sd1Model,
+      base: 'z-image' as const,
+      format: 'diffusers' as const,
+      key: 'z-image',
+      name: 'Z-Image',
+    };
+    const controlModel = {
+      base: 'z-image',
+      file_size: 1,
+      format: 'checkpoint',
+      hash: 'hash',
+      key: 'z-control',
+      name: 'Z Control',
+      path: 'z-control',
+      source: 'z-control',
+      source_type: 'path' as const,
+      type: 'controlnet',
+    };
+    const harness = makeHarness({
+      document: docWithLayers([
+        controlLayer('first', { kind: 'z_image_control', model: controlModel.key }),
+        controlLayer('second', { kind: 'z_image_control', model: controlModel.key }),
+      ]),
+      model: zImage,
+      models: [controlModel],
+    });
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.submittedGraphs()).toHaveLength(0);
+    expect(harness.notices()[0]?.message).toBe('Only one Z-Image control layer can be used at a time.');
+  });
+
+  it('ignores a concurrent invoke while a prior prepare for the same project is in flight', async () => {
+    const inFlight = new Set<string>();
+    let releaseFlush = (): void => {};
+    const gatedFlush = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseFlush = resolve;
+        })
+    );
+
+    const first = makeHarness({ flushPendingUploads: gatedFlush, inFlight });
+    // Kick off the first invoke; it parks on the gated flush.
+    const firstRun = runCanvasInvocation(first.deps);
+    await Promise.resolve();
+
+    // A second invoke for the same project (shares the in-flight set) is dropped.
+    const second = makeHarness({ inFlight });
+    await runCanvasInvocation(second.deps);
+
+    expect(second.submittedGraphs()).toHaveLength(0);
+    expect(second.notices()).toHaveLength(0);
+    expect(second.uploadImage).not.toHaveBeenCalled();
+
+    // Let the first invoke finish; it still submits exactly once.
+    releaseFlush();
+    await firstRun;
+    expect(first.submittedGraphs()).toHaveLength(1);
+  });
+
+  it('enqueues into the originating project, not the active one, when the active project changes mid-flight', async () => {
+    // Two real projects, driven through the real reducer, so we can tell
+    // "landed in project A" apart from "landed in project B".
+    let state: WorkbenchState = createInitialWorkbenchState();
+    const originatingProjectId = state.activeProjectId;
+    state = workbenchReducer(state, { type: 'createProject' });
+    const otherProjectId = state.activeProjectId;
+    expect(otherProjectId).not.toBe(originatingProjectId);
+
+    let releaseFlush = (): void => {};
+    const gatedFlush = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          releaseFlush = resolve;
+        })
+    );
+    const dispatch = vi.fn((action: WorkbenchAction) => {
+      state = workbenchReducer(state, action);
+    });
+
+    // The invoke is prepared while `originatingProjectId` is active...
+    const harness = makeHarness({ dispatch, flushPendingUploads: gatedFlush, projectId: originatingProjectId });
+    const invokePromise = runCanvasInvocation(harness.deps);
+    await Promise.resolve();
+
+    expect(state.activeProjectId).toBe(otherProjectId);
+
+    releaseFlush();
+    await invokePromise;
+
+    const originatingProject = state.projects.find((project) => project.id === originatingProjectId);
+    const otherProject = state.projects.find((project) => project.id === otherProjectId);
+
+    expect(originatingProject?.queue.items).toHaveLength(1);
+    expect(originatingProject?.queue.items[0]?.snapshot.sourceId).toBe('canvas');
+    expect(otherProject?.queue.items).toHaveLength(0);
+  });
+});
+
+// ---- Regional guidance through the real composite pipeline ---------------
+
+const animaModel: MainModelConfig = { base: 'anima', key: 'anima-model', name: 'Anima', type: 'main' };
+const animaGenerateValues = (): Record<string, unknown> => ({
+  ...generateValuesFor(animaModel),
+  cfgScale: 4,
+  qwen3EncoderModel: { base: 'any', key: 'qwen3', name: 'Qwen3 Encoder', type: 'qwen3_encoder', variant: 'qwen3_06b' },
+  vae: { base: 'anima', key: 'anima-vae', name: 'Anima VAE', type: 'vae' },
+});
+
+const regionalLayer = (
+  id: string,
+  overrides: Partial<
+    Pick<
+      CanvasLayerContract & { type: 'regional_guidance' },
+      'positivePrompt' | 'negativePrompt' | 'autoNegative' | 'referenceImages'
+    >
+  > = {}
+): CanvasLayerContract => ({
+  autoNegative: false,
+  blendMode: 'normal',
+  id,
+  isEnabled: true,
+  isLocked: false,
+  mask: { bitmap: { height: 64, imageName: `${id}-bmp`, width: 64 }, fill: { color: '#00ff00', style: 'solid' } },
+  name: id,
+  negativePrompt: null,
+  opacity: 0.5,
+  positivePrompt: 'a red hat',
+  referenceImages: [],
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'regional_guidance',
+  ...overrides,
+});
+
+describe('runCanvasInvocation — regional guidance on a Qwen3 base', () => {
+  const makeAnimaHarness = (layer: CanvasLayerContract) => {
+    const harness = makeHarness({ document: docWithLayers([layer]), model: animaModel });
+    harness.deps.generateValues = animaGenerateValues();
+    return harness;
+  };
+
+  it('composites an Anima region and grafts its masked prompt into the positive collector', async () => {
+    const harness = makeAnimaHarness(regionalLayer('rg'));
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toHaveLength(0);
+    // The only upload is the region's own mask composite (no raster content → no base composite).
+    expect(harness.uploadImage).toHaveBeenCalledTimes(1);
+    const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
+    expect(graph?.nodes.rg_pos_cond_rg).toMatchObject({ prompt: 'a red hat', type: 'anima_text_encoder' });
+    expect(graph?.nodes.rg_mask_to_tensor_rg).toMatchObject({
+      image: { image_name: 'composite-1.png' },
+      type: 'alpha_mask_to_tensor',
+    });
+    expect(
+      graph?.edges.some(
+        (edge) => edge.source.node_id === 'rg_pos_cond_rg' && edge.destination.node_id === 'pos_cond_collect'
+      )
+    ).toBe(true);
+  });
+
+  it.each([
+    ['a negative prompt', { negativePrompt: 'blurry' }],
+    ['auto-negative', { autoNegative: true }],
+    [
+      'a complete IP-Adapter reference',
+      {
+        referenceImages: [
+          {
+            config: {
+              beginEndStepPct: [0, 1],
+              clipVisionModel: 'ViT-H',
+              image: { imageName: 'ref.png' },
+              method: 'full',
+              model: { base: 'anima', key: 'ipa', name: 'IP Adapter', type: 'ip_adapter' },
+              type: 'ip_adapter',
+              weight: 1,
+            },
+            id: 'ref',
+            isEnabled: true,
+          },
+        ],
+      },
+    ],
+  ] as const)(
+    'still submits the positive prompt of an Anima region carrying %s, without the extra',
+    async (_label, overrides) => {
+      const harness = makeAnimaHarness(regionalLayer('rg', overrides as Parameters<typeof regionalLayer>[1]));
+
+      await runCanvasInvocation(harness.deps);
+
+      expect(harness.notices()).toHaveLength(0);
+      const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
+      expect(graph?.nodes.rg_pos_cond_rg).toMatchObject({ prompt: 'a red hat', type: 'anima_text_encoder' });
+      expect(graph?.nodes.rg_neg_cond_rg).toBeUndefined();
+      expect(graph?.nodes.rg_pos_cond_inverted_rg).toBeUndefined();
+      expect(graph?.nodes.ip_adapter_ref).toBeUndefined();
+      const negativeSources = graph?.edges
+        .filter((edge) => edge.destination.node_id === 'neg_cond_collect')
+        .map((edge) => edge.source.node_id);
+      expect(negativeSources).toEqual(['neg_cond']);
+    }
+  );
+
+  it('skips an Anima region that carries only a negative prompt', async () => {
+    const harness = makeAnimaHarness(regionalLayer('rg', { negativePrompt: 'blurry', positivePrompt: null }));
+
+    await runCanvasInvocation(harness.deps);
+
+    expect(harness.notices()).toHaveLength(0);
+    expect(harness.uploadImage).not.toHaveBeenCalled();
+    const graph = harness.submittedGraphs()[0]?.graph.backendGraph;
+    expect(graph?.nodes.denoise_latents?.type).toBe('anima_denoise');
+    expect(graph?.nodes.rg_mask_to_tensor_rg).toBeUndefined();
+  });
+});
+
+// ---- Inpaint / outpaint mode dispatch -------------------------------------
+
+const inpaintMaskLayer = (id: string): CanvasLayerContract => ({
+  blendMode: 'normal',
+  id,
+  isEnabled: true,
+  isLocked: false,
+  mask: { bitmap: { height: 64, imageName: `${id}-bmp`, width: 64 }, fill: { color: '#ff0000', style: 'solid' } },
+  name: id,
+  opacity: 1,
+  transform: { rotation: 0, scaleX: 1, scaleY: 1, x: 0, y: 0 },
+  type: 'inpaint_mask',
+});
+
+const docWithLayers = (layers: CanvasLayerContract[], size = 64): CanvasDocumentContractV3 => ({
+  background: 'transparent',
+  bbox: { height: size, width: size, x: 0, y: 0 },
+  height: size,
+  stacks: stacksFrom(layers),
+  selectedLayerId: null,
+  version: 3,
+  width: size,
+});
+
+describe('runCanvasInvocation — inpaint / outpaint dispatch', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('dispatches an inpaint graph when content covers the bbox and a mask has content', async () => {
+    const doc = docWithLayers([rasterLayer('base'), inpaintMaskLayer('mask')]);
+    const harness = makeHarness({ document: doc, alpha: 255 });
+
+    await runCanvasInvocation(harness.deps);
+
+    const submitted = harness.submittedGraphs();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]?.graph.label).toBe('SD 1.5 inpaint');
+    const nodes = submitted[0]!.graph.backendGraph!.nodes;
+    expect(nodes.create_gradient_mask?.type).toBe('create_gradient_mask');
+    expect(nodes.canvas_output?.type).toBe('apply_mask_to_image');
+    // The gradient mask consumes the uploaded grayscale mask (base upload is composite-1).
+    expect((nodes.create_gradient_mask?.mask as { image_name?: string } | undefined)?.image_name).toBeDefined();
+    expect(harness.notices()).toHaveLength(0);
+    // The mask layer was rasterized for the grayscale composite.
+    expect(harness.surfaceIds).toEqual(['base', 'mask']);
+  });
+
+  it('dispatches an outpaint graph when content only partially covers the bbox', async () => {
+    // Partial alpha → bboxFullyCovered false → outpaint.
+    const harness = makeHarness({ document: makeDoc([rasterLayer('base')]), alpha: 200 });
+
+    await runCanvasInvocation(harness.deps);
+
+    const submitted = harness.submittedGraphs();
+    expect(submitted).toHaveLength(1);
+    expect(submitted[0]?.graph.label).toBe('SD 1.5 outpaint');
+    const nodes = submitted[0]!.graph.backendGraph!.nodes;
+    expect(nodes.infill?.type).toBe('infill_lama');
+    expect(nodes.image_alpha_to_mask?.type).toBe('tomask');
+    expect(nodes.canvas_output?.type).toBe('apply_mask_to_image');
+    expect(harness.notices()).toHaveLength(0);
+  });
+
+  it('composites the generated region over the source when masked-only output is disabled', async () => {
+    const doc = docWithLayers([rasterLayer('base'), inpaintMaskLayer('mask')]);
+    const harness = makeHarness({ document: doc, outputOnlyMaskedRegions: false });
+
+    await runCanvasInvocation(harness.deps);
+
+    const nodes = harness.submittedGraphs()[0]!.graph.backendGraph!.nodes;
+    expect(nodes.canvas_output).toMatchObject({
+      layer_base: expect.objectContaining({ image_name: expect.any(String) }),
+      type: 'invokeai_img_blend',
+    });
+  });
+});
+
+// Regional references require an assigned image and compatible model before reaching graph inputs.
+describe('resolveRegionalReferenceImages', () => {
+  const asset = { imageName: 'ref.png' } as RegionalGuidanceReferenceImageAsset;
+  const ipAdapterModel = { base: 'sd-1', key: 'ipa', name: 'IP Adapter', type: 'ip_adapter' };
+  const fluxReduxModel = { base: 'flux', key: 'redux', name: 'FLUX Redux', type: 'flux_redux' };
+
+  const ipAdapterRef = (image: RegionalGuidanceReferenceImageAsset | null): RegionalGuidanceReferenceImage => ({
+    config: {
+      beginEndStepPct: [0, 1],
+      clipVisionModel: 'ViT-H',
+      image,
+      method: 'full',
+      model: ipAdapterModel,
+      type: 'ip_adapter',
+      weight: 1,
+    },
+    id: 'ref-ipa',
+    isEnabled: true,
+  });
+
+  const fluxReduxRef = (image: RegionalGuidanceReferenceImageAsset | null): RegionalGuidanceReferenceImage => ({
+    config: { image, imageInfluence: 'highest', model: fluxReduxModel, type: 'flux_redux' },
+    id: 'ref-redux',
+    isEnabled: true,
+  });
+
+  it('drops an IP-Adapter ref with no image assigned', () => {
+    expect(resolveRegionalReferenceImages({ referenceImages: [ipAdapterRef(null)] }, 'sd-1')).toEqual([]);
+  });
+
+  it('keeps an IP-Adapter ref once an image is assigned for a supported SD base', () => {
+    const inputs = resolveRegionalReferenceImages({ referenceImages: [ipAdapterRef(asset)] }, 'sd-1');
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]).toMatchObject({ id: 'ref-ipa', imageName: 'ref.png', type: 'ip_adapter' });
+  });
+
+  it('drops regional reference images for FLUX.2', () => {
+    expect(resolveRegionalReferenceImages({ referenceImages: [ipAdapterRef(asset)] }, 'flux2')).toEqual([]);
+  });
+
+  it.each(['krea-2', 'z-image', 'anima'])('drops regional reference images for %s', (base) => {
+    const ref = ipAdapterRef(asset);
+    const matchingBase = { ...ref, config: { ...ref.config, model: { ...ipAdapterModel, base } } };
+    expect(resolveRegionalReferenceImages({ referenceImages: [matchingBase] }, base)).toEqual([]);
+  });
+
+  it('keeps an SD2 IP-Adapter ref whose model matches the base', () => {
+    const sd2Ref = {
+      ...ipAdapterRef(asset),
+      config: { ...ipAdapterRef(asset).config, model: { ...ipAdapterModel, base: 'sd-2' } },
+    };
+    expect(resolveRegionalReferenceImages({ referenceImages: [sd2Ref] }, 'sd-2')).toHaveLength(1);
+  });
+
+  it('drops a FLUX Redux ref with no image assigned', () => {
+    expect(resolveRegionalReferenceImages({ referenceImages: [fluxReduxRef(null)] }, 'flux')).toEqual([]);
+  });
+
+  it('keeps a FLUX Redux ref once an image is assigned (FLUX base)', () => {
+    const inputs = resolveRegionalReferenceImages({ referenceImages: [fluxReduxRef(asset)] }, 'flux');
+    expect(inputs).toHaveLength(1);
+    expect(inputs[0]).toMatchObject({ id: 'ref-redux', imageName: 'ref.png', type: 'flux_redux' });
+  });
+
+  it('drops a disabled ref even when an image is assigned', () => {
+    const disabled = { ...ipAdapterRef(asset), isEnabled: false };
+    expect(resolveRegionalReferenceImages({ referenceImages: [disabled] }, 'sd-1')).toEqual([]);
+  });
+});

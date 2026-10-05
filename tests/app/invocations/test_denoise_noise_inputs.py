@@ -5,10 +5,10 @@ from unittest.mock import MagicMock, patch
 import pytest
 import torch
 
-from invokeai.app.invocations.anima_denoise import AnimaDenoiseInvocation
-from invokeai.app.invocations.cogview4_denoise import CogView4DenoiseInvocation
-from invokeai.app.invocations.flux2_denoise import Flux2DenoiseInvocation
-from invokeai.app.invocations.flux_denoise import FluxDenoiseInvocation
+from invokeai.app.invocations.anima.anima_denoise import AnimaDenoiseInvocation
+from invokeai.app.invocations.cogview4.cogview4_denoise import CogView4DenoiseInvocation
+from invokeai.app.invocations.flux.flux_denoise import FluxDenoiseInvocation
+from invokeai.app.invocations.flux2.flux2_denoise import Flux2DenoiseInvocation
 from invokeai.app.invocations.metadata_linked import (
     AnimaDenoiseMetaInvocation,
     DenoiseLatentsMetaInvocation,
@@ -16,12 +16,12 @@ from invokeai.app.invocations.metadata_linked import (
     ZImageDenoiseMetaInvocation,
 )
 from invokeai.app.invocations.primitives import LatentsOutput
-from invokeai.app.invocations.sd3_denoise import SD3DenoiseInvocation
-from invokeai.app.invocations.z_image_denoise import ZImageDenoiseInvocation
+from invokeai.app.invocations.sd3.sd3_denoise import SD3DenoiseInvocation
+from invokeai.app.invocations.z_image.z_image_denoise import ZImageDenoiseInvocation
 from invokeai.backend.flux.sampling_utils import clip_timestep_schedule_fractional, get_schedule
 from invokeai.backend.flux.schedulers import ANIMA_SCHEDULER_MAP, FLUX_SCHEDULER_MAP, ZIMAGE_SCHEDULER_MAP
 from invokeai.backend.flux2.sampling_utils import get_schedule_flux2
-from invokeai.backend.model_manager.taxonomy import BaseModelType, ModelType
+from invokeai.backend.model_manager.taxonomy import BaseModelType, FluxVariantType, ModelType
 
 
 def test_flux_prepare_noise_uses_external_noise():
@@ -32,7 +32,7 @@ def test_flux_prepare_noise_uses_external_noise():
     expected = torch.zeros(1, 16, 8, 8)
     mock_context.tensors.load.return_value = expected
 
-    with patch("invokeai.app.invocations.flux_denoise.get_noise") as mock_get_noise:
+    with patch("invokeai.app.invocations.flux.flux_denoise.get_noise") as mock_get_noise:
         noise = invocation._prepare_noise_tensor(mock_context, torch.bfloat16, torch.device("cpu"))
 
     assert torch.equal(noise, expected.to(dtype=torch.bfloat16))
@@ -79,20 +79,82 @@ def test_flux_add_noise_false_ignores_connected_noise():
 
     with (
         patch(
-            "invokeai.app.invocations.flux_denoise.TorchDevice.choose_torch_device", return_value=torch.device("cpu")
+            "invokeai.app.invocations.flux.flux_denoise.TorchDevice.choose_torch_device",
+            return_value=torch.device("cpu"),
         ),
-        patch("invokeai.app.invocations.flux_denoise.FLUXConditioningInfo", object),
+        patch("invokeai.app.invocations.flux.flux_denoise.FLUXConditioningInfo", object),
         patch(
-            "invokeai.app.invocations.flux_denoise.RegionalPromptingExtension.from_text_conditioning",
+            "invokeai.app.invocations.flux.flux_denoise.RegionalPromptingExtension.from_text_conditioning",
             return_value=MagicMock(),
         ),
         patch.object(invocation, "_prepare_noise_tensor", side_effect=AssertionError("noise should be ignored")),
         patch.object(invocation, "_load_redux_conditioning", return_value=[]),
-        patch("invokeai.app.invocations.flux_denoise.get_schedule", return_value=[0.75]),
+        patch("invokeai.app.invocations.flux.flux_denoise.get_schedule", return_value=[0.75]),
     ):
         result = invocation._run_diffusion(mock_context)
 
     assert torch.equal(result, init_latents)
+
+
+@pytest.mark.parametrize(
+    ["variant", "expects_shift"],
+    [(FluxVariantType.Schnell, False), (FluxVariantType.Dev, True)],
+)
+def test_flux_derives_the_schedule_shift_and_token_count_from_the_model(variant: FluxVariantType, expects_shift: bool):
+    """Two wirings that live only at the node, and that cells on `get_schedule` cannot see.
+
+    `shift=not is_schnell` is the only thing deciding whether FLUX.1 shifts its schedule at all.
+    And `image_seq_len` is a *packed* token count -- 4096 for a 1024x1024 frame -- which is the unit
+    the shift's fit and its clamp are expressed in; passing latent dimensions instead would be four
+    times too large and, above one megapixel, now invisible because both values clamp alike.
+    """
+    invocation = FluxDenoiseInvocation.model_construct(
+        latents=MagicMock(latents_name="latents"),
+        add_noise=False,
+        width=1024,
+        height=1024,
+        num_steps=4,
+        denoising_start=0.25,
+        denoising_end=0.25,
+        positive_text_conditioning=MagicMock(conditioning_name="positive"),
+        transformer=MagicMock(transformer="transformer"),
+        seed=123,
+    )
+    init_latents = torch.full((1, 16, 128, 128), 2.0)
+    dummy_conditioning = SimpleNamespace(
+        t5_embeds=torch.zeros(1, 4, 16),
+        clip_embeds=torch.zeros(1, 768),
+        to=lambda **_: dummy_conditioning,
+    )
+    mock_context = MagicMock()
+    mock_context.tensors.load.return_value = init_latents
+    mock_context.conditioning.load.return_value = SimpleNamespace(conditionings=[dummy_conditioning])
+    mock_context.models.get_config.return_value = SimpleNamespace(
+        base=BaseModelType.Flux, type=ModelType.Main, variant=variant
+    )
+    schedule_calls: list[dict[str, object]] = []
+
+    with (
+        patch(
+            "invokeai.app.invocations.flux.flux_denoise.TorchDevice.choose_torch_device",
+            return_value=torch.device("cpu"),
+        ),
+        patch("invokeai.app.invocations.flux.flux_denoise.FLUXConditioningInfo", object),
+        patch(
+            "invokeai.app.invocations.flux.flux_denoise.RegionalPromptingExtension.from_text_conditioning",
+            return_value=MagicMock(),
+        ),
+        patch.object(invocation, "_load_redux_conditioning", return_value=[]),
+        patch(
+            "invokeai.app.invocations.flux.flux_denoise.get_schedule",
+            side_effect=lambda **kwargs: schedule_calls.append(kwargs) or [0.75],
+        ),
+    ):
+        invocation._run_diffusion(mock_context)
+
+    assert len(schedule_calls) == 1
+    assert schedule_calls[0]["shift"] is expects_shift
+    assert schedule_calls[0]["image_seq_len"] == 4096
 
 
 def test_flux2_prepare_noise_uses_external_noise():
@@ -103,7 +165,7 @@ def test_flux2_prepare_noise_uses_external_noise():
     expected = torch.zeros(1, 32, 8, 8)
     mock_context.tensors.load.return_value = expected
 
-    with patch("invokeai.app.invocations.flux2_denoise.get_noise_flux2") as mock_get_noise:
+    with patch("invokeai.app.invocations.flux2.flux2_denoise.get_noise_flux2") as mock_get_noise:
         noise = invocation._prepare_noise_tensor(mock_context, torch.bfloat16, torch.device("cpu"))
 
     assert torch.equal(noise, expected.to(dtype=torch.bfloat16))
@@ -227,15 +289,16 @@ def test_z_image_add_noise_false_ignores_connected_noise():
 
     with (
         patch(
-            "invokeai.app.invocations.z_image_denoise.TorchDevice.choose_torch_device", return_value=torch.device("cpu")
+            "invokeai.app.invocations.z_image.z_image_denoise.TorchDevice.choose_torch_device",
+            return_value=torch.device("cpu"),
         ),
         patch(
-            "invokeai.app.invocations.z_image_denoise.TorchDevice.choose_bfloat16_safe_dtype",
+            "invokeai.app.invocations.z_image.z_image_denoise.TorchDevice.choose_bfloat16_safe_dtype",
             return_value=torch.bfloat16,
         ),
-        patch("invokeai.app.invocations.z_image_denoise.ZImageConditioningInfo", object),
+        patch("invokeai.app.invocations.z_image.z_image_denoise.ZImageConditioningInfo", object),
         patch(
-            "invokeai.app.invocations.z_image_denoise.ZImageRegionalPromptingExtension.from_text_conditionings",
+            "invokeai.app.invocations.z_image.z_image_denoise.ZImageRegionalPromptingExtension.from_text_conditionings",
             return_value=regional_extension,
         ),
         patch.object(invocation, "_load_text_conditioning", return_value=loaded_text_conditioning),
@@ -296,10 +359,12 @@ def test_anima_add_noise_false_ignores_connected_noise():
 
     with (
         patch(
-            "invokeai.app.invocations.anima_denoise.TorchDevice.choose_torch_device", return_value=torch.device("cpu")
+            "invokeai.app.invocations.anima.anima_denoise.TorchDevice.choose_torch_device",
+            return_value=torch.device("cpu"),
         ),
         patch(
-            "invokeai.app.invocations.anima_denoise.TorchDevice.choose_bfloat16_safe_dtype", return_value=torch.bfloat16
+            "invokeai.app.invocations.anima.anima_denoise.TorchDevice.choose_bfloat16_safe_dtype",
+            return_value=torch.bfloat16,
         ),
         patch.object(invocation, "_load_text_conditionings", return_value=loaded_text_conditioning),
         patch.object(invocation, "_prepare_noise_tensor", side_effect=AssertionError("noise should be ignored")),
@@ -339,9 +404,10 @@ def test_flux2_add_noise_false_ignores_connected_noise():
 
     with (
         patch(
-            "invokeai.app.invocations.flux2_denoise.TorchDevice.choose_torch_device", return_value=torch.device("cpu")
+            "invokeai.app.invocations.flux2.flux2_denoise.TorchDevice.choose_torch_device",
+            return_value=torch.device("cpu"),
         ),
-        patch("invokeai.app.invocations.flux2_denoise.FLUXConditioningInfo", object),
+        patch("invokeai.app.invocations.flux2.flux2_denoise.FLUXConditioningInfo", object),
         patch.object(invocation, "_get_bn_stats", return_value=None),
         patch.object(invocation, "_prepare_noise_tensor", side_effect=AssertionError("noise should be ignored")),
     ):
@@ -596,9 +662,10 @@ def test_flux2_partial_denoise_short_circuit_uses_first_clipped_timestep():
 
     with (
         patch(
-            "invokeai.app.invocations.flux2_denoise.TorchDevice.choose_torch_device", return_value=torch.device("cpu")
+            "invokeai.app.invocations.flux2.flux2_denoise.TorchDevice.choose_torch_device",
+            return_value=torch.device("cpu"),
         ),
-        patch("invokeai.app.invocations.flux2_denoise.FLUXConditioningInfo", object),
+        patch("invokeai.app.invocations.flux2.flux2_denoise.FLUXConditioningInfo", object),
         patch.object(invocation, "_get_bn_stats", return_value=None),
         patch.object(invocation, "_prepare_noise_tensor", return_value=noise),
     ):
@@ -745,8 +812,10 @@ def test_sd3_partial_denoise_short_circuit_uses_first_clipped_timestep():
     )
 
     with (
-        patch("invokeai.app.invocations.sd3_denoise.TorchDevice.choose_torch_device", return_value=torch.device("cpu")),
-        patch("invokeai.app.invocations.sd3_denoise.TorchDevice.choose_torch_dtype", return_value=torch.float32),
+        patch(
+            "invokeai.app.invocations.sd3.sd3_denoise.TorchDevice.choose_torch_device", return_value=torch.device("cpu")
+        ),
+        patch("invokeai.app.invocations.sd3.sd3_denoise.TorchDevice.choose_torch_dtype", return_value=torch.float32),
         patch.object(invocation, "_prepare_noise_tensor", return_value=noise),
         patch.object(invocation, "_load_text_conditioning", return_value=(torch.zeros(1, 1, 1), torch.zeros(1, 1))),
     ):
@@ -778,9 +847,9 @@ def test_cogview4_partial_denoise_short_circuit_uses_first_clipped_sigma():
     mock_context.models.load.return_value = MagicMock(model=transformer_model)
 
     with (
-        patch("invokeai.app.invocations.cogview4_denoise.CogView4Transformer2DModel", object),
+        patch("invokeai.app.invocations.cogview4.cogview4_denoise.CogView4Transformer2DModel", object),
         patch(
-            "invokeai.app.invocations.cogview4_denoise.TorchDevice.choose_torch_device",
+            "invokeai.app.invocations.cogview4.cogview4_denoise.TorchDevice.choose_torch_device",
             return_value=torch.device("cpu"),
         ),
         patch.object(invocation, "_prepare_noise_tensor", return_value=noise),

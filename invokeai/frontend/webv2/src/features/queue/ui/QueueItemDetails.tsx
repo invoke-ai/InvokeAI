@@ -1,0 +1,81 @@
+import type { QueueItemReadModel } from '@features/queue/core/types';
+import type { ReactNode } from 'react';
+
+import { Box, DataList, Separator, Text } from '@chakra-ui/react';
+import { extractGenerationMeta } from '@features/queue/core/generationMeta';
+import { MiddleTruncate } from '@platform/ui/MiddleTruncate';
+import { Suspense } from 'react';
+import { useTranslation } from 'react-i18next';
+
+import { formatDuration } from './formatDuration';
+import { useQueueUi } from './QueueUiContext';
+import { useDeviceLabel } from './useDeviceLabel';
+
+const DetailRow = ({ label, children }: { label: string; children: ReactNode }) => (
+  <DataList.Item key={label} alignItems="start">
+    <DataList.ItemLabel>{label}</DataList.ItemLabel>
+    {/* minW=0 lets unbreakable values (batch UUIDs) truncate instead of
+        pushing the row's min-content past the panel. */}
+    <DataList.ItemValue fontFamily="mono" fontSize="xs" minW="0">
+      {children}
+    </DataList.ItemValue>
+  </DataList.Item>
+);
+
+/** Reserves the actions row's height so resolving the chunk doesn't shift the panel. */
+const ItemActionsPlaceholder = () => {
+  const { t } = useTranslation();
+
+  return <Box aria-busy="true" aria-label={t('widgets.queue.loading')} minH="6" role="status" w="full" />;
+};
+
+const ITEM_ACTIONS_PLACEHOLDER = <ItemActionsPlaceholder />;
+
+/** Expanded detail grid + actions for a RECENT queue item row. */
+export const QueueItemDetails = ({ item }: { item: QueueItemReadModel }) => {
+  const { t } = useTranslation();
+  const { ItemActions } = useQueueUi();
+  const meta = extractGenerationMeta(item);
+  const duration = formatDuration(item.startedAt, item.completedAt);
+  const deviceLabel = useDeviceLabel(item.device);
+
+  return (
+    <DataList.Root gap="1.5" orientation="horizontal">
+      <DetailRow label={t('common.prompt')}>{meta.positivePrompt ?? '—'}</DetailRow>
+      <DetailRow label={t('common.negative')}>{meta.negativePrompt ?? '—'}</DetailRow>
+      <DetailRow label={t('common.seed')}>
+        <Text as="span" fontVariantNumeric="tabular-nums">
+          {meta.seed ?? '—'}
+        </Text>
+      </DetailRow>
+      <DetailRow label={t('common.created')}>{new Date(item.createdAt).toLocaleString()}</DetailRow>
+      <DetailRow label={t('widgets.queue.took')}>{duration ?? '—'}</DetailRow>
+      <DetailRow label={t('widgets.queue.batch')}>
+        <MiddleTruncate as="span" text={item.batchId} />
+      </DetailRow>
+      <DetailRow label={t('common.item')}>
+        <Text as="span" fontVariantNumeric="tabular-nums">
+          #{item.id}
+        </Text>
+      </DetailRow>
+      {item.userDisplayName || item.userEmail ? (
+        <DetailRow label={t('users.user')}>{item.userDisplayName ?? item.userEmail}</DetailRow>
+      ) : null}
+      {deviceLabel ? <DetailRow label={t('widgets.queue.device.label')}>{deviceLabel.name}</DetailRow> : null}
+      {item.errorMessage ? (
+        <DetailRow label={t('common.error')}>
+          <Text as="span" color="fg.error">
+            {item.errorMessage}
+          </Text>
+        </DetailRow>
+      ) : null}
+
+      <Separator borderColor="border.subtle" my="0.5" />
+      {/* ItemActions is a lazy chunk. Without this boundary the first expand
+          suspends against the widget root and blanks the whole queue panel. */}
+      <Suspense fallback={ITEM_ACTIONS_PLACEHOLDER}>
+        <ItemActions item={item} />
+      </Suspense>
+    </DataList.Root>
+  );
+};

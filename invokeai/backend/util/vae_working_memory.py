@@ -8,13 +8,106 @@ from diffusers.models.autoencoders.autoencoder_kl_wan import AutoencoderKLWan
 from diffusers.models.autoencoders.autoencoder_tiny import AutoencoderTiny
 
 from invokeai.app.invocations.constants import LATENT_SCALE_FACTOR
-from invokeai.backend.flux.modules.autoencoder import AutoEncoder
+from invokeai.backend.util import wddm
 from invokeai.backend.util.attention import sdpa_score_matrix_bytes
 from invokeai.backend.util.devices import TorchDevice
+from invokeai.backend.util.logging import InvokeAILogger
+from invokeai.backend.util.vae_tiling_scope import resolve_tile_size
+
+# Share of the device's memory an untiled decode may claim before the decode nodes tile it up front (see
+# `should_pretile_vae_decode`). High enough that common resolutions on common cards stay untiled -- tiled output is
+# not pixel-identical -- and low enough that a decode no card of that size can hold is tiled before it starts.
+VAE_PRETILE_VRAM_FRACTION = 0.9
+
+
+def should_pretile_vae_decode(
+    device: torch.device, full_decode_bytes: int, vram_fraction: float = VAE_PRETILE_VRAM_FRACTION
+) -> bool:
+    """Whether a decode should be tiled up front because its untiled working memory would claim more than
+    ``vram_fraction`` of the memory ``device`` will keep resident.
+
+    Waiting for an out-of-memory error does not work everywhere: on Windows, drivers page an allocation that does not
+    fit into system memory instead of failing it (always for ROCm, by default for NVIDIA's sysmem fallback), and the
+    decode just runs very slowly. ``device`` is where the VAE runs: a ``cpu_only`` VAE (and MPS, sharing system
+    memory) is never tiled on these grounds.
+
+    On Windows the ceiling is the video-memory budget rather than the card's nameplate total -- the budget is the point
+    past which Windows pages this process out. With one correction: a budget *below* what this process keeps resident is
+    Windows asking it to trim itself, and the cache does exactly that to honour the reservation, so the ceiling is then
+    that residency. Measured on an RX 9060 XT (16 GB): with Invoke holding 12 GiB and nothing else on the card the
+    budget read 7.62 GiB, and comparing against that tiled a 7.0 GiB decode that fits, changing output that had been
+    pixel-identical.
+
+    Residency, not ``CurrentUsage``: that also counts what Windows has already paged out, which a foreign process forces
+    exactly when the budget carries its pressure (next to an 8 GiB holder the budget stepped down to 7.58 GiB while our
+    ``CurrentUsage`` kept growing past our 7.70 GiB in VRAM). So the override is ``CurrentUsage`` minus this process's
+    paged bytes, and where either is unknown -- ``CurrentUsage`` beyond the card, or no counter reading -- the budget
+    alone decides (so a transient counter failure can tile a decode that the next run leaves untiled).
+
+    Known limit: the budget reacts to a foreign process only once this process grows into the memory it holds -- it
+    stays at 15.09 GiB next to an 8 GiB holder while Invoke holds little -- torch's free figure ignores other processes,
+    and the adapter-wide performance counter contradicts itself between processes (15.66 GiB read from the holding
+    process against 0.18 GiB from another, same instance, same instant). A decode sized before that point can still
+    page, and the end-of-session paging warning is what surfaces it.
+    """
+    if device.type == "cuda":
+        total_bytes = torch.cuda.get_device_properties(device).total_memory
+        local = wddm.local_video_memory(device)
+        if local is not None:
+            budget_bytes, usage_bytes = local
+            ceiling_bytes = budget_bytes
+            paged = wddm.paged_bytes(device) if usage_bytes is not None else None
+            if paged is not None:
+                ceiling_bytes = max(budget_bytes, usage_bytes - paged)
+            total_bytes = min(total_bytes, ceiling_bytes)
+    elif device.type == "xpu":
+        total_bytes = torch.xpu.get_device_properties(device).total_memory
+    else:
+        return False
+    if full_decode_bytes <= vram_fraction * total_bytes:
+        return False
+    InvokeAILogger.get_logger(__name__).debug(
+        f"Decoding in tiles: an untiled decode would need ~{full_decode_bytes / 2**30:.1f} GiB of working memory, more "
+        f"than {vram_fraction:.0%} of the {total_bytes / 2**30:.1f} GiB the GPU keeps resident."
+    )
+    return True
+
+
+# The diffusers AutoencoderKL (SD1/SDXL, SD3, CogView4) and the FLUX.1 AutoEncoder run the same
+# mid-block self-attention as the FLUX.2 VAE: one head over the 512-channel width, on the
+# 8x-downsampled grid. Where that attention runs on the math kernel (see `sdpa_score_matrix_bytes`)
+# its score matrix is the dominant term for a large untiled image, exactly as it is for FLUX.2;
+# `_vae_mid_block_score_matrix_bytes` prices it for those estimators the same way. The video VAEs
+# (Wan, Qwen-Image) need no such term: the Qwen-Image ROCm constants below were measured with math
+# attention. The Wan video-decode constant was measured on CUDA and on an RX 9060 XT (see there).
+_CLASSIC_VAE_MID_BLOCK_HEADS = 1
+_CLASSIC_VAE_MID_BLOCK_HEAD_DIM = 512
+
+# Fixed cost of the LTX-2 VAE's own buffers, and the marginal cost of a tile pixel-element.
+# See `estimate_vae_working_memory_ltx2` for the measurements these are fitted to.
+_LTX2_VAE_BASE_BYTES = 512 * 2**20
+_LTX2_AUDIO_BASE_BYTES = 128 * 2**20
+_LTX2_AUDIO_BYTES_PER_LATENT = 6.5 * 2**20
+_LTX2_VAE_DECODE_BYTES_PER_TILE_ELEMENT = 466
+_LTX2_DECODE_CLIP_COPIES = 3
+_LTX2_VAE_ENCODE_BYTES_PER_TILE_ELEMENT = 700
+_LTX2_VAE_TILED_ENCODE_BYTES_PER_TILE_ELEMENT = 360
 
 _WAN_VAE_SINGLE_FRAME_DECODE_SCALING_CONSTANT = 2900
-_WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_A14B = 6500
-_WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_TI2V = 7000
+_WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT = 10000
+
+
+def _vae_mid_block_score_matrix_bytes(
+    out_h: int, out_w: int, dtype: torch.dtype, batch_size: int = 1, device: torch.device | None = None
+) -> int:
+    """Score-matrix bytes for a classic VAE's mid-block attention over an `out_h` x `out_w` output."""
+    return sdpa_score_matrix_bytes(
+        device=device if device is not None else TorchDevice.choose_torch_device(),
+        dtype=dtype,
+        num_heads=_CLASSIC_VAE_MID_BLOCK_HEADS * batch_size,
+        head_dim=_CLASSIC_VAE_MID_BLOCK_HEAD_DIM,
+        seq_len=(out_h // LATENT_SCALE_FACTOR) * (out_w // LATENT_SCALE_FACTOR),
+    )
 
 
 def estimate_vae_working_memory_sd15_sdxl(
@@ -23,15 +116,17 @@ def estimate_vae_working_memory_sd15_sdxl(
     vae: AutoencoderKL | AutoencoderTiny,
     tile_size: int | None,
     fp32: bool,
+    device: torch.device | None = None,
 ) -> int:
     """Estimate the working memory required to encode or decode the given tensor."""
     # It was found experimentally that the peak working memory scales linearly with the number of pixels and the
     # element size (precision). This estimate is accurate for both SD1 and SDXL.
     element_size = 4 if fp32 else 2
 
-    # This constant is determined experimentally and takes into consideration both allocated and reserved memory. See #8414
-    # Encoding uses ~45% the working memory as decoding.
-    scaling_constant = 2200 if operation == "decode" else 1100
+    # The same AutoencoderKL convolution stack as the FLUX.1 autoencoder, so it takes the same measured constants per
+    # convolution backend: MIOpen needs ~1.64x what cuDNN does (see `_FLUX_VAE_SCALING_CONSTANTS`). `device` is where
+    # the VAE will run; it defaults to the session device.
+    scaling_constant = _flux_vae_scaling_constant(operation, device or TorchDevice.choose_torch_device())
 
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
 
@@ -52,6 +147,12 @@ def estimate_vae_working_memory_sd15_sdxl(
         w = latent_scale_factor_for_operation * image_tensor.shape[-1]
         working_memory = h * w * element_size * scaling_constant
 
+    if isinstance(vae, AutoencoderKL):
+        # max, not sum: the mid-block attention and the full-resolution convolutions peak in
+        # different phases of the forward (see the FLUX.2 estimator for the measurements).
+        score_dtype = torch.float32 if fp32 else next(vae.parameters()).dtype
+        working_memory = max(working_memory, _vae_mid_block_score_matrix_bytes(h, w, score_dtype, device=device))
+
     if fp32:
         # If we are running in FP32, then we should account for the likely increase in model size (~250MB).
         working_memory += 250 * 2**20
@@ -60,7 +161,10 @@ def estimate_vae_working_memory_sd15_sdxl(
 
 
 def estimate_vae_working_memory_cogview4(
-    operation: Literal["encode", "decode"], image_tensor: torch.Tensor, vae: AutoencoderKL
+    operation: Literal["encode", "decode"],
+    image_tensor: torch.Tensor,
+    vae: AutoencoderKL,
+    device: torch.device | None = None,
 ) -> int:
     """Estimate the working memory required by the invocation in bytes."""
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
@@ -69,36 +173,139 @@ def estimate_vae_working_memory_cogview4(
     w = latent_scale_factor_for_operation * image_tensor.shape[-1]
     element_size = next(vae.parameters()).element_size()
 
-    # This constant is determined experimentally and takes into consideration both allocated and reserved memory. See #8414
-    # Encoding uses ~45% the working memory as decoding.
-    scaling_constant = 2200 if operation == "decode" else 1100
+    # The same AutoencoderKL convolution stack as the FLUX.1 autoencoder, so it takes the same measured constants per
+    # convolution backend: MIOpen needs ~1.64x what cuDNN does (see `_FLUX_VAE_SCALING_CONSTANTS`). `device` is where
+    # the VAE will run; it defaults to the session device.
+    scaling_constant = _flux_vae_scaling_constant(operation, device or TorchDevice.choose_torch_device())
     working_memory = h * w * element_size * scaling_constant
 
-    print(f"estimate_vae_working_memory_cogview4: {int(working_memory)}")
+    # max, not sum: the mid-block attention and the full-resolution convolutions peak in different
+    # phases of the forward (see the FLUX.2 estimator for the measurements).
+    return int(
+        max(working_memory, _vae_mid_block_score_matrix_bytes(h, w, next(vae.parameters()).dtype, device=device))
+    )
 
-    return int(working_memory)
+
+# What a tiled decode does *not* bound: the assembled image, several times over, per output pixel.
+#
+# `AutoencoderKL.tiled_decode` assembles entirely on the device: every decoded tile stays live in
+# `rows` while the cropped rows and then the concatenated result are built. On top of that, a decode
+# node runs `clamp(-1, 1)`, `+ 1.0` and `* 127.5` over the result and then `.byte()` it: more
+# element-size RGB buffers plus the 8-bit one.
+#
+# The measurement below was taken when this estimator also served InvokeAI's own port of the BFL
+# autoencoder, which merged on the *host* and therefore had a far smaller slope. That class is gone;
+# the constant is kept at the value that covers the diffusers slope, which is the one that remains.
+#
+# Measured on this repo's fixtures (RTX 4090, fp32), device peak over baseline against one full
+# image, at 1024px and 2048px:
+#
+#   InvokeAI AutoEncoder   196.0 -> 200.0 MiB   image 12 -> 48 MiB   marginal slope 0.11
+#   diffusers AutoencoderKL 178.7 -> 235.1 MiB  image 12 -> 48 MiB   marginal slope 1.57
+#
+# The BFL class merges on the *host*, so almost nothing image-sized is on the device until the
+# final `stack(...).to(device)`, by which point the tile activations have been freed; the diffusers
+# class assembles on-device and grows at ~1.6 copies. Both peaks are dominated by the tile term
+# above, which is why the earlier value of 7 -- derived rather than measured -- over-reserved by
+# roughly 7x on the node it was named for. Four covers the measured slope plus the node's in-window
+# post-processing, and one constant still covers both classes.
+_FLUX_VAE_TILED_IMAGE_COPIES = 4
+_IMAGE_CHANNELS = 3
+
+# An encoder emits mean and logvar before `DiagonalGaussianDistribution` splits them, so the tensor
+# a tiled encode assembles is twice the latent width.
+_VAE_MOMENT_CHANNELS_PER_LATENT = 2
 
 
 def estimate_vae_working_memory_flux(
-    operation: Literal["encode", "decode"], image_tensor: torch.Tensor, vae: AutoEncoder
+    operation: Literal["encode", "decode"],
+    image_tensor: torch.Tensor,
+    vae: AutoencoderKL,
+    tile_size: int | None = None,
+    device: torch.device | None = None,
 ) -> int:
-    """Estimate the working memory required by the invocation in bytes."""
+    """Estimate the working memory required by the invocation in bytes.
+
+    `tile_size` is in output pixels and defaults to None, i.e. a single-pass decode -- the existing
+    call sites that pass no tile depend on that signature. When set, the decode term is bounded by
+    one tile instead of the whole image, and the full-resolution assembly and post-processing that
+    tiling does *not* bound are added on top. `tile_size <= 0` is the nodes' "use the default"
+    sentinel; see `resolve_tile_size`.
+
+    Both operations tile. The tile-bounded term is the same for either; what tiling does *not*
+    bound differs, so the residual is chosen by `operation` -- see `_FLUX_VAE_TILED_IMAGE_COPIES`
+    for the decode side.
+
+    `device` is where the VAE will run (a `cpu_only` VAE runs on the CPU); it picks the convolution
+    backend's constant. Defaults to the session device.
+    """
 
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
+    element_size = next(vae.parameters()).element_size()
+
+    # The FLUX.1 autoencoder shares the FLUX.2 VAE's convolution stack and measures the same constants on both
+    # backends; see `_FLUX_VAE_SCALING_CONSTANTS`.
+    device = device if device is not None else TorchDevice.choose_torch_device()
+    scaling_constant = _flux_vae_scaling_constant(operation, device)
 
     out_h = latent_scale_factor_for_operation * image_tensor.shape[-2]
     out_w = latent_scale_factor_for_operation * image_tensor.shape[-1]
-    element_size = next(vae.parameters()).element_size()
 
-    # This constant is determined experimentally and takes into consideration both allocated and reserved memory. See #8414
-    # Encoding uses ~45% the working memory as decoding.
-    scaling_constant = 2200 if operation == "decode" else 1100
+    # Resolved against a module-level constant, never by reading `vae.tile_sample_min_size`: the VAE
+    # belongs to the model cache, so that attribute reflects whatever the previous invocation set
+    # rather than the default this node is asking for.
+    tile = resolve_tile_size(tile_size) if tile_size is not None else None
 
-    working_memory = out_h * out_w * element_size * scaling_constant
+    # `_tiled_decode` short-circuits to a single pass once the tile covers the image on both axes,
+    # so a tile that large has to be priced as the untiled decode it will actually run. The node
+    # field carries no upper bound: a 2048px tile on a 1024px image would otherwise reserve ~23GB
+    # for a decode that needs ~4.6GB, evicting the transformer from the cache for nothing.
+    if tile is not None and (tile < out_h or tile < out_w):
+        # `calc_tiles_min_overlap` clamps the tile to the image *per axis*, so the largest tile the
+        # decode builds is this, not `tile` squared. Without the clamp an 8192px tile on a
+        # 1024x8200 image -- tiled, because one axis exceeds it -- prices 8192x8192.
+        tile_h = min(tile, out_h)
+        tile_w = min(tile, out_w)
+        # A 25% margin for tile overlap and the number of tiles, mirroring the SD1/SDXL estimator.
+        working_memory = tile_h * tile_w * element_size * scaling_constant * 1.25
+        if operation == "decode":
+            working_memory += out_h * out_w * _IMAGE_CHANNELS * (_FLUX_VAE_TILED_IMAGE_COPIES * element_size + 1)
+        else:
+            # A tiled encode leaves two things un-bounded: the full-resolution image it slices tiles
+            # from, and the moments it assembles.
+            #
+            # The moments are *not* one copy. `AutoencoderKL._tiled_encode` appends every encoded
+            # tile to `rows`, then builds `result_rows` from them -- blending against `rows[i-1][j]`,
+            # so `rows` stays live throughout -- and finally concatenates `enc` on top of both. The
+            # tiles overlap, so their total area is `1 / (1 - overlap_factor)**2` times the output;
+            # `result_rows` and `enc` are one output each. Hence the factor below, which is 3.78 at
+            # the 0.25 every `AutoencoderKL` ships.
+            #
+            # Read from the VAE rather than hard-coded: an overlap factor of 0.5 would make the
+            # tiles alone four times the output, and a fixed 3.78 would then under-reserve. An
+            # estimate consumed as `free >= estimate` has to err upwards.
+            config = getattr(vae, "config", None)
+            latent_channels = getattr(config, "latent_channels", 16)
+            overlap_factor = getattr(vae, "tile_overlap_factor", 0.25)
+            live_moment_copies = 1.0 / (1.0 - overlap_factor) ** 2 + 2.0
+            moments = (
+                (out_h // LATENT_SCALE_FACTOR)
+                * (out_w // LATENT_SCALE_FACTOR)
+                * _VAE_MOMENT_CHANNELS_PER_LATENT
+                * latent_channels
+                * element_size
+            )
+            working_memory += out_h * out_w * _IMAGE_CHANNELS * element_size
+            working_memory += moments * live_moment_copies
+        score_h, score_w = tile_h, tile_w
+    else:
+        working_memory = out_h * out_w * element_size * scaling_constant
+        score_h, score_w = out_h, out_w
 
-    print(f"estimate_vae_working_memory_flux: {int(working_memory)}")
-
-    return int(working_memory)
+    # max, not sum: the mid-block attention and the full-resolution convolutions peak in different
+    # phases of the forward (see the FLUX.2 estimator for the measurements).
+    dtype = next(vae.parameters()).dtype
+    return int(max(working_memory, _vae_mid_block_score_matrix_bytes(score_h, score_w, dtype, device=device)))
 
 
 # The FLUX.2 VAE runs one attention block at the bottom of the encoder and one at the top of the
@@ -110,17 +317,21 @@ _FLUX2_VAE_MID_BLOCK_HEADS = 1
 _FLUX2_VAE_MID_BLOCK_HEAD_DIM = 512
 _FLUX2_VAE_SPATIAL_COMPRESSION = 8
 
-# Peak reserved bytes per output pixel per element byte, per conv backend and operation. Fitted with
-# `scripts/calibrate_flux2_working_memory.py --only vae`, which reproduces this table on any build:
+# Peak reserved bytes per output pixel per element byte, per conv backend and operation, for the FLUX.2 VAE and the
+# FLUX.1 autoencoder alike. Fitted with `scripts/calibrate_flux2_working_memory.py --only vae`, which reproduces
+# this table on any build:
 #
-#                                     decode   encode   encode/decode
-#   cuDNN   RTX 4090, torch 2.7.1       2185     1072       0.49
-#   MIOpen  RX 9070 XT, torch 2.10      3453     2688       0.78
-#   MIOpen  PRO W7900, torch 2.10       3525     2688       0.76
+#                                                        decode   encode   encode/decode
+#   cuDNN   RTX 4090, torch 2.7.1                          2185     1072       0.49
+#   MIOpen  RX 9070 XT, torch 2.10                         3453     2688       0.78
+#   MIOpen  PRO W7900, torch 2.10                          3525     2688       0.76
+#   MIOpen  RX 9060 XT, torch 2.12, Windows, FLUX.1 VAE    3451     2688       0.78
 #
 # Two AMD generations (RDNA3 and RDNA4), the same numbers: the encode column agrees to the byte and
 # the decode column to 2%. So this is MIOpen, not a per-card quirk, and the column below is fitted
-# to the larger with ~2% headroom.
+# to the larger with ~2% headroom. The FLUX.1 row (bf16, 768-1536px, Invoke's ROCm SDPA guard installed,
+# `MIOPEN_FIND_MODE=FAST`) lands on the same numbers: the two VAEs share their convolution stack. The
+# cuDNN column is the FLUX.1 constant this estimator shipped with before.
 #
 # MIOpen's convolution workspaces are simply larger than cuDNN's. This is not the attention term --
 # it shows up identically on the fused path, and the implied constants are flat across resolution on
@@ -131,16 +342,18 @@ _FLUX2_VAE_SPATIAL_COMPRESSION = 8
 # Shipping the MIOpen numbers everywhere would add ~60% to every cuDNN decode for nothing, so the
 # constant follows the backend.
 #
-# Caveat for AMD users: `MIOPEN_FIND_MODE=2` selects convolution algorithms heuristically instead of
-# by benchmark, and measured a uniform 1.28x more memory at every resolution. It is not the default
-# and is not budgeted for here -- raise `device_working_mem_gb` if you set it.
-_FLUX2_VAE_SCALING_CONSTANTS: dict[str, dict[str, int]] = {
+# Caveat for AMD users: `MIOPEN_FIND_MODE=2` (FAST) selects convolution algorithms heuristically instead of
+# by benchmark, and measured a uniform 1.28x more memory at every resolution when these constants were
+# first fitted. Invoke has since made FAST its default (`run_app.py`); the RX 9060 XT row above was taken
+# under it and did not show the 1.28x. If you see decodes exceed their reservation on another card, raise
+# `device_working_mem_gb`.
+_FLUX_VAE_SCALING_CONSTANTS: dict[str, dict[str, int]] = {
     "cudnn": {"decode": 2200, "encode": 1100},
     "miopen": {"decode": 3600, "encode": 2750},
 }
 
 
-def _flux2_vae_scaling_constant(operation: Literal["encode", "decode"], device: torch.device) -> int:
+def _flux_vae_scaling_constant(operation: Literal["encode", "decode"], device: torch.device) -> int:
     """Pick the pixel-area constant for the convolution backend this device will actually use.
 
     A HIP build reports ``device.type == "cuda"``, so the torch build -- not the device string -- is
@@ -148,7 +361,7 @@ def _flux2_vae_scaling_constant(operation: Literal["encode", "decode"], device: 
     that pairs with a score-matrix term the probe always charges there, so the total is not thin.
     """
     is_rocm = device.type == "cuda" and torch.version.hip is not None
-    return _FLUX2_VAE_SCALING_CONSTANTS["miopen" if is_rocm else "cudnn"][operation]
+    return _FLUX_VAE_SCALING_CONSTANTS["miopen" if is_rocm else "cudnn"][operation]
 
 
 def estimate_vae_working_memory_flux2(
@@ -163,7 +376,7 @@ def estimate_vae_working_memory_flux2(
     Peak memory scales linearly with pixel area and element size, as it does for the FLUX.1 VAE, and
     the implied constant is flat across 512-1536px on every backend measured. What is *not* constant
     is the constant itself: MIOpen's convolution workspaces cost ~1.6x cuDNN's for a decode and ~2.4x
-    for an encode, so it is looked up per backend -- see ``_FLUX2_VAE_SCALING_CONSTANTS`` for the
+    for an encode, so it is looked up per backend -- see ``_FLUX_VAE_SCALING_CONSTANTS`` for the
     fitted table and the caveats. Peak *reserved* memory is what is measured throughout, the
     conservative quantity that includes allocator overhead.
 
@@ -173,14 +386,15 @@ def estimate_vae_working_memory_flux2(
 
     That linear term holds only while ``AutoencoderKLFlux2``'s mid-block attention runs through a
     fused SDPA kernel, which is what CUDA does (verified: the memory-efficient kernel takes the
-    512-wide head, and measured peak stays linear from 512 to 1536px). A build with no fused kernel
-    for the shapes -- ROCm/gfx1100 reports ``math`` for this 512-wide head, though gfx1201 takes it
-    on flash, and MPS has no fused kernel at all -- materializes a (pixels/8)^2 score matrix, which
-    grows quadratically and overtakes the linear term somewhere past 1280px. We ask torch which path
-    applies rather than assuming, so the estimate is right on all of them.
+    512-wide head, and measured peak stays linear from 512 to 1536px). Where the math kernel runs
+    instead -- every ROCm build, by policy, because its fused kernels return wrong output for this
+    head width (see ``rocm_sdpa_uses_math_kernel``), and MPS, which has no fused kernel at all -- it
+    materializes a (pixels/8)^2 score matrix, which grows quadratically and overtakes the linear
+    term somewhere past 1280px. ``sdpa_score_matrix_bytes`` applies the ROCm rule and asks torch
+    for everything else, so the estimate is right on all of them.
 
     The two terms are independent: a build can have a fused kernel and still need the larger
-    convolution constant, which is exactly what gfx1201 does. They also do not add -- see the
+    convolution constant (gfx1201 did, before the ROCm rule above). They also do not add -- see the
     ``max`` at the end of this function for why, and for the measurements behind it. (Unlike the transformer, this attention does not go through
     diffusers' attention dispatcher -- ``AttnProcessor2_0`` calls ``F.scaled_dot_product_attention``
     itself -- so torch's own answer is the whole answer here.)
@@ -200,7 +414,7 @@ def estimate_vae_working_memory_flux2(
     element_size = param.element_size()
 
     device = device if device is not None else TorchDevice.choose_torch_device()
-    scaling_constant = _flux2_vae_scaling_constant(operation, device)
+    scaling_constant = _flux_vae_scaling_constant(operation, device)
     batch_size = image_tensor.shape[0] if image_tensor.dim() >= 4 else 1
 
     if tile_size is not None:
@@ -249,10 +463,13 @@ def estimate_vae_working_memory_flux2(
 def estimate_vae_working_memory_anima(
     operation: Literal["encode", "decode"],
     image_tensor: torch.Tensor,
-    vae: AutoencoderKLWan,
+    vae: AutoencoderKLWan | AutoencoderKLQwenImage,
     tile_size: int | None,
 ) -> int:
     """Estimate the working memory required to encode or decode with the Wan 2.1 VAE (Anima).
+
+    Anima reaches that VAE as either class: AutoencoderKLWan (original layout) or AutoencoderKLQwenImage
+    (the diffusers-layout Qwen-Image export), which run the same network on the same weights.
 
     The Wan VAE uses 3D convolutions and needs noticeably more working memory per output
     pixel than the 2D VAEs estimated above. Calibrated empirically on a 1024x1024 fp16
@@ -268,6 +485,20 @@ def estimate_vae_working_memory_anima(
         w = tile_size
         # Add 25% to account for tile overlap.
         working_memory = h * w * element_size * scaling_constant * 1.25
+        if operation == "encode":
+            # ...plus what tiling does not bound on the encode: the full-resolution frame the tiles
+            # are sliced from, and the moments assembled out of them. Without these the estimate is
+            # flat while the measurement grows about 4 bytes per pixel -- measured on a 4090 at 1.07x
+            # headroom at 1024px falling to 0.69x at 4096px, i.e. an under-reservation, and this node
+            # has no tiled retry to fall back on the way its decode sibling does.
+            #
+            # The decode has the same kind of un-bounded assembly and does not price it either. That
+            # is pre-existing -- `anima_l2i` has tiled since it was written -- and is left alone here
+            # rather than changed in a diff about the encode.
+            frame_h, frame_w = image_tensor.shape[-2], image_tensor.shape[-1]
+            latent_area = (frame_h // LATENT_SCALE_FACTOR) * (frame_w // LATENT_SCALE_FACTOR)
+            working_memory += frame_h * frame_w * _IMAGE_CHANNELS * element_size
+            working_memory += latent_area * _VAE_MOMENT_CHANNELS_PER_LATENT * vae.config.z_dim * element_size
     else:
         latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
         h = latent_scale_factor_for_operation * image_tensor.shape[-2]
@@ -275,6 +506,179 @@ def estimate_vae_working_memory_anima(
         working_memory = h * w * element_size * scaling_constant
 
     return int(working_memory)
+
+
+# Bytes of chunk working set per output pixel per element byte, measured at ~12 on a W7900 (a
+# 768x1344 28-frame chunk peaks at 1.31 GiB allocated in fp32) and rounded up for other canvases.
+MINIMAX_H3_CHUNK_BYTES_PER_PIXEL = 14
+
+# The caching allocator holds more than is live — measured 1.3-1.7x across tile-heavy decodes — and
+# the reservation has to cover what it holds.
+MINIMAX_H3_ALLOCATOR_HEADROOM = 1.6
+
+
+def estimate_vae_working_memory_minimax_h3(
+    operation: Literal["encode", "decode"],
+    vae: "torch.nn.Module",
+    pixel_height: int,
+    pixel_width: int,
+    pixel_frames: int,
+) -> int:
+    """Estimate the working memory to encode/decode with the MiniMax H3 video VAE.
+
+    Two terms, both measured rather than borrowed from Wan (whose VAE is a pixel-resolution conv
+    stack decoded one frame at a time; H3's decoder is a ViT over the 16x16 latent grid, so Wan's
+    per-pixel constant is orders of magnitude too large here):
+
+    - **Chunk term.** The VAE processes one temporal chunk at a time, spatially tiled
+      (``use_tiling`` defaults to True with 256px tiles; the released frames are the blended-tile
+      ones). ``_decode_clip`` materializes ``tokens_chunk_size + token_overlap`` latent frames — 28
+      pixel frames with the released geometry — as tile activations, the accumulated tile rows and
+      the stitched chunk; ``_encode_clip`` does the same over ``clip_length`` frames. It therefore
+      scales with chunk frames x canvas, not with clip length.
+    - **Clip term.** ``_decode`` accumulates every chunk and then concatenates, so two copies of
+      the whole RGB clip are live at the peak. Encode keeps one.
+
+    The sum is scaled by :data:`MINIMAX_H3_ALLOCATOR_HEADROOM` because the reservation has to cover
+    what the caching allocator *holds*, not what is live: across the hundreds of tile calls in a
+    long clip, reserved runs ~1.3-1.7x allocated from block rounding and fragmentation. Ignoring
+    that gap is what made a 243-frame 768x1344 decode fail — it needed 7.92 GiB reserved against a
+    6.49 GiB reservation, and since partial loading packs VRAM up to exactly this number, the
+    shortfall was a hard failure rather than a near miss (on ROCm it surfaces from hipBLAS as
+    HIPBLAS_STATUS_INTERNAL_ERROR, so neither the caller nor the cache recognizes it as an OOM).
+
+    Calibrated 2026-08-09 on a W7900 (gfx1100, fp32, real released config), peak reserved:
+    one 256px tile at 28 frames 0.56 GiB; one 768x1344 chunk 1.81 GiB; a full 768x1344 decode
+    4.37 GiB at 90 frames and 7.92 GiB at 243 frames. This formula returns ~1.3-1.4x those.
+    """
+    element_size = next(vae.parameters()).element_size()
+
+    if operation == "decode":
+        tokens_chunk_size = int(getattr(vae, "tokens_chunk_size", 5))
+        token_overlap = int(getattr(vae, "token_overlap", 2))
+        temporal_ratio = int(getattr(vae, "temporal_compression_ratio", 4))
+        chunk_frames = (tokens_chunk_size + token_overlap) * temporal_ratio
+    else:
+        chunk_frames = int(getattr(getattr(vae, "config", None), "clip_length", 17))
+    # A clip with fewer frames than a chunk cannot fill one.
+    chunk_frames = max(1, min(chunk_frames, pixel_frames))
+
+    chunk_bytes = chunk_frames * pixel_height * pixel_width * element_size * MINIMAX_H3_CHUNK_BYTES_PER_PIXEL
+
+    clip_copies = 2 if operation == "decode" else 1
+    clip_bytes = clip_copies * 3 * pixel_frames * pixel_height * pixel_width * element_size
+
+    return int((chunk_bytes + clip_bytes) * MINIMAX_H3_ALLOCATOR_HEADROOM)
+
+
+def estimate_vae_working_memory_ltx2(
+    operation: Literal["encode", "decode"],
+    vae: "torch.nn.Module",
+    pixel_height: int,
+    pixel_width: int,
+    pixel_frames: int,
+    tile_size: int | None = None,
+    temporal_tile: int | None = None,
+    tiled: bool = False,
+) -> int:
+    """Estimate the working memory to encode or decode with the LTX-2 video VAE.
+
+    The decode is always tiled in space and time (see
+    :func:`invokeai.backend.ltx2.video_decoding.scoped_ltx2_tiling`), so its activation term scales
+    with one tile's pixel volume and is almost flat in the clip's own size. Measured on a W7900
+    (gfx1100, bf16 weights, released 2.5 VAE), as peak *reserved* minus the weights, decoding
+    1248x704:
+
+    | tile | temporal tile | frames | activation |
+    |------|---------------|--------|------------|
+    | 256  | 16            | 33     | 1.12 GiB   |
+    | 512  | 16            | 33     | 3.85 GiB   |
+    | 512  | 16            | 121    | 3.60 GiB   |
+    | 512  | 32            | 33     | 5.57 GiB   |
+    | 768  | 16            | 33     | 6.45 GiB   |
+
+    A tile costs less than its volume suggests as it grows (the fixed cost of the decoder's own
+    buffers dominates a small tile), which is why the fit is affine rather than proportional; the
+    constants below bracket every row above by 11-55%. The clip term is added on top: the temporal
+    tiler holds both the decoded rows and the clip it concatenates them into, and the rows are not
+    one clip's worth: at the default 16-frame tile the latent stride is one, so a row is kept for
+    every latent frame and the accumulation runs to about two clips. Three is what that sums to,
+    and it is the term that grows with the clip -- the tile term does not, so a long clip would
+    otherwise eat the margin the measured rows show.
+
+    Encode has the same two shapes with one clip copy. ``tiled=False`` is the first-frame encode,
+    where the whole "tile" is the one frame and the fixed per-tile cost dominates: 1248x704x1
+    measured 1.26 GiB against 1.65 GiB predicted. ``tiled=True`` is a whole conditioning clip,
+    which cannot run any other way -- untiled, the activation grows with the clip and a
+    1248x704x121 encode needs about 65 GiB. Tiled at 512/16, measured the same way:
+
+    | canvas     | frames | activation | of which the tile term |
+    |------------|--------|------------|------------------------|
+    | 768x512    | 33     | 2.82 GiB   | 2.75 GiB               |
+    | 768x512    | 121    | 2.87 GiB   | 2.60 GiB               |
+    | 1248x704   | 121    | 3.20 GiB   | 2.61 GiB               |
+    | 1248x704   | 241    | 3.78 GiB   | 2.60 GiB               |
+    | 1920x1088  | 121    | 4.02 GiB   | 2.61 GiB               |
+
+    The tile term is flat across a 16x range of clip volume, as it should be, and works out at
+    333-352 bytes per tile element; the constant rounds up from there. Reading the encode constant
+    for a tiled run would over-reserve it twofold, which is cache the rest of the graph loses.
+    """
+    element_size = next(vae.parameters()).element_size()
+    spatial_ratio = int(getattr(vae, "spatial_compression_ratio", 32))
+    temporal_ratio = int(getattr(vae, "temporal_compression_ratio", 8))
+
+    if operation == "decode":
+        tile_height = max(
+            spatial_ratio, min(tile_size or int(getattr(vae, "tile_sample_min_height", 512)), pixel_height)
+        )
+        tile_width = max(spatial_ratio, min(tile_size or int(getattr(vae, "tile_sample_min_width", 512)), pixel_width))
+        # Not clamped to the clip's own frames: the temporal tile is two *latent* frames, which
+        # decode to a full tile of pixel frames even when the clip is shorter than one.
+        tile_frames = max(temporal_ratio, temporal_tile or int(getattr(vae, "tile_sample_min_num_frames", 16)))
+        bytes_per_element = _LTX2_VAE_DECODE_BYTES_PER_TILE_ELEMENT
+        clip_copies = _LTX2_DECODE_CLIP_COPIES
+    elif tiled:
+        tile_height = max(
+            spatial_ratio, min(tile_size or int(getattr(vae, "tile_sample_min_height", 512)), pixel_height)
+        )
+        tile_width = max(spatial_ratio, min(tile_size or int(getattr(vae, "tile_sample_min_width", 512)), pixel_width))
+        tile_frames = max(temporal_ratio, temporal_tile or int(getattr(vae, "tile_sample_min_num_frames", 16)))
+        bytes_per_element = _LTX2_VAE_TILED_ENCODE_BYTES_PER_TILE_ELEMENT
+        clip_copies = 1
+    else:
+        tile_height, tile_width, tile_frames = pixel_height, pixel_width, pixel_frames
+        bytes_per_element = _LTX2_VAE_ENCODE_BYTES_PER_TILE_ELEMENT
+        clip_copies = 1
+
+    activation_bytes = tile_frames * tile_height * tile_width * element_size * bytes_per_element
+    clip_bytes = clip_copies * 3 * pixel_frames * pixel_height * pixel_width * element_size
+    return int(_LTX2_VAE_BASE_BYTES + activation_bytes + clip_bytes)
+
+
+def estimate_audio_working_memory_ltx2(num_audio_latents: int) -> int:
+    """Estimate the working memory to turn LTX-2 audio latents into a waveform.
+
+    Three stages run back to back over the whole soundtrack, none of them tiled: the audio VAE
+    decodes the latents to a log-mel spectrogram, the vocoder synthesizes a 16 kHz waveform from
+    it, and a bandwidth extender resynthesizes that at 48 kHz. Every intermediate is proportional
+    to the clip's length, so the estimate is a line in the latent count (25 latents per second).
+
+    Measured on a W7900 (gfx1100, released 2.5 audio VAE and vocoder, fp32 weights), as peak
+    *reserved* minus the two models:
+
+    | audio latents | duration | working set |
+    |---------------|----------|-------------|
+    | 126           | 5 s      | 0.71 GiB    |
+    | 251           | 10 s     | 1.30 GiB    |
+    | 501           | 20 s     | 2.18 GiB    |
+    | 1251          | 50 s     | 6.93 GiB    |
+
+    The constants bracket every row by 16-30%. They also make an absurd request fail at the
+    reservation rather than inside a forward: a 481-frame clip at 1 fps is 481 seconds of audio,
+    and asking the cache for the ~76 GiB that needs is the honest answer.
+    """
+    return int(_LTX2_AUDIO_BASE_BYTES + num_audio_latents * _LTX2_AUDIO_BYTES_PER_LATENT)
 
 
 def estimate_vae_working_memory_wan(
@@ -290,8 +694,8 @@ def estimate_vae_working_memory_wan(
 
     Callers pass pixel-space dimensions, so the VAE's spatial scale factor is already
     applied. Single-frame decode and encode use the original Wan 2.1 calibration;
-    multi-frame decode uses conservative, VAE-variant-specific calibrations because
-    causal-convolution state makes the single-frame value unsafe at video resolutions.
+    multi-frame decode uses a calibration of peak reserved memory because causal-convolution
+    state makes the single-frame value unsafe at video resolutions.
     The Wan VAE processes the clip causally, one latent frame at a time with cached
     features. In streaming mode, only one temporal-upscale chunk of the RGB output is
     kept on the execution device; otherwise the full output clip and its transient copy
@@ -301,18 +705,40 @@ def estimate_vae_working_memory_wan(
 
     # The original 2900-byte calibration covers a single Wan 2.1 frame. Multi-frame video
     # decodes retain causal-convolution state that makes that constant unsafe at video
-    # resolutions. These conservative constants are based on measured allocated-memory
-    # peaks with allocator headroom: 6500 for the z_dim=16 A14B VAE and 7000 for the
-    # larger z_dim=48 TI2V VAE. Keep the single-frame value for image decode and the
-    # existing encode calibration.
+    # resolutions. The video constant is calibrated on peak *reserved* growth, which is what the
+    # cache's `free >= estimate` check has to cover: the decode's live tensors peak at only about
+    # two thirds of what the allocator reserves. The earlier constants (6500 A14B, 7000 TI2V)
+    # covered the live tensors; in a server faking a 16 GB card the 832x480x49 decode then overran
+    # the card by 1.3-1.9 GB, and with sysmem fallback such a decode stalled for minutes.
+    #
+    # Implied constant = (reserved - clip bytes) / (h * w * element_size), with the clip bytes this
+    # function budgets for the mode (`wan_vae_clip_bytes`: two full clips, or one 4-frame chunk when
+    # streaming); bf16,
+    # RTX 4090, `scripts/calibrate_wan_vae_working_memory.py --dtype bfloat16 [--no-streaming]`, and
+    # "server" = torch's peak stats around the decode inside a running server:
+    #                       640x352x49  832x480x49  832x480x81  1280x704x49  1280x704x81  1280x704x121
+    #   A14B full              7512        8457        7751         7557                     8073
+    #   A14B streaming                     7773                                 8601
+    #   TI2V full              8903        8457        8557         8943                     8511
+    #   TI2V full, server                  9505                     8944
+    #   TI2V streaming                     9004                                 9230
+    #   TI2V streaming, server             9081                     9235
+    # The reserved peak barely grows with the frame count (TI2V 1280x704 reserved 15876 MiB at 49
+    # and at 121 frames), so the clip bytes are budget on top of it rather than part of it. Both
+    # VAEs reserved exactly the same 6666 MiB at 832x480x49 standalone, so one constant covers
+    # both: the highest measurement, the server's 480p full decode, plus ~5%.
+    # ROCm (RX 9060 XT, gfx1200, torch 2.13+rocm10, with the app's conv3d decomposition, SDPA guard
+    # and expandable segments): 7973-8813 standalone across both VAEs, full and streaming up to
+    # 832x480x81, and 7719-8297 for TI2V 832x480x49 in a server -- covered as well.
+    #
+    # The same estimate decides auto-tiling (`should_pretile_vae_decode`): with it, 832x480 clips
+    # tile on 8 GB cards and 720p clips on 16 GB cards, where their untiled decodes reserve about as
+    # much as the card holds or more. A14B's 1280x720x81 sits right at the line on 20 GB cards: one
+    # constant for both VAEs gives A14B 16-24% over its own standalone maxima at 720p, kept because
+    # its in-server 480p peak was not measured.
+    # Keep the single-frame value for image decode and the existing encode calibration.
     if operation == "decode" and pixel_frames > 1:
-        try:
-            z_dim = int(getattr(vae.config, "z_dim", 16))
-        except (TypeError, ValueError):
-            z_dim = 48
-        scaling_constant = (
-            _WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_TI2V if z_dim >= 32 else _WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT_A14B
-        )
+        scaling_constant = _WAN_VAE_VIDEO_DECODE_SCALING_CONSTANT
     else:
         scaling_constant = _WAN_VAE_SINGLE_FRAME_DECODE_SCALING_CONSTANT if operation == "decode" else 1450
     if tile_size is not None:
@@ -321,6 +747,26 @@ def estimate_vae_working_memory_wan(
     else:
         per_frame = pixel_height * pixel_width * element_size * scaling_constant
 
+    return int(
+        per_frame + wan_vae_clip_bytes(operation, vae, pixel_height, pixel_width, pixel_frames, tile_size, streaming)
+    )
+
+
+def wan_vae_clip_bytes(
+    operation: Literal["encode", "decode"],
+    vae: AutoencoderKLWan,
+    pixel_height: int,
+    pixel_width: int,
+    pixel_frames: int,
+    tile_size: int | None = None,
+    streaming: bool = False,
+) -> int:
+    """The RGB clip bytes `estimate_vae_working_memory_wan` budgets on top of the VAE's own working set.
+
+    Shared with `scripts/calibrate_wan_vae_working_memory.py`, which subtracts exactly this from a measurement to
+    report the implied constant.
+    """
+    element_size = next(vae.parameters()).element_size()
     # Streaming decode moves each causal decoder chunk to CPU immediately. Only one
     # temporal-upscale chunk remains on the execution device, instead of the full RGB
     # clip plus the transient copy created by torch.cat.
@@ -328,12 +774,93 @@ def estimate_vae_working_memory_wan(
         temporal_scale = int(getattr(vae.config, "scale_factor_temporal", None) or 4)
         resident_frames = min(pixel_frames, temporal_scale)
         clip_copies = 1
+    elif operation == "decode" and tile_size is not None:
+        # diffusers' tiled_decode keeps every row of decoded tiles, the blended rows, their concatenation and the
+        # clamped result alive together, and the tile's own working set is small next to them: reserved memory grew
+        # by 5.2 (A14B) and 5.6 (TI2V) clip copies per frame (1280x704 at 81 vs 121 frames, bf16).
+        resident_frames = pixel_frames
+        clip_copies = 6
     else:
         resident_frames = pixel_frames
         clip_copies = 2 if operation == "decode" else 1
-    clip_bytes = clip_copies * 3 * resident_frames * pixel_height * pixel_width * element_size
+    return clip_copies * 3 * resident_frames * pixel_height * pixel_width * element_size
 
-    return int(per_frame + clip_bytes)
+
+# What a full-frame Qwen-Image VAE decode was actually measured to peak at, per output pixel-byte, against the output
+# area it was measured at -- the per-point table in `estimate_vae_working_memory_qwen_image`, taking the larger of the
+# measured ROCm cards at each point (the W7900 column; the RX 9060 XT measures 2650-2772 throughout).
+#
+# This exists because the shipped constants are one flat figure fitted to the worst point of a curve that is not
+# flat, across cards that differ by up to 1.9x. That is the right figure to *reserve* -- a reservation that is too
+# small is an out-of-memory error or, on Windows, a decode paged into system memory. It is the wrong figure to decide
+# tiling with: a tiled decode is not pixel-identical, so a 1536^2 decode whose real peak is 14.4 GiB must not be
+# tiled on a 24 GiB card because a flat 5500 prices it at 24.2 GiB.
+#
+# Neither column is extrapolated. Past its last measured area the decision falls back to the reservation constant,
+# which is what "we have not measured this, assume the conservative figure" has to mean here: CUDA's grid ends at
+# 1792^2 because 2048^2 ran out of memory on the card it was measured on, and carrying a flat maximum past that point
+# priced a 2048^2 decode 0.6 GiB under a 24 GiB card's line while its own reservation exceeded the whole card.
+# What the estimator reserves per output pixel-byte: the worst measured point of each backend's column plus ~8%
+# headroom (the per-point grid is in `estimate_vae_working_memory_qwen_image`).
+_QWEN_VAE_RESERVATION_CONSTANTS: dict[str, dict[str, int]] = {
+    "rocm": {"decode": 5500, "encode": 6300},
+    "cuda": {"decode": 2900, "encode": 1600},
+}
+
+_QWEN_VAE_MEASURED_DECODE_PEAKS: dict[str, tuple[tuple[int, int], ...]] = {
+    "rocm": (
+        (512 * 512, 5132),
+        (768 * 768, 4596),
+        (1024 * 1024, 4570),
+        (1536 * 1536, 3273),
+        (1792 * 1792, 3735),
+        (2048 * 2048, 4813),
+    ),
+    "cuda": (
+        (512 * 512, 2660),
+        (768 * 768, 2519),
+        (1024 * 1024, 2690),
+        (1536 * 1536, 2671),
+        (1792 * 1792, 2281),
+    ),
+}
+
+
+def qwen_image_untiled_decode_peak_bytes(
+    image_tensor: torch.Tensor, vae: AutoencoderKLQwenImage, device: torch.device
+) -> int:
+    """What an untiled decode of this latent is expected to peak at, for the up-front tiling decision only.
+
+    Reservations keep using `estimate_vae_working_memory_qwen_image`, which is deliberately conservative. Between two
+    measured points this is the chord between them in bytes -- so an interior area can price below either neighbour's
+    per-pixel constant, which is the point: the constant dips while the bytes rise, and taking the larger neighbour
+    priced a smaller image above a larger one. Past the last measured area it takes the reservation figure, since a
+    decode larger than anything measured is not one to guess low about.
+    """
+    h = LATENT_SCALE_FACTOR * image_tensor.shape[-2]
+    w = LATENT_SCALE_FACTOR * image_tensor.shape[-1]
+    element_size = next(vae.parameters()).element_size()
+    is_rocm = device.type == "cuda" and torch.version.hip is not None
+    points = _QWEN_VAE_MEASURED_DECODE_PEAKS["rocm" if is_rocm else "cuda"]
+
+    area = h * w
+    if area > points[-1][0]:
+        constant = _QWEN_VAE_RESERVATION_CONSTANTS["rocm" if is_rocm else "cuda"]["decode"]
+        return h * w * element_size * constant
+    # Interpolate the bytes, not the constant: the per-pixel figure dips (ROCm 3273 at 1536^2, CUDA 2281 at 1792^2)
+    # while the bytes themselves rise with area, so taking the larger neighbouring constant priced a smaller image
+    # above a larger one -- a 1728x1856 CUDA decode at 15.96 GiB against 1792^2 at 13.64 GiB. Measured points keep
+    # their measured value.
+    previous_area, previous_bytes = 0, 0
+    for measured_area, peak in points:
+        measured_bytes = measured_area * peak
+        if measured_area >= area:
+            if measured_area == area or previous_area == 0:
+                return int(area * element_size * peak)
+            span = (measured_bytes - previous_bytes) / (measured_area - previous_area)
+            return int(element_size * (previous_bytes + span * (area - previous_area)))
+        previous_area, previous_bytes = measured_area, measured_bytes
+    raise AssertionError("areas past the measured range are handled above")
 
 
 def estimate_vae_working_memory_qwen_image(
@@ -341,6 +868,7 @@ def estimate_vae_working_memory_qwen_image(
     image_tensor: torch.Tensor,
     vae: AutoencoderKLQwenImage,
     tile_size: int | None = None,
+    device: torch.device | None = None,
 ) -> int:
     """Estimate the working memory required by the invocation in bytes.
 
@@ -355,7 +883,8 @@ def estimate_vae_working_memory_qwen_image(
     plus the pixel-space buffers, which stay resident on the execution device either way.
 
     ``tile_size`` is the resolved tile size (the nodes' 0 sentinel already substituted), and assumes
-    the 4:3 tile-to-stride ratio applied by ``patch_qwen_image_vae_tiling``.
+    the 4:3 tile-to-stride ratio applied by ``patch_qwen_image_vae_tiling``. ``device`` is where the
+    VAE will run; it selects the constants below and defaults to the session device.
     """
     latent_scale_factor_for_operation = LATENT_SCALE_FACTOR if operation == "decode" else 1
 
@@ -393,11 +922,17 @@ def estimate_vae_working_memory_qwen_image(
     #    materialised seq^2 score matrix), i.e. XPU gets an efficient kernel and is in the same
     #    O(area) regime as CUDA. If a future driver regresses to math attention, this branch --
     #    not the constants -- is what needs to change.
-    is_rocm = torch.version.hip is not None
-    if operation == "decode":
-        scaling_constant = 5500 if is_rocm else 2900
-    else:  # encode
-        scaling_constant = 6300 if is_rocm else 1600
+    #  - A second ROCm card measures far below the shipped pair: on an RX 9060 XT (gfx1200, torch 2.12+rocm7.14,
+    #    fp16, 2026-09-23, the same script with the attention guard installed) the implied constant is flat at
+    #    2650-2772 for decode and 1541-1552 for encode, all the way to 2048^2. The shipped figures stay at the
+    #    W7900's, which is the card that needs them; what the spread means is that the reservation carries
+    #    cross-card conservatism, so it must not double as the up-front tiling decision -- see
+    #    `qwen_image_untiled_decode_peak_bytes`, which prices that decision from the measured curve instead.
+    # A named device answers for that device -- a `cpu_only` VAE is not on MIOpen even on a ROCm build. Without one
+    # the answer stays the build-wide one these constants were always selected by, so callers that pass no device
+    # (and tests that pin none) keep the figure they had.
+    is_rocm = torch.version.hip is not None and (device is None or device.type == "cuda")
+    scaling_constant = _QWEN_VAE_RESERVATION_CONSTANTS["rocm" if is_rocm else "cuda"][operation]
 
     if tile_size is not None and tile_size > 0:
         # Bounded by one tile (plus overlap) rather than the full frame.
@@ -420,7 +955,10 @@ def estimate_vae_working_memory_qwen_image(
 
 
 def estimate_vae_working_memory_sd3(
-    operation: Literal["encode", "decode"], image_tensor: torch.Tensor, vae: AutoencoderKL
+    operation: Literal["encode", "decode"],
+    image_tensor: torch.Tensor,
+    vae: AutoencoderKL,
+    device: torch.device | None = None,
 ) -> int:
     """Estimate the working memory required by the invocation in bytes."""
     # Encode operations use approximately 50% of the memory required for decode operations
@@ -431,12 +969,15 @@ def estimate_vae_working_memory_sd3(
     w = latent_scale_factor_for_operation * image_tensor.shape[-1]
     element_size = next(vae.parameters()).element_size()
 
-    # This constant is determined experimentally and takes into consideration both allocated and reserved memory. See #8414
-    # Encoding uses ~45% the working memory as decoding.
-    scaling_constant = 2200 if operation == "decode" else 1100
+    # The same AutoencoderKL convolution stack as the FLUX.1 autoencoder, so it takes the same measured constants per
+    # convolution backend: MIOpen needs ~1.64x what cuDNN does (see `_FLUX_VAE_SCALING_CONSTANTS`). `device` is where
+    # the VAE will run; it defaults to the session device.
+    scaling_constant = _flux_vae_scaling_constant(operation, device or TorchDevice.choose_torch_device())
 
     working_memory = h * w * element_size * scaling_constant
 
-    print(f"estimate_vae_working_memory_sd3: {int(working_memory)}")
-
-    return int(working_memory)
+    # max, not sum: the mid-block attention and the full-resolution convolutions peak in different
+    # phases of the forward (see the FLUX.2 estimator for the measurements).
+    return int(
+        max(working_memory, _vae_mid_block_score_matrix_bytes(h, w, next(vae.parameters()).dtype, device=device))
+    )

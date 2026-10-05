@@ -10,6 +10,7 @@ from invokeai.app.services.image_records.image_records_common import (
     ImageRecordChanges,
     ResourceOrigin,
 )
+from invokeai.app.services.shared.intermediate_delete import IntermediateDeleteGuard
 from invokeai.app.services.shared.pagination import OffsetPaginatedResults
 from invokeai.app.services.shared.sqlite.sqlite_common import SQLiteDirection
 from invokeai.app.services.virtual_boards.virtual_boards_common import VirtualSubBoardDTO
@@ -62,10 +63,19 @@ class ImageRecordStorageBase(ABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> OffsetPaginatedResults[ImageRecord]:
-        """Gets a page of image records. When board_id is 'none', filters by user_id for per-user uncategorized images unless is_admin is True."""
+        """Gets a page of image records.
+
+        When board_id is 'none', filters by user_id for per-user uncategorized images unless is_admin is True.
+        When board_id is 'all', returns uncategorized images and images on readable, non-archived boards.
+        Omitting board_id retains owner-only isolation for non-admin users.
+
+        created_from/created_to are inclusive YYYY-MM-DD bounds on created_at (UTC days).
+        """
         pass
 
     # TODO: The database has a nullable `deleted_at` column, currently unused.
@@ -81,23 +91,20 @@ class ImageRecordStorageBase(ABC):
         pass
 
     @abstractmethod
-    def get_intermediates(self) -> list[tuple[str, str]]:
-        """Gets all intermediate image records as (image_name, image_subfolder) tuples, without deleting them."""
+    def get_subfolders(self, image_names: list[str]) -> dict[str, str]:
+        """Maps each existing named image to its on-disk subfolder; absent names are omitted."""
         pass
 
     @abstractmethod
-    def delete_intermediates_by_names(self, image_names: list[str]) -> list[str]:
+    def delete_intermediates_by_names(
+        self, image_names: list[str], guard: Optional[IntermediateDeleteGuard] = None
+    ) -> list[str]:
         """Deletes the named image records, skipping any that are no longer intermediates.
 
         Returns the names whose records this call actually removed. Names that were already gone, and
         names whose records survive because they are no longer intermediates, are both excluded, so a
         caller purges the files of exactly the returned names and touches nothing else.
         """
-        pass
-
-    @abstractmethod
-    def get_intermediates_count(self, user_id: Optional[str] = None) -> int:
-        """Gets a count of intermediate images. If user_id is provided, only counts that user's intermediates."""
         pass
 
     @abstractmethod
@@ -116,8 +123,19 @@ class ImageRecordStorageBase(ABC):
         metadata: Optional[str] = None,
         user_id: Optional[str] = None,
         image_subfolder: str = "",
+        project_id: Optional[str] = None,
     ) -> datetime:
         """Saves an image record."""
+        pass
+
+    @abstractmethod
+    def set_file_size_bytes(self, image_name: str, file_size_bytes: Optional[int]) -> None:
+        """Records the measured on-disk size of an image and its thumbnail; None marks it unmeasured."""
+        pass
+
+    @abstractmethod
+    def set_file_sizes_bytes(self, sizes: dict[str, int]) -> None:
+        """Records many measured sizes in one transaction, leaving rows that already have a size."""
         pass
 
     @abstractmethod
@@ -140,10 +158,17 @@ class ImageRecordStorageBase(ABC):
         is_intermediate: Optional[bool] = None,
         board_id: Optional[str] = None,
         search_term: Optional[str] = None,
+        created_from: Optional[str] = None,
+        created_to: Optional[str] = None,
         user_id: Optional[str] = None,
         is_admin: bool = False,
     ) -> ImageNamesResult:
-        """Gets ordered list of image names with metadata for optimistic updates."""
+        """Gets ordered list of image names with metadata for optimistic updates.
+
+        board_id supports the same 'none', 'all', concrete-ID, and omitted scopes as get_many().
+
+        created_from/created_to are inclusive YYYY-MM-DD bounds on created_at (UTC days).
+        """
         pass
 
     @abstractmethod

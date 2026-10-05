@@ -10,7 +10,6 @@ from invokeai.backend.patches.layers.flux_control_lora_layer import FluxControlL
 from invokeai.backend.patches.model_patch_raw import ModelPatchRaw
 from invokeai.backend.patches.pad_with_zeros import pad_with_zeros
 from invokeai.backend.util import InvokeAILogger
-from invokeai.backend.util.devices import TorchDevice
 from invokeai.backend.util.fp8 import FP8_STORAGE_DTYPES
 from invokeai.backend.util.original_weights_storage import OriginalWeightsStorage
 
@@ -41,6 +40,10 @@ class LayerPatcher:
         original_weights = OriginalWeightsStorage(cached_weights)
         # original_modules are stored for unpatching layers that are wrapped.
         original_modules: dict[str, torch.nn.Module] = {}
+        # Where each sidecar-applied patch's tensors lived before it was moved onto the device, so
+        # the `finally` can put them back. Keyed by identity: one patch object can be applied to many
+        # modules, and only its first, pre-move placement is the one to restore.
+        patch_placements: dict[int, tuple[BaseLayerPatch, torch.device | None, torch.dtype | None]] = {}
         cache_pins = ExitStack()
         try:
             # Materialize the patch iterable BEFORE acquiring the read lock. Callers pass a lazy
@@ -76,6 +79,7 @@ class LayerPatcher:
                         patch_weight=patch_weight,
                         original_weights=original_weights,
                         original_modules=original_modules,
+                        patch_placements=patch_placements,
                         dtype=dtype,
                         force_direct_patching=force_direct_patching,
                         force_sidecar_patching=force_sidecar_patching,
@@ -94,6 +98,12 @@ class LayerPatcher:
                 # Note: This logic assumes no nested modules in original_modules.
                 for orig_module in original_modules.values():
                     orig_module.clear_patches()
+
+                # Return every sidecar-applied patch to where it came from. `clear_patches()` only
+                # drops the module's reference; without this the tensors stay on the device, inside
+                # an object the model cache owns and believes is in RAM.
+                for patch, patch_device, patch_dtype in patch_placements.values():
+                    patch.to(device=patch_device, dtype=patch_dtype)
             finally:
                 cache_pins.close()
 
@@ -106,6 +116,7 @@ class LayerPatcher:
         patch_weight: float,
         original_weights: OriginalWeightsStorage,
         original_modules: dict[str, torch.nn.Module],
+        patch_placements: dict[int, tuple[BaseLayerPatch, torch.device | None, torch.dtype | None]],
         dtype: torch.dtype,
         force_direct_patching: bool,
         force_sidecar_patching: bool,
@@ -185,6 +196,7 @@ class LayerPatcher:
                     patch=layer,
                     patch_weight=patch_weight,
                     original_modules=original_modules,
+                    patch_placements=patch_placements,
                     dtype=dtype,
                 )
             else:
@@ -224,6 +236,11 @@ class LayerPatcher:
         # We intentionally move to the target device first, then cast. Experimentally, this was found to
         # be significantly faster for 16-bit CPU tensors being moved to a CUDA device than doing the
         # same thing in a single call to '.to(...)'.
+        #
+        # `patch` is the model cache's own object, not a copy, and `BaseLayerPatch.to()` rebinds its
+        # tensors in place -- so whatever is done here outlives the patch and is what the cache is
+        # left holding. Both moves are undone in the `finally` below.
+        original_device, original_dtype = LayerPatcher._patch_placement(patch)
         patch.to(device=device)
         patch.to(dtype=torch.float32)
 
@@ -280,7 +297,22 @@ class LayerPatcher:
             # `module_param.data + param_weight_converted` temporary).
             module_param.data = module_param.data + param_weight_converted
 
-        patch.to(device=TorchDevice.CPU_DEVICE)
+        # Back exactly as it came: returning the device but leaving the float32 promotion doubled the
+        # cached record's size for the rest of the process, while the cache went on billing the size
+        # it measured at `put()`.
+        patch.to(device=original_device, dtype=original_dtype)
+
+    @staticmethod
+    def _patch_placement(patch: BaseLayerPatch) -> tuple[torch.device | None, torch.dtype | None]:
+        """The device and dtype a patch's tensors currently sit on, so they can be put back.
+
+        Patches carry their tensors in subclass-specific attributes rather than as registered
+        parameters, so this reads the first real tensor instead of relying on `nn.Module` state.
+        """
+        for value in vars(patch).values():
+            if isinstance(value, torch.Tensor):
+                return value.device, value.dtype
+        return None, None
 
     @staticmethod
     @torch.no_grad()
@@ -290,12 +322,23 @@ class LayerPatcher:
         patch: BaseLayerPatch,
         patch_weight: float,
         original_modules: dict[str, torch.nn.Module],
+        patch_placements: dict[int, tuple[BaseLayerPatch, torch.device | None, torch.dtype | None]],
         dtype: torch.dtype,
     ):
         """Apply a single LoRA wrapper patch to a module."""
-        # Move the LoRA layer to the same device/dtype as the orig module.
-        first_param = next(module_to_patch.parameters())
-        device = first_param.device
+        # Move the LoRA layer to the same device/dtype as the orig module. Quantized modules
+        # that register their weights as buffers (e.g. MiniMax H3's Int8ConvrotLinear) have no
+        # parameters at all — fall back to the first buffer for the device reference.
+        first_tensor = next(module_to_patch.parameters(), None)
+        if first_tensor is None:
+            first_tensor = next(module_to_patch.buffers())
+        device = first_tensor.device
+        # Same in-place mutation of the cache's own object as the direct path, but this one had no
+        # counterpart: `clear_patches()` drops the module's reference and leaves the tensors on the
+        # device. The record is RAM-pinned, so `cur_vram_bytes()` reports zero for it and
+        # `full_unload_from_vram()` early-returns -- the cache cannot reclaim what it cannot see.
+        # Recorded here and restored in the `finally`.
+        patch_placements.setdefault(id(patch), (patch, *LayerPatcher._patch_placement(patch)))
         patch.to(device=device, dtype=dtype)
 
         if module_to_patch_key not in original_modules:

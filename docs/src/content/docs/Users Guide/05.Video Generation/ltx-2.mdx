@@ -1,0 +1,145 @@
+---
+title: LTX-2
+lastUpdated: 2026-10-03
+alsoListedIn:
+  - users-guide/models/local-models
+sidebar:
+   order: 3
+---
+
+LTX-2 is Lightricks' 22B **dual-stream** transformer: picture and soundtrack are generated *together*, by the same model, at every denoising step — not dubbed on afterwards. It ships in two builds that share every other component:
+
+* **Dev** — the guided build. It samples a 30-step schedule and exposes four guidance controls (see below).
+* **Distilled** — guidance-distilled to a fixed **eight-step** schedule. It runs one model evaluation per step where Dev runs up to four, which makes it roughly fifteen times cheaper per clip. Guidance has no effect on it, so the panel hides those controls and shows the step count as fixed.
+
+Both builds support every LTX-2 mode — text, first frame, last frame, first-to-last, extend, audio-to-video and video-to-audio — and your own LTX-2 LoRAs.
+
+What to know in practice:
+
+* **Frames are 8·n + 1** (the video VAE encodes the first frame alone, then groups of eight): 9 to 481, default 121 — five seconds at the default 24 fps, up to twenty. Time and memory grow roughly linearly with the frame count, so a 481-frame clip costs about four times a default one.
+* **Frame rate is yours to set** (1–60 fps). It changes the clip's duration, and with it how much audio is generated — the two streams share one clock.
+* **Canvas presets pin the short edge**, with the long edge following your aspect ratio: 512p, 704p (default) and 768p render in one pass and snap to a multiple of 32; 1024p and 1536p are [two-stage](#two-stage-presets) and snap to 64, because the first pass runs at half of them.
+* **Image-to-video re-compresses your frame** as a single H.264 frame before encoding it. That is deliberate: the model was trained on frames that had been through a video codec, and a pristine PNG is far enough out of that distribution that the clip visibly drifts away from it over the first second.
+* **The negative prompt** only reaches the model through classifier-free guidance, so it is available on Dev and hidden on Distilled. It is pre-filled with the release's own default, a long list of artifact and audio-defect terms.
+
+#### Advanced guidance (Dev only)
+
+Beyond the usual **CFG**, LTX-2 exposes three more terms in a collapsed **Advanced guidance** section. Each one costs an extra model evaluation per step, so turning one off is a real saving:
+
+* **Audio CFG** (default 7) — how hard the soundtrack follows the prompt. The release guides audio far harder than picture.
+* **STG** (default 1) — spatio-temporal guidance. Steers away from a pass with one attention block skipped, which sharpens motion. 0 turns it off.
+* **Modality guidance** (default 3) — steers away from a pass with the audio/video cross-attention disabled, tightening how well the two streams agree. 1 turns it off.
+
+#### Two-stage presets
+
+The **1024p** and **1536p** target resolutions are *two-stage*. LTX-2 generates at half the canvas, doubles the latent with a dedicated x2 upscaler, then runs a second, shorter denoise over it. The upscaler alone produces a soft latent; the refine pass is what resolves it, so the output is larger without going soft. The soundtrack skips the upscaler, having no spatial extent, but is carried through the second pass so the two streams stay on one trajectory.
+
+The refine pass is the expensive half: it runs at four times the base pass's token count. Dev evaluates the model four times per step, so a Dev refine step costs four times a Distilled one — which is why the Dev refine runs a smaller step budget than its base pass rather than the same one. Expect minutes for Distilled at 1024p and hours for Dev at 1536p.
+
+A first frame is anchored on both passes, encoded once at each canvas. The refine pass re-noises every frame including the first, so an anchor that was only applied to the base pass would not survive into the output. The same holds for the opening of an extension. A [conditioning clip](#conditioning-clip), which holds a whole stream fixed, cannot run two-stage at all.
+
+#### The Distilled LoRA (fast path on Dev)
+
+The **LTX-2.5 Distilled LoRA** turns the Dev transformer into an eight-step, guidance-free model like the Distilled build. With it installed, the Dev model's **Distilled** toggle defaults on: it adds the LoRA, sets eight steps and turns every guidance scale off, so each step is one model evaluation instead of four. Turn it off to return to the guided 30-step recipe.
+
+Why use it rather than the Distilled transformer? It keeps a single ~19 GB transformer on disk that can run either way. The LoRA is large for a LoRA (~8.9 GB) because distillation changes the whole network. The toggle is only offered on Dev: the Distilled build already is that model.
+
+#### Last frames and keyframes
+
+A **Last Frame** works alone or with a first frame, as on MiniMax H3. Unlike a first frame, which directly replaces the clip's opening, a last frame is added to the model's input as an extra *keyframe* positioned at the clip's final frame, and the generated frames are steered toward it. A last frame can also be combined with an **Initial Video** to steer where an extension lands.
+
+#### Conditioning Clip
+
+With an LTX-2 model selected, the panel offers a **Conditioning Clip** slot. Drop a clip and choose, under **Use from this clip**, which half of it the model is given — it generates the other half:
+
+* **Its soundtrack — generate the picture** (audio-to-video). The clip's audio is held fixed and LTX-2 generates video to match it, down to lip movement. The output carries the **original recording**, not a re-synthesis of it.
+* **Its picture — generate the soundtrack** (video-to-audio). The clip's frames are held fixed and LTX-2 generates a soundtrack for them.
+
+The clip decides the run's length: in the soundtrack role the Frames control locks to however many frames the audio covers at the panel's FPS; in the picture role both Frames and FPS come from the clip (FPS stays the panel's if the gallery doesn't know the clip's frame rate). Counts snap *down* to LTX-2's 8·n + 1 grid, so up to seven trailing frames of a clip are dropped. Trim the clip beforehand if you only want part of it.
+
+A few rules follow from how it works:
+
+* The clip excludes every other conditioning input — clear the first frame, last frame and initial video to use one.
+* Only the single-pass resolutions (512p, 704p, 768p) can run; with 1024p or 1536p selected, the Invoke button says to pick another. A [two-stage](#two-stage-presets) refine pass re-noises everything, which would undo the held stream.
+* In the picture role, the output carries **your original footage** at its own resolution with the new soundtrack. The model itself sees the clip resized to the generation canvas, whose aspect ratio the panel takes from the clip, so the soundtrack is generated for the whole frame.
+* To give LTX-2 a bare soundtrack — a song, a voice recording — upload the audio file to the gallery. It becomes a clip whose frames draw the waveform, and dropping it here selects the soundtrack role automatically.
+
+Describe the scene you want in the prompt either way; for audio-to-video, saying who or what is making the sound ("a woman singing to the camera") is what lets the model tie picture to audio.
+
+#### Prompt Enhancement
+
+InvokeAI ships with an optional LTX-2 prompt enhancement model
+designed specifically to produce improved results with this video
+model. It is not bundled, but can be installed from the starter models
+by searching for "LTX-2.5 Prompt Enhancer (Gemma-4 E2B)". Once
+installed, type your prompt and press the "sparkle pencil" icon above
+and to the right of the prompt text box. Select the LTX prompt
+enhancer model, and choose the system prompt "LTX-2.5
+Text-to-Video". This will expand the prompt by adding cinematic
+instructions and colorful detail. You may edit the resulting prompt as
+you wish.
+
+#### Auto duration
+
+LTX-2.5 ships with a small **duration head** that reads your prompt, as the model will see it, and predicts how long the shot it describes should run. With a duration head in the **Duration head** slot of **Model components**, an **Auto duration** switch appears above Frames:
+
+* With it on, the head chooses the clip's length, and **Frames becomes Max frames** — the longest clip it may choose. That number still sizes the run's memory, so it stays editable, and its help text shows the range in seconds. Raise it to allow longer shots.
+* The head chooses between one second (or the shortest clip LTX-2 makes) and Max frames, at the panel's FPS, and lands on the 8·n + 1 frame grid. If Max frames is too short to leave it a choice, the clip simply runs at that length.
+* It is off for audio-to-video, video-to-audio and extensions, where the source clip decides the length.
+* The length that ran is what the video records, so recalling it reproduces that exact clip; recall turns Auto duration off for that reason.
+
+The duration head is a separate, optional 3.6 MB install (**LTX-2.5 Duration Head** in the starter models). It is fetched from Lightricks' own repository, which is license-gated: the install needs a Hugging Face token from an account that has accepted the LTX-2.5 license. Once installed it is selected automatically; the switch stays off until you turn it on.
+
+#### Extending with LTX-2
+
+LTX-2 continues a clip from its **closing frames and closing sound**, not from a single still. The final *Context Frames* of the trimmed source (default **17**, about 0.7 s at 24 fps) are held fixed at the start of the new clip, picture and audio together, so the model sees the motion and sound it is continuing. The same span is then cross-faded to join the new clip to the source, so the join blends two copies of the same moment rather than two different ones.
+
+Context comes out of the frame budget: the extension adds **Frames − Context Frames** new frames, and the Context Frames help text shows that number. Trade-offs when choosing it:
+
+* **Longer context carries more of the source.** 17 frames is enough for motion and the *tone* of a sound, but only about a syllable of it: extending a song at 17 tends to flatten the continuation into a sustained note. Raising context to 33–49 restores rhythm and cadence.
+* **Raise Frames with it.** At 121 frames, context 17 adds 104 new frames; context 49 adds only 72.
+* **The ceiling depends on the source.** The join must fit the overlap in memory at the source's own resolution, so large sources cap Context Frames lower. The control's maximum already reflects this.
+
+Context Frames steps along the same 8·n + 1 grid as Frames (9, 17, 25, 33 …).
+
+#### Audio-to-video and video-to-audio
+
+LTX-2 generates picture and soundtrack as one sequence, so it can hold either stream fixed and generate only the other — the same mechanism a first frame uses to hold one image fixed, applied to a whole stream. The panel exposes this as the [Conditioning Clip](#conditioning-clip):
+
+* **Audio-to-video** encodes the clip's soundtrack and keeps it fixed at every step. Because the model has always learned picture and sound together, it lines the video up with the audio — a face speaking or singing to camera gets matching lip movement. The output contains the original recording, so nothing is lost from the audio. The two modes are mirror images: each returns the stream you supplied untouched.
+* **Video-to-audio** keeps the clip's frames fixed and generates a soundtrack. The output is your original footage, frame for frame, with the generated soundtrack muxed in.
+
+Both run on the single-pass canvases only. Guidance applies as usual on Dev; in particular **Audio CFG** is the one that steers a video-to-audio soundtrack toward the prompt.
+
+#### License
+
+LTX-2.5 is released under the **LTX-2.x Community License**: free for commercial and production use by entities with less than $10M in annual revenue, above which a paid commercial agreement is needed. The optional Duration Head and NVFP4 Distilled transformer come from Lightricks' gated repositories (see [Installing LTX-2](#installing-ltx-2)). The Gemma-4 E2B prompt enhancer is Apache 2.0.
+
+This is a summary, not legal advice. Read the full license on the model's HuggingFace page before using a model commercially.
+
+#### Installing LTX-2
+
+The **LTX-2.5** starter bundle installs the working set:
+
+* **LTX-2.5 Dev Transformer (int8)** and **LTX-2.5 Distilled Transformer (int8)** (~18 GiB each) — single-file transformer builds. **One of these is the model you select in the Video panel**, and which one you pick decides the schedule.
+* **LTX-2.5 Components** — the video VAE, audio VAE, vocoder, text connectors and the x2 latent upscaler, which go in the panel's **Model components** slot. The upscaler is what the two-stage presets need; a hand-assembled components folder without it fails when the refine pass begins, after the first pass has already run.
+* **LTX-2.5 Text Encoder (Gemma-4 12B, int8)** — the Lightricks-tuned Gemma-4 text tower, which goes in the **Gemma-4 encoder** slot. No LTX-2 model carries text-encoder weights, so this one is required rather than an override.
+
+Available separately in the starter models list:
+
+* **LTX-2.5 Distilled LoRA** (~8.9 GB) — the [fast path](#the-distilled-lora-fast-path-on-dev) for the Dev transformer. Not needed if you use the Distilled transformer.
+* **LTX-2.5 Dev Transformer (bf16)** (~38 GB) and **LTX-2.5 Text Encoder (Gemma-4 12B, bf16)** (~24 GB) — unquantized builds, for a 48 GB+ card or partial loading.
+* **LTX-2.5 Distilled Transformer (NVFP4)** (~18.7 GB) — Lightricks' official 4-bit build of the Distilled transformer, an alternative to the int8 one with the same eight-step schedule. It is barely smaller on disk than the int8 build (the last six transformer blocks and some projections are kept in bf16), so on a 16 GB card it still runs partially loaded — but a larger share of it fits on the card, which makes it the faster choice there: on an RTX 5060 Ti (16 GB) at 512×512×161 frames it ran at 6.5 s/step against 9.8 s/step for the int8 build. The 4-bit weights are unpacked layer by layer, so any GPU can run it; with enough VRAM to hold either build entirely, expect no speed advantage. License-gated: needs a Hugging Face token whose account has accepted the LTX-2.5 license. There is no NVFP4 build of the Dev transformer.
+* **LTX-2.5 Duration Head** (3.6 MB) — enables [Auto duration](#auto-duration). License-gated: needs a Hugging Face token whose account has accepted the LTX-2.5 license.
+* **LTX-2.5 Prompt Enhancer (Gemma-4 E2B) (~10 GB) - Enables prompt enhancement.
+
+LTX-2 does not condition on the last hidden state of its text encoder the way most models do: it stacks the hidden states of *every* Gemma layer and runs them through a separate connector model. That is why the encoder is a large, separate download.
+
+Measured on a 48 GB card at 1248×704×121 frames, the int8 Dev transformer is resident at ~18 GiB and the denoise working set peaks at ~2.8 GiB, with all four guidance passes running. The Distilled build at the same size needs the same memory and about a fifteenth of the time.
+
+:::caution[License]
+LTX-2.5 is distributed under the **LTX-2.x Community License**, which is free for entities under $10M in annual revenue. Review the terms at [huggingface.co/Lightricks/LTX-2.5](https://huggingface.co/Lightricks/LTX-2.5) before installing.
+:::
+
+---
+
