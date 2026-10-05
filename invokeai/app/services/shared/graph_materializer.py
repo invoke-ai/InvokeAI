@@ -1404,8 +1404,8 @@ class _ExecutionNodeBuilder:
             new_node = self._create_execution_node_copy(node, node_id, iteration_index)
             if new_node_iteration_path is not None:
                 self._state._prepared_registry().set_iteration_path(new_node.id, new_node_iteration_path)
-            self._state._record_activation_dependencies(new_node.id)
             attached_edges = self._attach_execution_edges(new_node.id, new_edges)
+            self._state._record_activation_dependencies(new_node.id)
             self._initialize_execution_node(new_node.id, attached_edges)
             new_nodes.append(new_node.id)
 
