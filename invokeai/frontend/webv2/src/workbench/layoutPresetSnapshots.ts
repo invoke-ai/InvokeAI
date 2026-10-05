@@ -53,6 +53,38 @@ export const resolveSavedLayoutPreset = (account: AccountState, presetId: Layout
     : builtInPreset;
 };
 
+/** Built-in presets always exist; a custom one exists while the account still has it. */
+export const doesLayoutPresetExist = (account: AccountState, presetId: LayoutPresetId): boolean =>
+  isBuiltInLayoutPresetId(presetId) || (account.customLayoutPresets ?? []).some((preset) => preset.id === presetId);
+
+export const findLayoutPresetWorkingCopy = (
+  presetWorkingLayouts: Project['presetWorkingLayouts'],
+  presetId: LayoutPresetId
+): LayoutPresetSnapshot | undefined => presetWorkingLayouts?.find((copy) => copy.presetId === presetId)?.snapshot;
+
+/** What switching to a preset lays out in this project: its working copy here, else its saved arrangement. */
+export const getLayoutPresetArrangement = (project: Project, preset: LayoutPreset): LayoutPresetSnapshot =>
+  (project.layout.presetId === preset.id
+    ? undefined
+    : findLayoutPresetWorkingCopy(project.presetWorkingLayouts, preset.id)) ?? preset.snapshot;
+
+/**
+ * Presets this project holds an unsaved arrangement of besides the active one, whose drift is the live layout's.
+ * A copy that matches its saved preset (saved since, here or in another project) is not unsaved.
+ */
+export const getUnsavedInactiveLayoutPresetIds = (
+  presetWorkingLayouts: Project['presetWorkingLayouts'],
+  activePresetId: LayoutPresetId,
+  account: AccountState
+): LayoutPresetId[] =>
+  (presetWorkingLayouts ?? []).flatMap(({ presetId, snapshot }) =>
+    presetId !== activePresetId &&
+    doesLayoutPresetExist(account, presetId) &&
+    !areLayoutPresetSnapshotsEqual(snapshot, resolveSavedLayoutPreset(account, presetId).snapshot)
+      ? [presetId]
+      : []
+  );
+
 const cloneFloatingWidgets = (
   floatingWidgets: Record<WidgetInstanceId, FloatingWidgetState>
 ): Record<WidgetInstanceId, FloatingWidgetState> =>

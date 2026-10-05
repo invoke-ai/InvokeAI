@@ -2,23 +2,11 @@ import type { DynamicPromptsConfig } from '@features/generation/core/dynamicProm
 
 import { hasDynamicPromptSyntax } from '@features/generation/core/dynamicPrompts';
 import { dynamicPromptsQueryOptions } from '@features/generation/data/dynamicPromptsQueries';
+import { useDebouncedValue } from '@platform/react/useDebouncedValue';
 import { useQuery } from '@tanstack/react-query';
-import { useEffect, useState } from 'react';
 
 /** This debounce follows the form commit debounce. */
 const DYNAMIC_PROMPTS_DEBOUNCE_MS = 500;
-
-const useDebouncedValue = <Value>(value: Value, delayMs: number): Value => {
-  const [debouncedValue, setDebouncedValue] = useState(value);
-
-  useEffect(() => {
-    const timeout = window.setTimeout(() => setDebouncedValue(value), delayMs);
-
-    return () => window.clearTimeout(timeout);
-  }, [delayMs, value]);
-
-  return debouncedValue;
-};
 
 export interface DynamicPromptsExpansion {
   /** The expanded prompts, or the prompt itself when there is nothing to expand. */

@@ -6,10 +6,11 @@ import type { WidgetInstanceId, WidgetTypeId } from '@workbench/widgetContracts'
 import { startIntermediatesHoldLease } from '@features/intermediates/holdLease';
 import { createLogger } from '@platform/logging/logger';
 import { flushWorkbenchDrafts } from '@platform/react/draftRegistry';
+import { useDebouncedValue } from '@platform/react/useDebouncedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
 import { captureAccountScope, type AccountScope } from '@platform/state/accountLifecycle';
 import { shallowEqual as selectorShallowEqual, useExternalStoreSelector } from '@platform/state/selectors';
-import { createContext, use, useEffect, useSyncExternalStore, useState, type ReactNode } from 'react';
+import { createContext, use, useSyncExternalStore, useState, type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import type { ProjectPushOutcome } from './projects/projectFlush';
@@ -260,30 +261,13 @@ export const useWorkbenchSelector = <Selected,>(
   return useExternalStoreSelector(store.subscribe, store.getSnapshot, selector, isEqual);
 };
 
+/** Debounce a selection; see `useDebouncedValue` for `settlesImmediately`. */
 export const useDebouncedWorkbenchSelector = <Selected,>(
   selector: WorkbenchSelector<Selected>,
   debounceMs = 300,
-  isEqual: EqualityFn<Selected> = Object.is
-): Selected => {
-  const liveSelection = useWorkbenchSelector(selector, isEqual);
-  const [selection, setSelection] = useState(liveSelection);
-
-  useEffect(() => {
-    if (isEqual(selection, liveSelection)) {
-      return;
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      setSelection(liveSelection);
-    }, debounceMs);
-
-    return () => {
-      window.clearTimeout(timeoutId);
-    };
-  }, [debounceMs, isEqual, liveSelection, selection]);
-
-  return selection;
-};
+  isEqual: EqualityFn<Selected> = Object.is,
+  settlesImmediately?: (previous: Selected, next: Selected) => boolean
+): Selected => useDebouncedValue(useWorkbenchSelector(selector, isEqual), debounceMs, { isEqual, settlesImmediately });
 
 export const useActiveProject = (): Project => useWorkbenchSelector((snapshot) => snapshot.activeProject);
 

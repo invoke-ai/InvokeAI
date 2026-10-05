@@ -19,7 +19,7 @@ import type { CanvasProjectMutation } from './canvasProjectMutations';
 
 import { clearLayerPanelStates, reconcileLayerPanelStates } from './layerPanelState';
 import { createLayoutPresetActivator, loadLayoutPresetWidgets } from './layoutPresetActivation';
-import { resolveSavedLayoutPreset } from './layoutPresetSnapshots';
+import { getLayoutPresetArrangement, resolveSavedLayoutPreset } from './layoutPresetSnapshots';
 import { getLayoutWidgetTypeIds } from './layoutWidgetSet';
 import { createBlankWorkflowDocument, findProjectWorkflow } from './projectWorkflows';
 import { getWorkbenchPreferences } from './settings/store';
@@ -87,7 +87,7 @@ export type ProjectCommandResult =
 const createCommands = (
   dispatch: WorkbenchDispatch,
   getState: () => WorkbenchState,
-  activateLayoutPreset: ReturnType<typeof createLayoutPresetActivator>['activate']
+  layoutPresetActivator: Pick<ReturnType<typeof createLayoutPresetActivator>, 'activate' | 'invalidate'>
 ) => {
   const command = createCommandFactory(dispatch);
 
@@ -289,7 +289,12 @@ const createCommands = (
     },
     layout: {
       activatePreset: (presetId: ActionPayload<'applyPreset'>['presetId']) =>
-        activateLayoutPreset(resolveSavedLayoutPreset(getState().account, presetId)),
+        layoutPresetActivator.activate(resolveSavedLayoutPreset(getState().account, presetId)),
+      /**
+       * Drop an activation still waiting on its widgets, leaving the active preset as it is. Choosing the active preset
+       * while another is pending means "stay", not the active preset's revert.
+       */
+      cancelPresetActivation: (): void => layoutPresetActivator.invalidate(),
       applyPreset: command('applyPreset', (presetId: ActionPayload<'applyPreset'>['presetId']) => ({ presetId })),
       createPreset: command(
         'addLayoutPreset',
@@ -332,7 +337,11 @@ const createCommands = (
         (presetId: ActionPayload<'renameLayoutPreset'>['presetId'], label: string) => ({ label, presetId })
       ),
       reset: command('resetActiveLayout'),
-      /** Writes the live arrangement back onto the named preset. */
+      /** Discards the named preset's unsaved arrangement in the active project. */
+      revertPreset: command('revertLayoutPreset', (presetId: ActionPayload<'revertLayoutPreset'>['presetId']) => ({
+        presetId,
+      })),
+      /** Writes the preset's arrangement (live when active, else this project's working copy) back onto it. */
       savePreset: command('saveLayoutPreset', (presetId: ActionPayload<'saveLayoutPreset'>['presetId']) => ({
         presetId,
       })),
@@ -918,11 +927,22 @@ export const createWorkbenchStore = (
 
       return current.id === preset.id && current.snapshot === preset.snapshot;
     },
-    isLoaded: options.isLoaded ?? ((preset) => areWidgetsLoaded(getLayoutWidgetTypeIds(preset.snapshot))),
-    load: options.loadLayoutPresetWidgets ?? loadLayoutPresetWidgets,
+    // Switching lays out the active project's working copy when it has one, so that is what has to be in memory.
+    isLoaded: (preset) => {
+      const incoming = { ...preset, snapshot: getLayoutPresetArrangement(getActiveProject(state), preset) };
+
+      return options.isLoaded
+        ? options.isLoaded(incoming)
+        : areWidgetsLoaded(getLayoutWidgetTypeIds(incoming.snapshot));
+    },
+    load: (preset) =>
+      (options.loadLayoutPresetWidgets ?? loadLayoutPresetWidgets)({
+        ...preset,
+        snapshot: getLayoutPresetArrangement(getActiveProject(state), preset),
+      }),
   });
   invalidateLayoutPresetActivation = layoutPresetActivator.invalidate;
-  const commands = createCommands(dispatch, getState, layoutPresetActivator.activate);
+  const commands = createCommands(dispatch, getState, layoutPresetActivator);
 
   return {
     commands,

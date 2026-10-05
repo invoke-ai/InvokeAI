@@ -304,8 +304,9 @@ describe('createWorkbenchStore', () => {
       });
     const store = createWorkbenchStore(createInitialWorkbenchState(), { loadLayoutPresetWidgets });
 
-    store.commands.layout.applyPreset('edit');
     store.commands.layout.createPreset('custom-pending', 'Pending');
+    // Saving as a new preset moves the project onto it; start the pending switch from Edit.
+    store.commands.layout.applyPreset('edit');
     const activation = store.commands.layout.activatePreset('custom-pending');
     store.commands.layout.deletePreset('custom-pending');
     resolve();

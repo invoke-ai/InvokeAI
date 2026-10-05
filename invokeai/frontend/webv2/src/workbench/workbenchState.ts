@@ -25,11 +25,13 @@ import type {
   LayoutPresetRoute,
   LayoutPresetRouteOverrides,
   LayoutPresetSnapshot,
+  LayoutPresetWorkingCopy,
   ProjectLayoutState,
   WidgetRegion,
   WidgetRegionState,
 } from '@workbench/layoutContracts';
 import type {
+  AccountState,
   Project,
   ProjectUndoSnapshot,
   PromptHistoryItem,
@@ -215,8 +217,11 @@ import {
   resolveLayoutPresetId,
 } from './layoutPresets';
 import {
+  areLayoutPresetSnapshotsEqual,
   cloneLayoutPresetWidgetRegions,
   createLayoutPresetSnapshot,
+  doesLayoutPresetExist,
+  findLayoutPresetWorkingCopy,
   normalizeLayoutPresetSnapshot,
   resolveSavedLayoutPreset,
 } from './layoutPresetSnapshots';
@@ -256,6 +261,8 @@ type WorkbenchReducerAction =
   | { type: 'renameLayoutPreset'; presetId: LayoutPresetId; label: string }
   | { type: 'deleteLayoutPreset'; presetId: LayoutPresetId }
   | { type: 'resetActiveLayout' }
+  /** Drop a preset's unsaved arrangement: the active one reapplies its saved layout, an inactive one forgets its copy. */
+  | { type: 'revertLayoutPreset'; presetId: LayoutPresetId }
   | { type: 'recoverShellLayout' }
   | { type: 'setInvocationSource'; sourceId: InvocationSourceId }
   | { type: 'setInvocationDestination'; destination: ResultDestination }
@@ -1221,6 +1228,8 @@ const createUndoSnapshot = (project: Project): ProjectUndoSnapshot => ({
   floatingWidgets: project.floatingWidgets ? { ...project.floatingWidgets } : undefined,
   invocation: { ...project.invocation },
   layout: { ...project.layout, panels: { ...project.layout.panels } },
+  // Working copies are never mutated in place, so the snapshot shares them rather than copying.
+  presetWorkingLayouts: project.presetWorkingLayouts,
   widgetGraphs: cloneWidgetGraphs(project.widgetGraphs),
   widgetInstances: cloneWidgetInstances(project.widgetInstances),
   widgetRegions: cloneWidgetRegions(project.widgetRegions),
@@ -1240,6 +1249,7 @@ const restoreUndoSnapshot = (project: Project, snapshot: ProjectUndoSnapshot): P
   ),
   invocation: { ...snapshot.invocation },
   layout: { ...snapshot.layout, panels: { ...snapshot.layout.panels } },
+  presetWorkingLayouts: snapshot.presetWorkingLayouts,
   widgetGraphs: cloneWidgetGraphs(snapshot.widgetGraphs),
   widgetInstances: cloneWidgetInstances(snapshot.widgetInstances),
   widgetRegions: cloneWidgetRegions(snapshot.widgetRegions),
@@ -1723,6 +1733,10 @@ const assembleWorkbenchProject = (
     ),
     // Resolve historical built-in preset ids to their current arrangements to avoid false layout drift.
     layout: { ...project.layout, presetId: resolveLayoutPresetId(project.layout.presetId) },
+    presetWorkingLayouts: normalizePresetWorkingLayouts(
+      (project as Partial<Project>).presetWorkingLayouts,
+      resolveLayoutPresetId(project.layout.presetId)
+    ),
     promptHistory: normalizePromptHistory((project as Partial<Project>).promptHistory),
     queue: isArriving ? { items: [] } : project.queue,
     settings: normalizeProjectSettings(project.settings),
@@ -2195,6 +2209,108 @@ const normalizeCustomLayoutPresets = (presets: unknown): LayoutPreset[] => {
   });
 };
 
+/**
+ * How many presets' working arrangements a project keeps. Each is a few kilobytes of placement; past this the oldest
+ * copy is forgotten, which loses an unsaved arrangement but never a saved preset or any widget state.
+ */
+export const PRESET_WORKING_LAYOUT_LIMIT = 16;
+
+const withSnapshotPresetId = (snapshot: LayoutPresetSnapshot, presetId: LayoutPresetId): LayoutPresetSnapshot => ({
+  ...snapshot,
+  layout: { ...snapshot.layout, presetId },
+});
+
+const toPresetWorkingLayouts = (copies: readonly LayoutPresetWorkingCopy[]): Project['presetWorkingLayouts'] =>
+  copies.length > 0 ? copies.slice(-PRESET_WORKING_LAYOUT_LIMIT) : undefined;
+
+/** Validated as stored presets are; the active preset's copy is dropped because the live layout is that copy. */
+const normalizePresetWorkingLayouts = (
+  stored: unknown,
+  activePresetId: LayoutPresetId
+): Project['presetWorkingLayouts'] => {
+  if (!Array.isArray(stored)) {
+    return undefined;
+  }
+
+  const copies: LayoutPresetWorkingCopy[] = [];
+
+  for (const entry of stored as unknown[]) {
+    const { presetId: storedId, snapshot } = (entry ?? {}) as Partial<Record<keyof LayoutPresetWorkingCopy, unknown>>;
+    const presetId = typeof storedId === 'string' ? resolveLayoutPresetId(storedId) : '';
+
+    if (!presetId || presetId === activePresetId || !isLayoutPresetSnapshot(snapshot)) {
+      continue;
+    }
+
+    const clone = cloneLayoutPresetSnapshot(snapshot);
+    // A historical id and its current one name the same preset; the later entry is the newer copy.
+    const earlier = copies.findIndex((copy) => copy.presetId === presetId);
+
+    if (earlier !== -1) {
+      copies.splice(earlier, 1);
+    }
+    copies.push({ presetId, snapshot: withSnapshotPresetId(clone, presetId) });
+  }
+
+  return toPresetWorkingLayouts(copies);
+};
+
+const withoutPresetWorkingLayouts = (
+  project: Project,
+  isDropped: (presetId: LayoutPresetId) => boolean
+): Project['presetWorkingLayouts'] => {
+  const copies = project.presetWorkingLayouts ?? [];
+  const kept = copies.filter((copy) => !isDropped(copy.presetId));
+
+  return kept.length === copies.length ? project.presetWorkingLayouts : toPresetWorkingLayouts(kept);
+};
+
+/**
+ * Drop copies that no longer hold anything: those of presets the account no longer has (they go with the preset and
+ * never take one of the bounded places), and those equal to what their preset has saved. Run where the account is
+ * the one the server holds (hydration, opening a project), so a copy whose save was lost still differs and stays.
+ */
+const withoutRedundantWorkingCopies = (account: AccountState, project: Project): Project => {
+  const presetWorkingLayouts = withoutPresetWorkingLayouts(
+    project,
+    (presetId) =>
+      !doesLayoutPresetExist(account, presetId) ||
+      areLayoutPresetSnapshotsEqual(
+        findLayoutPresetWorkingCopy(project.presetWorkingLayouts, presetId)!,
+        resolveSavedLayoutPreset(account, presetId).snapshot
+      )
+  );
+
+  return presetWorkingLayouts === project.presetWorkingLayouts ? project : { ...project, presetWorkingLayouts };
+};
+
+/**
+ * The working copies after leaving the active preset for `incomingPresetId`: the outgoing arrangement is kept,
+ * newest last, when it differs from what that preset has saved; the incoming copy leaves the list because it becomes
+ * the live layout; copies of presets the account no longer has are dropped.
+ */
+const captureOutgoingWorkingLayout = (
+  account: AccountState,
+  project: Project,
+  incomingPresetId: LayoutPresetId
+): Project['presetWorkingLayouts'] => {
+  const outgoingPresetId = project.layout.presetId;
+  const copies = (project.presetWorkingLayouts ?? []).filter(
+    ({ presetId }) =>
+      presetId !== outgoingPresetId && presetId !== incomingPresetId && doesLayoutPresetExist(account, presetId)
+  );
+
+  if (doesLayoutPresetExist(account, outgoingPresetId)) {
+    const live = cloneLayoutPresetSnapshot(createLayoutPresetSnapshot(project));
+
+    if (!areLayoutPresetSnapshotsEqual(live, resolveSavedLayoutPreset(account, outgoingPresetId).snapshot)) {
+      copies.push({ presetId: outgoingPresetId, snapshot: live });
+    }
+  }
+
+  return toPresetWorkingLayouts(copies);
+};
+
 const normalizeLayoutPresetRouteOverrides = (overrides: unknown): LayoutPresetRouteOverrides => {
   if (!overrides || typeof overrides !== 'object') {
     return {};
@@ -2278,7 +2394,9 @@ const normalizeWorkbenchState = (state: WorkbenchState): WorkbenchState => {
   // Built explicitly: legacy snapshots carried preferences inside the account
   // (they live in the settings store now) and must not resurface here.
   const account = normalizeWorkbenchAccount(state.account);
-  const restored = state.projects.map((project) => normalizeWorkbenchProject(project));
+  const restored = state.projects.map((project) =>
+    withoutRedundantWorkingCopies(account, normalizeWorkbenchProject(project))
+  );
   // Every hydrated editor needs an active project, including projectless cached snapshots returned after canvas
   // recovery fails; seed a draft here for all load paths.
   const projects = restored.length > 0 ? restored : [createDraftProject([], account)];
@@ -2393,6 +2511,40 @@ const updateActiveProjectLayoutPreset = (
         : nextLayoutProject.invocation,
     };
   });
+
+/** Leave the active preset for another, keeping each preset's working arrangement in this project. */
+const switchActiveProjectLayoutPreset = (state: WorkbenchState, preset: LayoutPreset): WorkbenchState =>
+  updateActiveProject(state, (project) => {
+    const nextProject = pushUndo(project, 'Update layout');
+    const workingArrangement = findLayoutPresetWorkingCopy(project.presetWorkingLayouts, preset.id);
+    // The working copy takes the saved preset's place for the arrangement only; identity and route stay the preset's.
+    const nextLayoutProject = applyLayoutPresetToProject(
+      nextProject,
+      workingArrangement ? { ...preset, snapshot: workingArrangement } : preset
+    );
+
+    return {
+      ...nextLayoutProject,
+      events: prependProjectEvent(nextProject.events, {
+        createdAt: now(),
+        id: createId('event'),
+        summary: 'Updated active layout',
+        type: 'layout-updated',
+      }),
+      invocation: getInvocationAfterLayoutPreset(nextProject.invocation, preset),
+      presetWorkingLayouts: captureOutgoingWorkingLayout(state.account, project, preset.id),
+    };
+  });
+
+const resetActiveLayoutToSaved = (state: WorkbenchState): WorkbenchState => {
+  const preset = getAvailableLayoutPreset(
+    state,
+    state.projects.find((project) => project.id === state.activeProjectId)?.layout.presetId ??
+      state.account.activeLayoutPresetId
+  );
+
+  return updateActiveProjectLayoutPreset(state, preset, { applyDefaultRoute: false });
+};
 
 const updateActiveInvocation = (
   state: WorkbenchState,
@@ -3517,7 +3669,7 @@ export const __workbenchReducerInternal = (
         return { ...state, activeProjectId: action.project.id };
       }
 
-      const project = normalizeWorkbenchProject(action.project);
+      const project = withoutRedundantWorkingCopies(state.account, normalizeWorkbenchProject(action.project));
 
       return { ...state, activeProjectId: project.id, projects: [...state.projects, project] };
     }
@@ -3565,7 +3717,12 @@ export const __workbenchReducerInternal = (
     }
     case 'applyPreset': {
       const preset = getAvailableLayoutPreset(state, action.presetId);
-      const nextState = updateActiveProjectLayoutPreset(state, preset, { applyDefaultRoute: true });
+      const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
+      // Choosing the preset already in use reapplies its saved arrangement, which is how its shortcut reverts.
+      const nextState =
+        activeProject && activeProject.layout.presetId !== preset.id
+          ? switchActiveProjectLayoutPreset(state, preset)
+          : updateActiveProjectLayoutPreset(state, preset, { applyDefaultRoute: true });
 
       return {
         ...nextState,
@@ -3599,7 +3756,7 @@ export const __workbenchReducerInternal = (
         iconId: action.iconId,
         id: presetId,
         label: action.label.trim() || 'Custom layout',
-        snapshot: createLayoutPresetSnapshot(normalizeWorkbenchProject(activeProject)),
+        snapshot: withSnapshotPresetId(createLayoutPresetSnapshot(normalizeWorkbenchProject(activeProject)), presetId),
       };
       const customLayoutPresets = [
         ...(state.account.customLayoutPresets ?? []).filter((candidate) => candidate.id !== presetId),
@@ -3612,9 +3769,14 @@ export const __workbenchReducerInternal = (
         preset.id,
       ];
 
+      // The project moves onto the new preset, whose saved arrangement is the live one, so it opens clean; the
+      // preset it came from is left as saved, its changes having gone to the new preset rather than to a copy.
       return {
         ...state,
         account: { ...state.account, activeLayoutPresetId: preset.id, customLayoutPresets, layoutPresetOrder },
+        projects: state.projects.map((project) =>
+          project === activeProject ? { ...project, layout: { ...project.layout, presetId: preset.id } } : project
+        ),
       };
     }
     case 'saveLayoutPreset': {
@@ -3624,7 +3786,41 @@ export const __workbenchReducerInternal = (
         return state;
       }
 
-      const snapshot = createLayoutPresetSnapshot(normalizeWorkbenchProject(activeProject));
+      // The active preset saves the live arrangement; another preset saves this project's working copy of it, and
+      // with no copy it has nothing unsaved to write. That copy stays (equal to the saved preset, it no longer reads
+      // as unsaved): saving writes only the account, so if the write is lost the copy still holds the arrangement and
+      // shows as unsaved again. Hydration drops it once the account it loads proves it redundant.
+      const workingArrangement =
+        activeProject.layout.presetId === action.presetId
+          ? undefined
+          : findLayoutPresetWorkingCopy(activeProject.presetWorkingLayouts, action.presetId);
+
+      if (activeProject.layout.presetId !== action.presetId && !workingArrangement) {
+        return state;
+      }
+
+      const snapshot = workingArrangement ?? createLayoutPresetSnapshot(normalizeWorkbenchProject(activeProject));
+      const previouslySaved = resolveSavedLayoutPreset(state.account, action.presetId).snapshot;
+      // Another open project's copy that equals the old saved arrangement was never a change of its own (it would now
+      // show the outdated arrangement as unsaved, and saving it would overwrite this save); one equal to the new
+      // arrangement is redundant. Both go. A copy that differs from both is that project's own work and stays.
+      const projects = state.projects.map((project) => {
+        if (project === activeProject && workingArrangement) {
+          return project;
+        }
+
+        const presetWorkingLayouts = withoutPresetWorkingLayouts(project, (presetId) => {
+          if (presetId !== action.presetId) {
+            return false;
+          }
+
+          const copy = findLayoutPresetWorkingCopy(project.presetWorkingLayouts, presetId)!;
+
+          return areLayoutPresetSnapshotsEqual(copy, previouslySaved) || areLayoutPresetSnapshotsEqual(copy, snapshot);
+        });
+
+        return presetWorkingLayouts === project.presetWorkingLayouts ? project : { ...project, presetWorkingLayouts };
+      });
 
       // Built-in preset bodies are code, so their saved form lives in an
       // override map; custom presets own their snapshot outright.
@@ -3634,7 +3830,7 @@ export const __workbenchReducerInternal = (
           [action.presetId]: { ...snapshot, layout: { ...snapshot.layout, presetId: action.presetId } },
         };
 
-        return { ...state, account: { ...state.account, layoutPresetOverrides } };
+        return { ...state, account: { ...state.account, layoutPresetOverrides }, projects };
       }
 
       const customLayoutPresets = (state.account.customLayoutPresets ?? []).map((preset) =>
@@ -3643,7 +3839,7 @@ export const __workbenchReducerInternal = (
           : preset
       );
 
-      return { ...state, account: { ...state.account, customLayoutPresets } };
+      return { ...state, account: { ...state.account, customLayoutPresets }, projects };
     }
     case 'restoreLayoutPresetDefault': {
       if (!isBuiltInLayoutPresetId(action.presetId)) {
@@ -3768,11 +3964,29 @@ export const __workbenchReducerInternal = (
       const customLayoutPresets = (state.account.customLayoutPresets ?? []).filter(
         (preset) => preset.id !== action.presetId
       );
-      const projects = state.projects.map((project) =>
-        project.layout.presetId === action.presetId
-          ? { ...project, layout: { ...project.layout, presetId: defaultLayoutPreset.id } }
-          : project
-      );
+      const defaultPreset = resolveSavedLayoutPreset(state.account, defaultLayoutPreset.id);
+      // The deleted preset's arrangements go with it. A project that was on it moves to the default preset as a switch
+      // would: its working copy of the default if it has one, otherwise the saved default.
+      const projects = state.projects.map((project) => {
+        if (project.layout.presetId !== action.presetId) {
+          const presetWorkingLayouts = withoutPresetWorkingLayouts(project, (presetId) => presetId === action.presetId);
+
+          return presetWorkingLayouts === project.presetWorkingLayouts ? project : { ...project, presetWorkingLayouts };
+        }
+
+        const defaultCopy = findLayoutPresetWorkingCopy(project.presetWorkingLayouts, defaultPreset.id);
+
+        return {
+          ...applyLayoutPresetToProject(
+            project,
+            defaultCopy ? { ...defaultPreset, snapshot: defaultCopy } : defaultPreset
+          ),
+          presetWorkingLayouts: withoutPresetWorkingLayouts(
+            project,
+            (presetId) => presetId === action.presetId || presetId === defaultPreset.id
+          ),
+        };
+      });
 
       return {
         ...state,
@@ -3789,13 +4003,25 @@ export const __workbenchReducerInternal = (
       };
     }
     case 'resetActiveLayout': {
-      const preset = getAvailableLayoutPreset(
-        state,
-        state.projects.find((project) => project.id === state.activeProjectId)?.layout.presetId ??
-          state.account.activeLayoutPresetId
-      );
+      return resetActiveLayoutToSaved(state);
+    }
+    case 'revertLayoutPreset': {
+      const activeProject = state.projects.find((project) => project.id === state.activeProjectId);
 
-      return updateActiveProjectLayoutPreset(state, preset, { applyDefaultRoute: false });
+      if (!activeProject) {
+        return state;
+      }
+      if (activeProject.layout.presetId === action.presetId) {
+        return resetActiveLayoutToSaved(state);
+      }
+      if (!findLayoutPresetWorkingCopy(activeProject.presetWorkingLayouts, action.presetId)) {
+        return state;
+      }
+
+      return updateActiveProject(state, (project) => ({
+        ...pushUndo(project, 'Update layout'),
+        presetWorkingLayouts: withoutPresetWorkingLayouts(project, (presetId) => presetId === action.presetId),
+      }));
     }
     case 'recoverShellLayout': {
       return updateActiveLayout(state, (layout) => ({

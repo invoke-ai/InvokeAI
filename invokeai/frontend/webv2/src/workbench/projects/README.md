@@ -2,7 +2,7 @@
 
 The backend project record is authoritative. Writes use `expected_revision`; a divergent revision or remotely deleted project requires an explicit user decision. Editing can continue while that decision is pending. Saving a copy reuses one reserved identity through `createProjectSettled`, including after a lost response.
 
-`ProjectDocumentV3` allowlists editable document fields. Queue runs, events, undo and per-workflow edit histories are not project documents. Documents are limited to 32 MiB of UTF-8 JSON on both sides of the API.
+`ProjectDocumentV3` allowlists editable document fields. Optional fields added within schema 3 (`lastFloatingGeometry`, `presetWorkingLayouts`) are additive: absent means none, so older schema-3 documents load unchanged, and a build that predates a field ignores it and drops it from the next document it saves to the server rather than refusing the project, which a schema bump would do. Queue runs, events, undo and per-workflow edit histories are not project documents. Documents are limited to 32 MiB of UTF-8 JSON on both sides of the API.
 
 ## Workflows
 

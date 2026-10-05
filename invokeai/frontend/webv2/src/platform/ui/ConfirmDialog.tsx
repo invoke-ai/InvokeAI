@@ -31,6 +31,7 @@ export const ConfirmDialog = ({
 }) => {
   const [isPending, setIsPending] = useState(false);
   const isPendingRef = useRef(false);
+  const cancelRef = useRef<HTMLButtonElement>(null);
   // Hosts often clear the subject the dialog describes as it closes; keep the text it showed while it animates out.
   const live = useMemo(
     () => ({ body, confirmLabel, isDestructive, title }),
@@ -80,11 +81,16 @@ export const ConfirmDialog = ({
     void handleConfirm();
   }, [handleConfirm]);
 
+  // A destructive confirmation opens on Cancel rather than the dialog's default target (the close button for an
+  // alertdialog), so a reflexive Enter or Space cancels and never commits or flips an option in the body.
+  const getInitialFocus = useCallback(() => cancelRef.current, []);
+
   return (
     <Dialog.Root
       closeOnEscape={!isPending}
       closeOnInteractOutside={!isPending}
       finalFocusEl={finalFocusEl}
+      initialFocusEl={text.isDestructive ? getInitialFocus : undefined}
       open={isOpen}
       role="alertdialog"
       size="sm"
@@ -104,7 +110,7 @@ export const ConfirmDialog = ({
               </Stack>
             </Dialog.Body>
             <Dialog.Footer>
-              <Button disabled={isPending} variant="ghost" onClick={handleClose}>
+              <Button ref={cancelRef} disabled={isPending} variant="ghost" onClick={handleClose}>
                 Cancel
               </Button>
               <Button
