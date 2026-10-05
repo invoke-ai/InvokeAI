@@ -61,6 +61,7 @@ import { INLINE_EDIT_SELECTOR } from './surfaceFocus';
 import { ToolStrip } from './ToolStrip';
 import { useCanvasGallerySave } from './useCanvasGallerySave';
 import { useCreateFromBbox } from './useCreateFromBbox';
+import { useStagedResultGallerySave } from './useStagedResultGallerySave';
 import { reportLayerOperation, reportPreparedCommit, reportStructuralCommit } from './useStructuralCommit';
 
 const MissingFontsDialog = lazy(() =>
@@ -144,6 +145,9 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
   const stagingSlots = getCanvasStagingSlots(canvas, queueItems);
   const selectedSlot = stagingSlots[stagingArea.selectedImageIndex];
   const selectedCandidate = selectedSlot?.kind === 'candidate' ? selectedSlot.candidate : undefined;
+  const { isSaving: isSavingStagedResult, save: saveStagedResult } = useStagedResultGallerySave(
+    selectedCandidate?.imageName ?? null
+  );
   const selectedPlaceholder = selectedSlot?.kind === 'placeholder' ? selectedSlot : null;
   const acceptStopsBatch = selectedCandidate
     ? getStoppableCandidateBatch(selectedCandidate, queueItems) !== null
@@ -545,6 +549,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
                 canAccept={interactionCapabilities.canAcceptStagedImage}
                 hasMultipleSlots={hasMultipleStagingSlots}
                 isGenerating={isCanvasGenerationInFlight}
+                isSavingToGallery={isSavingStagedResult}
                 isVisible={stagingArea.isVisible}
                 selectedCandidate={selectedCandidate}
                 selectedImageIndex={stagingArea.selectedImageIndex}
@@ -557,6 +562,7 @@ export const CanvasWidgetView = ({ runtime }: WidgetViewProps) => {
                 onDiscardSelected={discardSelectedStagedImage}
                 onPreloadCandidate={preloadStagedCandidate}
                 onSelectImage={selectStagedImage}
+                onSaveToGallery={saveStagedResult}
                 onSaveToLayerAndContinue={saveStagedImageAndContinue}
                 onSetAutoSwitch={setStagingAutoSwitch}
                 onToggleThumbnails={toggleStagingThumbnails}

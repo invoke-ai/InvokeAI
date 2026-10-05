@@ -1,6 +1,7 @@
 import type { WidgetContributionSource } from '@workbench/widgetContracts';
 
 import { isModalPresent } from '@platform/ui/modalPresence';
+import { isToastActivationKeyEvent } from '@platform/ui/toaster';
 import { useWorkbenchFocusTarget } from '@workbench/focusRegions';
 import { useWorkbenchPreferenceSelector } from '@workbench/settings/store';
 import { areWidgetPlacementProjectsEqual, getWidgetPlacementProject } from '@workbench/widgetPlacementMeta';
@@ -50,7 +51,8 @@ export const WorkbenchHotkeyRuntime = () => {
   });
 
   const handleHotkey = useEffectEvent((event: KeyboardEvent, matchedKey: string) => {
-    if (event.isComposing || event.keyCode === 229) {
+    // A focused toast button keeps its activation keys; no shortcut, however scoped, takes them.
+    if (event.isComposing || event.keyCode === 229 || isToastActivationKeyEvent(event)) {
       return;
     }
 

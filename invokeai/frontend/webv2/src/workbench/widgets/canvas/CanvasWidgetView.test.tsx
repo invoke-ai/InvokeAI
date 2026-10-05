@@ -38,6 +38,9 @@ vi.mock('@workbench/canvas-operations/react', () => ({ useCanvasEngine: () => ha
 vi.mock('./useCanvasGallerySave', () => ({
   useCanvasGallerySave: () => ({ isSaving: false, save: () => undefined }),
 }));
+vi.mock('./useStagedResultGallerySave', () => ({
+  useStagedResultGallerySave: () => ({ isSaving: false, save: () => Promise.resolve() }),
+}));
 vi.mock('./useCreateFromBbox', () => ({
   useCreateFromBbox: () => ({ createFromBbox: () => undefined, isCreating: false }),
 }));

@@ -3046,6 +3046,11 @@
         "autoSwitchLatest": "Newest",
         "autoSwitchOff": "Off",
         "autoSwitchProgress": "In progress",
+        "boardFailed": "Saved to Gallery, but couldn't add it to {{board}}",
+        "boardFailedDescription": "{{name}} is in the Gallery without a board for now.",
+        "boardFailedUnnamed": "Saved to Gallery, but couldn't add it to its board",
+        "boardMissing": "Saved to Gallery, but its board no longer exists",
+        "boardMissingDescription": "{{name}} is in Uncategorized.",
         "generating": "Generating…",
         "moreAcceptOptions": "More accept options",
         "recall": "Recall settings",
@@ -3053,7 +3058,9 @@
         "saveError": "Couldn't save to gallery",
         "saveToGallery": "Save to gallery",
         "saved": "Saved to gallery",
-        "savedDescription": "{{name}} added to your gallery."
+        "savedDescription": "{{name}} added to your gallery.",
+        "savedToBoard": "Saved to {{board}}",
+        "showInGallery": "Show in Gallery"
       },
       "structural": {
         "busy": "Another canvas operation is in progress, so this edit was not kept.",

@@ -5,6 +5,7 @@ import type { WidgetContributionSource } from '@workbench/widgetContracts';
 import type { WorkbenchInternalStore } from '@workbench/workbenchStore';
 
 import { ChakraProvider } from '@chakra-ui/react';
+import { AppToaster, createActionToast, toaster } from '@platform/ui/toaster';
 import { system } from '@theme/system';
 import { createExtensionRegistry } from '@workbench/extensions/extensionRegistry';
 import { useFloatingWindowFocus, useFocusRegionProps } from '@workbench/focusRegions';
@@ -13,6 +14,7 @@ import { createWorkbenchStore } from '@workbench/workbenchStore';
 import { act, useCallback } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { userEvent } from 'vitest/browser';
 
 /**
  * The hotkey runtime under the real focus provider, a real store, and the real extension registry: which command
@@ -124,6 +126,7 @@ beforeEach(async () => {
         <WorkbenchFocusProvider>
           <WorkbenchHotkeyRuntime />
           <Harness />
+          <AppToaster />
         </WorkbenchFocusProvider>
       </ChakraProvider>
     );
@@ -131,6 +134,7 @@ beforeEach(async () => {
 });
 
 afterEach(async () => {
+  await act(() => toaster.remove());
   await act(() => root?.unmount());
   host?.remove();
   host = null;
@@ -186,5 +190,38 @@ describe('WorkbenchHotkeyRuntime under a floating window', () => {
     await pressKey('y');
 
     expect(ran).toEqual([]);
+  });
+});
+
+describe('WorkbenchHotkeyRuntime and toast buttons', () => {
+  it('leaves Enter and Space on a focused toast button to the button, while a widget binds Enter', async () => {
+    const floating: WidgetContributionSource = {
+      instanceId: 'image-map',
+      projectId: projectId(),
+      region: 'floating',
+      typeId: 'image-map',
+    };
+    // What an active canvas session's apply command looks like to the runtime.
+    contribute('map.apply', 'enter', 'widget', floating);
+    const retried = vi.fn();
+    await pressOn('window');
+
+    await act(() => {
+      createActionToast({ actions: [{ label: 'Retry', onClick: retried }], title: 'Saved', type: 'warning' });
+    });
+    await act(() => vi.waitFor(() => expect(document.querySelector('[data-scope="toast"] button')).not.toBeNull()));
+    const retry = [...document.querySelectorAll<HTMLButtonElement>('[data-scope="toast"] button')].find(
+      (button) => button.textContent === 'Retry'
+    )!;
+
+    retry.focus();
+    await act(() => userEvent.keyboard('{Enter}'));
+
+    expect(retried).toHaveBeenCalledOnce();
+    expect(ran).toEqual([]);
+
+    // Outside the toast the binding still runs.
+    await pressKey('Enter', host!.querySelector('[data-testid="window"]')!);
+    expect(ran).toEqual(['map.apply']);
   });
 });

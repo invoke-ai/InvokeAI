@@ -90,8 +90,17 @@ const renderStagingBar = async (
     acceptStopsBatch = false,
     canvasWidth = CANVAS_WIDTH,
     isGenerating = false,
+    isSavingToGallery = false,
     onAccept = noop,
-  }: { acceptStopsBatch?: boolean; canvasWidth?: number; isGenerating?: boolean; onAccept?: () => void } = {}
+    onSaveToGallery = () => Promise.resolve(),
+  }: {
+    acceptStopsBatch?: boolean;
+    canvasWidth?: number;
+    isGenerating?: boolean;
+    isSavingToGallery?: boolean;
+    onAccept?: () => void;
+    onSaveToGallery?: (imageName: string) => Promise<void>;
+  } = {}
 ) => {
   const slots = Array.from({ length: slotCount }, (_, index) => slotAt(index));
   const selectedSlot = slots[selectedImageIndex];
@@ -117,6 +126,7 @@ const renderStagingBar = async (
                   canAccept
                   hasMultipleSlots={slotCount > 1}
                   isGenerating={isGenerating}
+                  isSavingToGallery={isSavingToGallery}
                   isVisible
                   selectedCandidate={selectedSlot?.kind === 'candidate' ? selectedSlot.candidate : undefined}
                   selectedImageIndex={selectedImageIndex}
@@ -129,6 +139,7 @@ const renderStagingBar = async (
                   onDiscardSelected={noop}
                   onPreloadCandidate={onPreloadCandidate}
                   onSelectImage={onSelectImage}
+                  onSaveToGallery={onSaveToGallery}
                   onSaveToLayerAndContinue={onSaveToLayerAndContinue}
                   onSetAutoSwitch={noop}
                   onToggleThumbnails={noop}
@@ -327,8 +338,8 @@ describe('StagingBar thumbnail strip', () => {
     expect(onAccept).toHaveBeenCalledOnce();
   });
 
-  it.each([640, 700, 800])(
-    'keeps the accept split button inside a %ipx canvas while a batch is generating',
+  it.each([360, 450, 560, 640, 700, 800])(
+    'keeps the accept split button and every other control inside a %ipx canvas while a batch is generating',
     async (canvasWidth) => {
       const { overlay } = await renderStagingBar(
         3,
@@ -344,9 +355,79 @@ describe('StagingBar thumbnail strip', () => {
       const bounds = overlay.getBoundingClientRect();
       expect(trigger.getBoundingClientRect().right).toBeLessThanOrEqual(bounds.right);
       expect(accept.getBoundingClientRect().left).toBeGreaterThanOrEqual(bounds.left);
+      // Nothing in the bar is clipped: each control a pointer can reach sits inside the canvas.
+      for (const control of overlay.querySelectorAll<HTMLElement>('button')) {
+        const rect = control.getBoundingClientRect();
+        // Thumbnails scroll inside their own strip, which the first test covers.
+        if (rect.width > 1 && !control.closest('[data-scope="scroll-area"]')) {
+          expect(rect.left, control.getAttribute('aria-label') ?? control.textContent ?? '').toBeGreaterThanOrEqual(
+            bounds.left
+          );
+          expect(rect.right, control.getAttribute('aria-label') ?? control.textContent ?? '').toBeLessThanOrEqual(
+            bounds.right
+          );
+        }
+      }
+      // The accept action keeps its full name, and Tooltip, however narrow the bar.
+      expect(accept.getAttribute('aria-label')).toBe('Accept and Stop Batch');
       // Collapsed or not, Discard All and the generating status keep their names.
       await expect.element(page.getByRole('button', { name: 'Discard All' })).toBeVisible();
       expect(page.getByRole('status').element().textContent).toBe('Generating…');
+    }
+  );
+
+  it('saves the selected candidate from an icon button that keeps its name inside a compact canvas', async () => {
+    const onSaveToGallery = vi.fn(() => Promise.resolve());
+    const { overlay } = await renderStagingBar(3, 1, noop, noop, noop, makeSlot, {
+      acceptStopsBatch: true,
+      canvasWidth: 640,
+      isGenerating: true,
+      onSaveToGallery,
+    });
+    const save = page.getByRole('button', { exact: true, name: 'Save to gallery' });
+    const bounds = overlay.getBoundingClientRect();
+    const rect = save.element().getBoundingClientRect();
+
+    expect(rect.left).toBeGreaterThanOrEqual(bounds.left);
+    expect(rect.right).toBeLessThanOrEqual(bounds.right);
+    await save.click();
+    expect(onSaveToGallery).toHaveBeenCalledExactlyOnceWith('image-1');
+  });
+
+  it('holds the save button while a save of the candidate is in flight', async () => {
+    const onSaveToGallery = vi.fn(() => Promise.resolve());
+    await renderStagingBar(1, 0, noop, noop, noop, makeSlot, { isSavingToGallery: true, onSaveToGallery });
+
+    await expect.element(page.getByRole('button', { exact: true, name: 'Save to gallery' })).toBeDisabled();
+  });
+
+  it.each([
+    { canvasWidth: 800, iconOnly: false },
+    { canvasWidth: 360, iconOnly: true },
+  ])(
+    'shows one Cancel for a running slot at $canvasWidth px, labelled only when there is room',
+    async ({ canvasWidth, iconOnly }) => {
+      const { overlay } = await renderStagingBar(
+        2,
+        1,
+        noop,
+        noop,
+        noop,
+        (index) => (index === 0 ? makeSlot(index) : makePlaceholder(index)),
+        { canvasWidth, isGenerating: true }
+      );
+      const visibleCancels = [...overlay.querySelectorAll<HTMLButtonElement>('button')].filter(
+        (button) =>
+          (button.getAttribute('aria-label') ?? button.textContent?.trim()) === 'Cancel' &&
+          button.getBoundingClientRect().width > 0
+      );
+
+      expect(visibleCancels).toHaveLength(1);
+      // The icon-only one carries its name (and so its tooltip); the labelled one shows the word itself.
+      expect(visibleCancels[0]!.hasAttribute('aria-label')).toBe(iconOnly);
+      expect(visibleCancels[0]!.getBoundingClientRect().right).toBeLessThanOrEqual(
+        overlay.getBoundingClientRect().right
+      );
     }
   );
 });
