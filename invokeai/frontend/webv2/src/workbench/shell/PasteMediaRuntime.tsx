@@ -1,6 +1,7 @@
 import { classifyGalleryUpload } from '@features/gallery/contracts';
 import { useExitRetainedValue } from '@platform/react/useExitRetainedValue';
 import { useMountEffect } from '@platform/react/useMountEffect';
+import { Dialog } from '@platform/ui/Dialog';
 import { isModalPresent } from '@platform/ui/modalPresence';
 import { isEditableHotkeyTarget } from '@workbench/hotkeys/keys';
 import { lazy, Suspense, useCallback, useState } from 'react';
@@ -19,6 +20,8 @@ const isInsideDialog = (target: EventTarget | null): boolean =>
 const PasteMediaDialog = lazy(() =>
   import('./PasteMediaDialog').then((module) => ({ default: module.PasteMediaDialog }))
 );
+// The dialog is open, and modal, from the paste that requested it, not from when its module arrives.
+const PENDING_DIALOG = <Dialog.Pending />;
 
 /**
  * Offer destinations for workbench media paste. Canvas handles its own chord; text fields and open dialogs retain
@@ -57,7 +60,7 @@ export const PasteMediaRuntime = () => {
   });
 
   return dialog.value ? (
-    <Suspense fallback={null}>
+    <Suspense fallback={dialog.isOpen ? PENDING_DIALOG : null}>
       <PasteMediaDialog
         key={dialog.value.ticket}
         isOpen={dialog.isOpen}
