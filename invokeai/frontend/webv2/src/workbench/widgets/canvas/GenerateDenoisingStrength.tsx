@@ -1,4 +1,5 @@
-import type { CanvasDenoisingStrengthProps } from '@features/generation/react';
+import type { CanvasDenoisingStrength, CanvasDenoisingStrengthProps } from '@features/generation/react';
+import type { ReactNode } from 'react';
 
 import { Badge } from '@chakra-ui/react';
 import { useDebouncedDraftValue, useRegisterGenerateDraftFlusher } from '@features/generation/react';
@@ -13,7 +14,7 @@ import {
 } from '@workbench/widgets/canvas/invoke/canvasStrength';
 import { getProjectWidgetValues } from '@workbench/widgetState';
 import { useActiveProjectSelector, useWorkbenchCommands } from '@workbench/WorkbenchContext';
-import { useCallback } from 'react';
+import { createContext, use, useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { DenoisingStrengthWave } from './DenoisingStrengthWave';
@@ -25,12 +26,27 @@ const formatStrengthPercent = (value: number): string => `${Math.round(value * 1
 const selectCanvasStrength = (project: Parameters<typeof getProjectWidgetValues>[0]): number =>
   readCanvasDenoisingStrength(getProjectWidgetValues(project, 'canvas'));
 
+interface StrengthDraft {
+  value: number;
+  setValue: (value: number) => void;
+}
+
+const StrengthDraftContext = createContext<StrengthDraft | null>(null);
+
+const useStrengthDraft = (): StrengthDraft => {
+  const draft = use(StrengthDraftContext);
+  if (!draft) {
+    throw new Error('Denoising strength controls render inside GenerateDenoisingStrength.');
+  }
+  return draft;
+};
+
 /**
- * Lays out the Render section with canvas denoising strength: its badge and wave in the header, its control under
- * guidance. The strength persists in canvas widget values; its draft flushes with the Generate form before invocation.
+ * Owns the strength draft: persists it in canvas widget values after a debounce and flushes it with the Generate
+ * form before invocation. Its `children` keep their element identity across draft changes, so a scrub re-renders
+ * only the badge and field that read the draft, not the section laid out around them.
  */
-export const GenerateDenoisingStrength = ({ children }: CanvasDenoisingStrengthProps) => {
-  const { t } = useTranslation();
+const StrengthDraftProvider = ({ children }: { children: ReactNode }) => {
   const { widgets } = useWorkbenchCommands();
   const projectId = useActiveProjectSelector((project) => project.id);
   const strength = useActiveProjectSelector(selectCanvasStrength);
@@ -42,11 +58,7 @@ export const GenerateDenoisingStrength = ({ children }: CanvasDenoisingStrengthP
     [widgets]
   );
 
-  const {
-    draftValue: draftStrength,
-    flushDraftValue,
-    setDraftValue: setStrength,
-  } = useDebouncedDraftValue({
+  const { draftValue, flushDraftValue, setDraftValue } = useDebouncedDraftValue({
     delayMs: STRENGTH_DEBOUNCE_MS,
     onCommit: commitStrength,
     resetKey: projectId,
@@ -55,24 +67,44 @@ export const GenerateDenoisingStrength = ({ children }: CanvasDenoisingStrengthP
 
   useRegisterGenerateDraftFlusher(flushDraftValue);
 
-  return children({
-    badges: (
-      <Badge gap="1.5">
-        {formatStrengthPercent(draftStrength)}
-        <DenoisingStrengthWave value={draftStrength} />
-      </Badge>
-    ),
-    field: (
-      <ScrubberField
-        defaultValue={DEFAULT_CANVAS_DENOISING_STRENGTH}
-        formatValue={formatStrengthPercent}
-        label={t('widgets.generate.denoisingStrength')}
-        max={MAX_CANVAS_DENOISING_STRENGTH}
-        min={MIN_CANVAS_DENOISING_STRENGTH}
-        step={0.01}
-        value={draftStrength}
-        onChange={setStrength}
-      />
-    ),
-  });
+  const draft = useMemo<StrengthDraft>(
+    () => ({ setValue: setDraftValue, value: draftValue }),
+    [draftValue, setDraftValue]
+  );
+
+  return <StrengthDraftContext value={draft}>{children}</StrengthDraftContext>;
 };
+
+const StrengthBadge = () => {
+  const { value } = useStrengthDraft();
+  return (
+    <Badge gap="1.5">
+      {formatStrengthPercent(value)}
+      <DenoisingStrengthWave value={value} />
+    </Badge>
+  );
+};
+
+const StrengthField = () => {
+  const { t } = useTranslation();
+  const { setValue, value } = useStrengthDraft();
+  return (
+    <ScrubberField
+      defaultValue={DEFAULT_CANVAS_DENOISING_STRENGTH}
+      formatValue={formatStrengthPercent}
+      label={t('widgets.generate.denoisingStrength')}
+      max={MAX_CANVAS_DENOISING_STRENGTH}
+      min={MIN_CANVAS_DENOISING_STRENGTH}
+      step={0.01}
+      value={value}
+      onChange={setValue}
+    />
+  );
+};
+
+const STRENGTH_SLOTS: CanvasDenoisingStrength = { badges: <StrengthBadge />, field: <StrengthField /> };
+
+/** Lays out the Render section with canvas denoising strength: its badge in the header, its control under guidance. */
+export const GenerateDenoisingStrength = ({ children }: CanvasDenoisingStrengthProps) => (
+  <StrengthDraftProvider>{children(STRENGTH_SLOTS)}</StrengthDraftProvider>
+);
