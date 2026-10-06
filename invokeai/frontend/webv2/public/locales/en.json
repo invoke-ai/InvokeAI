@@ -351,6 +351,7 @@
   "topbar": {
     "appMenu": {
       "documentation": "Documentation",
+      "launchpad": "Launchpad",
       "manage": "Manage",
       "open": "Open menu"
     },
