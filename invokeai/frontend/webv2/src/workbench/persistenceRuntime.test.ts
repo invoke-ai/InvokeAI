@@ -961,6 +961,32 @@ describe('Workbench persistence runtime exit checkpoint', () => {
     expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
   });
 
+  it('keeps a retry held while the session was closed bound to its revision when it runs on reopen', async () => {
+    const { aggregate, clock, persistence, reopenSession, setClosedSession } = await startLoaded();
+    vi.mocked(persistence.saveWorkbench).mockResolvedValueOnce({ ...saveResult(aggregate.state), shouldRetry: true });
+    aggregate.edit('Pending retry');
+    clock.runAll();
+    await flushPromises();
+    expect(aggregate.events.at(-1)).toBe('save-pending:Autosave is pending and will retry.');
+    // The retry comes due while the session is closed.
+    setClosedSession(true);
+    clock.runAll();
+    expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
+
+    const retrying = deferred<WorkbenchSaveResult>();
+    vi.mocked(persistence.saveWorkbench).mockImplementationOnce(() => retrying.promise);
+    reopenSession();
+    expect(savedNames(persistence)).toEqual(['Pending retry', 'Pending retry']);
+    // Edited while the retry is in flight: a retry only counts for the revision it was scheduled for.
+    aggregate.edit('Edited meanwhile');
+    retrying.resolve(saveResult(aggregate.state));
+    await flushPromises();
+
+    expect(aggregate.events).not.toContain('save-succeeded:2026-07-17T00:00:00.000Z');
+    clock.runAll();
+    expect(savedNames(persistence)).toEqual(['Pending retry', 'Pending retry', 'Edited meanwhile']);
+  });
+
   it('does not save on a reopened session when nothing was requested while it was closed', async () => {
     const { aggregate, clock, persistence, reopenSession, setClosedSession } = await startLoaded();
     aggregate.edit('Before the close');
