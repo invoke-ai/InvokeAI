@@ -759,7 +759,7 @@ const runUnloadRecovery = async ({ browser, contexts, errors, imported }) => {
   await page.keyboard.press('Escape');
   await dialog.waitFor({ state: 'hidden' });
   await page.getByRole('button', { exact: true, name: 'Open menu' }).click();
-  await page.getByRole('menuitem', { exact: true, name: 'Home' }).click();
+  await page.getByRole('menuitem', { exact: true, name: 'Launchpad' }).click();
   await page.waitForURL(/#\/$/);
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.getByRole('heading', { exact: true, name: 'Welcome to Invoke' }).waitFor();
