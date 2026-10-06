@@ -1,4 +1,5 @@
 import type { GalleryVideoItem } from '@features/gallery';
+import type { ImageWithDims } from '@features/generation/contracts';
 import type { ModelConfig } from '@features/models';
 import type {
   VideoConditioningRole,
@@ -18,6 +19,7 @@ import {
   createVideoSourceClip,
   getConditioningClipPatch,
   getDefaultReferenceConditioning,
+  getDefaultReferenceImageDetail,
   getInitialVideoPatch,
   getReferencesPatch,
   getVideoModelPolicy,
@@ -599,6 +601,102 @@ export const appendReferenceVideo = ({
     }),
     status: 'appended',
   };
+};
+
+export type VideoImagePlacement =
+  | {
+      /** Whether placing the image cleared media it can't be used with: a conditioning clip or an initial video. */
+      displaced: boolean;
+      patch: Partial<VideoWidgetValues>;
+      slot: 'firstFrame' | 'lastFrame' | 'reference';
+      status: 'placed';
+    }
+  /** `full`: an append found every image slot the model takes already in use. */
+  | { status: 'full' | 'unsupported' };
+
+/**
+ * Place a gallery image where the Video panel's model takes images. A model with reference images gets it as one:
+ * it replaces the reference images (reference videos stay), or with `append` joins them. A frame model gets it as
+ * the first frame, clearing the last, as if the frames were a two-image list; with `append` it fills the first free
+ * frame slot, and an initial video holds the first. The panel's model is never switched to make the image fit.
+ */
+export const placeVideoImage = ({
+  append,
+  image,
+  models,
+  videoValues,
+}: {
+  append: boolean;
+  image: ImageWithDims;
+  models: readonly ModelConfig[];
+  videoValues: Record<string, unknown>;
+}): VideoImagePlacement => {
+  const values = getCurrentVideoValues({ models, videoValues });
+  const policy = values.model ? getVideoModelPolicy(values.model, values) : null;
+
+  if (!policy) {
+    return { status: 'unsupported' };
+  }
+
+  if (policy.references && policy.modes.includes('reference')) {
+    const kept = append ? values.references : values.references.filter((entry) => entry.kind === 'video');
+
+    if (kept.filter((entry) => entry.kind === 'image').length >= policy.references.maxImages) {
+      return { status: 'full' };
+    }
+    const referenceExtend = Boolean(policy.references.extend);
+
+    return {
+      displaced: Boolean(values.conditioningClip || (values.sourceVideo && !referenceExtend)),
+      patch: getReferencesPatch({
+        referenceExtend,
+        references: [...kept, { detail: getDefaultReferenceImageDetail(kept), image, kind: 'image' }],
+      }),
+      slot: 'reference',
+      status: 'placed',
+    };
+  }
+
+  const takesFirstFrame = policy.modes.includes('first-frame') || policy.modes.includes('first-last');
+
+  if (!takesFirstFrame) {
+    return { status: 'unsupported' };
+  }
+
+  // The same displacements as the panel's own frame fields: a first frame shares its slot with the initial video,
+  // and either frame clears a conditioning clip.
+  if (!append) {
+    return {
+      displaced: Boolean(values.conditioningClip || values.sourceVideo),
+      patch: {
+        conditioningClip: null,
+        firstFrameImage: image,
+        lastFrameImage: null,
+        references: [],
+        sourceVideo: null,
+      },
+      slot: 'firstFrame',
+      status: 'placed',
+    };
+  }
+  if (!values.firstFrameImage && !values.sourceVideo) {
+    return {
+      displaced: Boolean(values.conditioningClip),
+      patch: { conditioningClip: null, firstFrameImage: image, references: [] },
+      slot: 'firstFrame',
+      status: 'placed',
+    };
+  }
+  if (!values.lastFrameImage && policy.modes.includes('first-last')) {
+    return {
+      displaced: Boolean(values.conditioningClip),
+      patch: { conditioningClip: null, lastFrameImage: image },
+      slot: 'lastFrame',
+      status: 'placed',
+    };
+  }
+
+  return { status: 'full' };
 };
 
 /** The generation mode a conditioning clip in each role asks of the model. */

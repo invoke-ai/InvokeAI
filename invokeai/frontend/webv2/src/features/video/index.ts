@@ -22,6 +22,7 @@ export {
   createVideoSourceClip,
   getDefaultConditioningRole,
   getDefaultReferenceConditioning,
+  getDefaultReferenceImageDetail,
   getConditioningClipPatch,
   getInitialVideoPatch,
   getReferencesPatch,
