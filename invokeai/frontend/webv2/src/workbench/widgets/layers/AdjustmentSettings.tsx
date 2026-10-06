@@ -13,7 +13,7 @@ import { chakra, createListCollection, HStack, Stack, Text } from '@chakra-ui/re
 import { Field, Select, Slider } from '@platform/ui';
 import { ScrubberField } from '@platform/ui/ScrubberField';
 import { buildCurveLut } from '@workbench/canvas-engine/api';
-import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
+import { baselineConfig, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -67,13 +67,8 @@ const IDENTITY_CURVE: [number, number][] = [
 /** The fields a gesture changes on one entry. */
 type EntryPatch = Record<string, unknown>;
 
-const CURVES_FIELDS = ['curves'] as const;
-
 const withPatch = (entries: readonly CanvasAdjustmentEntry[], id: string, patch: EntryPatch): CanvasAdjustmentEntry[] =>
   entries.map((candidate) => (candidate.id === id ? ({ ...candidate, ...patch } as CanvasAdjustmentEntry) : candidate));
-
-const fieldsOf = (entry: CanvasAdjustmentEntry, fields: readonly string[]): EntryPatch =>
-  Object.fromEntries(fields.map((field) => [field, (entry as unknown as EntryPatch)[field]]));
 
 /** An adjustment stack's owner: a raster layer or a raster-stack group. */
 export type AdjustmentOwner = Pick<CanvasRasterLayerContractV2, 'id' | 'adjustments'> & {
@@ -107,9 +102,9 @@ const AdjustmentEntryEditor = ({
 }) => {
   const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const { t } = useTranslation();
-  // The entry as the gesture found it. Previews and commits patch only the gesture's fields onto the live stack, so
-  // a toggle, undo, or other edit landing mid-gesture survives it, and undo restores just those fields.
-  const gestureStartRef = useRef<CanvasAdjustmentEntry | null>(null);
+  // Previews patch the gesture's fields onto the live stack. The engine's preview session holds the stack as the
+  // gesture found it and ends the gesture when an undo or an edit from elsewhere lands, so the next preview starts
+  // from the changed stack and the commit records from where that session began.
   const configOf = useCallback(
     (adjustments: CanvasAdjustmentEntry[]) =>
       layer.type === 'group'
@@ -131,57 +126,33 @@ const AdjustmentEntryEditor = ({
 
   const patchLive = useCallback(
     (patch: EntryPatch) => {
-      const entries = currentEntries();
-      gestureStartRef.current ??= entries.find((candidate) => candidate.id === entry.id) ?? entry;
       previewStructural({
-        config: configOf(withPatch(entries, entry.id, patch)),
+        config: configOf(withPatch(currentEntries(), entry.id, patch)),
         id: layer.id,
         type: 'updateCanvasLayerConfig',
       });
     },
-    [configOf, currentEntries, entry, layer.id, previewStructural]
+    [configOf, currentEntries, entry.id, layer.id, previewStructural]
   );
 
-  const cancelGesture = useCallback(
-    (fields: readonly string[]) => {
-      const start = gestureStartRef.current;
-      gestureStartRef.current = null;
-      if (start) {
-        cancelPreview({
-          config: configOf(withPatch(currentEntries(), entry.id, fieldsOf(start, fields))),
-          id: layer.id,
-          type: 'updateCanvasLayerConfig',
-        });
-      }
-    },
-    [cancelPreview, configOf, currentEntries, entry.id, layer.id]
-  );
-
+  // A gesture that ends where it began prepares nothing, which drops its previews.
   const commitEntry = useCallback(
     (label: string, patch: EntryPatch) => {
-      const fields = Object.keys(patch);
-      const start = gestureStartRef.current ?? entry;
-      // A gesture that ends where it began records nothing and drops its previews.
-      if (JSON.stringify(fieldsOf(start, fields)) === JSON.stringify(patch)) {
-        cancelGesture(fields);
-        return;
-      }
-      gestureStartRef.current = null;
-      commitPrepared(label, (model) => {
+      commitPrepared(label, (model, baseline) => {
         const entries = liveEntries(model);
         // The entry was removed mid-gesture: committing would resurrect it.
         if (!entries?.some((candidate) => candidate.id === entry.id)) {
           return { ids: [entry.id], status: 'missing' };
         }
         return model.prepare({
-          before: configOf(withPatch(entries, entry.id, fieldsOf(start, fields))),
+          before: baselineConfig(baseline),
           config: configOf(withPatch(entries, entry.id, patch)),
           id: layer.id,
           type: 'patch-config',
         });
       });
     },
-    [cancelGesture, commitPrepared, configOf, entry, layer.id, liveEntries]
+    [commitPrepared, configOf, entry.id, layer.id, liveEntries]
   );
 
   const handleScalarLive = useCallback((field: ScalarField, next: number) => patchLive({ [field]: next }), [patchLive]);
@@ -194,7 +165,6 @@ const AdjustmentEntryEditor = ({
     [commitEntry, t]
   );
   const handleCurvesLive = useCallback((curves: CanvasAdjustmentCurves) => patchLive({ curves }), [patchLive]);
-  const handleCurvesCancel = useCallback(() => cancelGesture(CURVES_FIELDS), [cancelGesture]);
   const handleCurvesCommit = useCallback(
     (curves: CanvasAdjustmentCurves) => commitEntry(t('widgets.layers.adjustments.curves'), { curves }),
     [commitEntry, t]
@@ -252,7 +222,7 @@ const AdjustmentEntryEditor = ({
       return (
         <CurvesEditor
           curves={entry.curves}
-          onCancel={handleCurvesCancel}
+          onCancel={cancelPreview}
           onCommit={handleCurvesCommit}
           onLive={handleCurvesLive}
         />

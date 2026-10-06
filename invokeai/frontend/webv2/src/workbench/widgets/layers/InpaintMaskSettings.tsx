@@ -8,12 +8,13 @@ import { useNotify } from '@workbench/useNotify';
 import { armMaskTintTarget } from '@workbench/widgets/canvas/color-system/maskTintTarget';
 import { type ColorSamplerEngine, useColorSampler } from '@workbench/widgets/canvas/useColorSampler';
 import {
+  baselineConfig,
   type CanvasPreparedEngine,
   reportMaskEdit,
   useStructuralPreview,
 } from '@workbench/widgets/canvas/useStructuralCommit';
 import { PaletteIcon } from 'lucide-react';
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 
 /** The six mask fill styles, matching `CanvasMaskFillContract['style']` / legacy `zFillStyle`. */
@@ -39,7 +40,6 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
   const { t } = useTranslation();
   const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const sampleColor = useColorSampler(engine);
-  const fillBeforeRef = useRef<CanvasMaskFillContract | null>(null);
 
   const fill = layer.mask.fill;
 
@@ -54,11 +54,12 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
     [t]
   );
 
+  // A previewed color records from where its preview started; a style change from the live fill.
   const commitFill = useCallback(
-    (next: CanvasMaskFillContract, before: CanvasMaskFillContract) => {
-      commitPrepared(t('widgets.layers.maskFill.fill'), (model) =>
+    (next: CanvasMaskFillContract) => {
+      commitPrepared(t('widgets.layers.maskFill.fill'), (model, baseline) =>
         model.prepare({
-          before: { layerType: 'inpaint_mask', mask: { fill: before } },
+          before: baselineConfig(baseline),
           config: { layerType: 'inpaint_mask', mask: { fill: next } },
           id: layer.id,
           type: 'patch-config',
@@ -70,37 +71,23 @@ export const InpaintMaskSettings = ({ engine, layer }: InpaintMaskSettingsProps)
 
   const handleColorChange = useCallback(
     (hex: string) => {
-      if (
-        !previewStructural({
-          config: { layerType: 'inpaint_mask', mask: { fill: { ...fill, color: hex } } },
-          id: layer.id,
-          type: 'updateCanvasLayerConfig',
-        })
-      ) {
-        return;
-      }
-      if (fillBeforeRef.current === null) {
-        fillBeforeRef.current = fill;
-      }
+      previewStructural({
+        config: { layerType: 'inpaint_mask', mask: { fill: { ...fill, color: hex } } },
+        id: layer.id,
+        type: 'updateCanvasLayerConfig',
+      });
     },
     [previewStructural, fill, layer.id]
   );
 
   const handleArmTint = useCallback(() => armMaskTintTarget(layer.id), [layer.id]);
-  const handleColorChangeEnd = useCallback(
-    (hex: string) => {
-      const before = fillBeforeRef.current ?? fill;
-      fillBeforeRef.current = null;
-      commitFill({ ...before, color: hex }, before);
-    },
-    [commitFill, fill]
-  );
+  const handleColorChangeEnd = useCallback((hex: string) => commitFill({ ...fill, color: hex }), [commitFill, fill]);
 
   const handleStyleChange = useCallback(
     ({ value }: SelectValueChangeDetails) => {
       const style = value[0] as CanvasMaskFillContract['style'] | undefined;
       if (style && style !== fill.style) {
-        commitFill({ ...fill, style }, fill);
+        commitFill({ ...fill, style });
       }
     },
     [commitFill, fill]

@@ -69,20 +69,19 @@ const Harness = () => {
       layers: {
         beginStructuralPreview: () => ({
           apply,
-          cancel: (restore?: CanvasProjectMutation) => {
-            if (restore) {
-              apply(restore);
-            }
-          },
+          baseline: () => null,
+          cancel: () => undefined,
           commit: (label: string, edit: PreparedDocumentEdit) => {
             commits.push({ edit, label });
             return { status: apply(edit.forward) ? ('committed' as const) : ('dispatch-rejected' as const) };
           },
+          isActive: () => true,
         }),
         commitPrepared: (label: string, edit: PreparedDocumentEdit) => {
           commits.push({ edit, label });
           return { status: apply(edit.forward) ? ('committed' as const) : ('dispatch-rejected' as const) };
         },
+        endStructuralPreview: () => undefined,
       },
       tools: {
         requestColorSample: () => {

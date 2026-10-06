@@ -42,6 +42,7 @@ import {
   layerChildRowKey,
   projectLayerChildRows,
   type LayerChildDropTarget,
+  type LayerChildRowAction,
   type ProjectedChildRow,
 } from './layerChildRows';
 import { clearLayerChildSelection, selectLayerChild, useLayerChildSelection } from './layerChildSelection';
@@ -359,19 +360,24 @@ export const LayersTree = ({
     const { commitPrepared: commit } = latest.current;
     return commit(label, (model) => model.prepare(command));
   }, []);
+  // A child row's command is built from the engine's document inside the commit: a preview gesture open
+  // elsewhere has ended and been restored by then, so the row's siblings carry committed values, not previewed ones.
+  const runChildStructural = useCallback((label: string, child: ProjectedChildRow, action: LayerChildRowAction) => {
+    const { commitPrepared: commit } = latest.current;
+    return commit(label, (model) => {
+      const command = layerChildRowCommand(model.document, child, action);
+      return command ? model.prepare(command) : { status: 'unchanged' };
+    });
+  }, []);
   const removeChildRow = useCallback(
     (child: ProjectedChildRow) => {
-      const command = layerChildRowCommand(latest.current.document, child, { type: 'remove' });
-      if (!command) {
-        return;
-      }
       const { panel: current, projectId: project } = latest.current;
-      const outcome = runStructural(t(layerChildRemoveLabelKey(child.kind)), command);
+      const outcome = runChildStructural(t(layerChildRemoveLabelKey(child.kind)), child, { type: 'remove' });
       if (outcome.status === 'committed' && current.focusId === child.key) {
         setLayerPanelFocus(project, current.primaryId, child.layerId);
       }
     },
-    [runStructural, t]
+    [runChildStructural, t]
   );
 
   const selectChildRow = useCallback(
@@ -612,21 +618,13 @@ export const LayersTree = ({
         }
         focusItem(navigation.focus);
       },
-      duplicateChild: (child) => {
-        const command = layerChildRowCommand(latest.current.document, child, {
+      duplicateChild: (child) =>
+        runChildStructural(t('widgets.layers.modifiers.duplicateAdjustment'), child, {
           newId: createAdjustmentId(),
           type: 'duplicate',
-        });
-        if (command) {
-          runStructural(t('widgets.layers.modifiers.duplicateAdjustment'), command);
-        }
-      },
-      moveChild: (child, direction) => {
-        const command = layerChildRowCommand(latest.current.document, child, { direction, type: 'move' });
-        if (command) {
-          runStructural(t('widgets.layers.modifiers.reorderAdjustment'), command);
-        }
-      },
+        }),
+      moveChild: (child, direction) =>
+        runChildStructural(t('widgets.layers.modifiers.reorderAdjustment'), child, { direction, type: 'move' }),
       moveChildToLayer: (child, layerId) => {
         const command = layerChildDropCommand(latest.current.document, child, { beforeItemId: null, layerId });
         if (command) {
@@ -638,12 +636,8 @@ export const LayersTree = ({
       openStackMenu: (stack, anchor: LayerSurfaceAnchor) => setSurface({ anchor, kind: 'stack-menu', stack }),
       removeChild: (child) => removeChildRow(child),
       rename: (id, name) => runStructural(t('widgets.layers.actions.rename'), { id, patch: { name }, type: 'patch' }),
-      renameChild: (child, name) => {
-        const command = layerChildRowCommand(latest.current.document, child, { name, type: 'rename' });
-        if (command) {
-          runStructural(t(layerChildRenameLabelKey(child.kind)), command);
-        }
-      },
+      renameChild: (child, name) =>
+        runChildStructural(t(layerChildRenameLabelKey(child.kind)), child, { name, type: 'rename' }),
       select: (id, modifiers: LayerSelectionModifiers) => {
         const {
           allNodeIds: all,
@@ -662,12 +656,8 @@ export const LayersTree = ({
         }
       },
       selectChild: (child, options) => selectChildRow(child, options?.reveal !== false),
-      setChildEnabled: (child, isEnabled) => {
-        const command = layerChildRowCommand(latest.current.document, child, { isEnabled, type: 'set-enabled' });
-        if (command) {
-          runStructural(t('widgets.layers.modifiers.toggleActive'), command);
-        }
-      },
+      setChildEnabled: (child, isEnabled) =>
+        runChildStructural(t('widgets.layers.modifiers.toggleActive'), child, { isEnabled, type: 'set-enabled' }),
       setEnabled: (id, isEnabled) =>
         runStructural(t('widgets.layers.actions.toggleActive'), {
           type: 'set-enabled',
@@ -693,7 +683,17 @@ export const LayersTree = ({
         }
       },
     }),
-    [commitChildMove, focusItem, movingIds, removeChildRow, removeRows, runStructural, selectChildRow, t]
+    [
+      commitChildMove,
+      focusItem,
+      movingIds,
+      removeChildRow,
+      removeRows,
+      runChildStructural,
+      runStructural,
+      selectChildRow,
+      t,
+    ]
   );
 
   const closeSurface = useCallback(() => {

@@ -80,7 +80,7 @@ const engine = {
   },
   exports: { hasExportableLayerContent: () => true },
   interaction: { get: () => false, subscribe: () => () => undefined },
-  layers: { commitPrepared: () => ({ status: 'committed' as const }) },
+  layers: { commitPrepared: () => ({ status: 'committed' as const }), endStructuralPreview: () => undefined },
   projectId: PROJECT_ID,
 } as unknown as LayerSurfaceEngine;
 const anchor = { height: 10, width: 10, x: 40, y: 40 };

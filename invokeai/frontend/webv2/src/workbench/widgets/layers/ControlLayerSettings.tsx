@@ -30,7 +30,7 @@ import { getCanvasOperations, resolveDefaultFilterForModel } from '@workbench/ca
 import { CONTROL_ADAPTER_DEFAULTS, CONTROL_KIND_BASE } from '@workbench/controlAdapters';
 import { describeControlLayerReason, getControlLayerReasonInSequence } from '@workbench/controlLayerChecks';
 import { useCanvasDocumentEditingLocked, useCanvasEngineRead } from '@workbench/widgets/canvas/engineStoreHooks';
-import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
+import { baselineConfig, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
@@ -68,7 +68,7 @@ interface ControlLayerSettingsProps {
 /** Edit adapters through canvas undo; utility-queue filter previews leave the document untouched until Apply. */
 export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: ControlLayerSettingsProps) => {
   const { t } = useTranslation();
-  const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const editingLocked = useCanvasDocumentEditingLocked(engine);
   const models = useModelsSelector((snapshot) => snapshot.models);
   const mainModel = useSelectedMainModel();
@@ -76,11 +76,12 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
   const { adapter } = layer;
   const weightInputMin = adapter.kind === 'z_image_control' ? 0 : CONTROL_WEIGHT_BOUNDS.inputMin;
 
+  // A previewed gesture records from where its preview started; any other change from the live adapter.
   const commitAdapter = useCallback(
-    (next: Partial<CanvasControlAdapterContract>, before: Partial<CanvasControlAdapterContract>, label: string) => {
-      commitPrepared(label, (model) =>
+    (next: Partial<CanvasControlAdapterContract>, label: string) => {
+      commitPrepared(label, (model, baseline) =>
         model.prepare({
-          before: { adapter: before, layerType: 'control' },
+          before: baselineConfig(baseline),
           config: { adapter: next, layerType: 'control' },
           id: layer.id,
           type: 'patch-config',
@@ -175,11 +176,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
       if (kind === adapter.kind) {
         return;
       }
-      commitAdapter(
-        switchControlAdapterKind(adapter, kind, models, base),
-        { ...adapter, beginEndStepPct: [...adapter.beginEndStepPct] },
-        t('widgets.layers.control.kind')
-      );
+      commitAdapter(switchControlAdapterKind(adapter, kind, models, base), t('widgets.layers.control.kind'));
     },
     [adapter, base, commitAdapter, models, t]
   );
@@ -202,7 +199,7 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
     ({ value }: SelectValueChangeDetails) => {
       const model = value[0] ?? null;
       if (model !== adapter.model) {
-        commitAdapter({ model }, { model: adapter.model }, t('widgets.layers.control.model'));
+        commitAdapter({ model }, t('widgets.layers.control.model'));
         const selected = models.find((candidate) => candidate.key === model);
         const recommendation = resolveDefaultFilterForModel(selected);
         if (recommendation && !layer.filter) {
@@ -220,87 +217,48 @@ export const ControlLayerSettings = ({ engine, layer, onOperationStarted }: Cont
     ({ value }: SelectValueChangeDetails) => {
       const mode = value[0] as CanvasControlAdapterContract['controlMode'] | undefined;
       if (mode && mode !== adapter.controlMode) {
-        commitAdapter({ controlMode: mode }, { controlMode: adapter.controlMode }, t('widgets.layers.control.mode'));
+        commitAdapter({ controlMode: mode }, t('widgets.layers.control.mode'));
       }
     },
     [adapter.controlMode, commitAdapter, t]
   );
 
-  // Where a weight gesture started; outside render closures because a drag keeps the handlers it started with.
-  const weightBeforeRef = useRef<number | null>(null);
   const handleWeightChange = useCallback(
     (next: number) => {
-      if (
-        previewStructural({
-          config: { adapter: { weight: next }, layerType: 'control' },
-          id: layer.id,
-          type: 'updateCanvasLayerConfig',
-        })
-      ) {
-        weightBeforeRef.current ??= adapter.weight;
-      }
+      previewStructural({
+        config: { adapter: { weight: next }, layerType: 'control' },
+        id: layer.id,
+        type: 'updateCanvasLayerConfig',
+      });
     },
-    [adapter.weight, previewStructural, layer.id]
+    [previewStructural, layer.id]
   );
+  // A gesture ending where it started prepares nothing and drops its previews; one whose previews were refused
+  // (editing locked) still commits, so the refusal is reported instead of dropping the value.
   const handleWeightChangeEnd = useCallback(
-    (next: number) => {
-      const before = weightBeforeRef.current;
-      weightBeforeRef.current = null;
-      // Previews were refused (editing locked): a commit attempt reports why instead of dropping the value.
-      if (before === null) {
-        if (next !== adapter.weight) {
-          commitAdapter({ weight: next }, { weight: adapter.weight }, t('widgets.layers.control.weight'));
-        }
-        return;
-      }
-      if (next === before) {
-        cancelPreview({
-          config: { adapter: { weight: before }, layerType: 'control' },
-          id: layer.id,
-          type: 'updateCanvasLayerConfig',
-        });
-        return;
-      }
-      commitAdapter({ weight: next }, { weight: before }, t('widgets.layers.control.weight'));
-    },
-    [adapter.weight, cancelPreview, commitAdapter, layer.id, t]
+    (next: number) => commitAdapter({ weight: next }, t('widgets.layers.control.weight')),
+    [commitAdapter, t]
   );
 
-  const rangeBeforeRef = useRef<[number, number] | null>(null);
   const handleRangeChange = useCallback(
     ({ value }: SliderValueChangeDetails) => {
-      if (value.length !== 2) {
-        return;
-      }
-      if (
-        !previewStructural({
+      if (value.length === 2) {
+        previewStructural({
           config: { adapter: { beginEndStepPct: [value[0]!, value[1]!] }, layerType: 'control' },
           id: layer.id,
           type: 'updateCanvasLayerConfig',
-        })
-      ) {
-        return;
-      }
-      if (rangeBeforeRef.current === null) {
-        rangeBeforeRef.current = adapter.beginEndStepPct;
+        });
       }
     },
-    [adapter.beginEndStepPct, previewStructural, layer.id]
+    [previewStructural, layer.id]
   );
   const handleRangeChangeEnd = useCallback(
     ({ value }: SliderValueChangeDetails) => {
-      const before = rangeBeforeRef.current ?? adapter.beginEndStepPct;
-      rangeBeforeRef.current = null;
-      if (value.length !== 2) {
-        return;
+      if (value.length === 2) {
+        commitAdapter({ beginEndStepPct: [value[0]!, value[1]!] }, t('widgets.layers.control.stepRange'));
       }
-      commitAdapter(
-        { beginEndStepPct: [value[0]!, value[1]!] },
-        { beginEndStepPct: before },
-        t('widgets.layers.control.stepRange')
-      );
     },
-    [adapter.beginEndStepPct, commitAdapter, t]
+    [commitAdapter, t]
   );
 
   const handleTransparencyToggle = useCallback(

@@ -1,6 +1,8 @@
 import type {
   CanvasDocumentCapability,
+  CanvasLayerBasePatch,
   CanvasLayerCapability,
+  CanvasLayerConfigPatch,
   CanvasLayerPreviewMutation,
   CanvasDocumentModel,
   DocumentRefusal,
@@ -103,7 +105,7 @@ export const reportStructuralCommit = (
 /** The engine surface a prepared edit needs: the document model and the transaction. */
 export interface CanvasPreparedEngine {
   readonly document: Pick<CanvasDocumentCapability, 'model'>;
-  readonly layers: Pick<CanvasLayerCapability, 'commitPrepared'>;
+  readonly layers: Pick<CanvasLayerCapability, 'commitPrepared' | 'endStructuralPreview'>;
 }
 
 export type PreparedCommitOutcome =
@@ -111,12 +113,16 @@ export type PreparedCommitOutcome =
   | { status: 'refused'; refusal: DocumentRefusal }
   | { status: 'unchanged' };
 
-/** Prepares an edit against the engine's current model and commits it; refusals and no-ops never dispatch. */
+/**
+ * Prepares an edit against the engine's current model and commits it; refusals and no-ops never dispatch. A preview
+ * gesture open elsewhere ends first, so the edit and its inverse capture the committed document, not the preview.
+ */
 export const commitPreparedEdit = (
   engine: CanvasPreparedEngine | null,
   label: string,
   prepare: (model: CanvasDocumentModel) => PrepareEditResult
 ): PreparedCommitOutcome => {
+  engine?.layers.endStructuralPreview();
   const model = engine?.document.model() ?? null;
   if (!engine || !model) {
     return { status: 'not-ready' };
@@ -188,16 +194,34 @@ export const usePreparedCommit = (engine: CanvasPreparedEngine | null): Prepared
 };
 
 export interface CanvasPreviewEngine extends CanvasPreparedEngine {
-  readonly layers: Pick<CanvasLayerCapability, 'beginStructuralPreview' | 'commitPrepared'>;
+  readonly layers: Pick<CanvasLayerCapability, 'beginStructuralPreview' | 'commitPrepared' | 'endStructuralPreview'>;
 }
+
+/**
+ * Prepares the gesture's edit. `baseline` restores what the gesture previewed, for the edit's `before`; it is null
+ * when nothing was previewed or the engine ended the gesture (a replay or an edit from elsewhere landed), and the
+ * edit then records from the live document.
+ */
+export type PreviewCommit = (
+  label: string,
+  prepare: (model: CanvasDocumentModel, baseline: CanvasLayerPreviewMutation | null) => PrepareEditResult
+) => PreparedCommitOutcome;
+
+/** The base fields a gesture's baseline holds, as a `patch` command's `before`. */
+export const baselinePatch = (baseline: CanvasLayerPreviewMutation | null): CanvasLayerBasePatch | undefined =>
+  baseline?.type === 'updateCanvasLayer' ? baseline.patch : undefined;
+
+/** The config a gesture's baseline holds, as a `patch-config` command's `before`. */
+export const baselineConfig = (baseline: CanvasLayerPreviewMutation | null): CanvasLayerConfigPatch | undefined =>
+  baseline?.type === 'updateCanvasLayerConfig' ? baseline.config : undefined;
 
 export interface StructuralPreview {
   /** Previews `action` live, at most once per frame; false while edits are refused. */
   preview(action: CanvasLayerPreviewMutation): boolean;
   /** Records the gesture as one undo step from its baseline and reports any refusal. */
-  commit: PreparedCommit;
-  /** Ends the gesture unrecorded, returning the document to `restore`. */
-  cancel(restore?: CanvasLayerPreviewMutation): void;
+  commit: PreviewCommit;
+  /** Ends the gesture unrecorded, restoring what it previewed. */
+  cancel(): void;
 }
 
 /** A live-preview gesture backed by one engine preview session, committed or cancelled as a whole. */
@@ -214,27 +238,29 @@ export const useStructuralPreview = (engine: CanvasPreviewEngine | null): Struct
       if (sessionRef.current?.apply(action)) {
         return true;
       }
-      // No session yet, or a newer one or a commit ended it.
+      // No session yet, or the engine ended it: the next session starts from the document as it is now.
       sessionRef.current = engine.layers.beginStructuralPreview();
       return sessionRef.current?.apply(action) ?? false;
     },
     [engine]
   );
 
-  const commit = useCallback<PreparedCommit>(
+  const commit = useCallback<PreviewCommit>(
     (label, prepare) => {
       const session = sessionRef.current;
       sessionRef.current = null;
+      // A document change that ended the gesture (an undo removing its target) is not the user's commit to explain.
+      const endedByDocument = session !== null && !session.isActive();
       const model = engine?.document.model() ?? null;
       let outcome: PreparedCommitOutcome;
       if (!engine || !model) {
         session?.cancel();
         outcome = { status: 'not-ready' };
       } else {
-        const result = prepare(model);
+        const result = prepare(model, session?.baseline() ?? null);
         if (result.status === 'prepared') {
           const committed = session?.commit(label, result.edit);
-          // A session another gesture ended commits like any prepared edit.
+          // A session the engine ended commits like any prepared edit, from the live document.
           outcome =
             committed && committed.status !== 'busy' ? committed : engine.layers.commitPrepared(label, result.edit);
         } else {
@@ -242,16 +268,18 @@ export const useStructuralPreview = (engine: CanvasPreviewEngine | null): Struct
           outcome = result.status === 'unchanged' ? result : { refusal: result, status: 'refused' };
         }
       }
-      reportPreparedCommit(outcome, notify.error, t);
+      if (!(endedByDocument && outcome.status === 'refused' && outcome.refusal.status === 'missing')) {
+        reportPreparedCommit(outcome, notify.error, t);
+      }
       return outcome;
     },
     [engine, notify, t]
   );
 
-  const cancel = useCallback((restore?: CanvasLayerPreviewMutation): void => {
+  const cancel = useCallback((): void => {
     const session = sessionRef.current;
     sessionRef.current = null;
-    session?.cancel(restore);
+    session?.cancel();
   }, []);
 
   return { cancel, commit, preview };

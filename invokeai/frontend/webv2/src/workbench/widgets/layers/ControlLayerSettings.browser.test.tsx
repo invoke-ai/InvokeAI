@@ -1,5 +1,5 @@
 import type { ArchitectureCapabilitiesRow } from '@features/generation/core/architectureCapabilities';
-import type { CanvasControlLayerContract } from '@workbench/canvas-engine/api';
+import type { CanvasControlLayerContract, CanvasLayerPreviewMutation } from '@workbench/canvas-engine/api';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { architectureCapabilitiesFixture } from '@features/generation/core/architectureCapabilities.testing';
@@ -9,6 +9,7 @@ import { applyThemeToRoot } from '@theme/applyTheme';
 import { system } from '@theme/system';
 import { createDocumentModel } from '@workbench/canvas-engine/api';
 import { stacksFrom } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { previewInverse } from '@workbench/canvas-engine/document-model/documentModel';
 import { attachCanvasOperations } from '@workbench/canvas-operations/operationAccess';
 import { createEmptyCanvasDocument } from '@workbench/canvasMigration';
 import { createInstance } from 'i18next';
@@ -86,9 +87,9 @@ type Engine = NonNullable<Parameters<typeof ControlLayerSettings>[0]['engine']>;
 /** Committed document edits, in order; each carries the adapter patch the panel prepared. */
 const commits: { label: string; edit: unknown }[] = [];
 
-/** Live previews the panel sent, and the restores a cancelled gesture dispatched. */
-const previews: unknown[] = [];
-const restores: unknown[] = [];
+/** Live previews the panel sent, and the baselines a cancelled gesture restored. */
+const previews: CanvasLayerPreviewMutation[] = [];
+const restores: CanvasLayerPreviewMutation[] = [];
 let editingLocked = false;
 let previewsRefused = false;
 
@@ -103,26 +104,36 @@ const engineWith = (layers: CanvasControlLayerContract[]): Engine => {
     exports: { hasExportableLayerContent: () => true },
     interaction: { get: () => editingLocked, subscribe: () => () => undefined },
     layers: {
-      beginStructuralPreview: () =>
-        previewsRefused
-          ? null
-          : {
-              apply: (action: unknown) => {
-                previews.push(action);
-                return true;
-              },
-              cancel: (restore?: unknown) => {
-                restores.push(restore);
-              },
-              commit: (label: string, edit: unknown) => {
-                commits.push({ edit, label });
-                return { status: 'committed' as const };
-              },
-            },
+      beginStructuralPreview: () => {
+        if (previewsRefused) {
+          return null;
+        }
+        // As the engine's session: the first preview captures what it replaces, and cancel restores it.
+        let baseline: CanvasLayerPreviewMutation | null = null;
+        return {
+          apply: (action: CanvasLayerPreviewMutation) => {
+            baseline ??= previewInverse(model.getNode(action.id)!, action);
+            previews.push(action);
+            return true;
+          },
+          baseline: () => baseline,
+          cancel: () => {
+            if (baseline) {
+              restores.push(baseline);
+            }
+          },
+          commit: (label: string, edit: unknown) => {
+            commits.push({ edit, label });
+            return { status: 'committed' as const };
+          },
+          isActive: () => true,
+        };
+      },
       commitPrepared: (label: string, edit: unknown) => {
         commits.push({ edit, label });
         return { status: 'committed' as const };
       },
+      endStructuralPreview: () => undefined,
     },
   } as unknown as Engine;
   attachCanvasOperations(engine, {} as never);

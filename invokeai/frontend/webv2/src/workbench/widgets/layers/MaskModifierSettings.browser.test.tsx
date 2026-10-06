@@ -1,13 +1,12 @@
-import type {
-  CanvasInpaintMaskLayerContract,
-  CanvasLayerPreviewMutation,
-  PreparedDocumentEdit,
-} from '@workbench/canvas-engine/api';
+import type { CanvasInpaintMaskLayerContract, PreparedDocumentEdit } from '@workbench/canvas-engine/api';
+import type { StructuralEngineStub } from '@workbench/canvas-engine/controllers/structuralEngine.testStub';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
-import { createDocumentModel } from '@workbench/canvas-engine/api';
-import { documentFrom, layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { createStructuralEngineStub } from '@workbench/canvas-engine/controllers/structuralEngine.testStub';
+import { layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { getDocumentLayer } from '@workbench/canvas-engine/document/documentIndex';
+import { commitPreparedEdit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { createInstance } from 'i18next';
 import { act, useSyncExternalStore } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -27,62 +26,29 @@ void i18n.use(initReactI18next).init({ fallbackLng: 'en', initAsync: false, lng:
 
 type Engine = NonNullable<Parameters<typeof MaskModifierSettings>[0]['engine']>;
 
-const commits: PreparedDocumentEdit[] = [];
-const previews: CanvasLayerPreviewMutation[] = [];
+/** The structural engine over the real reducer and history; previews flush synchronously, as a settled frame would. */
+let stub: StructuralEngineStub;
+const documentLayer = (): CanvasInpaintMaskLayerContract =>
+  getDocumentLayer(stub.document(), 'mask-1') as CanvasInpaintMaskLayerContract;
 
-/** The layer as the engine holds it; the one stable engine reads it live, as the real engine's model does. */
-let documentLayer: CanvasInpaintMaskLayerContract;
-const layerListeners = new Set<() => void>();
-const subscribeLayer = (listener: () => void) => {
-  layerListeners.add(listener);
-  return () => layerListeners.delete(listener);
-};
-const publishLayer = (next: CanvasInpaintMaskLayerContract): void => {
-  documentLayer = next;
-  layerListeners.forEach((listener) => listener());
-};
+type Noise = NonNullable<CanvasInpaintMaskLayerContract['noise']>;
 
-/** Applies a config mutation the way the reducer does: the named fields replace the layer's. */
-const applyConfig = (mutation: unknown): void => {
-  const { config } = mutation as { config: Record<string, unknown> };
-  const { layerType: _layerType, ...fields } = config;
-  publishLayer({ ...documentLayer, ...fields } as CanvasInpaintMaskLayerContract);
+/** Lands a noise edit from elsewhere (a tree toggle, a script) as a recorded step, prepared from the live layer. */
+const commitNoiseFromElsewhere = (update: (noise: Noise) => Noise): void => {
+  const outcome = commitPreparedEdit(stub.engine as never, 'Noise', (model) => {
+    const live = model.getLayer('mask-1') as CanvasInpaintMaskLayerContract;
+    return model.prepare({
+      config: { layerType: 'inpaint_mask', noise: update(live.noise!) },
+      id: 'mask-1',
+      type: 'patch-config',
+    });
+  });
+  expect(outcome).toEqual({ status: 'committed' });
 };
-
-const engine = {
-  document: {
-    model: () =>
-      createDocumentModel(documentFrom([documentLayer], documentLayer.id), { editRevision: 0, projectId: 'p' }),
-  },
-  layers: {
-    beginStructuralPreview: () => ({
-      apply: (action: CanvasLayerPreviewMutation) => {
-        previews.push(action);
-        applyConfig(action);
-        return true;
-      },
-      cancel: (restore?: CanvasLayerPreviewMutation) => {
-        if (restore) {
-          applyConfig(restore);
-        }
-      },
-      commit: (_label: string, edit: PreparedDocumentEdit) => {
-        commits.push(edit);
-        applyConfig(edit.forward);
-        return { status: 'committed' as const };
-      },
-    }),
-    commitPrepared: (_label: string, edit: PreparedDocumentEdit) => {
-      commits.push(edit);
-      applyConfig(edit.forward);
-      return { status: 'committed' as const };
-    },
-  },
-} as unknown as Engine;
 
 const Harness = () => {
-  const layer = useSyncExternalStore(subscribeLayer, () => documentLayer);
-  return <MaskModifierSettings engine={engine} kind="mask-noise" layer={layer} />;
+  const layer = useSyncExternalStore(stub.subscribe, documentLayer);
+  return <MaskModifierSettings engine={stub.engine as unknown as Engine} kind="mask-noise" layer={layer} />;
 };
 
 let host: HTMLDivElement | null = null;
@@ -97,9 +63,13 @@ const settle = (run: () => void = () => undefined) =>
   });
 
 const render = async () => {
-  documentLayer = layerContract('mask-1', 'inpaint_mask', {
-    noise: { isEnabled: true, level: 0.25 },
-  } as never) as CanvasInpaintMaskLayerContract;
+  stub = createStructuralEngineStub({
+    layers: [layerContract('mask-1', 'inpaint_mask', { noise: { isEnabled: true, level: 0.25 } } as never)],
+    schedulePreview: (flush) => {
+      flush();
+      return () => undefined;
+    },
+  });
   host = document.createElement('div');
   host.style.width = '260px';
   document.body.append(host);
@@ -120,14 +90,13 @@ afterEach(async () => {
   host?.remove();
   host = null;
   root = null;
-  commits.length = 0;
-  previews.length = 0;
   vi.clearAllMocks();
 });
 
 const noiseSlider = () => page.getByRole('slider', { name: 'widgets.layers.maskFill.noiseLevel' });
 const noiseOf = (edit: PreparedDocumentEdit, side: 'forward' | 'inverse') =>
   (edit[side] as unknown as { config: { noise: { isEnabled: boolean; level: number } } }).config.noise;
+const commits = () => stub.commits;
 
 /** Starts a drag on the noise scrubber; `moveTo` takes track fractions from the press, `release` ends it there. */
 const startDrag = async () => {
@@ -157,29 +126,60 @@ describe('MaskModifierSettings', () => {
     await drag.moveTo(0.1);
     await drag.moveTo(0.2);
 
-    expect(documentLayer.noise).toEqual({ isEnabled: true, level: 0.45 });
-    expect(commits).toHaveLength(0);
+    expect(documentLayer().noise).toEqual({ isEnabled: true, level: 0.45 });
+    expect(commits()).toHaveLength(0);
 
     await drag.release();
 
-    expect(commits).toHaveLength(1);
-    expect(noiseOf(commits[0]!, 'forward')).toEqual({ isEnabled: true, level: 0.45 });
-    expect(noiseOf(commits[0]!, 'inverse')).toEqual({ isEnabled: true, level: 0.25 });
+    expect(commits()).toHaveLength(1);
+    expect(noiseOf(commits()[0]!, 'forward')).toEqual({ isEnabled: true, level: 0.45 });
+    expect(noiseOf(commits()[0]!, 'inverse')).toEqual({ isEnabled: true, level: 0.25 });
+    await stub.engine.history.undo();
+    expect(documentLayer().noise).toEqual({ isEnabled: true, level: 0.25 });
   });
 
   it('keeps a toggle that lands mid-drag in the previews, the commit, and its undo', async () => {
     await render();
     const drag = await startDrag();
     await drag.moveTo(0.1);
-    await settle(() => publishLayer({ ...documentLayer, noise: { ...documentLayer.noise!, isEnabled: false } }));
+    await settle(() => commitNoiseFromElsewhere((noise) => ({ ...noise, isEnabled: false })));
+
+    // The toggle ended the previewed gesture, restoring its level before it landed.
+    expect(documentLayer().noise).toEqual({ isEnabled: false, level: 0.25 });
+
     await drag.moveTo(0.3);
 
-    expect(previews.at(-1)).toMatchObject({ config: { noise: { isEnabled: false, level: 0.55 } } });
+    expect(documentLayer().noise).toEqual({ isEnabled: false, level: 0.55 });
 
     await drag.release();
 
-    expect(noiseOf(commits[0]!, 'forward')).toEqual({ isEnabled: false, level: 0.55 });
-    expect(noiseOf(commits[0]!, 'inverse')).toEqual({ isEnabled: false, level: 0.25 });
+    expect(noiseOf(commits().at(-1)!, 'forward')).toEqual({ isEnabled: false, level: 0.55 });
+    expect(noiseOf(commits().at(-1)!, 'inverse')).toEqual({ isEnabled: false, level: 0.25 });
+    await stub.engine.history.undo();
+    expect(documentLayer().noise).toEqual({ isEnabled: false, level: 0.25 });
+  });
+
+  it('keeps an undo that lands mid-drag and records the rest of the drag from the undone level', async () => {
+    await render();
+    commitNoiseFromElsewhere((noise) => ({ ...noise, level: 0.5 }));
+    await settle();
+    const drag = await startDrag();
+    await drag.moveTo(0.1);
+    expect(documentLayer().noise?.level).toBeCloseTo(0.6, 5);
+
+    await act(() => stub.engine.history.undo());
+
+    expect(documentLayer().noise).toEqual({ isEnabled: true, level: 0.25 });
+    expect(stub.history.canRedo()).toBe(true);
+
+    await drag.moveTo(0.2);
+    await drag.release();
+
+    expect(noiseOf(commits().at(-1)!, 'inverse')).toEqual({ isEnabled: true, level: 0.25 });
+    expect(stub.history.canRedo()).toBe(false);
+    await stub.engine.history.undo();
+    expect(documentLayer().noise).toEqual({ isEnabled: true, level: 0.25 });
+    expect(notify.error).not.toHaveBeenCalled();
   });
 
   it('records nothing and restores the level when a drag returns to where it started', async () => {
@@ -189,7 +189,8 @@ describe('MaskModifierSettings', () => {
     await drag.moveTo(0);
     await drag.release();
 
-    expect(commits).toHaveLength(0);
-    expect(documentLayer.noise).toEqual({ isEnabled: true, level: 0.25 });
+    expect(commits()).toHaveLength(0);
+    expect(documentLayer().noise).toEqual({ isEnabled: true, level: 0.25 });
+    expect(stub.history.canUndo()).toBe(false);
   });
 });

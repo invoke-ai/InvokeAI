@@ -2,8 +2,12 @@ import type { CanvasDocumentModel, CanvasInpaintMaskLayerContract } from '@workb
 import type { CanvasStructuralEngine } from '@workbench/widgets/layers/layerOps';
 
 import { ScrubberField } from '@platform/ui/ScrubberField';
-import { type CanvasPreparedEngine, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
-import { useCallback, useRef } from 'react';
+import {
+  baselineConfig,
+  type CanvasPreparedEngine,
+  useStructuralPreview,
+} from '@workbench/widgets/canvas/useStructuralCommit';
+import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
 import { MASK_MODIFIER_DEFAULTS } from './layerOps';
@@ -37,12 +41,9 @@ export const MaskModifierSettings = ({
   layer: CanvasInpaintMaskLayerContract;
 }) => {
   const { t } = useTranslation();
-  const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const field = FIELD_OF[kind];
   const modifier = layer[field];
-  // The magnitude a gesture started from. Previews and commits set only the magnitude on the live modifier, so a
-  // toggle or other edit landing mid-gesture (a drag keeps the handlers it started with) survives it.
-  const startRef = useRef<number | null>(null);
 
   const liveModifier = useCallback(
     (model: CanvasDocumentModel | null | undefined): MaskModifier | null => {
@@ -60,51 +61,35 @@ export const MaskModifierSettings = ({
     [field]
   );
 
+  // Previews set only the magnitude on the live modifier (a drag keeps the handlers it started with).
   const handleChange = useCallback(
     (percent: number) => {
       const live = liveModifier(engine?.document.model());
-      if (!live) {
-        return;
-      }
-      if (
-        previewStructural({ config: configWith(live, percent / 100), id: layer.id, type: 'updateCanvasLayerConfig' })
-      ) {
-        startRef.current ??= magnitudeOf(live);
+      if (live) {
+        previewStructural({ config: configWith(live, percent / 100), id: layer.id, type: 'updateCanvasLayerConfig' });
       }
     },
     [configWith, engine, layer.id, liveModifier, previewStructural]
   );
 
+  // A gesture ending where it started prepares nothing, which drops its previews.
   const handleChangeEnd = useCallback(
     (percent: number) => {
-      const start = startRef.current;
-      startRef.current = null;
-      if (start === null) {
-        return;
-      }
-      const next = percent / 100;
-      if (next === start) {
-        const live = liveModifier(engine?.document.model());
-        if (live) {
-          cancelPreview({ config: configWith(live, start), id: layer.id, type: 'updateCanvasLayerConfig' });
-        }
-        return;
-      }
-      commitPrepared(t(LABEL_OF[kind]), (model) => {
+      commitPrepared(t(LABEL_OF[kind]), (model, baseline) => {
         const live = liveModifier(model);
         // Removed mid-gesture: committing would bring it back.
         if (!live) {
           return { ids: [layer.id], status: 'missing' };
         }
         return model.prepare({
-          before: configWith(live, start),
-          config: configWith(live, next),
+          before: baselineConfig(baseline),
+          config: configWith(live, percent / 100),
           id: layer.id,
           type: 'patch-config',
         });
       });
     },
-    [cancelPreview, commitPrepared, configWith, engine, kind, layer.id, liveModifier, t]
+    [commitPrepared, configWith, kind, layer.id, liveModifier, t]
   );
 
   if (!modifier) {

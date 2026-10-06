@@ -10,8 +10,9 @@ import type { PreparedDocumentEdit } from '@workbench/canvas-engine/document-mod
 import type { HistoryEntryToken } from '@workbench/canvas-engine/history/history';
 import type { CanvasMutationOrigin, CanvasProjectMutation } from '@workbench/canvas-engine/mutationContracts';
 
-import { createDocumentModel } from '@workbench/canvas-engine/document-model/documentModel';
+import { createDocumentModel, previewInverse } from '@workbench/canvas-engine/document-model/documentModel';
 import { checkEditPostconditions } from '@workbench/canvas-engine/document-model/postconditions';
+import { getDocumentIndex } from '@workbench/canvas-engine/document/documentIndex';
 import { createDocumentPatchEntry } from '@workbench/canvas-engine/history/documentPatch';
 import { HISTORY_ENTRY_OVERHEAD_BYTES } from '@workbench/canvas-engine/history/history';
 
@@ -81,6 +82,42 @@ const positionMutation = (positions: readonly { id: string; x: number; y: number
 
 const unique = (ids: readonly string[]): string[] => [...new Set(ids)];
 
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null && !Array.isArray(value);
+
+/** `existing` keeps every value it holds; `incoming` adds the rest, field by field inside plain records. */
+const mergeRecords = (
+  existing: Record<string, unknown>,
+  incoming: Record<string, unknown>
+): Record<string, unknown> => {
+  const merged: Record<string, unknown> = { ...incoming, ...existing };
+  for (const key of Object.keys(incoming)) {
+    const have = existing[key];
+    const add = incoming[key];
+    if (isRecord(have) && isRecord(add)) {
+      merged[key] = mergeRecords(have, add);
+    }
+  }
+  return merged;
+};
+
+/** The session baseline with `inverse` added for the fields it does not hold yet; earlier captures win. */
+const withBaseline = (
+  baseline: CanvasLayerPreviewMutation | null,
+  inverse: CanvasLayerPreviewMutation
+): CanvasLayerPreviewMutation => {
+  if (!baseline) {
+    return inverse;
+  }
+  if (baseline.type === 'updateCanvasLayer' && inverse.type === 'updateCanvasLayer') {
+    return { ...baseline, patch: mergeRecords(baseline.patch, inverse.patch) as typeof baseline.patch };
+  }
+  if (baseline.type === 'updateCanvasLayerConfig' && inverse.type === 'updateCanvasLayerConfig') {
+    return { ...baseline, config: mergeRecords(baseline.config, inverse.config) as typeof baseline.config };
+  }
+  return baseline;
+};
+
 type RecordedResult = StructuralCommitResult | { status: 'committed'; token: HistoryEntryToken };
 
 /** The public result; the history token stays internal. */
@@ -92,7 +129,7 @@ export class StructuralLayerController {
   private burst: NudgeBurst | null = null;
   private disposed = false;
   private readonly now: () => number;
-  private preview: { session: StructuralPreviewSession; flushPending(): void; drop(): void } | null = null;
+  private preview: { session: StructuralPreviewSession; end(): void } | null = null;
 
   constructor(private readonly deps: StructuralLayerControllerOptions) {
     this.now = deps.now ?? Date.now;
@@ -143,9 +180,10 @@ export class StructuralLayerController {
   }
 
   /**
-   * Starts an owned preview: `apply` coalesces live dispatches to one per frame, and `commit` records the gesture
-   * as one step from its prepared baseline without dispatching again when the preview already reached it, restoring
-   * the baseline when it is refused. A newer session, any commit or disposal ends this one.
+   * Starts an owned preview: `apply` coalesces live dispatches to one per frame and captures the values the first
+   * preview of each field replaces, `commit` records the gesture as one step from its prepared baseline without
+   * dispatching again when the preview already reached it, restoring the baseline when it is refused. A newer
+   * session, any commit, a history replay or disposal ends this one first, restoring its baseline.
    */
   beginPreview(): StructuralPreviewSession | null {
     if (!this.canCommit()) {
@@ -154,6 +192,7 @@ export class StructuralLayerController {
     this.endPreview();
     let pending: CanvasProjectMutation | null = null;
     let cancelFlush: (() => void) | null = null;
+    let baseline: CanvasLayerPreviewMutation | null = null;
     const owns = (): boolean => this.preview?.session === session;
     const flushPending = (): void => {
       cancelFlush?.();
@@ -164,16 +203,33 @@ export class StructuralLayerController {
         this.deps.ctx.dispatch(next, 'system');
       }
     };
-    const drop = (): void => {
+    // Returning to the baseline undoes this session's own unrecorded previews, so a lock does not block it.
+    const restore = (): void => {
+      if (baseline && !this.disposed) {
+        this.deps.ctx.dispatch(baseline, 'system');
+      }
+    };
+    const end = (): void => {
       cancelFlush?.();
       cancelFlush = null;
       pending = null;
+      restore();
     };
     const session: StructuralPreviewSession = {
       apply: (action: CanvasLayerPreviewMutation) => {
         if (!owns() || !this.canCommit()) {
           return false;
         }
+        // A session previews one mutation kind on one node; its baseline holds each field as the gesture found it.
+        if (baseline && (baseline.id !== action.id || baseline.type !== action.type)) {
+          return false;
+        }
+        const document = this.deps.ctx.getReducerDocument();
+        const node = document ? getDocumentIndex(document).byId.get(action.id)?.node : undefined;
+        if (!node) {
+          return false;
+        }
+        baseline = withBaseline(baseline, previewInverse(node, action));
         pending = action;
         if (cancelFlush === null) {
           let flushed = false;
@@ -186,14 +242,10 @@ export class StructuralLayerController {
         }
         return true;
       },
-      cancel: (restore) => {
+      baseline: () => (owns() ? baseline : null),
+      cancel: () => {
         if (owns()) {
-          drop();
-          this.preview = null;
-          // Returning to the baseline undoes this session's own unrecorded previews, so a lock does not block it.
-          if (restore && !this.disposed) {
-            this.deps.ctx.dispatch(restore, 'system');
-          }
+          this.endPreview();
         }
       },
       commit: (label, edit) => {
@@ -203,6 +255,7 @@ export class StructuralLayerController {
         flushPending();
         this.preview = null;
         if (edit.projectId !== this.deps.ctx.projectId) {
+          restore();
           return { status: 'dispatch-rejected' };
         }
         const verify = (document: CanvasDocumentContractV3 | null): boolean =>
@@ -213,14 +266,25 @@ export class StructuralLayerController {
           : this.step(edit.forward, edit.inverse, verify);
         const result = publicResult(this.publish(label, step, edit.forward, edit.inverse));
         // A refused gesture must not leave its unrecorded previews behind.
-        if (result.status !== 'committed' && !this.disposed) {
-          this.deps.ctx.dispatch(edit.inverse, 'system');
+        if (result.status !== 'committed') {
+          restore();
         }
         return result;
       },
+      isActive: owns,
     };
-    this.preview = { drop, flushPending, session };
+    this.preview = { end, session };
     return session;
+  }
+
+  /** Ends an open preview session: pending previews are dropped and its baseline is restored, unrecorded. */
+  endPreview(): void {
+    const preview = this.preview;
+    if (!preview) {
+      return;
+    }
+    this.preview = null;
+    preview.end();
   }
 
   nudge(dx: number, dy: number): StructuralCommitResult {
@@ -271,11 +335,6 @@ export class StructuralLayerController {
     this.disposed = true;
     this.burst = null;
     this.endPreview();
-  }
-
-  private endPreview(): void {
-    this.preview?.drop();
-    this.preview = null;
   }
 
   private staleRevision(expectedRevision: number | undefined): StructuralCommitResult | null {

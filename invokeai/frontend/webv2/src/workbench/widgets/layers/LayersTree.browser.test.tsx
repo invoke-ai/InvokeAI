@@ -212,6 +212,7 @@ const engine = withOperations({
       dispatchExternal(edit.forward);
       return { status: 'committed' as const };
     },
+    endStructuralPreview: () => undefined,
   },
   previews: { drawLayerThumbnail: () => false, requestLayerThumbnail: thumbnailRequests },
   projectId: PROJECT_ID,
@@ -839,6 +840,23 @@ describe('LayersTree projected child rows', () => {
     await act(() => userEvent.keyboard('{Delete}'));
     expect(output('mask-modifiers')).toBe('noise:off:0.25');
     expect(document.activeElement).toBe(treeitem('Mask'));
+  });
+
+  it("builds a child row's edit from the engine's document, not the rendered one", async () => {
+    await renderTree([
+      layerContract('mask', 'inpaint_mask', { name: 'Mask', noise: { isEnabled: true, level: 0.25 } }),
+    ]);
+    // The engine restored a preview that the rendered tree still shows: the toggle must carry the committed level.
+    harnessDocument = {
+      ...harnessDocument,
+      stacks: stacksFrom([
+        layerContract('mask', 'inpaint_mask', { name: 'Mask', noise: { isEnabled: true, level: 0.5 } }),
+      ]),
+    };
+    const dot = treeitem('Noise').querySelector<HTMLButtonElement>('button[aria-label="Toggle active"]')!;
+    await act(() => userEvent.click(dot));
+
+    expect(committedEdits.at(-1)!.forward).toMatchObject({ config: { noise: { isEnabled: false, level: 0.5 } } });
   });
 
   it('projects adjustment rows in stack order; the dot toggles one entry', async () => {

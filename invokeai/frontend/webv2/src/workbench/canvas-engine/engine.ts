@@ -628,6 +628,13 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
   const persistenceController = new PersistenceController(bitmapStore);
 
   const historyController = new HistoryController({
+    // A live float holds pixels no history entry knows about, and a preview holds unrecorded document values:
+    // replaying over either would land on state the entry never saw. Put both back first; neither is itself
+    // undoable until it commits.
+    beforeReplay: () => {
+      floatingSelection.cancel();
+      structuralController.endPreview();
+    },
     canEdit: () => canEditDocument(),
     canRedoStore: stores.canRedo,
     canUndoStore: stores.canUndo,
@@ -2480,13 +2487,7 @@ export const createCanvasEngine = (opts: CanvasEngineOptions): CanvasEngineCoreC
     !stores.textEditSession.get() &&
     mirror.getDocument() !== null;
 
-  // A live float holds pixels that no history entry knows about, so replaying an
-  // entry over them would write into a layer with a hole in it. Put them back
-  // first; the float is not itself undoable until it commits.
   const replayHistory = async (direction: 'undo' | 'redo'): Promise<CanvasHistoryReplayStatus> => {
-    if (!history.isReplaying()) {
-      floatingSelection.cancel();
-    }
     const result = await (direction === 'undo' ? historyController.undo() : historyController.redo());
     return result.status;
   };

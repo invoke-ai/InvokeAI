@@ -11,7 +11,7 @@ import { createListCollection, Flex, HStack, Icon, InputGroup, NumberInput } fro
 import { Select } from '@platform/ui';
 import { getDocumentIndex, isGroupNode } from '@workbench/canvas-engine/api';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
-import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
+import { baselinePatch, useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
 import { CANVAS_BLEND_MODES } from '@workbench/widgets/layers/layerOps';
 import { useActiveProjectSelector } from '@workbench/WorkbenchContext';
 import { MoveHorizontalIcon } from 'lucide-react';
@@ -77,7 +77,9 @@ const blendModeOf = (layer: CanvasNodeContract | null): CanvasBlendMode => layer
 
 /**
  * Highlighting an option (hover or arrow keys) previews its mode unrecorded. Choosing one records a single step from
- * the mode the menu opened on; closing without a choice or unmounting restores that mode.
+ * the mode the preview started on; closing without a choice or unmounting restores that mode. An undo or an edit
+ * from elsewhere while the menu is open ends the preview in the engine, and a choice then records from the live
+ * mode.
  */
 const BlendModeControl = ({
   editingLocked,
@@ -106,11 +108,8 @@ const BlendModeControl = ({
   const blendValue = useMemo(() => [shownMode], [shownMode]);
 
   const endPreview = useCallback(() => {
-    const session = previewRef.current;
     previewRef.current = null;
-    if (session?.previewed) {
-      cancelPreview({ id: session.id, patch: { blendMode: session.original }, type: 'updateCanvasLayer' });
-    }
+    cancelPreview();
   }, [cancelPreview]);
 
   const handleOpenChange = useCallback(
@@ -145,19 +144,18 @@ const BlendModeControl = ({
   const handleBlendChange = useCallback(
     ({ value }: SelectValueChangeDetails<BlendModeOption>) => {
       const mode = value[0] as CanvasBlendMode | undefined;
-      const session = previewRef.current;
-      const id = session?.id ?? layer?.id;
-      const original = session ? session.original : blendModeOf(layer);
-      if (!id || !mode || mode === original) {
-        endPreview();
+      const id = previewRef.current?.id ?? layer?.id;
+      previewRef.current = null;
+      if (!id || !mode) {
+        cancelPreview();
         return;
       }
-      previewRef.current = null;
-      commitPrepared(t('widgets.layers.actions.blendMode'), (model) =>
-        model.prepare({ before: { blendMode: original }, id, patch: { blendMode: mode }, type: 'patch' })
+      // Choosing the mode the preview started on prepares nothing, which drops the previews.
+      commitPrepared(t('widgets.layers.actions.blendMode'), (model, baseline) =>
+        model.prepare({ before: baselinePatch(baseline), id, patch: { blendMode: mode }, type: 'patch' })
       );
     },
-    [commitPrepared, endPreview, layer, t]
+    [cancelPreview, commitPrepared, layer, t]
   );
 
   const endPreviewOnUnmount = useCallback(
@@ -197,9 +195,8 @@ const OpacityRow = ({
 }) => {
   const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const { t } = useTranslation();
-  // Capture original opacity once and track latest writes outside render closures so same-event commits record
-  // current values.
-  const pendingRef = useRef<{ id: string; before: number; latest: number } | null>(null);
+  // Track latest writes outside render closures so same-event commits record current values.
+  const pendingRef = useRef<{ id: string; latest: number } | null>(null);
   const disabled = isLayerEditingDisabled(layer, editingLocked);
   const opacityPercent = useMemo(() => String(Math.round((layer?.opacity ?? 1) * 100)), [layer?.opacity]);
 
@@ -207,12 +204,12 @@ const OpacityRow = ({
   const commitPending = useCallback(() => {
     const pending = pendingRef.current;
     pendingRef.current = null;
-    if (!pending || pending.before === pending.latest) {
+    if (!pending) {
       return;
     }
-    commitPrepared(t('widgets.layers.actions.opacity'), (model) =>
+    commitPrepared(t('widgets.layers.actions.opacity'), (model, baseline) =>
       model.prepare({
-        before: { opacity: pending.before },
+        before: baselinePatch(baseline),
         id: pending.id,
         patch: { opacity: pending.latest },
         type: 'patch',
@@ -240,11 +237,7 @@ const OpacityRow = ({
       ) {
         return;
       }
-      if (pendingRef.current === null) {
-        pendingRef.current = { before: layer.opacity ?? 1, id: layer.id, latest: next };
-      } else {
-        pendingRef.current.latest = next;
-      }
+      pendingRef.current = { id: layer.id, latest: next };
     },
     [commitPending, previewStructural, layer]
   );

@@ -42,9 +42,18 @@ describe('commitPreparedEdit', () => {
   const document = { ...createEmptyCanvasDocument(), stacks: stacksFrom([layer]), selectedLayerId: 'a' };
   const model = createDocumentModel(document, { editRevision: 3, projectId: 'p' });
 
-  it('commits a prepared edit through the engine transaction', () => {
+  it('commits a prepared edit through the engine transaction, ending any preview before reading the model', () => {
+    const order: string[] = [];
     const commitPrepared = vi.fn(() => ({ status: 'committed' as const }));
-    const engine = { document: { model: () => model }, layers: { commitPrepared } };
+    const engine = {
+      document: {
+        model: () => {
+          order.push('model');
+          return model;
+        },
+      },
+      layers: { commitPrepared, endStructuralPreview: () => void order.push('end-preview') },
+    };
 
     expect(
       commitPreparedEdit(engine, 'Rename', (m) => m.prepare({ id: 'a', patch: { name: 'B' }, type: 'patch' }))
@@ -55,11 +64,12 @@ describe('commitPreparedEdit', () => {
       'Rename',
       expect.objectContaining({ expectedRevision: 3, projectId: 'p' })
     );
+    expect(order).toEqual(['end-preview', 'model']);
   });
 
   it('never dispatches a refusal or an unchanged command', () => {
     const commitPrepared = vi.fn(() => ({ status: 'committed' as const }));
-    const engine = { document: { model: () => model }, layers: { commitPrepared } };
+    const engine = { document: { model: () => model }, layers: { commitPrepared, endStructuralPreview: vi.fn() } };
 
     expect(commitPreparedEdit(engine, 'Delete', (m) => m.prepare({ ids: ['ghost'], type: 'remove' }))).toEqual({
       refusal: { ids: ['ghost'], status: 'missing' },
@@ -73,7 +83,10 @@ describe('commitPreparedEdit', () => {
 
   it('refuses as not-ready without an engine or a document', () => {
     expect(commitPreparedEdit(null, 'Rename', () => ({ status: 'unchanged' }))).toEqual({ status: 'not-ready' });
-    const engine = { document: { model: () => null }, layers: { commitPrepared: vi.fn() } };
+    const engine = {
+      document: { model: () => null },
+      layers: { commitPrepared: vi.fn(), endStructuralPreview: vi.fn() },
+    };
     expect(commitPreparedEdit(engine, 'Rename', () => ({ status: 'unchanged' }))).toEqual({ status: 'not-ready' });
   });
 });

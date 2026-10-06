@@ -62,6 +62,7 @@ const engine = {
       createDocumentModel(documentFrom([documentLayer], documentLayer.id), { editRevision: 0, projectId: 'p' }),
   },
   layers: {
+    endStructuralPreview: () => undefined,
     commitPrepared: (_label: string, edit: PreparedDocumentEdit) => {
       commits.push(edit);
       const { config } = edit.forward as unknown as { config: { referenceImages: RegionalGuidanceReferenceImage[] } };

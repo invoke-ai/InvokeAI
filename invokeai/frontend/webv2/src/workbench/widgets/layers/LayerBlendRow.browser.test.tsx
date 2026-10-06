@@ -1,13 +1,13 @@
-import type {
-  CanvasLayerContract,
-  CanvasLayerPreviewMutation,
-  PreparedDocumentEdit,
-} from '@workbench/canvas-engine/api';
+import type { CanvasBlendMode, CanvasLayerContract } from '@workbench/canvas-engine/api';
+import type { StructuralEngineStub } from '@workbench/canvas-engine/controllers/structuralEngine.testStub';
+import type { Project } from '@workbench/projectContracts';
 
 import { ChakraProvider } from '@chakra-ui/react';
 import { system } from '@theme/system';
-import { createDocumentModel } from '@workbench/canvas-engine/api';
-import { documentFrom, layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { getDocumentLayer } from '@workbench/canvas-engine/api';
+import { createStructuralEngineStub } from '@workbench/canvas-engine/controllers/structuralEngine.testStub';
+import { layerContract } from '@workbench/canvas-engine/document-model/documentFixtures.testStub';
+import { commitPreparedEdit } from '@workbench/widgets/canvas/useStructuralCommit';
 import { createInstance } from 'i18next';
 import { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
@@ -16,10 +16,8 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vite
 import { page, userEvent } from 'vitest/browser';
 
 const harness = vi.hoisted(() => ({
-  layers: [] as CanvasLayerContract[],
   listeners: new Set<() => void>(),
-  project: null as { canvas: { document: unknown } } | null,
-  selectedLayerId: null as string | null,
+  project: null as Project | null,
 }));
 
 vi.mock('@workbench/WorkbenchContext', async () => {
@@ -47,87 +45,53 @@ beforeAll(async () => {
 
 (globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 
+/** The structural engine over the real reducer and history; previews flush synchronously, as a settled frame would. */
+let stub: StructuralEngineStub;
+let unsubscribe: () => void = () => undefined;
+
 const publish = (): void => {
-  harness.project = { canvas: { document: documentFrom(harness.layers, harness.selectedLayerId) } };
+  harness.project = stub.project();
   harness.listeners.forEach((listener) => listener());
 };
 
-/** Applies an `updateCanvasLayer` patch the way the reducer does, so the row re-renders from the document. */
-const applyMutation = (mutation: unknown): void => {
-  const { id, patch, type } = mutation as { id: string; patch: Partial<CanvasLayerContract>; type: string };
-  if (type !== 'updateCanvasLayer') {
-    throw new Error(`Unexpected mutation ${type}`);
-  }
-  harness.layers = harness.layers.map((layer) =>
-    layer.id === id ? ({ ...layer, ...patch } as CanvasLayerContract) : layer
-  );
+const createStub = (selectedLayerId: string | null = 'r1'): void => {
+  unsubscribe();
+  stub = createStructuralEngineStub({
+    layers: [layerContract('r1'), layerContract('r2')],
+    schedulePreview: (flush) => {
+      flush();
+      return () => undefined;
+    },
+    selectedLayerId,
+  });
+  unsubscribe = stub.subscribe(publish);
   publish();
 };
 
-const previews: CanvasLayerPreviewMutation[] = [];
-const commits: PreparedDocumentEdit[] = [];
-
-/** One engine preview session at a time, as the engine owns them: a newer session ends the last. */
-const createEngine = () => {
-  let current: object | null = null;
-  return {
-    document: {
-      model: () => createDocumentModel(harness.project!.canvas.document as never, { editRevision: 0, projectId: 'p' }),
-    },
-    exports: {},
-    interaction: { get: () => false, subscribe: () => () => undefined },
-    layers: {
-      beginStructuralPreview: () => {
-        const session = {
-          apply: (action: CanvasLayerPreviewMutation) => {
-            if (current !== session) {
-              return false;
-            }
-            previews.push(action);
-            applyMutation(action);
-            return true;
-          },
-          cancel: (restore?: CanvasLayerPreviewMutation) => {
-            if (current === session) {
-              current = null;
-              if (restore) {
-                applyMutation(restore);
-              }
-            }
-          },
-          commit: (_label: string, edit: PreparedDocumentEdit) => {
-            if (current !== session) {
-              return { status: 'busy' as const };
-            }
-            current = null;
-            commits.push(edit);
-            applyMutation(edit.forward);
-            return { status: 'committed' as const };
-          },
-        };
-        current = session;
-        return session;
-      },
-      commitPrepared: (_label: string, edit: PreparedDocumentEdit) => {
-        current = null;
-        commits.push(edit);
-        applyMutation(edit.forward);
-        return { status: 'committed' as const };
-      },
-    },
-    projectId: 'p',
-  };
+/** Records a blend-mode step from elsewhere (a hotkey, a script), as the user's history to undo. */
+const commitBlendMode = (id: string, blendMode: CanvasBlendMode): void => {
+  const outcome = commitPreparedEdit(stub.engine, 'Blend mode', (model) =>
+    model.prepare({ id, patch: { blendMode }, type: 'patch' })
+  );
+  expect(outcome).toEqual({ status: 'committed' });
 };
 
 let host: HTMLDivElement | null = null;
 let root: Root | null = null;
+
+/** The row's engine surface: the stub's structural half plus an unlocked interaction store. */
+const rowEngine = () => ({
+  ...stub.engine,
+  exports: {},
+  interaction: { get: () => false, subscribe: () => () => undefined },
+});
 
 const mount = async (width = 280): Promise<void> => {
   host = document.createElement('div');
   host.style.width = `${width}px`;
   document.body.append(host);
   root = createRoot(host);
-  const engine = createEngine();
+  const engine = rowEngine();
   await act(() =>
     root!.render(
       <I18nextProvider i18n={i18n}>
@@ -144,22 +108,19 @@ const unmount = async (): Promise<void> => {
   root = null;
 };
 
-const layer = (id = 'r1'): CanvasLayerContract => harness.layers.find((candidate) => candidate.id === id)!;
+const layer = (id = 'r1'): CanvasLayerContract => getDocumentLayer(stub.document(), id)!;
 const trigger = () => page.getByRole('combobox', { name: 'Blend mode' });
 const option = (name: string) => page.getByRole('option', { exact: true, name });
+const commits = () => stub.commits;
 
 beforeEach(() => {
-  harness.layers = [layerContract('r1'), layerContract('r2')];
-  harness.selectedLayerId = 'r1';
-  publish();
+  createStub();
 });
 
 afterEach(async () => {
   await unmount();
   host?.remove();
   host = null;
-  previews.length = 0;
-  commits.length = 0;
   vi.clearAllMocks();
   // Prototype spies (pointer lock) must not leak into later tests or files sharing the browser.
   vi.restoreAllMocks();
@@ -182,7 +143,8 @@ describe('blend mode preview', () => {
     await userEvent.keyboard('{Escape}');
 
     await expect.poll(() => layer().blendMode).toBe('normal');
-    expect(commits).toHaveLength(0);
+    expect(commits()).toHaveLength(0);
+    expect(stub.history.canUndo()).toBe(false);
     expect(notify.error).not.toHaveBeenCalled();
   });
 
@@ -196,11 +158,13 @@ describe('blend mode preview', () => {
 
     await userEvent.keyboard('{Enter}');
 
-    expect(commits).toHaveLength(1);
-    expect(commits[0]!.forward).toMatchObject({ patch: { blendMode: 'screen' } });
-    expect(commits[0]!.inverse).toMatchObject({ patch: { blendMode: 'normal' } });
+    expect(commits()).toHaveLength(1);
+    expect(commits()[0]!.forward).toMatchObject({ patch: { blendMode: 'screen' } });
+    expect(commits()[0]!.inverse).toMatchObject({ patch: { blendMode: 'normal' } });
     await expect.element(trigger()).toHaveTextContent('Screen');
     expect(layer().blendMode).toBe('screen');
+    await stub.engine.history.undo();
+    expect(layer().blendMode).toBe('normal');
   });
 
   it('records a clicked option once, even after previewing others on the way', async () => {
@@ -210,9 +174,10 @@ describe('blend mode preview', () => {
     await userEvent.hover(option('Overlay'));
     await userEvent.click(option('Overlay'));
 
-    expect(commits).toHaveLength(1);
-    expect(commits[0]!.inverse).toMatchObject({ id: 'r1', patch: { blendMode: 'normal' } });
+    expect(commits()).toHaveLength(1);
+    expect(commits()[0]!.inverse).toMatchObject({ id: 'r1', patch: { blendMode: 'normal' } });
     expect(layer().blendMode).toBe('overlay');
+    expect(stub.history.entries().past).toEqual(['Blend mode']);
   });
 
   it('restores the original when the menu unmounts or the selection moves while it is open', async () => {
@@ -222,8 +187,7 @@ describe('blend mode preview', () => {
     await expect.poll(() => layer().blendMode).toBe('darken');
 
     await act(() => {
-      harness.selectedLayerId = 'r2';
-      publish();
+      stub.ctx.dispatch({ id: 'r2', type: 'setCanvasSelectedLayer' }, 'system');
     });
 
     expect(layer('r1').blendMode).toBe('normal');
@@ -235,7 +199,63 @@ describe('blend mode preview', () => {
     await unmount();
 
     expect(layer('r2').blendMode).toBe('normal');
-    expect(commits).toHaveLength(0);
+    expect(commits()).toHaveLength(0);
+  });
+
+  it('keeps an undo that lands while a mode is hovered: Escape restores nothing over it', async () => {
+    commitBlendMode('r1', 'screen');
+    await mount();
+    await userEvent.click(trigger());
+    await userEvent.hover(option('Multiply'));
+    await expect.poll(() => layer().blendMode).toBe('multiply');
+
+    await act(() => stub.engine.history.undo());
+
+    expect(layer().blendMode).toBe('normal');
+
+    await userEvent.keyboard('{Escape}');
+    await expect.poll(() => page.getByRole('option').query()).toBeNull();
+
+    // The undone step stays undone: the document, the undo stack and the redo stack agree.
+    expect(layer().blendMode).toBe('normal');
+    expect(stub.history.canUndo()).toBe(false);
+    expect(stub.history.canRedo()).toBe(true);
+    expect(notify.error).not.toHaveBeenCalled();
+  });
+
+  it('records a choice made after an undo landed mid-menu from the undone mode, not the one the menu opened on', async () => {
+    commitBlendMode('r1', 'screen');
+    await mount();
+    await userEvent.click(trigger());
+    await userEvent.hover(option('Multiply'));
+    await expect.poll(() => layer().blendMode).toBe('multiply');
+    await act(() => stub.engine.history.undo());
+
+    await userEvent.click(option('Multiply'));
+
+    expect(layer().blendMode).toBe('multiply');
+    expect(commits().at(-1)!.inverse).toMatchObject({ id: 'r1', patch: { blendMode: 'normal' } });
+    await stub.engine.history.undo();
+    expect(layer().blendMode).toBe('normal');
+  });
+
+  it('ends a hovered preview before a delete from elsewhere, so undoing the delete restores the committed mode', async () => {
+    await mount();
+    await userEvent.click(trigger());
+    await userEvent.hover(option('Multiply'));
+    await expect.poll(() => layer().blendMode).toBe('multiply');
+
+    await act(() => {
+      const outcome = commitPreparedEdit(stub.engine, 'Delete', (model) =>
+        model.prepare({ ids: ['r1'], type: 'remove' })
+      );
+      expect(outcome).toEqual({ status: 'committed' });
+    });
+
+    expect(getDocumentLayer(stub.document(), 'r1')).toBeNull();
+    await stub.engine.history.undo();
+    expect(layer('r1').blendMode).toBe('normal');
+    expect(stub.history.entries()).toEqual({ future: ['Delete'], past: [] });
   });
 });
 
@@ -250,9 +270,9 @@ describe('opacity input', () => {
     });
 
     expect(layer().opacity).toBeCloseTo(0.96, 5);
-    expect(commits).toHaveLength(1);
-    expect(commits[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.96 } });
-    expect(commits[0]!.inverse).toMatchObject({ id: 'r1', patch: { opacity: 1 } });
+    expect(commits()).toHaveLength(1);
+    expect(commits()[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.96 } });
+    expect(commits()[0]!.inverse).toMatchObject({ id: 'r1', patch: { opacity: 1 } });
   });
 
   it('scrubs from its drag handle and records the result once when the mouse button lifts', async () => {
@@ -273,13 +293,13 @@ describe('opacity input', () => {
 
     // Each step previews on the layer; nothing is recorded until the release.
     expect(layer().opacity).toBeCloseTo(0.95, 5);
-    expect(commits).toHaveLength(0);
+    expect(commits()).toHaveLength(0);
     await act(() =>
       document.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, button: 0, clientX: 80, clientY: 100 }))
     );
-    expect(commits).toHaveLength(1);
-    expect(commits[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.95 } });
-    expect(commits[0]!.inverse).toMatchObject({ id: 'r1', patch: { opacity: 1 } });
+    expect(commits()).toHaveLength(1);
+    expect(commits()[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.95 } });
+    expect(commits()[0]!.inverse).toMatchObject({ id: 'r1', patch: { opacity: 1 } });
   });
 
   it('previews a typed value and records it once on Enter', async () => {
@@ -288,30 +308,29 @@ describe('opacity input', () => {
     await userEvent.keyboard('45');
 
     expect(layer().opacity).toBeCloseTo(0.45, 5);
-    expect(commits).toHaveLength(0);
+    expect(commits()).toHaveLength(0);
 
     await userEvent.keyboard('{Enter}');
 
-    expect(commits).toHaveLength(1);
-    expect(commits[0]!.forward).toMatchObject({ patch: { opacity: 0.45 } });
-    expect(commits[0]!.inverse).toMatchObject({ patch: { opacity: 1 } });
+    expect(commits()).toHaveLength(1);
+    expect(commits()[0]!.forward).toMatchObject({ patch: { opacity: 0.45 } });
+    expect(commits()[0]!.inverse).toMatchObject({ patch: { opacity: 1 } });
   });
 
   it('records a still-pending edit when the row unmounts', async () => {
     await mount();
     await userEvent.tripleClick(opacityInput());
     await userEvent.keyboard('30');
-    expect(commits).toHaveLength(0);
+    expect(commits()).toHaveLength(0);
 
     await unmount();
 
-    expect(commits).toHaveLength(1);
-    expect(commits[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.3 } });
+    expect(commits()).toHaveLength(1);
+    expect(commits()[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.3 } });
   });
 
   it('disables both controls without an editable selection', async () => {
-    harness.selectedLayerId = null;
-    publish();
+    createStub(null);
     await mount();
 
     await expect.element(trigger()).toBeDisabled();

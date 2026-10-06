@@ -61,6 +61,24 @@ describe('HistoryController', () => {
     expect(redo).not.toHaveBeenCalled();
   });
 
+  it('puts back unrecorded live state before a replay it admits, and not before one it refuses', async () => {
+    const order: string[] = [];
+    let canEdit = true;
+    const controller = new HistoryController({
+      beforeReplay: () => order.push('before'),
+      canEdit: () => canEdit,
+    });
+    record(controller, entry('edit', 1, { undo: () => void order.push('undo'), redo: () => void order.push('redo') }));
+
+    await expect(controller.undo()).resolves.toEqual({ status: 'applied' });
+    await expect(controller.redo()).resolves.toEqual({ status: 'applied' });
+    expect(order).toEqual(['before', 'undo', 'before', 'redo']);
+
+    canEdit = false;
+    await expect(controller.undo()).resolves.toEqual({ status: 'refused' });
+    expect(order).toHaveLength(4);
+  });
+
   it('reports a failed replay and leaves the step where it was', async () => {
     const reportFailure = vi.fn();
     const controller = new HistoryController({ reportFailure });

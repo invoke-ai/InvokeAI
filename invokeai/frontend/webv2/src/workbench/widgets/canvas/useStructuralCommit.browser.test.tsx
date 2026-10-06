@@ -44,11 +44,14 @@ const opacity = (value: number): CanvasLayerPreviewMutation => ({
 });
 const EDIT = { forward: opacity(0.5), inverse: opacity(1) } as unknown as PreparedDocumentEdit;
 
-const createSession = (commitStatus: 'committed' | 'busy' = 'committed') => {
+/** A session mock; `active: false` models one the engine ended (a replay or a commit from elsewhere landed). */
+const createSession = (commitStatus: 'committed' | 'busy' = 'committed', active = true) => {
   const session = {
-    apply: vi.fn(() => true),
+    apply: vi.fn(() => active),
+    baseline: vi.fn(() => (active ? opacity(1) : null)),
     cancel: vi.fn(),
     commit: vi.fn(() => ({ status: commitStatus })),
+    isActive: vi.fn(() => active),
   } satisfies StructuralPreviewSession;
   return session;
 };
@@ -56,7 +59,7 @@ const createSession = (commitStatus: 'committed' | 'busy' = 'committed') => {
 const createEngine = (session: StructuralPreviewSession, commitPrepared = vi.fn(() => ({ status: 'committed' }))) =>
   ({
     document: { model: () => ({}) },
-    layers: { beginStructuralPreview: vi.fn(() => session), commitPrepared },
+    layers: { beginStructuralPreview: vi.fn(() => session), commitPrepared, endStructuralPreview: vi.fn() },
   }) as unknown as CanvasPreviewEngine & { layers: { commitPrepared: typeof commitPrepared } };
 
 const PreviewProbe = ({ engine, ref }: { engine: CanvasPreviewEngine; ref: Ref<StructuralPreview> }) => {
@@ -123,6 +126,47 @@ describe('useStructuralPreview', () => {
     expect(notify.error).toHaveBeenCalledWith(
       'widgets.canvas.structural.failed',
       'widgets.canvas.structural.refusedLocked'
+    );
+  });
+
+  it("prepares from the session's baseline, and from the live document once the engine ended the session", () => {
+    const live = createSession();
+    const prepare = vi.fn(() => ({ edit: EDIT, status: 'prepared' }) as never);
+    const livePreview = renderPreview(createEngine(live));
+    livePreview.preview(opacity(0.5));
+    livePreview.commit('Opacity', prepare);
+    expect(prepare).toHaveBeenLastCalledWith(expect.anything(), opacity(1));
+
+    const ended = createSession('busy', false);
+    const engine = createEngine(ended);
+    const preview = renderPreview(engine);
+    preview.preview(opacity(0.5));
+    preview.commit('Opacity', prepare);
+
+    expect(prepare).toHaveBeenLastCalledWith(expect.anything(), null);
+    expect(engine.layers.commitPrepared).toHaveBeenCalledWith('Opacity', EDIT);
+  });
+
+  it('stays silent when the target went missing with the gesture the engine ended, and reports it otherwise', () => {
+    const ended = createSession('busy', false);
+    const endedPreview = renderPreview(createEngine(ended));
+    endedPreview.preview(opacity(0.5));
+
+    expect(endedPreview.commit('Opacity', () => ({ ids: ['layer'], status: 'missing' }) as never)).toEqual({
+      refusal: { ids: ['layer'], status: 'missing' },
+      status: 'refused',
+    });
+    expect(notify.error).not.toHaveBeenCalled();
+
+    const live = createSession();
+    const livePreview = renderPreview(createEngine(live));
+    livePreview.preview(opacity(0.5));
+    livePreview.commit('Opacity', () => ({ ids: ['layer'], status: 'missing' }) as never);
+
+    expect(live.cancel).toHaveBeenCalledOnce();
+    expect(notify.error).toHaveBeenCalledWith(
+      'widgets.canvas.structural.failed',
+      'widgets.canvas.structural.refusedMissing'
     );
   });
 });
