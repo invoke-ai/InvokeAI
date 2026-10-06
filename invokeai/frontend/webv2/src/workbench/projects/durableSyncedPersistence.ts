@@ -414,6 +414,8 @@ export interface DurableSyncedWorkbenchPersistence {
   releaseMutationLocks(): void;
   /** Undoes `persistEmptySession` when the editor stays open after all, writing its session again. */
   reopenSession(state: WorkbenchState): Promise<DurableWorkbenchSaveResult>;
+  /** Called after `reopenSession` has reopened the session, so saves held back while it was closed can resume. */
+  subscribeSessionReopened(listener: () => void): () => void;
   resolveConflictDiscard(projectId: string): Promise<void>;
   resolveConflictSaveAsNew(project: Project): Promise<{
     boardId: string;
@@ -552,6 +554,7 @@ export const createDurableSyncedWorkbenchPersistence = (
   let hasPending = false;
   let sessionSavePending = false;
   let isSessionClosed = false;
+  const sessionReopenedListeners = new Set<() => void>();
   let localDraftStatus: LocalDraftStatus = 'ok';
   const localDraftFailures = new Set<string>();
   /** Documents this writer journaled and has not yet seen acknowledged, by resolved project id. */
@@ -3199,7 +3202,17 @@ export const createDurableSyncedWorkbenchPersistence = (
     },
     reopenSession: (state) => {
       isSessionClosed = false;
-      return service.saveWorkbench(state);
+      const saved = service.saveWorkbench(state);
+      for (const listener of sessionReopenedListeners) {
+        listener();
+      }
+      return saved;
+    },
+    subscribeSessionReopened: (listener) => {
+      sessionReopenedListeners.add(listener);
+      return () => {
+        sessionReopenedListeners.delete(listener);
+      };
     },
     saveWorkbench: (state) => {
       if (isTerminallyCleared) {

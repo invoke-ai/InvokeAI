@@ -34,6 +34,8 @@ export interface WorkbenchPersistencePort {
   /** True while the editor is leaving after closing its last tab: its session must stay empty, so nothing saves. */
   hasClosedSession(): boolean;
   hasPendingChanges(): boolean;
+  /** Called when a closed session is reopened because the editor stays after all; saves held back resume. */
+  subscribeSessionReopened(listener: () => void): () => void;
   /**
    * Synchronously writes committed state that is not yet in local recovery, for a page that may unload before an
    * asynchronous save finishes.
@@ -169,10 +171,13 @@ export const createWorkbenchPersistenceRuntime = ({
   let journaledRevision: number | null = null;
   let retryAttempt = 0;
   let queuedSaveRequireCurrentRevision: boolean | null = null;
+  /** A save that was due while the session was closed, to run when the session reopens. */
+  let saveHeldByClosedSession: boolean | null = null;
   let pendingPreviousExit = previousExit ?? null;
   let previousExitWait: Promise<void> | null = null;
   let unsubscribeAggregate: (() => void) | null = null;
   let unsubscribePage: (() => void) | null = null;
+  let unsubscribeSessionReopened: (() => void) | null = null;
 
   const isStopped = (): boolean => disposed || exiting;
 
@@ -288,8 +293,9 @@ export const createWorkbenchPersistenceRuntime = ({
       return;
     }
     timeoutId = null;
-    // The closing tab flow either leaves the editor or reopens the session, which saves it then.
+    // The closing tab flow either leaves the editor, or reopens the session and this save runs then.
     if (persistence.hasClosedSession()) {
+      saveHeldByClosedSession = Boolean(saveHeldByClosedSession) || requireCurrentRevision;
       return;
     }
 
@@ -538,13 +544,24 @@ export const createWorkbenchPersistenceRuntime = ({
     }
   };
 
+  const onSessionReopened = (): void => {
+    const held = saveHeldByClosedSession;
+    saveHeldByClosedSession = null;
+    if (held !== null && !isStopped()) {
+      save(held);
+    }
+  };
+
   const stopObserving = (): void => {
     clearScheduledSave();
     queuedSaveRequireCurrentRevision = null;
+    saveHeldByClosedSession = null;
     unsubscribeAggregate?.();
     unsubscribeAggregate = null;
     unsubscribePage?.();
     unsubscribePage = null;
+    unsubscribeSessionReopened?.();
+    unsubscribeSessionReopened = null;
     snapshot = { error: null, phase: 'disposed' };
     listeners.clear();
   };
@@ -711,6 +728,7 @@ export const createWorkbenchPersistenceRuntime = ({
       signal?.addEventListener('abort', dispose, { once: true });
       unsubscribeAggregate = aggregate.subscribe(onAggregateChange);
       unsubscribePage = page?.subscribeHidden(saveBeforeHidden) ?? null;
+      unsubscribeSessionReopened = persistence.subscribeSessionReopened(onSessionReopened);
       void load();
     },
     subscribe(listener) {

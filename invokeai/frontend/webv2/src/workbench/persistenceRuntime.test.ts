@@ -149,15 +149,27 @@ const createAggregate = (initialState = createInitialWorkbenchState()) => {
 const createPersistence = (load: WorkbenchPersistencePort['loadWorkbench']) => {
   let pending = false;
   let closedSession = false;
+  const sessionReopenedListeners = new Set<() => void>();
   const persistence: WorkbenchPersistencePort = {
     hasClosedSession: () => closedSession,
     hasPendingChanges: () => pending,
     journalBeforeUnload: vi.fn(() => ({ kind: 'nothing-to-journal' as const })),
     loadWorkbench: vi.fn(load),
     saveWorkbench: vi.fn((state) => Promise.resolve(saveResult(state))),
+    subscribeSessionReopened: (listener) => {
+      sessionReopenedListeners.add(listener);
+      return () => sessionReopenedListeners.delete(listener);
+    },
   };
   return {
     persistence,
+    /** The close did not complete: the service reopened the session and told its listeners. */
+    reopenSession() {
+      closedSession = false;
+      for (const listener of sessionReopenedListeners) {
+        listener();
+      }
+    },
     setClosedSession(next: boolean) {
       closedSession = next;
     },
@@ -929,6 +941,38 @@ describe('Workbench persistence runtime exit checkpoint', () => {
 
     await expect(runtime.exit().settled).resolves.toBe('nothing-to-save');
     expect(persistence.saveWorkbench).not.toHaveBeenCalled();
+  });
+
+  it('saves an edit committed while the session was being emptied once the session reopens', async () => {
+    const { aggregate, clock, persistence, reopenSession, setClosedSession } = await startLoaded();
+    setClosedSession(true);
+    aggregate.edit('Typed during the close');
+    await flushPromises();
+    clock.runAll();
+    expect(persistence.saveWorkbench).not.toHaveBeenCalled();
+    expect(aggregate.events.at(-1)).toBe('save-scheduled');
+
+    reopenSession();
+    await flushPromises();
+
+    expect(savedNames(persistence)).toEqual(['Typed during the close']);
+    expect(aggregate.events.at(-1)).toBe('save-succeeded:2026-07-17T00:00:00.000Z');
+    clock.runAll();
+    expect(persistence.saveWorkbench).toHaveBeenCalledOnce();
+  });
+
+  it('does not save on a reopened session when nothing was requested while it was closed', async () => {
+    const { aggregate, clock, persistence, reopenSession, setClosedSession } = await startLoaded();
+    aggregate.edit('Before the close');
+    clock.runAll();
+    await flushPromises();
+    setClosedSession(true);
+
+    reopenSession();
+    await flushPromises();
+    clock.runAll();
+
+    expect(savedNames(persistence)).toEqual(['Before the close']);
   });
 
   it('loads a remounted editor only after the previous exit checkpoint settles', async () => {

@@ -889,15 +889,19 @@ describe('durable project persistence', () => {
     const project = createDraftProject([]);
     await service.loadWorkbench();
 
+    const reopened = vi.fn();
+    service.subscribeSessionReopened(reopened);
     const closing = service.persistEmptySession(stateWith([project]));
     expect(service.hasClosedSession()).toBe(true);
     await closing;
     expect(service.hasClosedSession()).toBe(true);
+    expect(reopened).not.toHaveBeenCalled();
 
     vi.mocked(api.saveSession).mockClear();
     await service.reopenSession(stateWith([project]));
 
     expect(service.hasClosedSession()).toBe(false);
+    expect(reopened).toHaveBeenCalledOnce();
     expect(
       vi
         .mocked(api.saveSession)
