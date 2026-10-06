@@ -147,8 +147,6 @@ const unmount = async (): Promise<void> => {
 const layer = (id = 'r1'): CanvasLayerContract => harness.layers.find((candidate) => candidate.id === id)!;
 const trigger = () => page.getByRole('combobox', { name: 'Blend mode' });
 const option = (name: string) => page.getByRole('option', { exact: true, name });
-const opacitySliderFrame = (): HTMLElement =>
-  page.getByRole('slider', { name: 'Opacity' }).element().closest<HTMLElement>('[data-scope="scrubber"]')!;
 
 beforeEach(() => {
   harness.layers = [layerContract('r1'), layerContract('r2')];
@@ -239,66 +237,47 @@ describe('blend mode preview', () => {
   });
 });
 
-describe('opacity scrubber', () => {
-  const opacitySlider = () => page.getByRole('slider', { name: 'Opacity' });
+describe('opacity input', () => {
+  const opacityInput = () => page.getByRole('spinbutton', { exact: true, name: 'Opacity' });
 
-  it('previews a drag and records it as one step from where it started', async () => {
-    await mount();
-    const frame = opacitySliderFrame();
-    const rect = frame.getBoundingClientRect();
-    const startX = rect.left + rect.width / 2;
-    const trackWidth = rect.width - 20;
-    const pointer = (target: EventTarget, type: string, x: number) =>
-      act(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX: x, pointerId: 1 })));
-
-    await pointer(frame, 'pointerdown', startX);
-    await pointer(window, 'pointermove', startX - trackWidth * 0.2);
-    await pointer(window, 'pointermove', startX - trackWidth * 0.4);
-
-    expect(layer().opacity).toBeCloseTo(0.6, 5);
-    expect(commits).toHaveLength(0);
-
-    await pointer(window, 'pointerup', startX - trackWidth * 0.4);
-
-    expect(commits).toHaveLength(1);
-    expect(commits[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.6 } });
-    expect(commits[0]!.inverse).toMatchObject({ id: 'r1', patch: { opacity: 1 } });
-    await expect.element(opacitySlider()).toHaveAttribute('aria-valuetext', '60%');
-  });
-
-  it('records a held arrow key once and a typed value once', async () => {
+  it('records a held arrow key as one step from where it started', async () => {
     await mount();
     await act(async () => {
-      opacitySlider().element().focus();
-      await userEvent.keyboard('{ArrowLeft>4/}');
+      (opacityInput().element() as HTMLInputElement).focus();
+      await userEvent.keyboard('{ArrowDown>4/}');
     });
 
+    expect(layer().opacity).toBeCloseTo(0.96, 5);
     expect(commits).toHaveLength(1);
-    expect(commits[0]!.forward).toMatchObject({ patch: { opacity: 0.96 } });
-    expect(commits[0]!.inverse).toMatchObject({ patch: { opacity: 1 } });
-
-    await act(() => userEvent.keyboard('{Enter}25{Enter}'));
-
-    expect(commits).toHaveLength(2);
-    expect(commits[1]!.forward).toMatchObject({ patch: { opacity: 0.25 } });
-    expect(commits[1]!.inverse).toMatchObject({ patch: { opacity: 0.96 } });
+    expect(commits[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.96 } });
+    expect(commits[0]!.inverse).toMatchObject({ id: 'r1', patch: { opacity: 1 } });
   });
 
-  it('records nothing and restores the layer when a drag returns to where it started', async () => {
+  it('previews a typed value and records it once on Enter', async () => {
     await mount();
-    const frame = opacitySliderFrame();
-    const rect = frame.getBoundingClientRect();
-    const startX = rect.left + rect.width / 2;
-    const pointer = (target: EventTarget, type: string, x: number) =>
-      act(() => target.dispatchEvent(new PointerEvent(type, { bubbles: true, button: 0, clientX: x, pointerId: 1 })));
+    await userEvent.tripleClick(opacityInput());
+    await userEvent.keyboard('45');
 
-    await pointer(frame, 'pointerdown', startX);
-    await pointer(window, 'pointermove', startX - 40);
-    await pointer(window, 'pointermove', startX);
-    await pointer(window, 'pointerup', startX);
-
+    expect(layer().opacity).toBeCloseTo(0.45, 5);
     expect(commits).toHaveLength(0);
-    expect(layer().opacity).toBe(1);
+
+    await userEvent.keyboard('{Enter}');
+
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.forward).toMatchObject({ patch: { opacity: 0.45 } });
+    expect(commits[0]!.inverse).toMatchObject({ patch: { opacity: 1 } });
+  });
+
+  it('records a still-pending edit when the row unmounts', async () => {
+    await mount();
+    await userEvent.tripleClick(opacityInput());
+    await userEvent.keyboard('30');
+    expect(commits).toHaveLength(0);
+
+    await unmount();
+
+    expect(commits).toHaveLength(1);
+    expect(commits[0]!.forward).toMatchObject({ id: 'r1', patch: { opacity: 0.3 } });
   });
 
   it('disables both controls without an editable selection', async () => {
@@ -307,21 +286,6 @@ describe('opacity scrubber', () => {
     await mount();
 
     await expect.element(trigger()).toBeDisabled();
-    await expect.element(opacitySlider()).toHaveAttribute('aria-disabled', 'true');
-  });
-});
-
-describe('row layout', () => {
-  it('shares one row in a wide panel and gives opacity its own row in a typical one', async () => {
-    await mount(400);
-    const top = (element: Element) => element.getBoundingClientRect().top;
-    const opacity = opacitySliderFrame();
-    expect(Math.abs(top(trigger().element()) - top(opacity))).toBeLessThan(4);
-    await unmount();
-    host?.remove();
-
-    await mount(300);
-    expect(opacitySliderFrame().getBoundingClientRect().width).toBeGreaterThan(280);
-    expect(top(opacitySliderFrame())).toBeGreaterThan(top(trigger().element()) + 8);
+    await expect.element(opacityInput()).toBeDisabled();
   });
 });

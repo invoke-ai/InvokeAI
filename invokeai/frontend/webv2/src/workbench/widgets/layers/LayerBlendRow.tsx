@@ -1,10 +1,14 @@
-import type { SelectHighlightChangeDetails, SelectOpenChangeDetails, SelectValueChangeDetails } from '@chakra-ui/react';
+import type {
+  NumberInput as ChakraNumberInput,
+  SelectHighlightChangeDetails,
+  SelectOpenChangeDetails,
+  SelectValueChangeDetails,
+} from '@chakra-ui/react';
 import type { CanvasBlendMode, CanvasDocumentContractV3, CanvasNodeContract } from '@workbench/canvas-engine/api';
 import type { CanvasEngineHandle } from '@workbench/canvas-operations/react';
 
-import { createListCollection, Flex } from '@chakra-ui/react';
+import { createListCollection, Flex, HStack, NumberInput } from '@chakra-ui/react';
 import { Select } from '@platform/ui';
-import { ScrubberField } from '@platform/ui/ScrubberField';
 import { getDocumentIndex, isGroupNode } from '@workbench/canvas-engine/api';
 import { useCanvasDocumentEditingLocked } from '@workbench/widgets/canvas/engineStoreHooks';
 import { useStructuralPreview } from '@workbench/widgets/canvas/useStructuralCommit';
@@ -17,11 +21,9 @@ type LayerBlendRowEngine = Pick<CanvasEngineHandle, 'document' | 'exports' | 'in
 
 const SELECT_POSITIONING = { placement: 'bottom-start', sameWidth: true } as const;
 const BLEND_TRIGGER_PROPS = { fontSize: 'md', h: 'control.md', minH: 'control.md' } as const;
-// The controls share a row only when each keeps this width: a narrower scrubber would run its thumb through its
-// label and value, so typical panel widths give opacity its own full-width row.
-const CONTROL_FLEX = '1 1 11rem';
+const OPACITY_INPUT_PROPS = { fontSize: 'md', h: 'control.md' } as const;
 
-const formatPercent = (value: number): string => `${value}%`;
+const clamp01 = (value: number): number => Math.min(1, Math.max(0, value));
 
 // Reference equality is exact: the document index hands back the same node
 // object until the node itself changes. A raster-stack GROUP is a valid target
@@ -48,10 +50,10 @@ export const LayerBlendRow = ({ engine }: { engine: LayerBlendRowEngine | null }
   const editingLocked = useCanvasDocumentEditingLocked(engine);
 
   return (
-    <Flex align="center" columnGap="1.5" flexShrink={0} flexWrap="wrap" mx="1.5" rowGap="1">
+    <Flex align="center" flexShrink={0} gap="1.5" mx="1.5">
       {/* Keyed by layer: a selection change closes the menu and ends the outgoing layer's preview. */}
       <BlendModeControl key={layer?.id ?? ''} editingLocked={editingLocked} engine={engine} layer={layer} />
-      <OpacityField editingLocked={editingLocked} engine={engine} layer={layer} />
+      <OpacityRow editingLocked={editingLocked} engine={engine} layer={layer} />
     </Flex>
   );
 };
@@ -161,7 +163,7 @@ const BlendModeControl = ({
   );
 
   return (
-    <Flex ref={endPreviewOnUnmount} flex={CONTROL_FLEX} minW="0">
+    <Flex ref={endPreviewOnUnmount} flex="1" minW="0">
       <Select
         aria-label={t('widgets.layers.actions.blendMode')}
         collection={blendCollection}
@@ -181,14 +183,7 @@ const BlendModeControl = ({
   );
 };
 
-/** Where an opacity gesture started and the latest value it previewed; it records one step when it ends. */
-interface OpacityGesture {
-  readonly id: string;
-  readonly before: number;
-  latest: number;
-}
-
-const OpacityField = ({
+const OpacityRow = ({
   editingLocked,
   engine,
   layer,
@@ -197,68 +192,102 @@ const OpacityField = ({
   engine: LayerBlendRowEngine | null;
   layer: CanvasNodeContract | null;
 }) => {
-  const { cancel: cancelPreview, commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
+  const { commit: commitPrepared, preview: previewStructural } = useStructuralPreview(engine);
   const { t } = useTranslation();
-  // Outside render closures: a drag keeps the handlers it started with.
-  const gestureRef = useRef<OpacityGesture | null>(null);
+  // Capture original opacity once and track latest writes outside render closures so same-event commits record
+  // current values.
+  const pendingRef = useRef<{ id: string; before: number; latest: number } | null>(null);
   const disabled = isLayerEditingDisabled(layer, editingLocked);
-  const opacityPercent = Math.round((layer?.opacity ?? 1) * 100);
+  const opacityPercent = useMemo(() => String(Math.round((layer?.opacity ?? 1) * 100)), [layer?.opacity]);
 
-  const settleGesture = useCallback(() => {
-    const gesture = gestureRef.current;
-    gestureRef.current = null;
-    if (!gesture) {
-      return;
-    }
-    if (gesture.before === gesture.latest) {
-      cancelPreview({ id: gesture.id, patch: { opacity: gesture.before }, type: 'updateCanvasLayer' });
+  // Record one history entry per completed opacity gesture.
+  const commitPending = useCallback(() => {
+    const pending = pendingRef.current;
+    pendingRef.current = null;
+    if (!pending || pending.before === pending.latest) {
       return;
     }
     commitPrepared(t('widgets.layers.actions.opacity'), (model) =>
       model.prepare({
-        before: { opacity: gesture.before },
-        id: gesture.id,
-        patch: { opacity: gesture.latest },
+        before: { opacity: pending.before },
+        id: pending.id,
+        patch: { opacity: pending.latest },
         type: 'patch',
       })
     );
-  }, [cancelPreview, commitPrepared, t]);
+  }, [commitPrepared, t]);
 
   const handleOpacityChange = useCallback(
-    (percent: number) => {
-      if (!layer) {
+    ({ valueAsNumber }: ChakraNumberInput.ValueChangeDetails) => {
+      if (!layer || !Number.isFinite(valueAsNumber)) {
         return;
       }
-      // A gesture still open on a previously selected layer lands there before this one starts.
-      if (gestureRef.current && gestureRef.current.id !== layer.id) {
-        settleGesture();
+      // If a pending edit belongs to a previously selected layer, flush it first
+      // so its history entry is never attributed to the new layer.
+      if (pendingRef.current && pendingRef.current.id !== layer.id) {
+        commitPending();
       }
-      const next = percent / 100;
-      if (!previewStructural({ id: layer.id, patch: { opacity: next }, type: 'updateCanvasLayer' })) {
+      const next = clamp01(valueAsNumber / 100);
+      if (
+        !previewStructural({
+          id: layer.id,
+          patch: { opacity: next },
+          type: 'updateCanvasLayer',
+        })
+      ) {
         return;
       }
-      if (gestureRef.current === null) {
-        gestureRef.current = { before: layer.opacity ?? 1, id: layer.id, latest: next };
+      if (pendingRef.current === null) {
+        pendingRef.current = { before: layer.opacity ?? 1, id: layer.id, latest: next };
       } else {
-        gestureRef.current.latest = next;
+        pendingRef.current.latest = next;
       }
     },
-    [layer, previewStructural, settleGesture]
+    [commitPending, previewStructural, layer]
+  );
+
+  // Commit on spinner release, arrow/page-key release, Enter, or typed-value blur.
+  const handleInputKeyUp = useCallback(
+    (event: { key: string }) => {
+      if (['ArrowDown', 'ArrowUp', 'End', 'Enter', 'Home', 'PageDown', 'PageUp'].includes(event.key)) {
+        commitPending();
+      }
+    },
+    [commitPending]
+  );
+
+  // Flush a still-pending edit if the row unmounts mid-gesture (e.g. the panel
+  // closes right after a spinner click) so the edit is never lost to history.
+  const flushOnUnmountRef = useCallback(
+    (node: HTMLDivElement | null) => {
+      if (node) {
+        return () => commitPending();
+      }
+      return undefined;
+    },
+    [commitPending]
   );
 
   return (
-    <ScrubberField
-      defaultValue={100}
-      disabled={disabled}
-      flex={CONTROL_FLEX}
-      formatValue={formatPercent}
-      label={t('widgets.layers.actions.opacity')}
-      max={100}
-      min={0}
-      step={1}
-      value={opacityPercent}
-      onChange={handleOpacityChange}
-      onChangeEnd={settleGesture}
-    />
+    <HStack ref={flushOnUnmountRef} flexShrink={0} gap="2">
+      <NumberInput.Root
+        disabled={disabled}
+        max={100}
+        min={0}
+        size="lg"
+        step={1}
+        value={opacityPercent}
+        w="16"
+        onValueChange={handleOpacityChange}
+      >
+        <NumberInput.Control onClick={commitPending} />
+        <NumberInput.Input
+          aria-label={t('widgets.layers.actions.opacity')}
+          css={OPACITY_INPUT_PROPS}
+          onBlur={commitPending}
+          onKeyUp={handleInputKeyUp}
+        />
+      </NumberInput.Root>
+    </HStack>
   );
 };
