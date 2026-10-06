@@ -257,6 +257,27 @@ describe('blend mode preview', () => {
     expect(commits().at(-1)!.inverse).toMatchObject({ id: 'r1', patch: { blendMode: 'normal' } });
   });
 
+  it('shows the undone mode, not the one the menu opened on, when the highlight leaves the list after an undo', async () => {
+    commitBlendMode('r1', 'screen');
+    const committed = commits().length;
+    await mount();
+    await userEvent.click(trigger());
+    await userEvent.hover(option('Multiply'));
+    await expect.poll(() => layer().blendMode).toBe('multiply');
+    await act(() => stub.engine.history.undo());
+    expect(layer().blendMode).toBe('normal');
+
+    await userEvent.unhover(option('Multiply'));
+    await userEvent.hover(trigger());
+
+    // Nothing was previewed on the undone document, so leaving the options previews nothing over it.
+    await new Promise((resolve) => {
+      setTimeout(resolve, 50);
+    });
+    expect(layer().blendMode).toBe('normal');
+    expect(commits()).toHaveLength(committed);
+  });
+
   it('ends a hovered preview before a delete from elsewhere, so undoing the delete restores the committed mode', async () => {
     await mount();
     await userEvent.click(trigger());

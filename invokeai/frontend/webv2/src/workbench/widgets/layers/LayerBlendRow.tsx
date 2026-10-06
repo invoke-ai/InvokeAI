@@ -71,11 +71,9 @@ interface BlendModeOption {
   value: CanvasBlendMode;
 }
 
-/** An open menu's preview: its layer, the mode the menu opened on, and whether a preview has been applied. */
+/** An open menu's preview target: the layer the menu opened for. */
 interface BlendPreview {
   readonly id: string;
-  readonly original: CanvasBlendMode;
-  previewed: boolean;
 }
 
 const blendModeOf = (layer: CanvasNodeContract | null): CanvasBlendMode => layer?.blendMode ?? 'normal';
@@ -135,29 +133,30 @@ const BlendModeControl = ({
     ({ open }: SelectOpenChangeDetails) => {
       endPreview();
       if (open && layer) {
-        previewRef.current = { id: layer.id, original: blendModeOf(layer), previewed: false };
+        previewRef.current = { id: layer.id };
       }
       setIsOpen(open && layer !== null);
     },
     [endPreview, layer]
   );
 
-  // Leaving every option clears the highlight, which shows the original again.
+  // Leaving every option clears the highlight, which shows the mode the open preview replaced again. Once the engine
+  // ended the preview, that is the document's own mode, so there is nothing to preview.
   const handleHighlightChange = useCallback(
     ({ highlightedValue }: SelectHighlightChangeDetails<BlendModeOption>) => {
       const session = previewRef.current;
       if (!session) {
         return;
       }
-      const mode = (highlightedValue as CanvasBlendMode | null) ?? session.original;
-      if (!session.previewed && mode === session.original) {
+      const baseline = previewBaseline();
+      const original = pinnedBlendMode(baseline, layer) ?? blendModeOf(layer);
+      const mode = (highlightedValue as CanvasBlendMode | null) ?? original;
+      if (mode === original && baseline === null) {
         return;
       }
-      if (previewStructural({ id: session.id, patch: { blendMode: mode }, type: 'updateCanvasLayer' })) {
-        session.previewed = true;
-      }
+      previewStructural({ id: session.id, patch: { blendMode: mode }, type: 'updateCanvasLayer' });
     },
-    [previewStructural]
+    [layer, previewBaseline, previewStructural]
   );
 
   const handleBlendChange = useCallback(
