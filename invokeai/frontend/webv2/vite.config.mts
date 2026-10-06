@@ -48,6 +48,9 @@ const ROUTE_SHARED_MODULES = [
   '/platform/browser/downloadBlob.ts',
   // Editor search fields and the lazy pickers share the IME guard; alone it costs a startup request.
   '/platform/browser/imeComposition.ts',
+  // The route's recovery peek and the lazy editor share the editor-session lock probe; alone they cost a startup request.
+  '/platform/browser/webLocks.ts',
+  '/workbench/projects/editorSession.ts',
   '/platform/ui/BrandIcon.tsx',
   '/platform/ui/Button.tsx',
   '/platform/ui/Tooltip.tsx',
