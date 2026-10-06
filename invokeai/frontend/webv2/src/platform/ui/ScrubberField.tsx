@@ -56,6 +56,14 @@ type OwnProps = {
   /** Looser clamps for typed and keyboard values (the track bounds apply to scrubbing). */
   inputMin?: number;
   inputMax?: number;
+  /**
+   * How values spread along the track. `'log'` gives equal travel to equal ratios (it requires `min > 0`), so small
+   * values get room; the thumb, stops, drags (Shift-fine included) and Alt-snap follow it, while `value`, typing,
+   * keys and bounds stay in real units.
+   */
+  scale?: 'linear' | 'log';
+  /** The keyboard step from `value` in `direction`, for steps that grow with the value. Shift/Page keys ×10. */
+  stepFor?: (value: number, direction: 1 | -1) => number;
   /** Double-click or Backspace/Delete restores this value. No reset without it. */
   defaultValue?: number;
   disabled?: boolean;
@@ -88,8 +96,9 @@ const countDecimals = (value: number): number => {
 
 const roundTo = (value: number, decimals: number): number => Number(value.toFixed(decimals));
 
-const nearestMark = (raw: number, marks: readonly number[]): number =>
-  marks.reduce((best, mark) => (Math.abs(mark - raw) < Math.abs(best - raw) ? mark : best));
+/** The stop nearest a raw track position, measured along the track so a log scale snaps to what looks closest. */
+const nearestMark = (rawTrack: number, marks: readonly number[], toTrack: (value: number) => number): number =>
+  marks.reduce((best, mark) => (Math.abs(toTrack(mark) - rawTrack) < Math.abs(toTrack(best) - rawTrack) ? mark : best));
 
 const isValueTarget = (target: EventTarget | null): boolean =>
   target instanceof Element && target.closest('[data-part="value"]') !== null;
@@ -231,7 +240,9 @@ export const ScrubberField = ({
   min,
   onChange,
   onChangeEnd,
+  scale = 'linear',
   step,
+  stepFor,
   value,
   ...stackProps
 }: ScrubberFieldProps) => {
@@ -274,7 +285,9 @@ export const ScrubberField = ({
     [measureText]
   );
 
-  const range = max - min;
+  const isLog = scale === 'log';
+  // Track length in scale units: value units, or natural-log ratio units.
+  const span = isLog ? Math.log(max / min) : max - min;
   const decimals = Math.max(countDecimals(step), countDecimals(min));
   const typedMin = inputMin ?? min;
   const typedMax = inputMax ?? max;
@@ -282,10 +295,22 @@ export const ScrubberField = ({
     (raw: number): number => clamp(roundTo(min + Math.round((raw - min) / step) * step, decimals), min, max),
     [decimals, max, min, step]
   );
-  const fractionOf = useCallback(
-    (target: number): number => (range > 0 ? clamp((target - min) / range, 0, 1) : 0),
-    [min, range]
+  // Unclamped, so a drag anchored beyond either end still moves relative to the real value.
+  const toTrack = useCallback(
+    (target: number): number => {
+      if (!(span > 0)) {
+        return 0;
+      }
+
+      return isLog ? Math.log(target / min) / span : (target - min) / span;
+    },
+    [isLog, min, span]
   );
+  const fromTrack = useCallback(
+    (track: number): number => (isLog ? min * Math.exp(track * span) : min + track * span),
+    [isLog, min, span]
+  );
+  const fractionOf = useCallback((target: number): number => clamp(toTrack(target), 0, 1), [toTrack]);
   const trackPosition = (fraction: number): string =>
     `calc(${TRACK_INSET_PX}px + ${fraction} * (100% - ${TRACK_INSET_PX * 2}px))`;
   const isUnderText = (fraction: number): boolean => {
@@ -412,12 +437,12 @@ export const ScrubberField = ({
       const trackLeft = rect.left + TRACK_INSET_PX;
       const trackWidth = Math.max(1, rect.width - TRACK_INSET_PX * 2);
       // Unclamped, so a press left of the thumb can still be dragged past the track's end to max.
-      const valueAt = (clientX: number): number => min + ((clientX - trackLeft) / trackWidth) * range;
+      const trackAt = (clientX: number): number => (clientX - trackLeft) / trackWidth;
       const session = new AbortController();
       let isPendingTouch = event.pointerType === 'touch';
       let moved = false;
       // Re-anchor on sensitivity changes so toggling Shift mid-drag does not jump.
-      let anchor = { clientX: event.clientX, ratio: event.shiftKey ? FINE_DRAG_RATIO : 1, value };
+      let anchor = { clientX: event.clientX, ratio: event.shiftKey ? FINE_DRAG_RATIO : 1, track: toTrack(value) };
       const drag: Gesture = {
         kind: 'drag',
         latest: value,
@@ -448,12 +473,14 @@ export const ScrubberField = ({
         const ratio = pointer.shiftKey ? FINE_DRAG_RATIO : 1;
 
         if (anchor.ratio !== ratio) {
-          anchor = { clientX: pointer.clientX, ratio, value: drag.latest };
+          anchor = { clientX: pointer.clientX, ratio, track: toTrack(drag.latest) };
         }
 
-        const raw = anchor.value + (valueAt(pointer.clientX) - valueAt(anchor.clientX)) * ratio;
+        const rawTrack = anchor.track + (trackAt(pointer.clientX) - trackAt(anchor.clientX)) * ratio;
 
-        return pointer.altKey && markValues?.length ? nearestMark(raw, markValues) : snapToStep(raw);
+        return pointer.altKey && markValues?.length
+          ? nearestMark(rawTrack, markValues, toTrack)
+          : snapToStep(fromTrack(rawTrack));
       };
       // Only the initiating pointer may move or end this gesture.
       const apply = (pointer: PointerSample) => {
@@ -487,7 +514,7 @@ export const ScrubberField = ({
       window.addEventListener('pointerup', end, { signal: session.signal });
       window.addEventListener('pointercancel', end, { signal: session.signal });
     },
-    [disabled, edit, markValues, min, onChange, onChangeEnd, range, snapToStep, value]
+    [disabled, edit, fromTrack, markValues, onChange, onChangeEnd, snapToStep, toTrack, value]
   );
 
   const handleDoubleClick = useCallback(
@@ -506,25 +533,24 @@ export const ScrubberField = ({
         return;
       }
 
-      const coarse = step * COARSE_STEP_MULTIPLIER;
-      const stepBy = event.shiftKey ? coarse : step;
       let next: number | undefined;
+      let precision = decimals;
 
       switch (event.key) {
         case 'ArrowRight':
         case 'ArrowUp':
-          next = value + stepBy;
-          break;
         case 'ArrowLeft':
         case 'ArrowDown':
-          next = value - stepBy;
-          break;
         case 'PageUp':
-          next = value + coarse;
+        case 'PageDown': {
+          const direction = event.key === 'ArrowRight' || event.key === 'ArrowUp' || event.key === 'PageUp' ? 1 : -1;
+          const coarse = event.shiftKey || event.key === 'PageUp' || event.key === 'PageDown';
+          const fine = stepFor ? stepFor(value, direction) : step;
+          next = value + direction * fine * (coarse ? COARSE_STEP_MULTIPLIER : 1);
+          // A value-dependent step can be finer than `step`; rounding keeps its decimals.
+          precision = Math.max(decimals, countDecimals(fine));
           break;
-        case 'PageDown':
-          next = value - coarse;
-          break;
+        }
         case 'Home':
           next = min;
           break;
@@ -559,9 +585,23 @@ export const ScrubberField = ({
 
       event.preventDefault();
       event.stopPropagation();
-      stepTo(clamp(roundTo(next, decimals), typedMin, typedMax));
+      stepTo(clamp(roundTo(next, precision), typedMin, typedMax));
     },
-    [commitValue, decimals, defaultValue, disabled, max, min, startEditing, step, stepTo, typedMax, typedMin, value]
+    [
+      commitValue,
+      decimals,
+      defaultValue,
+      disabled,
+      max,
+      min,
+      startEditing,
+      step,
+      stepFor,
+      stepTo,
+      typedMax,
+      typedMin,
+      value,
+    ]
   );
 
   const settleKeys = useCallback(() => {

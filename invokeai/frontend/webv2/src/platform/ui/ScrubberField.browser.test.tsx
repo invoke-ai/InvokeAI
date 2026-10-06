@@ -30,6 +30,9 @@ afterEach(async () => {
 const TRACK_INSET_PX = 10;
 const HOST_WIDTH_PX = 400;
 
+/** Hundredths below 1 (and leaving 1 downwards), whole units above. */
+const stepFor = (value: number, direction: 1 | -1) => (value < 1 || (direction < 0 && value === 1) ? 0.01 : 1);
+
 const mount = async (props: Partial<ScrubberFieldProps> = {}) => {
   const onChange = vi.fn();
 
@@ -632,5 +635,122 @@ describe('ScrubberField', () => {
 
       expect(events).toEqual(['change:55', 'end:55']);
     });
+  });
+});
+
+describe('ScrubberField log scale and value-dependent steps', () => {
+  /** Where an element's centre sits along the track, 0–1. */
+  const trackFraction = (frame: HTMLElement, element: Element): number => {
+    const rect = frame.getBoundingClientRect();
+    const box = element.getBoundingClientRect();
+
+    return (box.left + box.width / 2 - rect.left - TRACK_INSET_PX) / (rect.width - TRACK_INSET_PX * 2);
+  };
+
+  const LOG = { max: 100, min: 1, scale: 'log', step: 1, value: 10 } as const;
+
+  it('places the thumb and stops by ratio', async () => {
+    const { frame, slider } = await mount({ ...LOG, marks: [50] });
+
+    // 10 is the geometric middle of 1–100.
+    expect(trackFraction(frame, frame.querySelector('[data-part="thumb"]')!)).toBeCloseTo(0.5, 1);
+    expect(trackFraction(frame, frame.querySelector('[data-part="mark"]')!)).toBeCloseTo(Math.log10(50) / 2, 1);
+    expect(slider.getAttribute('aria-valuenow')).toBe('10');
+  });
+
+  it('pins a value beyond the log track to its end', async () => {
+    const { frame, slider } = await mount({ ...LOG, inputMax: 1000, value: 500 });
+
+    expect(trackFraction(frame, frame.querySelector('[data-part="thumb"]')!)).toBeCloseTo(1, 1);
+    expect(slider.getAttribute('aria-valuemax')).toBe('500');
+  });
+
+  it('scrubs along the track by ratio, finely with Shift, snapped to the step in real units', async () => {
+    const { frame, onChange } = await mount(LOG);
+
+    await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5) });
+    // A quarter-track further multiplies by 10^0.5.
+    await pointer(window, 'pointermove', { clientX: trackX(frame, 0.75) });
+
+    expect(onChange).toHaveBeenLastCalledWith(32);
+    await pointer(window, 'pointerup', { clientX: trackX(frame, 0.75) });
+
+    await pointer(frame, 'pointerdown', { clientX: trackX(frame, 0.5), shiftKey: true });
+    await pointer(window, 'pointermove', { clientX: trackX(frame, 1), shiftKey: true });
+
+    // Half a track at a tenth of the sensitivity: 10 × 10^0.1.
+    expect(onChange).toHaveBeenLastCalledWith(13);
+    await pointer(window, 'pointerup', { clientX: trackX(frame, 1) });
+  });
+
+  it('snaps Alt-drags to the stop nearest along the track, not in raw units', async () => {
+    const { frame, onChange } = await mount({ ...LOG, marks: [2, 40] });
+
+    await pointer(frame, 'pointerdown', { altKey: true, clientX: trackX(frame, 0.5) });
+    // Raw ≈ 17: nearer 2 in units, nearer 40 along a log track.
+    await pointer(window, 'pointermove', { altKey: true, clientX: trackX(frame, 0.62) });
+
+    expect(onChange).toHaveBeenLastCalledWith(40);
+    await pointer(window, 'pointerup', { clientX: trackX(frame, 0.62) });
+  });
+
+  it('clamps typed values to the real-unit input bounds', async () => {
+    const { onChange, slider } = await mount({ ...LOG, inputMax: 1000, inputMin: 0.5 });
+
+    for (const [typed, committed] of [
+      ['500', 500],
+      ['0.1', 0.5],
+    ] as const) {
+      await act(async () => {
+        slider.focus();
+        await userEvent.keyboard('{Enter}');
+      });
+      await act(async () => {
+        await userEvent.fill(editor()!, typed);
+        await userEvent.keyboard('{Enter}');
+      });
+
+      expect(onChange).toHaveBeenLastCalledWith(committed);
+    }
+  });
+
+  it('steps by the value-dependent step, ×10 with Shift or Page keys, keeping its decimals', async () => {
+    const onChange = vi.fn();
+
+    host = document.createElement('div');
+    host.style.width = `${HOST_WIDTH_PX}px`;
+    document.body.append(host);
+    root = createRoot(host);
+    await act(() => {
+      root?.render(
+        <I18nextProvider i18n={i18n}>
+          <ChakraProvider value={system}>
+            <ControlledScrubber
+              initial={0.98}
+              label="Size"
+              max={100}
+              min={0.1}
+              scale="log"
+              step={1}
+              stepFor={stepFor}
+              onChange={onChange}
+            />
+          </ChakraProvider>
+        </I18nextProvider>
+      );
+    });
+    const slider = host.querySelector<HTMLDivElement>('[role="slider"]')!;
+    const steps = () => onChange.mock.calls.map(([value]) => value as number);
+
+    await act(async () => {
+      slider.focus();
+      await userEvent.keyboard('{ArrowRight}{ArrowRight}{ArrowRight}');
+    });
+
+    expect(steps()).toEqual([0.99, 1, 2]);
+
+    await act(() => userEvent.keyboard('{ArrowLeft}{ArrowLeft}{PageDown}{Shift>}{ArrowUp}{/Shift}{End}'));
+
+    expect(steps().slice(3)).toEqual([1, 0.99, 0.89, 0.99, 100]);
   });
 });
